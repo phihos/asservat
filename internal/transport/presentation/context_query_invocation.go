@@ -88,6 +88,9 @@ func (i *contextQueryInvocation) CheckInput(ctx context.Context, in analysisapp.
 	if !i.current(ctx) || i.mac == nil {
 		return ErrOperationDelivery
 	}
+	if i.call.Tool != "get_target_discovery" && in.Discovery != (value.TargetDiscoveryRequest{}) {
+		return ErrOperationDelivery
+	}
 	if i.call.Tool != "get_logs" && in.RawLogs != (value.RawLogQueryRequest{}) {
 		return ErrOperationDelivery
 	}
@@ -103,6 +106,13 @@ func (i *contextQueryInvocation) CheckInput(ctx context.Context, in analysisapp.
 	var raw []byte
 	var err error
 	switch i.call.Tool {
+	case "get_target_discovery":
+		other := in
+		other.Discovery = value.TargetDiscoveryRequest{}
+		if !in.Discovery.Valid() || !reflect.DeepEqual(other, analysisapp.ContextQueryInput{}) {
+			return ErrOperationDelivery
+		}
+		raw, err = json.Marshal(normalizeTargetDiscoveryInput(TargetDiscoveryOperationInput{CaptureID: in.Discovery.CaptureID, Section: in.Discovery.Section, Cursor: in.Discovery.Cursor, Limit: in.Discovery.Limit}))
 	case "get_logs":
 		if !in.RawLogs.Valid() || in.QueryID != "" || !reflect.DeepEqual(in.PacketQuery, value.PacketQueryRequest{}) || in.RawSyscalls != (value.RawSyscallQueryRequest{}) || in.Packet != (value.PacketSummaryRequest{}) || in.Comparison != (value.ProfileComparisonRequest{}) || in.Selection != (value.ContextExcerptSelection{}) || in.Headers != (value.HTTPHeaderSelection{}) || in.Profile != (value.ProfileSummaryRequest{}) || in.Syscalls != (value.SyscallQueryRequest{}) {
 			return ErrOperationDelivery
@@ -213,13 +223,16 @@ func (i *contextQueryInvocation) bind(ctx context.Context, d *analysisapp.Contex
 	if a.Logs.Valid() {
 		branches++
 	}
+	if a.Discovery.Valid() {
+		branches++
+	}
 	if a.PacketQuery.Valid() {
 		branches++
 	}
 	if d.Tool() == "get_pcap_summary" {
 		branches++
 	}
-	selected = branches == 1 && (a.Logs.Valid() || a.Logs == (value.LogWindow{})) && (a.Selection.Valid() || a.Selection == (value.LineSelection{})) && (a.Headers.Valid() || a.Headers == (value.HTTPHeaderWindow{})) && (a.Profile.Valid() || a.Profile == (value.ProfileSummarySelection{})) && (a.Syscalls.Valid() || a.Syscalls == (value.SyscallWindow{})) && (a.Comparison.Valid() || a.Comparison == (value.ProfileComparisonSelection{}))
+	selected = branches == 1 && (a.Discovery.Valid() || a.Discovery == (value.TargetDiscoveryWindow{})) && (a.Logs.Valid() || a.Logs == (value.LogWindow{})) && (a.Selection.Valid() || a.Selection == (value.LineSelection{})) && (a.Headers.Valid() || a.Headers == (value.HTTPHeaderWindow{})) && (a.Profile.Valid() || a.Profile == (value.ProfileSummarySelection{})) && (a.Syscalls.Valid() || a.Syscalls == (value.SyscallWindow{})) && (a.Comparison.Valid() || a.Comparison == (value.ProfileComparisonSelection{}))
 
 	if !authorization.UUID(a.ID) || !authorization.UUID(a.QueryID) || !selected || !a.PacketQuery.Valid() && a.PacketQuery != (value.PacketQueryWindow{}) {
 		return ErrOperationDelivery
@@ -249,6 +262,15 @@ func (i *contextQueryInvocation) bind(ctx context.Context, d *analysisapp.Contex
 	}
 	if i.call.Tool == "syscall_query" && (a.Syscalls != i.input.RawSyscalls.Selection || a.Selection != (value.LineSelection{}) || a.Headers != (value.HTTPHeaderWindow{}) || a.Profile != (value.ProfileSummarySelection{}) || a.Comparison != (value.ProfileComparisonSelection{})) {
 		return ErrOperationDelivery
+	}
+	if i.call.Tool != "get_target_discovery" && i.call.Tool != "get_query_result" && a.Discovery != (value.TargetDiscoveryWindow{}) {
+		return ErrOperationDelivery
+	}
+	if i.call.Tool == "get_target_discovery" {
+		w, err := value.NormalizeTargetDiscoveryWindow(i.input.Discovery)
+		if err != nil || a.Discovery != w {
+			return ErrOperationDelivery
+		}
 	}
 	if i.call.Tool != "get_logs" && i.call.Tool != "get_query_result" && a.Logs != (value.LogWindow{}) {
 		return ErrOperationDelivery

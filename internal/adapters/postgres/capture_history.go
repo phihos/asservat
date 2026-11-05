@@ -313,6 +313,9 @@ func (s *ContextProgressReads) ReadCaptureSettings(ctx context.Context, q value.
 }
 
 func historyActionKinds(expected artifact.ContextExpectation) []string {
+	if expected.Processes != nil {
+		return []string{"processSnapshot"}
+	}
 	if expected.Recording == nil && expected.Snapshot == nil {
 		return []string{"kubernetesSnapshot"}
 	}

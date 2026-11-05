@@ -389,6 +389,14 @@
           },
           "minItems": 0,
           "maxItems": 32
+        },
+        "query_observed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "query_expires_at": {
+          "type": "string",
+          "format": "date-time"
         }
       },
       "required": [
@@ -398,7 +406,9 @@
         "expires_at",
         "section",
         "summary",
-        "gaps"
+        "gaps",
+        "query_observed_at",
+        "query_expires_at"
       ],
       "allOf": [
         {

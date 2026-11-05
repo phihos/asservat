@@ -60,6 +60,9 @@ func readNodeDeployment(ctx context.Context) (contracts.NodeDeployment, *x509.Ce
 }
 
 func validNodeDeployment(d contracts.NodeDeployment) (*x509.CertPool, error) {
+	if d.ProcessRuntime != "" && d.ProcessRuntime != "containerd" {
+		return nil, mounts.ErrUnavailable
+	}
 	if d.Format != contracts.NodeDeploymentFormat || !authorization.UUID(d.InstallationID) || !authorization.UUID(d.ClusterID) ||
 		!node.DomainCeilings(d.Ceilings).Valid() || d.Connector.ServerName == "" || len(d.Connector.ServerName) > 253 {
 		return nil, mounts.ErrUnavailable
@@ -143,6 +146,10 @@ func RunNode(ctx context.Context, podUID string) error {
 	}
 	facts := probeNode()
 	mechanisms := collector.Assess(facts)
+	processAcquirer := nodeProcessAcquirer(d.ProcessRuntime, facts)
+	if processAcquirer != nil {
+		mechanisms = append(mechanisms, collector.Availability{Mechanism: collector.MechanismProcesses, Prerequisites: true, Adapter: collector.AdapterAvailable})
+	}
 	if gadget.ProfileDialAvailable() && facts.HostProcesses == collector.Supported {
 		mechanisms = append(mechanisms, collector.Availability{Mechanism: collector.MechanismProfile, Prerequisites: true, Adapter: collector.AdapterAvailable, ProfileTLS: true, ProfileAuthorization: true})
 	}
@@ -173,6 +180,7 @@ func RunNode(ctx context.Context, podUID string) error {
 	p.packets = &nodePackets{engine: gadget.CapturePackets, syscallTrace: syscallTraceIfAvailable(mechanisms), argumentTrace: argumentTraceIfAvailable(mechanisms), argumentResources: gadget.ArgumentWorkingBytes, observedEngine: gadget.CaptureObservedPackets, identity: p.packetIdentity, upload: client.UploadCapture, available: packetAvailable(mechanisms), version: facts.Engine.Version,
 		now: time.Now, log: func(line string) { fmt.Fprintln(os.Stderr, line) }, budget: func() *collector.Budget { return p.budget }, budgetMu: &p.mu}
 	p.profiles = &nodeProfiles{identity: p.packetIdentity, acquire: acquireNodeProfile(p.packetIdentity, time.Now), upload: client.UploadProfileStream, now: time.Now, budget: func() *collector.Budget { return p.budget }, budgetMu: &p.mu}
+	p.profiles.processes, p.profiles.uploadProcesses = processAcquirer, client.UploadProcessesStream
 	ringDir, removed := "", 0
 	if st, err := os.Stat(contracts.NodeRingDiskPath); err == nil && st.IsDir() && d.Ceilings.RingDiskBytes > 0 {
 		ringDir = contracts.NodeRingDiskPath
@@ -463,6 +471,13 @@ func (p *nodeProcess) pollLoop(ctx context.Context, kick chan<- struct{}) error 
 			// Starting a capture takes the lock for the budget, so decide
 			// without holding it.
 			r := collector.Decide(w, p.now())
+			if w.Kind == collector.WorkProcesses && p.profiles != nil {
+				root := p.root
+				if root == nil {
+					root = ctx
+				}
+				r = p.profiles.startProcesses(root, p.epoch, w)
+			}
 			if w.Kind == collector.WorkProfileCapture && p.profiles != nil {
 				root := p.root
 				if root == nil {
@@ -470,7 +485,7 @@ func (p *nodeProcess) pollLoop(ctx context.Context, kick chan<- struct{}) error 
 				}
 				r = p.profiles.start(root, p.epoch, w, received.ProfileAuthorization, received.ProfileAuthorizationUnavailable)
 			}
-			if w.Kind == collector.WorkCancelProfileCapture && p.profiles != nil {
+			if (w.Kind == collector.WorkCancelProfileCapture || w.Kind == collector.WorkCancelProcesses) && p.profiles != nil {
 				r = p.profiles.stop(w)
 			}
 			if w.Kind == collector.WorkPacketCapture && p.packets != nil {

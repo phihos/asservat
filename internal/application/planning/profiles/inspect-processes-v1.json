@@ -1,0 +1,24 @@
+{
+  "name": "inspect-processes",
+  "version": "v1",
+  "definition": {
+    "displayName": "Inspect Pod processes",
+    "description": "Finite process identity, status and cgroup metadata from all available Pod runtime containers. No arguments, environment or user-memory reads.",
+    "recipe": {
+      "description": "Bounded whole-Pod process discovery with exact runtime and kernel identities.",
+      "actions": [{
+        "id": "processes", "kind": "processSnapshot",
+        "parameters": {"include": ["identity", "status", "threads", "cgroups"]},
+        "required": true, "impact": "observe",
+        "limits": {"maxBytes": 2097152, "timeout": "5s"},
+        "executionMode": "onTrigger"
+      }],
+      "maxTotalBytes": 2097152,
+      "maxDuration": "10s"
+    },
+    "editableFields": [
+      {"actionID": "processes", "field": "actionMaxBytes", "label": "Native metadata limit"},
+      {"actionID": "processes", "field": "actionTimeout", "label": "Original action deadline"}
+    ]
+  }
+}

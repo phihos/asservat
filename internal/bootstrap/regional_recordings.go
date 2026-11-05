@@ -79,6 +79,7 @@ type heldRecording struct {
 }
 
 type ConnectorRecordings struct {
+	processes           map[string]*heldProcesses
 	logs                map[string]*heldLogs
 	logsContext         context.Context
 	logsRoot, logsEpoch string
@@ -122,6 +123,11 @@ func (h *ConnectorRecordings) releaseStoreLocked(bytes int64) {
 // A pending recording that expires keeps no keys: its PreparedArtifact is
 // dropped unused (the attempt stays charged until custody cleanup).
 func (h *ConnectorRecordings) expireLocked(now time.Time) {
+	for id, p := range h.processes {
+		if !p.storing && !now.Before(p.expires) {
+			delete(h.processes, id)
+		}
+	}
 	for id, p := range h.logs {
 		if p.joined && !now.Before(p.expires) {
 			delete(h.logs, id)
@@ -393,6 +399,9 @@ func (h *ConnectorRecordings) Collect(w fleet.APIContextWork) (evidence.Recordin
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.expireLocked(h.now())
+	if out, ok, err := h.collectProcesses(w); ok {
+		return out, err
+	}
 	if out, ok, err := h.collectLogs(w); ok {
 		return out, err
 	}

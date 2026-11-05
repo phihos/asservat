@@ -137,6 +137,8 @@ func withProtectedContextQueryLedger(t *testing.T, ctx context.Context, admin *p
 	rawSyscall := len(profileSource) > 5 && profileSource[5]
 	isLogs := len(profileSource) > 6 && profileSource[6]
 	logsGroup := len(profileSource) > 7 && profileSource[7]
+	isProcesses := len(profileSource) > 8 && profileSource[8]
+	processCancellation := len(profileSource) > 9 && profileSource[9]
 	f := newCapacitySQLFixture(t, ctx, admin, address, tlsConfig, scope, claim, administration, objects, func(f *capacitySQLFixture) {
 		queryLedgerQualification(t, f)
 		if isLogs {
@@ -145,7 +147,7 @@ func withProtectedContextQueryLedger(t *testing.T, ctx context.Context, admin *p
 		if isPacket || rawSyscall {
 			packetLedgerFunding(t, f)
 		}
-		if isProfile || isPacket || rawSyscall || isLogs {
+		if isProfile || isPacket || rawSyscall || isLogs || isProcesses {
 			q := f.qualification.ContextQuery
 			q.Profile.Worker.MemoryBytes, q.Profile.Worker.WorkerTransientBytes = value.ProfileSummaryWorkerBytes, value.ProfileSummaryWorkerBytes
 			q.RootQueries, q.PrincipalQueries, q.WorkloadQueries = 20, 20, 20
@@ -203,9 +205,12 @@ func withProtectedContextQueryLedger(t *testing.T, ctx context.Context, admin *p
 	for _, p := range pools[processingPools:] {
 		p.Close()
 	}
-	query.scenario, query.published = publishQueryLedgerContext(t, f, root, enrolled, isProfile, legacyTiming, isPacket, rawPacket, rawSyscall, isLogs)
+	query.scenario, query.published = publishQueryLedgerContext(t, f, root, enrolled, isProfile, legacyTiming, isPacket, rawPacket, rawSyscall, isLogs, isProcesses, processCancellation)
+	if processCancellation {
+		return
+	}
 	profile := syntheticWorkerProfile(f.input.InstallationID)
-	if isProfile || isPacket || rawSyscall || isLogs {
+	if isProfile || isPacket || rawSyscall || isLogs || isProcesses {
 		profile.MemoryBytes = value.ProfileSummaryWorkerBytes
 		if isComparison {
 			profile.MemoryBytes = value.ProfileComparisonWorkerBytes
@@ -229,7 +234,7 @@ func withProtectedContextQueryLedger(t *testing.T, ctx context.Context, admin *p
 	if err != nil {
 		t.Fatal(err)
 	}
-	raw := querySQLPolicy{root: f.input.PermissionRootID, installation: f.input.InstallationID, epoch: recovery.IssuerEpoch, path: path, profile: isProfile, packet: isPacket, syscall: rawSyscall, logs: isLogs}
+	raw := querySQLPolicy{root: f.input.PermissionRootID, installation: f.input.InstallationID, epoch: recovery.IssuerEpoch, path: path, profile: isProfile, packet: isPacket, syscall: rawSyscall, logs: isLogs, processes: isProcesses}
 	query.policies, err = authapp.NewContextProjectionPolicies(raw, time.Now)
 	if err != nil {
 		t.Fatal(err)
@@ -252,7 +257,16 @@ func publishQueryLedgerContext(t *testing.T, f *capacitySQLFixture, root app.Roo
 	rawPacket := len(legacyTiming) > 2 && legacyTiming[2]
 	rawSyscall := len(legacyTiming) > 3 && legacyTiming[3]
 	isLogs := len(legacyTiming) > 4 && legacyTiming[4]
-	if isLogs {
+	isProcesses := len(legacyTiming) > 5 && legacyTiming[5]
+	processCancellation := len(legacyTiming) > 6 && legacyTiming[6]
+	if isProcesses {
+		s, accepted, profileSQL = admitQueryLedgerProfile(t, f, root, enrollment, false, false, false, true)
+		started, refresh = startQueryLedgerProfile(t, f, s, accepted, profileSQL)
+		if processCancellation {
+			qualifyProcessesStartedCancellation(t, f, s, accepted, profileSQL, started, refresh)
+			return s, artifact.PublishedContext{}
+		}
+	} else if isLogs {
 		s, accepted, profileSQL = admitQueryLedgerProfile(t, f, root, enrollment, false, false, true)
 		started, refresh = startQueryLedgerProfile(t, f, s, accepted, profileSQL)
 	} else if rawSyscall {
@@ -283,6 +297,7 @@ func publishPreparedQueryLedgerContext(t *testing.T, f *capacitySQLFixture, s ca
 	rawPacket := accepted.Expectation.NativeType == artifact.RawPCAPNGArtifact
 	rawSyscall := accepted.Expectation.NativeType == artifact.SyscallArgumentsArtifact
 	isLogs := accepted.Expectation.Logs != nil
+	isProcesses := accepted.Expectation.Processes != nil
 	e := accepted.Expectation
 	if isLogs {
 		assertLogsOriginalCollectCutoff(t, f.ctx, profileSQL, e)
@@ -293,7 +308,7 @@ func publishPreparedQueryLedgerContext(t *testing.T, f *capacitySQLFixture, s ca
 	}
 	var copies artifact.Copies
 	var acquisition artifact.AcquisitionWindow
-	if profileSource || packetSource || rawSyscall || isLogs {
+	if profileSource || packetSource || rawSyscall || isLogs || isProcesses {
 		var prepared *objectstore.PreparedArtifact
 		if isLogs && e.Registration.NativeLimit > artifact.FrameBytes {
 			// Match the actual connector writer: the pending SQL obligation is
@@ -325,7 +340,9 @@ func publishPreparedQueryLedgerContext(t *testing.T, f *capacitySQLFixture, s ca
 		}
 		var body bytes.Buffer
 		at := time.Now().UTC()
-		if isLogs {
+		if isProcesses {
+			body.Write(processesQuerySyntheticNative(t, e, started.StartedAt, at))
+		} else if isLogs {
 			body.Write(logsQuerySyntheticNative(t, e, started.StartedAt, time.Now().UTC()))
 			at = time.Now().UTC()
 		} else if rawSyscall {
@@ -437,7 +454,7 @@ func publishPreparedQueryLedgerContext(t *testing.T, f *capacitySQLFixture, s ca
 	publisher := evidence.ContextPublisher{Ledger: evidence.ContextPublicationFacets{ContextAcceptanceReader: check, ContextVerificationRecorder: check, ContextVerificationAuditor: ack, ContextCatalogPublisher: publish}, Authority: contextPublicationTestGate{check: func(ctx context.Context, v artifact.ContextExpectation) (artifact.PublicationAuthority, error) {
 		return f.currentManagedPublication(ctx, s, v)
 	}}, Verifier: verifier, Audit: &objectstore.ContextVerificationObjects{Store: f.store, Seal: f.keys, Open: f.keys}, Now: time.Now}
-	if profileSource || packetSource || rawSyscall || isLogs {
+	if profileSource || packetSource || rawSyscall || isLogs || isProcesses {
 		gatePool := f.fixturePool("api_publication_gate_runtime", "synthetic-api-publication-gate")
 		defer gatePool.Close()
 		gate, err := postgres.NewAPIContextPublicationGate(f.ctx, gatePool, s.a.RootID, guards, privacyapp.RetentionResolver{RetainedPolicies: s.retention, Now: time.Now}, s.recovery.reader)
@@ -469,6 +486,7 @@ type querySQLPolicy struct {
 	packet                    bool
 	syscall                   bool
 	logs                      bool
+	processes                 bool
 }
 
 func (p querySQLPolicy) DownloadPolicy(ctx context.Context) (privacy.DownloadPolicy, error) {
@@ -479,7 +497,9 @@ func (p querySQLPolicy) DownloadPolicy(ctx context.Context) (privacy.DownloadPol
 	x := p.path
 	path := artifact.DownloadPath{ID: x.ID, TargetClusterID: x.TargetClusterID, StoreID: x.StoreID, StorageRegion: x.StorageRegion, AcquisitionClusterID: x.AcquisitionClusterID, AcquisitionRegion: x.AcquisitionRegion, ConnectorClusterID: x.ConnectorClusterID, ConnectorRegion: x.ConnectorRegion, HubClusterID: x.HubClusterID, HubRegion: x.HubRegion, WorkerConfiguration: x.WorkerConfiguration, HubConfiguration: x.HubConfiguration}
 	classes, evidenceTypes := []string{"metadata"}, []string{"context"}
-	if p.logs {
+	if p.processes {
+		classes, evidenceTypes = []string{"extract"}, []string{"processSnapshot"}
+	} else if p.logs {
 		classes, evidenceTypes = []string{"raw"}, []string{"logs"}
 	} else if p.syscall {
 		classes, evidenceTypes = []string{"extract"}, []string{"syscallTrace"}

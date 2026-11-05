@@ -56,6 +56,7 @@ func TestCaseProjectionDiscriminatesVerifiedNativeFormat(t *testing.T) {
 		{"pprof", "profile", artifact.PprofArtifact, "raw", artifact.PprofFormat},
 		{"go-trace", "profile", artifact.GoTraceArtifact, "raw", artifact.GoTraceFormat},
 		{"logs", "logs", artifact.LogsArtifact, "raw", artifact.LogFormat},
+		{"processes", "processSnapshot", artifact.ProcessesArtifact, "metadata", artifact.ProcessFormat},
 		{"context", "context", artifact.PodStatusArtifact, "metadata", artifact.ContextFormat},
 		{"context-raw", "context", artifact.PodStatusArtifact, "raw", artifact.ContextFormat},
 		{"unknown-native", "profile", "unknown", "raw", ""},
@@ -81,6 +82,9 @@ func TestCaseProjectionDiscriminatesVerifiedNativeFormat(t *testing.T) {
 				t.Fatal("incorrect public case", string(reply.Body))
 			}
 			a := envelope.Data.Artifacts[0]
+			if tc.name == "processes" && (a.Kind != "processSnapshot" || a.Completeness != "unknown") {
+				t.Fatal("process inventory mislabeled", a.Kind)
+			}
 			if tc.name == "logs" && (a.Kind != "logs" || a.Completeness != "unknown") {
 				t.Fatal("verified logs mislabeled", a.Kind)
 			}

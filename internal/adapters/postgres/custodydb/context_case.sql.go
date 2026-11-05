@@ -72,3 +72,67 @@ func (q *Queries) ReadContextCaseRoutes(ctx context.Context, arg ReadContextCase
 	}
 	return items, nil
 }
+
+const readTargetDiscoveryRoute = `-- name: ReadTargetDiscoveryRoute :many
+SELECT r.artifact_id, r.capture_id, r.root_id, r.case_id, r.cluster_id, r.namespace_uid, r.workload_uid, r.pod_uid, v.copies_digest AS version
+FROM context_case_locator r
+JOIN context_catalog cat ON cat.artifact_id=r.artifact_id AND cat.capture_id=r.capture_id AND cat.root_id=r.root_id
+JOIN context_capture c ON c.id=r.capture_id AND c.root_id=r.root_id
+JOIN context_verification v ON v.capture_id=r.capture_id AND v.root_id=r.root_id
+JOIN custody_attempt a ON a.id=c.attempt_id AND a.artifact_id=r.artifact_id
+WHERE r.root_id=$1 AND r.capture_id=$2
+AND convert_from(c.expectation_json,'UTF8')::jsonb->>'NativeType'='processes'
+AND convert_from(c.expectation_json,'UTF8')::jsonb->>'DataClass'='metadata'
+AND jsonb_typeof(convert_from(c.expectation_json,'UTF8')::jsonb->'Processes')='object'
+AND v.audit_acknowledged_at IS NOT NULL AND a.state='stored_unpublished'
+AND a.copies_digest=v.copies_digest AND clock_timestamp()<a.effective_expires_at
+ORDER BY r.artifact_id LIMIT 2
+`
+
+type ReadTargetDiscoveryRouteParams struct {
+	RootID    pgtype.UUID
+	CaptureID pgtype.UUID
+}
+
+type ReadTargetDiscoveryRouteRow struct {
+	ArtifactID   pgtype.UUID
+	CaptureID    pgtype.UUID
+	RootID       pgtype.UUID
+	CaseID       pgtype.UUID
+	ClusterID    pgtype.UUID
+	NamespaceUid string
+	WorkloadUid  string
+	PodUid       string
+	Version      []byte
+}
+
+// Exact saved process source only; metadata routing is not read authority.
+func (q *Queries) ReadTargetDiscoveryRoute(ctx context.Context, arg ReadTargetDiscoveryRouteParams) ([]ReadTargetDiscoveryRouteRow, error) {
+	rows, err := q.db.Query(ctx, readTargetDiscoveryRoute, arg.RootID, arg.CaptureID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ReadTargetDiscoveryRouteRow{}
+	for rows.Next() {
+		var i ReadTargetDiscoveryRouteRow
+		if err := rows.Scan(
+			&i.ArtifactID,
+			&i.CaptureID,
+			&i.RootID,
+			&i.CaseID,
+			&i.ClusterID,
+			&i.NamespaceUid,
+			&i.WorkloadUid,
+			&i.PodUid,
+			&i.Version,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

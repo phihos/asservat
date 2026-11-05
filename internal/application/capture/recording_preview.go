@@ -39,6 +39,19 @@ type ProfileRecorders interface {
 	ResolveProfileRecorder(context.Context, targets.Request) (targets.PodResolution, error)
 }
 
+type ProcessRecorders interface {
+	ProcessRecorder(context.Context, targets.PodResolution) error
+	ResolveProcessRecorder(context.Context, targets.Request) (targets.PodResolution, error)
+}
+
+func processesRecorderInput(intent value.ContextIntent) bool {
+	if intent.Composition == nil {
+		return false
+	}
+	kind, e := compiler.RecorderEvidenceType(*intent.Composition)
+	return e == nil && kind == "processSnapshot"
+}
+
 func profileRecorderInput(intent value.ContextIntent) bool {
 	if intent.Composition == nil {
 		return false
@@ -56,7 +69,7 @@ func logsRecorderInput(intent value.ContextIntent) bool {
 }
 
 func acquisitionInput(intent value.ContextIntent, class artifact.ContextExecutionClass) bool {
-	return packetRecorderInput(intent, class) || class == artifact.ContextAPIExecution && (profileRecorderInput(intent) || logsRecorderInput(intent))
+	return packetRecorderInput(intent, class) || class == artifact.ContextAPIExecution && (profileRecorderInput(intent) || logsRecorderInput(intent) || processesRecorderInput(intent))
 }
 
 // packetRecorderAvailable reports whether this composition could be recorded
@@ -73,7 +86,13 @@ func (s ContextInvestigation) packetRecorderAvailable(ctx context.Context, inten
 	}
 	mark := time.Now()
 	var err error
-	if profileRecorderInput(intent) {
+	if processesRecorderInput(intent) {
+		processes, ok := s.Recorders.(ProcessRecorders)
+		if !ok {
+			return false, nil
+		}
+		err = processes.ProcessRecorder(ctx, target)
+	} else if profileRecorderInput(intent) {
 		profiles, ok := s.Recorders.(ProfileRecorders)
 		if !ok {
 			return false, nil
@@ -138,6 +157,13 @@ func (s ContextInvestigation) recordingPlan(ctx context.Context, p value.Context
 		logs.TriggeredAt = p.Intent.LogsTriggeredAt
 		return compiler.CompileContext(planning.ContextInput{CaptureID: p.CaptureID, CaseID: p.CaseID, Executor: p.Actor, Deadline: p.Deadline, Target: f.target, Retention: f.retention, Capability: f.capability, Logs: logs}, s.Now())
 	}
+	if processesRecorderInput(p.Intent) {
+		processes, e := compiler.ProcessesContextFromScope(*p.Intent.Composition, p.CanonicalScope)
+		if e != nil {
+			return planning.ContextPlan{}, e
+		}
+		return compiler.CompileContext(planning.ContextInput{CaptureID: p.CaptureID, CaseID: p.CaseID, Executor: p.Actor, Deadline: p.Deadline, Target: f.target, Retention: f.retention, Capability: f.capability, Processes: processes}, s.Now())
+	}
 	recorder, err := compiler.RecorderContextFromScope(*p.Intent.Composition, p.CanonicalScope)
 	if err != nil {
 		return planning.ContextPlan{}, err
@@ -183,7 +209,7 @@ func (s ContextInvestigation) previewRecording(ctx context.Context, source ident
 	}
 	p.CanonicalScope, p.ScopeDigest = slices.Clone(plan.CanonicalScope), plan.ScopeDigest
 	p.AssessmentRulesDigest = compiler.RecorderAssessmentRulesFor(plan.Actions)
-	recordable := compiler.AcceptableRecorder(plan).Acceptable() || compiler.AcceptableProfile(plan).Acceptable() || compiler.AcceptableLogs(plan).Acceptable()
+	recordable := compiler.AcceptableRecorder(plan).Acceptable() || compiler.AcceptableProfile(plan).Acceptable() || compiler.AcceptableLogs(plan).Acceptable() || compiler.AcceptableProcesses(plan).Acceptable()
 	if _, _, policy := authorization.PolicyExecutor(i.Principal); policy {
 		// requireRecordingApproval above already checked the package-private
 		// accepted settings provenance. This structural plan is not a permit:
@@ -262,6 +288,9 @@ func (s ContextInvestigation) recordingAssessment(p value.ContextPreview, plan p
 	}
 	if plan.Input.Logs != nil {
 		rp, err = compiler.LogsPlanForContext(plan)
+	}
+	if plan.Input.Processes != nil {
+		rp, err = compiler.ProcessesPlanForContext(plan)
 	}
 	if err != nil {
 		return err

@@ -86,7 +86,7 @@ func class(s string) bool {
 	return slices.Contains([]string{"unknown", "potentialPersonalData", "personalData", "specialCategoryPossible", "verifiedNonPersonal"}, s)
 }
 func evidenceType(s string) bool {
-	return slices.Contains([]string{"coreDump", "heapDump", "packetCapture", "syscallTrace", "logs", "files", "profile", "commandOutput", "context", "other"}, s)
+	return slices.Contains([]string{"coreDump", "heapDump", "packetCapture", "syscallTrace", "processSnapshot", "logs", "files", "profile", "commandOutput", "context", "other"}, s)
 }
 func finiteTime(t time.Time) bool {
 	return !t.IsZero() && t.Year() >= 2020 && t.Year() <= 9999 && t.Nanosecond()%1000 == 0

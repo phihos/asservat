@@ -64,7 +64,7 @@ for package in packages:
                 # Recorded argument values use canonical bounded base64. Checking
                 # that pure encoding adds no file/network, key or decoder adapter.
                 if package["ImportPath"] == module+"/internal/domain/artifact":
-                    allowed |= {"encoding/base64"}
+                    allowed |= {"encoding/base64", "path"}
                 # Analysis cursors bind an immutable source version and closed
                 # display selection. SHA-256 is a deterministic value identity;
                 # no key handling, network, storage or protocol I/O is allowed here.
@@ -96,8 +96,8 @@ for package in packages:
             continue
         # Publication reuses the canonical data-only logs codec/checker. This
         # narrow edge does not allow storage adapters to import collectors.
-        if source == "C-21" and target == "C-23" and relative(imported) != "internal/adapters/logs":
-            raise ValueError(f"Persistence may only reuse the canonical logs codec from C-23: {imported}")
+        if source == "C-21" and target == "C-23" and relative(imported) not in {"internal/adapters/logs", "internal/adapters/processes"}:
+            raise ValueError(f"Persistence may only reuse the canonical logs/processes codecs from C-23: {imported}")
         if source != target and target not in components[source]["allowed_dependencies"]:
             raise ValueError(f"Undeclared dependency {source} -> {target}: {imported}")
         source_layer, target_layer = components[source]["layer"], components[target]["layer"]

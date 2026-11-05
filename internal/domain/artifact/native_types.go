@@ -21,6 +21,7 @@ const (
 	SyscallArgumentsArtifact = "syscallArguments"
 	HTTPHeadersArtifact      = "httpHeaders"
 	LogsArtifact             = "logs"
+	ProcessesArtifact        = "processes"
 	// PprofArtifact and GoTraceArtifact are a Go endpoint's native response
 	// (ADR-284): gzip-compressed pprof protobuf and the Go execution trace.
 	PprofArtifact   = "pprof"
@@ -61,6 +62,7 @@ type NativeType struct {
 }
 
 var nativeTypes = []NativeType{
+	{Name: ProcessesArtifact, Kind: "processSnapshot", EvidenceType: "processSnapshot", MediaType: "application/json", Format: ProcessFormat, Extension: ".json", Coverage: "Bounded process metadata from runtime-identified Pod containers and verified cgroups. No arguments, environment or user-memory contents. Process churn, unavailable sources and enumeration limits are reported; identities are observed and must be revalidated before acting.", MaxBytes: ProcessNativeLimit, DataClasses: []string{"metadata"}},
 	{Name: LogsArtifact, Kind: "logs", EvidenceType: "logs", MediaType: "application/x-ndjson", Format: LogFormat, Extension: ".jsonl", Coverage: "Available current and previous container logs of the selected pod as byte-preserving JSON Lines; stdout and stderr are combined. Missing sources, rotation, time uncertainty and truncation are reported; this is not a complete historical archive or redacted text.", MaxBytes: LogNativeLimit, DataClasses: []string{"raw"}},
 	{Name: PodStatusArtifact, Kind: "kubernetesSnapshot", EvidenceType: "context", MediaType: "application/json", Format: ContextFormat, Extension: ".json", Coverage: "Selected pod-status fields only; no logs, messages or workload configuration.", MaxBytes: MaxContextBytes, DataClasses: []string{"metadata", "raw"}},
 	{Name: PCAPNGArtifact, Kind: "packetCapture", EvidenceType: "packetCapture", MediaType: "application/x-pcapng", Format: PCAPNGFormat, Extension: ".pcapng", Coverage: "Packet headers of the selected pod, truncated after the transport header; no payload. Filtered, truncated or lost packets are not included.", MaxBytes: StreamingNativeLimit, DataClasses: []string{"metadata"}},
@@ -128,7 +130,7 @@ func (t NativeType) DownloadLimit() int64 {
 // serves (ADR-248): pod-status context, packet captures (PCAPNG) and syscall
 // metadata (JSON Lines, ADR-273), and raw Go endpoint profiles.
 func DownloadEvidenceType(evidenceType string) bool {
-	return evidenceType == "context" || evidenceType == "packetCapture" || evidenceType == "syscallTrace" || evidenceType == "profile" || evidenceType == "logs"
+	return evidenceType == "context" || evidenceType == "packetCapture" || evidenceType == "syscallTrace" || evidenceType == "profile" || evidenceType == "logs" || evidenceType == "processSnapshot"
 }
 
 // ValidNativeDownloadMetadata checks the fixed, type-derived facts of prepared

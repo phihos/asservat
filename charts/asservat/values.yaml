@@ -171,6 +171,11 @@ cluster:
 # the collector probes its node and reports status; it records nothing.
 collector:
   enabled: false
+  # Installer-selected metadata-only process discovery. Empty keeps the
+  # legacy collector mounts; containerd mounts its fixed runtime socket and
+  # host cgroup tree. A read-only socket mount still exposes its full API.
+  processDiscovery:
+    runtime: ""
   namespace: asservat-collector
   # The exact product repository@sha256 digest of the collector image (built
   # with the gadget tag).

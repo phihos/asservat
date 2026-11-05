@@ -91,7 +91,8 @@ The C-21 [multi-cluster routing adapters](worker-routing.md) implement existing 
 
 C-21 `kubernetes.BuildHubWorkerWorkload` builds installation-owned native Deployment/account/RBAC resources under [ADR-094](../decisions/094-native-hub-worker-projections.md). It does not apply objects, resolve recovery or introduce a public wire; bootstrap remains the role composition root.
 
-C-21 artifact publication reuses C-23 `internal/adapters/logs` for the mandatory
-canonical streaming native check. This data-only codec adds no collector, API,
+C-21 artifact publication reuses C-23 `internal/adapters/logs` and
+`internal/adapters/processes` for the mandatory
+canonical native checks. These data-only codecs add no collector, API,
 credential or execution capability. The Go gate confines the C-21 → C-23 edge to
-that package; persistence cannot import Gadget, Linux or other mechanism adapters.
+those packages; persistence cannot import Gadget, Linux or other mechanism adapters.

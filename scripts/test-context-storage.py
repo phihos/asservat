@@ -403,7 +403,7 @@ def qualify_direct_helper_issuer(env, report):
 
 def qualification_cluster_count(default_count, installer_continuation=False):
     """Owned topology: one hub plus one workload cluster for these focuses."""
-    if installer_continuation and os.environ.get("ASSERVAT_JOURNEY_FOCUS") in ("restart", "journey", "browser", "upgrade", "policy", "alert", "logresource", "chain", "share", "approved-recording", "manual-logs", "manual-syscall", "manual-arguments", "manual-mixed", "manual-raw", "manual-http", "manual-peers", "manual-profile", "profile-comparison", "native-paced", "policy-recording", "policy-arguments", "policy-profile", "ongoing-save", "ongoing-save-disk", "ongoing-incident", "ongoing-syscall", "ongoing-mixed"):
+    if installer_continuation and os.environ.get("ASSERVAT_JOURNEY_FOCUS") in ("restart", "journey", "browser", "upgrade", "policy", "alert", "logresource", "chain", "share", "approved-recording", "manual-logs", "manual-processes", "manual-syscall", "manual-arguments", "manual-mixed", "manual-raw", "manual-http", "manual-peers", "manual-profile", "profile-comparison", "native-paced", "policy-recording", "policy-arguments", "policy-profile", "ongoing-save", "ongoing-save-disk", "ongoing-incident", "ongoing-syscall", "ongoing-mixed"):
         return 2
     return default_count
 
@@ -411,7 +411,7 @@ def qualification_cluster_count(default_count, installer_continuation=False):
 def qualification_go_timeout(helm_bootstrap=False, runtime_provider_owner=False, installer_continuation=False, native_traffic_probe=False):
     if native_traffic_probe:
         return "2m"
-    if installer_continuation and os.environ.get("ASSERVAT_JOURNEY_FOCUS") in ("approved-recording", "manual-logs", "manual-syscall", "manual-arguments", "manual-mixed", "manual-raw", "manual-http", "manual-peers", "manual-profile", "profile-comparison", "native-paced", "policy-recording", "policy-arguments", "policy-profile", "ongoing-save", "ongoing-save-disk", "ongoing-incident", "ongoing-syscall", "ongoing-mixed"):
+    if installer_continuation and os.environ.get("ASSERVAT_JOURNEY_FOCUS") in ("approved-recording", "manual-logs", "manual-processes", "manual-syscall", "manual-arguments", "manual-mixed", "manual-raw", "manual-http", "manual-peers", "manual-profile", "profile-comparison", "native-paced", "policy-recording", "policy-arguments", "policy-profile", "ongoing-save", "ongoing-save-disk", "ongoing-incident", "ongoing-syscall", "ongoing-mixed"):
         return "18m"
     if installer_continuation:
         # The installed journey waits for its capture's ten-minute expiry; the
@@ -544,7 +544,7 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
     profile_variant = qualification_profile_variant(os.environ)
     if profile_variant == "accepted-heavy" and not installer_continuation:
         raise ValueError("Accepted-heavy requires the installed comparison continuation")
-    collector_qualification = installer_continuation and focus in ("approved-recording", "manual-syscall", "manual-arguments", "manual-mixed", "manual-raw", "manual-http", "manual-peers", "manual-profile", "profile-comparison", "native-paced", "policy-recording", "policy-arguments", "policy-profile", "ongoing-save", "ongoing-save-disk", "ongoing-incident", "ongoing-syscall", "ongoing-mixed")
+    collector_qualification = installer_continuation and focus in ("approved-recording", "manual-processes", "manual-syscall", "manual-arguments", "manual-mixed", "manual-raw", "manual-http", "manual-peers", "manual-profile", "profile-comparison", "native-paced", "policy-recording", "policy-arguments", "policy-profile", "ongoing-save", "ongoing-save-disk", "ongoing-incident", "ongoing-syscall", "ongoing-mixed")
     native_paced = installer_continuation and focus == "native-paced"
     native_traffic_probe = test_pattern == NATIVE_TRAFFIC_PROBE
     guard = Path("/etc/asservat-disposable-host")
@@ -610,6 +610,7 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
             report["installedPacketSummaryBrowserQualification"] = collector_qualification and focus in ("manual-mixed", "manual-raw")
             report["installedPacketQueryQualification"] = collector_qualification and focus == "manual-raw"
             report["installedRawSyscallQueryQualification"] = collector_qualification and focus == "manual-arguments"
+            report["installedTargetDiscoveryQualification"] = collector_qualification and focus == "manual-processes"
             report["installedLogsQueryQualification"] = installer_continuation and focus == "manual-logs"
             report["installedHeapBrowserQualification"] = collector_qualification and focus == "manual-profile" and profile_variant == "heap"
             report["installedProfileAuth"] = profile_auth if collector_qualification and focus == "manual-profile" else None

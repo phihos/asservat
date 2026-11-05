@@ -128,6 +128,11 @@ func qualifySharedProjectionLifecycleClient(t *testing.T, f *queryLedgerFixture,
 			scope.NativeType, scope.SourceFormat, scope.DisplayVersion = artifact.RawPCAPNGArtifact, artifact.RawPCAPNGFormat, query.RawPacketSummaryDisplayVersion
 		}
 	}
+	if expected.NativeType == artifact.ProcessesArtifact {
+		scope.NativeType, scope.SourceFormat, scope.DisplayVersion = artifact.ProcessesArtifact, artifact.ProcessFormat, query.TargetDiscoveryDisplayVersion
+		scope.SourceProjectionDigest, scope.Selection = artifact.Digest{}, query.LineSelection{}
+		scope.Discovery = query.TargetDiscoveryWindow{Section: "processes", Limit: 20}
+	}
 	policy := f.audit.Normal.Policy
 	journal, err := postgres.NewHealthyOperationJournal(ctx, compiled("hub-runtime"), policy, s.recovery.guard)
 	if err != nil {

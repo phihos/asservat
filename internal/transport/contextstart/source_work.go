@@ -20,6 +20,7 @@ type SourceQueue interface {
 }
 type SourceLocal struct {
 	Recordings evidence.RecordingCanceller
+	Processes  evidence.ProcessesCanceller
 	Profiles   evidence.ProfileCanceller
 	Snapshots  evidence.SourceSnapshotCanceller
 	Verifier   app.SourceWorkVerifier
@@ -34,6 +35,10 @@ func sourceReply(w app.SourceWork, state string) contracts.SourceReply {
 		reply.CaptureID = w.StopSnapshot.CaptureID
 		reply.SnapshotID = w.StopSnapshot.Request.SnapshotID
 	}
+	if w.StopProcesses != nil {
+		reply.CaptureID = w.StopProcesses.CaptureID
+		reply.ProcessAttemptID = w.StopProcesses.AttemptID
+	}
 	if w.StopProfile != nil {
 		reply.CaptureID = w.StopProfile.CaptureID
 		reply.ProfileAttemptID = w.StopProfile.AttemptID
@@ -45,6 +50,12 @@ func sourceReply(w app.SourceWork, state string) contracts.SourceReply {
 	return reply
 }
 func matchingSourceReply(w app.SourceWork, r contracts.SourceReply) bool {
+	if w.StopProcesses != nil {
+		return r.SourceID == "" && r.Fence == "" && r.SnapshotID == "" && r.ProfileAttemptID == "" && r.RecordingAttemptID == "" && r.CaptureID == w.StopProcesses.CaptureID && r.ProcessAttemptID == w.StopProcesses.AttemptID
+	}
+	if r.ProcessAttemptID != "" {
+		return false
+	}
 	if w.StopRecording != nil {
 		return r.SourceID == "" && r.Fence == "" && r.SnapshotID == "" && r.ProfileAttemptID == "" && r.CaptureID == w.StopRecording.CaptureID && r.RecordingAttemptID == w.StopRecording.AttemptID
 	}
@@ -102,6 +113,12 @@ func applySourceWork(ctx context.Context, r fleet.APIContextReceiver, signed []b
 			effectErr = fleet.ErrUnavailable
 		} else {
 			effectErr = local.Recordings.CancelRecording(call, *w.StopRecording)
+		}
+	} else if w.StopProcesses != nil {
+		if local.Processes == nil {
+			effectErr = fleet.ErrUnavailable
+		} else {
+			effectErr = local.Processes.CancelProcesses(call, *w.StopProcesses)
 		}
 	} else if w.StopProfile != nil {
 		if local.Profiles == nil {

@@ -43,6 +43,7 @@ type ContextProjectionService struct {
 	ProfileRoutes    ContextProjectionRouteReader
 	SyscallRoutes    SyscallProjectionRouteReader
 	LogRoutes        LogProjectionRouteReader
+	DiscoveryRoutes  TargetDiscoveryRoutes
 	ComparisonRoutes ContextProjectionRouteReader
 }
 
@@ -72,6 +73,7 @@ const (
 // Exactly one selection branch is set: the line selection of a pod-status
 // excerpt, httpHeaders record window, or pprof sample type/top-N.
 type ContextProjectionAssociation struct {
+	Discovery                         value.TargetDiscoveryWindow `json:",omitzero"`
 	ID, QueryID, OperationID, BatchID string
 	Generation                        int64
 	Selection                         value.LineSelection
@@ -88,6 +90,7 @@ type ContextProjectionAssociation struct {
 // acknowledge its existing outcome and retain the guard through write/flush.
 // Its own audit slot/cancel must also transfer to transport-owned cleanup.
 type ContextProjectionDelivery struct {
+	discovery                               *value.TargetDiscoveryPage
 	owner                                   *projectionRequest
 	association                             ContextProjectionAssociation
 	effect                                  ContextQueryEffect
@@ -591,6 +594,9 @@ func (s ContextProjectionService) begin(ctx context.Context, current identities.
 		if tool == "get_pcap_summary" {
 			return nil, &packetSummaryPreAdmissionRefusal{cause: refusal}
 		}
+		if tool == "get_target_discovery" {
+			return nil, &targetDiscoveryPreAdmissionRefusal{cause: refusal}
+		}
 		return nil, refusal
 	}
 	var q value.ContextQuery
@@ -730,7 +736,7 @@ func (s ContextProjectionResults) prepare(o *projectionRequest, effect ContextQu
 	d := &ContextProjectionDelivery{owner: o, pending: !worker.Ready, effect: effect,
 		observedAt: s.Now(), queryDeadline: identity.Earlier(o.query.Deadline, a.AccessUntil),
 		cleanupUntil: identity.Earlier(o.query.CleanupUntil, o.request.Call.WriteUntil),
-		association:  ContextProjectionAssociation{ID: s.NewID(), QueryID: o.query.ID, OperationID: o.request.Call.ID, Selection: o.query.Scope.Selection, Headers: o.query.Scope.Headers, Profile: o.query.Scope.Profile, Syscalls: o.query.Scope.Syscalls, Logs: o.query.Scope.Logs, PacketQuery: o.query.Scope.PacketQuery, Comparison: comparisonAssociationSelection(o.query.Scope)}}
+		association:  ContextProjectionAssociation{ID: s.NewID(), QueryID: o.query.ID, OperationID: o.request.Call.ID, Selection: o.query.Scope.Selection, Headers: o.query.Scope.Headers, Profile: o.query.Scope.Profile, Syscalls: o.query.Scope.Syscalls, Logs: o.query.Scope.Logs, Discovery: o.query.Scope.Discovery, PacketQuery: o.query.Scope.PacketQuery, Comparison: comparisonAssociationSelection(o.query.Scope)}}
 	if d.association.Comparison != (value.ProfileComparisonSelection{}) {
 		d.association.Profile = value.ProfileSummarySelection{}
 	}
@@ -814,6 +820,12 @@ func (s ContextProjectionResults) prepare(o *projectionRequest, effect ContextQu
 	switch {
 	case err != nil || !projection.Valid(scope):
 		err = value.ErrUnavailable
+	case scope.NativeType == artifact.ProcessesArtifact && projection.InvalidCursor:
+		invalidCursor = true
+	case scope.NativeType == artifact.ProcessesArtifact && projection.TooLarge:
+		tooLarge = true
+	case scope.NativeType == artifact.ProcessesArtifact:
+		d.discovery, projection.TargetDiscovery = projection.TargetDiscovery, nil
 	case scope.NativeType == artifact.LogsArtifact && projection.InvalidCursor:
 		invalidCursor = true
 	case scope.NativeType == artifact.LogsArtifact && projection.TooLarge:

@@ -54,6 +54,13 @@ type syscallProjectionReply struct {
 
 // The saved-log page is selected and byte bounded by the canonical parser.
 // Preserve its exact continuation; trimming here would lose source bytes.
+type targetDiscoveryReply struct {
+	Version       artifact.Digest
+	Page          *query.TargetDiscoveryPage `json:",omitempty"`
+	InvalidCursor bool                       `json:",omitempty"`
+	TooLarge      bool                       `json:",omitempty"`
+}
+
 type logProjectionReply struct {
 	Version       artifact.Digest
 	Logs          *query.LogPage `json:",omitempty"`
@@ -74,6 +81,14 @@ type profileComparisonReply struct {
 func encodeProjectionResult(r query.ProjectionResult, scope query.ContextProjectionScope) ([]byte, error) {
 	if !r.Valid(scope) {
 		return nil, contracts.ErrNativeProtocol
+	}
+	if scope.NativeType == artifact.ProcessesArtifact {
+		b, e := json.Marshal(targetDiscoveryReply{Version: scope.Version, Page: r.TargetDiscovery, InvalidCursor: r.InvalidCursor, TooLarge: r.TooLarge})
+		if e != nil || len(b) > query.ContextResultBytes {
+			clear(b)
+			return nil, contracts.ErrNativeProtocol
+		}
+		return b, nil
 	}
 	if scope.NativeType == artifact.LogsArtifact {
 		b, e := json.Marshal(logProjectionReply{Version: scope.Version, Logs: r.Logs, InvalidCursor: r.InvalidCursor, TooLarge: r.TooLarge})
@@ -175,6 +190,12 @@ func encodeProjectionResult(r query.ProjectionResult, scope query.ContextProject
 func decodeProjectionResult(b []byte, scope query.ContextProjectionScope) (query.ProjectionResult, error) {
 	var r query.ProjectionResult
 	switch scope.NativeType {
+	case artifact.ProcessesArtifact:
+		var reply targetDiscoveryReply
+		if nativeDecodeBounded(b, &reply, query.ContextResultBytes) != nil || reply.Version != scope.Version {
+			return query.ProjectionResult{}, contracts.ErrNativeProtocol
+		}
+		r.TargetDiscovery, r.InvalidCursor, r.TooLarge = reply.Page, reply.InvalidCursor, reply.TooLarge
 	case artifact.LogsArtifact:
 		var reply logProjectionReply
 		if nativeDecodeBounded(b, &reply, query.ContextResultBytes) != nil || reply.Version != scope.Version {

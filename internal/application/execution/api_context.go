@@ -278,6 +278,27 @@ func (s APIContextRunner) checkObserved(ctx context.Context, current identities.
 		}
 		evidenceType = e.Type().EvidenceType
 	}
+	var processes *planning.ProcessesContext
+	if e.Processes != nil {
+		if processes, err = compiler.ProcessesContextFor(e.Processes); err != nil {
+			return out, nil, apiCheckStep{"Processes", value.ErrInvalid}
+		}
+		var refs []planning.ProfileRef
+		for _, c := range processes.Composition.Components {
+			if c.Profile.Catalog != "builtin" {
+				refs = append(refs, c.Profile)
+			}
+		}
+		if len(refs) > 0 {
+			if s.Profiles == nil {
+				return out, nil, apiCheckStep{"Profiles", value.ErrUnavailable}
+			}
+			if processes.Composition.Resolved, err = s.Profiles.ReadCatalogProfiles(ctx, t, refs); err != nil {
+				return out, nil, apiCheckStep{"Profiles", err}
+			}
+		}
+		evidenceType = e.Type().EvidenceType
+	}
 	var logs *planning.LogsContext
 	if e.Logs != nil {
 		if logs, err = compiler.LogsContextFor(e.Logs); err != nil || !logs.TriggeredAt.IsZero() && !logs.TriggeredAt.Equal(e.TriggeredAt) {
@@ -311,10 +332,10 @@ func (s APIContextRunner) checkObserved(ctx context.Context, current identities.
 		return out, nil, apiCheckStep{"Retention", err}
 	}
 	caseID := e.CaseID
-	if recorder != nil || profile != nil || logs != nil {
+	if recorder != nil || profile != nil || logs != nil || processes != nil {
 		caseID = "" // a recorder scope carries no case (ADR-243)
 	}
-	plan, err := compiler.CompileContext(planning.ContextInput{CaptureID: e.CaptureUID, CaseID: caseID, Executor: w.Actor, Deadline: w.Accepted.Deadline, Target: t, Capability: cap, Retention: retention, Recorder: recorder, Profile: profile, Logs: logs, Snapshot: snapshot, SnapshotSource: snapshotObserved}, s.Now())
+	plan, err := compiler.CompileContext(planning.ContextInput{CaptureID: e.CaptureUID, CaseID: caseID, Executor: w.Actor, Deadline: w.Accepted.Deadline, Target: t, Capability: cap, Retention: retention, Recorder: recorder, Profile: profile, Logs: logs, Processes: processes, Snapshot: snapshot, SnapshotSource: snapshotObserved}, s.Now())
 	if err != nil {
 		return out, nil, apiCheckStep{"Compile", err}
 	}
@@ -328,6 +349,12 @@ func (s APIContextRunner) checkObserved(ctx context.Context, current identities.
 		derived, actionID, err := compiler.LogsForContext(plan)
 		if err != nil || actionID != e.ActionID || derived.BeforeMillis != e.Logs.BeforeMillis || derived.AfterMillis != e.Logs.AfterMillis || derived.TimeoutMillis != e.Logs.TimeoutMillis || derived.MaxNativeBytes != e.Registration.NativeLimit || derived.Streams != e.Logs.Streams {
 			return out, nil, apiCheckStep{"Logs", value.ErrInvalid}
+		}
+	}
+	if processes != nil {
+		derived, id, err := compiler.ProcessesForContext(plan)
+		if err != nil || id != e.ActionID || derived.Mode != e.Processes.Mode || derived.TimeoutMillis != e.Processes.TimeoutMillis || derived.MaxNativeBytes != e.Registration.NativeLimit {
+			return out, nil, apiCheckStep{"Processes", value.ErrInvalid}
 		}
 	}
 	var recovery artifact.RecoveryProof
@@ -507,7 +534,7 @@ func (s APIContextRunner) execute(ctx context.Context, current identities.Curren
 	}
 	defer prepared.Close()
 	closer, ok := prepared.(evidence.StoredContextCloser)
-	if !ok && w.Accepted.Expectation.Recording == nil && w.Accepted.Expectation.Snapshot == nil && w.Accepted.Expectation.Profile == nil && w.Accepted.Expectation.Logs == nil {
+	if !ok && w.Accepted.Expectation.Recording == nil && w.Accepted.Expectation.Snapshot == nil && w.Accepted.Expectation.Profile == nil && w.Accepted.Expectation.Logs == nil && w.Accepted.Expectation.Processes == nil {
 		return zero, executeStep{"PrepareContext", value.ErrUnavailable}
 	}
 	// Queued recorders transfer ownership to the regional holder. Their joined
@@ -562,6 +589,21 @@ func (s APIContextRunner) execute(ctx context.Context, current identities.Curren
 		return ContextResult{State: "Indeterminate"}, value.ErrExpired
 	}
 	result := r
+	if w.Accepted.Expectation.Processes != nil {
+		processes, ok := prepared.(evidence.ProcessesRecorder)
+		if !ok {
+			return zero, executeStep{"StartProcesses", value.ErrUnavailable}
+		}
+		queued, startErr := processes.StartProcesses(startCtx, w.Accepted.Pin, r.StartedAt, d.ValidUntil)
+		if startErr == nil && !queued.IsZero() && queued.Before(d.ValidUntil) && !queued.Before(r.StartedAt) {
+			return ContextResult{State: "Recording"}, nil
+		}
+		result.CompletedAt, result.Phase = s.Now().UTC().Truncate(time.Microsecond), "captureFailed"
+		if startErr == nil {
+			startErr = value.ErrUnavailable
+		}
+		return s.finishAcquisition(ctx, w, prepared, closer, completionRecorder, result, startErr)
+	}
 	if w.Accepted.Expectation.Logs != nil {
 		logs, ok := prepared.(evidence.LogsRecorder)
 		if !ok {

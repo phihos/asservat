@@ -163,7 +163,7 @@ func (s *ContextCaseOperations) CallWithContext(ctx context.Context, current ide
 		data := ContextCaseData{Case: ContextCaseSummary{CaseID: view.CaseID, Status: "Ready", Access: "ordinary"}, Artifacts: make([]ContextCaseArtifactData, 0, len(view.Artifacts)), Timeline: []any{}}
 		for _, a := range view.Artifacts {
 			kind := "pod-status"
-			if a.EvidenceType == "packetCapture" || a.EvidenceType == "syscallTrace" || a.EvidenceType == "profile" || a.EvidenceType == "logs" {
+			if a.EvidenceType == "packetCapture" || a.EvidenceType == "syscallTrace" || a.EvidenceType == "profile" || a.EvidenceType == "logs" || a.EvidenceType == "processSnapshot" {
 				kind = a.EvidenceType
 			}
 			if a.Shared {
@@ -175,7 +175,7 @@ func (s *ContextCaseOperations) CallWithContext(ctx context.Context, current ide
 				nativeFormat = typ.Format
 			}
 			completeness := "complete"
-			if a.NativeType == artifact.LogsArtifact {
+			if a.NativeType == artifact.LogsArtifact || a.NativeType == artifact.ProcessesArtifact {
 				completeness = "unknown"
 			}
 			data.Artifacts = append(data.Artifacts, ContextCaseArtifactData{ProfileAcquisition: profileAcquisitionData(a.ProfileAcquisition), VerifiedNativeBytes: a.NativeBytes, Target: ContextCaseTargetData{ClusterID: a.Target.ClusterID, NamespaceUID: a.Target.NamespaceUID, WorkloadUID: a.Target.WorkloadUID, PodUID: a.Target.PodUID, Namespace: a.Namespace, WorkloadKind: a.WorkloadKind, WorkloadName: a.WorkloadName, PodName: a.PodName}, NativeFormat: nativeFormat, ArtifactID: a.ArtifactID, Digest: hash(a.Version), Kind: kind, DataClass: listedDataClass(a.DataClass), Completeness: completeness, ExpiresAt: a.ExpiresAt, HandlingNotice: ArtifactHandlingNotice{Classification: "potentialPersonalData", MayContain: listedMayContain(a.DataClass), ExpiresAt: a.ExpiresAt, DeleteBy: a.DeleteBy, DeletionState: "scheduled", AutomaticDeletion: true, ManagedCopiesOnly: true, ExternalCopiesRecallable: false, HandlingCodes: []string{"minimizeCapture", "restrictAccess", "preferApprovedExtracts", "reviewBeforeSharing", "approvedClientsOnly", "externalCopiesNotRecalled"}, PreservationException: false, AsOf: view.ObservedAt}})

@@ -1099,6 +1099,43 @@
                 }
               }
             }
+          },
+          {
+            "properties": {
+              "target": {
+                "properties": {
+                  "scope": {
+                    "const": "pod"
+                  }
+                }
+              },
+              "kind": {
+                "const": "processSnapshot"
+              },
+              "format": {
+                "const": "asservat-processes/v1"
+              },
+              "mediaType": {
+                "const": "application/json"
+              },
+              "dataClass": {
+                "const": "metadata"
+              },
+              "collectionProvenance": {
+                "properties": {
+                  "actionID": {
+                    "pattern": "^a[0-9a-f]{24}$"
+                  }
+                }
+              },
+              "sizes": {
+                "properties": {
+                  "plaintextBytes": {
+                    "maximum": 2097152
+                  }
+                }
+              }
+            }
           }
         ]
       }

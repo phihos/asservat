@@ -132,14 +132,14 @@ func TestCaptureProfileListAndGet(t *testing.T) {
 	source := f.source(t, ctx)
 	target := f.compositionIntent(networkComposition()).Target
 	all, _, err := f.svc.CaptureProfiles(ctx, source, target, "")
-	if err != nil || len(all) != 5 || all[0].Ref.Catalog != "builtin" || !all[0].Available || all[3].Ref.Name != "finite-logs" || !all[3].Available || all[4].Ref != ref || all[4].Available || !all[4].Deprecated || len(all[4].ExecutionModes) != 2 {
+	if err != nil || len(all) != 6 || all[0].Ref.Catalog != "builtin" || !all[0].Available || all[3].Ref.Name != "finite-logs" || !all[3].Available || all[4].Ref.Name != "inspect-processes" || !all[4].Available || all[5].Ref != ref || all[5].Available || !all[5].Deprecated || len(all[5].ExecutionModes) != 2 {
 		t.Fatalf("list = %+v, %v", all, err)
 	}
-	if builtins, _, err := f.svc.CaptureProfiles(ctx, source, target, "builtin"); err != nil || len(builtins) != 4 {
+	if builtins, _, err := f.svc.CaptureProfiles(ctx, source, target, "builtin"); err != nil || len(builtins) != 5 {
 		t.Fatal("builtin filter", builtins, err)
 	}
 	got, _, err := f.svc.CaptureProfile(ctx, source, target, ref)
-	if err != nil || got.Ref != ref || got.Digest != all[4].Digest || !bytes.Contains(got.Definition, []byte(`"editableFields"`)) {
+	if err != nil || got.Ref != ref || got.Digest != all[5].Digest || !bytes.Contains(got.Definition, []byte(`"editableFields"`)) {
 		t.Fatal("get", got, err)
 	}
 	if _, _, err = f.svc.CaptureProfile(ctx, source, target, planning.ProfileRef{Catalog: "organization", Name: "absent", Version: "v1"}); !errors.Is(err, value.ErrProfileNotFound) {

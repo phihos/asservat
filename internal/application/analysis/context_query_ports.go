@@ -49,6 +49,7 @@ type ContextQueryInvocation interface {
 // C-20 owner compares it with its normalized input before any effect; C-18
 // neither computes another MAC nor accepts an unrelated acknowledged intent.
 type ContextQueryInput struct {
+	Discovery   value.TargetDiscoveryRequest
 	Selection   value.ContextExcerptSelection
 	Headers     value.HTTPHeaderSelection
 	Packet      value.PacketSummaryRequest

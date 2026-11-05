@@ -42,13 +42,14 @@ const (
 // ProjectionResult is the approved result of one read batch. Exactly the
 // scope's branch is populated; InvalidCursor discloses no record.
 type ProjectionResult struct {
-	Logs          *LogPage `json:",omitempty"`
-	PodStatus     PodStatusProjection
-	Headers       HTTPHeaderPage
-	Summary       *ProfileSummary    `json:",omitempty"`
-	PacketQuery   *PacketQueryResult `json:",omitempty"`
-	PacketSummary *PacketSummary     `json:",omitempty"`
-	Comparison    *ProfileComparison `json:",omitempty"`
+	TargetDiscovery *TargetDiscoveryPage `json:",omitempty"`
+	Logs            *LogPage             `json:",omitempty"`
+	PodStatus       PodStatusProjection
+	Headers         HTTPHeaderPage
+	Summary         *ProfileSummary    `json:",omitempty"`
+	PacketQuery     *PacketQueryResult `json:",omitempty"`
+	PacketSummary   *PacketSummary     `json:",omitempty"`
+	Comparison      *ProfileComparison `json:",omitempty"`
 	// IncompatibleProfiles is a content-free semantic result after both
 	// authenticated source reads, not an unknown read/transport failure.
 	IncompatibleProfiles bool                 `json:",omitempty"`
@@ -65,6 +66,18 @@ type ProjectionResult struct {
 // Valid reports whether the result is exactly the scope's source branch.
 func (r ProjectionResult) Valid(s ContextProjectionScope) bool {
 	if !s.Valid() {
+		return false
+	}
+	if s.NativeType == artifact.ProcessesArtifact {
+		if r.PodStatus != (PodStatusProjection{}) || !r.Headers.empty() || r.Logs != nil || r.Summary != nil || r.PacketQuery != nil || r.PacketSummary != nil || r.Comparison != nil || r.IncompatibleProfiles || r.SyscallSummary != nil || r.SyscallEvents != nil || r.SyscallQuery != nil {
+			return false
+		}
+		if r.InvalidCursor || r.TooLarge {
+			return r.InvalidCursor != r.TooLarge && r.TargetDiscovery == nil
+		}
+		return r.TargetDiscovery != nil && r.TargetDiscovery.CaptureID == s.CaptureID && r.TargetDiscovery.ArtifactID == s.ArtifactID && r.TargetDiscovery.Version == s.Version && r.TargetDiscovery.PodUID == s.PodUID && r.TargetDiscovery.Valid(s.Discovery)
+	}
+	if r.TargetDiscovery != nil {
 		return false
 	}
 	if s.NativeType == artifact.LogsArtifact {
@@ -150,6 +163,11 @@ func (r ProjectionResult) Valid(s ContextProjectionScope) bool {
 
 // Clear drops the transient record values.
 func (r *ProjectionResult) Clear() {
+	if r.TargetDiscovery != nil {
+		clear(r.TargetDiscovery.Processes)
+		clear(r.TargetDiscovery.Gaps)
+		*r.TargetDiscovery = TargetDiscoveryPage{}
+	}
 	if r.Logs != nil {
 		r.Logs.Clear()
 	}
@@ -193,6 +211,9 @@ func (p HTTPHeaderPage) empty() bool {
 
 // BeginTool is the public tool that admits a query of this scope.
 func (s ContextProjectionScope) BeginTool() string {
+	if s.NativeType == artifact.ProcessesArtifact && s.Discovery.Valid() {
+		return "get_target_discovery"
+	}
 	if s.NativeType == artifact.LogsArtifact && s.Logs.Valid() {
 		return "get_logs"
 	}
@@ -229,6 +250,9 @@ func (s ContextProjectionScope) BeginTool() string {
 // ReadBatches is the number of read batches a query of this scope may
 // start: one page read for an extract, the historical two for pod status.
 func (s ContextProjectionScope) ReadBatches() int64 {
+	if s.NativeType == artifact.ProcessesArtifact {
+		return 1
+	}
 	if s.NativeType == artifact.LogsArtifact && s.Logs.Valid() {
 		return LogQueryReadBatches
 	}

@@ -136,3 +136,14 @@ guarded reinstall/restart as other private installation inputs. Upgrade connecto
 before collectors, then use nodes reporting authorization support; old nodes
 continue unauthenticated HTTP/TLS-only work and refuse credentialed work. There is
 no automatic refresh, cleartext fallback, extra Secret or additional RBAC reader.
+
+Process inventory is an explicit collector installation choice:
+`collector.processDiscovery.runtime: containerd`. It mounts the fixed
+`/run/containerd/containerd.sock` and host `/sys/fs/cgroup` read-only. A read-only
+socket mount still exposes the runtime daemon's full RPC API to that collector;
+the implementation uses only bounded metadata List/Status/Tasks.Get calls.
+The default empty choice adds neither mount. CRI-O process inventory is
+unsupported. Existing collector capabilities, `privileged: false`, workload
+Restricted policy and the disposable-host qualification guard remain in force.
+See [ADR-309](../../docs/decisions/309-bounded-pod-process-discovery.md); installed
+process qualification is pending.

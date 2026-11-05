@@ -36,6 +36,7 @@ type ContextProjectionOperations struct {
 	syscalls      SyscallQueryService
 	rawSyscalls   RawSyscallQueryService
 	rawLogs       RawLogQueryService
+	discovery     TargetDiscoveryQueryService
 	contracts     *contracts.InvestigationContracts
 }
 
@@ -63,12 +64,15 @@ func (s *ContextProjectionOperations) WithHTTPHeaders(headers HTTPHeaderQuerySer
 
 // serves reports whether name is one of this composition's operations.
 func (s *ContextProjectionOperations) serves(name string) bool {
-	return s != nil && queryOperation(name) && (name != "get_logs" || s.rawLogs != nil) && (name != "syscall_query" || s.rawSyscalls != nil) && (name != "get_http_headers" || s.headers != nil) && (name != "get_profile_summary" || s.profiles != nil) && (name != "get_pcap_summary" || s.packets != nil) && (name != "pcap_query" || s.packetQueries != nil) && (name != "compare_profiles" || s.comparisons != nil) && (!syscallQueryOperation(name) || s.syscalls != nil)
+	return s != nil && queryOperation(name) && (name != "get_target_discovery" || s.discovery != nil) && (name != "get_logs" || s.rawLogs != nil) && (name != "syscall_query" || s.rawSyscalls != nil) && (name != "get_http_headers" || s.headers != nil) && (name != "get_profile_summary" || s.profiles != nil) && (name != "get_pcap_summary" || s.packets != nil) && (name != "pcap_query" || s.packetQueries != nil) && (name != "compare_profiles" || s.comparisons != nil) && (!syscallQueryOperation(name) || s.syscalls != nil)
 }
 
 // toolNames are the operations this composition advertises.
 func (s *ContextProjectionOperations) toolNames() []string {
 	names := []string{"get_file_excerpt", "get_query_result"}
+	if s.discovery != nil {
+		names = append(names, "get_target_discovery")
+	}
 	if s.rawLogs != nil {
 		names = append(names, "get_logs")
 	}
@@ -109,6 +113,20 @@ func (s *ContextProjectionOperations) CallWithContext(ctx context.Context, curre
 	}
 	var input analysisapp.ContextQueryInput
 	switch name {
+	case "get_target_discovery":
+		var in TargetDiscoveryOperationInput
+		if json.Unmarshal(raw, &in) != nil {
+			return noDispatch, ErrOperationDelivery
+		}
+		r := normalizeTargetDiscoveryInput(in).request()
+		if _, e := value.NormalizeTargetDiscoveryWindow(r); e != nil {
+			failure, decision := discoveryNotAvailable, operationAuditDenied
+			if errors.Is(e, value.ErrInvalidCursor) {
+				failure, decision = discoveryInvalidCursor, operationAuditInvalid
+			}
+			return s.refusal(record.ID, name, record.Until, failure, decision, operationEffectNone, true)
+		}
+		input.Discovery = r
 	case "get_logs":
 		var in RawLogQueryOperationInput
 		if json.Unmarshal(raw, &in) != nil {
@@ -221,6 +239,8 @@ func (s *ContextProjectionOperations) CallWithContext(ctx context.Context, curre
 	}
 	var d *analysisapp.ContextProjectionDelivery
 	switch name {
+	case "get_target_discovery":
+		d, err = s.discovery.Begin(ctx, current, i, input.Discovery)
 	case "get_logs":
 		d, err = s.rawLogs.Begin(ctx, current, i, input.RawLogs)
 	case "syscall_query":
@@ -256,6 +276,9 @@ func (s *ContextProjectionOperations) CallWithContext(ctx context.Context, curre
 			}
 		}
 	}()
+	if d == nil && name == "get_target_discovery" && analysisapp.TargetDiscoveryUnavailableBeforeAdmission(err) {
+		return s.refusal(record.ID, name, record.Until, discoveryNotAvailable, operationAuditDenied, operationEffectNone, true)
+	}
 	if d == nil && name == "get_logs" && analysisapp.RawLogQueryApprovalRequiredBeforeAdmission(err) {
 		return s.refusal(record.ID, name, record.Until, OperationFailure{Code: "RawApprovalRequired", Message: "Independent approval must cover get_logs for this saved log artifact and your current registered client. Download approval does not cover this query.", Retryable: false}, operationAuditUnspecified, operationEffectNone, true)
 	}
@@ -337,6 +360,24 @@ type queryViewTimes struct {
 
 func (s *ContextProjectionOperations) serialize(requestID, name string, d *analysisapp.ContextProjectionDelivery) ([]byte, error) {
 	times := queryViewTimes{ObservedAt: d.ObservedAt(), ExpiresAt: d.QueryDeadline()}
+	if !d.Pending() && d.Tool() == "get_target_discovery" {
+		p, ok := d.TargetDiscovery()
+		if !ok {
+			return nil, ErrOperationDelivery
+		}
+		defer clear(p.Processes)
+		defer clear(p.Gaps)
+		body, err := renderTargetDiscoveryPage(requestID, name, d.Association().QueryID, p, times)
+		if err != nil {
+			return nil, err
+		}
+		if s.contracts.ValidateOutput(name, body) != nil {
+			clear(body)
+			return nil, ErrOperationDelivery
+		}
+		return body, nil
+	}
+
 	if !d.Pending() && d.Tool() == "get_logs" {
 		body, err := renderRawLogResult(requestID, name, d, times)
 		if err != nil {
@@ -543,6 +584,9 @@ func (s *ContextProjectionOperations) deliveryRefusal(requestID, name string, d 
 	switch d.Refusal() {
 	case analysisapp.ContextProjectionInvalidCursor:
 		failure, decision = httpHeaderInvalidCursor, operationAuditInvalid
+		if d.Tool() == "get_target_discovery" {
+			failure = discoveryInvalidCursor
+		}
 		if d.Tool() == "get_logs" {
 			failure = OperationFailure{Code: "InvalidCursor", Message: "The cursor does not match this saved log view. Start again without a cursor.", Retryable: false}
 		}
@@ -555,11 +599,17 @@ func (s *ContextProjectionOperations) deliveryRefusal(requestID, name string, d 
 	case analysisapp.ContextProjectionIncompatibleProfiles:
 		failure = profileComparisonIncompatible
 	case analysisapp.ContextProjectionRecordTooLarge:
+		if d.Tool() == "get_target_discovery" {
+			failure = discoveryTooLarge
+		}
 		if d.Tool() == "get_logs" {
 			failure = OperationFailure{Code: "NotAvailable", Message: "This saved log fragment does not fit the response limit.", Retryable: false}
 		}
 		if name == "get_query_result" {
 			failure.Message = "This saved evidence record does not fit the response limit."
+		}
+		if d.Tool() == "get_target_discovery" {
+			failure = discoveryTooLarge
 		}
 		if syscallQueryOperation(name) || d.Tool() == "syscall_query" {
 			failure = syscallTooLarge

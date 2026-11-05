@@ -804,6 +804,144 @@ export interface components {
                 retry_after_seconds?: number;
             };
         });
+        McpInput_get_target_discovery: {
+            /** Format: uuid */
+            capture_id: string;
+            /** @enum {unknown} */
+            section: "summary" | "processes" | "flows";
+            cursor?: string;
+            limit?: number;
+        };
+        Contract_guidance_ab5389e8510e6fdf: {
+            /** @constant */
+            kind: "discoveryPage";
+            /** Format: uuid */
+            capture_id: string;
+            source_artifact_ids: string[];
+            /** Format: date-time */
+            expires_at: string;
+            /** @enum {unknown} */
+            section: "summary" | "processes" | "flows";
+            summary: components["schemas"]["Contract_guidance_12c1bf2df01fe57b"];
+            processes?: components["schemas"]["Contract_guidance_1f2eaf917843690c"][];
+            flows?: components["schemas"]["Contract_guidance_ec15ff08f2c4dc52"][];
+            gaps: string[];
+            /** Format: date-time */
+            query_observed_at: string;
+            /** Format: date-time */
+            query_expires_at: string;
+        } & (unknown & unknown);
+        Contract_guidance_12c1bf2df01fe57b: {
+            /** Format: date-time */
+            started_at: string;
+            /** Format: date-time */
+            ended_at: string;
+            observed_wire_bytes: number;
+            retained_bytes: number;
+            coverage: components["schemas"]["Contract_guidance_554f1345ab0637f1"];
+            classifier_digest?: string;
+            /** @enum {unknown} */
+            capture_mode: "none" | "networkHeaders" | "rawPackets";
+        };
+        Contract_guidance_554f1345ab0637f1: {
+            requested_pods: number;
+            covered_pods: number;
+            process_inventory_complete: boolean;
+            traffic_complete: boolean;
+            dropped_packets: number;
+            /** @enum {unknown} */
+            stop_reason: "completed" | "duration" | "outputLimit" | "observationLimit" | "impactLimit" | "cancelled" | "capabilityGap" | "targetGone";
+        };
+        Contract_guidance_1f2eaf917843690c: {
+            process_ref: string;
+            pod_uid: string;
+            display_pid: number;
+            executable_name?: string;
+            executable_path?: string;
+            /** @enum {unknown} */
+            runtime: "native" | "go" | "dotnet" | "python" | "node" | "jvm" | "unknown";
+            identity_basis: components["schemas"]["Contract_guidance_a88818a38198abf7"];
+            parent_ref?: string;
+            rss_bytes?: number;
+            selector_candidate?: components["schemas"]["Contract_action_f252bcf961e0afcb"];
+            build_ids?: string[];
+            /** Format: date-time */
+            observed_at: string;
+        };
+        Contract_guidance_a88818a38198abf7: {
+            /** @enum {unknown} */
+            confidence: "observed" | "inferred" | "ambiguous" | "unknown";
+            reason: string;
+        };
+        Contract_action_f252bcf961e0afcb: {
+            match: {
+                executablePath?: string;
+                executableName?: string;
+                /** @enum {unknown} */
+                runtime?: "native" | "go" | "dotnet" | "python" | "node" | "jvm";
+                buildIDs?: string[];
+            };
+            includeDescendants: boolean;
+            maxDepth: number;
+            /** @constant */
+            resolve: "atDispatch";
+        };
+        Contract_guidance_ec15ff08f2c4dc52: {
+            flow_ref: string;
+            pod_uid: string;
+            /** @enum {unknown} */
+            transport: "tcp" | "udp" | "icmp" | "other";
+            peer_address: string;
+            peer_port?: number;
+            /** @enum {unknown} */
+            direction: "ingress" | "egress" | "unknown";
+            /** @enum {unknown} */
+            protocol: "unknown" | "dns" | "http1" | "http2Cleartext" | "tls";
+            protocol_basis: components["schemas"]["Contract_guidance_a88818a38198abf7"];
+            peer_candidates: components["schemas"]["Contract_guidance_edd351d6a8502e69"][];
+            peer_basis: components["schemas"]["Contract_guidance_a88818a38198abf7"];
+            process_refs: string[];
+            process_basis: components["schemas"]["Contract_guidance_a88818a38198abf7"];
+            observation_point: string;
+        };
+        Contract_guidance_edd351d6a8502e69: {
+            /** @enum {unknown} */
+            kind: "Service" | "Deployment" | "StatefulSet" | "Pod";
+            namespace: string;
+            name: string;
+            uid: string;
+        };
+        McpOutput_get_target_discovery: components["schemas"]["Contract_mcp_result"] & ({
+            /** @constant */
+            status: "ok";
+            data: components["schemas"]["Contract_guidance_ab5389e8510e6fdf"];
+            /** @constant */
+            data_class?: "extract";
+        } | {
+            /** @constant */
+            status: "pending";
+            data: {
+                query_handle: string;
+                retry_after_seconds: number;
+                /** Format: date-time */
+                query_observed_at: string;
+                /** Format: date-time */
+                query_expires_at: string;
+            };
+        } | {
+            /** @constant */
+            status: "error";
+            data: {
+                code: string;
+                message: string;
+                retryable: boolean;
+                /** Format: uri */
+                navigation_uri?: string;
+                /** @enum {unknown} */
+                responsible_role?: "maintainer" | "approver" | "administrator" | "none";
+                retry_after_seconds?: number;
+            };
+        });
         McpInput_get_query_result: {
             query_handle: string;
         };

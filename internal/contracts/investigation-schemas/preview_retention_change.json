@@ -261,7 +261,8 @@
                       "commandOutput",
                       "context",
                       "other",
-                      "syscallTrace"
+                      "syscallTrace",
+                      "processSnapshot"
                     ]
                   },
                   "minItems": 1,

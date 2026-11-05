@@ -31,6 +31,7 @@ type RetentionRule struct {
 // historical value is pod status, whose serialized form and digest are
 // unchanged. Lifecycle is set only for a save from an ongoing source.
 type ContextExpectation struct {
+	Processes *ProcessCapture `json:",omitempty"`
 	// Logs binds a finite raw whole-Pod logs action; nil preserves old digests.
 	Logs *LogCapture `json:",omitempty"`
 	// Profile is a Go endpoint profile's accepted request (ADR-284); nil
@@ -98,13 +99,14 @@ func (e ContextExpectation) Validate() error {
 	// native type follows its accepted profile type.
 	profile := e.Profile.Valid() && e.Profile.NativeType() == e.NativeType && e.DataClass == "raw" && recorderActionID(e.ActionID) && e.Recording == nil && e.Snapshot == nil && e.Lifecycle == nil && e.CompositionGroup == nil
 	logs := e.Logs.Valid() && e.NativeType == LogsArtifact && e.DataClass == "raw" && e.ExecutionClass == ContextAPIExecution && e.Logs.ActionID == e.ActionID && e.Logs.MaxNativeBytes == r.NativeLimit && e.Recording == nil && e.Profile == nil && e.Snapshot == nil && e.SourceSnapshotManifest == nil && e.Lifecycle == nil
+	processes := e.Processes.Valid() && e.NativeType == ProcessesArtifact && e.DataClass == "metadata" && e.ExecutionClass == ContextAPIExecution && e.Processes.ActionID == e.ActionID && e.Processes.MaxNativeBytes == r.NativeLimit && e.Recording == nil && e.Profile == nil && e.Logs == nil && e.Snapshot == nil && e.SourceSnapshotManifest == nil && e.Lifecycle == nil && e.CompositionGroup == nil
 	if logs {
 		_, end, err := e.Logs.Window(e.TriggeredAt)
 		logs = err == nil && end.Before(r.WriteUntil)
 	}
 	isProfile := e.NativeType == PprofArtifact || e.NativeType == GoTraceArtifact
-	if (e.NativeType == LogsArtifact || e.Logs != nil) && !logs || e.CompositionGroup != nil && (!e.CompositionGroup.Valid() || !recording && !logs) || (e.NativeType == HTTPHeadersArtifact || e.NativeType == SyscallArgumentsArtifact) && !recording || (isProfile || e.Profile != nil) && !profile ||
-		e.ExecutionClass == ContextAPIExecution && !podStatus && !recording && !snapshot && !profile && !logs || e.Recording != nil && !recording || e.Snapshot != nil && !snapshot || e.SourceSnapshotManifest != nil && !snapshot {
+	if (e.NativeType == ProcessesArtifact || e.Processes != nil) && !processes || e.Processes != nil && !processes || (e.NativeType == LogsArtifact || e.Logs != nil) && !logs || e.CompositionGroup != nil && (!e.CompositionGroup.Valid() || !recording && !logs) || (e.NativeType == HTTPHeadersArtifact || e.NativeType == SyscallArgumentsArtifact) && !recording || (isProfile || e.Profile != nil) && !profile ||
+		e.ExecutionClass == ContextAPIExecution && !podStatus && !recording && !snapshot && !profile && !logs && !processes || e.Recording != nil && !recording || e.Snapshot != nil && !snapshot || e.SourceSnapshotManifest != nil && !snapshot {
 		return ErrInvalid
 	}
 	// Pod status is an onTrigger snapshot; only recorder types save from an

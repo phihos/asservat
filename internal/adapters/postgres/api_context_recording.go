@@ -61,7 +61,7 @@ func (s *APIContextExecutions) ReadRecordingWork(ctx context.Context, captureID 
 			return err
 		}
 		w.CancellationRequested = row.SnapshotCancelRequestedAt.Valid
-		if w.Accepted.Expectation.Recording == nil && w.Accepted.Expectation.Snapshot == nil && w.Accepted.Expectation.Profile == nil && w.Accepted.Expectation.Logs == nil {
+		if w.Accepted.Expectation.Recording == nil && w.Accepted.Expectation.Snapshot == nil && w.Accepted.Expectation.Profile == nil && w.Accepted.Expectation.Logs == nil && w.Accepted.Expectation.Processes == nil {
 			return value.ErrDenied
 		}
 		if err = sourceSnapshotWork(ctx, q, s.root, &w); err != nil {

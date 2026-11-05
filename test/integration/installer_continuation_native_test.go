@@ -539,6 +539,12 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 				}
 			}()
 		}
+		if installedProcessesFocus() {
+			t.Run("manual-processes", func(t *testing.T) {
+				qualifyInstalledManualProcesses(t, ctx, admin, api, p.RootID, identity, publicRoot, publicAddress, origin, cluster, namespace, workload, diagnose)
+			})
+			return
+		}
 		if installedLogsFocus() {
 			t.Run("manual-logs", func(t *testing.T) {
 				qualifyInstalledManualLogs(t, ctx, admin, api, p.RootID, identity, publicRoot, publicAddress, origin, f.Clusters[1].Config, cluster, namespace, workload, diagnose)
@@ -725,7 +731,7 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 	}
 	hubKubeconfig := installedUnifiedRunnerKubeconfig(t, f.Clusters[0].Config, desired)
 	qualifyRegionalInstall(t, ctx, f, 1, admin, runnerAPI, api, hubKubeconfig, desired.TargetNamespace, issuer, journey, providers, offerMap.Data[contracts.RegionalOfferFile], installation)
-	if focus := installedJourneyFocus(); focus == "restart" || focus == "journey" || focus == "browser" || focus == "upgrade" || focus == "policy" || focus == "alert" || focus == "logresource" || focus == "chain" || focus == "share" || installedRecordingFocus() || installedLogsFocus() {
+	if focus := installedJourneyFocus(); focus == "restart" || focus == "journey" || focus == "browser" || focus == "upgrade" || focus == "policy" || focus == "alert" || focus == "logresource" || focus == "chain" || focus == "share" || installedRecordingFocus() || installedLogsFocus() || installedProcessesFocus() {
 		t.Log("focused " + focus + " run complete: the second workload cluster and replay checks were not run")
 		return
 	}

@@ -744,6 +744,7 @@ components:
   - internal/adapters/httpheaders
   - internal/adapters/syscalls
   - internal/adapters/logs
+  - internal/adapters/processes
   - internal/adapters/pcap
   - internal/adapters/diagnostics
   - internal/adapters/tools

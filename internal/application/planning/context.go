@@ -114,6 +114,9 @@ func ProjectionDigest() artifact.Digest {
 // execution digest. The capture identity and original deadline always do.
 func CompileContext(in value.ContextInput, now time.Time) (value.ContextPlan, error) {
 	kinds := 0
+	if in.Processes != nil {
+		kinds++
+	}
 	if in.Logs != nil {
 		kinds++
 	}
@@ -131,6 +134,9 @@ func CompileContext(in value.ContextInput, now time.Time) (value.ContextPlan, er
 	}
 	if in.Logs != nil {
 		return compileLogsContext(in, now)
+	}
+	if in.Processes != nil {
+		return compileProcessesContext(in, now)
 	}
 	if in.Profile != nil {
 		return compileProfileContext(in, now)

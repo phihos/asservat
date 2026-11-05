@@ -18,5 +18,7 @@ export declare function validInput_syscall_query(value: unknown): value is compo
 export declare function validOutput_syscall_query(value: unknown): value is components['schemas']['McpOutput_syscall_query'];
 export declare function validInput_get_logs(value: unknown): value is components['schemas']['McpInput_get_logs'];
 export declare function validOutput_get_logs(value: unknown): value is components['schemas']['McpOutput_get_logs'];
+export declare function validInput_get_target_discovery(value: unknown): value is components['schemas']['McpInput_get_target_discovery'];
+export declare function validOutput_get_target_discovery(value: unknown): value is components['schemas']['McpOutput_get_target_discovery'];
 export declare function validInput_get_query_result(value: unknown): value is components['schemas']['McpInput_get_query_result'];
 export declare function validOutput_get_query_result(value: unknown): value is components['schemas']['McpOutput_get_query_result'];

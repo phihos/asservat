@@ -24,6 +24,21 @@ spec.loader.exec_module(fixture)
 
 
 class RegionalContextSelection(unittest.TestCase):
+    def test_manual_processes_is_guarded_two_cluster_finite_source(self):
+        with patch.dict(os.environ, {"ASSERVAT_JOURNEY_FOCUS":"manual-processes"}):
+            self.assertEqual(fixture.qualification_cluster_count(3, installer_continuation=True),2)
+            self.assertEqual(fixture.qualification_go_timeout(installer_continuation=True),"18m")
+        source=Path(fixture.__file__).read_text()
+        collector=next(line for line in source.splitlines() if line.strip().startswith("collector_qualification ="))
+        self.assertIn('"manual-processes"',collector)
+        self.assertIn('report["installedTargetDiscoveryQualification"] = collector_qualification and focus == "manual-processes"',source)
+        selected=json.loads(subprocess.check_output([str(Path(__file__).with_name("ci-native.sh")),"--list"],text=True))
+        self.assertIn("continuation-manual-processes",selected)
+        workflow=Path(__file__).resolve().parents[1]/".github/workflows/native.yml"
+        text=workflow.read_text()
+        self.assertIn("timeout-minutes: 20",text)
+        self.assertIn("matrix.suite != 'continuation-manual-processes'",text)
+
     def test_manual_logs_api_only_focus_and_resource_selector(self):
         with patch.dict(os.environ, {"ASSERVAT_JOURNEY_FOCUS":"manual-logs"}):
             self.assertEqual(fixture.qualification_cluster_count(3, installer_continuation=True),2)

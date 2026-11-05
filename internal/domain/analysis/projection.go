@@ -58,6 +58,8 @@ func LookupProjectionSource(nativeType string) (ProjectionSource, bool) {
 		return LookupProjectionSourceFor(nativeType, SyscallSummaryDisplayVersion)
 	}
 	switch nativeType {
+	case artifact.ProcessesArtifact:
+		return ProjectionSource{NativeType: artifact.ProcessesArtifact, Format: artifact.ProcessFormat, DataClass: "metadata", EvidenceType: "processSnapshot", DisplayVersion: TargetDiscoveryDisplayVersion, NativeLimit: artifact.ProcessNativeLimit}, true
 	case artifact.LogsArtifact:
 		return ProjectionSource{NativeType: artifact.LogsArtifact, Format: artifact.LogFormat, DataClass: "raw", EvidenceType: "logs", DisplayVersion: LogQueryDisplayVersion, NativeLimit: artifact.LogNativeLimit}, true
 	case artifact.PodStatusArtifact:
@@ -109,7 +111,7 @@ func LookupProjectionSourceFor(nativeType, displayVersion string) (ProjectionSou
 // Matches reports whether published facts are exactly this source.
 func (p ProjectionSource) Matches(nativeType, format, dataClass, evidenceType string, nativeLimit int64, digest artifact.Digest) bool {
 	return p.NativeType == nativeType && p.Format == format && p.DataClass == dataClass && p.EvidenceType == evidenceType &&
-		(p.NativeLimit == nativeLimit || (p.NativeType == artifact.LogsArtifact || p.NativeType == artifact.PprofArtifact || p.NativeType == artifact.PCAPNGArtifact || p.NativeType == artifact.RawPCAPNGArtifact) && nativeLimit > 0 && nativeLimit <= p.NativeLimit) && p.ProjectionDigest == digest
+		(p.NativeLimit == nativeLimit || (p.NativeType == artifact.ProcessesArtifact || p.NativeType == artifact.LogsArtifact || p.NativeType == artifact.PprofArtifact || p.NativeType == artifact.PCAPNGArtifact || p.NativeType == artifact.RawPCAPNGArtifact) && nativeLimit > 0 && nativeLimit <= p.NativeLimit) && p.ProjectionDigest == digest
 }
 
 func ContextSourceProjectionDigest() artifact.Digest {
@@ -182,6 +184,7 @@ func (w HTTPHeaderWindow) Selection(caseID, artifactID string) HTTPHeaderSelecti
 // or a sample type/top-N for pprof. All other branches are zero. Added fields
 // are omitted when zero, preserving existing candidate/scope serialization.
 type ContextProjectionCandidate struct {
+	Discovery                                                                           TargetDiscoveryWindow `json:",omitzero"`
 	RootID, CaseID, ArtifactID, CaptureID, ClusterID, NamespaceUID, WorkloadUID, PodUID string
 	Selection                                                                           LineSelection
 	Principal                                                                           identity.Principal
@@ -222,6 +225,9 @@ func (c ContextProjectionCandidate) Source() (ProjectionSource, bool) {
 }
 
 func (c ContextProjectionCandidate) selectionValid() bool {
+	if c.NativeType == artifact.ProcessesArtifact || c.Discovery != (TargetDiscoveryWindow{}) {
+		return c.NativeType == artifact.ProcessesArtifact && c.Discovery.Valid() && c.Logs == (LogWindow{}) && c.PacketQuery == (PacketQueryWindow{}) && c.Comparison == (ProfileComparisonWindow{}) && c.Selection == (LineSelection{}) && c.Headers == (HTTPHeaderWindow{}) && c.Profile == (ProfileSummarySelection{}) && c.Syscalls == (SyscallWindow{}) && c.RawGrantID == ""
+	}
 	if c.NativeType == artifact.LogsArtifact || c.Logs != (LogWindow{}) {
 		return c.NativeType == artifact.LogsArtifact && c.Logs.Valid() && c.PacketQuery == (PacketQueryWindow{}) && c.Comparison == (ProfileComparisonWindow{}) && c.Selection == (LineSelection{}) && c.Headers == (HTTPHeaderWindow{}) && c.Profile == (ProfileSummarySelection{}) && c.Syscalls == (SyscallWindow{}) && (c.RawGrantID == "" || authorization.UUID(c.RawGrantID))
 	}
@@ -258,6 +264,7 @@ func (c ContextProjectionCandidate) selectionValid() bool {
 // ContextProjectionScope is built from protected routing/publication facts,
 // never decoded from a public request or treated as a permit by itself.
 type ContextProjectionScope struct {
+	Discovery                                                                           TargetDiscoveryWindow `json:",omitzero"`
 	RootID, CaseID, ArtifactID, CaptureID, ClusterID, NamespaceUID, WorkloadUID, PodUID string
 	Version, SourceProjectionDigest                                                     artifact.Digest
 	SourceFormat, DisplayVersion                                                        string
@@ -290,6 +297,9 @@ func (s ContextProjectionScope) sourceValid() bool {
 
 // Source is the closed projection source this scope reads.
 func (s ContextProjectionScope) Source() (ProjectionSource, bool) {
+	if (s.Discovery != (TargetDiscoveryWindow{})) != (s.DisplayVersion == TargetDiscoveryDisplayVersion) {
+		return ProjectionSource{}, false
+	}
 	if (s.Logs != (LogWindow{})) != (s.DisplayVersion == LogQueryDisplayVersion) {
 		return ProjectionSource{}, false
 	}
@@ -312,7 +322,7 @@ func (s ContextProjectionScope) Candidate() ContextProjectionCandidate {
 	comparison.Baseline.Version = artifact.Digest{}
 	return ContextProjectionCandidate{RootID: s.RootID, CaseID: s.CaseID, ArtifactID: s.ArtifactID, CaptureID: s.CaptureID,
 		ClusterID: s.ClusterID, NamespaceUID: s.NamespaceUID, WorkloadUID: s.WorkloadUID, PodUID: s.PodUID,
-		Selection: s.Selection, Principal: s.Principal, NativeType: s.NativeType, Headers: s.Headers, Profile: s.Profile, Syscalls: s.Syscalls, Comparison: comparison, PacketQuery: s.PacketQuery, Logs: s.Logs, RawGrantID: s.RawGrantID}
+		Selection: s.Selection, Principal: s.Principal, NativeType: s.NativeType, Headers: s.Headers, Profile: s.Profile, Syscalls: s.Syscalls, Comparison: comparison, PacketQuery: s.PacketQuery, Logs: s.Logs, Discovery: s.Discovery, RawGrantID: s.RawGrantID}
 }
 
 // ContextProjectionPath is accepted placement for this query purpose. It is not

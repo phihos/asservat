@@ -336,3 +336,30 @@ for actual exits, scope, hashes and rollback limits. No source arming, kernel/CP
 or safe reference-throughput qualification follows.
 No cached raw CRD bypass is
 needed to retrieve the limits.
+
+## Finite process inventory (ADR-309, qualification pending)
+
+The optional installer-selected `collector.processDiscovery.runtime=containerd`
+adds the fixed runtime socket and read-only host cgroup mount. Socket read-only
+mode does not restrict runtime RPC authority. No credential, RBAC, daemon,
+watch or runtime-detection fallback is added. The collector keeps
+`privileged:false`, its existing capabilities and the disposable-host guard;
+workload Pods stay Restricted.
+
+One original five-second `processSnapshot` item uses two filtered CRI lists and
+at most 128 nonverbose status plus 128 metadata-only Tasks.Get calls. All calls
+retain that deadline. The fixed containerd namespace is `k8s.io`; empty ExecID
+selects each runtime-identified initial process. CRI-O is unsupported. A joined
+thread enters/restores the node cgroup namespace, and the reader pins Pod,
+boot, full runtime ID/restart, PID/start ticks and cgroup path/inode. No argv,
+environment or user-memory file is read. The 64-origin/256-row/2-MiB limits
+produce gaps or a closed refusal; observations are not an atomic historical
+snapshot or future action authority.
+
+The existing node channel carries a distinct process result and restrictive
+process-stop work. Original acquisition/reader/writer join precedes its typed
+cancellation receipt. Native JSON publication uses the mandatory canonical
+process checker and normal encrypted custody; saved `get_target_discovery`
+pages use the regional one-batch reader and current retained-audience checks.
+Local synthetic namespace/CRI tests and encrypted TLS read tests do not qualify
+privileged execution, installed timing or maximum collector containment.

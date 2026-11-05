@@ -92,7 +92,7 @@ async function operationBundle(names, bundle) {
 }
 await operationBundle(['list_diagnostics', 'preview_capture', 'request_capture', 'resolve_capture_request', 'get_capture', 'cancel_capture', 'list_capture_history', 'get_capture_settings', 'list_capture_profiles', 'get_capture_profile'], 'capture');
 await operationBundle(['get_case', 'prepare_artifact_download', 'get_artifact_download', 'cancel_artifact_download'], 'evidence');
-await operationBundle(['get_file_excerpt', 'get_profile_summary', 'get_pcap_summary', 'pcap_query', 'compare_profiles', 'get_syscall_summary', 'get_syscall_events', 'syscall_query', 'get_logs', 'get_query_result'], 'projection');
+await operationBundle(['get_file_excerpt', 'get_profile_summary', 'get_pcap_summary', 'pcap_query', 'compare_profiles', 'get_syscall_summary', 'get_syscall_events', 'syscall_query', 'get_logs', 'get_target_discovery', 'get_query_result'], 'projection');
 await operationBundle(['activate_policy', 'deactivate_policy', 'get_policy_status'], 'policy');
 await operationBundle(['list_recordings', 'preview_recording_save'], 'recordings');
 await operationBundle(['create_share', 'list_shares', 'revoke_share', 'transfer_share', 'stop_future_sharing'], 'sharing');

@@ -65,6 +65,7 @@ func NodeTokenAudience(installationID string) string { return "asservat-node:" +
 // from the chart's ConfigMap. Ceilings are the local administrator's
 // collector-wide budgets (specs/capacity.md).
 type NodeDeployment struct {
+	ProcessRuntime string                `json:"processRuntime,omitempty"`
 	Format         string                `json:"format"`
 	InstallationID string                `json:"installationID"`
 	ClusterID      string                `json:"clusterID"`
@@ -127,6 +128,8 @@ type NodePollResponse struct {
 // peerGeneration or packetCapture. Only packetCapture (ADR-248) carries a
 // typed payload in this version; the others carry only their identity.
 type NodeWork struct {
+	CancelProcesses      *NodePacketCancel   `json:"cancelProcesses,omitempty"`
+	Processes            *NodeProcessCapture `json:"processes,omitempty"`
 	ID                   string              `json:"id"`
 	Sequence             uint64              `json:"sequence"`
 	Kind                 string              `json:"kind"`

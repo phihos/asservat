@@ -142,7 +142,7 @@ func (s ContextProjectionAuthority) checkProjection(ctx context.Context, source 
 	// refuses, the caller's own shares of this one artifact; no share, no
 	// catalog read.
 	shares := func(retained *value.Retained, version artifact.Digest) (*value.Share, value.Result, error) {
-		if s.Shares == nil || src.DataClass == "raw" {
+		if s.Shares == nil || src.DataClass == "raw" || src.NativeType == artifact.ProcessesArtifact {
 			return nil, value.Result{Reason: "NoEntitlement"}, nil
 		}
 		rows, e := s.Shares.RecipientShares(call, candidate.ArtifactID, i)
@@ -163,7 +163,7 @@ func (s ContextProjectionAuthority) checkProjection(ctx context.Context, source 
 	// The protected source lookup follows current ordinary target eligibility.
 	record, err := s.Catalog.ContextProjectionEvidence(call, candidate.ArtifactID)
 	record = cloneProjectionEvidence(record)
-	scope := analysis.ContextProjectionScope{RootID: candidate.RootID, CaseID: candidate.CaseID, CaptureID: candidate.CaptureID, ArtifactID: candidate.ArtifactID, ClusterID: candidate.ClusterID, NamespaceUID: candidate.NamespaceUID, WorkloadUID: candidate.WorkloadUID, PodUID: candidate.PodUID, Selection: candidate.Selection, Principal: candidate.Principal, NativeType: candidate.NativeType, Headers: candidate.Headers, Profile: candidate.Profile, Syscalls: candidate.Syscalls, Logs: candidate.Logs, PacketQuery: candidate.PacketQuery, RawGrantID: candidate.RawGrantID, Version: record.Version, SourceProjectionDigest: record.SourceProjectionDigest, SourceFormat: record.SourceFormat}
+	scope := analysis.ContextProjectionScope{RootID: candidate.RootID, CaseID: candidate.CaseID, CaptureID: candidate.CaptureID, ArtifactID: candidate.ArtifactID, ClusterID: candidate.ClusterID, NamespaceUID: candidate.NamespaceUID, WorkloadUID: candidate.WorkloadUID, PodUID: candidate.PodUID, Selection: candidate.Selection, Principal: candidate.Principal, NativeType: candidate.NativeType, Headers: candidate.Headers, Profile: candidate.Profile, Syscalls: candidate.Syscalls, Logs: candidate.Logs, PacketQuery: candidate.PacketQuery, Discovery: candidate.Discovery, RawGrantID: candidate.RawGrantID, Version: record.Version, SourceProjectionDigest: record.SourceProjectionDigest, SourceFormat: record.SourceFormat}
 	if src, ok := candidate.Source(); ok {
 		scope.DisplayVersion = src.DisplayVersion
 	}

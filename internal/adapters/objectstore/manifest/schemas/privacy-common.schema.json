@@ -29,7 +29,8 @@
             "commandOutput",
             "context",
             "other",
-            "syscallTrace"
+            "syscallTrace",
+            "processSnapshot"
           ]
         },
         "purposeRef": {

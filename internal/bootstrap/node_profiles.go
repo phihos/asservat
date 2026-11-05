@@ -15,6 +15,7 @@ import (
 	"asservat.local/asservat/internal/adapters/gadget"
 	"asservat.local/asservat/internal/adapters/mtls"
 	executionapp "asservat.local/asservat/internal/application/execution"
+	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/collector"
 	"asservat.local/asservat/internal/domain/execution"
 )
@@ -23,15 +24,17 @@ type profileAcquirer func(context.Context, collector.ProfileCapture, []byte, io.
 type profileUploader func(context.Context, string, collector.ProfileResult, io.Reader) error
 
 type nodeProfiles struct {
-	identity func() collector.Identity
-	acquire  profileAcquirer
-	upload   profileUploader
-	now      func() time.Time
-	budget   func() *collector.Budget
-	budgetMu *sync.Mutex
-	running  map[string]runningProfile // one conservative runtime slot per whole Pod
-	spent    map[string]time.Time
-	wg       sync.WaitGroup
+	processes       func(context.Context, collector.ProcessCapture) (artifact.ProcessInventory, error)
+	uploadProcesses func(context.Context, string, collector.ProcessResult, io.Reader) error
+	identity        func() collector.Identity
+	acquire         profileAcquirer
+	upload          profileUploader
+	now             func() time.Time
+	budget          func() *collector.Budget
+	budgetMu        *sync.Mutex
+	running         map[string]runningProfile // one conservative runtime slot per whole Pod
+	spent           map[string]time.Time
+	wg              sync.WaitGroup
 }
 type runningProfile struct {
 	captureID, workID string
@@ -181,13 +184,17 @@ func (n *nodeProfiles) stop(w collector.Work) collector.Receipt {
 	if reply.Reason == collector.ReasonWorkUnknown || reply.Reason == collector.ReasonWorkExpired {
 		return reply
 	}
-	if w.CancelProfile == nil {
+	target := w.CancelProfile
+	if w.Kind == collector.WorkCancelProcesses {
+		target = w.CancelProcesses
+	}
+	if target == nil {
 		return reply
 	}
 	n.budgetMu.Lock()
 	defer n.budgetMu.Unlock()
 	for pod, r := range n.running {
-		if r.captureID == w.CancelProfile.CaptureID && r.workID == w.CancelProfile.WorkID {
+		if r.captureID == target.CaptureID && r.workID == target.WorkID {
 			r.stopRequested = true
 			n.running[pod] = r
 			r.cancel()

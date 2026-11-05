@@ -82,7 +82,7 @@ const (
 )
 
 func (k WorkKind) Valid() bool {
-	return k == WorkProfileCapture || k == WorkCancelProfileCapture || k == WorkCancelSourceSnapshot || k == WorkPacketSourceSnapshot || k == WorkArmSource || k == WorkStopSource || k == WorkSnapshot || k == WorkPeerGeneration || k == WorkPacketCapture || k == WorkPacketSource || k == WorkStopPacketSource || k == WorkSyscallCapture || k == WorkCancelPacketCapture
+	return k == WorkCancelProcesses || k == WorkProcesses || k == WorkProfileCapture || k == WorkCancelProfileCapture || k == WorkCancelSourceSnapshot || k == WorkPacketSourceSnapshot || k == WorkArmSource || k == WorkStopSource || k == WorkSnapshot || k == WorkPeerGeneration || k == WorkPacketCapture || k == WorkPacketSource || k == WorkStopPacketSource || k == WorkSyscallCapture || k == WorkCancelPacketCapture
 }
 
 // PacketCancel names one running finite packet capture by its capture ID and
@@ -97,10 +97,12 @@ func (c PacketCancel) Valid() bool { return validUUID(c.CaptureID) && validUUID(
 // assigned per node process and only grows; NotAfter bounds when the node may
 // still act on it.
 type Work struct {
-	ID       string
-	Sequence uint64
-	Kind     WorkKind
-	NotAfter time.Time
+	CancelProcesses *PacketCancel
+	Processes       *ProcessCapture
+	ID              string
+	Sequence        uint64
+	Kind            WorkKind
+	NotAfter        time.Time
 	// Packet is the payload of exactly the packetCapture kind.
 	Profile        *ProfileCapture
 	CancelProfile  *PacketCancel
@@ -282,6 +284,10 @@ type Receipt struct {
 func Decide(w Work, now time.Time) Receipt {
 	r := Receipt{WorkID: w.ID, Sequence: w.Sequence, Outcome: OutcomeRefused, Reason: ReasonRecorderNotImplemented}
 	switch {
+	case (w.Kind == WorkCancelProcesses) != (w.CancelProcesses != nil) || w.CancelProcesses != nil && !w.CancelProcesses.Valid():
+		r.Reason = ReasonWorkUnknown
+	case (w.Kind == WorkProcesses) != (w.Processes != nil) || w.Processes != nil && (!w.Processes.Valid() || w.NotAfter.After(w.Processes.Request.Deadline)):
+		r.Reason = ReasonWorkUnknown
 	case (w.Kind == WorkProfileCapture) != (w.Profile != nil) || w.Profile != nil && (!w.Profile.Valid() || w.NotAfter.After(w.Profile.Request.Deadline.Add(-w.Profile.Request.Parameters.Duration-2*time.Second))) ||
 		(w.Kind == WorkCancelProfileCapture) != (w.CancelProfile != nil) || w.CancelProfile != nil && !w.CancelProfile.Valid() ||
 		!w.Kind.Valid() || (w.Kind == WorkPacketCapture || w.Kind == WorkSyscallCapture) != (w.Packet != nil) || w.Packet != nil && (!w.Packet.Valid() || (w.Kind == WorkSyscallCapture) != (w.Packet.Syscalls != nil)) ||

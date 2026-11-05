@@ -11,6 +11,8 @@ import { PlanDiff } from './PlanDiff';
 import { planFromPreview } from './plan-diff';
 import { SaveAsProfile } from './SaveAsProfile';
 import { CaptureSubmission } from './CaptureSubmission';
+import { TargetDiscovery } from '../projection/target-discovery';
+import { TargetDiscoveryView } from '../projection/TargetDiscoveryView';
 const RecordingsPanel = lazy(() => import('../recordings/RecordingsPanel').then(module => ({ default: module.RecordingsPanel })));
 
 const phases: Record<Progress['phase'], string> = {
@@ -151,6 +153,11 @@ function OrdinarySavedSettings({ settings, busy, controller }: { settings: Exclu
 }
 
 
+function SavedProcesses({ session, scope, captureID }: { session: Session; scope: AbortSignal; captureID: string }) {
+  const [controller] = useState(() => new TargetDiscovery());
+  return <TargetDiscoveryView controller={controller} session={session} scope={scope} captureID={captureID}/>;
+}
+
 export function CaptureWorkspace({ session, scope, controller }: { session: Session; scope: AbortSignal; controller: Investigation }) {
   const state = useSyncExternalStore(controller.subscribe, controller.snapshot);
   const [customRetention, setCustomRetention] = useState(false);
@@ -158,6 +165,9 @@ export function CaptureWorkspace({ session, scope, controller }: { session: Sess
   const catalogDraft = useRef<{ target: string; draft: CatalogDraft }>(undefined);
   useEffect(() => controller.attach(session, scope, captureIDFromPath(window.location.pathname)), [controller, session, scope]);
   const draft = state.draft;
+  const processCapture = state.preview?.lifecycle_plan.actions.some(action => action.kind === 'processSnapshot') ||
+    state.settings?.kind === 'captureSettings' && (state.settings.settings.recipe_spec.actions as { kind: string }[]).some(action => action.kind === 'processSnapshot');
+
   const setTarget = (key: keyof Target, value: string) => controller.setDraft({ ...draft, target: { ...draft.target, [key]: value } });
   const title = state.stage === 'recordings' ? 'Save existing recordings' : state.stage === 'review' ? 'Review collection' : state.stage === 'reviewed' ? 'Continue your reviewed request' : state.stage === 'progress' ? state.progress?.operation === 'recordingSave' ? 'Recording save progress' : 'Collection progress' : state.stage === 'uncertain' ? 'Confirming your request' : state.stage === 'closed' ? 'Request closed' : 'Collect evidence';
   useEffect(() => { heading.current?.focus(); }, [state.stage]);
@@ -261,6 +271,7 @@ export function CaptureWorkspace({ session, scope, controller }: { session: Sess
         {state.progress.blockers.map((blocker, index) => <p className="notice" key={index}>{blocker.message}</p>)}
         {state.progress.sharing && <p role="status">{sharingLabels[state.progress.sharing.state]}</p>}
         {state.progress.case_id && <p><a className="button" href={"/cases/" + state.progress.case_id}>View evidence</a></p>}
+        {state.progress.case_id && processCapture && <SavedProcesses key={state.progress.capture_id} session={session} scope={scope} captureID={state.progress.capture_id}/>}
         {state.progress.history_state === 'available' && <Button className="button secondary" isDisabled={state.busy} onPress={() => void controller.showSettings(state.progress!.capture_id)}>{state.progress.operation === 'recordingSave' ? 'View saved settings and acceptance time' : 'View settings'}</Button>}
         {state.progress.history_state === 'unavailable' && <p>Saved settings are unavailable. Start a new investigation to prepare a request with your current settings.</p>}
         {state.settings && <><p>Reviewing these settings prepares a new request. The original capture is not cancelled.</p><SavedSettings key={state.settings.settings_digest} settings={state.settings} busy={state.busy} controller={controller} /></>}

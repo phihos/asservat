@@ -38,6 +38,9 @@ func (s ProjectionSource) ReadOperation() authorization.Operation {
 	if s.DisplayVersion == LogQueryDisplayVersion {
 		return authorization.ReadLogQuery
 	}
+	if s.DisplayVersion == TargetDiscoveryDisplayVersion {
+		return authorization.ReadTargetDiscovery
+	}
 	if s.DisplayVersion == SyscallQueryDisplayVersion {
 		return authorization.ReadSyscallQuery
 	}
@@ -60,6 +63,9 @@ func (s ProjectionSource) ReadOperation() authorization.Operation {
 func (s ProjectionSource) OutputClass() string {
 	if s.ReadOperation() == "" {
 		return ""
+	}
+	if s.NativeType == artifact.ProcessesArtifact {
+		return "extract"
 	}
 	if s.DisplayVersion == SyscallQueryDisplayVersion {
 		return "raw"

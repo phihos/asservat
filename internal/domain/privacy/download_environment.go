@@ -66,7 +66,7 @@ func (p DownloadPolicy) WellFormed() bool {
 		key := [2]string{c.Issuer, c.ID}
 		if !identity.Text(c.Issuer, 2048) || !identity.Text(c.ID, 256) || !identity.ValidKind(c.Kind) || clients[key] ||
 			c.DataClasses == nil || !identity.Strings(c.DataClasses, 3, 32) || c.PrivacyClasses == nil || !identity.Strings(c.PrivacyClasses, 1, 32) ||
-			c.EvidenceTypes == nil || !identity.Strings(c.EvidenceTypes, 5, 32) || c.Purposes == nil || !identity.Strings(c.Purposes, 32, 128) ||
+			c.EvidenceTypes == nil || !identity.Strings(c.EvidenceTypes, 6, 32) || c.Purposes == nil || !identity.Strings(c.Purposes, 32, 128) ||
 			c.PathIDs == nil || !identity.Strings(c.PathIDs, 32, 36) {
 			return false
 		}

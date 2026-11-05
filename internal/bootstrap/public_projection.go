@@ -137,6 +137,9 @@ func newPublicProjection(ctx context.Context, d *OwnerDeployment, policy authapp
 	if profile.MemoryBytes >= query.LogQueryWorkerBytes {
 		service.LogRoutes = routes
 	}
+	if profile.MemoryBytes >= query.TargetDiscoveryWorkerBytes {
+		service.DiscoveryRoutes = routes
+	}
 	if profile.MemoryBytes >= query.SyscallProjectionWorkerBytes {
 		service.SyscallRoutes = routes
 	}

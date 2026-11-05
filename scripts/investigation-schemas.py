@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "specs/contracts"
 DEST = ROOT / "internal/contracts/investigation-schemas"
 PREFIX = "https://asservat.io/spec/v1/"
-NAMES = ["cancel_capture", "list_recordings", "preview_recording_save", "list_diagnostics", "preview_capture", "request_capture", "resolve_capture_request", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "cancel_artifact_download", "get_file_excerpt", "get_query_result", "activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share", "explain_access", "list_capture_history", "get_capture_settings", "preview_access_change", "transfer_share", "stop_future_sharing", "preview_retention_change", "request_policy_grant", "request_raw_access", "get_grant", "list_reviews", "decide_review", "revoke_grant", "list_capture_profiles", "get_capture_profile", "get_http_headers", "get_profile_summary", "get_pcap_summary", "pcap_query", "compare_profiles", "get_syscall_summary", "get_syscall_events", "syscall_query", "get_logs"]
+NAMES = ["cancel_capture", "list_recordings", "preview_recording_save", "list_diagnostics", "preview_capture", "request_capture", "resolve_capture_request", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "cancel_artifact_download", "get_file_excerpt", "get_query_result", "activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share", "explain_access", "list_capture_history", "get_capture_settings", "preview_access_change", "transfer_share", "stop_future_sharing", "preview_retention_change", "request_policy_grant", "request_raw_access", "get_grant", "list_reviews", "decide_review", "revoke_grant", "list_capture_profiles", "get_capture_profile", "get_http_headers", "get_profile_summary", "get_pcap_summary", "pcap_query", "compare_profiles", "get_syscall_summary", "get_syscall_events", "syscall_query", "get_logs", "get_target_discovery"]
 
 RECORDER_EDITS = ["packetPeers", "packetFilter", "packetBefore", "packetAfter", "packetRing", "syscallFilter", "syscallMode", "syscallBefore", "syscallAfter", "syscallRing", "syscallArguments", "syscallMaxEvents", "syscallRate", "actionMaxBytes", "actionTimeout", "actionExecutionMode", "profileDuration", "logBefore", "logAfter", "logStream"]
 
@@ -239,7 +239,7 @@ def main():
                 data["properties"]["logical_path"] = {"const": "pod-status.txt"}
                 data["properties"]["lines"]["maxItems"] = 14
             else:
-                data["properties"]["tool_name"] = {"enum": ["get_file_excerpt", "get_http_headers", "get_profile_summary", "get_pcap_summary", "pcap_query", "compare_profiles", "get_syscall_summary", "get_syscall_events", "syscall_query", "get_logs"]}
+                data["properties"]["tool_name"] = {"enum": ["get_file_excerpt", "get_http_headers", "get_profile_summary", "get_pcap_summary", "pcap_query", "compare_profiles", "get_syscall_summary", "get_syscall_events", "syscall_query", "get_logs", "get_target_discovery"]}
                 # The Go validator additionally applies the original output
                 # schema and relational request/timing checks to this object.
             output["allOf"] = [{"oneOf": branches}]
@@ -247,7 +247,7 @@ def main():
             description["outputSchema"] = localize(output)
             result[name + ".json"] = (json.dumps(description, indent=2) + "\n").encode()
             continue
-        if name in ("get_http_headers", "get_profile_summary", "get_pcap_summary", "pcap_query", "compare_profiles", "get_syscall_summary", "get_syscall_events", "syscall_query", "get_logs"):
+        if name in ("get_http_headers", "get_profile_summary", "get_pcap_summary", "pcap_query", "compare_profiles", "get_syscall_summary", "get_syscall_events", "syscall_query", "get_logs", "get_target_discovery"):
             # ADR-282/291: the whole canonical input and output. Each page is an
             # approved query: pending with its handle, the page served by
             # get_query_result. The cursor is the next record index bound to
@@ -261,6 +261,16 @@ def main():
             output["properties"]["narrowing_hint"] = {"type": "null"}
             output["properties"]["next_cursor"] = {"anyOf": [{"type": "string", "pattern": "^[0-9]{1,7}:[0-9a-f]{32}$"}, {"type": "null"}]}
             output["properties"]["provenance"]["maxItems"] = 2 if name == "compare_profiles" else 1
+            if name == "get_target_discovery":
+                output["properties"]["truncated"] = {"type": "boolean"}
+                output["properties"]["narrowing_hint"] = copy.deepcopy(common["properties"]["narrowing_hint"])
+                # ADR-309: process metadata is saved evidence, not a live sensor.
+                # Flow reconnaissance remains unavailable in this runtime.
+                description["inputSchema"]["properties"]["section"] = {"enum": ["summary", "processes"]}
+                description["description"] = "Read bounded process or summary projections from an existing process capture. Never starts or refreshes acquisition. Requires current artifact access and target collection eligibility; flow projections are unavailable."
+                documents["guidance.schema.json"]["$defs"]["discoveryPage"]["properties"]["section"] = {"enum": ["summary", "processes"]}
+                output["properties"]["data_class"] = {"enum": ["metadata", "extract"]}
+                branches[0]["properties"]["provenance"] = {"type": "array", "minItems": 1, "maxItems": 1}
             if name in ("get_profile_summary", "get_pcap_summary", "compare_profiles"):
                 output["properties"]["next_cursor"] = {"type": "null"}
                 output["properties"]["data_class"] = {"enum": ["metadata", "extract"]}
@@ -282,7 +292,7 @@ def main():
             if name == "get_logs":
                 output["properties"]["next_cursor"] = {"anyOf": [{"type":"string", "pattern":"^[0-9]{1,8}:[0-9]{1,4}:[0-9a-f]{32}$"},{"type":"null"}]}
             output["allOf"] = [{"oneOf": branches}]
-            if name in ("pcap_query", "syscall_query", "get_logs"):
+            if name in ("pcap_query", "syscall_query", "get_logs", "get_target_discovery"):
                 # A limited page needs the same useful hint as the canonical
                 # browser/MCP result; only its poll wrapper remains untruncated.
                 output["allOf"].extend(copy.deepcopy(common.get("allOf", [])))

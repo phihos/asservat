@@ -131,7 +131,7 @@ func qualifyRegionalInstall(t *testing.T, ctx context.Context, f fixture, index 
 		// warm-up (no installer input names it).
 		installMetricsServer(t, ctx, region, f.MetricsServerImage)
 	}
-	if executor && installedRecordingFocus() && index == 1 {
+	if executor && (installedRecordingFocus() || installedProcessesFocus()) && index == 1 {
 		if _, err := region.CoreV1().Namespaces().Create(ctx, &core.Namespace{ObjectMeta: meta.ObjectMeta{Name: "asservat-collector"}}, meta.CreateOptions{}); err != nil {
 			t.Fatal("collector namespace prerequisite", err)
 		}
@@ -164,7 +164,7 @@ func qualifyRegionalInstall(t *testing.T, ctx context.Context, f fixture, index 
 	if json.Unmarshal(first.Bytes(), &installed) != nil || installed.Secret.UID == "" {
 		t.Fatal("installer-cluster result")
 	}
-	if executor && installedRecordingFocus() && index == 1 {
+	if executor && (installedRecordingFocus() || installedProcessesFocus()) && index == 1 {
 		installApprovedRecordingCollector(t, ctx, region, f.Clusters[index].Config, f.CollectorImage, installation, envelope.Binding.ClusterID, installed.Namespace.Name)
 	}
 	peer := envelope.Binding.PeerID
@@ -1018,7 +1018,7 @@ func createRegionalWorkload(t *testing.T, ctx context.Context, region kubernetes
 	// The regional workload: a labeled namespace (the selector guard admits
 	// the administrator) and a Deployment with no replicas.
 	labels := map[string]string{"team": "regional"}
-	if installedRecordingFocus() || installedLogsFocus() {
+	if installedRecordingFocus() || installedLogsFocus() || installedProcessesFocus() {
 		labels["pod-security.kubernetes.io/enforce"] = "restricted"
 	}
 	ns, err := region.CoreV1().Namespaces().Create(ctx, &core.Namespace{ObjectMeta: meta.ObjectMeta{Name: name, Labels: labels}}, meta.CreateOptions{})
@@ -1067,14 +1067,19 @@ func createRegionalWorkload(t *testing.T, ctx context.Context, region kubernetes
 		volumeMounts = []core.VolumeMount{{Name: "profile-tls", MountPath: "/run/profile-tls", ReadOnly: true}}
 	}
 
-	// One running replica the installed journey captures from: the product
-	// image's idle proxy under a restricted security context.
-	app, err := region.AppsV1().Deployments(ns.Name).Create(ctx, &apps.Deployment{ObjectMeta: meta.ObjectMeta{Name: "regional-app"}, Spec: apps.DeploymentSpec{Replicas: ptr.To(int32(1)), Selector: &meta.LabelSelector{MatchLabels: labels},
-		Template: core.PodTemplateSpec{ObjectMeta: meta.ObjectMeta{Labels: labels}, Spec: core.PodSpec{AutomountServiceAccountToken: ptr.To(false), TerminationGracePeriodSeconds: ptr.To(int64(3)),
-			SecurityContext: &core.PodSecurityContext{RunAsNonRoot: ptr.To(true), RunAsUser: ptr.To(int64(65532)), SeccompProfile: &core.SeccompProfile{Type: core.SeccompProfileTypeRuntimeDefault}},
-			Volumes:         volumes, InitContainers: initContainers, Containers: []core.Container{{Name: "app", Image: image, ImagePullPolicy: core.PullIfNotPresent, Command: command, Ports: ports, VolumeMounts: volumeMounts,
-				Resources:       regionalWorkloadResources(nativePaced),
-				SecurityContext: &core.SecurityContext{AllowPrivilegeEscalation: ptr.To(false), ReadOnlyRootFilesystem: ptr.To(true), Capabilities: &core.Capabilities{Drop: []core.Capability{"ALL"}}}}}}}}}, meta.CreateOptions{})
+	// The process reference uses two independent runtime containers in one
+	// Restricted Pod; private argv/env markers must not enter metadata.
+	workloadContainers := []core.Container{{Name: "app", Image: image, ImagePullPolicy: core.PullIfNotPresent, Command: command, Ports: ports, VolumeMounts: volumeMounts, Resources: regionalWorkloadResources(nativePaced), SecurityContext: &core.SecurityContext{AllowPrivilegeEscalation: ptr.To(false), ReadOnlyRootFilesystem: ptr.To(true), Capabilities: &core.Capabilities{Drop: []core.Capability{"ALL"}}}}}
+	if installedProcessesFocus() {
+		workloadContainers[0].Command = []string{"/provider-proxy", "http://127.0.0.1:1/" + installedProcessArgCanary, "http://127.0.0.1:1", "127.0.0.1:1"}
+		workloadContainers[0].Env = []core.EnvVar{{Name: "SYNTHETIC_PROCESS_ENV_PRIVATE", Value: installedProcessEnvCanary}}
+		second := workloadContainers[0].DeepCopy()
+		second.Name = "second"
+		second.Command = []string{"/provider-proxy", "signals"}
+		second.Ports = nil
+		workloadContainers = append(workloadContainers, *second)
+	}
+	app, err := region.AppsV1().Deployments(ns.Name).Create(ctx, &apps.Deployment{ObjectMeta: meta.ObjectMeta{Name: "regional-app"}, Spec: apps.DeploymentSpec{Replicas: ptr.To(int32(1)), Selector: &meta.LabelSelector{MatchLabels: labels}, Template: core.PodTemplateSpec{ObjectMeta: meta.ObjectMeta{Labels: labels}, Spec: core.PodSpec{AutomountServiceAccountToken: ptr.To(false), TerminationGracePeriodSeconds: ptr.To(int64(3)), SecurityContext: &core.PodSecurityContext{RunAsNonRoot: ptr.To(true), RunAsUser: ptr.To(int64(65532)), SeccompProfile: &core.SeccompProfile{Type: core.SeccompProfileTypeRuntimeDefault}}, Volumes: volumes, InitContainers: initContainers, Containers: workloadContainers}}}}, meta.CreateOptions{})
 	if err != nil {
 		t.Fatal("regional workload", err)
 	}

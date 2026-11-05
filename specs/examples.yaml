@@ -454,3 +454,5 @@ examples:
   tool: get_logs
 - file: examples/capture-profile-finite-logs.yaml
   schema: https://asservat.io/spec/v1/capture-profile.schema.json
+- file: examples/capture-profile-inspect-processes.yaml
+  schema: https://asservat.io/spec/v1/capture-profile.schema.json

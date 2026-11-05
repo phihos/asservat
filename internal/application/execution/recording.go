@@ -46,6 +46,26 @@ func (s APIContextRunner) CollectRecording(ctx context.Context, w APIContextWork
 		return ContextResult{State: "Indeterminate"}, executeStep{"ReadAPIProcess", err}
 	}
 	result := r
+	if c.State == evidence.RecordingCancelled && e.Processes != nil {
+		joined := c.ProcessesCancellation
+		if joined == nil || joined.CaptureID != e.CaptureUID || joined.AttemptID != e.Registration.Location.AttemptID || joined.ExpectationDigest != r.ExpectationDigest || joined.WriterPodUID != r.Process.PodUID || joined.WriterEpoch != r.Process.ProcessEpoch || joined.JoinedAt.Before(r.StartedAt) || joined.JoinedAt.After(s.Now()) {
+			return ContextResult{State: "Indeterminate"}, executeStep{"ProcessesCancellation", value.ErrInvalid}
+		}
+		recorder, ok := s.Record.(APIProcessesCancellationRecorder)
+		if !ok {
+			return ContextResult{State: "Indeterminate"}, value.ErrUnavailable
+		}
+		recovery, err := s.Recovery.RecoveryState(ctx)
+		if err != nil {
+			return ContextResult{State: "Indeterminate"}, err
+		}
+		result.Phase, result.CompletedAt = "cancelled", joined.JoinedAt.UTC()
+		result.AcquiredAt, result.Copies = time.Time{}, artifact.Copies{}
+		if _, err = recorder.RecordAPIProcessesCancellation(ctx, result, *joined, process, recovery); err != nil {
+			return ContextResult{State: "Indeterminate"}, err
+		}
+		return ContextResult{State: "Cancelled"}, nil
+	}
 	if c.State == evidence.RecordingCancelled && e.Logs != nil {
 		joined := c.LogsCancellation
 		if joined == nil || joined.CaptureID != e.CaptureUID || joined.AttemptID != e.Registration.Location.AttemptID || joined.ExpectationDigest != r.ExpectationDigest || joined.WriterPodUID != r.Process.PodUID || joined.WriterEpoch != r.Process.ProcessEpoch || joined.JoinedAt.Before(r.StartedAt) || joined.JoinedAt.After(s.Now()) {
@@ -176,4 +196,8 @@ type APILogsCancellationRecorder interface {
 // The durable request alone never supplies this proof.
 type APIRecordingCancellationRecorder interface {
 	RecordAPIRecordingCancellation(context.Context, value.APIExecution, artifact.RecordingCancellation, value.APIProcessObservation, artifact.RecoveryProof) (value.APIExecution, error)
+}
+
+type APIProcessesCancellationRecorder interface {
+	RecordAPIProcessesCancellation(context.Context, value.APIExecution, artifact.ProcessCancellation, value.APIProcessObservation, artifact.RecoveryProof) (value.APIExecution, error)
 }

@@ -49,6 +49,7 @@ func (r *NativeContextReader) projectionReader() (*ContextProjectionReader, erro
 	reader.queryPackets = r.queryPackets
 	reader.querySyscalls = r.querySyscalls
 	reader.queryLogs = r.queryLogs
+	reader.queryDiscovery = r.queryDiscovery
 	return reader, nil
 }
 
@@ -101,5 +102,12 @@ func (r *NativeContextReader) ServeSyscallQueries(f evidence.SyscallQuerier) {
 func (r *NativeContextReader) ServeLogQueries(f evidence.LogQuerier) {
 	if r != nil {
 		r.queryLogs = f
+	}
+}
+
+// ServeTargetDiscoveries installs only the saved process metadata interpreter.
+func (r *NativeContextReader) ServeTargetDiscoveries(f evidence.TargetDiscoveryQuerier) {
+	if r != nil {
+		r.queryDiscovery = f
 	}
 }

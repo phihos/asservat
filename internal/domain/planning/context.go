@@ -31,6 +31,7 @@ func (c ContextCapability) Valid(now time.Time) bool {
 }
 
 type ContextInput struct {
+	Processes         *ProcessesContext `json:",omitempty"`
 	CaptureID, CaseID string
 	Executor          identity.Principal
 	Deadline          time.Time
@@ -49,6 +50,20 @@ type ContextInput struct {
 	Snapshot *SourceSnapshotContext `json:",omitempty"`
 	// SnapshotSource is a current exact-source observation, never persisted in passive preview.
 	SnapshotSource *targets.SourceSnapshotResolution `json:",omitempty"`
+}
+
+type ProcessesContext struct {
+	Composition     ProfileComposition
+	RequireApproval bool `json:",omitempty"`
+}
+
+func (p *ProcessesContext) Clone() *ProcessesContext {
+	if p == nil {
+		return nil
+	}
+	out := *p
+	out.Composition = *p.Composition.Clone()
+	return &out
 }
 
 // SourceSnapshotContext binds a saved window to its original policy executor

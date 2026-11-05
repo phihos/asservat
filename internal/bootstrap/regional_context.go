@@ -295,7 +295,7 @@ func (r *regionalContext) run(ctx context.Context, credentials *mtls.ConnectorPr
 	local.History = &contextstart.HistoryLocal{Verifier: r.verifier, Effects: regionalHistoryObjects{objects: r.history, root: r.rootID, cluster: r.c.TrustSettings.ClusterID, epoch: process.ProcessEpoch(), now: time.Now}, Report: timedEventLog(os.Stderr, "regional history timing")}
 	if r.output.recordings != nil {
 		local.Recordings = r.output.recordings
-		local.Sources = &contextstart.SourceLocal{Verifier: r.verifier, Snapshots: r.output.recordings, Profiles: r.output.recordings, Recordings: r.output.recordings, Report: eventLog(os.Stderr, "regional source work refused")}
+		local.Sources = &contextstart.SourceLocal{Verifier: r.verifier, Snapshots: r.output.recordings, Processes: r.output.recordings, Profiles: r.output.recordings, Recordings: r.output.recordings, Report: eventLog(os.Stderr, "regional source work refused")}
 		if queue, ok := r.output.recordings.nodes.(contextstart.SourceQueue); ok {
 			local.Sources.Queue = queue
 		}
@@ -343,6 +343,20 @@ func (o regionalArtifactOutput) PrepareContext(ctx context.Context, e artifact.C
 			return nil, err
 		}
 		return o.recordings.PrepareProfile(prepared, e), nil
+	}
+	if e.Processes != nil {
+		if o.recordings == nil {
+			return nil, value.ErrUnavailable
+		}
+		producer, err := objectstore.NewArtifactProducer(o.store, seal, noJournal{}, o.now)
+		if err != nil {
+			return nil, err
+		}
+		prepared, err := producer.Prepare(ctx, e, "")
+		if err != nil {
+			return nil, err
+		}
+		return o.recordings.PrepareProcesses(prepared, e), nil
 	}
 	if e.Logs != nil {
 		if o.recordings == nil || o.writerEpoch == "" {
@@ -517,4 +531,14 @@ func (t reportedTargets) ResolveProfileRecorder(ctx context.Context, r targets.R
 		return targets.RecorderResolution{}, err
 	}
 	return t.packetTargetAvailability(ctx, p, node, false, collector.MechanismProfile), nil
+}
+
+// ResolveProcessRecorder binds the existing exact whole-Pod resolution to
+// current metadata-only process mechanism availability.
+func (t reportedTargets) ResolveProcessRecorder(ctx context.Context, r targets.Request) (targets.RecorderResolution, error) {
+	p, node, err := t.PodTargets.ResolvePacketPod(ctx, r)
+	if err != nil {
+		return targets.RecorderResolution{}, err
+	}
+	return t.packetTargetAvailability(ctx, p, node, false, collector.MechanismProcesses), nil
 }

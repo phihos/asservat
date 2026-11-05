@@ -38,6 +38,7 @@ func admitQueryLedgerProfile(t *testing.T, f *capacitySQLFixture, root capacitya
 	raw := len(rawPacket) > 0 && rawPacket[0]
 	rawSyscall := len(rawPacket) > 1 && rawPacket[1]
 	isLogs := len(rawPacket) > 2 && rawPacket[2]
+	isProcesses := len(rawPacket) > 3 && rawPacket[3]
 	evidenceType := "profile"
 	if raw {
 		evidenceType = "packetCapture"
@@ -45,7 +46,9 @@ func admitQueryLedgerProfile(t *testing.T, f *capacitySQLFixture, root capacitya
 	if rawSyscall {
 		evidenceType = "syscallTrace"
 	}
-	if isLogs {
+	if isProcesses {
+		evidenceType = "processSnapshot"
+	} else if isLogs {
 		evidenceType = "logs"
 	}
 	s, publisher, _ := f.prepareManagedContext(t, root, enrollment, 60)
@@ -64,7 +67,11 @@ func admitQueryLedgerProfile(t *testing.T, f *capacitySQLFixture, root capacitya
 	c := planvalue.ProfileComposition{Components: []planvalue.ProfileComponent{{ID: "cpu", Profile: planvalue.ProfileRef{Catalog: "builtin", Name: "go-cpu", Version: "v1"}, Edits: []planvalue.ProfileEdit{{ActionID: "cpu", Field: "actionMaxBytes", Number: 1 << 20}}}}, MaxTotalBytes: 16 << 20, MaxDuration: "30s"}
 	input := planvalue.RecorderInput{CaptureID: in.CaptureID, Executor: in.Executor, Target: in.Target, Composition: c, Retention: in.Retention, Deadline: now.Add(time.Minute), NodeRecorder: true}
 	var reviewed planvalue.RecorderPlan
-	if isLogs {
+	if isProcesses {
+		c = processesQueryComposition()
+		input.Composition, input.RequireApproval = c, true
+		reviewed, err = planning.CompileRecorder(input, nil, now)
+	} else if isLogs {
 		c = logsQueryComposition()
 		input.Composition, input.RequireApproval = c, true
 		reviewed, err = planning.CompileRecorder(input, nil, now)
@@ -105,8 +112,11 @@ func admitQueryLedgerProfile(t *testing.T, f *capacitySQLFixture, root capacitya
 		t.Fatal(err)
 	}
 	g := authorization.Grant{ID: custodyID(), RootID: p.RootID, Kind: authorization.GrantAdHocCapture, PreviewID: p.ID, CaptureID: p.CaptureID, Target: in.Target.Target(), Requester: p.Actor, ExecutionDigest: p.ScopeDigest, Scope: p.CanonicalScope, Review: []byte(`{}`), DataClass: "raw", Reasons: []authorization.SensitiveReason{{ActionID: reviewed.Actions[0].ID, Code: planvalue.ReasonLiveProfile}}, Lifetime: time.Hour, Revision: 1}
-	if raw || rawSyscall || isLogs {
+	if raw || rawSyscall || isLogs || isProcesses {
 		g.Reasons = reviewed.Approval.Reasons
+	}
+	if isProcesses {
+		g.DataClass = "metadata"
 	}
 	g.ReviewDigest = authapp.ReviewDigest(g, g.Review)
 	g, _, err = grants.RequestGrant(ctx, authapp.StoredGrantRequest{Grant: g, IdempotencyKey: "profile-review", RequestDigest: sha256.Sum256([]byte("synthetic-profile-review"))}, s.a.Recovery)
@@ -114,7 +124,9 @@ func admitQueryLedgerProfile(t *testing.T, f *capacitySQLFixture, root capacitya
 		t.Fatal("profile review", err)
 	}
 	in.Deadline = input.Deadline
-	if isLogs {
+	if isProcesses {
+		in.Processes = &planvalue.ProcessesContext{Composition: c, RequireApproval: true}
+	} else if isLogs {
 		in.Logs = &planvalue.LogsContext{Composition: c, RequireApproval: true}
 	} else if raw || rawSyscall {
 		in.Recorder, err = planning.RecorderContextFromScope(c, reviewed.CanonicalScope)
@@ -136,6 +148,9 @@ func admitQueryLedgerProfile(t *testing.T, f *capacitySQLFixture, root capacitya
 	}
 	if isLogs {
 		r.NativeLimit = artifact.LogNativeLimit
+	}
+	if isProcesses {
+		r.NativeLimit = artifact.ProcessNativeLimit
 	}
 	r.AnchorAt = in.Retention.AnchorAt
 	r.WriteUntil = in.Deadline
@@ -161,7 +176,11 @@ func admitQueryLedgerProfile(t *testing.T, f *capacitySQLFixture, root capacitya
 	if err != nil {
 		t.Fatal("approved profile admission", err)
 	}
-	if isLogs {
+	if isProcesses {
+		if accepted.Expectation.NativeType != artifact.ProcessesArtifact || accepted.Expectation.Processes == nil || accepted.Expectation.DataClass != "metadata" {
+			t.Fatal("processes admitted wrong shape")
+		}
+	} else if isLogs {
 		if accepted.Expectation.NativeType != artifact.LogsArtifact || accepted.Expectation.Logs == nil || accepted.Expectation.DataClass != "raw" {
 			t.Fatal("logs admitted wrong shape")
 		}

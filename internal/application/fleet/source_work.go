@@ -28,15 +28,25 @@ type SourceWork struct {
 	StopIssuedAt  time.Time
 	StopSnapshot  *collector.SourceSnapshot `json:",omitempty"`
 	StopRecording *collector.RecordingStop  `json:",omitempty"`
+	StopProcesses *collector.ProcessStop    `json:",omitempty"`
 	StopProfile   *collector.ProfileStop    `json:",omitempty"`
 }
 
 func (w SourceWork) Valid(now time.Time) bool {
 	p, b := w.Source.Permit, w.Source.Permit.Binding
 	if x := w.StopRecording; x != nil {
+		if w.StopProcesses != nil {
+			return false
+		}
 		return x.Valid() && w.Source.Syscalls == nil && !w.Stop && w.StopSnapshot == nil && w.StopProfile == nil && w.Channel.Valid() && x.RootID == w.Channel.RootID && x.ClusterID == w.Channel.Connector.Binding.ClusterID && x.WriterPodUID == w.Channel.Executor.PodUID && x.WriterEpoch == w.Channel.Executor.ProcessEpoch && p == (collector.SourcePermit{}) && len(w.Source.Program) == 0 && w.Source.Ring == (collector.SourceRingLimits{}) && w.Source.Resources == (collector.SourceResources{}) && w.Target == (targets.PodResolution{}) && w.Node == (targets.PacketSourceObservation{}) && !w.StopIssuedAt.IsZero() && !now.Before(w.StopIssuedAt) && now.Before(w.NotAfter) && !w.NotAfter.After(w.StopIssuedAt.Add(5*time.Second))
 	}
+	if x := w.StopProcesses; x != nil {
+		return w.StopProfile == nil && w.StopRecording == nil && x.Valid() && w.Source.Syscalls == nil && !w.Stop && w.StopSnapshot == nil && w.Channel.Valid() && x.RootID == w.Channel.RootID && x.ClusterID == w.Channel.Connector.Binding.ClusterID && x.WriterPodUID == w.Channel.Executor.PodUID && x.WriterEpoch == w.Channel.Executor.ProcessEpoch && p == (collector.SourcePermit{}) && len(w.Source.Program) == 0 && w.Source.Ring == (collector.SourceRingLimits{}) && w.Source.Resources == (collector.SourceResources{}) && w.Target == (targets.PodResolution{}) && w.Node == (targets.PacketSourceObservation{}) && !w.StopIssuedAt.IsZero() && !now.Before(w.StopIssuedAt) && now.Before(w.NotAfter) && !w.NotAfter.After(w.StopIssuedAt.Add(5*time.Second))
+	}
 	if x := w.StopProfile; x != nil {
+		if w.StopProcesses != nil {
+			return false
+		}
 		return w.StopRecording == nil && x.Valid() && w.Source.Syscalls == nil && !w.Stop && w.StopSnapshot == nil && w.Channel.Valid() && x.RootID == w.Channel.RootID && x.ClusterID == w.Channel.Connector.Binding.ClusterID && x.WriterPodUID == w.Channel.Executor.PodUID && x.WriterEpoch == w.Channel.Executor.ProcessEpoch && p == (collector.SourcePermit{}) && len(w.Source.Program) == 0 && w.Source.Ring == (collector.SourceRingLimits{}) && w.Source.Resources == (collector.SourceResources{}) && w.Target == (targets.PodResolution{}) && w.Node == (targets.PacketSourceObservation{}) && !w.StopIssuedAt.IsZero() && !now.Before(w.StopIssuedAt) && now.Before(w.NotAfter) && !w.NotAfter.After(w.StopIssuedAt.Add(5*time.Second))
 	}
 	if w.StopSnapshot != nil {
@@ -60,7 +70,7 @@ func (w SourceWork) Valid(now time.Time) bool {
 		now.Before(w.NotAfter) && !w.NotAfter.After(p.DispatchUntil) && !w.NotAfter.After(w.Target.FreshUntil) && !w.NotAfter.After(w.Node.FreshUntil)
 }
 func (w SourceWork) IssuedAt() time.Time {
-	if w.Stop || w.StopSnapshot != nil || w.StopProfile != nil || w.StopRecording != nil {
+	if w.Stop || w.StopSnapshot != nil || w.StopProcesses != nil || w.StopProfile != nil || w.StopRecording != nil {
 		return w.StopIssuedAt
 	}
 	return w.Source.Permit.IssuedAt
@@ -87,6 +97,9 @@ func (w SourceWork) Binding() collector.SourceBinding {
 	return w.Source.Permit.Binding
 }
 func (w SourceWork) RouteID() string {
+	if w.StopProcesses != nil {
+		return w.StopProcesses.CaptureID
+	}
 	if w.StopRecording != nil {
 		return w.StopRecording.CaptureID
 	}

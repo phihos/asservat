@@ -31,7 +31,7 @@ export interface components {
             rules: {
                 name: string;
                 privacyClasses?: ("unknown" | "potentialPersonalData" | "personalData" | "specialCategoryPossible" | "verifiedNonPersonal")[];
-                evidenceTypes?: ("coreDump" | "heapDump" | "packetCapture" | "logs" | "files" | "profile" | "commandOutput" | "context" | "other" | "syscallTrace")[];
+                evidenceTypes?: ("coreDump" | "heapDump" | "packetCapture" | "logs" | "files" | "profile" | "commandOutput" | "context" | "other" | "syscallTrace" | "processSnapshot")[];
                 maxAgeSeconds: number;
             }[];
             deletionBudgetSeconds: number;

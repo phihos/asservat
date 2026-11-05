@@ -68,6 +68,10 @@ var RecorderUnavailableBlocker = OperationBlocker{Code: "RecorderUnavailable", M
 func recorderWarnings(plan planning.RecorderPlan) []string {
 	out := []string{}
 	for _, a := range plan.Actions {
+		if a.Kind == "processSnapshot" {
+			out = append(out, "This snapshot records process identity and status once, without arguments, environment or memory. Runtime and socket ownership are reported only where qualified.")
+			continue
+		}
 		if a.Kind == "logs" {
 			out = append(out, "Logs preserve raw bytes from available current and previous container sources. Streams are combined; requested history may be incomplete and source timestamps may be unknown.")
 			if plan.Approval == nil {

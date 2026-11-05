@@ -17,6 +17,9 @@ const (
 	ReadApproved   Operation = "readApproved"
 	// ReadProfileSummary authorizes only a closed pprof aggregate, never raw bytes.
 	ReadProfileSummary Operation = "readProfileSummary"
+	// ReadTargetDiscovery reads saved process metadata only for a current
+	// whole-Pod maintainer. It grants no acquisition and needs only read OAuth.
+	ReadTargetDiscovery Operation = "readTargetDiscovery"
 	// ReadPacketSummary permits only fixed numeric aggregates of a raw PCAPNG.
 	// It never authorizes raw query expressions, payload or native downloads.
 	ReadPacketSummary Operation = "readPacketSummary"
@@ -104,7 +107,7 @@ func (t Target) Valid() bool {
 	return UUID(t.ClusterID) && identity.Text(t.NamespaceUID, 64) && identity.Text(t.WorkloadUID, 64) && identity.Text(t.PodUID, 64)
 }
 func (op Operation) Valid() bool {
-	return op == CollectContext || op == ReadApproved || op == ReadProfileSummary || op == ReadPacketSummary || op == ReadPacketQuery || op == ReadSyscallProjection || op == ReadSyscallQuery || op == ReadLogQuery || op == DownloadApproved || op == ApproveAction
+	return op == ReadTargetDiscovery || op == CollectContext || op == ReadApproved || op == ReadProfileSummary || op == ReadPacketSummary || op == ReadPacketQuery || op == ReadSyscallProjection || op == ReadSyscallQuery || op == ReadLogQuery || op == DownloadApproved || op == ApproveAction
 }
 func validAudience(a artifact.AudienceAssignment) bool {
 	return (a.Kind == "User" || a.Kind == "Group" || a.Kind == "Workload") && identity.Text(a.Issuer, 2048) && identity.Text(a.SubjectID, 256) && validRole(a.Role) && (a.BasisKind == "AccessBinding" || a.BasisKind == "PermissionSource") && identity.Text(a.BasisUID, 64) && UUID(a.AssignmentID) && a.BasisDigest != (artifact.Digest{})
@@ -114,7 +117,7 @@ func validRole(role string) bool {
 }
 func permits(role string, op Operation) bool {
 	switch op {
-	case CollectContext:
+	case CollectContext, ReadTargetDiscovery:
 		return role == "workload-maintainer"
 	case ReadApproved, ReadProfileSummary, ReadPacketSummary, ReadPacketQuery, ReadSyscallProjection, ReadSyscallQuery, ReadLogQuery, DownloadApproved:
 		return role == "evidence-reader" || role == "workload-maintainer" || role == "evidence-owner"
@@ -216,6 +219,9 @@ func evaluateDetailScope(i identity.Identity, p Projection, op Operation, t Targ
 	if requireRetained && op != CollectContext && op != ApproveAction && (e == nil || !e.valid() || e.Target != t || !now.Before(e.ExpiresAt)) {
 		return deny("EvidenceUnavailable")
 	}
+	if e != nil && op == ReadTargetDiscovery && (e.DataClass != "metadata" || e.NativeType != artifact.ProcessesArtifact) {
+		return deny("UnsupportedDataClass")
+	}
 	if e != nil && op == ReadProfileSummary && (e.DataClass != "raw" || e.NativeType != artifact.PprofArtifact) {
 		return deny("ProjectionSourceUnsupported")
 	}
@@ -242,7 +248,11 @@ func evaluateDetailScope(i identity.Identity, p Projection, op Operation, t Targ
 			return deny("PermissionUnavailable")
 		}
 		until = identity.Earlier(until, d.FreshUntil)
-		if matches(d.Audience, i) && permits(d.Audience.Role, op) {
+		denies := permits(d.Audience.Role, op)
+		if op == ReadTargetDiscovery {
+			denies = permits(d.Audience.Role, ReadApproved) || permits(d.Audience.Role, CollectContext)
+		}
+		if matches(d.Audience, i) && denies {
 			matched := d.Audience
 			detail.matchedDeny = &matched
 			return deny("ExplicitDeny")

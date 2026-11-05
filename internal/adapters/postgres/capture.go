@@ -147,6 +147,10 @@ func validAdmission(a value.Admission) bool {
 
 func admissionNativeLimit(a value.Admission) bool {
 	p, r := a.Plan.Input, a.Registration
+	if p.Processes != nil {
+		processes, _, e := planning.ProcessesForContext(a.Plan)
+		return e == nil && p.Recorder == nil && p.Profile == nil && p.Logs == nil && p.Snapshot == nil && r.NativeLimit == processes.MaxNativeBytes
+	}
 	if p.Logs != nil {
 		logs, _, err := planning.LogsForContext(a.Plan)
 		return err == nil && p.Recorder == nil && p.Profile == nil && p.Snapshot == nil && r.NativeLimit == logs.MaxNativeBytes
@@ -679,6 +683,13 @@ func (s *ContextAdmissions) admitContextInTransaction(ctx context.Context, q *cu
 				}
 				expected.TriggeredAt = in.Logs.TriggeredAt
 			}
+		}
+		if in.Processes != nil {
+			processes, id, err := planning.ProcessesForContext(a.Plan)
+			if err != nil {
+				return value.ErrInvalid
+			}
+			expected.NativeType, expected.ActionID, expected.Processes, expected.DataClass = artifact.ProcessesArtifact, id, &processes, "metadata"
 		}
 		if in.Profile != nil {
 			profile, actionID, err := planning.ProfileForContext(a.Plan)

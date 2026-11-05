@@ -41,6 +41,12 @@ func (d *ContextProjectionDelivery) RefuseOversizedResult() bool {
 }
 
 func (d *ContextProjectionDelivery) clearProjectionLocked() {
+	if d.discovery != nil {
+		clear(d.discovery.Processes)
+		clear(d.discovery.Gaps)
+		*d.discovery = value.TargetDiscoveryPage{}
+		d.discovery = nil
+	}
 	if d.comparison != nil {
 		d.comparison.Clear()
 		d.comparison = nil

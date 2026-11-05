@@ -161,7 +161,7 @@ func (p resolvedProfile) wire(componentID string) wireResolved {
 // Builtin evidence kinds available as composition components in this release.
 // process-context and http-headers stay unavailable until their recorders or
 // action kinds exist (plan §2.2); go-cpu plans in preview (ADR-285).
-var builtinNames = []string{"network-connections", "syscall-activity", "go-cpu", "finite-logs"}
+var builtinNames = []string{"network-connections", "syscall-activity", "go-cpu", "finite-logs", "inspect-processes"}
 
 func strict(b []byte, out any) error {
 	d := json.NewDecoder(bytes.NewReader(b))
@@ -287,6 +287,8 @@ func evidenceType(kind string) string {
 		return "profile"
 	case "logs":
 		return "logs"
+	case "processSnapshot":
+		return "processSnapshot"
 	}
 	return ""
 }
@@ -378,11 +380,12 @@ type expandedAction struct {
 	arguments *artifact.RecordingArguments
 	// profile is a profile action (ADR-285); bindings are its component's
 	// expanded endpoint bindings and endpoint the region's frozen answer.
-	profile  *profileParameters
-	logs     *logsParameters
-	bindings []endpointBinding
-	endpoint *targets.ProfileEndpointResolution
-	filter   *value.CompiledFilter
+	profile   *profileParameters
+	logs      *logsParameters
+	processes *processParameters
+	bindings  []endpointBinding
+	endpoint  *targets.ProfileEndpointResolution
+	filter    *value.CompiledFilter
 	// peers is the canonical CIDR selection (ADR-283); nil selects all pod
 	// traffic. expression is the compiled effective filter: the peer
 	// expression intersected with the authored filter.
@@ -658,6 +661,9 @@ func validRing(path string, r ring, before time.Duration) error {
 // normalize resolves the execution mode and validates one expanded action
 // against the action-lifecycle and mechanism rules as a whole.
 func normalize(path string, a *expandedAction, compiler FilterCompiler, pc *peerContext) error {
+	if a.processes != nil {
+		return normalizeProcesses(path, a)
+	}
 	if a.logs != nil {
 		return normalizeLogs(path, a)
 	}
@@ -948,6 +954,9 @@ func expand(c value.ProfileComposition, compiler FilterCompiler, pc *peerContext
 			case "logs":
 				x.logs = &logsParameters{}
 				err = strict(a.Parameters, x.logs)
+			case "processSnapshot":
+				x.processes = &processParameters{}
+				err = strict(a.Parameters, x.processes)
 			default:
 				err = value.ErrInvalid
 			}
@@ -1228,6 +1237,8 @@ func normalizedRecorderAction(x expandedAction, componentID string) (recipeActio
 			}
 		}
 		rr = x.packet.Ring
+	} else if x.processes != nil {
+		params = x.processes
 	} else if x.logs != nil {
 		params = x.logs
 		summary.Before, summary.After, summary.LogStream = x.logs.Before, x.logs.After, x.logs.Stream
@@ -1511,6 +1522,11 @@ func RecorderScopeSummary(scope []byte) ([]value.RecorderAction, *value.Recorder
 				return nil, nil, value.ErrInvalid
 			}
 			s.Before, s.After, s.LogStream = p.Before, p.After, p.Stream
+		case "processSnapshot":
+			var p processParameters
+			if strict(a.Parameters, &p) != nil {
+				return nil, nil, value.ErrInvalid
+			}
 		default:
 			return nil, nil, value.ErrInvalid
 		}

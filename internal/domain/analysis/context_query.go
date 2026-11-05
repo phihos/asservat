@@ -93,6 +93,7 @@ func (p ContextQueryPlan) Matches(s ContextProjectionScope) bool {
 		p.Profile.Valid() && p.Profile.Path.TargetClusterID == s.ClusterID &&
 		(s.NativeType != artifact.LogsArtifact || p.Profile.Worker.MemoryBytes >= LogQueryWorkerBytes && p.Profile.Worker.WorkerTransientBytes >= LogQueryWorkerBytes) &&
 		(s.DisplayVersion != PacketQueryDisplayVersion || p.Profile.Worker.MemoryBytes >= PacketQueryWorkerBytes && p.Profile.Worker.WorkerTransientBytes >= PacketQueryWorkerBytes) &&
+		(s.NativeType != artifact.ProcessesArtifact || p.Profile.Worker.MemoryBytes >= TargetDiscoveryWorkerBytes && p.Profile.Worker.WorkerTransientBytes >= TargetDiscoveryWorkerBytes) &&
 		(s.NativeType != artifact.PCAPNGArtifact && s.NativeType != artifact.RawPCAPNGArtifact || p.Profile.Worker.MemoryBytes >= PacketSummaryWorkerBytes && p.Profile.Worker.WorkerTransientBytes >= PacketSummaryWorkerBytes) &&
 		(s.NativeType != artifact.PprofArtifact || p.Profile.Worker.MemoryBytes >= ProfileSummaryWorkerBytes && p.Profile.Worker.WorkerTransientBytes >= ProfileSummaryWorkerBytes) &&
 		(s.NativeType != artifact.SyscallRecordsArtifact && s.NativeType != artifact.SyscallArgumentsArtifact || p.Profile.Worker.MemoryBytes >= SyscallProjectionWorkerBytes && p.Profile.Worker.WorkerTransientBytes >= SyscallProjectionWorkerBytes) &&
@@ -270,7 +271,7 @@ type ContextQueryCall struct {
 func (r ContextQueryCall) Valid(now time.Time) bool {
 	return authorization.UUID(r.ID) && authorization.UUID(r.RootID) && r.InputFormat == "context-query-input/v1" &&
 		identity.Text(r.MACVersion, 64) && r.InputDigest != (artifact.Digest{}) && r.PrincipalDigest != (artifact.Digest{}) &&
-		(r.Tool == "get_logs" || r.Tool == "syscall_query" || r.Tool == "pcap_query" || r.Tool == "get_pcap_summary" || r.Tool == "get_file_excerpt" || r.Tool == "get_http_headers" || r.Tool == "get_profile_summary" || r.Tool == "compare_profiles" || r.Tool == "get_syscall_summary" || r.Tool == "get_syscall_events" || r.Tool == "get_query_result") && r.Principal.Valid() &&
+		(r.Tool == "get_target_discovery" || r.Tool == "get_logs" || r.Tool == "syscall_query" || r.Tool == "pcap_query" || r.Tool == "get_pcap_summary" || r.Tool == "get_file_excerpt" || r.Tool == "get_http_headers" || r.Tool == "get_profile_summary" || r.Tool == "compare_profiles" || r.Tool == "get_syscall_summary" || r.Tool == "get_syscall_events" || r.Tool == "get_query_result") && r.Principal.Valid() &&
 		identity.Fresh(r.StartedAt, r.Until, now, identity.EvidenceReadRequestWindow) && !r.WriteUntil.Before(r.Until) &&
 		!r.WriteUntil.After(r.StartedAt.Add(30*time.Second))
 }

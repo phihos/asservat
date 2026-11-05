@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"asservat.local/asservat/internal/adapters/logs"
+	processcodec "asservat.local/asservat/internal/adapters/processes"
 	"asservat.local/asservat/internal/application/evidence"
 	"asservat.local/asservat/internal/domain/artifact"
 )
@@ -34,6 +35,8 @@ func (v *Validator) NativeCheck(e artifact.ContextExpectation, m ContextManifest
 		return nil, artifact.ErrInvalid
 	}
 	switch e.NativeType {
+	case artifact.ProcessesArtifact:
+		return processcodec.NewProcessCheck(e, m.StartedAt, m.CompletedAt)
 	case artifact.LogsArtifact:
 		return logs.NewCheck(e, m.StartedAt, m.CompletedAt)
 	case artifact.PodStatusArtifact:

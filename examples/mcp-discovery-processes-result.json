@@ -9,7 +9,7 @@
     "source_artifact_ids": [
       "00000000-0000-4000-8000-000000000091"
     ],
-    "expires_at": "2026-10-09T12:15:00Z",
+    "expires_at": "2026-10-09T12:00:41Z",
     "section": "processes",
     "summary": {
       "started_at": "2026-10-09T12:00:00Z",
@@ -75,7 +75,9 @@
         },
         "observed_at": "2026-10-09T12:00:00Z"
       }
-    ]
+    ],
+    "query_observed_at": "2026-10-09T12:00:11Z",
+    "query_expires_at": "2026-10-09T12:00:41Z"
   },
   "truncated": false,
   "next_cursor": null,

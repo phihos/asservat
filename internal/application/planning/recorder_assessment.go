@@ -43,6 +43,9 @@ func RecorderAssessmentRulesFor(actions []value.RecorderAction) artifact.Digest 
 		if a.Kind == "logs" {
 			out = artifact.Digest(sha256.Sum256([]byte(string(out[:]) + "finite-logs-assessment/v1;whole-pod-current-previous;combined-streams;raw-text-no-redaction;encoded-native-cap;unknown-rotation-and-impact")))
 		}
+		if a.Kind == "processSnapshot" {
+			out = artifact.Digest(sha256.Sum256([]byte(string(out[:]) + "process-metadata-assessment/v1;whole-pod-cri-cgroup;64-origins256-processes;no-argv-environment-user-memory;configured-bounds-not-measured")))
+		}
 	}
 	return out
 }
@@ -177,6 +180,9 @@ func AssessRecorder(plan value.RecorderPlan, assessmentID string, now time.Time)
 		case "logs":
 			assessed.Impact = value.AssessmentImpact{Level: "unknown", HasUnknowns: true, Effects: []string{"collectorMemory", "storageIO", "uploadContention"}, Explanation: "Finite Kubernetes log reads, encoding, encryption and upload use shared API and collector resources. Load and latency are unmeasured; byte and duration limits are ceilings."}
 			assessed.Exposure = value.AssessmentExposure{Classification: "potentialPersonalData", Basis: "conservativeMechanism", RetainedPossible: []string{"userContent", "credentials", "paths", "personalIdentifiers"}, TransientOnly: []string{}, UnknownContent: true}
+		case "processSnapshot":
+			assessed.Impact = value.AssessmentImpact{Level: "low", HasUnknowns: true, Effects: []string{"nodeCPU", "collectorMemory", "storageIO", "uploadContention"}, Explanation: "Finite runtime and kernel metadata reads; no application memory or argument reads. Shared load is not measured by preview."}
+			assessed.Exposure = value.AssessmentExposure{Classification: "potentialPersonalData", Basis: "conservativeMechanism", RetainedPossible: []string{"paths", "personalIdentifiers"}, TransientOnly: []string{}}
 		default:
 			return value.RecorderAssessment{}, value.ErrInvalid
 		}
@@ -191,7 +197,7 @@ func AssessRecorder(plan value.RecorderPlan, assessmentID string, now time.Time)
 			quantity("collectorMemoryBytes", ringPhase, ringScope, ringRef, ringCoverage, ringMemory),
 			quantity("collectorMemoryBytes", "perIncident", "perIncidentPod", "action:"+a.ID+":maxFrozenBytes", frozenCoverage, a.MaxFrozenBytes),
 		}
-		if a.Kind == "profile" || a.Kind == "logs" {
+		if a.Kind == "profile" || a.Kind == "logs" || a.Kind == "processSnapshot" {
 			// A profile has no ring or frozen snapshot buffers.
 			assessed.Quantities = assessed.Quantities[:1]
 		}
@@ -205,7 +211,7 @@ func AssessRecorder(plan value.RecorderPlan, assessmentID string, now time.Time)
 	if ringArmed > 0 {
 		out.CombinedQuantities = append(out.CombinedQuantities, quantity("collectorMemoryBytes", "whileArmed", "wholePlan", "sum-of-declared-ring-limits", ringCoverage, ringArmed))
 	}
-	if plan.Actions[0].Kind != "profile" && plan.Actions[0].Kind != "logs" {
+	if plan.Actions[0].Kind != "profile" && plan.Actions[0].Kind != "logs" && plan.Actions[0].Kind != "processSnapshot" {
 		// A manual plan records one evidence type; profiles have no buffers.
 		out.CombinedQuantities = append(out.CombinedQuantities, quantity("collectorMemoryBytes", "perIncident", "wholePlan", "sum-of-declared-frozen-and-staging-limits", frozenCoverage, frozen+ringIncident))
 	}

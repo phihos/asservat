@@ -26,6 +26,7 @@ type PacketSink interface {
 }
 
 type pendingCapture struct {
+	processes      *collector.ProcessCapture
 	profile        *collector.ProfileCapture
 	cancelOnly     bool
 	cancelID       string

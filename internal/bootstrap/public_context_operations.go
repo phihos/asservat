@@ -170,6 +170,11 @@ func NewPublicContextOperations(c PublicContextOperationsConfig, s PublicContext
 			return nil, err
 		}
 	}
+	if reads, ok := q.TargetDiscoveries(); ok {
+		if projection, err = projection.WithTargetDiscovery(reads); err != nil {
+			return nil, err
+		}
+	}
 	if raw, ok := q.RawSyscallQueries(); ok {
 		if projection, err = projection.WithRawSyscallQueries(raw); err != nil {
 			return nil, err

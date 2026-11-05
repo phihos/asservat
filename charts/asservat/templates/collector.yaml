@@ -1,5 +1,7 @@
 {{- if .Values.collector.enabled }}
 {{- $c := .Values.collector }}
+{{- $processRuntime := $c.processDiscovery.runtime }}
+{{- if and (ne $processRuntime "") (ne $processRuntime "containerd") }}{{ fail "collector.processDiscovery.runtime supports only containerd; no CRI-O verbose or runtime autodetection fallback" }}{{ end }}
 {{- if eq .Values.mode "hub" }}{{ fail "collector.enabled requires mode=cluster or mode=combined" }}{{ end }}
 {{- if or (hasPrefix "kube-" $c.namespace) (eq $c.namespace "default") (eq $c.namespace .Release.Namespace) (eq $c.namespace .Values.cluster.namespace) }}{{ fail "collector.namespace must be a dedicated collector namespace distinct from the release and connector namespaces" }}{{ end }}
 {{- if not (regexMatch "^[a-z0-9][a-z0-9./:_-]{0,383}@sha256:[a-f0-9]{64}$" $c.image) }}{{ fail "collector.image requires the exact verified product repository@sha256 digest" }}{{ end }}
@@ -29,6 +31,7 @@
 {{- $_ := set $ceilings "inputBurstBytes" (int64 $c.ceilings.inputBurstBytes) }}
 {{- end }}
 {{- $input := dict "format" "asservat-node-deployment/v1" "installationID" $c.installationID "clusterID" $c.clusterID "connector" (dict "endpoint" $conn.endpoint "serverName" $conn.serverName "rootsPEM" $conn.rootsPEM) "ceilings" $ceilings }}
+{{- if eq $processRuntime "containerd" }}{{- $_ := set $input "processRuntime" "containerd" }}{{- end }}
 {{- $json := toJson $input }}
 {{- $digest := sha256sum $json }}
 # ADR-246: the collector namespace is the only namespace with the privileged
@@ -152,6 +155,12 @@ spec:
             - { name: debugfs, mountPath: /sys/kernel/debug, readOnly: true }
             - { name: tracefs, mountPath: /sys/kernel/tracing, readOnly: true }
             - { name: bpffs, mountPath: /sys/fs/bpf, readOnly: true }
+            {{- if eq $processRuntime "containerd" }}
+            # Socket permissions are not an RPC allowlist. Only the collector
+            # receives it; the product adapter issues bounded metadata reads.
+            - { name: process-runtime, mountPath: /run/containerd/containerd.sock, readOnly: true }
+            - { name: process-cgroups, mountPath: /sys/fs/cgroup, readOnly: true }
+            {{- end }}
             {{- if $c.ringDisk.enabled }}
             - { name: ring-disk, mountPath: /var/lib/asservat-ring }
             {{- end }}
@@ -183,5 +192,11 @@ spec:
           hostPath: { path: /sys/kernel/tracing, type: "" }
         - name: bpffs
           hostPath: { path: /sys/fs/bpf, type: "" }
+        {{- if eq $processRuntime "containerd" }}
+        - name: process-runtime
+          hostPath: { path: /run/containerd/containerd.sock, type: Socket }
+        - name: process-cgroups
+          hostPath: { path: /sys/fs/cgroup, type: Directory }
+        {{- end }}
 {{- end }}
 {{- end }}

@@ -1,7 +1,7 @@
 import type { components } from '../generated/projection';
 import * as validators from '../generated/validate-projection';
 
-export type Operation = 'get_logs' | 'syscall_query' | 'pcap_query' | 'get_file_excerpt' | 'get_pcap_summary' | 'get_profile_summary' | 'compare_profiles' | 'get_syscall_summary' | 'get_syscall_events' | 'get_query_result';
+export type Operation = 'get_target_discovery' | 'get_logs' | 'syscall_query' | 'pcap_query' | 'get_file_excerpt' | 'get_pcap_summary' | 'get_profile_summary' | 'compare_profiles' | 'get_syscall_summary' | 'get_syscall_events' | 'get_query_result';
 export type Input<N extends Operation> = components['schemas'][`McpInput_${N}`];
 export type Output<N extends Operation> = components['schemas'][`McpOutput_${N}`];
 export type Excerpt = Extract<Output<'get_file_excerpt'>, { status: 'ok' }>['data'];

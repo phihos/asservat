@@ -116,7 +116,8 @@
                       "get_syscall_summary",
                       "get_syscall_events",
                       "syscall_query",
-                      "get_logs"
+                      "get_logs",
+                      "get_target_discovery"
                     ]
                   },
                   "result": {

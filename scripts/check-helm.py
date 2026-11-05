@@ -469,6 +469,23 @@ def check_collector(directory):
     token = volumes["token"]["projected"]["sources"][0]["serviceAccountToken"]
     assert token == {"path": "token", "audience": "asservat-node:10000000-0000-4000-8000-000000000001", "expirationSeconds": 600}
     assert pod["serviceAccountName"] == account["metadata"]["name"] == ds["metadata"]["name"] == "asservat-node"
+    # ADR-309: explicit containerd-only process metadata. A read-only Unix
+    # socket mount does not constrain daemon RPC authority. No API RBAC added.
+    processes = copy.deepcopy(base)
+    processes["collector"]["processDiscovery"] = {"runtime": "containerd"}
+    process_docs = render(processes)
+    process_pod = next(r for r in process_docs if r["kind"] == "DaemonSet")["spec"]["template"]["spec"]
+    process_node = json.loads(next(r for r in process_docs if r["kind"] == "ConfigMap")["data"]["node.json"])
+    assert process_node["processRuntime"] == "containerd" and "processRuntime" not in node
+    process_paths = {v["hostPath"]["path"]:v["hostPath"]["type"] for v in process_pod["volumes"] if "hostPath" in v}
+    assert set(process_paths) == host_paths | {"/run/containerd/containerd.sock", "/sys/fs/cgroup"}
+    assert process_paths["/run/containerd/containerd.sock"] == "Socket" and process_paths["/sys/fs/cgroup"] == "Directory"
+    assert process_pod["containers"][0]["securityContext"] == container["securityContext"]
+    assert all(m["readOnly"] is True for m in process_pod["containers"][0]["volumeMounts"])
+    assert not any(r["kind"] in ("Role", "ClusterRole", "RoleBinding", "ClusterRoleBinding", "Secret") for r in process_docs)
+    unsupported = copy.deepcopy(processes)
+    unsupported["collector"]["processDiscovery"]["runtime"] = "cri-o"
+    render(unsupported, ok=False)
     # ADR-278: the optional ring volume is a size-limited emptyDir and the
     # only writable collector mount; it is absent unless enabled.
     assert "ring-disk" not in volumes

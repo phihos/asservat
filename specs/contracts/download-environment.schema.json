@@ -238,11 +238,12 @@
               "packetCapture",
               "syscallTrace",
               "profile",
-              "logs"
+              "logs",
+              "processSnapshot"
             ]
           },
           "minItems": 0,
-          "maxItems": 5,
+          "maxItems": 6,
           "uniqueItems": true
         },
         "purposes": {

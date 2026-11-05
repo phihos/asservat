@@ -30,7 +30,7 @@ type heldLogs struct {
 }
 
 func (h *ConnectorRecordings) heldCountLocked() int {
-	return len(h.held) + len(h.profiles) + len(h.logs)
+	return len(h.held) + len(h.profiles) + len(h.logs) + len(h.processes)
 }
 
 func (h *ConnectorRecordings) configureLogs(ctx context.Context, root string, client *kube.SavedLogClient, pod, epoch string) {

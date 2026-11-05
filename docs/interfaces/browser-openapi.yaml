@@ -13771,9 +13771,17 @@ components:
                   type: integer
                   minimum: 1
                   maximum: 60
+                query_observed_at:
+                  type: string
+                  format: date-time
+                query_expires_at:
+                  type: string
+                  format: date-time
               required:
               - query_handle
               - retry_after_seconds
+              - query_observed_at
+              - query_expires_at
           required:
           - status
           - data

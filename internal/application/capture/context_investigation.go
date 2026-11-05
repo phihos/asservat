@@ -641,6 +641,12 @@ func (s ContextInvestigation) requestWithGroupBounds(ctx context.Context, source
 		target, snapshotObserved, err = s.resolveSourceSnapshot(ctx, p.Intent.Snapshot)
 	} else if recording && logsRecorderInput(p.Intent) {
 		target, err = s.Targets.ResolvePod(ctx, p.Target)
+	} else if recording && s.Recorders != nil && processesRecorderInput(p.Intent) {
+		if processes, ok := s.Recorders.(ProcessRecorders); ok {
+			target, err = processes.ResolveProcessRecorder(ctx, p.Target)
+		} else {
+			err = targets.ErrUnsupported
+		}
 	} else if recording && s.Recorders != nil && profileRecorderInput(p.Intent) {
 		if profiles, ok := s.Recorders.(ProfileRecorders); ok {
 			target, err = profiles.ResolveProfileRecorder(ctx, p.Target)
@@ -776,6 +782,13 @@ func (s ContextInvestigation) requestWithGroupBounds(ctx context.Context, source
 		}
 		r.NativeLimit = acquisition.MaxNativeBytes
 	}
+	if plan.Input.Processes != nil {
+		acquisition, _, e := compiler.ProcessesForContext(plan)
+		if e != nil {
+			return zero, e
+		}
+		r.NativeLimit = acquisition.MaxNativeBytes
+	}
 	if r.Validate() != nil {
 		return zero, value.ErrInvalid
 	}
@@ -798,6 +811,14 @@ func (s ContextInvestigation) requestWithGroupBounds(ctx context.Context, source
 		}
 		_, end, err := logs.Window(anchor)
 		if err != nil || !end.Add(recordingCompletionMargin).Before(r.WriteUntil) {
+			return zero, value.ErrAcquisitionClosed
+		}
+	} else if plan.Input.Processes != nil {
+		acquisition, _, e := compiler.ProcessesForContext(plan)
+		if e != nil {
+			return zero, e
+		}
+		if !s.Now().Add(time.Duration(acquisition.TimeoutMillis)*time.Millisecond + recordingCompletionMargin).Before(r.WriteUntil) {
 			return zero, value.ErrAcquisitionClosed
 		}
 	} else if recording {

@@ -1060,32 +1060,87 @@
                 "pattern": "^[a-z0-9.:\\[\\]-]+$"
               },
               "credential": {
-                "type": "object", "additionalProperties": false, "required": ["audiences"],
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "audiences"
+                ],
                 "description": "ADR-302: public exact workload audiences; private values belong only in profile-authorization.json in the existing evidenceSecret.",
-                "properties": {"audiences": {"type": "array", "minItems": 1, "maxItems": 64, "uniqueItems": true, "items": {
-                  "type": "object", "additionalProperties": false,
-                  "required": ["clusterID", "namespaceUID", "workloadKind", "workloadUID"],
-                  "properties": {
-                    "clusterID": {"type": "string", "format": "uuid"},
-                    "namespaceUID": {"type": "string", "format": "uuid"},
-                    "workloadKind": {"enum": ["Deployment", "StatefulSet", "Pod"]},
-                    "workloadUID": {"type": "string", "format": "uuid"}
+                "properties": {
+                  "audiences": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 64,
+                    "uniqueItems": true,
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "clusterID",
+                        "namespaceUID",
+                        "workloadKind",
+                        "workloadUID"
+                      ],
+                      "properties": {
+                        "clusterID": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "namespaceUID": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "workloadKind": {
+                          "enum": [
+                            "Deployment",
+                            "StatefulSet",
+                            "Pod"
+                          ]
+                        },
+                        "workloadUID": {
+                          "type": "string",
+                          "format": "uuid"
+                        }
+                      }
+                    }
                   }
-                }}}
+                }
               },
               "tls": {
                 "type": "object",
                 "additionalProperties": false,
-                "required": ["serverName", "rootsPEM"],
+                "required": [
+                  "serverName",
+                  "rootsPEM"
+                ],
                 "description": "ADR-299: explicit public certificate roots, never credentials. The installer checks canonical certificate syntax and the 8 KiB byte cap. Connector-first rollout; TLS-capable collectors required.",
                 "properties": {
-                  "serverName": {"type": "string", "minLength": 1, "maxLength": 253},
-                  "rootsPEM": {"type": "string", "minLength": 1, "maxLength": 8192}
+                  "serverName": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 253
+                  },
+                  "rootsPEM": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 8192
+                  }
                 }
               }
             },
             "allOf": [
-              {"if": {"required": ["credential"]}, "then": {"required": ["tls"]}},
+              {
+                "if": {
+                  "required": [
+                    "credential"
+                  ]
+                },
+                "then": {
+                  "required": [
+                    "tls"
+                  ]
+                }
+              },
               {
                 "if": {
                   "properties": {
@@ -1307,6 +1362,22 @@
               "type": "integer",
               "minimum": 16777216,
               "maximum": 1099511627776
+            }
+          }
+        },
+        "processDiscovery": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "runtime"
+          ],
+          "properties": {
+            "runtime": {
+              "enum": [
+                "",
+                "containerd"
+              ],
+              "description": "Installer-selected metadata-only process discovery; containerd adds its fixed runtime socket and read-only host cgroup mounts. The socket API is not restricted by the read-only mount. CRI-O is unsupported; no autodetection."
             }
           }
         }

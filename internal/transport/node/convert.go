@@ -109,7 +109,7 @@ func DomainStatus(s contracts.NodeStatus) (collector.Report, bool) {
 		if a.ProfileTLS && (a.Mechanism != collector.MechanismProfile || !a.Prerequisites || a.Adapter != collector.AdapterAvailable) {
 			return collector.Report{}, false
 		}
-		if (a.Mechanism != collector.MechanismProfile && a.Mechanism != collector.MechanismPacket && a.Mechanism != collector.MechanismSyscall) || (a.Adapter != collector.AdapterAvailable && a.Adapter != collector.AdapterUnavailable) ||
+		if (a.Mechanism != collector.MechanismProcesses && a.Mechanism != collector.MechanismProfile && a.Mechanism != collector.MechanismPacket && a.Mechanism != collector.MechanismSyscall) || (a.Adapter != collector.AdapterAvailable && a.Adapter != collector.AdapterUnavailable) ||
 			(a.Hook != collector.HookNone && a.Hook != collector.HookTCX && a.Hook != collector.HookTC) || len(m.Reasons) > 16 {
 			return collector.Report{}, false
 		}
@@ -142,9 +142,16 @@ func DomainStatus(s contracts.NodeStatus) (collector.Report, bool) {
 
 func WireWork(w collector.Work) contracts.NodeWork {
 	out := contracts.NodeWork{ID: w.ID, Sequence: w.Sequence, Kind: string(w.Kind), NotAfter: w.NotAfter.UTC()}
+	if w.Processes != nil {
+		p := WireProcesses(*w.Processes)
+		out.Processes = &p
+	}
 	if w.Profile != nil {
 		p := WireProfile(*w.Profile)
 		out.ProfileCapture = &p
+	}
+	if w.CancelProcesses != nil {
+		out.CancelProcesses = &contracts.NodePacketCancel{CaptureID: w.CancelProcesses.CaptureID, WorkID: w.CancelProcesses.WorkID}
 	}
 	if w.CancelProfile != nil {
 		out.CancelProfileCapture = &contracts.NodePacketCancel{CaptureID: w.CancelProfile.CaptureID, WorkID: w.CancelProfile.WorkID}
@@ -222,6 +229,14 @@ func DomainWork(w contracts.NodeWork) (collector.Work, bool) {
 		return collector.Work{}, false
 	}
 	out := collector.Work{ID: w.ID, Sequence: w.Sequence, Kind: collector.WorkKind(w.Kind), NotAfter: w.NotAfter.UTC().Truncate(time.Microsecond)}
+	if w.Processes != nil {
+		p, ok := DomainProcesses(*w.Processes)
+		if !ok {
+			p = collector.ProcessCapture{}
+		}
+		out.Processes = &p
+		out.NotAfter = w.NotAfter.UTC()
+	}
 	if w.ProfileCapture != nil {
 		p, valid := DomainProfile(*w.ProfileCapture)
 		if !valid {
@@ -229,6 +244,10 @@ func DomainWork(w contracts.NodeWork) (collector.Work, bool) {
 		}
 		out.Profile = &p
 		out.NotAfter = w.NotAfter.UTC()
+	}
+	if w.CancelProcesses != nil {
+		p := collector.PacketCancel{CaptureID: w.CancelProcesses.CaptureID, WorkID: w.CancelProcesses.WorkID}
+		out.CancelProcesses = &p
 	}
 	if w.CancelProfileCapture != nil {
 		p := collector.PacketCancel{CaptureID: w.CancelProfileCapture.CaptureID, WorkID: w.CancelProfileCapture.WorkID}

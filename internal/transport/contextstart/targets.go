@@ -389,3 +389,17 @@ func (t Targets) ProfileRecorder(ctx context.Context, p targets.PodResolution) e
 	}
 	return nil
 }
+
+func (t Targets) ResolveProcessRecorder(ctx context.Context, r targets.Request) (targets.PodResolution, error) {
+	return t.resolveRecorder(ctx, r, queryResolveProcessRecorder)
+}
+func (t Targets) ProcessRecorder(ctx context.Context, p targets.PodResolution) error {
+	current, err := t.ResolveProcessRecorder(ctx, p.Request)
+	if err != nil {
+		return err
+	}
+	if current.Pin != p.Pin {
+		return targets.ErrChanged
+	}
+	return nil
+}

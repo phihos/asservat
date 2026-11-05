@@ -1,5 +1,32 @@
 # Sustained implementation progress
 
+## Bounded process discovery local candidate (2026-11-05)
+
+ADR-309 implements a finite whole-Pod process snapshot, explicit containerd
+metadata-only acquisition, exact runtime/kernel identity and encrypted publication.
+The saved `get_target_discovery` query uses ordinary retained-artifact and current
+target rights, one joined processing batch and an approved extract. The React
+capture workspace reads the original saved settings and displays recorded paths,
+identity references, coverage and zero-valued memory without another acquisition.
+Flows, socket owners and inferred runtime/build identities remain unavailable.
+
+Local core regressions, four actual compiler/native-parity/Stop model tests and
+four shared lifetime/poll/FIFO tests pass. The old builtin catalog-count failure
+is preserved; its corrected regression passes. The actual audited C18/C20 bridge,
+canonical contracts and direct/nested escaped page limits pass focused races
+(presentation4.634s/contracts1.529s). Six React tests pass, including inert paths,
+original pending handles, relative expiry and source-bound pagination. Independent
+public-slice review is clear; repository integration fixes register the builtin
+example, refresh the canonical policy bundle and format one test. The final
+pre-push gate passes. Full public affected races are still in progress.
+
+These are local implementation checks. Migration142 real-service lifecycle,
+cancellation and upgrade/rollback, installed containerd acquisition, native/browser/
+MCP parity and combined resource qualification remain pending. Fast completion
+never supplies evidence for an in-flight Stop. Policy/mixed process execution,
+file/core collection and the broader guided discovery requirements remain open;
+S-05 and the complete specification goal are not complete.
+
 ## API-only saved-logs start correction (2026-11-05)
 
 Signed `ed7ebe06` passes CI42112331527, but installed42112422885 fails

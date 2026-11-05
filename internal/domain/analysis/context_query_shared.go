@@ -39,6 +39,8 @@ func (s ContextProjectionScope) QueryUnits() int64 {
 		return ProfileComparisonQueryUnits
 	}
 	switch s.BeginTool() {
+	case "get_target_discovery":
+		return 2
 	case "get_logs":
 		return LogQueryUnits
 	case "syscall_query":
