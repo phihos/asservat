@@ -1,6 +1,6 @@
 {
   "name": "preview_capture",
-  "description": "Passively preview whole-Pod status or a finite packet, syscall or Go profile capture. Use profile_composition for versioned profiles and typed edits; onTrigger requires before 0s. History IDs from list_capture_history restore target, retention and composition for a fresh preview. Returns Pod selection, lifecycle, impact, data handling and blockers. Sharing requires evidence-owner and evidence:share (up to eight users/groups; default 24 hours, maximum seven days).",
+  "description": "Preview whole-Pod status or a versioned capture composition without collection. Returns exact Pod, impact, handling and blockers. onTrigger requires before 0s. Sharing needs evidence-owner and evidence:share; eight recipients and seven days maximum (default24h).",
   "annotations": {
     "readOnlyHint": true,
     "destructiveHint": false,
@@ -1339,6 +1339,37 @@
                       "lexicalEligiblePod"
                     ],
                     "description": "Selection for the fixed pod-status/v1 preset. This describes the reviewed pod, never ongoing monitoring coverage or authority to select a replacement."
+                  },
+                  "result_access_actions": {
+                    "type": "array",
+                    "maxItems": 16,
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "action_id": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 64
+                        },
+                        "operations": {
+                          "type": "array",
+                          "minItems": 1,
+                          "maxItems": 2,
+                          "uniqueItems": true,
+                          "items": {
+                            "enum": [
+                              "download_artifact",
+                              "pcap_query"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "action_id",
+                        "operations"
+                      ]
+                    }
                   }
                 },
                 "required": [

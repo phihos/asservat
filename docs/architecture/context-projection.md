@@ -47,6 +47,71 @@ The two-unit/three-key paid query creates no derivative. Current privacy,
 retention, original deadlines, audit and joined closure remain mandatory.
 Raw-input resource and installed browser/MCP/native qualification are pending.
 
+## Bounded saved-packet queries (implementation pending)
+
+[ADR-305](../decisions/305-bounded-saved-packet-queries.md) adds the planned
+pcap_query workflow to the existing C-03/C-18/C-14 query composition; it is not
+implemented by the fixed numeric summary. The explicit language choice revises
+REQ-MCP-003 to named tcpdump/libpcap packet-filter syntax, while retaining the
+public packet_filter field and512-byte cap. Reuse the pinned hub compiler,
+existing syntax/instruction/no-resolution checks and supported packets.Filter
+Go VM. Reject the RawBytePredicate bracket class before effects. Typed packet
+time and flag mask/value selectors preserve those questions without adding an
+expression parser; a closed agreed field catalog preserves numeric header
+projection and a bounded raw captured-frame prefix. No names, guessed headers,
+reconstructed payload, plugins or external command are introduced.
+
+C-03 authorizes metadata-only fields from metadata sources through ordinary
+current/retained rights. Any raw original needs its exact pcap_query artifact/
+digest/human/client grant even for header-only fields. The fixed raw-summary
+aggregate right, raw share, acquisition approval and download operation do not
+supply that grant. A metadata original cannot yield raw bytes it never retained.
+Both standalone and combined resultAccess grants use current ordinary eligibility,
+parent decision/revocation/expiry and the same finite disclosure pool. Exact
+source/selection/current grant checks follow blocking work and final delivery.
+
+C-24 owns the bounded query selection/result and distinct display version;
+C-18 normalizes source, fields, typed selectors, original program and budgets;
+C-08/C-20 bind that same selection through the existing keyed OperationMAC,
+audit and nested original-tool output validation. C-14 receives only a typed
+server-constructed native command. SQL/outbox/audit carry bounded control data,
+not rows, frame prefixes or payload/string-literal predicates. Numeric addresses
+remain retained user data. No new control-encryption service or callback is
+needed for this subset.
+
+Logical scan visits saved records in original order and charges their captured
+lengths, including nonmatches, until the next record would cross the scan cap
+or the row cap is reached. It does not release a computed page early: the
+existing bounded native/canonical check must authenticate full EOF, independently
+of reported logical scanned_bytes. Total original input/drain work and evaluator
+structure/elapsed work remain bounded; an input cap alone does not qualify the
+filter VM caches, crypto, transport and result together. The page is at most100
+rows/32 fields/24KiB including wrapping. Source error, cancel, corrupt tail or
+lost authority discards it and joins the original owner; no late result/refund.
+Today's8MiB source bound is distinct from the schema's1GiB scan ceiling.
+
+The initial public idempotency key is specific to this explicit query; fixed
+ordinary excerpts/summaries keep their key-free requests. The existing query
+ledger must immutably associate caller/client/key and normalized input digest
+with the original query and grant/use before effects. Same-key replay resolves
+that record before new compilation/admission/debit and retains the pinned
+program, paid batch, worker and original cutoffs. Changed selection/grant
+conflicts; get_query_result never creates a replacement. Each request/poll
+still has an independent audit invocation and current identity check.
+
+Extend the existing immutable grant-use journal from its download-only operation
+checks, comparing operation on replay as well as parent/child/bytes/count. A raw
+query reserves one operation and worst-case bounded returned bytes, durably
+linked to its original paid query/batch; uncertain spend is never refunded or
+moved to a new grant. Query-only maxBytes does not require whole-native-size
+coverage; verified size remains an exact source fact. A scope also including
+download retains whole-file coverage and that operation's existing ceiling;
+both consume the same parent pool. Scan/capacity cost is separate. No second
+lifecycle journal, captured artifact, stored derivative, history row, PVC or
+extra Job is needed. Reuse one existing worker and three one-use key roles per
+source. New query units/resources and exact SQL read/lock cost require measured
+qualification; prior summary values are not a new query benchmark.
+
 ## Profile summary candidate
 
 [ADR-291](../decisions/291-bounded-profile-summary.md) adds a closed raw-pprof
@@ -356,7 +421,9 @@ does not issue another SQL completion or invent a later cleanup interval.
 ## Audit and transport boundary
 
 SC-AUT-005 gives every invocation a new server audit request ID, including polls
-and denials. No user-managed read idempotency key is added. Normalize the exact
+and denials. Fixed ordinary projection reads add no user-managed idempotency
+key; explicit pcap_query has the separate initial-key association described
+above. Normalize the exact
 case/artifact or server-owned query reference, tool, display version and line
 selection; SQL/outbox/audit metadata never carry output lines. Use the existing
 keyed input/output audit digests and encrypted audit objects. Query admission,
@@ -414,8 +481,9 @@ or HTML interpretation. Its managed view has a finite original cutoff, clears
 on scope loss/close and does not silently create a new query after a terminal
 result. Result metadata/cutoff must be conveyed through the shared validated
 presentation contract; implementation must not invent an unvalidated browser-only
-evidence shape. Canonical ordinary-read request schemas need no idempotency or
-continuation extension. Native-download actions remain separate.
+evidence shape. Fixed ordinary-read request schemas need no idempotency or
+continuation extension; explicit pcap_query retains its separately declared
+initial key. Native-download actions remain separate.
 
 The two query operations carry `query_observed_at` and `query_expires_at` in
 successful/pending `data` only. C-18 fixes the observation timestamp when it

@@ -85,9 +85,14 @@ func TestRawQueryGrantPublicRequestAndReview(t *testing.T) {
 		}
 	}
 	uc.requestErr = authapp.ErrRawQueryOperationUnsupported
+	uc.input = authapp.RawQueryRequestInput{}
 	reply, err = s.Call(t.Context(), f, "request_raw_access", []byte(strings.Replace(in, "download_artifact", "read_memory", 1)))
+	if err == nil || uc.input.CaseID != "" {
+		t.Fatal("unsupported runtime operation reached grant service", err)
+	}
+	reply, err = s.Call(t.Context(), f, "request_raw_access", []byte(strings.Replace(in, "download_artifact", "pcap_query", 1)))
 	if err != nil || !strings.Contains(string(reply.Body), `"code":"UnsupportedOperation"`) {
-		t.Fatalf("future operation: %v %s", err, reply.Body)
+		t.Fatalf("closed service refusal: %v %s", err, reply.Body)
 	}
 	uc.view = rawGrantView(f.i.VerifiedAt, 2)
 	for _, name := range []string{"get_grant", "list_reviews"} {

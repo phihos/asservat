@@ -31,8 +31,14 @@ func NewContextProjectionPolicies(source DownloadPolicyReader, now func() time.T
 }
 
 func (s *ContextProjectionPolicies) ContextProjectionPolicy(ctx context.Context, target, store, nativeType string) (value.ContextProjectionPolicy, error) {
+	return s.ContextProjectionPolicyFor(ctx, target, store, nativeType, "")
+}
+func (s *ContextProjectionPolicies) ContextProjectionPolicyFor(ctx context.Context, target, store, nativeType, display string) (value.ContextProjectionPolicy, error) {
 	var out value.ContextProjectionPolicy
 	source, known := value.LookupProjectionSource(nativeType)
+	if display != "" {
+		source, known = value.LookupProjectionSourceFor(nativeType, display)
+	}
 	if !known || s == nil || s.source == nil || s.now == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(target) || !authorization.UUID(store) {
 		return out, value.ErrUnavailable
 	}

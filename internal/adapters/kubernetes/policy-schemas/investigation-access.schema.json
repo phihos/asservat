@@ -43,7 +43,8 @@
           },
           "minItems": 1,
           "maxItems": 8,
-          "uniqueItems": true
+          "uniqueItems": true,
+          "description": "Selected clients. When omitted, resolve to the authenticated requesting client before recording the review and digest. Explicit selections remain exact; replay never adds or changes a client."
         },
         "maxArtifacts": {
           "type": "integer",
@@ -68,7 +69,6 @@
       "required": [
         "actionIds",
         "operations",
-        "clientIDs",
         "maxArtifacts",
         "maxBytes",
         "maxOperations",

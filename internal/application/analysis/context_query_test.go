@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"testing"
 	"time"
 
@@ -257,7 +258,7 @@ func (i *projectionInvocationFake) Invocation(ctx context.Context) (value.Contex
 	return i.call, nil
 }
 func (i *projectionInvocationFake) CheckInput(_ context.Context, in ContextQueryInput) error {
-	if in != i.input {
+	if !reflect.DeepEqual(in, i.input) {
 		return value.ErrUnavailable
 	}
 	return nil

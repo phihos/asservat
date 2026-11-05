@@ -79,7 +79,11 @@ func TestInstalledPacketSummaryOriginalQueryFunding(t *testing.T) {
 			q, source := installedProfileComparisonCapacityFixture(t, p)
 			const queries = 2 // one ordinary MCP query and one independent console query.
 			needed := int64(queries * query.PacketSummaryQueryUnits)
-			if p.Records != 8 || q.ContextQuery.WorkloadQueries < needed || q.ContextQuery.PrincipalQueries < needed || q.ContextQuery.RootQueries < needed {
+			expectedRecords := int64(8)
+			if focus == "manual-raw" {
+				expectedRecords = 16
+			}
+			if p.Records != expectedRecords || q.ContextQuery.WorkloadQueries < needed || q.ContextQuery.PrincipalQueries < needed || q.ContextQuery.RootQueries < needed {
 				t.Fatal("original manual-mixed query reservation cannot fund both clients")
 			}
 			pool, err := capacity.CompileProtectedPoolPlan(source, "capacity")
@@ -89,7 +93,7 @@ func TestInstalledPacketSummaryOriginalQueryFunding(t *testing.T) {
 			if _, err = capacity.CompileQualifiedRootBacking(q, pool); err != nil {
 				t.Fatal("original manual-mixed combined backing", err)
 			}
-			t.Logf("%s retains original8record reservation: two independent2unit reads=%d<=workload%d; exact shared-account charge checked in installedSQL, no capture/query/pool ceiling increase", focus, needed, q.ContextQuery.WorkloadQueries)
+			t.Logf("%s retains its original accepted reservation: two independent2unit reads=%d<=workload%d; exact shared-account charge checked in installedSQL, no runtime topup/refund", focus, needed, q.ContextQuery.WorkloadQueries)
 		})
 	}
 }

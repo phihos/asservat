@@ -24,9 +24,10 @@ const (
 )
 
 var (
-	ErrInvalid     = errors.New("invalid context projection")
-	ErrUnavailable = errors.New("context projection unavailable")
-	ErrExpired     = errors.New("context projection expired")
+	ErrInvalid       = errors.New("invalid context projection")
+	ErrUnavailable   = errors.New("context projection unavailable")
+	ErrExpired       = errors.New("context projection expired")
+	ErrQueryConflict = errors.New("query idempotency conflict")
 	// ErrBusy refuses a query whose worker would exceed the live acquisition
 	// worker caps; the query stays charged and a later retry may succeed.
 	ErrBusy = errors.New("context projection workers busy")
@@ -76,6 +77,11 @@ func LookupProjectionSource(nativeType string) (ProjectionSource, bool) {
 // LookupProjectionSourceFor binds a closed display purpose as well as its
 // native input. A syscall source supports two distinct approved views.
 func LookupProjectionSourceFor(nativeType, displayVersion string) (ProjectionSource, bool) {
+	if displayVersion == PacketQueryDisplayVersion && (nativeType == artifact.PCAPNGArtifact || nativeType == artifact.RawPCAPNGArtifact) {
+		known, _ := LookupProjectionSource(nativeType)
+		known.DisplayVersion = displayVersion
+		return known, true
+	}
 	if nativeType == artifact.PprofArtifact && displayVersion == ProfileComparisonDisplayVersion {
 		known, _ := LookupProjectionSource(nativeType)
 		known.DisplayVersion = displayVersion
@@ -179,6 +185,8 @@ type ContextProjectionCandidate struct {
 	Profile                                                                             ProfileSummarySelection `json:",omitzero"`
 	Syscalls                                                                            SyscallWindow           `json:",omitzero"`
 	Comparison                                                                          ProfileComparisonWindow `json:",omitzero"`
+	PacketQuery                                                                         PacketQueryWindow       `json:",omitzero"`
+	RawGrantID                                                                          string                  `json:",omitempty"`
 }
 
 func (c ContextProjectionCandidate) Valid() bool {
@@ -195,6 +203,9 @@ func (c ContextProjectionCandidate) RouteValid() bool {
 
 // Source derives the view identity from the closed typed selection.
 func (c ContextProjectionCandidate) Source() (ProjectionSource, bool) {
+	if c.PacketQuery != (PacketQueryWindow{}) {
+		return LookupProjectionSourceFor(c.NativeType, PacketQueryDisplayVersion)
+	}
 	if c.Comparison != (ProfileComparisonWindow{}) {
 		return LookupProjectionSourceFor(c.NativeType, ProfileComparisonDisplayVersion)
 	}
@@ -205,6 +216,12 @@ func (c ContextProjectionCandidate) Source() (ProjectionSource, bool) {
 }
 
 func (c ContextProjectionCandidate) selectionValid() bool {
+	if c.PacketQuery != (PacketQueryWindow{}) {
+		return c.PacketQuery.Valid() && c.PacketQuery.Selection().ValidFor(c.NativeType) && c.Comparison == (ProfileComparisonWindow{}) && c.Selection == (LineSelection{}) && c.Headers == (HTTPHeaderWindow{}) && c.Profile == (ProfileSummarySelection{}) && c.Syscalls == (SyscallWindow{}) && ((c.NativeType == artifact.RawPCAPNGArtifact && (c.RawGrantID == "" || authorization.UUID(c.RawGrantID))) || (c.NativeType == artifact.PCAPNGArtifact && c.RawGrantID == ""))
+	}
+	if c.RawGrantID != "" {
+		return false
+	}
 	if c.Comparison != (ProfileComparisonWindow{}) {
 		return c.NativeType == artifact.PprofArtifact && c.Selection == (LineSelection{}) && c.Headers == (HTTPHeaderWindow{}) && c.Syscalls == (SyscallWindow{}) && c.Profile.Valid() && c.Comparison.candidateValid(c)
 	}
@@ -239,9 +256,20 @@ type ContextProjectionScope struct {
 	Profile                                                                             ProfileSummarySelection `json:",omitzero"`
 	Syscalls                                                                            SyscallWindow           `json:",omitzero"`
 	Comparison                                                                          ProfileComparisonWindow `json:",omitzero"`
+	PacketQuery                                                                         PacketQueryWindow       `json:",omitzero"`
+	RawGrantID                                                                          string                  `json:",omitempty"`
 }
 
 func (s ContextProjectionScope) Valid() bool {
+	return s.sourceValid() && (s.DisplayVersion != PacketQueryDisplayVersion || s.NativeType != artifact.RawPCAPNGArtifact || authorization.UUID(s.RawGrantID))
+}
+
+// PreGrantValid checks only the protected raw-query source and selection while
+// discovering a missing approval. It is never accepted read/admission authority.
+func (s ContextProjectionScope) PreGrantValid() bool {
+	return s.RawGrantID == "" && s.DisplayVersion == PacketQueryDisplayVersion && s.NativeType == artifact.RawPCAPNGArtifact && s.sourceValid()
+}
+func (s ContextProjectionScope) sourceValid() bool {
 	src, ok := s.Source()
 	return ok && s.Candidate().Valid() && s.Version != (artifact.Digest{}) && s.comparisonResolved() &&
 		s.SourceProjectionDigest == src.ProjectionDigest && s.SourceFormat == src.Format && s.DisplayVersion == src.DisplayVersion
@@ -249,6 +277,9 @@ func (s ContextProjectionScope) Valid() bool {
 
 // Source is the closed projection source this scope reads.
 func (s ContextProjectionScope) Source() (ProjectionSource, bool) {
+	if (s.PacketQuery != (PacketQueryWindow{})) != (s.DisplayVersion == PacketQueryDisplayVersion) {
+		return ProjectionSource{}, false
+	}
 	if s.Comparison != (ProfileComparisonWindow{}) || s.DisplayVersion == ProfileComparisonDisplayVersion {
 		if s.NativeType != artifact.PprofArtifact || s.Comparison == (ProfileComparisonWindow{}) || s.DisplayVersion != ProfileComparisonDisplayVersion {
 			return ProjectionSource{}, false
@@ -265,7 +296,7 @@ func (s ContextProjectionScope) Candidate() ContextProjectionCandidate {
 	comparison.Baseline.Version = artifact.Digest{}
 	return ContextProjectionCandidate{RootID: s.RootID, CaseID: s.CaseID, ArtifactID: s.ArtifactID, CaptureID: s.CaptureID,
 		ClusterID: s.ClusterID, NamespaceUID: s.NamespaceUID, WorkloadUID: s.WorkloadUID, PodUID: s.PodUID,
-		Selection: s.Selection, Principal: s.Principal, NativeType: s.NativeType, Headers: s.Headers, Profile: s.Profile, Syscalls: s.Syscalls, Comparison: comparison}
+		Selection: s.Selection, Principal: s.Principal, NativeType: s.NativeType, Headers: s.Headers, Profile: s.Profile, Syscalls: s.Syscalls, Comparison: comparison, PacketQuery: s.PacketQuery, RawGrantID: s.RawGrantID}
 }
 
 // ContextProjectionPath is accepted placement for this query purpose. It is not
@@ -326,6 +357,7 @@ type ContextProjectionAuthority struct {
 	// Baseline is present only on a compound comparison. It owns exactly one
 	// independently authorized legacy summary child; nested pairs are invalid.
 	Baseline *ContextProjectionAuthority `json:",omitempty"`
+	Grant    ContextQueryGrant           `json:",omitzero"`
 }
 
 func (a ContextProjectionAuthority) Valid(now time.Time) bool {
@@ -350,7 +382,7 @@ func (a ContextProjectionAuthority) Valid(now time.Time) bool {
 }
 
 func (a ContextProjectionAuthority) validSingle(now time.Time) bool {
-	return a.Scope.Valid() && a.Environment.Valid(now) && a.Environment.RootID == a.Scope.RootID &&
+	return a.grantMatches() && a.Scope.Valid() && a.Environment.Valid(now) && a.Environment.RootID == a.Scope.RootID &&
 		a.Environment.Principal == a.Scope.Principal && a.Environment.Location.ClusterID == a.Scope.ClusterID &&
 		a.Environment.Location.ArtifactID == a.Scope.ArtifactID && a.Environment.Processing.CaptureID == a.Scope.CaptureID &&
 		a.Retention.Valid(now) && a.Retention.Matches(a.Scope.RootID, a.Scope.ClusterID, a.Scope.NamespaceUID, a.Scope.WorkloadUID, a.Scope.PodUID) &&
@@ -388,4 +420,11 @@ func (p ContextProjectionPath) AcquisitionPath() artifact.DownloadPath {
 		return artifact.DownloadPath{}
 	}
 	return artifact.DownloadPath{ID: p.ID, TargetClusterID: p.TargetClusterID, StoreID: p.StoreID, StorageRegion: p.StorageRegion, AcquisitionClusterID: p.AcquisitionClusterID, AcquisitionRegion: p.AcquisitionRegion, ConnectorClusterID: p.ConnectorClusterID, ConnectorRegion: p.ConnectorRegion, HubClusterID: p.HubClusterID, HubRegion: p.HubRegion, WorkerConfiguration: p.WorkerConfiguration, HubConfiguration: p.HubConfiguration}
+}
+
+func (a ContextProjectionAuthority) grantMatches() bool {
+	if a.Scope.DisplayVersion == PacketQueryDisplayVersion && a.Scope.NativeType == artifact.RawPCAPNGArtifact {
+		return a.Grant.Valid() && a.Grant.ParentID == a.Scope.RawGrantID
+	}
+	return a.Grant == (ContextQueryGrant{})
 }

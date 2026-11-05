@@ -60,6 +60,10 @@ func (d *ContextProjectionDelivery) clearProjectionLocked() {
 		*d.syscallEvents = value.SyscallEventPage{}
 		d.syscallEvents = nil
 	}
+	if d.packetQuery != nil {
+		d.packetQuery.Clear()
+		d.packetQuery = nil
+	}
 	if d.packetSummary != nil {
 		clear(d.packetSummary.Conversations)
 		*d.packetSummary = value.PacketSummary{}

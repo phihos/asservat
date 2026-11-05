@@ -289,7 +289,7 @@ func refuseRetainedProfileSummaryDowngrade(t *testing.T, f *queryLedgerFixture) 
 	// same immutable queries and spend across the supported schema prefix.
 	snapshot := func(ctx context.Context) (string, error) {
 		var b []byte
-		err := f.base.admin.QueryRow(ctx, `SELECT jsonb_build_object('queries',(SELECT jsonb_agg(to_jsonb(q)-'baseline_allocation_id' ORDER BY q.id) FROM context_query q WHERE q.root_id=$1),'backing',(SELECT to_jsonb(b) FROM context_query_backing b WHERE b.root_id=$1),'allocations',(SELECT jsonb_agg(to_jsonb(a) ORDER BY a.id) FROM context_query_allocation a WHERE a.root_id=$1))`, f.base.input.PermissionRootID).Scan(&b)
+		err := f.base.admin.QueryRow(ctx, `SELECT jsonb_build_object('queries',(SELECT jsonb_agg(to_jsonb(q)-ARRAY['baseline_allocation_id','invocation_key','request_digest'] ORDER BY q.id) FROM context_query q WHERE q.root_id=$1),'backing',(SELECT to_jsonb(b) FROM context_query_backing b WHERE b.root_id=$1),'allocations',(SELECT jsonb_agg(to_jsonb(a) ORDER BY a.id) FROM context_query_allocation a WHERE a.root_id=$1))`, f.base.input.PermissionRootID).Scan(&b)
 		if err != nil {
 			return "", err
 		}

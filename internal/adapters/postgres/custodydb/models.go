@@ -1097,6 +1097,8 @@ type ContextQuery struct {
 	Controls             int64
 	Uncertain            bool
 	BaselineAllocationID pgtype.UUID
+	InvocationKey        pgtype.Text
+	RequestDigest        []byte
 }
 
 type ContextQueryAllocation struct {

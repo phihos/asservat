@@ -281,6 +281,16 @@ it('reviews whole-file raw access with every target and size and no collection c
   expect(screen.queryByRole('button', { name: 'Continue approved capture' })).toBeNull();
   expect(screen.queryByText(/preview was valid/)).toBeNull();
 });
+it('reviews query-only and combined raw operations with explicit page charging', async () => {
+  const client = new SyntheticApprovals(); const detail = rawGrant();
+  detail.raw_access.operations = ['download_artifact', 'pcap_query']; client.detail = detail;
+  expect(validOutput_get_grant(result(detail))).toBe(true);
+  render(<ApprovalsWorkspace session={session} scope={new AbortController().signal} client={client} grantID={id(41)}/>);
+  expect(await screen.findByRole('heading', { name: 'Inspect existing raw evidence' })).toBeTruthy();
+  expect(screen.getByText(/Saved packet queries and whole-file downloads/)).toBeTruthy();
+  expect(screen.getByText(/Each paid query page reserves 24 KiB/)).toBeTruthy();
+  expect(screen.getByText(/10000 selected operations/)).toBeTruthy();
+});
 it('validates64 exact raw review artifacts and rejects collection fields or hidden selection truncation', () => {
   const raw = rawGrant(64);
   expect(validOutput_get_grant(result(raw))).toBe(true);

@@ -26,14 +26,15 @@ type ContextQueryResults interface {
 // installation composition adds its two operations to InvestigationOperations;
 // the existing audit wrapper alone supplies each live invocation owner.
 type ContextProjectionOperations struct {
-	excerpts    ContextExcerptService
-	results     ContextQueryResults
-	headers     HTTPHeaderQueryService
-	comparisons ProfileComparisonQueryService
-	profiles    ProfileSummaryQueryService
-	packets     PacketSummaryQueryService
-	syscalls    SyscallQueryService
-	contracts   *contracts.InvestigationContracts
+	excerpts      ContextExcerptService
+	results       ContextQueryResults
+	headers       HTTPHeaderQueryService
+	comparisons   ProfileComparisonQueryService
+	profiles      ProfileSummaryQueryService
+	packets       PacketSummaryQueryService
+	packetQueries PacketQueryService
+	syscalls      SyscallQueryService
+	contracts     *contracts.InvestigationContracts
 }
 
 func NewContextProjectionOperations(excerpts ContextExcerptService, results ContextQueryResults) (*ContextProjectionOperations, error) {
@@ -60,12 +61,15 @@ func (s *ContextProjectionOperations) WithHTTPHeaders(headers HTTPHeaderQuerySer
 
 // serves reports whether name is one of this composition's operations.
 func (s *ContextProjectionOperations) serves(name string) bool {
-	return s != nil && queryOperation(name) && (name != "get_http_headers" || s.headers != nil) && (name != "get_profile_summary" || s.profiles != nil) && (name != "get_pcap_summary" || s.packets != nil) && (name != "compare_profiles" || s.comparisons != nil) && (!syscallQueryOperation(name) || s.syscalls != nil)
+	return s != nil && queryOperation(name) && (name != "get_http_headers" || s.headers != nil) && (name != "get_profile_summary" || s.profiles != nil) && (name != "get_pcap_summary" || s.packets != nil) && (name != "pcap_query" || s.packetQueries != nil) && (name != "compare_profiles" || s.comparisons != nil) && (!syscallQueryOperation(name) || s.syscalls != nil)
 }
 
 // toolNames are the operations this composition advertises.
 func (s *ContextProjectionOperations) toolNames() []string {
 	names := []string{"get_file_excerpt", "get_query_result"}
+	if s.packetQueries != nil {
+		names = append(names, "pcap_query")
+	}
 	if s.headers != nil {
 		names = append(names, "get_http_headers")
 	}
@@ -97,6 +101,12 @@ func (s *ContextProjectionOperations) CallWithContext(ctx context.Context, curre
 	}
 	var input analysisapp.ContextQueryInput
 	switch name {
+	case "pcap_query":
+		var in PacketQueryOperationInput
+		if json.Unmarshal(raw, &in) != nil {
+			return noDispatch, ErrOperationDelivery
+		}
+		input.PacketQuery = in.request()
 	case "get_pcap_summary":
 		var in PacketSummaryOperationInput
 		if json.Unmarshal(raw, &in) != nil {
@@ -183,6 +193,8 @@ func (s *ContextProjectionOperations) CallWithContext(ctx context.Context, curre
 	}
 	var d *analysisapp.ContextProjectionDelivery
 	switch name {
+	case "pcap_query":
+		d, err = s.packetQueries.Begin(ctx, current, i, input.PacketQuery)
 	case "get_pcap_summary":
 		d, err = s.packets.Begin(ctx, current, i, input.Packet)
 	case "get_syscall_summary", "get_syscall_events":
@@ -212,6 +224,20 @@ func (s *ContextProjectionOperations) CallWithContext(ctx context.Context, curre
 			}
 		}
 	}()
+	if d == nil && name == "pcap_query" && analysisapp.PacketQueryApprovalRequiredBeforeAdmission(err) {
+		return s.refusal(record.ID, name, record.Until, OperationFailure{Code: "RawApprovalRequired", Message: "Independent approval must cover pcap_query for this saved raw artifact and your current registered client. Download approval does not cover this query.", Retryable: false}, operationAuditUnspecified, operationEffectNone, true)
+	}
+	if d == nil && name == "pcap_query" {
+		if invalid, known := analysisapp.PacketQueryFilterRefusedBeforeAdmission(err); known {
+			failure := OperationFailure{Code: "NotAvailable", Message: "Packet filtering is not available with the current service conditions. Retry later.", Retryable: true}
+			status := operationAuditUnspecified
+			if invalid {
+				failure = OperationFailure{Code: "InvalidInput", Message: "Use the supported bounded tcpdump/libpcap packet-filter subset. Names, protocol-offset predicates and unsupported instructions are unavailable.", Retryable: false}
+				status = operationAuditInvalid
+			}
+			return s.refusal(record.ID, name, record.Until, failure, status, operationEffectNone, true)
+		}
+	}
 	if d == nil && errors.Is(err, value.ErrBusy) && name == "get_http_headers" {
 		// ADR-282: the live worker caps are full; the query was not admitted
 		// or charged, and a later page request may succeed.
@@ -241,6 +267,9 @@ func (s *ContextProjectionOperations) CallWithContext(ctx context.Context, curre
 	} else {
 		reply.Body, err = s.serialize(call.requestID, name, d)
 		reply.ValidUntil, reply.auditEffect = d.ValidUntil(), operationEffectAccepted
+		if d.Effect() == analysisapp.ContextQueryReplayed {
+			reply.auditEffect = operationEffectNone
+		}
 		if errors.Is(err, value.ErrRecordTooLarge) && d.RefuseOversizedResult() {
 			reply, err = s.deliveryRefusal(record.ID, name, d)
 		}
@@ -299,6 +328,34 @@ func (s *ContextProjectionOperations) serialize(requestID, name string, d *analy
 			queryViewTimes
 		}{d.Association().QueryID, 1, times}
 
+	case d.Tool() == "pcap_query":
+		page, ok := d.PacketQuery()
+		if !ok {
+			return nil, ErrOperationDelivery
+		}
+		envelope.DataClass = "extract"
+		if page.CaptureMode == "rawPackets" {
+			envelope.DataClass = "raw"
+		}
+		artifactID, version := d.Provenance()
+		envelope.Provenance = []any{httpHeaderProvenance{ArtifactID: artifactID, Digest: hash(version)}}
+		envelope.Warnings = []string{packetQueryHandling}
+		envelope.Truncated = page.RowLimitReached || page.ScanLimitReached || page.OutputLimitReached
+		if envelope.Truncated {
+			hint := "Narrow the packet filter, time interval or selected fields to inspect another bounded result."
+			envelope.NarrowingHint = &hint
+			envelope.Warnings = append(envelope.Warnings, "QueryLimit: "+hint)
+		}
+		envelope.Data = struct {
+			contracts.PacketQueryPage
+			queryViewTimes
+		}{packetQueryPage(page), times}
+		if name == "get_query_result" {
+			envelope.Data = queryResult(d.Association().QueryID, d.Tool(), envelope, times)
+			envelope.Provenance = []any{}
+			envelope.Truncated = false
+			envelope.NarrowingHint = nil
+		}
 	case d.Tool() == "compare_profiles":
 		comparison, ok := d.ProfileComparison()
 		baseline, incident, sourcesOK := d.ProfileComparisonSources()
@@ -465,7 +522,14 @@ func queryResult(queryID, tool string, inner OperationEnvelope, times queryViewT
 // refusal is a fixed error reply without a delivery. noDispatch marks a
 // refusal proven before any query effect.
 func (s *ContextProjectionOperations) refusal(requestID, name string, until time.Time, f OperationFailure, decision operationAuditDecision, effect operationAuditEffect, noDispatch bool) (OperationReply, error) {
-	body, err := json.Marshal(httpHeaderFailure(requestID, f))
+	envelope := httpHeaderFailure(requestID, f)
+	if f.Code == "RawApprovalRequired" {
+		envelope.Data = struct {
+			OperationFailure
+			ResponsibleRole string `json:"responsible_role"`
+		}{f, "approver"}
+	}
+	body, err := json.Marshal(envelope)
 	if err != nil || len(body) > contracts.InvestigationOutputLimit || s.contracts.ValidateOutput(name, body) != nil {
 		clear(body)
 		return OperationReply{auditNoDispatch: noDispatch, auditEffect: effect}, ErrOperationDelivery

@@ -1,0 +1,42 @@
+{
+  "schema_version": "mcp-result/v1",
+  "request_id": "00000000-0000-4000-8000-000000000090",
+  "data_class": "extract",
+  "status": "ok",
+  "data": {
+    "capture_mode": "networkHeaders",
+    "fields": [
+      "packet_index",
+      "source_port"
+    ],
+    "rows": [
+      [
+        1,
+        0
+      ],
+      [
+        2,
+        42000
+      ]
+    ],
+    "scanned_bytes": 108,
+    "scanned_packets": 2,
+    "row_limit_reached": false,
+    "scan_limit_reached": false,
+    "output_limit_reached": false,
+    "query_observed_at": "2026-11-05T09:00:00Z",
+    "query_expires_at": "2026-11-05T09:01:00Z"
+  },
+  "truncated": false,
+  "next_cursor": null,
+  "narrowing_hint": null,
+  "warnings": [
+    "SensitiveDataHandling: Packet metadata may contain user data. Deletion covers Asservat-managed copies; delivered copies cannot be recalled."
+  ],
+  "provenance": [
+    {
+      "artifactID": "00000000-0000-4000-8000-000000000021",
+      "digest": "7777777777777777777777777777777777777777777777777777777777777777"
+    }
+  ]
+}

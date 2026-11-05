@@ -72,7 +72,7 @@ Given a header spans several packets and a body shares its last packet, when htt
 
 Each network artifact records profile/projection and engine/compiler digests, link/hook/CNI profile, target identity, authored filter digest, resolved peer generations and activation intervals, requested/achieved time range, wire/captured counts, loss/suppression reasons, ring/frozen/parser ceilings and actual truncation. Generation history is itself bounded (default 1,024 entries per artifact); close a segment/artifact within reserved output slots or stop with a visible limit instead of dropping provenance silently. Manifests reference a bounded encrypted network metadata record under the same lifetime.
 
-`get_pcap_summary` describes sanitized or raw packet metadata; `get_http_headers` returns bounded structured HTTP fields from an approved projection with provenance, cursor/output limits and no body parameter. A raw original remains raw. Its fixed numeric summary may use the qualified transient Go projection in [ADR-304](../docs/decisions/304-transient-raw-packet-summary.md), with dedicated ordinary aggregate authority and independent output validation. This creates no stored derivative or raw-content permission. `pcap_query` remains a separately granted raw operation; native/subprocess analysis retains the separate-Job encrypted-scratch boundary. All external-agent disclosures retain existing client policy, audit, share and expiry checks. The UI calls the choices “Network headers”, “HTTP headers” and “Raw packets”, shows unsupported target capabilities early, and lets maintainers choose Kubernetes peers by workload/service rather than typing addresses.
+`get_pcap_summary` describes sanitized or raw packet metadata; `get_http_headers` returns bounded structured HTTP fields from an approved projection with provenance, cursor/output limits and no body parameter. A raw original remains raw. Its fixed numeric summary may use the qualified transient Go projection in [ADR-304](../docs/decisions/304-transient-raw-packet-summary.md), with dedicated ordinary aggregate authority and independent output validation. This creates no stored derivative or raw-content permission. `pcap_query` over a raw original or raw fields remains separately granted; metadata-only queries use ordinary current/retained rights. Native/subprocess analysis retains the separate-Job encrypted-scratch boundary. All external-agent disclosures retain existing client policy, audit, share and expiry checks. The UI calls the choices “Network headers”, “HTTP headers” and “Raw packets”, shows unsupported target capabilities early, and lets maintainers choose Kubernetes peers by workload/service rather than typing addresses.
 
 EXP-02/03 must qualify filter compilation, continuous peer updates, CNI/dual-stack/NAT/hostNetwork/loopback behavior, rings under stalls and HTTP secrecy/resource bounds before capability advertisement. Unsupported environments return specific unavailable results; no blanket packet coverage claim.
 
@@ -106,6 +106,50 @@ output, truncated prefixes remain visible as unclassified records and a unique
 payload marker appears only in separately authorized raw/native inspection.
 The original remains raw; another client, changed source or expired/revoked
 authority cannot reuse the summary's query or widen its output.
+
+### Saved packet queries (REQ-NET-005 / REQ-MCP-003)
+
+[ADR-305](../docs/decisions/305-bounded-saved-packet-queries.md) applies one bounded
+query to an existing metadata or raw PCAPNG. It reuses the pinned hub libpcap
+compiler and supported Go filter VM with a512-byte public filter cap and the
+existing screening/instruction bounds. This explicitly replaces the former
+Wireshark-style display-filter wording with named tcpdump/libpcap packet-filter
+syntax; it is an implementation choice, not a newly asserted user requirement.
+The first subset rejects bracket/raw-byte predicates before effects and disables
+name resolution. Numeric/address/protocol selection remains available; packet
+time intervals and TCP flag mask/value use typed selectors. The finite field
+catalog preserves packet times/lengths, network/transport fields and a bounded
+raw captured-frame prefix, with exact names/limits agreed in the canonical
+contract before implementation. Prefix bytes come from the saved frame, not a
+claim of payload reconstruction. Short saved prefixes cannot yield invented
+headers, endpoints, flags or padding.
+
+Any raw original requires a current exact pcap_query grant even when only header
+fields are selected. Metadata-only fields from a metadata original need ordinary
+rights; they never require a raw approval merely because this tool also supports
+raw. Raw fields unavailable from that original are refused. Reuse a covering
+standalone or same-human/selected-client combined result-access grant without a
+second approval; original audience/client/retention/recovery and current grant
+checks remain binding. Neither acquisition approval nor the fixed numeric
+summary operation supplies arbitrary packet-query or download authority.
+
+Logical scan work counts captured frame bytes visited in saved order, including
+nonmatches, within the selected scan bound; a record crossing the remaining
+bound is not visited. Logical row/scan limits stop projection, not authentication:
+complete bounded native/canonical EOF must still pass before one transient
+at-most100-row/32-field/24KiB page is released. Report work/limit state without
+claiming full traffic coverage or mistaking authenticated drain bytes for scanned
+bytes. The1GiB API scan ceiling is distinct from today's8MiB source/qualification
+bound. Keep original operation/source deadlines and joined failure handling.
+
+A query creates no new capture, derivative or capture-history entry. Its original
+normalized request/key must resolve the same admitted query, program, grant/use
+and worker after an uncertain reply; changed selection conflicts, and no replay
+refunds or renews work. Raw disclosure reserves one operation and bounded output
+bytes, separately from scan/capacity budgets. Query-only grant byte pools need
+not cover the whole native source; mixed download/query scopes retain the native
+full-file coverage requirement and use one shared pool. SQL/audit/logs retain
+only bounded control selection/identity, never projected frame bytes or rows.
 
 ## REQ-NET-006 — Pod scope, zero-history captures and watch health
 

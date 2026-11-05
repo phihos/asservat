@@ -39,6 +39,7 @@ type ContextProjectionService struct {
 	HeaderRoutes ContextProjectionRouteReader
 	// ProfileRoutes is opt-in; production composition remains disabled.
 	PacketRoutes     ContextProjectionRouteReader
+	PacketCompiler   PacketQueryCompiler
 	ProfileRoutes    ContextProjectionRouteReader
 	SyscallRoutes    SyscallProjectionRouteReader
 	ComparisonRoutes ContextProjectionRouteReader
@@ -61,6 +62,7 @@ func (s ContextProjectionResults) valid() bool {
 type ContextQueryEffect string
 
 const (
+	ContextQueryReplayed    ContextQueryEffect = "query_replayed"
 	ContextQueryAdmitted    ContextQueryEffect = "query_admitted"
 	ContextQueryPollCharged ContextQueryEffect = "query_poll_charged"
 	ContextQueryReadCharged ContextQueryEffect = "query_read_charged"
@@ -76,6 +78,7 @@ type ContextProjectionAssociation struct {
 	Profile                           value.ProfileSummarySelection
 	Syscalls                          value.SyscallWindow
 	Comparison                        value.ProfileComparisonSelection
+	PacketQuery                       value.PacketQueryWindow
 }
 
 // ContextProjectionDelivery owns both the prepared result and its live request.
@@ -89,6 +92,7 @@ type ContextProjectionDelivery struct {
 	excerpt                                 value.ContextExcerpt
 	page                                    value.HTTPHeaderPage
 	packetSummary                           *value.PacketSummary
+	packetQuery                             *value.PacketQueryResult
 	summary                                 *value.ProfileSummary
 	comparison                              *value.ProfileComparison
 	syscallSummary                          *value.SyscallSummaryPage
@@ -522,6 +526,29 @@ func (s ContextProjectionService) begin(ctx context.Context, current identities.
 	if err != nil || !recovery.Valid(s.Results.Now()) || recovery.InstallationID != s.Results.InstallationID || !o.shorten("recovery", recovery.FreshUntil) {
 		return nil, queryCollapsed("recovery", value.ErrUnavailable, err)
 	}
+	var invocationKey value.ContextQueryInvocationKey
+	if input.PacketQuery.Valid() {
+		lookup, ok := s.Results.Ledger.(ContextQueryInvocationLookup)
+		if !ok {
+			return nil, queryStepped("invocation-lookup", value.ErrUnavailable)
+		}
+		invocationKey = value.ContextQueryInvocationKey{Key: input.PacketQuery.IdempotencyKey, RequestDigest: PacketQueryRequestDigest(input.PacketQuery)}
+		original, found, e := lookup.LookupQueryInvocation(o.ctx, o.initial.Principal, invocationKey.Key, invocationKey.RequestDigest)
+		if e != nil {
+			return nil, queryStepped("invocation-lookup", e)
+		}
+		if found {
+			if !original.Valid() || original.Scope.RootID != s.Results.RootID || original.Scope.Principal != o.initial.Principal || original.InvocationKey != invocationKey || original.Scope.BeginTool() != tool {
+				return nil, value.ErrUnavailable
+			}
+			d, e := s.Results.replayPacketQuery(o, original)
+			if e != nil {
+				return nil, e
+			}
+			owned = true
+			return d, nil
+		}
+	}
 	candidate, err := route(o.ctx, o.initial, recovery)
 	if err != nil || !candidate.Valid() || candidate.RootID != s.Results.RootID || candidate.Principal != o.initial.Principal {
 		return nil, queryCollapsed("route", value.ErrUnavailable, err)
@@ -530,6 +557,12 @@ func (s ContextProjectionService) begin(ctx context.Context, current identities.
 	if err != nil || !a.Valid(s.Results.Now()) || a.Scope.Candidate() != candidate || a.Scope.BeginTool() != tool || a.Environment.InstallationID != s.Results.InstallationID ||
 		a.Environment.Recovery.IssuerEpoch != recovery.IssuerEpoch || a.Environment.Recovery.Revision != recovery.Revision || a.IdentityRevision != o.initial.Policy || !o.shorten("resolved-authority/"+a.Bound, a.ValidUntil) {
 		refusal := queryCollapsed("authority", value.ErrUnavailable, err)
+		if tool == "pcap_query" {
+			var proof interface{ PacketQueryApprovalRequired() bool }
+			if errors.As(err, &proof) && proof.PacketQueryApprovalRequired() {
+				return nil, &packetQueryApprovalRefusal{cause: refusal}
+			}
+		}
 		if tool == "get_profile_summary" {
 			return nil, &profileSummaryPreAdmissionRefusal{cause: refusal}
 		}
@@ -554,7 +587,11 @@ func (s ContextProjectionService) begin(ctx context.Context, current identities.
 		if e != nil || !p.Valid(a.Scope, s.Results.Now()) || !o.shorten("plan", p.ValidUntil) {
 			return nil, queryCollapsed("plan", value.ErrUnavailable, e)
 		}
-		q, err = value.NewContextQuery(s.Results.NewID(), o.request.Call.ID, s.Results.NewID(), a, p, s.Results.Now())
+		if invocationKey.Valid() {
+			q, err = value.NewContextQuery(s.Results.NewID(), o.request.Call.ID, s.Results.NewID(), a, p, s.Results.Now(), invocationKey)
+		} else {
+			q, err = value.NewContextQuery(s.Results.NewID(), o.request.Call.ID, s.Results.NewID(), a, p, s.Results.Now())
+		}
 	}
 	if err != nil {
 		return nil, queryStepped("query", err)
@@ -573,8 +610,19 @@ func (s ContextProjectionService) begin(ctx context.Context, current identities.
 		return nil, queryCollapsed("worker-room", value.ErrUnavailable, err)
 	}
 	admitted, err := s.Results.Ledger.AdmitQuery(o.ctx, q, o.request, a)
-	if err != nil || !admitted.Fresh || !admitted.Query.Equal(q) {
+	if err != nil {
 		return nil, queryCollapsed("admit", value.ErrUnavailable, err)
+	}
+	if !admitted.Fresh && invocationKey.Valid() && admitted.Query.InvocationKey == invocationKey {
+		d, e := s.Results.replayPacketQuery(o, admitted.Query)
+		if e != nil {
+			return nil, e
+		}
+		owned = true
+		return d, nil
+	}
+	if !admitted.Fresh || !admitted.Query.Equal(q) {
+		return nil, queryStepped("admit", value.ErrUnavailable)
 	}
 	if _, err = o.CheckCurrent(o.ctx); err != nil {
 		return nil, queryStepped("post-admit", err)
@@ -660,7 +708,7 @@ func (s ContextProjectionResults) prepare(o *projectionRequest, effect ContextQu
 	d := &ContextProjectionDelivery{owner: o, pending: !worker.Ready, effect: effect,
 		observedAt: s.Now(), queryDeadline: identity.Earlier(o.query.Deadline, a.AccessUntil),
 		cleanupUntil: identity.Earlier(o.query.CleanupUntil, o.request.Call.WriteUntil),
-		association:  ContextProjectionAssociation{ID: s.NewID(), QueryID: o.query.ID, OperationID: o.request.Call.ID, Selection: o.query.Scope.Selection, Headers: o.query.Scope.Headers, Profile: o.query.Scope.Profile, Syscalls: o.query.Scope.Syscalls, Comparison: comparisonAssociationSelection(o.query.Scope)}}
+		association:  ContextProjectionAssociation{ID: s.NewID(), QueryID: o.query.ID, OperationID: o.request.Call.ID, Selection: o.query.Scope.Selection, Headers: o.query.Scope.Headers, Profile: o.query.Scope.Profile, Syscalls: o.query.Scope.Syscalls, PacketQuery: o.query.Scope.PacketQuery, Comparison: comparisonAssociationSelection(o.query.Scope)}}
 	if d.association.Comparison != (value.ProfileComparisonSelection{}) {
 		d.association.Profile = value.ProfileSummarySelection{}
 	}
@@ -764,6 +812,12 @@ func (s ContextProjectionResults) prepare(o *projectionRequest, effect ContextQu
 		} else {
 			d.syscallSummary, projection.SyscallSummary = projection.SyscallSummary, nil
 			d.syscallEvents, projection.SyscallEvents = projection.SyscallEvents, nil
+		}
+	case scope.PacketQuery.Valid():
+		if projection.PacketQuery == nil || !projection.PacketQuery.Valid(scope.PacketQuery.Selection(), scope.NativeType) || projection.PacketQuery.EncodedSize() > value.PacketQueryPageBytes {
+			err = value.ErrUnavailable
+		} else {
+			d.packetQuery, projection.PacketQuery = projection.PacketQuery, nil
 		}
 	case scope.NativeType == artifact.PCAPNGArtifact || scope.NativeType == artifact.RawPCAPNGArtifact:
 		if !boundedPacketSummary(projection.PacketSummary) {

@@ -64,6 +64,9 @@ func (s *ContextQueries) BeginReadBatch(ctx context.Context, q value.ContextQuer
 				if e != nil || b.Worker != w || !sameAuditJSON(b.Request, r) {
 					return value.ErrUnavailable
 				}
+				if e = packetQueryCurrentGrant(ctx, tx, q, b.ID); e != nil {
+					return e
+				}
 				out.Batch = b
 				return nil
 			}
@@ -75,7 +78,7 @@ func (s *ContextQueries) BeginReadBatch(ctx context.Context, q value.ContextQuer
 			}
 			call, e := tx.ReadContextQueryCall(ctx, custodydb.ReadContextQueryCallParams{OperationID: id(r.Call.ID), QueryID: id(q.ID)})
 			var request value.ContextQueryRequest
-			if e != nil || queryDecode(call.Request, 8192, &request) != nil || !sameAuditJSON(request, r) {
+			if e != nil || (!call.IsPoll && r.Call.ID != q.OperationID) || queryDecode(call.Request, 8192, &request) != nil || !sameAuditJSON(request, r) {
 				return value.ErrUnavailable
 			}
 			now, e := tx.CurrentTime(ctx)
@@ -88,6 +91,9 @@ func (s *ContextQueries) BeginReadBatch(ctx context.Context, q value.ContextQuer
 			}
 			raw, e := queryJSON(batch)
 			if e != nil {
+				return e
+			}
+			if e = s.reservePacketQueryBatch(ctx, tx, q, batchID); e != nil {
 				return e
 			}
 			result, e := tx.InsertContextQueryBatch(ctx, custodydb.InsertContextQueryBatchParams{ID: id(batchID), QueryID: id(q.ID), OperationID: id(r.Call.ID), Generation: int16(batch.Generation), Batch: raw})
@@ -134,6 +140,9 @@ func (s *ContextQueries) withBatch(ctx context.Context, b value.ContextReadBatch
 			now, e := tx.CurrentTime(ctx)
 			if e != nil || !b.Current(q, a, now.Time) {
 				return value.ErrUnavailable
+			}
+			if e = packetQueryCurrentGrant(ctx, tx, q, b.ID); e != nil {
+				return e
 			}
 			if e = fn(ctx, tx, q, row); e != nil {
 				return e

@@ -73,6 +73,17 @@ func encodeProjectionResult(r query.ProjectionResult, scope query.ContextProject
 		}
 		return b, nil
 	}
+	if scope.PacketQuery.Valid() {
+		if r.PacketQuery == nil {
+			return nil, contracts.ErrNativeProtocol
+		}
+		b, e := json.Marshal(packetQueryWire(*r.PacketQuery))
+		if e != nil || len(b) > query.ContextResultBytes {
+			clear(b)
+			return nil, contracts.ErrNativeProtocol
+		}
+		return b, nil
+	}
 	if scope.NativeType == artifact.PCAPNGArtifact || scope.NativeType == artifact.RawPCAPNGArtifact {
 		b, e := json.Marshal(r.PacketSummary)
 		if e != nil || len(b) > query.ContextResultBytes {
@@ -151,6 +162,15 @@ func decodeProjectionResult(b []byte, scope query.ContextProjectionScope) (query
 			return query.ProjectionResult{}, contracts.ErrNativeProtocol
 		}
 	case artifact.PCAPNGArtifact, artifact.RawPCAPNGArtifact:
+		if scope.PacketQuery.Valid() {
+			var page contracts.PacketQueryPage
+			if nativeDecodeBounded(b, &page, query.ContextResultBytes) != nil {
+				return query.ProjectionResult{}, contracts.ErrNativeProtocol
+			}
+			result := packetQueryDomain(page)
+			r.PacketQuery = &result
+			break
+		}
 		var summary query.PacketSummary
 		if nativeDecodeBounded(b, &summary, query.ContextResultBytes) != nil {
 			return query.ProjectionResult{}, contracts.ErrNativeProtocol
@@ -236,4 +256,31 @@ func (o *HubOperation) AcknowledgeProjection(ctx context.Context) error {
 	case <-ctx.Done():
 		return ctx.Err()
 	}
+}
+
+func packetQueryWire(r query.PacketQueryResult) contracts.PacketQueryPage {
+	p := contracts.PacketQueryPage{CaptureMode: r.CaptureMode, Fields: make([]string, len(r.Fields)), Rows: make([][]contracts.PacketQueryCell, len(r.Rows)), ScannedBytes: r.ScannedBytes, ScannedPackets: r.ScannedPackets, RowLimitReached: r.RowLimitReached, ScanLimitReached: r.ScanLimitReached, OutputLimitReached: r.OutputLimitReached}
+	for i, f := range r.Fields {
+		p.Fields[i] = string(f)
+	}
+	for i, row := range r.Rows {
+		p.Rows[i] = make([]contracts.PacketQueryCell, len(row))
+		for j, c := range row {
+			p.Rows[i][j] = contracts.PacketQueryCell{Text: c.Text, Number: c.Number}
+		}
+	}
+	return p
+}
+func packetQueryDomain(p contracts.PacketQueryPage) query.PacketQueryResult {
+	r := query.PacketQueryResult{CaptureMode: p.CaptureMode, Fields: make([]query.PacketQueryField, len(p.Fields)), Rows: make([][]query.PacketQueryCell, len(p.Rows)), ScannedBytes: p.ScannedBytes, ScannedPackets: p.ScannedPackets, RowLimitReached: p.RowLimitReached, ScanLimitReached: p.ScanLimitReached, OutputLimitReached: p.OutputLimitReached}
+	for i, f := range p.Fields {
+		r.Fields[i] = query.PacketQueryField(f)
+	}
+	for i, row := range p.Rows {
+		r.Rows[i] = make([]query.PacketQueryCell, len(row))
+		for j, c := range row {
+			r.Rows[i][j] = query.PacketQueryCell{Text: c.Text, Number: c.Number}
+		}
+	}
+	return r
 }

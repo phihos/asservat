@@ -81,7 +81,7 @@ func (s *ContextPublications) ContextProjectionEvidence(ctx context.Context, art
 		// profile; they are not a content hash or a substitute for C-14's later
 		// independent envelope/manifest/native verification of the pinned bytes.
 		out = authorizationapp.ContextProjectionEvidence{
-			CaseID: e.CaseID, CaptureID: e.CaptureUID, PurposeRef: e.PurposeRef,
+			CaseID: e.CaseID, CaptureID: e.CaptureUID, PurposeRef: e.PurposeRef, ActionID: e.ActionID, ExecutionDigest: e.PlanDigest,
 			SourceProjectionDigest: src.ProjectionDigest, NativeType: src.NativeType,
 			SourceFormat: src.Format, DataClass: e.DataClass,
 			Audience: e.Audience, Retained: retained, ObservedAt: started.Time, ValidUntil: until,

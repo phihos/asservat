@@ -36,6 +36,16 @@ type ResultAccessInput struct {
 	NotAfter      time.Time `json:"notAfter"`
 }
 
+// The omitted client list means this authenticated client, resolved before
+// immutable result-access digest/review creation. Explicit lists are unchanged.
+func (in *ResultAccessInput) accessForClient(clientID string) *authorization.ResultAccess {
+	a := in.access()
+	if a != nil && len(a.ClientIDs) == 0 {
+		a.ClientIDs = []string{clientID}
+	}
+	return a
+}
+
 func (in *ResultAccessInput) access() *authorization.ResultAccess {
 	if in == nil {
 		return nil
@@ -75,7 +85,7 @@ func approvalFailure(err error, origin string) (ApprovalFailure, bool) {
 	case errors.Is(err, authorization.ErrGrantScope), errors.Is(err, authorization.ErrGrantPrincipal), errors.Is(err, authapp.ErrGrantConflict):
 		return ApprovalFailure{"ReviewChanged", "The approval does not cover this exact plan, requester or result access. Review a new preview.", false, "", "maintainer"}, true
 	case errors.Is(err, authorization.ErrGrantInvalid):
-		return ApprovalFailure{"InvalidApprovalRequest", "The result access must select actions of this plan, download_artifact, one to four of your client IDs, finite counts and an end within eight hours.", false, "", "maintainer"}, true
+		return ApprovalFailure{"InvalidApprovalRequest", "The result access must select raw actions of this plan, download_artifact or eligible pcap_query, one to four of your client IDs, finite counts and an end within eight hours.", false, "", "maintainer"}, true
 	}
 	return ApprovalFailure{}, false
 }
@@ -421,7 +431,7 @@ type grantDecisionData struct {
 func publicGrantFailure(err error) OperationFailure {
 	switch {
 	case errors.Is(err, authapp.ErrRawQueryOperationUnsupported):
-		return OperationFailure{"UnsupportedOperation", "Only whole-file download_artifact approval is currently available for existing raw evidence. No collection or disclosure was started.", false}
+		return OperationFailure{"UnsupportedOperation", "Only download_artifact and bounded pcap_query approval are currently available for existing raw evidence. No collection or disclosure was started.", false}
 	case errors.Is(err, authorization.ErrGrantInvalid), errors.Is(err, authorization.ErrGrantScope):
 		return OperationFailure{"InvalidApprovalRequest", "The selected approval scope, period or limits are invalid. Check the selected evidence or policy and its current limits.", false}
 	case errors.Is(err, authorization.ErrSelfApproval):

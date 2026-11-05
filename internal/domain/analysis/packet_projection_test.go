@@ -84,3 +84,33 @@ func TestPacketSummaryRequiresPhysicalAndTransientBudget(t *testing.T) {
 		t.Fatal("physical memory substituted for transient reservation")
 	}
 }
+
+func TestRawPacketSummaryRequiresBothResourceReservations(t *testing.T) {
+	a := testAuthority()
+	a.Scope.NativeType = artifact.PCAPNGArtifact
+	a.Scope.SourceFormat = artifact.PCAPNGFormat
+	a.Scope.DisplayVersion = PacketSummaryDisplayVersion
+	a.Scope.SourceProjectionDigest = artifact.Digest{}
+	a.Scope.Selection = LineSelection{}
+	a.Scope.NativeType = artifact.RawPCAPNGArtifact
+	a.Scope.SourceFormat = artifact.RawPCAPNGFormat
+	a.Scope.DisplayVersion = RawPacketSummaryDisplayVersion
+	p := queryPlan(a)
+	p.Profile.Worker.MemoryBytes = PacketSummaryWorkerBytes
+	p.Profile.Worker.WorkerTransientBytes = PacketSummaryWorkerBytes
+	if !p.Matches(a.Scope) {
+		t.Fatal("valid raw summary profile refused")
+	}
+	for _, physical := range []bool{true, false} {
+		bad := p
+		if physical {
+			bad.Profile.Worker.MemoryBytes--
+			bad.Profile.Worker.WorkerTransientBytes--
+		} else {
+			bad.Profile.Worker.WorkerTransientBytes--
+		}
+		if bad.Matches(a.Scope) {
+			t.Fatal("raw summary accepted undersized reservation", physical)
+		}
+	}
+}

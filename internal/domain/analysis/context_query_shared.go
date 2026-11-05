@@ -39,6 +39,8 @@ func (s ContextProjectionScope) QueryUnits() int64 {
 		return ProfileComparisonQueryUnits
 	}
 	switch s.BeginTool() {
+	case "pcap_query":
+		return PacketQueryQueryUnits
 	case "get_profile_summary":
 		return ProfileSummaryQueryUnits
 	case "get_pcap_summary":

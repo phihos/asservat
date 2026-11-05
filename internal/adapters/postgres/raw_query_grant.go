@@ -112,7 +112,7 @@ func (s *AccessGrants) requestRawQueryGrant(ctx context.Context, in app.StoredGr
 	return out, replay, nil
 }
 func (s *AccessGrants) RawQueryCandidates(ctx context.Context, scope artifact.DownloadScope, use value.GrantUse) ([]value.Grant, error) {
-	if s == nil || ctx == nil || ctx.Err() != nil || !scope.Valid() || scope.RootID != s.root || scope.Principal.Kind != identity.Human || (use != (value.GrantUse{}) && use.Operation != value.GrantDownloadOperation) || use.Bytes < 0 || use.Operations < 0 {
+	if s == nil || ctx == nil || ctx.Err() != nil || !scope.Valid() || scope.RootID != s.root || scope.Principal.Kind != identity.Human || (use != (value.GrantUse{}) && use.Operation != value.GrantDownloadOperation && use.Operation != value.GrantPacketQueryOperation) || use.Bytes < 0 || use.Operations < 0 {
 		return nil, value.ErrGrantInvalid
 	}
 	// This is index selection only; domain membership checks compare the full
@@ -124,7 +124,7 @@ func (s *AccessGrants) RawQueryCandidates(ctx context.Context, scope artifact.Do
 	version, _ := json.Marshal(scope.Version)
 	var out []value.Grant
 	err = s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		rows, err := q.ReadRawQueryCandidates(ctx, custodydb.ReadRawQueryCandidatesParams{RootID: id(s.root), RequesterKey: policyGrantActorKey(scope.Principal), RequesterIssuer: scope.Principal.Issuer, RequesterSubject: scope.Principal.Subject, RequesterClient: scope.Principal.ClientID, Member: member, Version: version, ArtifactID: id(scope.ArtifactID), Bytes: use.Bytes, Operations: use.Operations})
+		rows, err := q.ReadRawQueryCandidates(ctx, custodydb.ReadRawQueryCandidatesParams{RootID: id(s.root), RequesterKey: policyGrantActorKey(scope.Principal), RequesterIssuer: scope.Principal.Issuer, RequesterSubject: scope.Principal.Subject, RequesterClient: scope.Principal.ClientID, Member: member, Version: version, ArtifactID: id(scope.ArtifactID), Bytes: use.Bytes, Operations: use.Operations, Operation: use.Operation})
 		if err != nil {
 			return err
 		}

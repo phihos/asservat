@@ -19,16 +19,25 @@ import (
 // original terminal wait. This read-only wrapper adds the new closed packet
 // scope/resource/charge proof BEFORE that wait, while its exact Pod is live.
 func installedPacketSummarySQLCheck(t *testing.T, ctx context.Context, admin *pgxpool.Pool, api kubernetes.Interface, root string, modes ...string) installedProjectionCheck {
-	rawSource := len(modes) == 1 && modes[0] == "rawPackets"
+	return installedPacketSummarySQLCheckWithTerminal(t, ctx, admin, api, root, len(modes) == 1 && modes[0] == "rawPackets", nil)
+}
+
+// The raw four-query qualification captures each live SQL/Pod proof now and
+// queues only its independent original terminal wait; other foci stay serial.
+func installedPacketSummarySQLCheckWithTerminal(t *testing.T, ctx context.Context, admin *pgxpool.Pool, api kubernetes.Interface, root string, rawSource bool, terminalSink func(func())) installedProjectionCheck {
 	wantType, wantFormat, wantDisplay := artifact.PCAPNGArtifact, artifact.PCAPNGFormat, query.PacketSummaryDisplayVersion
 	if rawSource {
 		wantType, wantFormat, wantDisplay = artifact.RawPCAPNGArtifact, artifact.RawPCAPNGFormat, query.RawPacketSummaryDisplayVersion
 	}
-	shared := installedProjectionSQLCheck(t, ctx, admin, api, root)
 	return func(artifactID string) func(string, string) func() {
 		beforeCaptures := 0
 		if err := admin.QueryRow(ctx, "SELECT count(*) FROM context_capture WHERE root_id=$1", root).Scan(&beforeCaptures); err != nil {
 			t.Fatal("packet capture count snapshot", err)
+		}
+		var waitTerminal func()
+		shared := installedProjectionSQLCheck(t, ctx, admin, api, root)
+		if terminalSink != nil {
+			shared = installedProjectionSQLCheck(t, ctx, admin, api, root, func(wait func()) { waitTerminal = wait })
 		}
 		verify := shared(artifactID)
 		return func(handle, operation string) func() {
@@ -70,21 +79,31 @@ WHERE q.root_id=$1 AND q.operation_id=$2 AND q.query->'Scope'->>'ArtifactID'=$3`
 				t.Log("installed packet summary SQL: exact packet source scope/allselectionzero, two read units/one three-key child, original384MiB+500m Pod and transient declaration")
 			}
 			retirement := verify(handle, operation)
-			if operation != "" {
-				err := installedProfileComparisonRetirementAfterTerminal(ctx, api, observed, func(read context.Context) error {
-					var retired bool
-					err := admin.QueryRow(read, `SELECT termination_json IS NOT NULL AND retired_proof_json IS NOT NULL AND abandoned_at IS NULL FROM download_worker WHERE root_id=$1 AND id=$2 AND query_id=$3`, root, observed.Intent.ID, observed.Intent.Parent.ID).Scan(&retired)
-					if err != nil {
-						return err
-					}
-					if !retired {
-						return errors.New("packet worker missing positive original retirement")
-					}
-					return nil
-				})
-				if err != nil {
-					t.Fatal("packet terminal/retirement exact proof", err)
+			finishTerminal := func() {
+				if waitTerminal != nil {
+					waitTerminal()
 				}
+				if operation != "" {
+					err := installedProfileComparisonRetirementAfterTerminal(ctx, api, observed, func(read context.Context) error {
+						var retired bool
+						err := admin.QueryRow(read, `SELECT termination_json IS NOT NULL AND retired_proof_json IS NOT NULL AND abandoned_at IS NULL FROM download_worker WHERE root_id=$1 AND id=$2 AND query_id=$3`, root, observed.Intent.ID, observed.Intent.Parent.ID).Scan(&retired)
+						if err != nil {
+							return err
+						}
+						if !retired {
+							return errors.New("packet worker missing positive original retirement")
+						}
+						return nil
+					})
+					if err != nil {
+						t.Fatal("packet terminal/retirement exact proof", err)
+					}
+				}
+			}
+			if terminalSink != nil && operation != "" {
+				terminalSink(finishTerminal)
+			} else {
+				finishTerminal()
 			}
 			return retirement
 		}

@@ -16,6 +16,7 @@ import (
 	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/domain/privacy"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -48,6 +49,7 @@ type ContextQueries struct {
 }
 
 var _ app.ContextQueryLedger = (*ContextQueries)(nil)
+var _ app.ContextQueryReplayCalls = (*ContextQueries)(nil)
 
 func NewContextQueries(ctx context.Context, pool *pgxpool.Pool, root string, effects EffectTransactionGuards, backing ContextQueryBackingGuard, workers ContextQueryWorkerGuard) (*ContextQueries, error) {
 	if !authorization.UUID(root) || effects.Retention == nil || effects.Recovery == nil || effects.Retention.root != root || effects.Recovery.root != root || backing == nil {
@@ -80,6 +82,13 @@ func queryFromRow(r custodydb.ContextQuery) (value.ContextQuery, error) {
 	if queryDecode(r.Query, comparisonQueryBytes, &q) != nil || len(r.Query) > projectionQueryBytes(q) || !q.Valid() || q.ID != uid(r.ID) || q.Scope.RootID != uid(r.RootID) || q.OperationID != uid(r.OperationID) || q.WorkerID != uid(r.WorkerID) || q.Plan.AllocationID != uid(r.AllocationID) || q.Plan.AccountID != uid(r.AccountID) || q.BaselinePlan.AllocationID != uid(r.BaselineAllocationID) || q.RecoveryIssuerEpoch != uid(r.IssuerEpoch) || !q.CreatedAt.Equal(r.CreatedAt.Time) || !q.Deadline.Equal(r.Deadline.Time) || !q.CleanupUntil.Equal(r.CleanupUntil.Time) || !q.Plan.RetireBy.Equal(r.RetireBy.Time) || !bytes.Equal(principalKey(q.Scope.Principal), r.PrincipalKey) {
 		return value.ContextQuery{}, value.ErrUnavailable
 	}
+	if q.InvocationKey == (value.ContextQueryInvocationKey{}) {
+		if r.InvocationKey.Valid || len(r.RequestDigest) != 0 {
+			return value.ContextQuery{}, value.ErrUnavailable
+		}
+	} else if !r.InvocationKey.Valid || r.InvocationKey.String != q.InvocationKey.Key || !bytes.Equal(r.RequestDigest, q.InvocationKey.RequestDigest[:]) {
+		return value.ContextQuery{}, value.ErrUnavailable
+	}
 	var actor identity.Principal
 	if queryDecode(r.Actor, 4096, &actor) != nil || actor != q.Scope.Principal {
 		return value.ContextQuery{}, value.ErrUnavailable
@@ -92,7 +101,7 @@ func queryFromRow(r custodydb.ContextQuery) (value.ContextQuery, error) {
 // returned after unknown commit, a failed guard return, or an omitted/repeated
 // callback. Committed obligations are deliberately not undone in those cases.
 func (s *ContextQueries) current(ctx context.Context, query value.ContextQuery, request value.ContextQueryRequest, authority value.ContextProjectionAuthority, effect func(context.Context, *custodydb.Queries, custodydb.ContextQueryBacking, custodydb.ContextQueryAllocation) error) error {
-	if s == nil || s.ledger == nil || s.backing == nil || ctx == nil || ctx.Err() != nil || query.Scope.RootID != s.root || !query.Current(authority, time.Now()) || !request.Valid(time.Now()) || request.Call.RootID != s.root || request.Call.Principal != query.Scope.Principal {
+	if s == nil || s.ledger == nil || s.backing == nil || ctx == nil || ctx.Err() != nil || query.Scope.RootID != s.root || query.Grant != authority.Grant || !query.Current(authority, time.Now()) || !request.Valid(time.Now()) || request.Call.RootID != s.root || request.Call.Principal != query.Scope.Principal {
 		return queryRefusal("input", nil)
 	}
 	until := identity.Earlier(query.Deadline, identity.Earlier(request.Call.Until, authority.ValidUntil))
@@ -270,6 +279,25 @@ func (s *ContextQueries) AdmitQuery(ctx context.Context, q value.ContextQuery, r
 		if e != nil || uid(principal.ID) != q.Plan.AccountID {
 			return value.ErrUnavailable
 		}
+		if q.InvocationKey != (value.ContextQueryInvocationKey{}) {
+			actor, _ := queryJSON(q.Scope.Principal)
+			prior, e := tx.ReadContextQueryInvocationKey(ctx, custodydb.ReadContextQueryInvocationKeyParams{RootID: id(s.root), PrincipalKey: principalKey(q.Scope.Principal), Actor: actor, InvocationKey: q.InvocationKey.Key})
+			if e == nil {
+				stored, err := queryFromRow(prior)
+				if err != nil {
+					return err
+				}
+				if stored.InvocationKey != q.InvocationKey {
+					return value.ErrQueryConflict
+				}
+				out.Query = stored
+				if stored.ID != q.ID {
+					return nil
+				} // Original-key race: no new query/call/worker.
+			} else if !errors.Is(e, pgx.ErrNoRows) {
+				return e
+			}
+		}
 		old, e := tx.LockContextQuery(ctx, custodydb.LockContextQueryParams{ID: id(q.ID), RootID: id(s.root)})
 		if e == nil {
 			stored, e := queryFromRow(old)
@@ -298,7 +326,7 @@ func (s *ContextQueries) AdmitQuery(ctx context.Context, q value.ContextQuery, r
 		if e != nil {
 			return e
 		}
-		row, e := tx.InsertContextQuery(ctx, custodydb.InsertContextQueryParams{ID: id(q.ID), RootID: id(s.root), AllocationID: id(q.Plan.AllocationID), AccountID: id(q.Plan.AccountID), PrincipalKey: principalKey(q.Scope.Principal), Actor: actor, Query: raw, InitialRequest: initialRequest, OperationID: id(q.OperationID), WorkerID: id(q.WorkerID), CreatedAt: ts(q.CreatedAt), Deadline: ts(q.Deadline), CleanupUntil: ts(q.CleanupUntil), RetireBy: ts(q.Plan.RetireBy), IssuerEpoch: id(q.RecoveryIssuerEpoch), PostmasterAt: incarnation.PostmasterAt, DatabaseOid: incarnation.DatabaseOid, BaselineAllocationID: id(q.BaselinePlan.AllocationID)})
+		row, e := tx.InsertContextQuery(ctx, custodydb.InsertContextQueryParams{ID: id(q.ID), RootID: id(s.root), AllocationID: id(q.Plan.AllocationID), AccountID: id(q.Plan.AccountID), PrincipalKey: principalKey(q.Scope.Principal), Actor: actor, Query: raw, InitialRequest: initialRequest, OperationID: id(q.OperationID), WorkerID: id(q.WorkerID), CreatedAt: ts(q.CreatedAt), Deadline: ts(q.Deadline), CleanupUntil: ts(q.CleanupUntil), RetireBy: ts(q.Plan.RetireBy), IssuerEpoch: id(q.RecoveryIssuerEpoch), PostmasterAt: incarnation.PostmasterAt, DatabaseOid: incarnation.DatabaseOid, BaselineAllocationID: id(q.BaselinePlan.AllocationID), InvocationKey: nullableString(q.InvocationKey.Key), RequestDigest: queryInvocationDigest(q)})
 		if e != nil {
 			return e
 		}
@@ -307,6 +335,9 @@ func (s *ContextQueries) AdmitQuery(ctx context.Context, q value.ContextQuery, r
 			return e
 		}
 		out.Fresh = true
+		if e = packetQueryCurrentGrant(ctx, tx, q, ""); e != nil {
+			return e
+		}
 		return s.call(ctx, tx, q, r, false)
 	})
 	if e != nil {
@@ -371,11 +402,39 @@ func (s *ContextQueries) AdmitQueryPoll(ctx context.Context, q value.ContextQuer
 		return s.call(ctx, tx, q, r, true)
 	})
 }
+
+// RegisterQueryReplayCall binds a newly acknowledged repetition of the exact
+// normalized Begin input to its immutable query. It charges one existing control
+// on first insertion, not a poll, read, worker, query unit or grant use.
+func (s *ContextQueries) RegisterQueryReplayCall(ctx context.Context, q value.ContextQuery, r value.ContextQueryRequest, a value.ContextProjectionAuthority) error {
+	if q.Scope.DisplayVersion != value.PacketQueryDisplayVersion || !q.Scope.PacketQuery.Valid() || !q.InvocationKey.Valid() || r.Call.Tool != q.Scope.BeginTool() {
+		return value.ErrUnavailable
+	}
+	return s.current(ctx, q, r, a, func(ctx context.Context, tx *custodydb.Queries, _ custodydb.ContextQueryBacking, _ custodydb.ContextQueryAllocation) error {
+		row, e := queryExact(ctx, tx, q)
+		var original value.ContextQueryRequest
+		if e != nil || row.Uncertain || queryDecode(row.InitialRequest, 8192, &original) != nil || r.Call.InputFormat != original.Call.InputFormat || r.Call.MACVersion != original.Call.MACVersion || r.Call.InputDigest != original.Call.InputDigest {
+			return value.ErrUnavailable
+		}
+		// An original operation ID can only repeat its exact already-bound request.
+		if r.Call.ID == q.OperationID && !sameAuditJSON(original, r) {
+			return value.ErrUnavailable
+		}
+		if e = packetQueryCurrentGrant(ctx, tx, q, ""); e != nil {
+			return e
+		}
+		return s.call(ctx, tx, q, r, false)
+	})
+}
+
 func (s *ContextQueries) PermitQuery(ctx context.Context, q value.ContextQuery, r value.ContextQueryRequest, a value.ContextProjectionAuthority) error {
 	return s.current(ctx, q, r, a, func(ctx context.Context, tx *custodydb.Queries, _ custodydb.ContextQueryBacking, _ custodydb.ContextQueryAllocation) error {
 		row, e := queryExact(ctx, tx, q)
 		if e != nil || row.Uncertain {
 			return value.ErrUnavailable
+		}
+		if e = packetQueryCurrentGrant(ctx, tx, q, ""); e != nil {
+			return e
 		}
 		call, e := tx.ReadContextQueryCall(ctx, custodydb.ReadContextQueryCallParams{OperationID: id(r.Call.ID), QueryID: id(q.ID)})
 		var old value.ContextQueryRequest
@@ -414,3 +473,40 @@ func scopeSource(scope value.ContextProjectionScope, e artifact.ContextExpectati
 	src, ok := scope.Source()
 	return ok && src.Matches(e.NativeType, e.Type().Format, e.DataClass, src.EvidenceType, e.Registration.NativeLimit, src.ProjectionDigest)
 }
+
+func queryInvocationDigest(q value.ContextQuery) []byte {
+	if q.InvocationKey == (value.ContextQueryInvocationKey{}) {
+		return nil
+	}
+	return q.InvocationKey.RequestDigest[:]
+}
+
+// LookupQueryInvocation is original-key routing only, not authority or a paid read.
+func (s *ContextQueries) LookupQueryInvocation(ctx context.Context, p identity.Principal, key string, digest artifact.Digest) (value.ContextQuery, bool, error) {
+	if s == nil || ctx == nil || ctx.Err() != nil || !p.Valid() || !identity.Text(key, 128) || digest == (artifact.Digest{}) {
+		return value.ContextQuery{}, false, value.ErrUnavailable
+	}
+	call, stop := context.WithTimeout(ctx, 5*time.Second)
+	defer stop()
+	actor, err := queryJSON(p)
+	if err != nil {
+		return value.ContextQuery{}, false, value.ErrUnavailable
+	}
+	row, err := custodydb.New(s.ledger.pool).ReadContextQueryInvocationKey(call, custodydb.ReadContextQueryInvocationKeyParams{RootID: id(s.root), PrincipalKey: principalKey(p), Actor: actor, InvocationKey: key})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return value.ContextQuery{}, false, nil
+	}
+	if err != nil || call.Err() != nil {
+		return value.ContextQuery{}, false, value.ErrUnavailable
+	}
+	q, err := queryFromRow(row)
+	if err != nil || q.Scope.Principal != p {
+		return value.ContextQuery{}, false, value.ErrUnavailable
+	}
+	if q.InvocationKey.Key != key || q.InvocationKey.RequestDigest != digest {
+		return value.ContextQuery{}, false, value.ErrQueryConflict
+	}
+	return q, true, nil
+}
+
+func nullableString(v string) pgtype.Text { return pgtype.Text{String: v, Valid: v != ""} }

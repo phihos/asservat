@@ -221,6 +221,100 @@ export interface components {
                 retry_after_seconds?: number;
             };
         });
+        McpInput_pcap_query: {
+            /** Format: uuid */
+            case_id: string;
+            /** Format: uuid */
+            artifact_id: string;
+            /**
+             * Format: uuid
+             * @description Required for every raw source, including header-only fields, and for raw byte output. The service derives this requirement from the authorized source; metadata-only queries need no raw approval.
+             */
+            grant_id?: string;
+            idempotency_key: string;
+            fields: ("packet_index" | "packet_time" | "captured_length" | "wire_length" | "source_address" | "destination_address" | "source_port" | "destination_port" | "protocol" | "tcp_flags" | "tcp_seq" | "tcp_ack" | "tcp_window" | "icmp_type" | "icmp_code" | "frame_prefix_hex")[];
+            max_packets: number;
+            /** @description Logical scan budget: sum of captured lengths of all visited saved records, including nonmatches. Full bounded source authentication still completes after a logical cap. The API ceiling does not qualify larger sources. */
+            max_scan_bytes: number;
+            /** @description Supported tcpdump/libpcap packet-filter subset; no name resolution or bracket predicates. Omitted or empty means no packet-filter restriction. This is not Wireshark display-filter syntax. */
+            packet_filter?: string;
+            /**
+             * Format: date-time
+             * @description Inclusive saved-packet timestamp bound; normalized to UTC. It does not establish clock accuracy.
+             */
+            start_time?: string;
+            /**
+             * Format: date-time
+             * @description Exclusive saved-packet timestamp bound. Must be later than start_time when both are present.
+             */
+            end_time?: string;
+            /** @description Only fully decoded TCP headers match (flags & mask) == value; value cannot contain bits outside mask. */
+            tcp_flags?: {
+                mask: number;
+                value: number;
+            };
+            /** @description Raw-only actual saved-frame byte window. Offset plus length must not exceed 1500. Missing bytes remain unavailable; no padding or inferred payload start. */
+            frame_prefix?: {
+                offset: number;
+                length: number;
+            };
+        } & unknown;
+        McpOutput_pcap_query: components["schemas"]["Contract_mcp_result"] & (({
+            /** @constant */
+            status: "ok";
+            data: {
+                /** @enum {unknown} */
+                capture_mode: "networkHeaders" | "rawPackets";
+                fields: ("packet_index" | "packet_time" | "captured_length" | "wire_length" | "source_address" | "destination_address" | "source_port" | "destination_port" | "protocol" | "tcp_flags" | "tcp_seq" | "tcp_ack" | "tcp_window" | "icmp_type" | "icmp_code" | "frame_prefix_hex")[];
+                /** @description Exactly one cell per selected field. Fixed field types, canonical values and null availability are independently validated; zero is not null. */
+                rows: (string | number | null)[][];
+                scanned_bytes: number;
+                scanned_packets: number;
+                row_limit_reached: boolean;
+                scan_limit_reached: boolean;
+                output_limit_reached: boolean;
+                /**
+                 * Format: date-time
+                 * @description Server time of this prepared query snapshot. This observation does not renew query or request authority. Together with query_expires_at it bounds managed-view lifetime independently of the client wall clock.
+                 */
+                query_observed_at: string;
+                /**
+                 * Format: date-time
+                 * @description Original total query cutoff, irreversibly shortened by effective evidence access. A poll never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline.
+                 */
+                query_expires_at: string;
+            } & (unknown & unknown & unknown & unknown);
+        } & unknown) | {
+            /** @constant */
+            status: "pending";
+            data: {
+                query_handle: string;
+                retry_after_seconds: number;
+                /**
+                 * Format: date-time
+                 * @description Server time of this prepared query snapshot. This observation does not renew query or request authority. Together with query_expires_at it bounds managed-view lifetime independently of the client wall clock.
+                 */
+                query_observed_at: string;
+                /**
+                 * Format: date-time
+                 * @description Original total query cutoff, irreversibly shortened by effective evidence access. A poll never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline.
+                 */
+                query_expires_at: string;
+            };
+        } | {
+            /** @constant */
+            status: "error";
+            data: {
+                code: string;
+                message: string;
+                retryable: boolean;
+                /** Format: uri */
+                navigation_uri?: string;
+                /** @enum {unknown} */
+                responsible_role?: "maintainer" | "approver" | "administrator" | "none";
+                retry_after_seconds?: number;
+            };
+        });
         McpInput_compare_profiles: {
             /** Format: uuid */
             case_id: string;

@@ -1,0 +1,45 @@
+{
+  "schema_version": "mcp-result/v1",
+  "request_id": "00000000-0000-4000-8000-000000000090",
+  "data_class": "raw",
+  "status": "ok",
+  "data": {
+    "capture_mode": "rawPackets",
+    "fields": [
+      "packet_index",
+      "tcp_seq",
+      "frame_prefix_hex"
+    ],
+    "rows": [
+      [
+        1,
+        0,
+        "0102"
+      ],
+      [
+        2,
+        null,
+        null
+      ]
+    ],
+    "scanned_bytes": 55,
+    "scanned_packets": 2,
+    "row_limit_reached": false,
+    "scan_limit_reached": false,
+    "output_limit_reached": false,
+    "query_observed_at": "2026-11-05T09:00:00Z",
+    "query_expires_at": "2026-11-05T09:01:00Z"
+  },
+  "truncated": false,
+  "next_cursor": null,
+  "narrowing_hint": null,
+  "warnings": [
+    "SensitiveDataHandling: Raw packet bytes may contain user data. Deletion covers Asservat-managed copies; delivered copies cannot be recalled."
+  ],
+  "provenance": [
+    {
+      "artifactID": "00000000-0000-4000-8000-000000000022",
+      "digest": "8888888888888888888888888888888888888888888888888888888888888888"
+    }
+  ]
+}

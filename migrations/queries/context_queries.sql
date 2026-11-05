@@ -17,8 +17,8 @@ SELECT * FROM context_query WHERE id=$1 AND root_id=$2 FOR UPDATE;
 SELECT * FROM context_query WHERE id=$1 AND root_id=$2 AND actor=$3;
 
 -- name: InsertContextQuery :one
-INSERT INTO context_query(id,root_id,allocation_id,account_id,principal_key,actor,query,initial_request,operation_id,worker_id,created_at,deadline,cleanup_until,retire_by,issuer_epoch,postmaster_at,database_oid,baseline_allocation_id)
-VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING *;
+INSERT INTO context_query(id,root_id,allocation_id,account_id,principal_key,actor,query,initial_request,operation_id,worker_id,created_at,deadline,cleanup_until,retire_by,issuer_epoch,postmaster_at,database_oid,baseline_allocation_id,invocation_key,request_digest)
+VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,sqlc.narg(invocation_key)::text,sqlc.narg(request_digest)::bytea) RETURNING *;
 
 -- name: ReadContextQueryCall :one
 SELECT * FROM context_query_call WHERE operation_id=$1 AND query_id=$2;
@@ -100,3 +100,9 @@ INSERT INTO context_query_key_binding(child_id,batch_id,query_id,source_ordinal,
 -- name: ConsumeProjectionComparisonKeyRole :execrows
 UPDATE context_query_key_binding SET used_roles=used_roles|sqlc.arg(role)::smallint
 WHERE child_id=sqlc.arg(child_id) AND source_ordinal IS NOT NULL AND (used_roles&sqlc.arg(role)::smallint)=0;
+
+-- name: ReadContextQueryInvocationKey :one
+SELECT * FROM context_query WHERE root_id=sqlc.arg(root_id)::uuid AND principal_key=sqlc.arg(principal_key)::bytea AND actor=sqlc.arg(actor)::jsonb AND invocation_key=sqlc.arg(invocation_key)::text;
+
+-- name: PacketQueryGrantCurrent :one
+SELECT context_packet_query_grant_current(sqlc.arg(root_id)::uuid,sqlc.arg(query_id)::uuid,sqlc.narg(batch_id)::uuid)::boolean;

@@ -140,3 +140,32 @@ it('lets a refused selection discard an artifact that expired during the request
     expect(call.mock.calls[1][1]).toMatchObject({ artifact_digests: [current.digest], max_bytes: 1024, idempotency_key: 'request-2' });
   } finally { clock.mockRestore(); }
 });
+
+it('requests query-only access without charging the whole native size and checks the original approval', async () => {
+  const saved = { ...artifact(3, 8 * 1024 * 1024), kind: 'packetCapture', native_format: 'pcapng-raw' };
+  const onGrant = vi.fn();
+  const call = vi.fn().mockResolvedValueOnce(result({ grant_id: id(41), phase: 'Pending' })).mockResolvedValueOnce(result({ grant_id: id(41), phase: 'Approved' }));
+  render(<RawAccessPanel purpose="packet-query" onGrant={onGrant} session={session} scope={new AbortController().signal} caseID={id(2)} artifacts={[saved]} prefilledArtifactID={saved.artifact_id} client={{ call } as Operations} newID={() => 'query-access-key'}/>);
+  expect(screen.getByLabelText('Total disclosure byte budget')).toHaveProperty('value', '49152');
+  fireEvent.change(screen.getByLabelText('Reason for raw access'), { target: { value: 'Inspect selected packet headers' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Request query approval' }));
+  await screen.findByRole('link', { name: 'Review query approval' });
+  expect(call.mock.calls[0][1]).toMatchObject({ operations: ['pcap_query'], max_bytes: 49152, idempotency_key: 'query-access-key' });
+  expect(onGrant).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('button', { name: 'Check approval' }));
+  await waitFor(() => expect(onGrant).toHaveBeenCalledExactlyOnceWith(id(41)));
+  expect(call.mock.calls[1].slice(0, 2)).toEqual(['get_grant', { grant_id: id(41) }]);
+});
+
+it('shares one budget for selected query and whole-file download access', async () => {
+  const saved = { ...artifact(3, 100000), kind: 'packetCapture', native_format: 'pcapng-raw' };
+  const onGrant = vi.fn();
+  const call = vi.fn().mockResolvedValueOnce(result({ grant_id: id(41), phase: 'Approved' }));
+  render(<RawAccessPanel purpose="packet-query" onGrant={onGrant} session={session} scope={new AbortController().signal} caseID={id(2)} artifacts={[saved]} prefilledArtifactID={saved.artifact_id} client={{ call } as Operations}/>);
+  fireEvent.change(screen.getByLabelText('Allowed operations'), { target: { value: 'both' } });
+  expect(screen.getByLabelText('Total disclosure byte budget')).toHaveProperty('value', '149152');
+  fireEvent.change(screen.getByLabelText('Reason for raw access'), { target: { value: 'Inspect packets and open Wireshark' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Request query approval' }));
+  await waitFor(() => expect(onGrant).toHaveBeenCalledExactlyOnceWith(id(41)));
+  expect(call.mock.calls[0][1]).toMatchObject({ operations: ['download_artifact', 'pcap_query'], max_bytes: 149152 });
+});

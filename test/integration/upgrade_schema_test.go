@@ -125,15 +125,35 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 			t.Fatal("previous key-child bound", e)
 		}
 	}
+	const packetQueryDefinitions = `SELECT string_agg(pg_get_functiondef(f::regprocedure),E'\n' ORDER BY f) FROM unnest(ARRAY['public.context_query_scope_source_valid(jsonb)','public.context_query_begin_tool(jsonb)','public.context_query_read_batches(jsonb)','public.context_query_units(jsonb)','public.guard_context_query()','public.guard_context_query_child()','public.operation_audit_lane(text)','public.operation_audit_human_input_valid(text,text)','public.guard_operation_audit()','public.context_query_intent_current(uuid,uuid,jsonb,uuid,jsonb)','public.context_query_outcome_closed(uuid,uuid,jsonb,uuid)','public.guard_context_query_account()','public.read_capacity_audit_profiles(uuid,uuid,uuid,bytea,text,timestamptz,timestamptz)']) f`
+	const packetQueryShape = `SELECT jsonb_build_object('columns',(SELECT jsonb_agg(to_jsonb(c) ORDER BY c.table_name,c.ordinal_position) FROM (SELECT table_name,column_name,ordinal_position,is_nullable,data_type,column_default FROM information_schema.columns WHERE table_schema='public' AND table_name IN ('context_query','access_grant','access_grant_use','context_query_key_binding')) c),'constraints',(SELECT jsonb_agg(x ORDER BY x) FROM (SELECT conrelid::regclass::text||':'||pg_get_constraintdef(oid) x FROM pg_constraint WHERE conrelid IN ('context_query'::regclass,'access_grant'::regclass,'access_grant_use'::regclass,'context_query_key_binding'::regclass)) c),'indexes',(SELECT jsonb_agg(indexdef ORDER BY indexdef) FROM pg_indexes WHERE schemaname='public' AND tablename IN ('context_query','access_grant','access_grant_use','context_query_key_binding')))::text`
+	var originalPacketQueryFunctions, originalPacketQueryShape string
+	if head == 139 {
+		if e = conn.QueryRow(ctx, packetQueryDefinitions).Scan(&originalPacketQueryFunctions); e != nil {
+			t.Fatal(e)
+		}
+		if e = conn.QueryRow(ctx, packetQueryShape).Scan(&originalPacketQueryShape); e != nil {
+			t.Fatal(e)
+		}
+		var accepted bool
+		if e = conn.QueryRow(ctx, `SELECT context_query_scope_source_valid($1::jsonb)`, packetQuerySQLScope(t, true)).Scan(&accepted); e != nil || accepted {
+			t.Fatal("previous138 accepted raw pcap_query", e)
+		}
+	}
 	const rawPacketDefinitions = `SELECT string_agg(pg_get_functiondef(f::regprocedure),E'\n' ORDER BY f) FROM unnest(ARRAY['public.context_query_scope_source_valid(jsonb)','public.context_query_begin_tool(jsonb)','public.context_query_read_batches(jsonb)','public.context_query_units(jsonb)','public.guard_context_query()']) f`
 	var originalRawPacketFunctions string
-	if head == 138 {
+	if head >= 138 && head <= 139 {
+		if head > 138 {
+			if _, e = p.DownTo(ctx, 137); e != nil {
+				t.Fatal(e)
+			}
+		}
 		if e = conn.QueryRow(ctx, rawPacketDefinitions).Scan(&originalRawPacketFunctions); e != nil {
 			t.Fatal("original137 raw summary functions", e)
 		}
 	}
 	var originalPacketFunctions string
-	if head >= 137 && head <= 138 {
+	if head >= 137 && head <= 139 {
 		if head > 137 {
 			if _, e = p.DownTo(ctx, 136); e != nil {
 				t.Fatal("capture pre137 functions", e)
@@ -157,7 +177,7 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 	}
 	var originalAcquisitionGuard, originalAcquisitionShape string
 	const acquisitionShape = `SELECT jsonb_build_object('columns',(SELECT jsonb_agg(to_jsonb(c) ORDER BY c.ordinal_position) FROM (SELECT column_name,ordinal_position,is_nullable,data_type FROM information_schema.columns WHERE table_schema='public' AND table_name='context_verification') c),'constraints',(SELECT jsonb_agg(pg_get_constraintdef(oid) ORDER BY conname) FROM pg_constraint WHERE conrelid='context_verification'::regclass))::text`
-	if head >= 134 && head <= 138 {
+	if head >= 134 && head <= 139 {
 		if head >= 135 {
 			if _, e = p.DownTo(ctx, 133); e != nil {
 				t.Fatal("capture pre134 verification guard", e)
@@ -186,7 +206,7 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 	}
 	// At 136 capture the actual pre-135 refusal definitions, then restore
 	// the previous head before testing the production upgrader.
-	if head >= 136 && head <= 138 {
+	if head >= 136 && head <= 139 {
 		if _, e = p.DownTo(ctx, 134); e != nil {
 			t.Fatal("capture pre135 execution guard", e)
 		}
@@ -198,27 +218,45 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 	}
 	const refusalExecutionShape = `SELECT jsonb_agg(pg_get_constraintdef(oid) ORDER BY conname)::text FROM pg_constraint WHERE conrelid='context_execution'::regclass`
 	var originalRefusalExecutionShape string
-	if head >= 135 && head <= 138 {
+	if head >= 135 && head <= 139 {
 		if e = conn.QueryRow(ctx, refusalExecutionShape).Scan(&originalRefusalExecutionShape); e != nil {
 			t.Fatal(e)
 		}
 	}
-	if head >= 136 && head <= 138 {
+	if head >= 136 && head <= 139 {
 		if _, e = p.UpTo(ctx, 135); e != nil {
 			t.Fatal("restore pre136 schema", e)
 		}
 	}
 	const historyAdmissionShape = `SELECT jsonb_build_object('function',pg_get_functiondef('public.require_capacity_new_admission()'::regprocedure),'triggers',(SELECT jsonb_agg(jsonb_build_array(tgrelid::regclass::text,pg_get_triggerdef(oid)) ORDER BY tgrelid::regclass::text) FROM pg_trigger WHERE tgname='zzz_capacity_new_admission'))::text`
 	var originalHistoryAdmission string
-	if head >= 136 && head <= 138 {
+	if head >= 136 && head <= 139 {
 		if e = conn.QueryRow(ctx, historyAdmissionShape).Scan(&originalHistoryAdmission); e != nil {
 			t.Fatal(e)
 		}
 	}
-	if head >= 137 && head <= 138 {
+	if head >= 137 && head <= 139 {
 		if _, e = p.UpTo(ctx, head-1); e != nil {
 			t.Fatal("restore previous schema before production upgrade", e)
 		}
+	}
+	if head == 139 {
+		// Historical setup temporarily removes/re-adds133columns. Verify its
+		// logical138shape, then bind the STRICT139roundtrip to the actual
+		// immediately preceding138catalog, including its physical ordinals.
+		var preparedFunctions, preparedShape string
+		if e = conn.QueryRow(ctx, packetQueryDefinitions).Scan(&preparedFunctions); e != nil || preparedFunctions != originalPacketQueryFunctions {
+			t.Fatal("preparatory restoration changed138functions", e)
+		}
+		if e = conn.QueryRow(ctx, packetQueryShape).Scan(&preparedShape); e != nil {
+			t.Fatal("prepared138schema", e)
+		}
+		ordinals, err := packetQueryPreparationShape(originalPacketQueryShape, preparedShape)
+		if err != nil {
+			t.Fatal("historical preparation changed logical138schema", err)
+		}
+		t.Logf("preparatory138logical columns/order/types/nullability/defaults/constraints/indexes exact; physical ordinal changes before139: %v", ordinals)
+		originalPacketQueryFunctions, originalPacketQueryShape = preparedFunctions, preparedShape
 	}
 	const profileCancelDefinition = `SELECT pg_get_functiondef('public.guard_snapshot_cancel()'::regprocedure)`
 	var originalCancellation string
@@ -353,7 +391,32 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 		}
 		t.Log("resource projection Down restored exact validators and unchanged trust; Up restored104; no old-decoder rollback qualification")
 	}
-	if head == 138 {
+	if head == 139 {
+		qualifyPacketQuerySQLFunctions(t, ctx, conn)
+		if _, e = p.DownTo(ctx, 138); e != nil {
+			t.Fatal("empty packet query Down", e)
+		}
+		var helpersAbsent bool
+		if e = conn.QueryRow(ctx, `SELECT to_regprocedure('public.context_packet_query_uuid(text)') IS NULL AND to_regprocedure('public.context_packet_query_window_valid(jsonb,text)') IS NULL AND to_regprocedure('public.context_packet_query_scope_grant_current(uuid,jsonb,jsonb,jsonb)') IS NULL AND to_regprocedure('public.context_packet_query_grant_current(uuid,uuid,uuid)') IS NULL`).Scan(&helpersAbsent); e != nil || !helpersAbsent {
+			t.Fatal("139Down retainednewpacketqueryhelpers", e)
+		}
+		var functions, shape, trust string
+		if e = conn.QueryRow(ctx, packetQueryDefinitions).Scan(&functions); e != nil || functions != originalPacketQueryFunctions {
+			t.Fatal("139 Down changed138 function definitions", e)
+		}
+		if e = conn.QueryRow(ctx, packetQueryShape).Scan(&shape); e != nil || shape != originalPacketQueryShape {
+			t.Fatal("139 Down changed138 columns/constraints/indexes", e)
+		}
+		if e = conn.QueryRow(ctx, `SELECT row_to_json(t)::text FROM fleet_trust t`).Scan(&trust); e != nil || trust != originalTrust {
+			t.Fatal("139 Down changed trust", e)
+		}
+		if from, to, e = upgrade.Run(ctx); e != nil || from != 138 || to != 139 {
+			t.Fatal("139 Up after Down", from, to, e)
+		}
+		qualifyPacketQuerySQLFunctions(t, ctx, conn)
+		t.Log("pcap_query139→138→139 restores exact previous functions/schema/grant constraints/trust; new query4units2batches, oldsummary2units1batch")
+	}
+	if head >= 138 && head <= 139 {
 		qualifyPacketSummaryQueryFunctions(t, ctx, conn, true)
 		if _, e = p.DownTo(ctx, 137); e != nil {
 			t.Fatal("empty raw summary Down", e)
@@ -370,13 +433,13 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 			t.Fatal("137 accepted raw source", e)
 		}
 		qualifyPacketSummaryQueryFunctions(t, ctx, conn)
-		if from, to, e = upgrade.Run(ctx); e != nil || from != 137 || to != 138 {
+		if from, to, e = upgrade.Run(ctx); e != nil || from != 137 || to != head {
 			t.Fatal("raw Up after Down", from, to, e)
 		}
 		qualifyPacketSummaryQueryFunctions(t, ctx, conn, true)
 		t.Log("raw138→137→138: exact five137 functions/trust restored; metadata stays supported, raw refused at137; two units/one batch; no new state/privileges")
 	}
-	if head >= 137 && head <= 138 {
+	if head >= 137 && head <= 139 {
 		qualifyPacketSummaryQueryFunctions(t, ctx, conn)
 		if _, e = p.DownTo(ctx, 136); e != nil {
 			t.Fatal("empty packet summary Down", e)
@@ -398,7 +461,7 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 		qualifyPacketSummaryQueryFunctions(t, ctx, conn)
 		t.Logf("packet%d→136→%d: exact ten136 function definitions/trust restored, closed source, two units, one batch; no new state/privileges", head, head)
 	}
-	if head >= 133 && head <= 138 {
+	if head >= 133 && head <= 139 {
 		qualifyProfileComparisonQueryFunctions(t, ctx, conn)
 		qualifySavedSyscallQueryFunctions(t, ctx, conn)
 		qualifyProfileSummaryQueryFunctions(t, ctx, conn)
@@ -421,7 +484,7 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 		qualifyProfileComparisonQueryFunctions(t, ctx, conn)
 		t.Logf("comparison%d→132→%d: exact twelve existing function definitions, table/index/constraint shape and trust restored; closed pair/20 units/one batch", head, head)
 	}
-	if head >= 134 && head <= 138 {
+	if head >= 134 && head <= 139 {
 		qualifyProfileComparisonQueryFunctions(t, ctx, conn)
 		qualifySavedSyscallQueryFunctions(t, ctx, conn)
 		qualifyProfileSummaryQueryFunctions(t, ctx, conn)
@@ -443,7 +506,7 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 		}
 		t.Logf("acquisition%d→133→%d: paired nullable timing, exact native-length guard/shape restored and trust unchanged; prior query parity retained", head, head)
 	}
-	if head >= 135 && head <= 138 {
+	if head >= 135 && head <= 139 {
 		if _, e = p.DownTo(ctx, 134); e != nil {
 			t.Fatal("empty profile refusal Down", e)
 		}
@@ -462,7 +525,7 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 		}
 		t.Logf("profile refusal%d→134→%d: exact existing execution guard/constraints restored and trust unchanged", head, head)
 	}
-	if head >= 136 && head <= 138 {
+	if head >= 136 && head <= 139 {
 		var deferrable, deferred bool
 		if e = conn.QueryRow(ctx, `SELECT tgdeferrable,tginitdeferred FROM pg_trigger WHERE tgrelid='custody_attempt'::regclass AND tgname='zzz_capacity_new_admission'`).Scan(&deferrable, &deferred); e != nil || !deferrable || deferred {
 			t.Fatal("history constraint default timing", e)

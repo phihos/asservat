@@ -39,3 +39,10 @@ it('never offers the raw aggregate through a shared case', async () => {
   const controller = new Evidence(client); render(<EvidenceWorkspace controller={controller} session={session} scope={new AbortController().signal} caseID={id(2)}/>);
   await screen.findByRole('button', { name: 'Download' }); expect(screen.queryByRole('button', { name: 'Inspect saved packets' })).toBeNull(); controller.reset();
 });
+
+it('offers the saved packet query and invokes only that explicit operation', async () => {
+ const client=new SyntheticEvidence(),value=caseResult();if(value.status!=='ok')throw Error();Object.assign(value.data.artifacts[0],{artifact_id:id(3),kind:'packetCapture',native_format:'pcapng',data_class:'metadata',digest:profileVersion});client.responder=()=>value;
+ const page=packetSummary();
+ const fetcher=vi.fn().mockImplementation(async (_url,options)=>{const input=JSON.parse(options.body);return new Response(JSON.stringify({...page,data:{capture_mode:'networkHeaders',fields:input.fields,rows:[input.fields.map((field:string)=>field==='packet_index'?1:field==='packet_time'?'2026-10-18T12:00:00Z':field==='source_address'?'192.0.2.1':field==='destination_address'?'192.0.2.2':field==='protocol'?'TCP':0)],scanned_bytes:54,scanned_packets:1,row_limit_reached:false,scan_limit_reached:false,output_limit_reached:false,query_observed_at:page.data.query_observed_at,query_expires_at:page.data.query_expires_at}}),{headers:{'Content-Type':'application/json'}})});vi.stubGlobal('fetch',fetcher);
+ const controller=new Evidence(client);render(<EvidenceWorkspace controller={controller} session={session} scope={new AbortController().signal} caseID={id(2)}/>);const run=await screen.findByRole('button',{name:'Run packet query'});expect(fetcher).not.toHaveBeenCalled();fireEvent.click(run);await screen.findByRole('table',{name:'Saved packet query rows'});expect(fetcher).toHaveBeenCalledOnce();expect(fetcher.mock.calls[0][0]).toBe('/api/v1/operations/pcap_query');expect(client.calls.every(call=>call.name==='get_case')).toBe(true);controller.reset();
+});

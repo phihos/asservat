@@ -1,0 +1,635 @@
+{
+  "name": "pcap_query",
+  "description": "Query one saved metadata or raw PCAPNG with a bounded tcpdump/libpcap filter, typed time/TCP-flag bounds and closed fields. Raw sources require exact pcap_query approval; metadata-only queries use ordinary rights. Rows are transient, not downloads or new collection.",
+  "annotations": {
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "openWorldHint": false
+  },
+  "inputSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "case_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "artifact_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "grant_id": {
+        "type": "string",
+        "format": "uuid",
+        "description": "Required for every raw source, including header-only fields, and for raw byte output. The service derives this requirement from the authorized source; metadata-only queries need no raw approval."
+      },
+      "idempotency_key": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128
+      },
+      "fields": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "enum": [
+            "packet_index",
+            "packet_time",
+            "captured_length",
+            "wire_length",
+            "source_address",
+            "destination_address",
+            "source_port",
+            "destination_port",
+            "protocol",
+            "tcp_flags",
+            "tcp_seq",
+            "tcp_ack",
+            "tcp_window",
+            "icmp_type",
+            "icmp_code",
+            "frame_prefix_hex"
+          ]
+        },
+        "minItems": 1,
+        "maxItems": 32,
+        "uniqueItems": true
+      },
+      "max_packets": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "max_scan_bytes": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 1073741824,
+        "description": "Logical scan budget: sum of captured lengths of all visited saved records, including nonmatches. Full bounded source authentication still completes after a logical cap. The API ceiling does not qualify larger sources."
+      },
+      "packet_filter": {
+        "type": "string",
+        "maxLength": 512,
+        "description": "Supported tcpdump/libpcap packet-filter subset; no name resolution or bracket predicates. Omitted or empty means no packet-filter restriction. This is not Wireshark display-filter syntax."
+      },
+      "start_time": {
+        "type": "string",
+        "format": "date-time",
+        "maxLength": 35,
+        "description": "Inclusive saved-packet timestamp bound; normalized to UTC. It does not establish clock accuracy."
+      },
+      "end_time": {
+        "type": "string",
+        "format": "date-time",
+        "maxLength": 35,
+        "description": "Exclusive saved-packet timestamp bound. Must be later than start_time when both are present."
+      },
+      "tcp_flags": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "mask": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 511
+          },
+          "value": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 511
+          }
+        },
+        "required": [
+          "mask",
+          "value"
+        ],
+        "description": "Only fully decoded TCP headers match (flags & mask) == value; value cannot contain bits outside mask."
+      },
+      "frame_prefix": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1499
+          },
+          "length": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 64
+          }
+        },
+        "required": [
+          "offset",
+          "length"
+        ],
+        "description": "Raw-only actual saved-frame byte window. Offset plus length must not exceed 1500. Missing bytes remain unavailable; no padding or inferred payload start."
+      }
+    },
+    "required": [
+      "case_id",
+      "artifact_id",
+      "idempotency_key",
+      "fields",
+      "max_packets",
+      "max_scan_bytes"
+    ],
+    "allOf": [
+      {
+        "if": {
+          "properties": {
+            "fields": {
+              "contains": {
+                "const": "frame_prefix_hex"
+              }
+            }
+          },
+          "required": [
+            "fields"
+          ]
+        },
+        "then": {
+          "required": [
+            "frame_prefix",
+            "grant_id"
+          ]
+        },
+        "else": {
+          "properties": {
+            "frame_prefix": false
+          }
+        }
+      }
+    ]
+  },
+  "outputSchema": {
+    "title": "Asservat mcp-result v1",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "schema_version": {
+        "const": "mcp-result/v1"
+      },
+      "request_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "data_class": {
+        "enum": [
+          "metadata",
+          "extract",
+          "raw"
+        ]
+      },
+      "status": {
+        "type": "string",
+        "enum": [
+          "ok",
+          "pending",
+          "error"
+        ]
+      },
+      "data": {
+        "type": "object"
+      },
+      "truncated": {
+        "type": "boolean"
+      },
+      "next_cursor": {
+        "type": "null"
+      },
+      "narrowing_hint": {
+        "anyOf": [
+          {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "warnings": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "maxItems": 32,
+        "minItems": 0,
+        "uniqueItems": true
+      },
+      "provenance": {
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/d0"
+        },
+        "maxItems": 1,
+        "minItems": 0,
+        "uniqueItems": true
+      }
+    },
+    "required": [
+      "schema_version",
+      "request_id",
+      "data_class",
+      "status",
+      "data",
+      "truncated",
+      "next_cursor",
+      "narrowing_hint",
+      "warnings",
+      "provenance"
+    ],
+    "allOf": [
+      {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": "ok"
+              },
+              "data": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "capture_mode": {
+                    "enum": [
+                      "networkHeaders",
+                      "rawPackets"
+                    ]
+                  },
+                  "fields": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "packet_index",
+                        "packet_time",
+                        "captured_length",
+                        "wire_length",
+                        "source_address",
+                        "destination_address",
+                        "source_port",
+                        "destination_port",
+                        "protocol",
+                        "tcp_flags",
+                        "tcp_seq",
+                        "tcp_ack",
+                        "tcp_window",
+                        "icmp_type",
+                        "icmp_code",
+                        "frame_prefix_hex"
+                      ]
+                    },
+                    "minItems": 1,
+                    "maxItems": 32,
+                    "uniqueItems": true
+                  },
+                  "rows": {
+                    "type": "array",
+                    "maxItems": 100,
+                    "items": {
+                      "type": "array",
+                      "minItems": 1,
+                      "maxItems": 32,
+                      "items": {
+                        "type": [
+                          "string",
+                          "integer",
+                          "null"
+                        ],
+                        "maxLength": 128,
+                        "minimum": 0,
+                        "maximum": 4294967295
+                      }
+                    },
+                    "description": "Exactly one cell per selected field. Fixed field types, canonical values and null availability are independently validated; zero is not null."
+                  },
+                  "scanned_bytes": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1073741824
+                  },
+                  "scanned_packets": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 4294967295
+                  },
+                  "row_limit_reached": {
+                    "type": "boolean"
+                  },
+                  "scan_limit_reached": {
+                    "type": "boolean"
+                  },
+                  "output_limit_reached": {
+                    "type": "boolean"
+                  },
+                  "query_observed_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "Server time of this prepared query snapshot. This observation does not renew query or request authority. Together with query_expires_at it bounds managed-view lifetime independently of the client wall clock."
+                  },
+                  "query_expires_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "Original total query cutoff, irreversibly shortened by effective evidence access. A poll never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline."
+                  }
+                },
+                "required": [
+                  "capture_mode",
+                  "fields",
+                  "rows",
+                  "scanned_bytes",
+                  "scanned_packets",
+                  "row_limit_reached",
+                  "scan_limit_reached",
+                  "output_limit_reached",
+                  "query_observed_at",
+                  "query_expires_at"
+                ],
+                "allOf": [
+                  {
+                    "if": {
+                      "properties": {
+                        "capture_mode": {
+                          "const": "networkHeaders"
+                        }
+                      },
+                      "required": [
+                        "capture_mode"
+                      ]
+                    },
+                    "then": {
+                      "properties": {
+                        "fields": {
+                          "not": {
+                            "contains": {
+                              "const": "frame_prefix_hex"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "if": {
+                      "properties": {
+                        "row_limit_reached": {
+                          "const": true
+                        }
+                      },
+                      "required": [
+                        "row_limit_reached"
+                      ]
+                    },
+                    "then": {
+                      "properties": {
+                        "scan_limit_reached": {
+                          "const": false
+                        },
+                        "output_limit_reached": {
+                          "const": false
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "if": {
+                      "properties": {
+                        "scan_limit_reached": {
+                          "const": true
+                        }
+                      },
+                      "required": [
+                        "scan_limit_reached"
+                      ]
+                    },
+                    "then": {
+                      "properties": {
+                        "row_limit_reached": {
+                          "const": false
+                        },
+                        "output_limit_reached": {
+                          "const": false
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "if": {
+                      "properties": {
+                        "output_limit_reached": {
+                          "const": true
+                        }
+                      },
+                      "required": [
+                        "output_limit_reached"
+                      ]
+                    },
+                    "then": {
+                      "properties": {
+                        "row_limit_reached": {
+                          "const": false
+                        },
+                        "scan_limit_reached": {
+                          "const": false
+                        }
+                      }
+                    }
+                  }
+                ]
+              },
+              "provenance": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 1
+              }
+            },
+            "required": [
+              "status",
+              "data"
+            ],
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "data": {
+                      "properties": {
+                        "capture_mode": {
+                          "const": "rawPackets"
+                        }
+                      },
+                      "required": [
+                        "capture_mode"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "data_class": {
+                      "const": "raw"
+                    }
+                  }
+                },
+                "else": {
+                  "properties": {
+                    "data_class": {
+                      "const": "extract"
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": "pending"
+              },
+              "data": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "query_handle": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 4096
+                  },
+                  "retry_after_seconds": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 60
+                  },
+                  "query_observed_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "Server time of this prepared query snapshot. This observation does not renew query or request authority. Together with query_expires_at it bounds managed-view lifetime independently of the client wall clock."
+                  },
+                  "query_expires_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "Original total query cutoff, irreversibly shortened by effective evidence access. A poll never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline."
+                  }
+                },
+                "required": [
+                  "query_handle",
+                  "retry_after_seconds",
+                  "query_observed_at",
+                  "query_expires_at"
+                ]
+              }
+            },
+            "required": [
+              "status",
+              "data"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": "error"
+              },
+              "data": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "message": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1024
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "navigation_uri": {
+                    "type": "string",
+                    "format": "uri",
+                    "maxLength": 2048
+                  },
+                  "responsible_role": {
+                    "enum": [
+                      "maintainer",
+                      "approver",
+                      "administrator",
+                      "none"
+                    ]
+                  },
+                  "retry_after_seconds": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 60
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ]
+              }
+            },
+            "required": [
+              "status",
+              "data"
+            ]
+          }
+        ]
+      },
+      {
+        "if": {
+          "properties": {
+            "truncated": {
+              "const": true
+            }
+          },
+          "required": [
+            "truncated"
+          ]
+        },
+        "then": {
+          "properties": {
+            "narrowing_hint": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            }
+          }
+        }
+      }
+    ],
+    "$defs": {
+      "d0": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "artifactID": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": [
+          "artifactID",
+          "digest"
+        ]
+      }
+    }
+  }
+}

@@ -1,6 +1,7 @@
 package presentation
 
 import (
+	analysisapp "asservat.local/asservat/internal/application/analysis"
 	"encoding/json"
 	"slices"
 
@@ -8,10 +9,25 @@ import (
 )
 
 func queryOperation(name string) bool {
-	return name == "get_file_excerpt" || name == "get_http_headers" || name == "get_profile_summary" || name == "get_pcap_summary" || name == "compare_profiles" || syscallQueryOperation(name) || name == "get_query_result"
+	return name == "pcap_query" || name == "get_file_excerpt" || name == "get_http_headers" || name == "get_profile_summary" || name == "get_pcap_summary" || name == "compare_profiles" || syscallQueryOperation(name) || name == "get_query_result"
 }
 
 func normalizeQueryInput(name string, raw []byte) ([]byte, error) {
+	if name == "pcap_query" {
+		var in PacketQueryOperationInput
+		if err := json.Unmarshal(raw, &in); err != nil {
+			return nil, err
+		}
+		r := analysisapp.NormalizePacketQueryRequest(in.request())
+		if !r.Valid() {
+			return nil, ErrOperationDelivery
+		}
+		return json.Marshal(struct {
+			Tool, DisplayVersion string
+			Input                PacketQueryOperationInput
+		}{name, analysis.PacketQueryDisplayVersion, packetQueryInput(r)})
+	}
+
 	if syscallQueryOperation(name) {
 		var in SyscallOperationInput
 		if err := json.Unmarshal(raw, &in); err != nil {

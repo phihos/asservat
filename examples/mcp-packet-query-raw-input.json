@@ -1,0 +1,18 @@
+{
+  "case_id": "00000000-0000-4000-8000-000000000001",
+  "artifact_id": "00000000-0000-4000-8000-000000000022",
+  "idempotency_key": "raw-packet-page-1",
+  "fields": [
+    "packet_index",
+    "tcp_seq",
+    "frame_prefix_hex"
+  ],
+  "packet_filter": "tcp port 80",
+  "max_packets": 100,
+  "max_scan_bytes": 8388608,
+  "grant_id": "00000000-0000-4000-8000-000000000099",
+  "frame_prefix": {
+    "offset": 52,
+    "length": 4
+  }
+}

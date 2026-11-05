@@ -97,7 +97,7 @@ def source_hashes():
     files = [ROOT/"go.mod", ROOT/"go.sum", Path(__file__), ROOT/"scripts/fetch-gadget.sh", ROOT/"scripts/ci-native.sh", ROOT/".github/workflows/native.yml"]
     files += [ROOT/"scripts/package-argument-gadget.py"]
     files += [ROOT/"experiments/syscall-argument-budget"/name for name in ("prepare.py", "pins.json", "program.patch", "budget.h")]
-    files += [ROOT/"web/package.json", ROOT/"web/package-lock.json", ROOT/"web/scripts/installed-history-browser.mjs", ROOT/"web/scripts/installed-history-response.mjs", ROOT/"web/scripts/installed-profile-comparison-browser.mjs", ROOT/"web/scripts/installed-packet-summary-browser.mjs", ROOT/"web/scripts/installed-profile-case-proof.mjs", ROOT/"web/src/generated/validate-auth.js", ROOT/"web/src/generated/validate-evidence.js"]
+    files += [ROOT/"web/package.json", ROOT/"web/package-lock.json", ROOT/"web/scripts/installed-history-browser.mjs", ROOT/"web/scripts/installed-history-response.mjs", ROOT/"web/scripts/installed-profile-comparison-browser.mjs", ROOT/"web/scripts/installed-packet-summary-browser.mjs", ROOT/"web/scripts/installed-packet-query-browser.mjs", ROOT/"web/scripts/installed-profile-case-proof.mjs", ROOT/"web/src/generated/validate-auth.js", ROOT/"web/src/generated/validate-evidence.js"]
     files += list((ROOT/"cmd").rglob("*.go")) + list((ROOT/"internal").rglob("*.go")) + list((ROOT/"test/integration").rglob("*.go"))
     files += [ROOT/"scripts/helm_registry.py", ROOT/"scripts/native_kube_audit.py"] + list((ROOT/"charts/asservat").rglob("*"))
     files = [p for p in files if p.is_file()]
@@ -585,6 +585,7 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
             report["installedHistoryBrowserQualification"] = collector_qualification and focus == "approved-recording"
             report["installedProfileComparisonBrowserQualification"] = collector_qualification and focus == "profile-comparison"
             report["installedPacketSummaryBrowserQualification"] = collector_qualification and focus in ("manual-mixed", "manual-raw")
+            report["installedPacketQueryQualification"] = collector_qualification and focus == "manual-raw"
             report["installedHeapBrowserQualification"] = collector_qualification and focus == "manual-profile" and profile_variant == "heap"
             report["installedProfileAuth"] = profile_auth if collector_qualification and focus == "manual-profile" else None
             report["installedProfileTransport"] = profile_transport if collector_qualification and focus == "manual-profile" else None

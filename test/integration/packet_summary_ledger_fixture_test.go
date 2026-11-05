@@ -128,7 +128,7 @@ func refuseRetainedPacketSummaryDowngrade(t *testing.T, f *queryLedgerFixture) {
 	}
 	snapshot := func() string {
 		var b []byte
-		if err := f.base.admin.QueryRow(f.base.ctx, `SELECT jsonb_build_object('queries',(SELECT jsonb_agg(to_jsonb(q) ORDER BY q.id) FROM context_query q),'backing',(SELECT jsonb_agg(to_jsonb(b)) FROM context_query_backing b),'allocations',(SELECT jsonb_agg(to_jsonb(a) ORDER BY a.id) FROM context_query_allocation a),'keys',(SELECT jsonb_agg(to_jsonb(k) ORDER BY k.child_id) FROM context_query_key_binding k))`).Scan(&b); err != nil {
+		if err := f.base.admin.QueryRow(f.base.ctx, `SELECT jsonb_build_object('queries',(SELECT jsonb_agg(to_jsonb(q)-ARRAY['invocation_key','request_digest'] ORDER BY q.id) FROM context_query q),'backing',(SELECT jsonb_agg(to_jsonb(b)) FROM context_query_backing b),'allocations',(SELECT jsonb_agg(to_jsonb(a) ORDER BY a.id) FROM context_query_allocation a),'keys',(SELECT jsonb_agg(to_jsonb(k) ORDER BY k.child_id) FROM context_query_key_binding k))`).Scan(&b); err != nil {
 			t.Fatal(err)
 		}
 		if !json.Valid(b) {
@@ -136,6 +136,27 @@ func refuseRetainedPacketSummaryDowngrade(t *testing.T, f *queryLedgerFixture) {
 		}
 		return string(b)
 	}
+	beforePacketSnapshot := snapshot()
+	originalHead, e := p.GetDBVersion(f.base.ctx)
+	if e != nil {
+		t.Fatal(e)
+	}
+	// Later additive migrations may commit their Down before the retained138
+	// audit refuses. Restore that prefix, including the original predicate ACL.
+	defer func() {
+		cleanup, stop := context.WithTimeout(context.WithoutCancel(f.base.ctx), 30*time.Second)
+		defer stop()
+		if _, e := p.UpTo(cleanup, originalHead); e != nil {
+			t.Error("restore packet schema prefix", e)
+			return
+		}
+		if originalHead >= 139 {
+			restorePacketQueryFixturePredicate(t, cleanup, f)
+		}
+		if snapshot() != beforePacketSnapshot {
+			t.Error("restored packet prefix changed retained state")
+		}
+	}()
 	before := snapshot()
 	if _, err = p.DownTo(f.base.ctx, 136); err == nil || !strings.Contains(err.Error(), "packet query history cannot be downgraded") {
 		t.Fatal("retained packet downgrade", err)
@@ -144,7 +165,7 @@ func refuseRetainedPacketSummaryDowngrade(t *testing.T, f *queryLedgerFixture) {
 	if err != nil || head != 138 || snapshot() != before {
 		t.Fatal("refused downgrade changed history/spend", head, err)
 	}
-	t.Log("retained packet138→137 refused (conservative same-tool audit boundary): exact query/key/accounting snapshot unchanged")
+	t.Logf("retained packet138→137 refused (same-tool audit); nullable later columns excluded from prefix snapshot; original schema%d restored on return", originalHead)
 }
 
 // Two OAuth clients of the SAME human retain distinct query actors but share

@@ -40,6 +40,19 @@ type summaryScan struct {
 // It never exports options, payload or names.
 // Authenticity belongs to the enclosing source reader and canonical checker.
 func SummarizePCAPNG(ctx context.Context, source io.Reader, e artifact.ContextExpectation, from, until time.Time) (query.PacketSummary, error) {
+	return scanSavedPCAPNG(ctx, source, e, from, until, nil)
+}
+
+type savedPacket struct {
+	frame    []byte
+	wire     uint32
+	at       time.Time
+	ordinal  uint32
+	decoder  *decoder
+	headerOK bool
+}
+
+func scanSavedPCAPNG(ctx context.Context, source io.Reader, e artifact.ContextExpectation, from, until time.Time, visit func(savedPacket) error) (query.PacketSummary, error) {
 	var zero query.PacketSummary
 	if ctx == nil || ctx.Err() != nil || source == nil || (e.NativeType != artifact.PCAPNGArtifact || e.DataClass != "metadata") && (e.NativeType != artifact.RawPCAPNGArtifact || e.DataClass != "raw") || e.Registration.NativeLimit < 1 || e.Registration.NativeLimit > artifact.RecordingNativeLimit || from.IsZero() || until.Before(from) {
 		return zero, query.ErrUnavailable
@@ -157,6 +170,18 @@ func SummarizePCAPNG(ctx context.Context, source io.Reader, e artifact.ContextEx
 				}
 			}
 			count, drop := decoder.headerLength(frame)
+			if visit != nil {
+				if !raw && (drop != DropNone || count != len(frame)) {
+					return zero, query.ErrUnavailable
+				}
+				if s.packets > int64(^uint32(0)) {
+					return zero, query.ErrUnavailable
+				}
+				if err := visit(savedPacket{frame, wire, at, uint32(s.packets), decoder, drop == DropNone}); err != nil {
+					return zero, err
+				}
+				continue
+			}
 			if raw && drop != DropNone {
 				s.unclassified++
 				continue
@@ -219,6 +244,9 @@ func SummarizePCAPNG(ctx context.Context, source io.Reader, e artifact.ContextEx
 	}
 	if ctx.Err() != nil || s.order == nil || len(s.interfaces) == 0 || s.finishSection() != nil {
 		return zero, query.ErrUnavailable
+	}
+	if visit != nil {
+		return zero, nil
 	}
 	out := query.PacketSummary{CaptureMode: "networkHeaders", Packets: s.packets, DropReporting: "unavailable", Conversations: make([]query.PacketConversation, 0, min(len(s.rows), query.PacketSummaryMaxConversations)), ConversationsTotal: len(s.rows)}
 	if raw {

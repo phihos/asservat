@@ -420,3 +420,21 @@ it('requests independent approval for an exact recording review and resumes its 
   expect(client.calls.filter(c => c.name === 'preview_capture')).toHaveLength(2);
   expect(controller.snapshot().captureID).toBe(id(8));
 });
+
+it('retains selected result access unchanged through uncertain submission and approval', async () => {
+  const { controller, client, scope } = await ready();
+  const recording = recordingPreviewResult(); if (recording.status !== 'ok') throw new Error();
+  client.responder = () => recording;
+  await controller.previewComposition(recording.data.profile_composition!.authored);
+  const access = { actionIds: [recording.data.capture_assessment.actions[0].actionID], operations: ['download_artifact' as const, 'pcap_query' as const], maxArtifacts: 1, maxBytes: 8 * 1024 * 1024 + 49152, maxOperations: 10, notAfter: new Date(Date.now() + 3600000).toISOString() };
+  client.responder = () => { throw new Error('lost response'); };
+  await controller.submit(access);
+  access.maxBytes = 1; access.actionIds[0] = 'changed';
+  const first = client.calls.filter(c => c.name === 'request_capture')[0].input;
+  expect(first).toMatchObject({ result_access: { maxBytes: 8 * 1024 * 1024 + 49152, actionIds: [recording.data.capture_assessment.actions[0].actionID] } });
+  scope.abort(); controller.attach(session, new AbortController().signal);
+  client.responder = () => approvalPendingResult();
+  await controller.retrySubmission();
+  expect(client.calls.filter(c => c.name === 'request_capture').map(c => c.input)).toEqual([first, first]);
+  controller.reset();
+});

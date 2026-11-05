@@ -24,7 +24,7 @@ console-build:
 	cd web && npm run build
 
 console-browser-check: console-build
-	ASSERVAT_CONSOLE_BROWSER_TEST=1 TMPDIR="$(ASSERVAT_BUILD_TMP)" go test -count=1 -run '^TestConsole(Browser|NativeRestart|ProfileComparison|HeapProfile|PacketSummary)WithBuiltPackage$$' -v ./test/integration
+	ASSERVAT_CONSOLE_BROWSER_TEST=1 TMPDIR="$(ASSERVAT_BUILD_TMP)" go test -count=1 -run '^TestConsole(Browser|NativeRestart|ProfileComparison|HeapProfile|PacketSummary|PacketQuery)WithBuiltPackage$$' -v ./test/integration
 
 .PHONY: openapi-check
 openapi-check:
@@ -87,6 +87,7 @@ libpcap:
 # no capture or BPF load.
 pcap-check: libpcap
 	$(PCAP_ENV) go test -tags libpcap -count=1 ./internal/adapters/pcap/
+	$(PCAP_ENV) go test -tags libpcap -count=1 -run '^TestPacketQueryPinnedLibpcapWireLengthAndTruncation$$' ./internal/bootstrap
 	$(PCAP_ENV) go test -tags libpcap -count=1 -run '^TestRawPolicyApprovedTimingReplayIgnoresRequireAllSwitch$$' ./internal/adapters/postgres/
 	$(HUB_BUILD) -o "$(ASSERVAT_BUILD_TMP)/asservat-hub" ./cmd/asservat 2>/dev/null
 	file "$(ASSERVAT_BUILD_TMP)/asservat-hub" | grep -q 'statically linked'
@@ -256,5 +257,5 @@ profile-service-preflight:
 # No external services, collector, acquisition or installed qualification.
 .PHONY: packet-summary-preflight
 packet-summary-preflight:
-	TMPDIR="$(ASSERVAT_BUILD_TMP)" go test -race -count=1 -timeout=3m -run '^(TestRawPacket|TestPacketSummary|TestPacketProjection|TestSavedPacketMigration|TestProjectionSource|TestProjectionScope|TestProjectionResult|TestProfileSummarySource|TestContextQueryAuditNamesFormatsAndEffects)' ./internal/domain/analysis ./internal/domain/audit ./internal/application/analysis ./internal/application/authorization ./internal/application/evidence ./internal/adapters/packets ./internal/adapters/objectstore ./internal/adapters/postgres ./internal/contracts ./internal/transport/native ./internal/transport/presentation ./internal/bootstrap
-	TMPDIR="$(ASSERVAT_BUILD_TMP)" go test -race -count=1 -timeout=3m -run '^TestInstalledPacketSummary' ./test/integration
+	TMPDIR="$(ASSERVAT_BUILD_TMP)" go test -race -count=1 -timeout=3m -run '^(TestRawPacket|TestPacketQuery|TestNativePacketQuery|TestPacketSummary|TestPacketProjection|TestSavedPacketMigration|TestProjectionSource|TestProjectionScope|TestProjectionResult|TestProfileSummarySource|TestContextQueryAuditNamesFormatsAndEffects)' ./internal/domain/analysis ./internal/domain/audit ./internal/application/analysis ./internal/application/authorization ./internal/application/evidence ./internal/adapters/packets ./internal/adapters/objectstore ./internal/adapters/postgres ./internal/contracts ./internal/transport/native ./internal/transport/presentation ./internal/bootstrap
+	TMPDIR="$(ASSERVAT_BUILD_TMP)" go test -race -count=1 -timeout=3m -run '^TestInstalledPacket(Summary|Query)' ./test/integration

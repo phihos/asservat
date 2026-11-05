@@ -107,6 +107,7 @@ WHERE g.root_id= @root_id::uuid AND g.kind='rawQuery' AND g.requester_key= @requ
  AND g.requester_issuer= @requester_issuer::text AND g.requester_subject= @requester_subject::text AND g.requester_client= @requester_client::text AND g.requester_kind='human'
  AND g.decision='approved' AND g.revoked_at IS NULL AND g.expires_at>clock_timestamp()
  AND g.raw_query @> @member::jsonb
+ AND (@operation::text='' OR (g.raw_query->'Operations') ? @operation::text)
  AND EXISTS(SELECT 1 FROM jsonb_array_elements(g.raw_query->'Artifacts') a WHERE a#>>'{Output,ArtifactID}'= (@artifact_id::uuid)::text AND a#>'{Output,ArtifactDigest}'= sqlc.arg(version)::jsonb AND (a->>'ExpiresAt')::timestamptz>clock_timestamp())
  AND @bytes::bigint<=g.max_bytes-g.bytes_spent AND @operations::bigint<=g.max_operations-g.operations_spent
 ORDER BY EXISTS(SELECT 1 FROM access_grant_child c WHERE c.root_id=g.root_id AND c.parent_id=g.id AND c.artifact_id= @artifact_id::uuid AND c.client_id=g.requester_client) DESC,g.requested_at,g.id

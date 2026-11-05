@@ -1405,9 +1405,10 @@ WHERE g.root_id= $1::uuid AND g.kind='rawQuery' AND g.requester_key= $2::bytea
  AND g.requester_issuer= $3::text AND g.requester_subject= $4::text AND g.requester_client= $5::text AND g.requester_kind='human'
  AND g.decision='approved' AND g.revoked_at IS NULL AND g.expires_at>clock_timestamp()
  AND g.raw_query @> $6::jsonb
- AND EXISTS(SELECT 1 FROM jsonb_array_elements(g.raw_query->'Artifacts') a WHERE a#>>'{Output,ArtifactID}'= ($7::uuid)::text AND a#>'{Output,ArtifactDigest}'= $8::jsonb AND (a->>'ExpiresAt')::timestamptz>clock_timestamp())
- AND $9::bigint<=g.max_bytes-g.bytes_spent AND $10::bigint<=g.max_operations-g.operations_spent
-ORDER BY EXISTS(SELECT 1 FROM access_grant_child c WHERE c.root_id=g.root_id AND c.parent_id=g.id AND c.artifact_id= $7::uuid AND c.client_id=g.requester_client) DESC,g.requested_at,g.id
+ AND ($7::text='' OR (g.raw_query->'Operations') ? $7::text)
+ AND EXISTS(SELECT 1 FROM jsonb_array_elements(g.raw_query->'Artifacts') a WHERE a#>>'{Output,ArtifactID}'= ($8::uuid)::text AND a#>'{Output,ArtifactDigest}'= $9::jsonb AND (a->>'ExpiresAt')::timestamptz>clock_timestamp())
+ AND $10::bigint<=g.max_bytes-g.bytes_spent AND $11::bigint<=g.max_operations-g.operations_spent
+ORDER BY EXISTS(SELECT 1 FROM access_grant_child c WHERE c.root_id=g.root_id AND c.parent_id=g.id AND c.artifact_id= $8::uuid AND c.client_id=g.requester_client) DESC,g.requested_at,g.id
 LIMIT 64
 `
 
@@ -1418,6 +1419,7 @@ type ReadRawQueryCandidatesParams struct {
 	RequesterSubject string
 	RequesterClient  string
 	Member           []byte
+	Operation        string
 	ArtifactID       pgtype.UUID
 	Version          []byte
 	Bytes            int64
@@ -1432,6 +1434,7 @@ func (q *Queries) ReadRawQueryCandidates(ctx context.Context, arg ReadRawQueryCa
 		arg.RequesterSubject,
 		arg.RequesterClient,
 		arg.Member,
+		arg.Operation,
 		arg.ArtifactID,
 		arg.Version,
 		arg.Bytes,

@@ -19,7 +19,10 @@ import (
 // ContextProjectionEvidence comes from independently verified publication. It
 // contains no native content, filename or checksum and is not a writer manifest.
 type ContextProjectionEvidence struct {
+	DisplayVersion                  string
 	CaseID, CaptureID, PurposeRef   string
+	ActionID                        string
+	ExecutionDigest                 artifact.Digest
 	Version, SourceProjectionDigest artifact.Digest
 	SourceFormat, DataClass         string
 	// NativeType is the published native type (empty is pod status); with
@@ -57,7 +60,8 @@ type ContextProjectionAuthority struct {
 	// Shares is the ADR-232 recipient branch: consulted only when ordinary
 	// target eligibility refuses, before the protected catalog read. Nil
 	// disables shared inspection.
-	Shares ShareReader
+	Shares       ShareReader
+	PacketGrants PacketProjectionGrants
 	// Reviews repeats the caller's recorded decision-time reviews before the
 	// permission read (ADR-245); nil disables them.
 	Reviews RecordedReviewRefresher
@@ -157,12 +161,15 @@ func (s ContextProjectionAuthority) checkProjection(ctx context.Context, source 
 	// The protected source lookup follows current ordinary target eligibility.
 	record, err := s.Catalog.ContextProjectionEvidence(call, candidate.ArtifactID)
 	record = cloneProjectionEvidence(record)
-	scope := analysis.ContextProjectionScope{RootID: candidate.RootID, CaseID: candidate.CaseID, CaptureID: candidate.CaptureID, ArtifactID: candidate.ArtifactID, ClusterID: candidate.ClusterID, NamespaceUID: candidate.NamespaceUID, WorkloadUID: candidate.WorkloadUID, PodUID: candidate.PodUID, Selection: candidate.Selection, Principal: candidate.Principal, NativeType: candidate.NativeType, Headers: candidate.Headers, Profile: candidate.Profile, Syscalls: candidate.Syscalls, Version: record.Version, SourceProjectionDigest: record.SourceProjectionDigest, SourceFormat: record.SourceFormat}
+	scope := analysis.ContextProjectionScope{RootID: candidate.RootID, CaseID: candidate.CaseID, CaptureID: candidate.CaptureID, ArtifactID: candidate.ArtifactID, ClusterID: candidate.ClusterID, NamespaceUID: candidate.NamespaceUID, WorkloadUID: candidate.WorkloadUID, PodUID: candidate.PodUID, Selection: candidate.Selection, Principal: candidate.Principal, NativeType: candidate.NativeType, Headers: candidate.Headers, Profile: candidate.Profile, Syscalls: candidate.Syscalls, PacketQuery: candidate.PacketQuery, RawGrantID: candidate.RawGrantID, Version: record.Version, SourceProjectionDigest: record.SourceProjectionDigest, SourceFormat: record.SourceFormat}
 	if src, ok := candidate.Source(); ok {
 		scope.DisplayVersion = src.DisplayVersion
 	}
-	if err != nil || !scope.Valid() || expected != nil && scope != *expected || !projectionEvidenceMatches(record, scope, s.Now()) || call.Err() != nil {
+	if err != nil || !(scope.Valid() || expected == nil && scope.PreGrantValid()) || expected != nil && scope != *expected || !projectionEvidenceMatches(record, scope, s.Now()) || call.Err() != nil {
 		return zero, projectionRefused("catalog", analysis.ErrUnavailable, errors.Join(err, call.Err()))
+	}
+	if scope.PacketQuery.Valid() {
+		record.DisplayVersion = scope.DisplayVersion
 	}
 	r := record.Retained
 	retained := value.Retained{ArtifactID: scope.ArtifactID, Target: target, DataClass: record.DataClass, NativeType: record.NativeType, ExpiresAt: r.Effective.ExpiresAt, Audience: slices.Clone(record.Audience)}
@@ -245,6 +252,18 @@ func (s ContextProjectionAuthority) checkProjection(ctx context.Context, source 
 		return zero, projectionRefused("environment-again", analysis.ErrUnavailable, errors.Join(err, call.Err()))
 	}
 	defer shorten(environmentBound(lastEnvironment), lastEnvironment.ValidUntil)()
+	var queryGrant analysis.ContextQueryGrant
+	if scope.PacketQuery.Valid() && scope.NativeType == artifact.RawPCAPNGArtifact && scope.RawGrantID != "" {
+		if s.PacketGrants == nil {
+			return zero, projectionRefused("raw-grant", analysis.ErrUnavailable, nil)
+		}
+		var grantUntil time.Time
+		queryGrant, grantUntil, err = s.PacketGrants.PacketProjectionGrant(call, source, scope, record, expected == nil)
+		if err != nil || !queryGrant.Valid() || queryGrant.ParentID != scope.RawGrantID || call.Err() != nil {
+			return zero, projectionRefused("raw-grant", analysis.ErrUnavailable, err)
+		}
+		defer shorten("raw-grant", grantUntil)()
+	}
 	lastIdentity, err := source.ResolveIdentity(call)
 	lastIdentity = cloneProjectionIdentity(lastIdentity)
 	if err != nil || !sameProjectionIdentity(i, lastIdentity, s.Now()) || !sameProjectionIdentity(current, lastIdentity, s.Now()) || call.Err() != nil {
@@ -263,7 +282,10 @@ func (s ContextProjectionAuthority) checkProjection(ctx context.Context, source 
 	if !now.Before(until) || !resolved.Proof.Valid(now) || !environment.Valid(now) || !eligibleAt(i, p) || !eligibleAt(lastIdentity, latest) {
 		return zero, projectionRefused("expired", analysis.ErrExpired, nil)
 	}
-	out := analysis.ContextProjectionAuthority{Scope: scope, Environment: environment, Retention: resolved.Proof, PermissionRevision: p.Revision, IdentityRevision: i.Policy, CheckedAt: started, ValidUntil: until, AccessUntil: resolved.ExpiresAt, DeleteBy: resolved.DeleteBy, Bound: bound}
+	if scope.PreGrantValid() {
+		return zero, &packetQueryApprovalRequired{}
+	}
+	out := analysis.ContextProjectionAuthority{Scope: scope, Grant: queryGrant, Environment: environment, Retention: resolved.Proof, PermissionRevision: p.Revision, IdentityRevision: i.Policy, CheckedAt: started, ValidUntil: until, AccessUntil: resolved.ExpiresAt, DeleteBy: resolved.DeleteBy, Bound: bound}
 	// A shared decision also binds the admitting share and its revision.
 	var shareID string
 	var shareRevision int64

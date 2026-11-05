@@ -15,15 +15,16 @@ import (
 // legacy preparation or native-window key binding before sending its command.
 // This acquisition process has no SQL write credential or wrapping root.
 type NativeContextReader struct {
-	store     *CustodyStore
-	scope     value.KeyScope
-	endpoint  string
-	client    *http.Client
-	pages     evidence.HTTPHeaderPager
-	summarize evidence.ProfileSummarizer
-	syscalls  evidence.SyscallProjector
-	compare   evidence.ProfileComparer
-	packets   evidence.PacketSummarizer
+	store        *CustodyStore
+	scope        value.KeyScope
+	endpoint     string
+	client       *http.Client
+	pages        evidence.HTTPHeaderPager
+	summarize    evidence.ProfileSummarizer
+	syscalls     evidence.SyscallProjector
+	compare      evidence.ProfileComparer
+	packets      evidence.PacketSummarizer
+	queryPackets evidence.PacketQuerier
 }
 
 var _ evidence.NativeContextRead = (*NativeContextReader)(nil)

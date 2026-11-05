@@ -1,5 +1,187 @@
 # Sustained implementation progress
 
+## Packet native parity passes; outer job exceeds its limit (2026-11-05)
+
+Candidate `01c68fef` passed all 15 CI jobs. Native42019184868 completed all
+four Go tests in 801.558s with Go/harness0, unchanged 4,258 exact Git inputs,
+removed scratch and cleanup[]. MCP and actual React queries and fixed
+summaries matched the same authenticated PCAPNG/tshark original; query rows,
+times, exact saved frame prefixes, grant/accounting and original worker joins
+passed. The outer job was nevertheless cancelled at its20-minute limit and is
+not a green workflow. [Originals and scope](../test/results/saved-packet-query-native-42019184868/README.md)
+retain the native file and exact stage chronology. This attempt reported no
+audit-profile23514; the earlier rejection's cause and sustained availability
+remain unproven.
+
+The run logged component exit0 only3.740s before cancellation. An existing
+26.928s pinned builder pull occurred synchronously after124s setup because this
+suite was missing from the existing background prefetch list. The one-line
+candidate adds only that suite to prefetch, with the same image/download and
+unchanged tests/20-minute bound. A full hosted pass remains required. No
+complete S-05, second-cluster matrix or release follows.
+
+## Audit refusal diagnostics pass real SQL and exact rollback (2026-11-05)
+
+Signed `6297ff69` preserves the effective capacity-audit reader predicate and
+adds operator-only bounded rejection details from held rows, with no added
+reads, roles, state or success-path work. Independent comparison confirms that
+only DETAIL differs from effective65+74. The native failure hook now invokes
+existing diagnostics before its unchanged refusal. On that exact checkpoint,
+the real compiled-reader diagnostic campaign passed 5 tests in 35.743s and
+pristine upgrade139 passed 401 tests in 8.073s; harness/Go exits were 0/0.
+Each matched all 4,197 Git hashes, retained unchanged sources and cleaned up.
+Fresh controls and identical-state permission/source/trust expiry checks retain
+SQL23514/message, with 809–818 bytes of operator detail and a generic public
+adapter. [Originals and limits](../test/results/saved-packet-query-audit-diagnostics-local/README.md)
+also retain exact actual function restoration through 139→138→139.
+
+This is observability for the proven installed failure, not an availability
+fix. Its original failed predicate remains unknown until a later installed
+attempt supplies current timing/category. PR169 remains unmerged.
+
+## Installed packet queries pass; native download audit remains unresolved (2026-11-05)
+
+Candidate `17d72a84` passed all 15 CI jobs. Installed42011944382 passed both
+fixed summaries, MCP keyed replay/query delivery, actual React query delivery,
+covering-grant reuse, exact accounting/key checks and original worker joins.
+The later native GET failed at current audit-profile preflight (Go/harness 1,
+Go811.852s). The specific failing combined SQL guard term was not retained.
+[Original campaign and diagnoses](../test/results/saved-packet-query-native-42011944382/README.md)
+preserve 4,257 exact Git source hashes, unchanged inputs and clean teardown.
+
+No native download/hash/tshark parity or complete S-05 exit follows. The next
+change adds bounded operator-only diagnostics from already-held SQL rows,
+preserving the effective predicate, all cutoffs and the public refusal. It is
+diagnostic work, not an asserted availability fix. PR169 remains open.
+
+## Same-key replay correction passes real-service composition (2026-11-05)
+
+Candidate `9bf84fcc` passed all 15 CI jobs. Its installed run41990901022
+passed both fixed summaries and returned Pending for the first raw packet query,
+then failed the immediate same-key Begin retry with HTTP503 (Go/harness 1,
+Go713.646s). [Original failed evidence](../test/results/saved-packet-query-native-41990901022/README.md)
+has 4,255 exact Git hashes, unchanged sources and clean teardown.
+
+The retry's new audited operation was absent from the existing query-call
+journal, so strict `PermitQuery` correctly refused it. The old unit fake had
+not modeled that requirement. Stricter audited-path and real-role PostgreSQL
+regressions reproduce the failure. The correction adds bounded registration of
+the exact keyed repeat before permit; it retains current authority and the
+original query, grant and deadlines. One existing control row per new audited
+repeat is SQL work; it creates no worker, admission, poll, read batch or
+disclosure charge. On signed `c6b87702`, the actual composed C18/SQL metadata
+replay campaign passed in 14.329s (9 tests), raw replay in 16.922s (9 tests), and
+the separate upgrade139 round trip in 8.065s (401 tests). Each matched all 4,196
+reported Git inputs, kept sources unchanged and completed cleanup. The checks
+include exact registration/idempotence, current grant/MAC refusals and proof
+that the replay call cannot fund a read. Corrected installed qualification
+remains pending.
+
+[Replay service originals](../test/results/saved-packet-query-services-local/replay-registration/README.md)
+retain the real refusal and all three corrected campaigns. Fresh
+[resource checks](../test/results/saved-packet-query-resource-c6b87702-local/README.md)
+also passed four cases on `c6b87702`, with 1,812 exact inputs and complete
+cleanup. The complete-case peaks were 87,736,320 and 136,445,952 bytes under
+256 MiB; 500m CPU remains verified configuration rather than sustained
+throughput. These component results do not replace installed delivery.
+
+Fresh resource checks on `9bf84fcc` separately passed all four cases with all
+1,812 input hashes matched and clean teardown; the two complete-case peaks were
+92,012,544 and 131,002,368 bytes. Those named component measurements do not
+qualify the subsequent replay correction or an installed query result.
+
+## Packet-query SQL correction passes locally; installed retry pending (2026-11-05)
+
+PR169 candidate `329a48fc` passed all 15 eligible CI jobs. Its separate installed
+`continuation-manual-raw` run41986407470 failed (Go/harness 1, Go697.503s).
+Both fixed summaries passed before the first raw query returned HTTP503.
+PostgreSQL retained SQLSTATE42702: the nonempty compiled-filter digest checks
+used an unqualified `i` that collided with their PL/pgSQL loop variable.
+The earlier empty-program service fixtures bypassed this branch.
+
+The correction qualifies both digest-byte columns without changing validation.
+A direct PostgreSQL regression reproduces the old failure with a valid nonempty
+program; both managed lifecycle fixtures now also use nonempty programs.
+Focused race/generation checks and independent source review pass. On signed
+`8fcd4963`, the corrected direct PostgreSQL campaign passed in 1.147s (27 tests),
+metadata lifecycle in 13.526s, raw lifecycle in 15.325s and separate upgrade139
+round trip in 6.492s (401 tests). All four campaigns matched their 4,194 reported
+Git hashes, kept sources unchanged and cleaned up. The regression uses a valid
+nonempty BPF instruction representation; it does not invoke libpcap itself.
+[Corrected service originals](../test/results/saved-packet-query-services-local/compiled-program/README.md)
+preserve the old failure and each new pass. SQL generation, spec/architecture
+checks and Go vet also pass. Corrected installed qualification remains pending.
+
+[Failed installed originals](../test/results/saved-packet-query-native-41986407470/README.md)
+preserve the terminal run, verified ZIP and exact 4,255 Git source hashes.
+Sources stayed unchanged, cleanup was empty and scratch was removed. Those
+facts do not establish query delivery or native parity. PR169 remains open.
+
+## Saved packet queries implemented; named local checks passed (2026-11-05)
+
+The private candidate at `360ba3f60d71c500dff6e5c6512ce38a71421f0d` implements
+[ADR-305](decisions/305-bounded-saved-packet-queries.md): bounded `pcap_query` over saved metadata and raw PCAPNG, with
+React/MCP parity, the existing libpcap compiler/Go VM and no new acquisition or
+stored derivative. Installed query qualification, eligible CI, PR publication
+and merge remain pending. This does not complete S-05 or authorize a release.
+
+Metadata queries use current ordinary/retained rights. Every raw original needs
+an exact query grant, including header-only selection; download-only approval
+and raw-summary authority do not cover it. Standalone and same-human combined
+review use one finite disclosure pool. Each actual raw batch reserves 24
+KiB/one operation atomically; query admission reserves four units for at most
+two batches. Same-key Begin returns only the original pending handle after
+current checks, without compiling, reading or charging again. The worker
+authenticates complete EOF even after a logical scan/output stop. Primitive
+zero/null fields, typed time/flags and raw saved-frame prefixes retain exact
+source classification.
+
+[Local evidence](../test/results/saved-packet-query-local/README.md) retains focused RED/GREEN checks, independent reviews and
+source-scoped repository checks. The full built React/Go TLS gate passed at
+`bb936966` in 107.539 seconds, including metadata ordinary access, raw
+zero/null/prefix fields and a limited nested reply; existing browser cases and
+28 journeys/27 accessibility scans passed. A real limited-page failure exposed
+runtime/browser schema disagreement: fixed inner narrowing hints and a null
+outer hint now pass both validators. The 4096-byte wrapper reserve keeps the
+measured maximal admitted primitive page at 20,424 B, direct reply 21,254 B and
+nested reply 21,955 B within 24 KiB.
+
+[Service evidence](../test/results/saved-packet-query-services-local/README.md) records separate pristine managed metadata (13.764 seconds,
+`5722a38e`) and raw (15.639 seconds, `b2759438`) lifecycle passes. Each matched
+all 4,194 reported Git hashes, kept sources unchanged and cleaned up. Actual
+compiled hub/key roles, encrypted audit, original query/key identity, two
+batches/six one-use key roles, current grant/pool checks, atomic rollback and
+retained-history downgrade refusal pass. Job/Pod/issuer/join and initial
+authority inputs remain synthetic. The corrected upgrade 139 campaign at
+`360ba3f6` passed 401 tests with all 4,194 Git hashes matched, unchanged source
+and empty cleanup. It restores exact 138 functions, schema, account guard,
+key-binding CHECK and trust; all four new helpers are absent after Down.
+Historical setup checks logical schema before rebinding the full snapshot; the
+actual 139 round trip still compares physical ordinals exactly.
+
+[Resource evidence](../test/results/saved-packet-query-resource-local/README.md) at `b2759438` passed four fresh consumers against 1,812 exact
+dependency hashes: two 8 MiB originals exercise 256-instruction GoVM filtering,
+long raw fields/prefix output and 233,011 tiny records with wire-length cache
+overflow. Complete peaks were 94,838,784 B and 134,688,768 B under the observed
+256 MiB memory maximum, with zero swap/OOM and three key roles per read.
+Cancellation/source-error cases return no rows and join; all containers were
+removed. The 500m quota is verified configuration only: short CPU/wall/period
+counters do not demonstrate enforced or sustained 500m throughput.
+Installed/all-maximum/sustained/second-cluster qualification remains open.
+
+Full `go-check` exited 0 (68 full packages and 691 Kubernetes tests in 18
+groups); its recorded source scope and subsequent migration/fixture changes
+remain separate. Pre-push at `b2759438` passed with 529 console tests. These
+are not represented as one unchanged final-source campaign. Retained failures
+include missing four-unit SQL admission, the old 16 KiB key-binding CHECK, role
+cleanup after premature admin-pool closure, and an upgrade snapshot taken
+before historical column re-creation. Fixes preserve quota/role checks and
+strict actual rollback comparison. Earlier setup, compiler/vet and browser
+failures remain in the linked originals rather than being replaced by later
+passes.
+
+
+
 ## Raw-source fixed packet summary merged and installed-qualified (2026-11-05)
 
 PR167 merged normally as `897fd783d6963073ce421cb6a211ffd59a1cdebf` at
