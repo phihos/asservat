@@ -144,6 +144,10 @@ func (l workerNativeLoop) Run(parent context.Context) error {
 // Both child lifetimes are joined even if the initiating context is already
 // cancelled. Native work starts only after credential readiness; readiness is
 // not reported as a successful download. A failed child cancels the other.
+// The private credentials callback must preserve WorkerCredentialSupervisor's
+// origin contract: context.Canceled comes only from its supplied context, never
+// directly from an independently failed provider operation. The actual callback
+// uses that supervisor with waitWorker; this is not a generic provider hook.
 func runWorkerNativePair(ctx context.Context, ready <-chan value.KeyPeer, credentials, work func(context.Context) error) error {
 	if ctx == nil || ready == nil || credentials == nil || work == nil {
 		return artifact.ErrInvalid

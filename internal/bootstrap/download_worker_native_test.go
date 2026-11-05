@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"asservat.local/asservat/internal/application/evidence"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
 	value "asservat.local/asservat/internal/domain/authorization"
@@ -398,5 +399,45 @@ func TestWorkerNativeNaturalCompletionRejectsPrematureCredentialsAndParentCancel
 				t.Fatal("premature lifetime became success or child was not joined", err)
 			}
 		})
+	}
+}
+
+type nativeIndependentEnrollmentCancellation struct {
+	calls, peers, closed int
+	live                 bool
+}
+
+func (f *nativeIndependentEnrollmentCancellation) Enroll(ctx context.Context) error {
+	f.calls++
+	f.live = f.live && ctx.Err() == nil
+	return context.Canceled
+}
+func (f *nativeIndependentEnrollmentCancellation) Peer() (value.KeyPeer, error) {
+	f.peers++
+	return value.KeyPeer{}, artifact.ErrDownloadExpired
+}
+func (f *nativeIndependentEnrollmentCancellation) Close() { f.closed++ }
+
+// Exercise the actual production credential supervisor, not a callback that
+// forwards provider cancellation directly into the private native pair.
+func TestWorkerNativeCredentialSupervisorDoesNotForwardIndependentCancellation(t *testing.T) {
+	now := time.Now().UTC().Truncate(time.Second)
+	const id = "11111111-1111-4111-8111-111111111111"
+	target := value.WorkerCredentialTarget{InstallationID: id, QueryID: id, WorkerID: id, PodUID: id, CreatedAt: now, RunUntil: now.Add(time.Minute)}
+	client := &nativeIndependentEnrollmentCancellation{live: true}
+	ready := make(chan value.KeyPeer, 1)
+	supervisor := evidence.WorkerCredentialSupervisor{Client: client, Target: target, Now: func() time.Time { return now }, IdentityReady: ready, Jitter: func() time.Duration { return 0 }, Wait: func(ctx context.Context, d time.Duration) error {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		if d <= 0 {
+			t.Fatal("unbounded credential wait")
+		}
+		now = now.Add(d)
+		return nil
+	}}
+	err := supervisor.Run(t.Context())
+	if err == nil || errors.Is(err, context.Canceled) || t.Context().Err() != nil || !client.live || client.calls < 2 || client.calls > 8 || client.peers != 0 || client.closed != 1 || len(ready) != 0 || !now.Before(target.RunUntil) {
+		t.Fatal("independent enrollment cancellation escaped as owning cancellation or established credentials", err, client.calls, client.peers, client.closed, len(ready))
 	}
 }

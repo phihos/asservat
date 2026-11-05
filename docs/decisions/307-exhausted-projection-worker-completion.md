@@ -29,6 +29,17 @@ must allow exactly one read batch and the completed generation must be one.
 The bootstrap loop may then return successful completion and cancel/join the
 credential child before the process exits.
 
+The private credential callback has the production supervisor's error-origin
+contract: `context.Canceled` is returned only from its supplied context, not
+forwarded from an independently cancelled enrollment/provider operation. The
+sole runtime composition uses `WorkerCredentialSupervisor.Run` with
+`waitWorker`; enrollment failures are normalized before reaching the pair.
+A cache-only audit substituting an arbitrary callback that independently returns
+`context.Canceled` reproduced false success in 46 of 50 concurrent cases. That
+callback is outside this contract: the error value alone cannot prove its origin.
+Keep the actual-supervisor regression and this limitation when changing the
+composition; no generic cancellation-origin mechanism is added.
+
 The exhaustion disposition is private process information, never a field of a
 wire message, public result, signed authority, SQL row or caller instruction.
 A remote message cannot supply it. Premature credential completion, cancelled

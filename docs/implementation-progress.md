@@ -19,9 +19,20 @@ demand with the existing bounded object walk and caller limit.
 
 The real compiled-role baseline reproduces the missing early selection after
 joined closure (Go8.227s, unchanged sources, provider0, cleanup[]); before-join
-negatives pass. Frozen-source GREEN with actual successor admission and the
-multi-batch control remains pending. These local changes do not establish
-installed capacity savings, cleanup or a full20-minute syscall workflow pass.
+negatives pass. After a fixture-only accounting-table spelling correction,
+frozen-source single-batch retirement and actual successor admission pass
+(Go11.567s); a separate pristine two-batch control passes (Go9.247s) and retains
+its charge. Both finish with testExit0, unchanged sources and cleanup[]. Root
+and independent review match all4,231 Git input hashes per final run. Physical,
+issuer, transport and crypto proofs remain synthetic where declared by the SQL
+fixtures; these results do not establish installed Kubernetes retirement.
+
+On signed `5c4fc02e`, make pre-push exits0, including561 console tests/49 files;
+the full compiled console-browser gate exits0 across8 top-level fixtures in
+118.349s. [Original local evidence](../test/results/saved-syscall-query-worker-lifecycle-local/README.md)
+retains baseline failures, the fixture error, final source maps, reviews and gate
+logs. No installed capacity saving or full20-minute syscall workflow pass is
+asserted; fresh final-candidate CI and installed Repeat/Stop/cleanup remain.
 
 ## Syscall authoring gaps closed locally; observed cancellation scoped (2026-11-05)
 
@@ -46,8 +57,8 @@ bind13 final owned sources and preserve meaningful REDs separately from fixture
 setup failures. Independent reviews are clear; installed qualification remains.
 
 Runtime analysis identifies exhausted single-batch workers reconnecting until
-RunUntil. A bounded natural-completion/positive-retirement correction is being
-implemented; original dates, paid budgets, expiry/view/Repeat/Stop checks and
+RunUntil. A bounded natural-completion/positive-retirement correction now passes local
+lifecycle/service tests; original dates, paid budgets, expiry/view/Repeat/Stop checks and
 multi-batch behavior remain requirements. No time saving or full pass is claimed.
 
 ## Cancellation fixture and interrupted-run diagnostics corrected locally (2026-11-05)
