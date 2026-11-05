@@ -21,6 +21,28 @@ type BrowserSettingsProjection struct {
 }
 
 var _ app.BrowserSettingsProjection = (*BrowserSettingsProjection)(nil)
+var _ app.SessionCleanup = (*BrowserSettingsProjection)(nil)
+
+// Cleanup is housekeeping under the same root lock used by settings changes.
+// It reads the currently stored epoch; missing/stale/suspended settings cannot
+// revive credentials, but must not prevent removal of expired or retired state.
+// This facet never reads provider ciphertext or creates/renews a session.
+func (s *BrowserSettingsProjection) Cleanup(ctx context.Context) error {
+	if s == nil || s.ledger == nil || ctx == nil || ctx.Err() != nil {
+		return value.ErrUnavailable
+	}
+	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
+		root, err := q.LockBrowserRoot(ctx, id(s.root))
+		if err != nil {
+			return err
+		}
+		return pruneBrowserState(ctx, q, s.root, uid(root.Epoch))
+	})
+	if err != nil {
+		return value.ErrUnavailable
+	}
+	return nil
+}
 
 func NewBrowserSettingsProjection(ctx context.Context, pool *pgxpool.Pool, root string) (*BrowserSettingsProjection, error) {
 	if !authorization.UUID(root) {

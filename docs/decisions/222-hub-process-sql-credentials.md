@@ -56,6 +56,10 @@ their existing processes. No evidence decryption key or administrator credential
 enters the hub. The removed certificate-owner duty from ADR-221 must not survive
 as an unused member of either union.
 
+[ADR-311](311-browser-session-cleanup.md) later closes the unconsumed cleanup
+facet by reusing the browser-settings worker and its existing SQL role/pool.
+It does not restore a separate cleanup credential or add it to the hub union.
+
 ## Connections and lifecycle
 
 Keep the existing 32 physical connections per hub process and existing governor:

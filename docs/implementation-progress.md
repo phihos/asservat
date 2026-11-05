@@ -39,6 +39,26 @@ and final `make pre-push` exits0 including587 console tests/51 files. The focuse
 reconnect/readiness tests pass after reproduced baseline failures. Installed logs
 and full-specification completion remain pending.
 
+## Browser-session cleanup worker implemented; real-role proof pending (2026-11-05)
+
+The isolated browser-session cleanup candidate closes the unused cleanup facet
+through the existing installed browser-settings child/pool ([ADR-311](decisions/311-browser-session-cleanup.md)). One startup pass and then a 60-second cadence
+prune at most 256 rows/table, with an original one-second operation deadline and
+joined SQL rollback. It runs during settings-source failure/suspension; fixed
+session lifetimes, one-use refresh, current epochs, logout and unexpired receipts
+remain unchanged. No new service, role, connection, API request, watch, timer,
+configuration or schema migration is added. The existing worker role gains only
+11 metadata/row-lock/logout-delete ACL entries; provider ciphertext stays unreadable.
+
+The compiled-profile regression first failed on missing login metadata. Focused
+races pass, and full affected races pass for bootstrap (115.541s), PostgreSQL
+(6.368s) and application identity (1.058s). SQL generation, Go architecture,
+specification, architecture and design gates pass. The new actual compiled-role
+service fixture compiles (default skip, no service execution). Its two-pass
+backlog/live-state/epoch/logout/ACL/deadline checks await the shared lab slot;
+no real-role or installed cleanup qualification is claimed. Row removal does not
+erase backups/WAL. Root integration/publication remains separate.
+
 ## Finite whole-pod logs local service qualification passed (2026-11-05)
 
 Signed `1e85a5bb` passes the mixed logs/packet/syscall service lifecycle

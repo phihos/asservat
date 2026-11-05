@@ -32,18 +32,24 @@ func (s *BrowserSessions) Cleanup(ctx context.Context) error {
 		if e != nil || uid(root.Epoch) != s.epoch {
 			return value.ErrDenied
 		}
-		if e = q.PruneBrowserLogins(ctx, custodydb.PruneBrowserLoginsParams{RootID: id(s.root), Epoch: id(s.epoch)}); e != nil {
-			return e
-		}
-		if e = q.PruneBrowserSessions(ctx, custodydb.PruneBrowserSessionsParams{RootID: id(s.root), Epoch: id(s.epoch)}); e != nil {
-			return e
-		}
-		return q.PruneBrowserLogout(ctx, custodydb.PruneBrowserLogoutParams{RootID: id(s.root), Epoch: id(s.epoch)})
+		return pruneBrowserState(ctx, q, s.root, s.epoch)
 	})
 	if err != nil {
 		return value.ErrUnavailable
 	}
 	return nil
+}
+
+// The caller holds the root lock and supplies its exact current epoch. Each
+// generated statement preserves the original expiry/claim predicates and 256 cap.
+func pruneBrowserState(ctx context.Context, q *custodydb.Queries, root, epoch string) error {
+	if err := q.PruneBrowserLogins(ctx, custodydb.PruneBrowserLoginsParams{RootID: id(root), Epoch: id(epoch)}); err != nil {
+		return err
+	}
+	if err := q.PruneBrowserSessions(ctx, custodydb.PruneBrowserSessionsParams{RootID: id(root), Epoch: id(epoch)}); err != nil {
+		return err
+	}
+	return q.PruneBrowserLogout(ctx, custodydb.PruneBrowserLogoutParams{RootID: id(root), Epoch: id(epoch)})
 }
 
 func NewBrowserSessions(ctx context.Context, pool *pgxpool.Pool, binding value.BrowserBinding) (*BrowserSessions, error) {

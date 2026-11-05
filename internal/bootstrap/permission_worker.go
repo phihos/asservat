@@ -44,6 +44,7 @@ type permissionWorker struct {
 	// browser projects the browser settings into SQL (ADR-210); nil without
 	// its section.
 	browser             *identities.BrowserSettingsObserver
+	browserCleanup      identities.SessionCleanup
 	policyGrantSettings *app.PolicyGrantSettingsObserver
 	closers             []func()
 }
@@ -203,6 +204,7 @@ func (d *InstalledHubWorkerDeployment) openPermission(ctx context.Context) (*per
 			return nil, &fixedStepError{"browser/projection", e}
 		}
 		w.browser = &identities.BrowserSettingsObserver{Source: source, Projection: projection, Now: time.Now}
+		w.browserCleanup = projection
 	}
 	// ADR-242: namespace inheritance observes the hub cluster's namespaces
 	// with its own client, so a large namespace LIST never spends the
@@ -324,13 +326,7 @@ func (p *permissionWorker) run(ctx context.Context) error {
 		browser := make(chan struct{})
 		go func() {
 			defer close(browser)
-			report := capacitySourceReporter("hub-worker browser settings: ")
-			for ctx.Err() == nil {
-				report(p.browser.Reconcile(ctx))
-				if !sleepContext(ctx, time.Second) {
-					return
-				}
-			}
+			p.runBrowserSettings(ctx)
 		}()
 		defer func() { <-browser }()
 	}
@@ -374,6 +370,35 @@ func (p *permissionWorker) run(ctx context.Context) error {
 	}
 	<-done
 	return ctx.Err()
+}
+
+// Cleanup needs no authentication-freshness cadence. Reuse this existing child
+// and pool, at startup and at most once/minute, even when settings refuse.
+// The one-second bound keeps housekeeping from monopolizing the settings pool.
+func (p *permissionWorker) runBrowserSettings(ctx context.Context) {
+	report := capacitySourceReporter("hub-worker browser settings: ")
+	cleanupReport := capacitySourceReporter("hub-worker browser cleanup: ")
+	var nextCleanup time.Time
+	for ctx.Err() == nil {
+		report(p.browser.Reconcile(ctx))
+		if ctx.Err() != nil {
+			return
+		}
+		now := time.Now()
+		if !now.Before(nextCleanup) {
+			nextCleanup = now.Add(time.Minute)
+			cleanup, cancel := context.WithTimeout(ctx, time.Second)
+			if p.browserCleanup == nil {
+				cleanupReport(mounts.ErrUnavailable)
+			} else {
+				cleanupReport(p.browserCleanup.Cleanup(cleanup))
+			}
+			cancel()
+		}
+		if !sleepContext(ctx, time.Second) {
+			return
+		}
+	}
 }
 
 // publish writes one pending authority record per admitted lease: a lease
