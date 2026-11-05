@@ -52,9 +52,11 @@ func readReviewedContext(ctx context.Context, q *custodydb.Queries, previewID st
 }
 
 // approvedContextPlan requires the explicit versioned timing marker, never a
-// reinterpretation of a legacy plan's frozen absolute deadline.
+// reinterpretation of a legacy plan's frozen absolute deadline. Sensitive
+// recorder approval is independent of the installation require-all switch;
+// validAdmission independently recompiles the exact immutable scope first.
 func approvedContextPlan(a value.Admission) bool {
-	return (a.Plan.Input.Profile != nil || a.Plan.Input.Recorder != nil && a.Plan.Input.Recorder.RequireApproval) && planning.RecorderApprovedAcceptance(a.Plan.CanonicalScope)
+	return (a.Plan.Input.Profile != nil || a.Plan.Input.Recorder != nil) && planning.RecorderApprovedAcceptance(a.Plan.CanonicalScope)
 }
 
 func currentReviewedContext(ctx context.Context, q *custodydb.Queries, p value.ContextPreview, a value.Admission) error {
