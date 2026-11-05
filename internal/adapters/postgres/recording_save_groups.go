@@ -86,7 +86,7 @@ func compositionGroupAcceptedRows(row custodydb.RecordingSaveGroup, rows []custo
 	state := value.IntentAudited
 	for n, child := range rows {
 		accepted, err := admittedRecord(child)
-		if err != nil || child.ID != row.ChildIds[n] || uid(child.ID) != parsed.ChildCapture[n] || child.GroupID != row.ID || !child.GroupOrdinal.Valid || int(child.GroupOrdinal.Int16) != n || !bytes.Equal(child.ScopeDigest, parsed.ChildScope[n][:]) || !child.CreatedAt.Time.Equal(row.AcceptedAt.Time) || child.Deadline.Time.After(row.Deadline.Time) || accepted.Expectation.Recording == nil {
+		if err != nil || child.ID != row.ChildIds[n] || uid(child.ID) != parsed.ChildCapture[n] || child.GroupID != row.ID || !child.GroupOrdinal.Valid || int(child.GroupOrdinal.Int16) != n || !bytes.Equal(child.ScopeDigest, parsed.ChildScope[n][:]) || !child.CreatedAt.Time.Equal(row.AcceptedAt.Time) || child.Deadline.Time.After(row.Deadline.Time) || (accepted.Expectation.Recording == nil && accepted.Expectation.Logs == nil) {
 			return value.Accepted{}, value.ErrUnavailable
 		}
 		if b := accepted.Expectation.CompositionGroup; b == nil || b.ParentCaptureID != uid(row.ID) || b.ChildIndex != n || b.ChildCount != len(rows) {
@@ -370,7 +370,7 @@ func authorizeRecordingGroupReplayWithPermissions(ctx context.Context, q *custod
 }
 
 // AdmitRecordingCompositionGroup admits the single manual recordings of one
-// reviewed packet + syscall composition (ADR-276) under one transaction and
+// reviewed finite recorder/logs composition (ADR-276/308) under one transaction and
 // the parent preview's single review. A later child's refusal rolls back all.
 func (s *ContextAdmissions) AdmitRecordingCompositionGroup(ctx context.Context, in value.RecordingSaveGroupAdmission) (value.Accepted, error) {
 	var out value.Accepted

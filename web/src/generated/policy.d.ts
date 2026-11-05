@@ -198,7 +198,7 @@ export interface components {
                  * @description Accepted collection action; controls available approval commands, not acquisition authority.
                  * @enum {unknown}
                  */
-                collection_kind: "podStatus" | "packetCapture" | "syscallTrace" | "profile";
+                collection_kind: "podStatus" | "packetCapture" | "syscallTrace" | "profile" | "logs";
                 /**
                  * Format: uuid
                  * @description Grant named by the current attachment pointer; does not assert that its authority, budget or recorder readiness currently permits collection.

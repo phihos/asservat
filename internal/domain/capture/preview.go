@@ -52,6 +52,9 @@ func (r ProtectedReasonRef) Valid() bool {
 // its diagnostic handle and protect any free-text reason before constructing
 // this value. It cannot substitute the broader incident-context preset.
 type ContextIntent struct {
+	// LogsTriggeredAt is service-owned original policy occurrence time. Public
+	// routes cannot set it; manual logs use the admission preparation anchor.
+	LogsTriggeredAt time.Time `json:",omitzero"`
 	// Snapshot is service-owned existing-source selection, never decoded by ordinary recipe routes.
 	Snapshot        *planning.SourceSnapshotContext `json:",omitempty"`
 	HistoryAuthored *HistoryAuthored                `json:",omitempty"`
@@ -69,6 +72,9 @@ type ContextIntent struct {
 }
 
 func (i ContextIntent) Valid() bool {
+	if !i.LogsTriggeredAt.IsZero() && (i.Composition == nil || i.LogsTriggeredAt.Year() < 1 || i.LogsTriggeredAt.Year() > 9999) {
+		return false
+	}
 	if (i.HistoryAuthored != nil && (!i.HistoryAuthored.Valid() || i.HistoryAuthored.Target.ClusterID != i.Target.ClusterID)) || (i.RepeatedFrom != nil && (!authorization.UUID(i.RepeatedFrom.CaptureID) || i.RepeatedFrom.ExpiresAt.IsZero())) || !i.Target.Valid() || i.RequestedSeconds < 0 || i.RequestedSeconds > privacy.MaxAgeSeconds || (i.Reason != nil && !i.Reason.Valid()) || (i.Sharing != nil && !i.Sharing.Valid()) {
 		return false
 	}

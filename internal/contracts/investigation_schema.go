@@ -67,7 +67,7 @@ func (investigationOfflineLoader) Load(string) (any, error) { return nil, ErrInv
 
 // InvestigationToolNames lists every embedded operation contract.
 func InvestigationToolNames() []string {
-	return []string{"cancel_capture", "list_recordings", "preview_recording_save", "list_diagnostics", "preview_capture", "request_capture", "resolve_capture_request", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "cancel_artifact_download", "get_file_excerpt", "get_query_result", "activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share", "explain_access", "list_capture_history", "get_capture_settings", "preview_access_change", "transfer_share", "stop_future_sharing", "preview_retention_change", "request_policy_grant", "request_raw_access", "get_grant", "list_reviews", "decide_review", "revoke_grant", "list_capture_profiles", "get_capture_profile", "get_http_headers", "get_profile_summary", "get_pcap_summary", "pcap_query", "compare_profiles", "get_syscall_summary", "get_syscall_events", "syscall_query"}
+	return []string{"cancel_capture", "list_recordings", "preview_recording_save", "list_diagnostics", "preview_capture", "request_capture", "resolve_capture_request", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "cancel_artifact_download", "get_file_excerpt", "get_query_result", "activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share", "explain_access", "list_capture_history", "get_capture_settings", "preview_access_change", "transfer_share", "stop_future_sharing", "preview_retention_change", "request_policy_grant", "request_raw_access", "get_grant", "list_reviews", "decide_review", "revoke_grant", "list_capture_profiles", "get_capture_profile", "get_http_headers", "get_profile_summary", "get_pcap_summary", "pcap_query", "compare_profiles", "get_syscall_summary", "get_syscall_events", "syscall_query", "get_logs"}
 }
 
 func NewInvestigationContracts() (*InvestigationContracts, error) {
@@ -183,7 +183,7 @@ func (v *InvestigationContracts) ValidateOutput(name string, b []byte) error {
 	if err := v.validate(name, b, true); err != nil {
 		return err
 	}
-	if name != "get_file_excerpt" && name != "get_query_result" && name != "get_profile_summary" && name != "get_pcap_summary" && name != "pcap_query" && name != "compare_profiles" && name != "get_syscall_summary" && name != "get_syscall_events" && name != "syscall_query" {
+	if name != "get_file_excerpt" && name != "get_query_result" && name != "get_profile_summary" && name != "get_pcap_summary" && name != "pcap_query" && name != "compare_profiles" && name != "get_syscall_summary" && name != "get_syscall_events" && name != "get_logs" && name != "syscall_query" {
 		return nil
 	}
 	var out struct {
@@ -211,7 +211,7 @@ func (v *InvestigationContracts) ValidateOutput(name string, b []byte) error {
 	}
 	// The server-selected original tool is closed at this implementation
 	// boundary. A future catalog entry cannot choose a weaker nested schema.
-	if out.Data.Tool != "get_file_excerpt" && out.Data.Tool != "get_http_headers" && out.Data.Tool != "get_profile_summary" && out.Data.Tool != "get_pcap_summary" && out.Data.Tool != "pcap_query" && out.Data.Tool != "compare_profiles" && out.Data.Tool != "get_syscall_summary" && out.Data.Tool != "get_syscall_events" && out.Data.Tool != "syscall_query" || v.ValidateOutput(out.Data.Tool, out.Data.Result) != nil {
+	if out.Data.Tool != "get_file_excerpt" && out.Data.Tool != "get_http_headers" && out.Data.Tool != "get_profile_summary" && out.Data.Tool != "get_pcap_summary" && out.Data.Tool != "pcap_query" && out.Data.Tool != "compare_profiles" && out.Data.Tool != "get_syscall_summary" && out.Data.Tool != "get_syscall_events" && out.Data.Tool != "get_logs" && out.Data.Tool != "syscall_query" || v.ValidateOutput(out.Data.Tool, out.Data.Result) != nil {
 		return ErrInvestigationWire
 	}
 	if out.Data.Tool == "get_http_headers" {
@@ -236,7 +236,7 @@ func (v *InvestigationContracts) ValidateOutput(name string, b []byte) error {
 		} `json:"data"`
 	}
 	if json.Unmarshal(out.Data.Result, &nested) != nil || nested.Status != "ok" || nested.RequestID != out.RequestID ||
-		(out.Data.Tool == "pcap_query" || out.Data.Tool == "syscall_query") && nested.DataClass != out.DataClass ||
+		(out.Data.Tool == "get_logs" || out.Data.Tool == "pcap_query" || out.Data.Tool == "syscall_query") && nested.DataClass != out.DataClass ||
 		!nested.Data.ObservedAt.Equal(out.Data.ObservedAt) || !nested.Data.ExpiresAt.Equal(out.Data.ExpiresAt) {
 		return ErrInvestigationWire
 	}

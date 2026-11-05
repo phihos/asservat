@@ -68,6 +68,13 @@ var RecorderUnavailableBlocker = OperationBlocker{Code: "RecorderUnavailable", M
 func recorderWarnings(plan planning.RecorderPlan) []string {
 	out := []string{}
 	for _, a := range plan.Actions {
+		if a.Kind == "logs" {
+			out = append(out, "Logs preserve raw bytes from available current and previous container sources. Streams are combined; requested history may be incomplete and source timestamps may be unknown.")
+			if plan.Approval == nil {
+				out = append(out, "After collection, request separate approval from the saved artifact for log queries or native download. This observe capture does not include result-access approval.")
+			}
+			continue
+		}
 		if a.Kind == "profile" {
 			timing := a.ProfileMode
 			if a.Duration != "" {
@@ -243,10 +250,13 @@ func recorderResultAccessActions(plan planning.RecorderPlan) []RecorderResultAcc
 	}
 	var out []RecorderResultAccessAction
 	for _, a := range plan.Actions {
-		if a.Kind != "profile" && a.PacketProfile != "rawPackets" && a.SyscallMode != "arguments" {
+		if a.Kind != "profile" && a.Kind != "logs" && a.PacketProfile != "rawPackets" && a.SyscallMode != "arguments" {
 			continue
 		}
 		ops := []string{"download_artifact"}
+		if a.Kind == "logs" {
+			ops = append(ops, "get_logs")
+		}
 		if a.Kind == "packetCapture" && a.PacketProfile == "rawPackets" {
 			ops = append(ops, "pcap_query")
 		}

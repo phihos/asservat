@@ -1,0 +1,556 @@
+{
+  "name": "get_logs",
+  "description": "Read bounded raw byte fragments from one saved whole-pod logs artifact. Requires evidence:read and evidence:raw plus exact get_logs approval for the current client. This starts no collection and grants no native download. Streams are combined; source timestamps may be unknown and fetch completion does not establish complete log history. Retry an uncertain Begin with the same idempotency key.",
+  "annotations": {
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "openWorldHint": false
+  },
+  "inputSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "case_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "artifact_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "cursor": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 64,
+        "pattern": "^[0-9]{1,8}:[0-9]{1,4}:[0-9a-f]{32}$"
+      },
+      "limit": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "grant_id": {
+        "type": "string",
+        "format": "uuid",
+        "description": "Exact current get_logs approval. Omission allows an approval remedy before admission; it never authorizes a read."
+      },
+      "idempotency_key": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128
+      }
+    },
+    "required": [
+      "case_id",
+      "artifact_id",
+      "idempotency_key"
+    ]
+  },
+  "outputSchema": {
+    "title": "Asservat mcp-result v1",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "schema_version": {
+        "const": "mcp-result/v1"
+      },
+      "request_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "data_class": {
+        "enum": [
+          "metadata",
+          "raw"
+        ]
+      },
+      "status": {
+        "type": "string",
+        "enum": [
+          "ok",
+          "pending",
+          "error"
+        ]
+      },
+      "data": {
+        "type": "object"
+      },
+      "truncated": {
+        "type": "boolean"
+      },
+      "next_cursor": {
+        "anyOf": [
+          {
+            "type": "string",
+            "pattern": "^[0-9]{1,8}:[0-9]{1,4}:[0-9a-f]{32}$"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "narrowing_hint": {
+        "anyOf": [
+          {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "warnings": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "maxItems": 32,
+        "minItems": 0,
+        "uniqueItems": true
+      },
+      "provenance": {
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/d0"
+        },
+        "maxItems": 1,
+        "minItems": 0,
+        "uniqueItems": true
+      }
+    },
+    "required": [
+      "schema_version",
+      "request_id",
+      "data_class",
+      "status",
+      "data",
+      "truncated",
+      "next_cursor",
+      "narrowing_hint",
+      "warnings",
+      "provenance"
+    ],
+    "allOf": [
+      {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": "ok"
+              },
+              "data": {
+                "$ref": "#/$defs/d1"
+              },
+              "data_class": {
+                "const": "raw"
+              },
+              "provenance": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 1
+              }
+            },
+            "required": [
+              "status",
+              "data"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": "pending"
+              },
+              "data": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "query_handle": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 4096
+                  },
+                  "retry_after_seconds": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 60
+                  },
+                  "query_observed_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "Server time of this prepared query snapshot. This observation does not renew query or request authority. Together with query_expires_at it bounds managed-view lifetime independently of the client wall clock."
+                  },
+                  "query_expires_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "Original total query cutoff, irreversibly shortened by effective evidence access. A poll never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline."
+                  }
+                },
+                "required": [
+                  "query_handle",
+                  "retry_after_seconds",
+                  "query_observed_at",
+                  "query_expires_at"
+                ]
+              }
+            },
+            "required": [
+              "status",
+              "data"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": "error"
+              },
+              "data": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "message": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1024
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "navigation_uri": {
+                    "type": "string",
+                    "format": "uri",
+                    "maxLength": 2048
+                  },
+                  "responsible_role": {
+                    "enum": [
+                      "maintainer",
+                      "approver",
+                      "administrator",
+                      "none"
+                    ]
+                  },
+                  "retry_after_seconds": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 60
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ]
+              }
+            },
+            "required": [
+              "status",
+              "data"
+            ]
+          }
+        ]
+      },
+      {
+        "if": {
+          "properties": {
+            "truncated": {
+              "const": true
+            }
+          },
+          "required": [
+            "truncated"
+          ]
+        },
+        "then": {
+          "properties": {
+            "narrowing_hint": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            }
+          }
+        }
+      }
+    ],
+    "$defs": {
+      "d0": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "artifactID": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": [
+          "artifactID",
+          "digest"
+        ]
+      },
+      "d2": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "origin": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "origin_id": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 127
+              },
+              "container_kind": {
+                "enum": [
+                  "regular",
+                  "init",
+                  "ephemeral"
+                ]
+              },
+              "container_name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 63
+              },
+              "source": {
+                "enum": [
+                  "current",
+                  "previous"
+                ]
+              },
+              "stream": {
+                "const": "combined"
+              },
+              "runtime_id": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "restart_count": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 4294967295
+              }
+            },
+            "required": [
+              "origin_id",
+              "container_kind",
+              "container_name",
+              "source",
+              "stream",
+              "runtime_id",
+              "restart_count"
+            ]
+          },
+          "fragment": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 67108864
+          },
+          "line": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 67108864
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 67108864
+          },
+          "line_offset": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 67108864
+          },
+          "continuation": {
+            "type": "boolean"
+          },
+          "end_line": {
+            "type": "boolean"
+          },
+          "source_time": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "text": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "maxLength": 1024
+          },
+          "bytes_base64": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 4,
+            "maxLength": 1368,
+            "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+          }
+        },
+        "required": [
+          "origin",
+          "fragment",
+          "line",
+          "offset",
+          "line_offset",
+          "continuation",
+          "end_line",
+          "source_time",
+          "text",
+          "bytes_base64"
+        ],
+        "oneOf": [
+          {
+            "properties": {
+              "text": {
+                "type": "string"
+              },
+              "bytes_base64": {
+                "type": "null"
+              }
+            }
+          },
+          {
+            "properties": {
+              "text": {
+                "type": "null"
+              },
+              "bytes_base64": {
+                "type": "string"
+              }
+            }
+          }
+        ]
+      },
+      "d1": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "logs"
+          },
+          "pod_uid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "window_start": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "window_end": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "entries": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "$ref": "#/$defs/d2"
+            }
+          },
+          "coverage": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "origins": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 128
+              },
+              "complete_origins": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 128
+              },
+              "partial_origins": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 128
+              },
+              "unavailable_origins": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 128
+              },
+              "unknown_timestamp_origins": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 128
+              },
+              "gapped_origins": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 128
+              },
+              "source_bytes": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 67108864
+              },
+              "total_fragments": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 67108864
+              }
+            },
+            "required": [
+              "origins",
+              "complete_origins",
+              "partial_origins",
+              "unavailable_origins",
+              "unknown_timestamp_origins",
+              "gapped_origins",
+              "source_bytes",
+              "total_fragments"
+            ]
+          },
+          "query_observed_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "query_expires_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "kind",
+          "pod_uid",
+          "window_start",
+          "window_end",
+          "entries",
+          "coverage",
+          "query_observed_at",
+          "query_expires_at"
+        ]
+      }
+    }
+  }
+}

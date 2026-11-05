@@ -100,7 +100,7 @@ func (q *Queries) InsertAPIExecution(ctx context.Context, arg InsertAPIExecution
 
 const listStartedRecordings = `-- name: ListStartedRecordings :many
 SELECT e.capture_id FROM context_execution e JOIN context_capture c ON c.id=e.capture_id AND c.root_id=e.root_id
-WHERE e.root_id=$1 AND e.phase='started' AND e.started_at<=$2 AND convert_from(c.expectation_json,'UTF8')::jsonb->>'NativeType' IN ('pcapng','rawPcapng','httpHeaders','syscallRecords','syscallArguments','pprof','goTrace')
+WHERE e.root_id=$1 AND e.phase='started' AND (CASE WHEN convert_from(c.expectation_json,'UTF8')::jsonb->>'NativeType'='logs' THEN (convert_from(c.expectation_json,'UTF8')::jsonb->>'TriggeredAt')::timestamptz+make_interval(secs=>(convert_from(c.expectation_json,'UTF8')::jsonb#>>'{Logs,AfterMillis}')::double precision/1000) ELSE e.started_at END)<=$2::timestamptz AND convert_from(c.expectation_json,'UTF8')::jsonb->>'NativeType' IN ('pcapng','rawPcapng','httpHeaders','syscallRecords','syscallArguments','pprof','goTrace','logs')
 ORDER BY e.started_at LIMIT $3
 `
 
@@ -110,8 +110,8 @@ type ListStartedRecordingsParams struct {
 	Limit     int32
 }
 
-// ADR-248/273/279/281/282: started recordings (pcapng, rawPcapng, httpHeaders, syscallRecords, syscallArguments or runtime-profile expectations) whose start is at
-// or before the given instant, oldest first, for the hub's collect loop.
+// Started recordings whose original start (logs: accepted trigger plus after)
+// is at or before the supplied collect cutoff, oldest first. No window renewal.
 func (q *Queries) ListStartedRecordings(ctx context.Context, arg ListStartedRecordingsParams) ([]pgtype.UUID, error) {
 	rows, err := q.db.Query(ctx, listStartedRecordings, arg.RootID, arg.StartedAt, arg.Limit)
 	if err != nil {

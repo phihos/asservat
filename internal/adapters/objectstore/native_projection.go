@@ -48,6 +48,7 @@ func (r *NativeContextReader) projectionReader() (*ContextProjectionReader, erro
 	reader.packets = r.packets
 	reader.queryPackets = r.queryPackets
 	reader.querySyscalls = r.querySyscalls
+	reader.queryLogs = r.queryLogs
 	return reader, nil
 }
 
@@ -93,5 +94,12 @@ func (r *NativeContextReader) ServePacketQueries(f evidence.PacketQuerier) {
 func (r *NativeContextReader) ServeSyscallQueries(f evidence.SyscallQuerier) {
 	if r != nil {
 		r.querySyscalls = f
+	}
+}
+
+// ServeLogQueries installs only the exact approved saved-log interpreter.
+func (r *NativeContextReader) ServeLogQueries(f evidence.LogQuerier) {
+	if r != nil {
+		r.queryLogs = f
 	}
 }

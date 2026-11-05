@@ -1,0 +1,58 @@
+{
+  "schema_version": "mcp-result/v1",
+  "request_id": "00000000-0000-4000-8000-000000000032",
+  "data_class": "raw",
+  "status": "ok",
+  "data": {
+    "kind": "logs",
+    "pod_uid": "original-pod",
+    "window_start": "2026-11-05T12:00:00Z",
+    "window_end": "2026-11-05T12:01:00Z",
+    "entries": [
+      {
+        "origin": {
+          "origin_id": 0,
+          "container_kind": "regular",
+          "container_name": "app",
+          "source": "current",
+          "stream": "combined",
+          "runtime_id": null,
+          "restart_count": 0
+        },
+        "fragment": 0,
+        "line": 1,
+        "offset": 0,
+        "line_offset": 0,
+        "continuation": false,
+        "end_line": true,
+        "source_time": null,
+        "text": "\n",
+        "bytes_base64": null
+      }
+    ],
+    "coverage": {
+      "origins": 2,
+      "complete_origins": 1,
+      "partial_origins": 0,
+      "unavailable_origins": 1,
+      "unknown_timestamp_origins": 1,
+      "gapped_origins": 2,
+      "source_bytes": 1,
+      "total_fragments": 1
+    },
+    "query_observed_at": "2026-11-05T12:02:00Z",
+    "query_expires_at": "2026-11-05T12:03:00Z"
+  },
+  "truncated": false,
+  "next_cursor": null,
+  "narrowing_hint": null,
+  "warnings": [
+    "Saved raw logs may contain user data. Streams are combined and historical coverage is unknown."
+  ],
+  "provenance": [
+    {
+      "artifactID": "00000000-0000-4000-8000-000000000023",
+      "digest": "0900000000000000000000000000000000000000000000000000000000000000"
+    }
+  ]
+}

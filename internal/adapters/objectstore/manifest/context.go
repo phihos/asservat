@@ -141,6 +141,9 @@ func lifecycle(e artifact.ContextExpectation) lifecycleDTO {
 // completeness reports a save's source coverage truthfully: only a fully
 // covered window is complete; its gap reasons are the recorded gaps.
 func completeness(e artifact.ContextExpectation) completenessDTO {
+	if e.NativeType == artifact.LogsArtifact {
+		return completenessDTO{"unknown", "complete", "true", []string{"Kubernetes API logs are not a complete historical archive; see native per-origin coverage."}}
+	}
 	l := e.Lifecycle
 	if l == nil {
 		return completenessDTO{"complete", "complete", "true", []string{}}

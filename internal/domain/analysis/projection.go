@@ -58,6 +58,8 @@ func LookupProjectionSource(nativeType string) (ProjectionSource, bool) {
 		return LookupProjectionSourceFor(nativeType, SyscallSummaryDisplayVersion)
 	}
 	switch nativeType {
+	case artifact.LogsArtifact:
+		return ProjectionSource{NativeType: artifact.LogsArtifact, Format: artifact.LogFormat, DataClass: "raw", EvidenceType: "logs", DisplayVersion: LogQueryDisplayVersion, NativeLimit: artifact.LogNativeLimit}, true
 	case artifact.PodStatusArtifact:
 		return ProjectionSource{NativeType: artifact.PodStatusArtifact, Format: artifact.ContextFormat, DataClass: "metadata", EvidenceType: "context",
 			DisplayVersion: ContextDisplayVersion, NativeLimit: artifact.MaxContextBytes, ProjectionDigest: ContextSourceProjectionDigest()}, true
@@ -107,7 +109,7 @@ func LookupProjectionSourceFor(nativeType, displayVersion string) (ProjectionSou
 // Matches reports whether published facts are exactly this source.
 func (p ProjectionSource) Matches(nativeType, format, dataClass, evidenceType string, nativeLimit int64, digest artifact.Digest) bool {
 	return p.NativeType == nativeType && p.Format == format && p.DataClass == dataClass && p.EvidenceType == evidenceType &&
-		(p.NativeLimit == nativeLimit || (p.NativeType == artifact.PprofArtifact || p.NativeType == artifact.PCAPNGArtifact || p.NativeType == artifact.RawPCAPNGArtifact) && nativeLimit > 0 && nativeLimit <= p.NativeLimit) && p.ProjectionDigest == digest
+		(p.NativeLimit == nativeLimit || (p.NativeType == artifact.LogsArtifact || p.NativeType == artifact.PprofArtifact || p.NativeType == artifact.PCAPNGArtifact || p.NativeType == artifact.RawPCAPNGArtifact) && nativeLimit > 0 && nativeLimit <= p.NativeLimit) && p.ProjectionDigest == digest
 }
 
 func ContextSourceProjectionDigest() artifact.Digest {
@@ -189,6 +191,7 @@ type ContextProjectionCandidate struct {
 	Syscalls                                                                            SyscallWindow           `json:",omitzero"`
 	Comparison                                                                          ProfileComparisonWindow `json:",omitzero"`
 	PacketQuery                                                                         PacketQueryWindow       `json:",omitzero"`
+	Logs                                                                                LogWindow               `json:",omitzero"`
 	RawGrantID                                                                          string                  `json:",omitempty"`
 }
 
@@ -219,6 +222,9 @@ func (c ContextProjectionCandidate) Source() (ProjectionSource, bool) {
 }
 
 func (c ContextProjectionCandidate) selectionValid() bool {
+	if c.NativeType == artifact.LogsArtifact || c.Logs != (LogWindow{}) {
+		return c.NativeType == artifact.LogsArtifact && c.Logs.Valid() && c.PacketQuery == (PacketQueryWindow{}) && c.Comparison == (ProfileComparisonWindow{}) && c.Selection == (LineSelection{}) && c.Headers == (HTTPHeaderWindow{}) && c.Profile == (ProfileSummarySelection{}) && c.Syscalls == (SyscallWindow{}) && (c.RawGrantID == "" || authorization.UUID(c.RawGrantID))
+	}
 	if c.PacketQuery != (PacketQueryWindow{}) {
 		return c.PacketQuery.Valid() && c.PacketQuery.Selection().ValidFor(c.NativeType) && c.Comparison == (ProfileComparisonWindow{}) && c.Selection == (LineSelection{}) && c.Headers == (HTTPHeaderWindow{}) && c.Profile == (ProfileSummarySelection{}) && c.Syscalls == (SyscallWindow{}) && ((c.NativeType == artifact.RawPCAPNGArtifact && (c.RawGrantID == "" || authorization.UUID(c.RawGrantID))) || (c.NativeType == artifact.PCAPNGArtifact && c.RawGrantID == ""))
 	}
@@ -263,6 +269,7 @@ type ContextProjectionScope struct {
 	Syscalls                                                                            SyscallWindow           `json:",omitzero"`
 	Comparison                                                                          ProfileComparisonWindow `json:",omitzero"`
 	PacketQuery                                                                         PacketQueryWindow       `json:",omitzero"`
+	Logs                                                                                LogWindow               `json:",omitzero"`
 	RawGrantID                                                                          string                  `json:",omitempty"`
 }
 
@@ -283,6 +290,9 @@ func (s ContextProjectionScope) sourceValid() bool {
 
 // Source is the closed projection source this scope reads.
 func (s ContextProjectionScope) Source() (ProjectionSource, bool) {
+	if (s.Logs != (LogWindow{})) != (s.DisplayVersion == LogQueryDisplayVersion) {
+		return ProjectionSource{}, false
+	}
 	if (s.PacketQuery != (PacketQueryWindow{})) != (s.DisplayVersion == PacketQueryDisplayVersion) {
 		return ProjectionSource{}, false
 	}
@@ -302,7 +312,7 @@ func (s ContextProjectionScope) Candidate() ContextProjectionCandidate {
 	comparison.Baseline.Version = artifact.Digest{}
 	return ContextProjectionCandidate{RootID: s.RootID, CaseID: s.CaseID, ArtifactID: s.ArtifactID, CaptureID: s.CaptureID,
 		ClusterID: s.ClusterID, NamespaceUID: s.NamespaceUID, WorkloadUID: s.WorkloadUID, PodUID: s.PodUID,
-		Selection: s.Selection, Principal: s.Principal, NativeType: s.NativeType, Headers: s.Headers, Profile: s.Profile, Syscalls: s.Syscalls, Comparison: comparison, PacketQuery: s.PacketQuery, RawGrantID: s.RawGrantID}
+		Selection: s.Selection, Principal: s.Principal, NativeType: s.NativeType, Headers: s.Headers, Profile: s.Profile, Syscalls: s.Syscalls, Comparison: comparison, PacketQuery: s.PacketQuery, Logs: s.Logs, RawGrantID: s.RawGrantID}
 }
 
 // ContextProjectionPath is accepted placement for this query purpose. It is not
@@ -436,5 +446,5 @@ func (a ContextProjectionAuthority) grantMatches() bool {
 }
 
 func (s ContextProjectionScope) rawGrantRequired() bool {
-	return s.DisplayVersion == PacketQueryDisplayVersion && s.NativeType == artifact.RawPCAPNGArtifact || s.DisplayVersion == SyscallQueryDisplayVersion && s.NativeType == artifact.SyscallArgumentsArtifact
+	return s.DisplayVersion == LogQueryDisplayVersion && s.NativeType == artifact.LogsArtifact || s.DisplayVersion == PacketQueryDisplayVersion && s.NativeType == artifact.RawPCAPNGArtifact || s.DisplayVersion == SyscallQueryDisplayVersion && s.NativeType == artifact.SyscallArgumentsArtifact
 }

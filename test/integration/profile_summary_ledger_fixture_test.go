@@ -37,12 +37,16 @@ func admitQueryLedgerProfile(t *testing.T, f *capacitySQLFixture, root capacitya
 	ctx, admin, poolFor := f.ctx, f.admin, f.fixturePool
 	raw := len(rawPacket) > 0 && rawPacket[0]
 	rawSyscall := len(rawPacket) > 1 && rawPacket[1]
+	isLogs := len(rawPacket) > 2 && rawPacket[2]
 	evidenceType := "profile"
 	if raw {
 		evidenceType = "packetCapture"
 	}
 	if rawSyscall {
 		evidenceType = "syscallTrace"
+	}
+	if isLogs {
+		evidenceType = "logs"
 	}
 	s, publisher, _ := f.prepareManagedContext(t, root, enrollment, 60)
 	in := s.a.Plan.Input
@@ -60,7 +64,11 @@ func admitQueryLedgerProfile(t *testing.T, f *capacitySQLFixture, root capacitya
 	c := planvalue.ProfileComposition{Components: []planvalue.ProfileComponent{{ID: "cpu", Profile: planvalue.ProfileRef{Catalog: "builtin", Name: "go-cpu", Version: "v1"}, Edits: []planvalue.ProfileEdit{{ActionID: "cpu", Field: "actionMaxBytes", Number: 1 << 20}}}}, MaxTotalBytes: 16 << 20, MaxDuration: "30s"}
 	input := planvalue.RecorderInput{CaptureID: in.CaptureID, Executor: in.Executor, Target: in.Target, Composition: c, Retention: in.Retention, Deadline: now.Add(time.Minute), NodeRecorder: true}
 	var reviewed planvalue.RecorderPlan
-	if rawSyscall {
+	if isLogs {
+		c = logsQueryComposition()
+		input.Composition, input.RequireApproval = c, true
+		reviewed, err = planning.CompileRecorder(input, nil, now)
+	} else if rawSyscall {
 		c = manualArgumentSQLComposition(t, in.Target)
 		input.Composition = c
 		reviewed, err = planning.CompileRecorder(input, installedArgumentsCompiler{}, now)
@@ -97,7 +105,7 @@ func admitQueryLedgerProfile(t *testing.T, f *capacitySQLFixture, root capacitya
 		t.Fatal(err)
 	}
 	g := authorization.Grant{ID: custodyID(), RootID: p.RootID, Kind: authorization.GrantAdHocCapture, PreviewID: p.ID, CaptureID: p.CaptureID, Target: in.Target.Target(), Requester: p.Actor, ExecutionDigest: p.ScopeDigest, Scope: p.CanonicalScope, Review: []byte(`{}`), DataClass: "raw", Reasons: []authorization.SensitiveReason{{ActionID: reviewed.Actions[0].ID, Code: planvalue.ReasonLiveProfile}}, Lifetime: time.Hour, Revision: 1}
-	if raw || rawSyscall {
+	if raw || rawSyscall || isLogs {
 		g.Reasons = reviewed.Approval.Reasons
 	}
 	g.ReviewDigest = authapp.ReviewDigest(g, g.Review)
@@ -106,7 +114,9 @@ func admitQueryLedgerProfile(t *testing.T, f *capacitySQLFixture, root capacitya
 		t.Fatal("profile review", err)
 	}
 	in.Deadline = input.Deadline
-	if raw || rawSyscall {
+	if isLogs {
+		in.Logs = &planvalue.LogsContext{Composition: c, RequireApproval: true}
+	} else if raw || rawSyscall {
 		in.Recorder, err = planning.RecorderContextFromScope(c, reviewed.CanonicalScope)
 	} else {
 		in.Profile, err = planning.ProfileContextFromScope(c, in.Target.Request, reviewed.CanonicalScope)
@@ -121,8 +131,11 @@ func admitQueryLedgerProfile(t *testing.T, f *capacitySQLFixture, root capacitya
 	s.a.SubmissionDigest = captureapp.ContextRequestDigest(p.ID)
 	r := &s.a.Registration
 	r.NativeLimit = 1 << 20
-	if raw || rawSyscall {
+	if raw || rawSyscall || isLogs {
 		r.NativeLimit = artifact.RecordingNativeLimit
+	}
+	if isLogs {
+		r.NativeLimit = artifact.LogNativeLimit
 	}
 	r.AnchorAt = in.Retention.AnchorAt
 	r.WriteUntil = in.Deadline
@@ -148,7 +161,11 @@ func admitQueryLedgerProfile(t *testing.T, f *capacitySQLFixture, root capacitya
 	if err != nil {
 		t.Fatal("approved profile admission", err)
 	}
-	if rawSyscall {
+	if isLogs {
+		if accepted.Expectation.NativeType != artifact.LogsArtifact || accepted.Expectation.Logs == nil || accepted.Expectation.DataClass != "raw" {
+			t.Fatal("logs admitted wrong shape")
+		}
+	} else if rawSyscall {
 		if accepted.Expectation.NativeType != artifact.SyscallArgumentsArtifact || accepted.Expectation.Recording == nil || accepted.Expectation.Recording.Arguments == nil || accepted.Expectation.DataClass != "raw" {
 			t.Fatal("rawsyscall admitted with wrong shape")
 		}

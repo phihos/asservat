@@ -16,5 +16,7 @@ export declare function validInput_get_syscall_events(value: unknown): value is 
 export declare function validOutput_get_syscall_events(value: unknown): value is components['schemas']['McpOutput_get_syscall_events'];
 export declare function validInput_syscall_query(value: unknown): value is components['schemas']['McpInput_syscall_query'];
 export declare function validOutput_syscall_query(value: unknown): value is components['schemas']['McpOutput_syscall_query'];
+export declare function validInput_get_logs(value: unknown): value is components['schemas']['McpInput_get_logs'];
+export declare function validOutput_get_logs(value: unknown): value is components['schemas']['McpOutput_get_logs'];
 export declare function validInput_get_query_result(value: unknown): value is components['schemas']['McpInput_get_query_result'];
 export declare function validOutput_get_query_result(value: unknown): value is components['schemas']['McpOutput_get_query_result'];

@@ -719,6 +719,7 @@ components:
   - C-18
   - C-19
   - C-20
+  - C-23
   - C-24
   responsibility: Implement consumer-owned ports with role-scoped SQL, Kubernetes, object, key, identity and cache clients.
   provided_ports:
@@ -742,6 +743,7 @@ components:
   - internal/adapters/packets
   - internal/adapters/httpheaders
   - internal/adapters/syscalls
+  - internal/adapters/logs
   - internal/adapters/pcap
   - internal/adapters/diagnostics
   - internal/adapters/tools

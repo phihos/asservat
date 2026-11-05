@@ -41,7 +41,7 @@ flowchart LR
   Ports --> Domain
 ```
 
-Only bootstrap chooses concrete adapters, credentials and role capabilities. Domain packages import standard-library value utilities and other explicitly allowed domain values only. `net/netip` is allowed for pure canonical IP parsing/classification; `net` sockets/DNS and HTTP remain infrastructure. They do not depend on logging globals, SQL, Kubernetes, HTTP, MCP, clocks, randomness or filesystem I/O. Pass time/identity inputs to pure rules; inject clock/ID generation at the application boundary.
+Only bootstrap chooses concrete adapters, credentials and role capabilities. Domain packages import standard-library value utilities and other explicitly allowed domain values only. `net/netip` is allowed for pure canonical IP parsing/classification; `net` sockets/DNS and HTTP remain infrastructure. They do not depend on logging globals, SQL, Kubernetes, HTTP, MCP, clocks, randomness or filesystem I/O. C-24 analysis values may use standard-library base64 validation and in-memory JSON encoding to bound closed log-page values; this grants no protocol, key or I/O capability. Pass time/identity inputs to pure rules; inject clock/ID generation at the application boundary.
 
 Application packages contain use-case services, state transition orchestration and the interfaces they consume. They may import other application packages only along the catalog's allowed dependency graph; use the smallest public service/facet. Adapters implement those interfaces and may import the consumer's port types. Application code never imports concrete adapters or transport packages. In-memory fakes belong to tests and must obey the same purpose/bound invariants; they are not alternate production storage modes.
 
@@ -90,3 +90,8 @@ The C-21 [multi-cluster routing adapters](worker-routing.md) implement existing 
 [Configuration reconciliation](configuration-reconciliation.md) adds a C-04 serial observer-loop supervisor and C-21 protected fleet/Lease adapters. The private `hub-worker` loader composes them through the same fixed provider connection helpers as owner startup, with separate credentials and no recovery activation port.
 
 C-21 `kubernetes.BuildHubWorkerWorkload` builds installation-owned native Deployment/account/RBAC resources under [ADR-094](../decisions/094-native-hub-worker-projections.md). It does not apply objects, resolve recovery or introduce a public wire; bootstrap remains the role composition root.
+
+C-21 artifact publication reuses C-23 `internal/adapters/logs` for the mandatory
+canonical streaming native check. This data-only codec adds no collector, API,
+credential or execution capability. The Go gate confines the C-21 → C-23 edge to
+that package; persistence cannot import Gadget, Linux or other mechanism adapters.

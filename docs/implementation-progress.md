@@ -1,5 +1,55 @@
 # Sustained implementation progress
 
+## Finite whole-pod logs composition in progress (2026-11-05)
+
+ADR-308 revises the unimplemented redacted/split-stream saved-log promise to
+lossless raw JSONL and exact grant-protected saved pages with truthful combined
+stream provenance. This is an engineering decision under standing simplification
+delegation, not a newly claimed direct maintainer choice. Original incident time,
+whole-pod permissions and aggregate action limits remain binding. The builtin
+uses observe; collection review follows actual authored/protected requirements,
+while saved raw-page disclosure always requires exact independent approval.
+
+An isolated worktree based on merged main `4791f25c` composes the finite API
+collector, typed plan, encrypted streaming writer, native checker, query/grant
+ledger and browser/MCP delivery. Codec races include a near64MiB pipe,128 fair
+origins, long/empty/invalid byte records and strict EOF. TLS adapter tests exercise
+regular/init/ephemeral current/previous provenance and source-change refusal.
+Logs-only finalization waits for the actual joined completion rather than
+inventing a future fetch end. New query regressions reproduce direct callback
+expectation/fetch-window gaps, then pass exact byte reconstruction across pages,
+escaped output bounds, corruption, cancellation and late-window rejection.
+Focused authority/accounting/migration checks are local component evidence only.
+
+Actual built React and official SDK MCP component checks now pass with the real
+C18/C20/audit path and synthetic authority/providers below it; near-full escaped
+pages remain within direct/nested bounds. The encrypted reader reproduces and
+fixes a missing logs source-kind case and passes final-hash refusal with three
+key opens. Three local near64MiB reader processes finish below256MiB measured
+memory; configured500m is not runtime-qualified because observed CPU use exceeds
+its quota-consistent wall allowance on the active local scheduler. A fresh-host
+resource gate now checks actual CPU accounting as well as declarations.
+
+The private native transport regression reproduces logs being encoded as an
+HTTP-header page. The closed logs branch now preserves exact bytes and source
+version; real H2/mTLS component tests cover positive ACK, typed cursor refusal,
+wrong-Pod refusal and joined cancellation. Full native-package races pass in
+133.084s. The public three-field log edit path also passes actual conversion,
+compiler/funding and editor checks. Authority/source reads remain synthetic in
+these transport/browser components. Architecture ownership and dependency gates
+pass, including the narrow shared canonical-codec edge.
+
+Final local `make pre-push` exits0 after correcting canonical schema self
+references, the builtin example and all embedded composition bundles. It includes
+587 console tests in51 files. The full compiled console-browser gate exits0 in
+123.912s across9 top-level fixtures; browser authority/providers remain synthetic.
+Original schema failures are retained separately from the final complete pass.
+
+Composition is still being implemented. No real-service logs lifecycle,
+maximum-shape installed worker result, built React logs journey or installed
+logs/native/history/Repeat qualification is claimed. Full S-05 and the complete
+specification goal remain active.
+
 ## Saved syscall queries merged with complete installed test evidence (2026-11-05)
 
 PR171 merges as `2f74df8d`; signed `51344180`, the merge and fresh main share

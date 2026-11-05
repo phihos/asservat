@@ -35,15 +35,17 @@ import (
 // enrolled connector process. The API process and its exchanges are built
 // only once the connector credentials are active.
 type regionalContext struct {
-	c        contracts.RegionalAPIContext
-	rootID   string
-	pool     value.OwnerPool
-	roots    *x509.CertPool
-	attester *kube.ConnectorProcessAttester
-	settings *kube.ConnectorAPISettingsProtection
-	capacity *kube.PermissionClient
-	journal  *kube.StartJournal
-	targets  *kube.PodTargets
+	podUID     string
+	logsClient *kube.SavedLogClient
+	c          contracts.RegionalAPIContext
+	rootID     string
+	pool       value.OwnerPool
+	roots      *x509.CertPool
+	attester   *kube.ConnectorProcessAttester
+	settings   *kube.ConnectorAPISettingsProtection
+	capacity   *kube.PermissionClient
+	journal    *kube.StartJournal
+	targets    *kube.PodTargets
 	// peers re-resolves frozen Kubernetes packet peers for the running
 	// recordings' membership verifiers (ADR-283 part 3) with its own client
 	// and limiter, so verification never starves target resolution.
@@ -145,7 +147,7 @@ func newRegionalContext(ctx context.Context, c contracts.RegionalDeployment, in 
 	if err != nil {
 		return nil, closers, mounts.ErrUnavailable
 	}
-	out := &regionalContext{c: a, rootID: c.PermissionRootID, owners: owners, source: source}
+	out := &regionalContext{c: a, rootID: c.PermissionRootID, podUID: podUID, owners: owners, source: source}
 	if out.pool, err = regionalOwnerPool(c, a.Owners.Configuration); err != nil {
 		return nil, closers, err
 	}
@@ -206,6 +208,10 @@ func newRegionalContext(ctx context.Context, c contracts.RegionalDeployment, in 
 	if out.collector, err = kube.NewAPIContextClient(in.kubernetes("kube-observer.token")); err != nil {
 		return nil, closers, mounts.ErrUnavailable
 	}
+	if out.logsClient, err = kube.NewSavedLogClient(in.kubernetes("kube-observer.token")); err != nil {
+		return nil, closers, mounts.ErrUnavailable
+	}
+	out.output.recordings = NewConnectorRecordings(nil, out.collector, time.Now, eventLog(os.Stderr, "regional collection"))
 	storage, err := ownerHTTP(a.EvidenceStore.Endpoint, a.EvidenceStore.Roots)
 	if err != nil {
 		return nil, closers, mounts.ErrUnavailable
@@ -281,12 +287,17 @@ func (r *regionalContext) run(ctx context.Context, credentials *mtls.ConnectorPr
 	}
 	output := r.output
 	output.writerEpoch = process.ProcessEpoch()
+	if output.recordings != nil {
+		output.recordings.configureLogs(ctx, r.rootID, r.logsClient, r.podUID, process.ProcessEpoch())
+		defer output.recordings.closeLogs()
+	}
 	local := contextstart.RegionalLocal{Process: process, Targets: reportedTargets{r.targets, timedEventLog(os.Stderr, "regional target answer"), r.output.recordings}, Local: preparer, Starts: r.journal, Output: output, Collector: r.collector, Source: r.source, Now: time.Now}
 	local.History = &contextstart.HistoryLocal{Verifier: r.verifier, Effects: regionalHistoryObjects{objects: r.history, root: r.rootID, cluster: r.c.TrustSettings.ClusterID, epoch: process.ProcessEpoch(), now: time.Now}, Report: timedEventLog(os.Stderr, "regional history timing")}
 	if r.output.recordings != nil {
 		local.Recordings = r.output.recordings
+		local.Sources = &contextstart.SourceLocal{Verifier: r.verifier, Snapshots: r.output.recordings, Profiles: r.output.recordings, Recordings: r.output.recordings, Report: eventLog(os.Stderr, "regional source work refused")}
 		if queue, ok := r.output.recordings.nodes.(contextstart.SourceQueue); ok {
-			local.Sources = &contextstart.SourceLocal{Verifier: r.verifier, Queue: queue, Snapshots: r.output.recordings, Profiles: r.output.recordings, Recordings: r.output.recordings, Report: eventLog(os.Stderr, "regional source work refused")}
+			local.Sources.Queue = queue
 		}
 	}
 	fmt.Fprintln(os.Stderr, "regional context start active")
@@ -332,6 +343,26 @@ func (o regionalArtifactOutput) PrepareContext(ctx context.Context, e artifact.C
 			return nil, err
 		}
 		return o.recordings.PrepareProfile(prepared, e), nil
+	}
+	if e.Logs != nil {
+		if o.recordings == nil || o.writerEpoch == "" {
+			return nil, value.ErrUnavailable
+		}
+		var prepared *objectstore.PreparedArtifact
+		var err error
+		if e.Registration.NativeLimit > artifact.FrameBytes {
+			prepared, err = objectstore.PrepareOneShotLogsArtifact(ctx, o.store, seal, e, o.writerEpoch, o.now)
+		} else {
+			var producer *objectstore.ArtifactProducer
+			producer, err = objectstore.NewArtifactProducer(o.store, seal, noJournal{}, o.now)
+			if err == nil {
+				prepared, err = producer.Prepare(ctx, e, "")
+			}
+		}
+		if err != nil {
+			return nil, err
+		}
+		return o.recordings.PrepareLogs(prepared, e), nil
 	}
 	if e.Recording != nil || e.Snapshot != nil {
 		// ADR-248: one frame at most, so the artifact producer never needs

@@ -39,3 +39,19 @@ func TestSyscallArgumentsEditConversion(t *testing.T) {
 		}
 	}
 }
+
+func TestLogsTypedWindowEditsConversion(t *testing.T) {
+	for field, text := range map[string]string{"logBefore": "1h", "logAfter": "30s", "logStream": "both"} {
+		t.Run(field, func(t *testing.T) {
+			wire := argumentEditWire(t, `{"maxBytesPerEvent":128,"captureBuffers":false}`)
+			edit := &wire.Components[0].Overrides[0]
+			edit.ActionID = "logs"
+			edit.Field = field
+			edit.Value, _ = json.Marshal(text)
+			got, err := CompositionFromWire(wire)
+			if err != nil || got.Components[0].Edits[0].Unmodeled || got.Components[0].Edits[0].Text != text {
+				t.Fatal("advertised finite logs edit lost", field, got, err)
+			}
+		})
+	}
+}

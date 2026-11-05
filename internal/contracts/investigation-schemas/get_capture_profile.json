@@ -2731,7 +2731,10 @@
                     "commandArgv",
                     "actionMaxBytes",
                     "actionTimeout",
-                    "actionExecutionMode"
+                    "actionExecutionMode",
+                    "logBefore",
+                    "logAfter",
+                    "logStream"
                   ]
                 },
                 "label": {

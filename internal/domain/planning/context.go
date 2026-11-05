@@ -37,6 +37,8 @@ type ContextInput struct {
 	Target            targets.PodResolution
 	Retention         privacy.Resolution
 	Capability        ContextCapability
+	// Logs selects a finite whole-Pod API logs action, with no container selector.
+	Logs *LogsContext `json:",omitempty"`
 	// Recorder selects an accepted node recorder plan (ADR-248) instead of
 	// pod status: the authored composition with its filters frozen at
 	// preview, so the plan never depends on a compiler being present later.

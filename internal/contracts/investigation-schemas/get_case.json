@@ -139,7 +139,8 @@
                             "pod-status",
                             "packetCapture",
                             "syscallTrace",
-                            "profile"
+                            "profile",
+                            "logs"
                           ]
                         },
                         "data_class": {
@@ -150,7 +151,10 @@
                           ]
                         },
                         "completeness": {
-                          "const": "complete"
+                          "enum": [
+                            "complete",
+                            "unknown"
+                          ]
                         },
                         "expires_at": {
                           "type": "string",
@@ -596,6 +600,32 @@
                             "required": [
                               "native_format"
                             ]
+                          }
+                        },
+                        {
+                          "if": {
+                            "properties": {
+                              "kind": {
+                                "const": "logs"
+                              }
+                            },
+                            "required": [
+                              "kind"
+                            ]
+                          },
+                          "then": {
+                            "properties": {
+                              "completeness": {
+                                "const": "unknown"
+                              }
+                            }
+                          },
+                          "else": {
+                            "properties": {
+                              "completeness": {
+                                "const": "complete"
+                              }
+                            }
                           }
                         }
                       ]

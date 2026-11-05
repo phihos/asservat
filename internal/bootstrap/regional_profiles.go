@@ -101,7 +101,7 @@ func (h *ConnectorRecordings) startProfile(ctx context.Context, p *objectstore.P
 	defer h.mu.Unlock()
 	now = h.now()
 	h.expireLocked(now)
-	if (work.AuthorizationRequired && h.profileAuthorization == nil) || ctx.Err() != nil || !now.Before(startBy) || !now.Before(plan.ValidUntil) || !work.Valid() || len(h.held)+len(h.profiles) >= maxHeldRecordings || h.held[e.CaptureUID] != nil || h.profiles[e.CaptureUID] != nil {
+	if (work.AuthorizationRequired && h.profileAuthorization == nil) || ctx.Err() != nil || !now.Before(startBy) || !now.Before(plan.ValidUntil) || !work.Valid() || h.heldCountLocked() >= maxHeldRecordings || h.held[e.CaptureUID] != nil || h.profiles[e.CaptureUID] != nil || h.logs[e.CaptureUID] != nil {
 		return time.Time{}, value.ErrUnavailable
 	}
 	w, err := nodes.EnqueueProfile(ctx, work, startBy)

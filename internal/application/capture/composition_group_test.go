@@ -1,6 +1,7 @@
 package capture
 
 import (
+	compiler "asservat.local/asservat/internal/application/planning"
 	"context"
 	"encoding/json"
 	"errors"
@@ -11,12 +12,23 @@ import (
 	"asservat.local/asservat/internal/domain/identity"
 
 	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/planning"
 	"asservat.local/asservat/internal/domain/targets"
 )
 
 type bothRecorders struct{ availableRecording }
+
+type logsGroupAdmission struct {
+	*retainedRecording
+	groups []value.RecordingSaveGroupAdmission
+}
+
+func (f *logsGroupAdmission) AdmitRecordingCompositionGroup(_ context.Context, a value.RecordingSaveGroupAdmission) (value.Accepted, error) {
+	f.groups = append(f.groups, a)
+	return value.Accepted{}, reachedRecordingAdmission
+}
 
 func (b bothRecorders) ResolveSyscallRecorder(ctx context.Context, r targets.Request) (targets.PodResolution, error) {
 	return b.ResolvePacketRecorder(ctx, r)
@@ -48,6 +60,93 @@ func TestMixedCompositionPreviewsAsGroup(t *testing.T) {
 	g := r.Preview.CompositionGroup
 	if r.Plan.Approval == nil || !r.Recordable || g == nil || len(g.Children) != 2 || len(r.Plan.Actions) != 2 || len(r.Assessment.Actions) != 2 || g.Children[0].ScopeDigest == g.Children[1].ScopeDigest {
 		t.Fatalf("group preview %+v", r.Preview.CompositionGroup)
+	}
+}
+
+func TestLogsAndMetadataRecordersShareOneGroupReview(t *testing.T) {
+	for _, mode := range []struct {
+		name                string
+		required, sensitive bool
+	}{{name: "ordinary"}, {name: "protected", required: true}, {name: "authored-sensitive", sensitive: true}} {
+		required, reviewed := mode.required, mode.required || mode.sensitive
+		t.Run(mode.name, func(t *testing.T) {
+			f := newInvestigationFixture()
+			admission := &logsGroupAdmission{retainedRecording: &retainedRecording{investigationFixture: f}}
+			f.svc.Previews, f.svc.Admission = admission, admission
+			f.target.NodeUID, f.target.NodeBootID, f.target.Pin.NodeName = "", "", ""
+			f.target.ExecutionClass, f.cap.ExecutionClass = artifact.ContextAPIExecution, artifact.ContextAPIExecution
+			f.svc.Recorders, f.svc.Filters = bothRecorders{availableRecording{f}}, &stubFilters{}
+			f.svc.ReportPreviewFailure = func(stage string) { t.Log("stage", stage) }
+			f.svc.Approvals = fixedApprovalSettings{policy: identity.Policy{Revision: identity.Revision{UID: "identity", Generation: 1, Digest: [32]byte{1}}, Issuer: f.actor.Issuer, ObservedAt: f.now, FreshUntil: f.now.Add(30 * time.Second), Clients: []identity.Client{{ID: "console", Kind: identity.Human, ClassQualified: true}}, EligibleGroups: []string{"dev-team"}, GroupsAtIssueQualified: true, GroupMaxAge: time.Minute, RequireRecordingApproval: required}}
+			c := mixedComposition()
+			c.MaxTotalBytes = 64 << 20
+			c.Components = append(c.Components, planning.ProfileComponent{ID: "logs", Profile: planning.ProfileRef{Catalog: "builtin", Name: "finite-logs", Version: "v1"}})
+			if mode.sensitive {
+				raw, err := os.ReadFile("../planning/profiles/finite-logs-v1.json")
+				if err != nil {
+					t.Fatal(err)
+				}
+				var doc map[string]any
+				if json.Unmarshal(raw, &doc) != nil {
+					t.Fatal("logs profile")
+				}
+				doc["name"] = "sensitive-logs"
+				doc["definition"].(map[string]any)["recipe"].(map[string]any)["actions"].([]any)[0].(map[string]any)["impact"] = "sensitiveRead"
+				raw, _ = json.Marshal(doc)
+				ref := planning.ProfileRef{Catalog: "namespace", Name: "sensitive-logs", Version: "v1"}
+				c.Components[2].Profile = ref
+				f.svc.Profiles = &catalogFixture{profiles: []planning.CatalogProfile{{Ref: ref, SourceClusterID: f.target.Request.ClusterID, SourceNamespaceUID: f.target.Request.Namespace.UID, SourceUID: "sensitive-logs-source", Enabled: true, Document: raw}}}
+			}
+			r, err := f.svc.PreviewComposition(t.Context(), f.source(t, t.Context()), f.compositionIntent(c))
+			if err != nil {
+				t.Fatal("logs group preview", err)
+			}
+			if !r.Recordable || r.Preview.CompositionGroup == nil || len(r.Preview.CompositionGroup.Children) != 3 || len(r.Plan.Actions) != 3 || len(r.Assessment.Actions) != 3 || (r.Plan.Approval != nil) != reviewed || r.Preview.AssessmentRulesDigest != compiler.RecorderAssessmentRulesFor(r.Plan.Actions) || r.Assessment.RulesDigest != r.Preview.AssessmentRulesDigest {
+				t.Fatal("mixed group lost combined review")
+			}
+			for n, child := range r.Preview.CompositionGroup.Children {
+				actions, approval, err := compiler.RecorderScopeSummary(child.CanonicalScope)
+				if err != nil || len(actions) != 1 || (approval != nil) != reviewed {
+					t.Fatal("child scope changed", n, err)
+				}
+				if actions[0].Kind == "logs" && (actions[0].MaxBytes != 10<<20 || actions[0].Before != "10s" || actions[0].LogStream != "both") {
+					t.Fatal("logs limits changed in group")
+				}
+			}
+			var access *authorization.ResultAccess
+			if reviewed {
+				grants := &fakeGrants{}
+				f.svc.Grants = grants
+				for _, a := range r.Plan.Actions {
+					if a.Kind == "logs" {
+						access = &authorization.ResultAccess{ActionIDs: []string{a.ID}, Operations: []string{authorization.GrantDownloadOperation}, ClientIDs: []string{"console"}, MaxArtifacts: 1, MaxBytes: 10 << 20, MaxOperations: 4, NotAfter: f.now.Add(time.Hour)}
+					}
+				}
+				if _, err := f.svc.RequestWithResultAccess(t.Context(), f.source(t, t.Context()), r.Preview.ID, "mixed-logs", access); !errors.Is(err, authorization.ErrApprovalRequired) || len(grants.requests) != 1 || len(admission.groups) != 0 {
+					t.Fatal("combined review bypassed", err)
+				}
+				if grants.requests[0].DataClass != "raw" || len(grants.requests[0].Review.Actions) != 3 {
+					t.Fatal("parent review omitted raw logs or siblings")
+				}
+				grants.covering = nil
+				grants.grant.ExpiresAt = f.now.Add(90 * time.Second)
+			}
+			if _, err := f.svc.RequestWithResultAccess(t.Context(), f.source(t, t.Context()), r.Preview.ID, "mixed-logs", access); !errors.Is(err, reachedRecordingAdmission) || len(admission.groups) != 1 {
+				t.Fatal("mixed typed children did not reach atomic admission", err)
+			}
+			group := admission.groups[0]
+			if len(group.Children) != 3 {
+				t.Fatal("partial group admission")
+			}
+			for n, child := range group.Children {
+				if !ReviewedCompositionGroupChild(group.Preview, n, child) || !child.Registration.AnchorAt.Equal(group.Children[0].Registration.AnchorAt) {
+					t.Fatal("child lost original common admission anchor", n)
+				}
+				if child.Plan.Input.Logs != nil && child.Registration.NativeLimit != 10<<20 {
+					t.Fatal("logs inherited recorder eight MiB cap")
+				}
+			}
+		})
 	}
 }
 

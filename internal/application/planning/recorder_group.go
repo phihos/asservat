@@ -125,7 +125,7 @@ func RecorderGroupDisplay(scope []byte, digest artifact.Digest, assessmentID str
 	a.ID, a.PlanDigest, a.Actions, a.CombinedQuantities = assessmentID, digest, nil, nil
 	a.Combined.Effects = nil
 	for i, p := range plans {
-		if (p.Approval == nil) != (plans[0].Approval == nil) || assessments[i].RulesDigest != a.RulesDigest {
+		if (p.Approval == nil) != (plans[0].Approval == nil) || assessments[i].RulesDigest != RecorderAssessmentRulesFor(p.Actions) {
 			return value.RecorderPlan{}, value.RecorderAssessment{}, value.ErrInvalid
 		}
 		plan.Actions = append(plan.Actions, p.Actions...)
@@ -136,9 +136,7 @@ func RecorderGroupDisplay(scope []byte, digest artifact.Digest, assessmentID str
 			if plan.Approval == nil {
 				plan.Approval = &value.RecorderApproval{DataClass: p.Approval.DataClass}
 			}
-			if p.Approval.DataClass != plan.Approval.DataClass {
-				return value.RecorderPlan{}, value.RecorderAssessment{}, value.ErrInvalid
-			}
+			plan.Approval.DataClass = groupReviewClass(plan.Approval.DataClass, p.Approval.DataClass)
 			plan.Approval.Reasons = append(plan.Approval.Reasons, p.Approval.Reasons...)
 			if plan.Approval.ObservationLimits == nil {
 				plan.Approval.ObservationLimits = p.Approval.ObservationLimits
@@ -155,6 +153,10 @@ func RecorderGroupDisplay(scope []byte, digest artifact.Digest, assessmentID str
 				a.Combined.Effects = append(a.Combined.Effects, e)
 			}
 		}
+	}
+	a.RulesDigest = RecorderAssessmentRulesFor(plan.Actions)
+	if slices.ContainsFunc(plan.Actions, func(a value.RecorderAction) bool { return a.Kind == "logs" }) {
+		a.Combined.Explanation = "Combined finite log reads and node recording use API, collector, encoding, encryption and upload resources. Their aggregate overhead is unmeasured; each action keeps its configured native byte and duration limits."
 	}
 	return plan, a, nil
 }
@@ -176,15 +178,25 @@ func RecorderGroupSummary(children [][]byte) ([]value.RecorderAction, *value.Rec
 		if approval == nil {
 			approval = &value.RecorderApproval{DataClass: p.DataClass}
 		}
-		if p.DataClass != approval.DataClass {
-			return nil, nil, value.ErrInvalid
-		}
+		approval.DataClass = groupReviewClass(approval.DataClass, p.DataClass)
 		approval.Reasons = append(approval.Reasons, p.Reasons...)
 		if approval.ObservationLimits == nil {
 			approval.ObservationLimits = p.ObservationLimits
 		}
 	}
 	return actions, approval, nil
+}
+
+// A group's one review describes the most sensitive child. Each child still
+// binds its own class and scope; this grants no disclosure operation.
+func groupReviewClass(a, b string) string {
+	if a == "raw" || b == "raw" {
+		return "raw"
+	}
+	if a == "extract" || b == "extract" {
+		return "extract"
+	}
+	return a
 }
 
 func maxTime(a, b time.Time) time.Time {

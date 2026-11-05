@@ -24,7 +24,7 @@ func (h *ConnectorRecordings) CancelProfile(ctx context.Context, stop collector.
 	if p == nil {
 		// The same process has not queued this attempt. Keep a bounded tombstone
 		// so a start already in transit cannot follow this restrictive request.
-		if len(h.held)+len(h.profiles) >= maxHeldRecordings {
+		if h.heldCountLocked() >= maxHeldRecordings {
 			return value.ErrUnavailable
 		}
 		if h.profiles == nil {

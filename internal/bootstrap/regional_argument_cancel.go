@@ -30,9 +30,12 @@ func (h *ConnectorRecordings) CancelRecording(ctx context.Context, stop collecto
 	if !now.Before(until) || !now.Before(stop.WriteUntil.Add(recordingRetain)) {
 		return value.ErrExpired
 	}
+	if held := h.logs[stop.CaptureID]; held != nil {
+		return h.cancelLogsLocked(stop, held)
+	}
 	held := h.held[stop.CaptureID]
 	if held == nil {
-		if h.profiles[stop.CaptureID] != nil || len(h.held)+len(h.profiles) >= maxHeldRecordings {
+		if h.profiles[stop.CaptureID] != nil || h.heldCountLocked() >= maxHeldRecordings {
 			return value.ErrUnavailable
 		}
 		// This fences a delayed start, but absence is never evidence of termination.

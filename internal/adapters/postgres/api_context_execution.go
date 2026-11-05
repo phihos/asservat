@@ -13,6 +13,7 @@ import (
 	captureapp "asservat.local/asservat/internal/application/capture"
 	"asservat.local/asservat/internal/application/evidence"
 	app "asservat.local/asservat/internal/application/execution"
+	"asservat.local/asservat/internal/application/planning"
 	privacyapp "asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
@@ -86,7 +87,7 @@ func apiWork(c custodydb.ContextCapture) (app.APIContextWork, error) {
 		return out, value.ErrUnavailable
 	}
 	t := scope.Collection.Spec.Target
-	if e.Recording != nil || e.Profile != nil {
+	if e.Recording != nil || e.Profile != nil || e.Logs != nil {
 		t = scope.Target
 	}
 	request := targets.Request{ClusterID: e.Registration.Location.ClusterID, Namespace: configuration.NamespaceRef{Name: t.Namespace, UID: e.NamespaceUID}, Workload: configuration.WorkloadRef{Kind: t.Workload.Kind, Name: t.Workload.Name, UID: t.Workload.UID}, PodName: accepted.Pin.Name, PodUID: e.PodUID}
@@ -338,7 +339,7 @@ func (s *APIContextExecutions) prepareAPIExecution(ctx context.Context, c app.AP
 				e := c.Work.Accepted.Expectation
 				p := c.Process.Binding
 				b := value.Binding{ExecutionClass: artifact.ContextAPIExecution, ExecutorPodUID: p.PodUID, ExecutorAccountUID: p.AccountUID, OperationID: e.CaptureUID, CaptureID: e.CaptureUID, ActionID: e.ActionID, AttemptID: e.Registration.Location.AttemptID, ClusterID: p.ClusterID, IssuerEpoch: p.IssuerEpoch, PodUID: e.PodUID, CollectorEpoch: p.ProcessEpoch, ScopeDigest: e.PlanDigest, AuditDigest: c.Work.IntentDigest, NativeBytes: e.Registration.NativeLimit, NotBefore: c.CheckedAt.UTC(), NotAfter: c.ValidUntil.UTC()}
-				if e.Profile != nil {
+				if e.Profile != nil || e.Logs != nil {
 					b.NativeType = e.NativeType
 				}
 				copy(b.BudgetDigest[:], digest(normalized(e.Registration)))
@@ -746,7 +747,7 @@ func currentRecordingGrant(ctx context.Context, q *custodydb.Queries, row custod
 	if _, _, policy := authorization.PolicyExecutor(intent.Actor); policy {
 		return currentPolicyCaptureGrant(ctx, q, row, a)
 	}
-	if a.Expectation.Profile == nil && !policyRecordingNeedsGrant(a.Expectation.Recording) {
+	if a.Expectation.Profile == nil && !policyRecordingNeedsGrant(a.Expectation.Recording) && !(a.Expectation.Logs != nil && planning.RecorderApprovedAcceptance(row.ScopeJson)) {
 		return nil
 	}
 	previewID, captureID, scopeDigest := row.PreviewID, row.ID, row.ScopeDigest

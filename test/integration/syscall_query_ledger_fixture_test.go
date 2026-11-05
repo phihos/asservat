@@ -24,6 +24,9 @@ func TestRawSyscallQueryLifecycleWithRealServices(t *testing.T) {
 	})
 }
 func packetQueryFixtureOperation(f *queryLedgerFixture) string {
+	if f.published.Expectation.NativeType == artifact.LogsArtifact {
+		return value.GrantLogQueryOperation
+	}
 	if f.published.Expectation.NativeType == artifact.SyscallArgumentsArtifact {
 		return value.GrantSyscallQueryOperation
 	}

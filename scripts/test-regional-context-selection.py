@@ -24,6 +24,18 @@ spec.loader.exec_module(fixture)
 
 
 class RegionalContextSelection(unittest.TestCase):
+    def test_manual_logs_api_only_focus_and_resource_selector(self):
+        with patch.dict(os.environ, {"ASSERVAT_JOURNEY_FOCUS":"manual-logs"}):
+            self.assertEqual(fixture.qualification_cluster_count(3, installer_continuation=True),2)
+            self.assertEqual(fixture.qualification_go_timeout(installer_continuation=True),"18m")
+        source=Path(fixture.__file__).read_text()
+        collector=next(line for line in source.splitlines() if line.strip().startswith("collector_qualification ="))
+        self.assertNotIn('"manual-logs"',collector)
+        self.assertIn('report["installedLogsQueryQualification"] = installer_continuation and focus == "manual-logs"',source)
+        selected=json.loads(subprocess.check_output([str(Path(__file__).with_name("ci-native.sh")),"--list"],text=True))
+        self.assertIn("continuation-manual-logs",selected)
+        self.assertIn("logs-resource",selected)
+
     def test_cancelled_go_capture_retains_partial_output_and_source_checkpoint(self):
         # Real subprocesses, no cluster/services: terminate the harness while a
         # tiny flushed child is still alive. A partial checkpoint is not a pass.

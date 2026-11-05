@@ -23,11 +23,12 @@
           "type": "array",
           "items": {
             "enum": [
-              "read_memory",
               "debugger_command",
+              "download_artifact",
+              "get_logs",
               "pcap_query",
-              "syscall_query",
-              "download_artifact"
+              "read_memory",
+              "syscall_query"
             ]
           },
           "minItems": 1,
@@ -94,11 +95,12 @@
           "type": "array",
           "items": {
             "enum": [
-              "read_memory",
               "debugger_command",
+              "download_artifact",
+              "get_logs",
               "pcap_query",
-              "syscall_query",
-              "download_artifact"
+              "read_memory",
+              "syscall_query"
             ]
           },
           "minItems": 1,

@@ -32,7 +32,7 @@ func (h *ConnectorRecordings) CancelSourceSnapshot(ctx context.Context, x collec
 		if held.outcome.State == evidence.RecordingStored || held.outcome.State == evidence.RecordingCancelled {
 			return nil
 		}
-	} else if len(h.held)+len(h.profiles) >= maxHeldRecordings {
+	} else if h.heldCountLocked() >= maxHeldRecordings {
 		return value.ErrUnavailable
 	}
 	until := h.now().Add(5 * time.Second)

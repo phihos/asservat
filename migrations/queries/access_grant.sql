@@ -4,7 +4,7 @@
 SELECT * FROM access_grant WHERE root_id=$1 AND requester_issuer=$2 AND requester_subject=$3 AND idempotency_key=$4 AND kind='adHocCapture';
 
 -- name: ReadGrantByCapture :one
-SELECT * FROM access_grant WHERE root_id=$1 AND capture_id=$2;
+SELECT parent.* FROM access_grant parent WHERE parent.root_id=$1 AND (parent.capture_id=$2 OR parent.capture_id=(SELECT c.group_id FROM context_capture c JOIN recording_save_group g ON g.id=c.group_id AND g.root_id=c.root_id AND g.group_kind='composition' WHERE c.root_id=$1 AND c.id=$2 AND g.child_ids[c.group_ordinal+1]=c.id)) ORDER BY CASE WHEN parent.capture_id=$2 THEN 0 ELSE 1 END LIMIT 1;
 
 -- name: InsertGrant :one
 -- The review window starts at the database clock; the caller never names it.
@@ -53,10 +53,48 @@ SELECT * FROM access_grant WHERE root_id=sqlc.arg(root_id)::uuid AND requester_i
 ORDER BY requested_at DESC, id LIMIT @row_limit;
 
 -- name: ReadGrantChild :one
-SELECT * FROM access_grant_child WHERE parent_id=$1 AND artifact_id=$2 AND client_id=$3;
+SELECT sqlc.embed(child),c.scope_digest AS source_scope_digest,(CASE WHEN rg.group_kind='composition' AND c.group_ordinal>=0 AND cardinality(rg.child_ids) BETWEEN 2 AND 16 AND rg.child_ids[c.group_ordinal+1]=c.id AND
+ c.created_at=rg.accepted_at AND c.deadline<=rg.deadline AND sha256(c.scope_json)=c.scope_digest AND sha256(rg.scope_json)=rg.scope_digest AND
+ convert_from(rg.scope_json,'UTF8')::jsonb->>'schemaVersion'='recorder-group/v1' AND
+ convert_from(rg.scope_json,'UTF8')::jsonb->'children'->c.group_ordinal->>'captureID'=c.id::text AND
+ convert_from(rg.scope_json,'UTF8')::jsonb->'children'->c.group_ordinal->>'scopeDigest'=encode(c.scope_digest,'hex') AND
+ convert_from(rg.scope_json,'UTF8')::jsonb->'children'->c.group_ordinal->>'actionID'=convert_from(c.expectation_json,'UTF8')::jsonb->>'ActionID' AND
+ convert_from(c.expectation_json,'UTF8')::jsonb#>>'{Registration,Location,ArtifactID}'=l.artifact_id::text AND
+ convert_from(c.expectation_json,'UTF8')::jsonb#>>'{CompositionGroup,ParentCaptureID}'=rg.id::text AND
+ (convert_from(c.expectation_json,'UTF8')::jsonb#>>'{CompositionGroup,ChildIndex}')::integer=c.group_ordinal AND
+ (convert_from(c.expectation_json,'UTF8')::jsonb#>>'{CompositionGroup,ChildCount}')::integer=cardinality(rg.child_ids) THEN jsonb_build_object('RootID',c.root_id,'ParentCaptureID',rg.id,'CaptureID',c.id,'ArtifactID',l.artifact_id,
+ 'ActionID',convert_from(c.expectation_json,'UTF8')::jsonb->>'ActionID',
+ 'ParentExecutionDigest',to_jsonb(ARRAY(SELECT get_byte(rg.scope_digest,byte_index) FROM generate_series(0,31) AS bytes(byte_index))),
+ 'ExecutionDigest',to_jsonb(ARRAY(SELECT get_byte(c.scope_digest,byte_index) FROM generate_series(0,31) AS bytes(byte_index))),
+ 'ArtifactDigest',to_jsonb(ARRAY(SELECT get_byte(l.version,byte_index) FROM generate_series(0,31) AS bytes(byte_index))),
+ 'ChildIndex',c.group_ordinal,'ChildCount',cardinality(rg.child_ids)) END)::jsonb AS group_association
+FROM access_grant_child child
+LEFT JOIN context_capture c ON c.root_id=child.root_id AND c.id=child.capture_id
+LEFT JOIN context_case_locator l ON l.root_id=c.root_id AND l.capture_id=c.id AND l.artifact_id=child.artifact_id AND l.version=child.artifact_digest
+LEFT JOIN recording_save_group rg ON rg.root_id=c.root_id AND rg.id=c.group_id
+WHERE child.parent_id=$1 AND child.artifact_id=$2 AND child.client_id=$3;
 
 -- name: ReadGrantChildByID :one
-SELECT * FROM access_grant_child WHERE root_id=$1 AND id=$2;
+SELECT sqlc.embed(child),c.scope_digest AS source_scope_digest,(CASE WHEN rg.group_kind='composition' AND c.group_ordinal>=0 AND cardinality(rg.child_ids) BETWEEN 2 AND 16 AND rg.child_ids[c.group_ordinal+1]=c.id AND
+ c.created_at=rg.accepted_at AND c.deadline<=rg.deadline AND sha256(c.scope_json)=c.scope_digest AND sha256(rg.scope_json)=rg.scope_digest AND
+ convert_from(rg.scope_json,'UTF8')::jsonb->>'schemaVersion'='recorder-group/v1' AND
+ convert_from(rg.scope_json,'UTF8')::jsonb->'children'->c.group_ordinal->>'captureID'=c.id::text AND
+ convert_from(rg.scope_json,'UTF8')::jsonb->'children'->c.group_ordinal->>'scopeDigest'=encode(c.scope_digest,'hex') AND
+ convert_from(rg.scope_json,'UTF8')::jsonb->'children'->c.group_ordinal->>'actionID'=convert_from(c.expectation_json,'UTF8')::jsonb->>'ActionID' AND
+ convert_from(c.expectation_json,'UTF8')::jsonb#>>'{Registration,Location,ArtifactID}'=l.artifact_id::text AND
+ convert_from(c.expectation_json,'UTF8')::jsonb#>>'{CompositionGroup,ParentCaptureID}'=rg.id::text AND
+ (convert_from(c.expectation_json,'UTF8')::jsonb#>>'{CompositionGroup,ChildIndex}')::integer=c.group_ordinal AND
+ (convert_from(c.expectation_json,'UTF8')::jsonb#>>'{CompositionGroup,ChildCount}')::integer=cardinality(rg.child_ids) THEN jsonb_build_object('RootID',c.root_id,'ParentCaptureID',rg.id,'CaptureID',c.id,'ArtifactID',l.artifact_id,
+ 'ActionID',convert_from(c.expectation_json,'UTF8')::jsonb->>'ActionID',
+ 'ParentExecutionDigest',to_jsonb(ARRAY(SELECT get_byte(rg.scope_digest,byte_index) FROM generate_series(0,31) AS bytes(byte_index))),
+ 'ExecutionDigest',to_jsonb(ARRAY(SELECT get_byte(c.scope_digest,byte_index) FROM generate_series(0,31) AS bytes(byte_index))),
+ 'ArtifactDigest',to_jsonb(ARRAY(SELECT get_byte(l.version,byte_index) FROM generate_series(0,31) AS bytes(byte_index))),
+ 'ChildIndex',c.group_ordinal,'ChildCount',cardinality(rg.child_ids)) END)::jsonb AS group_association
+FROM access_grant_child child
+LEFT JOIN context_capture c ON c.root_id=child.root_id AND c.id=child.capture_id
+LEFT JOIN context_case_locator l ON l.root_id=c.root_id AND l.capture_id=c.id AND l.artifact_id=child.artifact_id AND l.version=child.artifact_digest
+LEFT JOIN recording_save_group rg ON rg.root_id=c.root_id AND rg.id=c.group_id
+WHERE child.root_id=$1 AND child.id=$2;
 
 -- name: GrantArtifactRegistered :one
 SELECT EXISTS(SELECT 1 FROM access_grant_child WHERE parent_id=$1 AND artifact_id=$2);
@@ -121,3 +159,40 @@ JOIN access_grant g ON g.root_id=c.root_id AND g.id=c.parent_id
 WHERE g.root_id=sqlc.arg(root_id)::uuid AND g.id=sqlc.arg(parent_id)::uuid AND g.kind='adHocCapture'
  AND c.artifact_id=ANY(sqlc.arg(artifact_ids)::uuid[])
  AND (g.result_access->'clientIDs') ? c.client_id;
+
+-- name: ResolveGrantedGroupOutput :one
+-- Immutable accepted association only; current caller/recovery/grant/retention
+-- checks remain mandatory before effects. No log bytes or grant JSON returned.
+SELECT c.id AS capture_id,(convert_from(c.expectation_json,'UTF8')::jsonb->>'ActionID')::text AS action_id,
+ c.scope_digest AS execution_digest,(CASE WHEN rg.group_kind='composition' AND c.group_ordinal>=0 AND cardinality(rg.child_ids) BETWEEN 2 AND 16 AND rg.child_ids[c.group_ordinal+1]=c.id AND
+ c.created_at=rg.accepted_at AND c.deadline<=rg.deadline AND sha256(c.scope_json)=c.scope_digest AND sha256(rg.scope_json)=rg.scope_digest AND
+ convert_from(rg.scope_json,'UTF8')::jsonb->>'schemaVersion'='recorder-group/v1' AND
+ convert_from(rg.scope_json,'UTF8')::jsonb->'children'->c.group_ordinal->>'captureID'=c.id::text AND
+ convert_from(rg.scope_json,'UTF8')::jsonb->'children'->c.group_ordinal->>'scopeDigest'=encode(c.scope_digest,'hex') AND
+ convert_from(rg.scope_json,'UTF8')::jsonb->'children'->c.group_ordinal->>'actionID'=convert_from(c.expectation_json,'UTF8')::jsonb->>'ActionID' AND
+ convert_from(c.expectation_json,'UTF8')::jsonb#>>'{Registration,Location,ArtifactID}'=l.artifact_id::text AND
+ convert_from(c.expectation_json,'UTF8')::jsonb#>>'{CompositionGroup,ParentCaptureID}'=rg.id::text AND
+ (convert_from(c.expectation_json,'UTF8')::jsonb#>>'{CompositionGroup,ChildIndex}')::integer=c.group_ordinal AND
+ (convert_from(c.expectation_json,'UTF8')::jsonb#>>'{CompositionGroup,ChildCount}')::integer=cardinality(rg.child_ids) THEN jsonb_build_object('RootID',c.root_id,'ParentCaptureID',rg.id,'CaptureID',c.id,'ArtifactID',l.artifact_id,
+ 'ActionID',convert_from(c.expectation_json,'UTF8')::jsonb->>'ActionID',
+ 'ParentExecutionDigest',to_jsonb(ARRAY(SELECT get_byte(rg.scope_digest,byte_index) FROM generate_series(0,31) AS bytes(byte_index))),
+ 'ExecutionDigest',to_jsonb(ARRAY(SELECT get_byte(c.scope_digest,byte_index) FROM generate_series(0,31) AS bytes(byte_index))),
+ 'ArtifactDigest',to_jsonb(ARRAY(SELECT get_byte(l.version,byte_index) FROM generate_series(0,31) AS bytes(byte_index))),
+ 'ChildIndex',c.group_ordinal,'ChildCount',cardinality(rg.child_ids)) END)::jsonb AS group_association
+FROM context_case_locator l
+JOIN context_capture c ON c.root_id=l.root_id AND c.id=l.capture_id
+JOIN recording_save_group rg ON rg.root_id=c.root_id AND rg.id=c.group_id
+JOIN access_grant parent ON parent.root_id=c.root_id AND parent.capture_id=rg.id AND parent.id=sqlc.arg(parent_id)::uuid
+WHERE l.root_id=sqlc.arg(root_id)::uuid AND l.artifact_id=sqlc.arg(artifact_id)::uuid AND l.capture_id=sqlc.arg(capture_id)::uuid AND l.version=sqlc.arg(version)::bytea
+ AND l.cluster_id=sqlc.arg(cluster_id)::uuid AND l.namespace_uid=sqlc.arg(namespace_uid)::text AND l.workload_uid=sqlc.arg(workload_uid)::text AND l.pod_uid=sqlc.arg(pod_uid)::text
+ AND (sqlc.arg(action_id)::text='' OR convert_from(c.expectation_json,'UTF8')::jsonb->>'ActionID'=sqlc.arg(action_id)::text)
+ AND parent.kind='adHocCapture' AND rg.group_kind='composition' AND c.group_ordinal>=0 AND cardinality(rg.child_ids) BETWEEN 2 AND 16 AND rg.child_ids[c.group_ordinal+1]=c.id AND
+ c.created_at=rg.accepted_at AND c.deadline<=rg.deadline AND sha256(c.scope_json)=c.scope_digest AND sha256(rg.scope_json)=rg.scope_digest AND
+ convert_from(rg.scope_json,'UTF8')::jsonb->>'schemaVersion'='recorder-group/v1' AND
+ convert_from(rg.scope_json,'UTF8')::jsonb->'children'->c.group_ordinal->>'captureID'=c.id::text AND
+ convert_from(rg.scope_json,'UTF8')::jsonb->'children'->c.group_ordinal->>'scopeDigest'=encode(c.scope_digest,'hex') AND
+ convert_from(rg.scope_json,'UTF8')::jsonb->'children'->c.group_ordinal->>'actionID'=convert_from(c.expectation_json,'UTF8')::jsonb->>'ActionID' AND
+ convert_from(c.expectation_json,'UTF8')::jsonb#>>'{Registration,Location,ArtifactID}'=l.artifact_id::text AND
+ convert_from(c.expectation_json,'UTF8')::jsonb#>>'{CompositionGroup,ParentCaptureID}'=rg.id::text AND
+ (convert_from(c.expectation_json,'UTF8')::jsonb#>>'{CompositionGroup,ChildIndex}')::integer=c.group_ordinal AND
+ (convert_from(c.expectation_json,'UTF8')::jsonb#>>'{CompositionGroup,ChildCount}')::integer=cardinality(rg.child_ids);

@@ -31,7 +31,7 @@ func (p *preparedRecording) StartSourceSnapshot(ctx context.Context, x collector
 	defer h.mu.Unlock()
 	now := h.now()
 	h.expireLocked(now)
-	if p.prepared == nil || len(h.held)+len(h.profiles) >= maxHeldRecordings || h.held[x.CaptureID] != nil || ctx.Err() != nil || !now.Before(x.Request.StartBy) {
+	if p.prepared == nil || h.heldCountLocked() >= maxHeldRecordings || h.held[x.CaptureID] != nil || h.logs[x.CaptureID] != nil || ctx.Err() != nil || !now.Before(x.Request.StartBy) {
 		return time.Time{}, value.ErrUnavailable
 	}
 	prepared := p.prepared

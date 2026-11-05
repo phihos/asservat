@@ -25,6 +25,13 @@ type PolicyRecorderConfiguration struct {
 }
 
 func (p PolicyRecorderConfiguration) Valid() bool {
+	logs := p.Action.Kind == "logs" && p.Action.ExecutionMode == "onTrigger" && p.Action.LogStream == "both" && p.Filter == nil && p.Arguments == nil && p.ProfileEndpoint == nil && len(p.SyscallInclude) == 0
+	if logs {
+		before, e1 := time.ParseDuration(p.Action.Before)
+		after, e2 := time.ParseDuration(p.Action.After)
+		timeout, e3 := time.ParseDuration(p.Action.Timeout)
+		logs = e1 == nil && e2 == nil && e3 == nil && before >= 0 && before <= 24*time.Hour && after >= 0 && after <= time.Minute && before+after > 0 && before%time.Millisecond == 0 && after%time.Millisecond == 0 && timeout > after && timeout <= 5*time.Minute && timeout%time.Millisecond == 0 && p.Action.MaxBytes > 0 && p.Action.MaxBytes <= artifact.LogNativeLimit
+	}
 	profile := p.Action.Kind == "profile" && p.Action.ExecutionMode == "onTrigger" && p.Action.ProfileRuntime == "go" && p.Action.ProfileSource == "httpEndpoint" && p.Action.EndpointDigest == "" && p.ProfileEndpoint.Valid() && p.Arguments == nil && p.Filter == nil && len(p.SyscallInclude) == 0 && slices.Contains(p.Action.Sensitive, ReasonLiveProfile)
 	if profile {
 		d, err := time.ParseDuration(p.Action.Duration)
@@ -55,5 +62,5 @@ func (p PolicyRecorderConfiguration) Valid() bool {
 		age, e3 := time.ParseDuration(p.Action.RingMaxAge)
 		lifecycle = e == nil && e2 == nil && e3 == nil && before >= 0 && after >= 0 && before+after > 0 && before <= age && age > 0 && age <= time.Hour && p.Action.RingMaxBytes > 0 && p.Action.RingMaxBytes <= 256<<20 && p.Action.SegmentBytes > 32 && p.Action.SegmentBytes <= 64<<20 && p.Action.MaxSegments >= 2 && p.Action.MaxSegments <= 64 && int64(p.Action.MaxSegments) <= p.Action.RingMaxBytes/p.Action.SegmentBytes && p.Action.MaxConcurrentSnapshots >= 1 && p.Action.MaxConcurrentSnapshots <= 4 && p.Action.MaxFrozenBytes > 0 && p.Action.MaxFrozenBytes <= 256<<20
 	}
-	return p.Composition.Valid() && len(p.Scope) > 0 && len(p.Scope) <= 64<<10 && p.Digest != (artifact.Digest{}) && len(p.Recipe) > 0 && p.RecipeDigest != (artifact.Digest{}) && p.Profile.DefinitionDigest != (artifact.Digest{}) && (kind && lifecycle || profile)
+	return p.Composition.Valid() && len(p.Scope) > 0 && len(p.Scope) <= 64<<10 && p.Digest != (artifact.Digest{}) && len(p.Recipe) > 0 && p.RecipeDigest != (artifact.Digest{}) && p.Profile.DefinitionDigest != (artifact.Digest{}) && (kind && lifecycle || profile || logs)
 }

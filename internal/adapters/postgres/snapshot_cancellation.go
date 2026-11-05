@@ -137,7 +137,7 @@ func (s *APIContextExecutions) requestSnapshotCancellationInTransaction(ctx cont
 		if err != nil {
 			return err
 		}
-		if accepted.Expectation.Snapshot == nil && accepted.Expectation.Profile == nil && !argumentCancellationExpected(accepted.Expectation) {
+		if accepted.Expectation.Snapshot == nil && accepted.Expectation.Profile == nil && accepted.Expectation.Logs == nil && !argumentCancellationExpected(accepted.Expectation) {
 			return value.ErrUnavailable
 		}
 		intent, err := captureIntent(row)
@@ -212,7 +212,7 @@ func (s *APIContextExecutions) requestSnapshotCancellationInTransaction(ctx cont
 			if accepted.Expectation.Profile != nil {
 				out.ClusterID = accepted.Expectation.Registration.Location.ClusterID
 				out.Profile = &collector.ProfileStop{RootID: s.root, ClusterID: out.ClusterID, CaptureID: accepted.CaptureID, AttemptID: accepted.Expectation.Registration.Location.AttemptID, WriterPodUID: old.Process.PodUID, WriterEpoch: old.Process.ProcessEpoch, ExpectationDigest: evidence.ContextExpectationDigest(accepted.Expectation), WriteUntil: accepted.Expectation.Registration.WriteUntil}
-			} else if argumentCancellationExpected(accepted.Expectation) {
+			} else if argumentCancellationExpected(accepted.Expectation) || accepted.Expectation.Logs != nil {
 				out.ClusterID = accepted.Expectation.Registration.Location.ClusterID
 				out.Recording = &collector.RecordingStop{RootID: s.root, ClusterID: out.ClusterID, CaptureID: accepted.CaptureID, AttemptID: accepted.Expectation.Registration.Location.AttemptID, WriterPodUID: old.Process.PodUID, WriterEpoch: old.Process.ProcessEpoch, ExpectationDigest: evidence.ContextExpectationDigest(accepted.Expectation), WriteUntil: accepted.Expectation.Registration.WriteUntil}
 			} else {

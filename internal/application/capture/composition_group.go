@@ -39,6 +39,7 @@ func compositionChild(p value.ContextPreview, n int) value.ContextPreview {
 	q.Retention = c.Retention
 	q.Retention.Policies = slices.Clone(c.Retention.Policies)
 	q.CanonicalScope, q.ScopeDigest = slices.Clone(c.CanonicalScope), c.ScopeDigest
+	q.AssessmentRulesDigest, _ = compiler.RecorderAssessmentRulesForScope(c.CanonicalScope)
 	return q
 }
 
@@ -122,7 +123,7 @@ func (s ContextInvestigation) previewCompositionGroup(ctx context.Context, sourc
 		if err != nil {
 			return zero, previewFailure("compile", err)
 		}
-		if len(plans[n].Actions) != 1 || !compiler.AcceptableRecorder(plans[n]).Acceptable() {
+		if len(plans[n].Actions) != 1 || !compiler.AcceptableRecorder(plans[n]).Acceptable() && !compiler.AcceptableLogs(plans[n]).Acceptable() {
 			return zero, errRecordingNotAcceptable
 		}
 		if a := plans[n].Actions[0]; a.Kind == "syscallTrace" && a.SyscallMode == "arguments" {
@@ -138,6 +139,25 @@ func (s ContextInvestigation) previewCompositionGroup(ctx context.Context, sourc
 		}
 		p.CompositionGroup.Children = append(p.CompositionGroup.Children, child)
 	}
+	// One combined review covers all siblings when any authored action needs
+	// review. Recompile only that mixed case with the existing shared approval
+	// marker; action impact and disclosure rights remain unchanged.
+	if !required && slices.ContainsFunc(plans, func(p planning.RecorderPlan) bool { return p.Approval != nil }) {
+		for n := range plans {
+			input := plans[n].Input
+			input.RequireApproval = true
+			plans[n], err = compiler.CompileRecorder(input, s.Filters, s.Now())
+			if err != nil {
+				return zero, previewFailure("compile/group-review", err)
+			}
+			child := &p.CompositionGroup.Children[n]
+			child.CanonicalScope, child.ScopeDigest = slices.Clone(plans[n].CanonicalScope), plans[n].ScopeDigest
+			assessments[n], err = compiler.AssessRecorder(plans[n], child.AssessmentID, s.Now())
+			if err != nil {
+				return zero, previewFailure("assessment", err)
+			}
+		}
+	}
 	if p.CanonicalScope, p.ScopeDigest, err = compiler.CompileRecorderGroup(p.CaptureID, plans); err != nil {
 		return zero, previewFailure("compile/group", err)
 	}
@@ -145,6 +165,7 @@ func (s ContextInvestigation) previewCompositionGroup(ctx context.Context, sourc
 	if err != nil {
 		return zero, previewFailure("assessment", err)
 	}
+	p.AssessmentRulesDigest = assessment.RulesDigest
 	coverageUntil := time.Time{}
 	for n := range parts {
 		cp := compositionChild(p, n)
@@ -190,7 +211,7 @@ func (s ContextInvestigation) previewCompositionGroup(ctx context.Context, sourc
 func (s ContextInvestigation) requestCompositionGroup(ctx context.Context, source identities.CurrentIdentity, p value.ContextPreview, key string, i identity.Identity, recovery artifact.RecoveryProof) (value.Accepted, error) {
 	var zero value.Accepted
 	admit, ok := s.Admission.(CompositionGroupAdmissions)
-	if !ok || s.Recorders == nil {
+	if !ok {
 		return zero, value.ErrRecorderUnavailable
 	}
 	if _, _, policy := authorization.PolicyExecutor(p.Actor); policy {
@@ -207,7 +228,15 @@ func (s ContextInvestigation) requestCompositionGroup(ctx context.Context, sourc
 			children[n].Composition = *c
 		}
 	}
-	if p.IssuerEpoch != recovery.IssuerEpoch || p.AssessmentRulesDigest != compiler.RecorderAssessmentRulesDigest() {
+	var reviewedActions []planning.RecorderAction
+	for _, c := range children {
+		actions, _, err := compiler.RecorderScopeSummary(c.CanonicalScope)
+		if err != nil {
+			return zero, s.requestChanged("assessment")
+		}
+		reviewedActions = append(reviewedActions, actions...)
+	}
+	if p.IssuerEpoch != recovery.IssuerEpoch || p.AssessmentRulesDigest != compiler.RecorderAssessmentRulesFor(reviewedActions) {
 		return zero, s.requestChanged("epoch")
 	}
 	// As for a single recording: warm the reviewed storage selection while
@@ -244,13 +273,18 @@ func (s ContextInvestigation) requestCompositionGroup(ctx context.Context, sourc
 	for n := range children {
 		cp := compositionChild(p, n)
 		var resolved targets.PodResolution
-		if syscallRecorderInput(cp.Intent) {
+		if logsRecorderInput(cp.Intent) {
+			resolved, err = s.Targets.ResolvePod(ctx, p.Target)
+		} else if syscallRecorderInput(cp.Intent) {
 			syscalls, ok := s.Recorders.(SyscallRecorders)
 			if !ok {
 				return zero, value.ErrRecorderUnavailable
 			}
 			resolved, err = syscalls.ResolveSyscallRecorder(ctx, p.Target)
 		} else {
+			if s.Recorders == nil {
+				return zero, value.ErrRecorderUnavailable
+			}
 			resolved, err = s.Recorders.ResolvePacketRecorder(ctx, p.Target)
 		}
 		if errors.Is(err, targets.ErrUnsupported) {
@@ -313,15 +347,30 @@ func (s ContextInvestigation) requestCompositionGroup(ctx context.Context, sourc
 			return zero, s.requestChanged("assessment")
 		}
 		r := artifact.Registration{Location: artifact.Location{ClusterID: p.Target.ClusterID, ArtifactID: c.ArtifactID, AttemptID: c.AttemptID}, StoreID: p.Storage.StoreID, AllocationID: p.Storage.AllocationID, PoolRevision: p.Storage.PoolRevision, AllocationRevision: p.Storage.AllocationRevision, NativeLimit: nativeLimit(true), AnchorAt: fc.retention.AnchorAt, WriteUntil: identity.Earlier(p.Deadline, fc.retention.ExpiresAt), ExpiresAt: fc.retention.ExpiresAt, DeleteBy: fc.retention.DeleteBy}
+		if plan.Input.Logs != nil {
+			logs, _, err := compiler.LogsForContext(plan)
+			if err != nil {
+				return zero, s.requestChanged("logs")
+			}
+			r.NativeLimit = logs.MaxNativeBytes
+		}
 		if r.Validate() != nil {
 			return zero, value.ErrInvalid
 		}
-		rec, _, err := compiler.RecordingForContext(plan)
-		if err != nil {
-			return zero, s.requestChanged("recording")
-		}
-		if !s.Now().Add(time.Duration(rec.DurationMillis)*time.Millisecond + recordingCompletionMargin).Before(r.WriteUntil) {
-			return zero, value.ErrAcquisitionClosed
+		if plan.Input.Logs != nil {
+			logs, _, err := compiler.LogsForContext(plan)
+			_, end, windowErr := logs.Window(fc.retention.AnchorAt)
+			if err != nil || windowErr != nil || !end.Add(recordingCompletionMargin).Before(r.WriteUntil) {
+				return zero, value.ErrAcquisitionClosed
+			}
+		} else {
+			rec, _, err := compiler.RecordingForContext(plan)
+			if err != nil {
+				return zero, s.requestChanged("recording")
+			}
+			if !s.Now().Add(time.Duration(rec.DurationMillis)*time.Millisecond + recordingCompletionMargin).Before(r.WriteUntil) {
+				return zero, value.ErrAcquisitionClosed
+			}
 		}
 		request.Children = append(request.Children, value.Admission{Recovery: recovery, RootID: s.RootID, IdempotencyKey: key, SubmissionDigest: digest, Plan: plan, Storage: f.storage.Binding, Registration: r, CaseID: p.CaseID, OccurrenceID: c.OccurrenceID})
 	}

@@ -4,8 +4,8 @@ import { requestablePreview, type Investigation, type State } from './investigat
 import type { Input, Preview } from './http';
 
 type AccessOperation = NonNullable<Preview['result_access_actions']>[number]['operations'][number];
-const operationOrder: AccessOperation[] = ['download_artifact', 'pcap_query', 'syscall_query'];
-const queryOperation = (operation: AccessOperation) => operation === 'pcap_query' || operation === 'syscall_query';
+const operationOrder: AccessOperation[] = ['download_artifact', 'get_logs', 'pcap_query', 'syscall_query'];
+const queryOperation = (operation: AccessOperation) => operation === 'get_logs' || operation === 'pcap_query' || operation === 'syscall_query';
 
 type Props = { preview: Preview; state: State; controller: Investigation };
 // Choices come from the reviewed server plan. They describe available options;
@@ -24,7 +24,8 @@ export function CaptureSubmission({ preview, state, controller }: Props) {
   const operations = operationOrder.filter(operation => enabled(operation, mode) && chosen.some(choice => choice.operations.includes(operation)));
   const packetQueries = choices.some(choice => choice.operations.includes('pcap_query'));
   const syscallQueries = choices.some(choice => choice.operations.includes('syscall_query'));
-  const queryLabel = packetQueries && syscallQueries ? 'Saved packet and syscall argument queries' : syscallQueries ? 'Saved syscall argument queries' : 'Saved packet queries';
+  const kinds = [packetQueries && 'packet', syscallQueries && 'syscall argument', choices.some(choice => choice.operations.includes('get_logs')) && 'log'].filter(Boolean);
+  const queryLabel = 'Saved ' + (kinds.length > 1 ? kinds.slice(0, -1).join(', ') + ' and ' + kinds.at(-1) : kinds[0]) + ' queries';
   const invalid = include && (!chosen.length || mode === 'both' && (!operations.includes('download_artifact') || !operations.some(queryOperation)) || !Number.isSafeInteger(maxBytes) || maxBytes < (mode === 'query' ? 24576 : 1) || maxBytes > 274877906944 || !Number.isInteger(seconds) || seconds < 1 || seconds > 28800 || !Number.isInteger(maxOperations) || maxOperations < 1 || maxOperations > 10000);
   const changeMode = (next: typeof mode) => {
     setMode(next);
@@ -54,7 +55,7 @@ export function CaptureSubmission({ preview, state, controller }: Props) {
         <p>The same independent review covers collection and your selected result access through this browser client. Current permissions, source retention and expiry still apply. This grants no sharing rights.</p>
         <label>Follow-up operations<select value={mode} onChange={event => changeMode(event.target.value as typeof mode)}>
           <option value="download">Whole-file downloads</option>
-          {(packetQueries || syscallQueries) && <><option value="query">{queryLabel}</option><option value="both">Downloads and {queryLabel.toLowerCase()}</option></>}
+          {kinds.length > 0 && <><option value="query">{queryLabel}</option><option value="both">Downloads and {queryLabel.toLowerCase()}</option></>}
         </select></label>
         {eligible.map(choice => <label key={choice.action_id}><input type="checkbox" checked={selected.includes(choice.action_id)} onChange={event => setSelected(event.target.checked ? [...selected, choice.action_id] : selected.filter(id => id !== choice.action_id))}/>{label(choice.action_id)}</label>)}
         <label>Shared disclosure byte budget<input type="number" min={mode === 'query' ? 24576 : 1} max={274877906944} step={1} value={maxBytes} onChange={event => setMaxBytes(Number(event.target.value))}/></label>

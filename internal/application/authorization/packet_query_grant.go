@@ -41,13 +41,19 @@ func (s GrantService) rawProjectionGrant(ctx context.Context, current identities
 	if !sameHuman(g.Requester, i.Principal) || g.Kind == value.GrantRawQuery && (g.Requester != i.Principal || !slices.Contains(g.RawQuery.Operations, operation)) || g.Kind == value.GrantAdHocCapture && (g.ResultAccess == nil || !slices.Contains(g.ResultAccess.Operations, operation)) {
 		return zero, time.Time{}, value.ErrGrantScope
 	}
-	if err = value.CheckMaterialize(g, output, i.Principal.ClientID, true, s.Now()); err != nil {
-		return zero, time.Time{}, err
-	}
 	var child value.GrantChild
 	if materialize {
-		child, _, err = s.Materialize(ctx, g.ID, i.Principal.ClientID, output)
+		group, e := s.outputGroup(ctx, g, output)
+		if e != nil {
+			return zero, time.Time{}, e
+		}
+		if e = value.CheckMaterialize(g, output, i.Principal.ClientID, true, s.Now(), group); e != nil {
+			return zero, time.Time{}, e
+		}
+		child, _, err = s.materialize(ctx, g.ID, i.Principal.ClientID, output, group)
 	} else {
+		// The existing child read resolves its immutable group association in the
+		// same SQL join; current checks need no separate association lookup.
 		child, err = s.Store.GrantChildFor(ctx, g.ID, scope.ArtifactID, i.Principal.ClientID)
 	}
 	if err != nil || child.Output != output || child.ParentID != g.ID {

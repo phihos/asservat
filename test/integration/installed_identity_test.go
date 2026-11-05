@@ -44,10 +44,10 @@ type installedIdentity struct {
 func installedConsoleScopes() []string {
 	// evidence:share is a default console scope so the browser can share (ADR-232 console).
 	scopes := []string{"basic", "evidence:read", "evidence:download", "evidence:capture", "evidence:share"}
-	if installedJourneyFocus() == "manual-raw" || installedJourneyFocus() == "manual-arguments" {
+	if installedJourneyFocus() == "manual-raw" || installedJourneyFocus() == "manual-arguments" || installedLogsFocus() {
 		scopes = append(scopes, "evidence:raw")
 	}
-	if installedRecordingFocus() {
+	if installedRecordingFocus() || installedLogsFocus() {
 		scopes = append(scopes, "acr")
 	}
 	return scopes
@@ -107,7 +107,7 @@ func newInstalledIdentity(t *testing.T, f fixture, origin, consoleSecret string)
 	user := created("/users", map[string]any{"username": "developer", "enabled": true, "email": "synthetic@example.invalid", "firstName": "Synthetic", "lastName": "Developer", "credentials": []any{map[string]any{"type": "password", "value": kc.UserPassword, "temporary": false}}})
 	kc.json("PUT", prefix+"/users/"+user+"/groups/"+group, nil)
 	var reviewer string
-	if installedRecordingFocus() {
+	if installedRecordingFocus() || installedLogsFocus() {
 		reviewer = created("/users", map[string]any{"username": "reviewer", "enabled": true, "email": "reviewer@example.invalid", "firstName": "Synthetic", "lastName": "Reviewer", "credentials": []any{map[string]any{"type": "password", "value": kc.UserPassword, "temporary": false}}})
 		kc.json("PUT", prefix+"/users/"+reviewer+"/groups/"+group, nil)
 	}

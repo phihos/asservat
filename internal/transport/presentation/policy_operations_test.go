@@ -171,3 +171,20 @@ func TestPolicyProfileStatusContractAcceptsProfileAndRefusesUnknownCollection(t 
 		}
 	}
 }
+
+func TestPolicyLogsStatusReportsNativeCollectionAndOriginalSpend(t *testing.T) {
+	f := &policyOperationsFixture{scopes: []string{"evidence:read"}, status: value.PolicyStatus{PolicyUID: "policy-uid", ActiveID: "99999999-9999-4999-8999-999999999999", Generation: 1, AcceptedGeneration: 1, IntentVersion: 1, AcceptedIntentVersion: 1, ExecutionsSpent: 1, MaxExecutions: 2, CollectedBytesSpent: 64 << 20, MaxCollectedBytes: 128 << 20, NotAfter: time.Now().Add(time.Hour), Authority: authorization.AcceptedPolicyAuthority{Actions: []string{"logs"}}}}
+	s, err := NewPolicyOperations("https://asservat.example.invalid", time.Now, func() string { return "88888888-8888-4888-8888-888888888888" }, f, f, f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := policyCall(t, s, f, "get_policy_status", `{"policy_name":"finite-logs"}`)
+	data := out["data"].(map[string]any)
+	if data["collection_kind"] != "logs" || data["executions_spent"] != float64(1) || data["collected_bytes_spent"] != float64(64<<20) || data["observed_bytes_spent"] != float64(0) {
+		t.Fatal("log policy status lost exact finite collection or spend", data)
+	}
+	raw, _ := json.Marshal(out)
+	if s.contracts.ValidateOutput("get_policy_status", raw) != nil {
+		t.Fatal("MCP/browser logs status rejected")
+	}
+}

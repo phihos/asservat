@@ -57,6 +57,12 @@ func (s *ContextCaseReads) ResolvePacketProjectionRoute(ctx context.Context, cas
 	return s.resolveProjectionRoute(ctx, caseID, artifactID, caller, recovery, "packets")
 }
 
+// ResolveLogProjectionRoute exposes only the exact logs discriminator from
+// the same bounded locator. Protected publication and current rights follow.
+func (s *ContextCaseReads) ResolveLogProjectionRoute(ctx context.Context, caseID, artifactID string, caller identity.Identity, recovery artifact.RecoveryProof) (analysis.ContextProjectionCandidate, error) {
+	return s.resolveProjectionRoute(ctx, caseID, artifactID, caller, recovery, "logs")
+}
+
 func (s *ContextCaseReads) resolveProjectionRoute(ctx context.Context, caseID, artifactID string, caller identity.Identity, recovery artifact.RecoveryProof, family string) (analysis.ContextProjectionCandidate, error) {
 	var out analysis.ContextProjectionCandidate
 	if s == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(caseID) || !authorization.UUID(artifactID) {
@@ -80,7 +86,12 @@ func (s *ContextCaseReads) resolveProjectionRoute(ctx context.Context, caseID, a
 			ClusterID: route.Target.ClusterID, NamespaceUID: route.Target.NamespaceUID,
 			WorkloadUID: route.Target.WorkloadUID, PodUID: route.Target.PodUID, Principal: caller.Principal,
 		}
-		if family == "syscalls" {
+		if family == "logs" {
+			if route.NativeType != artifact.LogsArtifact {
+				return analysis.ContextProjectionCandidate{}, analysis.ErrUnavailable
+			}
+			out.NativeType = route.NativeType
+		} else if family == "syscalls" {
 			if route.NativeType != artifact.SyscallRecordsArtifact && route.NativeType != artifact.SyscallArgumentsArtifact {
 				return analysis.ContextProjectionCandidate{}, analysis.ErrUnavailable
 			}

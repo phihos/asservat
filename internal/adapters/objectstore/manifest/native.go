@@ -6,6 +6,7 @@ import (
 	"encoding/json/jsontext"
 	"time"
 
+	"asservat.local/asservat/internal/adapters/logs"
 	"asservat.local/asservat/internal/application/evidence"
 	"asservat.local/asservat/internal/domain/artifact"
 )
@@ -33,6 +34,8 @@ func (v *Validator) NativeCheck(e artifact.ContextExpectation, m ContextManifest
 		return nil, artifact.ErrInvalid
 	}
 	switch e.NativeType {
+	case artifact.LogsArtifact:
+		return logs.NewCheck(e, m.StartedAt, m.CompletedAt)
 	case artifact.PodStatusArtifact:
 		return &documentCheck{limit: artifact.MaxContextBytes, final: func(b []byte) error { return v.ValidateNative(b, e, m) }}, nil
 	case artifact.HTTPHeadersArtifact:

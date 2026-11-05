@@ -961,6 +961,73 @@
               "field",
               "value"
             ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionID": {
+                "$ref": "#/$defs/d6"
+              },
+              "field": {
+                "const": "logBefore"
+              },
+              "value": {
+                "type": "string",
+                "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
+                "maxLength": 16
+              }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionID": {
+                "$ref": "#/$defs/d6"
+              },
+              "field": {
+                "const": "logAfter"
+              },
+              "value": {
+                "type": "string",
+                "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
+                "maxLength": 16
+              }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionID": {
+                "$ref": "#/$defs/d6"
+              },
+              "field": {
+                "const": "logStream"
+              },
+              "value": {
+                "type": "string",
+                "enum": [
+                  "both"
+                ]
+              }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
           }
         ]
       },
@@ -1360,6 +1427,7 @@
                           "items": {
                             "enum": [
                               "download_artifact",
+                              "get_logs",
                               "pcap_query",
                               "syscall_query"
                             ]
@@ -2337,6 +2405,73 @@
                 "enum": [
                   "onTrigger",
                   "ongoing"
+                ]
+              }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionID": {
+                "$ref": "#/$defs/d5"
+              },
+              "field": {
+                "const": "logBefore"
+              },
+              "value": {
+                "type": "string",
+                "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
+                "maxLength": 16
+              }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionID": {
+                "$ref": "#/$defs/d5"
+              },
+              "field": {
+                "const": "logAfter"
+              },
+              "value": {
+                "type": "string",
+                "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
+                "maxLength": 16
+              }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionID": {
+                "$ref": "#/$defs/d5"
+              },
+              "field": {
+                "const": "logStream"
+              },
+              "value": {
+                "type": "string",
+                "enum": [
+                  "both"
                 ]
               }
             },

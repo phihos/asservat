@@ -32,6 +32,9 @@ func (s ContextCaseService) ResolveRawPacketQuery(ctx context.Context, source id
 func (s ContextCaseService) ResolveRawSyscallQuery(ctx context.Context, source identities.CurrentIdentity, caseID string, digests []artifact.Digest) (permissions.RawQuerySelection, error) {
 	return s.resolveRawSelection(ctx, source, caseID, digests, authorization.ReadSyscallQuery)
 }
+func (s ContextCaseService) ResolveRawLogQuery(ctx context.Context, source identities.CurrentIdentity, caseID string, digests []artifact.Digest) (permissions.RawQuerySelection, error) {
+	return s.resolveRawSelection(ctx, source, caseID, digests, authorization.ReadLogQuery)
+}
 func (s ContextCaseService) resolveRawSelection(ctx context.Context, source identities.CurrentIdentity, caseID string, digests []artifact.Digest, operation authorization.Operation) (permissions.RawQuerySelection, error) {
 	var zero permissions.RawQuerySelection
 	if len(digests) < 1 || len(digests) > authorization.GrantMaxResultArtifacts {
@@ -65,6 +68,8 @@ func rawRecordValid(r permissions.ContextDownloadEvidence, route value.ContextCa
 	switch r.NativeType {
 	case artifact.RawPCAPNGArtifact:
 		return r.Retained.Input.EvidenceType == "packetCapture"
+	case artifact.LogsArtifact:
+		return r.Retained.Input.EvidenceType == "logs"
 	case artifact.SyscallArgumentsArtifact:
 		return r.Retained.Input.EvidenceType == "syscallTrace"
 	case artifact.PprofArtifact, artifact.GoTraceArtifact:

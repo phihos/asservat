@@ -381,6 +381,12 @@ func (t PolicyTrigger) capture(ctx context.Context, a authorization.AcceptedPoli
 	if p.Recorder != nil {
 		intent.Diagnostic = ""
 		intent.Composition = p.Recorder.Composition.Clone()
+		if p.Recorder.Action.Kind == "logs" {
+			if occurrence.TriggeredAt.IsZero() {
+				return "", "unavailable"
+			}
+			intent.LogsTriggeredAt = occurrence.TriggeredAt
+		}
 	}
 	// A review that admitted nothing (a lost regional exchange, a replaced
 	// standby) is reviewed again, at most three times, two seconds apart, as a

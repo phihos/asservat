@@ -42,6 +42,7 @@ type ContextProjectionService struct {
 	PacketCompiler   PacketQueryCompiler
 	ProfileRoutes    ContextProjectionRouteReader
 	SyscallRoutes    SyscallProjectionRouteReader
+	LogRoutes        LogProjectionRouteReader
 	ComparisonRoutes ContextProjectionRouteReader
 }
 
@@ -77,6 +78,7 @@ type ContextProjectionAssociation struct {
 	Headers                           value.HTTPHeaderWindow
 	Profile                           value.ProfileSummarySelection
 	Syscalls                          value.SyscallWindow
+	Logs                              value.LogWindow `json:",omitzero"`
 	Comparison                        value.ProfileComparisonSelection
 	PacketQuery                       value.PacketQueryWindow
 }
@@ -94,6 +96,7 @@ type ContextProjectionDelivery struct {
 	packetSummary                           *value.PacketSummary
 	packetQuery                             *value.PacketQueryResult
 	syscallQuery                            *value.SyscallArgumentPage
+	logs                                    *value.LogPage
 	summary                                 *value.ProfileSummary
 	comparison                              *value.ProfileComparison
 	syscallSummary                          *value.SyscallSummaryPage
@@ -528,12 +531,14 @@ func (s ContextProjectionService) begin(ctx context.Context, current identities.
 		return nil, queryCollapsed("recovery", value.ErrUnavailable, err)
 	}
 	var invocationKey value.ContextQueryInvocationKey
-	if input.PacketQuery.Valid() || input.RawSyscalls.Valid() {
+	if input.PacketQuery.Valid() || input.RawSyscalls.Valid() || input.RawLogs.Valid() {
 		lookup, ok := s.Results.Ledger.(ContextQueryInvocationLookup)
 		if !ok {
 			return nil, queryStepped("invocation-lookup", value.ErrUnavailable)
 		}
-		if input.RawSyscalls.Valid() {
+		if input.RawLogs.Valid() {
+			invocationKey = value.ContextQueryInvocationKey{Key: input.RawLogs.IdempotencyKey, RequestDigest: RawLogQueryRequestDigest(input.RawLogs)}
+		} else if input.RawSyscalls.Valid() {
 			invocationKey = value.ContextQueryInvocationKey{Key: input.RawSyscalls.IdempotencyKey, RequestDigest: RawSyscallQueryRequestDigest(input.RawSyscalls)}
 		} else {
 			invocationKey = value.ContextQueryInvocationKey{Key: input.PacketQuery.IdempotencyKey, RequestDigest: PacketQueryRequestDigest(input.PacketQuery)}
@@ -566,6 +571,12 @@ func (s ContextProjectionService) begin(ctx context.Context, current identities.
 			var proof interface{ PacketQueryApprovalRequired() bool }
 			if errors.As(err, &proof) && proof.PacketQueryApprovalRequired() {
 				return nil, &packetQueryApprovalRefusal{cause: refusal}
+			}
+		}
+		if tool == "get_logs" {
+			var proof interface{ RawLogQueryApprovalRequired() bool }
+			if errors.As(err, &proof) && proof.RawLogQueryApprovalRequired() {
+				return nil, &rawLogApprovalRefusal{cause: refusal}
 			}
 		}
 		if tool == "syscall_query" {
@@ -719,7 +730,7 @@ func (s ContextProjectionResults) prepare(o *projectionRequest, effect ContextQu
 	d := &ContextProjectionDelivery{owner: o, pending: !worker.Ready, effect: effect,
 		observedAt: s.Now(), queryDeadline: identity.Earlier(o.query.Deadline, a.AccessUntil),
 		cleanupUntil: identity.Earlier(o.query.CleanupUntil, o.request.Call.WriteUntil),
-		association:  ContextProjectionAssociation{ID: s.NewID(), QueryID: o.query.ID, OperationID: o.request.Call.ID, Selection: o.query.Scope.Selection, Headers: o.query.Scope.Headers, Profile: o.query.Scope.Profile, Syscalls: o.query.Scope.Syscalls, PacketQuery: o.query.Scope.PacketQuery, Comparison: comparisonAssociationSelection(o.query.Scope)}}
+		association:  ContextProjectionAssociation{ID: s.NewID(), QueryID: o.query.ID, OperationID: o.request.Call.ID, Selection: o.query.Scope.Selection, Headers: o.query.Scope.Headers, Profile: o.query.Scope.Profile, Syscalls: o.query.Scope.Syscalls, Logs: o.query.Scope.Logs, PacketQuery: o.query.Scope.PacketQuery, Comparison: comparisonAssociationSelection(o.query.Scope)}}
 	if d.association.Comparison != (value.ProfileComparisonSelection{}) {
 		d.association.Profile = value.ProfileSummarySelection{}
 	}
@@ -803,6 +814,16 @@ func (s ContextProjectionResults) prepare(o *projectionRequest, effect ContextQu
 	switch {
 	case err != nil || !projection.Valid(scope):
 		err = value.ErrUnavailable
+	case scope.NativeType == artifact.LogsArtifact && projection.InvalidCursor:
+		invalidCursor = true
+	case scope.NativeType == artifact.LogsArtifact && projection.TooLarge:
+		tooLarge = true
+	case scope.NativeType == artifact.LogsArtifact:
+		if projection.Logs == nil || !boundedRawLogResult(*projection.Logs, scope) {
+			err = value.ErrUnavailable
+		} else {
+			d.logs, projection.Logs = projection.Logs, nil
+		}
 	case scope.Comparison != (value.ProfileComparisonWindow{}) && projection.TooLarge:
 		tooLarge = true
 	case scope.Comparison != (value.ProfileComparisonWindow{}) && projection.IncompatibleProfiles:

@@ -278,10 +278,10 @@ it('keeps cumulative argument events in both requested pools and displays their 
  expect(calls[0]).toMatchObject({limits:{max_observed_events:3000},observation_limits:{max_observed_events:3000}});
 });
 
-it('decodes profile status and requests its explicit output budget without observation fields', async () => {
+it.each(['profile','logs'] as const)('decodes %s status and requests its explicit output budget without observation fields', async kind => {
   const reply = status('active');
   if (reply.status !== 'ok') throw new Error('fixture');
-  Object.assign(reply.data, { collection_kind: 'profile', max_executions: 1, executions_spent: 0, max_collected_bytes: 16 << 20, collected_bytes_spent: 0,
+  Object.assign(reply.data, { collection_kind: kind, max_executions: 1, executions_spent: 0, max_collected_bytes: 16 << 20, collected_bytes_spent: 0,
     // A broader delegated ceiling cannot introduce profile observation inputs.
     max_observed_bytes: 64 << 20, max_observed_events: 6000 });
   expect(validOutput_get_policy_status(reply)).toBe(true);
@@ -299,7 +299,7 @@ it('decodes profile status and requests its explicit output budget without obser
   fireEvent.change(screen.getByLabelText('Policy name'), { target: { value: 'regional-finite-go-profile' } });
   fireEvent.click(screen.getByRole('button', { name: 'Show policy' }));
   await screen.findByText('No policy grant is attached.');
-  expect(screen.getByText('Go endpoint profile')).toBeTruthy();
+  expect(screen.getByText(kind === 'logs' ? 'Finite whole-Pod logs' : 'Go endpoint profile')).toBeTruthy();
   expect((screen.getByLabelText('Maximum output (bytes)') as HTMLInputElement).value).toBe(String(16 << 20));
   for (const label of ['Maximum observed input (bytes)', 'Maximum observed events', 'Maximum session (seconds)', 'Maximum input rate (bytes/second)', 'Maximum concurrent sessions']) {
     expect(screen.queryByLabelText(label)).toBeNull();

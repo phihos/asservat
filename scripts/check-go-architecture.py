@@ -67,11 +67,16 @@ for package in packages:
                     allowed |= {"encoding/base64"}
                 # Analysis cursors bind an immutable source version and closed
                 # display selection. SHA-256 is a deterministic value identity;
-                # no key handling, network, storage or JSON I/O is allowed here.
+                # no key handling, network, storage or protocol I/O is allowed here.
                 if package["ImportPath"] == module+"/internal/domain/analysis":
                     # SHA-1 is only the RFC 4122 UUIDv5 row locator in profile_comparison_keys.go.
                     # Key use and authorization still require independently checked parents.
                     allowed |= {"crypto/sha256", "crypto/sha1"}
+                    # Log pages validate canonical byte values and count bounded
+                    # in-memory DTO encodings. These standard-library utilities
+                    # perform no filesystem/network I/O or protocol/key handling;
+                    # use the actual encoder rather than bespoke JSON size logic.
+                    allowed |= {"encoding/base64", "encoding/json"}
                 # The finite execution TLS value binds bounded PUBLIC root
                 # material to its SHA-256 identity. This pure comparison does
                 # not parse X.509, use keys, or permit network/storage/JSON I/O.
@@ -89,6 +94,10 @@ for package in packages:
             raise ValueError(f"Invalid dependency {source} -> {target}")
         if source == "bootstrap":
             continue
+        # Publication reuses the canonical data-only logs codec/checker. This
+        # narrow edge does not allow storage adapters to import collectors.
+        if source == "C-21" and target == "C-23" and relative(imported) != "internal/adapters/logs":
+            raise ValueError(f"Persistence may only reuse the canonical logs codec from C-23: {imported}")
         if source != target and target not in components[source]["allowed_dependencies"]:
             raise ValueError(f"Undeclared dependency {source} -> {target}: {imported}")
         source_layer, target_layer = components[source]["layer"], components[target]["layer"]

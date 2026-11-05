@@ -37,6 +37,7 @@ const (
 	GrantDownloadOperation     = "download_artifact"
 	GrantPacketQueryOperation  = "pcap_query"
 	GrantSyscallQueryOperation = "syscall_query"
+	GrantLogQueryOperation     = "get_logs"
 )
 
 var (
@@ -108,11 +109,11 @@ func sortedUnique(v []string, minimum, maximum, length int) bool {
 
 // ValidResultOperations is the closed sorted operation set supported by exact output grants.
 func ValidResultOperations(operations []string) bool {
-	if len(operations) < 1 || len(operations) > 3 {
+	if len(operations) < 1 || len(operations) > 4 {
 		return false
 	}
 	for i, op := range operations {
-		if op != GrantDownloadOperation && op != GrantPacketQueryOperation && op != GrantSyscallQueryOperation || i > 0 && operations[i-1] >= op {
+		if op != GrantDownloadOperation && op != GrantPacketQueryOperation && op != GrantSyscallQueryOperation && op != GrantLogQueryOperation || i > 0 && operations[i-1] >= op {
 			return false
 		}
 	}
@@ -333,13 +334,37 @@ func (o VerifiedOutput) Valid() bool {
 	return UUID(o.CaptureID) && identity.Text(o.ActionID, 64) && UUID(o.ArtifactID) && o.ExecutionDigest != (artifact.Digest{}) && o.ArtifactDigest != (artifact.Digest{}) && o.Target.Valid()
 }
 
+// GrantOutputGroup is an immutable association read from the accepted group
+// and exact published member. It supplies no current permission or recovery.
+// SQL revalidates the same association under the existing transaction locks.
+type GrantOutputGroup struct {
+	RootID, ParentCaptureID, CaptureID, ArtifactID, ActionID string
+	ParentExecutionDigest, ExecutionDigest, ArtifactDigest   artifact.Digest
+	ChildIndex, ChildCount                                   int
+}
+
+func (a GrantOutputGroup) Valid() bool {
+	return UUID(a.RootID) && UUID(a.ParentCaptureID) && UUID(a.CaptureID) && a.ParentCaptureID != a.CaptureID && UUID(a.ArtifactID) && identity.Text(a.ActionID, 64) && a.ParentExecutionDigest != (artifact.Digest{}) && a.ExecutionDigest != (artifact.Digest{}) && a.ArtifactDigest != (artifact.Digest{}) && a.ChildCount >= 2 && a.ChildCount <= 16 && a.ChildIndex >= 0 && a.ChildIndex < a.ChildCount
+}
+func (a GrantOutputGroup) Matches(g Grant, o VerifiedOutput) bool {
+	return a.Valid() && g.Kind == GrantAdHocCapture && a.RootID == g.RootID && a.ParentCaptureID == g.CaptureID && a.ParentExecutionDigest == g.ExecutionDigest && a.CaptureID == o.CaptureID && a.ExecutionDigest == o.ExecutionDigest && a.ArtifactID == o.ArtifactID && a.ArtifactDigest == o.ArtifactDigest && a.ActionID == o.ActionID
+}
+func approvedOutput(g Grant, o VerifiedOutput, group *GrantOutputGroup) bool {
+	if group == nil {
+		return o.CaptureID == g.CaptureID && o.ExecutionDigest == g.ExecutionDigest
+	}
+	return group.Matches(g, o)
+}
+
 // GrantChild is one exact child grant: an existing artifact digest, one
 // approved client of the original human and the parent's operations,
 // inheriting the parent's decision provenance, expiry and pool.
 type GrantChild struct {
 	ID, ParentID, ClientID string
 	Output                 VerifiedOutput
-	CreatedAt              time.Time
+	// Group is resolved locally from protected SQL, never accepted from a wire reply.
+	Group     *GrantOutputGroup `json:"-"`
+	CreatedAt time.Time
 }
 
 func (c GrantChild) Valid() bool {
@@ -349,7 +374,14 @@ func (c GrantChild) Valid() bool {
 // CheckMaterialize decides whether the parent may register output for
 // clientID. registered reports whether the artifact already counts toward
 // MaxArtifacts (another client's child or a duplicate commit delivery).
-func CheckMaterialize(g Grant, output VerifiedOutput, clientID string, registered bool, now time.Time) error {
+func CheckMaterialize(g Grant, output VerifiedOutput, clientID string, registered bool, now time.Time, groups ...*GrantOutputGroup) error {
+	if len(groups) > 1 {
+		return ErrGrantInvalid
+	}
+	var group *GrantOutputGroup
+	if len(groups) == 1 {
+		group = groups[0]
+	}
 	if !g.Valid() || !output.Valid() {
 		return ErrGrantInvalid
 	}
@@ -366,7 +398,7 @@ func CheckMaterialize(g Grant, output VerifiedOutput, clientID string, registere
 		return nil
 	}
 	r := g.ResultAccess
-	if r == nil || output.CaptureID != g.CaptureID || output.ExecutionDigest != g.ExecutionDigest || output.Target != g.Target || !slices.Contains(r.ActionIDs, output.ActionID) || !slices.Contains(r.ClientIDs, clientID) {
+	if r == nil || !approvedOutput(g, output, group) || output.Target != g.Target || !slices.Contains(r.ActionIDs, output.ActionID) || !slices.Contains(r.ClientIDs, clientID) {
 		return ErrGrantScope
 	}
 	if !registered && g.Spent.Artifacts >= r.MaxArtifacts {
@@ -403,7 +435,7 @@ func CheckResultUse(g Grant, c GrantChild, caller identity.Identity, operation s
 		return nil
 	}
 	r := g.ResultAccess
-	if r == nil || !slices.Contains(r.Operations, operation) || !slices.Contains(r.ClientIDs, c.ClientID) || c.Output.CaptureID != g.CaptureID || c.Output.ExecutionDigest != g.ExecutionDigest {
+	if r == nil || !slices.Contains(r.Operations, operation) || !slices.Contains(r.ClientIDs, c.ClientID) || !approvedOutput(g, c.Output, c.Group) {
 		return ErrGrantScope
 	}
 	return nil

@@ -444,3 +444,11 @@ examples:
 - file: examples/mcp-packet-query-metadata-result.json
   schema: https://asservat.io/spec/v1/mcp-result.schema.json
   tool: pcap_query
+
+- file: examples/mcp-logs-input.json
+  input_tool: get_logs
+- file: examples/mcp-logs-result.json
+  schema: https://asservat.io/spec/v1/mcp-result.schema.json
+  tool: get_logs
+- file: examples/capture-profile-finite-logs.yaml
+  schema: https://asservat.io/spec/v1/capture-profile.schema.json

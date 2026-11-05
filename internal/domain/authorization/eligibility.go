@@ -25,6 +25,7 @@ const (
 	// ReadSyscallProjection admits only fixed metadata views of stored arguments.
 	ReadSyscallProjection Operation = "readSyscallProjection"
 	ReadSyscallQuery      Operation = "readSyscallQuery"
+	ReadLogQuery          Operation = "readLogQuery"
 	DownloadApproved      Operation = "downloadApproved"
 	// ApproveAction is reviewing another person's sensitive acquisition
 	// request (ADR-249): the action-approver role in scope. It is never an
@@ -103,7 +104,7 @@ func (t Target) Valid() bool {
 	return UUID(t.ClusterID) && identity.Text(t.NamespaceUID, 64) && identity.Text(t.WorkloadUID, 64) && identity.Text(t.PodUID, 64)
 }
 func (op Operation) Valid() bool {
-	return op == CollectContext || op == ReadApproved || op == ReadProfileSummary || op == ReadPacketSummary || op == ReadPacketQuery || op == ReadSyscallProjection || op == ReadSyscallQuery || op == DownloadApproved || op == ApproveAction
+	return op == CollectContext || op == ReadApproved || op == ReadProfileSummary || op == ReadPacketSummary || op == ReadPacketQuery || op == ReadSyscallProjection || op == ReadSyscallQuery || op == ReadLogQuery || op == DownloadApproved || op == ApproveAction
 }
 func validAudience(a artifact.AudienceAssignment) bool {
 	return (a.Kind == "User" || a.Kind == "Group" || a.Kind == "Workload") && identity.Text(a.Issuer, 2048) && identity.Text(a.SubjectID, 256) && validRole(a.Role) && (a.BasisKind == "AccessBinding" || a.BasisKind == "PermissionSource") && identity.Text(a.BasisUID, 64) && UUID(a.AssignmentID) && a.BasisDigest != (artifact.Digest{})
@@ -115,7 +116,7 @@ func permits(role string, op Operation) bool {
 	switch op {
 	case CollectContext:
 		return role == "workload-maintainer"
-	case ReadApproved, ReadProfileSummary, ReadPacketSummary, ReadPacketQuery, ReadSyscallProjection, ReadSyscallQuery, DownloadApproved:
+	case ReadApproved, ReadProfileSummary, ReadPacketSummary, ReadPacketQuery, ReadSyscallProjection, ReadSyscallQuery, ReadLogQuery, DownloadApproved:
 		return role == "evidence-reader" || role == "workload-maintainer" || role == "evidence-owner"
 	case ApproveAction:
 		return role == "action-approver"
@@ -224,10 +225,13 @@ func evaluateDetailScope(i identity.Identity, p Projection, op Operation, t Targ
 	if e != nil && (op == ReadSyscallProjection || op == ReadSyscallQuery) && (e.DataClass != "raw" || e.NativeType != artifact.SyscallArgumentsArtifact) {
 		return deny("ProjectionSourceUnsupported")
 	}
+	if e != nil && op == ReadLogQuery && (e.DataClass != "raw" || e.NativeType != artifact.LogsArtifact) {
+		return deny("ProjectionSourceUnsupported")
+	}
 	if e != nil && op == ReadPacketQuery && !((e.DataClass == "raw" && e.NativeType == artifact.RawPCAPNGArtifact) || (e.DataClass == "metadata" && e.NativeType == artifact.PCAPNGArtifact)) {
 		return deny("ProjectionSourceUnsupported")
 	}
-	if e != nil && op != ReadProfileSummary && op != ReadPacketSummary && op != ReadPacketQuery && op != ReadSyscallProjection && op != ReadSyscallQuery && e.DataClass != "metadata" && e.DataClass != "extract" {
+	if e != nil && op != ReadProfileSummary && op != ReadPacketSummary && op != ReadPacketQuery && op != ReadSyscallProjection && op != ReadSyscallQuery && op != ReadLogQuery && e.DataClass != "metadata" && e.DataClass != "extract" {
 		return deny("RawAccessUnsupported")
 	}
 	until := identity.Earlier(i.ValidUntil, p.FreshUntil)
@@ -245,7 +249,7 @@ func evaluateDetailScope(i identity.Identity, p Projection, op Operation, t Targ
 		}
 	}
 	required := []string{"evidence:read"}
-	if (op == ReadPacketQuery || op == ReadSyscallQuery) && e != nil && e.DataClass == "raw" {
+	if (op == ReadPacketQuery || op == ReadSyscallQuery || op == ReadLogQuery) && e != nil && e.DataClass == "raw" {
 		required = append(required, "evidence:raw")
 	}
 	if op == CollectContext {

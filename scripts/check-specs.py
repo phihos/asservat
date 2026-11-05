@@ -740,7 +740,7 @@ def semantic_checks(doc: dict) -> None:
         require(limits["renewalNoticeSeconds"] < limits["defaultAgeSeconds"], "Renewal notice exceeds default lifetime")
     if kind == "EvidenceShare":
         require(not spec["includeFutureArtifacts"] and not spec["allowReshare"], "Share broadens future/delegation scope")
-        raw_ops = {"read_memory", "debugger_command", "pcap_query", "syscall_query", "download_artifact"}
+        raw_ops = {"read_memory", "debugger_command", "pcap_query", "syscall_query", "get_logs", "download_artifact"}
         require(not raw_ops.intersection(spec["operations"]) or "raw" in spec["dataClasses"], "Raw operation in extract-only share")
         if "raw" in spec["dataClasses"] and doc.get("status", {}).get("phase") == "Active":
             approver = doc["status"].get("approvedBy")
@@ -2054,11 +2054,15 @@ def main() -> None:
     # Missing grant permits the pre-admission approval remedy; keyed invocation
     # remains mandatory even for discovery. Runtime authorization still denies reads.
     rejects_tool_input("syscall_query", {k: v for k, v in examples["mcp-syscall-query-input.json"].items() if k != "idempotency_key"})
+    rejects_tool_input("get_logs", {k: v for k, v in examples["mcp-logs-input.json"].items() if k != "idempotency_key"})
     rejects_tool_input("get_syscall_events", {"case_id": intent["id"], "artifact_id": intent["id"], "include_arguments": True})
     rejects_guidance("get_syscall_events", "mcp-syscall-events-result.json", lambda d: d["data"]["events"][0].update({"arguments": []}))
     rejects_guidance("get_syscall_summary", "mcp-syscall-summary-result.json", lambda d: d["data"]["rows"][0].update({"errors": 11}), True)
     rejects_guidance("syscall_query", "mcp-syscall-query-result.json", lambda d: d.update({"data_class": "extract"}))
+    rejects_guidance("get_logs", "mcp-logs-result.json", lambda d: d.update({"data_class": "extract"}))
+    rejects_guidance("get_logs", "mcp-logs-result.json", lambda d: d["data"]["entries"][0].update({"bytes_base64": "Cg=="}))
     rejects(examples["share-extract.yaml"], "share", lambda d: d["spec"]["operations"].append("syscall_query"), True)
+    rejects(examples["share-extract.yaml"], "share", lambda d: d["spec"]["operations"].append("get_logs"), True)
     rejects_guidance("preview_capture", "mcp-composition-preview-result.json", lambda d: d.update({"data_class": "metadata"}))
     # Event grants and profile identity changes need independent evidence from output limits.
     event_grant = copy.deepcopy(examples["grant-packet-observation.yaml"])

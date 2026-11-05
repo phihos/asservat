@@ -189,14 +189,14 @@ func (m *memoryGrants) MaterializeGrantChild(_ context.Context, in GrantChildReq
 		if c.ParentID == in.ParentID && c.Output.ArtifactID == in.Output.ArtifactID {
 			registered = true
 			if c.ClientID == in.ClientID {
-				if err := value.CheckMaterialize(g, in.Output, in.ClientID, true, m.now()); err != nil {
+				if err := value.CheckMaterialize(g, in.Output, in.ClientID, true, m.now(), in.Group); err != nil {
 					return value.GrantChild{}, false, err
 				}
 				return c, true, nil
 			}
 		}
 	}
-	if err := value.CheckMaterialize(g, in.Output, in.ClientID, registered, m.now()); err != nil {
+	if err := value.CheckMaterialize(g, in.Output, in.ClientID, registered, m.now(), in.Group); err != nil {
 		return value.GrantChild{}, false, err
 	}
 	if m.locator[in.Output.ArtifactID] != in.Output.CaptureID {
@@ -206,7 +206,7 @@ func (m *memoryGrants) MaterializeGrantChild(_ context.Context, in GrantChildReq
 		g.Spent.Artifacts++
 		m.rows[g.ID] = g
 	}
-	c := value.GrantChild{ID: in.ChildID, ParentID: in.ParentID, ClientID: in.ClientID, Output: in.Output, CreatedAt: m.now()}
+	c := value.GrantChild{ID: in.ChildID, ParentID: in.ParentID, ClientID: in.ClientID, Output: in.Output, Group: in.Group, CreatedAt: m.now()}
 	m.children[c.ID] = c
 	return c, false, nil
 }

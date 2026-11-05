@@ -150,7 +150,7 @@ func projectionSourceKnown(r ContextProjectionEvidence) bool {
 }
 
 func projectionPolicyFor(ctx context.Context, p ContextProjectionPolicyReader, r ContextProjectionEvidence) (value.ContextProjectionPolicy, error) {
-	if r.DisplayVersion == value.PacketQueryDisplayVersion || r.DisplayVersion == value.SyscallQueryDisplayVersion {
+	if r.DisplayVersion == value.PacketQueryDisplayVersion || r.DisplayVersion == value.SyscallQueryDisplayVersion || r.DisplayVersion == value.LogQueryDisplayVersion {
 		exact, ok := p.(ContextProjectionDisplayPolicyReader)
 		if !ok {
 			return value.ContextProjectionPolicy{}, value.ErrUnavailable

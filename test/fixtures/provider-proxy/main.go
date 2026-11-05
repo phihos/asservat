@@ -30,6 +30,12 @@ import (
 )
 
 func main() {
+	if len(os.Args) == 2 && os.Args[1] == "signals-once" {
+		if err := writeSignalLogFixture(os.Stdout, os.Stderr); err != nil {
+			os.Exit(1)
+		}
+		return
+	}
 	if len(os.Args) == 4 && os.Args[1] == "traffic-client" {
 		deadline, err := time.Parse(time.RFC3339Nano, os.Args[3])
 		ip := net.ParseIP(os.Args[2])
@@ -183,6 +189,7 @@ func signals() error {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 	mux := http.NewServeMux()
+	mux.HandleFunc("/exit", signalExit(stop))
 	mux.Handle("/traffic", trafficHandler())
 	mux.HandleFunc("/log", func(w http.ResponseWriter, r *http.Request) {
 		line := r.URL.Query().Get("line")
@@ -218,6 +225,32 @@ func signals() error {
 		return err
 	}
 	return nil
+}
+
+func signalExit(stop func()) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method", http.StatusMethodNotAllowed)
+			return
+		}
+		_, _ = io.WriteString(w, "synthetic signal process stopping\n")
+		if f, ok := w.(http.Flusher); ok {
+			f.Flush()
+		}
+		stop()
+	}
+}
+
+// Exact synthetic workload bytes for init/ephemeral log provenance. This is
+// fixture-only input, with no workload data or product route.
+func writeSignalLogFixture(stdout, stderr io.Writer) error {
+	for _, part := range [][]byte{[]byte("synthetic-finite-logs-once\n\n"), {0xff, 0x00, '\n'}, append([]byte(strings.Repeat("L", 9000)), '\n')} {
+		if _, err := stdout.Write(part); err != nil {
+			return err
+		}
+	}
+	_, err := io.WriteString(stderr, "synthetic-finite-logs-stderr\n")
+	return err
 }
 
 const (

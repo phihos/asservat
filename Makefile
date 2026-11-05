@@ -24,7 +24,7 @@ console-build:
 	cd web && npm run build
 
 console-browser-check: console-build
-	ASSERVAT_CONSOLE_BROWSER_TEST=1 TMPDIR="$(ASSERVAT_BUILD_TMP)" go test -count=1 -run '^TestConsole(Browser|NativeRestart|ProfileComparison|HeapProfile|PacketSummary|PacketQuery|SyscallQuery|SyscallCaptureAuthoring)WithBuiltPackage$$' -v ./test/integration
+	ASSERVAT_CONSOLE_BROWSER_TEST=1 TMPDIR="$(ASSERVAT_BUILD_TMP)" go test -count=1 -run '^TestConsole(Browser|NativeRestart|ProfileComparison|HeapProfile|PacketSummary|PacketQuery|SyscallQuery|SyscallCaptureAuthoring|LogsQuery)WithBuiltPackage$$' -v ./test/integration
 
 .PHONY: openapi-check
 openapi-check:
@@ -259,3 +259,8 @@ profile-service-preflight:
 packet-summary-preflight:
 	TMPDIR="$(ASSERVAT_BUILD_TMP)" go test -race -count=1 -timeout=3m -run '^(TestRawPacket|TestPacketQuery|TestNativePacketQuery|TestPacketSummary|TestPacketProjection|TestSavedPacketMigration|TestProjectionSource|TestProjectionScope|TestProjectionResult|TestProfileSummarySource|TestContextQueryAuditNamesFormatsAndEffects)' ./internal/domain/analysis ./internal/domain/audit ./internal/application/analysis ./internal/application/authorization ./internal/application/evidence ./internal/adapters/packets ./internal/adapters/objectstore ./internal/adapters/postgres ./internal/contracts ./internal/transport/native ./internal/transport/presentation ./internal/bootstrap
 	TMPDIR="$(ASSERVAT_BUILD_TMP)" go test -race -count=1 -timeout=3m -run '^TestInstalledPacket(Summary|Query)' ./test/integration
+
+# Optional fresh-host qualification; local CPU schedulers may not enforce quotas.
+.PHONY: logs-resource-check
+logs-resource-check:
+	$(PYTHON) scripts/test-logs-resource.py

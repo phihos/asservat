@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	logcodec "asservat.local/asservat/internal/adapters/logs"
 	"asservat.local/asservat/internal/adapters/objectstore/framed"
 	"asservat.local/asservat/internal/adapters/objectstore/manifest"
 	"asservat.local/asservat/internal/application/evidence"
@@ -84,6 +85,7 @@ func (p *ArtifactProducer) Prepare(ctx context.Context, e artifact.ContextExpect
 	e.Audience = slices.Clone(e.Audience)
 	e.RetentionRules = slices.Clone(e.RetentionRules)
 	e.Lifecycle = e.Lifecycle.Clone()
+	e.Logs = e.Logs.Clone()
 	e.SourceSnapshotManifest = e.SourceSnapshotManifest.Clone()
 	if e.Snapshot != nil {
 		e.Snapshot = e.Snapshot.Clone()
@@ -134,6 +136,22 @@ func (a *PreparedArtifact) Store(ctx context.Context, src io.Reader, started, co
 	return a.storeLocked(ctx, src, started, completed)
 }
 
+// StoreLogs streams one ongoing finite API acquisition. complete must join its
+// original reader and final source check and return the actual acquisition end.
+// No unknown/future end is placed into a manifest; the ordinary Store API and
+// every other native type retain their known-interval path.
+func (a *PreparedArtifact) StoreLogs(ctx context.Context, src io.Reader, started time.Time, complete func() (time.Time, error)) (artifact.Copies, error) {
+	if a == nil || complete == nil {
+		return artifact.Copies{}, artifact.ErrInvalid
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.expectation.NativeType != artifact.LogsArtifact || a.expectation.Logs == nil || a.expectation.Validate() != nil {
+		return artifact.Copies{}, artifact.ErrInvalid
+	}
+	return a.storeLocked(ctx, src, started, time.Time{}, complete)
+}
+
 // artifactStoreError exposes only a producer-owned stage; its cause remains
 // available to errors.Is but is never interpolated into diagnostic text.
 type artifactStoreError struct {
@@ -145,7 +163,7 @@ func (e artifactStoreError) Error() string     { return "artifact store refused 
 func (e artifactStoreError) Unwrap() error     { return e.cause }
 func (e artifactStoreError) FixedStep() string { return e.stage }
 
-func (a *PreparedArtifact) storeLocked(ctx context.Context, src io.Reader, started, completed time.Time) (copies artifact.Copies, err error) {
+func (a *PreparedArtifact) storeLocked(ctx context.Context, src io.Reader, started, completed time.Time, acquiring ...func() (time.Time, error)) (copies artifact.Copies, err error) {
 	stage := "prepare"
 	defer func() {
 		if err != nil {
@@ -160,13 +178,20 @@ func (a *PreparedArtifact) storeLocked(ctx context.Context, src io.Reader, start
 	defer func() { a.encoder = nil; a.metadata = nil }()
 	e, p := a.expectation, a.producer
 	r := e.Registration
-	if !p.now().Before(r.WriteUntil) || completed.Before(started) || started.Before(r.AnchorAt) || completed.After(p.now()) {
+	if len(acquiring) > 1 || len(acquiring) == 1 && (acquiring[0] == nil || e.NativeType != artifact.LogsArtifact || e.Logs == nil) || !p.now().Before(r.WriteUntil) || started.Before(r.AnchorAt) || started.After(p.now()) || len(acquiring) == 0 && (completed.Before(started) || completed.After(p.now())) {
 		return out, fmt.Errorf("%w: store interval", artifact.ErrInvalid)
 	}
 	ctx, cancel := context.WithDeadline(ctx, r.WriteUntil)
 	defer cancel()
 	stage = "native-check"
-	check, err := p.contracts.NativeCheck(e, manifest.ContextManifest{StartedAt: started, CompletedAt: completed})
+	var check manifest.NativeCheck
+	var liveCheck *logcodec.StreamCheck
+	if len(acquiring) == 1 {
+		liveCheck, err = logcodec.NewAcquiringCheck(e, started)
+		check = liveCheck
+	} else {
+		check, err = p.contracts.NativeCheck(e, manifest.ContextManifest{StartedAt: started, CompletedAt: completed})
+	}
 	if err != nil {
 		return out, fmt.Errorf("%w: native check", err)
 	}
@@ -186,7 +211,18 @@ func (a *PreparedArtifact) storeLocked(ctx context.Context, src io.Reader, start
 		return out, err
 	}
 	stage = "native-check"
-	if err = check.Close(); err != nil {
+	if liveCheck != nil {
+		completed, err = acquiring[0]()
+		if err == nil && (completed.Before(started) || completed.After(p.now()) || !completed.Before(r.WriteUntil) || ctx.Err() != nil) {
+			err = artifact.ErrInvalid
+		}
+		if err == nil {
+			err = liveCheck.CloseAt(completed)
+		}
+	} else {
+		err = check.Close()
+	}
+	if err != nil {
 		return out, err
 	}
 	if a.snapshotRetained != nil {

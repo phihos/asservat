@@ -33,6 +33,20 @@ A recipe resolves into source arming plus an incident graph. Ongoing sources hav
 
 Every action MUST end in `Succeeded`, `Partial`, `Skipped`, `Denied`, `TimedOut`, `Failed`, `TargetGone`, `Unsupported` or `Indeterminate`, with reason and timing. Failed optional actions do not discard successful artifacts. A capture MUST distinguish a partial action set from fully successful collection. An intrusive action with unknown execution outcome MUST NOT be retried automatically.
 
+### Finite logs implementation contract (ADR-308)
+
+[ADR-308](../docs/decisions/308-finite-whole-pod-logs.md) defines finite whole-pod
+API logs, raw saved `get_logs` pages and native JSONL. Current/available previous
+regular/init/ephemeral sources share aggregate action limits. Portable stream
+provenance is combined; exact stdout/stderr selection is Unsupported without
+qualified split capability. Preserve original bytes, nullable source timestamps,
+empty lines and explicit coverage gaps; API history is not a complete log archive.
+The64MiB native ceiling includes encoding/framing. Saved pages require current
+read/raw/client rights and exact query approval, independently of native download.
+No generic text redaction or per-container permission surface is introduced.
+Implementation and installed qualification remain pending; the existing count-only
+log detector does not fulfill this action.
+
 ### SC-ACT-001
 
 Given a recipe with logs, `/proc` and a heap dump, when the heap dump times out, then logs and `/proc` are retained, the case reports partial evidence and the dump is not described as complete or retried automatically.

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"slices"
 	"testing"
 	"time"
 
@@ -49,8 +50,15 @@ func TestCaptureProfileToolsProjectContract(t *testing.T) {
 			Profiles []ProfileRow `json:"profiles"`
 		} `json:"data"`
 	}
-	if err != nil || json.Unmarshal(reply.Body, &out) != nil || out.DataClass != "metadata" || len(out.Data.Profiles) != 3 || f.catalog != "builtin" || out.Data.Profiles[0].ExecutionModes[0] != "onTrigger" {
+	if err != nil || json.Unmarshal(reply.Body, &out) != nil || out.DataClass != "metadata" || len(out.Data.Profiles) != 4 || f.catalog != "builtin" || out.Data.Profiles[0].ExecutionModes[0] != "onTrigger" {
 		t.Fatalf("list = %s, %v", reply.Body, err)
+	}
+	var names []string
+	for _, profile := range out.Data.Profiles {
+		names = append(names, profile.Ref.Name)
+	}
+	if !slices.Equal(names, []string{"network-connections", "syscall-activity", "go-cpu", "finite-logs"}) {
+		t.Fatal("actual closed builtin catalog", names)
 	}
 	reply, err = s.Call(context.Background(), f, "get_capture_profile", []byte(`{`+wireTarget+`,"profile_ref":{"catalog":"builtin","name":"network-connections","version":"v1"}}`))
 	if err != nil || !bytes.Contains(reply.Body, []byte(`"data_class":"extract"`)) || !bytes.Contains(reply.Body, []byte(`"definition_digest"`)) {
@@ -62,5 +70,37 @@ func TestCaptureProfileToolsProjectContract(t *testing.T) {
 	}
 	if _, ok := base.Tool("list_capture_profiles"); ok {
 		t.Fatal("a service without catalog reads served the profile tools")
+	}
+}
+
+func TestRawLogCaptureProfileAdvertisesTypedEdits(t *testing.T) {
+	base, inner := operationFixture(t, false)
+	f := &profileOperationFixture{contextOperationFixture: inner}
+	s, err := NewContextOperations(base.config, f, f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reply, err := s.Call(t.Context(), f, "get_capture_profile", []byte(`{`+wireTarget+`,"profile_ref":{"catalog":"builtin","name":"finite-logs","version":"v1"}}`))
+	if err != nil || s.contracts.ValidateOutput("get_capture_profile", reply.Body) != nil {
+		t.Fatal("actual builtin logs definition rejected", err, string(reply.Body))
+	}
+	var out struct {
+		Data struct {
+			Definition struct {
+				Fields []struct {
+					Field string `json:"field"`
+				} `json:"editableFields"`
+			} `json:"definition"`
+		} `json:"data"`
+	}
+	if json.Unmarshal(reply.Body, &out) != nil {
+		t.Fatal("actual logs definition")
+	}
+	fields := map[string]bool{}
+	for _, field := range out.Data.Definition.Fields {
+		fields[field.Field] = true
+	}
+	if !fields["logBefore"] || !fields["logAfter"] || !fields["logStream"] {
+		t.Fatal("public catalog lost exact declared log edits", fields)
 	}
 }

@@ -809,10 +809,11 @@
                           "operations": {
                             "type": "array",
                             "minItems": 1,
-                            "maxItems": 3,
+                            "maxItems": 4,
                             "items": {
                               "enum": [
                                 "download_artifact",
+                                "get_logs",
                                 "pcap_query",
                                 "syscall_query"
                               ]
@@ -1464,12 +1465,13 @@
                             "items": {
                               "enum": [
                                 "download_artifact",
+                                "get_logs",
                                 "pcap_query",
                                 "syscall_query"
                               ]
                             },
                             "minItems": 1,
-                            "maxItems": 3,
+                            "maxItems": 4,
                             "uniqueItems": true
                           },
                           "max_bytes": {

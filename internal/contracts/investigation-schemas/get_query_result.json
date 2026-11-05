@@ -115,7 +115,8 @@
                       "compare_profiles",
                       "get_syscall_summary",
                       "get_syscall_events",
-                      "syscall_query"
+                      "syscall_query",
+                      "get_logs"
                     ]
                   },
                   "result": {
