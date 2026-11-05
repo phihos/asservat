@@ -1,0 +1,173 @@
+{
+  "format": "asservat-original-evidence-archive/v1",
+  "entries": [
+    {
+      "path": "initial-run.json.gz",
+      "original": "/home/phil/.cache/asservat-build/packet-summary-native-41945434872/initial-run.json",
+      "bytes": 12145,
+      "sha256": "c98241d19d8fd48f42a8cc869c25d81b02e64019e668d97477c8b71961f6b023",
+      "gzipBytes": 1628,
+      "gzipSHA256": "50e9e2ae1fe1c33d94439bad097723ac0030ab5f18d2ccf1f7fbe487d61bfcf0"
+    },
+    {
+      "path": "initial-jobs.json.gz",
+      "original": "/home/phil/.cache/asservat-build/packet-summary-native-41945434872/initial-jobs.json",
+      "bytes": 5028,
+      "sha256": "998c0a0a0f23a795af94137323e73e85d65625823df008610c01b2a9cffc31ba",
+      "gzipBytes": 1051,
+      "gzipSHA256": "08fbe86ccdae739addc968adc184b1c8bd94d1244a57bbfa8046306f9c66518d"
+    },
+    {
+      "path": "terminal-run.json.gz",
+      "original": "/home/phil/.cache/asservat-build/packet-summary-native-41945434872/terminal-run.json",
+      "bytes": 12148,
+      "sha256": "2f587bac8feaf3bf9204a4e60cb7c290cdece6a2a764df128d2e4103d43336df",
+      "gzipBytes": 1633,
+      "gzipSHA256": "f468ab19f326ba9deae4a52fa6fbd4eef85c97d38eb4aa819f3181ac314053c3"
+    },
+    {
+      "path": "terminal-jobs.json.gz",
+      "original": "/home/phil/.cache/asservat-build/packet-summary-native-41945434872/terminal-jobs.json",
+      "bytes": 6074,
+      "sha256": "423616c56ec18649d1503cc3b4812816e04b8911b49509386923f03617786e6b",
+      "gzipBytes": 1097,
+      "gzipSHA256": "7b4d9396b389d75f8b3ab92431ca1c148f61a483ac53ad532cb4891147029d36"
+    },
+    {
+      "path": "terminal-artifacts.json.gz",
+      "original": "/home/phil/.cache/asservat-build/packet-summary-native-41945434872/terminal-artifacts.json",
+      "bytes": 748,
+      "sha256": "f7346288763c49a3bc83f570167e7413be2da86ba714bf70c371869a4e6fa334",
+      "gzipBytes": 451,
+      "gzipSHA256": "8395d1942511f61a791b5464573e3d5682ba6d4c73275525566a36f2803ad89c"
+    },
+    {
+      "path": "poll-history.jsonl.gz",
+      "original": "/home/phil/.cache/asservat-build/packet-summary-native-41945434872/poll-history.jsonl",
+      "bytes": 12510,
+      "sha256": "b75f845452c1809e204f94243a6b20a7d209ee72ad993f02fa293d45ef50661c",
+      "gzipBytes": 697,
+      "gzipSHA256": "263a289f0d4a17053c06395f0cce56e269a2172d8d2245912b65b4adc1a57afd"
+    },
+    {
+      "path": "verification.json.gz",
+      "original": "/home/phil/.cache/asservat-build/packet-summary-native-41945434872/verification.json",
+      "bytes": 3396,
+      "sha256": "61bc7c9c0c1da18f76b090e49dbdc05db4547af49c3a806f5a3f13b41458212f",
+      "gzipBytes": 1504,
+      "gzipSHA256": "a0dba220a67f19f14535368903c1dd0b54284231d0375e936f7beca29b7a40ff"
+    },
+    {
+      "path": "root-independent-verification.json.gz",
+      "original": "/home/phil/.cache/asservat-build/packet-summary-native-41945434872/root-independent-verification.json",
+      "bytes": 388,
+      "sha256": "060d075e284d22bd041a43dca13c37d9bca64f21798e879526f65c03dc782074",
+      "gzipBytes": 279,
+      "gzipSHA256": "c4810c4ae9ca49a144fdf3dfe771a3495ba361f4c897acb05c8fe44f4be9ce5b"
+    },
+    {
+      "path": "workflow-all.log.gz",
+      "original": "/home/phil/.cache/asservat-build/packet-summary-native-41945434872/workflow-all.log",
+      "bytes": 152764,
+      "sha256": "76156cb03d4f03b8851de3bed1282aecf30093e3682cf20ee58ad611046f9c6f",
+      "gzipBytes": 22232,
+      "gzipSHA256": "416af68ae02fc6bf9af9e66d3a4c16b9e755050ab2def9c4acebf6dbfff22505"
+    },
+    {
+      "path": "ci-native-continuation-manual-mixed.log.gz",
+      "original": "/home/phil/.cache/asservat-build/packet-summary-native-41945434872/native-continuation-manual-mixed-1/ci-native-continuation-manual-mixed.log",
+      "bytes": 5366,
+      "sha256": "cbf9ab3d85179608fb619968f98bec5644bbe1519841b2a91bc98e900cd88a8c",
+      "gzipBytes": 1676,
+      "gzipSHA256": "26fd849dc707a4665d3d3fc066c0154fbdeae4fbebefd72faefee1de06099ac8"
+    },
+    {
+      "path": "context-storage-environment.json.gz",
+      "original": "/home/phil/.cache/asservat-build/packet-summary-native-41945434872/native-continuation-manual-mixed-1/context-storage-environment.json",
+      "bytes": 542806,
+      "sha256": "128280d51c78fa8842b77022cb4b8f4734a6ee27a59142ebdb4b4f04c3201943",
+      "gzipBytes": 204015,
+      "gzipSHA256": "d0214b3941be00146f60a19612fb37c5a0cb42f34d190db585f6cc68dd82221c"
+    },
+    {
+      "path": "context-storage-timing.log.gz",
+      "original": "/home/phil/.cache/asservat-build/packet-summary-native-41945434872/native-continuation-manual-mixed-1/context-storage-timing.log",
+      "bytes": 15543,
+      "sha256": "b074d214a1238795af65a0e7ecf75f657a4a95d992c34920c2044b8e46dd9c06",
+      "gzipBytes": 3323,
+      "gzipSHA256": "9dc955fa1b01d05c39199324c97806cb3a34e653a0290c3b175b4a9dd6fd44db"
+    },
+    {
+      "path": "context-storage.log.gz",
+      "original": "/home/phil/.cache/asservat-build/packet-summary-native-41945434872/native-continuation-manual-mixed-1/context-storage.log",
+      "bytes": 14463,
+      "sha256": "2cd24d084dd8108a39d5150c3a67491500206e2f93e711a18cc6683ffd00addc",
+      "gzipBytes": 3130,
+      "gzipSHA256": "957409981ec419159814a247808cb47ea4028ece43d147026e7a3358aaea2555"
+    },
+    {
+      "path": "manual-mixed.pcapng.gz",
+      "original": "/home/phil/.cache/asservat-build/packet-summary-native-41945434872/native-continuation-manual-mixed-1/manual-mixed.pcapng",
+      "bytes": 13460,
+      "sha256": "101fa008508579422fab833b649c35f7f0c520824e25163c990fbc7a39a5f6a9",
+      "gzipBytes": 3201,
+      "gzipSHA256": "7f1db1cc47688687bbd28b2a34d72592998ee305e87b1839d7b3d708d05b3def"
+    },
+    {
+      "path": "packet-summary-ci-41945402872-run.json.gz",
+      "original": "/home/phil/.cache/asservat-build/packet-summary-ci-41945402872-run.json",
+      "bytes": 12183,
+      "sha256": "7ec0e3d7cac6c685064d9f429383ad398bb69ccc54ef7888720118ceb784965a",
+      "gzipBytes": 1660,
+      "gzipSHA256": "670973e57fa037059bfd5994169974c4039c34814181ae52629ad9a5c4ebdaf7"
+    },
+    {
+      "path": "packet-summary-ci-41945402872-jobs.json.gz",
+      "original": "/home/phil/.cache/asservat-build/packet-summary-ci-41945402872-jobs.json",
+      "bytes": 32187,
+      "sha256": "17386e88216ffc77f12c4c96198cae1e974f7310db08c9c4e09c4c0d96af634b",
+      "gzipBytes": 2350,
+      "gzipSHA256": "3958782b7521b5adeb4c602e88825f8df0b2641b97d0254a060aca9eb988dbb5"
+    },
+    {
+      "path": "packet-summary-ci-41945402872-verification.json.gz",
+      "original": "/home/phil/.cache/asservat-build/packet-summary-ci-41945402872-verification.json",
+      "bytes": 946,
+      "sha256": "808c8f32e5da4bc5e3f258b7358dfffdb0a6592792cc1991df68b1037b1f3e32",
+      "gzipBytes": 496,
+      "gzipSHA256": "6586af07a80dea4ec9a32ddca3d0f330c9128c1eeee4ce3817c197fd1b8b1b34"
+    },
+    {
+      "path": "packet-summary-pr165-premerge-checks.json.gz",
+      "original": "/home/phil/.cache/asservat-build/packet-summary-pr165-premerge-checks.json",
+      "bytes": 4219,
+      "sha256": "f82de5840b9100edd626dbafec3eb421306055a29432c8bd6fe5a8e9f99f3029",
+      "gzipBytes": 515,
+      "gzipSHA256": "f490371052f69f57b5b0d26a0d29dad41bdb7dee8f868e6939a08969b75f1757"
+    },
+    {
+      "path": "packet-summary-pr165-premerge-review.json.gz",
+      "original": "/home/phil/.cache/asservat-build/packet-summary-pr165-premerge-review.json",
+      "bytes": 1868,
+      "sha256": "59361789a31bc347e393e5c5d5310aee8eea8e9251e1e6d5eb64c44496a829c9",
+      "gzipBytes": 1018,
+      "gzipSHA256": "8b7563e3e7a5f23f7157d37ea3bebedd6d816b8b2209cbef1d8d87ac0e3538ad"
+    },
+    {
+      "path": "packet-summary-pr165-merged.json.gz",
+      "original": "/home/phil/.cache/asservat-build/packet-summary-pr165-merged.json",
+      "bytes": 226,
+      "sha256": "756334d2756fd0bf9a3c04ac0d408845611aa618697acf63afe7bf390643e9b8",
+      "gzipBytes": 203,
+      "gzipSHA256": "eecf768b481a06f8c98e248b8a5a880030d54e3f627d01a22594a8b5dcfc2792"
+    },
+    {
+      "path": "packet-summary-pr165-tree-readback.json.gz",
+      "original": "/home/phil/.cache/asservat-build/packet-summary-pr165-tree-readback.json",
+      "bytes": 580,
+      "sha256": "2430a6c48bc1008ed586722f4b89f7fc3a6ef14b44b09dfe810166e5a34b2711",
+      "gzipBytes": 322,
+      "gzipSHA256": "43bc4cc0974112a6872157e96adfc41144088a887328a07ee59f554bdc72ed40"
+    }
+  ]
+}

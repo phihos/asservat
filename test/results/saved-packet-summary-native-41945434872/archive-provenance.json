@@ -1,0 +1,51 @@
+{
+  "source": "547396d3ba9385aa15203efed7ae3ded2604667b",
+  "nativeRun": 41945434872,
+  "requiredCI": 41945402872,
+  "goExit": 0,
+  "harnessExit": 0,
+  "goSeconds": 757.951,
+  "sourceCount": 4200,
+  "allSourceGitHashesExact": true,
+  "sourceUnchanged": true,
+  "cleanupFailures": [],
+  "scratchRemoved": true,
+  "native": {
+    "bytes": 13460,
+    "sha256": "101fa008508579422fab833b649c35f7f0c520824e25163c990fbc7a39a5f6a9",
+    "savedRecords": 132,
+    "directionalGroups": 2,
+    "groupPackets": [
+      44,
+      88
+    ],
+    "reportedExclusions": 0,
+    "meaning": "producer capture exclusions; not measured network loss"
+  },
+  "originalZipSHA256": "fe4c5593881e9df7acc9c260bb72fffa1092f8b6b9c6b3f0d02e4bb8b9aa7eb7",
+  "duplicateZipArchived": false,
+  "normalMerge": {
+    "pr": 165,
+    "state": "MERGED",
+    "mergedAt": "2026-11-05T01:24:47Z",
+    "qualifiedHead": "547396d3ba9385aa15203efed7ae3ded2604667b",
+    "normalSquashMerge": "8bea063222b873283d210264e88d286efa0a2a86",
+    "freshOriginMain": "8bea063222b873283d210264e88d286efa0a2a86",
+    "trees": {
+      "reviewed": "61476805b76ed0f493dc16c16821397932499cf1",
+      "merge": "61476805b76ed0f493dc16c16821397932499cf1",
+      "freshMain": "61476805b76ed0f493dc16c16821397932499cf1"
+    },
+    "allCompleteTreesEqual": true,
+    "worktreeClean": true,
+    "requiredCI": 41945402872,
+    "nativeRun": 41945434872
+  },
+  "limitations": [
+    "one reference metadata source; no second-workload/replay repeat",
+    "no all-max resource/kernel/CNI qualification",
+    "no raw packet analysis or full S-05 completion",
+    "terminal original workers checked; absent Job requires exact SQL retirement; returned later-retirement callbacks not separately executed"
+  ],
+  "archiveReadbackFailures": []
+}

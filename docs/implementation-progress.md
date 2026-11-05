@@ -1,6 +1,19 @@
 # Sustained implementation progress
 
-## Current saved packet summary candidate (2026-11-05)
+## Saved packet summaries merged and installed-qualified (2026-11-05)
+
+PR165 merged as `8bea063222b873283d210264e88d286efa0a2a86` after required
+CI41945402872 passed all15 jobs and
+[installed41945434872](../test/results/saved-packet-summary-native-41945434872/README.md)
+passed Go/harness0 in757.951s. MCP and actual React summaries matched the same
+13,460-byte authenticated PCAPNG through tshark:132 saved records/two directional
+groups. Both paid-query source/account/key/batch checks and original worker
+terminal joins passed; later-retirement callback limits remain explicit in the
+report. All4,200 source hashes matched Git, sources stayed unchanged, cleanup was
+empty and scratch removed. Reviewed/merge/fresh-main complete trees are identical.
+This qualifies one metadata reference workflow, not raw queries, all-maxima
+resource coverage, second-workload/replay repetition or full S-05. Earlier
+candidate and failure evidence follows.
 
 PR164 merged normally as `b06b59c78cc778c036b6969f5fe84802e3d6bf37`; fresh
 main has the identical complete tree as reviewed `2bb27caf`. Required pull-request
@@ -15,7 +28,7 @@ cleanup was empty and scratch removed. This is one reference CPU workflow.
 The per-item credential-refusal correction is separately covered by the retained
 real mTLS component regression; no additional installed variant is claimed.
 
-The next candidate implements `get_pcap_summary` for already published metadata
+The merged implementation provides `get_pcap_summary` for already published metadata
 PCAPNG: one authenticated bounded native read in the existing regional worker,
 ordinary current/retained rights, browser/MCP query parity and original native
 file parity. Raw packet analysis remains behind its existing sandbox/review
@@ -72,10 +85,9 @@ consumed key roles and both native/public batches joined. Both runs matched all
 unchanged sources and clean cleanup. Production quota semantics are unchanged;
 [Exact local originals](../test/results/saved-packet-summary-shared-account-local/README.md)
 retain both runs, affected race exit0 and final integrated pre-push exit0.
-Fresh final CI and complete installed qualification remain required.
-No complete installed packet-summary, maximum-shape/cgroup or raw-query
-qualification is claimed.
-Broader S-05 and the full specification remain open.
+Final CI and the scoped installed workflow passed as recorded above.
+Maximum-shape/cgroup and raw-query qualification remain open. Broader S-05 and
+the full specification remain unfinished.
 
 ## Shared profile qualification history (2026-11-04)
 
