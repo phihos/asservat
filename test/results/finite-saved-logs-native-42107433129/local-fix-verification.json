@@ -1,0 +1,91 @@
+{
+  "base": "67a28e07c87295da2aab354f24d7595993cb28ac",
+  "sourceSHA256": {
+    "examples/mcp-preview-result.json": "a5cc81e9b8549c6db4ced6c83e1f589b547fd8785f2ee2b4d0767cfef3cca3b8",
+    "examples/mcp-repeat-preview-result.json": "9ceb0603683338431ca282af79e9ca87ad822af48ea5525384d626e8d27cbabe",
+    "internal/adapters/objectstore/manifest/schemas/action-lifecycle.schema.json": "042b3f6ad470c5d15ac1205f0d744adb1a5d9d2b39df4dc39b5b4d9090252538",
+    "internal/contracts/investigation-schemas/preview_capture.json": "ff5a1840046e312c92efd10f36c3188240d7ba21a8fbee5dce505647197d5727",
+    "internal/transport/presentation/recorder_preview.go": "7303ef75b0753ef7efd7419d32701e20b53f4869a9efaa09086330dfd37f9eb8",
+    "internal/transport/presentation/recorder_preview_test.go": "d634b57561206eaa7233ce945f5205bd719b473db3c0dae71c79157626d2643e",
+    "scripts/investigation-schemas.py": "1a3909a55616444c8472b6567175b7467a364f74e341a5ed9993989f8167f1d6",
+    "specs/action-lifecycle.md": "7bb37a10e73c787fbb77ee104d58f8a0c3c26fbbd1c8ccaefb6d63f1a79a3285",
+    "specs/contracts/action-lifecycle.schema.json": "042b3f6ad470c5d15ac1205f0d744adb1a5d9d2b39df4dc39b5b4d9090252538",
+    "web/src/generated/capture.d.ts": "5b58cc886ebe2148ee8f3eb5ea287a000dacdd63aaf846a7ddac5bb43759ca67",
+    "web/src/generated/validate-capture.js": "3bcaa8f149a7bce4dd2fb0e88b37c39e1ee0a7d6bbb32793e706b7caf9d6e94b",
+    "internal/transport/presentation/recorder_logs_preview_test.go": "d571ea5ab0371e2a1cab59ba5d940c97fa19b23a2f8963453ab4cd21183c12cc"
+  },
+  "payloads": [
+    {
+      "archive": "finite-logs-public-preview-red.log.gz",
+      "originalBytes": 289,
+      "originalSHA256": "ef607fa63d17e02dd4eded7469c7c69e6c573cff3ec5764d8fb2b7b85b8204c0",
+      "gzipBytes": 231,
+      "gzipSHA256": "80fd34a503ae34782656d780627649beed4217559dcf03147d492fd642211efa"
+    },
+    {
+      "archive": "finite-logs-public-preview-first-green.log.gz",
+      "originalBytes": 68,
+      "originalSHA256": "8f675f24fddb5dce437591e62ba629c04c6aa0968361f5669d8c0a4b27458409",
+      "gzipBytes": 80,
+      "gzipSHA256": "f82862f5abe8979d4d2dbdab0ed21c31b8392db401ecf40d3bba6be99cd0e2cb"
+    },
+    {
+      "archive": "finite-logs-public-preview-ceiling-red.log.gz",
+      "originalBytes": 255,
+      "originalSHA256": "aa751bbb77a28ee967e20d4fbbcf67bc5c608e041f6145b9f26e7777840ffc17",
+      "gzipBytes": 205,
+      "gzipSHA256": "af7748e778bffe1d1cb977a3348f740164de6c7d42143685d327c835c75f9fdc"
+    },
+    {
+      "archive": "finite-logs-public-preview-final-green.log.gz",
+      "originalBytes": 68,
+      "originalSHA256": "4447ae4fb88bfadb2ad284103639b26e73dad9bdf2a4479b2600051da44e6b2a",
+      "gzipBytes": 80,
+      "gzipSHA256": "e9a71d2625c8ee2f328351c25bd1d249e0ba3aa71fa85bb13c9277e44d0990e4"
+    },
+    {
+      "archive": "finite-logs-public-preview-full-race.log.gz",
+      "originalBytes": 201,
+      "originalSHA256": "3cbab94161f48b3b6e1a3e4fec2c98b376e3e27ac38d9b34f45f16989369a693",
+      "gzipBytes": 125,
+      "gzipSHA256": "626fdaea6647020b973a27aaeca506339fe07e6c8b2857c6c5d6b24dcf9f6fdd"
+    },
+    {
+      "archive": "finite-logs-preview-fix-pre-push.log.gz",
+      "originalBytes": 73960,
+      "originalSHA256": "717a9a2c430b8bae0b62b827932a1d20ca9e8101ac4b26c4f096fb1e82599fb3",
+      "gzipBytes": 7684,
+      "gzipSHA256": "00eaa8624ee7f91e52c706ab80817c7f55f1316466ced9049e08363014fea61f"
+    },
+    {
+      "archive": "finite-logs-preview-fix-pre-push-final.log.gz",
+      "originalBytes": 12775,
+      "originalSHA256": "9dcc26c4c393795077227529a394b0015092ee389fd32b5da35f7c9293ef0d5c",
+      "gzipBytes": 2622,
+      "gzipSHA256": "ba423ada4bcde1625301ba08abc8fdfe620796840e86751d0aca51d9d64351c0"
+    },
+    {
+      "archive": "root-logs-preview-readonly-review.json.gz",
+      "originalBytes": 2741,
+      "originalSHA256": "3b90e980631ac9d683724ffdaeb57bf975ca2e243b5262d0a4d77620ed126608",
+      "gzipBytes": 1462,
+      "gzipSHA256": "94784ef853637fa78e12416a5c9cf3d648390eafe68ceff21dcc9797e86f43d8"
+    }
+  ],
+  "results": {
+    "schemaBaselineExit": 1,
+    "ceilingBaselineExit": 1,
+    "focusedRaceExit": 0,
+    "fullRaceExit": 0,
+    "fullRaceSeconds": {
+      "presentation": 419.743,
+      "contracts": 12.415,
+      "manifest": 2.967
+    },
+    "finalPrePushExit": 0,
+    "consoleFiles": 51,
+    "consoleTests": 587,
+    "independentReview": "CLEAR"
+  },
+  "scope": "Local component/contract checks. Full races precede only a tool-description clarification and golden-example updates; final pre-push includes those changes. No installed success."
+}

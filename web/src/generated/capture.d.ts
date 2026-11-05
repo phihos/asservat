@@ -585,7 +585,7 @@ export interface components {
             actions: (({
                 actionID: string;
                 /** @enum {unknown} */
-                kind: "kubernetesSnapshot" | "logs" | "processSnapshot" | "fileRead" | "packetCapture" | "networkSnapshot" | "runtimeDiagnostic" | "kernelCore" | "liveCore" | "command" | "httpDiagnostic" | "artifactCollect" | "profile" | "syscallTrace";
+                kind: "kubernetesSnapshot" | "processSnapshot" | "fileRead" | "packetCapture" | "networkSnapshot" | "runtimeDiagnostic" | "kernelCore" | "liveCore" | "command" | "httpDiagnostic" | "artifactCollect" | "profile" | "syscallTrace";
                 /** @constant */
                 executionMode: "onTrigger";
                 /** @constant */
@@ -599,6 +599,14 @@ export interface components {
                 executionMode: "ongoing";
                 /** @enum {unknown} */
                 activation: "policyArming" | "manualSession";
+                requestedBefore: string;
+                after: string;
+            } | {
+                actionID: string;
+                /** @constant */
+                kind: "logs";
+                /** @constant */
+                executionMode: "onTrigger";
                 requestedBefore: string;
                 after: string;
             })[];

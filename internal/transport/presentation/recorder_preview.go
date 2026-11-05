@@ -205,8 +205,13 @@ func (s *ContextOperations) recorderPreviewResult(result app.RecorderPreviewResu
 		// other; a plan-only one has the generic reason.
 		blockers = append(blockers, RecorderUnavailableBlocker)
 	} else {
-		// ADR-248: the interim per-capture output cap.
-		limit = min(limit, artifact.RecordingNativeLimit)
+		// Finite logs use the streaming logs ceiling; the original packet/
+		// syscall recorders retain their single-frame output ceiling.
+		maximum := int64(artifact.RecordingNativeLimit)
+		if len(result.Plan.Actions) == 1 && result.Plan.Actions[0].Kind == "logs" {
+			maximum = artifact.LogNativeLimit
+		}
+		limit = min(limit, maximum)
 	}
 	if approval {
 		// ADR-249: an individual approval precedes any observation.

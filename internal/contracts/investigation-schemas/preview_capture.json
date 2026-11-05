@@ -1,6 +1,6 @@
 {
   "name": "preview_capture",
-  "description": "Preview whole-Pod status or a versioned capture composition without collection. Returns exact Pod, impact, handling and blockers. onTrigger requires before 0s. Sharing needs evidence-owner and evidence:share; eight recipients and seven days maximum (default24h).",
+  "description": "Preview whole-Pod status or a versioned capture composition without collection. Returns exact Pod, impact, handling and blockers. On-trigger packet/syscall recording requires before 0s. Sharing needs evidence-owner and evidence:share; eight recipients and seven days maximum (default24h).",
   "annotations": {
     "readOnlyHint": true,
     "destructiveHint": false,
@@ -2301,7 +2301,6 @@
                     "kind": {
                       "enum": [
                         "kubernetesSnapshot",
-                        "logs",
                         "processSnapshot",
                         "fileRead",
                         "packetCapture",
@@ -2413,6 +2412,50 @@
                     "requestedBefore",
                     "after"
                   ]
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "actionID": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 63
+                    },
+                    "kind": {
+                      "const": "logs"
+                    },
+                    "executionMode": {
+                      "const": "onTrigger"
+                    },
+                    "requestedBefore": {
+                      "type": "string",
+                      "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
+                      "maxLength": 16
+                    },
+                    "after": {
+                      "type": "string",
+                      "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
+                      "maxLength": 16
+                    }
+                  },
+                  "required": [
+                    "actionID",
+                    "kind",
+                    "executionMode",
+                    "requestedBefore",
+                    "after"
+                  ],
+                  "not": {
+                    "properties": {
+                      "requestedBefore": {
+                        "const": "0s"
+                      },
+                      "after": {
+                        "const": "0s"
+                      }
+                    }
+                  }
                 }
               ]
             },

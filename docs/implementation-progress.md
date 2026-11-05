@@ -1,5 +1,23 @@
 # Sustained implementation progress
 
+## Logs preview contract correction after installed failure (2026-11-05)
+
+Signed `67a28e07` passes all15 CI jobs. Its installed run still fails before
+collection (Go/harness1,486.522s), after original Pod restart/listener readiness
+succeed. All4,363 sources match Git and cleanup completes. The [original report](../test/results/finite-saved-logs-native-42107433129/README.md)
+and local actual-compiler/C20 regression isolate a public lifecycle schema
+rejecting finite logs' requested1h history. The dedicated finite-log onTrigger
+shape now accepts historical/future windows with at least one positive interval;
+packet/syscall onTrigger still requires zero lookback. Canonical, embedded Go
+and generated browser validators are updated together.
+
+A separate64MiB preview regression reproduces the old8MiB recorder cap being
+shown for logs. The renderer now selects the qualified logs ceiling for a single
+finite logs action, with existing recorder limits unchanged. Full affected races pass (presentation419.743s, contracts12.415s, manifest2.967s);
+final pre-push exits0 including587 console tests/51files. Independent review
+finds no issues. These are local corrections; fresh installed qualification
+remains pending.
+
 ## Saved-logs hosted results and targeted corrections (2026-11-05)
 
 Frozen `fb955e46` passes the hosted quota-enforced reader resource workflow;

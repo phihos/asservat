@@ -31,8 +31,9 @@ type recorderFixture struct {
 	compileErr  error
 	access      *authorization.ResultAccess
 	// resolved supplies namespace catalog profiles (the service reads them).
-	resolved []planning.CatalogProfile
-	filters  compiler.FilterCompiler
+	resolved        []planning.CatalogProfile
+	filters         compiler.FilterCompiler
+	requireApproval bool
 }
 
 type oneInstruction struct{}
@@ -61,7 +62,7 @@ func (f *recorderFixture) PreviewComposition(_ context.Context, _ identities.Cur
 	if err != nil {
 		return app.RecorderPreviewResult{}, err
 	}
-	input := planning.RecorderInput{CaptureID: "00000000-0000-4000-8000-000000000045", Executor: f.i.Principal, Target: target, Composition: *in.Composition, Retention: r, Deadline: now.Add(time.Minute)}
+	input := planning.RecorderInput{CaptureID: "00000000-0000-4000-8000-000000000045", Executor: f.i.Principal, Target: target, Composition: *in.Composition, Retention: r, Deadline: now.Add(time.Minute), RequireApproval: f.requireApproval}
 	filters := f.filters
 	if filters == nil {
 		filters = oneInstruction{}
