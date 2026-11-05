@@ -125,8 +125,8 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 			t.Fatal("previous key-child bound", e)
 		}
 	}
-	const packetQueryDefinitions = `SELECT string_agg(pg_get_functiondef(f::regprocedure),E'\n' ORDER BY f) FROM unnest(ARRAY['public.context_query_scope_source_valid(jsonb)','public.context_query_begin_tool(jsonb)','public.context_query_read_batches(jsonb)','public.context_query_units(jsonb)','public.guard_context_query()','public.guard_context_query_child()','public.operation_audit_lane(text)','public.operation_audit_human_input_valid(text,text)','public.guard_operation_audit()','public.context_query_intent_current(uuid,uuid,jsonb,uuid,jsonb)']) f`
-	const packetQueryShape = `SELECT jsonb_build_object('columns',(SELECT jsonb_agg(to_jsonb(c) ORDER BY c.ordinal_position) FROM (SELECT column_name,ordinal_position,is_nullable,data_type FROM information_schema.columns WHERE table_schema='public' AND table_name='context_query') c),'constraints',(SELECT jsonb_agg(pg_get_constraintdef(oid) ORDER BY conname) FROM pg_constraint WHERE conrelid IN ('context_query'::regclass,'access_grant'::regclass,'access_grant_use'::regclass)),'indexes',(SELECT jsonb_agg(indexdef ORDER BY indexdef) FROM pg_indexes WHERE schemaname='public' AND tablename='context_query'))::text`
+	const packetQueryDefinitions = `SELECT string_agg(pg_get_functiondef(f::regprocedure),E'\n' ORDER BY f) FROM unnest(ARRAY['public.context_query_scope_source_valid(jsonb)','public.context_query_begin_tool(jsonb)','public.context_query_read_batches(jsonb)','public.context_query_units(jsonb)','public.guard_context_query()','public.guard_context_query_child()','public.operation_audit_lane(text)','public.operation_audit_human_input_valid(text,text)','public.guard_operation_audit()','public.context_query_intent_current(uuid,uuid,jsonb,uuid,jsonb)','public.context_query_outcome_closed(uuid,uuid,jsonb,uuid)','public.guard_context_query_account()']) f`
+	const packetQueryShape = `SELECT jsonb_build_object('columns',(SELECT jsonb_agg(to_jsonb(c) ORDER BY c.table_name,c.ordinal_position) FROM (SELECT table_name,column_name,ordinal_position,is_nullable,data_type,column_default FROM information_schema.columns WHERE table_schema='public' AND table_name IN ('context_query','access_grant','access_grant_use','context_query_key_binding')) c),'constraints',(SELECT jsonb_agg(x ORDER BY x) FROM (SELECT conrelid::regclass::text||':'||pg_get_constraintdef(oid) x FROM pg_constraint WHERE conrelid IN ('context_query'::regclass,'access_grant'::regclass,'access_grant_use'::regclass,'context_query_key_binding'::regclass)) c),'indexes',(SELECT jsonb_agg(indexdef ORDER BY indexdef) FROM pg_indexes WHERE schemaname='public' AND tablename IN ('context_query','access_grant','access_grant_use','context_query_key_binding')))::text`
 	var originalPacketQueryFunctions, originalPacketQueryShape string
 	if head == 139 {
 		if e = conn.QueryRow(ctx, packetQueryDefinitions).Scan(&originalPacketQueryFunctions); e != nil {
@@ -239,6 +239,24 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 		if _, e = p.UpTo(ctx, head-1); e != nil {
 			t.Fatal("restore previous schema before production upgrade", e)
 		}
+	}
+	if head == 139 {
+		// Historical setup temporarily removes/re-adds133columns. Verify its
+		// logical138shape, then bind the STRICT139roundtrip to the actual
+		// immediately preceding138catalog, including its physical ordinals.
+		var preparedFunctions, preparedShape string
+		if e = conn.QueryRow(ctx, packetQueryDefinitions).Scan(&preparedFunctions); e != nil || preparedFunctions != originalPacketQueryFunctions {
+			t.Fatal("preparatory restoration changed138functions", e)
+		}
+		if e = conn.QueryRow(ctx, packetQueryShape).Scan(&preparedShape); e != nil {
+			t.Fatal("prepared138schema", e)
+		}
+		ordinals, err := packetQueryPreparationShape(originalPacketQueryShape, preparedShape)
+		if err != nil {
+			t.Fatal("historical preparation changed logical138schema", err)
+		}
+		t.Logf("preparatory138logical columns/order/types/nullability/defaults/constraints/indexes exact; physical ordinal changes before139: %v", ordinals)
+		originalPacketQueryFunctions, originalPacketQueryShape = preparedFunctions, preparedShape
 	}
 	const profileCancelDefinition = `SELECT pg_get_functiondef('public.guard_snapshot_cancel()'::regprocedure)`
 	var originalCancellation string
@@ -377,6 +395,10 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 		qualifyPacketQuerySQLFunctions(t, ctx, conn)
 		if _, e = p.DownTo(ctx, 138); e != nil {
 			t.Fatal("empty packet query Down", e)
+		}
+		var helpersAbsent bool
+		if e = conn.QueryRow(ctx, `SELECT to_regprocedure('public.context_packet_query_uuid(text)') IS NULL AND to_regprocedure('public.context_packet_query_window_valid(jsonb,text)') IS NULL AND to_regprocedure('public.context_packet_query_scope_grant_current(uuid,jsonb,jsonb,jsonb)') IS NULL AND to_regprocedure('public.context_packet_query_grant_current(uuid,uuid,uuid)') IS NULL`).Scan(&helpersAbsent); e != nil || !helpersAbsent {
+			t.Fatal("139Down retainednewpacketqueryhelpers", e)
 		}
 		var functions, shape, trust string
 		if e = conn.QueryRow(ctx, packetQueryDefinitions).Scan(&functions); e != nil || functions != originalPacketQueryFunctions {

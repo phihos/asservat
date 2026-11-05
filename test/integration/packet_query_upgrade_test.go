@@ -4,6 +4,8 @@ import (
 	"asservat.local/asservat/internal/adapters/postgres"
 	"context"
 	"encoding/json"
+	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -94,5 +96,91 @@ func restorePacketQueryFixturePredicate(t *testing.T, ctx context.Context, f *qu
 		if !found {
 			t.Fatal("compiled predicate grant missing", purpose)
 		}
+	}
+}
+
+// Historical fixture preparation can consume pg_attribute slots by dropping
+// and re-adding old columns. Ignore ONLY those numeric slots for this separate
+// preparation check. Array order and every other logical schema value remain
+// exact. The actual139roundtrip still compares its full snapshot byte-for-byte.
+func packetQueryPreparationShape(before, after string) ([]string, error) {
+	var a, b map[string]any
+	if json.Unmarshal([]byte(before), &a) != nil || json.Unmarshal([]byte(after), &b) != nil {
+		return nil, fmt.Errorf("invalid preparation schema snapshots")
+	}
+	first, ok := a["columns"].([]any)
+	last, okLast := b["columns"].([]any)
+	if !ok || !okLast || len(first) == 0 || len(first) != len(last) {
+		return nil, fmt.Errorf("preparation changed visible column count")
+	}
+	var drift []string
+	for i, c := range first {
+		x, ok := c.(map[string]any)
+		y, okY := last[i].(map[string]any)
+		if !ok || !okY {
+			return nil, fmt.Errorf("invalid column snapshot")
+		}
+		old, ok := x["ordinal_position"].(float64)
+		current, okNow := y["ordinal_position"].(float64)
+		if !ok || !okNow || old < 1 || current < 1 || old != float64(int(old)) || current != float64(int(current)) {
+			return nil, fmt.Errorf("invalid column ordinal")
+		}
+		if old != current {
+			drift = append(drift, fmt.Sprintf("%s.%s:%d->%d", x["table_name"], x["column_name"], int(old), int(current)))
+		}
+		delete(x, "ordinal_position")
+		delete(y, "ordinal_position")
+		if !reflect.DeepEqual(x, y) {
+			return nil, fmt.Errorf("preparation changed column/order at position%d", i)
+		}
+	}
+	if !reflect.DeepEqual(a, b) {
+		return nil, fmt.Errorf("preparation changed constraints/indexes or other schema values")
+	}
+	return drift, nil
+}
+
+func TestPacketQueryPreparationShapePreservesLogicalSchema(t *testing.T) {
+	before := map[string]any{"columns": []any{map[string]any{"table_name": "context_query", "column_name": "id", "ordinal_position": 1, "data_type": "uuid", "is_nullable": "NO", "column_default": nil}, map[string]any{"table_name": "context_query", "column_name": "baseline_allocation_id", "ordinal_position": 23, "data_type": "uuid", "is_nullable": "YES", "column_default": nil}}, "constraints": []any{"context_query:oldcheck", "context_query_key_binding:typedbound"}, "indexes": []any{"CREATE UNIQUE INDEX original ON context_query(id)"}}
+	baseline, _ := json.Marshal(before)
+	prepared := func() map[string]any {
+		var out map[string]any
+		if json.Unmarshal(baseline, &out) != nil {
+			t.Fatal("fixture")
+		}
+		out["columns"].([]any)[1].(map[string]any)["ordinal_position"] = float64(24)
+		return out
+	}
+	b, _ := json.Marshal(prepared())
+	drift, err := packetQueryPreparationShape(string(baseline), string(b))
+	if err != nil || !reflect.DeepEqual(drift, []string{"context_query.baseline_allocation_id:23->24"}) {
+		t.Fatal("physicalslotonlychange", drift, err)
+	}
+	for _, mode := range []string{"name", "order", "type", "nullable", "default", "constraint", "index"} {
+		t.Run(mode, func(t *testing.T) {
+			bad := prepared()
+			cols := bad["columns"].([]any)
+			c := cols[1].(map[string]any)
+			switch mode {
+			case "name":
+				c["column_name"] = "replacement"
+			case "order":
+				cols[0], cols[1] = cols[1], cols[0]
+			case "type":
+				c["data_type"] = "text"
+			case "nullable":
+				c["is_nullable"] = "NO"
+			case "default":
+				c["column_default"] = "generated"
+			case "constraint":
+				bad["constraints"] = []any{"weaker"}
+			case "index":
+				bad["indexes"] = []any{"nonunique"}
+			}
+			b, _ := json.Marshal(bad)
+			if _, err := packetQueryPreparationShape(string(baseline), string(b)); err == nil {
+				t.Fatal("logical schema delta hidden", mode)
+			}
+		})
 	}
 }
