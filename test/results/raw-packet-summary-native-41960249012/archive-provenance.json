@@ -1,0 +1,56 @@
+{
+  "format": "asservat-native-proof-provenance/v1",
+  "source_commit": "b6e2c08476829e0a1ff46240ffd0b13fdded34af",
+  "source_tree": "33a5659402e0bb2ea520802d6708c2a6424f1a64",
+  "merge": {
+    "pr": 167,
+    "merged_at": "2026-11-05T03:38:53Z",
+    "merge_commit": "897fd783d6963073ce421cb6a211ffd59a1cdebf",
+    "fresh_main": "897fd783d6963073ce421cb6a211ffd59a1cdebf",
+    "complete_trees": {
+      "b6e2c08476829e0a1ff46240ffd0b13fdded34af": "33a5659402e0bb2ea520802d6708c2a6424f1a64",
+      "897fd783d6963073ce421cb6a211ffd59a1cdebf": "33a5659402e0bb2ea520802d6708c2a6424f1a64",
+      "origin/main": "33a5659402e0bb2ea520802d6708c2a6424f1a64"
+    },
+    "all_complete_trees_equal": true,
+    "ci": 41960208068,
+    "native": 41960249012
+  },
+  "native": {
+    "id": 41960249012,
+    "head_sha": "b6e2c08476829e0a1ff46240ffd0b13fdded34af",
+    "event": "workflow_dispatch",
+    "status": "completed",
+    "conclusion": "success",
+    "created_at": "2026-11-05T03:13:41Z",
+    "run_started_at": "2026-11-05T03:13:41Z",
+    "updated_at": "2026-11-05T03:32:45Z"
+  },
+  "eligible_required_ci": {
+    "id": 41960208068,
+    "event": "pull_request",
+    "head": "b6e2c08476829e0a1ff46240ffd0b13fdded34af",
+    "conclusion": "success",
+    "jobs": 15,
+    "all_jobs_passed": true,
+    "ci_ok_passed": true
+  },
+  "archive_members": 22,
+  "all_readbacks_byte_identical_to_retained_originals": true,
+  "server_zip_digest_matched": true,
+  "original_artifact_five_members": [
+    "ci-native-continuation-manual-raw.log",
+    "context-storage-environment.json",
+    "context-storage-timing.log",
+    "context-storage.log",
+    "manual-raw.pcapng"
+  ],
+  "scope_limits": [
+    "No installed maximum-size/aggregate/tiny-prefix/OOM or sustained500m qualification.",
+    "No second workload cluster, replay or capture-history Repeat exercised.",
+    "No arbitrary raw pcap_query/native permission from summary authority.",
+    "Both query terminal checks passed; exact absence requires positive SQL retirement, but branch not logged. Later-retirement callback unused; no unconditional retirement/refund/reclaimed-capacity claim.",
+    "The native run is workflow_dispatch qualification, not required pull_request CI. Automatic merge-main CI is separate from eligible reviewed-head CI41960208068.",
+    "Earlier failed/local/resource/service reports retain their own scopes; not duplicated or relabeled here."
+  ]
+}

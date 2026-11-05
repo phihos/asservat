@@ -1,6 +1,7 @@
 # ADR-304: Fixed transient summaries of raw packet recordings
 
-Date: 2026-11-05. Status: implementation; qualification pending.
+Date: 2026-11-05. Status: implemented and reference installed workflow qualified;
+broader qualification remains scoped below.
 Requirements: REQ-NET-005, REQ-EVD-005/008, REQ-MCP-003/005, REQ-DLD-001.
 Extends [ADR-303](303-saved-packet-summary.md) using the accepted bounded Go
 mechanism in [ADR-286](286-bounded-go-analyzer-isolation.md).
@@ -88,3 +89,24 @@ encrypted key/store read, compiled SQL roles and rollback, built React, then the
 installed MCP/browser summary and same-original native PCAPNG parity. Include a
 synthetic payload marker that never appears in approved output or normal logs.
 No checkbox or component pass establishes an installed raw-summary workflow.
+
+## Qualification
+
+PR167 merged as `897fd783` with the complete tree equal to reviewed `b6e2c084`.
+Eligible pull-request CI41960208068 passed all15 jobs. The
+[installed manual-raw reference](../../test/results/raw-packet-summary-native-41960249012/README.md)
+passed Go/harness0 in773.697s: ordinary read-only MCP and actual React summaries
+matched the same authenticated9,400-byte original through native/tshark parity,
+54 saved records, two directional groups and0 unclassified records. Payload
+remained in the raw original and was excluded from the fixed output. Both paid
+queries passed source/account/three-key/worker terminal checks. All4,212 reported
+source hashes matched Git, sources stayed unchanged, cleanup was empty and
+scratch removed. Conditional retirement proof and unused later callback limits
+remain explicit in the report.
+
+Local compiled-role lifecycle/upgrade, built React and five named resource
+containers have separate retained evidence in implementation-progress.md.
+Those resource inputs do not establish every installed maximum or sustained
+500m throughput. Second-workload/replay/Repeat checks and arbitrary raw
+`pcap_query` were not exercised by this focused native run; complete S-05 is
+unfinished.
