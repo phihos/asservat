@@ -49,7 +49,9 @@ func withCapacityProducerFixture(t *testing.T, qualify capacityProducerCheck) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	defer admin.Close()
+	// Later fixture helpers register role cleanup against this borrowed pool.
+	// Keep its owner alive until those LIFO cleanups have completed.
+	t.Cleanup(admin.Close)
 	// Dedicated owned database only; there must be no earlier installation state.
 	var count int
 	if e = admin.QueryRow(ctx, "SELECT (SELECT count(*) FROM fleet_trust)+(SELECT count(*) FROM fleet_initial_activation)").Scan(&count); e != nil || count != 0 {
