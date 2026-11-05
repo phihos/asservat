@@ -39,8 +39,34 @@ func TestHistoryAttachmentWaitsAfterJoinedExchange(t *testing.T) {
 		work.Authority.CopiesDigest = capture.HistoryCopiesDigest(copies)
 		work.Authority.NotAfter = deadline
 		hub, region := historyStreamPair(t, t.Context(), r)
-		joined := make(chan struct{})
-		go func() { defer close(joined); _ = standby.Serve(hub, time.Now); _ = hub.Close(); standby.Finish() }()
+		served, regionalDone, joined := make(chan struct{}), make(chan struct{}), make(chan struct{})
+		// The real hub ends its HTTP/2 response after the receipt; it does not
+		// close the regional client's TCP connection. Keep this full-duplex
+		// net.Pipe alive until the region validates that terminal receipt too.
+		go func() {
+			defer close(joined)
+			_ = standby.Serve(hub, time.Now)
+			close(served)
+			<-regionalDone
+			_ = hub.Close()
+			standby.Finish()
+		}()
+		readDeadline := region.readDeadline
+		region.readDeadline = func(until time.Time) error {
+			region.mu.Lock()
+			final := region.lease != nil && region.lease.final
+			region.mu.Unlock()
+			if final {
+				// Exercise the former failure order deliberately: the ACK was
+				// sent before Receive installs its still-original deadline.
+				select {
+				case <-served:
+				case <-ctx.Done():
+					return ctx.Err()
+				}
+			}
+			return readDeadline(until)
+		}
 		local := &HistoryLocal{Verifier: historyVerifierFunc(func(context.Context, []byte, fleet.APIContextReceiver) (fleetapp.AuthenticatedHistoryWork, error) {
 			return fleetapp.AuthenticatedHistoryWork{Work: work, KeyID: "synthetic", TrustRevision: workFixture().TrustRevision, VerifiedAt: work.Authority.StartedAt, ValidUntil: deadline}, nil
 		}), Effects: historyEffectsFunc(func(context.Context, capture.HistoryOperationAuthority, capture.HistoryCiphertexts, artifact.Copies) (fleetapp.HistoryReply, error) {
@@ -49,6 +75,7 @@ func TestHistoryAttachmentWaitsAfterJoinedExchange(t *testing.T) {
 		})}
 		regional := make(chan error, 1)
 		go func() {
+			defer close(regionalDone)
 			frame, current, e := region.AwaitWork(ctx)
 			if e == nil && frame.Kind == contracts.HistoryWorkFrame {
 				e = serveRegionalHistory(ctx, region, current, frame.Payload, local, time.Now)

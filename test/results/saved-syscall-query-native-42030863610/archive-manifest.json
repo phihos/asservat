@@ -1,0 +1,105 @@
+{
+  "format": "saved-syscall-query-failed-native/v1",
+  "source_commit": "6fe419ada2c9a7013ca2ccfb72a31c2708171574",
+  "workflow_conclusion": "failure",
+  "go_exit": 1,
+  "harness_exit": 1,
+  "members": [
+    {
+      "member": "ci-native-continuation-manual-arguments.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-native-42030863610/artifacts/native-continuation-manual-arguments-1/ci-native-continuation-manual-arguments.log",
+      "original_bytes": 3335,
+      "original_sha256": "f13853797149c5ed8125a676830fc4bb4048b804c5a18a033992f7120371cc4f",
+      "gzip_bytes": 1218,
+      "gzip_sha256": "88d4a34e67ddbd7a1428fd65b38fbeb0f4b269538c4166068bf6a369788470f9"
+    },
+    {
+      "member": "context-storage-environment.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-native-42030863610/artifacts/native-continuation-manual-arguments-1/context-storage-environment.json",
+      "original_bytes": 554513,
+      "original_sha256": "0ba87ad5bb97458b9d55d375aaf684b17586f15c3911b248507ddb92f603efc2",
+      "gzip_bytes": 208351,
+      "gzip_sha256": "4853d75382e58d2a1af3624ca7971e0c8c5c8030d23fef0e46df93be6c1aa14b"
+    },
+    {
+      "member": "context-storage-kubelet.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-native-42030863610/artifacts/native-continuation-manual-arguments-1/context-storage-kubelet.log",
+      "original_bytes": 25403,
+      "original_sha256": "e82ffdb446c313ebd42aed916413e63d6e0d67e47daea0e74f0c2b565bc2b428",
+      "gzip_bytes": 2326,
+      "gzip_sha256": "76bdb7026175ef8c4d074861c2758bcc1eaa88287ff460493522178bb0621b5b"
+    },
+    {
+      "member": "context-storage-postgres.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-native-42030863610/artifacts/native-continuation-manual-arguments-1/context-storage-postgres.log",
+      "original_bytes": 472468,
+      "original_sha256": "0af7c6af98c1958fd78b1bcf84a06a14b778572c13b4db53b882c9de7004e8b3",
+      "gzip_bytes": 26218,
+      "gzip_sha256": "30812871b40a2048cf4a8903424db023dcf9c5d5726aa2a378ddc1a8e1119f8e"
+    },
+    {
+      "member": "context-storage-timing.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-native-42030863610/artifacts/native-continuation-manual-arguments-1/context-storage-timing.log",
+      "original_bytes": 190270,
+      "original_sha256": "1dea028bc015df1054be69e7bf7c3d35ec6c4016ec97fce04728752af313383f",
+      "gzip_bytes": 23085,
+      "gzip_sha256": "e2c16a02b177c63079f7f42e5d1050bdb1870b0ef9764950c435a47575034208"
+    },
+    {
+      "member": "context-storage.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-native-42030863610/artifacts/native-continuation-manual-arguments-1/context-storage.log",
+      "original_bytes": 179506,
+      "original_sha256": "9d20bc82177d0de60444405005035fe84c79097a0c289b8f830616d2814f56d3",
+      "gzip_bytes": 22184,
+      "gzip_sha256": "8e3b286049c72d110aecef9cb6a67c29431b992c3763941206ef0e3e93a5d38c"
+    },
+    {
+      "member": "manual-arguments.jsonl.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-native-42030863610/artifacts/native-continuation-manual-arguments-1/manual-arguments.jsonl",
+      "original_bytes": 33494,
+      "original_sha256": "2f96f77b2ba0d5501f7e4496f2443f4293053e782dffc3533db50259eba25042",
+      "gzip_bytes": 1912,
+      "gzip_sha256": "b0bc80d3ab4f5d2f12c2386951742bcf149ede86168508454e796c1120a98f48"
+    },
+    {
+      "member": "source-audit.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-native-42030863610/source-audit.json",
+      "original_bytes": 515,
+      "original_sha256": "8c1c95ed89733a106376e562f061d2772747a4e3e8d55978efee5281cdbd3722",
+      "gzip_bytes": 356,
+      "gzip_sha256": "bcae370d3571e55bdda3462b98405f023cb8c5454aaa324298d36da61f46159f"
+    },
+    {
+      "member": "saved-syscall-query-native-42030863610-terminal.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-native-42030863610-terminal.json",
+      "original_bytes": 4854,
+      "original_sha256": "a965818ec62302058d44385d89c4c71bdf7f6f320e42b93e4000d49a94a81a4c",
+      "gzip_bytes": 864,
+      "gzip_sha256": "c13aaf3e2a86fa26d46bea8c54885abbdede8cb07382f6ea7174f07b02805a4f"
+    },
+    {
+      "member": "saved-syscall-query-native-42030863610-artifacts.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-native-42030863610-artifacts.json",
+      "original_bytes": 751,
+      "original_sha256": "27ec8c15733824e9af047971a5c6eef5619b7d1b9e1e7963944a5c8c995539a4",
+      "gzip_bytes": 453,
+      "gzip_sha256": "fc5323e93ac411b51801bf7778167fadffca69cfa3c49a147ca8cbca0d7c5963"
+    },
+    {
+      "member": "ci42030712526-terminal.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query/ci42030712526-terminal.json",
+      "original_bytes": 22677,
+      "original_sha256": "de1c1e410efa1047539098e807c0ce8a712d3966904d9b3b4b41c81c30e2a40e",
+      "gzip_bytes": 1906,
+      "gzip_sha256": "fbfbafc8ccd2b0f324dc64d7bdc6db819dd960171aef2460ab645d1c07f674b1"
+    },
+    {
+      "member": "ci42030712526-failed.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query/ci42030712526-failed.log",
+      "original_bytes": 74911,
+      "original_sha256": "e9169783918439c542bd6c333d3434debdbe0b95c5ba1a15c49b748de26d62d6",
+      "gzip_bytes": 12246,
+      "gzip_sha256": "54ee1cf8c12a14755fe4d636d318fc3d112cb3a661afb8dfa6b7e42b4b910902"
+    }
+  ]
+}

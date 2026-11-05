@@ -1,5 +1,24 @@
 # Sustained implementation progress
 
+## Installed raw syscall queries pass; Repeat preview remains failing (2026-11-05)
+
+Candidate `6fe419ad` completed all five fixed views and new raw MCP/actual React
+query/nativeJSONL parity, exact18-unit/shared-grant/key accounting and original
+worker joins. Native42030863610 nevertheless failed later in the existing
+Repeat preview at `facts/storage/expired/readiness-tail` (Go/harness1,
+884.527s). It read history successfully; fresh capacity publication finished
+31.675ms after the preview's readiness refusal. Exact original cutoff dates
+are unlogged; later current snapshots are not failure-time proof. Stop was not
+reached. [Originals and scope](../test/results/saved-syscall-query-native-42030863610/README.md)
+retain4,291 exact Git hashes, unchanged sources, clean teardown and native data.
+
+CI separately exposed a pre-existing synthetic history transport close race.
+The test-only correction retains real final ACK validation, joined cleanup
+and original4.5s/5s bounds; production transport files remain byte-identical.
+The installed Repeat failure is being reproduced at its storage-readiness
+boundary before another candidate or hosted attempt. PR171 remains open and
+the full specification goal remains active.
+
 ## Installed syscall argument-query fixture prepared on merged main (2026-11-05)
 
 The candidate is rebased onto main through PR169/170. Runtime/native Go files
