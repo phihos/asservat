@@ -428,14 +428,23 @@
         "maximum": 100000
       },
       "d5": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "actionID": {
+            "$ref": "#/$defs/d6"
+          },
+          "value": {},
+          "field": {}
+        },
+        "required": [
+          "actionID",
+          "field",
+          "value"
+        ],
         "oneOf": [
           {
-            "type": "object",
-            "additionalProperties": false,
             "properties": {
-              "actionID": {
-                "$ref": "#/$defs/d6"
-              },
               "field": {
                 "const": "packetPeers"
               },
@@ -630,280 +639,143 @@
                   "maxStaleness"
                 ]
               }
-            },
-            "required": [
-              "actionID",
-              "field",
-              "value"
-            ]
+            }
           },
           {
-            "type": "object",
-            "additionalProperties": false,
             "properties": {
-              "actionID": {
-                "$ref": "#/$defs/d6"
-              },
               "field": {
                 "const": "packetFilter"
               },
               "value": {
                 "$ref": "#/$defs/d8"
               }
-            },
-            "required": [
-              "actionID",
-              "field",
-              "value"
-            ]
+            }
           },
           {
-            "type": "object",
-            "additionalProperties": false,
             "properties": {
-              "actionID": {
-                "$ref": "#/$defs/d6"
-              },
               "field": {
                 "const": "packetBefore"
               },
               "value": {
                 "$ref": "#/$defs/d9"
               }
-            },
-            "required": [
-              "actionID",
-              "field",
-              "value"
-            ]
+            }
           },
           {
-            "type": "object",
-            "additionalProperties": false,
             "properties": {
-              "actionID": {
-                "$ref": "#/$defs/d6"
-              },
               "field": {
                 "const": "packetAfter"
               },
               "value": {
                 "$ref": "#/$defs/d10"
               }
-            },
-            "required": [
-              "actionID",
-              "field",
-              "value"
-            ]
+            }
           },
           {
-            "type": "object",
-            "additionalProperties": false,
             "properties": {
-              "actionID": {
-                "$ref": "#/$defs/d6"
-              },
               "field": {
                 "const": "packetRing"
               },
               "value": {
                 "$ref": "#/$defs/d11"
               }
-            },
-            "required": [
-              "actionID",
-              "field",
-              "value"
-            ]
+            }
           },
           {
-            "type": "object",
-            "additionalProperties": false,
             "properties": {
-              "actionID": {
-                "$ref": "#/$defs/d6"
-              },
               "field": {
-                "const": "profileDuration"
+                "enum": [
+                  "profileDuration",
+                  "actionTimeout"
+                ]
               },
               "value": {
                 "$ref": "#/$defs/d7"
               }
-            },
-            "required": [
-              "actionID",
-              "field",
-              "value"
-            ]
+            }
           },
           {
-            "type": "object",
-            "additionalProperties": false,
             "properties": {
-              "actionID": {
-                "$ref": "#/$defs/d6"
-              },
               "field": {
                 "const": "syscallFilter"
               },
               "value": {
                 "$ref": "#/$defs/d12"
               }
-            },
-            "required": [
-              "actionID",
-              "field",
-              "value"
-            ]
+            }
           },
           {
-            "type": "object",
-            "additionalProperties": false,
             "properties": {
-              "actionID": {
-                "$ref": "#/$defs/d6"
-              },
               "field": {
                 "const": "syscallMode"
               },
               "value": {
                 "$ref": "#/$defs/d13"
               }
-            },
-            "required": [
-              "actionID",
-              "field",
-              "value"
-            ]
+            }
           },
           {
-            "type": "object",
-            "additionalProperties": false,
             "properties": {
-              "actionID": {
-                "$ref": "#/$defs/d6"
-              },
               "field": {
                 "const": "syscallBefore"
               },
               "value": {
                 "$ref": "#/$defs/d14"
               }
-            },
-            "required": [
-              "actionID",
-              "field",
-              "value"
-            ]
+            }
           },
           {
-            "type": "object",
-            "additionalProperties": false,
             "properties": {
-              "actionID": {
-                "$ref": "#/$defs/d6"
-              },
               "field": {
                 "const": "syscallAfter"
               },
               "value": {
                 "$ref": "#/$defs/d15"
               }
-            },
-            "required": [
-              "actionID",
-              "field",
-              "value"
-            ]
+            }
           },
           {
-            "type": "object",
-            "additionalProperties": false,
             "properties": {
-              "actionID": {
-                "$ref": "#/$defs/d6"
-              },
               "field": {
                 "const": "syscallRing"
               },
               "value": {
                 "$ref": "#/$defs/d16"
               }
-            },
-            "required": [
-              "actionID",
-              "field",
-              "value"
-            ]
+            }
           },
           {
-            "type": "object",
-            "additionalProperties": false,
             "properties": {
-              "actionID": {
-                "$ref": "#/$defs/d6"
-              },
               "field": {
                 "const": "syscallArguments"
               },
               "value": {
                 "$ref": "#/$defs/d17"
               }
-            },
-            "required": [
-              "actionID",
-              "field",
-              "value"
-            ]
+            }
           },
           {
-            "type": "object",
-            "additionalProperties": false,
             "properties": {
-              "actionID": {
-                "$ref": "#/$defs/d6"
-              },
               "field": {
                 "const": "syscallMaxEvents"
               },
               "value": {
                 "$ref": "#/$defs/d18"
               }
-            },
-            "required": [
-              "actionID",
-              "field",
-              "value"
-            ]
+            }
           },
           {
-            "type": "object",
-            "additionalProperties": false,
             "properties": {
-              "actionID": {
-                "$ref": "#/$defs/d6"
-              },
               "field": {
                 "const": "syscallRate"
               },
               "value": {
                 "$ref": "#/$defs/d19"
               }
-            },
-            "required": [
-              "actionID",
-              "field",
-              "value"
-            ]
+            }
           },
           {
-            "type": "object",
-            "additionalProperties": false,
             "properties": {
-              "actionID": {
-                "$ref": "#/$defs/d6"
-              },
               "field": {
                 "const": "actionMaxBytes"
               },
@@ -912,40 +784,10 @@
                 "minimum": 1,
                 "maximum": 1099511627776
               }
-            },
-            "required": [
-              "actionID",
-              "field",
-              "value"
-            ]
+            }
           },
           {
-            "type": "object",
-            "additionalProperties": false,
             "properties": {
-              "actionID": {
-                "$ref": "#/$defs/d6"
-              },
-              "field": {
-                "const": "actionTimeout"
-              },
-              "value": {
-                "$ref": "#/$defs/d7"
-              }
-            },
-            "required": [
-              "actionID",
-              "field",
-              "value"
-            ]
-          },
-          {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "actionID": {
-                "$ref": "#/$defs/d6"
-              },
               "field": {
                 "const": "actionExecutionMode"
               },
@@ -955,64 +797,25 @@
                   "ongoing"
                 ]
               }
-            },
-            "required": [
-              "actionID",
-              "field",
-              "value"
-            ]
+            }
           },
           {
-            "type": "object",
-            "additionalProperties": false,
             "properties": {
-              "actionID": {
-                "$ref": "#/$defs/d6"
-              },
               "field": {
-                "const": "logBefore"
+                "enum": [
+                  "logBefore",
+                  "logAfter"
+                ]
               },
               "value": {
                 "type": "string",
                 "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
                 "maxLength": 16
               }
-            },
-            "required": [
-              "actionID",
-              "field",
-              "value"
-            ]
+            }
           },
           {
-            "type": "object",
-            "additionalProperties": false,
             "properties": {
-              "actionID": {
-                "$ref": "#/$defs/d6"
-              },
-              "field": {
-                "const": "logAfter"
-              },
-              "value": {
-                "type": "string",
-                "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
-                "maxLength": 16
-              }
-            },
-            "required": [
-              "actionID",
-              "field",
-              "value"
-            ]
-          },
-          {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "actionID": {
-                "$ref": "#/$defs/d6"
-              },
               "field": {
                 "const": "logStream"
               },
@@ -1022,12 +825,7 @@
                   "both"
                 ]
               }
-            },
-            "required": [
-              "actionID",
-              "field",
-              "value"
-            ]
+            }
           }
         ]
       },
@@ -1880,14 +1678,23 @@
         "maximum": 100000
       },
       "d4": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "actionID": {
+            "$ref": "#/$defs/d5"
+          },
+          "value": {},
+          "field": {}
+        },
+        "required": [
+          "actionID",
+          "field",
+          "value"
+        ],
         "oneOf": [
           {
-            "type": "object",
-            "additionalProperties": false,
             "properties": {
-              "actionID": {
-                "$ref": "#/$defs/d5"
-              },
               "field": {
                 "const": "packetPeers"
               },
@@ -2082,280 +1889,143 @@
                   "maxStaleness"
                 ]
               }
-            },
-            "required": [
-              "actionID",
-              "field",
-              "value"
-            ]
+            }
           },
           {
-            "type": "object",
-            "additionalProperties": false,
             "properties": {
-              "actionID": {
-                "$ref": "#/$defs/d5"
-              },
               "field": {
                 "const": "packetFilter"
               },
               "value": {
                 "$ref": "#/$defs/d7"
               }
-            },
-            "required": [
-              "actionID",
-              "field",
-              "value"
-            ]
+            }
           },
           {
-            "type": "object",
-            "additionalProperties": false,
             "properties": {
-              "actionID": {
-                "$ref": "#/$defs/d5"
-              },
               "field": {
                 "const": "packetBefore"
               },
               "value": {
                 "$ref": "#/$defs/d8"
               }
-            },
-            "required": [
-              "actionID",
-              "field",
-              "value"
-            ]
+            }
           },
           {
-            "type": "object",
-            "additionalProperties": false,
             "properties": {
-              "actionID": {
-                "$ref": "#/$defs/d5"
-              },
               "field": {
                 "const": "packetAfter"
               },
               "value": {
                 "$ref": "#/$defs/d9"
               }
-            },
-            "required": [
-              "actionID",
-              "field",
-              "value"
-            ]
+            }
           },
           {
-            "type": "object",
-            "additionalProperties": false,
             "properties": {
-              "actionID": {
-                "$ref": "#/$defs/d5"
-              },
               "field": {
                 "const": "packetRing"
               },
               "value": {
                 "$ref": "#/$defs/d10"
               }
-            },
-            "required": [
-              "actionID",
-              "field",
-              "value"
-            ]
+            }
           },
           {
-            "type": "object",
-            "additionalProperties": false,
             "properties": {
-              "actionID": {
-                "$ref": "#/$defs/d5"
-              },
               "field": {
-                "const": "profileDuration"
+                "enum": [
+                  "profileDuration",
+                  "actionTimeout"
+                ]
               },
               "value": {
                 "$ref": "#/$defs/d6"
               }
-            },
-            "required": [
-              "actionID",
-              "field",
-              "value"
-            ]
+            }
           },
           {
-            "type": "object",
-            "additionalProperties": false,
             "properties": {
-              "actionID": {
-                "$ref": "#/$defs/d5"
-              },
               "field": {
                 "const": "syscallFilter"
               },
               "value": {
                 "$ref": "#/$defs/d11"
               }
-            },
-            "required": [
-              "actionID",
-              "field",
-              "value"
-            ]
+            }
           },
           {
-            "type": "object",
-            "additionalProperties": false,
             "properties": {
-              "actionID": {
-                "$ref": "#/$defs/d5"
-              },
               "field": {
                 "const": "syscallMode"
               },
               "value": {
                 "$ref": "#/$defs/d12"
               }
-            },
-            "required": [
-              "actionID",
-              "field",
-              "value"
-            ]
+            }
           },
           {
-            "type": "object",
-            "additionalProperties": false,
             "properties": {
-              "actionID": {
-                "$ref": "#/$defs/d5"
-              },
               "field": {
                 "const": "syscallBefore"
               },
               "value": {
                 "$ref": "#/$defs/d13"
               }
-            },
-            "required": [
-              "actionID",
-              "field",
-              "value"
-            ]
+            }
           },
           {
-            "type": "object",
-            "additionalProperties": false,
             "properties": {
-              "actionID": {
-                "$ref": "#/$defs/d5"
-              },
               "field": {
                 "const": "syscallAfter"
               },
               "value": {
                 "$ref": "#/$defs/d14"
               }
-            },
-            "required": [
-              "actionID",
-              "field",
-              "value"
-            ]
+            }
           },
           {
-            "type": "object",
-            "additionalProperties": false,
             "properties": {
-              "actionID": {
-                "$ref": "#/$defs/d5"
-              },
               "field": {
                 "const": "syscallRing"
               },
               "value": {
                 "$ref": "#/$defs/d15"
               }
-            },
-            "required": [
-              "actionID",
-              "field",
-              "value"
-            ]
+            }
           },
           {
-            "type": "object",
-            "additionalProperties": false,
             "properties": {
-              "actionID": {
-                "$ref": "#/$defs/d5"
-              },
               "field": {
                 "const": "syscallArguments"
               },
               "value": {
                 "$ref": "#/$defs/d16"
               }
-            },
-            "required": [
-              "actionID",
-              "field",
-              "value"
-            ]
+            }
           },
           {
-            "type": "object",
-            "additionalProperties": false,
             "properties": {
-              "actionID": {
-                "$ref": "#/$defs/d5"
-              },
               "field": {
                 "const": "syscallMaxEvents"
               },
               "value": {
                 "$ref": "#/$defs/d17"
               }
-            },
-            "required": [
-              "actionID",
-              "field",
-              "value"
-            ]
+            }
           },
           {
-            "type": "object",
-            "additionalProperties": false,
             "properties": {
-              "actionID": {
-                "$ref": "#/$defs/d5"
-              },
               "field": {
                 "const": "syscallRate"
               },
               "value": {
                 "$ref": "#/$defs/d18"
               }
-            },
-            "required": [
-              "actionID",
-              "field",
-              "value"
-            ]
+            }
           },
           {
-            "type": "object",
-            "additionalProperties": false,
             "properties": {
-              "actionID": {
-                "$ref": "#/$defs/d5"
-              },
               "field": {
                 "const": "actionMaxBytes"
               },
@@ -2364,40 +2034,10 @@
                 "minimum": 1,
                 "maximum": 1099511627776
               }
-            },
-            "required": [
-              "actionID",
-              "field",
-              "value"
-            ]
+            }
           },
           {
-            "type": "object",
-            "additionalProperties": false,
             "properties": {
-              "actionID": {
-                "$ref": "#/$defs/d5"
-              },
-              "field": {
-                "const": "actionTimeout"
-              },
-              "value": {
-                "$ref": "#/$defs/d6"
-              }
-            },
-            "required": [
-              "actionID",
-              "field",
-              "value"
-            ]
-          },
-          {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "actionID": {
-                "$ref": "#/$defs/d5"
-              },
               "field": {
                 "const": "actionExecutionMode"
               },
@@ -2407,64 +2047,25 @@
                   "ongoing"
                 ]
               }
-            },
-            "required": [
-              "actionID",
-              "field",
-              "value"
-            ]
+            }
           },
           {
-            "type": "object",
-            "additionalProperties": false,
             "properties": {
-              "actionID": {
-                "$ref": "#/$defs/d5"
-              },
               "field": {
-                "const": "logBefore"
+                "enum": [
+                  "logBefore",
+                  "logAfter"
+                ]
               },
               "value": {
                 "type": "string",
                 "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
                 "maxLength": 16
               }
-            },
-            "required": [
-              "actionID",
-              "field",
-              "value"
-            ]
+            }
           },
           {
-            "type": "object",
-            "additionalProperties": false,
             "properties": {
-              "actionID": {
-                "$ref": "#/$defs/d5"
-              },
-              "field": {
-                "const": "logAfter"
-              },
-              "value": {
-                "type": "string",
-                "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
-                "maxLength": 16
-              }
-            },
-            "required": [
-              "actionID",
-              "field",
-              "value"
-            ]
-          },
-          {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "actionID": {
-                "$ref": "#/$defs/d5"
-              },
               "field": {
                 "const": "logStream"
               },
@@ -2474,12 +2075,7 @@
                   "both"
                 ]
               }
-            },
-            "required": [
-              "actionID",
-              "field",
-              "value"
-            ]
+            }
           }
         ]
       },

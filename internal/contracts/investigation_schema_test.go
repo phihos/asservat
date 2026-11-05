@@ -66,6 +66,46 @@ func TestInvestigationProfileDurationUsesClosedPublicEdit(t *testing.T) {
 	}
 }
 
+func TestInvestigationCompactOverridesPreserveTypedFields(t *testing.T) {
+	wire, err := NewInvestigationContracts()
+	if err != nil {
+		t.Fatal(err)
+	}
+	input := func(override string) []byte {
+		return []byte(`{"target_ref":{"cluster_id":"00000000-0000-4000-8000-000000000001","namespace":"payments","kind":"Deployment","name":"api"},"profile_composition":{"components":[{"id":"logs","profileRef":{"catalog":"builtin","name":"logs","version":"v1"},"overrides":[` + override + `]}],"maxTotalBytes":8388608,"maxDuration":"10s"}}`)
+	}
+	for _, field := range []string{"packetBefore", "packetAfter", "syscallBefore", "syscallAfter", "profileDuration", "actionTimeout", "logBefore", "logAfter"} {
+		for _, duration := range []string{"1s", "30s", "1h"} {
+			if err := wire.ValidateInput("preview_capture", input(fmt.Sprintf(`{"actionID":"a","field":%q,"value":%q}`, field, duration))); err != nil {
+				t.Fatalf("%s duration rejected: %v", field, err)
+			}
+		}
+		for _, bad := range []string{`null`, `30`, `"forever"`, `{}`, `true`} {
+			if wire.ValidateInput("preview_capture", input(fmt.Sprintf(`{"actionID":"a","field":%q,"value":%s}`, field, bad))) == nil {
+				t.Fatalf("%s admitted invalid duration %s", field, bad)
+			}
+		}
+	}
+	for _, field := range []string{"profileDuration", "actionTimeout"} {
+		if wire.ValidateInput("preview_capture", input(fmt.Sprintf(`{"actionID":"a","field":%q,"value":"0s"}`, field))) == nil {
+			t.Fatal("positive-only duration admitted zero", field)
+		}
+	}
+	for _, bad := range []string{
+		`{"field":"logBefore","value":"1s"}`,
+		`{"actionID":"a","value":"1s"}`,
+		`{"actionID":"a","field":"logBefore"}`,
+		`{"actionID":"a","field":"logBefore","value":"1s","extra":true}`,
+		`{"actionID":"a","field":"unknown","value":"1s"}`,
+		`{"actionID":"a","field":"logStream","value":"1s"}`,
+		`{"actionID":"a","field":"actionMaxBytes","value":"1s"}`,
+	} {
+		if wire.ValidateInput("preview_capture", input(bad)) == nil {
+			t.Fatal("override lost closed shape or field-specific bounds", bad)
+		}
+	}
+}
+
 func TestInvestigationInputsRejectUnsupportedOrAmbiguousValues(t *testing.T) {
 	s, err := NewInvestigationContracts()
 	if err != nil {

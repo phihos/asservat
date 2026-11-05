@@ -1,5 +1,26 @@
 # Sustained implementation progress
 
+## Saved-logs hosted results and targeted corrections (2026-11-05)
+
+Frozen `fb955e46` passes the hosted quota-enforced reader resource workflow;
+all4,825 inputs match Git and cleanup completes. This is synthetic reader/parser
+qualification, not installed full-worker qualification. Installed logs fail in
+synthetic listener readiness before acquisition (Go/harness1,514.443s overall),
+with4,363 exact Git inputs and cleanup[]. CI separately rejects the38,161B
+preview descriptor against the unchanged36KiB limit. [Original reports and
+failure logs](../test/results/finite-saved-logs-hosted-qualification/README.md)
+retain all three scopes.
+
+The correction asks readiness for one traffic record rather than4MiB/65,536
+flushes, retaining its2s deadline and100m fixture CPU. Connector reconfiguration
+joins old log workers before resetting closing; old terminal outcomes survive.
+Runtime schema generation shares the common closed override object and groups
+identical value constraints under disjoint field enums. The preview descriptor
+is33,387B; exact value/action bounds and36KiB budget remain unchanged. Full contracts races pass (12.128s), full bootstrap races pass (113.214s),
+and final `make pre-push` exits0 including587 console tests/51 files. The focused
+reconnect/readiness tests pass after reproduced baseline failures. Installed logs
+and full-specification completion remain pending.
+
 ## Finite whole-pod logs local service qualification passed (2026-11-05)
 
 Signed `1e85a5bb` passes the mixed logs/packet/syscall service lifecycle

@@ -1,0 +1,189 @@
+{
+  "commit": "fb955e46fed5f44d76568a944d761c2980aa9ce1",
+  "files": [
+    {
+      "archive": "resource-originals-ci-native-logs-resource.log.gz",
+      "original": "/home/phil/.cache/asservat-build/finite-logs-resource-native-42100969787/originals/ci-native-logs-resource.log",
+      "bytes": 4518,
+      "sha256": "3feaf5008a9b858ae56c005716277121e9ab859102e91859ee447a658db88feb",
+      "compressedBytes": 1204,
+      "compressedSHA256": "ad1d8bb331e108642c2a9740a29bbe58f8aabf122fca13eb6c62f39c7af883c1"
+    },
+    {
+      "archive": "resource-originals-logs-resource-build.log.gz",
+      "original": "/home/phil/.cache/asservat-build/finite-logs-resource-native-42100969787/originals/logs-resource/build.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "compressedBytes": 20,
+      "compressedSHA256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "archive": "resource-originals-logs-resource-dense-container.json.gz",
+      "original": "/home/phil/.cache/asservat-build/finite-logs-resource-native-42100969787/originals/logs-resource/dense-container.json",
+      "bytes": 6386,
+      "sha256": "d28e404fe1b6709968754ea6eb153ce6f14b1442e40a770533c27f0addcaa237",
+      "compressedBytes": 2031,
+      "compressedSHA256": "01da7affceb27df0671efe509303bbbc73954576720267e17d658cfefe3bfe0f"
+    },
+    {
+      "archive": "resource-originals-logs-resource-dense-generate.log.gz",
+      "original": "/home/phil/.cache/asservat-build/finite-logs-resource-native-42100969787/originals/logs-resource/dense-generate.log",
+      "bytes": 188,
+      "sha256": "34f3ec5b8648a9c9a4128a92075cc9586f63c9e74f6100789658c5792486c220",
+      "compressedBytes": 163,
+      "compressedSHA256": "68652b1db62f72854c1f12c6ec9185e3a55a1d16db0dea54b371d62c00f1aba4"
+    },
+    {
+      "archive": "resource-originals-logs-resource-dense-worker.log.gz",
+      "original": "/home/phil/.cache/asservat-build/finite-logs-resource-native-42100969787/originals/logs-resource/dense-worker.log",
+      "bytes": 1107,
+      "sha256": "33525dc37df8e76964183c99c4dc0c82b1ecc4368f4b6ee87faf6d45c9d4a7b1",
+      "compressedBytes": 440,
+      "compressedSHA256": "aa1a50017d2ce5ccb284523e8c90f30eba2ae73fc56af7d4223780902ffa361b"
+    },
+    {
+      "archive": "resource-originals-logs-resource-image-build.log.gz",
+      "original": "/home/phil/.cache/asservat-build/finite-logs-resource-native-42100969787/originals/logs-resource/image-build.log",
+      "bytes": 625,
+      "sha256": "a85b8e62668f22545bf17b20d676543e2ee3748e5314eb68f2464382419151c6",
+      "compressedBytes": 347,
+      "compressedSHA256": "dff8fea556b1902d6b7b22276852ad830c9b324ab9c2a801c489ed1ce5eb21e2"
+    },
+    {
+      "archive": "resource-originals-logs-resource-long-container.json.gz",
+      "original": "/home/phil/.cache/asservat-build/finite-logs-resource-native-42100969787/originals/logs-resource/long-container.json",
+      "bytes": 6385,
+      "sha256": "2a202dfa91d554932e88f0b05765d22041379a4fabd7e6621642da3ba36e74fa",
+      "compressedBytes": 2025,
+      "compressedSHA256": "20af4a008c759205ef596a41cb2fa6d8348c8a3ca45b4191ae5ec133a0b3d081"
+    },
+    {
+      "archive": "resource-originals-logs-resource-long-generate.log.gz",
+      "original": "/home/phil/.cache/asservat-build/finite-logs-resource-native-42100969787/originals/logs-resource/long-generate.log",
+      "bytes": 187,
+      "sha256": "1d5f4c44119e862e55dd35339b4a314efa03a1dbf8a6286a50f7055ae18dae88",
+      "compressedBytes": 161,
+      "compressedSHA256": "91c3fa1163b9ca6d6e6ac3acf50ef4b9c2f7114a484d2347a8bc0ed3ebfbb7e4"
+    },
+    {
+      "archive": "resource-originals-logs-resource-long-worker.log.gz",
+      "original": "/home/phil/.cache/asservat-build/finite-logs-resource-native-42100969787/originals/logs-resource/long-worker.log",
+      "bytes": 1104,
+      "sha256": "d29c0d9b1917b6773987a2af7b9730dc6ae75b8dde3350c0649f6048b7660335",
+      "compressedBytes": 436,
+      "compressedSHA256": "a50ea1cfbcba7b797798b121d558ae325bcc0f04a25121be14474b73e4cadfc5"
+    },
+    {
+      "archive": "resource-originals-logs-resource-origins-container.json.gz",
+      "original": "/home/phil/.cache/asservat-build/finite-logs-resource-native-42100969787/originals/logs-resource/origins-container.json",
+      "bytes": 6394,
+      "sha256": "7dfceb2ab2b11a8d83dc95f1eadc3cda6e88c99420aaebf0aafa9d8e79ce3798",
+      "compressedBytes": 2034,
+      "compressedSHA256": "f39fcb5be66852959a600c34b1d24188af74ce6390d2fa905924cd158b03abeb"
+    },
+    {
+      "archive": "resource-originals-logs-resource-origins-generate.log.gz",
+      "original": "/home/phil/.cache/asservat-build/finite-logs-resource-native-42100969787/originals/logs-resource/origins-generate.log",
+      "bytes": 192,
+      "sha256": "96f925d8ccdbf79632a8d3270c6ae5553412e771f92290f207d75659d8d35c13",
+      "compressedBytes": 161,
+      "compressedSHA256": "f6d9634cad65edf748ee20a352ddce008e9e9fd7adca3047f24c361a62b6a39a"
+    },
+    {
+      "archive": "resource-originals-logs-resource-origins-worker.log.gz",
+      "original": "/home/phil/.cache/asservat-build/finite-logs-resource-native-42100969787/originals/logs-resource/origins-worker.log",
+      "bytes": 1104,
+      "sha256": "e5fd74577e2512d944954488bec74e4e7d9837e94ba7fc957d888b37fee4fdb7",
+      "compressedBytes": 436,
+      "compressedSHA256": "2610fdf900c73283360447efba0604c4df8160ea9c11920fa91e9f15998e847a"
+    },
+    {
+      "archive": "resource-originals-logs-resource-report.json.gz",
+      "original": "/home/phil/.cache/asservat-build/finite-logs-resource-native-42100969787/originals/logs-resource/report.json",
+      "bytes": 613250,
+      "sha256": "48de5f9dd0a3616b7d6864156bcab5529a41253ae0eecb5b2b0e8d258cf4b3ef",
+      "compressedBytes": 232326,
+      "compressedSHA256": "dd0f6173384f09111fff6c7355d8dcc161b17e51a416251bf2dcb6ee7d049cbf"
+    },
+    {
+      "archive": "resource-qualification-summary.json.gz",
+      "original": "/home/phil/.cache/asservat-build/finite-logs-resource-native-42100969787/qualification-summary.json",
+      "bytes": 1002,
+      "sha256": "cf7fd05557027b76bda3e81dad67329ee77ac34067d2ff9ed870ded891166bf7",
+      "compressedBytes": 446,
+      "compressedSHA256": "07a395776fa7e1eb8742969c4e38481c1c53a73d6beb2660fde833c6c007f981"
+    },
+    {
+      "archive": "resource-root-source-audit.json.gz",
+      "original": "/home/phil/.cache/asservat-build/finite-logs-resource-native-42100969787/root-source-audit.json",
+      "bytes": 497,
+      "sha256": "ad79cbedecd244a7f1cb190b3b940628c942c0cba405cc6a829fef5532be1d95",
+      "compressedBytes": 322,
+      "compressedSHA256": "fdfb23aa501b2c22f06ad6a643917fd0de10f30a85a8de8551c7550db581b612"
+    },
+    {
+      "archive": "installed-originals-ci-native-continuation-manual-logs.log.gz",
+      "original": "/home/phil/.cache/asservat-build/finite-logs-installed-native-42101047925/originals/ci-native-continuation-manual-logs.log",
+      "bytes": 3030,
+      "sha256": "def6d11c917f976556b29f4627e093b734ba4f4e6f6fcf97213aa7d1431679be",
+      "compressedBytes": 1018,
+      "compressedSHA256": "be3ee962d94fcc355fc834f4e77b1ca46f312fef1d1ce734bfc593af945b6906"
+    },
+    {
+      "archive": "installed-originals-context-storage-environment.json.gz",
+      "original": "/home/phil/.cache/asservat-build/finite-logs-installed-native-42101047925/originals/context-storage-environment.json",
+      "bytes": 561384,
+      "sha256": "f9ba817281fe1d37df54296994c732828fffd1428c4f18e3561a11a767e8a167",
+      "compressedBytes": 210954,
+      "compressedSHA256": "3ba4403f1f47571d86a1297d291ab5beeee05cc667467799054882350e2e1917"
+    },
+    {
+      "archive": "installed-originals-context-storage-kubelet.log.gz",
+      "original": "/home/phil/.cache/asservat-build/finite-logs-installed-native-42101047925/originals/context-storage-kubelet.log",
+      "bytes": 29815,
+      "sha256": "584285befea18b2f624d272c0532ba443540bfbccc97c0bab655f864968f73df",
+      "compressedBytes": 3321,
+      "compressedSHA256": "88795078f70f0a29d63fbeb15af376371bd916fd98c3eb9251d329cea5d37cec"
+    },
+    {
+      "archive": "installed-originals-context-storage-postgres.log.gz",
+      "original": "/home/phil/.cache/asservat-build/finite-logs-installed-native-42101047925/originals/context-storage-postgres.log",
+      "bytes": 359641,
+      "sha256": "893ff36f529f1a527c547707965da69635f1c88d661ae7ac2ab080d9d2bad89c",
+      "compressedBytes": 19933,
+      "compressedSHA256": "8e693dbdebb80b18d96865087e3e6fe90de42d6365b1925c458da5d19a35e9ab"
+    },
+    {
+      "archive": "installed-originals-context-storage-timing.log.gz",
+      "original": "/home/phil/.cache/asservat-build/finite-logs-installed-native-42101047925/originals/context-storage-timing.log",
+      "bytes": 82123,
+      "sha256": "edcfed3165b6c0a5e04475b373603eb563a0e37806bb9f4148f14b55495c72c9",
+      "compressedBytes": 9763,
+      "compressedSHA256": "781001f5a7d9f9955c1396bccbca36e2f7383fa99cdf36c4b3a7184b90cc07b1"
+    },
+    {
+      "archive": "installed-originals-context-storage.log.gz",
+      "original": "/home/phil/.cache/asservat-build/finite-logs-installed-native-42101047925/originals/context-storage.log",
+      "bytes": 76480,
+      "sha256": "a66095ab6ccd63d6459ee190f7787d2d2e04ca2b392d1acadd82d55ea1ed3338",
+      "compressedBytes": 9095,
+      "compressedSHA256": "8ba442a0f1c1f42d3e1ee7c839165b3d37aba0fdde0f288494102b0ebf8d4332"
+    },
+    {
+      "archive": "installed-root-source-audit.json.gz",
+      "original": "/home/phil/.cache/asservat-build/finite-logs-installed-native-42101047925/root-source-audit.json",
+      "bytes": 595,
+      "sha256": "70fb85c9a87541736f82f11615669ed7dd31d0a2136b9d78c667d3b3ecbae741",
+      "compressedBytes": 404,
+      "compressedSHA256": "676f0a53d949c0add3cede2c530797402283b9a24f82cdba1a5ad1fc6601e7a7"
+    },
+    {
+      "archive": "ci-42100875392-failed.log.gz",
+      "original": "/home/phil/.cache/asservat-build/finite-logs-ci-failed.log",
+      "bytes": 75729,
+      "sha256": "34f58c3f44c2d5f0af24174cee31373ef198f5b48ee66c1706fcafd81b2225fb",
+      "compressedBytes": 12343,
+      "compressedSHA256": "49279d94b05d220addaf4ce319724aa28d3495896b96287bd556e9c8560309d3"
+    }
+  ]
+}

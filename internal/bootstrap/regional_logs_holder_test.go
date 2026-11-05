@@ -214,3 +214,61 @@ func TestRegionalLogsUsesOriginalAcceptedStartTimeout(t *testing.T) {
 		t.Fatal("requested window escaped accepted timeout", out)
 	}
 }
+
+func TestRegionalLogsReconnectAcceptsFreshCaptureAndPreservesJoinedOutcome(t *testing.T) {
+	e, pin := logsHolderExpectation(t)
+	entered := make(chan struct{})
+	var logGets, puts atomic.Int32
+	client := logsHolderClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/v1/namespaces/app/pods/app-0" {
+			_ = json.NewEncoder(w).Encode(core.Pod{ObjectMeta: meta.ObjectMeta{Name: pin.Name, Namespace: pin.Namespace, UID: types.UID(pin.UID)}, Spec: core.PodSpec{Containers: []core.Container{{Name: "main"}}}, Status: core.PodStatus{ContainerStatuses: []core.ContainerStatus{{Name: "main", ContainerID: "containerd://original"}}}})
+			return
+		}
+		first := logGets.Add(1) == 1
+		_, _ = w.Write([]byte("synthetic original\n"))
+		w.(http.Flusher).Flush()
+		if first {
+			close(entered)
+			<-r.Context().Done()
+		}
+	}))
+	h := NewConnectorRecordings(nil, nil, time.Now, func(string) {})
+	owner, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	h.configureLogs(owner, e.CaptureUID, client, e.CaptureUID, e.CaptureUID)
+	t.Cleanup(h.closeLogs)
+	prepared := preparedSnapshot(t, e, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { snapshotPUT(t, w, r, puts.Add(1)) }))
+	if _, err := h.PrepareLogs(prepared, e).StartLogs(t.Context(), pin, time.Now(), time.Now().Add(time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-entered:
+	case <-time.After(3 * time.Second):
+		t.Fatal("first owner did not open source")
+	}
+	h.closeLogs()
+	old := waitLogsOutcome(t, h, e)
+	if old.State != evidence.RecordingFailed || puts.Load() != 0 {
+		t.Fatal("closed owner published or lost failure", old, puts.Load())
+	}
+	fresh, _ := logsHolderExpectation(t)
+	fresh.CaptureUID = "20000000-0000-4000-8000-000000000001"
+	fresh.Registration.Location.AttemptID = "20000000-0000-4000-8000-000000000002"
+	fresh.Registration.Location.ArtifactID = "20000000-0000-4000-8000-000000000003"
+	if err := fresh.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	nextOwner, stop := context.WithCancel(t.Context())
+	defer stop()
+	h.configureLogs(nextOwner, e.CaptureUID, client, e.CaptureUID, "20000000-0000-4000-8000-000000000004")
+	next := preparedSnapshot(t, fresh, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { snapshotPUT(t, w, r, puts.Add(1)) }))
+	if _, err := h.PrepareLogs(next, fresh).StartLogs(t.Context(), pin, time.Now(), time.Now().Add(time.Second)); err != nil {
+		t.Fatal("reconnected owner refused fresh capture", err)
+	}
+	if got := waitLogsOutcome(t, h, fresh); got.State != evidence.RecordingStored || !got.Valid(fresh.Registration) || puts.Load() != 4 || logGets.Load() != 2 {
+		t.Fatal("fresh owner did not store exactly once", got, puts.Load(), logGets.Load())
+	}
+	if got := waitLogsOutcome(t, h, e); got.State != old.State || got.Failure != old.Failure {
+		t.Fatal("reconnect replaced original terminal outcome", got)
+	}
+}

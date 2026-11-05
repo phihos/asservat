@@ -144,6 +144,35 @@ def main():
         if o["properties"]["field"]["const"] == "packetPeers":
             o["properties"]["value"] = peers
 
+    # Overrides with identical value bounds differ only in their field tag.
+    # Represent those disjoint tags as one enum branch, retaining the exact
+    # object/value constraints while avoiding repeated schemas in discovery.
+    groups = {}
+    for override in overrides:
+        shape = copy.deepcopy(override)
+        field = shape["properties"].pop("field")["const"]
+        key = json.dumps(shape, sort_keys=True, separators=(",", ":"))
+        groups.setdefault(key, (shape, []))[1].append(field)
+    compact = []
+    for shape, fields in groups.values():
+        shape["properties"]["field"] = {"enum": fields} if len(fields) > 1 else {"const": fields[0]}
+        compact.append(shape)
+    # Object shape and action ID are common to every branch. Keep them outside
+    # oneOf; each branch then constrains only its field tag and typed value.
+    override_object = copy.deepcopy(compact[0])
+    override_object["properties"]["field"] = {}
+    override_object["properties"]["value"] = {}
+    branches = []
+    for shape in compact:
+        check = copy.deepcopy(shape)
+        check["properties"]["field"] = {}
+        check["properties"]["value"] = {}
+        if check != override_object:
+            raise ValueError("Override object bounds differ; preserve the distinct schema")
+        branches.append({"properties": {k: shape["properties"][k] for k in ("field", "value")}})
+    override_object["oneOf"] = branches
+    composition["$defs"]["override"] = override_object
+
     def localize(root):
         definitions, known = {}, {}
 

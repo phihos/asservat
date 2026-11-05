@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"reflect"
 	"slices"
 	"testing"
@@ -23,7 +25,35 @@ import (
 	"asservat.local/asservat/internal/domain/privacy"
 	"asservat.local/asservat/internal/domain/targets"
 	"asservat.local/asservat/internal/transport/conversion"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 )
+
+func TestManualLogsListenerReadinessUsesOneBoundedTrafficRecord(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/namespaces/app/pods/app-0:8080/proxy/traffic" {
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = w.Write(make([]byte, 64))
+		w.(http.Flusher).Flush()
+		if r.URL.Query().Get("records") != "1" {
+			// The real endpoint defaults to65536 flushed writes (4MiB).
+			// A slow but ready workload need not finish that readiness load.
+			<-r.Context().Done()
+		}
+	}))
+	defer server.Close()
+	client, err := kubernetes.NewForConfig(&rest.Config{Host: server.URL})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
+	defer cancel()
+	if !installedLogsListenerReady(ctx, client, "app", "app-0") {
+		t.Fatal("ready listener refused because readiness attempted the full traffic load")
+	}
+}
 
 func TestManualLogsActualPublicInputCompilerAndFunding(t *testing.T) {
 	t.Setenv("ASSERVAT_JOURNEY_FOCUS", "manual-logs")

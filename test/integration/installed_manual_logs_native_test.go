@@ -251,6 +251,11 @@ func checkInstalledLogsParity(native []byte, pod string, pages ...installedLogsP
 // This focused journey uses the provisioned API-only connector. Administrator
 // Kubernetes/SQL reads set up synthetic bytes and verify outcomes; they never
 // provide capture, query, approval or key authority to the installed product.
+func installedLogsListenerReady(ctx context.Context, region kubernetes.Interface, namespace, podName string) bool {
+	_, err := region.CoreV1().RESTClient().Get().Namespace(namespace).Resource("pods").Name(podName+":8080").SubResource("proxy").Suffix("traffic").Param("records", "1").DoRaw(ctx)
+	return err == nil
+}
+
 func qualifyInstalledManualLogs(t *testing.T, ctx context.Context, admin *pgxpool.Pool, hub kubernetes.Interface, root string, identity *installedIdentity, publicRoot []byte, address, origin, regionalConfig, cluster, namespace, workload string, diagnose func()) {
 	t.Helper()
 	if !installedLogsFocus() || identity == nil || identity.ReviewerSubject == "" || installedPolicyTarget == nil || installedPolicyTarget.cluster != cluster || installedPolicyTarget.namespace != namespace || installedPolicyTarget.workload != workload {
@@ -375,8 +380,7 @@ func qualifyInstalledManualLogs(t *testing.T, ctx context.Context, admin *pgxpoo
 	wait("restarted synthetic HTTP listener", 30*time.Second, func() bool {
 		c, cancel := context.WithTimeout(ctx, 2*time.Second)
 		defer cancel()
-		_, err := region.CoreV1().RESTClient().Get().Namespace(namespace).Resource("pods").Name(podName + ":8080").SubResource("proxy").Suffix("traffic").DoRaw(c)
-		return err == nil
+		return installedLogsListenerReady(c, region, namespace, podName)
 	})
 	proxy(http.MethodGet, "log", installedLogsMarker+"-current\n\n\xff\x00\n"+strings.Repeat("long-line-", 400))
 	ep := pod.DeepCopy()

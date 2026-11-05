@@ -34,10 +34,14 @@ func (h *ConnectorRecordings) heldCountLocked() int {
 }
 
 func (h *ConnectorRecordings) configureLogs(ctx context.Context, root string, client *kube.SavedLogClient, pod, epoch string) {
+	// The new owner can accept starts only after the previous owner's workers
+	// have joined. Retain their original terminal records for collection.
+	h.closeLogs()
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.logsContext, h.logsRoot, h.logsClient, h.logsEpoch = ctx, root, client, epoch
 	h.logsWriterPod = pod
+	h.logsClosing = false
 	if h.logs == nil {
 		h.logs = make(map[string]*heldLogs)
 	}
