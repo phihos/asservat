@@ -63,3 +63,18 @@ materialization controls bypassed that wrapper. The narrow success return fix
 leaves error mapping and all source/association rules unchanged; a new exported
 reader assertion also verifies that resolution does not spend disclosure.
 A successful mixed lifecycle remains pending.
+
+Final corrected source `1e85a5bb` PASSES mixed in15.455s (16run/pass), raw
+packet in16.807s (9), raw syscall in13.821s (9), and pristine migration141
+Up/Down/Up/closed-scope checks in6.240s (124). All harnesses exit0, sources
+remain unchanged, cleanup completes and each4,300-input report matches Git.
+Independent review repeats17,200 source comparisons without mismatch. The
+mixed flow now exercises the public resolver, actual C-03 authorization and
+the original two-paid-batch query lifecycle, in addition to grouping, replay,
+association negatives, sibling preservation and explicit parent Stop refusal.
+
+The20-case PostgreSQL size probe passes without modifying the16KiB binding
+limit: maximum complete key binding9,669B compact/11,053B JSONB. Its five typed
+source inputs and20 case hashes are independently verified; this content-free
+probe supplies no role or installed authority. All proof inputs, original scalar
+source attribution and installed/resource boundaries remain separate.

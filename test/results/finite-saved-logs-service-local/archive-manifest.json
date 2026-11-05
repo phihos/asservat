@@ -216,6 +216,102 @@
       "sha256": "c7b670d5d14eab4dc86811036e0f909bb50030a709c048be52c3066c3409613d",
       "compressedBytes": 308,
       "compressedSHA256": "28ea89ae30267639b40b0478f3e68b6abf1fbeb6bae5bec1b4c2d7a8b135995d"
+    },
+    {
+      "source": "test/results/finite-logs-mixed-group-1e85a5bb.log",
+      "archive": "finite-logs-mixed-group-1e85a5bb.log.gz",
+      "bytes": 4698,
+      "sha256": "9753b6248785275aff5d3fef75db8007c8f5fb80e40e6e05f6a2c565a16b05e1",
+      "compressedBytes": 1095,
+      "compressedSHA256": "3408e0b3069c3f7ef5ef26a8fffc5d5e618b4b66d371d1de8b82a7765ef0e1af"
+    },
+    {
+      "source": "test/results/finite-logs-mixed-group-1e85a5bb-environment.json",
+      "archive": "finite-logs-mixed-group-1e85a5bb-environment.json.gz",
+      "bytes": 550917,
+      "sha256": "d6675400123db14257f0a0543fce48ea58a42cb8b3b11957964291e872f21438",
+      "compressedBytes": 206192,
+      "compressedSHA256": "13e27b500790d2c73902c3a5e937469c36ef2635696d487efd133895e9a50e41"
+    },
+    {
+      "source": "/home/phil/.cache/asservat-build/finite-logs-db/mixed-1e85a5bb-root-source-audit.json",
+      "archive": "mixed-1e85a5bb-root-source-audit.json.gz",
+      "bytes": 448,
+      "sha256": "291e443f283b684114d2128e84f38e964569f1e6fe89a2d821c80a52efa4a381",
+      "compressedBytes": 305,
+      "compressedSHA256": "e8bb6f9fa6f41516c070dc80c26db12c5aac4498ac92739a33906c4e6a070019"
+    },
+    {
+      "source": "test/results/finite-logs-legacy-packet-1e85a5bb.log",
+      "archive": "finite-logs-legacy-packet-1e85a5bb.log.gz",
+      "bytes": 3612,
+      "sha256": "40492758860531dc10f164eb6432e90d5e11cb80c7f829c1a98a4a60575593d1",
+      "compressedBytes": 1163,
+      "compressedSHA256": "ab2a80c29ef531b111eb9c645922c9715bf0e07942ac88d174e1941f24650437"
+    },
+    {
+      "source": "test/results/finite-logs-legacy-packet-1e85a5bb-environment.json",
+      "archive": "finite-logs-legacy-packet-1e85a5bb-environment.json.gz",
+      "bytes": 549741,
+      "sha256": "261a6fee3607f79e09be7026830a8908ff44c4aea2390712a20fa1c58dcbf193",
+      "compressedBytes": 206074,
+      "compressedSHA256": "47dc5ee3a103380c0041f2587bde03c65728c466c367744a44f83233a1847871"
+    },
+    {
+      "source": "/home/phil/.cache/asservat-build/finite-logs-db/legacy-packet-1e85a5bb-root-source-audit.json",
+      "archive": "legacy-packet-1e85a5bb-root-source-audit.json.gz",
+      "bytes": 450,
+      "sha256": "411fd7e2a4027fe6c78b2a63b9dd188510f1cb9f3ae748c7e973c11a4daef483",
+      "compressedBytes": 307,
+      "compressedSHA256": "4fd96a55012980a617503c7d672c7400b75c17e6de3fed21efebd27b76ecf4c0"
+    },
+    {
+      "source": "test/results/finite-logs-legacy-syscall-1e85a5bb.log",
+      "archive": "finite-logs-legacy-syscall-1e85a5bb.log.gz",
+      "bytes": 3059,
+      "sha256": "0f2e278b3eb4b81610c47ba0d30dcaeea5dc958e1bdf9c9106dbe9bb8108aa36",
+      "compressedBytes": 902,
+      "compressedSHA256": "3c31d2b19fee8fdabb5d5b9f771666b57a203fe73c0a6eb8b2d939e71614e86a"
+    },
+    {
+      "source": "test/results/finite-logs-legacy-syscall-1e85a5bb-environment.json",
+      "archive": "finite-logs-legacy-syscall-1e85a5bb-environment.json.gz",
+      "bytes": 549761,
+      "sha256": "e6d1b13dbd3c92b692297156bff80d6475cfef354e9eb1494a4549258a1c15ec",
+      "compressedBytes": 206073,
+      "compressedSHA256": "111a9ad4e2f9201366ea4c0f67ed3c78fb0797c1480783c96cd65e15c5a1736b"
+    },
+    {
+      "source": "/home/phil/.cache/asservat-build/finite-logs-db/legacy-syscall-1e85a5bb-root-source-audit.json",
+      "archive": "legacy-syscall-1e85a5bb-root-source-audit.json.gz",
+      "bytes": 451,
+      "sha256": "f3bc1fa058e535b83bbffb0a6b2516a79e9dbc5da7a3ebc90d1350e547046c38",
+      "compressedBytes": 307,
+      "compressedSHA256": "b8088d4c53b4104ee10a7c9c11d46edac543b143a41e4db17e9a78b690d8eac2"
+    },
+    {
+      "source": "test/results/finite-logs-upgrade141-1e85a5bb.log",
+      "archive": "finite-logs-upgrade141-1e85a5bb.log.gz",
+      "bytes": 21821,
+      "sha256": "507f3a88070903c4996884e0b21b128332ada0c1bfceb8ab691bd62ff661baba",
+      "compressedBytes": 1405,
+      "compressedSHA256": "c27f4f9d22f43416fa70f1d5b15e9f1ce835aae5d8cdf49bd0727f1bfd9b6d47"
+    },
+    {
+      "source": "test/results/finite-logs-upgrade141-1e85a5bb-environment.json",
+      "archive": "finite-logs-upgrade141-1e85a5bb-environment.json.gz",
+      "bytes": 567953,
+      "sha256": "01be8562c99e20b9b29849dd4799e692f791126047159af43835f8aaad644ca5",
+      "compressedBytes": 207056,
+      "compressedSHA256": "f70ced4945c290eb0874700f808331c4d2ae0e0f08aedc34b3809f4ef55646b2"
+    },
+    {
+      "source": "/home/phil/.cache/asservat-build/finite-logs-db/upgrade141-1e85a5bb-root-source-audit.json",
+      "archive": "upgrade141-1e85a5bb-root-source-audit.json.gz",
+      "bytes": 447,
+      "sha256": "fbb1c69d2376112ceb7c7e4dd9c122273fdb9b9aca802541de18cc5a7b32cd61",
+      "compressedBytes": 304,
+      "compressedSHA256": "106be836014395fe625b92bdb8222903ed895adc4b71b31d39973ca2a527a283"
     }
   ],
   "campaigns": [
@@ -275,6 +371,42 @@
       "verdict": "FAIL",
       "testExit": 1,
       "goSeconds": 9.889,
+      "sourceHashesVerifiedAgainstGit": 4300,
+      "cleanupFailures": []
+    },
+    {
+      "commit": "1e85a5bb1a4a031730d628ab4357635d43796798",
+      "resultName": "finite-logs-mixed-group-1e85a5bb",
+      "verdict": "PASS",
+      "testExit": 0,
+      "goSeconds": 15.455,
+      "sourceHashesVerifiedAgainstGit": 4300,
+      "cleanupFailures": []
+    },
+    {
+      "commit": "1e85a5bb1a4a031730d628ab4357635d43796798",
+      "resultName": "finite-logs-legacy-packet-1e85a5bb",
+      "verdict": "PASS",
+      "testExit": 0,
+      "goSeconds": 16.807,
+      "sourceHashesVerifiedAgainstGit": 4300,
+      "cleanupFailures": []
+    },
+    {
+      "commit": "1e85a5bb1a4a031730d628ab4357635d43796798",
+      "resultName": "finite-logs-legacy-syscall-1e85a5bb",
+      "verdict": "PASS",
+      "testExit": 0,
+      "goSeconds": 13.821,
+      "sourceHashesVerifiedAgainstGit": 4300,
+      "cleanupFailures": []
+    },
+    {
+      "commit": "1e85a5bb1a4a031730d628ab4357635d43796798",
+      "resultName": "finite-logs-upgrade141-1e85a5bb",
+      "verdict": "PASS",
+      "testExit": 0,
+      "goSeconds": 6.24,
       "sourceHashesVerifiedAgainstGit": 4300,
       "cleanupFailures": []
     }

@@ -1,7 +1,7 @@
 {
   "format": "finite-saved-logs-local/v1",
   "scope": "Local component and bounded synthetic resource evidence. Individual failed/setup/skipped results remain original; no installed workflow qualification. Local500m CPU enforcement is unqualified.",
-  "base_commit": "f5410ffdfd1af41867f62f55ecbd1e923074813c",
+  "base_commit": "1e85a5bb1a4a031730d628ab4357635d43796798",
   "files": [
     {
       "source": "finite-logs-acquiring-check-focused.log",
@@ -588,6 +588,14 @@
       "compressedSHA256": "682407dc0a338ab507a4ba187d558006ef115c9a985f2022ab77ff342473000c"
     },
     {
+      "source": "finite-logs-db/final-services-and-jsonb-handoff.json",
+      "archive": "finite-logs-db__final-services-and-jsonb-handoff.json.gz",
+      "bytes": 9024,
+      "sha256": "504e6f31cacdbbd5318d228318b32afe90c2f26b4484c708b9bb411bdc5bcd22",
+      "compressedBytes": 2990,
+      "compressedSHA256": "e513edaecc9c0a88125dab35615b9f33ce221e95a5e31254a98c6e56ee1a9e96"
+    },
+    {
       "source": "finite-logs-db/full-funding-and-stream-final-race.log",
       "archive": "finite-logs-db__full-funding-and-stream-final-race.log.gz",
       "bytes": 1349,
@@ -642,6 +650,270 @@
       "sha256": "1d4b16380ce2901a20ee2d507d6bf2e64618725e447ce43eb7e822486b370a2e",
       "compressedBytes": 7870,
       "compressedSHA256": "266c0138aca9169b6a0d6c00a9675e8f101a1ea95951ae5f190fe2973bb438aa"
+    },
+    {
+      "source": "finite-logs-db/jsonb-size-probe/cleanup.stderr",
+      "archive": "finite-logs-db__jsonb-size-probe__cleanup.stderr.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "compressedBytes": 20,
+      "compressedSHA256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "finite-logs-db/jsonb-size-probe/cleanup.stdout",
+      "archive": "finite-logs-db__jsonb-size-probe__cleanup.stdout.gz",
+      "bytes": 45,
+      "sha256": "c24bf3cb2b4fc58f71f31d8d685119f51e31b9bed207100d6a8e07ec305750e6",
+      "compressedBytes": 65,
+      "compressedSHA256": "1d8bdf2aa50432c21e7ce5809158f510e169e3a018aac733ef467e66b64e5c17"
+    },
+    {
+      "source": "finite-logs-db/jsonb-size-probe/command-000.stderr",
+      "archive": "finite-logs-db__jsonb-size-probe__command-000.stderr.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "compressedBytes": 20,
+      "compressedSHA256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "finite-logs-db/jsonb-size-probe/command-000.stdout",
+      "archive": "finite-logs-db__jsonb-size-probe__command-000.stdout.gz",
+      "bytes": 72,
+      "sha256": "c87c5be5a3d8e17a692d3f86770ac132b9116c67405b2c705f090ed6dd72a31b",
+      "compressedBytes": 78,
+      "compressedSHA256": "11397e28a61b30e90c4cccaa7c27396553584dfe50f96277ad3696ddd1a62e65"
+    },
+    {
+      "source": "finite-logs-db/jsonb-size-probe/command-001.stderr",
+      "archive": "finite-logs-db__jsonb-size-probe__command-001.stderr.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "compressedBytes": 20,
+      "compressedSHA256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "finite-logs-db/jsonb-size-probe/command-001.stdout",
+      "archive": "finite-logs-db__jsonb-size-probe__command-001.stdout.gz",
+      "bytes": 65,
+      "sha256": "3ba9a1e86c30179697719295a250367481aa7ccd3b7b0426465bcffc486e811d",
+      "compressedBytes": 72,
+      "compressedSHA256": "40a04957ad45e6db092c5f3dc1705cbec4d31dcccdcd356bfe74c39dc434aeb7"
+    },
+    {
+      "source": "finite-logs-db/jsonb-size-probe/command-002.stderr",
+      "archive": "finite-logs-db__jsonb-size-probe__command-002.stderr.gz",
+      "bytes": 157,
+      "sha256": "4c4c9315cb1b41f8ecdaf4641d4bbd59103a2cb9b466e7b5c8851de197f91181",
+      "compressedBytes": 142,
+      "compressedSHA256": "cfe754f250baad4c712133bcde94f39ced55c272300bd9730d113ba42dd3c814"
+    },
+    {
+      "source": "finite-logs-db/jsonb-size-probe/command-002.stdout",
+      "archive": "finite-logs-db__jsonb-size-probe__command-002.stdout.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "compressedBytes": 20,
+      "compressedSHA256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "finite-logs-db/jsonb-size-probe/command-003.stderr",
+      "archive": "finite-logs-db__jsonb-size-probe__command-003.stderr.gz",
+      "bytes": 157,
+      "sha256": "4c4c9315cb1b41f8ecdaf4641d4bbd59103a2cb9b466e7b5c8851de197f91181",
+      "compressedBytes": 142,
+      "compressedSHA256": "cfe754f250baad4c712133bcde94f39ced55c272300bd9730d113ba42dd3c814"
+    },
+    {
+      "source": "finite-logs-db/jsonb-size-probe/command-003.stdout",
+      "archive": "finite-logs-db__jsonb-size-probe__command-003.stdout.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "compressedBytes": 20,
+      "compressedSHA256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "finite-logs-db/jsonb-size-probe/command-004.stderr",
+      "archive": "finite-logs-db__jsonb-size-probe__command-004.stderr.gz",
+      "bytes": 157,
+      "sha256": "4c4c9315cb1b41f8ecdaf4641d4bbd59103a2cb9b466e7b5c8851de197f91181",
+      "compressedBytes": 142,
+      "compressedSHA256": "cfe754f250baad4c712133bcde94f39ced55c272300bd9730d113ba42dd3c814"
+    },
+    {
+      "source": "finite-logs-db/jsonb-size-probe/command-004.stdout",
+      "archive": "finite-logs-db__jsonb-size-probe__command-004.stdout.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "compressedBytes": 20,
+      "compressedSHA256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "finite-logs-db/jsonb-size-probe/command-005.stderr",
+      "archive": "finite-logs-db__jsonb-size-probe__command-005.stderr.gz",
+      "bytes": 157,
+      "sha256": "4c4c9315cb1b41f8ecdaf4641d4bbd59103a2cb9b466e7b5c8851de197f91181",
+      "compressedBytes": 142,
+      "compressedSHA256": "cfe754f250baad4c712133bcde94f39ced55c272300bd9730d113ba42dd3c814"
+    },
+    {
+      "source": "finite-logs-db/jsonb-size-probe/command-005.stdout",
+      "archive": "finite-logs-db__jsonb-size-probe__command-005.stdout.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "compressedBytes": 20,
+      "compressedSHA256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "finite-logs-db/jsonb-size-probe/command-006.stderr",
+      "archive": "finite-logs-db__jsonb-size-probe__command-006.stderr.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "compressedBytes": 20,
+      "compressedSHA256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "finite-logs-db/jsonb-size-probe/command-006.stdout",
+      "archive": "finite-logs-db__jsonb-size-probe__command-006.stdout.gz",
+      "bytes": 2,
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+      "compressedBytes": 22,
+      "compressedSHA256": "c28cc69d141393e44a931229323624ef7b8c5bde3ee047ca9b87332daef23c82"
+    },
+    {
+      "source": "finite-logs-db/jsonb-size-probe/command-007.stderr",
+      "archive": "finite-logs-db__jsonb-size-probe__command-007.stderr.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "compressedBytes": 20,
+      "compressedSHA256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "finite-logs-db/jsonb-size-probe/command-007.stdout",
+      "archive": "finite-logs-db__jsonb-size-probe__command-007.stdout.gz",
+      "bytes": 848,
+      "sha256": "e95de5a87498677dbfa7e12eb75555952c2eb1e0d2666eff1bec847c619402df",
+      "compressedBytes": 278,
+      "compressedSHA256": "aab18dbc476754d274ebb4592a3d023410399a8ca9542eea661d13dc3ebeb056"
+    },
+    {
+      "source": "finite-logs-db/jsonb-size-probe/command-008.stderr",
+      "archive": "finite-logs-db__jsonb-size-probe__command-008.stderr.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "compressedBytes": 20,
+      "compressedSHA256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "finite-logs-db/jsonb-size-probe/command-008.stdout",
+      "archive": "finite-logs-db__jsonb-size-probe__command-008.stdout.gz",
+      "bytes": 45,
+      "sha256": "c24bf3cb2b4fc58f71f31d8d685119f51e31b9bed207100d6a8e07ec305750e6",
+      "compressedBytes": 65,
+      "compressedSHA256": "1d8bdf2aa50432c21e7ce5809158f510e169e3a018aac733ef467e66b64e5c17"
+    },
+    {
+      "source": "finite-logs-db/jsonb-size-probe/command-009.stderr",
+      "archive": "finite-logs-db__jsonb-size-probe__command-009.stderr.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "compressedBytes": 20,
+      "compressedSHA256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "finite-logs-db/jsonb-size-probe/command-009.stdout",
+      "archive": "finite-logs-db__jsonb-size-probe__command-009.stdout.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "compressedBytes": 20,
+      "compressedSHA256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "finite-logs-db/jsonb-size-probe/container-id.txt",
+      "archive": "finite-logs-db__jsonb-size-probe__container-id.txt.gz",
+      "bytes": 65,
+      "sha256": "3ba9a1e86c30179697719295a250367481aa7ccd3b7b0426465bcffc486e811d",
+      "compressedBytes": 72,
+      "compressedSHA256": "40a04957ad45e6db092c5f3dc1705cbec4d31dcccdcd356bfe74c39dc434aeb7"
+    },
+    {
+      "source": "finite-logs-db/jsonb-size-probe/git-source-verification.json",
+      "archive": "finite-logs-db__jsonb-size-probe__git-source-verification.json.gz",
+      "bytes": 1985,
+      "sha256": "3c55c8391d167dd0354c29d05ff8c85d395cbf4eaa9be5b1351b2c7d1d71de89",
+      "compressedBytes": 674,
+      "compressedSHA256": "fe42c8f260e686d349c367f9cf765ddfad2913623caa5ca025b14c876a48315b"
+    },
+    {
+      "source": "finite-logs-db/jsonb-size-probe/image-id.txt",
+      "archive": "finite-logs-db__jsonb-size-probe__image-id.txt.gz",
+      "bytes": 72,
+      "sha256": "c87c5be5a3d8e17a692d3f86770ac132b9116c67405b2c705f090ed6dd72a31b",
+      "compressedBytes": 78,
+      "compressedSHA256": "11397e28a61b30e90c4cccaa7c27396553584dfe50f96277ad3696ddd1a62e65"
+    },
+    {
+      "source": "finite-logs-db/jsonb-size-probe/psql.stderr",
+      "archive": "finite-logs-db__jsonb-size-probe__psql.stderr.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "compressedBytes": 20,
+      "compressedSHA256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "finite-logs-db/jsonb-size-probe/remaining.txt",
+      "archive": "finite-logs-db__jsonb-size-probe__remaining.txt.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "compressedBytes": 20,
+      "compressedSHA256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "source": "finite-logs-db/jsonb-size-probe/sizes.tsv",
+      "archive": "finite-logs-db__jsonb-size-probe__sizes.tsv.gz",
+      "bytes": 848,
+      "sha256": "e95de5a87498677dbfa7e12eb75555952c2eb1e0d2666eff1bec847c619402df",
+      "compressedBytes": 278,
+      "compressedSHA256": "aab18dbc476754d274ebb4592a3d023410399a8ca9542eea661d13dc3ebeb056"
+    },
+    {
+      "source": "finite-logs-db/jsonb-size-probe/verification.json",
+      "archive": "finite-logs-db__jsonb-size-probe__verification.json.gz",
+      "bytes": 10270,
+      "sha256": "5dc32dc8faf36f1967e3bafefb89779790eb5d17c1b63c54c6596d799a68b169",
+      "compressedBytes": 1984,
+      "compressedSHA256": "de77111f92832316427f5f271d2f94760856677699f8b01c3f7265d43c33788b"
+    },
+    {
+      "source": "finite-logs-db/jsonb-size-probe-campaign.log",
+      "archive": "finite-logs-db__jsonb-size-probe-campaign.log.gz",
+      "bytes": 136,
+      "sha256": "5eaa43a8c6ab976b15394213de61b830835d89e1deaeea6a4e25ccb75b30a7ed",
+      "compressedBytes": 134,
+      "compressedSHA256": "fafe1cdadf4e158f632feadce3fc2cf06c9f0a93553986d69fb3b40523bb8137"
+    },
+    {
+      "source": "finite-logs-db/legacy-packet-1e85a5bb-campaign.log",
+      "archive": "finite-logs-db__legacy-packet-1e85a5bb-campaign.log.gz",
+      "bytes": 55,
+      "sha256": "3f2046f611af70cf332a115b41adc28fd4e1b0e493435bedcd246a1f6a5f6bb5",
+      "compressedBytes": 75,
+      "compressedSHA256": "96190fedd2fa102794bd5d5f03f7b1655268d9dd177421ce5d710dc170481e28"
+    },
+    {
+      "source": "finite-logs-db/legacy-syscall-1e85a5bb-campaign.log",
+      "archive": "finite-logs-db__legacy-syscall-1e85a5bb-campaign.log.gz",
+      "bytes": 56,
+      "sha256": "1cdf53434ec8b8b78e61538c6850c675eeabe7968f2d5a14a9129034b6bcf6c1",
+      "compressedBytes": 76,
+      "compressedSHA256": "79b2bc148bb34aeff1279154ce6744d9702480ea074606c685bf36b5b8947946"
+    },
+    {
+      "source": "finite-logs-db/mixed-1e85a5bb-campaign.log",
+      "archive": "finite-logs-db__mixed-1e85a5bb-campaign.log.gz",
+      "bytes": 53,
+      "sha256": "00da4f6abcf02f460b757c4c5f36dc3a7a87a756b1d8bfe24bc7a81037743943",
+      "compressedBytes": 73,
+      "compressedSHA256": "58e0478b6dab7935cec81bc6fd31b63fcb0cbc8994c56392a7853931b68435c1"
     },
     {
       "source": "finite-logs-db/mixed-6dd89c26-campaign.log",
@@ -762,6 +1034,14 @@
       "sha256": "4cda629e08795732f15da2df2b7fc1da6a56fd5abb5ebe2cfe2a31d776cc0822",
       "compressedBytes": 206,
       "compressedSHA256": "e25563aa173074fb49b32586e81ba05d44b80b9d372d75b0d2b8837a0b7be6c1"
+    },
+    {
+      "source": "finite-logs-db/upgrade141-1e85a5bb-campaign.log",
+      "archive": "finite-logs-db__upgrade141-1e85a5bb-campaign.log.gz",
+      "bytes": 52,
+      "sha256": "3a83fc22c052b284e5b666d00632d39e75e184149270f23d580d8ab766127980",
+      "compressedBytes": 71,
+      "compressedSHA256": "7a32354f3b7b4eb5ac3016ee0210e85cd4640f4c2bbd18509d5c2323ffb86612"
     },
     {
       "source": "finite-logs-db/verified-version-fix-handoff.json",
@@ -1516,6 +1796,14 @@
       "compressedSHA256": "2732f5a7b345511f617e725d6c67cf65cd1a390fbb37441ae5bef5a974c7da17"
     },
     {
+      "source": "finite-logs-public-resolver-commit.log",
+      "archive": "finite-logs-public-resolver-commit.log.gz",
+      "bytes": 1250,
+      "sha256": "6d7eda84020917d7e4d60939cebb0bf7de6eb318ba1b1d152b6c8d054616ec09",
+      "compressedBytes": 340,
+      "compressedSHA256": "5033d00cadaf743f2a6eeeca55e0106e0b0f670cbd8c245625c72459cd2b711a"
+    },
+    {
       "source": "finite-logs-public-resolver-pre-push.log",
       "archive": "finite-logs-public-resolver-pre-push.log.gz",
       "bytes": 11469,
@@ -1738,6 +2026,14 @@
       "sha256": "62f1d234d9d0b772030c38c90460a9d956d7b484ba1a3b7d932e49d4f786655a",
       "compressedBytes": 66,
       "compressedSHA256": "80e7fb7cdc5eaefa7b8b087f937451df26572dbf6fbfe484c0efce4624ef4381"
+    },
+    {
+      "source": "finite-logs-source/final-services-jsonb-independent-review.json",
+      "archive": "finite-logs-source__final-services-jsonb-independent-review.json.gz",
+      "bytes": 2617,
+      "sha256": "9f85082cfe54acb7b444b0c6d0b85eb19d8cf6fa2704075e23dbf8557f5af8b6",
+      "compressedBytes": 1029,
+      "compressedSHA256": "cc8150d6984a793ed4a31c1079c1e2609f0ec1b7409b453023f6410c1136f925"
     },
     {
       "source": "finite-logs-source/handoff.json",

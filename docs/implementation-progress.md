@@ -1,6 +1,20 @@
 # Sustained implementation progress
 
-## Finite whole-pod logs composition in progress (2026-11-05)
+## Finite whole-pod logs local service qualification passed (2026-11-05)
+
+Signed `1e85a5bb` passes the mixed logs/packet/syscall service lifecycle
+(Go15.455s/16 tests), legacy raw packet (16.807s/9), raw syscall (13.821s/9)
+and pristine migration141 upgrade/rollback (6.240s/124). All four harnesses
+exit0, preserve4,300 exact Git inputs each and complete cleanup[]. Root and
+independent review verify the original reports and source hashes. Standalone
+logs retain their separate `f8c8eb5c` pass in13.320s. The20-case content-free
+PostgreSQL sizing probe passes with maximum complete key binding9,669B compact/
+11,053B JSONB under the unchanged16KiB bound. These are actual service/role
+fixtures; paid read-loop crypto/Job/issuer/transport proofs remain synthetic.
+[Original qualification history](../test/results/finite-saved-logs-service-local/README.md)
+retains all prior failures and only supersedes their specific corrected boundary.
+Installed/browser/native/history/Stop and fresh-host resource qualification are
+still pending; full S-05 and the complete specification goal remain active.
 
 ADR-308 revises the unimplemented redacted/split-stream saved-log promise to
 lossless raw JSONL and exact grant-protected saved pages with truthful combined
@@ -96,8 +110,9 @@ all association checks. An exported-reader assertion now precedes materializatio
 and verifies unchanged disclosure spend. Focused races and independent review
 pass; the whole mixed-query lifecycle still requires its fresh result.
 
-Mixed real-service qualification and the installed logs/browser/native/history/
-Repeat journey remain pending, as does installed maximum-shape worker evidence.
+The mixed service lifecycle is now qualified at the boundary stated above. The
+installed logs/browser/native/history/Repeat journey and installed maximum-shape
+worker evidence remain pending.
 Full S-05 and the complete specification goal remain active.
 
 ## Saved syscall queries merged with complete installed test evidence (2026-11-05)
