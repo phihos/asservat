@@ -1,5 +1,10 @@
 # Decision records
 
+[ADR-305 — Bounded saved-packet queries](305-bounded-saved-packet-queries.md)
+defines the next metadata/raw query workflow using the existing libpcap compiler
+and Go evaluator, exact raw-query grants and per-batch disclosure accounting.
+Implementation and qualification are pending.
+
 [ADR-304 — Fixed transient raw packet summaries](304-transient-raw-packet-summary.md)
 applies the accepted bounded Go mechanism to a dedicated ordinary aggregate of
 an unchanged raw original. Raw-only unclassified counts preserve truncated

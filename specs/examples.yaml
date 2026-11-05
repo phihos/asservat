@@ -433,3 +433,14 @@ examples:
 - file: examples/mcp-raw-packet-summary-unclassified-result.json
   schema: https://asservat.io/spec/v1/mcp-result.schema.json
   tool: get_pcap_summary
+
+- file: examples/mcp-packet-query-metadata-input.json
+  input_tool: pcap_query
+- file: examples/mcp-packet-query-raw-input.json
+  input_tool: pcap_query
+- file: examples/mcp-packet-query-raw-result.json
+  schema: https://asservat.io/spec/v1/mcp-result.schema.json
+  tool: pcap_query
+- file: examples/mcp-packet-query-metadata-result.json
+  schema: https://asservat.io/spec/v1/mcp-result.schema.json
+  tool: pcap_query

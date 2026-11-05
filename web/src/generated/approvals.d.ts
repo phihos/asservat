@@ -184,7 +184,7 @@ export interface components {
                 }))[];
                 result_access?: {
                     action_ids: string[];
-                    operations: "download_artifact"[];
+                    operations: ("download_artifact" | "pcap_query")[];
                     client_ids: string[];
                     max_artifacts: number;
                     max_bytes: number;
@@ -448,7 +448,7 @@ export interface components {
                 }))[];
                 result_access?: {
                     action_ids: string[];
-                    operations: "download_artifact"[];
+                    operations: ("download_artifact" | "pcap_query")[];
                     client_ids: string[];
                     max_artifacts: number;
                     max_bytes: number;
@@ -568,7 +568,7 @@ export interface components {
                     /** Format: uuid */
                     case_id: string;
                     reason: string;
-                    operations: "download_artifact"[];
+                    operations: ("download_artifact" | "pcap_query")[];
                     max_bytes: number;
                     /** @constant */
                     max_operations: 10000;
@@ -807,7 +807,7 @@ export interface components {
                         /** Format: uuid */
                         case_id: string;
                         reason: string;
-                        operations: "download_artifact"[];
+                        operations: ("download_artifact" | "pcap_query")[];
                         max_bytes: number;
                         /** @constant */
                         max_operations: 10000;

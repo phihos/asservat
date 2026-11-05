@@ -46,6 +46,7 @@ func (r *NativeContextReader) projectionReader() (*ContextProjectionReader, erro
 	reader.syscalls = r.syscalls
 	reader.compare = r.compare
 	reader.packets = r.packets
+	reader.queryPackets = r.queryPackets
 	return reader, nil
 }
 
@@ -78,5 +79,11 @@ func (r *NativeContextReader) ServeSyscallProjections(f evidence.SyscallProjecto
 func (r *NativeContextReader) ServePacketSummaries(f evidence.PacketSummarizer) {
 	if r != nil {
 		r.packets = f
+	}
+}
+
+func (r *NativeContextReader) ServePacketQueries(f evidence.PacketQuerier) {
+	if r != nil {
+		r.queryPackets = f
 	}
 }

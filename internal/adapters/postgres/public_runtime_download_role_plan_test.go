@@ -61,7 +61,7 @@ func TestDownloadAcceptanceAndAcquisitionRolesHaveExactPurposeGrants(t *testing.
 		acquisition = append(acquisition, publicRuntimeGrant{"table", table, "id", "UPDATE"})
 	}
 	acquisition = append(acquisition, publicRuntimeGrant{"table", "operation_audit_lifecycle", "operation_id", "UPDATE"}, publicRuntimeGrant{"table", "context_query_backing", "root_id", "UPDATE"}, publicRuntimeGrant{"table", "context_query_key_binding", "used_roles", "UPDATE"})
-	for _, signature := range []string{"lock_context_query_capacity(uuid,uuid)", "context_query_capacity_allocation_current(uuid,uuid)", "context_query_shared_profile_current(uuid,jsonb)"} {
+	for _, signature := range []string{"lock_context_query_capacity(uuid,uuid)", "context_query_capacity_allocation_current(uuid,uuid)", "context_query_shared_profile_current(uuid,jsonb)", "context_packet_query_grant_current(uuid,uuid,uuid)"} {
 		acquisition = append(acquisition, publicRuntimeGrant{"function", signature, "", "EXECUTE"})
 	}
 	keys := func(v []publicRuntimeGrant) []string {

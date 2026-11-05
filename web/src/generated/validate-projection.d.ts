@@ -6,6 +6,8 @@ export declare function validInput_get_profile_summary(value: unknown): value is
 export declare function validOutput_get_profile_summary(value: unknown): value is components['schemas']['McpOutput_get_profile_summary'];
 export declare function validInput_get_pcap_summary(value: unknown): value is components['schemas']['McpInput_get_pcap_summary'];
 export declare function validOutput_get_pcap_summary(value: unknown): value is components['schemas']['McpOutput_get_pcap_summary'];
+export declare function validInput_pcap_query(value: unknown): value is components['schemas']['McpInput_pcap_query'];
+export declare function validOutput_pcap_query(value: unknown): value is components['schemas']['McpOutput_pcap_query'];
 export declare function validInput_compare_profiles(value: unknown): value is components['schemas']['McpInput_compare_profiles'];
 export declare function validOutput_compare_profiles(value: unknown): value is components['schemas']['McpOutput_compare_profiles'];
 export declare function validInput_get_syscall_summary(value: unknown): value is components['schemas']['McpInput_get_syscall_summary'];

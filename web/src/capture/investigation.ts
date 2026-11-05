@@ -19,7 +19,7 @@ export type State = {
   previousPlan?: PreviousPlan;
 };
 export const historyPageSize = 10;
-type Receipt = { operation?: 'recordingSave'; expectedCaptureID?: string; preview_id: string; idempotency_key: string; captureID?: string; revision?: number; closed?: true; continuationBlocked?: true; approvalURI?: string };
+type Receipt = { resultAccess?: Input<'request_capture'>['result_access']; operation?: 'recordingSave'; expectedCaptureID?: string; preview_id: string; idempotency_key: string; captureID?: string; revision?: number; closed?: true; continuationBlocked?: true; approvalURI?: string };
 type ReviewedHandle = { id: string; expiresAt: number; approvalRequired: boolean };
 const emptyDraft = (): Draft => ({ target: { cluster_id: '', namespace: '', kind: 'Deployment', name: '' }, retention: '' });
 const terminal = new Set(['Succeeded', 'Partial', 'Failed', 'Cancelled', 'Indeterminate']);
@@ -373,7 +373,7 @@ export class Investigation {
     this.timer = setTimeout(() => this.publish({ stale: true }), Math.max(0, remaining));
     this.previewExpiry = setTimeout(() => this.publish({ expired: true }), Math.max(0, Date.parse(data.expires_at) - Date.now()));
   }
-  submit = async () => {
+  submit = async (resultAccess?: Input<'request_capture'>['result_access']) => {
     if (this.receipt || this.state.busy) return;
     const preview = this.state.preview;
     const reviewed = this.reviewed;
@@ -381,7 +381,7 @@ export class Investigation {
     if (this.state.expired || reviewed.expiresAt <= Date.now()) {
       this.publish({ expired: true }); return;
     }
-    this.receipt = { preview_id: reviewed.id, idempotency_key: reviewed.approvalRequired ? approvalSubmissionKey(reviewed.id) : this.newID() };
+    this.receipt = { preview_id: reviewed.id, idempotency_key: reviewed.approvalRequired ? approvalSubmissionKey(reviewed.id) : this.newID(), ...(resultAccess && { resultAccess: structuredClone(resultAccess) }) };
     this.reviewed = undefined;
     await this.retrySubmission();
   };
@@ -391,7 +391,7 @@ export class Investigation {
     // follow a commit; only this exact retry is allowed until resolved.
     const receipt = this.receipt;
     this.publish({ stage: 'uncertain', preview: undefined, diagnostics: undefined, resolving: false });
-    const data = await this.run('request_capture', { preview_id: receipt.preview_id, idempotency_key: receipt.idempotency_key });
+    const data = await this.run('request_capture', { preview_id: receipt.preview_id, idempotency_key: receipt.idempotency_key, ...(receipt.resultAccess && { result_access: structuredClone(receipt.resultAccess) }) });
     if (!data || receipt !== this.receipt) return;
     if (receipt.operation && data.operation !== receipt.operation) { this.publish({ error: 'The saved recording outcome could not be verified. Resolve the same request before continuing.' }); return; }
     await this.openAccepted(receipt, data.capture_id);

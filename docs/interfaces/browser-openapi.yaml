@@ -5010,9 +5010,12 @@ components:
                             operations:
                               type: array
                               items:
-                                const: download_artifact
+                                enum:
+                                - download_artifact
+                                - pcap_query
                               minItems: 1
-                              maxItems: 1
+                              maxItems: 2
+                              uniqueItems: true
                             max_bytes:
                               type: integer
                               minimum: 1
@@ -9961,9 +9964,12 @@ components:
                       operations:
                         type: array
                         minItems: 1
-                        maxItems: 1
+                        maxItems: 2
                         items:
-                          const: download_artifact
+                          enum:
+                          - download_artifact
+                          - pcap_query
+                        uniqueItems: true
                       client_ids:
                         type: array
                         minItems: 1
@@ -10416,9 +10422,12 @@ components:
                       operations:
                         type: array
                         items:
-                          const: download_artifact
+                          enum:
+                          - download_artifact
+                          - pcap_query
                         minItems: 1
-                        maxItems: 1
+                        maxItems: 2
+                        uniqueItems: true
                       max_bytes:
                         type: integer
                         minimum: 1
@@ -10906,6 +10915,7 @@ components:
         grant_id:
           type: string
           format: uuid
+          description: Required for every raw source, including header-only fields, and for raw byte output. The service derives this requirement from the authorized source; metadata-only queries need no raw approval.
         idempotency_key:
           type: string
           minLength: 1
@@ -10914,13 +10924,26 @@ components:
           type: array
           items:
             type: string
-            minLength: 1
-            maxLength: 64
+            enum:
+            - packet_index
+            - packet_time
+            - captured_length
+            - wire_length
+            - source_address
+            - destination_address
+            - source_port
+            - destination_port
+            - protocol
+            - tcp_flags
+            - tcp_seq
+            - tcp_ack
+            - tcp_window
+            - icmp_type
+            - icmp_code
+            - frame_prefix_hex
+          minItems: 1
           maxItems: 32
-        display_filter:
-          type: string
-          minLength: 1
-          maxLength: 512
+          uniqueItems: true
         max_packets:
           type: integer
           minimum: 1
@@ -10929,14 +10952,75 @@ components:
           type: integer
           minimum: 1
           maximum: 1073741824
+          description: 'Logical scan budget: sum of captured lengths of all visited saved records, including nonmatches. Full bounded source authentication still completes after a logical cap. The API ceiling does not qualify larger sources.'
+        packet_filter:
+          type: string
+          maxLength: 512
+          description: Supported tcpdump/libpcap packet-filter subset; no name resolution or bracket predicates. Omitted or empty means no packet-filter restriction. This is not Wireshark display-filter syntax.
+        start_time:
+          type: string
+          format: date-time
+          maxLength: 35
+          description: Inclusive saved-packet timestamp bound; normalized to UTC. It does not establish clock accuracy.
+        end_time:
+          type: string
+          format: date-time
+          maxLength: 35
+          description: Exclusive saved-packet timestamp bound. Must be later than start_time when both are present.
+        tcp_flags:
+          type: object
+          additionalProperties: false
+          properties:
+            mask:
+              type: integer
+              minimum: 1
+              maximum: 511
+            value:
+              type: integer
+              minimum: 0
+              maximum: 511
+          required:
+          - mask
+          - value
+          description: Only fully decoded TCP headers match (flags & mask) == value; value cannot contain bits outside mask.
+        frame_prefix:
+          type: object
+          additionalProperties: false
+          properties:
+            offset:
+              type: integer
+              minimum: 0
+              maximum: 1499
+            length:
+              type: integer
+              minimum: 1
+              maximum: 64
+          required:
+          - offset
+          - length
+          description: Raw-only actual saved-frame byte window. Offset plus length must not exceed 1500. Missing bytes remain unavailable; no padding or inferred payload start.
       required:
       - case_id
       - artifact_id
-      - grant_id
       - idempotency_key
       - fields
       - max_packets
       - max_scan_bytes
+      allOf:
+      - if:
+          properties:
+            fields:
+              contains:
+                const: frame_prefix_hex
+          required:
+          - fields
+        then:
+          required:
+          - frame_prefix
+          - grant_id
+        else:
+          properties:
+            frame_prefix: false
     McpOutput_pcap_query:
       allOf:
       - $ref: https://asservat.io/spec/v1/mcp-result.schema.json
@@ -10949,36 +11033,154 @@ components:
               type: object
               additionalProperties: false
               properties:
+                capture_mode:
+                  enum:
+                  - networkHeaders
+                  - rawPackets
                 fields:
                   type: array
                   items:
                     type: string
-                    minLength: 1
-                    maxLength: 64
+                    enum:
+                    - packet_index
+                    - packet_time
+                    - captured_length
+                    - wire_length
+                    - source_address
+                    - destination_address
+                    - source_port
+                    - destination_port
+                    - protocol
+                    - tcp_flags
+                    - tcp_seq
+                    - tcp_ack
+                    - tcp_window
+                    - icmp_type
+                    - icmp_code
+                    - frame_prefix_hex
+                  minItems: 1
                   maxItems: 32
+                  uniqueItems: true
                 rows:
                   type: array
+                  maxItems: 100
                   items:
                     type: array
+                    minItems: 1
+                    maxItems: 32
                     items:
                       type:
                       - string
-                      - number
-                      - boolean
+                      - integer
                       - 'null'
-                    maxItems: 32
-                  maxItems: 100
+                      maxLength: 128
+                      minimum: 0
+                      maximum: 4294967295
+                  description: Exactly one cell per selected field. Fixed field types, canonical values and null availability are independently validated; zero is not null.
                 scanned_bytes:
                   type: integer
                   minimum: 0
                   maximum: 1073741824
+                scanned_packets:
+                  type: integer
+                  minimum: 0
+                  maximum: 4294967295
+                row_limit_reached:
+                  type: boolean
+                scan_limit_reached:
+                  type: boolean
+                output_limit_reached:
+                  type: boolean
+                query_observed_at:
+                  type: string
+                  format: date-time
+                  description: Server time of this prepared query snapshot. This observation does not renew query or request authority. Together with query_expires_at it bounds managed-view lifetime independently of the client wall clock.
+                query_expires_at:
+                  type: string
+                  format: date-time
+                  description: Original total query cutoff, irreversibly shortened by effective evidence access. A poll never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline.
               required:
+              - capture_mode
               - fields
               - rows
               - scanned_bytes
+              - scanned_packets
+              - row_limit_reached
+              - scan_limit_reached
+              - output_limit_reached
+              - query_observed_at
+              - query_expires_at
+              allOf:
+              - if:
+                  properties:
+                    capture_mode:
+                      const: networkHeaders
+                  required:
+                  - capture_mode
+                then:
+                  properties:
+                    fields:
+                      not:
+                        contains:
+                          const: frame_prefix_hex
+              - if:
+                  properties:
+                    row_limit_reached:
+                      const: true
+                  required:
+                  - row_limit_reached
+                then:
+                  properties:
+                    scan_limit_reached:
+                      const: false
+                    output_limit_reached:
+                      const: false
+              - if:
+                  properties:
+                    scan_limit_reached:
+                      const: true
+                  required:
+                  - scan_limit_reached
+                then:
+                  properties:
+                    row_limit_reached:
+                      const: false
+                    output_limit_reached:
+                      const: false
+              - if:
+                  properties:
+                    output_limit_reached:
+                      const: true
+                  required:
+                  - output_limit_reached
+                then:
+                  properties:
+                    row_limit_reached:
+                      const: false
+                    scan_limit_reached:
+                      const: false
           required:
           - status
           - data
+          allOf:
+          - if:
+              properties:
+                data:
+                  properties:
+                    capture_mode:
+                      const: rawPackets
+                  required:
+                  - capture_mode
+              required:
+              - data
+            then:
+              properties:
+                data_class:
+                  const: raw
+            else:
+              properties:
+                data_class:
+                  const: extract
         - type: object
           properties:
             status:
@@ -10995,9 +11197,19 @@ components:
                   type: integer
                   minimum: 1
                   maximum: 60
+                query_observed_at:
+                  type: string
+                  format: date-time
+                  description: Server time of this prepared query snapshot. This observation does not renew query or request authority. Together with query_expires_at it bounds managed-view lifetime independently of the client wall clock.
+                query_expires_at:
+                  type: string
+                  format: date-time
+                  description: Original total query cutoff, irreversibly shortened by effective evidence access. A poll never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline.
               required:
               - query_handle
               - retry_after_seconds
+              - query_observed_at
+              - query_expires_at
           required:
           - status
           - data
@@ -12866,8 +13078,31 @@ components:
                   enum:
                   - explicitPod
                   - lexicalEligiblePod
-                  description: Selection for the fixed pod-status/v1 preset. This describes the
-                    reviewed pod, never ongoing monitoring coverage or authority to select a replacement.
+                  description: Selection for the fixed pod-status/v1 preset. This describes the reviewed pod, never ongoing monitoring coverage or authority to select a replacement.
+                result_access_actions:
+                  type: array
+                  maxItems: 16
+                  description: Advisory follow-up access choices for this exact reviewed raw plan. Current authority, retained source and selected operations are checked again on submission. Absence grants no access.
+                  items:
+                    type: object
+                    additionalProperties: false
+                    properties:
+                      action_id:
+                        type: string
+                        minLength: 1
+                        maxLength: 64
+                      operations:
+                        type: array
+                        minItems: 1
+                        maxItems: 2
+                        uniqueItems: true
+                        items:
+                          enum:
+                          - download_artifact
+                          - pcap_query
+                    required:
+                    - action_id
+                    - operations
               required:
               - preview_id
               - expires_at
@@ -16096,9 +16331,12 @@ components:
                     operations:
                       type: array
                       minItems: 1
-                      maxItems: 1
+                      maxItems: 2
                       items:
-                        const: download_artifact
+                        enum:
+                        - download_artifact
+                        - pcap_query
+                      uniqueItems: true
                     client_ids:
                       type: array
                       minItems: 1

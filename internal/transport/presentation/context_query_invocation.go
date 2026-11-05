@@ -3,6 +3,7 @@ package presentation
 import (
 	"context"
 	"encoding/json"
+	"reflect"
 	"strconv"
 	"sync"
 	"time"
@@ -87,12 +88,20 @@ func (i *contextQueryInvocation) CheckInput(ctx context.Context, in analysisapp.
 	if !i.current(ctx) || i.mac == nil {
 		return ErrOperationDelivery
 	}
+	if i.call.Tool != "pcap_query" && !reflect.DeepEqual(in.PacketQuery, value.PacketQueryRequest{}) {
+		return ErrOperationDelivery
+	}
 	if i.call.Tool != "get_pcap_summary" && in.Packet != (value.PacketSummaryRequest{}) {
 		return ErrOperationDelivery
 	}
 	var raw []byte
 	var err error
 	switch i.call.Tool {
+	case "pcap_query":
+		if !in.PacketQuery.Valid() || in.QueryID != "" || in.Packet != (value.PacketSummaryRequest{}) || in.Selection != (value.ContextExcerptSelection{}) || in.Headers != (value.HTTPHeaderSelection{}) || in.Profile != (value.ProfileSummaryRequest{}) || in.Syscalls != (value.SyscallQueryRequest{}) || in.Comparison != (value.ProfileComparisonRequest{}) {
+			return ErrOperationDelivery
+		}
+		raw, err = json.Marshal(packetQueryInput(in.PacketQuery))
 	case "get_pcap_summary":
 		if !in.Packet.Valid() || in.QueryID != "" || in.Comparison != (value.ProfileComparisonRequest{}) || in.Selection != (value.ContextExcerptSelection{}) || in.Headers != (value.HTTPHeaderSelection{}) || in.Profile != (value.ProfileSummaryRequest{}) || in.Syscalls != (value.SyscallQueryRequest{}) {
 			return ErrOperationDelivery
@@ -155,9 +164,10 @@ func (i *contextQueryInvocation) CheckInput(ctx context.Context, in analysisapp.
 		return ErrOperationDelivery
 	}
 	digest, err := i.mac.Digest(i.call.InputFormat, normalized)
-	if err != nil || digest != i.call.InputDigest || !i.current(ctx) || i.inputChecked && i.input != in {
+	if err != nil || digest != i.call.InputDigest || !i.current(ctx) || i.inputChecked && !reflect.DeepEqual(i.input, in) {
 		return ErrOperationDelivery
 	}
+	in.PacketQuery = analysisapp.NormalizePacketQueryRequest(in.PacketQuery)
 	i.input, i.inputChecked = in, true
 	return nil
 }
@@ -184,12 +194,15 @@ func (i *contextQueryInvocation) bind(ctx context.Context, d *analysisapp.Contex
 	if a.Syscalls.Valid() {
 		branches++
 	}
+	if a.PacketQuery.Valid() {
+		branches++
+	}
 	if d.Tool() == "get_pcap_summary" {
 		branches++
 	}
 	selected = branches == 1 && (a.Selection.Valid() || a.Selection == (value.LineSelection{})) && (a.Headers.Valid() || a.Headers == (value.HTTPHeaderWindow{})) && (a.Profile.Valid() || a.Profile == (value.ProfileSummarySelection{})) && (a.Syscalls.Valid() || a.Syscalls == (value.SyscallWindow{})) && (a.Comparison.Valid() || a.Comparison == (value.ProfileComparisonSelection{}))
 
-	if !authorization.UUID(a.ID) || !authorization.UUID(a.QueryID) || !selected {
+	if !authorization.UUID(a.ID) || !authorization.UUID(a.QueryID) || !selected || !a.PacketQuery.Valid() && a.PacketQuery != (value.PacketQueryWindow{}) {
 		return ErrOperationDelivery
 	}
 	until := d.ValidUntil()
@@ -215,10 +228,22 @@ func (i *contextQueryInvocation) bind(ctx context.Context, d *analysisapp.Contex
 		i.call.Tool == "get_query_result" && a.QueryID != i.input.QueryID {
 		return ErrOperationDelivery
 	}
+	if i.call.Tool != "pcap_query" && i.call.Tool != "get_query_result" && a.PacketQuery != (value.PacketQueryWindow{}) {
+		return ErrOperationDelivery
+	}
+	if i.call.Tool == "pcap_query" {
+		w, e := i.input.PacketQuery.Selection(a.PacketQuery.Selection().Program).Window()
+		if e != nil || w != a.PacketQuery || a.Selection != (value.LineSelection{}) || a.Headers != (value.HTTPHeaderWindow{}) || a.Profile != (value.ProfileSummarySelection{}) || a.Syscalls != (value.SyscallWindow{}) || a.Comparison != (value.ProfileComparisonSelection{}) {
+			return ErrOperationDelivery
+		}
+	}
 	if d.Pending() {
 		expected := analysisapp.ContextQueryAdmitted
 		if i.call.Tool == "get_query_result" {
 			expected = analysisapp.ContextQueryPollCharged
+		}
+		if i.call.Tool == "pcap_query" && d.Effect() == analysisapp.ContextQueryReplayed {
+			expected = analysisapp.ContextQueryReplayed
 		}
 		if a.BatchID != "" || a.Generation != 0 || d.Effect() != expected || refusal != analysisapp.ContextProjectionNoRefusal {
 			return ErrOperationDelivery
@@ -248,7 +273,7 @@ func (i *contextQueryInvocation) acknowledge(ctx context.Context, out audit.Oper
 		return ErrOperationDelivery
 	}
 	if !i.current(ctx) || i.delivery == nil || i.acknowledged || !out.Valid() || out.Intent != i.intent ||
-		out.Status != status || out.Reason != reason || out.Effect != "accepted" || i.delivery.Refusal() != i.refusal ||
+		out.Status != status || out.Reason != reason || out.Effect != queryDeliveryAuditEffect(i.delivery) || i.delivery.Refusal() != i.refusal ||
 		out.OutputBytes != i.outputBytes || out.MetadataUntil.After(i.metadataUntil) || !i.now().Before(out.MetadataUntil) {
 		return ErrOperationDelivery
 	}
@@ -286,4 +311,11 @@ func httpHeaderCursorText(s value.HTTPHeaderSelection) string {
 		return ""
 	}
 	return strconv.Itoa(s.Start) + ":" + s.Binding
+}
+
+func queryDeliveryAuditEffect(d *analysisapp.ContextProjectionDelivery) string {
+	if d != nil && d.Effect() == analysisapp.ContextQueryReplayed {
+		return "none"
+	}
+	return "accepted"
 }

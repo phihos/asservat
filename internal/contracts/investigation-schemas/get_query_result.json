@@ -35,7 +35,8 @@
       "data_class": {
         "enum": [
           "metadata",
-          "extract"
+          "extract",
+          "raw"
         ]
       },
       "status": {
@@ -110,6 +111,7 @@
                       "get_http_headers",
                       "get_profile_summary",
                       "get_pcap_summary",
+                      "pcap_query",
                       "compare_profiles",
                       "get_syscall_summary",
                       "get_syscall_events"

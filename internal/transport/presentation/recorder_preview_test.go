@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -296,6 +297,14 @@ func TestCompositionRefusalsAndRequestWire(t *testing.T) {
 	if _, err = s.Call(t.Context(), f, "request_capture", []byte(withAccess)); err != nil || f.access == nil || f.access.MaxBytes != 1024 || f.access.ClientIDs[0] != "console" {
 		t.Fatalf("result access not passed: %v %+v", err, f.access)
 	}
+	omittedClient := strings.Replace(withAccess, `"clientIDs":["console"],`, "", 1)
+	if _, err = s.Call(t.Context(), f, "request_capture", []byte(omittedClient)); err != nil || f.access == nil || len(f.access.ClientIDs) != 1 || f.access.ClientIDs[0] != f.i.Principal.ClientID {
+		t.Fatalf("currentclientdefault %v %+v", err, f.access)
+	}
+	explicitAgent := strings.Replace(withAccess, `"clientIDs":["console"]`, `"clientIDs":["agent"]`, 1)
+	if _, err = s.Call(t.Context(), f, "request_capture", []byte(explicitAgent)); err != nil || len(f.access.ClientIDs) != 1 || f.access.ClientIDs[0] != "agent" {
+		t.Fatalf("explicitclientrewritten %v %+v", err, f.access)
+	}
 	for name, bad := range map[string]string{
 		"read_memory":  strings.Replace(withAccess, `"download_artifact"`, `"read_memory"`, 1),
 		"five clients": strings.Replace(withAccess, `["console"]`, `["a","b","c","d","e"]`, 1),
@@ -332,28 +341,55 @@ func TestRecorderPreviewOperationalFailureIsTypedUnavailable(t *testing.T) {
 // ADR-282: a finite manual httpHeaders preview from a namespace profile
 // renders within the preview_capture output contract.
 func TestHTTPHeadersPreviewWire(t *testing.T) {
-	s, f := recorderOperations(t, true)
-	raw, err := os.ReadFile("../../application/planning/profiles/network-connections-v1.json")
-	if err != nil {
-		t.Fatal(err)
-	}
-	var doc map[string]any
-	if err = json.Unmarshal(raw, &doc); err != nil {
-		t.Fatal(err)
-	}
-	doc["name"] = "http-capture"
-	action := doc["definition"].(map[string]any)["recipe"].(map[string]any)["actions"].([]any)[0].(map[string]any)
-	action["parameters"].(map[string]any)["profile"] = map[string]any{"kind": "httpHeaders", "protocol": "http1", "projectionRef": map[string]any{"name": "http-response-headers", "version": "v1"}, "maxFlows": 1024, "maxHeaderBytes": 32768, "maxReassemblyBytesPerFlow": 262144, "maxReassemblyBytes": 16777216, "idleTimeout": "30s"}
-	action["impact"] = "sensitiveRead"
-	document, _ := json.Marshal(doc)
-	f.resolved = []planning.CatalogProfile{{Ref: planning.ProfileRef{Catalog: "namespace", Name: "http-capture", Version: "v1"}, SourceClusterID: "00000000-0000-4000-8000-000000000001", SourceNamespaceUID: "ns", SourceUID: "http-uid", Document: document, Enabled: true}}
-	in := `{` + wireTarget + `,"requested_retention_seconds":3600,"profile_composition":{"components":[{"id":"http","profileRef":{"catalog":"namespace","name":"http-capture","version":"v1"},"overrides":[{"actionID":"sample","field":"packetFilter","value":"tcp port 8080"},{"actionID":"sample","field":"actionExecutionMode","value":"onTrigger"},{"actionID":"sample","field":"packetBefore","value":"0s"},{"actionID":"sample","field":"packetAfter","value":"5s"},{"actionID":"sample","field":"actionTimeout","value":"15s"}]}],"maxTotalBytes":16777216,"maxDuration":"15s"}}`
-	reply, err := s.Call(t.Context(), f, "preview_capture", []byte(in))
-	if err != nil {
-		t.Fatal("preview_capture", err)
-	}
-	if !strings.Contains(string(reply.Body), `"status":"ok"`) {
-		t.Fatalf("http preview: %s", reply.Body)
+	for _, mode := range []string{"httpHeaders", "rawPackets"} {
+		t.Run(mode, func(t *testing.T) {
+			s, f := recorderOperations(t, true)
+			raw, err := os.ReadFile("../../application/planning/profiles/network-connections-v1.json")
+			if err != nil {
+				t.Fatal(err)
+			}
+			var doc map[string]any
+			if err = json.Unmarshal(raw, &doc); err != nil {
+				t.Fatal(err)
+			}
+			doc["name"] = "http-capture"
+			action := doc["definition"].(map[string]any)["recipe"].(map[string]any)["actions"].([]any)[0].(map[string]any)
+			action["parameters"].(map[string]any)["profile"] = map[string]any{"kind": "httpHeaders", "protocol": "http1", "projectionRef": map[string]any{"name": "http-response-headers", "version": "v1"}, "maxFlows": 1024, "maxHeaderBytes": 32768, "maxReassemblyBytesPerFlow": 262144, "maxReassemblyBytes": 16777216, "idleTimeout": "30s"}
+			if mode == "rawPackets" {
+				action["parameters"].(map[string]any)["profile"] = map[string]any{"kind": "rawPackets", "snaplen": 96}
+			}
+			action["impact"] = "sensitiveRead"
+			document, _ := json.Marshal(doc)
+			f.resolved = []planning.CatalogProfile{{Ref: planning.ProfileRef{Catalog: "namespace", Name: "http-capture", Version: "v1"}, SourceClusterID: "00000000-0000-4000-8000-000000000001", SourceNamespaceUID: "ns", SourceUID: "http-uid", Document: document, Enabled: true}}
+			in := `{` + wireTarget + `,"requested_retention_seconds":3600,"profile_composition":{"components":[{"id":"http","profileRef":{"catalog":"namespace","name":"http-capture","version":"v1"},"overrides":[{"actionID":"sample","field":"packetFilter","value":"tcp port 8080"},{"actionID":"sample","field":"actionExecutionMode","value":"onTrigger"},{"actionID":"sample","field":"packetBefore","value":"0s"},{"actionID":"sample","field":"packetAfter","value":"5s"},{"actionID":"sample","field":"actionTimeout","value":"15s"}]}],"maxTotalBytes":16777216,"maxDuration":"15s"}}`
+			reply, err := s.Call(t.Context(), f, "preview_capture", []byte(in))
+			if err != nil {
+				t.Fatal("preview_capture", err)
+			}
+			if !strings.Contains(string(reply.Body), `"status":"ok"`) {
+				t.Fatalf("http preview: %s", reply.Body)
+			}
+			var out struct {
+				Data struct {
+					Actions   []RecorderResultAccessAction `json:"result_access_actions"`
+					Lifecycle struct {
+						Actions []struct {
+							ActionID string `json:"actionID"`
+						} `json:"actions"`
+					} `json:"lifecycle_plan"`
+				} `json:"data"`
+			}
+			if json.Unmarshal(reply.Body, &out) != nil {
+				t.Fatal("decode")
+			}
+			if mode == "rawPackets" {
+				if len(out.Data.Actions) != 1 || len(out.Data.Lifecycle.Actions) != 1 || out.Data.Actions[0].ActionID != out.Data.Lifecycle.Actions[0].ActionID || !slices.Equal(out.Data.Actions[0].Operations, []string{"download_artifact", "pcap_query"}) {
+					t.Fatalf("raw eligible actions: %s", reply.Body)
+				}
+			} else if len(out.Data.Actions) != 0 {
+				t.Fatal("extract offered raw access", out.Data.Actions)
+			}
+		})
 	}
 }
 
@@ -377,5 +413,23 @@ func TestProfileWarningUsesOnlyItsReviewedEndpoint(t *testing.T) {
 	plan.Actions[0].EndpointDigest = hash(artifact.Digest{2})
 	if warnings := recorderWarnings(plan); len(warnings) != 1 {
 		t.Fatal("unrelated endpoint shown", warnings)
+	}
+}
+
+func TestRecorderResultAccessActionsUseCompiledRawOutputOnly(t *testing.T) {
+	plan := planning.RecorderPlan{Approval: &planning.RecorderApproval{}, Actions: []planning.RecorderAction{
+		{ID: "raw", Kind: "packetCapture", PacketProfile: "rawPackets"},
+		{ID: "meta", Kind: "packetCapture", PacketProfile: "networkHeaders"},
+		{ID: "http", Kind: "packetCapture", PacketProfile: "httpHeaders"},
+		{ID: "profile", Kind: "profile"},
+		{ID: "syscall", Kind: "syscallTrace", SyscallMode: "arguments"},
+	}}
+	got := recorderResultAccessActions(plan)
+	if len(got) != 3 || got[0].ActionID != "raw" || !slices.Equal(got[0].Operations, []string{"download_artifact", "pcap_query"}) || got[1].ActionID != "profile" || !slices.Equal(got[1].Operations, []string{"download_artifact"}) || got[2].ActionID != "syscall" {
+		t.Fatal(got)
+	}
+	plan.Approval = nil
+	if recorderResultAccessActions(plan) != nil {
+		t.Fatal("unreviewed actions offered")
 	}
 }

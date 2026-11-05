@@ -1,6 +1,6 @@
 {
   "name": "request_raw_access",
-  "description": "Request independent approval to download whole existing raw artifacts. This creates no collection or disclosure. The current runtime supports download_artifact only; other declared operations return unsupported operation. Exact verified sizes, targets, requester/client and the fixed 10000-operation ceiling are reviewed. Retry an uncertain reply with the same selection and idempotency key; original expiry and spend do not reset.",
+  "description": "Request independent approval for native download or bounded packet queries over exact existing raw artifacts. Reuse a covering approval; a download-only approval does not authorize a packet query.",
   "annotations": {
     "readOnlyHint": false,
     "destructiveHint": false,
@@ -26,24 +26,15 @@
       },
       "operations": {
         "type": "array",
-        "items": {
-          "type": "string",
-          "enum": [
-            "read_memory",
-            "backtrace",
-            "threads",
-            "registers",
-            "frame_variables",
-            "managed_stack",
-            "heap_statistics",
-            "pcap_query",
-            "syscall_query",
-            "download_artifact"
-          ]
-        },
-        "maxItems": 16,
         "minItems": 1,
-        "uniqueItems": true
+        "maxItems": 2,
+        "uniqueItems": true,
+        "items": {
+          "enum": [
+            "download_artifact",
+            "pcap_query"
+          ]
+        }
       },
       "reason": {
         "type": "string",

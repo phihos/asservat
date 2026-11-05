@@ -155,6 +155,11 @@ func NewPublicContextOperations(c PublicContextOperationsConfig, s PublicContext
 			return nil, err
 		}
 	}
+	if queries, ok := q.PacketQueries(); ok {
+		if projection, err = projection.WithPacketQueries(queries); err != nil {
+			return nil, err
+		}
+	}
 	if packets, ok := q.PacketSummaries(); ok {
 		if projection, err = projection.WithPacketSummaries(packets); err != nil {
 			return nil, err

@@ -264,6 +264,12 @@ func rawSummaryProbeNative(t *testing.T, shape string, at time.Time) ([]byte, ra
 
 func rawSummaryProbeRead(t *testing.T, ctx context.Context, cancel context.CancelFunc, dir string, f profileEncryptedFixture, mode string) (query.ProjectionResult, error, int, bool, int64) {
 	t.Helper()
+	return savedPacketProbeRead(t, ctx, cancel, dir, f, mode, func(r *NativeContextReader) { r.ServePacketSummaries(packets.SummarizePCAPNG) })
+}
+
+// Both process probes retain the identical receiver/key/source/join apparatus.
+func savedPacketProbeRead(t *testing.T, ctx context.Context, cancel context.CancelFunc, dir string, f profileEncryptedFixture, mode string, serve func(*NativeContextReader)) (query.ProjectionResult, error, int, bool, int64) {
+	t.Helper()
 	verifier, _, entered, unblock := profileEncryptedVerifier(t, dir, f, mode == "cancel")
 	defer unblock()
 	if mode == "source-error" {
@@ -314,7 +320,7 @@ func rawSummaryProbeRead(t *testing.T, ctx context.Context, cancel context.Cance
 	if err != nil {
 		t.Fatal(err)
 	}
-	reader.ServePacketSummaries(packets.SummarizePCAPNG)
+	serve(reader)
 	now := time.Now().UTC()
 	until, _ := ctx.Deadline()
 	s := f.Scope

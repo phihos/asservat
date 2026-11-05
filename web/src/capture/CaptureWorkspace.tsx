@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Button } from 'react-aria-components';
 import type { Session } from '../auth/session';
-import { Investigation, requestablePreview, type State } from './investigation';
+import { Investigation, type State } from './investigation';
 import type { Data, HistoryEntry, Input, Preview, Progress, Target } from './http';
 import { captureIDFromPath } from '../routes';
 import { WhyAccess } from '../access/WhyAccess';
@@ -10,6 +10,7 @@ import { ProfileCatalog, type CatalogDraft } from './ProfileCatalog';
 import { PlanDiff } from './PlanDiff';
 import { planFromPreview } from './plan-diff';
 import { SaveAsProfile } from './SaveAsProfile';
+import { CaptureSubmission } from './CaptureSubmission';
 const RecordingsPanel = lazy(() => import('../recordings/RecordingsPanel').then(module => ({ default: module.RecordingsPanel })));
 
 const phases: Record<Progress['phase'], string> = {
@@ -213,7 +214,7 @@ export function CaptureWorkspace({ session, scope, controller }: { session: Sess
       {state.preview.approval_required && <p className="notice">This collection needs independent approval. Request a review of this exact plan; collection starts only after approval and a further submission.</p>}
       {state.preview.warnings.map((warning, index) => <p key={index}>{warning}</p>)}
       <p role="status">{state.expired ? 'This preview has expired. Refreshing may select a different pod; check the updated selection.' : state.stale ? 'The impact assessment is older. Collection will recheck current conditions and these exact identities, and stop if the reviewed scope changed.' : 'The assessment is current. Collection rechecks your access and these exact identities.'}</p>
-      <div className="actions"><Button className="button" isDisabled={state.busy || (!state.expired && !requestablePreview(state.preview))} onPress={() => void (state.expired ? controller.preview() : controller.submit())}>{state.busy ? 'Checking…' : state.expired ? 'Refresh review' : state.preview.approval_required ? 'Request approval' : state.preview.profile_composition ? 'Collect evidence' : 'Collect pod status'}</Button>
+      <div className="actions"><CaptureSubmission key={state.preview.preview_id} preview={state.preview} state={state} controller={controller}/>
         {state.preview.profile_composition && !state.repeatedFrom && <Button className="button secondary" isDisabled={state.busy} onPress={controller.changeProfiles}>Change profiles</Button>}
         <Button className="button secondary" isDisabled={state.busy} onPress={controller.edit}>Edit request</Button></div>
       {state.preview.profile_composition?.authored.components.length === 1 && <SaveAsProfile key={state.preview.preview_id} session={session} scope={scope} target={draft.target} composition={state.preview.profile_composition} client={controller.client}/>}

@@ -56,6 +56,24 @@ it('uses actual catalog output and explains exact pod selection, impact limits a
   expect(screen.getByText('Within 65 minutes of that same submission.')).toBeTruthy();
   expect(screen.getByText(/cannot delete copies downloaded to local tools/)).toBeTruthy();
 });
+it('selects bounded follow-up queries and downloads in the same collection review', async () => {
+  const { client, controller } = mount();
+  const recording = recordingPreviewResult(); if (recording.status !== 'ok') throw new Error();
+  const action = recording.data.capture_assessment.actions[0].actionID;
+  recording.data.result_access_actions = [{ action_id: action, operations: ['download_artifact', 'pcap_query'] }];
+  client.responder = () => recording;
+  act(() => controller.setDraft({ target, retention: '' }));
+  await act(async () => { await controller.previewComposition(recording.data.profile_composition!.authored); });
+  fireEvent.click(screen.getByLabelText('Include follow-up access in this approval'));
+  fireEvent.change(screen.getByLabelText('Follow-up operations'), { target: { value: 'both' } });
+  fireEvent.change(screen.getByLabelText('Shared disclosure byte budget'), { target: { value: '9000000' } });
+  client.responder = () => approvalPendingResult();
+  fireEvent.click(screen.getByRole('button', { name: 'Request approval' }));
+  await screen.findByRole('link', { name: 'View approval' });
+  const sent = client.calls.find(c => c.name === 'request_capture')!.input as Record<string, unknown>;
+  expect(sent.result_access).toMatchObject({ actionIds: [action], operations: ['download_artifact', 'pcap_query'], maxBytes: 9000000, maxArtifacts: 1 });
+  expect(sent.result_access).not.toHaveProperty('clientIDs');
+});
 it('labels finite retention and kind choices independently of their options', () => {
   const { controller } = mount();
   const kind = screen.getByLabelText('Kind', { exact: true });

@@ -37,6 +37,9 @@ const syscallProjectionKeyBindingBytes = 48 << 10
 // 16 KiB key child. Only this typed source gets the additional bounded space;
 // it changes neither key use slots nor any other source's accepted encoding.
 func projectionKeyBindingBytes(b query.ContextProjectionKeyBinding) int {
+	if b.Authority.Scope.DisplayVersion == query.PacketQueryDisplayVersion && b.Authority.Scope.Valid() {
+		return syscallProjectionKeyBindingBytes
+	}
 	if (b.Authority.Scope.NativeType == artifact.SyscallRecordsArtifact || b.Authority.Scope.NativeType == artifact.SyscallArgumentsArtifact) && b.Authority.Scope.Valid() {
 		return syscallProjectionKeyBindingBytes
 	}

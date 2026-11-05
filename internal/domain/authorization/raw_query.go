@@ -40,8 +40,8 @@ func (r RawQueryScope) Clone() RawQueryScope {
 func (r RawQueryScope) Valid(requestedAt time.Time) bool {
 	if !UUID(r.CaseID) || requestedAt.IsZero() || !identity.Text(r.Reason, 512) ||
 		len(r.Artifacts) < 1 || len(r.Artifacts) > GrantMaxResultArtifacts ||
-		!slices.Equal(r.Operations, []string{GrantDownloadOperation}) ||
-		r.MaxBytes < 1 || r.MaxBytes > artifact.MaxNativeBytes ||
+		!ValidResultOperations(r.Operations) ||
+		r.MaxBytes < 1 || r.MaxBytes > artifact.MaxNativeBytes || !slices.Contains(r.Operations, GrantDownloadOperation) && r.MaxBytes > 1<<30 ||
 		r.MaxOperations < 1 || r.MaxOperations > GrantMaxResultOperations ||
 		!r.NotAfter.After(requestedAt) || r.NotAfter.After(requestedAt.Add(GrantMaxLifetime)) {
 		return false
@@ -51,7 +51,7 @@ func (r RawQueryScope) Valid(requestedAt time.Time) bool {
 	for _, a := range r.Artifacts {
 		if !a.Output.Valid() || a.Output.ArtifactID <= previous || a.NativeBytes < 0 ||
 			a.NativeBytes > artifact.MaxNativeBytes || !a.ExpiresAt.After(requestedAt) ||
-			a.NativeBytes > r.MaxBytes-total {
+			slices.Contains(r.Operations, GrantDownloadOperation) && a.NativeBytes > r.MaxBytes-total {
 			return false
 		}
 		total += a.NativeBytes

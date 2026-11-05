@@ -243,6 +243,7 @@ func runWorkerNative(ctx context.Context, input WorkerStartup, trust *mtls.Worke
 		reader.ServeProfileComparisons(diagnostics.ComparePprof)
 		reader.ServeSyscallProjections(syscalls.ProjectSyscalls)
 		reader.ServePacketSummaries(packets.SummarizePCAPNG)
+		reader.ServePacketQueries(packets.QueryPCAPNG)
 		result, err = evidence.NewRegionalApprovedResult(ctx, input.Target, reader, time.Now)
 	default:
 		return artifact.ErrInvalid

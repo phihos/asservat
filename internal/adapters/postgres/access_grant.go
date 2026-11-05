@@ -639,7 +639,7 @@ func (s *AccessGrants) GrantChild(ctx context.Context, childID string) (authoriz
 // pool is never exceeded. A retry with the same use ID charges nothing.
 func (s *AccessGrants) ReserveGrantUse(ctx context.Context, in authapp.GrantUseRequest, recovery artifact.RecoveryProof) (authorization.Grant, bool, error) {
 	var zero authorization.Grant
-	if s == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(in.UseID) || !authorization.UUID(in.ParentID) || !authorization.UUID(in.ChildID) || in.Use.Operation != authorization.GrantDownloadOperation || in.Use.Bytes < 0 || in.Use.Operations < 0 || in.Use.Bytes+in.Use.Operations == 0 {
+	if s == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(in.UseID) || !authorization.UUID(in.ParentID) || !authorization.UUID(in.ChildID) || (in.Use.Operation != authorization.GrantDownloadOperation && in.Use.Operation != authorization.GrantPacketQueryOperation) || in.Use.Bytes < 0 || in.Use.Operations < 0 || in.Use.Bytes+in.Use.Operations == 0 {
 		return zero, false, authorization.ErrGrantInvalid
 	}
 	var out authorization.Grant
@@ -650,60 +650,8 @@ func (s *AccessGrants) ReserveGrantUse(ctx context.Context, in authapp.GrantUseR
 		if err != nil {
 			return err
 		}
-		var row custodydb.AccessGrant
-		previous, err := q.ReadGrantUse(ctx, custodydb.ReadGrantUseParams{RootID: id(s.root), ID: id(in.UseID)})
-		switch {
-		case err == nil:
-			if uid(previous.ParentID) != in.ParentID || uid(previous.ChildID) != in.ChildID || previous.Bytes != in.Use.Bytes || previous.Operations != in.Use.Operations {
-				return authapp.ErrGrantConflict
-			}
-			// The original reservation stands; its delivery is rechecked by
-			// the caller against the current parent.
-			if row, err = q.ReadGrant(ctx, custodydb.ReadGrantParams{RootID: id(s.root), ID: id(in.ParentID)}); err != nil {
-				return err
-			}
-			replay = true
-		case errors.Is(err, pgx.ErrNoRows):
-			child, err := q.ReadGrantChildByID(ctx, custodydb.ReadGrantChildByIDParams{RootID: id(s.root), ID: id(in.ChildID)})
-			if errors.Is(err, pgx.ErrNoRows) || err == nil && uid(child.ParentID) != in.ParentID {
-				return authorization.ErrGrantScope
-			} else if err != nil {
-				return err
-			}
-			row, err = q.ChargeGrantUse(ctx, custodydb.ChargeGrantUseParams{RootID: id(s.root), ID: id(in.ParentID), Bytes: in.Use.Bytes, Operations: in.Use.Operations})
-			if errors.Is(err, pgx.ErrNoRows) {
-				// Distinguish a final phase from an exhausted pool.
-				current, err := q.ReadGrant(ctx, custodydb.ReadGrantParams{RootID: id(s.root), ID: id(in.ParentID)})
-				if err != nil {
-					return err
-				}
-				g, err := s.grant(current)
-				if err != nil {
-					return err
-				}
-				now, err := q.CurrentTime(ctx)
-				if err != nil {
-					return err
-				}
-				switch g.Phase(now.Time) {
-				case authorization.GrantRevoked:
-					return authorization.ErrGrantRevoked
-				case authorization.GrantExpired:
-					return authorization.ErrGrantExpired
-				case authorization.GrantApproved:
-					return authorization.ErrGrantPoolExhausted
-				}
-				return authorization.ErrGrantDenied
-			} else if err != nil {
-				return err
-			}
-			if _, err = q.InsertGrantUse(ctx, custodydb.InsertGrantUseParams{ID: id(in.UseID), RootID: id(s.root), ParentID: id(in.ParentID), ChildID: id(in.ChildID), Operation: in.Use.Operation, Bytes: in.Use.Bytes, Operations: in.Use.Operations}); err != nil {
-				return err
-			}
-		default:
-			return err
-		}
-		if out, err = s.grant(row); err != nil {
+		out, replay, err = s.reserveGrantUse(ctx, q, in)
+		if err != nil {
 			return err
 		}
 		if err = s.recovery.check(ctx, q, trust, s.root, recovery); err != nil {
@@ -715,4 +663,100 @@ func (s *AccessGrants) ReserveGrantUse(ctx context.Context, in authapp.GrantUseR
 		return zero, false, grantError(err)
 	}
 	return out, replay, nil
+}
+
+// grantUseMatches binds a replay to the original irreversible reservation.
+func grantUseMatches(previous custodydb.AccessGrantUse, in authapp.GrantUseRequest) bool {
+	return uid(previous.ParentID) == in.ParentID && uid(previous.ChildID) == in.ChildID && previous.Operation == in.Use.Operation && previous.Bytes == in.Use.Bytes && previous.Operations == in.Use.Operations
+}
+
+// reserveGrantUse performs SQL only, within its caller's existing recovery-fenced
+// transaction. Batch admission uses it before inserting the exact paid batch.
+func (s *AccessGrants) reserveGrantUse(ctx context.Context, q *custodydb.Queries, in authapp.GrantUseRequest) (authorization.Grant, bool, error) {
+	var out authorization.Grant
+	replay := false
+	var row custodydb.AccessGrant
+	var child custodydb.AccessGrantChild
+	previous, err := q.ReadGrantUse(ctx, custodydb.ReadGrantUseParams{RootID: id(s.root), ID: id(in.UseID)})
+	switch {
+	case err == nil:
+		if !grantUseMatches(previous, in) {
+			return out, false, authapp.ErrGrantConflict
+		}
+		// The original reservation stands; its delivery is rechecked by
+		// the caller against the current parent.
+		if row, err = q.ReadGrant(ctx, custodydb.ReadGrantParams{RootID: id(s.root), ID: id(in.ParentID)}); err != nil {
+			return out, false, err
+		}
+		child, err = q.ReadGrantChildByID(ctx, custodydb.ReadGrantChildByIDParams{RootID: id(s.root), ID: id(in.ChildID)})
+		if err != nil {
+			return out, false, err
+		}
+		replay = true
+	case errors.Is(err, pgx.ErrNoRows):
+		child, err = q.ReadGrantChildByID(ctx, custodydb.ReadGrantChildByIDParams{RootID: id(s.root), ID: id(in.ChildID)})
+		if errors.Is(err, pgx.ErrNoRows) || err == nil && uid(child.ParentID) != in.ParentID {
+			return out, false, authorization.ErrGrantScope
+		} else if err != nil {
+			return out, false, err
+		}
+		row, err = q.ChargeGrantUse(ctx, custodydb.ChargeGrantUseParams{RootID: id(s.root), ID: id(in.ParentID), Bytes: in.Use.Bytes, Operations: in.Use.Operations})
+		if errors.Is(err, pgx.ErrNoRows) {
+			// Distinguish a final phase from an exhausted pool.
+			current, err := q.ReadGrant(ctx, custodydb.ReadGrantParams{RootID: id(s.root), ID: id(in.ParentID)})
+			if err != nil {
+				return out, false, err
+			}
+			g, err := s.grant(current)
+			if err != nil {
+				return out, false, err
+			}
+			now, err := q.CurrentTime(ctx)
+			if err != nil {
+				return out, false, err
+			}
+			switch g.Phase(now.Time) {
+			case authorization.GrantRevoked:
+				return out, false, authorization.ErrGrantRevoked
+			case authorization.GrantExpired:
+				return out, false, authorization.ErrGrantExpired
+			case authorization.GrantApproved:
+				return out, false, authorization.ErrGrantPoolExhausted
+			}
+			return out, false, authorization.ErrGrantDenied
+		} else if err != nil {
+			return out, false, err
+		}
+		if _, err = q.InsertGrantUse(ctx, custodydb.InsertGrantUseParams{ID: id(in.UseID), RootID: id(s.root), ParentID: id(in.ParentID), ChildID: id(in.ChildID), Operation: in.Use.Operation, Bytes: in.Use.Bytes, Operations: in.Use.Operations}); err != nil {
+			return out, false, err
+		}
+	default:
+		return out, false, err
+	}
+	if out, err = s.grant(row); err != nil {
+		return out, false, err
+	}
+
+	if _, err := childFromRow(child, out); err != nil {
+		return out, false, err
+	}
+	if !grantUseOperationAllowed(out, in.Use.Operation) {
+		return out, false, authorization.ErrGrantScope
+	}
+	return out, replay, nil
+}
+
+func grantUseOperationAllowed(g authorization.Grant, operation string) bool {
+	var operations []string
+	if g.Kind == authorization.GrantRawQuery && g.RawQuery != nil {
+		operations = g.RawQuery.Operations
+	} else if g.Kind == authorization.GrantAdHocCapture && g.ResultAccess != nil {
+		operations = g.ResultAccess.Operations
+	}
+	for _, allowed := range operations {
+		if operation == allowed {
+			return true
+		}
+	}
+	return false
 }

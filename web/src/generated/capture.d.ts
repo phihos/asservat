@@ -499,7 +499,8 @@ export interface components {
         Contract_investigation_access_0d504ecd6bc8c0fd: {
             actionIds: string[];
             operations: ("read_memory" | "debugger_command" | "pcap_query" | "syscall_query" | "download_artifact")[];
-            clientIDs: string[];
+            /** @description Selected clients. When omitted, resolve to the authenticated requesting client before recording the review and digest. Explicit selections remain exact; replay never adds or changes a client. */
+            clientIDs?: string[];
             maxArtifacts: number;
             maxBytes: number;
             maxOperations: number;
@@ -756,6 +757,11 @@ export interface components {
                  * @enum {unknown}
                  */
                 pod_selection?: "explicitPod" | "lexicalEligiblePod";
+                /** @description Advisory follow-up access choices for this exact reviewed raw plan. Current authority, retained source and selected operations are checked again on submission. Absence grants no access. */
+                result_access_actions?: {
+                    action_id: string;
+                    operations: ("download_artifact" | "pcap_query")[];
+                }[];
             } & unknown;
         } | {
             /** @constant */

@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "specs/contracts"
 DEST = ROOT / "internal/contracts/investigation-schemas"
 PREFIX = "https://asservat.io/spec/v1/"
-NAMES = ["cancel_capture", "list_recordings", "preview_recording_save", "list_diagnostics", "preview_capture", "request_capture", "resolve_capture_request", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "cancel_artifact_download", "get_file_excerpt", "get_query_result", "activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share", "explain_access", "list_capture_history", "get_capture_settings", "preview_access_change", "transfer_share", "stop_future_sharing", "preview_retention_change", "request_policy_grant", "request_raw_access", "get_grant", "list_reviews", "decide_review", "revoke_grant", "list_capture_profiles", "get_capture_profile", "get_http_headers", "get_profile_summary", "get_pcap_summary", "compare_profiles", "get_syscall_summary", "get_syscall_events"]
+NAMES = ["cancel_capture", "list_recordings", "preview_recording_save", "list_diagnostics", "preview_capture", "request_capture", "resolve_capture_request", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "cancel_artifact_download", "get_file_excerpt", "get_query_result", "activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share", "explain_access", "list_capture_history", "get_capture_settings", "preview_access_change", "transfer_share", "stop_future_sharing", "preview_retention_change", "request_policy_grant", "request_raw_access", "get_grant", "list_reviews", "decide_review", "revoke_grant", "list_capture_profiles", "get_capture_profile", "get_http_headers", "get_profile_summary", "get_pcap_summary", "pcap_query", "compare_profiles", "get_syscall_summary", "get_syscall_events"]
 
 RECORDER_EDITS = ["packetPeers", "packetFilter", "packetBefore", "packetAfter", "packetRing", "syscallFilter", "syscallMode", "syscallBefore", "syscallAfter", "syscallRing", "syscallArguments", "syscallMaxEvents", "syscallRate", "actionMaxBytes", "actionTimeout", "actionExecutionMode", "profileDuration"]
 
@@ -200,7 +200,7 @@ def main():
             output["properties"]["data_class"] = {"const": "metadata"}
             if name == "get_query_result":
                 # ADR-282: a get_http_headers page result is an extract.
-                output["properties"]["data_class"] = {"enum": ["metadata", "extract"]}
+                output["properties"]["data_class"] = {"enum": ["metadata", "extract", "raw"]}
             output["properties"]["provenance"] = {"type": "array", "maxItems": 0}
             for key, fixed in (("truncated", False), ("next_cursor", None), ("narrowing_hint", None)):
                 output["properties"][key] = {"const": fixed}
@@ -210,7 +210,7 @@ def main():
                 data["properties"]["logical_path"] = {"const": "pod-status.txt"}
                 data["properties"]["lines"]["maxItems"] = 14
             else:
-                data["properties"]["tool_name"] = {"enum": ["get_file_excerpt", "get_http_headers", "get_profile_summary", "get_pcap_summary", "compare_profiles", "get_syscall_summary", "get_syscall_events"]}
+                data["properties"]["tool_name"] = {"enum": ["get_file_excerpt", "get_http_headers", "get_profile_summary", "get_pcap_summary", "pcap_query", "compare_profiles", "get_syscall_summary", "get_syscall_events"]}
                 # The Go validator additionally applies the original output
                 # schema and relational request/timing checks to this object.
             output["allOf"] = [{"oneOf": branches}]
@@ -218,7 +218,7 @@ def main():
             description["outputSchema"] = localize(output)
             result[name + ".json"] = (json.dumps(description, indent=2) + "\n").encode()
             continue
-        if name in ("get_http_headers", "get_profile_summary", "get_pcap_summary", "compare_profiles", "get_syscall_summary", "get_syscall_events"):
+        if name in ("get_http_headers", "get_profile_summary", "get_pcap_summary", "pcap_query", "compare_profiles", "get_syscall_summary", "get_syscall_events"):
             # ADR-282/291: the whole canonical input and output. Each page is an
             # approved query: pending with its handle, the page served by
             # get_query_result. The cursor is the next record index bound to
@@ -237,6 +237,13 @@ def main():
                 output["properties"]["data_class"] = {"enum": ["metadata", "extract"]}
                 branches[0]["properties"]["data_class"] = {"const": "extract"}
                 branches[0]["properties"]["provenance"] = {"type": "array", "minItems": 1, "maxItems": 2 if name == "compare_profiles" else 1}
+            if name == "pcap_query":
+                # ADR-305: raw pages retain their classification; metadata
+                # pages are approved extracts. Limits live in the page, not a cursor.
+                output["properties"]["data_class"] = {"enum": ["metadata", "extract", "raw"]}
+                output["properties"]["truncated"] = {"type": "boolean"}
+                output["properties"]["next_cursor"] = {"type": "null"}
+                branches[0]["properties"]["provenance"] = {"type": "array", "minItems": 1, "maxItems": 1}
             output["allOf"] = [{"oneOf": branches}]
             description["inputSchema"] = localize(description["inputSchema"])
             description["outputSchema"] = localize(output)
@@ -253,6 +260,9 @@ def main():
             description = copy.deepcopy(tool)
             description.pop("enabledByDefault", None)
             branches = copy.deepcopy(tool["outputSchema"]["allOf"][1]["oneOf"])
+            if name == "request_raw_access":
+                description["inputSchema"]["properties"]["operations"] = {"type": "array", "minItems": 1, "maxItems": 2, "uniqueItems": True, "items": {"enum": ["download_artifact", "pcap_query"]}}
+                description["description"] = "Request independent approval for native download or bounded packet queries over exact existing raw artifacts. Reuse a covering approval; a download-only approval does not authorize a packet query."
             if name == "preview_recording_save":
                 # Protected recording-save reasons use the accepted opaque audit path.
                 # Keep the same bounded capture-time sharing subset.
@@ -308,10 +318,10 @@ def main():
         }[name]
         props = {k: copy.deepcopy(tool["inputSchema"]["properties"][k]) for k in keys}
         if "result_access" in props:
-            # ADR-249: download_artifact only, at most four clients and sixteen
+            # ADR-305: download_artifact/pcap_query, at most four clients and sixteen
             # actions, a pool of at most 256 GiB; the plan must need review.
             access = copy.deepcopy(documents["investigation-access.schema.json"]["$defs"]["request"])
-            access["properties"]["operations"] = {"type": "array", "minItems": 1, "maxItems": 1, "items": {"const": "download_artifact"}}
+            access["properties"]["operations"] = {"type": "array", "minItems": 1, "maxItems": 2, "uniqueItems": True, "items": {"enum": ["download_artifact", "pcap_query"]}}
             access["properties"]["clientIDs"]["maxItems"] = 4
             access["properties"]["actionIds"]["maxItems"] = 16
             access["properties"]["actionIds"]["items"]["maxLength"] = 64
@@ -361,11 +371,14 @@ def main():
         if name=="cancel_artifact_download":
             success["properties"]["data"]={"$ref":PREFIX+"artifact-download.schema.json#/$defs/cancelReceipt"}
         if output_keys is not None:
-            optional = ["repeated_from_capture_id", "profile_composition"] if name == "preview_capture" else []
+            optional = ["repeated_from_capture_id", "profile_composition", "result_access_actions"] if name == "preview_capture" else []
             data["properties"] = {k: v for k, v in data["properties"].items() if k in output_keys + optional}
         # Preserve the exact preset conditions, including retention anchors.
         # Localizing below also closes references within these conditions.
         if name == "preview_capture":
+            # The canonical prose documents these advisory choices. Avoid
+            # duplicating it inside the already bounded discovery descriptor.
+            data["properties"]["result_access_actions"].pop("description", None)
             # ADR-243: a composition preview has no preset or pod-status selection.
             data["required"] = [k for k in output_keys if k not in ("preset_ref", "pod_selection")]
             data["oneOf"] = [
@@ -433,8 +446,8 @@ def main():
             "name": name,
             "description": {
                 "list_diagnostics": "List the supported pod-status preset for a currently authorized named workload. No evidence collection.",
-                "preview_capture": "Passively preview whole-Pod status or a finite packet, syscall or Go profile capture. Use profile_composition for versioned profiles and typed edits; onTrigger requires before 0s. History IDs from list_capture_history restore target, retention and composition for a fresh preview. Returns Pod selection, lifecycle, impact, data handling and blockers. Sharing requires evidence-owner and evidence:share (up to eight users/groups; default 24 hours, maximum seven days).",
-                "request_capture": "Submit the reviewed capture preview using a stable idempotency key. Acceptance is not collection or evidence success. Retry an uncertain result with the same key and preview. Ordinary accepted replay is passive; continue_acquisition:true explicitly attempts the original accepted acquisition with current rights, without new keys or another attempt. A packet, syscall or Go profile plan whose preview has the ApprovalRequired blocker opens one review request for an independent approver (error ApprovalRequired with its approval page; read it with get_grant), optionally with result_access for your own later downloads; submit the same preview again after approval.",
+                "preview_capture": "Preview whole-Pod status or a versioned capture composition without collection. Returns exact Pod, impact, handling and blockers. onTrigger requires before 0s. Sharing needs evidence-owner and evidence:share; eight recipients and seven days maximum (default24h).",
+                "request_capture": "Submit the reviewed capture preview using a stable idempotency key. Acceptance is not collection or evidence success. Retry an uncertain result with the same key and preview. Ordinary accepted replay is passive; continue_acquisition:true explicitly attempts the original accepted acquisition with current rights, without new keys or another attempt. A packet, syscall or Go profile plan whose preview has the ApprovalRequired blocker opens one review request for an independent approver (error ApprovalRequired with its approval page; read it with get_grant), optionally with result_access for your own later downloads or eligible saved packet queries; submit the same preview again after approval.",
                 "resolve_capture_request": tool["description"],
                 "get_capture": "Read authorized pod-status capture progress. No evidence bytes. Finalizing is not publication; Indeterminate must not be automatically recaptured.",
                 "prepare_artifact_download": "Prepare a native download using a stable idempotency key. A covering grant proceeds without another review. RawApprovalRequired opens independent whole-file review prefilled from the selected existing artifact and verified size; retain the same download key after approval. Unknown preparation replies retain the same key. Only an acknowledged continuation may repeat preparation automatically.",

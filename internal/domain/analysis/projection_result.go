@@ -45,6 +45,7 @@ type ProjectionResult struct {
 	PodStatus     PodStatusProjection
 	Headers       HTTPHeaderPage
 	Summary       *ProfileSummary    `json:",omitempty"`
+	PacketQuery   *PacketQueryResult `json:",omitempty"`
 	PacketSummary *PacketSummary     `json:",omitempty"`
 	Comparison    *ProfileComparison `json:",omitempty"`
 	// IncompatibleProfiles is a content-free semantic result after both
@@ -62,6 +63,12 @@ type ProjectionResult struct {
 // Valid reports whether the result is exactly the scope's source branch.
 func (r ProjectionResult) Valid(s ContextProjectionScope) bool {
 	if !s.Valid() {
+		return false
+	}
+	if s.PacketQuery != (PacketQueryWindow{}) {
+		return r.PodStatus == (PodStatusProjection{}) && r.Headers.empty() && r.Summary == nil && r.PacketSummary == nil && r.Comparison == nil && !r.IncompatibleProfiles && r.SyscallSummary == nil && r.SyscallEvents == nil && !r.InvalidCursor && !r.TooLarge && r.PacketQuery != nil && r.PacketQuery.Valid(s.PacketQuery.Selection(), s.NativeType)
+	}
+	if r.PacketQuery != nil {
 		return false
 	}
 	if s.Comparison != (ProfileComparisonWindow{}) {
@@ -117,6 +124,10 @@ func (r ProjectionResult) Valid(s ContextProjectionScope) bool {
 
 // Clear drops the transient record values.
 func (r *ProjectionResult) Clear() {
+	if r.PacketQuery != nil {
+		r.PacketQuery.Clear()
+		r.PacketQuery = nil
+	}
 	if r.Comparison != nil {
 		r.Comparison.Clear()
 	}
@@ -149,6 +160,9 @@ func (p HTTPHeaderPage) empty() bool {
 
 // BeginTool is the public tool that admits a query of this scope.
 func (s ContextProjectionScope) BeginTool() string {
+	if s.DisplayVersion == PacketQueryDisplayVersion && s.PacketQuery != (PacketQueryWindow{}) {
+		return "pcap_query"
+	}
 	if s.NativeType == artifact.PCAPNGArtifact || s.NativeType == artifact.RawPCAPNGArtifact {
 		return "get_pcap_summary"
 	}
@@ -177,6 +191,9 @@ func (s ContextProjectionScope) BeginTool() string {
 // ReadBatches is the number of read batches a query of this scope may
 // start: one page read for an extract, the historical two for pod status.
 func (s ContextProjectionScope) ReadBatches() int64 {
+	if s.DisplayVersion == PacketQueryDisplayVersion && s.PacketQuery != (PacketQueryWindow{}) {
+		return PacketQueryReadBatches
+	}
 	if s.NativeType == artifact.PCAPNGArtifact || s.NativeType == artifact.RawPCAPNGArtifact || s.NativeType == artifact.HTTPHeadersArtifact || s.NativeType == artifact.PprofArtifact || s.NativeType == artifact.SyscallRecordsArtifact || s.NativeType == artifact.SyscallArgumentsArtifact {
 		return 1
 	}

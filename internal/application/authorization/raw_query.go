@@ -50,6 +50,10 @@ type RawQueryGrantStore interface {
 	// registered under the parent across its reviewed clients; at most 64 IDs.
 	CountRegisteredGrantArtifacts(context.Context, string, []string) (int, error)
 }
+type RawPacketQuerySelectionReader interface {
+	ResolveRawPacketQuery(context.Context, identities.CurrentIdentity, string, []artifact.Digest) (RawQuerySelection, error)
+}
+
 type RawQueryRequestInput struct {
 	CaseID          string
 	ArtifactDigests []artifact.Digest
@@ -64,10 +68,11 @@ func normalizeRawQueryRequest(in RawQueryRequestInput) (RawQueryRequestInput, er
 	in.ArtifactDigests = slices.Clone(in.ArtifactDigests)
 	slices.SortFunc(in.ArtifactDigests, func(a, b artifact.Digest) int { return bytes.Compare(a[:], b[:]) })
 	in.Operations = slices.Clone(in.Operations)
+	slices.Sort(in.Operations)
 	if !value.UUID(in.CaseID) || len(in.ArtifactDigests) < 1 || len(in.ArtifactDigests) > value.GrantMaxResultArtifacts || !identity.Text(in.Reason, 512) || !identity.Text(in.IdempotencyKey, 128) || in.MaxBytes < 1 || in.MaxBytes > artifact.MaxNativeBytes || in.Lifetime < time.Second || in.Lifetime > value.GrantMaxLifetime || in.Lifetime%time.Second != 0 {
 		return in, value.ErrGrantInvalid
 	}
-	if !slices.Equal(in.Operations, []string{value.GrantDownloadOperation}) {
+	if !value.ValidResultOperations(in.Operations) {
 		return in, ErrRawQueryOperationUnsupported
 	}
 	for n, d := range in.ArtifactDigests {
@@ -102,7 +107,11 @@ func (s GrantService) RequestRaw(ctx context.Context, current identities.Current
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	i, err := s.human(ctx, current, "evidence:download")
+	scopes := []string{"evidence:download"}
+	if !slices.Contains(in.Operations, value.GrantDownloadOperation) {
+		scopes = []string{"evidence:read", "evidence:raw"}
+	}
+	i, err := s.human(ctx, current, scopes...)
 	if err != nil {
 		return zero, false, err
 	}
@@ -125,7 +134,16 @@ func (s GrantService) RequestRaw(ctx context.Context, current identities.Current
 	if !errors.Is(err, ErrGrantNotFound) {
 		return zero, false, ErrGrantUnavailable
 	}
-	selected, err := s.RawSelections.ResolveRawQuery(ctx, current, in.CaseID, in.ArtifactDigests)
+	var selected RawQuerySelection
+	if !slices.Contains(in.Operations, value.GrantDownloadOperation) {
+		selector, ok := s.RawSelections.(RawPacketQuerySelectionReader)
+		if !ok {
+			return zero, false, ErrGrantUnavailable
+		}
+		selected, err = selector.ResolveRawPacketQuery(ctx, current, in.CaseID, in.ArtifactDigests)
+	} else {
+		selected, err = s.RawSelections.ResolveRawQuery(ctx, current, in.CaseID, in.ArtifactDigests)
+	}
 	if err != nil || !s.Now().Before(selected.ValidUntil) || len(selected.Artifacts) != len(in.ArtifactDigests) || len(selected.Review) != len(selected.Artifacts) {
 		return zero, false, ErrGrantUnavailable
 	}
@@ -241,7 +259,11 @@ func (s GrantService) coveringRawSelection(ctx context.Context, i identity.Ident
 	first := selection.Artifacts[0].Output
 	// Reuse must permit at least one download per selected file, while
 	// preserving the exact requested byte pool (including any retry allowance).
-	use := value.GrantUse{Operation: value.GrantDownloadOperation, Bytes: selection.MaxBytes, Operations: int64(len(selection.Artifacts))}
+	operation := value.GrantDownloadOperation
+	if !slices.Contains(selection.Operations, operation) {
+		operation = value.GrantPacketQueryOperation
+	}
+	use := value.GrantUse{Operation: operation, Bytes: selection.MaxBytes, Operations: int64(len(selection.Artifacts))}
 	candidates, err := s.RawStore.RawQueryCandidates(ctx, rawDownloadScope(s.RootID, i.Principal, first), use)
 	if err != nil && !errors.Is(err, ErrGrantNotFound) {
 		return value.Grant{}, false, ErrGrantUnavailable
@@ -260,6 +282,17 @@ func (s GrantService) coveringRawSelection(ctx context.Context, i identity.Ident
 			continue
 		}
 		covered := true
+		var operations []string
+		if g.Kind == value.GrantRawQuery {
+			operations = g.RawQuery.Operations
+		} else if g.ResultAccess != nil {
+			operations = g.ResultAccess.Operations
+		}
+		for _, op := range selection.Operations {
+			if !slices.Contains(operations, op) {
+				covered = false
+			}
+		}
 		for _, a := range selection.Artifacts {
 			if value.CheckMaterialize(g, a.Output, i.Principal.ClientID, true, s.Now()) != nil {
 				covered = false
@@ -288,6 +321,9 @@ func (s GrantService) coveringRawSelection(ctx context.Context, i identity.Ident
 }
 
 func (s GrantService) rawQueryEligibility(ctx context.Context, i identity.Identity, g value.Grant, op value.Operation) (value.Result, error) {
+	if g.RawQuery != nil && op == value.DownloadApproved && !slices.Contains(g.RawQuery.Operations, value.GrantDownloadOperation) {
+		op = value.ReadPacketQuery
+	}
 	if !g.Valid() || !RawQueryScopeMatches(g) || ReviewDigest(g, g.Review) != g.ReviewDigest {
 		return value.Result{}, value.ErrGrantInvalid
 	}

@@ -67,9 +67,12 @@ func (s ContextCaseService) getContextCase(ctx context.Context, source identitie
 	op := authorization.ReadApproved
 	if raw != nil {
 		op = authorization.DownloadApproved
+		if raw.packetQuery {
+			op = authorization.ReadPacketQuery
+		}
 	}
 	i, err := source.ResolveIdentity(ctx)
-	if err != nil || !i.Valid(s.Now()) || !slices.Contains(i.Scopes, "evidence:read") || raw != nil && (i.Principal.Kind != identity.Human || !slices.Contains(i.Scopes, "evidence:download")) {
+	if err != nil || !i.Valid(s.Now()) || !slices.Contains(i.Scopes, "evidence:read") || raw != nil && (i.Principal.Kind != identity.Human || (!raw.packetQuery && !slices.Contains(i.Scopes, "evidence:download") || raw.packetQuery && !slices.Contains(i.Scopes, "evidence:raw"))) {
 		return zero, value.ErrUnavailable
 	}
 	recovery, err := s.Recovery.RecoveryState(ctx)
@@ -128,7 +131,7 @@ func (s ContextCaseService) getContextCase(ctx context.Context, source identitie
 		if err != nil {
 			return zero, value.ErrUnavailable
 		}
-		if raw != nil && (!rawRecordValid(record, route, caseID) || record.Version != route.Version) {
+		if raw != nil && (!rawRecordValid(record, route, caseID) || raw.packetQuery && record.NativeType != artifact.RawPCAPNGArtifact || record.Version != route.Version) {
 			return zero, value.ErrUnavailable
 		}
 		r := record.Retained
@@ -136,6 +139,10 @@ func (s ContextCaseService) getContextCase(ctx context.Context, source identitie
 			return zero, value.ErrUnavailable
 		}
 		retained := authorization.Retained{ArtifactID: route.ArtifactID, Target: route.Target, DataClass: "metadata", ExpiresAt: r.Effective.ExpiresAt, Audience: slices.Clone(record.Audience)}
+		if raw != nil && raw.packetQuery {
+			retained.DataClass = "raw"
+			retained.NativeType = record.NativeType
+		}
 		var initial authorization.Result
 		if share == nil {
 			initial = authorization.Evaluate(i, p, op, route.Target, &retained, s.Now())

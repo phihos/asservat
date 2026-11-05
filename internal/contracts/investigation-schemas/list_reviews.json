@@ -937,10 +937,14 @@
                                 "operations": {
                                   "type": "array",
                                   "items": {
-                                    "const": "download_artifact"
+                                    "enum": [
+                                      "download_artifact",
+                                      "pcap_query"
+                                    ]
                                   },
                                   "minItems": 1,
-                                  "maxItems": 1
+                                  "maxItems": 2,
+                                  "uniqueItems": true
                                 },
                                 "max_bytes": {
                                   "type": "integer",

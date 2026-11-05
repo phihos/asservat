@@ -91,7 +91,8 @@ func (p ContextQueryPlan) Matches(s ContextProjectionScope) bool {
 		p.WorkloadUID == s.WorkloadUID && p.Principal == s.Principal &&
 		p.AllocationRevision > 0 && p.AllocationRevision <= 1<<60 && p.PoolSource.Valid() && p.PolicySource.Valid() &&
 		p.Profile.Valid() && p.Profile.Path.TargetClusterID == s.ClusterID &&
-		(s.NativeType != artifact.PCAPNGArtifact || p.Profile.Worker.MemoryBytes >= PacketSummaryWorkerBytes && p.Profile.Worker.WorkerTransientBytes >= PacketSummaryWorkerBytes) &&
+		(s.DisplayVersion != PacketQueryDisplayVersion || p.Profile.Worker.MemoryBytes >= PacketQueryWorkerBytes && p.Profile.Worker.WorkerTransientBytes >= PacketQueryWorkerBytes) &&
+		(s.NativeType != artifact.PCAPNGArtifact && s.NativeType != artifact.RawPCAPNGArtifact || p.Profile.Worker.MemoryBytes >= PacketSummaryWorkerBytes && p.Profile.Worker.WorkerTransientBytes >= PacketSummaryWorkerBytes) &&
 		(s.NativeType != artifact.PprofArtifact || p.Profile.Worker.MemoryBytes >= ProfileSummaryWorkerBytes && p.Profile.Worker.WorkerTransientBytes >= ProfileSummaryWorkerBytes) &&
 		(s.NativeType != artifact.SyscallRecordsArtifact && s.NativeType != artifact.SyscallArgumentsArtifact || p.Profile.Worker.MemoryBytes >= SyscallProjectionWorkerBytes && p.Profile.Worker.WorkerTransientBytes >= SyscallProjectionWorkerBytes) &&
 		!p.ObservedAt.IsZero() && p.ValidUntil.After(p.ObservedAt) && !p.ValidUntil.After(p.ObservedAt.Add(5*time.Second)) &&
@@ -115,6 +116,8 @@ type ContextQuery struct {
 	RecoveryRevision                                  identity.Revision
 	CreatedAt, Deadline, WorkerUntil, CredentialUntil time.Time
 	ProviderUntil, CleanupUntil                       time.Time
+	Grant                                             ContextQueryGrant         `json:",omitzero"`
+	InvocationKey                                     ContextQueryInvocationKey `json:",omitzero"`
 }
 
 // Immutable query instants use the transaction store's fixed microsecond
@@ -122,6 +125,20 @@ type ContextQuery struct {
 func contextQueryTime(t time.Time) time.Time { return t.UTC().Truncate(time.Microsecond) }
 
 func (q ContextQuery) Valid() bool {
+	if q.Scope.DisplayVersion == PacketQueryDisplayVersion {
+		if !q.InvocationKey.Valid() {
+			return false
+		}
+		if q.Scope.NativeType == artifact.RawPCAPNGArtifact {
+			if !q.Grant.Valid() || q.Grant.ParentID != q.Scope.RawGrantID {
+				return false
+			}
+		} else if q.Grant != (ContextQueryGrant{}) {
+			return false
+		}
+	} else if q.Grant != (ContextQueryGrant{}) || q.InvocationKey != (ContextQueryInvocationKey{}) {
+		return false
+	}
 	for _, t := range []time.Time{q.CreatedAt, q.Deadline, q.WorkerUntil, q.CredentialUntil, q.ProviderUntil, q.CleanupUntil} {
 		if !t.Equal(contextQueryTime(t)) {
 			return false
@@ -150,9 +167,15 @@ func (q ContextQuery) Valid() bool {
 		(q.Scope.Comparison == (ProfileComparisonWindow{}) || !end.After(q.BaselinePlan.EffectsUntil) && !q.CleanupUntil.After(q.BaselinePlan.CleanupUntil))
 }
 
-func NewContextQuery(id, operationID, workerID string, a ContextProjectionAuthority, p ContextQueryPlan, now time.Time) (ContextQuery, error) {
+func NewContextQuery(id, operationID, workerID string, a ContextProjectionAuthority, p ContextQueryPlan, now time.Time, invocationKeys ...ContextQueryInvocationKey) (ContextQuery, error) {
 	q := ContextQuery{ID: id, OperationID: operationID, WorkerID: workerID, Scope: a.Scope, Plan: p,
-		RecoveryIssuerEpoch: a.Environment.Recovery.IssuerEpoch, RecoveryRevision: a.Environment.Recovery.Revision, CreatedAt: contextQueryTime(now)}
+		Grant: a.Grant, RecoveryIssuerEpoch: a.Environment.Recovery.IssuerEpoch, RecoveryRevision: a.Environment.Recovery.Revision, CreatedAt: contextQueryTime(now)}
+	if len(invocationKeys) > 1 {
+		return ContextQuery{}, ErrInvalid
+	}
+	if len(invocationKeys) == 1 {
+		q.InvocationKey = invocationKeys[0]
+	}
 	if a.Baseline != nil || a.Scope.Comparison != (ProfileComparisonWindow{}) || !a.Valid(now) || !p.Valid(a.Scope, now) || p.Profile.Path != a.Environment.Path || p.InstallationID != a.Environment.InstallationID {
 		return ContextQuery{}, ErrUnavailable
 	}
@@ -215,7 +238,7 @@ func (q ContextQuery) plansMatch() bool {
 // Later observations may shorten delivery; they cannot renew query, worker or
 // cleanup dates. SQL additionally checks monotonic current state after locks.
 func (q ContextQuery) Current(a ContextProjectionAuthority, now time.Time) bool {
-	return q.Valid() && a.Valid(now) && q.Scope == a.Scope &&
+	return q.Valid() && a.Valid(now) && q.Scope == a.Scope && q.Grant == a.Grant &&
 		(q.Scope.Comparison == (ProfileComparisonWindow{}) || q.BaselinePlan.InstallationID == a.Baseline.Environment.InstallationID && q.BaselinePlan.Profile.Path == a.Baseline.Environment.Path) && now.Before(q.Deadline) &&
 		q.Plan.InstallationID == a.Environment.InstallationID && q.Plan.Profile.Path == a.Environment.Path &&
 		q.RecoveryIssuerEpoch == a.Environment.Recovery.IssuerEpoch && q.RecoveryRevision == a.Environment.Recovery.Revision
@@ -246,7 +269,7 @@ type ContextQueryCall struct {
 func (r ContextQueryCall) Valid(now time.Time) bool {
 	return authorization.UUID(r.ID) && authorization.UUID(r.RootID) && r.InputFormat == "context-query-input/v1" &&
 		identity.Text(r.MACVersion, 64) && r.InputDigest != (artifact.Digest{}) && r.PrincipalDigest != (artifact.Digest{}) &&
-		(r.Tool == "get_pcap_summary" || r.Tool == "get_file_excerpt" || r.Tool == "get_http_headers" || r.Tool == "get_profile_summary" || r.Tool == "compare_profiles" || r.Tool == "get_syscall_summary" || r.Tool == "get_syscall_events" || r.Tool == "get_query_result") && r.Principal.Valid() &&
+		(r.Tool == "pcap_query" || r.Tool == "get_pcap_summary" || r.Tool == "get_file_excerpt" || r.Tool == "get_http_headers" || r.Tool == "get_profile_summary" || r.Tool == "compare_profiles" || r.Tool == "get_syscall_summary" || r.Tool == "get_syscall_events" || r.Tool == "get_query_result") && r.Principal.Valid() &&
 		identity.Fresh(r.StartedAt, r.Until, now, identity.EvidenceReadRequestWindow) && !r.WriteUntil.Before(r.Until) &&
 		!r.WriteUntil.After(r.StartedAt.Add(30*time.Second))
 }

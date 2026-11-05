@@ -125,8 +125,8 @@ func (q *Queries) ContextQueryCaseExists(ctx context.Context, arg ContextQueryCa
 }
 
 const insertContextQuery = `-- name: InsertContextQuery :one
-INSERT INTO context_query(id,root_id,allocation_id,account_id,principal_key,actor,query,initial_request,operation_id,worker_id,created_at,deadline,cleanup_until,retire_by,issuer_epoch,postmaster_at,database_oid,baseline_allocation_id)
-VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING id, root_id, allocation_id, account_id, principal_key, actor, query, initial_request, operation_id, worker_id, created_at, deadline, cleanup_until, retire_by, issuer_epoch, postmaster_at, database_oid, generation, active_batch, polls, controls, uncertain, baseline_allocation_id
+INSERT INTO context_query(id,root_id,allocation_id,account_id,principal_key,actor,query,initial_request,operation_id,worker_id,created_at,deadline,cleanup_until,retire_by,issuer_epoch,postmaster_at,database_oid,baseline_allocation_id,invocation_key,request_digest)
+VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19::text,$20::bytea) RETURNING id, root_id, allocation_id, account_id, principal_key, actor, query, initial_request, operation_id, worker_id, created_at, deadline, cleanup_until, retire_by, issuer_epoch, postmaster_at, database_oid, generation, active_batch, polls, controls, uncertain, baseline_allocation_id, invocation_key, request_digest
 `
 
 type InsertContextQueryParams struct {
@@ -148,6 +148,8 @@ type InsertContextQueryParams struct {
 	PostmasterAt         pgtype.Timestamptz
 	DatabaseOid          pgtype.Uint32
 	BaselineAllocationID pgtype.UUID
+	InvocationKey        pgtype.Text
+	RequestDigest        []byte
 }
 
 func (q *Queries) InsertContextQuery(ctx context.Context, arg InsertContextQueryParams) (ContextQuery, error) {
@@ -170,6 +172,8 @@ func (q *Queries) InsertContextQuery(ctx context.Context, arg InsertContextQuery
 		arg.PostmasterAt,
 		arg.DatabaseOid,
 		arg.BaselineAllocationID,
+		arg.InvocationKey,
+		arg.RequestDigest,
 	)
 	var i ContextQuery
 	err := row.Scan(
@@ -196,6 +200,8 @@ func (q *Queries) InsertContextQuery(ctx context.Context, arg InsertContextQuery
 		&i.Controls,
 		&i.Uncertain,
 		&i.BaselineAllocationID,
+		&i.InvocationKey,
+		&i.RequestDigest,
 	)
 	return i, err
 }
@@ -339,7 +345,7 @@ func (q *Queries) InsertProjectionQueryWorker(ctx context.Context, arg InsertPro
 }
 
 const lockContextQuery = `-- name: LockContextQuery :one
-SELECT id, root_id, allocation_id, account_id, principal_key, actor, query, initial_request, operation_id, worker_id, created_at, deadline, cleanup_until, retire_by, issuer_epoch, postmaster_at, database_oid, generation, active_batch, polls, controls, uncertain, baseline_allocation_id FROM context_query WHERE id=$1 AND root_id=$2 FOR UPDATE
+SELECT id, root_id, allocation_id, account_id, principal_key, actor, query, initial_request, operation_id, worker_id, created_at, deadline, cleanup_until, retire_by, issuer_epoch, postmaster_at, database_oid, generation, active_batch, polls, controls, uncertain, baseline_allocation_id, invocation_key, request_digest FROM context_query WHERE id=$1 AND root_id=$2 FOR UPDATE
 `
 
 type LockContextQueryParams struct {
@@ -374,6 +380,8 @@ func (q *Queries) LockContextQuery(ctx context.Context, arg LockContextQueryPara
 		&i.Controls,
 		&i.Uncertain,
 		&i.BaselineAllocationID,
+		&i.InvocationKey,
+		&i.RequestDigest,
 	)
 	return i, err
 }
@@ -546,6 +554,23 @@ func (q *Queries) OpenProjectionNativeBatch(ctx context.Context, arg OpenProject
 	return result.RowsAffected(), nil
 }
 
+const packetQueryGrantCurrent = `-- name: PacketQueryGrantCurrent :one
+SELECT context_packet_query_grant_current($1::uuid,$2::uuid,$3::uuid)::boolean
+`
+
+type PacketQueryGrantCurrentParams struct {
+	RootID  pgtype.UUID
+	QueryID pgtype.UUID
+	BatchID pgtype.UUID
+}
+
+func (q *Queries) PacketQueryGrantCurrent(ctx context.Context, arg PacketQueryGrantCurrentParams) (bool, error) {
+	row := q.db.QueryRow(ctx, packetQueryGrantCurrent, arg.RootID, arg.QueryID, arg.BatchID)
+	var column_1 bool
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const projectionComparisonKeyChildren = `-- name: ProjectionComparisonKeyChildren :many
 SELECT batch_id, query_id, binding, used_roles, child_id, source_ordinal FROM context_query_key_binding WHERE batch_id=$1 AND source_ordinal IS NOT NULL ORDER BY source_ordinal
 `
@@ -578,7 +603,7 @@ func (q *Queries) ProjectionComparisonKeyChildren(ctx context.Context, batchID p
 }
 
 const readAcquisitionQuery = `-- name: ReadAcquisitionQuery :one
-SELECT id, root_id, allocation_id, account_id, principal_key, actor, query, initial_request, operation_id, worker_id, created_at, deadline, cleanup_until, retire_by, issuer_epoch, postmaster_at, database_oid, generation, active_batch, polls, controls, uncertain, baseline_allocation_id FROM context_query WHERE id=$1 AND root_id=$2
+SELECT id, root_id, allocation_id, account_id, principal_key, actor, query, initial_request, operation_id, worker_id, created_at, deadline, cleanup_until, retire_by, issuer_epoch, postmaster_at, database_oid, generation, active_batch, polls, controls, uncertain, baseline_allocation_id, invocation_key, request_digest FROM context_query WHERE id=$1 AND root_id=$2
 `
 
 type ReadAcquisitionQueryParams struct {
@@ -613,12 +638,14 @@ func (q *Queries) ReadAcquisitionQuery(ctx context.Context, arg ReadAcquisitionQ
 		&i.Controls,
 		&i.Uncertain,
 		&i.BaselineAllocationID,
+		&i.InvocationKey,
+		&i.RequestDigest,
 	)
 	return i, err
 }
 
 const readContextQuery = `-- name: ReadContextQuery :one
-SELECT id, root_id, allocation_id, account_id, principal_key, actor, query, initial_request, operation_id, worker_id, created_at, deadline, cleanup_until, retire_by, issuer_epoch, postmaster_at, database_oid, generation, active_batch, polls, controls, uncertain, baseline_allocation_id FROM context_query WHERE id=$1 AND root_id=$2 AND actor=$3
+SELECT id, root_id, allocation_id, account_id, principal_key, actor, query, initial_request, operation_id, worker_id, created_at, deadline, cleanup_until, retire_by, issuer_epoch, postmaster_at, database_oid, generation, active_batch, polls, controls, uncertain, baseline_allocation_id, invocation_key, request_digest FROM context_query WHERE id=$1 AND root_id=$2 AND actor=$3
 `
 
 type ReadContextQueryParams struct {
@@ -654,6 +681,8 @@ func (q *Queries) ReadContextQuery(ctx context.Context, arg ReadContextQueryPara
 		&i.Controls,
 		&i.Uncertain,
 		&i.BaselineAllocationID,
+		&i.InvocationKey,
+		&i.RequestDigest,
 	)
 	return i, err
 }
@@ -739,6 +768,55 @@ func (q *Queries) ReadContextQueryInvocation(ctx context.Context, arg ReadContex
 		&i.OperationAuditLifecycle.OverdueSelectedAt,
 		&i.OperationAuditLifecycle.OverduePurge,
 		&i.OperationAuditLifecycle.CertificateVerifyAttempts,
+	)
+	return i, err
+}
+
+const readContextQueryInvocationKey = `-- name: ReadContextQueryInvocationKey :one
+SELECT id, root_id, allocation_id, account_id, principal_key, actor, query, initial_request, operation_id, worker_id, created_at, deadline, cleanup_until, retire_by, issuer_epoch, postmaster_at, database_oid, generation, active_batch, polls, controls, uncertain, baseline_allocation_id, invocation_key, request_digest FROM context_query WHERE root_id=$1::uuid AND principal_key=$2::bytea AND actor=$3::jsonb AND invocation_key=$4::text
+`
+
+type ReadContextQueryInvocationKeyParams struct {
+	RootID        pgtype.UUID
+	PrincipalKey  []byte
+	Actor         []byte
+	InvocationKey string
+}
+
+func (q *Queries) ReadContextQueryInvocationKey(ctx context.Context, arg ReadContextQueryInvocationKeyParams) (ContextQuery, error) {
+	row := q.db.QueryRow(ctx, readContextQueryInvocationKey,
+		arg.RootID,
+		arg.PrincipalKey,
+		arg.Actor,
+		arg.InvocationKey,
+	)
+	var i ContextQuery
+	err := row.Scan(
+		&i.ID,
+		&i.RootID,
+		&i.AllocationID,
+		&i.AccountID,
+		&i.PrincipalKey,
+		&i.Actor,
+		&i.Query,
+		&i.InitialRequest,
+		&i.OperationID,
+		&i.WorkerID,
+		&i.CreatedAt,
+		&i.Deadline,
+		&i.CleanupUntil,
+		&i.RetireBy,
+		&i.IssuerEpoch,
+		&i.PostmasterAt,
+		&i.DatabaseOid,
+		&i.Generation,
+		&i.ActiveBatch,
+		&i.Polls,
+		&i.Controls,
+		&i.Uncertain,
+		&i.BaselineAllocationID,
+		&i.InvocationKey,
+		&i.RequestDigest,
 	)
 	return i, err
 }

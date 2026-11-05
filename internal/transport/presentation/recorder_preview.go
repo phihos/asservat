@@ -35,24 +35,30 @@ func (in *CompositionInput) composition() (*planning.ProfileComposition, error) 
 // RecorderPreviewData is preview_capture's composition reply (ADR-243). The
 // plan is complete and reviewable; capture_enabled is true only for a manual
 // network-header plan whose node recorder is available (ADR-248).
+type RecorderResultAccessAction struct {
+	ActionID   string   `json:"action_id"`
+	Operations []string `json:"operations"`
+}
+
 type RecorderPreviewData struct {
-	RepeatedFrom     string             `json:"repeated_from_capture_id,omitempty"`
-	PreviewID        string             `json:"preview_id"`
-	ExpiresAt        time.Time          `json:"expires_at"`
-	ExecutionDigest  string             `json:"execution_digest"`
-	PodCount         int                `json:"pod_count"`
-	MaxBytes         int64              `json:"max_bytes"`
-	MaxProcessStarts int                `json:"max_process_starts"`
-	ApprovalRequired bool               `json:"approval_required"`
-	CaptureEnabled   bool               `json:"capture_enabled"`
-	Blockers         []OperationBlocker `json:"blockers"`
-	Warnings         []string           `json:"warnings"`
-	NavigationURI    string             `json:"navigation_uri"`
-	Composition      json.RawMessage    `json:"profile_composition"`
-	Lifecycle        json.RawMessage    `json:"lifecycle_plan"`
-	Assessment       CaptureAssessment  `json:"capture_assessment"`
-	Target           WorkloadReference  `json:"target_ref"`
-	SelectedPods     []SelectedPod      `json:"selected_pods"`
+	ResultAccessActions []RecorderResultAccessAction `json:"result_access_actions,omitempty"`
+	RepeatedFrom        string                       `json:"repeated_from_capture_id,omitempty"`
+	PreviewID           string                       `json:"preview_id"`
+	ExpiresAt           time.Time                    `json:"expires_at"`
+	ExecutionDigest     string                       `json:"execution_digest"`
+	PodCount            int                          `json:"pod_count"`
+	MaxBytes            int64                        `json:"max_bytes"`
+	MaxProcessStarts    int                          `json:"max_process_starts"`
+	ApprovalRequired    bool                         `json:"approval_required"`
+	CaptureEnabled      bool                         `json:"capture_enabled"`
+	Blockers            []OperationBlocker           `json:"blockers"`
+	Warnings            []string                     `json:"warnings"`
+	NavigationURI       string                       `json:"navigation_uri"`
+	Composition         json.RawMessage              `json:"profile_composition"`
+	Lifecycle           json.RawMessage              `json:"lifecycle_plan"`
+	Assessment          CaptureAssessment            `json:"capture_assessment"`
+	Target              WorkloadReference            `json:"target_ref"`
+	SelectedPods        []SelectedPod                `json:"selected_pods"`
 }
 
 // RecorderUnavailableBlocker is the interim blocker of every packet/syscall
@@ -224,7 +230,27 @@ func (s *ContextOperations) recorderPreviewResult(result app.RecorderPreviewResu
 	if !s.config.CollectionEnabled {
 		blockers = append(blockers, collectionBlockers(false)...)
 	}
-	return RecorderPreviewData{PreviewID: p.ID, ExpiresAt: p.Deadline, ExecutionDigest: hash(p.ScopeDigest), PodCount: 1, MaxBytes: limit, CaptureEnabled: len(blockers) == 0, ApprovalRequired: approval, Blockers: blockers,
+	return RecorderPreviewData{ResultAccessActions: recorderResultAccessActions(result.Plan), PreviewID: p.ID, ExpiresAt: p.Deadline, ExecutionDigest: hash(p.ScopeDigest), PodCount: 1, MaxBytes: limit, CaptureEnabled: len(blockers) == 0, ApprovalRequired: approval, Blockers: blockers,
 		Warnings: warnings, NavigationURI: s.config.PublicOrigin + "/captures/new", Composition: provenance, Lifecycle: lifecycle, Assessment: RecorderAssessment(result.Assessment), Target: target,
 		SelectedPods: []SelectedPod{{ClusterID: p.Target.ClusterID, Namespace: p.Target.Namespace.Name, Name: p.Target.PodName, UID: p.Target.PodUID, Workload: SelectedWorkload{Kind: p.Target.Workload.Kind, Name: p.Target.Workload.Name, UID: p.Target.Workload.UID}}}}, result.ValidUntil, nil
+}
+
+// This is a display of actual compiled raw output actions, never authority.
+// Metadata packet inspection stays ordinary access and needs no result grant.
+func recorderResultAccessActions(plan planning.RecorderPlan) []RecorderResultAccessAction {
+	if plan.Approval == nil {
+		return nil
+	}
+	var out []RecorderResultAccessAction
+	for _, a := range plan.Actions {
+		if a.Kind != "profile" && a.PacketProfile != "rawPackets" && a.SyscallMode != "arguments" {
+			continue
+		}
+		ops := []string{"download_artifact"}
+		if a.Kind == "packetCapture" && a.PacketProfile == "rawPackets" {
+			ops = append(ops, "pcap_query")
+		}
+		out = append(out, RecorderResultAccessAction{ActionID: a.ID, Operations: ops})
+	}
+	return out
 }

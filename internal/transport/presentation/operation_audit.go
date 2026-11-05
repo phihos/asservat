@@ -681,7 +681,7 @@ func (s *AuditedOperations) result(in audit.OperationIntent, reply OperationRepl
 			for _, a := range refs.Artifacts {
 				out.ArtifactIDs = append(out.ArtifactIDs, a.ID)
 			}
-			if in.Name == "get_http_headers" || in.Name == "get_profile_summary" || in.Name == "get_pcap_summary" || in.Name == "compare_profiles" || syscallQueryOperation(in.Name) {
+			if in.Name == "get_http_headers" || in.Name == "get_profile_summary" || in.Name == "get_pcap_summary" || in.Name == "pcap_query" || in.Name == "compare_profiles" || syscallQueryOperation(in.Name) {
 				// ADR-282: the disclosed page names its one artifact as provenance.
 				var page struct {
 					Provenance []struct {

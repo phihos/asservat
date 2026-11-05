@@ -34,7 +34,8 @@ const (
 	// GrantMaxRevision: request (1), decision (2), revocation (3).
 	GrantMaxRevision = 3
 	// GrantDownloadOperation is the one follow-up operation in this release.
-	GrantDownloadOperation = "download_artifact"
+	GrantDownloadOperation    = "download_artifact"
+	GrantPacketQueryOperation = "pcap_query"
 )
 
 var (
@@ -104,8 +105,21 @@ func sortedUnique(v []string, minimum, maximum, length int) bool {
 	return len(v) >= minimum && identity.Strings(v, maximum, length) && slices.IsSorted(v)
 }
 
+// ValidResultOperations is the closed sorted operation set supported by exact output grants.
+func ValidResultOperations(operations []string) bool {
+	if len(operations) < 1 || len(operations) > 2 {
+		return false
+	}
+	for i, op := range operations {
+		if op != GrantDownloadOperation && op != GrantPacketQueryOperation || i > 0 && operations[i-1] >= op {
+			return false
+		}
+	}
+	return true
+}
+
 func (r ResultAccess) Valid() bool {
-	if !sortedUnique(r.ActionIDs, 1, GrantMaxResultActions, 64) || !sortedUnique(r.ClientIDs, 1, GrantMaxResultClients, 256) || !slices.Equal(r.Operations, []string{GrantDownloadOperation}) {
+	if !sortedUnique(r.ActionIDs, 1, GrantMaxResultActions, 64) || !sortedUnique(r.ClientIDs, 1, GrantMaxResultClients, 256) || !ValidResultOperations(r.Operations) {
 		return false
 	}
 	return !r.NotAfter.IsZero() && r.MaxArtifacts >= 1 && r.MaxArtifacts <= GrantMaxResultArtifacts && r.MaxBytes >= 1 && r.MaxBytes <= GrantMaxResultBytes && r.MaxOperations >= 1 && r.MaxOperations <= GrantMaxResultOperations
