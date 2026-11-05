@@ -1,7 +1,7 @@
 # ADR-306 — Bounded queries over saved syscall arguments
 
-Date: 2026-11-05. Status: implementation in progress under standing delegation;
-real-service/resource and installed qualification pending. Requirements: REQ-SYS-003 / SC-SYS-003,
+Date: 2026-11-05. Status: component implementation and named service/resource
+checks pass under standing delegation; installed qualification pending. Requirements: REQ-SYS-003 / SC-SYS-003,
 REQ-MCP-002/003/005, REQ-EVD-005/008, REQ-AUT-003/004/006.
 Plan: [saved-syscall query implementation](../reviews/s05-syscall-query-implementation-2026-11-05.md).
 
@@ -148,5 +148,14 @@ hostile structured-output fixture, not native acquisition or resource proof.
 An actual workspace/approval/projection HTTP-client unit journey passes through
 Pending→Approved before querying the same selected source; transport replies
 are synthetic. Component checks do not establish installed operation.
+
+The [SQL/upgrade evidence](../../test/results/saved-syscall-query-services-local/README.md)
+and [encrypted-reader resource evidence](../../test/results/saved-syscall-query-resource-local/README.md)
+now pass their separate scopes. SQL paid loops use synthetic crypto/join proofs;
+the resource component runs the actual encrypted reader/parser. Neither proves
+the full installed composition. The new installed fixture retains all five fixed
+views, Repeat and Stop and adds MCP/React raw queries against the same native
+original. A rolling two-slot test pipeline retains original worker lifetimes;
+its advancing-clock model is not a measured installed speedup.
 
 No installed pass, complete S-05 exit, all-maxima coverage or release follows.

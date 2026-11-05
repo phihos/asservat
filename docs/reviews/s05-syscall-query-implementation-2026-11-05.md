@@ -1,8 +1,8 @@
 # Saved syscall argument query implementation plan
 
-Date: 2026-11-05. Base: `329a48fc14f173668dea717c07874a8046da4a84`.
-Status: typed interfaces agreed and component implementation in progress;
-real-service/resource and installed qualification pending.
+Date: 2026-11-05. Current base: `afc54889f20399bfdcd792c3a8b33d2482d118c8`.
+Status: typed interfaces implemented; named component/service/resource checks
+pass. Installed workflow implementation is prepared; its qualification is pending.
 
 Implementation checkpoint: raw domain/decoder/receiver, encrypted object reader,
 authorization, migration140, audited C20 delivery and console controls exist in
@@ -16,12 +16,25 @@ fixture URL and detached-button mistakes are retained in their failed logs;
 they are not product regressions. The built React/GoTLS fixture also passes two subcases with race detection in
 11.927s, including reviewed access, original pending clocks, a fresh-key next
 page and whole recorded values; its authority and query responses are synthetic.
-Real PostgreSQL JSONB sizing/upgrade,
-encrypted-worker resource measurements and installed MCP/React/native parity
-remain unrun. No whole S-05 or project completion is asserted.
-[ADR-306](../decisions/306-bounded-saved-syscall-queries.md) records the proposed
-contract. Packet query PR169 and native42019184868 remain a separate frozen
-qualification; this plan does not declare that workflow delivered.
+The real SQL lifecycle and pristine upgrade140 now pass9/497 tests with exact
+source/cleanup evidence. Twenty PostgreSQL JSONB sizes fit existing bounds;
+the maximum full binding is35,750B under48KiB. Separate actual encrypted-reader
+resource cases pass two near8MiB sources plus cancel/error, with a57,393,152B
+peak under256MiB; CPU500m remains configuration-only. The SQL paid loops use
+synthetic crypto/join proofs; their scope is distinct from parser/decrypt work.
+Installed MCP/React/native parity remains unrun. No whole S-05 or project
+completion is asserted. [ADR-306](../decisions/306-bounded-saved-syscall-queries.md)
+records the implementation contract. Packet PR169 is separately qualified by
+native42023214158 and merged, with proof closure in PR170.
+
+The installed argument fixture now retains all five fixed views, Repeat and
+Stop and adds two raw queries against the same native JSONL. All seven queries
+are prepaid from the beginning (18 units). A test-only rolling two-slot queue
+preserves each original worker end, immediate live SQL/key checks and final
+joins; the advancing-clock model is not a measured hosted speedup. The actual
+console scope producer regression reproduced missing `evidence:raw` for
+arguments; the corrected fixture and control foci pass. Original request,
+capture, worker, authority and20-minute workflow limits are unchanged.
 
 ## User outcome and reusable boundaries
 

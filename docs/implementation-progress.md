@@ -1,5 +1,23 @@
 # Sustained implementation progress
 
+## Installed syscall argument-query fixture prepared on merged main (2026-11-05)
+
+The candidate is rebased onto main through PR169/170. Runtime/native Go files
+match the reviewed checkpoint exactly; newer packet documentation, evidence
+and builder prefetch remain. The native argument fixture retains all five
+fixed views, Repeat and Stop and adds MCP/actual React queries against the same
+native JSONL, with18 originally prepaid units and the same combined review.
+A rolling two-slot test queue retains all original worker ends and immediate
+live SQL/key checks; its advancing-clock model is not a measured speedup.
+
+Review reproduced the fixture's missing console `evidence:raw` scope for
+arguments; the corrected actual scope producer and four controls pass. Helper
+races,36 selectors and independent reviews pass. Full integration unit races
+pass54.345s with external fixtures skipped. [Preflight originals](../test/results/saved-syscall-query-native-preflight-local/README.md)
+retain exact hashes, setup failures, native oracle/replay tests and pending
+installed SQL proof scope. New SQL readbacks, same-original installed argument
+parity and a complete20-minute workflow pass remain required.
+
 ## Saved syscall queries pass service, upgrade and resource checks (2026-11-05)
 
 On signed `0cf27e86`, the real SQL lifecycle passes9 tests/13.810s and pristine
