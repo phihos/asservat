@@ -1,7 +1,7 @@
 # ADR-307 — Natural completion of exhausted projection workers
 
-Date: 2026-11-05. Status: implementation and qualification in progress under
-standing engineering delegation. Requirements: REQ-MCP-002, REQ-EVD-005/008,
+Date: 2026-11-05. Status: implemented with named local and installed-test qualification
+under standing engineering delegation. Requirements: REQ-MCP-002, REQ-EVD-005/008,
 REQ-AUT-006; TASK-02/08/11.
 
 ## Observed problem
@@ -100,3 +100,10 @@ natural success, two-batch/download retention, cancellation, premature credentia
 exit, serialization exclusion and joined credential shutdown. Retain actual
 Job/Pod and positive SQL retirement assertions in fresh installed qualification.
 Local lifecycle tests are not installed cleanup or a full20-minute workflow pass.
+
+The installed test on signed51344180 (PR171) observes exact positive Job/Pod
+termination and SQL retirement with original RunUntil retained; raw two-batch
+queries retain their behavior. Go/harness finish0 with complete cleanup and
+source verification. The outer job is cancelled after a GitHub upload-finalization
+failure crosses its20-minute limit; this is not a green hosted workflow or a
+universal performance claim. [Original report](../../test/results/saved-syscall-query-native-42065554713/README.md).
