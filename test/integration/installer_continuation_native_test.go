@@ -693,6 +693,9 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 			deny, gone = nil, nil
 		}
 		run(cluster, namespace, workload, deny, gone)
+		if installedJourneyFocus() == "browser" {
+			qualifyInstalledBrowserSessionCleanup(t, ctx, admin, api, desired.TargetNamespace, installation, diagnose)
+		}
 		if focused && installedJourneyFocus() == "upgrade" {
 			// ADR-227: upgrade hub-api and hub-worker to a second release image
 			// (the same build, another digest), capture again, then roll back.

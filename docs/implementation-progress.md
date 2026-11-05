@@ -68,7 +68,7 @@ formatting and SQL/spec/architecture/design gates pass as recorded.
 
 [The local archive](../test/results/browser-session-cleanup-local/README.md)
 contains original campaign/probe/component logs with deterministic gzip and
-readbacks. Root integration and a focused actual installed caller proof remain;
+readbacks. A continuation-browser-only helper is prepared after foreground clients join; it pins the installed root, seeds six synthetic rows and makes only bounded SQL observations (no cleanup/HTTP call while waiting). Local helper races pass; actual installed execution remains pending. Root integration and that caller proof remain;
 row deletion is not backup/WAL erasure and no hard cleanup SLA is claimed.
 
 ## Finite whole-pod logs local service qualification passed (2026-11-05)

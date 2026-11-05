@@ -108,3 +108,30 @@ is complete. Its payload/identity/source setup is synthetic; this does not
 qualify the installed worker scheduler or a real identity provider.
 [Original reports and failure history](../../test/results/browser-session-cleanup-local/README.md)
 retain the actual boundaries.
+
+## Focused installed caller proof prepared
+
+The existing node-free `continuation-browser` focus now invokes one helper only
+after its foreground journey has returned and joined its clients. This matters:
+login/session creation also prunes, so overlapping HTTP activity would not prove
+the background worker called cleanup. Other installed suites gain no wait.
+
+The helper pins the exact installed browser ConfigMap and its SQL root, seeds
+three expired and three live synthetic opaque control rows under the original
+ceilings, then makes only SQL reads while waiting within the original caller
+and a 75-second proof bound. It calls neither the cleanup adapter nor HTTP nor
+administrator DELETE during observation. Stable epoch/binding/limits/source
+identity stay fixed; normal observer timestamps may advance. Only after expiry
+is observed are the exact synthetic IDs retired by the fixture. No real
+provider token, product session or authority is supplied by the seed.
+
+Live controls retain NULL claim fields. Actual refresh claims last ten seconds;
+no artificial long refresh claim is introduced to outlast the minute cadence.
+Unexpired active-claim preservation remains the separate real-role component
+control, not an installed refresh-concurrency claim.
+
+Incremental cost in this one focus is one ConfigMap GET, a small seed transaction,
+at most 39 poll iterations/two SQL reads each, and three exact-ID control deletes.
+The existing twenty-minute job/caller bound is unchanged. Local helper races and
+compilation are not execution of that installed proof; actual qualification is
+pending Root's integrated candidate and authorized campaign.
