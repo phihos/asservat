@@ -1,0 +1,854 @@
+{
+  "format": "asservat-local-evidence/v1",
+  "payloads": [
+    {
+      "name": "campaigns/browser-session-cleanup-34987c3b/browser-session-cleanup-34987c3b-environment.json.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/campaigns/browser-session-cleanup-34987c3b/browser-session-cleanup-34987c3b-environment.json",
+      "originalSHA256": "dd99d455f9e4cf65df8749fee14fe2d08fb754e8e364cfb983ab83b2fe0f8e29",
+      "originalBytes": 548861,
+      "gzipSHA256": "effd35f2a4739a0fb3e2eb57534073db7e251bb380d223eb242a80972f9809b8",
+      "gzipBytes": 206096,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "campaigns/browser-session-cleanup-34987c3b/browser-session-cleanup-34987c3b-postgres.log.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/campaigns/browser-session-cleanup-34987c3b/browser-session-cleanup-34987c3b-postgres.log",
+      "originalSHA256": "f04c49092e629674a0dd14c84431ef55a143706ae7e57e26598977298b41c835",
+      "originalBytes": 10580,
+      "gzipSHA256": "5b28b62d1dd944078b5a3f5e2d9802650d0b8724d883e73a7b8278eb91ed124b",
+      "gzipBytes": 1859,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "campaigns/browser-session-cleanup-34987c3b/browser-session-cleanup-34987c3b.log.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/campaigns/browser-session-cleanup-34987c3b/browser-session-cleanup-34987c3b.log",
+      "originalSHA256": "db13d3334d80a88a3c84036c6114158abd00edc8f1bbbc9aac505341e9981a99",
+      "originalBytes": 781,
+      "gzipSHA256": "155f5b95e816c6e9e8d8bc4c356b3ec2c0406f48f3c40fc5c1136b6c1723e442",
+      "gzipBytes": 383,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "campaigns/browser-session-cleanup-34987c3b/verification.json.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/campaigns/browser-session-cleanup-34987c3b/verification.json",
+      "originalSHA256": "ee30d98a2276cb19c8d2e50647280ef51f9b4e38f9e034509a76482e61c0f179",
+      "originalBytes": 1951,
+      "gzipSHA256": "c1910d5efa087556753d5c56afb73896dad7b00d5a6b74d41deaafcf809e637e",
+      "gzipBytes": 906,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "campaigns/browser-session-cleanup-52a154b0/browser-session-cleanup-52a154b0-environment.json.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/campaigns/browser-session-cleanup-52a154b0/browser-session-cleanup-52a154b0-environment.json",
+      "originalSHA256": "b33cb13a498cc1166297d6cc27e844f812e6c6130150e62975e80c71ea650f84",
+      "originalBytes": 548861,
+      "gzipSHA256": "0ec5cb369543e5562998b5ec051b5c81e6eb0ef9e49dd8285460d24ef418435e",
+      "gzipBytes": 206094,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "campaigns/browser-session-cleanup-52a154b0/browser-session-cleanup-52a154b0-postgres.log.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/campaigns/browser-session-cleanup-52a154b0/browser-session-cleanup-52a154b0-postgres.log",
+      "originalSHA256": "70f56473d6c5b69f30f5d9f9801302d7a68d4e5716cdc4c66d74bb6f98b3dccf",
+      "originalBytes": 11060,
+      "gzipSHA256": "00643fff8a94a3070dd88d79b5dc30d17323237bec5823ebbf4d46dcecba74c3",
+      "gzipBytes": 2092,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "campaigns/browser-session-cleanup-52a154b0/browser-session-cleanup-52a154b0.log.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/campaigns/browser-session-cleanup-52a154b0/browser-session-cleanup-52a154b0.log",
+      "originalSHA256": "d1af8241d6dc9a75e22bc7cbb1a2047174bb50eddac495af4fb2eceb57edcd21",
+      "originalBytes": 697,
+      "gzipSHA256": "4488f89e6c84ce655594c51d1802ce05652e56733641152e25aa303e018e7722",
+      "gzipBytes": 350,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "campaigns/browser-session-cleanup-52a154b0/verification.json.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/campaigns/browser-session-cleanup-52a154b0/verification.json",
+      "originalSHA256": "df75a516c8faac6c3dcaabdfe3a00e7f752c6b9b9b2509b89ab189460cd4bd01",
+      "originalBytes": 1951,
+      "gzipSHA256": "12db4fe81e73c8524f362d1abc2f921a46f0e268ce01b3f2e3b420c6a145c2ca",
+      "gzipBytes": 904,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "campaigns/browser-session-cleanup-f8c4a86a/browser-session-cleanup-f8c4a86a-environment.json.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/campaigns/browser-session-cleanup-f8c4a86a/browser-session-cleanup-f8c4a86a-environment.json",
+      "originalSHA256": "ec5ed1096eba05ea2ff9f07de34e40a58ceb0fafa2df166168bbfcb9634cd1a6",
+      "originalBytes": 548939,
+      "gzipSHA256": "f7800d28926c9a3ada822acd13962fc32f8679743bf67b9c45e72dd986e63d33",
+      "gzipBytes": 206086,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "campaigns/browser-session-cleanup-f8c4a86a/browser-session-cleanup-f8c4a86a.log.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/campaigns/browser-session-cleanup-f8c4a86a/browser-session-cleanup-f8c4a86a.log",
+      "originalSHA256": "5d18015e98eddd4db7b9d533f86d2670fcd687146091fe59384711b571949bc2",
+      "originalBytes": 850,
+      "gzipSHA256": "c0995f9177d0c803f52632278e8fe3651601f1615a1804cf8861c19517adf3b7",
+      "gzipBytes": 430,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "campaigns/browser-session-cleanup-f8c4a86a/verification.json.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/campaigns/browser-session-cleanup-f8c4a86a/verification.json",
+      "originalSHA256": "babf8a791814ac6493f5e4426ba13d64834e2521b04513e9ca51b1d5fa33629b",
+      "originalBytes": 1834,
+      "gzipSHA256": "c90b27546ddd83509fe61f16c35b66d21fabc23d30005bb28636f6405f94a902",
+      "gzipBytes": 848,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "local/acl-red.log.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/acl-red.log",
+      "originalSHA256": "a202664570ddc3ce09b289110bdd64f6529e30ee5a873ab91b851459fa277faf",
+      "originalBytes": 242,
+      "gzipSHA256": "1945fbe715c7e8c0f7b5fb7d4304f36d77fb9ce929524d43045ecc6eff2f0b4c",
+      "gzipBytes": 192,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "local/affected-full-race.log.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/affected-full-race.log",
+      "originalSHA256": "84bc65f9de85b35e346f7e1d4826360a0d40c948f2487bbe1e84f5ffecc3835d",
+      "originalBytes": 186,
+      "gzipSHA256": "549ec0e50f1b569dd8ce2a4ca3db8f78d562723f6f7cfe4cde4c3f7cceb9051d",
+      "gzipBytes": 114,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "local/affected-vet.log.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/affected-vet.log",
+      "originalSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "originalBytes": 0,
+      "gzipSHA256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "gzipBytes": 20,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "local/cast-fix-compile-only.log.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/cast-fix-compile-only.log",
+      "originalSHA256": "2c43807deb686750c5bdbcc855b12b5fe30a31b8228fdbd0f8ce52eb4fa561ce",
+      "originalBytes": 53,
+      "gzipSHA256": "8c6c72c3e78ffc3e746572e378291b10cd46a1798518b455e56d211cd3cd43e6",
+      "gzipBytes": 66,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "local/final-proof-doc-gates.log.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/final-proof-doc-gates.log",
+      "originalSHA256": "88c767f2b8f9e6c611d31c4c8064c67c8b81ecba4eceaf8bdba9f0d86f0e176a",
+      "originalBytes": 697,
+      "gzipSHA256": "b64c412ca732f0af9a15da20e4cdf51069d8975391bfed5e546271c1f0ffb054",
+      "gzipBytes": 427,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "local/final-spec-check.log.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/final-spec-check.log",
+      "originalSHA256": "cef2d4436b452aee7256ebbb3d515c794a5a12f9e71ba86ebddbdbdca7ad5aae",
+      "originalBytes": 316,
+      "gzipSHA256": "842f0988f8b1c4c31b7f6ac8bf8aa28f17703f100afe26434becbb3c3a4e91df",
+      "gzipBytes": 247,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "local/focused-first-green.log.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/focused-first-green.log",
+      "originalSHA256": "b1fc90d0ed696c101ef84b31a9742155be861a0997d2161f39f1650d4f940b32",
+      "originalBytes": 184,
+      "gzipSHA256": "cca5975fb9d03893c773ce72d1d1f316c01fd2a32a4e5f22bedc36a8dad94a18",
+      "gzipBytes": 112,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "local/gates.log.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/gates.log",
+      "originalSHA256": "46fa8eeeeb62890d9b46f3abeffee59cc27b9b29ad57d29830d63a68b8f2fe3d",
+      "originalBytes": 1317,
+      "gzipSHA256": "dbf92ffbedebb108832f503e0d9c55a077bf7842dc9d2aa5dfef4a0f8d94227e",
+      "gzipBytes": 628,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "local/gofmt-check.log.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/gofmt-check.log",
+      "originalSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "originalBytes": 0,
+      "gzipSHA256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "gzipBytes": 20,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "local/handoff.json.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/handoff.json",
+      "originalSHA256": "a61a9d8cdae6a0aa0dd34f2590283a95e9d1763ca3be580b1d5473ca16c25470",
+      "originalBytes": 9891,
+      "gzipSHA256": "97a1615f71a0889ebccbefe326cfd1fd7e1e8a3350f92ae7e05358709ad22bd3",
+      "gzipBytes": 3455,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "local/plan.json.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/plan.json",
+      "originalSHA256": "7a9343370e12bfc540c403eaf5d1fc9c1acf197dddbec2b6e9dcbadb192affae",
+      "originalBytes": 3596,
+      "gzipSHA256": "36af2c127688524cf3887ad718d57654da0eae72c50a6f8dafd12ad0ada935ac",
+      "gzipBytes": 1734,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "local/prune-materialized-green.sql.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/prune-materialized-green.sql",
+      "originalSHA256": "cb6c5f2408a998addfa339c07a20480ccf8113a88aad9aeb655411c713635e29",
+      "originalBytes": 10869,
+      "gzipSHA256": "c4ac945a854189cd1aba659765c13582baeaff384c8fa1142b223c404dc845f5",
+      "gzipBytes": 2142,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "local/prune-materialized-probe-campaign.log.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/prune-materialized-probe-campaign.log",
+      "originalSHA256": "9e9602ce63830a12a0d82e1bdfe2610b294d0cc09dabae1c0a265447cefc6b2d",
+      "originalBytes": 136,
+      "gzipSHA256": "e424bcc5d32e82fec07902b2d8df52aa53a6fcefa3e8757d5920b38f763ec31d",
+      "gzipBytes": 134,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "local/prune-query-pg-full-race.log.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/prune-query-pg-full-race.log",
+      "originalSHA256": "dbd9f18fb4f7ed4231c3d8b3af5f3713bc81b75795aa2d46270add2a6eb3aca2",
+      "originalBytes": 63,
+      "gzipSHA256": "c4f4f566fdd48bc20c928814496d484ef0dabfcf51d0c18a7cd090d59c0908a4",
+      "gzipBytes": 73,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "local/prune-query-sql-check.log.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/prune-query-sql-check.log",
+      "originalSHA256": "00ebbba7013770e0730630e2d24205f86dd6479522e4acd403b0fd61c4f4975e",
+      "originalBytes": 223,
+      "gzipSHA256": "0c09e73c8c40bccefafff3db9cb029b1f1fadd300d261f797df558c371c29283",
+      "gzipBytes": 158,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "local/prune-rescan-probe-campaign.log.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/prune-rescan-probe-campaign.log",
+      "originalSHA256": "9e9602ce63830a12a0d82e1bdfe2610b294d0cc09dabae1c0a265447cefc6b2d",
+      "originalBytes": 136,
+      "gzipSHA256": "e424bcc5d32e82fec07902b2d8df52aa53a6fcefa3e8757d5920b38f763ec31d",
+      "gzipBytes": 134,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "local/prune-rescan-red.sql.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/prune-rescan-red.sql",
+      "originalSHA256": "2a80f0e0f14a3fd8bbc3af625b548a1caa58b64584f0aa39b569344e4d508f85",
+      "originalBytes": 10809,
+      "gzipSHA256": "922bcce767373148836ef9ddff98f5504543d8d013c422faa1e20d87e0b754e7",
+      "gzipBytes": 2109,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "local/retired-generated-originals.json.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/retired-generated-originals.json",
+      "originalSHA256": "55b690611ddda1c019d429652fdd4d1f86596771ec1e2b28234ee0e099c7799b",
+      "originalBytes": 2907,
+      "gzipSHA256": "3fd0febff075b8d4139d54d7cbe2a245b82e23fa4b2160ae1215273a68810a7c",
+      "gzipBytes": 687,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "local/run-prune-materialized-probe.py.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/run-prune-materialized-probe.py",
+      "originalSHA256": "fbdee5bbaeb49341a116836ce5ecee87d5ce78b6c119ec5b9ac485f7eaee5c89",
+      "originalBytes": 4350,
+      "gzipSHA256": "72c473097cf200bbe5d7c2cebe8d5a4ec8df651831fedebab2a72b1c2b059974",
+      "gzipBytes": 1774,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "local/run-prune-rescan-probe.py.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/run-prune-rescan-probe.py",
+      "originalSHA256": "845beebe2eccc29ce30aeae8ba3ed2fa25ae53ce394ab50b34558d4cc9def48f",
+      "originalBytes": 4324,
+      "gzipSHA256": "08e6fce625b89c67b8f3a51f175d09e7827b2ae99e85dde4e33963339f6243da",
+      "gzipBytes": 1773,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "local/service-34987c3b-campaign.log.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/service-34987c3b-campaign.log",
+      "originalSHA256": "34c7d37a9267c67c6ec16c1467da811128a957260e1e85d5b6c493aaa99589eb",
+      "originalBytes": 53,
+      "gzipSHA256": "c0ba91284ae0460cd8d48d03aafe2aba669c2b39381f2f053503ba3e7e189b83",
+      "gzipBytes": 72,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "local/service-52a154b0-campaign.log.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/service-52a154b0-campaign.log",
+      "originalSHA256": "3f26da23368ec58fcf9aeeca5b0fb28b37013ccad86e273ca154e44794b3e1d7",
+      "originalBytes": 53,
+      "gzipSHA256": "e8616e7cb63327c5f8c82aa3b8e3e9432d4e0da96129f63895b9190fe4383e03",
+      "gzipBytes": 72,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "local/service-compile-only.log.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/service-compile-only.log",
+      "originalSHA256": "202549abe064570f3798ff5632cd990ce2d826e17984ebc5dc7eb438b7695ae6",
+      "originalBytes": 53,
+      "gzipSHA256": "cf01e711503a91ecd14cdf68da6483fe961ec8b52671ac62ab4453150dceddeb",
+      "gzipBytes": 66,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "local/service-f8c4a86a-campaign.log.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/service-f8c4a86a-campaign.log",
+      "originalSHA256": "fa96dc44f40ef8712c3d4c4a4109f3e6170868b4cdcc6e080af944191d3a8937",
+      "originalBytes": 53,
+      "gzipSHA256": "a4cf3b6145dc77a445f7f457ad4f361bdf1de3ff0f9de673e41f3a1e6db3477b",
+      "gzipBytes": 72,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "local/service-final-compile-only.log.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/service-final-compile-only.log",
+      "originalSHA256": "2c43807deb686750c5bdbcc855b12b5fe30a31b8228fdbd0f8ce52eb4fa561ce",
+      "originalBytes": 53,
+      "gzipSHA256": "8c6c72c3e78ffc3e746572e378291b10cd46a1798518b455e56d211cd3cd43e6",
+      "gzipBytes": 66,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "local/signature-verification.log.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/signature-verification.log",
+      "originalSHA256": "0910029859df3c7d7122d202f8e44f226e273842e6aaae3c69ce0fc5e7370a9c",
+      "originalBytes": 129,
+      "gzipSHA256": "71763afa30e836df177e4da48cc326127966565389e42e17296b315472a9bb64",
+      "gzipBytes": 146,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "local/signed-checkpoints-verification.log.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/signed-checkpoints-verification.log",
+      "originalSHA256": "fc3bfc0c812c832061170777b72551c189b136e6eb6b4cb41833d4023ae85726",
+      "originalBytes": 512,
+      "gzipSHA256": "1ce5ce2d5c321d594ab9728b225f17d633f3835d801c249255b25e1daef4058c",
+      "gzipBytes": 238,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "prune-materialized-probe/cleanup.stderr.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/prune-materialized-probe/cleanup.stderr",
+      "originalSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "originalBytes": 0,
+      "gzipSHA256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "gzipBytes": 20,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "prune-materialized-probe/cleanup.stdout.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/prune-materialized-probe/cleanup.stdout",
+      "originalSHA256": "4e433bc169cc5a7214eb97b9a4631f4ab2cc74384a31ef4e77038deea37c4e71",
+      "originalBytes": 45,
+      "gzipSHA256": "036d4b919e84fa6a65e79f3e16d0a22f1ac9e141acd743066e8dbd1a8c08ed73",
+      "gzipBytes": 65,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "prune-materialized-probe/command-000.stderr.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/prune-materialized-probe/command-000.stderr",
+      "originalSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "originalBytes": 0,
+      "gzipSHA256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "gzipBytes": 20,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "prune-materialized-probe/command-000.stdout.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/prune-materialized-probe/command-000.stdout",
+      "originalSHA256": "c87c5be5a3d8e17a692d3f86770ac132b9116c67405b2c705f090ed6dd72a31b",
+      "originalBytes": 72,
+      "gzipSHA256": "11397e28a61b30e90c4cccaa7c27396553584dfe50f96277ad3696ddd1a62e65",
+      "gzipBytes": 78,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "prune-materialized-probe/command-001.stderr.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/prune-materialized-probe/command-001.stderr",
+      "originalSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "originalBytes": 0,
+      "gzipSHA256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "gzipBytes": 20,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "prune-materialized-probe/command-001.stdout.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/prune-materialized-probe/command-001.stdout",
+      "originalSHA256": "e3654ff0d1e506747833754d6693e8c83ae7e633f22bbe2cf62708860faa8d59",
+      "originalBytes": 65,
+      "gzipSHA256": "fa31d2c0f454850ffc44656da3d3c00f684f78f99af5ce826455d9513792532f",
+      "gzipBytes": 71,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "prune-materialized-probe/command-002.stderr.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/prune-materialized-probe/command-002.stderr",
+      "originalSHA256": "4c4c9315cb1b41f8ecdaf4641d4bbd59103a2cb9b466e7b5c8851de197f91181",
+      "originalBytes": 157,
+      "gzipSHA256": "cfe754f250baad4c712133bcde94f39ced55c272300bd9730d113ba42dd3c814",
+      "gzipBytes": 142,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "prune-materialized-probe/command-002.stdout.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/prune-materialized-probe/command-002.stdout",
+      "originalSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "originalBytes": 0,
+      "gzipSHA256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "gzipBytes": 20,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "prune-materialized-probe/command-003.stderr.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/prune-materialized-probe/command-003.stderr",
+      "originalSHA256": "4c4c9315cb1b41f8ecdaf4641d4bbd59103a2cb9b466e7b5c8851de197f91181",
+      "originalBytes": 157,
+      "gzipSHA256": "cfe754f250baad4c712133bcde94f39ced55c272300bd9730d113ba42dd3c814",
+      "gzipBytes": 142,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "prune-materialized-probe/command-003.stdout.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/prune-materialized-probe/command-003.stdout",
+      "originalSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "originalBytes": 0,
+      "gzipSHA256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "gzipBytes": 20,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "prune-materialized-probe/command-004.stderr.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/prune-materialized-probe/command-004.stderr",
+      "originalSHA256": "4c4c9315cb1b41f8ecdaf4641d4bbd59103a2cb9b466e7b5c8851de197f91181",
+      "originalBytes": 157,
+      "gzipSHA256": "cfe754f250baad4c712133bcde94f39ced55c272300bd9730d113ba42dd3c814",
+      "gzipBytes": 142,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "prune-materialized-probe/command-004.stdout.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/prune-materialized-probe/command-004.stdout",
+      "originalSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "originalBytes": 0,
+      "gzipSHA256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "gzipBytes": 20,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "prune-materialized-probe/command-005.stderr.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/prune-materialized-probe/command-005.stderr",
+      "originalSHA256": "4c4c9315cb1b41f8ecdaf4641d4bbd59103a2cb9b466e7b5c8851de197f91181",
+      "originalBytes": 157,
+      "gzipSHA256": "cfe754f250baad4c712133bcde94f39ced55c272300bd9730d113ba42dd3c814",
+      "gzipBytes": 142,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "prune-materialized-probe/command-005.stdout.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/prune-materialized-probe/command-005.stdout",
+      "originalSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "originalBytes": 0,
+      "gzipSHA256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "gzipBytes": 20,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "prune-materialized-probe/command-006.stderr.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/prune-materialized-probe/command-006.stderr",
+      "originalSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "originalBytes": 0,
+      "gzipSHA256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "gzipBytes": 20,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "prune-materialized-probe/command-006.stdout.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/prune-materialized-probe/command-006.stdout",
+      "originalSHA256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+      "originalBytes": 2,
+      "gzipSHA256": "c28cc69d141393e44a931229323624ef7b8c5bde3ee047ca9b87332daef23c82",
+      "gzipBytes": 22,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "prune-materialized-probe/command-007.stderr.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/prune-materialized-probe/command-007.stderr",
+      "originalSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "originalBytes": 0,
+      "gzipSHA256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "gzipBytes": 20,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "prune-materialized-probe/command-007.stdout.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/prune-materialized-probe/command-007.stdout",
+      "originalSHA256": "818c650f595a8320d58ac5a1e754ad8854c3c8df47c43ac2515a89c6d1e97fc6",
+      "originalBytes": 10271,
+      "gzipSHA256": "4ba8af6eb3b2628dacffe37e4536d60f20a0d01ebc4f7b76cd54096c343c6dfe",
+      "gzipBytes": 1485,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "prune-materialized-probe/command-008.stderr.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/prune-materialized-probe/command-008.stderr",
+      "originalSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "originalBytes": 0,
+      "gzipSHA256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "gzipBytes": 20,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "prune-materialized-probe/command-008.stdout.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/prune-materialized-probe/command-008.stdout",
+      "originalSHA256": "4e433bc169cc5a7214eb97b9a4631f4ab2cc74384a31ef4e77038deea37c4e71",
+      "originalBytes": 45,
+      "gzipSHA256": "036d4b919e84fa6a65e79f3e16d0a22f1ac9e141acd743066e8dbd1a8c08ed73",
+      "gzipBytes": 65,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "prune-materialized-probe/command-009.stderr.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/prune-materialized-probe/command-009.stderr",
+      "originalSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "originalBytes": 0,
+      "gzipSHA256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "gzipBytes": 20,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "prune-materialized-probe/command-009.stdout.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/prune-materialized-probe/command-009.stdout",
+      "originalSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "originalBytes": 0,
+      "gzipSHA256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "gzipBytes": 20,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "prune-materialized-probe/container-id.txt.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/prune-materialized-probe/container-id.txt",
+      "originalSHA256": "e3654ff0d1e506747833754d6693e8c83ae7e633f22bbe2cf62708860faa8d59",
+      "originalBytes": 65,
+      "gzipSHA256": "fa31d2c0f454850ffc44656da3d3c00f684f78f99af5ce826455d9513792532f",
+      "gzipBytes": 71,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "prune-materialized-probe/image-id.txt.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/prune-materialized-probe/image-id.txt",
+      "originalSHA256": "c87c5be5a3d8e17a692d3f86770ac132b9116c67405b2c705f090ed6dd72a31b",
+      "originalBytes": 72,
+      "gzipSHA256": "11397e28a61b30e90c4cccaa7c27396553584dfe50f96277ad3696ddd1a62e65",
+      "gzipBytes": 78,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "prune-materialized-probe/plan-output.txt.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/prune-materialized-probe/plan-output.txt",
+      "originalSHA256": "818c650f595a8320d58ac5a1e754ad8854c3c8df47c43ac2515a89c6d1e97fc6",
+      "originalBytes": 10271,
+      "gzipSHA256": "4ba8af6eb3b2628dacffe37e4536d60f20a0d01ebc4f7b76cd54096c343c6dfe",
+      "gzipBytes": 1485,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "prune-materialized-probe/psql.stderr.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/prune-materialized-probe/psql.stderr",
+      "originalSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "originalBytes": 0,
+      "gzipSHA256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "gzipBytes": 20,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "prune-materialized-probe/remaining.txt.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/prune-materialized-probe/remaining.txt",
+      "originalSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "originalBytes": 0,
+      "gzipSHA256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "gzipBytes": 20,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "prune-materialized-probe/verification.json.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/prune-materialized-probe/verification.json",
+      "originalSHA256": "5f67458b084e43553eb669338aabe0f058e5624c33233eaf75eddc06535cf5a4",
+      "originalBytes": 6895,
+      "gzipSHA256": "23d867f55daa2f5399d004ba11bd93b23cd7bd13ea462b4231088bde8e31f195",
+      "gzipBytes": 1458,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "prune-rescan-probe/cleanup.stderr.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/prune-rescan-probe/cleanup.stderr",
+      "originalSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "originalBytes": 0,
+      "gzipSHA256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "gzipBytes": 20,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "prune-rescan-probe/cleanup.stdout.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/prune-rescan-probe/cleanup.stdout",
+      "originalSHA256": "709543f56b2bf8c76881d33af10340811ad4cbf3daa4866223d4a9cb8e084ab4",
+      "originalBytes": 45,
+      "gzipSHA256": "99570e107f21c5f281649ad62d53a75797b5e7e786d18ea6ce7aad3637329a93",
+      "gzipBytes": 65,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "prune-rescan-probe/command-000.stderr.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/prune-rescan-probe/command-000.stderr",
+      "originalSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "originalBytes": 0,
+      "gzipSHA256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "gzipBytes": 20,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "prune-rescan-probe/command-000.stdout.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/prune-rescan-probe/command-000.stdout",
+      "originalSHA256": "c87c5be5a3d8e17a692d3f86770ac132b9116c67405b2c705f090ed6dd72a31b",
+      "originalBytes": 72,
+      "gzipSHA256": "11397e28a61b30e90c4cccaa7c27396553584dfe50f96277ad3696ddd1a62e65",
+      "gzipBytes": 78,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "prune-rescan-probe/command-001.stderr.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/prune-rescan-probe/command-001.stderr",
+      "originalSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "originalBytes": 0,
+      "gzipSHA256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "gzipBytes": 20,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "prune-rescan-probe/command-001.stdout.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/prune-rescan-probe/command-001.stdout",
+      "originalSHA256": "abcfd5a99fa06914042372bc511f64ef0a2d4dd353b5b0dd599d4b5f21de67c7",
+      "originalBytes": 65,
+      "gzipSHA256": "8a62087b063e227ba12d7b299765c14b7a838ede9c856c189482727d9e068670",
+      "gzipBytes": 74,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "prune-rescan-probe/command-002.stderr.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/prune-rescan-probe/command-002.stderr",
+      "originalSHA256": "4c4c9315cb1b41f8ecdaf4641d4bbd59103a2cb9b466e7b5c8851de197f91181",
+      "originalBytes": 157,
+      "gzipSHA256": "cfe754f250baad4c712133bcde94f39ced55c272300bd9730d113ba42dd3c814",
+      "gzipBytes": 142,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "prune-rescan-probe/command-002.stdout.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/prune-rescan-probe/command-002.stdout",
+      "originalSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "originalBytes": 0,
+      "gzipSHA256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "gzipBytes": 20,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "prune-rescan-probe/command-003.stderr.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/prune-rescan-probe/command-003.stderr",
+      "originalSHA256": "4c4c9315cb1b41f8ecdaf4641d4bbd59103a2cb9b466e7b5c8851de197f91181",
+      "originalBytes": 157,
+      "gzipSHA256": "cfe754f250baad4c712133bcde94f39ced55c272300bd9730d113ba42dd3c814",
+      "gzipBytes": 142,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "prune-rescan-probe/command-003.stdout.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/prune-rescan-probe/command-003.stdout",
+      "originalSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "originalBytes": 0,
+      "gzipSHA256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "gzipBytes": 20,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "prune-rescan-probe/command-004.stderr.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/prune-rescan-probe/command-004.stderr",
+      "originalSHA256": "4c4c9315cb1b41f8ecdaf4641d4bbd59103a2cb9b466e7b5c8851de197f91181",
+      "originalBytes": 157,
+      "gzipSHA256": "cfe754f250baad4c712133bcde94f39ced55c272300bd9730d113ba42dd3c814",
+      "gzipBytes": 142,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "prune-rescan-probe/command-004.stdout.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/prune-rescan-probe/command-004.stdout",
+      "originalSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "originalBytes": 0,
+      "gzipSHA256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "gzipBytes": 20,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "prune-rescan-probe/command-005.stderr.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/prune-rescan-probe/command-005.stderr",
+      "originalSHA256": "4c4c9315cb1b41f8ecdaf4641d4bbd59103a2cb9b466e7b5c8851de197f91181",
+      "originalBytes": 157,
+      "gzipSHA256": "cfe754f250baad4c712133bcde94f39ced55c272300bd9730d113ba42dd3c814",
+      "gzipBytes": 142,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "prune-rescan-probe/command-005.stdout.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/prune-rescan-probe/command-005.stdout",
+      "originalSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "originalBytes": 0,
+      "gzipSHA256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "gzipBytes": 20,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "prune-rescan-probe/command-006.stderr.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/prune-rescan-probe/command-006.stderr",
+      "originalSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "originalBytes": 0,
+      "gzipSHA256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "gzipBytes": 20,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "prune-rescan-probe/command-006.stdout.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/prune-rescan-probe/command-006.stdout",
+      "originalSHA256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+      "originalBytes": 2,
+      "gzipSHA256": "c28cc69d141393e44a931229323624ef7b8c5bde3ee047ca9b87332daef23c82",
+      "gzipBytes": 22,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "prune-rescan-probe/command-007.stderr.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/prune-rescan-probe/command-007.stderr",
+      "originalSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "originalBytes": 0,
+      "gzipSHA256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "gzipBytes": 20,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "prune-rescan-probe/command-007.stdout.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/prune-rescan-probe/command-007.stdout",
+      "originalSHA256": "cafb3d6bb642d0786d70143d8987d589942b61bbeabf7fdcf127c7d973ec5092",
+      "originalBytes": 11257,
+      "gzipSHA256": "59e825a80c7066644ffef66f62f11df073949b8c48fbfde491b9fd5c08f20e62",
+      "gzipBytes": 1568,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "prune-rescan-probe/command-008.stderr.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/prune-rescan-probe/command-008.stderr",
+      "originalSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "originalBytes": 0,
+      "gzipSHA256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "gzipBytes": 20,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "prune-rescan-probe/command-008.stdout.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/prune-rescan-probe/command-008.stdout",
+      "originalSHA256": "709543f56b2bf8c76881d33af10340811ad4cbf3daa4866223d4a9cb8e084ab4",
+      "originalBytes": 45,
+      "gzipSHA256": "99570e107f21c5f281649ad62d53a75797b5e7e786d18ea6ce7aad3637329a93",
+      "gzipBytes": 65,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "prune-rescan-probe/command-009.stderr.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/prune-rescan-probe/command-009.stderr",
+      "originalSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "originalBytes": 0,
+      "gzipSHA256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "gzipBytes": 20,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "prune-rescan-probe/command-009.stdout.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/prune-rescan-probe/command-009.stdout",
+      "originalSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "originalBytes": 0,
+      "gzipSHA256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "gzipBytes": 20,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "prune-rescan-probe/container-id.txt.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/prune-rescan-probe/container-id.txt",
+      "originalSHA256": "abcfd5a99fa06914042372bc511f64ef0a2d4dd353b5b0dd599d4b5f21de67c7",
+      "originalBytes": 65,
+      "gzipSHA256": "8a62087b063e227ba12d7b299765c14b7a838ede9c856c189482727d9e068670",
+      "gzipBytes": 74,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "prune-rescan-probe/image-id.txt.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/prune-rescan-probe/image-id.txt",
+      "originalSHA256": "c87c5be5a3d8e17a692d3f86770ac132b9116c67405b2c705f090ed6dd72a31b",
+      "originalBytes": 72,
+      "gzipSHA256": "11397e28a61b30e90c4cccaa7c27396553584dfe50f96277ad3696ddd1a62e65",
+      "gzipBytes": 78,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "prune-rescan-probe/plan-output.txt.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/prune-rescan-probe/plan-output.txt",
+      "originalSHA256": "cafb3d6bb642d0786d70143d8987d589942b61bbeabf7fdcf127c7d973ec5092",
+      "originalBytes": 11257,
+      "gzipSHA256": "59e825a80c7066644ffef66f62f11df073949b8c48fbfde491b9fd5c08f20e62",
+      "gzipBytes": 1568,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "prune-rescan-probe/psql.stderr.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/prune-rescan-probe/psql.stderr",
+      "originalSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "originalBytes": 0,
+      "gzipSHA256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "gzipBytes": 20,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "prune-rescan-probe/remaining.txt.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/prune-rescan-probe/remaining.txt",
+      "originalSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "originalBytes": 0,
+      "gzipSHA256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "gzipBytes": 20,
+      "decompressedReadbackExact": true
+    },
+    {
+      "name": "prune-rescan-probe/verification.json.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/browser-session-cleanup/prune-rescan-probe/verification.json",
+      "originalSHA256": "18079aed15771d9ba1c7c64fa1f78b3c9b935aabfa1bf22a56a80453b1b0917d",
+      "originalBytes": 6891,
+      "gzipSHA256": "bb91028dfce9bfae73303173e2070cf9852340c9ae7475df6c0f8aea550c6d38",
+      "gzipBytes": 1450,
+      "decompressedReadbackExact": true
+    }
+  ],
+  "allDecompressedReadbacksExact": true,
+  "gzipMtime": 0,
+  "gzipFilenameEmpty": true
+}

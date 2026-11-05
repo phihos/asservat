@@ -1162,4 +1162,4 @@ The brief's domain-registration and trademark work remains a maintainer-owned pu
 
 - [ADR-308 — Finite whole-pod logs and approved saved-log pages](308-finite-whole-pod-logs.md): lossless bounded API log acquisition, truthful combined-stream provenance and exact raw get_logs approval; implementation and qualification pending.
 
-- [ADR-311 — Browser-session cleanup in the existing worker](311-browser-session-cleanup.md): bounded expiry/retired-epoch pruning reuses the browser-settings child and SQL profile; no new service, role or timer. Real-role and installed qualification pending.
+- [ADR-311 — Browser-session cleanup in the existing worker](311-browser-session-cleanup.md): bounded expiry/retired-epoch pruning reuses the browser-settings child and SQL profile; no new service, role or scheduling timer. Local real-role qualification passed; installed caller proof pending.

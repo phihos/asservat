@@ -1,6 +1,6 @@
 # ADR-311 — Run browser-session cleanup in the existing worker
 
-Date: 2026-11-05. Status: implemented; real-role and installed qualification pending.
+Date: 2026-11-05. Status: implemented; local real-role qualification passed, installed caller qualification pending.
 Related: [ADR-060](060-bounded-browser-sessions.md),
 [ADR-061](061-current-browser-configuration.md),
 [ADR-210](210-installed-processing-changes.md),
@@ -97,10 +97,14 @@ cost without changing the expiry decision, so none is introduced.
 ## Validation boundary
 
 Focused tests cover the actual compiled ACL profile, cleanup during settings
-failure/suspension, bounded retries and joined cancellation. A prepared managed
-service test uses the actual compiled worker role and SQL adapters to exercise
-300-row backlogs, live/old-epoch state, original receipts and logout while
-settings are unavailable. Its payload/identity/source setup is synthetic;
-passing it does not qualify an installed worker or a real identity provider.
-Record actual command exits and remaining qualification in the handoff rather
-than describing unrun fixtures as passed.
+failure/suspension, bounded retries and joined cancellation. The managed service test on signed `f8c4a86a` uses the actual compiled worker
+role and SQL adapter and passes (Go/harness exit 0, 4.698 s, 2 selected tests), including
+300-row backlogs, exact256/remaining passes, live/old-epoch state, original
+receipts, ACL denials, logout and blocked-lock cancellation while settings are
+unavailable. The first 768-row pass takes 19.902282 ms for small synthetic opaque
+records; maximum credential sizes and sustained ceilings are not measured.
+All 4,303 source hashes match exact Git, source remains unchanged and cleanup
+is complete. Its payload/identity/source setup is synthetic; this does not
+qualify the installed worker scheduler or a real identity provider.
+[Original reports and failure history](../../test/results/browser-session-cleanup-local/README.md)
+retain the actual boundaries.
