@@ -939,11 +939,12 @@
                                   "items": {
                                     "enum": [
                                       "download_artifact",
-                                      "pcap_query"
+                                      "pcap_query",
+                                      "syscall_query"
                                     ]
                                   },
                                   "minItems": 1,
-                                  "maxItems": 2,
+                                  "maxItems": 3,
                                   "uniqueItems": true
                                 },
                                 "max_bytes": {

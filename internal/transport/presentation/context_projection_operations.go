@@ -34,6 +34,7 @@ type ContextProjectionOperations struct {
 	packets       PacketSummaryQueryService
 	packetQueries PacketQueryService
 	syscalls      SyscallQueryService
+	rawSyscalls   RawSyscallQueryService
 	contracts     *contracts.InvestigationContracts
 }
 
@@ -61,12 +62,15 @@ func (s *ContextProjectionOperations) WithHTTPHeaders(headers HTTPHeaderQuerySer
 
 // serves reports whether name is one of this composition's operations.
 func (s *ContextProjectionOperations) serves(name string) bool {
-	return s != nil && queryOperation(name) && (name != "get_http_headers" || s.headers != nil) && (name != "get_profile_summary" || s.profiles != nil) && (name != "get_pcap_summary" || s.packets != nil) && (name != "pcap_query" || s.packetQueries != nil) && (name != "compare_profiles" || s.comparisons != nil) && (!syscallQueryOperation(name) || s.syscalls != nil)
+	return s != nil && queryOperation(name) && (name != "syscall_query" || s.rawSyscalls != nil) && (name != "get_http_headers" || s.headers != nil) && (name != "get_profile_summary" || s.profiles != nil) && (name != "get_pcap_summary" || s.packets != nil) && (name != "pcap_query" || s.packetQueries != nil) && (name != "compare_profiles" || s.comparisons != nil) && (!syscallQueryOperation(name) || s.syscalls != nil)
 }
 
 // toolNames are the operations this composition advertises.
 func (s *ContextProjectionOperations) toolNames() []string {
 	names := []string{"get_file_excerpt", "get_query_result"}
+	if s.rawSyscalls != nil {
+		names = append(names, "syscall_query")
+	}
 	if s.packetQueries != nil {
 		names = append(names, "pcap_query")
 	}
@@ -101,6 +105,16 @@ func (s *ContextProjectionOperations) CallWithContext(ctx context.Context, curre
 	}
 	var input analysisapp.ContextQueryInput
 	switch name {
+	case "syscall_query":
+		var in RawSyscallQueryOperationInput
+		if json.Unmarshal(raw, &in) != nil {
+			return noDispatch, ErrOperationDelivery
+		}
+		r, e := in.request()
+		if e != nil {
+			return s.refusal(record.ID, name, record.Until, syscallInvalidCursor, operationAuditInvalid, operationEffectNone, true)
+		}
+		input.RawSyscalls = r
 	case "pcap_query":
 		var in PacketQueryOperationInput
 		if json.Unmarshal(raw, &in) != nil {
@@ -193,6 +207,8 @@ func (s *ContextProjectionOperations) CallWithContext(ctx context.Context, curre
 	}
 	var d *analysisapp.ContextProjectionDelivery
 	switch name {
+	case "syscall_query":
+		d, err = s.rawSyscalls.Begin(ctx, current, i, input.RawSyscalls)
 	case "pcap_query":
 		d, err = s.packetQueries.Begin(ctx, current, i, input.PacketQuery)
 	case "get_pcap_summary":
@@ -224,6 +240,9 @@ func (s *ContextProjectionOperations) CallWithContext(ctx context.Context, curre
 			}
 		}
 	}()
+	if d == nil && name == "syscall_query" && analysisapp.RawSyscallQueryApprovalRequiredBeforeAdmission(err) {
+		return s.refusal(record.ID, name, record.Until, OperationFailure{Code: "RawApprovalRequired", Message: "Independent approval must cover syscall_query for this saved argument artifact and your current registered client. Download approval does not cover this query.", Retryable: false}, operationAuditUnspecified, operationEffectNone, true)
+	}
 	if d == nil && name == "pcap_query" && analysisapp.PacketQueryApprovalRequiredBeforeAdmission(err) {
 		return s.refusal(record.ID, name, record.Until, OperationFailure{Code: "RawApprovalRequired", Message: "Independent approval must cover pcap_query for this saved raw artifact and your current registered client. Download approval does not cover this query.", Retryable: false}, operationAuditUnspecified, operationEffectNone, true)
 	}
@@ -299,6 +318,17 @@ type queryViewTimes struct {
 
 func (s *ContextProjectionOperations) serialize(requestID, name string, d *analysisapp.ContextProjectionDelivery) ([]byte, error) {
 	times := queryViewTimes{ObservedAt: d.ObservedAt(), ExpiresAt: d.QueryDeadline()}
+	if !d.Pending() && d.Tool() == "syscall_query" {
+		body, err := renderRawSyscallResult(requestID, name, d, times)
+		if err != nil {
+			return nil, err
+		}
+		if s.contracts.ValidateOutput(name, body) != nil {
+			clear(body)
+			return nil, ErrOperationDelivery
+		}
+		return body, nil
+	}
 	if !d.Pending() && syscallQueryOperation(d.Tool()) {
 		body, err := renderSyscallResult(requestID, name, d, times)
 		if err != nil {
@@ -486,7 +516,7 @@ func (s *ContextProjectionOperations) deliveryRefusal(requestID, name string, d 
 		if name == "get_query_result" {
 			failure.Message = "The cursor is not valid for this saved evidence view. Start again without a cursor."
 		}
-		if syscallQueryOperation(name) {
+		if syscallQueryOperation(name) || d.Tool() == "syscall_query" {
 			failure = syscallInvalidCursor
 		}
 	case analysisapp.ContextProjectionIncompatibleProfiles:
@@ -495,7 +525,7 @@ func (s *ContextProjectionOperations) deliveryRefusal(requestID, name string, d 
 		if name == "get_query_result" {
 			failure.Message = "This saved evidence record does not fit the response limit."
 		}
-		if syscallQueryOperation(name) {
+		if syscallQueryOperation(name) || d.Tool() == "syscall_query" {
 			failure = syscallTooLarge
 		}
 		if d.Tool() == "get_profile_summary" {

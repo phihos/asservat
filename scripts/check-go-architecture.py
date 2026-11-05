@@ -61,6 +61,10 @@ for package in packages:
                 # storage I/O. Keep this exception confined to the value owner.
                 if package["ImportPath"] == module+"/internal/domain/capture":
                     allowed |= {"crypto/sha256", "encoding/json", "encoding/json/jsontext", "io"}
+                # Recorded argument values use canonical bounded base64. Checking
+                # that pure encoding adds no file/network, key or decoder adapter.
+                if package["ImportPath"] == module+"/internal/domain/artifact":
+                    allowed |= {"encoding/base64"}
                 # Analysis cursors bind an immutable source version and closed
                 # display selection. SHA-256 is a deterministic value identity;
                 # no key handling, network, storage or JSON I/O is allowed here.

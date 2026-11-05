@@ -1156,3 +1156,4 @@ The brief's domain-registration and trademark work remains a maintainer-owned pu
 - [ADR-301: accepted history metadata capacity](301-accepted-history-metadata-capacity.md): separately charge settings of an exact accepted capture under current root, pool/allocation, quota, identity, recovery and retention checks; live-workload observation remains required for new acquisition, not this metadata write. Atomic association and installed qualification pending.
 
 - [ADR-303 — Saved packet metadata summaries](303-saved-packet-summary.md)
+- [ADR-306 — Bounded saved syscall argument queries](306-bounded-saved-syscall-queries.md): reuse the regional Go worker, canonical native decoder and exact raw grants with stable keyed replay and bounded whole-event pages; component implementation in progress, installed qualification pending.

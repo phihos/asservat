@@ -60,8 +60,9 @@ type ContextProjectionAuthority struct {
 	// Shares is the ADR-232 recipient branch: consulted only when ordinary
 	// target eligibility refuses, before the protected catalog read. Nil
 	// disables shared inspection.
-	Shares       ShareReader
-	PacketGrants PacketProjectionGrants
+	Shares        ShareReader
+	PacketGrants  PacketProjectionGrants
+	SyscallGrants SyscallProjectionGrants
 	// Reviews repeats the caller's recorded decision-time reviews before the
 	// permission read (ADR-245); nil disables them.
 	Reviews RecordedReviewRefresher
@@ -168,7 +169,7 @@ func (s ContextProjectionAuthority) checkProjection(ctx context.Context, source 
 	if err != nil || !(scope.Valid() || expected == nil && scope.PreGrantValid()) || expected != nil && scope != *expected || !projectionEvidenceMatches(record, scope, s.Now()) || call.Err() != nil {
 		return zero, projectionRefused("catalog", analysis.ErrUnavailable, errors.Join(err, call.Err()))
 	}
-	if scope.PacketQuery.Valid() {
+	if scope.PacketQuery.Valid() || scope.Syscalls.View == analysis.SyscallQueryView {
 		record.DisplayVersion = scope.DisplayVersion
 	}
 	r := record.Retained
@@ -264,6 +265,17 @@ func (s ContextProjectionAuthority) checkProjection(ctx context.Context, source 
 		}
 		defer shorten("raw-grant", grantUntil)()
 	}
+	if scope.Syscalls.View == analysis.SyscallQueryView && scope.RawGrantID != "" {
+		if s.SyscallGrants == nil {
+			return zero, projectionRefused("raw-grant", analysis.ErrUnavailable, nil)
+		}
+		var grantUntil time.Time
+		queryGrant, grantUntil, err = s.SyscallGrants.SyscallProjectionGrant(call, source, scope, record, expected == nil)
+		if err != nil || !queryGrant.Valid() || queryGrant.ParentID != scope.RawGrantID || call.Err() != nil {
+			return zero, projectionRefused("raw-grant", analysis.ErrUnavailable, err)
+		}
+		defer shorten("raw-grant", grantUntil)()
+	}
 	lastIdentity, err := source.ResolveIdentity(call)
 	lastIdentity = cloneProjectionIdentity(lastIdentity)
 	if err != nil || !sameProjectionIdentity(i, lastIdentity, s.Now()) || !sameProjectionIdentity(current, lastIdentity, s.Now()) || call.Err() != nil {
@@ -283,6 +295,9 @@ func (s ContextProjectionAuthority) checkProjection(ctx context.Context, source 
 		return zero, projectionRefused("expired", analysis.ErrExpired, nil)
 	}
 	if scope.PreGrantValid() {
+		if scope.Syscalls.View == analysis.SyscallQueryView {
+			return zero, &syscallQueryApprovalRequired{}
+		}
 		return zero, &packetQueryApprovalRequired{}
 	}
 	out := analysis.ContextProjectionAuthority{Scope: scope, Grant: queryGrant, Environment: environment, Retention: resolved.Proof, PermissionRevision: p.Revision, IdentityRevision: i.Policy, CheckedAt: started, ValidUntil: until, AccessUntil: resolved.ExpiresAt, DeleteBy: resolved.DeleteBy, Bound: bound}

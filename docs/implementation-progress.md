@@ -1,5 +1,35 @@
 # Sustained implementation progress
 
+## Saved syscall argument queries reach built React; service proof pending (2026-11-05)
+
+The isolated candidate implements ADR-306's saved raw syscall query through
+canonical/browser schemas, C3 exact approval, C18 keyed invocation, migration140,
+the canonical raw decoder, encrypted regional reader, audited C20 and console.
+It reads only existing argument originals; metadata views remain argument-free.
+Four configured units/two batches and 24 KiB/one operation per actual raw read
+reuse the existing ledger and shared disclosure pool. Same-key replay retains
+original identity/deadlines and its audited control call cannot fund a read.
+
+The actual collection-grant producer regression reproduces the former two-op
+cap, then passes a three-op parent and exact-source packet/syscall children;
+duplicates/unsupported operations fail before storage. Independent C20/schema/UI
+review found no blockers. Missing approval has a no-effect review remedy;
+wrong source/version/type and malformed paid pages are refused with joined
+closure. Focused affected races and internal vet pass. Full console checks pass
+552 tests in 49 files and production assets build. The actual built React/GoTLS
+query fixture passes both subcases with race detection in 11.927s: Pending
+review→Approved, explicit Begin/poll with fixed expiry, current response clocks,
+fresh-key next page, recorded zero/empty/fault/truncation and close. Query and
+authority replies in this browser fixture are synthetic. Maximal C20 structured
+output is 20,349 bytes private, 21,223 direct and 21,890 nested; this does not
+qualify a maximal native source or process resources.
+
+Real-service JSONB sizing/lifecycle/replay, migration140 rollback, resource
+measurements and installed argument MCP/React/native parity remain pending.
+The current packet PR169 candidate and hosted qualification are separate. No
+complete S-05 or project exit is asserted.
+
+
 ## Saved-packet queries merged with complete installed parity (2026-11-05)
 
 PR169 merged normally as `b47507a1`; fresh main and installed-tested `b3049371`

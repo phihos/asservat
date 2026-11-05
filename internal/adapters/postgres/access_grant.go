@@ -639,7 +639,7 @@ func (s *AccessGrants) GrantChild(ctx context.Context, childID string) (authoriz
 // pool is never exceeded. A retry with the same use ID charges nothing.
 func (s *AccessGrants) ReserveGrantUse(ctx context.Context, in authapp.GrantUseRequest, recovery artifact.RecoveryProof) (authorization.Grant, bool, error) {
 	var zero authorization.Grant
-	if s == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(in.UseID) || !authorization.UUID(in.ParentID) || !authorization.UUID(in.ChildID) || (in.Use.Operation != authorization.GrantDownloadOperation && in.Use.Operation != authorization.GrantPacketQueryOperation) || in.Use.Bytes < 0 || in.Use.Operations < 0 || in.Use.Bytes+in.Use.Operations == 0 {
+	if s == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(in.UseID) || !authorization.UUID(in.ParentID) || !authorization.UUID(in.ChildID) || (in.Use.Operation != authorization.GrantDownloadOperation && in.Use.Operation != authorization.GrantPacketQueryOperation && in.Use.Operation != authorization.GrantSyscallQueryOperation) || in.Use.Bytes < 0 || in.Use.Operations < 0 || in.Use.Bytes+in.Use.Operations == 0 {
 		return zero, false, authorization.ErrGrantInvalid
 	}
 	var out authorization.Grant

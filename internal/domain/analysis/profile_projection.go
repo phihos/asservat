@@ -35,6 +35,9 @@ func (s ProjectionSource) ReadOperation() authorization.Operation {
 	if !ok || known != s {
 		return ""
 	}
+	if s.DisplayVersion == SyscallQueryDisplayVersion {
+		return authorization.ReadSyscallQuery
+	}
 	if s.DisplayVersion == PacketQueryDisplayVersion {
 		return authorization.ReadPacketQuery
 	}
@@ -54,6 +57,9 @@ func (s ProjectionSource) ReadOperation() authorization.Operation {
 func (s ProjectionSource) OutputClass() string {
 	if s.ReadOperation() == "" {
 		return ""
+	}
+	if s.DisplayVersion == SyscallQueryDisplayVersion {
+		return "raw"
 	}
 	if s.DisplayVersion == PacketQueryDisplayVersion {
 		if s.NativeType == artifact.RawPCAPNGArtifact {

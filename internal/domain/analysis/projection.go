@@ -88,7 +88,10 @@ func LookupProjectionSourceFor(nativeType, displayVersion string) (ProjectionSou
 		return known, true
 	}
 	if nativeType == artifact.SyscallRecordsArtifact || nativeType == artifact.SyscallArgumentsArtifact {
-		if displayVersion != SyscallSummaryDisplayVersion && displayVersion != SyscallEventsDisplayVersion {
+		if displayVersion != SyscallSummaryDisplayVersion && displayVersion != SyscallEventsDisplayVersion && displayVersion != SyscallQueryDisplayVersion {
+			return ProjectionSource{}, false
+		}
+		if displayVersion == SyscallQueryDisplayVersion && nativeType != artifact.SyscallArgumentsArtifact {
 			return ProjectionSource{}, false
 		}
 		class, format := "metadata", artifact.SyscallRecordsFormat
@@ -219,6 +222,9 @@ func (c ContextProjectionCandidate) selectionValid() bool {
 	if c.PacketQuery != (PacketQueryWindow{}) {
 		return c.PacketQuery.Valid() && c.PacketQuery.Selection().ValidFor(c.NativeType) && c.Comparison == (ProfileComparisonWindow{}) && c.Selection == (LineSelection{}) && c.Headers == (HTTPHeaderWindow{}) && c.Profile == (ProfileSummarySelection{}) && c.Syscalls == (SyscallWindow{}) && ((c.NativeType == artifact.RawPCAPNGArtifact && (c.RawGrantID == "" || authorization.UUID(c.RawGrantID))) || (c.NativeType == artifact.PCAPNGArtifact && c.RawGrantID == ""))
 	}
+	if c.Syscalls.View == SyscallQueryView {
+		return c.NativeType == artifact.SyscallArgumentsArtifact && c.Syscalls.Valid() && c.Selection == (LineSelection{}) && c.Headers == (HTTPHeaderWindow{}) && c.Profile == (ProfileSummarySelection{}) && c.Comparison == (ProfileComparisonWindow{}) && (c.RawGrantID == "" || authorization.UUID(c.RawGrantID))
+	}
 	if c.RawGrantID != "" {
 		return false
 	}
@@ -261,13 +267,13 @@ type ContextProjectionScope struct {
 }
 
 func (s ContextProjectionScope) Valid() bool {
-	return s.sourceValid() && (s.DisplayVersion != PacketQueryDisplayVersion || s.NativeType != artifact.RawPCAPNGArtifact || authorization.UUID(s.RawGrantID))
+	return s.sourceValid() && (!s.rawGrantRequired() || authorization.UUID(s.RawGrantID))
 }
 
 // PreGrantValid checks only the protected raw-query source and selection while
 // discovering a missing approval. It is never accepted read/admission authority.
 func (s ContextProjectionScope) PreGrantValid() bool {
-	return s.RawGrantID == "" && s.DisplayVersion == PacketQueryDisplayVersion && s.NativeType == artifact.RawPCAPNGArtifact && s.sourceValid()
+	return s.RawGrantID == "" && s.rawGrantRequired() && s.sourceValid()
 }
 func (s ContextProjectionScope) sourceValid() bool {
 	src, ok := s.Source()
@@ -423,8 +429,12 @@ func (p ContextProjectionPath) AcquisitionPath() artifact.DownloadPath {
 }
 
 func (a ContextProjectionAuthority) grantMatches() bool {
-	if a.Scope.DisplayVersion == PacketQueryDisplayVersion && a.Scope.NativeType == artifact.RawPCAPNGArtifact {
+	if a.Scope.rawGrantRequired() {
 		return a.Grant.Valid() && a.Grant.ParentID == a.Scope.RawGrantID
 	}
 	return a.Grant == (ContextQueryGrant{})
+}
+
+func (s ContextProjectionScope) rawGrantRequired() bool {
+	return s.DisplayVersion == PacketQueryDisplayVersion && s.NativeType == artifact.RawPCAPNGArtifact || s.DisplayVersion == SyscallQueryDisplayVersion && s.NativeType == artifact.SyscallArgumentsArtifact
 }

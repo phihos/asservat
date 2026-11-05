@@ -4,7 +4,8 @@
   "grant_id": "00000000-0000-4000-8000-000000000024",
   "limit": 20,
   "syscall_names": [
-    "connect"
+    "write"
   ],
-  "errors_only": true
+  "errors_only": true,
+  "idempotency_key": "syscall-query-original-page"
 }

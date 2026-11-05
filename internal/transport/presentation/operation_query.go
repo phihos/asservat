@@ -9,10 +9,20 @@ import (
 )
 
 func queryOperation(name string) bool {
-	return name == "pcap_query" || name == "get_file_excerpt" || name == "get_http_headers" || name == "get_profile_summary" || name == "get_pcap_summary" || name == "compare_profiles" || syscallQueryOperation(name) || name == "get_query_result"
+	return name == "syscall_query" || name == "pcap_query" || name == "get_file_excerpt" || name == "get_http_headers" || name == "get_profile_summary" || name == "get_pcap_summary" || name == "compare_profiles" || syscallQueryOperation(name) || name == "get_query_result"
 }
 
 func normalizeQueryInput(name string, raw []byte) ([]byte, error) {
+	if name == "syscall_query" {
+		var in RawSyscallQueryOperationInput
+		if err := json.Unmarshal(raw, &in); err != nil {
+			return nil, err
+		}
+		return json.Marshal(struct {
+			Tool, DisplayVersion string
+			Input                RawSyscallQueryOperationInput
+		}{name, analysis.SyscallQueryDisplayVersion, normalizeRawSyscallInput(in)})
+	}
 	if name == "pcap_query" {
 		var in PacketQueryOperationInput
 		if err := json.Unmarshal(raw, &in); err != nil {

@@ -50,9 +50,10 @@ type ProjectionResult struct {
 	Comparison    *ProfileComparison `json:",omitempty"`
 	// IncompatibleProfiles is a content-free semantic result after both
 	// authenticated source reads, not an unknown read/transport failure.
-	IncompatibleProfiles bool                `json:",omitempty"`
-	SyscallSummary       *SyscallSummaryPage `json:",omitempty"`
-	SyscallEvents        *SyscallEventPage   `json:",omitempty"`
+	IncompatibleProfiles bool                 `json:",omitempty"`
+	SyscallSummary       *SyscallSummaryPage  `json:",omitempty"`
+	SyscallEvents        *SyscallEventPage    `json:",omitempty"`
+	SyscallQuery         *SyscallArgumentPage `json:",omitempty"`
 	InvalidCursor        bool
 	// TooLarge refuses a page whose first selected record alone exceeds the
 	// wire bound, or an authenticated comparison that exceeds its result bound.
@@ -64,6 +65,18 @@ type ProjectionResult struct {
 func (r ProjectionResult) Valid(s ContextProjectionScope) bool {
 	if !s.Valid() {
 		return false
+	}
+	if r.SyscallQuery != nil && s.DisplayVersion != SyscallQueryDisplayVersion {
+		return false
+	}
+	if s.DisplayVersion == SyscallQueryDisplayVersion {
+		if r.PodStatus != (PodStatusProjection{}) || !r.Headers.empty() || r.Summary != nil || r.PacketQuery != nil || r.PacketSummary != nil || r.Comparison != nil || r.IncompatibleProfiles || r.SyscallSummary != nil || r.SyscallEvents != nil {
+			return false
+		}
+		if r.InvalidCursor || r.TooLarge {
+			return r.InvalidCursor != r.TooLarge && r.SyscallQuery == nil
+		}
+		return r.SyscallQuery != nil && r.SyscallQuery.ValidShape(s.Syscalls.Selection(s.CaseID, s.ArtifactID), s.Version, s.PodUID)
 	}
 	if s.PacketQuery != (PacketQueryWindow{}) {
 		return r.PodStatus == (PodStatusProjection{}) && r.Headers.empty() && r.Summary == nil && r.PacketSummary == nil && r.Comparison == nil && !r.IncompatibleProfiles && r.SyscallSummary == nil && r.SyscallEvents == nil && !r.InvalidCursor && !r.TooLarge && r.PacketQuery != nil && r.PacketQuery.Valid(s.PacketQuery.Selection(), s.NativeType)
@@ -124,6 +137,10 @@ func (r ProjectionResult) Valid(s ContextProjectionScope) bool {
 
 // Clear drops the transient record values.
 func (r *ProjectionResult) Clear() {
+	if r.SyscallQuery != nil {
+		r.SyscallQuery.Clear()
+		r.SyscallQuery = nil
+	}
 	if r.PacketQuery != nil {
 		r.PacketQuery.Clear()
 		r.PacketQuery = nil
@@ -172,6 +189,8 @@ func (s ContextProjectionScope) BeginTool() string {
 			return "get_syscall_summary"
 		case SyscallEventsView:
 			return "get_syscall_events"
+		case SyscallQueryView:
+			return "syscall_query"
 		}
 		return ""
 	}
@@ -191,6 +210,9 @@ func (s ContextProjectionScope) BeginTool() string {
 // ReadBatches is the number of read batches a query of this scope may
 // start: one page read for an extract, the historical two for pod status.
 func (s ContextProjectionScope) ReadBatches() int64 {
+	if s.DisplayVersion == SyscallQueryDisplayVersion && s.Syscalls.View == SyscallQueryView {
+		return SyscallQueryReadBatches
+	}
 	if s.DisplayVersion == PacketQueryDisplayVersion && s.PacketQuery != (PacketQueryWindow{}) {
 		return PacketQueryReadBatches
 	}

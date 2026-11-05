@@ -5,6 +5,8 @@ import { caseIDFromPath } from '../routes';
 import { Evidence } from './evidence';
 import type { Artifact, Download } from './http';
 import { ProfileComparisonView } from '../projection/ProfileComparisonView';
+import { SyscallQueryView } from '../projection/SyscallQueryView';
+import { SyscallQuery } from '../projection/syscall-query';
 import { PacketQueryView } from '../projection/PacketQueryView';
 import { PacketQuery } from '../projection/packet-query';
 import { PacketSummaryView } from '../projection/PacketSummaryView';
@@ -76,6 +78,12 @@ function SavedPacketQuery({session,scope,caseID,artifact}:{session:Session;scope
  const [controller]=useState(()=>new PacketQuery());
  return <PacketQueryView controller={controller} session={session} scope={scope} caseID={caseID} artifact={artifact}/>;
 }
+function SavedRawSyscallQuery({session,scope,caseID,artifact}:{session:Session;scope:AbortSignal;caseID:string;artifact:Artifact}) {
+ const [controller]=useState(()=>new SyscallQuery());
+ const [grant,setGrant]=useState<{id:string;session:Session;scope:AbortSignal}>();
+ const grantID=grant?.session===session && grant.scope===scope && !scope.aborted ? grant.id : undefined;
+ return <><RawAccessPanel session={session} scope={scope} caseID={caseID} artifacts={[artifact]} prefilledArtifactID={artifact.artifact_id} purpose="syscall-query" onGrant={id=>setGrant({id,session,scope})}/><SyscallQueryView controller={controller} session={session} scope={scope} caseID={caseID} artifactID={artifact.artifact_id} version={artifact.digest} grantID={grantID}/></>;
+}
 function SavedSyscallViews({ session, scope, caseID, artifact }: { session: Session; scope: AbortSignal; caseID: string; artifact: Artifact }) {
   const [controller] = useState(() => ContextProjection.syscalls());
   return <SyscallProjectionView controller={controller} session={session} scope={scope} caseID={caseID} artifactID={artifact.artifact_id} version={artifact.digest}/>;
@@ -134,7 +142,7 @@ export default function EvidenceWorkspace({ session, scope, caseID, controller =
           {artifact.data_class === 'metadata' && ['context', 'pod-status'].includes(artifact.kind) && <SavedPodStatus session={session} scope={scope} caseID={caseID} artifactID={artifact.artifact_id}/>}
           {artifact.kind === 'packetCapture' && (artifact.native_format === 'pcapng' && artifact.data_class === 'metadata' || artifact.native_format === 'pcapng-raw' && artifact.data_class === 'raw' && state.details?.case.access !== 'shared') && <><SavedPacketSummary session={session} scope={scope} caseID={caseID} artifact={artifact}/><SavedPacketQuery session={session} scope={scope} caseID={caseID} artifact={artifact}/></>}
           {artifact.kind === 'profile' && artifact.native_format === 'pprof' && artifact.data_class === 'raw' && state.details?.case.access !== 'shared' && <><SavedProfileSummary session={session} scope={scope} caseID={caseID} artifact={artifact}/><SavedProfileComparison session={session} scope={scope} caseID={caseID} artifact={artifact} profiles={profiles}/></>}
-          {artifact.kind === 'syscallTrace' && (artifact.native_format === 'asservat-syscall-events/v1' && artifact.data_class === 'metadata' || artifact.native_format === 'asservat-syscall-arguments/v1' && artifact.data_class === 'raw' && state.details?.case.access !== 'shared') && <SavedSyscallViews session={session} scope={scope} caseID={caseID} artifact={artifact}/>}
+          {artifact.kind === 'syscallTrace' && (artifact.native_format === 'asservat-syscall-events/v1' && artifact.data_class === 'metadata' || artifact.native_format === 'asservat-syscall-arguments/v1' && artifact.data_class === 'raw' && state.details?.case.access !== 'shared') && <><SavedSyscallViews session={session} scope={scope} caseID={caseID} artifact={artifact}/>{artifact.data_class === 'raw' && <SavedRawSyscallQuery key={caseID+artifact.artifact_id+artifact.digest} session={session} scope={scope} caseID={caseID} artifact={artifact}/>}</>}
           <Button className="button" isDisabled={state.busy || pending} onPress={() => void controller.prepare(artifact)}>Download</Button>
           {state.details?.case.access !== 'shared' && <>
             <SharePanel session={session} scope={scope} caseID={caseID} artifact={artifact} preview={<>

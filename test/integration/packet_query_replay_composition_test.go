@@ -23,7 +23,7 @@ func packetQueryReplayRequest(scope query.ContextProjectionScope, key string) qu
 
 type replayCompositionInvocation struct {
 	request query.ContextQueryRequest
-	input   query.PacketQueryRequest
+	input   app.ContextQueryInput
 }
 
 func (i replayCompositionInvocation) Invocation(ctx context.Context) (query.ContextQueryCall, error) {
@@ -33,7 +33,7 @@ func (i replayCompositionInvocation) Invocation(ctx context.Context) (query.Cont
 	return i.request.Call, nil
 }
 func (i replayCompositionInvocation) CheckInput(ctx context.Context, input app.ContextQueryInput) error {
-	if ctx.Err() != nil || !reflect.DeepEqual(input, app.ContextQueryInput{PacketQuery: app.NormalizePacketQueryRequest(i.input)}) {
+	if ctx.Err() != nil || !reflect.DeepEqual(input, i.input) {
 		return query.ErrUnavailable
 	}
 	return nil
@@ -62,6 +62,9 @@ func (p *replayCompositionNoEffects) ResolveProjectionRoute(context.Context, str
 }
 func (p *replayCompositionNoEffects) ResolvePacketProjectionRoute(context.Context, string, string, identity.Identity, artifact.RecoveryProof) (query.ContextProjectionCandidate, error) {
 	return query.ContextProjectionCandidate{}, p.fail("packet-route")
+}
+func (p *replayCompositionNoEffects) ResolveSyscallProjectionRoute(context.Context, string, string, identity.Identity, artifact.RecoveryProof) (query.ContextProjectionCandidate, error) {
+	return query.ContextProjectionCandidate{}, p.fail("syscall-route")
 }
 func (p *replayCompositionNoEffects) CompilePacketQueryFilter(context.Context, string) (query.PacketQueryProgram, error) {
 	return query.PacketQueryProgram{}, p.fail("compile")
@@ -103,7 +106,7 @@ func qualifyPacketQueryReplayApplication(t *testing.T, ctx context.Context, q qu
 	if !ok {
 		t.Fatal("replay service unavailable")
 	}
-	delivery, err := reads.Begin(ctx, caller, replayCompositionInvocation{r, input}, input)
+	delivery, err := reads.Begin(ctx, caller, replayCompositionInvocation{r, app.ContextQueryInput{PacketQuery: app.NormalizePacketQueryRequest(input)}}, input)
 	if delivery != nil {
 		defer func() {
 			if err := delivery.Close(context.WithoutCancel(ctx)); err != nil {
@@ -118,7 +121,58 @@ func qualifyPacketQueryReplayApplication(t *testing.T, ctx context.Context, q qu
 		t.Fatal("replay changed original association/deadline or charged a read")
 	}
 	if _, ok = delivery.PacketQuery(); ok {
-		t.Fatal("initial replay exposed a page")
+		t.Fatal("initial replay exposed a packet page")
+	}
+	if _, ok = delivery.SyscallQuery(); ok {
+		t.Fatal("initial replay exposed a syscall page")
+	}
+	if len(unused.calls) != 0 {
+		t.Fatal("replay called new-work ports", unused.calls)
+	}
+}
+
+func rawSyscallQueryReplayRequest(scope query.ContextProjectionScope, key string) query.RawSyscallQueryRequest {
+	return query.RawSyscallQueryRequest{CaseID: scope.CaseID, ArtifactID: scope.ArtifactID, GrantID: scope.RawGrantID, IdempotencyKey: key, Selection: scope.Syscalls}
+}
+
+func qualifyRawSyscallQueryReplayApplication(t *testing.T, ctx context.Context, q query.ContextQuery, r query.ContextQueryRequest, input query.RawSyscallQueryRequest, caller identities.CurrentIdentity, ledger app.ContextQueryLedger, authority app.CurrentContextProjectionAuthority, recovery app.ContextProjectionRecovery) {
+	t.Helper()
+	if input.IdempotencyKey != q.InvocationKey.Key || app.RawSyscallQueryRequestDigest(input) != q.InvocationKey.RequestDigest {
+		t.Fatal("replay fixture does not bind original normalized request")
+	}
+	unused := &replayCompositionNoEffects{}
+	allocated := 0
+	service := app.ContextProjectionService{Results: app.ContextProjectionResults{RootID: q.Scope.RootID, InstallationID: q.Plan.InstallationID, HubProcessEpoch: r.HubProcessEpoch, Authority: authority, Ledger: ledger, Reader: unused, Now: time.Now, NewID: func() string {
+		allocated++
+		if allocated == 1 {
+			return r.OwnerID
+		}
+		return custodyID()
+	}}, Recovery: recovery, PacketRoutes: unused, PacketCompiler: unused, Plans: unused, Workers: unused}
+	service.SyscallRoutes = unused
+	reads, ok := service.RawSyscallQueries()
+	if !ok {
+		t.Fatal("replay service unavailable")
+	}
+	delivery, err := reads.Begin(ctx, caller, replayCompositionInvocation{r, app.ContextQueryInput{RawSyscalls: input}}, input)
+	if delivery != nil {
+		defer func() {
+			if err := delivery.Close(context.WithoutCancel(ctx)); err != nil {
+				t.Error("pending replay close", err)
+			}
+		}()
+	}
+	if err != nil || delivery == nil {
+		t.Fatal("actual C18 original-key Begin replay", err)
+	}
+	if !delivery.Pending() || delivery.Effect() != app.ContextQueryReplayed || delivery.Association().QueryID != q.ID || delivery.Association().OperationID != r.Call.ID || delivery.Association().BatchID != "" || !delivery.QueryDeadline().Equal(q.Deadline) {
+		t.Fatal("replay changed original association/deadline or charged a read")
+	}
+	if _, ok = delivery.PacketQuery(); ok {
+		t.Fatal("initial replay exposed a packet page")
+	}
+	if _, ok = delivery.SyscallQuery(); ok {
+		t.Fatal("initial replay exposed a syscall page")
 	}
 	if len(unused.calls) != 0 {
 		t.Fatal("replay called new-work ports", unused.calls)

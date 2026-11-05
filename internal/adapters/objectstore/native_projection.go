@@ -47,6 +47,7 @@ func (r *NativeContextReader) projectionReader() (*ContextProjectionReader, erro
 	reader.compare = r.compare
 	reader.packets = r.packets
 	reader.queryPackets = r.queryPackets
+	reader.querySyscalls = r.querySyscalls
 	return reader, nil
 }
 
@@ -85,5 +86,12 @@ func (r *NativeContextReader) ServePacketSummaries(f evidence.PacketSummarizer) 
 func (r *NativeContextReader) ServePacketQueries(f evidence.PacketQuerier) {
 	if r != nil {
 		r.queryPackets = f
+	}
+}
+
+// ServeSyscallQueries installs only the approved recorded-argument interpreter.
+func (r *NativeContextReader) ServeSyscallQueries(f evidence.SyscallQuerier) {
+	if r != nil {
+		r.querySyscalls = f
 	}
 }

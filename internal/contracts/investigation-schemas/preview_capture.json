@@ -1360,7 +1360,8 @@
                           "items": {
                             "enum": [
                               "download_artifact",
-                              "pcap_query"
+                              "pcap_query",
+                              "syscall_query"
                             ]
                           }
                         }

@@ -36,6 +36,27 @@ Use `syscallTrace` as the manifest kind and privacy evidence type. New types def
 
 `get_syscall_summary` returns bounded per-syscall counts, errors and duration aggregates over an approved projection; missing/partial pairs and gaps are explicit. `get_syscall_events` returns a paginated metadata timeline with no argument option. `syscall_query` is a bounded typed raw operation for already collected artifacts, requiring evidence:raw, current artifact rights and a matching raw-query grant. It can select syscall names/errors and return bounded recorded arguments; no arbitrary code, address dereference, live tracing or new acquisition. Add this operation consistently to raw grant/share contracts and delivery checks. Sharing a metadata projection does not grant raw argument queries or live tracing.
 
+The saved-argument implementation uses the bounded regional Go worker under
+[ADR-306](../docs/decisions/306-bounded-saved-syscall-queries.md), reusing the
+canonical native decoder and full authenticated-source verification. Its input
+requires an idempotency key; omitting `grant_id` permits discovery of the
+missing-approval remedy only, never a raw read. After current checks, an exact
+same-key retry returns the original pending handle and deadline without another
+admission or read. A next-page Begin requires a fresh key. Current argument
+sources are limited to 8 MiB. Every actual raw batch conservatively consumes
+24 KiB and one operation from the existing finite disclosure pool; query
+admission reserves four units and at most two read batches. These are configured
+ceilings, not measured overhead or larger-source qualification.
+
+Return whole recorded events within a 20 KiB private page and the 24 KiB direct
+or nested public envelope. Continue validating the entire source after the
+logical page stop; a bad tail or cancellation releases no page. Preserve native
+`decimal:`, canonical `base64:` and `unavailable:fault` values verbatim, including
+zero, empty bytes and acquisition truncation. The current 128-byte memory-value
+and 8192-byte line checks remain stricter than public schema ceilings. The
+original artifact remains raw and queries grant no acquisition or native
+download authority.
+
 Saved summary/event pages scan the complete authenticated bounded source before
 returning a result. Display filters never reduce the charged source work or
 change acquisition. Continuation binds case, artifact version, view and filter;
@@ -52,6 +73,14 @@ The guidance engine can recommend a narrow syscall include list based on the dia
 ### SC-SYS-003
 
 Given an argument trace with a synthetic credential buffer, when a reader asks for summary/events, then only the approved metadata projection is returned. Raw-query and raw-sharing checks remain separate and cumulative. A hostile argument string is never executed or fetched, and expired source evidence cannot be revived by a derived summary or history repeat.
+
+Given that same saved original and a covering `syscall_query` approval, browser
+and MCP return matching bounded recorded argument events. A download-only grant
+or metadata source cannot supply them. Exact-key retries retain the original
+handle/deadline and spend, while changed selection or client cannot reuse the
+key. A corrupt authenticated tail yields no page even after enough matching
+events have filled it. Zero, empty bytes, read faults and truncated values remain
+distinct; expired or revoked authority prevents delivery.
 
 ## Source lifetime versus saved incidents
 

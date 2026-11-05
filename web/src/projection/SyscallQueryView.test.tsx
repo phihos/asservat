@@ -1,0 +1,27 @@
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, expect, it, vi } from 'vitest';
+import { SyscallQueryView } from './SyscallQueryView';
+import { SyscallQuery } from './syscall-query';
+import { SyntheticProjection, session, id } from './test-fixtures';
+import { packetPage } from './packet-query.test-fixtures';
+const source = { caseID: id(2), artifactID: id(3), version: '7'.repeat(64), grantID: id(4) };
+function page() {
+  const p = packetPage(true); p.warnings = ['<img src=x onerror=alert(1)>'];
+  p.data = { kind: 'syscallQuery', events: [{ identity: { process_ref: 'p', thread_ref: 't', pod_uid: 'pod' }, syscall: 'write', abi: 'x86_64', timestamp: '2026-11-05T09:00:00Z', duration_ns: 0, outcome: 'success', arguments: [{ name: 'fd', value: 'decimal:0', truncated: false }, { name: 'buffer', value: 'base64:', truncated: true }, { name: 'path', value: 'unavailable:fault', truncated: false }] }], coverage: { dropped_events: null, unmatched_events: 0, unfinished_events: 0, unknown_events: 0, record_count: 1, truncated: null, gaps: ['Acquisition coverage is unknown.'] }, query_observed_at: '2026-11-05T09:00:00Z', query_expires_at: '2026-11-05T09:01:00Z' }; return p;
+}
+afterEach(() => { cleanup(); vi.useRealTimers(); });
+it('renders zero, recorded empty bytes, fault and acquisition truncation distinctly as text', async () => {
+  const client = new SyntheticProjection(); client.responder = () => page(); const scope = new AbortController(), controller = new SyscallQuery(client); const { container } = render(<SyscallQueryView controller={controller} session={session} scope={scope.signal} {...source}/>); expect(client.calls).toHaveLength(0); fireEvent.click(screen.getByRole('button', { name: 'Run syscall query' })); await screen.findByRole('table', { name: 'Saved syscall argument events' }); expect(screen.getByText('decimal:0')).toBeTruthy(); expect(screen.getByText('base64:')).toBeTruthy(); expect(screen.getByText('unavailable:fault')).toBeTruthy(); expect(screen.getByText(/recorded empty bytes/)).toBeTruthy(); expect(screen.getByText(/recorded read failed/)).toBeTruthy(); expect(screen.getByText(/truncated at acquisition/)).toBeTruthy(); expect(screen.getByRole('table').textContent).toContain('0 ns'); expect(screen.getByText('<img src=x onerror=alert(1)>')).toBeTruthy(); expect(container.querySelector('img,a')).toBeNull(); expect(client.calls[0].input).toMatchObject({ grant_id: source.grantID, case_id: source.caseID, artifact_id: source.artifactID }); scope.abort();
+});
+it('does not invent approval or send a request when the parent has no approved grant', () => {
+  const client = new SyntheticProjection(), scope = new AbortController(); render(<SyscallQueryView controller={new SyscallQuery(client)} session={session} scope={scope.signal} {...source} grantID={undefined}/>); expect(screen.getByRole('button', { name: 'Run syscall query' })).toHaveProperty('disabled', true); expect(screen.getByText(/Obtain syscall-query approval/)).toBeTruthy(); expect(client.calls).toHaveLength(0); scope.abort();
+});
+it('clears raw values synchronously when source, selected grant or session changes', async () => {
+  const client = new SyntheticProjection(); client.responder = () => page(); const scope = new AbortController(), controller = new SyscallQuery(client); const view = render(<SyscallQueryView controller={controller} session={session} scope={scope.signal} {...source}/>); fireEvent.click(screen.getByRole('button', { name: 'Run syscall query' })); await screen.findByRole('table'); view.rerender(<SyscallQueryView controller={controller} session={{ ...session }} scope={scope.signal} {...source} grantID={id(9)}/>); expect(screen.queryByRole('table')).toBeNull(); expect(client.calls).toHaveLength(1); scope.abort();
+});
+it('retains raw rows only for the original view interval', async () => {
+  vi.useFakeTimers(); let now = 0; const client = new SyntheticProjection(); client.responder = () => page(); const scope = new AbortController(), controller = new SyscallQuery(client, () => now); render(<SyscallQueryView controller={controller} session={session} scope={scope.signal} {...source}/>); await act(() => controller.run({})); expect(screen.getByRole('table')).toBeTruthy(); now = 60_000; await act(() => vi.advanceTimersByTimeAsync(60_000)); expect(screen.queryByRole('table')).toBeNull(); expect(screen.getByRole('status').textContent).toContain('expired'); expect(client.calls).toHaveLength(1); scope.abort();
+});
+it('locks an uncertain Begin and offers only its explicit frozen-request retry', async () => {
+  const client = new SyntheticProjection(); let count = 0; client.responder = () => { if (count++ === 0) throw Error('lost response'); return page(); }; const scope = new AbortController(), controller = new SyscallQuery(client); render(<SyscallQueryView controller={controller} session={session} scope={scope.signal} {...source}/>); fireEvent.click(screen.getByRole('button', { name: 'Run syscall query' })); await screen.findByRole('button', { name: 'Retry same syscall query' }); expect(screen.getByRole('button', { name: 'Run syscall query' })).toHaveProperty('disabled', true); expect(screen.getByRole('group', { name: 'Recorded syscall selection' })).toHaveProperty('disabled', true); fireEvent.click(screen.getByRole('button', { name: 'Retry same syscall query' })); await screen.findByRole('table'); expect(client.calls[1].input).toEqual(client.calls[0].input); expect(client.calls).toHaveLength(2); scope.abort();
+});

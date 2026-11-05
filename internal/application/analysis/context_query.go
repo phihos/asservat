@@ -93,6 +93,7 @@ type ContextProjectionDelivery struct {
 	page                                    value.HTTPHeaderPage
 	packetSummary                           *value.PacketSummary
 	packetQuery                             *value.PacketQueryResult
+	syscallQuery                            *value.SyscallArgumentPage
 	summary                                 *value.ProfileSummary
 	comparison                              *value.ProfileComparison
 	syscallSummary                          *value.SyscallSummaryPage
@@ -527,12 +528,16 @@ func (s ContextProjectionService) begin(ctx context.Context, current identities.
 		return nil, queryCollapsed("recovery", value.ErrUnavailable, err)
 	}
 	var invocationKey value.ContextQueryInvocationKey
-	if input.PacketQuery.Valid() {
+	if input.PacketQuery.Valid() || input.RawSyscalls.Valid() {
 		lookup, ok := s.Results.Ledger.(ContextQueryInvocationLookup)
 		if !ok {
 			return nil, queryStepped("invocation-lookup", value.ErrUnavailable)
 		}
-		invocationKey = value.ContextQueryInvocationKey{Key: input.PacketQuery.IdempotencyKey, RequestDigest: PacketQueryRequestDigest(input.PacketQuery)}
+		if input.RawSyscalls.Valid() {
+			invocationKey = value.ContextQueryInvocationKey{Key: input.RawSyscalls.IdempotencyKey, RequestDigest: RawSyscallQueryRequestDigest(input.RawSyscalls)}
+		} else {
+			invocationKey = value.ContextQueryInvocationKey{Key: input.PacketQuery.IdempotencyKey, RequestDigest: PacketQueryRequestDigest(input.PacketQuery)}
+		}
 		original, found, e := lookup.LookupQueryInvocation(o.ctx, o.initial.Principal, invocationKey.Key, invocationKey.RequestDigest)
 		if e != nil {
 			return nil, queryStepped("invocation-lookup", e)
@@ -541,7 +546,7 @@ func (s ContextProjectionService) begin(ctx context.Context, current identities.
 			if !original.Valid() || original.Scope.RootID != s.Results.RootID || original.Scope.Principal != o.initial.Principal || original.InvocationKey != invocationKey || original.Scope.BeginTool() != tool {
 				return nil, value.ErrUnavailable
 			}
-			d, e := s.Results.replayPacketQuery(o, original)
+			d, e := s.Results.replayInitialQuery(o, original)
 			if e != nil {
 				return nil, e
 			}
@@ -561,6 +566,12 @@ func (s ContextProjectionService) begin(ctx context.Context, current identities.
 			var proof interface{ PacketQueryApprovalRequired() bool }
 			if errors.As(err, &proof) && proof.PacketQueryApprovalRequired() {
 				return nil, &packetQueryApprovalRefusal{cause: refusal}
+			}
+		}
+		if tool == "syscall_query" {
+			var proof interface{ RawSyscallQueryApprovalRequired() bool }
+			if errors.As(err, &proof) && proof.RawSyscallQueryApprovalRequired() {
+				return nil, &rawSyscallApprovalRefusal{cause: refusal}
 			}
 		}
 		if tool == "get_profile_summary" {
@@ -614,7 +625,7 @@ func (s ContextProjectionService) begin(ctx context.Context, current identities.
 		return nil, queryCollapsed("admit", value.ErrUnavailable, err)
 	}
 	if !admitted.Fresh && invocationKey.Valid() && admitted.Query.InvocationKey == invocationKey {
-		d, e := s.Results.replayPacketQuery(o, admitted.Query)
+		d, e := s.Results.replayInitialQuery(o, admitted.Query)
 		if e != nil {
 			return nil, e
 		}
@@ -806,6 +817,12 @@ func (s ContextProjectionResults) prepare(o *projectionRequest, effect ContextQu
 		invalidCursor = true
 	case (scope.NativeType == artifact.SyscallRecordsArtifact || scope.NativeType == artifact.SyscallArgumentsArtifact) && projection.TooLarge:
 		tooLarge = true
+	case scope.Syscalls.View == value.SyscallQueryView:
+		if projection.SyscallQuery == nil || !boundedRawSyscallResult(*projection.SyscallQuery, scope) {
+			err = value.ErrUnavailable
+		} else {
+			d.syscallQuery, projection.SyscallQuery = projection.SyscallQuery, nil
+		}
 	case scope.NativeType == artifact.SyscallRecordsArtifact || scope.NativeType == artifact.SyscallArgumentsArtifact:
 		if !boundedSyscallResult(projection) {
 			err = value.ErrUnavailable

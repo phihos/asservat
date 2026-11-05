@@ -88,6 +88,9 @@ func (i *contextQueryInvocation) CheckInput(ctx context.Context, in analysisapp.
 	if !i.current(ctx) || i.mac == nil {
 		return ErrOperationDelivery
 	}
+	if i.call.Tool != "syscall_query" && in.RawSyscalls != (value.RawSyscallQueryRequest{}) {
+		return ErrOperationDelivery
+	}
 	if i.call.Tool != "pcap_query" && !reflect.DeepEqual(in.PacketQuery, value.PacketQueryRequest{}) {
 		return ErrOperationDelivery
 	}
@@ -97,6 +100,11 @@ func (i *contextQueryInvocation) CheckInput(ctx context.Context, in analysisapp.
 	var raw []byte
 	var err error
 	switch i.call.Tool {
+	case "syscall_query":
+		if !in.RawSyscalls.Valid() || in.QueryID != "" || !reflect.DeepEqual(in.PacketQuery, value.PacketQueryRequest{}) || in.Packet != (value.PacketSummaryRequest{}) || in.Comparison != (value.ProfileComparisonRequest{}) || in.Selection != (value.ContextExcerptSelection{}) || in.Headers != (value.HTTPHeaderSelection{}) || in.Profile != (value.ProfileSummaryRequest{}) || in.Syscalls != (value.SyscallQueryRequest{}) {
+			return ErrOperationDelivery
+		}
+		raw, err = json.Marshal(rawSyscallInput(in.RawSyscalls))
 	case "pcap_query":
 		if !in.PacketQuery.Valid() || in.QueryID != "" || in.Packet != (value.PacketSummaryRequest{}) || in.Selection != (value.ContextExcerptSelection{}) || in.Headers != (value.HTTPHeaderSelection{}) || in.Profile != (value.ProfileSummaryRequest{}) || in.Syscalls != (value.SyscallQueryRequest{}) || in.Comparison != (value.ProfileComparisonRequest{}) {
 			return ErrOperationDelivery
@@ -228,6 +236,9 @@ func (i *contextQueryInvocation) bind(ctx context.Context, d *analysisapp.Contex
 		i.call.Tool == "get_query_result" && a.QueryID != i.input.QueryID {
 		return ErrOperationDelivery
 	}
+	if i.call.Tool == "syscall_query" && (a.Syscalls != i.input.RawSyscalls.Selection || a.Selection != (value.LineSelection{}) || a.Headers != (value.HTTPHeaderWindow{}) || a.Profile != (value.ProfileSummarySelection{}) || a.Comparison != (value.ProfileComparisonSelection{})) {
+		return ErrOperationDelivery
+	}
 	if i.call.Tool != "pcap_query" && i.call.Tool != "get_query_result" && a.PacketQuery != (value.PacketQueryWindow{}) {
 		return ErrOperationDelivery
 	}
@@ -242,7 +253,7 @@ func (i *contextQueryInvocation) bind(ctx context.Context, d *analysisapp.Contex
 		if i.call.Tool == "get_query_result" {
 			expected = analysisapp.ContextQueryPollCharged
 		}
-		if i.call.Tool == "pcap_query" && d.Effect() == analysisapp.ContextQueryReplayed {
+		if (i.call.Tool == "pcap_query" || i.call.Tool == "syscall_query") && d.Effect() == analysisapp.ContextQueryReplayed {
 			expected = analysisapp.ContextQueryReplayed
 		}
 		if a.BatchID != "" || a.Generation != 0 || d.Effect() != expected || refusal != analysisapp.ContextProjectionNoRefusal {

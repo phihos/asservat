@@ -17,6 +17,12 @@ import (
 // proof is not reconstructed from this file: the caller independently verifies
 // the published source's authenticated manifest and canonical NativeCheck.
 func walkArgumentMetadata(ctx context.Context, source io.Reader, e artifact.ContextExpectation, from, until time.Time, visit func(event) error) (analysis.SyscallRecordCounts, error) {
+	return walkArgumentRecords(ctx, source, e, from, until, func(raw artifact.RawArgumentEvent) error {
+		return visit(event{Identity: identity{ProcessRef: raw.Identity.ProcessRef, ThreadRef: raw.Identity.ThreadRef, PodUID: raw.Identity.PodUID}, Syscall: raw.Syscall, ABI: raw.ABI, Timestamp: raw.Timestamp, DurationNS: raw.DurationNS, Outcome: raw.Outcome, Errno: raw.Errno})
+	})
+}
+
+func walkArgumentRecords(ctx context.Context, source io.Reader, e artifact.ContextExpectation, from, until time.Time, visit func(artifact.RawArgumentEvent) error) (analysis.SyscallRecordCounts, error) {
 	var zero, counts analysis.SyscallRecordCounts
 	if e.Recording == nil || e.Recording.Arguments == nil || e.Recording.Syscalls == nil || e.Recording.MaxBytes < 1 || e.Recording.MaxBytes > artifact.RecordingNativeLimit || e.Recording.Syscalls.MaxEvents < 1 || e.Recording.Syscalls.MaxEvents > analysis.SyscallMaxRecords {
 		return zero, artifact.ErrInvalid
@@ -26,7 +32,7 @@ func walkArgumentMetadata(ctx context.Context, source io.Reader, e artifact.Cont
 	if err != nil || artifact.Digest(ArgumentDefinitionDigest(definitions)) != a.DefinitionDigest || int64(ArgumentMaxProbeBytes(definitions)) != a.MaxProbeBytes {
 		return zero, artifact.ErrInvalid
 	}
-	check := &argumentsCheck{e: e, from: from, until: until, projection: true, definitions: definitions, visit: func(e event) error {
+	check := &argumentsCheck{e: e, from: from, until: until, projection: true, definitions: definitions, visitRaw: func(e artifact.RawArgumentEvent) error {
 		counts.RecordCount++
 		switch e.Outcome {
 		case "unmatched":

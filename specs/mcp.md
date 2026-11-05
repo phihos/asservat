@@ -133,6 +133,16 @@ proves remote quiescence or releases uncertain worker, key or provider spend.
 
 ## REQ-MCP-003 — Typed raw operations
 
+`syscall_query` selects names/errors in an existing saved argument recording,
+with a required idempotency key and optional approval-discovery `grant_id`.
+An admitted read always requires the exact current `syscall_query` grant for
+the artifact and requesting client. No supplied grant returns the existing
+raw-approval remedy before admission, not argument data. The canonical and
+browser contracts share raw event fields, native encoded values, provenance,
+query observation/expiry timestamps and the 24 KiB result bound. Same-key Begin
+reuses the original pending handle/deadline; subsequent pages use fresh keys.
+See [the saved-argument contract](syscalls.md#req-sys-003--evidence-projections-and-mcp).
+
 `debugger_command` MUST accept an enum such as `backtrace`, `threads`, `registers`, `frame_variables`, `managed_stack`, or `heap_statistics`, plus validated numeric/frame/thread selectors and projection limits. The implementation constructs fixed debugger scripts or MI calls itself. Do not accept shell, Python, debugger expressions, `source`, output redirection, extension loading or arbitrary `print` expressions. A command-name allowlist applied to free text is insufficient.
 
 `pcap_query` MUST validate a bounded **tcpdump/libpcap packet-filter** subset,

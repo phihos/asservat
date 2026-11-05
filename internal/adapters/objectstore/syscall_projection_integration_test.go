@@ -25,7 +25,7 @@ const syscallProjectionSecret = "synthetic-credential-only-for-projection-test"
 
 // The largest process fixtures are generated separately from their measured
 // reader. These expectations/keys/receipts are synthetic, never authority.
-func prepareSyscallEncryptedFixture(t *testing.T, dir, kind string, maximum, malformed, wrongHash bool) profileEncryptedFixture {
+func prepareSyscallEncryptedFixture(t *testing.T, dir, kind string, maximum, malformed, wrongHash bool, sealers ...evidence.KeySealer) profileEncryptedFixture {
 	t.Helper()
 	unused, e, _ := writerFixture(t, http.NotFoundHandler())
 	unused.Close()
@@ -98,7 +98,7 @@ func prepareSyscallEncryptedFixture(t *testing.T, dir, kind string, maximum, mal
 	if err := e.Validate(); err != nil {
 		t.Fatal(err)
 	}
-	copies := prepareEncryptedProjectionSource(t, dir, bytes.NewReader(native.Bytes()), e, wrongHash)
+	copies := prepareEncryptedProjectionSource(t, dir, bytes.NewReader(native.Bytes()), e, wrongHash, sealers...)
 	f := profileEncryptedFixture{Source: evidence.NativeContextSource{Expectation: e, Copies: copies}, Scope: testProjectionScope()}
 	s := &f.Scope
 	s.CaseID, s.CaptureID, s.ArtifactID, s.ClusterID = e.CaseID, e.CaptureUID, e.Registration.Location.ArtifactID, e.Registration.Location.ClusterID

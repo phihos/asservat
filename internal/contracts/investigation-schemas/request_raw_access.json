@@ -27,12 +27,13 @@
       "operations": {
         "type": "array",
         "minItems": 1,
-        "maxItems": 2,
+        "maxItems": 3,
         "uniqueItems": true,
         "items": {
           "enum": [
             "download_artifact",
-            "pcap_query"
+            "pcap_query",
+            "syscall_query"
           ]
         }
       },

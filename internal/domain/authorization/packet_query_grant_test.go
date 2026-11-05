@@ -21,7 +21,7 @@ func TestPacketQueryDisclosurePoolIsNotWholeNativeCoverage(t *testing.T) {
 	if !g.Valid() {
 		t.Fatal("mixed operation pool refused")
 	}
-	g.RawQuery.Operations = []string{"syscall_query"}
+	g.RawQuery.Operations = []string{"future_query"}
 	if g.Valid() {
 		t.Fatal("unimplemented operation widened")
 	}

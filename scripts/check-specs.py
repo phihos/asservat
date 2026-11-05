@@ -2051,7 +2051,9 @@ def main() -> None:
     rejects(argument_recipe, "recipe", syscall_change(lambda p: p.update({"maxFrozenBytes": 1})), True)
     rejects(argument_recipe, "recipe", syscall_change(lambda p: p["arguments"].update({"maxBytesPerEvent": 4097})))
     rejects(argument_recipe, "recipe", syscall_change(lambda p: p["syscalls"].update({"names": ["write", "write"]})))
-    rejects_tool_input("syscall_query", {k: v for k, v in examples["mcp-syscall-query-input.json"].items() if k != "grant_id"})
+    # Missing grant permits the pre-admission approval remedy; keyed invocation
+    # remains mandatory even for discovery. Runtime authorization still denies reads.
+    rejects_tool_input("syscall_query", {k: v for k, v in examples["mcp-syscall-query-input.json"].items() if k != "idempotency_key"})
     rejects_tool_input("get_syscall_events", {"case_id": intent["id"], "artifact_id": intent["id"], "include_arguments": True})
     rejects_guidance("get_syscall_events", "mcp-syscall-events-result.json", lambda d: d["data"]["events"][0].update({"arguments": []}))
     rejects_guidance("get_syscall_summary", "mcp-syscall-summary-result.json", lambda d: d["data"]["rows"][0].update({"errors": 11}), True)

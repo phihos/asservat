@@ -34,8 +34,9 @@ const (
 	// GrantMaxRevision: request (1), decision (2), revocation (3).
 	GrantMaxRevision = 3
 	// GrantDownloadOperation is the one follow-up operation in this release.
-	GrantDownloadOperation    = "download_artifact"
-	GrantPacketQueryOperation = "pcap_query"
+	GrantDownloadOperation     = "download_artifact"
+	GrantPacketQueryOperation  = "pcap_query"
+	GrantSyscallQueryOperation = "syscall_query"
 )
 
 var (
@@ -107,11 +108,11 @@ func sortedUnique(v []string, minimum, maximum, length int) bool {
 
 // ValidResultOperations is the closed sorted operation set supported by exact output grants.
 func ValidResultOperations(operations []string) bool {
-	if len(operations) < 1 || len(operations) > 2 {
+	if len(operations) < 1 || len(operations) > 3 {
 		return false
 	}
 	for i, op := range operations {
-		if op != GrantDownloadOperation && op != GrantPacketQueryOperation || i > 0 && operations[i-1] >= op {
+		if op != GrantDownloadOperation && op != GrantPacketQueryOperation && op != GrantSyscallQueryOperation || i > 0 && operations[i-1] >= op {
 			return false
 		}
 	}
