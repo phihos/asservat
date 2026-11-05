@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Pure installed-fixture wiring checks; no browser, cluster or collection."""
 import os
+import re
 from pathlib import Path
 import subprocess
 import tempfile
@@ -32,7 +33,11 @@ class HeapBrowserSelection(unittest.TestCase):
         source=(ROOT/'scripts/test-context-storage.py').read_text()
         self.assertIn('ROOT/"web/scripts/installed-profile-comparison-browser.mjs"',source)
         self.assertIn('report["installedHeapBrowserQualification"] = collector_qualification and focus == "manual-profile" and profile_variant == "heap"',source)
-        self.assertIn('HeapProfile)WithBuiltPackage', (ROOT/'Makefile').read_text())
+        target = (ROOT/'Makefile').read_text().split('console-browser-check: console-build', 1)[1].split('\n\n', 1)[0]
+        pattern = re.search(r"-run '([^']+)'", target).group(1).replace('$$', '$')
+        for name in ('Browser', 'NativeRestart', 'ProfileComparison', 'HeapProfile', 'PacketSummary'):
+            self.assertIsNotNone(re.fullmatch(pattern, 'TestConsole' + name + 'WithBuiltPackage'), name)
+        self.assertIsNone(re.fullmatch(pattern, 'TestConsoleUnrelatedWithBuiltPackage'))
 
 if __name__ == '__main__':
     unittest.main()

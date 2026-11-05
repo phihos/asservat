@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { operations } from './http';
-import { excerpt, id, syscallSummary, syscallEvents, profileComparison } from './test-fixtures';
+import { excerpt, id, syscallSummary, syscallEvents, profileComparison, packetSummary } from './test-fixtures';
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
 const json = (value: unknown) => new Response(JSON.stringify(value), { headers: { 'Content-Type': 'application/json' } });
 it('uses fixed same-origin CSRF routes without an idempotency key or replay', async () => {
@@ -44,4 +44,16 @@ it('uses the existing bounded CSRF transport for a fixed two-source comparison',
   await operations.call('compare_profiles', input, 'csrf', new AbortController().signal);
   expect(fetcher).toHaveBeenCalledOnce(); expect(fetcher.mock.calls[0][0]).toBe('/api/v1/operations/compare_profiles');
   expect(fetcher.mock.calls[0][1]).toMatchObject({ credentials: 'same-origin', redirect: 'error', cache: 'no-store', headers: { 'X-CSRF-Token': 'csrf' }, body: JSON.stringify(input) });
+});
+
+it('uses only the closed saved packet route and refuses acquisition or raw inputs before HTTP', async () => {
+  const fetcher = vi.fn().mockImplementation(async () => json(packetSummary())); vi.stubGlobal('fetch', fetcher);
+  const input = { case_id: id(2), artifact_id: id(3) };
+  await operations.call('get_pcap_summary', input, 'csrf', new AbortController().signal);
+  expect(fetcher).toHaveBeenCalledOnce(); expect(fetcher.mock.calls[0][0]).toBe('/api/v1/operations/get_pcap_summary');
+  expect(fetcher.mock.calls[0][1]).toMatchObject({ credentials: 'same-origin', redirect: 'error', cache: 'no-store', headers: { 'X-CSRF-Token': 'csrf' }, body: JSON.stringify(input) });
+  for (const extra of [{ include_payload: true }, { filter: 'tcp' }, { query: 'private expression' }, { start_capture: true }]) {
+    await expect(operations.call('get_pcap_summary', { ...input, ...extra }, 'csrf', new AbortController().signal)).rejects.toThrow('Query unavailable');
+  }
+  expect(fetcher).toHaveBeenCalledOnce();
 });

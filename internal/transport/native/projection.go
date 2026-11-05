@@ -73,6 +73,14 @@ func encodeProjectionResult(r query.ProjectionResult, scope query.ContextProject
 		}
 		return b, nil
 	}
+	if scope.NativeType == artifact.PCAPNGArtifact {
+		b, e := json.Marshal(r.PacketSummary)
+		if e != nil || len(b) > query.ContextResultBytes {
+			clear(b)
+			return nil, contracts.ErrNativeProtocol
+		}
+		return b, nil
+	}
 	if scope.NativeType == artifact.PprofArtifact {
 		if scope.Comparison != (query.ProfileComparisonWindow{}) {
 			reply := profileComparisonReply{BaselineVersion: scope.Comparison.Baseline.Version, IncidentVersion: scope.Version, Comparison: r.Comparison, IncompatibleProfiles: r.IncompatibleProfiles, TooLarge: r.TooLarge}
@@ -142,6 +150,12 @@ func decodeProjectionResult(b []byte, scope query.ContextProjectionScope) (query
 		if len(b) > query.ContextResultBytes || nativeDecode(b, &r.PodStatus) != nil {
 			return query.ProjectionResult{}, contracts.ErrNativeProtocol
 		}
+	case artifact.PCAPNGArtifact:
+		var summary query.PacketSummary
+		if nativeDecodeBounded(b, &summary, query.ContextResultBytes) != nil {
+			return query.ProjectionResult{}, contracts.ErrNativeProtocol
+		}
+		r.PacketSummary = &summary
 	case artifact.PprofArtifact:
 		if scope.Comparison != (query.ProfileComparisonWindow{}) {
 			var reply profileComparisonReply

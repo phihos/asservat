@@ -51,6 +51,7 @@ type ContextQueryInvocation interface {
 type ContextQueryInput struct {
 	Selection  value.ContextExcerptSelection
 	Headers    value.HTTPHeaderSelection
+	Packet     value.PacketSummaryRequest
 	Profile    value.ProfileSummaryRequest
 	Comparison value.ProfileComparisonRequest
 	Syscalls   value.SyscallQueryRequest

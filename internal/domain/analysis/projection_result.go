@@ -42,10 +42,11 @@ const (
 // ProjectionResult is the approved result of one read batch. Exactly the
 // scope's branch is populated; InvalidCursor discloses no record.
 type ProjectionResult struct {
-	PodStatus  PodStatusProjection
-	Headers    HTTPHeaderPage
-	Summary    *ProfileSummary    `json:",omitempty"`
-	Comparison *ProfileComparison `json:",omitempty"`
+	PodStatus     PodStatusProjection
+	Headers       HTTPHeaderPage
+	Summary       *ProfileSummary    `json:",omitempty"`
+	PacketSummary *PacketSummary     `json:",omitempty"`
+	Comparison    *ProfileComparison `json:",omitempty"`
 	// IncompatibleProfiles is a content-free semantic result after both
 	// authenticated source reads, not an unknown read/transport failure.
 	IncompatibleProfiles bool                `json:",omitempty"`
@@ -64,7 +65,7 @@ func (r ProjectionResult) Valid(s ContextProjectionScope) bool {
 		return false
 	}
 	if s.Comparison != (ProfileComparisonWindow{}) {
-		if r.PodStatus != (PodStatusProjection{}) || !r.Headers.empty() || r.Summary != nil || r.SyscallSummary != nil || r.SyscallEvents != nil || r.InvalidCursor {
+		if r.PodStatus != (PodStatusProjection{}) || !r.Headers.empty() || r.Summary != nil || r.PacketSummary != nil || r.SyscallSummary != nil || r.SyscallEvents != nil || r.InvalidCursor {
 			return false
 		}
 		if r.IncompatibleProfiles || r.TooLarge {
@@ -76,7 +77,7 @@ func (r ProjectionResult) Valid(s ContextProjectionScope) bool {
 		return false
 	}
 	if s.NativeType == artifact.SyscallRecordsArtifact || s.NativeType == artifact.SyscallArgumentsArtifact {
-		if r.PodStatus != (PodStatusProjection{}) || !r.Headers.empty() || r.Summary != nil {
+		if r.PodStatus != (PodStatusProjection{}) || !r.Headers.empty() || r.Summary != nil || r.PacketSummary != nil {
 			return false
 		}
 		if r.InvalidCursor || r.TooLarge {
@@ -87,6 +88,12 @@ func (r ProjectionResult) Valid(s ContextProjectionScope) bool {
 			return r.SyscallEvents == nil && r.SyscallSummary != nil && r.SyscallSummary.Valid(selection, s.Version)
 		}
 		return r.SyscallSummary == nil && r.SyscallEvents != nil && r.SyscallEvents.ValidShape(selection, s.Version, s.PodUID)
+	}
+	if s.NativeType == artifact.PCAPNGArtifact {
+		return r.PodStatus == (PodStatusProjection{}) && r.Headers.empty() && r.Summary == nil && r.SyscallSummary == nil && r.SyscallEvents == nil && !r.InvalidCursor && !r.TooLarge && r.PacketSummary != nil && r.PacketSummary.Valid()
+	}
+	if r.PacketSummary != nil {
+		return false
 	}
 	if r.SyscallSummary != nil || r.SyscallEvents != nil {
 		return false
@@ -122,6 +129,10 @@ func (r *ProjectionResult) Clear() {
 		*r.SyscallEvents = SyscallEventPage{}
 	}
 
+	if r.PacketSummary != nil {
+		clear(r.PacketSummary.Conversations)
+		*r.PacketSummary = PacketSummary{}
+	}
 	if r.Summary != nil {
 		clear(r.Summary.Top)
 		*r.Summary = ProfileSummary{}
@@ -138,6 +149,9 @@ func (p HTTPHeaderPage) empty() bool {
 
 // BeginTool is the public tool that admits a query of this scope.
 func (s ContextProjectionScope) BeginTool() string {
+	if s.NativeType == artifact.PCAPNGArtifact {
+		return "get_pcap_summary"
+	}
 	if s.NativeType == artifact.SyscallRecordsArtifact || s.NativeType == artifact.SyscallArgumentsArtifact {
 		switch s.Syscalls.View {
 		case SyscallSummaryView:
@@ -163,7 +177,7 @@ func (s ContextProjectionScope) BeginTool() string {
 // ReadBatches is the number of read batches a query of this scope may
 // start: one page read for an extract, the historical two for pod status.
 func (s ContextProjectionScope) ReadBatches() int64 {
-	if s.NativeType == artifact.HTTPHeadersArtifact || s.NativeType == artifact.PprofArtifact || s.NativeType == artifact.SyscallRecordsArtifact || s.NativeType == artifact.SyscallArgumentsArtifact {
+	if s.NativeType == artifact.PCAPNGArtifact || s.NativeType == artifact.HTTPHeadersArtifact || s.NativeType == artifact.PprofArtifact || s.NativeType == artifact.SyscallRecordsArtifact || s.NativeType == artifact.SyscallArgumentsArtifact {
 		return 1
 	}
 	return ContextMaxReadBatches

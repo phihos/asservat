@@ -38,6 +38,7 @@ type ContextProjectionService struct {
 	// HeaderRoutes, when composed, admits get_http_headers (ADR-282).
 	HeaderRoutes ContextProjectionRouteReader
 	// ProfileRoutes is opt-in; production composition remains disabled.
+	PacketRoutes     ContextProjectionRouteReader
 	ProfileRoutes    ContextProjectionRouteReader
 	SyscallRoutes    SyscallProjectionRouteReader
 	ComparisonRoutes ContextProjectionRouteReader
@@ -87,6 +88,7 @@ type ContextProjectionDelivery struct {
 	effect                                  ContextQueryEffect
 	excerpt                                 value.ContextExcerpt
 	page                                    value.HTTPHeaderPage
+	packetSummary                           *value.PacketSummary
 	summary                                 *value.ProfileSummary
 	comparison                              *value.ProfileComparison
 	syscallSummary                          *value.SyscallSummaryPage
@@ -531,6 +533,9 @@ func (s ContextProjectionService) begin(ctx context.Context, current identities.
 		if tool == "get_profile_summary" {
 			return nil, &profileSummaryPreAdmissionRefusal{cause: refusal}
 		}
+		if tool == "get_pcap_summary" {
+			return nil, &packetSummaryPreAdmissionRefusal{cause: refusal}
+		}
 		return nil, refusal
 	}
 	var q value.ContextQuery
@@ -759,6 +764,12 @@ func (s ContextProjectionResults) prepare(o *projectionRequest, effect ContextQu
 		} else {
 			d.syscallSummary, projection.SyscallSummary = projection.SyscallSummary, nil
 			d.syscallEvents, projection.SyscallEvents = projection.SyscallEvents, nil
+		}
+	case scope.NativeType == artifact.PCAPNGArtifact:
+		if !boundedPacketSummary(projection.PacketSummary) {
+			err = value.ErrUnavailable
+		} else {
+			d.packetSummary, projection.PacketSummary = projection.PacketSummary, nil
 		}
 	case scope.NativeType == artifact.PprofArtifact:
 		if !boundedProfileSummary(projection.Summary, scope.Profile) {

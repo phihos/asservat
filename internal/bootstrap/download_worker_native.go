@@ -15,6 +15,7 @@ import (
 	"asservat.local/asservat/internal/adapters/httpheaders"
 	"asservat.local/asservat/internal/adapters/mtls"
 	"asservat.local/asservat/internal/adapters/objectstore"
+	"asservat.local/asservat/internal/adapters/packets"
 	"asservat.local/asservat/internal/adapters/syscalls"
 	auditapp "asservat.local/asservat/internal/application/audit"
 	"asservat.local/asservat/internal/application/evidence"
@@ -241,6 +242,7 @@ func runWorkerNative(ctx context.Context, input WorkerStartup, trust *mtls.Worke
 		reader.ServeProfileSummaries(diagnostics.SummarizePprof)
 		reader.ServeProfileComparisons(diagnostics.ComparePprof)
 		reader.ServeSyscallProjections(syscalls.ProjectSyscalls)
+		reader.ServePacketSummaries(packets.SummarizePCAPNG)
 		result, err = evidence.NewRegionalApprovedResult(ctx, input.Target, reader, time.Now)
 	default:
 		return artifact.ErrInvalid

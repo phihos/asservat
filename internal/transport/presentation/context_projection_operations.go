@@ -31,6 +31,7 @@ type ContextProjectionOperations struct {
 	headers     HTTPHeaderQueryService
 	comparisons ProfileComparisonQueryService
 	profiles    ProfileSummaryQueryService
+	packets     PacketSummaryQueryService
 	syscalls    SyscallQueryService
 	contracts   *contracts.InvestigationContracts
 }
@@ -59,7 +60,7 @@ func (s *ContextProjectionOperations) WithHTTPHeaders(headers HTTPHeaderQuerySer
 
 // serves reports whether name is one of this composition's operations.
 func (s *ContextProjectionOperations) serves(name string) bool {
-	return s != nil && queryOperation(name) && (name != "get_http_headers" || s.headers != nil) && (name != "get_profile_summary" || s.profiles != nil) && (name != "compare_profiles" || s.comparisons != nil) && (!syscallQueryOperation(name) || s.syscalls != nil)
+	return s != nil && queryOperation(name) && (name != "get_http_headers" || s.headers != nil) && (name != "get_profile_summary" || s.profiles != nil) && (name != "get_pcap_summary" || s.packets != nil) && (name != "compare_profiles" || s.comparisons != nil) && (!syscallQueryOperation(name) || s.syscalls != nil)
 }
 
 // toolNames are the operations this composition advertises.
@@ -73,6 +74,9 @@ func (s *ContextProjectionOperations) toolNames() []string {
 	}
 	if s.profiles != nil {
 		names = append(names, "get_profile_summary")
+	}
+	if s.packets != nil {
+		names = append(names, "get_pcap_summary")
 	}
 	if s.syscalls != nil {
 		names = append(names, "get_syscall_summary", "get_syscall_events")
@@ -93,6 +97,12 @@ func (s *ContextProjectionOperations) CallWithContext(ctx context.Context, curre
 	}
 	var input analysisapp.ContextQueryInput
 	switch name {
+	case "get_pcap_summary":
+		var in PacketSummaryOperationInput
+		if json.Unmarshal(raw, &in) != nil {
+			return noDispatch, ErrOperationDelivery
+		}
+		input.Packet = value.PacketSummaryRequest{CaseID: in.CaseID, ArtifactID: in.ArtifactID}
 	case "get_syscall_summary", "get_syscall_events":
 		var in SyscallOperationInput
 		if json.Unmarshal(raw, &in) != nil {
@@ -173,6 +183,8 @@ func (s *ContextProjectionOperations) CallWithContext(ctx context.Context, curre
 	}
 	var d *analysisapp.ContextProjectionDelivery
 	switch name {
+	case "get_pcap_summary":
+		d, err = s.packets.Begin(ctx, current, i, input.Packet)
 	case "get_syscall_summary", "get_syscall_events":
 		d, err = s.syscalls.Begin(ctx, current, i, input.Syscalls)
 	case "compare_profiles":
@@ -204,6 +216,9 @@ func (s *ContextProjectionOperations) CallWithContext(ctx context.Context, curre
 		// ADR-282: the live worker caps are full; the query was not admitted
 		// or charged, and a later page request may succeed.
 		return s.refusal(record.ID, name, record.Until, httpHeaderNotAvailable, operationAuditDenied, operationEffectNone, false)
+	}
+	if d == nil && name == "get_pcap_summary" && analysisapp.PacketSummaryUnavailableBeforeAdmission(err) {
+		return s.refusal(record.ID, name, record.Until, packetSummaryNotAvailable, operationAuditUnspecified, operationEffectNone, true)
 	}
 	if d == nil && name == "get_profile_summary" && analysisapp.ProfileSummaryUnavailableBeforeAdmission(err) {
 		// C18 proved no query admission was attempted. Access, missing/unsupported
@@ -311,6 +326,23 @@ func (s *ContextProjectionOperations) serialize(requestID, name string, d *analy
 			envelope.Provenance = []any{}
 		}
 
+	case d.Tool() == "get_pcap_summary":
+		summary, ok := d.PacketSummary()
+		if !ok {
+			return nil, ErrOperationDelivery
+		}
+		artifactID, version := d.Provenance()
+		envelope.DataClass = "extract"
+		envelope.Warnings = []string{packetSummaryHandling}
+		envelope.Provenance = []any{httpHeaderProvenance{ArtifactID: artifactID, Digest: hash(version)}}
+		envelope.Data = struct {
+			value.PacketSummary
+			queryViewTimes
+		}{summary, times}
+		if name == "get_query_result" {
+			envelope.Data = queryResult(d.Association().QueryID, d.Tool(), envelope, times)
+			envelope.Provenance = []any{}
+		}
 	case d.Tool() == "get_profile_summary":
 		summary, ok := d.ProfileSummary()
 		if !ok {

@@ -1,51 +1,81 @@
 # Sustained implementation progress
 
-## Current named Go endpoint authorization candidate (2026-11-04)
+## Current saved packet summary candidate (2026-11-05)
 
-PR163 merged normally as `c6efeffcc3b0f76126f692c9a60c57779f7de419` after
-required pull-request CI41916032445 passed all 15 jobs. Fresh main readback has
-the complete reviewed `abf25590` tree. [Installed TLS41916430295](../test/results/profile-tls-native-41916430295/README.md)
-exited Go/harness0 after 639.766s: the original Restricted app produced an
-authenticated 1,095 B native CPU profile, local pprof and read-only summary passed,
-and after-start history/settings/fresh Repeat 5.903s completed. A separately
-approved wrong-server-name attempt failed before HTTP, with zero pprof GET delta
-through its original slot cutoff, no artifact/fallback/retry and retained
-admission/control charge. This does not claim physical slot refund. All 4,149
-submitted sources matched Git; unchanged-source and terminal cleanup checks passed.
+PR164 merged normally as `b06b59c78cc778c036b6969f5fe84802e3d6bf37`; fresh
+main has the identical complete tree as reviewed `2bb27caf`. Required pull-request
+CI41926030097 passed all15 jobs. [Installed auth41926293863](../test/results/profile-auth-native-41926293863/README.md)
+exited Go/harness0 after641.287s: actual installer/private input, one authenticated
+TLS CPU request from the original Restricted Pod, encrypted publication, native
+882B hash/local pprof, read-only summary, history and fresh Repeat4.021s passed.
+Wrong workload audience refused before admission; a separately approved wrong
+TLS peer produced zero HTTP requests and no artifact, with retained admission
+charge. All4,168 submitted source hashes matched Git, source stayed unchanged,
+cleanup was empty and scratch removed. This is one reference CPU workflow.
+The per-item credential-refusal correction is separately covered by the retained
+real mTLS component regression; no additional installed variant is claimed.
 
-The current private auth candidate preserves that merged source. Public endpoint
-policy pins exact workload-root audiences; the existing immutable regional input
-bundle supplies a private bounded header snapshot at startup. Final held-work
-poll delivery checks audience, original sequence/epoch/deadline and current
-cancellation, reserves a byte-bounded prefix within the existing 256 KiB poll cap,
-and sends the header only after verifying the existing TLS socket. No new
-Secret, RBAC, API read, service, Job, connection or public credential field is
-added. Rotation uses the existing protected reinstall/restart path.
+The next candidate implements `get_pcap_summary` for already published metadata
+PCAPNG: one authenticated bounded native read in the existing regional worker,
+ordinary current/retained rights, browser/MCP query parity and original native
+file parity. Raw packet analysis remains behind its existing sandbox/review
+requirements and is unfinished. [ADR303](decisions/303-saved-packet-summary.md)
+records fixed bounds and the distinction between saved records, reported
+exclusions and unknown network loss. No acquisition is implicit in a summary.
 
-Targeted component races, private-input/Helm checks and independent producer and
-consumer reviews passed. Initial pre-push failures (wire-layer behavior import
-and missing local console dependencies) were corrected without changing the
-architecture rule. Corrective contract races, architecture, vet, formatting and
-443 console checks passed; other pre-push targets passed before that two-file
-correction. [Local originals](../test/results/named-profile-auth-local/README.md)
-retain exact failures and source scopes. Genuine PR CI41923157902 passed all15
-jobs on published `46f3317b`; that is baseline evidence, not the later fix.
+The integrated source is frozen at `6eee3964` after independent producer/consumer
+review and focused races. [Local originals](../test/results/saved-packet-summary-local/README.md)
+retain actual failures and source scopes. Initial pre-push exited2 solely because
+an old selector test expected heap to be the final browser case; the corrected
+selector checks every retained/new case and passed. Other pre-push targets passed,
+including481 console tests. Integrated packet preflight and the full built-console
+browser gate passed (83.053s, five selected fixtures including the new driver;
+existing28 journeys/27 accessibility scans). These browser facts use synthetic
+local authority, not an installed cluster.
 
-Automated review then found that one failed private lookup aborted an entire
-poll, blocking unrelated work and cancellation. A real four-item mTLS regression
-reproduced zero delivered items. The corrected receive-only refusal keeps all
-original IDs/sequences, delivers unrelated work/Stop, and reuses one zero-byte
-`ProfileUnavailable` outcome without acquisition, frozen reservation or replay.
-Original request cancellation and a replaced node still abort the poll.
-[Regression and fix originals](../test/results/profile-auth-poll-isolation-local/README.md)
-retain the baseline CI and corrective evidence separately. Focused
-race checks and independent final review passed. Corrected-candidate vet,
-formatting, Go/design architecture, specification and design gates passed.
-Updated eligible CI and installed auth qualification remain pending. No installed auth VM has been dispatched. The actual installer
-fixture is ready for authenticated CPU/native/summary/history/Repeat, audience
-denial and the separately approved wrong TLS peer. Heap React remains qualified
-at c2d4 and accepted-heavy comparison at c6. Broader S-05 and the full specification
-remain open.
+Two separate pristine real-service fixtures passed: compiled packet lifecycle
+Go9.166s and upgrade137 Go7.339s. Each reported4,137 source hashes that matched
+Git, unchanged sources and empty cleanup. Runtime/key SQL roles and managed
+publication are real; Job/Pod/issuer/join inputs remain synthetic.
+
+Eligible pull-request CI41936804544 passed all15 jobs on published `928eae4d`.
+[Installed attempt41937101838](../test/results/saved-packet-summary-native-41937101838/README.md)
+failed (Go/harness1,636.411s): capture/publication and summary admission passed,
+the first result poll was Pending, then the second returned HTTP503. No replay
+was attempted; the React view, SQL joined proof and native PCAPNG comparison
+were not reached. All4,197 submitted hashes matched Git; sources were unchanged,
+cleanup was empty and scratch removed. Missing hub/worker reports prevent an
+exact native-stage attribution. A focused actual regional-receiver test then
+reproduced a separate concrete omission: metadata PCAPNG was rejected before
+delegating to the configured parser (zero reader calls). Adding that accepted
+source type to the existing gate passes the regression; source expectation,
+original deadline and one-use batch checks remain. The complete populated
+top100 public poll envelope also passes for both exclusion labels and unknown
+statistics. Failure-only manual-mixed diagnostics now reuse existing hub/SQL/Pod
+reports and add a bounded query Job status read. No happy-path reads, privileges,
+timeouts or retries are added. [Final local checks](../test/results/saved-packet-summary-receiver-local/README.md)
+pass integrated pre-push and packet preflight, including the actual receiver,
+outer encrypted/TLS key reader and fresh raw/wrong-Pod denial. Independent review
+found no blockers. Corrected `e280290e` passed all15 eligible CI41941071465 jobs.
+[Installed attempt41941094248](../test/results/saved-packet-summary-native-41941094248/README.md)
+then reached successful MCP summary, exact SQL/key/batch proof and actual React
+rendered values. It exited1/704.734s at the browser's later accounting assertion:
+the fixture expected one two-unit principal allocation although MCP and browser
+intentionally share that human's account. Native download/tshark parity was not
+reached. All4,200 source hashes matched Git; sources were unchanged, cleanup was
+empty and scratch removed. A focused real-SQL regression reproduced two clients,
+one account and four correctly allocated units; the old installed assertion
+failed against that state (10.404s). The test-only correction verifies the exact
+sum for that account/root. Its fresh real-service run passed11.264s, with six
+consumed key roles and both native/public batches joined. Both runs matched all
+4,140 source hashes against Git plus their three exact test overrides, retained
+unchanged sources and clean cleanup. Production quota semantics are unchanged;
+[Exact local originals](../test/results/saved-packet-summary-shared-account-local/README.md)
+retain both runs, affected race exit0 and final integrated pre-push exit0.
+Fresh final CI and complete installed qualification remain required.
+No complete installed packet-summary, maximum-shape/cgroup or raw-query
+qualification is claimed.
+Broader S-05 and the full specification remain open.
 
 ## Shared profile qualification history (2026-11-04)
 

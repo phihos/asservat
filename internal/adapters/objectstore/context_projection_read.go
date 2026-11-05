@@ -26,6 +26,7 @@ type ContextProjectionReader struct {
 	summarize evidence.ProfileSummarizer
 	syscalls  evidence.SyscallProjector
 	compare   evidence.ProfileComparer
+	packets   evidence.PacketSummarizer
 }
 
 func NewContextProjectionReader(store *CustodyStore) (*ContextProjectionReader, error) {
@@ -38,6 +39,9 @@ func NewContextProjectionReader(store *CustodyStore) (*ContextProjectionReader, 
 // ReadProjectionNative returns the scope's one result: the pod-status DTO, or
 // one rechecked httpHeaders page.
 func (r *ContextProjectionReader) ReadProjectionNative(ctx context.Context, source evidence.NativeContextSource, scope value.ContextProjectionScope, keys evidence.KeyOpener, until time.Time) (value.ProjectionResult, error) {
+	if r != nil && scope.NativeType == artifact.PCAPNGArtifact {
+		return r.readPacketSummary(ctx, source, scope, keys, until)
+	}
 	if r != nil && (scope.NativeType == artifact.SyscallRecordsArtifact || scope.NativeType == artifact.SyscallArgumentsArtifact) {
 		return r.readSyscallProjection(ctx, source, scope, keys, until)
 	}

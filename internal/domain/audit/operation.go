@@ -47,7 +47,7 @@ func OperationLane(name string) string {
 		return "processing"
 	case "resolve_capture_request":
 		return "resolution"
-	case "cancel_capture", "list_recordings", "preview_recording_save", "list_diagnostics", "preview_capture", "request_capture", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "download_artifact_content", "invalid_operation", "get_file_excerpt", "get_query_result", "activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share", "explain_access", "list_capture_history", "get_capture_settings", "preview_access_change", "transfer_share", "stop_future_sharing", "preview_retention_change", "get_grant", "list_reviews", "decide_review", "revoke_grant", "request_policy_grant", "request_raw_access", "list_capture_profiles", "get_capture_profile", "get_http_headers", "get_profile_summary", "compare_profiles", "get_syscall_summary", "get_syscall_events":
+	case "cancel_capture", "list_recordings", "preview_recording_save", "list_diagnostics", "preview_capture", "request_capture", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "download_artifact_content", "invalid_operation", "get_file_excerpt", "get_query_result", "activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share", "explain_access", "list_capture_history", "get_capture_settings", "preview_access_change", "transfer_share", "stop_future_sharing", "preview_retention_change", "get_grant", "list_reviews", "decide_review", "revoke_grant", "request_policy_grant", "request_raw_access", "list_capture_profiles", "get_capture_profile", "get_http_headers", "get_profile_summary", "get_pcap_summary", "compare_profiles", "get_syscall_summary", "get_syscall_events":
 		return "normal"
 	default:
 		return ""
@@ -63,7 +63,7 @@ func OperationRequestWindow(name string) time.Duration {
 		return identity.RecordingSaveRequestWindow
 	case "preview_capture":
 		return identity.CapturePreviewRequestWindow
-	case "get_file_excerpt", "get_http_headers", "get_profile_summary", "compare_profiles", "get_syscall_summary", "get_syscall_events", "get_query_result", "prepare_artifact_download", "get_artifact_download":
+	case "get_file_excerpt", "get_http_headers", "get_profile_summary", "get_pcap_summary", "compare_profiles", "get_syscall_summary", "get_syscall_events", "get_query_result", "prepare_artifact_download", "get_artifact_download":
 		return identity.EvidenceReadRequestWindow
 	default:
 		return 5 * time.Second
@@ -139,7 +139,7 @@ func (r OperationOutcome) Valid() bool {
 	if !r.credentialValid() || !r.captureOutcomeValid() {
 		return false
 	}
-	if r.Effect != "none" && !r.Intent.connectorOperation() && !r.Intent.processingOperation() && r.Intent.Name != "persist_capture_intent" && r.Intent.Name != "cancel_capture" && r.Intent.Name != "request_capture" && r.Intent.Name != "resolve_capture_request" && r.Intent.Name != "prepare_artifact_download" && r.Intent.Name != "get_file_excerpt" && r.Intent.Name != "get_http_headers" && r.Intent.Name != "get_profile_summary" && r.Intent.Name != "compare_profiles" && r.Intent.Name != "get_syscall_summary" && r.Intent.Name != "get_syscall_events" && r.Intent.Name != "get_query_result" && r.Intent.Name != "activate_policy" && r.Intent.Name != "deactivate_policy" && r.Intent.Name != "create_share" && r.Intent.Name != "revoke_share" && r.Intent.Name != "transfer_share" && r.Intent.Name != "stop_future_sharing" && r.Intent.Name != "decide_review" && r.Intent.Name != "revoke_grant" && r.Intent.Name != "request_policy_grant" && r.Intent.Name != "request_raw_access" {
+	if r.Effect != "none" && !r.Intent.connectorOperation() && !r.Intent.processingOperation() && r.Intent.Name != "persist_capture_intent" && r.Intent.Name != "cancel_capture" && r.Intent.Name != "request_capture" && r.Intent.Name != "resolve_capture_request" && r.Intent.Name != "prepare_artifact_download" && r.Intent.Name != "get_file_excerpt" && r.Intent.Name != "get_http_headers" && r.Intent.Name != "get_profile_summary" && r.Intent.Name != "get_pcap_summary" && r.Intent.Name != "compare_profiles" && r.Intent.Name != "get_syscall_summary" && r.Intent.Name != "get_syscall_events" && r.Intent.Name != "get_query_result" && r.Intent.Name != "activate_policy" && r.Intent.Name != "deactivate_policy" && r.Intent.Name != "create_share" && r.Intent.Name != "revoke_share" && r.Intent.Name != "transfer_share" && r.Intent.Name != "stop_future_sharing" && r.Intent.Name != "decide_review" && r.Intent.Name != "revoke_grant" && r.Intent.Name != "request_policy_grant" && r.Intent.Name != "request_raw_access" {
 		return false
 	}
 	if r.Status != "success" && (len(r.CaseIDs) > 0 || len(r.ArtifactIDs) > 0 || len(r.CaptureIDs) > 0) {

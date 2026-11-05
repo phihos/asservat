@@ -24,7 +24,7 @@ console-build:
 	cd web && npm run build
 
 console-browser-check: console-build
-	ASSERVAT_CONSOLE_BROWSER_TEST=1 TMPDIR="$(ASSERVAT_BUILD_TMP)" go test -count=1 -run '^TestConsole(Browser|NativeRestart|ProfileComparison|HeapProfile)WithBuiltPackage$$' -v ./test/integration
+	ASSERVAT_CONSOLE_BROWSER_TEST=1 TMPDIR="$(ASSERVAT_BUILD_TMP)" go test -count=1 -run '^TestConsole(Browser|NativeRestart|ProfileComparison|HeapProfile|PacketSummary)WithBuiltPackage$$' -v ./test/integration
 
 .PHONY: openapi-check
 openapi-check:
@@ -236,7 +236,7 @@ history-storage-integration:
 profile-preflight:
 	TMPDIR="$(ASSERVAT_BUILD_TMP)" go test -race -count=1 -timeout=30s test/fixtures/worker-resource-probe/main.go test/fixtures/worker-resource-probe/main_test.go
 	TMPDIR="$(ASSERVAT_BUILD_TMP)" go test -race -count=1 -timeout=3m -run '^(TestRecordingProfileUnavailable|TestCaseView|TestAcquisitionWindow|TestContextVerificationAcquisition|TestContextVerificationReturns|TestPolicyProfile|TestPolicyEndpoint|TestPolicyExecutor|TestGoProfileEndpoint|TestInstalledProfile|TestDownloadWorkerProfileAndPathTemplate|TestPublicProfile|TestComparison|TestProjectionComparison|TestNativeComparison|TestPublicSnapshotCancellation|TestSourceWork|TestConnectorProfile|TestProfile|TestPprof|TestReadProfile|TestSharedManifest|TestNativeTypeRegistry|TestNodeProfile|TestOneShotProfile|TestCurrentDownloadEnvironment)' ./internal/bootstrap ./internal/domain/catalog ./internal/domain/collector ./internal/domain/execution ./internal/domain/capture ./internal/domain/planning ./internal/domain/targets ./internal/domain/authorization ./internal/domain/privacy ./internal/domain/artifact ./internal/domain/audit ./internal/domain/analysis ./internal/application/catalog ./internal/application/planning ./internal/application/authorization ./internal/application/capture ./internal/application/analysis ./internal/application/evidence ./internal/adapters/kubernetes ./internal/transport/presentation ./internal/transport/browser ./internal/transport/mcp ./internal/adapters/diagnostics ./internal/adapters/objectstore ./internal/adapters/objectstore/manifest ./internal/adapters/jose ./internal/transport/contextstart ./internal/transport/native ./internal/adapters/postgres
-	TMPDIR="$(ASSERVAT_BUILD_TMP)" go test -race -count=1 -timeout=3m -run '^(TestPolicy(Profile|Recorder)AdmissionFixtureOfflineBindings|TestInstalled(PolicyProfile|ManualProfile|ProfileComparison|RecordingPassive|ApprovedRecordingFixtureShape))' ./test/integration
+	TMPDIR="$(ASSERVAT_BUILD_TMP)" go test -race -count=1 -timeout=3m -run '^(TestPolicy(Profile|Recorder)AdmissionFixtureOfflineBindings|TestInstalled(PolicyProfile|ManualProfile|ProfileComparison|PacketSummary|RecordingPassive|ApprovedRecordingFixtureShape))' ./test/integration
 
 # Finite argument composition, without loading a collector or external services.
 .PHONY: argument-preflight
@@ -251,3 +251,10 @@ profile-service-preflight:
 	# Each protected capacity-root fixture requires its own pristine database.
 	$(PYTHON) scripts/test-custody.py --fleet --run '^TestProfileComparisonQueryLedgerWithRealPostgres$$' --result-name profile-comparison-service-preflight
 	$(PYTHON) scripts/test-custody.py --fleet --run '^(TestCustodyProfileWriteOnlyWithRealServices|TestProfileSummaryQueryLedgerWithRealPostgres|TestCustodyUpgradeSchemaWithRealPostgres)$$' --result-name profile-service-preflight
+
+# Saved metadata packets: local parser, authority, wire and UI-admission checks.
+# No external services, collector, acquisition or installed qualification.
+.PHONY: packet-summary-preflight
+packet-summary-preflight:
+	TMPDIR="$(ASSERVAT_BUILD_TMP)" go test -race -count=1 -timeout=3m -run '^(TestPacketSummary|TestContextQueryAuditNamesFormatsAndEffects)' ./internal/domain/analysis ./internal/domain/audit ./internal/application/analysis ./internal/application/authorization ./internal/application/evidence ./internal/adapters/packets ./internal/adapters/objectstore ./internal/adapters/postgres ./internal/contracts ./internal/transport/native ./internal/transport/presentation ./internal/bootstrap
+	TMPDIR="$(ASSERVAT_BUILD_TMP)" go test -race -count=1 -timeout=3m -run '^TestInstalledPacketSummary' ./test/integration

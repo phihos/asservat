@@ -23,6 +23,7 @@ type NativeContextReader struct {
 	summarize evidence.ProfileSummarizer
 	syscalls  evidence.SyscallProjector
 	compare   evidence.ProfileComparer
+	packets   evidence.PacketSummarizer
 }
 
 var _ evidence.NativeContextRead = (*NativeContextReader)(nil)

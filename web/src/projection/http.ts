@@ -1,11 +1,12 @@
 import type { components } from '../generated/projection';
 import * as validators from '../generated/validate-projection';
 
-export type Operation = 'get_file_excerpt' | 'get_profile_summary' | 'compare_profiles' | 'get_syscall_summary' | 'get_syscall_events' | 'get_query_result';
+export type Operation = 'get_file_excerpt' | 'get_pcap_summary' | 'get_profile_summary' | 'compare_profiles' | 'get_syscall_summary' | 'get_syscall_events' | 'get_query_result';
 export type Input<N extends Operation> = components['schemas'][`McpInput_${N}`];
 export type Output<N extends Operation> = components['schemas'][`McpOutput_${N}`];
 export type Excerpt = Extract<Output<'get_file_excerpt'>, { status: 'ok' }>['data'];
 export type Comparison = Extract<Output<'compare_profiles'>, { status: 'ok' }>['data'];
+export type PacketSummary = Extract<Output<'get_pcap_summary'>, { status: 'ok' }>['data'];
 export type Summary = Extract<Output<'get_profile_summary'>, { status: 'ok' }>['data'];
 export type SyscallSummary = Extract<Output<'get_syscall_summary'>, { status: 'ok' }>['data'];
 export type SyscallEvents = Extract<Output<'get_syscall_events'>, { status: 'ok' }>['data'];

@@ -91,6 +91,7 @@ func (p ContextQueryPlan) Matches(s ContextProjectionScope) bool {
 		p.WorkloadUID == s.WorkloadUID && p.Principal == s.Principal &&
 		p.AllocationRevision > 0 && p.AllocationRevision <= 1<<60 && p.PoolSource.Valid() && p.PolicySource.Valid() &&
 		p.Profile.Valid() && p.Profile.Path.TargetClusterID == s.ClusterID &&
+		(s.NativeType != artifact.PCAPNGArtifact || p.Profile.Worker.MemoryBytes >= PacketSummaryWorkerBytes && p.Profile.Worker.WorkerTransientBytes >= PacketSummaryWorkerBytes) &&
 		(s.NativeType != artifact.PprofArtifact || p.Profile.Worker.MemoryBytes >= ProfileSummaryWorkerBytes && p.Profile.Worker.WorkerTransientBytes >= ProfileSummaryWorkerBytes) &&
 		(s.NativeType != artifact.SyscallRecordsArtifact && s.NativeType != artifact.SyscallArgumentsArtifact || p.Profile.Worker.MemoryBytes >= SyscallProjectionWorkerBytes && p.Profile.Worker.WorkerTransientBytes >= SyscallProjectionWorkerBytes) &&
 		!p.ObservedAt.IsZero() && p.ValidUntil.After(p.ObservedAt) && !p.ValidUntil.After(p.ObservedAt.Add(5*time.Second)) &&
@@ -245,7 +246,7 @@ type ContextQueryCall struct {
 func (r ContextQueryCall) Valid(now time.Time) bool {
 	return authorization.UUID(r.ID) && authorization.UUID(r.RootID) && r.InputFormat == "context-query-input/v1" &&
 		identity.Text(r.MACVersion, 64) && r.InputDigest != (artifact.Digest{}) && r.PrincipalDigest != (artifact.Digest{}) &&
-		(r.Tool == "get_file_excerpt" || r.Tool == "get_http_headers" || r.Tool == "get_profile_summary" || r.Tool == "compare_profiles" || r.Tool == "get_syscall_summary" || r.Tool == "get_syscall_events" || r.Tool == "get_query_result") && r.Principal.Valid() &&
+		(r.Tool == "get_pcap_summary" || r.Tool == "get_file_excerpt" || r.Tool == "get_http_headers" || r.Tool == "get_profile_summary" || r.Tool == "compare_profiles" || r.Tool == "get_syscall_summary" || r.Tool == "get_syscall_events" || r.Tool == "get_query_result") && r.Principal.Valid() &&
 		identity.Fresh(r.StartedAt, r.Until, now, identity.EvidenceReadRequestWindow) && !r.WriteUntil.Before(r.Until) &&
 		!r.WriteUntil.After(r.StartedAt.Add(30*time.Second))
 }

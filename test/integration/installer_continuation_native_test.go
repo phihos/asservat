@@ -528,8 +528,11 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 			c, end := context.WithTimeout(ctx, 20*time.Second)
 			defer end()
 			installedPodDiagnostics(t, c, api, contracts.DownloadWorkerNamespaceName(installation), "download-worker", "")
+			if installedJourneyFocus() == "manual-mixed" {
+				installedPacketSummaryJobDiagnostics(c, api, contracts.DownloadWorkerNamespaceName(installation), t.Logf)
+			}
 		}
-		if installedJourneyFocus() == "manual-profile" && (installedHeapProfileVariant() || installedRuntimeTraceVariant()) {
+		if installedJourneyFocus() == "manual-mixed" || installedJourneyFocus() == "manual-profile" && (installedHeapProfileVariant() || installedRuntimeTraceVariant()) {
 			defer func() {
 				if t.Failed() {
 					diagnose()
@@ -609,7 +612,11 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 							profileChecks[0].NoQueries = installedRuntimeTraceNoQueries(t, ctx, admin, p.RootID)
 						}
 					}
-					qualifyInstalledApprovedRecording(t, ctx, identity, publicRoot, publicAddress, origin, cluster, namespace, workload, f.Clusters[1].Config, diagnose, measurement, func(captureID string) { installedHistoryStorageDiagnostics(t, ctx, admin, p.RootID, captureID) }, func(previewID string) { installedInitialStorageDiagnostics(t, ctx, admin, p.RootID, previewID) }, installedProjectionSQLCheck(t, ctx, admin, api, p.RootID), installedArgumentsSQLSource(t, ctx, admin, p.RootID), installedStoppedDownloadSQLCheck(t, ctx, admin, kc, p.RootID, original.Plan.ClusterID), profileChecks...)
+					summaryCheck := installedProjectionSQLCheck(t, ctx, admin, api, p.RootID)
+					if installedJourneyFocus() == "manual-mixed" {
+						summaryCheck = installedPacketSummarySQLCheck(t, ctx, admin, api, p.RootID)
+					}
+					qualifyInstalledApprovedRecording(t, ctx, identity, publicRoot, publicAddress, origin, cluster, namespace, workload, f.Clusters[1].Config, diagnose, measurement, func(captureID string) { installedHistoryStorageDiagnostics(t, ctx, admin, p.RootID, captureID) }, func(previewID string) { installedInitialStorageDiagnostics(t, ctx, admin, p.RootID, previewID) }, summaryCheck, installedArgumentsSQLSource(t, ctx, admin, p.RootID), installedStoppedDownloadSQLCheck(t, ctx, admin, kc, p.RootID, original.Plan.ClusterID), profileChecks...)
 				}
 			})
 			return
