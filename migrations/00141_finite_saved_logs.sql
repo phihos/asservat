@@ -147,7 +147,8 @@ BEGIN
  IF g.kind='adHocCapture' THEN
   RETURN COALESCE((g.capture_id=c.capture_id OR EXISTS(
    SELECT 1 FROM public.context_capture member
-   JOIN public.context_case_locator l ON l.root_id=member.root_id AND l.capture_id=member.id AND l.artifact_id=c.artifact_id AND l.version=c.artifact_digest
+   JOIN public.context_case_locator l ON l.root_id=member.root_id AND l.capture_id=member.id AND l.artifact_id=c.artifact_id
+   JOIN public.context_verification verified ON verified.root_id=member.root_id AND verified.capture_id=member.id AND verified.copies_digest=c.artifact_digest AND verified.audit_acknowledged_at IS NOT NULL
    JOIN public.recording_save_group rg ON rg.root_id=member.root_id AND rg.id=member.group_id
    WHERE member.root_id=r AND member.id=c.capture_id AND rg.id=g.capture_id AND rg.scope_digest=g.execution_digest AND
    convert_from(member.expectation_json,'UTF8')::jsonb->>'ActionID'=c.action_id AND rg.group_kind='composition' AND member.group_ordinal>=0 AND cardinality(rg.child_ids) BETWEEN 2 AND 16 AND rg.child_ids[member.group_ordinal+1]=member.id AND
@@ -619,7 +620,8 @@ BEGIN
  IF parent.kind='adHocCapture' THEN
   IF NEW.capture_id IS DISTINCT FROM parent.capture_id AND NOT EXISTS(
    SELECT 1 FROM public.context_capture c
-   JOIN public.context_case_locator l ON l.root_id=c.root_id AND l.capture_id=c.id AND l.artifact_id=NEW.artifact_id AND l.version=NEW.artifact_digest
+   JOIN public.context_case_locator l ON l.root_id=c.root_id AND l.capture_id=c.id AND l.artifact_id=NEW.artifact_id
+   JOIN public.context_verification verified ON verified.root_id=c.root_id AND verified.capture_id=c.id AND verified.copies_digest=NEW.artifact_digest AND verified.audit_acknowledged_at IS NOT NULL
    JOIN public.recording_save_group rg ON rg.root_id=c.root_id AND rg.id=c.group_id
    WHERE c.root_id=NEW.root_id AND c.id=NEW.capture_id AND rg.id=parent.capture_id AND rg.scope_digest=parent.execution_digest
    AND convert_from(c.expectation_json,'UTF8')::jsonb->>'ActionID'=NEW.action_id AND rg.group_kind='composition' AND c.group_ordinal>=0 AND cardinality(rg.child_ids) BETWEEN 2 AND 16 AND rg.child_ids[c.group_ordinal+1]=c.id AND

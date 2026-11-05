@@ -1,10 +1,5 @@
 {
   "format": "finite-logs-services/v1",
-  "commit": "4d5d450f738708635f9738e3b9f772d80768e179",
-  "verdict": "FAIL",
-  "testExit": 1,
-  "sourceHashesVerifiedAgainstGit": 4299,
-  "cleanupFailures": [],
   "files": [
     {
       "source": "test/results/finite-logs-lifecycle-4d5d450f-environment.json",
@@ -37,6 +32,54 @@
       "sha256": "05a097ce7c56d6bbd37e324ef3bb965bff4bf35cd6ac9ae5b5c125883b5e1d96",
       "compressedBytes": 305,
       "compressedSHA256": "508957215f4308753e8d2cbb684225005f280b0128a92387628b2a0164107458"
+    },
+    {
+      "source": "test/results/finite-logs-lifecycle-8aaa4162-environment.json",
+      "archive": "finite-logs-lifecycle-8aaa4162-environment.json.gz",
+      "bytes": 548469,
+      "sha256": "ff6155b82f39ce098c96c8c0608f8d66fee666070247eca5f8ecdaecdcb51c9f",
+      "compressedBytes": 205949,
+      "compressedSHA256": "41c9b4aca8874ab680b3104c98a372b19ea74834e8020dbf5d7fa67d27a82070"
+    },
+    {
+      "source": "test/results/finite-logs-lifecycle-8aaa4162-postgres.log",
+      "archive": "finite-logs-lifecycle-8aaa4162-postgres.log.gz",
+      "bytes": 13328,
+      "sha256": "5557d26bb7e4b69f2ecbbe61aced49adadbdb6c1a965246589b04a392d810cd8",
+      "compressedBytes": 2690,
+      "compressedSHA256": "3e07a191ec32186bd3fdb8ffed452dfc8acbb265ca192a0a2303dc7154d5c947"
+    },
+    {
+      "source": "test/results/finite-logs-lifecycle-8aaa4162.log",
+      "archive": "finite-logs-lifecycle-8aaa4162.log.gz",
+      "bytes": 804,
+      "sha256": "65b0e39accd1e7c20bfd5877485009d4759bc963261a3aaf381f7a5cba79338f",
+      "compressedBytes": 384,
+      "compressedSHA256": "9804794c6cd2fc2aac4e77f78de59d2c7dade4baf2e19fad2aa679b0a06be0ad"
+    },
+    {
+      "source": "/home/phil/.cache/asservat-build/finite-logs-db/scalar-8aaa4162-root-source-audit.json",
+      "archive": "scalar-8aaa4162-root-source-audit.json.gz",
+      "bytes": 443,
+      "sha256": "c350a7aa17491f966bf35db5cddb23a7b75a25812ad4775f8f84cf2970435b3e",
+      "compressedBytes": 305,
+      "compressedSHA256": "d08f1b3461597df33ab281b20fb9d2d3c7e2fe31359e258f571649afb30633f6"
+    }
+  ],
+  "campaigns": [
+    {
+      "commit": "4d5d450f738708635f9738e3b9f772d80768e179",
+      "verdict": "FAIL",
+      "testExit": 1,
+      "sourceHashesVerifiedAgainstGit": 4299,
+      "cleanupFailures": []
+    },
+    {
+      "commit": "8aaa416222b4f93fde9bb1c406da7d0799832469",
+      "verdict": "FAIL",
+      "testExit": 1,
+      "sourceHashesVerifiedAgainstGit": 4300,
+      "cleanupFailures": []
     }
   ]
 }

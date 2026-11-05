@@ -1,7 +1,7 @@
 {
   "format": "finite-saved-logs-local/v1",
   "scope": "Local component and bounded synthetic resource evidence. Individual failed/setup/skipped results remain original; no installed workflow qualification. Local500m CPU enforcement is unqualified.",
-  "base_commit": "4d5d450f738708635f9738e3b9f772d80768e179",
+  "base_commit": "8aaa416222b4f93fde9bb1c406da7d0799832469",
   "files": [
     {
       "source": "finite-logs-acquiring-check-focused.log",
@@ -612,6 +612,14 @@
       "compressedSHA256": "c89a38038ca940e9ad1f084170ad30bd56f6282fa66b1d7b5916261e7f71c45a"
     },
     {
+      "source": "finite-logs-db/scalar-8aaa4162-campaign.log",
+      "archive": "finite-logs-db__scalar-8aaa4162-campaign.log.gz",
+      "bytes": 51,
+      "sha256": "9f7d475b487ea9a6d7a904b0292301619fb3f6af5d260b47ff6df00ccd53796e",
+      "compressedBytes": 71,
+      "compressedSHA256": "c0fc657029e1911ec797c1da675b362c849a9222b69cde46310dca5181c006f0"
+    },
+    {
       "source": "finite-logs-db/source-acquisition-independent-review.json",
       "archive": "finite-logs-db__source-acquisition-independent-review.json.gz",
       "bytes": 4969,
@@ -634,6 +642,38 @@
       "sha256": "4cda629e08795732f15da2df2b7fc1da6a56fd5abb5ebe2cfe2a31d776cc0822",
       "compressedBytes": 206,
       "compressedSHA256": "e25563aa173074fb49b32586e81ba05d44b80b9d372d75b0d2b8837a0b7be6c1"
+    },
+    {
+      "source": "finite-logs-db/verified-version-fix-handoff.json",
+      "archive": "finite-logs-db__verified-version-fix-handoff.json.gz",
+      "bytes": 3241,
+      "sha256": "9c9e373fdf5ab2fda85cc62dba485b5b0362a7e2707816cd8c3b2b68199d66b5",
+      "compressedBytes": 1637,
+      "compressedSHA256": "160e6be1a9a6e7dc6927ceb1c842a139b0c3fb327e84eb0b2b258ff2d204b709"
+    },
+    {
+      "source": "finite-logs-db/verified-version-focused-race.log",
+      "archive": "finite-logs-db__verified-version-focused-race.log.gz",
+      "bytes": 200,
+      "sha256": "70910ecd5304ac1aaa9bac775462f63c6fabee48732ea404892a8908d66d2fba",
+      "compressedBytes": 115,
+      "compressedSHA256": "d8d53e2d63d535e232dcf3c590a1f16fec9298dab0a4f395fac8dd4dd978e0c2"
+    },
+    {
+      "source": "finite-logs-db/verified-version-generation-check.log",
+      "archive": "finite-logs-db__verified-version-generation-check.log.gz",
+      "bytes": 47,
+      "sha256": "7427d91d5aded986d34d29fe2f004687edc2bf0f07506ea69d5a7971b9a844a6",
+      "compressedBytes": 67,
+      "compressedSHA256": "f5f3066365693b581901f94ec82a98d89709bd61f5480e7d63482d13a0f67ee4"
+    },
+    {
+      "source": "finite-logs-db/verified-version-sqlc.log",
+      "archive": "finite-logs-db__verified-version-sqlc.log.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "compressedBytes": 20,
+      "compressedSHA256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
     },
     {
       "source": "finite-logs-domain-boundary-green.log",
@@ -1620,6 +1660,22 @@
       "compressedSHA256": "d3f6ac2871cc5216fda69e9fd1c00809a751009ac0a1ee12d5f18863c600480e"
     },
     {
+      "source": "finite-logs-stream-fix-commit.log",
+      "archive": "finite-logs-stream-fix-commit.log.gz",
+      "bytes": 1952,
+      "sha256": "efeb151cb5437b7d620eb1dfe37525807c26a939c0667a788a0cfc317d0267c7",
+      "compressedBytes": 444,
+      "compressedSHA256": "07cee5b7ad9ef489d9c701a02263cfc2c381fcd8c99632dbf8ab162ae3a1b266"
+    },
+    {
+      "source": "finite-logs-stream-fix-docs.log",
+      "archive": "finite-logs-stream-fix-docs.log.gz",
+      "bytes": 605,
+      "sha256": "83f445ae7fdd6addd654fea04045c48ece4e8d4850c2bc3700769009effc893b",
+      "compressedBytes": 395,
+      "compressedSHA256": "4e73681debc3ee75ce0609627361851c6ffb7e70377932173ffb89c8d4d8484d"
+    },
+    {
       "source": "finite-logs-stream-fix-pre-push.log",
       "archive": "finite-logs-stream-fix-pre-push.log.gz",
       "bytes": 11469,
@@ -1794,6 +1850,14 @@
       "sha256": "313ef115a20fa41aa463b1b1004094bb8b4ae129321ed1b609c6e21bc74bca49",
       "compressedBytes": 447,
       "compressedSHA256": "0339500927fbcbfa7564bc9a33ad9334a2aba20d7f05db3983e85bfa7f9ecca0"
+    },
+    {
+      "source": "finite-logs-verified-version-pre-push.log",
+      "archive": "finite-logs-verified-version-pre-push.log.gz",
+      "bytes": 11469,
+      "sha256": "d35eb7919d43f6d2fad857ceb008035978455fd39f03a83960875f9a882c3d16",
+      "compressedBytes": 2590,
+      "compressedSHA256": "16db9b7ed8b0a2f41ad37bee84538cc5b595bbc6d3384992769e4274577cd2d3"
     },
     {
       "source": "finite-logs-web-generate.log",

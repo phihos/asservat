@@ -55,6 +55,14 @@ backing; focused races pass. The installed two-query FIFO helper's closed-count
 regression also passes after adding logs2 alongside existing4/7 counts, retaining
 two active workers. These local corrections do not replace a service rerun.
 
+The corrected `8aaa4162` scalar campaign advances through admission, original
+writer binding, encrypted multipart storage and publication, then fails read
+authority because new SQL incorrectly references a version column on the
+routing-only locator. Actual Go exit1/7.904s, unchanged4,300 Git inputs and
+cleanup[] are preserved. The correction joins the acknowledged verification
+digest in child-reader, group and key-current checks without new privileges.
+Targeted races and pinned generation pass; fresh service qualification remains.
+
 Composition is still being implemented. No real-service logs lifecycle,
 maximum-shape installed worker result, built React logs journey or installed
 logs/native/history/Repeat qualification is claimed. Full S-05 and the complete

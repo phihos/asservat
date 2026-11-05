@@ -15,3 +15,12 @@ Original reports are deterministic gzip files with exact compressed/original
 byte counts and SHA256 in archive-manifest.json. The SQL/S3/OpenBao providers
 are real; bootstrap/current authority, source bytes, worker/process/issuer and
 transport joins remain synthetic where declared by the fixture.
+
+The corrected scalar run on signed `8aaa4162` advances through admission,
+start, actual process-bound multipart writing and encrypted publication, then
+fails C-03 read-only authority. Go exits1 in7.904s, harness1, provider0,
+sourceUnchangedDuringTest=true and cleanup[]. All4,300 inputs independently
+match Git. The concrete PostgreSQL42703 refers to nonexistent `l.version` on
+the routing-only context_case_locator. Current reader/group/key-helper SQL must
+join the acknowledged context_verification.copies_digest instead. These results
+do not establish a successful query or later correction.

@@ -53,7 +53,7 @@ SELECT * FROM access_grant WHERE root_id=sqlc.arg(root_id)::uuid AND requester_i
 ORDER BY requested_at DESC, id LIMIT @row_limit;
 
 -- name: ReadGrantChild :one
-SELECT sqlc.embed(child),c.scope_digest AS source_scope_digest,(CASE WHEN rg.group_kind='composition' AND c.group_ordinal>=0 AND cardinality(rg.child_ids) BETWEEN 2 AND 16 AND rg.child_ids[c.group_ordinal+1]=c.id AND
+SELECT sqlc.embed(child),c.scope_digest AS source_scope_digest,(CASE WHEN v.capture_id IS NOT NULL AND rg.group_kind='composition' AND c.group_ordinal>=0 AND cardinality(rg.child_ids) BETWEEN 2 AND 16 AND rg.child_ids[c.group_ordinal+1]=c.id AND
  c.created_at=rg.accepted_at AND c.deadline<=rg.deadline AND sha256(c.scope_json)=c.scope_digest AND sha256(rg.scope_json)=rg.scope_digest AND
  convert_from(rg.scope_json,'UTF8')::jsonb->>'schemaVersion'='recorder-group/v1' AND
  convert_from(rg.scope_json,'UTF8')::jsonb->'children'->c.group_ordinal->>'captureID'=c.id::text AND
@@ -66,16 +66,17 @@ SELECT sqlc.embed(child),c.scope_digest AS source_scope_digest,(CASE WHEN rg.gro
  'ActionID',convert_from(c.expectation_json,'UTF8')::jsonb->>'ActionID',
  'ParentExecutionDigest',to_jsonb(ARRAY(SELECT get_byte(rg.scope_digest,byte_index) FROM generate_series(0,31) AS bytes(byte_index))),
  'ExecutionDigest',to_jsonb(ARRAY(SELECT get_byte(c.scope_digest,byte_index) FROM generate_series(0,31) AS bytes(byte_index))),
- 'ArtifactDigest',to_jsonb(ARRAY(SELECT get_byte(l.version,byte_index) FROM generate_series(0,31) AS bytes(byte_index))),
+ 'ArtifactDigest',to_jsonb(ARRAY(SELECT get_byte(v.copies_digest,byte_index) FROM generate_series(0,31) AS bytes(byte_index))),
  'ChildIndex',c.group_ordinal,'ChildCount',cardinality(rg.child_ids)) END)::jsonb AS group_association
 FROM access_grant_child child
 LEFT JOIN context_capture c ON c.root_id=child.root_id AND c.id=child.capture_id
-LEFT JOIN context_case_locator l ON l.root_id=c.root_id AND l.capture_id=c.id AND l.artifact_id=child.artifact_id AND l.version=child.artifact_digest
+LEFT JOIN context_case_locator l ON l.root_id=c.root_id AND l.capture_id=c.id AND l.artifact_id=child.artifact_id
+LEFT JOIN context_verification v ON v.root_id=c.root_id AND v.capture_id=c.id AND v.copies_digest=child.artifact_digest AND v.audit_acknowledged_at IS NOT NULL
 LEFT JOIN recording_save_group rg ON rg.root_id=c.root_id AND rg.id=c.group_id
 WHERE child.parent_id=$1 AND child.artifact_id=$2 AND child.client_id=$3;
 
 -- name: ReadGrantChildByID :one
-SELECT sqlc.embed(child),c.scope_digest AS source_scope_digest,(CASE WHEN rg.group_kind='composition' AND c.group_ordinal>=0 AND cardinality(rg.child_ids) BETWEEN 2 AND 16 AND rg.child_ids[c.group_ordinal+1]=c.id AND
+SELECT sqlc.embed(child),c.scope_digest AS source_scope_digest,(CASE WHEN v.capture_id IS NOT NULL AND rg.group_kind='composition' AND c.group_ordinal>=0 AND cardinality(rg.child_ids) BETWEEN 2 AND 16 AND rg.child_ids[c.group_ordinal+1]=c.id AND
  c.created_at=rg.accepted_at AND c.deadline<=rg.deadline AND sha256(c.scope_json)=c.scope_digest AND sha256(rg.scope_json)=rg.scope_digest AND
  convert_from(rg.scope_json,'UTF8')::jsonb->>'schemaVersion'='recorder-group/v1' AND
  convert_from(rg.scope_json,'UTF8')::jsonb->'children'->c.group_ordinal->>'captureID'=c.id::text AND
@@ -88,11 +89,12 @@ SELECT sqlc.embed(child),c.scope_digest AS source_scope_digest,(CASE WHEN rg.gro
  'ActionID',convert_from(c.expectation_json,'UTF8')::jsonb->>'ActionID',
  'ParentExecutionDigest',to_jsonb(ARRAY(SELECT get_byte(rg.scope_digest,byte_index) FROM generate_series(0,31) AS bytes(byte_index))),
  'ExecutionDigest',to_jsonb(ARRAY(SELECT get_byte(c.scope_digest,byte_index) FROM generate_series(0,31) AS bytes(byte_index))),
- 'ArtifactDigest',to_jsonb(ARRAY(SELECT get_byte(l.version,byte_index) FROM generate_series(0,31) AS bytes(byte_index))),
+ 'ArtifactDigest',to_jsonb(ARRAY(SELECT get_byte(v.copies_digest,byte_index) FROM generate_series(0,31) AS bytes(byte_index))),
  'ChildIndex',c.group_ordinal,'ChildCount',cardinality(rg.child_ids)) END)::jsonb AS group_association
 FROM access_grant_child child
 LEFT JOIN context_capture c ON c.root_id=child.root_id AND c.id=child.capture_id
-LEFT JOIN context_case_locator l ON l.root_id=c.root_id AND l.capture_id=c.id AND l.artifact_id=child.artifact_id AND l.version=child.artifact_digest
+LEFT JOIN context_case_locator l ON l.root_id=c.root_id AND l.capture_id=c.id AND l.artifact_id=child.artifact_id
+LEFT JOIN context_verification v ON v.root_id=c.root_id AND v.capture_id=c.id AND v.copies_digest=child.artifact_digest AND v.audit_acknowledged_at IS NOT NULL
 LEFT JOIN recording_save_group rg ON rg.root_id=c.root_id AND rg.id=c.group_id
 WHERE child.root_id=$1 AND child.id=$2;
 
@@ -164,7 +166,7 @@ WHERE g.root_id=sqlc.arg(root_id)::uuid AND g.id=sqlc.arg(parent_id)::uuid AND g
 -- Immutable accepted association only; current caller/recovery/grant/retention
 -- checks remain mandatory before effects. No log bytes or grant JSON returned.
 SELECT c.id AS capture_id,(convert_from(c.expectation_json,'UTF8')::jsonb->>'ActionID')::text AS action_id,
- c.scope_digest AS execution_digest,(CASE WHEN rg.group_kind='composition' AND c.group_ordinal>=0 AND cardinality(rg.child_ids) BETWEEN 2 AND 16 AND rg.child_ids[c.group_ordinal+1]=c.id AND
+ c.scope_digest AS execution_digest,(CASE WHEN v.capture_id IS NOT NULL AND rg.group_kind='composition' AND c.group_ordinal>=0 AND cardinality(rg.child_ids) BETWEEN 2 AND 16 AND rg.child_ids[c.group_ordinal+1]=c.id AND
  c.created_at=rg.accepted_at AND c.deadline<=rg.deadline AND sha256(c.scope_json)=c.scope_digest AND sha256(rg.scope_json)=rg.scope_digest AND
  convert_from(rg.scope_json,'UTF8')::jsonb->>'schemaVersion'='recorder-group/v1' AND
  convert_from(rg.scope_json,'UTF8')::jsonb->'children'->c.group_ordinal->>'captureID'=c.id::text AND
@@ -177,13 +179,14 @@ SELECT c.id AS capture_id,(convert_from(c.expectation_json,'UTF8')::jsonb->>'Act
  'ActionID',convert_from(c.expectation_json,'UTF8')::jsonb->>'ActionID',
  'ParentExecutionDigest',to_jsonb(ARRAY(SELECT get_byte(rg.scope_digest,byte_index) FROM generate_series(0,31) AS bytes(byte_index))),
  'ExecutionDigest',to_jsonb(ARRAY(SELECT get_byte(c.scope_digest,byte_index) FROM generate_series(0,31) AS bytes(byte_index))),
- 'ArtifactDigest',to_jsonb(ARRAY(SELECT get_byte(l.version,byte_index) FROM generate_series(0,31) AS bytes(byte_index))),
+ 'ArtifactDigest',to_jsonb(ARRAY(SELECT get_byte(v.copies_digest,byte_index) FROM generate_series(0,31) AS bytes(byte_index))),
  'ChildIndex',c.group_ordinal,'ChildCount',cardinality(rg.child_ids)) END)::jsonb AS group_association
 FROM context_case_locator l
 JOIN context_capture c ON c.root_id=l.root_id AND c.id=l.capture_id
+JOIN context_verification v ON v.root_id=c.root_id AND v.capture_id=c.id AND v.audit_acknowledged_at IS NOT NULL
 JOIN recording_save_group rg ON rg.root_id=c.root_id AND rg.id=c.group_id
 JOIN access_grant parent ON parent.root_id=c.root_id AND parent.capture_id=rg.id AND parent.id=sqlc.arg(parent_id)::uuid
-WHERE l.root_id=sqlc.arg(root_id)::uuid AND l.artifact_id=sqlc.arg(artifact_id)::uuid AND l.capture_id=sqlc.arg(capture_id)::uuid AND l.version=sqlc.arg(version)::bytea
+WHERE l.root_id=sqlc.arg(root_id)::uuid AND l.artifact_id=sqlc.arg(artifact_id)::uuid AND l.capture_id=sqlc.arg(capture_id)::uuid AND v.copies_digest=sqlc.arg(version)::bytea
  AND l.cluster_id=sqlc.arg(cluster_id)::uuid AND l.namespace_uid=sqlc.arg(namespace_uid)::text AND l.workload_uid=sqlc.arg(workload_uid)::text AND l.pod_uid=sqlc.arg(pod_uid)::text
  AND (sqlc.arg(action_id)::text='' OR convert_from(c.expectation_json,'UTF8')::jsonb->>'ActionID'=sqlc.arg(action_id)::text)
  AND parent.kind='adHocCapture' AND rg.group_kind='composition' AND c.group_ordinal>=0 AND cardinality(rg.child_ids) BETWEEN 2 AND 16 AND rg.child_ids[c.group_ordinal+1]=c.id AND
