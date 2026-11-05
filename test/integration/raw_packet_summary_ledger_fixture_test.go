@@ -123,15 +123,20 @@ func qualifyRawPacketSummaryLifecycle(t *testing.T, f *queryLedgerFixture) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err = grants.RevokeGrant(f.base.ctx, authapp.GrantRevocationInput{GrantID: grantID, Revoker: who.Principal, ExpectedRevision: revision, IdempotencyKey: "raw-fixture-revoke-after-query"}, recovery); err != nil {
-		t.Fatal("original raw grant revocation", err)
+	revoked, _, err := grants.RevokeGrant(f.base.ctx, authapp.GrantRevocationInput{GrantID: grantID, Revoker: who.Principal, ExpectedRevision: revision, IdempotencyKey: "raw-fixture-revoke-after-query"}, recovery)
+	if err != nil || revoked.RevokedAt.IsZero() {
+		t.Fatal("original raw grant positive revocation", err)
 	}
 	_, err = executionSQL.ReadAPIContextWork(f.base.ctx, e.CaptureUID, who, recovery)
 	var step interface{ FixedStep() string }
-	if err == nil || !errors.As(err, &step) || step.FixedStep() != "approval" {
+	phase := ""
+	if err != nil && errors.As(err, &step) {
+		phase, _, _ = strings.Cut(step.FixedStep(), "/")
+	}
+	if phase != "approval" {
 		t.Fatal("revoked raw grant bypassed current executor approval", err)
 	}
-	t.Log("original raw acquisition grant live-read control then explicit revocation: later API work refuses at approval with require-all still false; no new capture or authority")
+	t.Logf("original raw acquisition grant live-read control then explicit positive revocation: later API work refuses at approval with require-all still false; full_stage=%s; no new capture or authority", step.FixedStep())
 
 }
 
