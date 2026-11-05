@@ -972,9 +972,12 @@ func installedJourneyReplyCode(wire *contracts.InvestigationContracts, name stri
 			return installedJourneyEnvelope{}, "", errors.New("installed failure without code")
 		}
 		return out, failure.Code, nil
-	} else if out.Status != "ok" {
+	} else if out.Status != "ok" && out.Status != "pending" {
 		return installedJourneyEnvelope{}, "", errors.New("unexpected installed operation status")
 	}
+	// The tool-specific schema above decides whether pending is legal. Query
+	// callers retain its original handle/deadline; synchronous callers still
+	// require ok before reading completed data.
 	return out, "", nil
 }
 

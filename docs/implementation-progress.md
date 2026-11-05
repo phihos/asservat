@@ -1,5 +1,18 @@
 # Sustained implementation progress
 
+## Installed saved-log pending reply fixture correction (2026-11-06)
+
+Signed `10ad65e2` succeeds through capture publication and collection-grant read.
+The first saved-log query returns a canonical pending handle; the installed
+fixture incorrectly rejects any status other than ok/error (Go/harness1,465.879s).
+The new SDK/parser regression reproduces this failure in.098s. A two-file test
+repair preserves that original pending handle/deadline after full tool-schema
+and SDK-error validation. Synchronous completed reads keep their ok requirement;
+no production authority, budget, retry or deadline changes. Selected journey,
+logs and packet-helper races pass16.148s; independent two-file review is clear.
+[Original failed runs and separate strict cleanup](../test/results/finite-saved-logs-query-admission/README.md)
+remain explicit. Full installed query/download/browser qualification is pending.
+
 ## Finite logs approval view contract correction (2026-11-06)
 
 Fresh signed `94519f1b` acknowledges the original logs request, verifies and

@@ -732,3 +732,40 @@ func TestInstalledJourneyRetriesOnlyRetryableUnavailability(t *testing.T) {
 		t.Fatal(status, code, err, n)
 	}
 }
+
+// A paid saved-evidence query can acknowledge its original handle before a
+// worker finishes. Keep that canonical reply for the existing query poller;
+// never discard it as an unexpected synchronous-operation status.
+func TestInstalledJourneyPreservesCanonicalPendingQueryReply(t *testing.T) {
+	wire, err := contracts.NewInvestigationContracts()
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw := `{"schema_version":"mcp-result/v1","request_id":"00000000-0000-4000-8000-000000000001","data_class":"metadata","status":"pending","data":{"query_handle":"00000000-0000-4000-8000-000000000002","query_observed_at":"2026-11-06T00:00:00Z","query_expires_at":"2026-11-06T00:01:00Z","retry_after_seconds":1},"truncated":false,"next_cursor":null,"narrowing_hint":null,"warnings":[],"provenance":[]}`
+	for _, name := range []string{"get_logs", "get_query_result"} {
+		result := &sdk.CallToolResult{StructuredContent: json.RawMessage(raw)}
+		if wire.ValidateOutput(name, []byte(raw)) != nil {
+			t.Fatal("regression is not a canonical pending reply", name)
+		}
+		got, code, err := installedJourneyReplyCode(wire, name, result)
+		if err != nil || code != "" || got.Status != "pending" || got.RequestID != "00000000-0000-4000-8000-000000000001" {
+			t.Fatal("original pending lineage lost", name, got.Status, code, err)
+		}
+		var pending struct {
+			Handle string    `json:"query_handle"`
+			Until  time.Time `json:"query_expires_at"`
+		}
+		if json.Unmarshal(got.Data, &pending) != nil || pending.Handle != "00000000-0000-4000-8000-000000000002" || pending.Until.Format(time.RFC3339) != "2026-11-06T00:01:00Z" {
+			t.Fatal("pending identity/deadline altered")
+		}
+		result.IsError = true
+		if _, _, err := installedJourneyReplyCode(wire, name, result); err == nil {
+			t.Fatal("inconsistent SDK error flag accepted")
+		}
+	}
+	for _, invalidName := range []string{"get_capture", "get_grant"} {
+		if _, _, err := installedJourneyReplyCode(wire, invalidName, &sdk.CallToolResult{StructuredContent: json.RawMessage(raw)}); err == nil {
+			t.Fatal("query handle accepted as another operation", invalidName)
+		}
+	}
+}
