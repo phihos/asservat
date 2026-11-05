@@ -69,6 +69,7 @@ func TestPacketQueryMigrationRestoresEveryPreviousFunction(t *testing.T) {
 	}
 	names := []string{"context_query_scope_source_valid", "context_query_begin_tool", "context_query_read_batches", "context_query_units", "guard_context_query", "guard_context_query_account", "guard_context_query_child", "operation_audit_lane", "operation_audit_human_input_valid", "guard_operation_audit", "context_query_intent_current", "context_query_outcome_closed"}
 	old := map[string]string{}
+	oldKeyConstraint := ""
 	for _, file := range files {
 		if file >= "00139_saved_packet_query.sql" {
 			continue
@@ -78,6 +79,9 @@ func TestPacketQueryMigrationRestoresEveryPreviousFunction(t *testing.T) {
 			t.Fatal(err)
 		}
 		up, _, _ := strings.Cut(string(b), "-- +goose Down")
+		if constraint := regexp.MustCompile(`(?s)ALTER TABLE context_query_key_binding ADD CONSTRAINT context_query_key_binding_binding_check CHECK.*?;`).FindString(up); constraint != "" {
+			oldKeyConstraint = constraint
+		}
 		for _, n := range names {
 			re := regexp.MustCompile(`(?s)CREATE (?:OR REPLACE )?FUNCTION ` + regexp.QuoteMeta(n) + `\(.*?\$\$;`)
 			if def := re.FindString(up); def != "" {
@@ -97,6 +101,9 @@ func TestPacketQueryMigrationRestoresEveryPreviousFunction(t *testing.T) {
 		if old[n] == "" || !strings.Contains(down, old[n]) {
 			t.Fatal("Down did not restore exact prior function", n)
 		}
+	}
+	if oldKeyConstraint == "" || !strings.Contains(down, oldKeyConstraint) {
+		t.Fatal("Down did not restore exact previous key-binding constraint")
 	}
 	if !strings.Contains(down, "packet query history cannot be downgraded") || !strings.Contains(down, "operation='pcap_query'") || !strings.Contains(down, "raw_query->'Operations' ? 'pcap_query'") {
 		t.Fatal("retained query/grant/use fence missing")

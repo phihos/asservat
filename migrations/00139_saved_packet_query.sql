@@ -521,6 +521,11 @@ BEGIN
  RETURN NEW;
 END $$;
 -- +goose StatementEnd
+-- Fixed packet-query windows enlarge the full authenticated control binding.
+-- Source-specific size is not authority: current q/batch/native equality and
+-- Scope.Valid remain mandatory in the existing key resolver.
+ALTER TABLE context_query_key_binding DROP CONSTRAINT context_query_key_binding_binding_check;
+ALTER TABLE context_query_key_binding ADD CONSTRAINT context_query_key_binding_binding_check CHECK(jsonb_typeof(binding)='object' AND octet_length(binding::text) BETWEEN 2 AND CASE WHEN source_ordinal IS NOT NULL THEN 4096 WHEN binding#>>'{Authority,Scope,NativeType}' IN ('syscallRecords','syscallArguments') THEN 49152 WHEN binding#>>'{Authority,Scope,NativeType}' IN ('pcapng','rawPcapng') AND binding#>>'{Authority,Scope,DisplayVersion}'='approved-pcap-query/v1' AND binding#>>'{Authority,Scope,SourceFormat}'=CASE binding#>>'{Authority,Scope,NativeType}' WHEN 'pcapng' THEN 'pcapng' ELSE 'pcapng-raw' END AND jsonb_typeof(binding#>'{Authority,Scope,PacketQuery}')='object' THEN 49152 ELSE 16384 END);
 -- +goose Down
 -- No retained new operation can be hidden by a downgrade. Existing scopes/uses stay immutable.
 -- +goose StatementBegin
@@ -877,6 +882,8 @@ BEGIN
  RETURN NEW;
 END $$;
 -- +goose StatementEnd
+ALTER TABLE context_query_key_binding DROP CONSTRAINT context_query_key_binding_binding_check;
+ALTER TABLE context_query_key_binding ADD CONSTRAINT context_query_key_binding_binding_check CHECK(jsonb_typeof(binding)='object' AND octet_length(binding::text) BETWEEN 2 AND CASE WHEN source_ordinal IS NOT NULL THEN 4096 WHEN binding#>>'{Authority,Scope,NativeType}' IN ('syscallRecords','syscallArguments') THEN 49152 ELSE 16384 END);
 ALTER TABLE access_grant DROP CONSTRAINT access_grant_followup_operations, DROP CONSTRAINT access_grant_scope_kind;
 ALTER TABLE access_grant ADD CONSTRAINT access_grant_scope_kind CHECK ((CASE WHEN kind='rawQuery' THEN (kind='rawQuery' AND requester_kind='human' AND request_operation='requestRawAccess'
  AND requester_key IS NOT NULL AND octet_length(requester_key)=32
