@@ -1,5 +1,23 @@
 # Sustained implementation progress
 
+## Corrected candidate CI failure and installed cancellation retained (2026-11-05)
+
+Signed `973c9b13` reached terminal CI42038828377 failure and native42038849665
+outer cancellation at20 minutes. CI's sole failing test is the storage-margin
+cancellation fixture: its one-second parent now permits a hint under750ms, so
+its claimed first authoritative read was actually a hint. Focused reproduction
+and explicit short-parent correction are in progress; no production change is
+inferred. C20 races passed538.558s; the aggregate CI result is failure.
+
+The installed artifact ZIP3,699B matches the server digest. Its four originals
+contain a complete50-record native JSONL (48 events), setup output and empty
+Go/timing logs. No terminal Go/harness exit, source inventory or cleanup report
+was emitted. Recording bytes do not establish query/Repeat/Stop completion.
+[Cancellation originals](../test/results/saved-syscall-query-native-42038849665/README.md)
+retain full API/workflow metadata and separate CI failure. The harness's loss of
+partial diagnostics is being resolved before another hosted attempt. PR171 is
+open; no full workflow, S-05 or project completion follows.
+
 ## Repeat readiness scheduling correction passes local boundaries (2026-11-05)
 
 The shared response reserve is reduced from1s to750ms, giving readiness250ms
