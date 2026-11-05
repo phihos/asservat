@@ -68,7 +68,7 @@ jobs:
           NATIVE_SUITE: "${{ matrix.suite }}"
         run: |
           builder=()
-          if [[ $NATIVE_SUITE == continuation-manual-arguments || $NATIVE_SUITE == continuation-manual-syscall || $NATIVE_SUITE == continuation-profile-comparison || $NATIVE_SUITE == continuation-profile-comparison-heavy || $NATIVE_SUITE == continuation-policy-profile ]]; then
+          if [[ $NATIVE_SUITE == continuation-manual-raw || $NATIVE_SUITE == continuation-manual-arguments || $NATIVE_SUITE == continuation-manual-syscall || $NATIVE_SUITE == continuation-profile-comparison || $NATIVE_SUITE == continuation-profile-comparison-heavy || $NATIVE_SUITE == continuation-policy-profile ]]; then
             builder=(experiments/syscall-argument-budget/pins.json)
           fi
           grep -ohE '[a-z0-9./-]+@sha256:[0-9a-f]{64}' scripts/test-*.py "${builder[@]}" | sort -u > /tmp/images

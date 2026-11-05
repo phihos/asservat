@@ -1,5 +1,25 @@
 # Sustained implementation progress
 
+## Packet native parity passes; outer job exceeds its limit (2026-11-05)
+
+Candidate `01c68fef` passed all 15 CI jobs. Native42019184868 completed all
+four Go tests in 801.558s with Go/harness0, unchanged 4,258 exact Git inputs,
+removed scratch and cleanup[]. MCP and actual React queries and fixed
+summaries matched the same authenticated PCAPNG/tshark original; query rows,
+times, exact saved frame prefixes, grant/accounting and original worker joins
+passed. The outer job was nevertheless cancelled at its20-minute limit and is
+not a green workflow. [Originals and scope](../test/results/saved-packet-query-native-42019184868/README.md)
+retain the native file and exact stage chronology. This attempt reported no
+audit-profile23514; the earlier rejection's cause and sustained availability
+remain unproven.
+
+The run logged component exit0 only3.740s before cancellation. An existing
+26.928s pinned builder pull occurred synchronously after124s setup because this
+suite was missing from the existing background prefetch list. The one-line
+candidate adds only that suite to prefetch, with the same image/download and
+unchanged tests/20-minute bound. A full hosted pass remains required. No
+complete S-05, second-cluster matrix or release follows.
+
 ## Audit refusal diagnostics pass real SQL and exact rollback (2026-11-05)
 
 Signed `6297ff69` preserves the effective capacity-audit reader predicate and
