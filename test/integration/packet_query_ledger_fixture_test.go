@@ -63,8 +63,14 @@ func qualifyPacketQueryManagedLifecycle(t *testing.T, f *queryLedgerFixture) {
 		return out
 	}
 	beforeAcquisition := acquisitionSnapshot()
+	baselineQueries, baselineUnits := int64(0), int64(0)
 	if f.published.Expectation.NativeType != artifact.SyscallArgumentsArtifact {
 		qualifySharedProjectionLifecycle(t, f)
+		baselineQueries, baselineUnits = 1, 2
+	}
+	var beforeQueries, beforeUnits int64
+	if err := base.admin.QueryRow(ctx, `SELECT (SELECT count(*) FROM context_query WHERE root_id=$1),(SELECT allocated FROM context_query_backing WHERE root_id=$1)`, root).Scan(&beforeQueries, &beforeUnits); err != nil || beforeQueries != baselineQueries || beforeUnits != baselineUnits {
+		t.Fatalf("exact pre-query baseline: queries=%d/%d units=%d/%d err=%v", beforeQueries, baselineQueries, beforeUnits, baselineUnits, err)
 	}
 
 	compiled := func(purpose string) *pgxpool.Pool {
@@ -505,8 +511,8 @@ func qualifyPacketQueryManagedLifecycle(t *testing.T, f *queryLedgerFixture) {
  FROM context_query_batch b JOIN context_query q ON q.id=b.query_id JOIN download_worker w ON w.id=q.worker_id WHERE b.id=$3`, q.ID, q.WorkerID, lastBatch.ID, root).Scan(&downloads, &workersCount, &certificates, &keyRoles, &keyChildren, &queries, &allocated, &nativeClosed, &closed, &active, &audited, &claimed, &bound); err != nil {
 		t.Fatal("independent final state", err)
 	}
-	if downloads != 0 || workersCount != 1 || certificates != 1 || keyRoles != 7 || keyChildren != 1 || queries != 2 || allocated != 2+scope.QueryUnits() || !nativeClosed || !closed || active || !audited || !claimed || !bound {
-		t.Fatalf("unexpected paid final state: downloads=%d workers=%d certificates=%d roles=%d children=%d queries=%d allocated=%d nativeClosed=%t closed=%t active=%t audited=%t claimed=%t bound=%t", downloads, workersCount, certificates, keyRoles, keyChildren, queries, allocated, nativeClosed, closed, active, audited, claimed, bound)
+	if downloads != 0 || workersCount != 1 || certificates != 1 || keyRoles != 7 || keyChildren != 1 || queries != baselineQueries+1 || allocated != baselineUnits+scope.QueryUnits() || !nativeClosed || !closed || active || !audited || !claimed || !bound {
+		t.Fatalf("unexpected paid final state: downloads=%d workers=%d certificates=%d roles=%d children=%d queries=%d/%d allocated=%d/%d nativeClosed=%t closed=%t active=%t audited=%t claimed=%t bound=%t", downloads, workersCount, certificates, keyRoles, keyChildren, queries, baselineQueries+1, allocated, baselineUnits+scope.QueryUnits(), nativeClosed, closed, active, audited, claimed, bound)
 	}
 
 	var batches, roles, children int

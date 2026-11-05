@@ -80,7 +80,7 @@ func TestPublicSyscallViewsRequireInstalledTypedRoute(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"get_syscall_summary", "get_syscall_events"} {
+	for _, name := range []string{"get_syscall_summary", "get_syscall_events", "syscall_query"} {
 		if presentation.BrowserOperationSupported(without, name) || slices.Contains(without.ToolNames(), name) {
 			t.Fatal("saved syscall view enabled without typed source route", name)
 		}
@@ -91,13 +91,13 @@ func TestPublicSyscallViewsRequireInstalledTypedRoute(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"get_syscall_summary", "get_syscall_events"} {
+	for _, name := range []string{"get_syscall_summary", "get_syscall_events", "syscall_query"} {
 		if !presentation.BrowserOperationSupported(with, name) || !slices.Contains(with.ToolNames(), name) {
 			t.Fatal("retained syscall view missing from browser/MCP composition", name)
 		}
 	}
-	if presentation.BrowserOperationSupported(with, "syscall_query") || slices.Contains(with.ToolNames(), "syscall_query") || slices.Contains(with.ToolNames(), "request_capture") {
-		t.Fatal("approved saved views enabled a raw query or collection")
+	if presentation.BrowserOperationSupported(with, "pcap_query") || slices.Contains(with.ToolNames(), "pcap_query") || slices.Contains(with.ToolNames(), "request_capture") {
+		t.Fatal("typed syscall route enabled an unrelated packet query or collection")
 	}
 }
 
