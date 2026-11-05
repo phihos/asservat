@@ -1013,6 +1013,7 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 	}
 	if dispositionErr != nil || disposition["filename"] != "artifact-"+evidence.Artifacts[0].ID+extension {
 		response.Body.Close()
+		diagnose()
 		t.Fatal("native download lacks its expected filename", response.StatusCode, dispositionErr)
 	}
 	native, err := io.ReadAll(io.LimitReader(response.Body, nativeLimit+1))

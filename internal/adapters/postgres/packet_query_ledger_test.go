@@ -67,7 +67,7 @@ func TestPacketQueryMigrationRestoresEveryPreviousFunction(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	names := []string{"context_query_scope_source_valid", "context_query_begin_tool", "context_query_read_batches", "context_query_units", "guard_context_query", "guard_context_query_account", "guard_context_query_child", "operation_audit_lane", "operation_audit_human_input_valid", "guard_operation_audit", "context_query_intent_current", "context_query_outcome_closed"}
+	names := []string{"context_query_scope_source_valid", "context_query_begin_tool", "context_query_read_batches", "context_query_units", "guard_context_query", "guard_context_query_account", "guard_context_query_child", "operation_audit_lane", "operation_audit_human_input_valid", "guard_operation_audit", "context_query_intent_current", "context_query_outcome_closed", "read_capacity_audit_profiles"}
 	old := map[string]string{}
 	oldKeyConstraint := ""
 	for _, file := range files {
@@ -98,6 +98,18 @@ func TestPacketQueryMigrationRestoresEveryPreviousFunction(t *testing.T) {
 		t.Fatal("missing down")
 	}
 	for _, n := range names {
+		if n == "read_capacity_audit_profiles" {
+			// Migration74 changes this function dynamically rather than redeclaring it.
+			old[n] = strings.ReplaceAll(old[n], "p.fresh_until>p.observed_at+interval '5 seconds'", "p.fresh_until>p.observed_at+interval '30 seconds'")
+			start := strings.Index(up, "CREATE OR REPLACE FUNCTION "+n+"(")
+			end := strings.Index(up[start:], "END $$;") + start + len("END $$;")
+			diagnostic := up[start:end]
+			beginDetail := strings.Index(diagnostic, ",\n   -- Operator-only diagnostics")
+			endDetail := strings.Index(diagnostic[beginDetail:], "::text,2048);") + beginDetail + len("::text,2048);")
+			if diagnostic[:beginDetail]+";"+diagnostic[endDetail:] != old[n] {
+				t.Fatal("audit profile guard changed beyond rejection DETAIL")
+			}
+		}
 		if old[n] == "" || !strings.Contains(down, old[n]) {
 			t.Fatal("Down did not restore exact prior function", n)
 		}
