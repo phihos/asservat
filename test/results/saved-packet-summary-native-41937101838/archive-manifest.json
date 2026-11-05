@@ -1,0 +1,141 @@
+{
+  "format": "asservat-original-evidence-archive/v1",
+  "entries": [
+    {
+      "path": "initial-run.json.gz",
+      "original": "/home/phil/.cache/asservat-build/packet-summary-native-41937101838/initial-run.json",
+      "bytes": 12147,
+      "sha256": "a5c61cc4d828c0405a8e331d9a9e5455e52c33ab29af47e7d11457d29bdb325c",
+      "gzipBytes": 1619,
+      "gzipSHA256": "835a606d3f629effed32e556416cc5d2d1a89119bce739e1ee7372d31a7c2163"
+    },
+    {
+      "path": "initial-jobs.json.gz",
+      "original": "/home/phil/.cache/asservat-build/packet-summary-native-41937101838/initial-jobs.json",
+      "bytes": 5028,
+      "sha256": "13912b1c3734631d0ed2d973aec92eff631ca16eb1a4fe1f937cc0f7eca315a1",
+      "gzipBytes": 1055,
+      "gzipSHA256": "3f1bbffb8c04906d58f01981ff169dedbcfa2633e4f5b3f128dc0b6b4f4c4e53"
+    },
+    {
+      "path": "terminal-run.json.gz",
+      "original": "/home/phil/.cache/asservat-build/packet-summary-native-41937101838/terminal-run.json",
+      "bytes": 12150,
+      "sha256": "f9676054a3e6a8d24bb2a2e8070b62accf730260edea927426d9934a7a177d38",
+      "gzipBytes": 1628,
+      "gzipSHA256": "708012c6a1afedef3f140ab1f822596fca4564ca6947a2562720c386f4bd9346"
+    },
+    {
+      "path": "terminal-jobs.json.gz",
+      "original": "/home/phil/.cache/asservat-build/packet-summary-native-41937101838/terminal-jobs.json",
+      "bytes": 6074,
+      "sha256": "f6bd801355e8c102e1dce4cc4fbe123fadcca58247717392c966f05dc8a69d9f",
+      "gzipBytes": 1111,
+      "gzipSHA256": "4671f08bb6dda863d99d35f501f697815f1619598fb5b76ddc0b75c204bb4adb"
+    },
+    {
+      "path": "terminal-artifacts.json.gz",
+      "original": "/home/phil/.cache/asservat-build/packet-summary-native-41937101838/terminal-artifacts.json",
+      "bytes": 748,
+      "sha256": "4c6d5efb7d5c2b0ff5fa3462ea6ceda4cf6cdc746c37fcb751e574211ea5e2c8",
+      "gzipBytes": 453,
+      "gzipSHA256": "b0d40700bb1b770f78af9f61abeaf67776b7772f3f0f82cef4c60350a5ae23b6"
+    },
+    {
+      "path": "poll-history.jsonl.gz",
+      "original": "/home/phil/.cache/asservat-build/packet-summary-native-41937101838/poll-history.jsonl",
+      "bytes": 5652,
+      "sha256": "52c7143b48d3b379ee9c18ff4367b28083a4da725c538af554c8ae6403cacf9c",
+      "gzipBytes": 453,
+      "gzipSHA256": "1351f7c3186142fefb0ccf5515823b4569ae98321140d8c82d068e839620de33"
+    },
+    {
+      "path": "verification.json.gz",
+      "original": "/home/phil/.cache/asservat-build/packet-summary-native-41937101838/verification.json",
+      "bytes": 1565,
+      "sha256": "f6564ffa0124aa9fe0a25217dc81bdbed6fbfd473ecd13b8528d6c348fb7c3da",
+      "gzipBytes": 770,
+      "gzipSHA256": "2bd5d1be75e338d65b2f8c1d67e558ae0427719f18bfa231c0194707b4d8e6d7"
+    },
+    {
+      "path": "workflow-all.log.gz",
+      "original": "/home/phil/.cache/asservat-build/packet-summary-native-41937101838/workflow-all.log",
+      "bytes": 150576,
+      "sha256": "4b28d2d2b344162fde3e990320011f66f656e3bfc07ef6d5dbce28f5902b5526",
+      "gzipBytes": 21887,
+      "gzipSHA256": "3e3766a1718ca484589fc8d8acb41b86c96d97621cbcc54b02a2456f0eb6f625"
+    },
+    {
+      "path": "ci-native-continuation-manual-mixed.log.gz",
+      "original": "/home/phil/.cache/asservat-build/packet-summary-native-41937101838/native-continuation-manual-mixed-1/ci-native-continuation-manual-mixed.log",
+      "bytes": 5300,
+      "sha256": "f708a93ef0ef76f7b8092376bb41cd6b0214f94b88db2c32a39b827524a62603",
+      "gzipBytes": 1667,
+      "gzipSHA256": "551007aa0941af84e18211dfcd9fe9aac5e54a3bda828aba70d8c1b79a00a2b8"
+    },
+    {
+      "path": "context-storage-environment.json.gz",
+      "original": "/home/phil/.cache/asservat-build/packet-summary-native-41937101838/native-continuation-manual-mixed-1/context-storage-environment.json",
+      "bytes": 542312,
+      "sha256": "6179caec3b8f4ed3babc7f0541fdcddd7e7357389cddc2199b262a447ac23db6",
+      "gzipBytes": 203899,
+      "gzipSHA256": "799b405c90d420460ea721adacf790835f116c09aba9f18e12cad331f7bdba65"
+    },
+    {
+      "path": "context-storage-kubelet.log.gz",
+      "original": "/home/phil/.cache/asservat-build/packet-summary-native-41937101838/native-continuation-manual-mixed-1/context-storage-kubelet.log",
+      "bytes": 35122,
+      "sha256": "3374b4d939ceca032a35284b708469af26d4ba16eec8339c72948bb4d95c9320",
+      "gzipBytes": 3636,
+      "gzipSHA256": "b280e0a7e73e27fa78b717b3b2997281628e244c3f4ce12e9f24feff24fa8e7a"
+    },
+    {
+      "path": "context-storage-postgres.log.gz",
+      "original": "/home/phil/.cache/asservat-build/packet-summary-native-41937101838/native-continuation-manual-mixed-1/context-storage-postgres.log",
+      "bytes": 398879,
+      "sha256": "94a7316d948cbc154f439615b7ce431a5877f09296bf9fa503c0353fcd82eaaa",
+      "gzipBytes": 22657,
+      "gzipSHA256": "ae17e9c4016b0ec3cf76ed4d835cbcff53c5a6c666582b93c7645d84f5622c5a"
+    },
+    {
+      "path": "context-storage-timing.log.gz",
+      "original": "/home/phil/.cache/asservat-build/packet-summary-native-41937101838/native-continuation-manual-mixed-1/context-storage-timing.log",
+      "bytes": 93558,
+      "sha256": "aaf6b31ca910eca731606fa8fa80391b1797c32b2c231c4c3e8bdaa52ffd8163",
+      "gzipBytes": 11063,
+      "gzipSHA256": "c7f168e2f97859df7d90f6a6b61a738f657080557a6a4b844d018f37a57c73ca"
+    },
+    {
+      "path": "context-storage.log.gz",
+      "original": "/home/phil/.cache/asservat-build/packet-summary-native-41937101838/native-continuation-manual-mixed-1/context-storage.log",
+      "bytes": 87528,
+      "sha256": "88f43f875cc7983f33dd45d59354ff3cbca28a0d60597c2d4239f6cf0ce0095d",
+      "gzipBytes": 10388,
+      "gzipSHA256": "f43e62e851dca7204e16be26161389a88807b35e359f35fe463ab8176f36a815"
+    },
+    {
+      "path": "packet-summary-ci-41936804544-run.json.gz",
+      "original": "/home/phil/.cache/asservat-build/packet-summary-ci-41936804544-run.json",
+      "bytes": 12185,
+      "sha256": "722a072fa84a62b971b373f2425c092b1c3809c5cb20e110580030ef11ce9c22",
+      "gzipBytes": 1658,
+      "gzipSHA256": "7d8e4c51c90f2312e04518524ad017878cc6388e1d989258ef96e706070b2def"
+    },
+    {
+      "path": "packet-summary-ci-41936804544-jobs.json.gz",
+      "original": "/home/phil/.cache/asservat-build/packet-summary-ci-41936804544-jobs.json",
+      "bytes": 32187,
+      "sha256": "197672246adaf3b39519dd176697303f568075fd8c8a762a10092c9e0b2e7d66",
+      "gzipBytes": 2402,
+      "gzipSHA256": "f13c090546ed9e5479fe4f22307b6f2e4f8485e47b9d76350d401e815217a779"
+    },
+    {
+      "path": "packet-summary-ci-41936804544-verification.json.gz",
+      "original": "/home/phil/.cache/asservat-build/packet-summary-ci-41936804544-verification.json",
+      "bytes": 952,
+      "sha256": "d7286ea7c7b0aa5797276474d4e14fd551b2e502e28ac4f998f30114ca736869",
+      "gzipBytes": 500,
+      "gzipSHA256": "fb52d61c84a9f13ca400057919573de28363924086f7821338b1575c04b5ed15"
+    }
+  ]
+}

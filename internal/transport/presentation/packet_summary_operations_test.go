@@ -6,6 +6,7 @@ import (
 	"asservat.local/asservat/internal/domain/artifact"
 	"context"
 	"encoding/json"
+	"fmt"
 	"slices"
 	"testing"
 )
@@ -108,5 +109,68 @@ func TestPacketSummaryRequiresExplicitServiceAndClosedInput(t *testing.T) {
 	}
 	if f.admissions != 0 || f.starts != 0 || f.reads != 0 {
 		t.Fatal("disabled packet service performed work")
+	}
+}
+
+// Exercise populated producer shapes through the same audited ready-poll
+// consumer as the installed worker. An empty summary cannot reveal endpoint,
+// counter, truncation or complete-envelope budget mismatches.
+func TestPacketSummaryPopulatedReadyPollFitsCanonicalEnvelope(t *testing.T) {
+	for _, reporting := range []string{"unavailable", "captureExclusions", "snapshotOutputLimit"} {
+		t.Run(reporting, func(t *testing.T) {
+			s, f, _, _ := packetSummaryBridge(t)
+			f.ready = false
+			first, err := s.Call(t.Context(), f, "get_pcap_summary", bridgeInput())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := first.Close(context.Background()); err != nil {
+				t.Fatal(err)
+			}
+			summary := value.PacketSummary{CaptureMode: "networkHeaders", Packets: value.PacketSummaryMaxCount,
+				DropReporting: reporting, ConversationsTotal: value.PacketSummaryMaxAggregates, ConversationsTruncated: true,
+				Conversations: make([]value.PacketConversation, value.PacketSummaryMaxConversations)}
+			if reporting != "unavailable" {
+				drops := value.PacketSummaryMaxCount
+				summary.Drops = &drops
+			}
+			for n := range summary.Conversations {
+				summary.Conversations[n] = value.PacketConversation{
+					Source:      fmt.Sprintf("[ffff:ffff:ffff:ffff:ffff:ffff:ffff:%x]:65535", n),
+					Destination: "[ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff]:65535", Protocol: "TCP",
+					Packets: value.PacketSummaryMaxCount / 1000,
+				}
+			}
+			slices.SortFunc(summary.Conversations, func(a, b value.PacketConversation) int {
+				if value.PacketConversationBefore(a, b) {
+					return -1
+				}
+				return 1
+			})
+			if !summary.Valid() {
+				t.Fatal("invalid producer fixture")
+			}
+			f.result, f.ready = &value.ProjectionResult{PacketSummary: &summary}, true
+			ready, err := s.Call(t.Context(), f, "get_query_result", bridgePoll(f.q.ID))
+			if err != nil {
+				t.Fatal("populated ready transition", err)
+			}
+			defer ready.Close(context.Background())
+			if err := s.contracts.ValidateOutput("get_query_result", ready.Body); err != nil {
+				t.Fatal("canonical complete poll envelope", err)
+			}
+			var out struct {
+				Data struct {
+					Result struct {
+						Data value.PacketSummary `json:"data"`
+					} `json:"result"`
+				} `json:"data"`
+			}
+			if json.Unmarshal(ready.Body, &out) != nil || !out.Data.Result.Data.Valid() || out.Data.Result.Data.DropReporting != reporting ||
+				(out.Data.Result.Data.Drops == nil) != (summary.Drops == nil) || len(out.Data.Result.Data.Conversations) != 100 ||
+				out.Data.Result.Data.ConversationsTotal != value.PacketSummaryMaxAggregates || !out.Data.Result.Data.ConversationsTruncated {
+				t.Fatal("ready poll changed bounded producer result")
+			}
+		})
 	}
 }

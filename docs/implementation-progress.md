@@ -36,10 +36,30 @@ local authority, not an installed cluster.
 Two separate pristine real-service fixtures passed: compiled packet lifecycle
 Go9.166s and upgrade137 Go7.339s. Each reported4,137 source hashes that matched
 Git, unchanged sources and empty cleanup. Runtime/key SQL roles and managed
-publication are real; Job/Pod/issuer/join inputs remain synthetic. The next gates
-are eligible candidate CI and one installed manual-mixed packet summary/native
-PCAPNG journey. No installed packet-summary, maximum-shape/cgroup or raw-query
-qualification is claimed. Broader S-05 and the full specification remain open.
+publication are real; Job/Pod/issuer/join inputs remain synthetic.
+
+Eligible pull-request CI41936804544 passed all15 jobs on published `928eae4d`.
+[Installed attempt41937101838](../test/results/saved-packet-summary-native-41937101838/README.md)
+failed (Go/harness1,636.411s): capture/publication and summary admission passed,
+the first result poll was Pending, then the second returned HTTP503. No replay
+was attempted; the React view, SQL joined proof and native PCAPNG comparison
+were not reached. All4,197 submitted hashes matched Git; sources were unchanged,
+cleanup was empty and scratch removed. Missing hub/worker reports prevent an
+exact native-stage attribution. A focused actual regional-receiver test then
+reproduced a separate concrete omission: metadata PCAPNG was rejected before
+delegating to the configured parser (zero reader calls). Adding that accepted
+source type to the existing gate passes the regression; source expectation,
+original deadline and one-use batch checks remain. The complete populated
+top100 public poll envelope also passes for both exclusion labels and unknown
+statistics. Failure-only manual-mixed diagnostics now reuse existing hub/SQL/Pod
+reports and add a bounded query Job status read. No happy-path reads, privileges,
+timeouts or retries are added. [Final local checks](../test/results/saved-packet-summary-receiver-local/README.md)
+pass integrated pre-push and packet preflight, including the actual receiver,
+outer encrypted/TLS key reader and fresh raw/wrong-Pod denial. Independent review
+found no blockers. Fresh candidate CI and an installed attempt remain next.
+No installed packet-summary, maximum-shape/cgroup or
+raw-query qualification is claimed.
+Broader S-05 and the full specification remain open.
 
 ## Shared profile qualification history (2026-11-04)
 

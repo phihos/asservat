@@ -66,7 +66,7 @@ func (r *RegionalContextResult) readApproved(ctx context.Context, o value.Native
 	// Pod status keeps its historical source check; an httpHeaders scope
 	// requires exactly its published extract (ADR-282).
 	kind := scope.NativeType == artifact.PodStatusArtifact && source.podStatus() ||
-		(scope.NativeType == artifact.HTTPHeadersArtifact || scope.NativeType == artifact.PprofArtifact || scope.NativeType == artifact.SyscallRecordsArtifact || scope.NativeType == artifact.SyscallArgumentsArtifact) && projectionExpectation(source.Expectation, scope)
+		(scope.NativeType == artifact.PCAPNGArtifact || scope.NativeType == artifact.HTTPHeadersArtifact || scope.NativeType == artifact.PprofArtifact || scope.NativeType == artifact.SyscallRecordsArtifact || scope.NativeType == artifact.SyscallArgumentsArtifact) && projectionExpectation(source.Expectation, scope)
 	if o.Kind != value.NativeProjection || !scope.Valid() || scope.Version != o.SourceVersion || o.Generation < 1 || o.Generation > scope.ReadBatches() || !source.Valid(scope.Version) || !kind || o.Processing.Location != source.Expectation.Registration.Location || o.Path.StoreID != source.Expectation.Registration.StoreID {
 		return zero, query.ErrUnavailable
 	}

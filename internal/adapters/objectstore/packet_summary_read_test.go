@@ -20,7 +20,7 @@ import (
 	"github.com/gopacket/gopacket/pcapgo"
 )
 
-func packetEncryptedFixture(t *testing.T, dir, mode string) profileEncryptedFixture {
+func packetEncryptedFixture(t *testing.T, dir, mode string, sealers ...evidence.KeySealer) profileEncryptedFixture {
 	t.Helper()
 	unused, e, _ := writerFixture(t, http.NotFoundHandler())
 	unused.Close()
@@ -72,7 +72,7 @@ func packetEncryptedFixture(t *testing.T, dir, mode string) profileEncryptedFixt
 	if err = e.Validate(); err != nil {
 		t.Fatal(err)
 	}
-	copies := prepareEncryptedProjectionSource(t, dir, bytes.NewReader(native.Bytes()), e, mode == "whole-hash")
+	copies := prepareEncryptedProjectionSource(t, dir, bytes.NewReader(native.Bytes()), e, mode == "whole-hash", sealers...)
 	f := profileEncryptedFixture{Source: evidence.NativeContextSource{Expectation: e, Copies: copies}, Scope: testProjectionScope()}
 	s := &f.Scope
 	s.CaseID, s.CaptureID, s.ArtifactID, s.ClusterID = e.CaseID, e.CaptureUID, e.Registration.Location.ArtifactID, e.Registration.Location.ClusterID

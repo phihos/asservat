@@ -528,8 +528,11 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 			c, end := context.WithTimeout(ctx, 20*time.Second)
 			defer end()
 			installedPodDiagnostics(t, c, api, contracts.DownloadWorkerNamespaceName(installation), "download-worker", "")
+			if installedJourneyFocus() == "manual-mixed" {
+				installedPacketSummaryJobDiagnostics(c, api, contracts.DownloadWorkerNamespaceName(installation), t.Logf)
+			}
 		}
-		if installedJourneyFocus() == "manual-profile" && (installedHeapProfileVariant() || installedRuntimeTraceVariant()) {
+		if installedJourneyFocus() == "manual-mixed" || installedJourneyFocus() == "manual-profile" && (installedHeapProfileVariant() || installedRuntimeTraceVariant()) {
 			defer func() {
 				if t.Failed() {
 					diagnose()
