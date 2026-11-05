@@ -146,3 +146,26 @@ func refuseRetainedPacketSummaryDowngrade(t *testing.T, f *queryLedgerFixture) {
 	}
 	t.Log("retained packet137→136 refused: exact query/key/accounting snapshot unchanged")
 }
+
+// Two OAuth clients of the SAME human retain distinct query actors but share
+// the existing principal account. This uses actual compiled roles and the full
+// same admitted-source/enrollment/native-key lifecycle twice, not seeded rows.
+func TestPacketSummarySharedPrincipalLifecycleWithRealServices(t *testing.T) {
+	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, administration fleet.Administration, objects *objectstore.AuthorityObjects) {
+		t.Run("same-human-two-clients", func(t *testing.T) {
+			withProtectedContextQueryLedger(t, ctx, admin, address, tlsConfig, scope, claim, administration, objects, func(t *testing.T, f *queryLedgerFixture) {
+				qualifySharedProjectionLifecycleClient(t, f, "console", 0)
+				qualifySharedProjectionLifecycleClient(t, f, "fixture-other-client", 1)
+				var accounts, clients, queries, allocated, expected int
+				err := admin.QueryRow(ctx, `SELECT count(DISTINCT q.account_id),count(DISTINCT q.actor->>'ClientID'),count(*),max(p.allocated),sum(context_query_units(q.query->'Scope')) FROM context_query q JOIN context_query_principal p ON p.id=q.account_id AND p.root_id=q.root_id WHERE q.root_id=$1`, f.base.input.PermissionRootID).Scan(&accounts, &clients, &queries, &allocated, &expected)
+				if err != nil || accounts != 1 || clients != 2 || queries != 2 || allocated != 4 || expected != 4 {
+					t.Fatal("actual same-human account topology/charge", accounts, clients, queries, allocated, expected, err)
+				}
+				t.Logf("two actual clients, one human account: clients=%d accounts=%d queries=%d allocated=%d exact_account_units=%d", clients, accounts, queries, allocated, expected)
+				if !installedPacketSummaryPrincipalAccounting(allocated, expected) {
+					t.Fatal("installed fixture rejected actual correctly shared principal charge", allocated, expected)
+				}
+			}, false, false, false, true)
+		})
+	})
+}

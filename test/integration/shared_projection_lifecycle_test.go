@@ -42,6 +42,10 @@ func TestSharedProjectionLifecycleWithRealServices(t *testing.T) {
 }
 
 func qualifySharedProjectionLifecycle(t *testing.T, f *queryLedgerFixture) {
+	qualifySharedProjectionLifecycleClient(t, f, "", 0)
+}
+
+func qualifySharedProjectionLifecycleClient(t *testing.T, f *queryLedgerFixture, client string, priorQueries int64) {
 	t.Helper()
 	ctx, base, s := f.base.ctx, f.base, f.scenario
 	root, profile := base.input.PermissionRootID, f.workerProfile
@@ -103,6 +107,9 @@ func qualifySharedProjectionLifecycle(t *testing.T, f *queryLedgerFixture) {
 	gate := authapp.ContextProjectionAuthority{RootID: root, Permissions: s.p, Catalog: catalog, Retention: privacyapp.RetentionResolver{RetainedPolicies: s.retention, Now: time.Now}, Environment: authapp.CurrentProjectionEnvironment{RootID: root, InstallationID: base.input.InstallationID, Policies: f.policies, Recovery: s.recovery.reader, Processing: processing, Now: time.Now}, Now: time.Now}
 	expected := f.published.Expectation
 	scope := query.ContextProjectionScope{RootID: root, CaseID: expected.CaseID, CaptureID: expected.CaptureUID, ArtifactID: expected.Registration.Location.ArtifactID, ClusterID: expected.Registration.Location.ClusterID, NamespaceUID: expected.NamespaceUID, WorkloadUID: expected.WorkloadUID, PodUID: expected.PodUID, Version: evidence.ContextCopiesDigest(f.published.Copies), SourceProjectionDigest: query.ContextSourceProjectionDigest(), SourceFormat: artifact.ContextFormat, DisplayVersion: query.ContextDisplayVersion, Selection: query.LineSelection{LineStart: 1, MaxLines: 14}, Principal: s.a.Plan.Input.Executor}
+	if client != "" {
+		scope.Principal.ClientID = client
+	}
 	comparison := expected.NativeType == artifact.PprofArtifact
 	if comparison {
 		scope.NativeType, scope.SourceFormat, scope.DisplayVersion = artifact.PprofArtifact, artifact.PprofFormat, query.ProfileComparisonDisplayVersion
@@ -148,6 +155,7 @@ func qualifySharedProjectionLifecycle(t *testing.T, f *queryLedgerFixture) {
 			t.Fatal("real invocation intent", e)
 		}
 		who := s.a.Eligibility.VerifiedIdentity
+		who.Principal = scope.Principal
 		who.Scopes = []string{"evidence:read"}
 		who.VerifiedAt, who.ValidUntil = n, intent.RequestUntil
 		a, e := gate.CheckProjectionCurrent(call, querySQLIdentity{who}, scope)
@@ -393,7 +401,7 @@ func qualifySharedProjectionLifecycle(t *testing.T, f *queryLedgerFixture) {
  FROM context_query_batch b JOIN context_query q ON q.id=b.query_id JOIN download_worker w ON w.id=q.worker_id WHERE b.id=$3`, q.ID, q.WorkerID, start.Batch.ID, root).Scan(&downloads, &workersCount, &certificates, &keyRoles, &keyChildren, &queries, &allocated, &nativeClosed, &closed, &active, &audited, &claimed, &bound); err != nil {
 		t.Fatal("independent final state", err)
 	}
-	if downloads != 0 || workersCount != 1 || certificates != 1 || keyRoles != int64(7*len(keyIDs)) || keyChildren != int64(len(keyIDs)) || queries != 1 || allocated != scope.QueryUnits() || !nativeClosed || !closed || active || !audited || !claimed || !bound {
+	if downloads != 0 || workersCount != 1 || certificates != 1 || keyRoles != int64(7*len(keyIDs)) || keyChildren != int64(len(keyIDs)) || queries != priorQueries+1 || allocated != (priorQueries+1)*scope.QueryUnits() || !nativeClosed || !closed || active || !audited || !claimed || !bound {
 		t.Fatalf("unexpected paid final state: downloads=%d workers=%d certificates=%d roles=%d children=%d queries=%d allocated=%d nativeClosed=%t closed=%t active=%t audited=%t claimed=%t bound=%t", downloads, workersCount, certificates, keyRoles, keyChildren, queries, allocated, nativeClosed, closed, active, audited, claimed, bound)
 	}
 	if packet {

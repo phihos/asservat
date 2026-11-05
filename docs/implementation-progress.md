@@ -56,9 +56,25 @@ reports and add a bounded query Job status read. No happy-path reads, privileges
 timeouts or retries are added. [Final local checks](../test/results/saved-packet-summary-receiver-local/README.md)
 pass integrated pre-push and packet preflight, including the actual receiver,
 outer encrypted/TLS key reader and fresh raw/wrong-Pod denial. Independent review
-found no blockers. Fresh candidate CI and an installed attempt remain next.
-No installed packet-summary, maximum-shape/cgroup or
-raw-query qualification is claimed.
+found no blockers. Corrected `e280290e` passed all15 eligible CI41941071465 jobs.
+[Installed attempt41941094248](../test/results/saved-packet-summary-native-41941094248/README.md)
+then reached successful MCP summary, exact SQL/key/batch proof and actual React
+rendered values. It exited1/704.734s at the browser's later accounting assertion:
+the fixture expected one two-unit principal allocation although MCP and browser
+intentionally share that human's account. Native download/tshark parity was not
+reached. All4,200 source hashes matched Git; sources were unchanged, cleanup was
+empty and scratch removed. A focused real-SQL regression reproduced two clients,
+one account and four correctly allocated units; the old installed assertion
+failed against that state (10.404s). The test-only correction verifies the exact
+sum for that account/root. Its fresh real-service run passed11.264s, with six
+consumed key roles and both native/public batches joined. Both runs matched all
+4,140 source hashes against Git plus their three exact test overrides, retained
+unchanged sources and clean cleanup. Production quota semantics are unchanged;
+[Exact local originals](../test/results/saved-packet-summary-shared-account-local/README.md)
+retain both runs, affected race exit0 and final integrated pre-push exit0.
+Fresh final CI and complete installed qualification remain required.
+No complete installed packet-summary, maximum-shape/cgroup or raw-query
+qualification is claimed.
 Broader S-05 and the full specification remain open.
 
 ## Shared profile qualification history (2026-11-04)

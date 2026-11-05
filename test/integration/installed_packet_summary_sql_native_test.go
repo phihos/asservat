@@ -28,20 +28,24 @@ func installedPacketSummarySQLCheck(t *testing.T, ctx context.Context, admin *pg
 			if operation != "" {
 				call, stop := context.WithTimeout(ctx, 5*time.Second)
 				var raw []byte
-				var units, rows, rootSpent, workloadSpent, principalSpent, queries int
+				var units, rows, rootSpent, workloadSpent, principalSpent, expectedPrincipal, queries int
 				var job, binding []byte
-				err := admin.QueryRow(call, `SELECT w.intent_json,w.job_json,w.binding_json,context_query_units(q.query->'Scope'),(SELECT count(*) FROM context_query_key_binding k WHERE k.query_id=q.id),b.allocated,a.allocated,p.allocated,(SELECT count(*) FROM context_query x WHERE x.root_id=q.root_id)
+				err := admin.QueryRow(call, `SELECT w.intent_json,w.job_json,w.binding_json,context_query_units(q.query->'Scope'),(SELECT count(*) FROM context_query_key_binding k WHERE k.query_id=q.id),b.allocated,a.allocated,p.allocated,(SELECT coalesce(sum(context_query_units(x.query->'Scope')),0) FROM context_query x WHERE x.root_id=q.root_id AND x.account_id=p.id),(SELECT count(*) FROM context_query x WHERE x.root_id=q.root_id)
 FROM context_query q JOIN context_query_backing b ON b.root_id=q.root_id JOIN context_query_allocation a ON a.id=q.allocation_id JOIN context_query_principal p ON p.id=q.account_id JOIN download_worker w ON w.id=q.worker_id AND w.query_id=q.id AND w.session_id IS NULL
-WHERE q.root_id=$1 AND q.operation_id=$2 AND q.query->'Scope'->>'ArtifactID'=$3`, root, operation, artifactID).Scan(&raw, &job, &binding, &units, &rows, &rootSpent, &workloadSpent, &principalSpent, &queries)
+WHERE q.root_id=$1 AND q.operation_id=$2 AND q.query->'Scope'->>'ArtifactID'=$3`, root, operation, artifactID).Scan(&raw, &job, &binding, &units, &rows, &rootSpent, &workloadSpent, &principalSpent, &expectedPrincipal, &queries)
 				var intent query.ContextProjectionWorkerIntent
 				if err != nil || json.Unmarshal(raw, &intent) != nil || !intent.Valid() || json.Unmarshal(job, &observed.Job) != nil || json.Unmarshal(binding, &observed.Binding) != nil {
 					stop()
 					t.Fatal("packet exact worker/query SQL readback", err)
 				}
 				scope := intent.Query.Scope
-				if scope.NativeType != artifact.PCAPNGArtifact || scope.SourceFormat != artifact.PCAPNGFormat || scope.DisplayVersion != query.PacketSummaryDisplayVersion || scope.Selection != (query.LineSelection{}) || scope.Headers != (query.HTTPHeaderWindow{}) || scope.Profile != (query.ProfileSummarySelection{}) || scope.Syscalls != (query.SyscallWindow{}) || scope.Comparison != (query.ProfileComparisonWindow{}) || scope.SourceProjectionDigest != (artifact.Digest{}) || scope.ArtifactID != artifactID || handle != "" && intent.Query.ID != handle || units != query.PacketSummaryQueryUnits || rows != 1 || queries < 1 || queries > 2 || rootSpent != queries*query.PacketSummaryQueryUnits || workloadSpent != rootSpent || principalSpent != query.PacketSummaryQueryUnits || intent.Query.Plan.Profile.Worker.MemoryBytes != query.ProfileComparisonWorkerBytes || intent.Query.Plan.Profile.Worker.WorkerTransientBytes != query.ProfileComparisonWorkerBytes {
+				if scope.NativeType != artifact.PCAPNGArtifact || scope.SourceFormat != artifact.PCAPNGFormat || scope.DisplayVersion != query.PacketSummaryDisplayVersion || scope.Selection != (query.LineSelection{}) || scope.Headers != (query.HTTPHeaderWindow{}) || scope.Profile != (query.ProfileSummarySelection{}) || scope.Syscalls != (query.SyscallWindow{}) || scope.Comparison != (query.ProfileComparisonWindow{}) || scope.SourceProjectionDigest != (artifact.Digest{}) || scope.ArtifactID != artifactID || handle != "" && intent.Query.ID != handle || intent.Query.Plan.Profile.Worker.MemoryBytes != query.ProfileComparisonWorkerBytes || intent.Query.Plan.Profile.Worker.WorkerTransientBytes != query.ProfileComparisonWorkerBytes {
 					stop()
 					t.Fatal("packet source/selection/paid resource reservation changed")
+				}
+				if units != query.PacketSummaryQueryUnits || rows != 1 || queries < 1 || queries > 2 || rootSpent != queries*query.PacketSummaryQueryUnits || workloadSpent != rootSpent || !installedPacketSummaryPrincipalAccounting(principalSpent, expectedPrincipal) {
+					stop()
+					t.Fatalf("packet accounting mismatch: units=%d want=%d children=%d want1 queries=%d root=%d workload=%d want=%d principal=%d exact_account_units=%d", units, query.PacketSummaryQueryUnits, rows, queries, rootSpent, workloadSpent, queries*query.PacketSummaryQueryUnits, principalSpent, expectedPrincipal)
 				}
 				observed.Intent = intent.Worker
 				pod, err := api.CoreV1().Pods(observed.Binding.Namespace).Get(call, observed.Binding.Pod, meta.GetOptions{})
@@ -72,4 +76,9 @@ WHERE q.root_id=$1 AND q.operation_id=$2 AND q.query->'Scope'->>'ArtifactID'=$3`
 			return retirement
 		}
 	}
+}
+
+// Used by the installed readback and its real-role two-client regression.
+func installedPacketSummaryPrincipalAccounting(allocated, exactAccountUnits int) bool {
+	return exactAccountUnits > 0 && allocated == exactAccountUnits
 }
