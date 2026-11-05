@@ -365,3 +365,22 @@ it('labels the saved syscall query inbox as inspection rather than a native down
   expect(screen.queryByRole('link', { name: /Download 1/ })).toBeNull();
 });
 it('labels saved-log approval as raw inspection with the reviewed page pool',async()=>{const client=new SyntheticApprovals();const detail=rawGrant(1);detail.raw_access.operations=['get_logs'];detail.raw_access.artifacts[0].native_type='logs';client.detail=detail;expect(validOutput_get_grant(result(detail))).toBe(true);render(<ApprovalsWorkspace session={session} scope={new AbortController().signal} client={client} grantID={detail.grant_id}/>);expect(await screen.findByRole('heading',{name:'Inspect existing raw evidence'})).toBeTruthy();expect(screen.getByText(/Saved log queries over/)).toBeTruthy();expect(screen.getByText(/24 KiB and one operation/)).toBeTruthy();expect(screen.queryByText(/Saved packet queries/)).toBeNull();});
+
+it('shows the reviewed finite logs window without syscall or ring claims', async () => {
+  const client = new SyntheticApprovals();
+  const logs: CollectionGrant = { ...grant, observation_limits: undefined, data_class: 'raw', reasons: [{ action_id: 'logs', code: 'recordingApprovalRequired' }],
+    actions: [{ action_id: 'logs', kind: 'logs', execution_mode: 'onTrigger', before: '1h', after: '10s', max_bytes: 64 * 1024 * 1024, sensitive: ['recordingApprovalRequired'] }] };
+  client.detail = logs;
+  expect(validOutput_get_grant(result(logs))).toBe(true);
+  render(<ApprovalsWorkspace session={session} scope={new AbortController().signal} client={client} grantID={id(41)}/>);
+  expect(await screen.findByText('No recording ring')).toBeTruthy();
+  expect(screen.getByText('1h before, 10s after')).toBeTruthy();
+  expect(screen.queryByText('Syscalls')).toBeNull();
+  expect(screen.queryByText(/0 bytes/)).toBeNull();
+  for (const change of [{ execution_mode: 'ongoing' }, { ring_max_bytes: 1024 }, { ring_max_age: '30s' }, { filter: 'tcp' }, { max_bytes: 64 * 1024 * 1024 + 1 }]) {
+    const invalid = structuredClone(logs); Object.assign(invalid.actions[0], change);
+    expect(validOutput_get_grant(result(invalid))).toBe(false);
+  }
+  const missing = structuredClone(logs); delete missing.actions[0].before;
+  expect(validOutput_get_grant(result(missing))).toBe(false);
+});

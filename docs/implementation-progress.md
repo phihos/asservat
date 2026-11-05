@@ -1,5 +1,23 @@
 # Sustained implementation progress
 
+## Finite logs approval view contract correction (2026-11-06)
+
+Fresh signed `94519f1b` acknowledges the original logs request, verifies and
+publishes its encrypted result, and serves its case. The installed run then
+fails at `get_grant` (Go/harness1,466.215s): the public action union still lists
+packet/syscall/profile only. All4,365 original Git inputs match, sources remain
+unchanged, provider logs exit0 and scratch is removed. The retained original
+report and subsequent strict cleanup remain separate; no operation was replayed.
+
+A new C20 regression reproduces the finite logs review rejection. The canonical,
+browser and embedded runtime contracts now admit an exact onTrigger logs window,
+positive64MiB maximum and no ring/filter/profile fields. Other action branches
+are byte-identical. The approval page labels Logs and reports no recording ring.
+Focused grant races pass4.922s, all29 approval UI tests pass, final pre-push passes,
+and independent eight-file review is clear with exact hash readback. A fresh
+installed disclosure/download/browser campaign is still required; collection
+publication alone does not qualify the complete logs workflow.
+
 ## Finite logs typed start contract correction (2026-11-05)
 
 The repaired `a03baf86` constructor reaches output preparation in a fresh
