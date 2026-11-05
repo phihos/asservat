@@ -138,6 +138,7 @@ func qualifyPacketQueryManagedLifecycle(t *testing.T, f *queryLedgerFixture) {
 	scope.NativeType, scope.SourceFormat, scope.DisplayVersion = expected.NativeType, expected.Type().Format, query.PacketQueryDisplayVersion
 	scope.SourceProjectionDigest, scope.Selection = artifact.Digest{}, query.LineSelection{}
 	selection := query.PacketQuerySelection{Fields: []query.PacketQueryField{query.PacketIndex, query.PacketCapturedLength, query.PacketWireLength}, MaxPackets: 100, MaxScanBytes: 8 << 20}
+	selection.Program = packetQueryNonemptyProgram()
 	scope.PacketQuery, err = selection.Window()
 	if err != nil {
 		t.Fatal(err)

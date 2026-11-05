@@ -104,9 +104,9 @@ BEGIN
  END LOOP;
  IF (w->>'ProgramCount')::integer=0 THEN RETURN w->'CompilerDigest'=to_jsonb(array_fill(0,ARRAY[32])) AND w->'ProgramDigest'=to_jsonb(array_fill(0,ARRAY[32])); END IF;
  d:=decode('9237f5bae9dcf3a91823d9963ec43b7c0e2e3374ef2ad57d92c8cd39530f4723','hex');
- IF w->'CompilerDigest' IS DISTINCT FROM to_jsonb(ARRAY(SELECT get_byte(d,i) FROM generate_series(0,31)i)) THEN RETURN false; END IF;
+ IF w->'CompilerDigest' IS DISTINCT FROM to_jsonb(ARRAY(SELECT get_byte(d,digest_byte.ordinal) FROM generate_series(0,31) AS digest_byte(ordinal))) THEN RETURN false; END IF;
  d:=sha256(program);
- RETURN w->'ProgramDigest'=to_jsonb(ARRAY(SELECT get_byte(d,i) FROM generate_series(0,31)i));
+ RETURN w->'ProgramDigest'=to_jsonb(ARRAY(SELECT get_byte(d,digest_byte.ordinal) FROM generate_series(0,31) AS digest_byte(ordinal)));
 EXCEPTION WHEN invalid_text_representation OR numeric_value_out_of_range OR datetime_field_overflow THEN RETURN false;
 END $$;
 -- +goose StatementEnd

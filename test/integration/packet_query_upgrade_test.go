@@ -5,9 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	query "asservat.local/asservat/internal/domain/analysis"
 	"asservat.local/asservat/internal/domain/artifact"
@@ -36,6 +38,34 @@ func packetQuerySQLScope(t *testing.T, raw bool) []byte {
 	}
 	return b
 }
+
+// A nonempty verified BPF program reaches both SQL digest checks. Empty
+// programs return earlier and cannot qualify this producer/consumer boundary.
+func packetQueryNonemptyProgram() query.PacketQueryProgram {
+	instructions := []artifact.FilterInstruction{{Code: 6, K: 0xffffffff}}
+	return query.PacketQueryProgram{Instructions: instructions, CompilerDigest: query.PacketQueryCompilerDigest(), ProgramDigest: query.PacketQueryProgramDigest(instructions)}
+}
+
+func TestPacketQueryNonemptyProgramWithRealPostgres(t *testing.T) {
+	path := os.Getenv("ASSERVAT_CUSTODY_FIXTURES")
+	if path == "" {
+		t.Skip("run the owned custody fixture")
+	}
+	var f fixture
+	data, err := os.ReadFile(path)
+	if err != nil || json.Unmarshal(data, &f) != nil || f.Postgres == "" {
+		t.Fatal("fixture unavailable", err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	conn, err := pgx.Connect(ctx, f.Postgres)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close(context.Background())
+	qualifyPacketQuerySQLFunctions(t, ctx, conn)
+}
+
 func qualifyPacketQuerySQLFunctions(t *testing.T, ctx context.Context, conn *pgx.Conn) {
 	t.Helper()
 	for _, raw := range []bool{false, true} {
@@ -50,13 +80,28 @@ func qualifyPacketQuerySQLFunctions(t *testing.T, ctx context.Context, conn *pgx
 		if err := json.Unmarshal(b, &scope); err != nil {
 			t.Fatal(err)
 		}
+		compiled := scope.PacketQuery.Selection()
+		compiled.Program = packetQueryNonemptyProgram()
+		window, err := compiled.Window()
+		if err != nil {
+			t.Fatal("valid nonempty program", err)
+		}
+		scope.PacketQuery = window
+		encoded, err := json.Marshal(scope)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err = conn.QueryRow(ctx, `SELECT context_query_scope_source_valid($1::jsonb)`, encoded).Scan(&good); err != nil || !good {
+			t.Fatal("nonempty compiled packet query SQL source", raw, good, err)
+		}
 		for _, mutate := range []func(*query.ContextProjectionScope){
 			func(s *query.ContextProjectionScope) { s.PacketQuery.Fields[2] = query.PacketWireLength },
 			func(s *query.ContextProjectionScope) {
 				s.PacketQuery.Instructions[0] = artifact.FilterInstruction{Code: 6, K: 1}
 			},
 			func(s *query.ContextProjectionScope) { s.PacketQuery.MaxPackets = 101 },
-			func(s *query.ContextProjectionScope) { s.PacketQuery.ProgramDigest[0] = 1 },
+			func(s *query.ContextProjectionScope) { s.PacketQuery.ProgramDigest[0] ^= 1 },
+			func(s *query.ContextProjectionScope) { s.PacketQuery.CompilerDigest[0] ^= 1 },
 			func(s *query.ContextProjectionScope) { s.SourceFormat = "arbitrary" },
 		} {
 			bad := scope

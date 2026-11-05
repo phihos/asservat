@@ -1,5 +1,25 @@
 # Sustained implementation progress
 
+## First installed packet-query attempt failed; SQL correction prepared (2026-11-05)
+
+PR169 candidate `329a48fc` passed all 15 eligible CI jobs. Its separate installed
+`continuation-manual-raw` run41986407470 failed (Go/harness 1, Go697.503s).
+Both fixed summaries passed before the first raw query returned HTTP503.
+PostgreSQL retained SQLSTATE42702: the nonempty compiled-filter digest checks
+used an unqualified `i` that collided with their PL/pgSQL loop variable.
+The earlier empty-program service fixtures bypassed this branch.
+
+The correction qualifies both digest-byte columns without changing validation.
+A direct PostgreSQL regression reproduces the old failure with a valid nonempty
+program; both managed lifecycle fixtures now also use nonempty programs.
+Focused race/generation checks and independent source review pass. Corrected
+managed-service, upgrade and installed results remain pending.
+
+[Failed installed originals](../test/results/saved-packet-query-native-41986407470/README.md)
+preserve the terminal run, verified ZIP and exact 4,255 Git source hashes.
+Sources stayed unchanged, cleanup was empty and scratch was removed. Those
+facts do not establish query delivery or native parity. PR169 remains open.
+
 ## Saved packet queries implemented; named local checks passed (2026-11-05)
 
 The private candidate at `360ba3f60d71c500dff6e5c6512ce38a71421f0d` implements
