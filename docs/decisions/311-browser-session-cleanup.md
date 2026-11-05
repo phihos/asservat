@@ -19,6 +19,15 @@ The compiled browser-settings role also lacked the metadata reads and candidate
 row locks needed by pruning. An actual compiled-profile regression first failed
 on `browser_login.id`; this is local component evidence, not an installed test.
 
+The first actual worker-role campaign then exposed a separate existing SQL
+bound defect: one pass removed 299 of 304 sessions rather than at most 256. An
+isolated PostgreSQL EXPLAIN ANALYZE reproduced a nested-loop semi join that
+rescanned the limited candidate subquery 304 times. All three prune statements
+now materialize their candidate IDs exactly once before DELETE. Their expiry,
+epoch, refresh-claim and SKIP LOCKED predicates and 256-row limits stay unchanged;
+there is no new table, role or migration. The actual-service regression checks
+both the first bounded pass and the remainder on the next independent pass.
+
 ## Decision
 
 Reuse the installed permission worker's browser-settings child, its existing

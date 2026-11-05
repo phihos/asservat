@@ -3,11 +3,14 @@ SELECT * FROM browser_session_root WHERE id=$1 FOR UPDATE;
 -- name: ShareBrowserRoot :one
 SELECT * FROM browser_session_root WHERE id=$1 FOR SHARE;
 -- name: PruneBrowserLogins :exec
-DELETE FROM browser_login AS target WHERE target.root_id=$1 AND target.id IN (SELECT candidate.id FROM browser_login AS candidate WHERE candidate.root_id=$1 AND (candidate.expires_at<=clock_timestamp() OR candidate.epoch<>$2) ORDER BY candidate.expires_at,candidate.id LIMIT 256 FOR UPDATE SKIP LOCKED);
+WITH candidates AS MATERIALIZED (SELECT candidate.id FROM browser_login AS candidate WHERE candidate.root_id=$1 AND (candidate.expires_at<=clock_timestamp() OR candidate.epoch<>$2) ORDER BY candidate.expires_at,candidate.id LIMIT 256 FOR UPDATE SKIP LOCKED)
+DELETE FROM browser_login AS target USING candidates WHERE target.root_id=$1 AND target.id=candidates.id;
 -- name: PruneBrowserSessions :exec
-DELETE FROM browser_session AS target WHERE target.root_id=$1 AND target.id IN (SELECT candidate.id FROM browser_session AS candidate WHERE candidate.root_id=$1 AND (candidate.expires_at<=clock_timestamp() OR candidate.epoch<>$2 OR candidate.claim_until<=clock_timestamp()) ORDER BY candidate.expires_at,candidate.id LIMIT 256 FOR UPDATE SKIP LOCKED);
+WITH candidates AS MATERIALIZED (SELECT candidate.id FROM browser_session AS candidate WHERE candidate.root_id=$1 AND (candidate.expires_at<=clock_timestamp() OR candidate.epoch<>$2 OR candidate.claim_until<=clock_timestamp()) ORDER BY candidate.expires_at,candidate.id LIMIT 256 FOR UPDATE SKIP LOCKED)
+DELETE FROM browser_session AS target USING candidates WHERE target.root_id=$1 AND target.id=candidates.id;
 -- name: PruneBrowserLogout :exec
-DELETE FROM browser_logout AS target WHERE target.root_id=$1 AND target.id IN (SELECT candidate.id FROM browser_logout AS candidate WHERE candidate.root_id=$1 AND (candidate.expires_at<=clock_timestamp() OR candidate.epoch<>$2) ORDER BY candidate.expires_at,candidate.id LIMIT 256 FOR UPDATE SKIP LOCKED);
+WITH candidates AS MATERIALIZED (SELECT candidate.id FROM browser_logout AS candidate WHERE candidate.root_id=$1 AND (candidate.expires_at<=clock_timestamp() OR candidate.epoch<>$2) ORDER BY candidate.expires_at,candidate.id LIMIT 256 FOR UPDATE SKIP LOCKED)
+DELETE FROM browser_logout AS target USING candidates WHERE target.root_id=$1 AND target.id=candidates.id;
 -- name: CountBrowserLogins :one
 SELECT count(*) FROM browser_login WHERE root_id=$1;
 -- name: CountBrowserSessions :one
