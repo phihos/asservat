@@ -80,6 +80,14 @@
       "original_sha256": "af665bd1d3a7e9e1e535de67e5ce6b59df78e7adf35be349f60d5772160030ce",
       "gzip_bytes": 12182,
       "gzip_sha256": "ca13ee69f9c28633c73537b9a1c410e48b1e25ff8e3361cdad0f903c2c4e7b0c"
+    },
+    {
+      "member": "terminal-summary.txt.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-native-42038849665/terminal-summary.txt",
+      "original_bytes": 616,
+      "original_sha256": "a12a7d2d033ff1d5565c1a26b05cd5f2609c60bab079e3992c03b19f25d12ead",
+      "gzip_bytes": 404,
+      "gzip_sha256": "9dd7ee268218d634245c6323b8a58a133d5bb5ef1ccc50ee300b3a06a2ae09ae"
     }
   ]
 }

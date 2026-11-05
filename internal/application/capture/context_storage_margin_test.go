@@ -129,7 +129,9 @@ func TestContextStorageMarginDoesNotRenewEarlierAuthority(t *testing.T) {
 func TestContextStorageMarginCancellationJoinsAuthoritativeRead(t *testing.T) {
 	f := newInvestigationFixture()
 	p := f.preview(t)
-	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+	// Keep the caller below the scheduling reserve so the first read is
+	// authoritative regardless of the reserve's current duration.
+	ctx, cancel := context.WithTimeout(t.Context(), storageResponseReserve/2)
 	defer cancel()
 	originalUntil, _ := ctx.Deadline()
 	entered, cancelled, release, exited := make(chan struct{}), make(chan struct{}), make(chan struct{}), make(chan struct{})

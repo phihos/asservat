@@ -1,0 +1,239 @@
+{
+  "format": "syscall-query-cancellation-local/v1",
+  "parent": "ce766620ce5f6a157a9972f122e90949c06d9e0d",
+  "scope": "Test-only shortcaller correction and interrupted-harness diagnostics; no installed workflow pass or runtime-overrun explanation",
+  "members": [
+    {
+      "member": "cancellation-buffered-repro-helm_registry.py.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query/cancellation-buffered-repro-helm_registry.py",
+      "original_bytes": 16698,
+      "original_sha256": "69faeecb70d34d1fd2d21b3dd90aefcd3b3821fc97ecdfa63961b8954070111b",
+      "gzip_bytes": 5373,
+      "gzip_sha256": "7c970b60a4d8d04714fac093d879d4a330c654830fda2ffbb2d6057e6d57bba1"
+    },
+    {
+      "member": "cancellation-buffered-repro-native_kube_audit.py.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query/cancellation-buffered-repro-native_kube_audit.py",
+      "original_bytes": 11395,
+      "original_sha256": "c9b95fe8ef4207d08ba9b6ad9c4ab0d807c90d2cefdf1f142d2ad9f8743152c6",
+      "gzip_bytes": 4060,
+      "gzip_sha256": "a9b34c80dbcf0e7f59454019aa14bfc593b7a075df4051034c53d5e3e71ab9ba"
+    },
+    {
+      "member": "cancellation-buffered-repro-test-context-storage.py.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query/cancellation-buffered-repro-test-context-storage.py",
+      "original_bytes": 97316,
+      "original_sha256": "09b0e9250890202a4b37de1db849cd26c791706eea0c2c13c44d226cd46fdb96",
+      "gzip_bytes": 24626,
+      "gzip_sha256": "1d84b87ecb71c21464e05a68f8c3c973a7f083d954f684d12b8bd57a40285629"
+    },
+    {
+      "member": "cancellation-buffered-repro-test-regional-context-selection.py.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query/cancellation-buffered-repro-test-regional-context-selection.py",
+      "original_bytes": 53496,
+      "original_sha256": "46a6c96538c68a12f7c5be3d14ff363e3a3d417f1e230952ec5d818a132375b8",
+      "gzip_bytes": 11944,
+      "gzip_sha256": "374d5a60ca476bb5169b997e8baaf074c342df15f60cebc2d3eb7108aee623e4"
+    },
+    {
+      "member": "cancellation-final-context_storage_margin_test.go.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query/cancellation-final-context_storage_margin_test.go",
+      "original_bytes": 7119,
+      "original_sha256": "162251d75525b547d8f8078a616c351a24f140bb9fae48dd616491d9091a402c",
+      "gzip_bytes": 2235,
+      "gzip_sha256": "45b6cb77710c77de492087d51fd975fcbf3c75d3d82a2e5a2d9248a3a6099d90"
+    },
+    {
+      "member": "cancellation-final-test-context-storage.py.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query/cancellation-final-test-context-storage.py",
+      "original_bytes": 97342,
+      "original_sha256": "2ca7b908c124884271035f1d05df13ae04c8590c092f626d111bb4bea18e9680",
+      "gzip_bytes": 24635,
+      "gzip_sha256": "e78548cad816ce88b79481e251a8ba19524d81378ed976e927a67c51b121e0d7"
+    },
+    {
+      "member": "cancellation-final-test-regional-context-selection.py.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query/cancellation-final-test-regional-context-selection.py",
+      "original_bytes": 53496,
+      "original_sha256": "46a6c96538c68a12f7c5be3d14ff363e3a3d417f1e230952ec5d818a132375b8",
+      "gzip_bytes": 11944,
+      "gzip_sha256": "374d5a60ca476bb5169b997e8baaf074c342df15f60cebc2d3eb7108aee623e4"
+    },
+    {
+      "member": "cancellation-final.patch.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query/cancellation-final.patch",
+      "original_bytes": 10608,
+      "original_sha256": "eb3402e2f43edcd44f60cc09df3ee56e930d949e3d8dc2443500a8af4839b146",
+      "gzip_bytes": 3312,
+      "gzip_sha256": "1f59e21f703e69c017c155979b568da4a7e254d2db98a27c6826237bc0e4cfe8"
+    },
+    {
+      "member": "cancellation-root-pre-push.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query/cancellation-root-pre-push.log",
+      "original_bytes": 11566,
+      "original_sha256": "1ebeb225d9e69fe0f9aa6b3e41c8f672396328ee7e792b6004be98faa435c2d6",
+      "gzip_bytes": 2595,
+      "gzip_sha256": "57348640ee15ef883ea8274ec9722c142b270398eed6ff00c44ecaad1185ac0a"
+    },
+    {
+      "member": "harness-cancel-buffered-red.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query/harness-cancel-buffered-red.log",
+      "original_bytes": 992,
+      "original_sha256": "db821199a58070f50bb9d3929c32a4d9a8d8b8f4de8ec83d81e449ba72c41691",
+      "gzip_bytes": 380,
+      "gzip_sha256": "87dc7c9d788caee1ac4ebc7a35d9664992080b92dd1c13e5dcff77e66584dbe1"
+    },
+    {
+      "member": "harness-cancel-buffered-red.patch.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query/harness-cancel-buffered-red.patch",
+      "original_bytes": 8205,
+      "original_sha256": "7bfac7cd28a3c79aa407bc28062964644bd3209016c96cb0250bfa6c4f1031a7",
+      "gzip_bytes": 2623,
+      "gzip_sha256": "0e72d5ec7beb095f87f769217f279b537cde72fca7914c14febd7eee8ad68240"
+    },
+    {
+      "member": "harness-cancel-final-buffered-red.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query/harness-cancel-final-buffered-red.log",
+      "original_bytes": 1017,
+      "original_sha256": "f568ee8535ab8b6d14311395b5eef8e9c662f912ae22ba5db3159120b2983947",
+      "gzip_bytes": 397,
+      "gzip_sha256": "4f183e457cc7fbe407acef9d99981d36293637576fb95dc37a474333286026ee"
+    },
+    {
+      "member": "harness-cancel-selection-final-green.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query/harness-cancel-selection-final-green.log",
+      "original_bytes": 137,
+      "original_sha256": "b07f89dce0a261d58b44f32674fb14e26331ce684bf107ae31da05df3b3a7760",
+      "gzip_bytes": 56,
+      "gzip_sha256": "2ec7b8d594b2688fd9b8ad2da443e6cd9be8d944066250c7e6869a848216b3c4"
+    },
+    {
+      "member": "harness-cancel-selection-green.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query/harness-cancel-selection-green.log",
+      "original_bytes": 527,
+      "original_sha256": "7cdc80cb6905a6356faf7ea420486371ac4d5092b6e7d19f0a0bb0b2d03cc5c3",
+      "gzip_bytes": 335,
+      "gzip_sha256": "06ca3e6f91715003c4ad8653d5fa29824a24e0135ee205d325647b2d916f7b6c"
+    },
+    {
+      "member": "harness-cancel-test-syntax-setup-failure.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query/harness-cancel-test-syntax-setup-failure.log",
+      "original_bytes": 360,
+      "original_sha256": "9e7877ac6441d28bb479cb32322095f1b895adb943030325a064ae8e73c9036a",
+      "gzip_bytes": 268,
+      "gzip_sha256": "474077d832e3cfe28d11af6effcdac3f26ac041c9883754a6a3643c1bcfd1321"
+    },
+    {
+      "member": "harness-cancellation-output-fix-handoff.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query/harness-cancellation-output-fix-handoff.json",
+      "original_bytes": 5477,
+      "original_sha256": "1808e7103de8be8033a8674dd61542c605f66663ad43fbf3412f0208932a4ff8",
+      "gzip_bytes": 2454,
+      "gzip_sha256": "4eac21f87369542fb92c234270a5cb32ffde01c88e291cd611ec5477e71d19fa"
+    },
+    {
+      "member": "margin-cancellation-baseline-repeat.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query/margin-cancellation-baseline-repeat.log",
+      "original_bytes": 11058,
+      "original_sha256": "327ec067e9eeb490727f0e6fb2201a277b6f9eef70efc9ef8dd118bfabc90f90",
+      "gzip_bytes": 324,
+      "gzip_sha256": "c24ad67d4b2db1a72b0cffe6e03fb81f4bcdf922a021d2a41f94deb5fa8df7e9"
+    },
+    {
+      "member": "margin-cancellation-baseline-sha.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query/margin-cancellation-baseline-sha.json",
+      "original_bytes": 216,
+      "original_sha256": "14fb390963ad24664999648342b231c96514ed39bfea6cde2e9741dc71b41f0d",
+      "gzip_bytes": 189,
+      "gzip_sha256": "1c92c5d5835bd159f5007005af24c3009036a6af0bbd46d988535bd14a764655"
+    },
+    {
+      "member": "margin-cancellation-baseline-test.go.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query/margin-cancellation-baseline-test.go",
+      "original_bytes": 6972,
+      "original_sha256": "7206285a14290ab621e8cd5e14cd8b7d66c3b059ad1d3c8d61d0b419266bc160",
+      "gzip_bytes": 2168,
+      "gzip_sha256": "62476e6b8ab8bba6705d38d354d3f6ae8f885fefd275dc43cd274fddf0fab7f0"
+    },
+    {
+      "member": "margin-cancellation-fix-handoff.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query/margin-cancellation-fix-handoff.json",
+      "original_bytes": 4605,
+      "original_sha256": "33c76403c67901301cc4c0432ad0df29cf25874cc5086f907f3b6c4374d55ae2",
+      "gzip_bytes": 1670,
+      "gzip_sha256": "1d0bd35984364352db38c68f65cf005b6576f86e53e52e468f3a97036440d0b7"
+    },
+    {
+      "member": "margin-cancellation-fix.patch.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query/margin-cancellation-fix.patch",
+      "original_bytes": 980,
+      "original_sha256": "73f514c8265a0fb2df62b4642e57a4409c62e9a1ae17699ca3ac3f392ea52a90",
+      "gzip_bytes": 457,
+      "gzip_sha256": "28fe39ceb70a819c3fca35cab30f8e5fa2dd9aece203ad5db0d459f5106984b8"
+    },
+    {
+      "member": "margin-cancellation-fixed-repeat.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query/margin-cancellation-fixed-repeat.log",
+      "original_bytes": 7370,
+      "original_sha256": "59265599247f73c1f4d93a54b05886b5c9dbacd449a4b0d8bc34978dfb050083",
+      "gzip_bytes": 201,
+      "gzip_sha256": "8e105bba6b2e5088bc06166ebb5f9efcd2fdc6bd286a8bb3745380e3af646b4d"
+    },
+    {
+      "member": "margin-cancellation-fixed-test.go.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query/margin-cancellation-fixed-test.go",
+      "original_bytes": 7119,
+      "original_sha256": "162251d75525b547d8f8078a616c351a24f140bb9fae48dd616491d9091a402c",
+      "gzip_bytes": 2235,
+      "gzip_sha256": "45b6cb77710c77de492087d51fd975fcbf3c75d3d82a2e5a2d9248a3a6099d90"
+    },
+    {
+      "member": "margin-cancellation-full-capture-race.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query/margin-cancellation-full-capture-race.log",
+      "original_bytes": 66,
+      "original_sha256": "4f6ec8414b115e161400c5bbf19272b5c4c5499582d648b589b35b5f6b497650",
+      "gzip_bytes": 77,
+      "gzip_sha256": "7eec100102049ad53023e3e9ce3316807dcbecec292c42f2053463d29104e759"
+    },
+    {
+      "member": "margin-cancellation-green.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query/margin-cancellation-green.log",
+      "original_bytes": 216,
+      "original_sha256": "2eb156ae58e4a19dc503cdbe84875fd79d10e25919118ef67216a52fe9c1143a",
+      "gzip_bytes": 157,
+      "gzip_sha256": "4c847bd25f209920e879ce3a6bc36259175e4ead7d4e8a2e0f1ea12673d9b872"
+    },
+    {
+      "member": "margin-cancellation-independent-review.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query/margin-cancellation-independent-review.json",
+      "original_bytes": 1398,
+      "original_sha256": "c12e9acce6b7264adc2059c353a03411c9fd86a0a357d79e55eeaecf59c11d9a",
+      "gzip_bytes": 824,
+      "gzip_sha256": "ae7855fb3e12ffcdab2dea9db571cb9291d509d5661c2763f82677945c39d477"
+    },
+    {
+      "member": "margin-cancellation-red.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query/margin-cancellation-red.log",
+      "original_bytes": 216,
+      "original_sha256": "2eb156ae58e4a19dc503cdbe84875fd79d10e25919118ef67216a52fe9c1143a",
+      "gzip_bytes": 157,
+      "gzip_sha256": "4c847bd25f209920e879ce3a6bc36259175e4ead7d4e8a2e0f1ea12673d9b872"
+    },
+    {
+      "member": "harness-cancellation-output-independent-review.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query/harness-cancellation-output-independent-review.json",
+      "original_bytes": 2729,
+      "original_sha256": "b2130b8e5420f9f61804cbf1a3780f2cb46552b7c7f6209a1df3de3d357b77c9",
+      "gzip_bytes": 1447,
+      "gzip_sha256": "b2089c138eb6ff1a23a9bdf8519dcd9ad14ac03edfe1384f205121cd7011d6c1"
+    },
+    {
+      "member": "cancellation-final-spec.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query/cancellation-final-spec.log",
+      "original_bytes": 270,
+      "original_sha256": "ba2ac94726746c49fc006b7b06409e0c60cf9f70ceb6e8df7a8676b402e63bbb",
+      "gzip_bytes": 218,
+      "gzip_sha256": "4d2813067aa786e5fb803312112c890ddebfc8187b98a124fc0c209114dbf98f"
+    }
+  ]
+}

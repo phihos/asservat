@@ -93,6 +93,29 @@ def postgres_fixture_options(regional_context_start=None, lock_waits=False, inst
     return options
 
 
+def write_environment_report(path, report):
+    """Keep the last complete report readable if this process is killed mid-write."""
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text(json.dumps(report, indent=2) + "\n")
+    temporary.replace(path)
+
+
+def record_go_output(command, env, results, report):
+    """Retain the original child output and elapsed line times."""
+    report["harnessState"] = "running"
+    write_environment_report(results/"context-storage-environment.json", report)
+    began = time.monotonic()
+    # SIGTERM/hard runner cancellation may bypass finally. Persist every
+    # received line now; a partial file never supplies a terminal verdict.
+    with (results/"context-storage.log").open("wb", buffering=0) as log, (results/"context-storage-timing.log").open("wb", buffering=0) as timing:
+        process = subprocess.Popen(command, cwd=ROOT, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        with process.stdout:
+            for line in process.stdout:
+                log.write(line)
+                timing.write(("%8.1f " % (time.monotonic() - began)).encode() + line)
+        return process.wait()
+
+
 def source_hashes():
     files = [ROOT/"go.mod", ROOT/"go.sum", Path(__file__), ROOT/"scripts/fetch-gadget.sh", ROOT/"scripts/ci-native.sh", ROOT/".github/workflows/native.yml"]
     files += [ROOT/"scripts/package-argument-gadget.py"]
@@ -595,6 +618,8 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
             report["installedPolicyArgumentsFocus"] = collector_qualification and focus == "policy-arguments"
             report["installedPolicyProfileFocus"] = collector_qualification and focus == "policy-profile"
             report["sourceHashes"] = source_hashes()
+            report.update({"harnessState": "setup", "goTestExit": None, "testExit": None, "cleanupComplete": False})
+            write_environment_report(ROOT/"test/results/context-storage-environment.json", report)
             if helm_bootstrap:
                 report["helmVersion"] = run(["helm", "version", "--short"])
                 report["images"]["registry"] = REGISTRY
@@ -950,13 +975,7 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
                 audit_started = True
             # Each output line also goes, with its elapsed seconds, to a timing
             # log, so slow phases are measured rather than guessed.
-            began = time.monotonic()
-            with (ROOT/"test/results/context-storage.log").open("wb") as log, (ROOT/"test/results/context-storage-timing.log").open("wb") as timing:
-                process = subprocess.Popen(command, cwd=ROOT, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-                for line in process.stdout:
-                    log.write(line)
-                    timing.write(("%8.1f " % (time.monotonic() - began)).encode() + line)
-                exit_code = process.wait()
+            exit_code = record_go_output(command, env, ROOT/"test/results", report)
             report["goTestExit"] = exit_code
             raw_output = (ROOT/"test/results/context-storage.log").read_bytes()
             try:
@@ -1133,7 +1152,9 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
                 report["sourceUnchangedDuringTest"] = report["sourceHashes"] == source_hashes()
                 if not report["sourceUnchangedDuringTest"]:
                     exit_code = 1
-            (ROOT/"test/results/context-storage-environment.json").write_text(json.dumps(report, indent=2)+"\n")
+            report["harnessState"] = "finished"
+            report["cleanupComplete"] = not keep and not failures
+            write_environment_report(ROOT/"test/results/context-storage-environment.json", report)
             if failures: raise RuntimeError("Owned fixtures need cleanup: "+", ".join(failures))
         return exit_code
 

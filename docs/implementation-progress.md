@@ -1,5 +1,29 @@
 # Sustained implementation progress
 
+## Cancellation fixture and interrupted-run diagnostics corrected locally (2026-11-05)
+
+The storage cancellation fixture now derives its short caller from half the
+response reserve, restoring its intended no-hint authoritative-read setup.
+The unchanged fixture reproduces29 failures in50 race runs; the correction
+passes50/50, and the full capture package races pass42.847s. All original
+cancellation/deadline/join/no-effect assertions remain; production is unchanged.
+
+The interrupted native run lost small output because both log files were
+buffered and the environment report was only written after cleanup. The harness
+now writes received lines without buffering and atomically checkpoints setup/
+running source facts with null exits and incomplete cleanup. Actual terminal
+cleanup still supplies the final verdict. A real child/process-group termination
+regression reproduces buffered loss and passes after the correction;38 existing
+selection/regression tests pass with ResourceWarnings treated as errors. A
+separate child-exit control preserves exact output and nonzero status.
+
+These changes do not explain the installed runtime overrun, extend20 minutes,
+assert cleanup after a kill, or establish Repeat/Stop success. Original failed
+and cancelled evidence remains. Required local pre-push checks and independent
+review pass; [local originals](../test/results/saved-syscall-query-cancellation-local/README.md)
+retain all results. One observable installed campaign remains required before
+merging PR171.
+
 ## Corrected candidate CI failure and installed cancellation retained (2026-11-05)
 
 Signed `973c9b13` reached terminal CI42038828377 failure and native42038849665

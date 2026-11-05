@@ -13,6 +13,9 @@ import json
 import tempfile
 import hashlib
 import subprocess
+import signal
+import sys
+import time
 from types import SimpleNamespace
 
 spec = importlib.util.spec_from_file_location("context_fixture", Path(__file__).with_name("test-context-storage.py"))
@@ -21,6 +24,66 @@ spec.loader.exec_module(fixture)
 
 
 class RegionalContextSelection(unittest.TestCase):
+    def test_cancelled_go_capture_retains_partial_output_and_source_checkpoint(self):
+        # Real subprocesses, no cluster/services: terminate the harness while a
+        # tiny flushed child is still alive. A partial checkpoint is not a pass.
+        with tempfile.TemporaryDirectory() as directory:
+            results = Path(directory)
+            marker = results/"child-started"
+            source = Path(fixture.__file__).resolve()
+            digest = hashlib.sha256(source.read_bytes()).hexdigest()
+            child = "import pathlib,time;print('=== RUN   SyntheticPartial',flush=True);print('synthetic stage reached',flush=True);pathlib.Path(" + repr(str(marker)) + ").write_text('started');time.sleep(30)"
+            code = "\n".join([
+                "import importlib.util, json, os, sys",
+                "from pathlib import Path",
+                "sys.path.insert(0, " + repr(str(source.parent)) + ")",
+                "spec=importlib.util.spec_from_file_location('context_fixture', " + repr(str(source)) + ")",
+                "h=importlib.util.module_from_spec(spec); spec.loader.exec_module(h)",
+                "results=Path(" + repr(str(results)) + ")",
+                "report={'harnessState':'setup','goTestExit':None,'testExit':None,'cleanupComplete':False,'sourceHashes':{'scripts/test-context-storage.py':" + repr(digest) + "}}",
+                "child=" + repr(child),
+                "h.record_go_output([sys.executable,'-u','-c',child],os.environ.copy(),results,report)",
+            ])
+            process = subprocess.Popen([sys.executable, "-c", code], stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True)
+            try:
+                until = time.monotonic() + 5
+                while not marker.exists() and process.poll() is None and time.monotonic() < until:
+                    time.sleep(.01)
+                self.assertTrue(marker.exists(), "synthetic child did not start")
+                # Allow the harness to consume the flushed line before killing
+                # both test-owned processes; buffered files still lose it.
+                until = time.monotonic() + 1
+                while time.monotonic() < until:
+                    log, timing = results/"context-storage.log", results/"context-storage-timing.log"
+                    if log.exists() and timing.exists():
+                        timed = timing.read_bytes().splitlines()
+                        if log.read_bytes() == b"=== RUN   SyntheticPartial\nsynthetic stage reached\n" and len(timed) == 2 and timed[0].endswith(b"=== RUN   SyntheticPartial") and timed[1].endswith(b"synthetic stage reached"):
+                            break
+                    time.sleep(.01)
+            finally:
+                try:
+                    os.killpg(process.pid, signal.SIGTERM)
+                except ProcessLookupError:
+                    pass
+                stdout, stderr = process.communicate(timeout=5)
+            self.assertNotEqual(process.returncode, 0, (stdout, stderr))
+            self.assertEqual((results/"context-storage.log").read_bytes(), b"=== RUN   SyntheticPartial\nsynthetic stage reached\n")
+            timing = (results/"context-storage-timing.log").read_text().splitlines()
+            self.assertEqual([line.split(maxsplit=1)[1] for line in timing], ["=== RUN   SyntheticPartial", "synthetic stage reached"])
+            report = json.loads((results/"context-storage-environment.json").read_text())
+            self.assertEqual(report, {'harnessState':'running','goTestExit':None,'testExit':None,'cleanupComplete':False,'sourceHashes':{'scripts/test-context-storage.py':digest}})
+
+    def test_go_capture_preserves_child_exit_and_exact_output(self):
+        with tempfile.TemporaryDirectory() as directory:
+            results = Path(directory)
+            report = {"sourceHashes": {}, "testExit": None, "goTestExit": None, "cleanupComplete": False}
+            status = fixture.record_go_output([sys.executable, "-c", "import sys;print('synthetic failure',flush=True);sys.exit(7)"], os.environ.copy(), results, report)
+            self.assertEqual(status, 7)
+            self.assertEqual((results/"context-storage.log").read_bytes(), b"synthetic failure\n")
+            self.assertEqual(json.loads((results/"context-storage-environment.json").read_text()), dict(report, harnessState="running"))
+            self.assertIsNone(report["goTestExit"])
+            self.assertFalse(report["cleanupComplete"])
+
     def test_profile_auth_alias_is_closed_and_preserves_existing_defaults(self):
         with tempfile.TemporaryDirectory() as directory:
             fake=Path(directory)/"python3"
