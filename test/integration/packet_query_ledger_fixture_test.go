@@ -34,19 +34,22 @@ import (
 // Each managed root owns a pristine database and closes its pools on return.
 // The actual compiled hub/key roles and encrypted audits are real; native
 // Job/Pod/issuer/join facts are controlled component inputs, not installed proof.
-func TestPacketQueryLifecycleWithRealServices(t *testing.T) {
-	for _, raw := range []bool{false, true} {
-		name := "metadata"
-		if raw {
-			name = "raw"
-		}
-		t.Run(name, func(t *testing.T) {
-			withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, administration fleet.Administration, objects *objectstore.AuthorityObjects) {
-				withProtectedContextQueryLedger(t, ctx, admin, address, tlsConfig, scope, claim, administration, objects, qualifyPacketQueryManagedLifecycle, false, false, false, true, raw)
-			})
-		})
-	}
+func TestPacketQueryMetadataLifecycleWithRealServices(t *testing.T) {
+	withPacketQueryManagedServices(t, false)
 }
+func TestPacketQueryRawLifecycleWithRealServices(t *testing.T) {
+	withPacketQueryManagedServices(t, true)
+}
+
+// These entrypoints must run in separate harness campaigns. Each managed
+// capacity fixture requires its own pristine database; no test resets product
+// state to make a second root fit the same database.
+func withPacketQueryManagedServices(t *testing.T, raw bool) {
+	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, administration fleet.Administration, objects *objectstore.AuthorityObjects) {
+		withProtectedContextQueryLedger(t, ctx, admin, address, tlsConfig, scope, claim, administration, objects, qualifyPacketQueryManagedLifecycle, false, false, false, true, raw)
+	})
+}
+
 func qualifyPacketQueryManagedLifecycle(t *testing.T, f *queryLedgerFixture) {
 	t.Helper()
 	ctx, base, s := f.base.ctx, f.base, f.scenario

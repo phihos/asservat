@@ -502,6 +502,25 @@ LANGUAGE sql VOLATILE SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
  AND (l.outcome_completion->>'ClosedAt')::timestamptz<a.write_until AND (l.outcome_completion->>'ClosedAt')::timestamptz<=clock_timestamp()),false)
 $$;
 -- +goose StatementEnd
+-- +goose StatementBegin
+CREATE OR REPLACE FUNCTION guard_context_query_account() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
+DECLARE b public.context_query_backing;
+BEGIN
+ IF TG_OP='DELETE' THEN RAISE EXCEPTION 'query account remains charged' USING ERRCODE='23514'; END IF;
+ SELECT * INTO STRICT b FROM public.context_query_backing WHERE root_id=NEW.root_id FOR UPDATE;
+ IF TG_OP='UPDATE' THEN
+  IF pg_trigger_depth()<2 OR (to_jsonb(NEW)-'allocated') IS DISTINCT FROM (to_jsonb(OLD)-'allocated') OR NEW.allocated-OLD.allocated NOT IN (1,2,4,10,20) THEN RAISE EXCEPTION 'query account mutation denied' USING ERRCODE='23514'; END IF;
+ ELSIF NEW.allocated<>0 THEN RAISE EXCEPTION 'query initial account spend invalid' USING ERRCODE='23514';
+ ELSIF TG_TABLE_NAME='context_query_principal' THEN
+  UPDATE public.context_query_backing SET principals=principals+1 WHERE root_id=NEW.root_id;
+ ELSE
+  IF NEW.query_limit>b.query_limit THEN RAISE EXCEPTION 'query allocation exceeds root' USING ERRCODE='23514'; END IF;
+  UPDATE public.context_query_backing SET allocations=allocations+1 WHERE root_id=NEW.root_id;
+ END IF;
+ IF TG_TABLE_NAME='context_query_principal' AND NEW.allocated>b.principal_query_limit THEN RAISE EXCEPTION 'query principal capacity exhausted' USING ERRCODE='23514'; END IF;
+ RETURN NEW;
+END $$;
+-- +goose StatementEnd
 -- +goose Down
 -- No retained new operation can be hidden by a downgrade. Existing scopes/uses stay immutable.
 -- +goose StatementBegin
@@ -837,6 +856,25 @@ BEGIN
  FOR i IN 0..31 LOOP IF NOT public.capacity_json_integer(b->'Version'->i,0,255) THEN RETURN false; END IF; END LOOP;
  IF b->>'ArtifactID'=s->>'ArtifactID' AND public.context_query_comparison_source(s,true) IS DISTINCT FROM public.context_query_comparison_source(s,false) THEN RETURN false; END IF;
  RETURN true;
+END $$;
+-- +goose StatementEnd
+-- +goose StatementBegin
+CREATE OR REPLACE FUNCTION guard_context_query_account() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
+DECLARE b public.context_query_backing;
+BEGIN
+ IF TG_OP='DELETE' THEN RAISE EXCEPTION 'query account remains charged' USING ERRCODE='23514'; END IF;
+ SELECT * INTO STRICT b FROM public.context_query_backing WHERE root_id=NEW.root_id FOR UPDATE;
+ IF TG_OP='UPDATE' THEN
+  IF pg_trigger_depth()<2 OR (to_jsonb(NEW)-'allocated') IS DISTINCT FROM (to_jsonb(OLD)-'allocated') OR NEW.allocated-OLD.allocated NOT IN (1,2,10,20) THEN RAISE EXCEPTION 'query account mutation denied' USING ERRCODE='23514'; END IF;
+ ELSIF NEW.allocated<>0 THEN RAISE EXCEPTION 'query initial account spend invalid' USING ERRCODE='23514';
+ ELSIF TG_TABLE_NAME='context_query_principal' THEN
+  UPDATE public.context_query_backing SET principals=principals+1 WHERE root_id=NEW.root_id;
+ ELSE
+  IF NEW.query_limit>b.query_limit THEN RAISE EXCEPTION 'query allocation exceeds root' USING ERRCODE='23514'; END IF;
+  UPDATE public.context_query_backing SET allocations=allocations+1 WHERE root_id=NEW.root_id;
+ END IF;
+ IF TG_TABLE_NAME='context_query_principal' AND NEW.allocated>b.principal_query_limit THEN RAISE EXCEPTION 'query principal capacity exhausted' USING ERRCODE='23514'; END IF;
+ RETURN NEW;
 END $$;
 -- +goose StatementEnd
 ALTER TABLE access_grant DROP CONSTRAINT access_grant_followup_operations, DROP CONSTRAINT access_grant_scope_kind;

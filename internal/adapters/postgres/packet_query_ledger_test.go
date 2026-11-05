@@ -67,7 +67,7 @@ func TestPacketQueryMigrationRestoresEveryPreviousFunction(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	names := []string{"context_query_scope_source_valid", "context_query_begin_tool", "context_query_read_batches", "context_query_units", "guard_context_query", "guard_context_query_child", "operation_audit_lane", "operation_audit_human_input_valid", "guard_operation_audit", "context_query_intent_current", "context_query_outcome_closed"}
+	names := []string{"context_query_scope_source_valid", "context_query_begin_tool", "context_query_read_batches", "context_query_units", "guard_context_query", "guard_context_query_account", "guard_context_query_child", "operation_audit_lane", "operation_audit_human_input_valid", "guard_operation_audit", "context_query_intent_current", "context_query_outcome_closed"}
 	old := map[string]string{}
 	for _, file := range files {
 		if file >= "00139_saved_packet_query.sql" {
