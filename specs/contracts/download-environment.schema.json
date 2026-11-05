@@ -237,11 +237,12 @@
               "context",
               "packetCapture",
               "syscallTrace",
-              "profile"
+              "profile",
+              "logs"
             ]
           },
           "minItems": 0,
-          "maxItems": 4,
+          "maxItems": 5,
           "uniqueItems": true
         },
         "purposes": {

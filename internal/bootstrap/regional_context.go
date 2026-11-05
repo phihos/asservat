@@ -211,7 +211,6 @@ func newRegionalContext(ctx context.Context, c contracts.RegionalDeployment, in 
 	if out.logsClient, err = kube.NewSavedLogClient(in.kubernetes("kube-observer.token")); err != nil {
 		return nil, closers, mounts.ErrUnavailable
 	}
-	out.output.recordings = NewConnectorRecordings(nil, out.collector, time.Now, eventLog(os.Stderr, "regional collection"))
 	storage, err := ownerHTTP(a.EvidenceStore.Endpoint, a.EvidenceStore.Roots)
 	if err != nil {
 		return nil, closers, mounts.ErrUnavailable
@@ -243,6 +242,7 @@ func newRegionalContext(ctx context.Context, c contracts.RegionalDeployment, in 
 	keyTransport := &http.Transport{Proxy: nil, TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS13, RootCAs: keyRoots, GetClientCertificate: credentials.GetClientCertificate}, DialContext: (&net.Dialer{Timeout: 2 * time.Second, KeepAlive: -1}).DialContext, TLSHandshakeTimeout: 2 * time.Second, ResponseHeaderTimeout: 5 * time.Second, IdleConnTimeout: 5 * time.Second, MaxConnsPerHost: 8, DisableCompression: true}
 	closers = append(closers, keyTransport.CloseIdleConnections)
 	out.output = regionalArtifactOutput{store: custody, endpoint: a.KeyService.Endpoint, scope: authorization.KeyScope{InstallationID: c.InstallationID, Purpose: "artifact", KeyID: a.KeyService.KeyID}, client: &http.Client{Transport: keyTransport, Timeout: 5 * time.Second}, now: time.Now}
+	out.output.recordings = NewConnectorRecordings(nil, out.collector, time.Now, eventLog(os.Stderr, "regional collection"))
 	trustGuard, err := kube.NewAPIContextWorkTrustProtection(observer, probe, configMap(a.WorkTrustGuard, a.WorkTrust.Name), regionalPin(a.WorkTrustGuard))
 	if err != nil {
 		return nil, closers, mounts.ErrUnavailable

@@ -34,3 +34,25 @@ func TestDownloadPolicyPacketCaptureNeedsExplicitClientType(t *testing.T) {
 		t.Fatal("evidence type without a download path accepted")
 	}
 }
+
+func TestDownloadPolicyAllSupportedTypesIncludesLogsWithoutImplicitExpansion(t *testing.T) {
+	p, who, n := downloadPolicyFixture()
+	path := p.Paths[0]
+	selectLogs := func(p DownloadPolicy) bool {
+		_, ok := p.Select(who, path.TargetClusterID, path.StoreID, "diagnostics", "metadata", "potentialPersonalData", "logs", n)
+		return ok
+	}
+	if selectLogs(p) {
+		t.Fatal("old context-only policy implicitly gained logs")
+	}
+	p.Clients[0].EvidenceTypes = []string{"context", "packetCapture", "syscallTrace", "profile", "logs"}
+	if !p.Valid(n) || !selectLogs(p) {
+		t.Fatal("explicit complete supported policy refused logs")
+	}
+	for _, types := range [][]string{{"context", "packetCapture", "syscallTrace", "profile", "logs", "coreDump"}, {"context", "packetCapture", "syscallTrace", "profile", "logs", "logs"}} {
+		p.Clients[0].EvidenceTypes = types
+		if p.Valid(n) {
+			t.Fatal("unknown/duplicate extra type accepted")
+		}
+	}
+}
