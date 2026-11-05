@@ -1,6 +1,8 @@
 examples:
 - file: examples/work-trust.json
   schema: https://asservat.io/spec/v1/work-trust.schema.json
+- file: examples/local-start-logs.json
+  schema: https://asservat.io/spec/v1/local-start.schema.json
 - file: examples/local-start.json
   schema: https://asservat.io/spec/v1/local-start.schema.json
 - file: examples/recipe-context.yaml

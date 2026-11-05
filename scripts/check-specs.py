@@ -1142,6 +1142,32 @@ def main() -> None:
         lambda d: d.pop("resources"),
     ):
         rejects(owner_roles, "owner-identity-roles", mutation)
+    # Finite logs already use the API executor's typed Binding. The
+    # persistent start contract must admit the same closed native bound.
+    logs_start = examples["local-start-logs.json"]
+    for size in (1, 1048576, 67108864):
+        accepted = copy.deepcopy(logs_start)
+        accepted["spec"]["nativeBytes"] = size
+        validate(accepted, schemas[BASE + "local-start.schema.json"])
+    for mutation in (
+        lambda d: d["spec"].update(nativeBytes=0),
+        lambda d: d["spec"].update(nativeBytes=67108865),
+        lambda d: d["spec"].update(nativeType="unknown"),
+        lambda d: d["spec"].update(actionID="pod-status"),
+        lambda d: d["spec"].update(nodeUID=d["spec"]["podUID"]),
+        lambda d: d["spec"].update(nodeBootID=d["spec"]["podUID"]),
+        lambda d: d["spec"].pop("executorPodUID"),
+        lambda d: d["spec"].pop("executorAccountUID"),
+        lambda d: d["spec"].pop("nativeType"),
+        lambda d: d["spec"].update(profile="onTriggerStart/v1"),
+    ):
+        rejects(logs_start, "local-start", mutation)
+    for native, maximum in (("pprof", 67108864), ("goTrace", 134217728)):
+        accepted = copy.deepcopy(logs_start)
+        accepted["spec"].update(nativeType=native, nativeBytes=maximum)
+        validate(accepted, schemas[BASE + "local-start.schema.json"])
+        rejects(accepted, "local-start", lambda d: d["spec"].update(nativeBytes=maximum+1))
+
     owner_entries = []
     for index, purpose in enumerate(("owner-runtime",)):
         owner_entries.append({"purpose": purpose, "password": "a" * 42 + str(index),
