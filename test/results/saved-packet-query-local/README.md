@@ -38,6 +38,16 @@ archives were frozen, the affected spec, architecture and design gates exited
 0. A final native/upgrade-helper race run also exited 0 in 6.540 seconds. Both
 the failed assembly log and the corrected documentation checks are retained.
 
+The later installed retry exposed missing registration of a new audited
+same-key Begin in the query-call journal. A stricter fake journal reproduced
+the real adapter's refusal in the actual audited presentation path (0.493s,
+exit 1). After exact bounded registration, that path passed under the race
+detector (3.908s). Full affected application/presentation races passed in
+1.680s/347.008s; SQL generation, spec/architecture/import checks and vet passed
+on `c6b87702`. Real PostgreSQL replay/upgrade proof is separately archived under
+the service directory. These fixes do not convert either failed installed
+campaign into a pass.
+
 The real PostgreSQL/S3 lifecycle and upgrade campaigns, including the account
 guard, key-binding-size and fixture-cleanup corrections, have separate
 [service evidence](../saved-packet-query-services-local/README.md). Fresh bounded

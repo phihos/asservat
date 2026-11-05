@@ -1,6 +1,6 @@
 # Sustained implementation progress
 
-## Installed query admission passes; same-key replay correction underway (2026-11-05)
+## Same-key replay correction passes real-service composition (2026-11-05)
 
 Candidate `9bf84fcc` passed all 15 CI jobs. Its installed run41990901022
 passed both fixed summaries and returned Pending for the first raw packet query,
@@ -15,7 +15,21 @@ regressions reproduce the failure. The correction adds bounded registration of
 the exact keyed repeat before permit; it retains current authority and the
 original query, grant and deadlines. One existing control row per new audited
 repeat is SQL work; it creates no worker, admission, poll, read batch or
-disclosure charge. Corrected service/upgrade/installed qualification is pending.
+disclosure charge. On signed `c6b87702`, the actual composed C18/SQL metadata
+replay campaign passed in 14.329s (9 tests), raw replay in 16.922s (9 tests), and
+the separate upgrade139 round trip in 8.065s (401 tests). Each matched all 4,196
+reported Git inputs, kept sources unchanged and completed cleanup. The checks
+include exact registration/idempotence, current grant/MAC refusals and proof
+that the replay call cannot fund a read. Corrected installed qualification
+remains pending.
+
+[Replay service originals](../test/results/saved-packet-query-services-local/replay-registration/README.md)
+retain the real refusal and all three corrected campaigns. Fresh
+[resource checks](../test/results/saved-packet-query-resource-c6b87702-local/README.md)
+also passed four cases on `c6b87702`, with 1,812 exact inputs and complete
+cleanup. The complete-case peaks were 87,736,320 and 136,445,952 bytes under
+256 MiB; 500m CPU remains verified configuration rather than sustained
+throughput. These component results do not replace installed delivery.
 
 Fresh resource checks on `9bf84fcc` separately passed all four cases with all
 1,812 input hashes matched and clean teardown; the two complete-case peaks were

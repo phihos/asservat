@@ -1,0 +1,583 @@
+{
+  "format": "packet-query-resource-c6b87702-originals/v1",
+  "measured_source_commit": "c6b877026e416e3a457902bfd296282d9a8c4096",
+  "scope": "Fresh exactc6 four-case local resource component; prior9bf retained separately. Binaries/nativepayload/ciphertext/privatefixture DTOs omitted; exacthashes retained. CPU500m configuration ONLY.",
+  "members": [
+    {
+      "member": "prepare-provenance.py.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/prepare-provenance.py",
+      "original_bytes": 2246,
+      "original_sha256": "f165422f3d3ed6cd5a71e47ac9b4a11dadd4c82f48ef5d779c01bf8a7fe885c6",
+      "gzip_bytes": 1058,
+      "gzip_sha256": "858bea06c8e298220023208589e9b5aadc588e9172f32991124258153ce0b580"
+    },
+    {
+      "member": "produce.py.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/produce.py",
+      "original_bytes": 2254,
+      "original_sha256": "98db40befb11dc05189fbe2a1c3d719a42f8689b13d48b43c6906826b233bae0",
+      "gzip_bytes": 1144,
+      "gzip_sha256": "1472aa68cc491568e14e143f056b069202043085102405bd636f14e804bd8864"
+    },
+    {
+      "member": "consume.py.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/consume.py",
+      "original_bytes": 5702,
+      "original_sha256": "ccec2f1d23e9fd20841a7159ccfbe79d8d7abc940a3e35887a354f67e0a71141",
+      "gzip_bytes": 2276,
+      "gzip_sha256": "befbc5d362baac27a504324d0f44925737102b5bbf6bdd465a36fa7cf8b1bc9d"
+    },
+    {
+      "member": "audit.py.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/audit.py",
+      "original_bytes": 8986,
+      "original_sha256": "e8db8346c9b910017a02f1ec8fc5c309105f18a31586d42cca7e6717b655c092",
+      "gzip_bytes": 3748,
+      "gzip_sha256": "24b1907852d983e40143e2297f2c8440b4f1518ca36110d61a370f332bc501e6"
+    },
+    {
+      "member": "audit-terminal.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/audit-terminal.log",
+      "original_bytes": 817,
+      "original_sha256": "ab63242002b9120c2663741b92f6be85c800a7e7dafd44d846fe84e8e055bbf6",
+      "gzip_bytes": 497,
+      "gzip_sha256": "ccc59d6320acda3200dacec266b68993f3b71033963f477c123a503f38fbc4ba"
+    },
+    {
+      "member": "build-commands.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/build-commands.json",
+      "original_bytes": 2401,
+      "original_sha256": "67c7016981642e9294d13c065cacdbab35e70522e854d47fa4443b197f5fc67b",
+      "gzip_bytes": 582,
+      "gzip_sha256": "648a6d59917e968353a287f35bd5ebbdb21efc0e1ad860ac221da9ee37a18c55"
+    },
+    {
+      "member": "compile-test.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/compile-test.log",
+      "original_bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gzip_bytes": 20,
+      "gzip_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "member": "compile-test.log.stderr.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/compile-test.log.stderr",
+      "original_bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gzip_bytes": 20,
+      "gzip_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "member": "compile-probe.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/compile-probe.log",
+      "original_bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gzip_bytes": 20,
+      "gzip_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "member": "compile-probe.log.stderr.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/compile-probe.log.stderr",
+      "original_bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gzip_bytes": 20,
+      "gzip_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "member": "dependencies.json.stderr.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/dependencies.json.stderr",
+      "original_bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gzip_bytes": 20,
+      "gzip_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "member": "prepare-provenance.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/prepare-provenance.log",
+      "original_bytes": 957,
+      "original_sha256": "725f70a273f2a0743ec01bf12020ffdf350074ec375e492be6c576f8c1ec2915",
+      "gzip_bytes": 379,
+      "gzip_sha256": "353ac6dcdfeb80e1d2c319bd0d81e53b2a0b662361580a56c03e76fd3207b1b5"
+    },
+    {
+      "member": "prepare-provenance.log.stderr.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/prepare-provenance.log.stderr",
+      "original_bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gzip_bytes": 20,
+      "gzip_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "member": "source-before.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/source-before.json",
+      "original_bytes": 973,
+      "original_sha256": "2b3dc791b10c22419f0aaee482a0ad8532b218bc790eab8b59cc25d289a976fc",
+      "gzip_bytes": 384,
+      "gzip_sha256": "c3c33a4fd8c508e0879d2c0bdcd2f9ac7b5174335a8c838a75cd0d188fcfea49"
+    },
+    {
+      "member": "source-after.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/source-after.json",
+      "original_bytes": 1760,
+      "original_sha256": "a035f8ec01239701587a73b4836999e5de45c5813f542bad5d846418b68c0338",
+      "gzip_bytes": 525,
+      "gzip_sha256": "d8d64804b5101e81c66736d72a6fb3688a505a149098fa7b9aeb862ab854dd40"
+    },
+    {
+      "member": "relevant-sources.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/relevant-sources.json",
+      "original_bytes": 228326,
+      "original_sha256": "9742f31c9150b28248ba88fe324a7037c1e3de1e1ba8a679bdba90ee867b4261",
+      "gzip_bytes": 87669,
+      "gzip_sha256": "476a90370ae450c00aee658087ec0e2c18ddb817123adfe7b4661c4560624b5c"
+    },
+    {
+      "member": "producer.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/producer.log",
+      "original_bytes": 97,
+      "original_sha256": "ca8940a035c9dc157e1421b0af3c63882309cfa32a1d042245346e5e05b983e1",
+      "gzip_bytes": 85,
+      "gzip_sha256": "b158505f5dad89ba612a956d81e3abacf2409651085bf3e790e587e46a1cb8ca"
+    },
+    {
+      "member": "producer-resource.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/producer-resource.json",
+      "original_bytes": 3528,
+      "original_sha256": "cc2605864d11a0fa96922599703a2852fa0f4aed26f6b1e457499c8298496dda",
+      "gzip_bytes": 1478,
+      "gzip_sha256": "cd80af0fe4fcf42da426ffc74be8393760c560aef7a2d232c363ceed471d3d61"
+    },
+    {
+      "member": "produce-terminal.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/produce-terminal.log",
+      "original_bytes": 646,
+      "original_sha256": "754559370dcfb93051c150cc2e8c4fbda4ed34877869757581ec52281bb65190",
+      "gzip_bytes": 407,
+      "gzip_sha256": "ced8b36269a92ac984af0089115301854c2617a21216891cb3313d9708388d9d"
+    },
+    {
+      "member": "matrix.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/matrix.json",
+      "original_bytes": 32404,
+      "original_sha256": "7699bfaf79152f1820192a10bb7215b7ca275fe20332434aad1f53f40a716a6a",
+      "gzip_bytes": 4093,
+      "gzip_sha256": "b537af5243befa06af6f37a6a52071443f078f4b0d1e3b6e1fe996a9470b0352"
+    },
+    {
+      "member": "matrix-terminal.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/matrix-terminal.log",
+      "original_bytes": 637,
+      "original_sha256": "0b575a3b7ceff3c5da0baa5ee9a118ff947e88ea659fde4e394debefcd59d27b",
+      "gzip_bytes": 338,
+      "gzip_sha256": "f7a30ac595377045038c2ba12dfaad12e350a97a4166e5f89cefa91fb04af0ba"
+    },
+    {
+      "member": "containers-before.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/containers-before.json",
+      "original_bytes": 45,
+      "original_sha256": "ff1d29df5ee964245831744f8f73b4536cca2e9b5ede02705dac7b08deadbeeb",
+      "gzip_bytes": 57,
+      "gzip_sha256": "dc9874e84a7d00a87b969d5482b9902af77a2fc7df2e6ed02bfb7d85b672fbbb"
+    },
+    {
+      "member": "remaining-containers.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/remaining-containers.json",
+      "original_bytes": 45,
+      "original_sha256": "ff1d29df5ee964245831744f8f73b4536cca2e9b5ede02705dac7b08deadbeeb",
+      "gzip_bytes": 57,
+      "gzip_sha256": "dc9874e84a7d00a87b969d5482b9902af77a2fc7df2e6ed02bfb7d85b672fbbb"
+    },
+    {
+      "member": "cleanup-readback.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/cleanup-readback.json",
+      "original_bytes": 195,
+      "original_sha256": "44e90a6cff5276a7d1ecb49081489d433dfb8aba5e7a8b09b15a6bed1a5bbce8",
+      "gzip_bytes": 151,
+      "gzip_sha256": "a36a4892f4df6c1abf136331153fd1dd9debd7dfec8d72460f644f434d9990b0"
+    },
+    {
+      "member": "image-inspect.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/image-inspect.json",
+      "original_bytes": 1299,
+      "original_sha256": "a2dad540c7f91a68cf8338e7a71ead28bec98f8a8b7068b324b1d86adef72ca0",
+      "gzip_bytes": 523,
+      "gzip_sha256": "10d07562cbf7f3590a424a39e67ad8c3eb8a3b17ed4c1d6caca3cd09b09e7750"
+    },
+    {
+      "member": "final-audit.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/final-audit.json",
+      "original_bytes": 6632,
+      "original_sha256": "d1d5f479a4232b06c769cc3cf07a9a010d62fff0d4bbd2017b71056c7810bb96",
+      "gzip_bytes": 2222,
+      "gzip_sha256": "07eb1cc028b9ea09178a2855da8895e8924f7ffa984f22bf38be6508aa8c08c9"
+    },
+    {
+      "member": "handoff.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/handoff.json",
+      "original_bytes": 12788,
+      "original_sha256": "12fb9beb9001da2276db37e6f27ae527cef56d63d8c140416c38945a54bbd78e",
+      "gzip_bytes": 3401,
+      "gzip_sha256": "3d277baa7f75227f2b9e96d3d3df63a7e7ae653340b94b3907b476c30a6710fd"
+    },
+    {
+      "member": "input-hashes.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/encrypted-inputs/probe.json",
+      "original_bytes": 1734,
+      "original_sha256": "bf46918139b009f09756f7bac966f78a678a2e9f0bd99f4f227cc24c27121f53",
+      "gzip_bytes": 814,
+      "gzip_sha256": "29542d2e5361a90aff2adb9d1aafc2851be1dd4bcf976c5885f465c7d171da83"
+    },
+    {
+      "member": "payload-output-complete/run.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/payload-output-complete/run.json",
+      "original_bytes": 7644,
+      "original_sha256": "30b83649cc53a1d1c0595732440eaf839f5c146205349fbcb3606fe4cb019f22",
+      "gzip_bytes": 2697,
+      "gzip_sha256": "82c85aa5448f3dbf03e03a8922bce4c06fbad663336a5727360fa07d995dfe23"
+    },
+    {
+      "member": "payload-output-complete/docker-inspect.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/payload-output-complete/docker-inspect.json",
+      "original_bytes": 11156,
+      "original_sha256": "8c8eca8e177eed1c0eae655a0a8dfa848f978ab42031464f2bc1e63acaff564a",
+      "gzip_bytes": 2628,
+      "gzip_sha256": "3e0994a213d9600817f03acb6de9ba4f4e071eb75f1b793f1821101926eddee2"
+    },
+    {
+      "member": "payload-output-complete/docker-start.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/payload-output-complete/docker-start.log",
+      "original_bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gzip_bytes": 20,
+      "gzip_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "member": "payload-output-complete/component.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/payload-output-complete/component.json",
+      "original_bytes": 2141,
+      "original_sha256": "a185e423256c60065b3afde56eaa40e392220b9b316c460771686f0c8bd4a47d",
+      "gzip_bytes": 1206,
+      "gzip_sha256": "1f3135cce555d2e9f391128def0ba93502b2946855fc2599624470b972a09109"
+    },
+    {
+      "member": "payload-output-complete/consumer.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/payload-output-complete/consumer.log",
+      "original_bytes": 97,
+      "original_sha256": "4dce9aab7289c35d106ef9c76d6e1959df7b39ecfe8f2a66edb0e1a5dec2bddb",
+      "gzip_bytes": 85,
+      "gzip_sha256": "7fc49d6fd97785aea9d76e2031c6ed8c2218c87cfc07cad77298bce83d021b1a"
+    },
+    {
+      "member": "payload-output-complete/consumer-exit.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/payload-output-complete/consumer-exit",
+      "original_bytes": 2,
+      "original_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "gzip_bytes": 22,
+      "gzip_sha256": "89ed3b723e0e40d8957a2df55fcb04d57b6d95fa665c5fe67b098df7f29694ae"
+    },
+    {
+      "member": "payload-output-complete/cgroup-before.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/payload-output-complete/cgroup-before.json",
+      "original_bytes": 702,
+      "original_sha256": "47cb99bc297b1f9cced88e35f0714619cf0eec12a027171ab7e07c9232c1bbd1",
+      "gzip_bytes": 385,
+      "gzip_sha256": "570aabc7b7a78eec646c52fa9488fb428a2541a2554dedcdda964086065a59df"
+    },
+    {
+      "member": "payload-output-complete/cgroup-after.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/payload-output-complete/cgroup-after.json",
+      "original_bytes": 703,
+      "original_sha256": "efcdbfd96d21dea640c2037f1cd525b6561f5f36428c4f2be20dace43da4c8ac",
+      "gzip_bytes": 395,
+      "gzip_sha256": "1d4d81ce16cf2afe4894c4b459be420ea4e81e13ec6b55ec9afcab5d3abd08ca"
+    },
+    {
+      "member": "payload-output-complete/probe-exit.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/payload-output-complete/probe-exit",
+      "original_bytes": 2,
+      "original_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "gzip_bytes": 22,
+      "gzip_sha256": "89ed3b723e0e40d8957a2df55fcb04d57b6d95fa665c5fe67b098df7f29694ae"
+    },
+    {
+      "member": "payload-output-complete/probe-error.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/payload-output-complete/probe-error.log",
+      "original_bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gzip_bytes": 20,
+      "gzip_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "member": "payload-output-complete/probe-before-error.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/payload-output-complete/probe-before-error.log",
+      "original_bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gzip_bytes": 20,
+      "gzip_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "member": "tiny-prefix-wire-cache-complete/run.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/tiny-prefix-wire-cache-complete/run.json",
+      "original_bytes": 7717,
+      "original_sha256": "e3548466c27e31a981c4fb8bfa8ee26130b099a72c0337db0de97b0823e4166c",
+      "gzip_bytes": 2706,
+      "gzip_sha256": "45c9559b14d099d2e679a9f0fa267e77e57ac29325d5d1c12511936df5bec2bf"
+    },
+    {
+      "member": "tiny-prefix-wire-cache-complete/docker-inspect.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/tiny-prefix-wire-cache-complete/docker-inspect.json",
+      "original_bytes": 11188,
+      "original_sha256": "43d7530eb476fbe333e9ee17e50f4398e9bf3e145193e0d4079dd7baa9c038ce",
+      "gzip_bytes": 2638,
+      "gzip_sha256": "b298357749e7c883056c07efafc5973eb92898508fdfa3910a6a8ab7adfe6ccc"
+    },
+    {
+      "member": "tiny-prefix-wire-cache-complete/docker-start.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/tiny-prefix-wire-cache-complete/docker-start.log",
+      "original_bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gzip_bytes": 20,
+      "gzip_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "member": "tiny-prefix-wire-cache-complete/component.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/tiny-prefix-wire-cache-complete/component.json",
+      "original_bytes": 2166,
+      "original_sha256": "8b813dedcc8de1a2bad1f490a975b2ec96fdc687c06db4b87c6220dfa54d4bed",
+      "gzip_bytes": 1202,
+      "gzip_sha256": "428d10cf5317be81eeaff868e84f825f6018a50f0c283c7c047fb9233e231545"
+    },
+    {
+      "member": "tiny-prefix-wire-cache-complete/consumer.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/tiny-prefix-wire-cache-complete/consumer.log",
+      "original_bytes": 97,
+      "original_sha256": "7de3e2ef87a80d1a536c4b2e042f60d9795bf124268965c54e7ae49e8cbff57b",
+      "gzip_bytes": 85,
+      "gzip_sha256": "d6e6ed2ccd4516ef2456c45de3abc52789b0786ae44c3e042020606aaf26033c"
+    },
+    {
+      "member": "tiny-prefix-wire-cache-complete/consumer-exit.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/tiny-prefix-wire-cache-complete/consumer-exit",
+      "original_bytes": 2,
+      "original_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "gzip_bytes": 22,
+      "gzip_sha256": "89ed3b723e0e40d8957a2df55fcb04d57b6d95fa665c5fe67b098df7f29694ae"
+    },
+    {
+      "member": "tiny-prefix-wire-cache-complete/cgroup-before.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/tiny-prefix-wire-cache-complete/cgroup-before.json",
+      "original_bytes": 700,
+      "original_sha256": "cdd5c8f7d19a0fa8f60bb1d5b02cc5d52abf2fb81697d3a6d1f5aef3d18fbe7e",
+      "gzip_bytes": 391,
+      "gzip_sha256": "da8e5f419c1c4a0186c5991a068d5d08b43d05607987a2b45af35d91f0d810d5"
+    },
+    {
+      "member": "tiny-prefix-wire-cache-complete/cgroup-after.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/tiny-prefix-wire-cache-complete/cgroup-after.json",
+      "original_bytes": 705,
+      "original_sha256": "41fb578f122d4d339eb0797b506ba08d23f61c48df93249627f29a5cc662e36c",
+      "gzip_bytes": 396,
+      "gzip_sha256": "5dd73b088f8c5f962dafba6fe26d9aafd7688adef84510b6a7d0e92d06ff32be"
+    },
+    {
+      "member": "tiny-prefix-wire-cache-complete/probe-exit.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/tiny-prefix-wire-cache-complete/probe-exit",
+      "original_bytes": 2,
+      "original_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "gzip_bytes": 22,
+      "gzip_sha256": "89ed3b723e0e40d8957a2df55fcb04d57b6d95fa665c5fe67b098df7f29694ae"
+    },
+    {
+      "member": "tiny-prefix-wire-cache-complete/probe-error.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/tiny-prefix-wire-cache-complete/probe-error.log",
+      "original_bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gzip_bytes": 20,
+      "gzip_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "member": "tiny-prefix-wire-cache-complete/probe-before-error.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/tiny-prefix-wire-cache-complete/probe-before-error.log",
+      "original_bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gzip_bytes": 20,
+      "gzip_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "member": "payload-output-cancel/run.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/payload-output-cancel/run.json",
+      "original_bytes": 7618,
+      "original_sha256": "f56463fe347969f045159490882c4e33adb70578a5fca7436c80b3d6a3d00f4d",
+      "gzip_bytes": 2700,
+      "gzip_sha256": "be8fe363b2e3648af9b41dfe6523c578008ce7dcb329ff50b6ebce786131c424"
+    },
+    {
+      "member": "payload-output-cancel/docker-inspect.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/payload-output-cancel/docker-inspect.json",
+      "original_bytes": 11144,
+      "original_sha256": "c53d6ebb31e94b5a37c2a964c67097be754060b4d11fe383d0270a9eac2dc959",
+      "gzip_bytes": 2620,
+      "gzip_sha256": "08918bdfe3f22d6a77819923dba18e28b9882efb53c949788d41738192e8efb8"
+    },
+    {
+      "member": "payload-output-cancel/docker-start.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/payload-output-cancel/docker-start.log",
+      "original_bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gzip_bytes": 20,
+      "gzip_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "member": "payload-output-cancel/component.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/payload-output-cancel/component.json",
+      "original_bytes": 2134,
+      "original_sha256": "7e9b3beeb77a4d5b8142874854dadc0ad5ff5bfe9580fa4157dd1ca75069f507",
+      "gzip_bytes": 1199,
+      "gzip_sha256": "6e88573f36a576d2fc5e2f051b11f854010c91fde5ad8e8e8c36cfedda8e9127"
+    },
+    {
+      "member": "payload-output-cancel/consumer.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/payload-output-cancel/consumer.log",
+      "original_bytes": 97,
+      "original_sha256": "b23dc5a2956f6ec2762f447b1557d14b8060991818d47e6240fb77a5d2a5b891",
+      "gzip_bytes": 85,
+      "gzip_sha256": "eea58bf99bc1faeec59454b283697267ea22405be34b5d6100445e2c62b89bb7"
+    },
+    {
+      "member": "payload-output-cancel/consumer-exit.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/payload-output-cancel/consumer-exit",
+      "original_bytes": 2,
+      "original_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "gzip_bytes": 22,
+      "gzip_sha256": "89ed3b723e0e40d8957a2df55fcb04d57b6d95fa665c5fe67b098df7f29694ae"
+    },
+    {
+      "member": "payload-output-cancel/cgroup-before.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/payload-output-cancel/cgroup-before.json",
+      "original_bytes": 700,
+      "original_sha256": "1b14eb97ec4db78272344806179e26c9bbf0e1aa6234b7aa4a8ab0f495dc6d25",
+      "gzip_bytes": 393,
+      "gzip_sha256": "04d72b7c47a9bc21656eb8492d239812162d244b19cf3f07bfac109140bd1a1e"
+    },
+    {
+      "member": "payload-output-cancel/cgroup-after.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/payload-output-cancel/cgroup-after.json",
+      "original_bytes": 702,
+      "original_sha256": "e2701fbc20d98954fe4d5846e5051143eedca490c592e997f34b2f7bc3522cc6",
+      "gzip_bytes": 394,
+      "gzip_sha256": "66a925df64b771e1e937b6e05019fcc31caaeadbf85e63d6ace441546a52b989"
+    },
+    {
+      "member": "payload-output-cancel/probe-exit.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/payload-output-cancel/probe-exit",
+      "original_bytes": 2,
+      "original_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "gzip_bytes": 22,
+      "gzip_sha256": "89ed3b723e0e40d8957a2df55fcb04d57b6d95fa665c5fe67b098df7f29694ae"
+    },
+    {
+      "member": "payload-output-cancel/probe-error.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/payload-output-cancel/probe-error.log",
+      "original_bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gzip_bytes": 20,
+      "gzip_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "member": "payload-output-cancel/probe-before-error.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/payload-output-cancel/probe-before-error.log",
+      "original_bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gzip_bytes": 20,
+      "gzip_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "member": "payload-output-source-error/run.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/payload-output-source-error/run.json",
+      "original_bytes": 7658,
+      "original_sha256": "7f248b4f1ad3c0a17f186b3582a425b20b074289483074699f6461234f907969",
+      "gzip_bytes": 2701,
+      "gzip_sha256": "4e0d94e76a49e18e094a8a2c1d13a460f6044617cf8674c02464668903555bcf"
+    },
+    {
+      "member": "payload-output-source-error/docker-inspect.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/payload-output-source-error/docker-inspect.json",
+      "original_bytes": 11172,
+      "original_sha256": "7d90af7b6673e4ed6980b226b6881498f333161eb557a05385a354c1644b0bb0",
+      "gzip_bytes": 2626,
+      "gzip_sha256": "f61657da73fbcd0fdfbefbf5ddd066d5f1c075eb38ac307317d27ea18cf0d42d"
+    },
+    {
+      "member": "payload-output-source-error/docker-start.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/payload-output-source-error/docker-start.log",
+      "original_bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gzip_bytes": 20,
+      "gzip_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "member": "payload-output-source-error/component.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/payload-output-source-error/component.json",
+      "original_bytes": 2135,
+      "original_sha256": "3b61d2c3ea139a41e3c4ad68ed9505f1a7663ac09e1822f0438b829097c36ceb",
+      "gzip_bytes": 1199,
+      "gzip_sha256": "c98063e525c2ae26eff277b49b8e8af58faa5197a2b6d76f7ec3d1545459ccd6"
+    },
+    {
+      "member": "payload-output-source-error/consumer.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/payload-output-source-error/consumer.log",
+      "original_bytes": 97,
+      "original_sha256": "b23dc5a2956f6ec2762f447b1557d14b8060991818d47e6240fb77a5d2a5b891",
+      "gzip_bytes": 85,
+      "gzip_sha256": "eea58bf99bc1faeec59454b283697267ea22405be34b5d6100445e2c62b89bb7"
+    },
+    {
+      "member": "payload-output-source-error/consumer-exit.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/payload-output-source-error/consumer-exit",
+      "original_bytes": 2,
+      "original_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "gzip_bytes": 22,
+      "gzip_sha256": "89ed3b723e0e40d8957a2df55fcb04d57b6d95fa665c5fe67b098df7f29694ae"
+    },
+    {
+      "member": "payload-output-source-error/cgroup-before.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/payload-output-source-error/cgroup-before.json",
+      "original_bytes": 699,
+      "original_sha256": "764a66281acb3e132ef1609e82d2987f16a618694a70a925a6ba941ed4f15556",
+      "gzip_bytes": 392,
+      "gzip_sha256": "2590311d53430cdb20a2d2a9a3ba076d1c5cc2b9a7f59e5aa9af597a93ab982f"
+    },
+    {
+      "member": "payload-output-source-error/cgroup-after.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/payload-output-source-error/cgroup-after.json",
+      "original_bytes": 702,
+      "original_sha256": "786d9ded962edc019c84ce75d131df96029d186d0ed2a65fe0ec9ca540ec8a20",
+      "gzip_bytes": 393,
+      "gzip_sha256": "8e167dcffcc01bd96f9512148a70ac68e245f32daa22bca825a15c77eb8a5af2"
+    },
+    {
+      "member": "payload-output-source-error/probe-exit.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/payload-output-source-error/probe-exit",
+      "original_bytes": 2,
+      "original_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "gzip_bytes": 22,
+      "gzip_sha256": "89ed3b723e0e40d8957a2df55fcb04d57b6d95fa665c5fe67b098df7f29694ae"
+    },
+    {
+      "member": "payload-output-source-error/probe-error.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/payload-output-source-error/probe-error.log",
+      "original_bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gzip_bytes": 20,
+      "gzip_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "member": "payload-output-source-error/probe-before-error.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-resource-final-c6b87702/payload-output-source-error/probe-before-error.log",
+      "original_bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gzip_bytes": 20,
+      "gzip_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    }
+  ]
+}
