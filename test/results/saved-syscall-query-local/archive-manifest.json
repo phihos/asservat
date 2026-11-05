@@ -449,6 +449,14 @@
       "original_sha256": "0c45b990897d5f9c8dde0af9391281d8350e5d96011d365b066fbf5604285ca3",
       "gzip_bytes": 395,
       "gzip_sha256": "e891717379dc67638661935bee46deb76901ef91c9d9273b4f8fabd9bfe2badb"
+    },
+    {
+      "member": "kubernetes-complete-groups-final.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query/kubernetes-complete-groups-final.log",
+      "original_bytes": 3684704,
+      "original_sha256": "71ae62dd15fdd2adb641ae0d5e7bae873b89ac09bcd8410251123b3a19669a6c",
+      "gzip_bytes": 250356,
+      "gzip_sha256": "b21003ad356521d0cf37b5d4860361e3bde5cb832fff5238f76c8013fe1e1149"
     }
   ]
 }

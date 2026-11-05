@@ -34,7 +34,7 @@ unrelated packet/collection tools absent. Focused bootstrap races pass37.484s;
 the full bootstrap package later passes110.580s. Other complete packages in
 the broad run passed, including C20 in371.161s. The original failed command is
 retained and is not relabeled green. Its previously unrun canonical Kubernetes
-groups are tracked separately. Two skipped external-fixture corrections
+groups separately passed all691 exact tests in18 serial groups, with no skips. Two skipped external-fixture corrections
 overlapped that local command; no whole immutable-source campaign is claimed.
 
 Parser/encrypted-reader evidence, real SQL lifecycle and resource evidence have

@@ -25,7 +25,8 @@ cleanup-label readback is retained alongside the corrected observation.
 retain552 console tests, production build, actual React/GoTLS two-case race
 pass, C20 raw/refusal/maximum-page checks and independent reviews. The broad
 Go gate's obsolete bootstrap expectation was corrected; full bootstrap passes
-110.580s, with canonical Kubernetes groups still tracked separately. These
+110.580s, and the separate canonical Kubernetes gate passes all691 exact
+tests in18 serial groups with no skips. These
 checks do not establish installed argument-query/native JSONL parity. That
 workflow and full S-05 remain pending; the packet PR is independently in flight.
 
