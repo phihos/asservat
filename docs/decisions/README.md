@@ -3,8 +3,10 @@
 [ADR-304 — Fixed transient raw packet summaries](304-transient-raw-packet-summary.md)
 applies the accepted bounded Go mechanism to a dedicated ordinary aggregate of
 an unchanged raw original. Raw-only unclassified counts preserve truncated
-prefixes. Local browser, real-service lifecycle/upgrade and named resource checks
-pass; installed qualification remains pending.
+prefixes. PR167 merged with the reference installed MCP/React/same-original
+native-tshark workflow qualified; [proof](../../test/results/raw-packet-summary-native-41960249012/README.md).
+Local browser, real-service lifecycle/upgrade and named resource checks retain
+their separate scopes. Arbitrary raw queries and broader maxima remain pending.
 
 [ADR-303 — Saved packet metadata summaries](303-saved-packet-summary.md)
 implements the bounded metadata-PCAPNG summary. The named MCP/React/native-file

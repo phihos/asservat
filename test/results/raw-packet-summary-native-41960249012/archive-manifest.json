@@ -1,0 +1,213 @@
+{
+  "format": "asservat-native-raw-packet-summary-proof/v1",
+  "qualified_source_commit": "b6e2c08476829e0a1ff46240ffd0b13fdded34af",
+  "run": 41960249012,
+  "artifact_id": 13386365282,
+  "artifact_zip_bytes": 205506,
+  "artifact_zip_sha256": "715c82f798e362122715294dabdf56f1e7d59369404e51fb1a6b2ea0876c5279",
+  "initial_manifest_sha256": "78c66f409bebf441b94afe48a16f0c29cac1c05739320bc00ca65178ef4c6f07",
+  "initial_members_preserved_byte_exact": 12,
+  "members": [
+    {
+      "member": "ci-native-continuation-manual-raw.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/raw-packet-summary/native41960249012-originals/ci-native-continuation-manual-raw.log",
+      "original_bytes": 5364,
+      "original_sha256": "d87c08999ce2a0db94cac20f1812de10de57cb8482afaf5fe1fb918753c08b53",
+      "gzip_bytes": 1671,
+      "gzip_sha256": "fd7a17e6ba3495c4425a4fffe29bb9312b3b896b09ed65ef59941c478cf46a8b",
+      "archive_origin": "byte-identical initial proof member"
+    },
+    {
+      "member": "context-storage-environment.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/raw-packet-summary/native41960249012-originals/context-storage-environment.json",
+      "original_bytes": 544375,
+      "original_sha256": "08d80ae0870cb04546b72f9e897273eb7e4518b453f357dc5dd66ae2a41a9b1a",
+      "gzip_bytes": 204587,
+      "gzip_sha256": "db8ec286a55f43a07d09be0061c2c7b078024e5f06846ef43b64f4be9d524acf",
+      "archive_origin": "byte-identical initial proof member"
+    },
+    {
+      "member": "context-storage-timing.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/raw-packet-summary/native41960249012-originals/context-storage-timing.log",
+      "original_bytes": 16143,
+      "original_sha256": "399ea8801be373d75231eb8da178760abcf223831900949dc9c5ff30ed14e4fc",
+      "gzip_bytes": 3588,
+      "gzip_sha256": "4e92664ea26a23e0dc382c5e38fca0671e9a4113a2cdaabf624f634ae8b37d67",
+      "archive_origin": "byte-identical initial proof member"
+    },
+    {
+      "member": "context-storage.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/raw-packet-summary/native41960249012-originals/context-storage.log",
+      "original_bytes": 15036,
+      "original_sha256": "c9d8e650387fa2591c298a29e2be24214b92576730c9ba54ebec17791819b27c",
+      "gzip_bytes": 3369,
+      "gzip_sha256": "a4fa68401afb6cac4a9b8975b1d93273e3935496a3009294a6bb5aac95eb149f",
+      "archive_origin": "byte-identical initial proof member"
+    },
+    {
+      "member": "manual-raw.pcapng.gz",
+      "original_path": "/home/phil/.cache/asservat-build/raw-packet-summary/native41960249012-originals/manual-raw.pcapng",
+      "original_bytes": 9400,
+      "original_sha256": "6147bd76156099a3a97a77076fb13f59ecb465861b634a6bb832b511bc9d9b84",
+      "gzip_bytes": 1825,
+      "gzip_sha256": "1b6111c4b41077643c3a32d3aca27d71759d787c9f877a5b1845372eb0e0d1cd",
+      "archive_origin": "byte-identical initial proof member"
+    },
+    {
+      "member": "native41960249012-artifacts.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/raw-packet-summary/native41960249012-artifacts.json",
+      "original_bytes": 744,
+      "original_sha256": "51383b1aaf1b686e82ae1782dd062192607b54bbe9284ccf8965feb4c4e91e4b",
+      "gzip_bytes": 447,
+      "gzip_sha256": "a42d6f9f81827c6b1f680ed947a5f3afd35abfe81316e89e4d8665bb708cf445",
+      "archive_origin": "byte-identical initial proof member"
+    },
+    {
+      "member": "native41960249012-progress8.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/raw-packet-summary/native41960249012-progress8.json",
+      "original_bytes": 4870,
+      "original_sha256": "b1fb6acf26227f81e577f29983fc5867186d928022d20b76636b638620aa25c8",
+      "gzip_bytes": 880,
+      "gzip_sha256": "8660b38ee2fd250f75c308a24d1a54b6450f1cb2a01859860423bcc57d7befb7",
+      "archive_origin": "byte-identical initial proof member"
+    },
+    {
+      "member": "native41960249012-workflow.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/raw-packet-summary/native41960249012-workflow.log",
+      "original_bytes": 147929,
+      "original_sha256": "aa5aad89ee05e7a5a6f94db233c16159beaf0e868ee70ae54de68636b909e407",
+      "gzip_bytes": 21862,
+      "gzip_sha256": "2e19be1e024abff0fa553b1985dba9a168c85fbac4735c5415e772dad5a3d387",
+      "archive_origin": "byte-identical initial proof member"
+    },
+    {
+      "member": "ci41960208068-progress5.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/raw-packet-summary/ci41960208068-progress5.json",
+      "original_bytes": 22677,
+      "original_sha256": "aff66b884735c75903759b147b9b0470e0737651f8748de8ba390cf12fe58b17",
+      "gzip_bytes": 1884,
+      "gzip_sha256": "323527a8fe5b856ac91fcff1be3ec834787359ec7dd12a00af030e419ee7548f",
+      "archive_origin": "byte-identical initial proof member"
+    },
+    {
+      "member": "pr167-progress-review-threads.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/raw-packet-summary/pr167-progress-review-threads.json",
+      "original_bytes": 221,
+      "original_sha256": "3c1a779fce3b2b1e74f18af5b68f4a1b0dfc6074b31ef9a72cbecec4958f2e2a",
+      "gzip_bytes": 181,
+      "gzip_sha256": "9f53ed51a34249452585aa6db6f811183e1d109d9c48c7340ba60eaf69575807",
+      "archive_origin": "byte-identical initial proof member"
+    },
+    {
+      "member": "pr167-progress-comments.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/raw-packet-summary/pr167-progress-comments.json",
+      "original_bytes": 5393,
+      "original_sha256": "eeb3a582ae8e87b7d5607e6ba449ebfd70f556c843c307bc1cce381624a6b498",
+      "gzip_bytes": 1942,
+      "gzip_sha256": "d15fbaafea62476236902ff969b0995669eb4ebbe54987b615b3aa71ce75d2d5",
+      "archive_origin": "byte-identical initial proof member"
+    },
+    {
+      "member": "pr167-ready-current.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/raw-packet-summary/pr167-ready-current.json",
+      "original_bytes": 4450,
+      "original_sha256": "9777fdc131bb5ca02c2738776ffc8669ab099f8dab355eefb1bf24ed33e63483",
+      "gzip_bytes": 553,
+      "gzip_sha256": "5fd3d884895396e6ca73ccc16f5ce2eaa10de341d3e0d886f07bce7bfd63a51a",
+      "archive_origin": "byte-identical initial proof member"
+    },
+    {
+      "member": "source-audit.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/raw-packet-summary/native41960249012-independent-source-review.json",
+      "original_bytes": 3405,
+      "original_sha256": "f2ae5c0623983af7e823528313bd355dad8fd292bc5d4c5e002d22b7d8cace3d",
+      "gzip_bytes": 1484,
+      "gzip_sha256": "777075d3317fa82d2692d4639f9ea1f04efe18ae39cd7854d9bf44ce68118e27",
+      "archive_origin": "final independent audit or authoritative readback"
+    },
+    {
+      "member": "sql-terminal-audit.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/raw-packet-summary/native41960249012-sql-terminal-audit.json",
+      "original_bytes": 10412,
+      "original_sha256": "5234c2ce1072f992a5bc19424c9115affed243dedaaf0d6a6d7502bc41385dc7",
+      "gzip_bytes": 3472,
+      "gzip_sha256": "29fc85fef7d5a5fe8d46e362f870611ee40fbd28973c16f66a8c65abf79824f1",
+      "archive_origin": "final independent audit or authoritative readback"
+    },
+    {
+      "member": "packet-audit.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/raw-packet-summary/native41960249012-audit/report.json",
+      "original_bytes": 8672,
+      "original_sha256": "d8a045c4ce16bf6391d78e5edd66314bf1532bb516240fd5fd79048ae995a7b2",
+      "gzip_bytes": 3328,
+      "gzip_sha256": "32dbb995bebbba0e8b9c4e9399276ac9de060045149ee18e997d4d5871991a30",
+      "archive_origin": "final independent audit or authoritative readback"
+    },
+    {
+      "member": "independent-native.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/raw-packet-summary/native41960249012-audit/independent-native.json",
+      "original_bytes": 1446,
+      "original_sha256": "4056d9ddf984bcb771d625cce41e92e4adb5fe74a280d59cf1bc3f057f15e2c3",
+      "gzip_bytes": 670,
+      "gzip_sha256": "8445a7dd28ccdb9b1e1bb1a740aaa88209eea002f398d24ffea77fe395c4c0c7",
+      "archive_origin": "final independent audit or authoritative readback"
+    },
+    {
+      "member": "independent-native.py.gz",
+      "original_path": "/home/phil/.cache/asservat-build/raw-packet-summary/native41960249012-audit/independent-native.py",
+      "original_bytes": 4456,
+      "original_sha256": "554aeb14a2aa56018a06592376d1737800315189f987556805bfaaf3b504dc2b",
+      "gzip_bytes": 1856,
+      "gzip_sha256": "fdbea163f651f1bc9c783c255e906fb043ea2bd0e4e30710284e6fb3c34ce924",
+      "archive_origin": "final independent audit or authoritative readback"
+    },
+    {
+      "member": "native-final-run.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/raw-packet-summary/native41960249012-source-review-run.json",
+      "original_bytes": 12140,
+      "original_sha256": "f33af68a97ad17c26cdfab40ffb1870a8f6c9f493939b8b255648e837d5b114f",
+      "gzip_bytes": 1619,
+      "gzip_sha256": "ff5d2f95def12b9faafdb474ef8c0bd8b5373855120d62c062b75a769621ac1e",
+      "archive_origin": "final independent audit or authoritative readback"
+    },
+    {
+      "member": "native-final-jobs.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/raw-packet-summary/native41960249012-source-review-jobs.json",
+      "original_bytes": 6066,
+      "original_sha256": "cf407dab2b3dc95bdb03cd35eb002ef5a24e8101bcb60808597093e579e952db",
+      "gzip_bytes": 1093,
+      "gzip_sha256": "3069a537e3623e0eaf8723649621e76f281d66017bc915c884fc27654d21b35f",
+      "archive_origin": "final independent audit or authoritative readback"
+    },
+    {
+      "member": "pr167-final-review-threads.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/raw-packet-summary/pr167-final-review-threads.json",
+      "original_bytes": 2067,
+      "original_sha256": "d6bb999be7a54a8691d3871c30b92d8be56714d0b9dfd10c07a1728297520099",
+      "gzip_bytes": 1102,
+      "gzip_sha256": "da8a60a20e632992cbbaabc69bc45146ee5b9d4abc8b9cf5c8d16aea5de1445a",
+      "archive_origin": "final independent audit or authoritative readback"
+    },
+    {
+      "member": "pr167-merged-readback.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/raw-packet-summary/pr167-merged-readback.json",
+      "original_bytes": 226,
+      "original_sha256": "ce27bd141150ea2ef20c97d54643371a06e8ac8b2f6769d687268ed0937541d0",
+      "gzip_bytes": 205,
+      "gzip_sha256": "440c562de2521c0043e32053c58fe038ae1decc256f55faae5702769985816d0",
+      "archive_origin": "final independent audit or authoritative readback"
+    },
+    {
+      "member": "pr167-merge-tree-verification.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/raw-packet-summary/pr167-merge-tree-verification.json",
+      "original_bytes": 532,
+      "original_sha256": "d5f48e0f79fa199d30e64b7106d79ec7b6fc740f9995cf6e71c4a57817c3d4ea",
+      "gzip_bytes": 263,
+      "gzip_sha256": "53a790bd553ada73009d2d31aa713066fc85e3304d7a19df070ed45723426ab5",
+      "archive_origin": "final independent audit or authoritative readback"
+    }
+  ],
+  "all_decompressed_original_bytes_sha256_sizes_and_gzip_sha256_sizes_verified": true,
+  "scope": "One installed manual-raw reference workflow; original five native artifact members plus workflow/CI/reviews and independent final source/packet/SQL/merge audits. No bulk earlier local reports or duplicate ZIP.",
+  "readme_sha256": "85be412a50b5f8dd4bc3d7cecbffb35645965502f5c775f178ef2cb4efd3cb07"
+}

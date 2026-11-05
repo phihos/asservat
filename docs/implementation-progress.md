@@ -1,9 +1,26 @@
 # Sustained implementation progress
 
-## Raw-source fixed packet summary candidate (2026-11-05)
+## Raw-source fixed packet summary merged and installed-qualified (2026-11-05)
+
+PR167 merged normally as `897fd783d6963073ce421cb6a211ffd59a1cdebf` at
+03:38:53Z. Reviewed `b6e2c084`, merge and fresh main share complete tree
+`33a5659402e0bb2ea520802d6708c2a6424f1a64`. Eligible pull-request
+CI41960208068 passed all15 jobs including ci-ok.
+[Installed41960249012](../test/results/raw-packet-summary-native-41960249012/README.md)
+passed Go/harness0 in773.697s. Independent read-only MCP and actual installed
+React fixed summaries completed before separately authorized raw download and
+matched the same9,400-byte authenticated original through native/tshark parity:
+54 saved records, two directional groups,0 unclassified, producer-reported
+exclusions0. Payload remained native-only, excluded from summary JSON/DOM.
+Both queries passed exact source/account/key/worker-terminal proofs. All4,212
+reported source hashes matched Git, sources stayed unchanged, cleanup was empty
+and scratch removed. The unused later-retirement callback does not establish
+unconditional retirement or capacity release. Second workload cluster, replay,
+Repeat and installed maximum-shape checks were not run. Raw `pcap_query`, broader
+qualification and the complete S-05 exit remain pending.
 
 PR165's metadata workflow and PR166's evidence/status closure are merged.
-[ADR-304](decisions/304-transient-raw-packet-summary.md) is the next S-05 workflow:
+[ADR-304](decisions/304-transient-raw-packet-summary.md) provides this S-05 increment:
 ordinary approved numeric inspection of an existing raw PCAPNG, using the
 accepted Go worker and separate raw display definition. The original stays raw;
 raw query/download grants remain independent. Tiny stored prefixes count as
@@ -13,8 +30,8 @@ composition, built React and named raw-input resource checks pass locally.
 [Local originals](../test/results/raw-packet-summary-local/README.md),
 [service evidence](../test/results/raw-packet-summary-services-local/README.md) and
 [resource evidence](../test/results/raw-packet-summary-resource-local/README.md)
-retain exact source scopes and failures. Installed qualification remains pending;
-no complete S-05 exit is claimed.
+retain exact source scopes and failures. The installed pass above closes the
+named reference workflow; no complete S-05 exit is claimed.
 
 Service source `749a87a9` passed the compiled raw lifecycle (11.020s, three tests)
 and a separate pristine schema138 upgrade campaign (7.298s, 349 tests). Both
@@ -40,8 +57,8 @@ zero swap and 500m CPU quota. Three exact 8 MiB shapes cover payload records,
 16,384 aggregates and 232,944 unclassified one-byte prefixes. Cancellation and
 source-error cases return no summary and join. The measured dependency set is
 identical between `9dc90018` and `749a87a9`. Short CPU samples do not qualify
-sustained 500m operation or every installed maximum. Installed MCP/React and
-same-original native/tshark qualification remain next.
+sustained 500m operation or every installed maximum. The later installed
+MCP/React/same-original native-tshark pass has the separate scope recorded above.
 
 ## Saved packet summaries merged and installed-qualified (2026-11-05)
 
