@@ -1,5 +1,23 @@
 # Sustained implementation progress
 
+## API-only saved-logs start correction (2026-11-05)
+
+Signed `ed7ebe06` passes CI42112331527, but installed42112422885 fails
+(Go/harness1,507.886s) after successful preview and independent approval.
+The original accepted capture remains prepared without a start object. A retained
+local fixture reproduces this boundary and identifies the constructor discarding
+its initialized logs holder when assigning the complete output struct. No original
+uncertain capture is retried. Both original failures and separate strict cleanup
+readback are [preserved with exact hashes](../test/results/finite-saved-logs-start-diagnosis/README.md).
+
+Signed `a03baf86` moves the existing holder initialization after that assignment.
+Its regression fails on the old constructor; full affected bootstrap/privacy
+races pass (119.024s/1.016s), as do vet, specification, architecture and final
+pre-push gates. Fresh initial human-client settings explicitly include logs;
+existing administrator policies retain their authored types. No service, timer,
+role, privilege, fallback or API call is added. A fresh API-only installed run
+is in progress; these local fixes are not an installed-success claim.
+
 ## Logs preview contract correction after installed failure (2026-11-05)
 
 Signed `67a28e07` passes all15 CI jobs. Its installed run still fails before
