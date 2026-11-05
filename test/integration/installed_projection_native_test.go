@@ -36,7 +36,7 @@ type installedProjectionCheck func(artifactID string) func(queryID, operationID 
 // Operator-only readback proves that the approved path did not create a dummy
 // native session, used one original query worker and consumed actual key slots.
 // It supplies no runtime input, grants or product authority.
-func installedProjectionSQLCheck(t *testing.T, ctx context.Context, admin *pgxpool.Pool, api kubernetes.Interface, root string) installedProjectionCheck {
+func installedProjectionSQLCheck(t *testing.T, ctx context.Context, admin *pgxpool.Pool, api kubernetes.Interface, root string, terminalSink ...func(func())) installedProjectionCheck {
 	return func(artifact string) func(string, string) func() {
 		t.Helper()
 		countDownloads := func() int {
@@ -131,8 +131,15 @@ func installedProjectionSQLCheck(t *testing.T, ctx context.Context, admin *pgxpo
 					// limit. Wait for this original worker to end (exit or Job
 					// deadline kill) before their demand cleanup; no fixture
 					// mutation releases its slot.
-					if err = installedProjectionWaitTerminal(ctx, api, observed); err != nil {
-						t.Fatal("approved query worker did not terminate", err)
+					waitTerminal := func() {
+						if err := installedProjectionWaitTerminal(ctx, api, observed); err != nil {
+							t.Fatal("approved query worker did not terminate", err)
+						}
+					}
+					if len(terminalSink) == 1 && terminalSink[0] != nil {
+						terminalSink[0](waitTerminal)
+					} else {
+						waitTerminal()
 					}
 					return func() {
 						t.Helper()

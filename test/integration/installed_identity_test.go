@@ -63,7 +63,7 @@ func newInstalledIdentity(t *testing.T, f fixture, origin, consoleSecret string)
 	profile["attributes"] = append(attributes, map[string]any{"name": "asservat_group_id", "multivalued": true, "permissions": map[string]any{"view": []string{"admin"}, "edit": []string{"admin"}}})
 	delete(profile, "unmanagedAttributePolicy")
 	kc.json("PUT", prefix+"/users/profile", profile)
-	for _, scope := range []string{"evidence:read", "evidence:download", "evidence:capture", "evidence:share"} {
+	for _, scope := range []string{"evidence:read", "evidence:download", "evidence:capture", "evidence:share", "evidence:raw"} {
 		kc.json("POST", prefix+"/client-scopes", map[string]any{"name": scope, "protocol": "openid-connect", "attributes": map[string]string{"include.in.token.scope": "true"}})
 	}
 	groups := map[string]any{"name": "stable-groups", "protocol": "openid-connect", "protocolMapper": "oidc-usermodel-attribute-mapper", "config": map[string]string{"user.attribute": "asservat_group_id", "claim.name": "asservat_groups", "jsonType.label": "String", "multivalued": "true", "aggregate.attrs": "true", "access.token.claim": "true", "id.token.claim": "false", "userinfo.token.claim": "false"}}
@@ -72,6 +72,9 @@ func newInstalledIdentity(t *testing.T, f fixture, origin, consoleSecret string)
 	}
 	// evidence:share is a default console scope so the browser can share (ADR-232 console).
 	scopes := []string{"basic", "evidence:read", "evidence:download", "evidence:capture", "evidence:share"}
+	if installedJourneyFocus() == "manual-raw" {
+		scopes = append(scopes, "evidence:raw")
+	}
 	if installedRecordingFocus() {
 		scopes = append(scopes, "acr")
 	}
@@ -82,7 +85,7 @@ func newInstalledIdentity(t *testing.T, f fixture, origin, consoleSecret string)
 	for name, resource := range map[string]string{installedMCPScope: "/mcp", installedDownloadsScope: "/api/v1/downloads"} {
 		kc.json("POST", prefix+"/client-scopes", map[string]any{"name": name, "protocol": "openid-connect", "attributes": map[string]string{"include.in.token.scope": "false"}, "protocolMappers": []any{audience(strings.TrimSuffix(origin, "/") + resource)}})
 	}
-	kc.json("POST", prefix+"/clients", map[string]any{"clientId": "mcp", "protocol": "openid-connect", "publicClient": true, "standardFlowEnabled": true, "directAccessGrantsEnabled": false, "implicitFlowEnabled": false, "serviceAccountsEnabled": false, "fullScopeAllowed": false, "redirectUris": []string{"http://127.0.0.1:1/callback"}, "defaultClientScopes": []string{"basic", "evidence:read"}, "optionalClientScopes": []string{installedMCPScope, installedDownloadsScope, "evidence:download", "evidence:capture", "evidence:share"}, "attributes": map[string]string{"pkce.code.challenge.method": "S256"}, "protocolMappers": []any{groups}})
+	kc.json("POST", prefix+"/clients", map[string]any{"clientId": "mcp", "protocol": "openid-connect", "publicClient": true, "standardFlowEnabled": true, "directAccessGrantsEnabled": false, "implicitFlowEnabled": false, "serviceAccountsEnabled": false, "fullScopeAllowed": false, "redirectUris": []string{"http://127.0.0.1:1/callback"}, "defaultClientScopes": []string{"basic", "evidence:read"}, "optionalClientScopes": []string{installedMCPScope, installedDownloadsScope, "evidence:download", "evidence:capture", "evidence:share", "evidence:raw"}, "attributes": map[string]string{"pkce.code.challenge.method": "S256"}, "protocolMappers": []any{groups}})
 	created := func(path string, value any) string {
 		t.Helper()
 		body, _ := json.Marshal(value)
@@ -149,6 +152,7 @@ type installedJourneyTokenSource struct {
 	subject          string
 	until            time.Time
 	approvedOnly     bool
+	packetQueryOnly  bool
 }
 
 func (i *installedIdentity) mcpTokenSource(origin string) *installedJourneyTokenSource {
@@ -227,6 +231,9 @@ func (s *installedJourneyTokenSource) Token(ctx context.Context) (string, error)
 	}
 	if s.approvedOnly && !installedApprovedScopes(claims.Scope) {
 		return "", errors.New("approved session lost read scope or gained download/capture scope")
+	}
+	if s.packetQueryOnly && !strings.Contains(" "+claims.Scope+" ", " evidence:raw ") {
+		return "", errors.New("packet query session lacks raw scope")
 	}
 	s.tokens, s.subject, s.until = next, claims.Subject, until
 	return next.Access, nil
@@ -326,4 +333,11 @@ func (i *installedIdentity) initializeProcessing(t *testing.T, ctx context.Conte
 		case <-time.After(2 * time.Second):
 		}
 	}
+}
+
+// Raw query inspection is a distinct OAuth session; it has no capture or native-download scope.
+func (i *installedIdentity) packetQueryTokenSource(origin string) *installedJourneyTokenSource {
+	return &installedJourneyTokenSource{issuer: i.Issuer, resource: strings.TrimSuffix(origin, "/") + "/mcp", now: time.Now, approvedOnly: true, packetQueryOnly: true, login: func() kcTokens {
+		return i.kc.loginScopes("mcp", "openid evidence:read evidence:raw "+installedMCPScope)
+	}, refresh: func(token string) kcTokens { return i.kc.refresh("mcp", token, http.StatusOK) }}
 }

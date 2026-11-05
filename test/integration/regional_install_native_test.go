@@ -906,6 +906,11 @@ func installedRegionalContextReserve() (bytes, objects int64) {
 	if installedRecordingFocus() {
 		bytes = 8 * (artifact.Registration{NativeLimit: artifact.RecordingNativeLimit}).ReservedBytes()
 	}
+	if installedJourneyFocus() == "manual-raw" {
+		// Existing byte reserve already covers sixteen protocol records;
+		// accept their sixty-four object slots before any capture/query.
+		objects = 64
+	}
 	if installedJourneyFocus() == "manual-profile" {
 		// Fund four independently approved 16MiB captures (CPU, busy, missing,
 		// Stop), including each immutable history artifact. Multipart backing

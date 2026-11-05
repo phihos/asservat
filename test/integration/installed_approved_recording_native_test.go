@@ -289,7 +289,7 @@ func (b *installedBrowser) approvedRecordingStepUp(t *testing.T, ctx context.Con
 	b.csrf = view.CSRF
 }
 
-func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identity *installedIdentity, publicRoot []byte, address, origin, cluster, namespace, workload, regionalConfig string, diagnose func(), measurement *nativePacingMeasurement, historyPhase func(string), initialStorageFailure func(string), summaryCheck installedProjectionCheck, argumentSource installedArgumentsSourceReader, stoppedDownload installedStoppedDownloadCheck, profileCapture ...installedProfileCaptureContinuation) {
+func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identity *installedIdentity, publicRoot []byte, address, origin, cluster, namespace, workload, regionalConfig string, diagnose func(), measurement *nativePacingMeasurement, historyPhase func(string), initialStorageFailure func(string), summaryCheck installedProjectionCheck, packetQueryCheck installedProjectionCheck, packetQueryDrain func(), argumentSource installedArgumentsSourceReader, stoppedDownload installedStoppedDownloadCheck, profileCapture ...installedProfileCaptureContinuation) {
 	t.Helper()
 	// Initial MCP transport/read failures can diagnose and terminate inside
 	// helpers before recovery returns. Sample this one preview first, once.
@@ -436,6 +436,11 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 		}
 		original["result_access"] = map[string]any{"actionIds": []string{preview.Lifecycle.Actions[0].ActionID}, "operations": []string{"download_artifact"}, "clientIDs": []string{installedProfileResultClient()},
 			"maxArtifacts": 1, "maxBytes": 64 << 20, "maxOperations": 100, "notAfter": time.Now().Add(time.Hour).UTC().Format(time.RFC3339)}
+	}
+	if installedJourneyFocus() == "manual-raw" {
+		access := original["result_access"].(map[string]any)
+		access["operations"] = []string{"download_artifact", "pcap_query"}
+		access["clientIDs"] = []string{"console", "mcp"}
 	}
 	pending, code := invoke("request_capture", original)
 	var refused struct {
@@ -904,6 +909,7 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 		return
 	}
 	var rawSummaries []analysis.PacketSummary
+	var rawQueries []analysis.PacketQueryResult
 	if installedJourneyFocus() == "manual-raw" {
 		row := evidence.Artifacts[0]
 		if row.Kind != "packetCapture" || row.NativeFormat != artifact.RawPCAPNGFormat || row.Target.PodUID != preview.Pods[0].UID || row.Target.ClusterID != cluster || row.Target.Namespace != namespace || row.Target.WorkloadName != workload {
@@ -913,6 +919,17 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 		rawSummaries = append(rawSummaries, queryInstalledPacketSummary(t, ctx, identity, transport, origin, source, summaryCheck))
 		rawSummaries = append(rawSummaries, queryInstalledPacketSummaryBrowser(t, ctx, self, address, source, summaryCheck))
 		t.Log("raw summary phase: independent read-only MCP and installed React fixed extracts completed before separately authorized original raw download")
+		if packetQueryDrain == nil {
+			t.Fatal("raw four-query original-worker pipeline missing")
+		}
+		packetQueryDrain() // Original first summary ends before a third worker is admitted.
+		querySource := installedPacketQuerySource{CaseID: progress.CaseID, ArtifactID: row.ID, Version: row.Digest, PodUID: preview.Pods[0].UID, GrantID: grantID, Expires: row.Expires}
+		rawQueries = append(rawQueries, queryInstalledPacketQuery(t, ctx, identity, transport, origin, querySource, packetQueryCheck))
+		packetQueryDrain() // Original second summary ends before the fourth worker.
+		rawQueries = append(rawQueries, queryInstalledPacketQueryBrowser(t, ctx, self, address, querySource, installedPacketQueryRequest(querySource, "installed-packet-query-console-"+row.ID), packetQueryCheck))
+		packetQueryDrain()
+		packetQueryDrain() // Both query results were delivered before their original terminal waits.
+		t.Log("raw packet query phase: MCP and actual React pages use the original combined review, same-source grant children and separately charged disclosures; no new acquisition before native download")
 	}
 	if measurement != nil {
 		if err := finishRecording(); err != nil {
@@ -1122,6 +1139,10 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 			}
 		}
 		installedPacketSummaryTshark(t, ctx, "../results/manual-raw.pcapng", native, rawSummaries...)
+		if len(rawQueries) != 2 {
+			t.Fatal("both original raw packet query clients missing")
+		}
+		installedPacketQueryTshark(t, ctx, "../results/manual-raw.pcapng", native, rawQueries...)
 		t.Logf("manual raw recording %s: %d packets on port 8080, %d kept payload beyond %d header bytes, largest %d (cap %d), %d bytes", receipt.CaptureID, s.Packets, s.Payload, artifact.RecordingSnaplen, s.MaxCaptured, manualRawTCPCap, len(native))
 		return
 	}

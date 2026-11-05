@@ -39,7 +39,7 @@ The machine-readable catalog is [mcp-tools.json](contracts/mcp-tools.json). A UI
 | `get_grant` | Poll own grant state and remaining quota | Requester/approver-specific views; anyone else sees the same reply as for an unknown ID (ADR-249). The approval inbox `list_reviews`, `decide_review` and `revoke_grant` are browser-only console operations |
 | `read_memory` | Bounded core-memory view at an address | Raw scope + share/ACL + grant; max 16 KiB/call, cumulative quota |
 | `debugger_command` | Structured enum operation with typed arguments | Raw grant; no text command language, shell or code evaluation |
-| `pcap_query` | Bounded packet projection and typed display predicates | Raw grant if any raw artifact/fields; scan/packet/output caps |
+| `pcap_query` | Bounded saved-packet fields, tcpdump/libpcap packet filter and typed time/flag selectors | Ordinary rights for metadata-only; exact pcap_query grant for any raw source/fields; scan/packet/output caps |
 | `get_query_result` | Retrieve result of an explicit analysis job | Recheck current authorization at every poll/delivery |
 | `list_shares` | View owned/received concrete shares; optionally owned SharingIntents; administrators: every share management-only (view administration) | Current personal/team-manager-only pending intents; bounded origins and combined pagination; administration view without recipients, ≤ 100 per cursor page |
 | `create_share` | Request an explicit user/group evidence share | Sharing authority; raw-sharing may be pending approval |
@@ -90,7 +90,9 @@ its own original at-most-five-second authority interval; polls reconstruct that
 request authority and never renew the query. Four paid polls and two paid read
 batches remain the profile ceilings. Clients honor the returned not-before
 interval and original expiry rather than immediately spending all polls.
-Ordinary reads require no extra caller idempotency key (SC-AUT-005). A pending
+Fixed ordinary reads require no extra caller idempotency key (SC-AUT-005). The
+explicit saved-packet query retains its separately declared initial idempotency
+key and exact replay contract under REQ-MCP-003; polling adds no new key. A pending
 handle binds the original tool, principal/client, exact committed source/display
 version, line selection, finite budgets and query deadline. `get_query_result`
 MUST NOT start another query, capture, analyzer or replacement worker. Delivering
@@ -133,11 +135,80 @@ proves remote quiescence or releases uncertain worker, key or provider spend.
 
 `debugger_command` MUST accept an enum such as `backtrace`, `threads`, `registers`, `frame_variables`, `managed_stack`, or `heap_statistics`, plus validated numeric/frame/thread selectors and projection limits. The implementation constructs fixed debugger scripts or MI calls itself. Do not accept shell, Python, debugger expressions, `source`, output redirection, extension loading or arbitrary `print` expressions. A command-name allowlist applied to free text is insufficient.
 
-`pcap_query` MUST validate a bounded subset of display-filter grammar, numeric/time/address ranges and field projections. Limit filter length, parse complexity, packets scanned/returned and CPU. Disable network name resolution. `read_memory` requires a collected core, validated address range and artifact digest; it is never a live process memory read. Returned byte views are bounded raw query results, not artifact downloads.
+`pcap_query` MUST validate a bounded **tcpdump/libpcap packet-filter** subset,
+closed packet fields and typed numeric/time/address/flag selections.
+[ADR-305](../docs/decisions/305-bounded-saved-packet-queries.md) explicitly revises
+the earlier display-filter-grammar wording as an implementation choice under
+standing complexity delegation: the named `packet_filter` input replaces `display_filter` and is not
+Wireshark display-filter syntax. The same pinned hub compiler and supported Go
+BPF evaluator used for acquisition are reused, without reconfiguring capture.
+Keep the public filter cap at512 bytes, the existing token/instruction bounds,
+no DNS/service-name resolution and exact evaluator compatibility checks. The
+initial query subset refuses bracket/raw-byte predicates before compilation or
+spend; this is a bounded first-release choice, not full libpcap support.
+Typed packet-time bounds and TCP flag mask/value selectors preserve those
+outcomes separately from expressions. The closed field catalog and selector
+limits MUST be identical across canonical input, browser/MCP, scope and worker.
+
+Metadata-only source/fields use current ordinary and retained rights without a
+raw grant. Any raw original needs an exact `pcap_query` grant even for header-only
+fields; the raw-summary aggregate right, collection grant, raw share or download
+operation does not replace it. A raw captured-frame prefix may be returned as
+bounded hex only from a raw original under that grant. It is a prefix of saved
+frame bytes, not inferred application payload. Missing/truncated headers remain
+null or explicitly unavailable. Current identity/client/audience, deny, retention,
+processing and recovery checks still precede and follow blocking work.
+
+Return one transient page of at most100 saved-record rows,32 selected fields and
+24KiB encoded structured output including required wrapping. Keep input/native,
+parser/evaluator work and elapsed-time bounds separate. The declared1GiB scan
+ceiling does not qualify sources larger than today's8MiB published packet bound.
+Logical `scanned_bytes` sums captured frame lengths visited in original order,
+including nonmatches; do not visit a record that would cross `max_scan_bytes`.
+Stop logical matching/projection at its row or scan cap, report visited work and
+limit/truncation state with a useful narrowing hint, then authenticate and check
+the complete original/canonical EOF before publishing a result. Full-authentication
+drain is bounded independently and is not reported as logical scanned bytes.
+Cancellation, source error, corrupt tail or lost authority overrides any page.
+
+The initial `idempotency_key` binds the exact normalized source/selection and
+conditional grant for the original human/client. Resolve an existing query before
+new compilation, admission or raw debit. Same-key/same-input replay retains its
+original query, pinned program, grant/use, paid batch, worker and all deadlines;
+changed input conflicts. Each invocation still has its own audit request ID.
+A poll cannot start another query or replenish spend. Reuse the existing query
+and immutable grant-use ledgers, including operation in replay comparisons; no
+second lifecycle journal is introduced. Before raw work, durably associate the
+query and its one-use disclosure reservation: one operation plus bounded
+worst-case returned bytes, independent of scan/capacity costs. Failure or uncertain
+closure does not refund either budget or move replay to a newer grant.
+
+Query-only raw grant pools fund returned disclosure rather than require coverage
+of the whole native file; retain verified native size as an exact source fact and
+the existing1GiB query-only request ceiling. A scope also selecting download keeps
+whole-file coverage and its existing download ceiling. Both operations spend the
+same parent pool across artifacts/clients. Reuse covering standalone or combined
+result-access grants under REQ-INV-001–003; an unlisted client needs its own review.
+Store bounded normalized filter/program, numeric/enum selectors, exact source and
+keyed control identity, never rows, frame bytes or arbitrary payload/string
+literals in SQL/audit/logs. Numeric addresses still have finite user-data retention.
+No new capture, native download, stored derivative or capture-history entry is
+implicit in a query. `read_memory` likewise requires a collected core, validated
+address range and artifact digest; it never reads a live process. Returned byte
+views are bounded raw query results, not artifact downloads.
 
 ### SC-MCP-003
 
-Given a malicious debugger command or packet filter containing file access, shell syntax, unbounded regex or unsupported functions, when submitted, then input validation rejects it before starting a sandbox. A permitted backtrace cannot load target-provided Python pretty-printers.
+Given a malicious debugger command or packet filter containing file access,
+shell syntax, unbounded regex, unsupported functions or an excluded raw-byte
+predicate, validation rejects it before query/worker/key/grant spend. A permitted
+backtrace cannot load target-provided Python pretty-printers. A supported packet
+filter uses the pinned program, typed time/flag bounds and exact saved fields;
+truncation cannot manufacture a missing field. A metadata-only query needs no
+raw grant, while header-only selection from a raw original still needs its exact
+pcap_query grant. A logical scan/row stop followed by a corrupt authenticated tail
+returns no page. Retrying an uncertain query with its original key does not
+create another paid query or disclosure use; a changed selection conflicts.
 
 ## REQ-MCP-004 — OAuth and untrusted evidence
 

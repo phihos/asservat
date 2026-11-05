@@ -41,6 +41,10 @@ func installedProfileBrowser(t *testing.T, ctx context.Context, browser *install
 // Only the packet owner supplies its trusted source mode. Other drivers keep
 // their original private input and function signature.
 func installedProfileBrowserSourceMode(t *testing.T, ctx context.Context, browser *installedBrowser, address string, source installedProfileComparisonSource, mode string, observed func(installedComparisonReply), packetCaptureMode string, restoreDuringNative ...bool) (func(string, any) installedComparisonReply, func() ([]byte, installedJourneyDownload), func()) {
+	return installedProjectionBrowserSource(t, ctx, browser, address, source, mode, observed, packetCaptureMode, nil, restoreDuringNative...)
+}
+
+func installedProjectionBrowserSource(t *testing.T, ctx context.Context, browser *installedBrowser, address string, source installedProfileComparisonSource, mode string, observed func(installedComparisonReply), packetCaptureMode string, packetQuery *installedPacketQueryBrowserInput, restoreDuringNative ...bool) (func(string, any) installedComparisonReply, func() ([]byte, installedJourneyDownload), func()) {
 	t.Helper()
 	origin, err := url.Parse(browser.base)
 	if err != nil || browser.client.Jar == nil || observed == nil {
@@ -61,7 +65,7 @@ func installedProfileBrowserSourceMode(t *testing.T, ctx context.Context, browse
 	if len(cookies) == 0 {
 		t.Fatal("installed comparison original cookie missing")
 	}
-	if mode != "comparison" && mode != "heap" && mode != "packet" {
+	if mode != "comparison" && mode != "heap" && mode != "packet" && mode != "packet-query" {
 		t.Fatal("invalid profile browser mode")
 	}
 	nativeDirectory := t.TempDir()
@@ -71,7 +75,7 @@ func installedProfileBrowserSourceMode(t *testing.T, ctx context.Context, browse
 		t.Fatal("invalid local browser session-restore selection")
 	}
 	input := map[string]any{"origin": browser.base, "proxy": proxy, "cookies": cookies, "caseID": source.CaseID, "artifactID": source.ArtifactID, "mode": mode, "nativeDestination": nativePath}
-	if mode == "packet" {
+	if mode == "packet" || mode == "packet-query" {
 		input["version"] = source.Version
 		if packetCaptureMode == "" {
 			packetCaptureMode = "networkHeaders"
@@ -80,6 +84,14 @@ func installedProfileBrowserSourceMode(t *testing.T, ctx context.Context, browse
 			t.Fatal("invalid packet source mode")
 		}
 		input["packet_capture_mode"] = packetCaptureMode
+	}
+	if mode == "packet-query" {
+		if packetQuery == nil {
+			t.Fatal("packet query browser input missing")
+		}
+		input["query_request"] = packetQuery.Request
+		input["podUID"] = packetQuery.Source.PodUID
+		input["grantID"] = packetQuery.Source.GrantID
 	}
 	if len(restoreDuringNative) == 1 && restoreDuringNative[0] {
 		input["restoreDuringNative"] = true
@@ -93,6 +105,9 @@ func installedProfileBrowserSourceMode(t *testing.T, ctx context.Context, browse
 	driver := "installed-profile-comparison-browser.mjs"
 	if mode == "packet" {
 		driver = "installed-packet-summary-browser.mjs"
+	}
+	if mode == "packet-query" {
+		driver = "installed-packet-query-browser.mjs"
 	}
 	command := exec.CommandContext(call, "node", filepath.Join("..", "..", "web", "scripts", driver))
 	command.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
@@ -178,7 +193,7 @@ func installedProfileBrowserSourceMode(t *testing.T, ctx context.Context, browse
 	}
 	invoke := func(name string, args any) installedComparisonReply {
 		t.Helper()
-		if closed || name != "get_query_result" && (mode == "comparison" && name != "compare_profiles" || mode == "heap" && name != "get_profile_summary" || mode == "packet" && name != "get_pcap_summary") {
+		if closed || name != "get_query_result" && (mode == "comparison" && name != "compare_profiles" || mode == "heap" && name != "get_profile_summary" || mode == "packet" && name != "get_pcap_summary" || mode == "packet-query" && name != "pcap_query") {
 			fail("unexpected operation")
 		}
 		encoded, err := json.Marshal(map[string]any{"kind": "call", "name": name, "input": args})
@@ -199,7 +214,22 @@ func installedProfileBrowserSourceMode(t *testing.T, ctx context.Context, browse
 		}
 		var actual, wanted any
 		input, encodeErr := json.Marshal(args)
-		if encodeErr != nil || json.Unmarshal(input, &wanted) != nil || json.Unmarshal(e.Input, &actual) != nil || !reflect.DeepEqual(actual, wanted) || browser.wire.ValidateOutput(name, e.Reply) != nil {
+		if encodeErr != nil || json.Unmarshal(input, &wanted) != nil || json.Unmarshal(e.Input, &actual) != nil {
+			fail("canonical request unavailable")
+		}
+		if mode == "packet-query" && name == "pcap_query" {
+			a, aok := actual.(map[string]any)
+			w, wok := wanted.(map[string]any)
+			key, kok := a["idempotency_key"].(string)
+			if !aok || !wok || !kok || len(key) < 1 || len(key) > 128 {
+				fail("original UI query key missing")
+			}
+			w["idempotency_key"] = key
+			if original, ok := args.(map[string]any); ok {
+				original["idempotency_key"] = key
+			}
+		}
+		if !reflect.DeepEqual(actual, wanted) || browser.wire.ValidateOutput(name, e.Reply) != nil {
 			fail("canonical request or reply")
 		}
 		return reply

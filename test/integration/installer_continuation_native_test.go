@@ -588,7 +588,7 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 					}()
 					var sources []installedProfileComparisonSource
 					for index := 0; index < 2; index++ {
-						qualifyInstalledApprovedRecording(t, ctx, identity, publicRoot, publicAddress, origin, cluster, namespace, workload, f.Clusters[1].Config, diagnose, nil, func(captureID string) { installedHistoryStorageDiagnostics(t, ctx, admin, p.RootID, captureID) }, func(previewID string) { installedInitialStorageDiagnostics(t, ctx, admin, p.RootID, previewID) }, nil, nil, installedStoppedDownloadSQLCheck(t, ctx, admin, kc, p.RootID, original.Plan.ClusterID), installedProfileCaptureContinuation{InitializeProcessing: index == 0, Captured: func(transport http.RoundTripper, source installedProfileComparisonSource) {
+						qualifyInstalledApprovedRecording(t, ctx, identity, publicRoot, publicAddress, origin, cluster, namespace, workload, f.Clusters[1].Config, diagnose, nil, func(captureID string) { installedHistoryStorageDiagnostics(t, ctx, admin, p.RootID, captureID) }, func(previewID string) { installedInitialStorageDiagnostics(t, ctx, admin, p.RootID, previewID) }, nil, nil, nil, nil, installedStoppedDownloadSQLCheck(t, ctx, admin, kc, p.RootID, original.Plan.ClusterID), installedProfileCaptureContinuation{InitializeProcessing: index == 0, Captured: func(transport http.RoundTripper, source installedProfileComparisonSource) {
 							if installedAcceptedHeavyComparison() {
 								if err := acceptedHeavySourceMatches(f.ProfileContainment, index, source.Native); err != nil {
 									t.Fatal("accepted-heavy original downloaded source", err)
@@ -612,14 +612,32 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 							profileChecks[0].NoQueries = installedRuntimeTraceNoQueries(t, ctx, admin, p.RootID)
 						}
 					}
+					var packetQueryCheck installedProjectionCheck
+					var packetQueryRetirements []func()
+					var packetPipeline *installedPacketTerminalPipeline
+					var packetDrain func()
 					summaryCheck := installedProjectionSQLCheck(t, ctx, admin, api, p.RootID)
 					if installedJourneyFocus() == "manual-mixed" {
 						summaryCheck = installedPacketSummarySQLCheck(t, ctx, admin, api, p.RootID)
 					}
 					if installedJourneyFocus() == "manual-raw" {
-						summaryCheck = installedPacketSummarySQLCheck(t, ctx, admin, api, p.RootID, "rawPackets")
+						packetPipeline = &installedPacketTerminalPipeline{}
+						defer packetPipeline.finish(t)
+						terminalSink := func(wait func()) { packetPipeline.add(t, wait) }
+						packetDrain = func() { packetPipeline.drain(t) }
+						summaryCheck = installedPacketSummarySQLCheckWithTerminal(t, ctx, admin, api, p.RootID, true, terminalSink)
+						packetQueryCheck = installedPacketQuerySQLCheck(t, ctx, admin, api, p.RootID, &packetQueryRetirements, terminalSink)
 					}
-					qualifyInstalledApprovedRecording(t, ctx, identity, publicRoot, publicAddress, origin, cluster, namespace, workload, f.Clusters[1].Config, diagnose, measurement, func(captureID string) { installedHistoryStorageDiagnostics(t, ctx, admin, p.RootID, captureID) }, func(previewID string) { installedInitialStorageDiagnostics(t, ctx, admin, p.RootID, previewID) }, summaryCheck, installedArgumentsSQLSource(t, ctx, admin, p.RootID), installedStoppedDownloadSQLCheck(t, ctx, admin, kc, p.RootID, original.Plan.ClusterID), profileChecks...)
+					qualifyInstalledApprovedRecording(t, ctx, identity, publicRoot, publicAddress, origin, cluster, namespace, workload, f.Clusters[1].Config, diagnose, measurement, func(captureID string) { installedHistoryStorageDiagnostics(t, ctx, admin, p.RootID, captureID) }, func(previewID string) { installedInitialStorageDiagnostics(t, ctx, admin, p.RootID, previewID) }, summaryCheck, packetQueryCheck, packetDrain, installedArgumentsSQLSource(t, ctx, admin, p.RootID), installedStoppedDownloadSQLCheck(t, ctx, admin, kc, p.RootID, original.Plan.ClusterID), profileChecks...)
+					for _, retired := range packetQueryRetirements {
+						retired()
+					}
+					if packetPipeline != nil && (packetPipeline.admitted != 4 || packetPipeline.joined != 4 || len(packetPipeline.pending) != 0) {
+						t.Fatal("four original raw-query workers were not positively joined")
+					}
+					if installedJourneyFocus() == "manual-raw" && len(packetQueryRetirements) != 2 {
+						t.Fatal("both query workers lack retained positive retirement checks")
+					}
 				}
 			})
 			return
@@ -1027,6 +1045,11 @@ func nativeCapacityProfile() *contracts.InstallerCapacitySettings {
 	// plus history, deriving 12 protocol records. Qualify those records upfront;
 	// its single pprof summary still charges ten conservative read-work units.
 	records := int64(8)
+	if installedJourneyFocus() == "manual-raw" {
+		// Two summaries (4 units) plus two independently paid packet queries
+		// (8 units) fit an originally accepted sixteen-record backing.
+		records = 16
+	}
 	if installedJourneyFocus() == "manual-profile" {
 		records = 12
 	}
