@@ -18,7 +18,11 @@ canonical contracts and direct/nested escaped page limits pass focused races
 original pending handles, relative expiry and source-bound pagination. Independent
 public-slice review is clear; repository integration fixes register the builtin
 example, refresh the canonical policy bundle and format one test. The final
-pre-push gate passes. Full public affected races are still in progress.
+pre-push gate passes. The first full public run preserves two failures: an old
+catalog-count expectation and the missing process kind/completeness branch in
+the case output schema. Both corrected regressions now pass focused races;
+the complete public rerun remains pending. Full audit/contracts races pass
+(1.030s/18.066s).
 
 These are local implementation checks. Migration142 real-service lifecycle,
 cancellation and upgrade/rollback, installed containerd acquisition, native/browser/

@@ -34,7 +34,7 @@ type Binding struct {
 	OperationID, CaptureID, ActionID, AttemptID                         string
 	ClusterID, IssuerEpoch, PodUID, NodeUID, NodeBootID, CollectorEpoch string
 	ScopeDigest, AuthorityDigest, BudgetDigest, AuditDigest             artifact.Digest
-	// NativeType is explicit for profile bindings; absent on existing recorder scopes.
+	// NativeType is explicit for finite profile, logs and process bindings; absent on existing recorder scopes.
 	NativeType          string `json:",omitempty"`
 	NativeBytes         int64
 	NotBefore, NotAfter time.Time
@@ -54,7 +54,8 @@ func (b Binding) Valid() bool {
 		recording := b.NativeType == "" && recorderAction(b.ActionID) && b.NativeBytes > 0 && b.NativeBytes <= artifact.RecordingNativeLimit
 		profile := recorderAction(b.ActionID) && b.NativeBytes > 0 && (b.NativeType == artifact.PprofArtifact && b.NativeBytes <= artifact.MaxPprofBytes || b.NativeType == artifact.GoTraceArtifact && b.NativeBytes <= artifact.MaxGoTraceBytes)
 		logs := recorderAction(b.ActionID) && b.NativeType == artifact.LogsArtifact && b.NativeBytes > 0 && b.NativeBytes <= artifact.LogNativeLimit
-		if b.NodeUID != "" || b.NodeBootID != "" || !authorization.UUID(b.ExecutorPodUID) || !authorization.UUID(b.ExecutorAccountUID) || !podStatus && !recording && !profile && !logs || b.NotAfter.After(b.NotBefore.Add(5*time.Second)) {
+		processes := recorderAction(b.ActionID) && b.NativeType == artifact.ProcessesArtifact && b.NativeBytes > 0 && b.NativeBytes <= artifact.ProcessNativeLimit
+		if b.NodeUID != "" || b.NodeBootID != "" || !authorization.UUID(b.ExecutorPodUID) || !authorization.UUID(b.ExecutorAccountUID) || !podStatus && !recording && !profile && !logs && !processes || b.NotAfter.After(b.NotBefore.Add(5*time.Second)) {
 			return false
 		}
 	} else if b.NativeType != "" || b.ExecutionClass != artifact.ContextNodeExecution || !authorization.UUID(b.NodeUID) || !authorization.UUID(b.NodeBootID) || b.ExecutorPodUID != "" || b.ExecutorAccountUID != "" {

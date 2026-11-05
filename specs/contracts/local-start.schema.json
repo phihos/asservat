@@ -127,7 +127,8 @@
           "enum": [
             "pprof",
             "goTrace",
-            "logs"
+            "logs",
+            "processes"
           ]
         }
       },
@@ -242,6 +243,23 @@
                   "nativeBytes": {
                     "minimum": 1,
                     "maximum": 67108864
+                  }
+                }
+              },
+              {
+                "required": [
+                  "nativeType"
+                ],
+                "properties": {
+                  "actionID": {
+                    "pattern": "^a[0-9a-f]{24}$"
+                  },
+                  "nativeType": {
+                    "const": "processes"
+                  },
+                  "nativeBytes": {
+                    "minimum": 1,
+                    "maximum": 2097152
                   }
                 }
               }

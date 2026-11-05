@@ -1168,6 +1168,32 @@ def main() -> None:
         validate(accepted, schemas[BASE + "local-start.schema.json"])
         rejects(accepted, "local-start", lambda d: d["spec"].update(nativeBytes=maximum+1))
 
+    # The process producer uses the API executor with a fixed metadata type.
+    # Keep its exact native limit aligned with the existing domain Binding.
+    processes_start = examples["local-start-processes.json"]
+    for size in (1, 1048576, 2097152):
+        accepted = copy.deepcopy(processes_start)
+        accepted["spec"]["nativeBytes"] = size
+        validate(accepted, schemas[BASE + "local-start.schema.json"])
+    for mutation in (
+        lambda d: d["spec"].update(nativeBytes=0),
+        lambda d: d["spec"].update(nativeBytes=2097153),
+        lambda d: d["spec"].update(nativeType="unknown"),
+        lambda d: d["spec"].update(actionID="pod-status"),
+        lambda d: d["spec"].update(nodeUID=d["spec"]["podUID"]),
+        lambda d: d["spec"].update(nodeBootID=d["spec"]["podUID"]),
+        lambda d: d["spec"].pop("executorPodUID"),
+        lambda d: d["spec"].pop("executorAccountUID"),
+        lambda d: d["spec"].pop("nativeType"),
+        lambda d: d["spec"].update(profile="onTriggerStart/v1"),
+    ):
+        rejects(processes_start, "local-start", mutation)
+    for native, maximum in (("pprof", 67108864), ("goTrace", 134217728)):
+        accepted = copy.deepcopy(processes_start)
+        accepted["spec"].update(nativeType=native, nativeBytes=maximum)
+        validate(accepted, schemas[BASE + "local-start.schema.json"])
+        rejects(accepted, "local-start", lambda d: d["spec"].update(nativeBytes=maximum+1))
+
     owner_entries = []
     for index, purpose in enumerate(("owner-runtime",)):
         owner_entries.append({"purpose": purpose, "password": "a" * 42 + str(index),

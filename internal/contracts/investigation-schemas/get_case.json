@@ -140,7 +140,8 @@
                             "packetCapture",
                             "syscallTrace",
                             "profile",
-                            "logs"
+                            "logs",
+                            "processSnapshot"
                           ]
                         },
                         "data_class": {
@@ -606,7 +607,10 @@
                           "if": {
                             "properties": {
                               "kind": {
-                                "const": "logs"
+                                "enum": [
+                                  "logs",
+                                  "processSnapshot"
+                                ]
                               }
                             },
                             "required": [

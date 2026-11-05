@@ -36,3 +36,12 @@ the existing execution-domain binding; it adds no permission, runtime journal,
 retry or lifetime. The original installed logs attempt stopped at this contract
 mismatch. A synthetic server dry-run reproduced its rejection; full fresh
 installed logs qualification after the correction remains pending.
+
+Finite process metadata uses the API executor's explicit `processes` native
+branch, a generated action ID and a positive ceiling of 2 MiB. The start permit
+still binds the regional executor Pod/account and original five-second interval;
+node/boot fields are absent from this API journal and are independently pinned
+in the process collector's exact source scope. This aligns the structural CRD
+and reviewed CEL with the existing domain binding without extending authority,
+roles, deadlines or the accepted process field set. Installed process startup
+qualification remains pending.

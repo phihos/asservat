@@ -456,3 +456,5 @@ examples:
   schema: https://asservat.io/spec/v1/capture-profile.schema.json
 - file: examples/capture-profile-inspect-processes.yaml
   schema: https://asservat.io/spec/v1/capture-profile.schema.json
+- file: examples/local-start-processes.json
+  schema: https://asservat.io/spec/v1/local-start.schema.json

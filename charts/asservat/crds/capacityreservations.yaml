@@ -158,7 +158,8 @@
                     "enum": [
                       "pprof",
                       "goTrace",
-                      "logs"
+                      "logs",
+                      "processes"
                     ]
                   }
                 },
@@ -186,7 +187,7 @@
                     "message": "A prepaid start binding is immutable."
                   },
                   {
-                    "rule": "self.profile == \"apiContextStart/v1\" ? (has(self.executorPodUID) && has(self.executorAccountUID) && !has(self.nodeUID) && !has(self.nodeBootID) && (!has(self.nativeType) && (self.actionID == \"pod-status\" && self.nativeBytes == 4096 || self.actionID.matches(\"^a[0-9a-f]{24}$\") && self.nativeBytes == 8388608) || has(self.nativeType) && self.actionID.matches(\"^a[0-9a-f]{24}$\") && self.nativeBytes > 0 && (self.nativeType == \"pprof\" && self.nativeBytes <= 67108864 || self.nativeType == \"goTrace\" && self.nativeBytes <= 134217728 || self.nativeType == \"logs\" && self.nativeBytes <= 67108864)) && timestamp(self.notAfter) <= timestamp(self.notBefore) + duration(\"5s\")) : (has(self.nodeUID) && has(self.nodeBootID) && !has(self.executorPodUID) && !has(self.executorAccountUID) && !has(self.nativeType))",
+                    "rule": "self.profile == \"apiContextStart/v1\" ? (has(self.executorPodUID) && has(self.executorAccountUID) && !has(self.nodeUID) && !has(self.nodeBootID) && (!has(self.nativeType) && (self.actionID == \"pod-status\" && self.nativeBytes == 4096 || self.actionID.matches(\"^a[0-9a-f]{24}$\") && self.nativeBytes == 8388608) || has(self.nativeType) && self.actionID.matches(\"^a[0-9a-f]{24}$\") && self.nativeBytes > 0 && (self.nativeType == \"pprof\" && self.nativeBytes <= 67108864 || self.nativeType == \"goTrace\" && self.nativeBytes <= 134217728 || self.nativeType == \"logs\" && self.nativeBytes <= 67108864 || self.nativeType == \"processes\" && self.nativeBytes <= 2097152)) && timestamp(self.notAfter) <= timestamp(self.notBefore) + duration(\"5s\")) : (has(self.nodeUID) && has(self.nodeBootID) && !has(self.executorPodUID) && !has(self.executorAccountUID) && !has(self.nativeType))",
                     "message": "Execution profile requires exactly its own identity and limits."
                   },
                   {

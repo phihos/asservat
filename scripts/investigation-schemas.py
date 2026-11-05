@@ -467,14 +467,14 @@ def main():
             artifacts = data["properties"]["artifacts"]
             artifacts["minItems"] = 1
             row = artifacts["items"]["properties"]
-            row["kind"] = {"enum": ["pod-status", "packetCapture", "syscallTrace", "profile", "logs"]}
+            row["kind"] = {"enum": ["pod-status", "packetCapture", "syscallTrace", "profile", "logs", "processSnapshot"]}
             # ADR-279: a raw packet capture is listed as raw; its download
             # needs the approved grant's result-access child. ADR-282: an
             # HTTP header projection is an extract.
             row["data_class"] = {"enum": ["metadata", "extract", "raw"]}
             row["completeness"] = {"enum": ["complete", "unknown"]}
             artifacts["items"].setdefault("allOf", []).append({
-                "if": {"properties": {"kind": {"const": "logs"}}, "required": ["kind"]},
+                "if": {"properties": {"kind": {"enum": ["logs", "processSnapshot"]}}, "required": ["kind"]},
                 "then": {"properties": {"completeness": {"const": "unknown"}}},
                 "else": {"properties": {"completeness": {"const": "complete"}}},
             })
