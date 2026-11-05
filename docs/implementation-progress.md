@@ -21,12 +21,16 @@ example, refresh the canonical policy bundle and format one test. The final
 pre-push gate passes. The first full public run preserves two failures: an old
 catalog-count expectation and the missing process kind/completeness branch in
 the case output schema. Both corrected regressions now pass focused races;
-the complete public rerun remains pending. Full audit/contracts races pass
-(1.030s/18.066s).
+the complete integrated presentation rerun passes452.435s. Full bootstrap
+races pass115.126s and execution-domain races1.013s. Full audit/contracts
+races pass1.030s/18.066s. Three separate actual SQL/provider lifecycle,
+cancellation and pristine142 upgrade/rollback campaigns also pass; Root
+verifies all4,367 Git inputs and cleanupFailures=[] for each.
+[Exact original service evidence](../test/results/process-discovery-service-local/README.md)
+keeps synthetic authority/Job boundaries and prior failures explicit.
 
-These are local implementation checks. Migration142 real-service lifecycle,
-cancellation and upgrade/rollback, installed containerd acquisition, native/browser/
-MCP parity and combined resource qualification remain pending. Fast completion
+These are local/component service checks. Installed containerd acquisition,
+native/browser/MCP parity and combined resource qualification remain pending. Fast completion
 never supplies evidence for an in-flight Stop. Policy/mixed process execution,
 file/core collection and the broader guided discovery requirements remain open;
 S-05 and the complete specification goal are not complete.
