@@ -250,6 +250,9 @@ func recorderResultAccessActions(plan planning.RecorderPlan) []RecorderResultAcc
 		if a.Kind == "packetCapture" && a.PacketProfile == "rawPackets" {
 			ops = append(ops, "pcap_query")
 		}
+		if a.Kind == "syscallTrace" && a.SyscallMode == "arguments" {
+			ops = append(ops, "syscall_query")
+		}
 		out = append(out, RecorderResultAccessAction{ActionID: a.ID, Operations: ops})
 	}
 	return out

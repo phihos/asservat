@@ -19,6 +19,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -37,13 +38,14 @@ import (
 )
 
 type installedApprovedRecordingPreview struct {
-	ID          string          `json:"preview_id"`
-	Expires     time.Time       `json:"expires_at"`
-	Approval    bool            `json:"approval_required"`
-	Enabled     bool            `json:"capture_enabled"`
-	Digest      string          `json:"execution_digest"`
-	Composition json.RawMessage `json:"profile_composition"`
-	Blockers    []struct {
+	ResultAccessActions []presentation.RecorderResultAccessAction `json:"result_access_actions"`
+	ID                  string                                    `json:"preview_id"`
+	Expires             time.Time                                 `json:"expires_at"`
+	Approval            bool                                      `json:"approval_required"`
+	Enabled             bool                                      `json:"capture_enabled"`
+	Digest              string                                    `json:"execution_digest"`
+	Composition         json.RawMessage                           `json:"profile_composition"`
+	Blockers            []struct {
 		Code string `json:"code"`
 	} `json:"blockers"`
 	Pods      []struct{ UID, Name string } `json:"selected_pods"`
@@ -57,6 +59,22 @@ type installedApprovedRecordingPreview struct {
 
 func (p installedApprovedRecordingPreview) readyForApproval(now time.Time) bool {
 	return p.ID != "" && p.Approval && !p.Enabled && len(p.Pods) == 1 && p.Pods[0].UID != "" && now.Before(p.Expires) && len(p.Blockers) == 1 && p.Blockers[0].Code == "ApprovalRequired"
+}
+
+// Qualification submits the exact choice offered for the selected compiled
+// action. Missing, duplicate, or changed choices must fail before approval.
+func (p installedApprovedRecordingPreview) resultAccessOperations(actionID string, expected []string) ([]string, bool) {
+	var operations []string
+	for _, choice := range p.ResultAccessActions {
+		if choice.ActionID != actionID {
+			continue
+		}
+		if operations != nil || !slices.Equal(choice.Operations, expected) {
+			return nil, false
+		}
+		operations = slices.Clone(choice.Operations)
+	}
+	return operations, len(operations) > 0
 }
 
 // Retry only the ordinary typed transient refusal, within the existing four
@@ -443,8 +461,12 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 		access["clientIDs"] = []string{"console", "mcp"}
 	}
 	if installedJourneyFocus() == "manual-arguments" {
+		operations, ok := preview.resultAccessOperations(preview.Lifecycle.Actions[0].ActionID, []string{"download_artifact", "syscall_query"})
+		if !ok {
+			t.Fatal("actual arguments preview did not offer download and syscall query for its selected action")
+		}
 		access := original["result_access"].(map[string]any)
-		access["operations"] = []string{"download_artifact", "syscall_query"}
+		access["operations"] = operations
 		access["clientIDs"] = []string{"console", "mcp"}
 	}
 	pending, code := invoke("request_capture", original)

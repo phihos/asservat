@@ -9,13 +9,16 @@ import { operations as defaultOperations, type Grant, type Operations, type Revi
 const date = (value: string) => new Date(value).toLocaleString();
 const reasons: Record<string, string> = {
   rawBytePredicate: 'a raw byte comparison in the packet filter can test payload bytes',
+  syscallArguments: 'the recording captures approved scalar values and bounded reads of user memory; arguments may contain sensitive user data',
   liveProfile: 'live profiling can affect the application and records raw user data',
   rawPackets: 'the recording keeps payload prefixes up to the approved per-transport caps',
   httpHeaders: 'the recording reads payload to project HTTP/1 method, status, Content-Type and Content-Length; bodies, URLs and credentials are discarded',
   recordingApprovalRequired: 'this installation requires approval for every recording',
   policyCollection: 'recurring policy collection uses a separate finite approval and shared budgets',
 };
-const accessOperation = (operation: string) => operation === 'pcap_query' ? 'Saved packet queries' : operation === 'download_artifact' ? 'whole-file downloads' : operation;
+const accessOperation = (operation: string) => operation === 'pcap_query' ? 'Saved packet queries' : operation === 'syscall_query' ? 'Saved syscall argument queries' : operation === 'download_artifact' ? 'whole-file downloads' : operation;
+const hasQueries = (operations: readonly string[]) => operations.includes('pcap_query') || operations.includes('syscall_query');
+const queryDescription = (operations: readonly string[]) => operations.includes('pcap_query') && operations.includes('syscall_query') ? 'Saved packet and syscall argument queries' : operations.includes('syscall_query') ? 'Saved syscall argument queries' : 'Saved packet queries';
 const phases: Record<string, string> = {
   Pending: 'Waiting for review', Approved: 'Approved', Denied: 'Denied', Revoked: 'Revoked', Expired: 'Expired', Exhausted: 'Exhausted',
 };
@@ -25,7 +28,7 @@ function Rows({ rows, empty, label }: { rows?: ReviewRow[]; empty: string; label
   if (!rows) return null;
   if (rows.length === 0) return <p>{empty}</p>;
   return <ul className="progress-actions" aria-label={label}>{rows.map(row => <li key={row.grant_id}>
-    <span><a href={'/approvals/' + row.grant_id}>{row.kind === 'rawQuery' ? `${row.raw_access.operations.includes('pcap_query') ? 'Inspect' : 'Download'} ${row.raw_access.artifact_count} existing artifacts` : `${row.target.workload_kind} ${row.target.workload_name}`}</a>{row.kind !== 'rawQuery' && <> in {row.target.namespace}</>} · {phases[row.phase] ?? row.phase} · requested by {row.requested_by.subject} {date(row.requested_at)}
+    <span><a href={'/approvals/' + row.grant_id}>{row.kind === 'rawQuery' ? `${hasQueries(row.raw_access.operations) ? 'Inspect' : 'Download'} ${row.raw_access.artifact_count} existing artifacts` : `${row.target.workload_kind} ${row.target.workload_name}`}</a>{row.kind !== 'rawQuery' && <> in {row.target.namespace}</>} · {phases[row.phase] ?? row.phase} · requested by {row.requested_by.subject} {date(row.requested_at)}
       {row.phase === 'Pending' && <> · review until {date(row.review_until)}</>}</span>
   </li>)}</ul>;
 }
@@ -35,12 +38,12 @@ function Detail({ grant, busy, onDecide, onRevoke, onResume, onResolve }: { gran
   const policy = grant.kind === 'policy' ? grant.policy : undefined;
   return <>
     {grant.kind === 'rawQuery' ? <section className="review-section" aria-labelledby="approval-plan">
-      <h2 id="approval-plan">{grant.raw_access.operations.includes('pcap_query') ? 'Inspect existing raw evidence' : 'Download existing raw evidence'}</h2>
-      <p>{grant.raw_access.operations.includes('pcap_query') ? grant.raw_access.operations.includes('download_artifact') ? 'Saved packet queries and whole-file downloads of the selected existing artifacts.' : 'Saved packet queries over the selected existing artifacts.' : 'Whole-file download of the selected existing artifacts.'} This approval starts no collection.</p>
+      <h2 id="approval-plan">{hasQueries(grant.raw_access.operations) ? 'Inspect existing raw evidence' : 'Download existing raw evidence'}</h2>
+      <p>{hasQueries(grant.raw_access.operations) ? grant.raw_access.operations.includes('download_artifact') ? `${queryDescription(grant.raw_access.operations)} and whole-file downloads of the selected existing artifacts.` : `${queryDescription(grant.raw_access.operations)} over the selected existing artifacts.` : 'Whole-file download of the selected existing artifacts.'} This approval starts no collection.</p>
       <p>Requested by {grant.requested_by.subject} (client {grant.requested_by.client_id}). Reason: {grant.raw_access.reason}</p>
       <table><thead><tr><th>Artifact</th><th>Target</th><th>Verified native size</th><th>Access until</th></tr></thead><tbody>{grant.raw_access.artifacts.map(a => <tr key={a.artifact_id}><td>{a.native_type} <span className="identifier">{a.artifact_id}</span><br/>Capture {a.capture_id}, action {a.action_id}<details><summary>Exact versions</summary>Copy {a.digest}<br/>Execution {a.execution_digest}</details></td><td>{a.target.workload_kind} {a.target.workload_name ?? a.target.workload_uid}, {a.target.namespace ?? a.target.namespace_uid}; Pod {a.target.pod_name ?? a.target.pod_uid}<br/>Cluster {a.target.cluster_id}<details><summary>Target identities</summary>Namespace {a.target.namespace_uid}<br/>Workload {a.target.workload_uid}<br/>Pod {a.target.pod_uid}</details></td><td>{new Intl.NumberFormat().format(a.native_bytes)} bytes</td><td>{date(a.expires_at)}</td></tr>)}</tbody></table>
-      <p>At most {new Intl.NumberFormat().format(grant.raw_access.max_bytes)} bytes and {grant.raw_access.max_operations} {grant.raw_access.operations.includes('pcap_query') ? 'selected operations' : 'download operations'} until {date(grant.raw_access.not_after)}. Used: {grant.raw_access.bytes_used} bytes and {grant.raw_access.operations_used} operations. Retransmissions consume this shared budget.</p>
-      {grant.raw_access.operations.includes('pcap_query') && <p>Each paid query page reserves 24 KiB and one operation, including a reply lost in transit. Queries and downloads share the reviewed pool; a query permits at most two paid pages. A query-only pool need not cover the whole native size.</p>}
+      <p>At most {new Intl.NumberFormat().format(grant.raw_access.max_bytes)} bytes and {grant.raw_access.max_operations} {hasQueries(grant.raw_access.operations) ? 'selected operations' : 'download operations'} until {date(grant.raw_access.not_after)}. Used: {grant.raw_access.bytes_used} bytes and {grant.raw_access.operations_used} operations. Retransmissions consume this shared budget.</p>
+      {hasQueries(grant.raw_access.operations) && <p>Each paid query page reserves 24 KiB and one operation, including a reply lost in transit. Queries and downloads share the reviewed pool; a query permits at most two paid pages. A query-only pool need not cover the whole native size.</p>}
       <p>Downloaded copies are outside Asservat's automatic deletion. Current permissions and retention still apply.</p>
       <a href={'/cases/' + grant.raw_access.case_id}>Return to evidence</a>
     </section> : <section className="review-section" aria-labelledby="approval-plan">
@@ -67,7 +70,7 @@ function Detail({ grant, busy, onDecide, onRevoke, onResume, onResolve }: { gran
       })}
       {grant.observation_limits && <p>Observation limits bound by this approval: {grant.observation_limits.max_session_seconds} s per session, {bytes(grant.observation_limits.max_observed_bytes)} in total, {bytes(grant.observation_limits.max_bytes_per_second)} per second, {grant.observation_limits.max_concurrent_sessions} concurrent session.{grant.observation_limits.max_observed_events !== undefined && <> {grant.observation_limits.max_observed_events} eligible entry and exit probes in total.</>}</p>}
       {grant.result_access && <p>Follow-up access for the requester only: {grant.result_access.operations.map(accessOperation).join(', ')} by clients {grant.result_access.client_ids.join(', ')}, at most {grant.result_access.max_artifacts} artifacts and {bytes(grant.result_access.max_bytes)} in total until {date(grant.result_access.not_after)} (used: {grant.result_access.artifacts_used} artifacts, {bytes(grant.result_access.bytes_used)}).</p>}
-      {grant.result_access?.operations.includes('pcap_query') && <p>Each paid query page reserves 24 KiB and one operation from that same follow-up pool. Downloaded bytes and query pages share its limit.</p>}
+      {grant.result_access && hasQueries(grant.result_access.operations) && <p>Each paid query page reserves 24 KiB and one operation from that same follow-up pool. Downloaded bytes and query pages share its limit.</p>}
       {policy ? <>
         <p>Team policy <span className="identifier">{policy.uid}</span> runs as <span className="identifier">{policy.executor.subject}</span> under the reviewed team authority from {date(policy.authority_issued_at)} until {date(policy.authority_not_after)}.</p>
         <p>Grant reservations: {policy.executions_used} of {policy.max_executions} action starts; {bytes(policy.collected_bytes_used)} of {bytes(policy.max_collected_bytes)} output; {bytes(policy.observed_bytes_used)} of {bytes(policy.max_observed_bytes)} sensitive observation.{!!policy.max_observed_events && <> {policy.observed_events_used ?? 0} of {policy.max_observed_events} eligible entry and exit probes.</>} Reservations include uncertain work and are not refunded by replacing an approval. Team, workload and admission limits can further restrict collection.</p>

@@ -276,3 +276,92 @@ it('keeps parent capture progress available when descriptive reason has retired'
  expect(await screen.findByText(/The save reason is unavailable/)).toBeTruthy();
  expect(document.querySelector('.progress-actions')).toBeTruthy();expect(screen.queryByRole('region',{name:'Save reason'})).toBeNull();
 });
+
+async function rawFollowupReview() {
+  const setup = mount();
+  const recording = recordingPreviewResult(); if (recording.status !== 'ok') throw new Error();
+  const [packet, syscall, profile] = recording.data.profile_composition!.actionMap.map(action => action.actionID);
+  recording.data.result_access_actions = [
+    { action_id: packet, operations: ['download_artifact', 'pcap_query'] },
+    { action_id: syscall, operations: ['download_artifact', 'syscall_query'] },
+    { action_id: profile, operations: ['download_artifact'] },
+  ];
+  setup.client.responder = () => recording;
+  act(() => setup.controller.setDraft({ target, retention: '' }));
+  await act(async () => { await setup.controller.previewComposition(recording.data.profile_composition!.authored); });
+  fireEvent.click(screen.getByLabelText('Include follow-up access in this approval'));
+  return { ...setup, recording, packet, syscall, profile };
+}
+it('derives server-advertised mixed query operations without losing either source', async () => {
+  const { client, packet, syscall } = await rawFollowupReview();
+  fireEvent.change(screen.getByLabelText('Follow-up operations'), { target: { value: 'query' } });
+  expect(screen.getByRole('option', { name: 'Saved packet and syscall argument queries' })).toBeTruthy();
+  expect(screen.getByLabelText('http / http')).toBeTruthy();
+  expect(screen.getByLabelText('calls / syscalls')).toBeTruthy();
+  expect(screen.queryByLabelText('context / processes')).toBeNull();
+  expect(screen.queryByLabelText('context / sockets')).toBeNull();
+  expect(client.calls.some(call => call.name === 'request_capture')).toBe(false);
+  client.responder = () => approvalPendingResult();
+  fireEvent.click(screen.getByRole('button', { name: 'Request approval' }));
+  await screen.findByRole('link', { name: 'View approval' });
+  expect(client.calls.find(call => call.name === 'request_capture')!.input).toMatchObject({ result_access: { actionIds: [packet, syscall], operations: ['pcap_query', 'syscall_query'], maxArtifacts: 2, maxBytes: 2 * 49152 } });
+});
+it('includes profile downloads beside server-advertised packet and argument queries', async () => {
+  const { client, recording, packet, syscall, profile } = await rawFollowupReview();
+  fireEvent.change(screen.getByLabelText('Follow-up operations'), { target: { value: 'both' } });
+  expect(screen.getByLabelText('context / processes')).toBeTruthy();
+  expect((screen.getByLabelText('Shared disclosure byte budget') as HTMLInputElement).value).toBe(String(recording.data.max_bytes + 2 * 49152));
+  client.responder = () => approvalPendingResult();
+  fireEvent.click(screen.getByRole('button', { name: 'Request approval' }));
+  await screen.findByRole('link', { name: 'View approval' });
+  const sent = client.calls.find(call => call.name === 'request_capture')!.input as Record<string, unknown>;
+  expect(sent.result_access).toMatchObject({ actionIds: [packet, syscall, profile], operations: ['download_artifact', 'pcap_query', 'syscall_query'], maxArtifacts: 3 });
+  expect(sent.result_access).not.toHaveProperty('clientIDs');
+});
+it('removes a deselected source query operation and refuses queryless combined selection', async () => {
+  const { client, syscall } = await rawFollowupReview();
+  fireEvent.change(screen.getByLabelText('Follow-up operations'), { target: { value: 'both' } });
+  fireEvent.click(screen.getByLabelText('http / http'));
+  fireEvent.click(screen.getByLabelText('calls / syscalls'));
+  expect((screen.getByRole('button', { name: 'Request approval' }) as HTMLButtonElement).disabled).toBe(true);
+  expect(client.calls.some(call => call.name === 'request_capture')).toBe(false);
+  fireEvent.click(screen.getByLabelText('context / processes'));
+  fireEvent.click(screen.getByLabelText('calls / syscalls'));
+  client.responder = () => approvalPendingResult();
+  fireEvent.click(screen.getByRole('button', { name: 'Request approval' }));
+  await screen.findByRole('link', { name: 'View approval' });
+  expect(client.calls.find(call => call.name === 'request_capture')!.input).toMatchObject({ result_access: { actionIds: [syscall], operations: ['download_artifact', 'syscall_query'], maxArtifacts: 1 } });
+});
+it('offers syscall-only follow-up from the server and preserves download-only choices', async () => {
+  const { client, controller } = mount();
+  const recording = recordingPreviewResult(); if (recording.status !== 'ok') throw new Error();
+  const action = recording.data.profile_composition!.actionMap[1].actionID;
+  recording.data.result_access_actions = [{ action_id: action, operations: ['download_artifact', 'syscall_query'] }];
+  client.responder = () => recording;
+  act(() => controller.setDraft({ target, retention: '' }));
+  await act(async () => { await controller.previewComposition(recording.data.profile_composition!.authored); });
+  fireEvent.click(screen.getByLabelText('Include follow-up access in this approval'));
+  expect(screen.getByRole('option', { name: 'Saved syscall argument queries' })).toBeTruthy();
+  expect(screen.queryByRole('option', { name: 'Saved packet queries' })).toBeNull();
+  fireEvent.change(screen.getByLabelText('Follow-up operations'), { target: { value: 'query' } });
+  client.responder = () => approvalPendingResult();
+  fireEvent.click(screen.getByRole('button', { name: 'Request approval' }));
+  await screen.findByRole('link', { name: 'View approval' });
+  expect(client.calls.find(call => call.name === 'request_capture')!.input).toMatchObject({ result_access: { actionIds: [action], operations: ['syscall_query'], maxBytes: 49152 } });
+});
+it('retains the download-only server choice without inventing query options', async () => {
+  const { client, controller } = mount();
+  const recording = recordingPreviewResult(); if (recording.status !== 'ok') throw new Error();
+  const action = recording.data.profile_composition!.actionMap[2].actionID;
+  recording.data.result_access_actions = [{ action_id: action, operations: ['download_artifact'] }];
+  client.responder = () => recording;
+  act(() => controller.setDraft({ target, retention: '' }));
+  await act(async () => { await controller.previewComposition(recording.data.profile_composition!.authored); });
+  fireEvent.click(screen.getByLabelText('Include follow-up access in this approval'));
+  expect((screen.getByLabelText('Follow-up operations') as HTMLSelectElement).options).toHaveLength(1);
+  expect(screen.getByLabelText('context / processes')).toBeTruthy();
+  client.responder = () => approvalPendingResult();
+  fireEvent.click(screen.getByRole('button', { name: 'Request approval' }));
+  await screen.findByRole('link', { name: 'View approval' });
+  expect(client.calls.find(call => call.name === 'request_capture')!.input).toMatchObject({ result_access: { actionIds: [action], operations: ['download_artifact'] } });
+});

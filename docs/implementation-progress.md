@@ -1,5 +1,32 @@
 # Sustained implementation progress
 
+## Syscall authoring gaps closed locally; observed cancellation scoped (2026-11-05)
+
+CI42044734677 passes all15 jobs on signed `dacedd43`. Native42044789919 is
+cancelled at20 minutes; its230,508B ZIP matches the server digest. All five
+fixed-view assertions and both raw MCP/actual React queries retain native
+parity/accounting/key/worker checks. Repeat preview returns ok in4.430s. The next
+history read fails263ms after cancellation was reported, so it does not establish
+an independent product defect. Initial4,291 source hashes match Git; Go/test
+exits and final-source/cleanup evidence remain absent. [Originals](../test/results/saved-syscall-query-native-42044789919/README.md)
+preserve the explicitly running/incomplete checkpoint. Stop is unqualified.
+
+The actual preview producer/browser controls had omitted combined syscall-query
+access and displayed download-only approval wording. Producer/DTO/UI regressions
+reproduce those gaps; exact compiled choices and server-derived selected-operation
+unions now preserve mixed packet/syscall/profile-download scope and frozen
+approval receipts. Targeted three-package races,91 React tests and TypeScript
+pass. A fresh build and actual compiled-plan/C20/GoTLS/builtReact authoring race
+passes query-only and combined cases in6.257s. Its authority/approval storage are
+synthetic; no collection/read occurs. [Local originals](../test/results/saved-syscall-query-approval-authoring-local/README.md)
+bind13 final owned sources and preserve meaningful REDs separately from fixture
+setup failures. Independent reviews are clear; installed qualification remains.
+
+Runtime analysis identifies exhausted single-batch workers reconnecting until
+RunUntil. A bounded natural-completion/positive-retirement correction is being
+implemented; original dates, paid budgets, expiry/view/Repeat/Stop checks and
+multi-batch behavior remain requirements. No time saving or full pass is claimed.
+
 ## Cancellation fixture and interrupted-run diagnostics corrected locally (2026-11-05)
 
 The storage cancellation fixture now derives its short caller from half the
