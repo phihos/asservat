@@ -79,6 +79,14 @@ Actual Go1/8.076s, unchanged4,300 Git inputs and cleanup[] are retained. The
 fixture now follows production's per-child intent acknowledgement and exact
 original source/deadline/group checks. No production change follows this failure.
 
+The next mixed run on `6dd89c26` passes all child intents, logs publication,
+seven association negatives, materialization/replay, partial progress and parent
+Stop refusal, then fails initial C-03 query authority (Go1/10.159s). All4,300
+inputs match and cleanup completes. No PostgreSQL error or specific product
+defect is established. A fixture-only diagnostic now retains the existing
+closed refusal stage and sentinel categories without dependency strings or
+additional reads, so the next campaign can identify the actual boundary.
+
 Mixed real-service qualification and the installed logs/browser/native/history/
 Repeat journey remain pending, as does installed maximum-shape worker evidence.
 Full S-05 and the complete specification goal remain active.

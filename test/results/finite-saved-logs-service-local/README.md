@@ -45,3 +45,11 @@ parent capture intent: the parent is control provenance and has no such intent.
 Production acknowledges each child with its original identity, scope, expectation
 digest, deadline and group ordinal. The fixture is corrected to that same path;
 no product check is removed and the group query remains unqualified.
+
+Mixed `6dd89c26` FAILS in10.159s after all child intents, logs publication,
+seven association-negative cases, materialization/replay, partial progress and
+parent Stop refusal. All4,300 inputs match and cleanup completes. Initial C-03
+query authority returns closed Unavailable; PostgreSQL reports no error. Read-only
+review establishes no specific parent/child product defect. The fixture now
+retains the existing safe refusal stage and closed sentinel flags, without new
+reads or dependency/error-body strings. Further diagnosis remains required.

@@ -227,7 +227,19 @@ func qualifyPacketQueryManagedLifecycle(t *testing.T, f *queryLedgerFixture) {
 			a, e = gate.CheckProjectionCurrent(call, querySQLIdentity{who}, scope)
 		}
 		if e != nil {
-			t.Fatal("actual read-only authority", e)
+			// Retain the closed authority stage and sentinel categories only.
+			// Dependency error strings may contain private source details.
+			stage := "unclassified"
+			var fixed interface{ FixedStep() string }
+			if errors.As(e, &fixed) {
+				stage = fixed.FixedStep()
+			}
+			cause := e
+			var caused interface{ StepCause() error }
+			if errors.As(e, &caused) {
+				cause = caused.StepCause()
+			}
+			t.Fatalf("actual read-only authority stage=%q grantScope=%t grantPrincipal=%t grantPool=%t grantExpired=%t grantRevoked=%t grantDenied=%t deadline=%t canceled=%t", stage, errors.Is(cause, value.ErrGrantScope), errors.Is(cause, value.ErrGrantPrincipal), errors.Is(cause, value.ErrGrantPoolExhausted), errors.Is(cause, value.ErrGrantExpired), errors.Is(cause, value.ErrGrantRevoked), errors.Is(cause, value.ErrGrantDenied), errors.Is(cause, context.DeadlineExceeded), errors.Is(cause, context.Canceled))
 		}
 		a.ValidUntil = identity.Earlier(a.ValidUntil, intent.RequestUntil)
 		if !a.Valid(time.Now()) {

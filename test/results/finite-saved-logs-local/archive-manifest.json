@@ -1,7 +1,7 @@
 {
   "format": "finite-saved-logs-local/v1",
   "scope": "Local component and bounded synthetic resource evidence. Individual failed/setup/skipped results remain original; no installed workflow qualification. Local500m CPU enforcement is unqualified.",
-  "base_commit": "71bafc2a118e8bea53fa8a05731335ff5c583c6c",
+  "base_commit": "6dd89c26fb392dedf57603402e5041db41277f55",
   "files": [
     {
       "source": "finite-logs-acquiring-check-focused.log",
@@ -98,6 +98,14 @@
       "sha256": "50b40b2fad62c0f288874ea3e606792e9f6668351111c6be0f629c65cb6c2f3f",
       "compressedBytes": 181,
       "compressedSHA256": "9746f062779182fd0ee9d7c5b458174344c6c450622aab9c7d8d82754f4e16a1"
+    },
+    {
+      "source": "finite-logs-authority-diagnostic-checks.log",
+      "archive": "finite-logs-authority-diagnostic-checks.log.gz",
+      "bytes": 329,
+      "sha256": "7b2fc58083e900910ba1b5528d07d044f0b40fecc311b08f03e4d23eef22434c",
+      "compressedBytes": 262,
+      "compressedSHA256": "994149bc0ec2ed1596f07c1c98f50dc9b31da8490aee9bb4010e8807ac3a45ba"
     },
     {
       "source": "finite-logs-authority-green.log",
@@ -412,6 +420,14 @@
       "compressedSHA256": "e69feb815185ecf7e06e9ecbf8bce958c5117fa55eb46f5f1eee5e014d651213"
     },
     {
+      "source": "finite-logs-child-intents-commit.log",
+      "archive": "finite-logs-child-intents-commit.log.gz",
+      "bytes": 1310,
+      "sha256": "796daa050c47c011225d0b5a5692f4908a2ce0e047f4e162012b3cf400281fd0",
+      "compressedBytes": 324,
+      "compressedSHA256": "eeb6bf470062aaa4b09a3aedc132211134666171460210a8a4a630c87cddd07b"
+    },
+    {
       "source": "finite-logs-child-intents-pre-push.log",
       "archive": "finite-logs-child-intents-pre-push.log.gz",
       "bytes": 11469,
@@ -604,12 +620,36 @@
       "compressedSHA256": "266c0138aca9169b6a0d6c00a9675e8f101a1ea95951ae5f190fe2973bb438aa"
     },
     {
+      "source": "finite-logs-db/mixed-6dd89c26-campaign.log",
+      "archive": "finite-logs-db__mixed-6dd89c26-campaign.log.gz",
+      "bytes": 53,
+      "sha256": "3a9630cafe26351cc6b69df9928b8965f1980d7b294820f098156b12c3ed7adb",
+      "compressedBytes": 73,
+      "compressedSHA256": "22a464d2c27dd25cab7206fa4c00a67c68aa5ab511f808fe04e0f39be25a8275"
+    },
+    {
       "source": "finite-logs-db/mixed-71bafc2a-campaign.log",
       "archive": "finite-logs-db__mixed-71bafc2a-campaign.log.gz",
       "bytes": 53,
       "sha256": "95ab316374ce4f6ca8c514e7273ce68b90c59c5df0ba1d932c3ba8639d24fb51",
       "compressedBytes": 73,
       "compressedSHA256": "1b31824767de1c3917ddf55f76f23f8d3f043891e7e42620c7ecda32552cb29b"
+    },
+    {
+      "source": "finite-logs-db/mixed-authority-diagnostic-focused.log",
+      "archive": "finite-logs-db__mixed-authority-diagnostic-focused.log.gz",
+      "bytes": 53,
+      "sha256": "54badae32922e1806688cbd1dab6db7f2311409eb7abc318e15ea53a2fc98280",
+      "compressedBytes": 66,
+      "compressedSHA256": "5ac396a41466552dff290e4c02686b9e0139dcb6845723a253cb546b7651eedf"
+    },
+    {
+      "source": "finite-logs-db/mixed-authority-diagnostic-handoff.json",
+      "archive": "finite-logs-db__mixed-authority-diagnostic-handoff.json.gz",
+      "bytes": 1581,
+      "sha256": "b3f222f6162e8f6c1e3ffb8c10220e4f231a563447c2d9744cf61bfc63418974",
+      "compressedBytes": 915,
+      "compressedSHA256": "79289e8cca6dbc30970f7d167a9d1c5d9d8d6ed41c2770d75bd440734d10ae02"
     },
     {
       "source": "finite-logs-db/mixed-child-intents-independent-review.json",
@@ -1666,6 +1706,14 @@
       "sha256": "49307cfdb29bb26d6a2f91b63be9b6bf160e9065d38b740d775d6e165030f5e9",
       "compressedBytes": 6858,
       "compressedSHA256": "e71d74a4e9a916d2b582967b0c8e3b40b3f8725036310e2873c59b5d8d1140c6"
+    },
+    {
+      "source": "finite-logs-source/mixed-group-c3-source-readonly-review.json",
+      "archive": "finite-logs-source__mixed-group-c3-source-readonly-review.json.gz",
+      "bytes": 4106,
+      "sha256": "b2163b79209e05bc7b46b5ad0dcee9dde596f8ac4446adbb0f21763b08cc40bd",
+      "compressedBytes": 1845,
+      "compressedSHA256": "d695a0cea024162d18bb72a91ff8fee2e956d9c6b1c0984a29b742ea605b59a1"
     },
     {
       "source": "finite-logs-source/reader-wire-independent-review.json",
