@@ -43,13 +43,13 @@ func TestBrowserSessionCleanupWithRealServices(t *testing.T) {
 		}
 		for _, r := range []string{root, other} {
 			for _, e := range []string{epoch, old} {
-				if _, err := admin.Exec(ctx, `INSERT INTO browser_login(root_id,epoch,id,browser,ciphertext,created_at,expires_at) VALUES($1,$2,sha256(convert_to($2::text,'UTF8')),sha256(convert_to($2::text,'UTF8')),'synthetic-live-login',statement_timestamp(),statement_timestamp()+interval '4 minutes')`, r, e); err != nil {
+				if _, err := admin.Exec(ctx, `INSERT INTO browser_login(root_id,epoch,id,browser,ciphertext,created_at,expires_at) VALUES($1,$2,sha256(convert_to($2::uuid::text,'UTF8')),sha256(convert_to($2::uuid::text,'UTF8')),'synthetic-live-login',statement_timestamp(),statement_timestamp()+interval '4 minutes')`, r, e); err != nil {
 					t.Fatal(err)
 				}
-				if _, err := admin.Exec(ctx, `INSERT INTO browser_session(root_id,epoch,id,issuer,client_id,subject,provider_session,ciphertext,created_at,authenticated_at,expires_at,refresh_at,version) VALUES($1,$2,sha256(convert_to($2::text,'UTF8')),'https://id.example.test','console','synthetic-user','synthetic-provider','synthetic-live-session',statement_timestamp(),statement_timestamp(),statement_timestamp()+interval '1 hour',statement_timestamp()+interval '1 minute',1)`, r, e); err != nil {
+				if _, err := admin.Exec(ctx, `INSERT INTO browser_session(root_id,epoch,id,issuer,client_id,subject,provider_session,ciphertext,created_at,authenticated_at,expires_at,refresh_at,version) VALUES($1,$2,sha256(convert_to($2::uuid::text,'UTF8')),'https://id.example.test','console','synthetic-user','synthetic-provider','synthetic-live-session',statement_timestamp(),statement_timestamp(),statement_timestamp()+interval '1 hour',statement_timestamp()+interval '1 minute',1)`, r, e); err != nil {
 					t.Fatal(err)
 				}
-				if _, err := admin.Exec(ctx, `INSERT INTO browser_logout(root_id,epoch,id,issuer,client_id,subject,provider_session,issued_at,expires_at) VALUES($1,$2,sha256(convert_to($2::text,'UTF8')),'https://id.example.test','console','synthetic-user','',statement_timestamp(),statement_timestamp()+interval '25 hours')`, r, e); err != nil {
+				if _, err := admin.Exec(ctx, `INSERT INTO browser_logout(root_id,epoch,id,issuer,client_id,subject,provider_session,issued_at,expires_at) VALUES($1,$2,sha256(convert_to($2::uuid::text,'UTF8')),'https://id.example.test','console','synthetic-user','',statement_timestamp(),statement_timestamp()+interval '25 hours')`, r, e); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -74,7 +74,7 @@ func TestBrowserSessionCleanupWithRealServices(t *testing.T) {
 		live := func() string {
 			t.Helper()
 			var out string
-			if err := admin.QueryRow(ctx, `SELECT jsonb_build_object('root',(SELECT to_jsonb(r) FROM browser_session_root r WHERE id=$1),'login',(SELECT to_jsonb(l) FROM browser_login l WHERE root_id=$1 AND id=sha256(convert_to($2::text,'UTF8'))),'session',(SELECT to_jsonb(s) FROM browser_session s WHERE root_id=$1 AND id=sha256(convert_to($2::text,'UTF8'))),'logout',(SELECT to_jsonb(l) FROM browser_logout l WHERE root_id=$1 AND id=sha256(convert_to($2::text,'UTF8'))),'inflight',(SELECT to_jsonb(s) FROM browser_session s WHERE root_id=$1 AND id=sha256(convert_to('inflight','UTF8'))))::text`, root, epoch).Scan(&out); err != nil {
+			if err := admin.QueryRow(ctx, `SELECT jsonb_build_object('root',(SELECT to_jsonb(r) FROM browser_session_root r WHERE id=$1),'login',(SELECT to_jsonb(l) FROM browser_login l WHERE root_id=$1 AND id=sha256(convert_to($2::uuid::text,'UTF8'))),'session',(SELECT to_jsonb(s) FROM browser_session s WHERE root_id=$1 AND id=sha256(convert_to($2::uuid::text,'UTF8'))),'logout',(SELECT to_jsonb(l) FROM browser_logout l WHERE root_id=$1 AND id=sha256(convert_to($2::uuid::text,'UTF8'))),'inflight',(SELECT to_jsonb(s) FROM browser_session s WHERE root_id=$1 AND id=sha256(convert_to('inflight','UTF8'))))::text`, root, epoch).Scan(&out); err != nil {
 				t.Fatal(err)
 			}
 			return out
