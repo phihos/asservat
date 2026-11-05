@@ -56,7 +56,7 @@ func projectionEarlyCleanupWithRealServices(t *testing.T, single bool) {
 				snapshot := func() string {
 					t.Helper()
 					var s string
-					if err := f.base.admin.QueryRow(ctx, `SELECT jsonb_build_array((SELECT allocated FROM context_query_backing WHERE root_id=$1),(SELECT coalesce(sum(allocated),0) FROM context_query_account WHERE root_id=$1),(SELECT count(*) FROM context_query WHERE root_id=$1),(SELECT count(*) FROM context_query_batch b JOIN context_query q ON q.id=b.query_id WHERE q.root_id=$1),(SELECT coalesce(sum(used_roles),0) FROM context_query_key_binding k JOIN context_query q ON q.id=k.query_id WHERE q.root_id=$1))::text`, q.Scope.RootID).Scan(&s); err != nil {
+					if err := f.base.admin.QueryRow(ctx, `SELECT jsonb_build_array((SELECT allocated FROM context_query_backing WHERE root_id=$1),(SELECT coalesce(sum(allocated),0) FROM context_query_principal WHERE root_id=$1),(SELECT count(*) FROM context_query WHERE root_id=$1),(SELECT count(*) FROM context_query_batch b JOIN context_query q ON q.id=b.query_id WHERE q.root_id=$1),(SELECT coalesce(sum(used_roles),0) FROM context_query_key_binding k JOIN context_query q ON q.id=k.query_id WHERE q.root_id=$1))::text`, q.Scope.RootID).Scan(&s); err != nil {
 						t.Fatal("logical spend snapshot", err)
 					}
 					return s
