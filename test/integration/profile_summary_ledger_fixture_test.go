@@ -11,6 +11,7 @@ import (
 	"errors"
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -22,6 +23,7 @@ import (
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	capture "asservat.local/asservat/internal/domain/capture"
+	"asservat.local/asservat/internal/domain/collector"
 	planvalue "asservat.local/asservat/internal/domain/planning"
 	"asservat.local/asservat/internal/domain/privacy"
 	"asservat.local/asservat/internal/domain/targets"
@@ -211,7 +213,31 @@ func startQueryLedgerProfile(t *testing.T, f *capacitySQLFixture, s captureAdmis
 		return check
 	}
 	check := refresh()
-	original, first, err := execSQL.PrepareAPIExecution(f.ctx, check)
+	var original execution.APIExecution
+	var first bool
+	var err error
+	if accepted.Expectation.NativeType == artifact.RawPCAPNGArtifact {
+		// Raw acquisition uses the existing metered companion, as the production
+		// API executor does. Node/process observations remain explicit synthetic input.
+		source := targets.PacketSourceObservation{PodUID: accepted.Expectation.PodUID, NodeUID: custodyID(), BootID: custodyID(), CollectorPodUID: custodyID(), CollectorEpoch: custodyID(), ObservedAt: check.Plan.Input.Target.ObservedAt, FreshUntil: check.ValidUntil}
+		var permit collector.ObservationPermit
+		original, first, permit, err = execSQL.PreparePolicyRecording(f.ctx, check, source)
+		if err == nil && (!permit.ValidFinite(time.Now()) || permit.Credit <= 0 || permit.Duration != 2*time.Second) {
+			t.Fatal("raw observation preparation lost original credit/bounds")
+		}
+		if err == nil {
+			replay, again, prior, e := execSQL.PreparePolicyRecording(f.ctx, check, source)
+			if e != nil || again || !reflect.DeepEqual(replay, original) || !reflect.DeepEqual(prior, permit) {
+				t.Fatal("raw preparation replay changed execution/observation debit", e)
+			}
+			var sessions, spent int64
+			if e = f.admin.QueryRow(f.ctx, `SELECT count(*),coalesce(sum(s.spent),0) FROM policy_observation_session p JOIN adhoc_observation_spend s ON s.root_id=p.root_id AND s.grant_id=p.grant_id WHERE p.root_id=$1 AND p.capture_id=$2`, s.a.RootID, accepted.CaptureID).Scan(&sessions, &spent); e != nil || sessions != 1 || spent != permit.Credit {
+				t.Fatal("raw single prepaid observation", sessions, spent, permit.Credit, e)
+			}
+		}
+	} else {
+		original, first, err = execSQL.PrepareAPIExecution(f.ctx, check)
+	}
 	if err != nil || !first {
 		t.Fatal("profile source preparation", err)
 	}

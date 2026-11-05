@@ -6,6 +6,7 @@ import (
 	"crypto/tls"
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -13,6 +14,7 @@ import (
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/packets"
 	"asservat.local/asservat/internal/adapters/postgres"
+	authapp "asservat.local/asservat/internal/application/authorization"
 	"asservat.local/asservat/internal/application/planning"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/fleet"
@@ -95,6 +97,42 @@ func qualifyRawPacketSummaryLifecycle(t *testing.T, f *queryLedgerFixture) {
 		t.Fatal("ordinary raw summary changed any acquisition/raw/native grant or spend")
 	}
 	t.Log("raw source preserved; ordinary fixed summary leaves every grant and spend byte-exact, no native session; same bounded route lookup exposes only raw native discriminator")
+	// Only after the ordinary-query grant snapshots, revoke the ORIGINAL
+	// acquisition review and prove later executor reads still check it.
+	f.refresh(t)
+	who = f.scenario.a.Eligibility.VerifiedIdentity // Original acquisition identity, not the read-only summary identity.
+	n := time.Now().UTC().Truncate(time.Microsecond)
+	who.VerifiedAt, who.ValidUntil = n, n.Add(5*time.Second)
+	recovery, err = f.scenario.recovery.reader.RecoveryState(f.base.ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	executionSQL, err := postgres.NewAPIContextExecutions(f.base.ctx, f.base.roles["hub-runtime"], f.base.input.PermissionRootID, postgres.EffectTransactionGuards{Retention: f.scenario.retention.guard, Recovery: f.scenario.recovery.guard})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = executionSQL.ReadAPIContextWork(f.base.ctx, e.CaptureUID, who, recovery); err != nil {
+		t.Fatal("original acquisition grant live control", err)
+	}
+	var grantID string
+	var revision int64
+	if err = f.base.admin.QueryRow(f.base.ctx, `SELECT id,revision FROM access_grant WHERE root_id=$1 AND capture_id=$2`, f.base.input.PermissionRootID, e.CaptureUID).Scan(&grantID, &revision); err != nil {
+		t.Fatal(err)
+	}
+	grants, err := postgres.NewAccessGrants(f.base.ctx, f.base.roles["hub-runtime"], f.base.input.PermissionRootID, f.scenario.recovery.guard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err = grants.RevokeGrant(f.base.ctx, authapp.GrantRevocationInput{GrantID: grantID, Revoker: who.Principal, ExpectedRevision: revision, IdempotencyKey: "raw-fixture-revoke-after-query"}, recovery); err != nil {
+		t.Fatal("original raw grant revocation", err)
+	}
+	_, err = executionSQL.ReadAPIContextWork(f.base.ctx, e.CaptureUID, who, recovery)
+	var step interface{ FixedStep() string }
+	if err == nil || !errors.As(err, &step) || step.FixedStep() != "approval" {
+		t.Fatal("revoked raw grant bypassed current executor approval", err)
+	}
+	t.Log("original raw acquisition grant live-read control then explicit revocation: later API work refuses at approval with require-all still false; no new capture or authority")
+
 }
 
 func TestRawPacketSummaryManagedPayload(t *testing.T) {

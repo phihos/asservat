@@ -309,5 +309,5 @@ func lockCurrentPolicyCaptureGrant(ctx context.Context, q *custodydb.Queries, ro
 // Raw sensitivity is separate from Recording.RequireApproval's immutable
 // protected require-all setting. Do not rewrite that setting on replay.
 func policyRecordingNeedsGrant(r *artifact.Recording) bool {
-	return r != nil && (r.RequireApproval || r.Kind == "syscallTrace" && r.Profile == "arguments" || r.Filter != nil && planning.RawBytePredicate(r.Filter.Expression))
+	return r != nil && (r.RequireApproval || r.Kind == "packetCapture" && (r.Profile == "rawPackets" || r.Profile == "httpHeaders") || r.Kind == "syscallTrace" && r.Profile == "arguments" || r.Filter != nil && planning.RawBytePredicate(r.Filter.Expression))
 }

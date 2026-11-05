@@ -136,3 +136,15 @@ func TestSensitiveRecorderApprovalIgnoresRequireAllSwitch(t *testing.T) {
 		t.Fatal("malformed scope accepted")
 	}
 }
+
+func TestSensitiveRecordingCurrentGrantIgnoresRequireAllSwitch(t *testing.T) {
+	for _, profile := range []string{"rawPackets", "httpHeaders"} {
+		r := &artifact.Recording{Kind: "packetCapture", Profile: profile}
+		if !policyRecordingNeedsGrant(r) || r.RequireApproval {
+			t.Fatalf("independent %s currentgrant requirement lost or rewrote require-all", profile)
+		}
+	}
+	if policyRecordingNeedsGrant(&artifact.Recording{Kind: "packetCapture", Profile: "networkHeaders"}) {
+		t.Fatal("ordinary metadata gained grant requirement")
+	}
+}
