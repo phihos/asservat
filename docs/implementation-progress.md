@@ -73,6 +73,12 @@ initializer attempts to replace a live accepted retention-source epoch; all4,300
 inputs match and cleanup completes. The fixture-only correction reuses original
 accepted sources/publisher with fresh request facts, preserving production checks.
 
+On `71bafc2a`, mixed admission and passive replay pass without a second charge;
+its later parent-intent lookup fails because the group parent is control-only.
+Actual Go1/8.076s, unchanged4,300 Git inputs and cleanup[] are retained. The
+fixture now follows production's per-child intent acknowledgement and exact
+original source/deadline/group checks. No production change follows this failure.
+
 Mixed real-service qualification and the installed logs/browser/native/history/
 Repeat journey remain pending, as does installed maximum-shape worker evidence.
 Full S-05 and the complete specification goal remain active.

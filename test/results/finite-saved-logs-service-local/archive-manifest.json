@@ -120,6 +120,38 @@
       "sha256": "3341059ebb51de4a4ab15c8d357fdbd308cf8995799179be6b01326d591816c2",
       "compressedBytes": 305,
       "compressedSHA256": "83c0241e96298ea9ef90b74de6003c1e1375ac45d2325a99d744c316ca822cc4"
+    },
+    {
+      "source": "test/results/finite-logs-mixed-group-71bafc2a.log",
+      "archive": "finite-logs-mixed-group-71bafc2a.log.gz",
+      "bytes": 851,
+      "sha256": "0c98970e71461b0021fa307870be96b4b1683811f2ba0065334f349bf7b66d5f",
+      "compressedBytes": 390,
+      "compressedSHA256": "0b8961d10a45573dfc5e7ba6d8d4a5e73ed23fedb36ae480f3cb7c17308dfb3d"
+    },
+    {
+      "source": "test/results/finite-logs-mixed-group-71bafc2a-postgres.log",
+      "archive": "finite-logs-mixed-group-71bafc2a-postgres.log.gz",
+      "bytes": 10581,
+      "sha256": "c75f214b3b4c4e7fd87901ae5db8013286f5c992cca16d0b18a166a89e754e50",
+      "compressedBytes": 1861,
+      "compressedSHA256": "0150a0efe6fe599ff02aa65e893f42f18cfec92008b7084bab35de1847434078"
+    },
+    {
+      "source": "test/results/finite-logs-mixed-group-71bafc2a-environment.json",
+      "archive": "finite-logs-mixed-group-71bafc2a-environment.json.gz",
+      "bytes": 548499,
+      "sha256": "38434208f31faa4f8599fa785dd5923f6a9a0409adf731cd3612fee4aa048ac1",
+      "compressedBytes": 205960,
+      "compressedSHA256": "5d8fa1b99f2bdaba74843d8d8c005c463937f829cdec2395893df95601b9cc74"
+    },
+    {
+      "source": "/home/phil/.cache/asservat-build/finite-logs-db/mixed-71bafc2a-root-source-audit.json",
+      "archive": "mixed-71bafc2a-root-source-audit.json.gz",
+      "bytes": 445,
+      "sha256": "c4fc1552bb91e2798c1485198ace5c97be94031710c544e4837b2c4857ca46da",
+      "compressedBytes": 305,
+      "compressedSHA256": "32f8e57095f8ae67c6897cd60c8525ee805f0da2f682d445a6c234354a866b8e"
     }
   ],
   "campaigns": [
@@ -152,6 +184,15 @@
       "verdict": "FAIL",
       "testExit": 1,
       "goSeconds": 7.696,
+      "sourceHashesVerifiedAgainstGit": 4300,
+      "cleanupFailures": []
+    },
+    {
+      "commit": "71bafc2a118e8bea53fa8a05731335ff5c583c6c",
+      "resultName": "finite-logs-mixed-group-71bafc2a",
+      "verdict": "FAIL",
+      "testExit": 1,
+      "goSeconds": 8.076,
       "sourceHashesVerifiedAgainstGit": 4300,
       "cleanupFailures": []
     }

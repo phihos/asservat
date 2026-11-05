@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"crypto/tls"
+	"encoding/json"
 	"errors"
 	"slices"
 	"testing"
@@ -265,8 +266,23 @@ func admitLogsMixedGroup(t *testing.T, f *queryLedgerFixture) logsMixedAccepted 
 	if err = b.admin.QueryRow(ctx, "SELECT charged_bytes FROM custody_allocation WHERE id=$1", s.a.Registration.AllocationID).Scan(&chargedAfter); err != nil || chargedBefore != chargedAfter {
 		t.Fatal("passive group replay recharged storage", chargedBefore, chargedAfter, err)
 	}
-	if _, err = publisher.AcknowledgedCaptureIntent(ctx, accepted.CaptureID); err != nil {
-		t.Fatal("actual parent capture intent", err)
+	// The parent is control provenance only. Match C18 dispatch: acknowledge
+	// every actual child intent before any child publication or execution.
+	for n, child := range accepted.Group.Children {
+		end := identity.Earlier(child.Deadline, child.Expectation.Registration.WriteUntil)
+		if !time.Now().Before(end) {
+			t.Fatal("mixed child intent window elapsed", n)
+		}
+		childCall, cancel := context.WithDeadline(ctx, end)
+		r, readErr := publisher.AcknowledgedCaptureIntent(childCall, child.CaptureID)
+		cancel()
+		if readErr != nil {
+			t.Fatal("actual child capture intent", n, readErr)
+		}
+		raw, encodeErr := json.Marshal(child.Expectation)
+		if encodeErr != nil || !r.Valid() || r.RootID != p.RootID || r.CaptureID != child.CaptureID || r.Requester() != p.Actor || r.Initiator != nil || r.ScopeDigest != child.ScopeDigest || r.SubmissionDigest != child.SubmissionDigest || r.ExpectationDigest != artifact.Digest(sha256.Sum256(raw)) || !r.Deadline.Equal(child.Deadline) || r.Group == nil || r.Group.ParentCaptureID != accepted.CaptureID || r.Group.ChildIndex != n || r.Group.ChildCount != len(accepted.Group.Children) {
+			t.Fatal("mixed acknowledged child intent binding changed", n, encodeErr)
+		}
 	}
 	execSQL, err := postgres.NewAPIContextExecutions(ctx, b.roles["hub-runtime"], p.RootID, postgres.EffectTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard})
 	if err != nil {

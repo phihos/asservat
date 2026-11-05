@@ -1,7 +1,7 @@
 {
   "format": "finite-saved-logs-local/v1",
   "scope": "Local component and bounded synthetic resource evidence. Individual failed/setup/skipped results remain original; no installed workflow qualification. Local500m CPU enforcement is unqualified.",
-  "base_commit": "f8c8eb5ce74e1bb92369aa8cc2bb7c023b7e8b84",
+  "base_commit": "71bafc2a118e8bea53fa8a05731335ff5c583c6c",
   "files": [
     {
       "source": "finite-logs-acquiring-check-focused.log",
@@ -412,6 +412,14 @@
       "compressedSHA256": "e69feb815185ecf7e06e9ecbf8bce958c5117fa55eb46f5f1eee5e014d651213"
     },
     {
+      "source": "finite-logs-child-intents-pre-push.log",
+      "archive": "finite-logs-child-intents-pre-push.log.gz",
+      "bytes": 11469,
+      "sha256": "cd2978440445f4ad52c3bb4bc96ad8884cf5db5805ed7fb93538e0c2eb0313a5",
+      "compressedBytes": 2595,
+      "compressedSHA256": "e05275d19e9d7a7ddfa623d6ec6cc1fe5c2ec909b0c3fa7c45538848fc28cde8"
+    },
+    {
       "source": "finite-logs-codec/acquiring-check-handoff.json",
       "archive": "finite-logs-codec__acquiring-check-handoff.json.gz",
       "bytes": 2318,
@@ -594,6 +602,22 @@
       "sha256": "1d4b16380ce2901a20ee2d507d6bf2e64618725e447ce43eb7e822486b370a2e",
       "compressedBytes": 7870,
       "compressedSHA256": "266c0138aca9169b6a0d6c00a9675e8f101a1ea95951ae5f190fe2973bb438aa"
+    },
+    {
+      "source": "finite-logs-db/mixed-71bafc2a-campaign.log",
+      "archive": "finite-logs-db__mixed-71bafc2a-campaign.log.gz",
+      "bytes": 53,
+      "sha256": "95ab316374ce4f6ca8c514e7273ce68b90c59c5df0ba1d932c3ba8639d24fb51",
+      "compressedBytes": 73,
+      "compressedSHA256": "1b31824767de1c3917ddf55f76f23f8d3f043891e7e42620c7ecda32552cb29b"
+    },
+    {
+      "source": "finite-logs-db/mixed-child-intents-independent-review.json",
+      "archive": "finite-logs-db__mixed-child-intents-independent-review.json.gz",
+      "bytes": 912,
+      "sha256": "dcba4fb9558b816c8bf6cb47a2de9ae2a8d54f3a26d6b94d4f1202d61b6fccb4",
+      "compressedBytes": 559,
+      "compressedSHA256": "7474fcb809aed64cd0ea5130acc651e84c7c61903710f6866e08dca551f9874e"
     },
     {
       "source": "finite-logs-db/mixed-existing-source-fix-handoff.json",
@@ -956,6 +980,22 @@
       "compressedSHA256": "6703c808e2c61e6b6c73126cf3e43274bd1a1c1949945024f72b39df8cd7f238"
     },
     {
+      "source": "finite-logs-mixed-child-intents-fix-handoff.json",
+      "archive": "finite-logs-mixed-child-intents-fix-handoff.json.gz",
+      "bytes": 1802,
+      "sha256": "193cc2173ef426fbd0aeec7dee99fbde7aeec9194b162e3452f81743b9a4bafa",
+      "compressedBytes": 970,
+      "compressedSHA256": "bddc75e319d8f6ab543b6a1b85eefd2118d2f4260c715110e18f0e5f68cda168"
+    },
+    {
+      "source": "finite-logs-mixed-child-intents-focused.log",
+      "archive": "finite-logs-mixed-child-intents-focused.log.gz",
+      "bytes": 584,
+      "sha256": "5871e537244f2b8111e2c3284d314dbc51d01e359880b7dab5749ae48178cf0d",
+      "compressedBytes": 346,
+      "compressedSHA256": "3058340f4dcd0af83c521719b34bb0e232239bf01892fa1dcfcd162a762a35ed"
+    },
+    {
       "source": "finite-logs-mixed-existing-source-final-focused.log",
       "archive": "finite-logs-mixed-existing-source-final-focused.log.gz",
       "bytes": 584,
@@ -1010,6 +1050,22 @@
       "sha256": "17bb63ce081e73419a4778a00894e405dde0d51c206cc78a0d9a97dedbc59bf5",
       "compressedBytes": 1720,
       "compressedSHA256": "2a5b0cfe951d1ce725b0aefe49c395965581be83e7cc48920fcf308920c3dc14"
+    },
+    {
+      "source": "finite-logs-mixed-reuse-commit.log",
+      "archive": "finite-logs-mixed-reuse-commit.log.gz",
+      "bytes": 1763,
+      "sha256": "b0770e74a574d37b6ac9f36e936f250fe4173bbe875dcb021605ce1df3f5cff1",
+      "compressedBytes": 343,
+      "compressedSHA256": "d38023b27bfdc802aafc609963d90269fde0e0452a313f662d0067b0cc6cf78b"
+    },
+    {
+      "source": "finite-logs-mixed-reuse-docs.log",
+      "archive": "finite-logs-mixed-reuse-docs.log.gz",
+      "bytes": 605,
+      "sha256": "83f445ae7fdd6addd654fea04045c48ece4e8d4850c2bc3700769009effc893b",
+      "compressedBytes": 395,
+      "compressedSHA256": "4e73681debc3ee75ce0609627361851c6ffb7e70377932173ffb89c8d4d8484d"
     },
     {
       "source": "finite-logs-mixed-reuse-pre-push.log",

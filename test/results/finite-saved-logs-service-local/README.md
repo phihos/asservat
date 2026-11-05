@@ -37,3 +37,11 @@ admission: a second fixture initializer attempts a new retention-source epoch
 while the accepted source lease is still live. All4,300 inputs match and cleanup
 is complete. The fixture must reuse its existing accepted source and publisher
 with fresh request facts. Production retention predicates remain unchanged.
+
+The next mixed run on signed `71bafc2a` FAILS in8.076s after actual group
+admission, three-member creation and passive replay without recharging. All
+4,300 inputs match Git and cleanup completes. The test incorrectly requests a
+parent capture intent: the parent is control provenance and has no such intent.
+Production acknowledges each child with its original identity, scope, expectation
+digest, deadline and group ordinal. The fixture is corrected to that same path;
+no product check is removed and the group query remains unqualified.
