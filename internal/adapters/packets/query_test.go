@@ -116,7 +116,7 @@ func TestPacketQueryOutputStopAndTimestampOutsideRFC3339(t *testing.T) {
 	e = rawSummaryExpectation(e, RawLimits{Snaplen: 1500})
 	s := querySelection()
 	s.Fields = []q.PacketQueryField{q.PacketIndex, q.PacketTime, q.PacketCapturedLength, q.PacketWireLength, q.PacketSourceAddress, q.PacketDestinationAddress, q.PacketSourcePort, q.PacketDestinationPort, q.PacketProtocol, q.PacketTCPFlags, q.PacketTCPSeq, q.PacketTCPAck, q.PacketTCPWindow, q.PacketICMPType, q.PacketICMPCode, q.PacketFramePrefixHex}
-	s.FramePrefix = &q.PacketQueryFramePrefix{0, 64}
+	s.FramePrefix = &q.PacketQueryFramePrefix{Offset: 0, Length: 64}
 	out, err := QueryPCAPNG(t.Context(), bytes.NewReader(b), e, at, at.Add(time.Second), s)
 	if err != nil || !out.OutputLimitReached || len(out.Rows) < 1 || len(out.Rows) >= 100 || out.EncodedSize() > q.PacketQueryPageBytes {
 		t.Fatal("output boundary", len(out.Rows), out.EncodedSize(), err)
