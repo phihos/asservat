@@ -1,0 +1,145 @@
+{
+  "format": "saved-syscall-query-installed/v1",
+  "source_commit": "51344180880234dc950f2f32996f2fe39a165fda",
+  "merge_commit": "2f74df8d5a9261c87efde324f6f9df3d65717640",
+  "qualified_tree": "1f400fa8108ef87fa4a1318349d57c121c216fab",
+  "artifact_id": 13433224573,
+  "zip_bytes": 210952,
+  "zip_sha256": "b5291c5c78eb011c8b65dbb9875bfb1cea7d338cfc2977d86b2f75b479f614f8",
+  "go_exit": 0,
+  "harness_exit": 0,
+  "go_seconds": 827.907,
+  "source_count": 4293,
+  "outer_workflow": "cancelled",
+  "ci": "success",
+  "members": [
+    {
+      "member": "ci-native-continuation-manual-arguments.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-native-42065554713/artifacts/ci-native-continuation-manual-arguments.log",
+      "original_bytes": 3335,
+      "original_sha256": "c8a74a8eed22b5512b6f8a8d0020db59921276266420fb63104f0bd71b984453",
+      "gzip_bytes": 1217,
+      "gzip_sha256": "118d7e0c2aa6a2a3fbe5cf110057b323acb1947b80a5de99c17ca3466a9d7a65"
+    },
+    {
+      "member": "context-storage-timing.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-native-42065554713/artifacts/context-storage-timing.log",
+      "original_bytes": 23931,
+      "original_sha256": "e04f531a21f681934c159564dfd3a761e2a927b9e51723dbe63092b6b8de3a05",
+      "gzip_bytes": 4713,
+      "gzip_sha256": "f63ab90df894a722b5b203e8064c105747c75c293a9ea65864d78ef8989edf3e"
+    },
+    {
+      "member": "context-storage-environment.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-native-42065554713/artifacts/context-storage-environment.json",
+      "original_bytes": 554910,
+      "original_sha256": "e28468a04d2ff59fa5fa8507a026c86b8bedcde9939490dc70143a90bb2c01d1",
+      "gzip_bytes": 208467,
+      "gzip_sha256": "b10b93088ddb42c53bcf6bef6b30da86f88d7dad8ad489df62a395438532477e"
+    },
+    {
+      "member": "context-storage.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-native-42065554713/artifacts/context-storage.log",
+      "original_bytes": 22455,
+      "original_sha256": "6437c3882d95bebe0fb14c04d6b719936a418abd749bf8a8bd7bdbe177f9b919",
+      "gzip_bytes": 4355,
+      "gzip_sha256": "6468a2a8e9ea8b66664966fea0782314292f431b2fdc2d4aae096dbc290f9cfb"
+    },
+    {
+      "member": "manual-arguments.jsonl.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-native-42065554713/artifacts/manual-arguments.jsonl",
+      "original_bytes": 34844,
+      "original_sha256": "13d3b96e4d1a28e9ad0c6836039600200a140b2bc9a38075136ee3310ab43261",
+      "gzip_bytes": 1899,
+      "gzip_sha256": "94bd78832f813292f4e5493737ce0995459bf337ff6f5dce7864b3041084ac48"
+    },
+    {
+      "member": "run-api.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-native-42065554713/run-api.json",
+      "original_bytes": 12168,
+      "original_sha256": "691ff0779b3600afe865e209eec0e9fcadae5816b859afe275f6fd03352d5e55",
+      "gzip_bytes": 1634,
+      "gzip_sha256": "e666261b719b12903fbb6fa4e8edafe0d38538dab92d30542eb39865146d3c97"
+    },
+    {
+      "member": "jobs-api.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-native-42065554713/jobs-api.json",
+      "original_bytes": 6059,
+      "original_sha256": "99c4b04742ad8eb081d78457db20bec12b1006024d4ed5a215a062635abce054",
+      "gzip_bytes": 1100,
+      "gzip_sha256": "b3259cb8445aaa8c77e700afb0d188e1ba03c90b9d41fa06f86107b82073322e"
+    },
+    {
+      "member": "artifacts-api.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-native-42065554713/artifacts-api.json",
+      "original_bytes": 751,
+      "original_sha256": "87b83465d134b96c3c4af7234f71039f465ce53dd841e1bc933778845950e171",
+      "gzip_bytes": 456,
+      "gzip_sha256": "d12f808c0fefff3769b900e2e4713946750f0697f156ec99d69cc0f2c9ff220b"
+    },
+    {
+      "member": "workflow.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-native-42065554713/workflow.log",
+      "original_bytes": 126789,
+      "original_sha256": "6473ff8ffdcd2fd742f767532b46e1264199d3d1446b85134ec1e56bf1eeb305",
+      "gzip_bytes": 17703,
+      "gzip_sha256": "acb953a07f3a6ebf70718079cb16e12c689623454f13ea374a823f2584d3cfbc"
+    },
+    {
+      "member": "source-audit.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-native-42065554713/source-audit.json",
+      "original_bytes": 808,
+      "original_sha256": "78c41c93a89d4d489fe457d59859375810c9774b653b10e8afd5fdfe0ed16ce4",
+      "gzip_bytes": 446,
+      "gzip_sha256": "08418fe97ea8aeafe4cc66132aa1e2a2f09d16cc9ec73c06e128fc1be13ebd57"
+    },
+    {
+      "member": "source-independent-audit.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-native-42065554713/source-independent-audit.json",
+      "original_bytes": 5064,
+      "original_sha256": "5ab1ad6e1c4f7bfacef68397cbe3fd8e04c679b6896748463e620d219a86f222",
+      "gzip_bytes": 2404,
+      "gzip_sha256": "a4651fc0bed802a6940570f6a33700e71da9e3ff2bc3299c7f24d3749cf9532e"
+    },
+    {
+      "member": "run-api-terminal-readback.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-native-42065554713/run-api-terminal-readback.json",
+      "original_bytes": 12168,
+      "original_sha256": "691ff0779b3600afe865e209eec0e9fcadae5816b859afe275f6fd03352d5e55",
+      "gzip_bytes": 1634,
+      "gzip_sha256": "e666261b719b12903fbb6fa4e8edafe0d38538dab92d30542eb39865146d3c97"
+    },
+    {
+      "member": "jobs-api-terminal-readback.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-native-42065554713/jobs-api-terminal-readback.json",
+      "original_bytes": 6082,
+      "original_sha256": "503a219dd3141c3f361437831e7df4b48e9c89b0b97f41540c68ab06952ece11",
+      "gzip_bytes": 1097,
+      "gzip_sha256": "4ef0767c4c0ca83291019333c58e8606f58aba672be140d1c4a340d05563af5a"
+    },
+    {
+      "member": "ci-run-api.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-native-42065554713/ci-run-api.json",
+      "original_bytes": 12195,
+      "original_sha256": "de725c52f58a6ef4f831e9fe58d557cbf33b31a9766106eba18b8b7c6fa57fad",
+      "gzip_bytes": 1652,
+      "gzip_sha256": "d0a7fe6199391c60c79344e042f6dcd784939c818c5643c025282768fdcbebe3"
+    },
+    {
+      "member": "ci-jobs-api.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-native-42065554713/ci-jobs-api.json",
+      "original_bytes": 32172,
+      "original_sha256": "8d8b0dad0f17049d78ceeeaa24536c3ecbc4e781890d465616652ce5de56a499",
+      "gzip_bytes": 2402,
+      "gzip_sha256": "69db375a273af25caf6c295a2b2a504f625ee9c7155c0cde1071618dff7992e1"
+    },
+    {
+      "member": "native-check-annotations.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-native-42065554713/native-check-annotations.json",
+      "original_bytes": 315,
+      "original_sha256": "78d249236ea04749361bcd9dd7a5e8fd2f30b726384093cf534d4f87413e0250",
+      "gzip_bytes": 234,
+      "gzip_sha256": "00f35b44df2a9c4d6e0e98615e29c2f598ff19537ed779b08ce729d3a90bef25"
+    }
+  ]
+}

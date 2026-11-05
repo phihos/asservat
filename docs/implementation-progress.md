@@ -1,5 +1,35 @@
 # Sustained implementation progress
 
+## Saved syscall queries merged with complete installed test evidence (2026-11-05)
+
+PR171 merges as `2f74df8d`; signed `51344180`, the merge and fresh main share
+complete tree `1f400fa8108ef87fa4a1318349d57c121c216fab`. Eligible pull-request
+CI42065525559 passes all15 jobs. Native42065554713 has actual Go exit0 in827.907s,
+harness exit0, unchanged sources, removed build scratch and complete cleanup[].
+Root and independent review match all4,293 input hashes to the candidate.
+[Original evidence](../test/results/saved-syscall-query-native-42065554713/README.md)
+retains both terminal test facts and the cancelled outer job.
+
+All five fixed views and raw MCP/actual React queries pass same-original parity,
+exact-key replay, parent/child24KiB+one-operation debits, three-role joined reads
+and exact18-unit root/workload accounting. Positive original Job/Pod termination
+and SQL retirement occur without extending RunUntil or refunding logical spend.
+The authenticated native is34,844B,52JSONL records (50 events), SHA256
+`13d3b96e4d1a28e9ad0c6836039600200a140b2bc9a38075136ee3310ab43261`.
+Fresh Repeat preview/settings preserve original composition and expiry; no repeat
+capture is requested. Running Stop joins collector cancellation and ends
+Cancelled without an artifact.
+
+The outer workflow is cancelled, not green. Its annotation records20m0s exceeded:
+although the test/cleanup finish16:52:13Z and bytes upload16:52:14Z, GitHub artifact
+finalization waits120s, returns HTML instead of JSON, retries and finishes
+16:54:24Z. All individual test/upload/post steps ultimately succeed. The downloaded
+210,952B ZIP matches the server digest. This hosting failure is distinct from the
+passing installed test; no duplicate campaign or timeout/test weakening follows.
+This named qualification does not complete broader S-05 or the full specification.
+The next implementation is finite whole-pod logs with approved saved pages,
+native download and history/Repeat, in a separate worktree.
+
 ## Exhausted-worker lifecycle correction reaches frozen local checkpoint (2026-11-05)
 
 ADR-307 adds natural completion only after the authenticated sole generation-one
