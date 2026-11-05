@@ -1,0 +1,790 @@
+{
+  "format": "saved-syscall-query-proof-originals/v1",
+  "scope": "Four component consumers;1821exact compiled inputs+explicitoverlay/12fixtures, actual encrypted reader/parser with syntheticauthority/TLS providers, no installed/SQL/public/bootstrap proof. Binary/probe kept cache-only by recordedhash.",
+  "members": [
+    {
+      "member": "audit-resource.py.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/audit-resource.py",
+      "original_bytes": 8685,
+      "original_sha256": "b88baf05445092f84ccabd7fde9a471e29697b60e9bc78a0c91ed9efea563c10",
+      "gzip_bytes": 3244,
+      "gzip_sha256": "6b0cf8f2de17f9c4bed228785a5bb45161bc0d2ffa2726d6c90ae20a8ca226aa"
+    },
+    {
+      "member": "audit-terminal.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/audit-terminal.log",
+      "original_bytes": 358,
+      "original_sha256": "7b361dc9197fe8b901a40833bd74145690eddaf72a2700da696f98361926881d",
+      "gzip_bytes": 284,
+      "gzip_sha256": "b605ba560fc53553e84a3c17eb96df89476f20c9158118fc1ed16e456954255a"
+    },
+    {
+      "member": "build-commands.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/build-commands.json",
+      "original_bytes": 2095,
+      "original_sha256": "3c32c2f413007cb07efcae164de7889e5fe9a013f183ff66cdb8d28397e9cb8c",
+      "gzip_bytes": 513,
+      "gzip_sha256": "f897a6e7fa3b1eb536d9ace15c2c5412dcaf4c7c7ee5c0eba2c0e23135e1f604"
+    },
+    {
+      "member": "cleanup-final-readback.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/cleanup-final-readback.json",
+      "original_bytes": 196,
+      "original_sha256": "d69c0f57e9e71c46106145d518aefbea74c117278ec472d35d64268b2947dc71",
+      "gzip_bytes": 151,
+      "gzip_sha256": "964b15ae6e7899c32243fd36797a95e80273851592e09443f5d26d9928e38d20"
+    },
+    {
+      "member": "compile-probe.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/compile-probe.log",
+      "original_bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gzip_bytes": 20,
+      "gzip_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "member": "compile-probe.log.stderr.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/compile-probe.log.stderr",
+      "original_bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gzip_bytes": 20,
+      "gzip_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "member": "compile-test.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/compile-test.log",
+      "original_bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gzip_bytes": 20,
+      "gzip_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "member": "compile-test.log.stderr.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/compile-test.log.stderr",
+      "original_bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gzip_bytes": 20,
+      "gzip_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "member": "consume.py.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/consume.py",
+      "original_bytes": 5908,
+      "original_sha256": "ab04a69ba28ca918691d79988b998d4e8fc187248e42f778c81c54f772b9adc3",
+      "gzip_bytes": 2338,
+      "gzip_sha256": "413c995d3fbc4cc3e7042b618af33a030078dcf754ea9301f8378e5d74beba3a"
+    },
+    {
+      "member": "dependencies.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/dependencies.json",
+      "original_bytes": 7718499,
+      "original_sha256": "f789d64b30a4644fc35867dd0b0d9b435c71f8924d9d20ea39a27f275cbe4bad",
+      "gzip_bytes": 350298,
+      "gzip_sha256": "6772f15a8a0bd864f9a3709c58775e3238eddf04346972d5e58ab3e7df9731af"
+    },
+    {
+      "member": "dependencies.json.stderr.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/dependencies.json.stderr",
+      "original_bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gzip_bytes": 20,
+      "gzip_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "member": "encrypted-inputs/many-small/commit.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/encrypted-inputs/many-small/commit",
+      "original_bytes": 691,
+      "original_sha256": "bc6d24ad393f330fc6bcfb7e3648567e3ad94e58ba10624a8a9389c4c72230b9",
+      "gzip_bytes": 440,
+      "gzip_sha256": "63be8bc83ba2ad4500e8785b04b7b0a329b924c3911294e490fe22ec6f0b814c"
+    },
+    {
+      "member": "encrypted-inputs/many-small/data.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/encrypted-inputs/many-small/data",
+      "original_bytes": 1722,
+      "original_sha256": "94ed371809d50336fbc2824d7b9c673ccb931340e1032757f4f622967ce97d34",
+      "gzip_bytes": 1745,
+      "gzip_sha256": "15bb78ef1d840cae8a6f849f9ded1267b5cfbc5d6b1ccc3fa2ff9a37711364aa"
+    },
+    {
+      "member": "encrypted-inputs/many-small/fixture.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/encrypted-inputs/many-small/fixture.json",
+      "original_bytes": 11295,
+      "original_sha256": "b4ff0d0a60b9d0eff087fbc52dc99c7fc2319b17a427d2ea822b0b2e37a18e0e",
+      "gzip_bytes": 1793,
+      "gzip_sha256": "638c4c4209ffd7a67e15c9026d4df8d5f81fbd2343411e6d79e1aeb67ee0c0f8"
+    },
+    {
+      "member": "encrypted-inputs/many-small/index.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/encrypted-inputs/many-small/index",
+      "original_bytes": 372,
+      "original_sha256": "86342404ec8b71353fc8fcf1ddd29ae88afde8d542e893ea3cb7ba112822e4a3",
+      "gzip_bytes": 395,
+      "gzip_sha256": "cf3b4f6ed93568d6f3883470c84f2f3cc5351d131eb479e41631f9fc6f999705"
+    },
+    {
+      "member": "encrypted-inputs/many-small/manifest.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/encrypted-inputs/many-small/manifest",
+      "original_bytes": 4113,
+      "original_sha256": "16353619af520f0a747aad2fa14fa2868410df783cb39f86693da7eeff108057",
+      "gzip_bytes": 4136,
+      "gzip_sha256": "d76df7d0171683cc4bcb46bc2310e8de6413b07f0a1d9a22650e8f8b1e0bc573"
+    },
+    {
+      "member": "encrypted-inputs/many-small/native.arguments.jsonl.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/encrypted-inputs/many-small/native.arguments.jsonl",
+      "original_bytes": 8387433,
+      "original_sha256": "718b356d0bf095e1785f17af6e5ab5e0dce6f25b41697c8ff7c95062fb712761",
+      "gzip_bytes": 37255,
+      "gzip_sha256": "7920d06c56cf34638069440f37334f6180c8919863fd2da2e096e2f06d79bb7c"
+    },
+    {
+      "member": "encrypted-inputs/probe.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/encrypted-inputs/probe.json",
+      "original_bytes": 1792,
+      "original_sha256": "351b59ee7ec570a285489e2fea5677669a9a55ce2f3d78eec05411fa05861fdf",
+      "gzip_bytes": 831,
+      "gzip_sha256": "42ce2d68a153be1932640ca3cc9cd4386d12d021888bff20e561b88884489a3f"
+    },
+    {
+      "member": "encrypted-inputs/widest-values-64names/commit.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/encrypted-inputs/widest-values-64names/commit",
+      "original_bytes": 691,
+      "original_sha256": "11731566fe97084670b8c8e5f0eaac0a92fcc9825179046b31e96caafb09e911",
+      "gzip_bytes": 440,
+      "gzip_sha256": "49f6978c30323d6f66e74c701d92c71de73d8efc74c42930419c42a0698b2ec4"
+    },
+    {
+      "member": "encrypted-inputs/widest-values-64names/data.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/encrypted-inputs/widest-values-64names/data",
+      "original_bytes": 1837,
+      "original_sha256": "fb15f52321a01c78510399f87a258e6d4e7b8728d82e869065deb68275833d97",
+      "gzip_bytes": 1860,
+      "gzip_sha256": "1bff264ba66c0cfbcfe72cc5f678c332639945084420da8b3c2a509fb525f583"
+    },
+    {
+      "member": "encrypted-inputs/widest-values-64names/fixture.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/encrypted-inputs/widest-values-64names/fixture.json",
+      "original_bytes": 34868,
+      "original_sha256": "8e03c96331e3cb81ad2cf085839df03e5b32ec10544fd17dd81f53b515da0a36",
+      "gzip_bytes": 2121,
+      "gzip_sha256": "bbeb9deae067ad408f30d3763aeb6e9ade85b2bd0517d46af788d73bb7d4262b"
+    },
+    {
+      "member": "encrypted-inputs/widest-values-64names/index.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/encrypted-inputs/widest-values-64names/index",
+      "original_bytes": 372,
+      "original_sha256": "297dd8471ea40e2ab618ab9ed30984222e8e823c9dc5079cf684c537730eabab",
+      "gzip_bytes": 395,
+      "gzip_sha256": "c8daae2a2caeea40e49037a6fccff788b0caa12051bfd85ac10836bbfd3e8033"
+    },
+    {
+      "member": "encrypted-inputs/widest-values-64names/manifest.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/encrypted-inputs/widest-values-64names/manifest",
+      "original_bytes": 4113,
+      "original_sha256": "f023fd2b018e310bc959d11c75969230f67693b2bda98e822813a8e91811749d",
+      "gzip_bytes": 4136,
+      "gzip_sha256": "8f64d43d4b1b9ecee83b66cfd7c9c306d23d10ce5f289c8d33ec392ab71fcac4"
+    },
+    {
+      "member": "encrypted-inputs/widest-values-64names/native.arguments.jsonl.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/encrypted-inputs/widest-values-64names/native.arguments.jsonl",
+      "original_bytes": 8387096,
+      "original_sha256": "5be99bd7eff843499d6f1001fdc3f5df677519d8b0e65be4f7dcb3d8da1cb7b9",
+      "gzip_bytes": 41443,
+      "gzip_sha256": "916d9e01e5c4181a8c52ff8cc40c1dc0e6064bdee8f53850511724ae949970d5"
+    },
+    {
+      "member": "final-audit.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/final-audit.json",
+      "original_bytes": 7431,
+      "original_sha256": "f8b96f89f803e7539e9189414d6ae43f0a5257e0c7c840412c100a507ad4bc4f",
+      "gzip_bytes": 2084,
+      "gzip_sha256": "2c46c8afc85f82929565424bf259d5868c8c3dc8729a364bcaeab61ad4076b6d"
+    },
+    {
+      "member": "final-handoff.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/final-handoff.json",
+      "original_bytes": 22478,
+      "original_sha256": "fab4748be6201240e1c7ea190b0c62436bc23f0b7d58f93b6686cd2362c1e0c9",
+      "gzip_bytes": 6186,
+      "gzip_sha256": "2cf28c8059cbcf3c59c2b3dcab636413abec1955ebeb4c7e83a0f98856fb0eee"
+    },
+    {
+      "member": "handoff.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/handoff.json",
+      "original_bytes": 9966,
+      "original_sha256": "f75eb282492608101dcbc88ee5271880f7be38465de57289876d82e95135f876",
+      "gzip_bytes": 3660,
+      "gzip_sha256": "a9362fd65c5634ef3d4a19ee21282b9a1affd274a84f3f8bf6718b6fdc0b5fb0"
+    },
+    {
+      "member": "image-inspect.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/image-inspect.json",
+      "original_bytes": 1299,
+      "original_sha256": "a2dad540c7f91a68cf8338e7a71ead28bec98f8a8b7068b324b1d86adef72ca0",
+      "gzip_bytes": 523,
+      "gzip_sha256": "10d07562cbf7f3590a424a39e67ad8c3eb8a3b17ed4c1d6caca3cd09b09e7750"
+    },
+    {
+      "member": "many-small-complete/cgroup-after.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/many-small-complete/cgroup-after.json",
+      "original_bytes": 703,
+      "original_sha256": "53853ea1da821af79b02c277eab98a251e388a6ebc2c333d6f84d974350e82b2",
+      "gzip_bytes": 393,
+      "gzip_sha256": "53cf478b8ff62e9d10a77fa7a18577ef8bce540dd65b6cc40ce1d43e505681cf"
+    },
+    {
+      "member": "many-small-complete/cgroup-before.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/many-small-complete/cgroup-before.json",
+      "original_bytes": 700,
+      "original_sha256": "e418e274661489bfd3b0e976d03e0ca7e45543932cd1ecf19ef160e8d4bc1fd1",
+      "gzip_bytes": 392,
+      "gzip_sha256": "4379870e57d14c2c3bb1e6cf551265e21417152f38348f03caf69daac69fe05b"
+    },
+    {
+      "member": "many-small-complete/component.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/many-small-complete/component.json",
+      "original_bytes": 2092,
+      "original_sha256": "13a2b684549ac0265d6a95e632cfb862b82c94beb9edf6d86c1909554c7ca697",
+      "gzip_bytes": 1197,
+      "gzip_sha256": "832579ab600fedd7106607290ee0821817f229b07344c7d93f846741b12d4710"
+    },
+    {
+      "member": "many-small-complete/consumer-exit.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/many-small-complete/consumer-exit",
+      "original_bytes": 2,
+      "original_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "gzip_bytes": 22,
+      "gzip_sha256": "89ed3b723e0e40d8957a2df55fcb04d57b6d95fa665c5fe67b098df7f29694ae"
+    },
+    {
+      "member": "many-small-complete/consumer.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/many-small-complete/consumer.log",
+      "original_bytes": 121,
+      "original_sha256": "54cbf17d2e153046f30fa75a38d18b1b71eec884fa648f985308609d29670c32",
+      "gzip_bytes": 97,
+      "gzip_sha256": "edd92872665fcc57468b392ff979f44422893e5b108752016c01d62abed92366"
+    },
+    {
+      "member": "many-small-complete/docker-inspect.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/many-small-complete/docker-inspect.json",
+      "original_bytes": 11194,
+      "original_sha256": "d6acb965ee30f5203c1244a07f585e519c6f622cbe7097018df82f56656ebfab",
+      "gzip_bytes": 2640,
+      "gzip_sha256": "653c69ace76af1f739eedf910d9cde1a9580faef3d73e5e49d22411701dace56"
+    },
+    {
+      "member": "many-small-complete/docker-start.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/many-small-complete/docker-start.log",
+      "original_bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gzip_bytes": 20,
+      "gzip_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "member": "many-small-complete/probe-before-error.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/many-small-complete/probe-before-error.log",
+      "original_bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gzip_bytes": 20,
+      "gzip_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "member": "many-small-complete/probe-error.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/many-small-complete/probe-error.log",
+      "original_bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gzip_bytes": 20,
+      "gzip_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "member": "many-small-complete/probe-exit.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/many-small-complete/probe-exit",
+      "original_bytes": 2,
+      "original_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "gzip_bytes": 22,
+      "gzip_sha256": "89ed3b723e0e40d8957a2df55fcb04d57b6d95fa665c5fe67b098df7f29694ae"
+    },
+    {
+      "member": "many-small-complete/run.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/many-small-complete/run.json",
+      "original_bytes": 7615,
+      "original_sha256": "145a2f0870c63d0cacbe71366bd46b5b3988c68b4a58aafb877fdca0dd835bf2",
+      "gzip_bytes": 2713,
+      "gzip_sha256": "d0dde4cdc876b4e04c57bdf7b901cd7d44e27811a39e8ffb3a24730975b970b3"
+    },
+    {
+      "member": "matrix-terminal.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/matrix-terminal.log",
+      "original_bytes": 654,
+      "original_sha256": "2c7387a169d5692a210dbac6b6aa3f71fbac015bb4fcc7c8d52f0c562b287882",
+      "gzip_bytes": 324,
+      "gzip_sha256": "b574a1fcb66d121f5ba6e9e7f8384b64cd070e17dc4fe317f256d948c69c66cf"
+    },
+    {
+      "member": "matrix.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/matrix.json",
+      "original_bytes": 32476,
+      "original_sha256": "60b8901683460a59e640d4797d97a57a978d96e0ab8d829d0796458d28af8ab8",
+      "gzip_bytes": 4110,
+      "gzip_sha256": "ce127d1d4ab6bc1862ff8da0feb50df77d1a860d76e3fab994a3286802e778eb"
+    },
+    {
+      "member": "native-shapes-independent-audit.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/native-shapes-independent-audit.json",
+      "original_bytes": 989,
+      "original_sha256": "dfe7e1fbaaf576cb6866b40a3c2b2980a53a36853e0f83e1ceb80957902f7855",
+      "gzip_bytes": 377,
+      "gzip_sha256": "e404ade7e4a6fd3ca046a01bcaef6e0ee8f94de290d22f692b72beb7bd8bfc48"
+    },
+    {
+      "member": "overinclusive-prepare-provenance.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/overinclusive-prepare-provenance.log",
+      "original_bytes": 1113,
+      "original_sha256": "e44fe5288f82480f07ef6b91defa950d710c0a19fac99aded39676cdda7d9354",
+      "gzip_bytes": 528,
+      "gzip_sha256": "ae4cd92e35fcf805f0db0bc4151a34a08d06e0faf1bf9a38c5ec56e3dc48b900"
+    },
+    {
+      "member": "overinclusive-prepare-provenance.py.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/overinclusive-prepare-provenance.py",
+      "original_bytes": 3275,
+      "original_sha256": "2df55429ccad7b5e55ce0b42627167ff3511e005af94396af4e1c1b3c1a69dc4",
+      "gzip_bytes": 1330,
+      "gzip_sha256": "0e1012f553da0f743c955a2fb3d9c1ba6a54a4ffd2587288a78c1c1dad6b2c91"
+    },
+    {
+      "member": "overinclusive-relevant-sources.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/overinclusive-relevant-sources.json",
+      "original_bytes": 380616,
+      "original_sha256": "8ec696b152061f69bca451d967fe315c4d4757974e6633093876cd5bfa56a533",
+      "gzip_bytes": 142416,
+      "gzip_sha256": "aa85362587d3bd1d6af3b3ff94b0b128708971dfc510232b6f7fb307b27cd2fb"
+    },
+    {
+      "member": "overinclusive-source-before.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/overinclusive-source-before.json",
+      "original_bytes": 1165,
+      "original_sha256": "65b00d0e584d50131325f1b7994ecef5c9b8d630859c576c947b3b0886da4030",
+      "gzip_bytes": 545,
+      "gzip_sha256": "d13dc7472aff78d9cdeb8d2248fc56a4fb4a19031266f69e1097e010b155d1cb"
+    },
+    {
+      "member": "overlay.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/overlay.json",
+      "original_bytes": 263,
+      "original_sha256": "2765fe5d25dc1f00ff926e16770434410c842fa773582873977e0e7dd58ad16b",
+      "gzip_bytes": 169,
+      "gzip_sha256": "dfc657b66bc75c317daebf39aced64811d210d8433336cb1279f332f4a4c67c0"
+    },
+    {
+      "member": "plan.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/plan.json",
+      "original_bytes": 6074,
+      "original_sha256": "adb735e01e98ca91d83e597c2bdc469ff3c91cd5c43f4835902d21d883ef7c48",
+      "gzip_bytes": 2932,
+      "gzip_sha256": "10d0d4b094d068c3b26527a00d0fd59eeadf68d3c858e34a9914c1ecebef2f33"
+    },
+    {
+      "member": "prepare-provenance.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/prepare-provenance.log",
+      "original_bytes": 1170,
+      "original_sha256": "09469b221ca4680938aa409a7df7151d18c402dc8dc826d18f1f760fe15e2f14",
+      "gzip_bytes": 557,
+      "gzip_sha256": "b4d8d5f74748ed77cd26b6b38024bfad00265d5403c7030eccb3bd6d3ecb8a80"
+    },
+    {
+      "member": "prepare-provenance.log.stderr.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/prepare-provenance.log.stderr",
+      "original_bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gzip_bytes": 20,
+      "gzip_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "member": "prepare-provenance.py.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/prepare-provenance.py",
+      "original_bytes": 3218,
+      "original_sha256": "45279c3dabcd399b3d2dd5b65718746df7a79c52347c9d96f0a08c6234dc6275",
+      "gzip_bytes": 1320,
+      "gzip_sha256": "a9c23de18914a8c03fc7f13861ee16f0ed0fcb64d4d7e196586585de2e0752e6"
+    },
+    {
+      "member": "produce-terminal.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/produce-terminal.log",
+      "original_bytes": 664,
+      "original_sha256": "a47570e83619ed2bb577559c055575edde997ee9808169f31139ecd39796228b",
+      "gzip_bytes": 418,
+      "gzip_sha256": "46613497d04c17b3a29cddd331fa21f4f832334c91d0518cfc1fc373c8e97fc9"
+    },
+    {
+      "member": "produce.py.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/produce.py",
+      "original_bytes": 2327,
+      "original_sha256": "7e2c716293cec603654d886a59791becec0390275444c3db2628fc4518a91f4b",
+      "gzip_bytes": 1163,
+      "gzip_sha256": "60dfe28cbd7f7d4051494c850a109344ff31327100c0fc79db21dc38f78265b5"
+    },
+    {
+      "member": "producer-resource.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/producer-resource.json",
+      "original_bytes": 3816,
+      "original_sha256": "6d9d9eb8eccb34f9b62db36307b226d081cee46ab83c7f853696167b50e2d816",
+      "gzip_bytes": 1633,
+      "gzip_sha256": "c9b394fadefff4b1d6e0da63708139ecefa01a8e8853dbc2e81c9beb642d03a5"
+    },
+    {
+      "member": "producer.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/producer.log",
+      "original_bytes": 303,
+      "original_sha256": "39825b4ab3e44ea5f2e80d14069fe35542e8fc4d8c621aca38b71d9cea316aa0",
+      "gzip_bytes": 166,
+      "gzip_sha256": "bbacbd95a67edca5da9c4346acd62234b712f247fe04de9ebed7e8b2df05b29f"
+    },
+    {
+      "member": "relevant-sources.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/relevant-sources.json",
+      "original_bytes": 229910,
+      "original_sha256": "0e254d23b926b195de152664a6d8b99cbee5d3c316ee2bba878917d3aeb8efef",
+      "gzip_bytes": 88281,
+      "gzip_sha256": "f12c63593b078141cc6d226e3085dff392b359d48fb08e3ea370e839ac7e3224"
+    },
+    {
+      "member": "remaining-containers.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/remaining-containers.json",
+      "original_bytes": 45,
+      "original_sha256": "ff1d29df5ee964245831744f8f73b4536cca2e9b5ede02705dac7b08deadbeeb",
+      "gzip_bytes": 57,
+      "gzip_sha256": "dc9874e84a7d00a87b969d5482b9902af77a2fc7df2e6ed02bfb7d85b672fbbb"
+    },
+    {
+      "member": "root-independent-audit.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/root-independent-audit.json",
+      "original_bytes": 855,
+      "original_sha256": "66425d179ca9d5b34e91e9fed5fc1da3be638b1257916027c708127be7e17b19",
+      "gzip_bytes": 507,
+      "gzip_sha256": "d1b928e9d4c5f09c81af82ac3f51e311b7f5a5fa9f44e35d827a0a8e3c8bd097"
+    },
+    {
+      "member": "setup-first-prepare-provenance.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/setup-first-prepare-provenance.log",
+      "original_bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gzip_bytes": 20,
+      "gzip_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "member": "setup-first-prepare-provenance.log.stderr.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/setup-first-prepare-provenance.log.stderr",
+      "original_bytes": 372,
+      "original_sha256": "dafc893d1388a0eb3375383cad53c3076988861153759e8360f6a44184479964",
+      "gzip_bytes": 241,
+      "gzip_sha256": "f42d4416d563902eb6f0549b000cca6970a6def1d37224911b40585ce7e939e3"
+    },
+    {
+      "member": "setup-first-prepare-provenance.py.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/setup-first-prepare-provenance.py",
+      "original_bytes": 2762,
+      "original_sha256": "0fa7c812d9f72827a6a0ce4c781391ff12a89a9887cf0585692442d4bc14e376",
+      "gzip_bytes": 1222,
+      "gzip_sha256": "e8556eab8b4c6fbf36bbeb4c237ae905a5a326c8c7a3223b74c17b161df585f4"
+    },
+    {
+      "member": "source-0cf-after.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/source-0cf-after.json",
+      "original_bytes": 2208,
+      "original_sha256": "6a6378bc7d4336b35378d36cdceaba35897afb7c55e7c7eab25692f14b062e36",
+      "gzip_bytes": 1042,
+      "gzip_sha256": "034601af59b217470be9ca8c41395acb5a56ceb9e5afff1a4a1f808e8484b4b3"
+    },
+    {
+      "member": "source-0cf-before.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/source-0cf-before.json",
+      "original_bytes": 1004,
+      "original_sha256": "0c6d0f74ae045487f19021708e5370e80912e57aa9ad23f86e9384f554ae3e42",
+      "gzip_bytes": 613,
+      "gzip_sha256": "ecb1dc45b4fb99232d89b9374f9e4a2f9b715b722ce314d4bd295d4c0b817977"
+    },
+    {
+      "member": "source-before.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/source-before.json",
+      "original_bytes": 1222,
+      "original_sha256": "eac1272582a6e6736c692f8592c388a725de8e36e2d97876089205edb8925b2a",
+      "gzip_bytes": 573,
+      "gzip_sha256": "13e3260459c7f54bd4f31dd2a8bd27ae23c35416e7365be264c70c1bb821cfae"
+    },
+    {
+      "member": "syscall_query_resource_overlay_test.go.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/syscall_query_resource_overlay_test.go",
+      "original_bytes": 12680,
+      "original_sha256": "ac5f056dfa3b38248dff4c015a56455cf9d4c7eabd05906a19a6b443e27935c9",
+      "gzip_bytes": 4359,
+      "gzip_sha256": "c86a25753a2b2b325bbbb8eac7ecd6babe5a80582eeead266addf32c7751a02d"
+    },
+    {
+      "member": "widest-values-64names-cancel/cgroup-after.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/widest-values-64names-cancel/cgroup-after.json",
+      "original_bytes": 702,
+      "original_sha256": "502b72e4a9ef63840c7dbd3b38bd4bb637f070f97335b684df32d5c73b835545",
+      "gzip_bytes": 391,
+      "gzip_sha256": "3c0028ebef259397d31b857ecb683fd7268cb215bde93ac19de4c04caaa4ea55"
+    },
+    {
+      "member": "widest-values-64names-cancel/cgroup-before.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/widest-values-64names-cancel/cgroup-before.json",
+      "original_bytes": 700,
+      "original_sha256": "4fb7e9db26b80e51142e8478c3aa1b96e9ea252eecb3a9302b1e6cb7fa98446f",
+      "gzip_bytes": 392,
+      "gzip_sha256": "a5fb3a8819a356ca09873241bbf3bb28caf447e1157324b44eb476f3a398ba54"
+    },
+    {
+      "member": "widest-values-64names-cancel/component.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/widest-values-64names-cancel/component.json",
+      "original_bytes": 2109,
+      "original_sha256": "11aac39e32bfde073d8b1187ac196aa73923f9e8adddd0eecfe685e78fe4f6a5",
+      "gzip_bytes": 1200,
+      "gzip_sha256": "fc7a5f9904172713c615d734072d23436fa980ec1cbc09bc9cc2b4c8f6322666"
+    },
+    {
+      "member": "widest-values-64names-cancel/consumer-exit.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/widest-values-64names-cancel/consumer-exit",
+      "original_bytes": 2,
+      "original_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "gzip_bytes": 22,
+      "gzip_sha256": "89ed3b723e0e40d8957a2df55fcb04d57b6d95fa665c5fe67b098df7f29694ae"
+    },
+    {
+      "member": "widest-values-64names-cancel/consumer.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/widest-values-64names-cancel/consumer.log",
+      "original_bytes": 121,
+      "original_sha256": "ade1645ec9b6501290d673b933ba7cbdbf5582ebdc555df698a2b77f9d7b5ef0",
+      "gzip_bytes": 97,
+      "gzip_sha256": "ed595aafbd93ffdcf96d70fcd3dedfa070806e8d05baf688dcb3ebbc8660743d"
+    },
+    {
+      "member": "widest-values-64names-cancel/docker-inspect.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/widest-values-64names-cancel/docker-inspect.json",
+      "original_bytes": 11231,
+      "original_sha256": "e7a69d0617ac96cd10ac63eb02ce5a8f55e97278a7296d1523a5c7fac28faa5f",
+      "gzip_bytes": 2647,
+      "gzip_sha256": "eb2886589c55b2fa635b9f8109b91322b80594fbd97269a9a03d5219cc386a8d"
+    },
+    {
+      "member": "widest-values-64names-cancel/docker-start.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/widest-values-64names-cancel/docker-start.log",
+      "original_bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gzip_bytes": 20,
+      "gzip_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "member": "widest-values-64names-cancel/probe-before-error.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/widest-values-64names-cancel/probe-before-error.log",
+      "original_bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gzip_bytes": 20,
+      "gzip_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "member": "widest-values-64names-cancel/probe-error.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/widest-values-64names-cancel/probe-error.log",
+      "original_bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gzip_bytes": 20,
+      "gzip_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "member": "widest-values-64names-cancel/probe-exit.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/widest-values-64names-cancel/probe-exit",
+      "original_bytes": 2,
+      "original_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "gzip_bytes": 22,
+      "gzip_sha256": "89ed3b723e0e40d8957a2df55fcb04d57b6d95fa665c5fe67b098df7f29694ae"
+    },
+    {
+      "member": "widest-values-64names-cancel/run.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/widest-values-64names-cancel/run.json",
+      "original_bytes": 7685,
+      "original_sha256": "2088836fb23645f0305cd5d16c9807bf72199e05267fde72e87a301f168d07e8",
+      "gzip_bytes": 2725,
+      "gzip_sha256": "35d93434fd8ae00d86c8022ded146639a7425703c77529b5f61629022729d9fc"
+    },
+    {
+      "member": "widest-values-64names-complete/cgroup-after.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/widest-values-64names-complete/cgroup-after.json",
+      "original_bytes": 703,
+      "original_sha256": "af8211c018660f11d5686ab47ecc267da52acc71897aa51a2718ee6d053f0d90",
+      "gzip_bytes": 393,
+      "gzip_sha256": "10a3ab49879026184096aafe4cff76b8dd936fc538ede7d63ea5d4418a5eab7d"
+    },
+    {
+      "member": "widest-values-64names-complete/cgroup-before.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/widest-values-64names-complete/cgroup-before.json",
+      "original_bytes": 700,
+      "original_sha256": "8bd941581af79580c8d976ac3f345b95a93fd74a5f96e8fc1b29683370d3ceec",
+      "gzip_bytes": 391,
+      "gzip_sha256": "7dc2cd52f8c52574c3ad4f5e892f803f476d3e7183b602c613726ee4bbeefc4a"
+    },
+    {
+      "member": "widest-values-64names-complete/component.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/widest-values-64names-complete/component.json",
+      "original_bytes": 2115,
+      "original_sha256": "7af7cdbf5711c290687e71fc7ff6c58f879f6ec2690adb7eb3e679e28dfecb39",
+      "gzip_bytes": 1206,
+      "gzip_sha256": "a08873570e1c718bf1372eab6e88ee466403fa6707a50c451bca568e100db59e"
+    },
+    {
+      "member": "widest-values-64names-complete/consumer-exit.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/widest-values-64names-complete/consumer-exit",
+      "original_bytes": 2,
+      "original_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "gzip_bytes": 22,
+      "gzip_sha256": "89ed3b723e0e40d8957a2df55fcb04d57b6d95fa665c5fe67b098df7f29694ae"
+    },
+    {
+      "member": "widest-values-64names-complete/consumer.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/widest-values-64names-complete/consumer.log",
+      "original_bytes": 121,
+      "original_sha256": "0543bccac22681168e82de03ad8fb69a667e2135247d2c84beb1c60a6c9841f9",
+      "gzip_bytes": 97,
+      "gzip_sha256": "f281943e9bab1b271a7cc6501b341021edfea6fd08f073c577a306c62d6740dc"
+    },
+    {
+      "member": "widest-values-64names-complete/docker-inspect.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/widest-values-64names-complete/docker-inspect.json",
+      "original_bytes": 11238,
+      "original_sha256": "c3963f48e373a848b6279e9aee3f727060da93bd8c520d8c03f439f3cd2629e5",
+      "gzip_bytes": 2651,
+      "gzip_sha256": "a0d2b0a78d68f808505c79b2a5467adc7cf93f66fcfb35ee634e9f90e1bb3be1"
+    },
+    {
+      "member": "widest-values-64names-complete/docker-start.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/widest-values-64names-complete/docker-start.log",
+      "original_bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gzip_bytes": 20,
+      "gzip_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "member": "widest-values-64names-complete/probe-before-error.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/widest-values-64names-complete/probe-before-error.log",
+      "original_bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gzip_bytes": 20,
+      "gzip_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "member": "widest-values-64names-complete/probe-error.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/widest-values-64names-complete/probe-error.log",
+      "original_bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gzip_bytes": 20,
+      "gzip_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "member": "widest-values-64names-complete/probe-exit.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/widest-values-64names-complete/probe-exit",
+      "original_bytes": 2,
+      "original_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "gzip_bytes": 22,
+      "gzip_sha256": "89ed3b723e0e40d8957a2df55fcb04d57b6d95fa665c5fe67b098df7f29694ae"
+    },
+    {
+      "member": "widest-values-64names-complete/run.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/widest-values-64names-complete/run.json",
+      "original_bytes": 7703,
+      "original_sha256": "ca5e5ed93f8d081c9860757de9a38b15b07630734f72accfc51be28c347adbe0",
+      "gzip_bytes": 2727,
+      "gzip_sha256": "3489756c2280b23be742a4ba70cf0e34c8ebbe8f8efc13c8652eb99bb9a4d6f8"
+    },
+    {
+      "member": "widest-values-64names-source-error/cgroup-after.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/widest-values-64names-source-error/cgroup-after.json",
+      "original_bytes": 702,
+      "original_sha256": "c66ea2ca68f4d609764ffd8e3d347f1539a9334c5ba8ee53652707d530390a32",
+      "gzip_bytes": 394,
+      "gzip_sha256": "8503f71ecb04e79430ff9383219de1bb0750a46661a0ae0aeea398d2d8aef58d"
+    },
+    {
+      "member": "widest-values-64names-source-error/cgroup-before.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/widest-values-64names-source-error/cgroup-before.json",
+      "original_bytes": 699,
+      "original_sha256": "c411e1785265fe8837202b9efea288f08ee94e5578224b4a6cc7db5ab543e074",
+      "gzip_bytes": 390,
+      "gzip_sha256": "be58ae6fdf3407c82c2d15d1de5d8d021ed8926836309a78d879a900907657c8"
+    },
+    {
+      "member": "widest-values-64names-source-error/component.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/widest-values-64names-source-error/component.json",
+      "original_bytes": 2110,
+      "original_sha256": "ad56f713079860475c5d14c4c6d9a3e219431a20ca10c33d0b93b9b319803628",
+      "gzip_bytes": 1199,
+      "gzip_sha256": "b578351fdcf66eb0d1500152c8926ce070891d279e7cf1a6459dadccb6d38a1e"
+    },
+    {
+      "member": "widest-values-64names-source-error/consumer-exit.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/widest-values-64names-source-error/consumer-exit",
+      "original_bytes": 2,
+      "original_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "gzip_bytes": 22,
+      "gzip_sha256": "89ed3b723e0e40d8957a2df55fcb04d57b6d95fa665c5fe67b098df7f29694ae"
+    },
+    {
+      "member": "widest-values-64names-source-error/consumer.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/widest-values-64names-source-error/consumer.log",
+      "original_bytes": 121,
+      "original_sha256": "85e8f887a88ff306d0ef289a5cad52aa469438e9b8602c15eeef9e99fe5a55d2",
+      "gzip_bytes": 97,
+      "gzip_sha256": "9ffa41e5756c314cad349e6fbbe6e320a5f7ccd29e5f9c622df955c5ff476bd1"
+    },
+    {
+      "member": "widest-values-64names-source-error/docker-inspect.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/widest-values-64names-source-error/docker-inspect.json",
+      "original_bytes": 11255,
+      "original_sha256": "7f4f8262d8aa2ece6ff46fd8412423783d4c6278c6bea6164b7fb75a75871495",
+      "gzip_bytes": 2644,
+      "gzip_sha256": "6925cd0c352ed1ec37ca133b5cc61c8570331d2341b803662ada6b9873ef815b"
+    },
+    {
+      "member": "widest-values-64names-source-error/docker-start.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/widest-values-64names-source-error/docker-start.log",
+      "original_bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gzip_bytes": 20,
+      "gzip_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "member": "widest-values-64names-source-error/probe-before-error.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/widest-values-64names-source-error/probe-before-error.log",
+      "original_bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gzip_bytes": 20,
+      "gzip_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "member": "widest-values-64names-source-error/probe-error.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/widest-values-64names-source-error/probe-error.log",
+      "original_bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gzip_bytes": 20,
+      "gzip_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "member": "widest-values-64names-source-error/probe-exit.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/widest-values-64names-source-error/probe-exit",
+      "original_bytes": 2,
+      "original_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "gzip_bytes": 22,
+      "gzip_sha256": "89ed3b723e0e40d8957a2df55fcb04d57b6d95fa665c5fe67b098df7f29694ae"
+    },
+    {
+      "member": "widest-values-64names-source-error/run.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-resource-preparation/widest-values-64names-source-error/run.json",
+      "original_bytes": 7722,
+      "original_sha256": "f0500e8de3584d56a82ca8cfe2c1df6c3b6c504444e4f0cbf6c8c5fa350495e5",
+      "gzip_bytes": 2713,
+      "gzip_sha256": "4cf1b12bcb985adef41e5a1b47b4933355ff771d85d44e28da3187c3627ddcbf"
+    }
+  ]
+}

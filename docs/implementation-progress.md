@@ -1,5 +1,34 @@
 # Sustained implementation progress
 
+## Saved syscall queries pass service, upgrade and resource checks (2026-11-05)
+
+On signed `0cf27e86`, the real SQL lifecycle passes9 tests/13.810s and pristine
+upgrade140 passes497 tests/8.928s; both preserve4,226 exact Git hashes,
+unchanged sources and cleanup[]. Exact C3/C18 replay, current grants, two paid
+allocations,48KiB/two operations, six one-use key roles and joined SQL closure
+pass. These paid loops use synthetic crypto/join proofs; actual parser/decrypt
+execution is separate. Actual PostgreSQL JSONB sizing passes20 cases with a
+35,750-byte maximal binding under the unchanged48KiB bound.
+[Originals, two failed fixtures and corrections](../test/results/saved-syscall-query-services-local/README.md)
+retain all scopes and actual failures. No product authority was relaxed.
+
+Four separate [encrypted-reader resource cases](../test/results/saved-syscall-query-resource-local/README.md)
+pass against1,821 exact compiled inputs plus a recorded overlay. Two legitimate
+near8MiB raw originals authenticate complete EOF despite page stops; cancellation
+and source error yield no page and join. The largest observed cgroup peak is
+57,393,152B under256MiB/no swap, with no OOM/max events.500m CPU remains
+configuration-only evidence. Root independently verifies inputs, actual limits,
+outcomes and exact-name/matching-label container cleanup. The earlier wrong
+cleanup-label readback is retained alongside the corrected observation.
+
+[Component/console originals](../test/results/saved-syscall-query-local/README.md)
+retain552 console tests, production build, actual React/GoTLS two-case race
+pass, C20 raw/refusal/maximum-page checks and independent reviews. The broad
+Go gate's obsolete bootstrap expectation was corrected; full bootstrap passes
+110.580s, with canonical Kubernetes groups still tracked separately. These
+checks do not establish installed argument-query/native JSONL parity. That
+workflow and full S-05 remain pending; the packet PR is independently in flight.
+
 ## Saved syscall argument queries reach built React; service proof pending (2026-11-05)
 
 The isolated candidate implements ADR-306's saved raw syscall query through
