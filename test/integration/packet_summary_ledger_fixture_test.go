@@ -137,14 +137,14 @@ func refuseRetainedPacketSummaryDowngrade(t *testing.T, f *queryLedgerFixture) {
 		return string(b)
 	}
 	before := snapshot()
-	if _, err = p.DownTo(f.base.ctx, 136); err == nil || !strings.Contains(err.Error(), "saved packet query history cannot be downgraded") {
+	if _, err = p.DownTo(f.base.ctx, 136); err == nil || !strings.Contains(err.Error(), "packet query history cannot be downgraded") {
 		t.Fatal("retained packet downgrade", err)
 	}
 	head, err := p.GetDBVersion(f.base.ctx)
-	if err != nil || head != 137 || snapshot() != before {
+	if err != nil || head != 138 || snapshot() != before {
 		t.Fatal("refused downgrade changed history/spend", head, err)
 	}
-	t.Log("retained packet137→136 refused: exact query/key/accounting snapshot unchanged")
+	t.Log("retained packet138→137 refused (conservative same-tool audit boundary): exact query/key/accounting snapshot unchanged")
 }
 
 // Two OAuth clients of the SAME human retain distinct query actors but share

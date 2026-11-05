@@ -1,0 +1,37 @@
+{
+  "schema_version": "mcp-result/v1",
+  "request_id": "00000000-0000-4000-8000-000000000090",
+  "data_class": "extract",
+  "status": "ok",
+  "data": {
+    "capture_mode": "rawPackets",
+    "packets": 14,
+    "drops": 2,
+    "drop_reporting": "captureExclusions",
+    "conversations": [
+      {
+        "source": "192.0.2.10:42000",
+        "destination": "192.0.2.20:443",
+        "protocol": "TCP",
+        "packets": 12
+      }
+    ],
+    "conversations_total": 1,
+    "conversations_truncated": false,
+    "query_observed_at": "2026-11-05T09:00:00Z",
+    "query_expires_at": "2026-11-05T09:01:00Z",
+    "unclassified_packets": 2
+  },
+  "truncated": false,
+  "next_cursor": null,
+  "narrowing_hint": null,
+  "warnings": [
+    "SensitiveDataHandling: Numeric endpoints may contain user data. The summary omits payload and names. Deletion covers Asservat-managed copies; delivered copies cannot be recalled."
+  ],
+  "provenance": [
+    {
+      "artifactID": "00000000-0000-4000-8000-000000000022",
+      "digest": "8888888888888888888888888888888888888888888888888888888888888888"
+    }
+  ]
+}

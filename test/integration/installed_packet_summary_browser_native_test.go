@@ -23,7 +23,7 @@ func queryInstalledPacketSummaryBrowser(t *testing.T, ctx context.Context, brows
 			verify(handle, operation)
 		}
 	}()
-	call, _, finish := installedProfileBrowser(t, ctx, browser, address, installedProfileComparisonSource{CaseID: source.CaseID, ArtifactID: source.ArtifactID, Version: source.Version, Expires: source.Expires}, "packet", func(reply installedComparisonReply) {
+	call, _, finish := installedProfileBrowserSourceMode(t, ctx, browser, address, installedProfileComparisonSource{CaseID: source.CaseID, ArtifactID: source.ArtifactID, Version: source.Version, Expires: source.Expires}, "packet", func(reply installedComparisonReply) {
 		if operation == "" {
 			operation = reply.RequestID
 		}
@@ -35,7 +35,7 @@ func queryInstalledPacketSummaryBrowser(t *testing.T, ctx context.Context, brows
 				handle = pending.Handle
 			}
 		}
-	})
+	}, source.CaptureMode)
 	defer finish() // Join Chrome before known-query failure inspection.
 	return queryInstalledPacketSummaryWithCall(t, ctx, source, call, func(queryID, operationID string) func() {
 		// Assert rendered values and close while the original view is live,

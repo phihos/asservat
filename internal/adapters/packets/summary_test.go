@@ -18,9 +18,13 @@ import (
 
 func summaryFixture(t *testing.T, frames [][]byte, stats ...uint64) ([]byte, artifact.ContextExpectation, time.Time) {
 	t.Helper()
+	return summaryFixtureWithSnaplen(t, frames, Snaplen, stats...)
+}
+func summaryFixtureWithSnaplen(t *testing.T, frames [][]byte, snaplen int, stats ...uint64) ([]byte, artifact.ContextExpectation, time.Time) {
+	t.Helper()
 	at := time.Unix(1800000000, 0).UTC()
 	var out bytes.Buffer
-	w, err := pcapgo.NewNgWriterInterface(&out, pcapgo.NgInterface{LinkType: layers.LinkTypeEthernet, SnapLength: Snaplen, TimestampResolution: 9, Name: "private-interface-comment"}, pcapgo.NgWriterOptions{SectionInfo: pcapgo.NgSectionInfo{Application: "synthetic-private-application-comment"}})
+	w, err := pcapgo.NewNgWriterInterface(&out, pcapgo.NgInterface{LinkType: layers.LinkTypeEthernet, SnapLength: uint32(snaplen), TimestampResolution: 9, Name: "private-interface-comment"}, pcapgo.NgWriterOptions{SectionInfo: pcapgo.NgSectionInfo{Application: "synthetic-private-application-comment"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -185,30 +189,7 @@ func TestPacketSummaryCancellationAndMaximumNativeRead(t *testing.T) {
 	}
 
 	// Exactly8MiB using bounded statistics comment options, which are ignored.
-	var out bytes.Buffer
-	out.Write(b)
-	for out.Len() < int(artifact.RecordingNativeLimit) {
-		size := min(summaryBlockLimit, int(artifact.RecordingNativeLimit)-out.Len())
-		body := make([]byte, 12)
-		drop := make([]byte, 12)
-		binary.LittleEndian.PutUint16(drop, 5)
-		binary.LittleEndian.PutUint16(drop[2:], 8)
-		body = append(body, drop...)
-		remaining := size - 40 // block12 + statistics12 + drop12 + end4
-		for remaining > 0 {
-			n := min(65532, remaining-4)
-			option := make([]byte, 4+n)
-			binary.LittleEndian.PutUint16(option, 1)
-			binary.LittleEndian.PutUint16(option[2:], uint16(n))
-			body = append(body, option...)
-			remaining -= 4 + n
-		}
-		body = append(body, 0, 0, 0, 0)
-		out.Write(summaryTestBlock(binary.LittleEndian, 5, body))
-	}
-	if out.Len() != int(artifact.RecordingNativeLimit) {
-		t.Fatal("maximum fixture shape", out.Len())
-	}
+	out := summaryMaximumNative(t, b)
 	if s, err := SummarizePCAPNG(t.Context(), bytes.NewReader(out.Bytes()), e, at, at.Add(time.Second)); err != nil || s.Packets != 1 {
 		t.Fatal("exact maximum refused", err)
 	}
@@ -381,4 +362,33 @@ func TestPacketSummaryStatisticsDescribeTheirOwnObservationPoint(t *testing.T) {
 	if err != nil || s.Packets != 2 || s.Drops == nil || *s.Drops != 2 {
 		t.Fatal("earlier statistics were treated as final coverage", err)
 	}
+}
+
+func summaryMaximumNative(t *testing.T, b []byte) bytes.Buffer {
+	t.Helper()
+	var out bytes.Buffer
+	out.Write(b)
+	for out.Len() < int(artifact.RecordingNativeLimit) {
+		size := min(summaryBlockLimit, int(artifact.RecordingNativeLimit)-out.Len())
+		body := make([]byte, 12)
+		drop := make([]byte, 12)
+		binary.LittleEndian.PutUint16(drop, 5)
+		binary.LittleEndian.PutUint16(drop[2:], 8)
+		body = append(body, drop...)
+		remaining := size - 40 // block12 + statistics12 + drop12 + end4
+		for remaining > 0 {
+			n := min(65532, remaining-4)
+			option := make([]byte, 4+n)
+			binary.LittleEndian.PutUint16(option, 1)
+			binary.LittleEndian.PutUint16(option[2:], uint16(n))
+			body = append(body, option...)
+			remaining -= 4 + n
+		}
+		body = append(body, 0, 0, 0, 0)
+		out.Write(summaryTestBlock(binary.LittleEndian, 5, body))
+	}
+	if out.Len() != int(artifact.RecordingNativeLimit) {
+		t.Fatal("maximum fixture shape", out.Len())
+	}
+	return out
 }

@@ -13,7 +13,7 @@ func TestProfileSummarySourceKeepsRawInputClassification(t *testing.T) {
 	if !ok || source.NativeType != artifact.PprofArtifact || source.DataClass != "raw" || source.EvidenceType != "profile" || source.NativeLimit != artifact.MaxPprofBytes || source.Format != artifact.PprofFormat {
 		t.Fatal("bounded pprof summary source unavailable or reclassified", source)
 	}
-	for _, kind := range []string{artifact.GoTraceArtifact, "core", artifact.RawPCAPNGArtifact} {
+	for _, kind := range []string{artifact.GoTraceArtifact, "core"} {
 		if _, ok := LookupProjectionSource(kind); ok {
 			t.Fatal("unreviewed summary source admitted", kind)
 		}

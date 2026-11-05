@@ -11,10 +11,13 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-func packetSummarySQLScope(t *testing.T) []byte {
+func packetSummarySQLScope(t *testing.T, rawPacket ...bool) []byte {
 	t.Helper()
 	id := custodyID()
 	s := analysis.ContextProjectionScope{RootID: id, CaseID: id, ArtifactID: id, CaptureID: id, ClusterID: id, NamespaceUID: "ns", WorkloadUID: "workload", PodUID: "pod", Version: artifact.Digest{1}, NativeType: artifact.PCAPNGArtifact, SourceFormat: artifact.PCAPNGFormat, DisplayVersion: analysis.PacketSummaryDisplayVersion, Principal: identity.Principal{Issuer: "https://fixture.invalid", Subject: "reader", ClientID: "fixture", Kind: identity.Human}}
+	if len(rawPacket) > 0 && rawPacket[0] {
+		s.NativeType, s.SourceFormat, s.DisplayVersion = artifact.RawPCAPNGArtifact, artifact.RawPCAPNGFormat, analysis.RawPacketSummaryDisplayVersion
+	}
 	if !s.Valid() {
 		t.Fatal("invalid packet summary fixture scope")
 	}
@@ -27,9 +30,10 @@ func packetSummarySQLScope(t *testing.T) []byte {
 
 // Migration source/tool/accounting parity only; real publication and role
 // consumption are exercised separately through the shared lifecycle fixture.
-func qualifyPacketSummaryQueryFunctions(t *testing.T, ctx context.Context, conn *pgx.Conn) {
+func qualifyPacketSummaryQueryFunctions(t *testing.T, ctx context.Context, conn *pgx.Conn, rawPacket ...bool) {
 	t.Helper()
-	raw := packetSummarySQLScope(t)
+	isRaw := len(rawPacket) > 0 && rawPacket[0]
+	raw := packetSummarySQLScope(t, isRaw)
 	for _, mode := range []string{"valid", "raw", "format", "display", "digest", "line", "headers", "profile", "syscalls", "comparison", "null-selection", "missing-selection", "extra-selection"} {
 		t.Run("packet-summary-sql-"+mode, func(t *testing.T) {
 			var obj map[string]any
@@ -38,7 +42,11 @@ func qualifyPacketSummaryQueryFunctions(t *testing.T, ctx context.Context, conn 
 			}
 			switch mode {
 			case "raw":
-				obj["NativeType"] = artifact.RawPCAPNGArtifact
+				if isRaw {
+					obj["NativeType"] = artifact.PCAPNGArtifact
+				} else {
+					obj["NativeType"] = artifact.RawPCAPNGArtifact
+				}
 			case "format":
 				obj["SourceFormat"] = "wrong"
 			case "display":

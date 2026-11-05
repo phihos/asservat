@@ -59,8 +59,8 @@ func TestProjectionScopeSourcesAreClosedAndCompatible(t *testing.T) {
 	if p.Valid() {
 		t.Fatal("pod-status scope accepted a record window")
 	}
-	if _, ok := LookupProjectionSource(artifact.RawPCAPNGArtifact); ok {
-		t.Fatal("raw pcapng is not an approved projection source")
+	if _, ok := LookupProjectionSourceFor(artifact.RawPCAPNGArtifact, PacketSummaryDisplayVersion); ok {
+		t.Fatal("raw pcapng accepted metadata display")
 	}
 	w := HTTPHeaderWindow{Start: 3, Limit: 10, Binding: "0123456789abcdef0123456789abcdef"}
 	if !w.Valid() || w.Selection(pod.CaseID, pod.ArtifactID).Window() != w || !w.Selection(pod.CaseID, pod.ArtifactID).Valid() {

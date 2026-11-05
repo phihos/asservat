@@ -19,7 +19,7 @@ const bytes = (value: number) => new Intl.NumberFormat().format(value) + ' bytes
 const states: Record<Download['state'], string> = { Preparing: 'Preparing the native file', Ready: 'Ready to download', Streaming: 'Sending the file', Completed: 'Transfer recorded', Interrupted: 'Download interrupted', Cancelled: 'Download cancelled', Expired: 'Download expired', Denied: 'Download access unavailable', Failed: 'Download failed' };
 const contentNames: Record<string, string> = { userContent: 'user content', credentials: 'credentials', personalIdentifiers: 'personal identifiers', networkAddresses: 'network addresses', paths: 'paths', profileLabels: 'profile labels', unknownApplicationData: 'other application data' };
 const terminal = new Set(['Completed', 'Cancelled', 'Expired', 'Denied', 'Failed']);
-const kindName = (kind: string) => ['context', 'pod-status'].includes(kind) ? 'Pod status' : kind === 'packetCapture' ? 'Packet capture (headers only)' : kind;
+const kindName = (kind: string, dataClass?: string) => ['context', 'pod-status'].includes(kind) ? 'Pod status' : kind === 'packetCapture' ? (dataClass === 'raw' ? 'Packet capture (raw packets)' : 'Packet capture (headers only)') : kind;
 const classLine = (artifact: Artifact) => `${artifact.data_class === 'raw' ? 'Raw evidence' : artifact.data_class === 'extract' ? 'Approved extract' : 'Approved metadata'} · ${artifact.completeness}`;
 function SavedPodStatus({ session, scope, caseID, artifactID }: { session: Session; scope: AbortSignal; caseID: string; artifactID: string }) {
   // Each visible artifact owns its view. Mounting reads nothing; the existing
@@ -68,7 +68,7 @@ function SavedProfileComparison({ session, scope, caseID, artifact, profiles }: 
 }
 function SavedPacketSummary({ session, scope, caseID, artifact }: { session: Session; scope: AbortSignal; caseID: string; artifact: Artifact }) {
   const [controller] = useState(() => ContextProjection.packet());
-  return <PacketSummaryView controller={controller} session={session} scope={scope} caseID={caseID} artifactID={artifact.artifact_id} version={artifact.digest}/>;
+  return <PacketSummaryView controller={controller} session={session} scope={scope} caseID={caseID} artifactID={artifact.artifact_id} version={artifact.digest} captureMode={artifact.data_class === 'raw' ? 'rawPackets' : 'networkHeaders'}/>;
 }
 function SavedSyscallViews({ session, scope, caseID, artifact }: { session: Session; scope: AbortSignal; caseID: string; artifact: Artifact }) {
   const [controller] = useState(() => ContextProjection.syscalls());
@@ -121,18 +121,18 @@ export default function EvidenceWorkspace({ session, scope, caseID, controller =
       {state.details.case.access === 'shared' && <p>You see the evidence explicitly shared with you. A share lets you read and download it; it does not let you share it further.</p>}
       {state.details.artifacts.length === 0 && <p>No evidence is currently available in this case.</p>}
       {state.details.artifacts.map((artifact, index) => <section className="review-section" key={artifact.artifact_id} aria-labelledby={`artifact-${index}`}>
-        <h2 id={`artifact-${index}`}>{kindName(artifact.kind)}</h2>
+        <h2 id={`artifact-${index}`}>{kindName(artifact.kind, artifact.data_class)}</h2>
         <p className="field-help">{classLine(artifact)}</p>
         <Handling artifact={artifact}/>
         {Date.parse(artifact.expires_at) <= Date.now() ? <p>Evidence access has expired.</p> : <>
           {artifact.data_class === 'metadata' && ['context', 'pod-status'].includes(artifact.kind) && <SavedPodStatus session={session} scope={scope} caseID={caseID} artifactID={artifact.artifact_id}/>}
-          {artifact.kind === 'packetCapture' && artifact.native_format === 'pcapng' && artifact.data_class === 'metadata' && <SavedPacketSummary session={session} scope={scope} caseID={caseID} artifact={artifact}/>}
+          {artifact.kind === 'packetCapture' && (artifact.native_format === 'pcapng' && artifact.data_class === 'metadata' || artifact.native_format === 'pcapng-raw' && artifact.data_class === 'raw' && state.details?.case.access !== 'shared') && <SavedPacketSummary session={session} scope={scope} caseID={caseID} artifact={artifact}/>}
           {artifact.kind === 'profile' && artifact.native_format === 'pprof' && artifact.data_class === 'raw' && state.details?.case.access !== 'shared' && <><SavedProfileSummary session={session} scope={scope} caseID={caseID} artifact={artifact}/><SavedProfileComparison session={session} scope={scope} caseID={caseID} artifact={artifact} profiles={profiles}/></>}
           {artifact.kind === 'syscallTrace' && (artifact.native_format === 'asservat-syscall-events/v1' && artifact.data_class === 'metadata' || artifact.native_format === 'asservat-syscall-arguments/v1' && artifact.data_class === 'raw' && state.details?.case.access !== 'shared') && <SavedSyscallViews session={session} scope={scope} caseID={caseID} artifact={artifact}/>}
           <Button className="button" isDisabled={state.busy || pending} onPress={() => void controller.prepare(artifact)}>Download</Button>
           {state.details?.case.access !== 'shared' && <>
             <SharePanel session={session} scope={scope} caseID={caseID} artifact={artifact} preview={<>
-              <p className="selected-name">{kindName(artifact.kind)}</p><p className="field-help">{classLine(artifact)}</p>
+              <p className="selected-name">{kindName(artifact.kind, artifact.data_class)}</p><p className="field-help">{classLine(artifact)}</p>
               <Handling artifact={artifact}/>
               {artifact.data_class === 'metadata' && ['context', 'pod-status'].includes(artifact.kind) && <p>The saved pod-status details, as shown above.</p>}
             </>}/>

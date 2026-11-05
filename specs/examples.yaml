@@ -426,3 +426,10 @@ examples:
 - file: examples/mcp-packet-summary-unreported-result.json
   schema: https://asservat.io/spec/v1/mcp-result.schema.json
   tool: get_pcap_summary
+
+- file: examples/mcp-raw-packet-summary-result.json
+  schema: https://asservat.io/spec/v1/mcp-result.schema.json
+  tool: get_pcap_summary
+- file: examples/mcp-raw-packet-summary-unclassified-result.json
+  schema: https://asservat.io/spec/v1/mcp-result.schema.json
+  tool: get_pcap_summary

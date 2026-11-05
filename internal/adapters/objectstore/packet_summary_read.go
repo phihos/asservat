@@ -15,7 +15,7 @@ import (
 	"asservat.local/asservat/internal/domain/identity"
 )
 
-// ServePacketSummaries installs only the fixed regional metadata PCAPNG view.
+// ServePacketSummaries installs the closed regional metadata views of metadata and raw PCAPNG.
 func (r *ContextProjectionReader) ServePacketSummaries(summarize evidence.PacketSummarizer) {
 	if r != nil {
 		r.packets = summarize

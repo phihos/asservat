@@ -746,7 +746,7 @@ func currentRecordingGrant(ctx context.Context, q *custodydb.Queries, row custod
 	if _, _, policy := authorization.PolicyExecutor(intent.Actor); policy {
 		return currentPolicyCaptureGrant(ctx, q, row, a)
 	}
-	if a.Expectation.Profile == nil && (a.Expectation.Recording == nil || !a.Expectation.Recording.RequireApproval) {
+	if a.Expectation.Profile == nil && !policyRecordingNeedsGrant(a.Expectation.Recording) {
 		return nil
 	}
 	previewID, captureID, scopeDigest := row.PreviewID, row.ID, row.ScopeDigest

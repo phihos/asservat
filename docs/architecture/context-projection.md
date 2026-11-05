@@ -30,6 +30,23 @@ metadata/argument saved-view native fixtures. The argument Go test passed while
 its outer job was cancelled at the wall-clock limit. Exact reports, supported
 scope and remaining timing/qualification gaps are in implementation progress.
 
+## Fixed raw packet summary candidate
+
+[ADR-304](../decisions/304-transient-raw-packet-summary.md) extends the existing
+metadata packet summary to one dedicated raw-PCAPNG aggregate operation. C-03
+checks ordinary target/retained rights and extract/packetCapture client policy;
+generic raw reads and share fallback do not supply that authority. The optional
+packet-route discriminator comes from the same bounded lookup, and the later
+protected catalog must match its exact source. Old readers remain metadata-only.
+
+The original keeps raw class and `pcapng-raw` format. The query binds
+`approved-raw-pcap-summary/v1`; all saved records are counted, while raw-only
+`unclassified_packets` explicitly accounts for prefixes without usable headers.
+The regional worker and independent consumers validate the closed numeric DTO.
+The two-unit/three-key paid query creates no derivative. Current privacy,
+retention, original deadlines, audit and joined closure remain mandatory.
+Raw-input resource and installed browser/MCP/native qualification are pending.
+
 ## Profile summary candidate
 
 [ADR-291](../decisions/291-bounded-profile-summary.md) adds a closed raw-pprof

@@ -130,6 +130,7 @@ func withProtectedContextQueryLedger(t *testing.T, ctx context.Context, admin *p
 	isComparison := len(profileSource) > 1 && profileSource[1]
 	legacyTiming := len(profileSource) > 2 && profileSource[2]
 	isPacket := len(profileSource) > 3 && profileSource[3]
+	rawPacket := len(profileSource) > 4 && profileSource[4]
 	f := newCapacitySQLFixture(t, ctx, admin, address, tlsConfig, scope, claim, administration, objects, func(f *capacitySQLFixture) {
 		queryLedgerQualification(t, f)
 		if isPacket {
@@ -193,7 +194,7 @@ func withProtectedContextQueryLedger(t *testing.T, ctx context.Context, admin *p
 	for _, p := range pools[processingPools:] {
 		p.Close()
 	}
-	query.scenario, query.published = publishQueryLedgerContext(t, f, root, enrolled, isProfile, legacyTiming, isPacket)
+	query.scenario, query.published = publishQueryLedgerContext(t, f, root, enrolled, isProfile, legacyTiming, isPacket, rawPacket)
 	profile := syntheticWorkerProfile(f.input.InstallationID)
 	if isProfile || isPacket {
 		profile.MemoryBytes = value.ProfileSummaryWorkerBytes
@@ -239,8 +240,13 @@ func publishQueryLedgerContext(t *testing.T, f *capacitySQLFixture, root app.Roo
 	var started execution.APIExecution
 	var refresh func() executionapp.APIExecutionCheck
 	packetSource := len(legacyTiming) > 1 && legacyTiming[1]
+	rawPacket := len(legacyTiming) > 2 && legacyTiming[2]
 	if packetSource {
-		s, accepted, profileSQL = admitQueryLedgerPacket(t, f, root, enrollment)
+		if rawPacket {
+			s, accepted, profileSQL = admitQueryLedgerProfile(t, f, root, enrollment, true)
+		} else {
+			s, accepted, profileSQL = admitQueryLedgerPacket(t, f, root, enrollment)
+		}
 		started, refresh = startQueryLedgerProfile(t, f, s, accepted, profileSQL)
 	} else if profileSource {
 		s, accepted, profileSQL = admitQueryLedgerProfile(t, f, root, enrollment)
@@ -271,7 +277,11 @@ func publishQueryLedgerContext(t *testing.T, f *capacitySQLFixture, root app.Roo
 			// every packet/footer within the real started/completed interval.
 			time.Sleep(2 * time.Millisecond)
 			at = time.Now().UTC()
-			body.Write(syntheticFilteredRecording(t, started.StartedAt, recordingProgram, 0, syntheticRecordingTimes{Step: time.Microsecond, End: at}))
+			if rawPacket {
+				body.Write(syntheticRawPacketSummaryRecording(t, started.StartedAt, at))
+			} else {
+				body.Write(syntheticFilteredRecording(t, started.StartedAt, recordingProgram, 0, syntheticRecordingTimes{Step: time.Microsecond, End: at}))
+			}
 		} else {
 			function := &pprof.Function{ID: 1, Name: "synthetic.work"}
 			location := &pprof.Location{ID: 1, Line: []pprof.Line{{Function: function}}}
@@ -325,7 +335,11 @@ func publishQueryLedgerContext(t *testing.T, f *capacitySQLFixture, root app.Roo
 	if err != nil {
 		t.Fatal(err)
 	}
-	if packetSource {
+	if rawPacket {
+		verifier.WithStreamCheck(artifact.RawPCAPNGArtifact, func(artifact.ContextExpectation) objectstore.StreamCheck {
+			return packets.NewRawCheck(packets.RawLimits{Snaplen: 96, TCP: manualRawTCPCap})
+		})
+	} else if packetSource {
 		verifier.WithStreamCheck(artifact.PCAPNGArtifact, func(artifact.ContextExpectation) objectstore.StreamCheck { return packets.NewHeadersCheck() })
 	} else if profileSource {
 		verifier.WithStreamCheck(artifact.PprofArtifact, func(artifact.ContextExpectation) objectstore.StreamCheck { return diagnostics.NewPprofCheck() })

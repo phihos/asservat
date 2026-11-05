@@ -616,6 +616,9 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 					if installedJourneyFocus() == "manual-mixed" {
 						summaryCheck = installedPacketSummarySQLCheck(t, ctx, admin, api, p.RootID)
 					}
+					if installedJourneyFocus() == "manual-raw" {
+						summaryCheck = installedPacketSummarySQLCheck(t, ctx, admin, api, p.RootID, "rawPackets")
+					}
 					qualifyInstalledApprovedRecording(t, ctx, identity, publicRoot, publicAddress, origin, cluster, namespace, workload, f.Clusters[1].Config, diagnose, measurement, func(captureID string) { installedHistoryStorageDiagnostics(t, ctx, admin, p.RootID, captureID) }, func(previewID string) { installedInitialStorageDiagnostics(t, ctx, admin, p.RootID, previewID) }, summaryCheck, installedArgumentsSQLSource(t, ctx, admin, p.RootID), installedStoppedDownloadSQLCheck(t, ctx, admin, kc, p.RootID, original.Plan.ClusterID), profileChecks...)
 				}
 			})

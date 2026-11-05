@@ -252,9 +252,9 @@ profile-service-preflight:
 	$(PYTHON) scripts/test-custody.py --fleet --run '^TestProfileComparisonQueryLedgerWithRealPostgres$$' --result-name profile-comparison-service-preflight
 	$(PYTHON) scripts/test-custody.py --fleet --run '^(TestCustodyProfileWriteOnlyWithRealServices|TestProfileSummaryQueryLedgerWithRealPostgres|TestCustodyUpgradeSchemaWithRealPostgres)$$' --result-name profile-service-preflight
 
-# Saved metadata packets: local parser, authority, wire and UI-admission checks.
+# Saved packet summaries: local parser, authority, wire and UI-admission checks.
 # No external services, collector, acquisition or installed qualification.
 .PHONY: packet-summary-preflight
 packet-summary-preflight:
-	TMPDIR="$(ASSERVAT_BUILD_TMP)" go test -race -count=1 -timeout=3m -run '^(TestPacketSummary|TestContextQueryAuditNamesFormatsAndEffects)' ./internal/domain/analysis ./internal/domain/audit ./internal/application/analysis ./internal/application/authorization ./internal/application/evidence ./internal/adapters/packets ./internal/adapters/objectstore ./internal/adapters/postgres ./internal/contracts ./internal/transport/native ./internal/transport/presentation ./internal/bootstrap
+	TMPDIR="$(ASSERVAT_BUILD_TMP)" go test -race -count=1 -timeout=3m -run '^(TestRawPacket|TestPacketSummary|TestPacketProjection|TestSavedPacketMigration|TestProjectionSource|TestProjectionScope|TestProjectionResult|TestProfileSummarySource|TestContextQueryAuditNamesFormatsAndEffects)' ./internal/domain/analysis ./internal/domain/audit ./internal/application/analysis ./internal/application/authorization ./internal/application/evidence ./internal/adapters/packets ./internal/adapters/objectstore ./internal/adapters/postgres ./internal/contracts ./internal/transport/native ./internal/transport/presentation ./internal/bootstrap
 	TMPDIR="$(ASSERVAT_BUILD_TMP)" go test -race -count=1 -timeout=3m -run '^TestInstalledPacketSummary' ./test/integration

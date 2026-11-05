@@ -1,8 +1,12 @@
 package integration
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"github.com/gopacket/gopacket"
+	"github.com/gopacket/gopacket/layers"
+	"github.com/gopacket/gopacket/pcapgo"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -65,25 +69,29 @@ func TestInstalledPacketSummaryNativeParity(t *testing.T) {
 }
 
 func TestInstalledPacketSummaryOriginalQueryFunding(t *testing.T) {
-	t.Setenv("ASSERVAT_JOURNEY_FOCUS", "manual-mixed")
-	t.Setenv("ASSERVAT_PROFILE_VARIANT", "")
-	t.Setenv("ASSERVAT_PROFILE_TRANSPORT", "")
-	t.Setenv("ASSERVAT_PROFILE_AUTH", "")
-	p := *nativeCapacityProfile()
-	q, source := installedProfileComparisonCapacityFixture(t, p)
-	const queries = 2 // one ordinary MCP query and one independent console query.
-	needed := int64(queries * query.PacketSummaryQueryUnits)
-	if p.Records != 8 || q.ContextQuery.WorkloadQueries < needed || q.ContextQuery.PrincipalQueries < query.PacketSummaryQueryUnits || q.ContextQuery.RootQueries < needed {
-		t.Fatal("original manual-mixed query reservation cannot fund both clients")
+	for _, focus := range []string{"manual-mixed", "manual-raw"} {
+		t.Run(focus, func(t *testing.T) {
+			t.Setenv("ASSERVAT_JOURNEY_FOCUS", focus)
+			t.Setenv("ASSERVAT_PROFILE_VARIANT", "")
+			t.Setenv("ASSERVAT_PROFILE_TRANSPORT", "")
+			t.Setenv("ASSERVAT_PROFILE_AUTH", "")
+			p := *nativeCapacityProfile()
+			q, source := installedProfileComparisonCapacityFixture(t, p)
+			const queries = 2 // one ordinary MCP query and one independent console query.
+			needed := int64(queries * query.PacketSummaryQueryUnits)
+			if p.Records != 8 || q.ContextQuery.WorkloadQueries < needed || q.ContextQuery.PrincipalQueries < needed || q.ContextQuery.RootQueries < needed {
+				t.Fatal("original manual-mixed query reservation cannot fund both clients")
+			}
+			pool, err := capacity.CompileProtectedPoolPlan(source, "capacity")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err = capacity.CompileQualifiedRootBacking(q, pool); err != nil {
+				t.Fatal("original manual-mixed combined backing", err)
+			}
+			t.Logf("%s retains original8record reservation: two independent2unit reads=%d<=workload%d; exact shared-account charge checked in installedSQL, no capture/query/pool ceiling increase", focus, needed, q.ContextQuery.WorkloadQueries)
+		})
 	}
-	pool, err := capacity.CompileProtectedPoolPlan(source, "capacity")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err = capacity.CompileQualifiedRootBacking(q, pool); err != nil {
-		t.Fatal("original manual-mixed combined backing", err)
-	}
-	t.Logf("manual-mixed retains original8record reservation: two independent2unit reads=%d<=workload%d; each principal charged2, no capture/query/pool ceiling increase", needed, q.ContextQuery.WorkloadQueries)
 }
 
 // C18 stamps each current response observation separately. The paid query
@@ -146,5 +154,48 @@ func TestInstalledPacketSummaryResponseObservationAdvances(t *testing.T) {
 	})
 	if !result.Valid() || calls != 3 || verified != 1 {
 		t.Fatal("pending/current ready sequence did not join exactly once", calls, verified)
+	}
+}
+
+func TestInstalledPacketSummaryRawPrefixParity(t *testing.T) {
+	now := time.Now().UTC()
+	original := syntheticRawPacketSummaryRecording(t, now, now.Add(time.Second))
+	reader, err := pcapgo.NewNgReader(bytes.NewReader(original), pcapgo.NgReaderOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	frame, _, err := reader.ReadPacketData()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var native bytes.Buffer
+	writer, err := pcapgo.NewNgWriterInterface(&native, pcapgo.NgInterface{LinkType: layers.LinkTypeEthernet, SnapLength: manualRawTCPCap, TimestampResolution: 9}, pcapgo.DefaultNgWriterOptions)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, data := range [][]byte{frame, frame[:1], frame[:37]} {
+		if err = writer.WritePacket(gopacket.CaptureInfo{Timestamp: now, CaptureLength: len(data), Length: len(frame)}, data); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err = writer.WriteInterfaceStats(0, pcapgo.NgInterfaceStatistics{LastUpdate: now.Add(time.Second), PacketsReceived: 3, PacketsDropped: 0}); err != nil {
+		t.Fatal(err)
+	}
+	if err = writer.Flush(); err != nil {
+		t.Fatal(err)
+	}
+	drops, unclassified := int64(0), int64(2)
+	summary := query.PacketSummary{CaptureMode: "rawPackets", Packets: 3, Drops: &drops, DropReporting: "captureExclusions", UnclassifiedPackets: &unclassified, Conversations: []query.PacketConversation{{Source: "10.0.0.1:40000", Destination: "10.0.0.2:80", Protocol: "TCP", Packets: 1}}, ConversationsTotal: 1}
+	fields := strings.Join([]string{"1", "10.0.0.1", "", "10.0.0.2", "", "40000", "80", "", "", "6", "", strconv.Itoa(len(frame)), "20", "20"}, "\t") + "\n" +
+		strings.Join([]string{"2", "", "", "", "", "", "", "", "", "", "", "1", "", ""}, "\t") + "\n" +
+		strings.Join([]string{"3", "10.0.0.1", "", "10.0.0.2", "", "40000", "", "", "", "6", "", "37", "20", ""}, "\t") + "\n"
+	if err = installedPacketSummaryMatchesNative(summary, native.Bytes(), fields); err != nil {
+		t.Fatal("legitimate raw prefixes must remain counted/explicitly unclassified", err)
+	}
+	bad := query.ClonePacketSummary(summary)
+	*bad.UnclassifiedPackets = 1
+	bad.Conversations[0].Packets = 2
+	if installedPacketSummaryMatchesNative(bad, native.Bytes(), fields) == nil {
+		t.Fatal("incomplete header guessed a second tuple")
 	}
 }

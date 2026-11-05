@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"encoding/json"
 	"net"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -22,6 +24,10 @@ import (
 
 func packetEncryptedFixture(t *testing.T, dir, mode string, sealers ...evidence.KeySealer) profileEncryptedFixture {
 	t.Helper()
+	return packetEncryptedFixtureSource(t, dir, mode, false, sealers...)
+}
+func packetEncryptedFixtureSource(t *testing.T, dir, mode string, raw bool, sealers ...evidence.KeySealer) profileEncryptedFixture {
+	t.Helper()
 	unused, e, _ := writerFixture(t, http.NotFoundHandler())
 	unused.Close()
 	e.NativeType, e.DataClass, e.ActionID = artifact.PCAPNGArtifact, "metadata", "a0123456789abcdef01234567"
@@ -31,8 +37,13 @@ func packetEncryptedFixture(t *testing.T, dir, mode string, sealers ...evidence.
 	e.Registration.ExpiresAt = e.Registration.AnchorAt.Add(time.Hour)
 	e.Registration.DeleteBy = e.Registration.ExpiresAt.Add(time.Minute)
 	e.Recording = &artifact.Recording{Kind: "packetCapture", Profile: "networkHeaders", Composition: []byte("{}"), DurationMillis: 1000, MaxBytes: artifact.RecordingNativeLimit, Snaplen: artifact.RecordingSnaplen}
+	if raw {
+		e.NativeType, e.DataClass = artifact.RawPCAPNGArtifact, "raw"
+		e.Recording.Profile = "rawPackets"
+		e.Recording.Snaplen = 1500
+	}
 	var native bytes.Buffer
-	w, err := pcapgo.NewNgWriterInterface(&native, pcapgo.NgInterface{LinkType: layers.LinkTypeEthernet, SnapLength: artifact.RecordingSnaplen, TimestampResolution: 9}, pcapgo.DefaultNgWriterOptions)
+	w, err := pcapgo.NewNgWriterInterface(&native, pcapgo.NgInterface{LinkType: layers.LinkTypeEthernet, SnapLength: uint32(e.Recording.Snaplen), TimestampResolution: 9}, pcapgo.DefaultNgWriterOptions)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -40,11 +51,15 @@ func packetEncryptedFixture(t *testing.T, dir, mode string, sealers ...evidence.
 	tcp := &layers.TCP{SrcPort: 42000, DstPort: 443, DataOffset: 5}
 	_ = tcp.SetNetworkLayerForChecksum(ip)
 	buf := gopacket.NewSerializeBuffer()
-	if err = gopacket.SerializeLayers(buf, gopacket.SerializeOptions{FixLengths: true, ComputeChecksums: true}, &layers.Ethernet{SrcMAC: net.HardwareAddr{0, 1, 2, 3, 4, 5}, DstMAC: net.HardwareAddr{0, 1, 2, 3, 4, 6}, EthernetType: layers.EthernetTypeIPv4}, ip, tcp); err != nil {
+	if err = gopacket.SerializeLayers(buf, gopacket.SerializeOptions{FixLengths: true, ComputeChecksums: true}, &layers.Ethernet{SrcMAC: net.HardwareAddr{0, 1, 2, 3, 4, 5}, DstMAC: net.HardwareAddr{0, 1, 2, 3, 4, 6}, EthernetType: layers.EthernetTypeIPv4}, ip, tcp, gopacket.Payload("SYNTHETIC-RAW-PRIVATE-PAYLOAD")); err != nil {
 		t.Fatal(err)
 	}
 	data := buf.Bytes()[:54] // Ethernet padding is not part of the header-only native profile.
-	for range 3 {
+	frames := [][]byte{data, data, data}
+	if raw {
+		frames = [][]byte{buf.Bytes(), buf.Bytes()[:1], buf.Bytes()[:37]}
+	}
+	for _, data := range frames {
 		if err = w.WritePacket(gopacket.CaptureInfo{Timestamp: e.TriggeredAt, CaptureLength: len(data), Length: 1500}, data); err != nil {
 			t.Fatal(err)
 		}
@@ -69,6 +84,9 @@ func packetEncryptedFixture(t *testing.T, dir, mode string, sealers ...evidence.
 		binary.LittleEndian.PutUint32(b[24:], 28)
 		native.Write(b)
 	}
+	if raw && mode == "over-cap" {
+		e.Recording.ProtocolSnaplen = &artifact.RecordingProtocolSnaplen{TCP: 32}
+	}
 	if err = e.Validate(); err != nil {
 		t.Fatal(err)
 	}
@@ -78,6 +96,9 @@ func packetEncryptedFixture(t *testing.T, dir, mode string, sealers ...evidence.
 	s.CaseID, s.CaptureID, s.ArtifactID, s.ClusterID = e.CaseID, e.CaptureUID, e.Registration.Location.ArtifactID, e.Registration.Location.ClusterID
 	s.NamespaceUID, s.WorkloadUID, s.PodUID = e.NamespaceUID, e.WorkloadUID, e.PodUID
 	s.Version, s.NativeType, s.SourceFormat, s.DisplayVersion = evidence.ContextCopiesDigest(copies), e.NativeType, e.Type().Format, query.PacketSummaryDisplayVersion
+	if raw {
+		s.DisplayVersion = query.RawPacketSummaryDisplayVersion
+	}
 	s.Selection, s.SourceProjectionDigest = query.LineSelection{}, artifact.Digest{}
 	if !s.Valid() || !f.Source.Valid(s.Version) {
 		t.Fatal("invalid encrypted packet fixture")
@@ -88,10 +109,12 @@ func packetEncryptedFixture(t *testing.T, dir, mode string, sealers ...evidence.
 // Actual encrypted frame/manifest/index/commit, TLS range store and all three
 // synthetic key-role unwraps compose the new adapter, not just the low-level parser.
 func TestPacketSummaryEncryptedCompleteReadAndAuthenticationFailures(t *testing.T) {
-	for _, mode := range []string{"complete", "unknown-stats", "malformed-tail", "bad-stats", "whole-hash", "ciphertext", "cancel", "unconfigured"} {
+	for _, mode := range []string{"complete", "unknown-stats", "malformed-tail", "bad-stats", "whole-hash", "ciphertext", "cancel", "unconfigured", "raw-complete", "raw-unknown-stats", "raw-malformed-tail", "raw-bad-stats", "raw-whole-hash", "raw-ciphertext", "raw-cancel", "raw-unconfigured", "raw-over-cap"} {
 		t.Run(mode, func(t *testing.T) {
+			rawSource := strings.HasPrefix(mode, "raw-")
+			mode := strings.TrimPrefix(mode, "raw-")
 			dir := t.TempDir()
-			f := packetEncryptedFixture(t, dir, mode)
+			f := packetEncryptedFixtureSource(t, dir, mode, rawSource)
 			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 			defer cancel()
 			verifier, keys, entered, unblock := profileEncryptedVerifier(t, dir, f, mode == "cancel")
@@ -144,6 +167,16 @@ func TestPacketSummaryEncryptedCompleteReadAndAuthenticationFailures(t *testing.
 					s := got.result.PacketSummary
 					if s.Packets != 3 || len(s.Conversations) != 1 || s.Conversations[0].Source != "192.0.2.1:42000" {
 						t.Fatal("wrong authenticated aggregate")
+					}
+					if rawSource && (s.CaptureMode != "rawPackets" || s.UnclassifiedPackets == nil || *s.UnclassifiedPackets != 2 || s.Conversations[0].Packets != 1) {
+						t.Fatal("raw counts not source-bound", s.Packets)
+					}
+					if !rawSource && s.UnclassifiedPackets != nil {
+						t.Fatal("legacy metadata gained raw field")
+					}
+					encoded, _ := json.Marshal(s)
+					if bytes.Contains(encoded, []byte("SYNTHETIC-RAW-PRIVATE-PAYLOAD")) {
+						t.Fatal("payload escaped")
 					}
 					if mode == "complete" && (s.Drops == nil || *s.Drops != 2) || mode == "unknown-stats" && s.Drops != nil {
 						t.Fatal("counter provenance changed")

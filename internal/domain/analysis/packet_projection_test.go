@@ -31,7 +31,7 @@ func TestPacketSummaryClosedPublishedSource(t *testing.T) {
 			t.Fatal("invalid packet source size accepted", n)
 		}
 	}
-	if _, ok := LookupProjectionSource(artifact.RawPCAPNGArtifact); ok || src.Matches(artifact.PCAPNGArtifact, artifact.PCAPNGFormat, "raw", "packetCapture", 1, artifact.Digest{}) {
+	if src.Matches(artifact.PCAPNGArtifact, artifact.PCAPNGFormat, "raw", "packetCapture", 1, artifact.Digest{}) {
 		t.Fatal("raw packet source became approved metadata query")
 	}
 	for _, change := range []func(*ContextProjectionScope){func(s *ContextProjectionScope) { s.Selection = LineSelection{1, 1} }, func(s *ContextProjectionScope) { s.Headers = HTTPHeaderWindow{Limit: 1} }, func(s *ContextProjectionScope) { s.Profile = ProfileSummarySelection{SampleType: "cpu", TopN: 20} }, func(s *ContextProjectionScope) { s.NativeType = artifact.RawPCAPNGArtifact }, func(s *ContextProjectionScope) { s.SourceProjectionDigest = artifact.Digest{1} }, func(s *ContextProjectionScope) { s.DisplayVersion = ProfileSummaryDisplayVersion }} {

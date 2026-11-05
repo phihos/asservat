@@ -35,6 +35,9 @@ func (s ProjectionSource) ReadOperation() authorization.Operation {
 	if !ok || known != s {
 		return ""
 	}
+	if s.NativeType == artifact.RawPCAPNGArtifact {
+		return authorization.ReadPacketSummary
+	}
 	if s.NativeType == artifact.PprofArtifact {
 		return authorization.ReadProfileSummary
 	}
@@ -49,7 +52,7 @@ func (s ProjectionSource) OutputClass() string {
 	if s.ReadOperation() == "" {
 		return ""
 	}
-	if s.NativeType == artifact.PCAPNGArtifact || s.NativeType == artifact.PprofArtifact || s.NativeType == artifact.SyscallRecordsArtifact || s.NativeType == artifact.SyscallArgumentsArtifact {
+	if s.NativeType == artifact.PCAPNGArtifact || s.NativeType == artifact.RawPCAPNGArtifact || s.NativeType == artifact.PprofArtifact || s.NativeType == artifact.SyscallRecordsArtifact || s.NativeType == artifact.SyscallArgumentsArtifact {
 		return "extract"
 	}
 	return s.DataClass

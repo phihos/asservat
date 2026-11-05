@@ -1,5 +1,48 @@
 # Sustained implementation progress
 
+## Raw-source fixed packet summary candidate (2026-11-05)
+
+PR165's metadata workflow and PR166's evidence/status closure are merged.
+[ADR-304](decisions/304-transient-raw-packet-summary.md) is the next S-05 workflow:
+ordinary approved numeric inspection of an existing raw PCAPNG, using the
+accepted Go worker and separate raw display definition. The original stays raw;
+raw query/download grants remain independent. Tiny stored prefixes count as
+unclassified saved records rather than guessed endpoints. No derivative or
+additional human approval is introduced. Source/authority/SQL/worker/public
+composition, built React and named raw-input resource checks pass locally.
+[Local originals](../test/results/raw-packet-summary-local/README.md),
+[service evidence](../test/results/raw-packet-summary-services-local/README.md) and
+[resource evidence](../test/results/raw-packet-summary-resource-local/README.md)
+retain exact source scopes and failures. Installed qualification remains pending;
+no complete S-05 exit is claimed.
+
+Service source `749a87a9` passed the compiled raw lifecycle (11.020s, three tests)
+and a separate pristine schema138 upgrade campaign (7.298s, 349 tests). Both
+matched all 4,152 reported source hashes to Git, kept sources unchanged and
+completed cleanup. The lifecycle covers reviewed finite raw acquisition, prepaid
+observation and passive replay, encrypted publication, the fixed query, three
+one-use key roles, native/public batch closure, unchanged acquisition grants
+during inspection and retained-history downgrade refusal. Job/Pod/issuer/join
+inputs remain synthetic.
+
+The runs exposed and corrected admission and runtime checks that incorrectly
+tied sensitive recording approval to the separate require-all setting. Existing
+canonical approval and current grant locks now apply independently of that
+switch. A live executor read followed by explicit grant revocation and an
+approval-stage refusal passes with the switch off. Earlier finite-mode and
+observation-port fixture errors, and an assertion that rejected the correct
+`approval/client` denial, remain recorded as failed runs.
+
+Integrated pre-push passed with 497 console tests; affected race checks and the
+full built-console browser gate passed, including metadata/raw packet views
+(94.863s). Five fresh resource containers passed at an observed 256 MiB limit,
+zero swap and 500m CPU quota. Three exact 8 MiB shapes cover payload records,
+16,384 aggregates and 232,944 unclassified one-byte prefixes. Cancellation and
+source-error cases return no summary and join. The measured dependency set is
+identical between `9dc90018` and `749a87a9`. Short CPU samples do not qualify
+sustained 500m operation or every installed maximum. Installed MCP/React and
+same-original native/tshark qualification remain next.
+
 ## Saved packet summaries merged and installed-qualified (2026-11-05)
 
 PR165 merged as `8bea063222b873283d210264e88d286efa0a2a86` after required

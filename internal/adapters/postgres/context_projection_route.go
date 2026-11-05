@@ -13,9 +13,10 @@ import (
 )
 
 var (
-	_ analysisapp.ContextProjectionRoutes      = (*ContextCaseReads)(nil)
-	_ analysisapp.ContextProjectionRouteReader = (*ContextCaseReads)(nil)
-	_ analysisapp.SyscallProjectionRouteReader = (*ContextCaseReads)(nil)
+	_ analysisapp.ContextProjectionRoutes            = (*ContextCaseReads)(nil)
+	_ analysisapp.ContextProjectionRouteReader       = (*ContextCaseReads)(nil)
+	_ analysisapp.SyscallProjectionRouteReader       = (*ContextCaseReads)(nil)
+	_ analysisapp.ContextPacketProjectionRouteReader = (*ContextCaseReads)(nil)
 )
 
 // ResolveContextProjection uses only the bounded private case locator. It does
@@ -39,17 +40,24 @@ func (s *ContextCaseReads) ResolveContextProjection(ctx context.Context, selecti
 // ResolveProjectionRoute returns the routing facts of one case artifact
 // without a source or selection (ADR-282 reuses it for httpHeaders reads).
 func (s *ContextCaseReads) ResolveProjectionRoute(ctx context.Context, caseID, artifactID string, caller identity.Identity, recovery artifact.RecoveryProof) (analysis.ContextProjectionCandidate, error) {
-	return s.resolveProjectionRoute(ctx, caseID, artifactID, caller, recovery, false)
+	return s.resolveProjectionRoute(ctx, caseID, artifactID, caller, recovery, "")
 }
 
 // ResolveSyscallProjectionRoute selects a closed native discriminator from the
 // same bounded private locator read. The observation is never read authority;
 // C-03 independently resolves current rights and protected published facts.
 func (s *ContextCaseReads) ResolveSyscallProjectionRoute(ctx context.Context, caseID, artifactID string, caller identity.Identity, recovery artifact.RecoveryProof) (analysis.ContextProjectionCandidate, error) {
-	return s.resolveProjectionRoute(ctx, caseID, artifactID, caller, recovery, true)
+	return s.resolveProjectionRoute(ctx, caseID, artifactID, caller, recovery, "syscalls")
 }
 
-func (s *ContextCaseReads) resolveProjectionRoute(ctx context.Context, caseID, artifactID string, caller identity.Identity, recovery artifact.RecoveryProof, syscalls bool) (analysis.ContextProjectionCandidate, error) {
+// ResolvePacketProjectionRoute reads the same bounded locator once, exposing
+// only the closed native discriminator. Current protected publication facts
+// and ordinary authority are checked independently by C-03.
+func (s *ContextCaseReads) ResolvePacketProjectionRoute(ctx context.Context, caseID, artifactID string, caller identity.Identity, recovery artifact.RecoveryProof) (analysis.ContextProjectionCandidate, error) {
+	return s.resolveProjectionRoute(ctx, caseID, artifactID, caller, recovery, "packets")
+}
+
+func (s *ContextCaseReads) resolveProjectionRoute(ctx context.Context, caseID, artifactID string, caller identity.Identity, recovery artifact.RecoveryProof, family string) (analysis.ContextProjectionCandidate, error) {
 	var out analysis.ContextProjectionCandidate
 	if s == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(caseID) || !authorization.UUID(artifactID) {
 		return out, analysis.ErrUnavailable
@@ -72,8 +80,13 @@ func (s *ContextCaseReads) resolveProjectionRoute(ctx context.Context, caseID, a
 			ClusterID: route.Target.ClusterID, NamespaceUID: route.Target.NamespaceUID,
 			WorkloadUID: route.Target.WorkloadUID, PodUID: route.Target.PodUID, Principal: caller.Principal,
 		}
-		if syscalls {
+		if family == "syscalls" {
 			if route.NativeType != artifact.SyscallRecordsArtifact && route.NativeType != artifact.SyscallArgumentsArtifact {
+				return analysis.ContextProjectionCandidate{}, analysis.ErrUnavailable
+			}
+			out.NativeType = route.NativeType
+		} else if family == "packets" {
+			if route.NativeType != artifact.PCAPNGArtifact && route.NativeType != artifact.RawPCAPNGArtifact {
 				return analysis.ContextProjectionCandidate{}, analysis.ErrUnavailable
 			}
 			out.NativeType = route.NativeType

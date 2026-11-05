@@ -52,7 +52,7 @@ func TestPacketProjectionPublishedSourcePinsMetadataAndBound(t *testing.T) {
 		badR.NativeType = artifact.RawPCAPNGArtifact
 		badR.SourceFormat = artifact.RawPCAPNGFormat
 		if scopeSource(s, badE) || projectionSource(badR) {
-			t.Fatal("raw packets accepted")
+			t.Fatal("raw packets reclassified metadata")
 		}
 	}
 }
