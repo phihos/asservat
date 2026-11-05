@@ -1,5 +1,24 @@
 # Sustained implementation progress
 
+## Saved-packet queries merged with complete installed parity (2026-11-05)
+
+PR169 merged normally as `b47507a1`; fresh main and installed-tested `b3049371`
+share exact tree `4371f05135ec660a50794cbd5146003bb41fdc46`. All15 CI jobs
+passed. The full native42023214158 workflow passed within20 minutes, with
+Go/harness0, four tests/769.146s,4,258 exact Git source hashes, unchanged inputs,
+removed scratch and cleanup[]. Both fixed summaries and MCP/actual React packet
+queries match the same authenticated PCAPNG/tshark original. SQL grant/query/
+key accounting, exact keyed replay and original worker joins/retirement pass.
+[Qualified originals and merge readback](../test/results/saved-packet-query-native-42023214158/README.md)
+retain the9,400-byte native file, independent source/hash checks and precise
+scope. The earlier SQL/replay failures and outer-cancelled inner pass remain.
+
+This closes the named bounded saved-packet query workflow, not all filters,
+installed maximum shapes, second-cluster/replay matrices or sustained operation.
+The earlier audit-profile refusal is not retroactively explained. Continue
+saved syscall raw-query installed composition and remaining S-05 work; the
+full specification goal is active and no release is authorized.
+
 ## Packet native parity passes; outer job exceeds its limit (2026-11-05)
 
 Candidate `01c68fef` passed all 15 CI jobs. Native42019184868 completed all

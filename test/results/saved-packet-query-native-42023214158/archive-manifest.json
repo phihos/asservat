@@ -1,0 +1,95 @@
+{
+  "format": "installed-packet-query-qualified-originals/v1",
+  "source_commit": "b30493710e26c4f058cffcd665baf4c5bdb8501b",
+  "merge_commit": "b47507a1ae4f5361ec7f4fb96cf1ba25ef108f04",
+  "members": [
+    {
+      "member": "ci-native-continuation-manual-raw.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-native-42023214158/artifacts/native-continuation-manual-raw-1/ci-native-continuation-manual-raw.log",
+      "original_bytes": 3329,
+      "original_sha256": "7886b598f669174bb7427bc3602fc973595fa591f12087236470ed666d30b45a",
+      "gzip_bytes": 1213,
+      "gzip_sha256": "c797b0e92a6e5cd86ca0750b6c9affb82f6185c7643cfe4d112769d0d8777b65"
+    },
+    {
+      "member": "context-storage-environment.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-native-42023214158/artifacts/native-continuation-manual-raw-1/context-storage-environment.json",
+      "original_bytes": 550249,
+      "original_sha256": "c9694afda163dfdc2c370822ba3312fcb66113c8fffff76215ed3d8a5cf5a2d4",
+      "gzip_bytes": 206738,
+      "gzip_sha256": "f04ca713b0bdc4a9270f97359dcf0026fce4fc5a2159601335ca9eb2c8ff665f"
+    },
+    {
+      "member": "context-storage-timing.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-native-42023214158/artifacts/native-continuation-manual-raw-1/context-storage-timing.log",
+      "original_bytes": 19706,
+      "original_sha256": "cf093bb10ed23aba2273acf273d155477032fe9231f78c3ddd47f379fa94c66d",
+      "gzip_bytes": 4211,
+      "gzip_sha256": "0c047e9f93adac7b57ed9d3841b1f2e6cdc3955b3f7f04e5f87f2f8f9e6cf7e2"
+    },
+    {
+      "member": "context-storage.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-native-42023214158/artifacts/native-continuation-manual-raw-1/context-storage.log",
+      "original_bytes": 18428,
+      "original_sha256": "9c06c5753ac2641fa3c7c2719f34c751eb50ef7cd75ab008865740d6c91044e6",
+      "gzip_bytes": 3961,
+      "gzip_sha256": "5045cc8e74cbbb77b0cf8fb755995ae5baf92ac716b3fac20fff14b778e30fd7"
+    },
+    {
+      "member": "manual-raw.pcapng.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-native-42023214158/artifacts/native-continuation-manual-raw-1/manual-raw.pcapng",
+      "original_bytes": 9400,
+      "original_sha256": "98e88162b4872d5679f7e15b685e6b85d3c738d2201bb94af9f5b7eb7629b9b0",
+      "gzip_bytes": 1783,
+      "gzip_sha256": "4c6bec6184c390ee08d4fca312a3f3f10614f1e08c91636b61262feeebd8a515"
+    },
+    {
+      "member": "merge-readback.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-native-42023214158/merge-readback.json",
+      "original_bytes": 174,
+      "original_sha256": "dac767e8062a6b1d10fe44585ad5f7989459c11b91497bf0a2ce3cb27f3ed24b",
+      "gzip_bytes": 161,
+      "gzip_sha256": "f124040f925c8a9abb88eb2b9c834f8909c25ecc5fb97e3f174a304ee3446ab0"
+    },
+    {
+      "member": "source-and-originals-audit.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-native-42023214158/source-and-originals-audit.json",
+      "original_bytes": 828,
+      "original_sha256": "3f2390ad84b8c56aaa75c07848ac0c39c9f9edf3d464da7e1da67432c9a6ef33",
+      "gzip_bytes": 436,
+      "gzip_sha256": "249fad7e4512c773dcd2773ebd53624d2172c2e7d10884116ee18f9f20fb76e6"
+    },
+    {
+      "member": "saved-packet-query-native-42023214158-artifacts.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-native-42023214158-artifacts.json",
+      "original_bytes": 744,
+      "original_sha256": "2f35b09ccf5ec58cde49d6a29f82f256e026fdd1201977239d4b6a0ab2a0dc8b",
+      "gzip_bytes": 449,
+      "gzip_sha256": "bf02c24017b11295e12b5f54283aca886839bac12fa4661a3c29e07910a735ec"
+    },
+    {
+      "member": "saved-packet-query-native-42023214158-terminal.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-native-42023214158-terminal.json",
+      "original_bytes": 4842,
+      "original_sha256": "655fee3df89569c3d44c328d3cdb0e70556da29b98f9d7e71f05e17d566b8083",
+      "gzip_bytes": 856,
+      "gzip_sha256": "e5cfac0e7ca82f81b50abb43c7b38fb920fd2077dd9aaf649b7568059da9e3c2"
+    },
+    {
+      "member": "saved-packet-query-ci42023126623-terminal.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-ci42023126623-terminal.json",
+      "original_bytes": 22654,
+      "original_sha256": "627564e4eefb2b206b43a92ea3da625c64a551e38b32e148752d9933b54eaa50",
+      "gzip_bytes": 1882,
+      "gzip_sha256": "e6f3e4f6136f5b913c81d17d85a34b3bc337cba957170aee56d01026b0c68a25"
+    },
+    {
+      "member": "tree-readback.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query-native-42023214158/tree-readback.json",
+      "original_bytes": 207,
+      "original_sha256": "c5929641e62bc0445c7c135b1d0b704544dbe77ad23fec8157479f1cf5ebd368",
+      "gzip_bytes": 176,
+      "gzip_sha256": "419f469da7e1f7bb09cdf27457bec9445a7f19c9314b8be2f6f6daaf4ffa9484"
+    }
+  ]
+}
