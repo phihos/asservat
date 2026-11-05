@@ -63,10 +63,19 @@ cleanup[] are preserved. The correction joins the acknowledged verification
 digest in child-reader, group and key-current checks without new privileges.
 Targeted races and pinned generation pass; fresh service qualification remains.
 
-Composition is still being implemented. No real-service logs lifecycle,
-maximum-shape installed worker result, built React logs journey or installed
-logs/native/history/Repeat qualification is claimed. Full S-05 and the complete
-specification goal remain active.
+Scalar logs lifecycle on signed `f8c8eb5c` now passes actual Go0/13.320s,
+9run/9pass, unchanged4,300 Git inputs and cleanup[]. The real-role ledger
+exercises20-unit/two-batch funding, paid24KiB/one-operation reads, six consumed
+key roles, closure and actual C-18 same-key replay/negative controls. Synthetic
+worker/issuer/transport/crypto proof inputs retain their documented boundary.
+The first mixed campaign fails before group admission because its second fixture
+initializer attempts to replace a live accepted retention-source epoch; all4,300
+inputs match and cleanup completes. The fixture-only correction reuses original
+accepted sources/publisher with fresh request facts, preserving production checks.
+
+Mixed real-service qualification and the installed logs/browser/native/history/
+Repeat journey remain pending, as does installed maximum-shape worker evidence.
+Full S-05 and the complete specification goal remain active.
 
 ## Saved syscall queries merged with complete installed test evidence (2026-11-05)
 

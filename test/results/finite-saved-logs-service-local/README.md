@@ -1,4 +1,4 @@
-# Finite logs: first real-service failure
+# Finite logs: real-service qualification history
 
 The scalar logs lifecycle on signed `4d5d450f` fails at capture admission,
 before query admission. The actual Go test exits1 in6.730s; the harness exits1,
@@ -24,3 +24,16 @@ match Git. The concrete PostgreSQL42703 refers to nonexistent `l.version` on
 the routing-only context_case_locator. Current reader/group/key-helper SQL must
 join the acknowledged context_verification.copies_digest instead. These results
 do not establish a successful query or later correction.
+
+The next scalar run on signed `f8c8eb5c` PASSES in13.320s (9run/9pass),
+with unchanged source, cleanup[] and all4,300 inputs independently matching Git.
+It exercises configured20-unit query funding, two paid24KiB/one-operation read
+batches, six consumed key roles, exact closure and the actual C-18 same-key replay
+and negative controls. Worker/Pod/issuer/transport/crypto proof inputs remain
+synthetic where the fixture declares them; this is not installed qualification.
+
+The first mixed-group run on that same source FAILS in7.696s before group
+admission: a second fixture initializer attempts a new retention-source epoch
+while the accepted source lease is still live. All4,300 inputs match and cleanup
+is complete. The fixture must reuse its existing accepted source and publisher
+with fresh request facts. Production retention predicates remain unchanged.

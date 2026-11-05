@@ -58,15 +58,56 @@ type logsMixedAccepted struct {
 func admitLogsMixedGroup(t *testing.T, f *queryLedgerFixture) logsMixedAccepted {
 	t.Helper()
 	ctx, b := f.base.ctx, f.base
-	s, publisher, _ := b.prepareManagedContext(t, f.root, f.enrolled, 60)
+	// The scalar setup already owns these live accepted sources. Starting a
+	// second retention producer here would attempt to replace its live epoch.
+	// Reuse the same source/store and refresh facts for this separate request.
+	s := f.scenario
+	publisher := logsExistingCapturePublisher(t, f)
+	f.refresh(t)
+	observed := time.Now().UTC().Truncate(time.Microsecond)
+	s.batch.ObservedAt, s.batch.FreshUntil, s.batch.Initial = observed, observed.Add(5*time.Second), nil
+	if err := s.p.RefreshPermissions(ctx, s.batch); err != nil {
+		t.Fatal("mixed current existing permission source", err)
+	}
 	in := s.a.Plan.Input
-	in.Target.ExecutionClass, in.Capability.ExecutionClass = artifact.ContextAPIExecution, artifact.ContextAPIExecution
-	in.Target.NodeUID, in.Target.NodeBootID, in.Target.Pin.NodeName = "", "", ""
-	policies, err := s.retention.policies(ctx)
+	currentPermissions, err := s.p.Permissions(ctx, in.Target.Target())
+	if err != nil {
+		t.Fatal("mixed current permission projection", err)
+	}
+	currentIdentity := s.a.Eligibility.VerifiedIdentity
+	currentIdentity.VerifiedAt = time.Now().UTC().Truncate(time.Microsecond)
+	currentIdentity.ValidUntil = currentIdentity.VerifiedAt.Add(5 * time.Second)
+	s.a.Eligibility = authorization.ContextEligibility(currentIdentity, currentPermissions, in.Target.Target(), time.Now())
+	if !s.a.Eligibility.Eligible {
+		t.Fatal("mixed independent current identity", s.a.Eligibility.Reason)
+	}
+	recovery, err := s.recovery.reader.RecoveryState(ctx)
+	if err != nil || recovery.InstallationID != s.a.Recovery.InstallationID || recovery.IssuerEpoch != s.a.Recovery.IssuerEpoch || recovery.Revision != s.a.Recovery.Revision {
+		t.Fatal("mixed original accepted recovery changed", err)
+	}
+	s.a.Recovery = recovery
+	storage, err := postgres.NewContextStorageReader(ctx, b.roles["hub-runtime"], s.a.RootID)
 	if err != nil {
 		t.Fatal(err)
 	}
+	selected, err := storage.ContextStorage(ctx, in.Target.Target())
+	if err != nil || selected.Selection.StoreID != s.a.Registration.StoreID || selected.Selection.AllocationID != s.a.Registration.AllocationID || selected.Selection.PoolRevision != s.a.Registration.PoolRevision || selected.Selection.AllocationRevision != s.a.Registration.AllocationRevision || selected.Binding.RootID != s.a.RootID || selected.Binding.Revision != s.a.Storage.Revision || selected.Binding.ClusterID != s.a.Storage.ClusterID || selected.Binding.NamespaceUID != s.a.Storage.NamespaceUID || selected.Binding.WorkloadUID != s.a.Storage.WorkloadUID {
+		t.Fatal("mixed original accepted storage changed", err)
+	}
+	s.a.Storage = selected.Binding
+	policies, err := s.retention.policies(ctx)
+	if err != nil {
+		t.Fatal("mixed existing retained source", err)
+	}
 	now := time.Now().UTC().Truncate(time.Microsecond)
+	in.Target.ExecutionClass, in.Capability.ExecutionClass = artifact.ContextAPIExecution, artifact.ContextAPIExecution
+	in.Target.NodeUID, in.Target.NodeBootID, in.Target.Pin.NodeName = "", "", ""
+	// Target and capability observations are independently controlled fixture
+	// inputs, with the same pinned Pod and qualification as the scalar source.
+	in.Target.ObservedAt, in.Target.FreshUntil = now, now.Add(5*time.Second)
+	in.Capability.ObservedAt, in.Capability.FreshUntil = now, now.Add(5*time.Second)
+	s.a.CaseID = custodyID()
+	in.CaseID = s.a.CaseID
 	deadline := now.Add(time.Minute)
 	composition := logsMixedGroupComposition()
 	parts, err := planning.SplitComposition(composition, recordingCompiler{})

@@ -64,6 +64,62 @@
       "sha256": "c350a7aa17491f966bf35db5cddb23a7b75a25812ad4775f8f84cf2970435b3e",
       "compressedBytes": 305,
       "compressedSHA256": "d08f1b3461597df33ab281b20fb9d2d3c7e2fe31359e258f571649afb30633f6"
+    },
+    {
+      "source": "test/results/finite-logs-lifecycle-f8c8eb5c.log",
+      "archive": "finite-logs-lifecycle-f8c8eb5c.log.gz",
+      "bytes": 2935,
+      "sha256": "1d179fc51d26652e16ea831455546050dd0091706675f62e93259373aeea1232",
+      "compressedBytes": 899,
+      "compressedSHA256": "f2d6fdd182cb37fcd67b30491bb34692d7f188893e1183f1f5372caccb7d09d2"
+    },
+    {
+      "source": "test/results/finite-logs-lifecycle-f8c8eb5c-environment.json",
+      "archive": "finite-logs-lifecycle-f8c8eb5c-environment.json.gz",
+      "bytes": 549646,
+      "sha256": "dd816da35a9fcd22a47f00679e82710f3703cf68e239440e8c044f811f7c0b2c",
+      "compressedBytes": 206073,
+      "compressedSHA256": "1b682e43e755251d3170da4772518355c6658a98e69d6ea21263159a33687974"
+    },
+    {
+      "source": "/home/phil/.cache/asservat-build/finite-logs-db/scalar-f8c8eb5c-root-source-audit.json",
+      "archive": "scalar-f8c8eb5c-root-source-audit.json.gz",
+      "bytes": 446,
+      "sha256": "783a7f716296b31e854da699a969558f2b97b5805e077a6891a31b20d959f4a0",
+      "compressedBytes": 304,
+      "compressedSHA256": "e6d217769b41fe800523ab57b0057b5bcbc91b3a932e8c683cb9457d6af80eb9"
+    },
+    {
+      "source": "test/results/finite-logs-mixed-group-f8c8eb5c.log",
+      "archive": "finite-logs-mixed-group-f8c8eb5c.log.gz",
+      "bytes": 831,
+      "sha256": "370441dc35993222cee1dcb7ca3dab7836868604b666e5105a427838c11a6dba",
+      "compressedBytes": 382,
+      "compressedSHA256": "a89812c97e01715369bdf98fcba87e275e7801992b0ba1e6dc9343e6f80b4596"
+    },
+    {
+      "source": "test/results/finite-logs-mixed-group-f8c8eb5c-postgres.log",
+      "archive": "finite-logs-mixed-group-f8c8eb5c-postgres.log.gz",
+      "bytes": 10578,
+      "sha256": "e8794ff06e0d3e9964e2957613abed4bc95be04b78aed5d181ed76820c4ff8f8",
+      "compressedBytes": 1853,
+      "compressedSHA256": "113a03d9620795713a81d872264339d649c83d43c816c96e6b26967628ba8547"
+    },
+    {
+      "source": "test/results/finite-logs-mixed-group-f8c8eb5c-environment.json",
+      "archive": "finite-logs-mixed-group-f8c8eb5c-environment.json.gz",
+      "bytes": 548498,
+      "sha256": "ca4936e72be96402b1bbdebc44d5686a7a2803ccc2e83c2057db36d227932ce6",
+      "compressedBytes": 205952,
+      "compressedSHA256": "e5a3385ad9643795dacecd837cd0d26bd5ffeb519b90ae5fc9fb1f2e4623883d"
+    },
+    {
+      "source": "/home/phil/.cache/asservat-build/finite-logs-db/mixed-f8c8eb5c-root-source-audit.json",
+      "archive": "mixed-f8c8eb5c-root-source-audit.json.gz",
+      "bytes": 445,
+      "sha256": "3341059ebb51de4a4ab15c8d357fdbd308cf8995799179be6b01326d591816c2",
+      "compressedBytes": 305,
+      "compressedSHA256": "83c0241e96298ea9ef90b74de6003c1e1375ac45d2325a99d744c316ca822cc4"
     }
   ],
   "campaigns": [
@@ -78,6 +134,24 @@
       "commit": "8aaa416222b4f93fde9bb1c406da7d0799832469",
       "verdict": "FAIL",
       "testExit": 1,
+      "sourceHashesVerifiedAgainstGit": 4300,
+      "cleanupFailures": []
+    },
+    {
+      "commit": "f8c8eb5ce74e1bb92369aa8cc2bb7c023b7e8b84",
+      "resultName": "finite-logs-lifecycle-f8c8eb5c",
+      "verdict": "PASS",
+      "testExit": 0,
+      "goSeconds": 13.32,
+      "sourceHashesVerifiedAgainstGit": 4300,
+      "cleanupFailures": []
+    },
+    {
+      "commit": "f8c8eb5ce74e1bb92369aa8cc2bb7c023b7e8b84",
+      "resultName": "finite-logs-mixed-group-f8c8eb5c",
+      "verdict": "FAIL",
+      "testExit": 1,
+      "goSeconds": 7.696,
       "sourceHashesVerifiedAgainstGit": 4300,
       "cleanupFailures": []
     }
