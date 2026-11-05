@@ -13,8 +13,12 @@ import (
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/packets"
 	"asservat.local/asservat/internal/adapters/postgres"
+	"asservat.local/asservat/internal/application/planning"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
+	planvalue "asservat.local/asservat/internal/domain/planning"
+	"asservat.local/asservat/internal/domain/targets"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -111,5 +115,48 @@ func TestRawPacketSummaryManagedPayload(t *testing.T) {
 	output, err := json.Marshal(summary)
 	if err != nil || bytes.Contains(output, []byte("SYNTHETIC-RAW-PAYLOAD")) {
 		t.Fatal("raw payload escaped summary", err)
+	}
+}
+
+func rawPacketSummaryComposition(t testing.TB, target targets.Request) planvalue.ProfileComposition {
+	t.Helper()
+	definition, e := manualRawProfileDefinition()
+	if e != nil {
+		t.Fatal(e)
+	}
+	document, e := json.Marshal(map[string]any{"name": manualRawProfileName, "version": manualRawProfileVersion, "definition": definition})
+	if e != nil {
+		t.Fatal(e)
+	}
+	ref := planvalue.ProfileRef{Catalog: "namespace", Name: manualRawProfileName, Version: manualRawProfileVersion}
+	return planvalue.ProfileComposition{Components: []planvalue.ProfileComponent{{ID: "net", Profile: ref, Edits: []planvalue.ProfileEdit{{ActionID: "sample", Field: "packetFilter", Text: "tcp dst port 80"}, {ActionID: "sample", Field: "actionExecutionMode", Text: "onTrigger"}, {ActionID: "sample", Field: "packetBefore", Text: "0s"}, {ActionID: "sample", Field: "packetAfter", Text: "2s"}}}}, Resolved: []planvalue.CatalogProfile{{Ref: ref, SourceClusterID: target.ClusterID, SourceNamespaceUID: target.Namespace.UID, SourceUID: "synthetic-raw-profile", Document: document, Enabled: true}}, MaxTotalBytes: 16 << 20, MaxDuration: "20s"}
+}
+
+// The exact composition used by SQL admission must compile before starting a
+// service lab. A namespace profile retains its ongoing default unless the
+// caller explicitly supplies the same finite edits as the installed raw path.
+func TestRawPacketSummaryManagedAdmissionPlan(t *testing.T) {
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	in := policyRecorderOfflineAdmission(t, now).Plan.Input
+	in.Executor = identity.Principal{Issuer: "https://id.example.test", Subject: "fixture", ClientID: "console", Kind: identity.Human}
+	c := rawPacketSummaryComposition(t, in.Target.Request)
+	p, err := planning.CompileRecorder(planvalue.RecorderInput{CaptureID: in.CaptureID, Executor: in.Executor, Target: in.Target, Composition: c, Retention: in.Retention, Deadline: now.Add(time.Minute), NodeRecorder: true}, recordingCompiler{}, now)
+	if err != nil {
+		t.Fatal("exact managed raw admission producer", err)
+	}
+	if len(p.Actions) != 1 || p.Actions[0].ExecutionMode != "onTrigger" || p.Actions[0].Before != "0s" || p.Approval == nil || p.Approval.DataClass != "raw" || p.Approval.ObservationLimits == nil || !planning.AcceptableRecorder(p).Acceptable() {
+		t.Fatal("managed raw source lost required approval/observation authority")
+	}
+	r, _, err := planning.RecordingFor(p)
+	if err != nil || r.Profile != "rawPackets" || r.DurationMillis != 2000 || r.Snaplen != 96 || r.ProtocolSnaplen == nil || r.ProtocolSnaplen.TCP != manualRawTCPCap {
+		t.Fatal("managed raw source finite bounds", r, err)
+	}
+	in.Recorder, err = planning.RecorderContextFromScope(c, p.CanonicalScope)
+	if err != nil {
+		t.Fatal(err)
+	}
+	compiled, err := planning.CompileContext(in, now)
+	if err != nil || compiled.ScopeDigest != p.ScopeDigest {
+		t.Fatal("actual context producer mismatch", err)
 	}
 }

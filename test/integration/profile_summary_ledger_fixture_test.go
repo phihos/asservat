@@ -8,7 +8,6 @@ import (
 	"asservat.local/asservat/migrations"
 	"context"
 	"crypto/sha256"
-	"encoding/json"
 	"errors"
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
@@ -56,16 +55,7 @@ func admitQueryLedgerProfile(t *testing.T, f *capacitySQLFixture, root capacitya
 	input := planvalue.RecorderInput{CaptureID: in.CaptureID, Executor: in.Executor, Target: in.Target, Composition: c, Retention: in.Retention, Deadline: now.Add(time.Minute), NodeRecorder: true}
 	var reviewed planvalue.RecorderPlan
 	if raw {
-		definition, e := manualRawProfileDefinition()
-		if e != nil {
-			t.Fatal(e)
-		}
-		document, e := json.Marshal(map[string]any{"name": manualRawProfileName, "version": manualRawProfileVersion, "definition": definition})
-		if e != nil {
-			t.Fatal(e)
-		}
-		ref := planvalue.ProfileRef{Catalog: "namespace", Name: manualRawProfileName, Version: manualRawProfileVersion}
-		c = planvalue.ProfileComposition{Components: []planvalue.ProfileComponent{{ID: "net", Profile: ref, Edits: []planvalue.ProfileEdit{{ActionID: "sample", Field: "packetFilter", Text: "tcp dst port 80"}, {ActionID: "sample", Field: "packetAfter", Text: "2s"}}}}, Resolved: []planvalue.CatalogProfile{{Ref: ref, SourceClusterID: in.Target.Request.ClusterID, SourceNamespaceUID: in.Target.Request.Namespace.UID, SourceUID: "synthetic-raw-profile", Document: document, Enabled: true}}, MaxTotalBytes: 16 << 20, MaxDuration: "20s"}
+		c = rawPacketSummaryComposition(t, in.Target.Request)
 		input.Composition = c
 		reviewed, err = planning.CompileRecorder(input, recordingCompiler{}, now)
 	} else {
