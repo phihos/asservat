@@ -203,13 +203,13 @@ func queryInstalledPacketQueryWithCall(t *testing.T, ctx context.Context, source
 	return out
 }
 
-// Only the installed raw four-query journey uses this two-slot FIFO. These
+// The installed packet, syscall and logs journeys share this two-slot FIFO. These
 // callbacks inspect already admitted originals; they never stop a Job, release
 // a charge, extend a deadline, or issue another query.
 type installedPacketTerminalPipeline struct {
 	pending          []func()
 	admitted, joined int
-	limit            int // zero retains the original four-query packet fixture; arguments funds seven.
+	limit            int // zero: four packet queries; arguments: seven; logs: two.
 }
 
 func (p *installedPacketTerminalPipeline) add(t *testing.T, wait func()) {
@@ -218,7 +218,7 @@ func (p *installedPacketTerminalPipeline) add(t *testing.T, wait func()) {
 	if maximum == 0 {
 		maximum = 4
 	}
-	if maximum != 4 && maximum != 7 || wait == nil || len(p.pending) >= 2 || p.admitted >= maximum {
+	if maximum != 2 && maximum != 4 && maximum != 7 || wait == nil || len(p.pending) >= 2 || p.admitted >= maximum {
 		t.Fatal("raw fixture exceeded two original query workers or its originally funded query count")
 	}
 	p.pending = append(p.pending, wait)

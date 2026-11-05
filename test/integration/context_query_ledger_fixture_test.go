@@ -10,6 +10,7 @@ import (
 	"asservat.local/asservat/internal/domain/execution"
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"crypto/tls"
 	"encoding/json"
 	pprof "github.com/google/pprof/profile"
@@ -293,13 +294,34 @@ func publishPreparedQueryLedgerContext(t *testing.T, f *capacitySQLFixture, s ca
 	var copies artifact.Copies
 	var acquisition artifact.AcquisitionWindow
 	if profileSource || packetSource || rawSyscall || isLogs {
-		producer, err := objectstore.NewArtifactProducer(bound, f.keys, unusedStreamingJournal{}, time.Now)
-		if err != nil {
-			t.Fatal(err)
+		var prepared *objectstore.PreparedArtifact
+		if isLogs && e.Registration.NativeLimit > artifact.FrameBytes {
+			// Match the actual connector writer: the pending SQL obligation is
+			// already charged and bound, while the process-owned journal cannot
+			// release it. Other one-frame fixture sources retain their old path.
+			plan := artifact.StreamingPlan{Registration: e.Registration, WriterEpoch: started.Process.ProcessEpoch}
+			encoded, err := json.Marshal(plan)
+			if err != nil {
+				t.Fatal(err)
+			}
+			wantDigest := sha256.Sum256(encoded)
+			var epoch string
+			var storedDigest []byte
+			var temporaryBytes, temporaryObjects int64
+			var charged bool
+			if err = f.admin.QueryRow(f.ctx, `SELECT writer_epoch::text,plan_digest,temporary_bytes,temporary_objects,released_at IS NULL FROM custody_stream WHERE attempt_id=$1`, e.Registration.Location.AttemptID).Scan(&epoch, &storedDigest, &temporaryBytes, &temporaryObjects, &charged); err != nil || epoch != plan.WriterEpoch || !bytes.Equal(storedDigest, wantDigest[:]) || temporaryBytes != plan.TemporaryBytes() || temporaryObjects != int64(1+plan.PartLimit()) || !charged {
+				t.Fatalf("original logs multipart obligation epochMatches=%t digestMatches=%t bytes=%d/%d objects=%d/%d charged=%t err=%v", epoch == plan.WriterEpoch, bytes.Equal(storedDigest, wantDigest[:]), temporaryBytes, plan.TemporaryBytes(), temporaryObjects, 1+plan.PartLimit(), charged, err)
+			}
+			prepared, err = objectstore.PrepareOneShotLogsArtifact(f.ctx, bound, f.keys, e, plan.WriterEpoch, time.Now)
+		} else {
+			producer, createErr := objectstore.NewArtifactProducer(bound, f.keys, unusedStreamingJournal{}, time.Now)
+			if createErr != nil {
+				t.Fatal(createErr)
+			}
+			prepared, err = producer.Prepare(f.ctx, e, "")
 		}
-		prepared, err := producer.Prepare(f.ctx, e, "")
 		if err != nil {
-			t.Fatal(err)
+			t.Fatal("managed original writer preparation", err)
 		}
 		var body bytes.Buffer
 		at := time.Now().UTC()

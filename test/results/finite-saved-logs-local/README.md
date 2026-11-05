@@ -39,3 +39,14 @@ and compressed/uncompressed SHA256. No large evidence fixtures, generated binary
 image context or synthetic fixture keys are included. The named reviews and
 source inventories describe their own boundaries; no full S-05/specification or
 production release completion is asserted.
+
+The followup restores actual large-log multipart reservation and original writer
+binding. Its separate skipped-binding and compiled-backing regressions fail
+before correction, then targeted PostgreSQL/capacity/funding races pass. The
+actual installed terminal-helper regression fails for the originally funded two
+queries, then passes with the existing packet/syscall controls. No source-work
+limit, grant or two-worker FIFO bound was relaxed. The first real-service
+admission failure and exact4299-input audit are preserved in
+[service evidence](../finite-saved-logs-service-local/README.md); a successful
+service rerun is still required. Earlier handoff hashes retain their original
+scope; the followup handoff supplies exact changed-file hashes.

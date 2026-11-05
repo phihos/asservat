@@ -168,3 +168,14 @@ remain outside domain code.
 The mandatory C-21 publication check reuses the C-23 canonical logs codec. The
 architecture gate permits only this package across that edge, preserving one
 parser without allowing persistence to import privileged collector adapters.
+
+Logs larger than one native frame reuse the existing multipart reservation and
+process binding: reserve final and temporary obligations in the admission
+transaction, then bind the original accepted API writer without refilling or
+changing epochs. Small logs retain the single-frame path. Reuse the existing
+large-native backing protocol (`go-profile/v1`); its name does not change the
+logs parser or artifact type. The configured64MiB case requires136,740,864B and
+14 objects including temporary obligations; these are conservative reservation
+values, not measured stored output or overhead. A legacy record-only fixture
+was insufficient despite spare general pool bytes and is corrected before
+installation rather than topped up after admission.

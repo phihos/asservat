@@ -29,11 +29,27 @@ func logsQueryComposition() planvalue.ProfileComposition {
 }
 func logsLedgerFunding(t *testing.T, f *capacitySQLFixture, group ...bool) {
 	t.Helper()
-	native := (artifact.Registration{NativeLimit: artifact.LogNativeLimit}).ReservedBytes()
-	objects := int64(12)
+	registration := artifact.Registration{NativeLimit: artifact.LogNativeLimit}
+	stream := artifact.StreamingPlan{Registration: registration}
+	native := registration.ReservedBytes() + stream.TemporaryBytes()
+	objects := int64(5 + stream.PartLimit())
 	if len(group) > 0 && group[0] {
 		native = 2*native + 2*(artifact.Registration{NativeLimit: artifact.RecordingNativeLimit}).ReservedBytes()
-		objects = 48
+		objects = 2*objects + 8
+	}
+	// Reuse the existing qualified large-native protocol. The legacy eight-MiB
+	// evidence ceiling cannot fund a64MiB log, irrespective of spare bytes.
+	in := &f.qualification.RootBacking
+	in.ContextHistory.ProfileProtocol = capacityapp.ProfileProtocolVersion
+	records := objects / 4
+	if records > in.RecordsPerAccount {
+		in.RecordsPerAccount, in.Capture.RecordsPerAccount = records, records
+		in.Capture.Policy.MetadataSlots = in.Capture.Accounts * records
+		backup, wal := in.ContextHistory.Capture.SlotBacking(in.ContextHistory.CapturePurgeLeases)
+		in.Capture.Policy.BackupReservedBytes = in.Capture.Policy.MetadataSlots * backup
+		in.Capture.Policy.WALReservedBytes = in.Capture.Policy.MetadataSlots * wal
+		in.ProcessingState.MaxCaptures = in.Accounts * records
+		in.ProcessingState.BackupBytes, in.ProcessingState.WALBytes, _ = in.ProcessingState.RequiredBytes()
 	}
 	b := f.template.Policies[0].Budget
 	b.Protected.Bytes = max(b.Protected.Bytes, native)
@@ -84,17 +100,25 @@ func TestLogsQueryOriginalFunding(t *testing.T) {
 	queryLedgerQualification(t, f)
 	before := f.template.Policies[0].Budget.Protected.Bytes
 	logsLedgerFunding(t, f)
-	want := (artifact.Registration{NativeLimit: artifact.LogNativeLimit}).ReservedBytes()
-	if before >= want || f.template.Policies[0].Budget.Protected.Bytes != want || f.template.Policies[0].Budget.Protected.Objects != 12 {
+	registration := artifact.Registration{NativeLimit: artifact.LogNativeLimit}
+	stream := artifact.StreamingPlan{Registration: registration}
+	needed := registration.ReservedBytes() + stream.TemporaryBytes()
+	backing, err := capacityapp.CompileContextProtocolBacking(f.template.Policies[0].Budget.Context, f.qualification.RootBacking.ContextHistory)
+	if err != nil || backing.Evidence.Bytes < needed || backing.Evidence.Objects < int64(5+stream.PartLimit()) {
+		t.Fatalf("actual compiled logs evidence backing bytes=%d objects=%d records=%d protocol=%q needsbytes=%d objects=%d err=%v", backing.Evidence.Bytes, backing.Evidence.Objects, backing.Records, f.qualification.RootBacking.ContextHistory.ProfileProtocol, needed, 5+stream.PartLimit(), err)
+	}
+	want := needed
+	if before >= want || f.template.Policies[0].Budget.Protected.Bytes != want || f.template.Policies[0].Budget.Protected.Objects != int64(5+stream.PartLimit()) {
 		t.Fatal("logs original funding", before, want)
 	}
 	t.Logf("original logs fixture64MiB authored native reserves%dB; no post-admission top-up; query20units/2reads is configured candidate", want)
 	logsLedgerFunding(t, f, true)
 	wantGroup := 2*want + 2*(artifact.Registration{NativeLimit: artifact.RecordingNativeLimit}).ReservedBytes()
-	if f.template.Policies[0].Budget.Protected.Bytes != wantGroup || f.template.Policies[0].Budget.Protected.Objects != 48 {
+	wantObjects := 2*int64(5+stream.PartLimit()) + 8
+	if f.template.Policies[0].Budget.Protected.Bytes != wantGroup || f.template.Policies[0].Budget.Protected.Objects != wantObjects {
 		t.Fatal("mixed logs original funding", f.template.Policies[0].Budget.Protected, wantGroup)
 	}
-	t.Logf("mixed fixture original setup+logs+two metadata children reserves%dB/48objects before installation", wantGroup)
+	t.Logf("mixed fixture original setup+logs+two metadata children reserves%dB/%dobjects before installation", wantGroup, wantObjects)
 }
 
 func assertLogsOriginalCollectCutoff(t *testing.T, ctx context.Context, store *postgres.APIContextExecutions, e artifact.ContextExpectation) {

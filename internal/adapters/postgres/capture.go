@@ -648,7 +648,7 @@ func (s *ContextAdmissions) admitContextInTransaction(ctx context.Context, q *cu
 		if _, err = registerLocked(ctx, q, p, allocation, r); err != nil {
 			return err
 		}
-		if a.Plan.Input.Profile != nil {
+		if a.Plan.Input.Profile != nil || a.Plan.Input.Logs != nil {
 			if err = reserveProfileStreamLocked(ctx, q, r); err != nil {
 				return err
 			}

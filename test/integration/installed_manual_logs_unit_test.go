@@ -221,3 +221,37 @@ func TestManualLogsImmediatePageStillReplaysOriginalBeginWithoutAnotherRead(t *t
 		t.Fatal("ready replay replaced page/charges")
 	}
 }
+
+// Synthetic advancing clock over the actual shared installed helper. Both live
+// proofs happen before waiting; only original terminal joins are deferred.
+func TestManualLogsRollingOriginalTwoSlots(t *testing.T) {
+	now, active, peak, snapshots := 0, 0, 0, 0
+	var joined []int
+	p := &installedPacketTerminalPipeline{limit: installedLogsQueries}
+	originalDeadlines := []int{60, 72}
+	for index := 0; index < installedLogsQueries; index++ {
+		if active >= 2 {
+			t.Fatal("third worker admitted before an original joined")
+		}
+		id, deadline := index, originalDeadlines[index]
+		active++
+		peak = max(peak, active)
+		now += 12
+		snapshots++
+		p.add(t, func() {
+			if originalDeadlines[id] != deadline {
+				t.Fatal("original worker deadline changed")
+			}
+			now = max(now, deadline)
+			active--
+			joined = append(joined, id)
+		})
+	}
+	if p.admitted != 2 || p.joined != 0 || len(p.pending) != 2 || snapshots != 2 || now != 24 {
+		t.Fatal("proofs deferred or originals prematurely joined")
+	}
+	p.finish(t)
+	if p.admitted != 2 || p.joined != 2 || len(p.pending) != 0 || active != 0 || peak != 2 || now != 72 || !reflect.DeepEqual(joined, []int{0, 1}) {
+		t.Fatal("two funded original workers lost FIFO/join/deadline", p, joined, now)
+	}
+}

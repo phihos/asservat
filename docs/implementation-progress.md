@@ -45,6 +45,16 @@ references, the builtin example and all embedded composition bundles. It include
 123.912s across9 top-level fixtures; browser authority/providers remain synthetic.
 Original schema failures are retained separately from the final complete pass.
 
+The first real-service logs campaign on signed `4d5d450f` fails at admission:
+its legacy record-only backing provides29,786,112B/12 objects while the64MiB
+logs final-plus-temporary declaration needs136,740,864B/14 objects. All4,299
+source hashes match Git, testExit1, providerExit0 and cleanup[]. A separate
+adapter regression reproduces missing original writer binding for large logs.
+The correction reuses existing multipart reservation/binding and large-native
+backing; focused races pass. The installed two-query FIFO helper's closed-count
+regression also passes after adding logs2 alongside existing4/7 counts, retaining
+two active workers. These local corrections do not replace a service rerun.
+
 Composition is still being implemented. No real-service logs lifecycle,
 maximum-shape installed worker result, built React logs journey or installed
 logs/native/history/Repeat qualification is claimed. Full S-05 and the complete

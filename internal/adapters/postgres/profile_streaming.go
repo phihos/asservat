@@ -12,7 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// reserveProfileStreamLocked joins admission's existing allocation/attempt
+// reserveProfileStreamLocked joins profile/log admission's existing allocation/attempt
 // transaction. No writer exists yet: reserve every multipart obligation now,
 // and leave the journal unusable until accepted execution chooses a process.
 func reserveProfileStreamLocked(ctx context.Context, q *custodydb.Queries, r artifact.Registration) error {
@@ -51,8 +51,11 @@ func reserveProfileStreamLocked(ctx context.Context, q *custodydb.Queries, r art
 // current authority transaction. A replay observes the same immutable binding;
 // it cannot change epochs, reset spend, or acquire a new remote-write permit.
 func bindProfileStreamLocked(ctx context.Context, q *custodydb.Queries, e artifact.ContextExpectation, epoch string, first bool) error {
-	if e.Profile == nil || e.Registration.NativeLimit <= artifact.FrameBytes {
+	if e.Profile == nil && e.Logs == nil || e.Registration.NativeLimit <= artifact.FrameBytes {
 		return nil
+	}
+	if e.Logs != nil && e.Validate() != nil {
+		return artifact.ErrInvalid
 	}
 	plan := artifact.StreamingPlan{Registration: normalized(e.Registration), WriterEpoch: epoch}
 	if plan.Validate() != nil {

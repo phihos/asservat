@@ -1,7 +1,7 @@
 {
   "format": "finite-saved-logs-local/v1",
   "scope": "Local component and bounded synthetic resource evidence. Individual failed/setup/skipped results remain original; no installed workflow qualification. Local500m CPU enforcement is unqualified.",
-  "base_commit": "4791f25cdd0fd83554e4cc553319ce4fe7d7c9ca",
+  "base_commit": "4d5d450f738708635f9738e3b9f772d80768e179",
   "files": [
     {
       "source": "finite-logs-acquiring-check-focused.log",
@@ -556,6 +556,38 @@
       "compressedSHA256": "682407dc0a338ab507a4ba187d558006ef115c9a985f2022ab77ff342473000c"
     },
     {
+      "source": "finite-logs-db/full-funding-and-stream-final-race.log",
+      "archive": "finite-logs-db__full-funding-and-stream-final-race.log.gz",
+      "bytes": 1349,
+      "sha256": "ca04b49eff79de3cfcd9d004f3d71aeb6558e7310a9bb620f660701f2cf80492",
+      "compressedBytes": 558,
+      "compressedSHA256": "f9ef634014077d74147d33ce525e0fe3316970ca12604222dda5de8d5475a07f"
+    },
+    {
+      "source": "finite-logs-db/full-funding-and-stream-focused-race.log",
+      "archive": "finite-logs-db__full-funding-and-stream-focused-race.log.gz",
+      "bytes": 1349,
+      "sha256": "9a135d7d72425043abfef6a415daf4a1eca8fcff872f6a9c23c34315c9ef0bd6",
+      "compressedBytes": 559,
+      "compressedSHA256": "09db4112d4bddb0b3179a5e56bb620b2a871491a24c3b824c312233573963061"
+    },
+    {
+      "source": "finite-logs-db/full-funding-red.log",
+      "archive": "finite-logs-db__full-funding-red.log.gz",
+      "bytes": 319,
+      "sha256": "8b7836932c1861f15b2e3fe6cd398316142b108706bb48ccf8d0b09fc24520d6",
+      "compressedBytes": 244,
+      "compressedSHA256": "144088ed078ab22f527b1c02ca886bd0d1652f0f76fb26754dd14eec55ee822f"
+    },
+    {
+      "source": "finite-logs-db/full-native-backing-fix-handoff.json",
+      "archive": "finite-logs-db__full-native-backing-fix-handoff.json.gz",
+      "bytes": 5765,
+      "sha256": "4700bffb66d572c98e976add9723393e96f65cab9400e19bbb11cd45a6cb78c5",
+      "compressedBytes": 2474,
+      "compressedSHA256": "246cbd0af0845b13a69bd0d4e1ac82fcf80971c6780da58e7bf2b6af37c33463"
+    },
+    {
       "source": "finite-logs-db/handoff.json",
       "archive": "finite-logs-db__handoff.json.gz",
       "bytes": 22002,
@@ -572,12 +604,36 @@
       "compressedSHA256": "ffae8db185f6f739dd1e4086326e53dbfdcd78082b083ece1de413267ce88060"
     },
     {
+      "source": "finite-logs-db/scalar-4d5d450f-campaign.log",
+      "archive": "finite-logs-db__scalar-4d5d450f-campaign.log.gz",
+      "bytes": 51,
+      "sha256": "ad66e81bdb0ad8fa897513e7d0951af577c4125fbb1ac63a57ee272e9bff7afd",
+      "compressedBytes": 71,
+      "compressedSHA256": "c89a38038ca940e9ad1f084170ad30bd56f6282fa66b1d7b5916261e7f71c45a"
+    },
+    {
       "source": "finite-logs-db/source-acquisition-independent-review.json",
       "archive": "finite-logs-db__source-acquisition-independent-review.json.gz",
       "bytes": 4969,
       "sha256": "ab99c87f7c88a7998aef6c3c670eb304360769f6149e90045f18925d472989a2",
       "compressedBytes": 2542,
       "compressedSHA256": "630e2dc9ca6712036ade0a9147fb63d881381a6ba893594fb2e4137443932f9c"
+    },
+    {
+      "source": "finite-logs-db/stream-binding-green.log",
+      "archive": "finite-logs-db__stream-binding-green.log.gz",
+      "bytes": 204,
+      "sha256": "ccb2b7f470fd629a56c2a6da6ddbdafc294921f7f950bd1e74a3e211e142706c",
+      "compressedBytes": 151,
+      "compressedSHA256": "ec7490cccd0a633facc2ead6d7e53d0cbbca67f25f6438de88fa16ea8f88c110"
+    },
+    {
+      "source": "finite-logs-db/stream-binding-red.log",
+      "archive": "finite-logs-db__stream-binding-red.log.gz",
+      "bytes": 294,
+      "sha256": "4cda629e08795732f15da2df2b7fc1da6a56fd5abb5ebe2cfe2a31d776cc0822",
+      "compressedBytes": 206,
+      "compressedSHA256": "e25563aa173074fb49b32586e81ba05d44b80b9d372d75b0d2b8837a0b7be6c1"
     },
     {
       "source": "finite-logs-domain-boundary-green.log",
@@ -772,6 +828,14 @@
       "compressedSHA256": "1b8599f4002ec76067f5614d1c47366984c42f9aa87770be6c075314855f84d1"
     },
     {
+      "source": "finite-logs-installed-parser-review.json",
+      "archive": "finite-logs-installed-parser-review.json.gz",
+      "bytes": 7983,
+      "sha256": "f997f3d1d27fe80cf27d46c0a5cbd630a89310a09290f4035f73f5601032ddd1",
+      "compressedBytes": 3380,
+      "compressedSHA256": "e4ed78fa872e13b303f904d9a6159a653b85f1891c91c66527f260e55424497a"
+    },
+    {
       "source": "finite-logs-integration-compile.log",
       "archive": "finite-logs-integration-compile.log.gz",
       "bytes": 71,
@@ -886,10 +950,10 @@
     {
       "source": "finite-logs-native/handoff.json",
       "archive": "finite-logs-native__handoff.json.gz",
-      "bytes": 10093,
-      "sha256": "8253a147916a70c05175090a8686dc78ad44c10386b511b73cf41e5cf288953b",
-      "compressedBytes": 4296,
-      "compressedSHA256": "c1a66fef0071da1fe9b72e5708af13642a9c444b67efb29a771b3c5a2e75a9f7"
+      "bytes": 11725,
+      "sha256": "0ca8546fb7dbec5f45c90b327cc06cc24d2ffe72b4c45bc98cb1b97ef79dd30a",
+      "compressedBytes": 4758,
+      "compressedSHA256": "cba638caedba443b828ced8e0fcd80fc3b88343b65c8f3a08371e3ada46657ef"
     },
     {
       "source": "finite-logs-native-codec-green.log",
@@ -1556,12 +1620,36 @@
       "compressedSHA256": "d3f6ac2871cc5216fda69e9fd1c00809a751009ac0a1ee12d5f18863c600480e"
     },
     {
+      "source": "finite-logs-stream-fix-pre-push.log",
+      "archive": "finite-logs-stream-fix-pre-push.log.gz",
+      "bytes": 11469,
+      "sha256": "8f9f7af35305ea40ad5bf2fd867123e0034bcf0d6eacd083391de7f5ebaa6490",
+      "compressedBytes": 2595,
+      "compressedSHA256": "8f602b269fbf9f5cc735ba7fd123723cb73495d2c2930acba0d853eae2bd0a08"
+    },
+    {
       "source": "finite-logs-timeout-compile.log",
       "archive": "finite-logs-timeout-compile.log.gz",
       "bytes": 66,
       "sha256": "4ec5f560b3e6179eb668a72e6f100e9aebd15afe9dbdb4088ca6d5eaeb56a6a4",
       "compressedBytes": 77,
       "compressedSHA256": "20597c910a74126e8704d64134251ee67d223b4ec3f7bb34600907753520ab73"
+    },
+    {
+      "source": "finite-logs-two-query-helper-green.log",
+      "archive": "finite-logs-two-query-helper-green.log.gz",
+      "bytes": 53,
+      "sha256": "2b96f5eb3466b033594caee4a5fd01ce7482e29fa5895cea99e1f6135d5a0061",
+      "compressedBytes": 66,
+      "compressedSHA256": "f6792313c19d39e24e6db74f3bb49b8c6b7490a4cdff822c47bd772459b8ed85"
+    },
+    {
+      "source": "finite-logs-two-query-helper-red.log",
+      "archive": "finite-logs-two-query-helper-red.log.gz",
+      "bytes": 248,
+      "sha256": "71dda3144d9ad2f5a8c4247c5a99f71fcfbb32c7d601e937141ae761595b3c24",
+      "compressedBytes": 200,
+      "compressedSHA256": "c8735ea7776e4faa562d0de330f557710c6d09fcfe3399954f47558811ca6d37"
     },
     {
       "source": "finite-logs-typed-edit-conversion-green.log",

@@ -1,0 +1,42 @@
+{
+  "format": "finite-logs-services/v1",
+  "commit": "4d5d450f738708635f9738e3b9f772d80768e179",
+  "verdict": "FAIL",
+  "testExit": 1,
+  "sourceHashesVerifiedAgainstGit": 4299,
+  "cleanupFailures": [],
+  "files": [
+    {
+      "source": "test/results/finite-logs-lifecycle-4d5d450f-environment.json",
+      "archive": "finite-logs-lifecycle-4d5d450f-environment.json.gz",
+      "bytes": 548344,
+      "sha256": "a39aad340e3152ca17604e88e65737c68102f0482eda79bd362a49c8f95cd495",
+      "compressedBytes": 205899,
+      "compressedSHA256": "ed4e1970bf9eda3619b266f31be15e8290009121facd2f6fb893d5edfe11b8ec"
+    },
+    {
+      "source": "test/results/finite-logs-lifecycle-4d5d450f-postgres.log",
+      "archive": "finite-logs-lifecycle-4d5d450f-postgres.log.gz",
+      "bytes": 10657,
+      "sha256": "f42363a90111e150d8996324df1914ee55f4c8ba5584c055c000727114fd0961",
+      "compressedBytes": 1880,
+      "compressedSHA256": "003d030cafeae28b9aee03fad5d9b5f5610ff3e63e61e83540b1dc55e178282e"
+    },
+    {
+      "source": "test/results/finite-logs-lifecycle-4d5d450f.log",
+      "archive": "finite-logs-lifecycle-4d5d450f.log.gz",
+      "bytes": 804,
+      "sha256": "978f4570b369db4784028d2a2e81726493e4db20074e34a6fe2474f17b019d02",
+      "compressedBytes": 380,
+      "compressedSHA256": "878abd53cd3712bfa06e566cfd74b540b0c20d09be7f13d5fd6ac371feefaa6e"
+    },
+    {
+      "source": "/home/phil/.cache/asservat-build/finite-logs-db/scalar-4d5d450f-root-source-audit.json",
+      "archive": "scalar-4d5d450f-root-source-audit.json.gz",
+      "bytes": 443,
+      "sha256": "05a097ce7c56d6bbd37e324ef3bb965bff4bf35cd6ac9ae5b5c125883b5e1d96",
+      "compressedBytes": 305,
+      "compressedSHA256": "508957215f4308753e8d2cbb684225005f280b0128a92387628b2a0164107458"
+    }
+  ]
+}
