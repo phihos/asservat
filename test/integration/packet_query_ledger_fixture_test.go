@@ -4,6 +4,7 @@ import (
 	"asservat.local/asservat/internal/adapters/mtls"
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
+	analysisapp "asservat.local/asservat/internal/application/analysis"
 	auditapp "asservat.local/asservat/internal/application/audit"
 	authapp "asservat.local/asservat/internal/application/authorization"
 	"asservat.local/asservat/internal/application/evidence"
@@ -176,7 +177,7 @@ func qualifyPacketQueryManagedLifecycle(t *testing.T, f *queryLedgerFixture) {
 		t.Fatal(err)
 	}
 	hubProcess := custodyID()
-	request := func(tool string) (*sharedProjectionOwner, audit.OperationIntent, context.CancelFunc) {
+	request := func(tool string, replay ...bool) (*sharedProjectionOwner, audit.OperationIntent, context.CancelFunc) {
 		t.Helper()
 		f.refresh(t)
 		n := time.Now().UTC().Truncate(time.Microsecond)
@@ -195,7 +196,7 @@ func qualifyPacketQueryManagedLifecycle(t *testing.T, f *queryLedgerFixture) {
 		who.VerifiedAt, who.ValidUntil = n, intent.RequestUntil
 		var a query.ContextProjectionAuthority
 		var e error
-		if tool == "pcap_query" {
+		if tool == "pcap_query" && !(len(replay) > 0 && replay[0]) {
 			a, e = gate.ResolveProjectionCurrent(call, querySQLIdentity{who}, scope.Candidate())
 		} else {
 			a, e = gate.CheckProjectionCurrent(call, querySQLIdentity{who}, scope)
@@ -210,9 +211,13 @@ func qualifyPacketQueryManagedLifecycle(t *testing.T, f *queryLedgerFixture) {
 		r := query.ContextQueryRequest{Call: query.ContextQueryCall{ID: intent.ID, RootID: root, Tool: tool, InputFormat: intent.InputFormat, MACVersion: intent.MACVersion, InputDigest: intent.InputDigest, PrincipalDigest: intent.PrincipalDigest, Principal: scope.Principal, StartedAt: n, Until: intent.RequestUntil, WriteUntil: intent.WriteUntil}, OwnerID: custodyID(), HubProcessEpoch: hubProcess}
 		return &sharedProjectionOwner{ctx: call, request: r, authority: a}, intent, stop
 	}
-	finish := func(in audit.OperationIntent) {
+	finish := func(in audit.OperationIntent, effect ...string) {
+		recordedEffect := "accepted"
+		if len(effect) > 0 {
+			recordedEffect = effect[0]
+		}
 		t.Helper()
-		out := audit.OperationOutcome{Intent: in, Status: "success", Reason: "prepared", Effect: "accepted", ClientReceipt: "unknown", OutputDigest: artifact.Digest{61}, OutputBytes: 12, MetadataUntil: in.RequestUntil, RecordedAt: time.Now().UTC().Truncate(time.Microsecond)}
+		out := audit.OperationOutcome{Intent: in, Status: "success", Reason: "prepared", Effect: recordedEffect, ClientReceipt: "unknown", OutputDigest: artifact.Digest{61}, OutputBytes: 12, MetadataUntil: in.RequestUntil, RecordedAt: time.Now().UTC().Truncate(time.Microsecond)}
 		if e := auditor.Finish(ctx, out); e != nil {
 			t.Fatal("real outcome acknowledgement", e)
 		}
@@ -237,7 +242,8 @@ func qualifyPacketQueryManagedLifecycle(t *testing.T, f *queryLedgerFixture) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	invocation := query.ContextQueryInvocationKey{Key: "packet-query-managed", RequestDigest: artifact.Digest{81}}
+	publicRequest := packetQueryReplayRequest(scope, "packet-query-managed")
+	invocation := query.ContextQueryInvocationKey{Key: publicRequest.IdempotencyKey, RequestDigest: analysisapp.PacketQueryRequestDigest(publicRequest)}
 	q, err = query.NewContextQuery(custodyID(), intent.ID, custodyID(), initial.authority, plan, time.Now().UTC().Truncate(time.Microsecond), invocation)
 
 	if err != nil {
@@ -274,6 +280,24 @@ func qualifyPacketQueryManagedLifecycle(t *testing.T, f *queryLedgerFixture) {
 	if initial.ctx.Err() == nil {
 		t.Fatal("original human operation did not close")
 	}
+	// Replay owns a fresh acknowledged call after the original caller closes.
+	replayOwner, replayIntent, stopReplay := request(scope.BeginTool(), true)
+	if err = ledger.PermitQuery(replayOwner.ctx, q, replayOwner.request, replayOwner.authority); err == nil {
+		t.Fatal("unregistered Begin replay permitted")
+	}
+	beforeReplay := readPacketReplayState(t, ctx, base.admin, q)
+	whoReplay := s.a.Eligibility.VerifiedIdentity
+	whoReplay.Principal = scope.Principal
+	whoReplay.Scopes = []string{"evidence:read"}
+	if rawPacket {
+		whoReplay.Scopes = append(whoReplay.Scopes, "evidence:raw")
+	}
+	whoReplay.VerifiedAt, whoReplay.ValidUntil = replayOwner.request.Call.StartedAt, replayOwner.request.Call.Until
+	qualifyPacketQueryReplayApplication(t, replayOwner.ctx, q, replayOwner.request, publicRequest, querySQLIdentity{whoReplay}, ledger, gate, s.recovery.reader)
+	assertPacketReplayDelta(t, beforeReplay, readPacketReplayState(t, ctx, base.admin, q), 1)
+	qualifyPacketReplayBindings(t, ctx, base.admin, compiled("hub-runtime"), ledger, q, replayOwner.request, replayOwner.authority, auditor, replayIntent)
+	finish(replayIntent, "none")
+	stopReplay()
 	// This independent admitted-worker request must need no live human owner.
 	_, private, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
@@ -308,6 +332,15 @@ func qualifyPacketQueryManagedLifecycle(t *testing.T, f *queryLedgerFixture) {
 		ready, err := runtime.ObserveProjectionWorker(poll.ctx, q, poll)
 		if err != nil || !ready.Ready || ready.Worker.QueryID != q.ID || ready.Worker.Certificate != cert.Peer.Certificate {
 			t.Fatal("actual activated identity", ready, err)
+		}
+		if generation == 1 {
+			noRead, noReadIntent, stopNoRead := request(scope.BeginTool(), true)
+			if err = ledger.RegisterQueryReplayCall(noRead.ctx, q, noRead.request, noRead.authority); err != nil {
+				t.Fatal("fresh replay control before no-read proof", err)
+			}
+			qualifyPacketReplayCannotRead(t, noRead.ctx, base.admin, compiled("hub-runtime"), ledger, q, noRead.request, ready.Worker, noRead.authority, rawPacket)
+			finish(noReadIntent, "none")
+			stopNoRead()
 		}
 		if rawPacket && generation == 1 {
 			packetQueryBatchRollback(t, f, compiled("hub-runtime"), q, r, ready.Worker, a)
@@ -482,6 +515,10 @@ func qualifyPacketQueryManagedLifecycle(t *testing.T, f *queryLedgerFixture) {
 		if e != nil {
 			t.Fatal(e)
 		}
+		revokedReplay, revokedReplayIntent, stopRevokedReplay := request(scope.BeginTool(), true)
+		if !q.Current(revokedReplay.authority, time.Now()) || !revokedReplay.request.Valid(time.Now()) {
+			t.Fatal("revocation replay control not current")
+		}
 		currentParent, e := grantStore.Grant(ctx, q.Grant.ParentID)
 		if e != nil {
 			t.Fatal(e)
@@ -490,6 +527,19 @@ func qualifyPacketQueryManagedLifecycle(t *testing.T, f *queryLedgerFixture) {
 		if e != nil || revoked.RevokedAt.IsZero() {
 			t.Fatal("original query grant revoke", e)
 		}
+		beforeRevokedReplay := readPacketReplayState(t, ctx, base.admin, q)
+		if e = ledger.RegisterQueryReplayCall(revokedReplay.ctx, q, revokedReplay.request, revokedReplay.authority); e == nil {
+			t.Fatal("revoked original grant registered Begin replay")
+		}
+		if !q.Current(revokedReplay.authority, time.Now()) || !revokedReplay.request.Valid(time.Now()) {
+			t.Fatal("revoked replay denial obscured by expired independent proof")
+		}
+		assertPacketReplayDelta(t, beforeRevokedReplay, readPacketReplayState(t, ctx, base.admin, q), 0)
+		refused := audit.OperationOutcome{Intent: revokedReplayIntent, Status: "unavailable", Reason: "not_available", Effect: "none", ClientReceipt: "unknown", OutputDigest: artifact.Digest{97}, OutputBytes: 0, MetadataUntil: revokedReplayIntent.RequestUntil, RecordedAt: time.Now().UTC().Truncate(time.Microsecond)}
+		if e = auditor.Finish(ctx, refused); e != nil {
+			t.Fatal("revoked Begin replay refusal audit", e)
+		}
+		stopRevokedReplay()
 		if e = keyPool.QueryRow(ctx, "SELECT context_packet_query_grant_current($1,$2,$3)", root, q.ID, lastBatch.ID).Scan(&live); e != nil || live {
 			t.Fatal("isolated key predicate ignored current revocation", e)
 		}

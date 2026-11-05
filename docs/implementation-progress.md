@@ -1,5 +1,27 @@
 # Sustained implementation progress
 
+## Installed query admission passes; same-key replay correction underway (2026-11-05)
+
+Candidate `9bf84fcc` passed all 15 CI jobs. Its installed run41990901022
+passed both fixed summaries and returned Pending for the first raw packet query,
+then failed the immediate same-key Begin retry with HTTP503 (Go/harness 1,
+Go713.646s). [Original failed evidence](../test/results/saved-packet-query-native-41990901022/README.md)
+has 4,255 exact Git hashes, unchanged sources and clean teardown.
+
+The retry's new audited operation was absent from the existing query-call
+journal, so strict `PermitQuery` correctly refused it. The old unit fake had
+not modeled that requirement. Stricter audited-path and real-role PostgreSQL
+regressions reproduce the failure. The correction adds bounded registration of
+the exact keyed repeat before permit; it retains current authority and the
+original query, grant and deadlines. One existing control row per new audited
+repeat is SQL work; it creates no worker, admission, poll, read batch or
+disclosure charge. Corrected service/upgrade/installed qualification is pending.
+
+Fresh resource checks on `9bf84fcc` separately passed all four cases with all
+1,812 input hashes matched and clean teardown; the two complete-case peaks were
+92,012,544 and 131,002,368 bytes. Those named component measurements do not
+qualify the subsequent replay correction or an installed query result.
+
 ## Packet-query SQL correction passes locally; installed retry pending (2026-11-05)
 
 PR169 candidate `329a48fc` passed all 15 eligible CI jobs. Its separate installed

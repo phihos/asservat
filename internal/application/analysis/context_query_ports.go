@@ -72,6 +72,14 @@ type ContextQueryBatchAdmission struct {
 // A lookup is private routing/accounting state. Neither it nor Fresh is a peer
 // permit. Every mutation independently checks exact acknowledged C-08 lineage,
 // accepted C-07 backing, current transaction guards and all original deadlines.
+// ContextQueryReplayCalls registers only a newly audited repetition of a keyed
+// Begin against its original query. It creates one bounded immutable call/control
+// entry, without a poll, read, grant use, worker or new query allocation.
+// PermitQuery remains mandatory afterwards and never inserts missing calls.
+type ContextQueryReplayCalls interface {
+	RegisterQueryReplayCall(context.Context, value.ContextQuery, value.ContextQueryRequest, value.ContextProjectionAuthority) error
+}
+
 type ContextQueryLedger interface {
 	AdmitQuery(context.Context, value.ContextQuery, value.ContextQueryRequest, value.ContextProjectionAuthority) (ContextQueryAdmission, error)
 	LookupQuery(context.Context, identity.Principal, string) (value.ContextQuery, error)

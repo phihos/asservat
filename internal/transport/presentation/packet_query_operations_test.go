@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	jsonschema "github.com/santhosh-tekuri/jsonschema/v6"
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -22,7 +23,46 @@ func (packetBridgeCompiler) CompilePacketQueryFilter(context.Context, string) (v
 	return value.PacketQueryProgram{}, nil
 }
 
-type packetBridgePort struct{ *bridgeFixture }
+type packetBridgePort struct {
+	*bridgeFixture
+	calls map[string]value.ContextQueryRequest
+}
+
+func newPacketBridgePort(f *bridgeFixture) packetBridgePort {
+	return packetBridgePort{bridgeFixture: f, calls: make(map[string]value.ContextQueryRequest)}
+}
+func (p packetBridgePort) AdmitQuery(ctx context.Context, q value.ContextQuery, r value.ContextQueryRequest, a value.ContextProjectionAuthority) (analysisapp.ContextQueryAdmission, error) {
+	out, err := p.bridgeFixture.AdmitQuery(ctx, q, r, a)
+	if err == nil {
+		p.calls[r.Call.ID] = r
+	}
+	return out, err
+}
+func (p packetBridgePort) AdmitQueryPoll(ctx context.Context, q value.ContextQuery, r value.ContextQueryRequest, a value.ContextProjectionAuthority) error {
+	if err := p.bridgeFixture.AdmitQueryPoll(ctx, q, r, a); err != nil {
+		return err
+	}
+	p.calls[r.Call.ID] = r
+	return nil
+}
+func (p packetBridgePort) RegisterQueryReplayCall(ctx context.Context, q value.ContextQuery, r value.ContextQueryRequest, a value.ContextProjectionAuthority) error {
+	initial, ok := p.calls[q.OperationID]
+	if !ok || !q.InvocationKey.Valid() || !reflect.DeepEqual(q, p.q) || r.Call.ID == q.OperationID || r.Call.Tool != q.Scope.BeginTool() || r.Call.InputFormat != initial.Call.InputFormat || r.Call.MACVersion != initial.Call.MACVersion || r.Call.InputDigest != initial.Call.InputDigest || r.Call.Principal != q.Scope.Principal {
+		return value.ErrUnavailable
+	}
+	if old, exists := p.calls[r.Call.ID]; exists && !reflect.DeepEqual(old, r) {
+		return value.ErrUnavailable
+	}
+	p.calls[r.Call.ID] = r
+	return p.bridgeFixture.PermitQuery(ctx, q, r, a)
+}
+func (p packetBridgePort) PermitQuery(ctx context.Context, q value.ContextQuery, r value.ContextQueryRequest, a value.ContextProjectionAuthority) error {
+	old, ok := p.calls[r.Call.ID]
+	if !ok || !reflect.DeepEqual(old, r) {
+		return value.ErrUnavailable
+	}
+	return p.bridgeFixture.PermitQuery(ctx, q, r, a)
+}
 
 func (f packetBridgePort) ResolvePacketProjectionRoute(context.Context, string, string, identity.Identity, artifact.RecoveryProof) (value.ContextProjectionCandidate, error) {
 	return f.a.Scope.Candidate(), nil
@@ -61,7 +101,7 @@ func TestPacketQueryActualAuditedBeginReplayAndReadyEnvelope(t *testing.T) {
 			f.a.Scope.PacketQuery, _ = r.Selection(value.PacketQueryProgram{}).Window()
 			f.p.Profile.Worker.MemoryBytes = value.PacketQueryWorkerBytes
 			f.p.Profile.Worker.WorkerTransientBytes = value.PacketQueryWorkerBytes
-			port := packetBridgePort{f}
+			port := newPacketBridgePort(f)
 			f.s.Results.Ledger = port
 			f.s.PacketRoutes = port
 			f.s.PacketCompiler = packetBridgeCompiler{}
@@ -177,7 +217,7 @@ func TestPacketQueryMissingRawGrantIsActionableWithoutEffects(t *testing.T) {
 	f.a.Scope.SourceProjectionDigest = artifact.Digest{}
 	f.a.Scope.Selection = value.LineSelection{}
 	f.a.Scope.PacketQuery, _ = r.Selection(value.PacketQueryProgram{}).Window()
-	port := packetBridgePort{f}
+	port := newPacketBridgePort(f)
 	f.s.Results.Ledger = port
 	f.s.Results.Authority = packetMissingAuthority{f}
 	f.s.PacketRoutes = port
@@ -240,7 +280,7 @@ func TestPacketQueryMaximumAdmittedPageFitsDirectAndNestedEnvelope(t *testing.T)
 			f.p.Profile.Worker.MemoryBytes, f.p.Profile.Worker.WorkerTransientBytes = value.PacketQueryWorkerBytes, value.PacketQueryWorkerBytes
 			admittedRows, admittedBytes := len(page.Rows), page.EncodedSize()
 			f.result = &value.ProjectionResult{PacketQuery: &page}
-			port := packetBridgePort{f}
+			port := newPacketBridgePort(f)
 			f.s.Results.Ledger = port
 			f.s.PacketRoutes = port
 			f.s.PacketCompiler = packetBridgeCompiler{}

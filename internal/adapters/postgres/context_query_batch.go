@@ -78,7 +78,7 @@ func (s *ContextQueries) BeginReadBatch(ctx context.Context, q value.ContextQuer
 			}
 			call, e := tx.ReadContextQueryCall(ctx, custodydb.ReadContextQueryCallParams{OperationID: id(r.Call.ID), QueryID: id(q.ID)})
 			var request value.ContextQueryRequest
-			if e != nil || queryDecode(call.Request, 8192, &request) != nil || !sameAuditJSON(request, r) {
+			if e != nil || (!call.IsPoll && r.Call.ID != q.OperationID) || queryDecode(call.Request, 8192, &request) != nil || !sameAuditJSON(request, r) {
 				return value.ErrUnavailable
 			}
 			now, e := tx.CurrentTime(ctx)

@@ -336,7 +336,12 @@ BEGIN
   call_tool:=begin_tool;
   IF NEW.is_poll THEN call_tool:='get_query_result'; END IF;
   IF TG_OP<>'INSERT' OR n>=q.deadline OR NOT public.context_query_complete_object(NEW.request,ARRAY['Call','OwnerID','HubProcessEpoch']) OR NOT public.context_query_intent_current(q.root_id,NEW.operation_id,q.actor,q.issuer_epoch,NEW.request->'Call') OR NEW.request->'Call'->>'ID'<>NEW.operation_id::text OR NEW.request->'Call'->'Principal' IS DISTINCT FROM q.actor OR
-   NEW.request->'Call'->>'RootID'<>q.root_id::text OR NEW.is_poll<>(NEW.operation_id<>q.operation_id) OR NEW.request->'Call'->>'Tool' IS DISTINCT FROM call_tool THEN RAISE EXCEPTION 'query invocation mismatch' USING ERRCODE='23514'; END IF;
+   NEW.request->'Call'->>'RootID'<>q.root_id::text OR (NEW.is_poll AND NEW.operation_id=q.operation_id) OR
+   (NOT NEW.is_poll AND NEW.operation_id<>q.operation_id AND NOT COALESCE(
+    q.query#>>'{Scope,DisplayVersion}'='approved-pcap-query/v1' AND q.invocation_key IS NOT NULL AND q.request_digest IS NOT NULL AND
+    NEW.request#>'{Call,InputFormat}'=q.initial_request#>'{Call,InputFormat}' AND
+    NEW.request#>'{Call,MACVersion}'=q.initial_request#>'{Call,MACVersion}' AND
+    NEW.request#>'{Call,InputDigest}'=q.initial_request#>'{Call,InputDigest}',false)) OR NEW.request->'Call'->>'Tool' IS DISTINCT FROM call_tool THEN RAISE EXCEPTION 'query invocation mismatch' USING ERRCODE='23514'; END IF;
   UPDATE public.context_query SET polls=polls+CASE WHEN NEW.is_poll THEN 1 ELSE 0 END,controls=controls+1 WHERE id=q.id;
  ELSIF TG_TABLE_NAME='context_query_batch' THEN
   IF TG_OP='INSERT' THEN
@@ -348,7 +353,7 @@ BEGIN
     NOT public.context_query_intent_current(q.root_id,NEW.operation_id,q.actor,q.issuer_epoch,NEW.batch->'Request'->'Call') OR
     q.active_batch IS NOT NULL OR q.uncertain OR NEW.generation<>q.generation+1 OR NEW.generation>public.context_query_read_batches(q.query->'Scope') OR NEW.claim_id IS NOT NULL OR NEW.closed OR
     NEW.batch->>'OperationID' IS DISTINCT FROM NEW.operation_id::text OR NEW.batch->>'ID'<>NEW.id::text OR NEW.batch->>'QueryID'<>q.id::text OR (NEW.batch->>'Generation')::smallint<>NEW.generation OR
-    NOT EXISTS(SELECT 1 FROM public.context_query_call c WHERE c.operation_id=NEW.operation_id AND c.query_id=q.id AND c.request=NEW.batch->'Request') OR
+    NOT EXISTS(SELECT 1 FROM public.context_query_call c WHERE c.operation_id=NEW.operation_id AND c.query_id=q.id AND c.request=NEW.batch->'Request' AND (c.is_poll OR c.operation_id=q.operation_id)) OR
     NOT EXISTS(SELECT 1 FROM public.context_query_worker w WHERE w.query_id=q.id AND w.binding=NEW.batch->'Worker') THEN RAISE EXCEPTION 'query batch unavailable' USING ERRCODE='23514'; END IF;
    UPDATE public.context_query SET generation=NEW.generation,active_batch=NEW.id,controls=controls+1 WHERE id=q.id;
   ELSE

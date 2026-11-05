@@ -128,6 +128,15 @@ repeated initial call returns only the same pending handle, without another
 read or debit; the existing paid poll performs any later page read. A lost
 reply cannot allocate a successor worker or move spend to a newer grant.
 
+Each new audited Begin repeat registers its exact request in the existing
+query-call journal before the strict current permit check. This costs one
+bounded control-row insert, under the existing query control ceiling. The
+repeat must match the original normalized input MAC, format/version, principal
+and keyed query; current audit, source and grant checks remain mandatory.
+Re-registering the same call is exact-content idempotent. It is a nonpoll call:
+poll count, query allocations, worker identity, batches and disclosure spend do
+not advance. No separate journal or replay lifecycle state is added.
+
 Store normalized bounded control selection/program and keyed invocation
 identity, not output rows/payload, original arbitrary filter text, credentials
 or evidence in SQL/audit/logs. Numeric addresses remain user data under finite

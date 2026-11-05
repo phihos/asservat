@@ -145,6 +145,13 @@ func (s ContextProjectionResults) replayPacketQuery(o *projectionRequest, q valu
 	if e != nil {
 		return nil, e
 	}
+	calls, ok := s.Ledger.(ContextQueryReplayCalls)
+	if !ok {
+		return nil, queryStepped("replay-registration", value.ErrUnavailable)
+	}
+	if e = calls.RegisterQueryReplayCall(o.ctx, q, o.request, a); e != nil {
+		return nil, queryCollapsed("replay-registration", value.ErrUnavailable, e)
+	}
 	if e = s.Ledger.PermitQuery(o.ctx, q, o.request, a); e != nil {
 		return nil, e
 	}

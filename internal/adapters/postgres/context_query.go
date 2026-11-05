@@ -49,6 +49,7 @@ type ContextQueries struct {
 }
 
 var _ app.ContextQueryLedger = (*ContextQueries)(nil)
+var _ app.ContextQueryReplayCalls = (*ContextQueries)(nil)
 
 func NewContextQueries(ctx context.Context, pool *pgxpool.Pool, root string, effects EffectTransactionGuards, backing ContextQueryBackingGuard, workers ContextQueryWorkerGuard) (*ContextQueries, error) {
 	if !authorization.UUID(root) || effects.Retention == nil || effects.Recovery == nil || effects.Retention.root != root || effects.Recovery.root != root || backing == nil {
@@ -401,6 +402,31 @@ func (s *ContextQueries) AdmitQueryPoll(ctx context.Context, q value.ContextQuer
 		return s.call(ctx, tx, q, r, true)
 	})
 }
+
+// RegisterQueryReplayCall binds a newly acknowledged repetition of the exact
+// normalized Begin input to its immutable query. It charges one existing control
+// on first insertion, not a poll, read, worker, query unit or grant use.
+func (s *ContextQueries) RegisterQueryReplayCall(ctx context.Context, q value.ContextQuery, r value.ContextQueryRequest, a value.ContextProjectionAuthority) error {
+	if q.Scope.DisplayVersion != value.PacketQueryDisplayVersion || !q.Scope.PacketQuery.Valid() || !q.InvocationKey.Valid() || r.Call.Tool != q.Scope.BeginTool() {
+		return value.ErrUnavailable
+	}
+	return s.current(ctx, q, r, a, func(ctx context.Context, tx *custodydb.Queries, _ custodydb.ContextQueryBacking, _ custodydb.ContextQueryAllocation) error {
+		row, e := queryExact(ctx, tx, q)
+		var original value.ContextQueryRequest
+		if e != nil || row.Uncertain || queryDecode(row.InitialRequest, 8192, &original) != nil || r.Call.InputFormat != original.Call.InputFormat || r.Call.MACVersion != original.Call.MACVersion || r.Call.InputDigest != original.Call.InputDigest {
+			return value.ErrUnavailable
+		}
+		// An original operation ID can only repeat its exact already-bound request.
+		if r.Call.ID == q.OperationID && !sameAuditJSON(original, r) {
+			return value.ErrUnavailable
+		}
+		if e = packetQueryCurrentGrant(ctx, tx, q, ""); e != nil {
+			return e
+		}
+		return s.call(ctx, tx, q, r, false)
+	})
+}
+
 func (s *ContextQueries) PermitQuery(ctx context.Context, q value.ContextQuery, r value.ContextQueryRequest, a value.ContextProjectionAuthority) error {
 	return s.current(ctx, q, r, a, func(ctx context.Context, tx *custodydb.Queries, _ custodydb.ContextQueryBacking, _ custodydb.ContextQueryAllocation) error {
 		row, e := queryExact(ctx, tx, q)
