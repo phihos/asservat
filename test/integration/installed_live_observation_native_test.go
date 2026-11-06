@@ -327,8 +327,17 @@ func installedLiveMCP(t *testing.T, ctx context.Context, db *pgxpool.Pool, root 
 	var page v.SourcePage
 	var selected *v.SourceRow
 	for attempt := 0; ; attempt++ {
-		if _, e := must("list_live_sources", map[string]any{"target_ref": source.Target, "limit": 20}, &page); e != nil {
-			return e
+		r, code, e := call(ctx, "list_live_sources", map[string]any{"target_ref": source.Target, "limit": 20})
+		if e == nil && code == "LiveUnavailable" && attempt < 10 {
+			// Read-only inventory; record transient refusals instead of hiding them.
+			t.Logf("installed live inventory attempt %d refused LiveUnavailable; retrying", attempt)
+			if e := installedJourneyPause(ctx, 2*time.Second); e != nil {
+				return e
+			}
+			continue
+		}
+		if e != nil || code != "" || r.Status != "ok" || json.Unmarshal(r.Data, &page) != nil {
+			return fmt.Errorf("installed live list_live_sources: %s %v", code, e)
 		}
 		selected = nil
 		for n := range page.Sources {
