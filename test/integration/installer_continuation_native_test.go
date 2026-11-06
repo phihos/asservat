@@ -563,6 +563,12 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 			})
 			return
 		}
+		if installedJourneyFocus() == "live-observation" {
+			t.Run("live-observation", func(t *testing.T) {
+				qualifyInstalledLiveObservation(t, ctx, installedLiveRun{SQL: admin, API: api, RootID: p.RootID, Installation: installation, HubNamespace: desired.TargetNamespace, OwnerDeployment: prefix + "-owner", Identity: identity, PublicRoot: publicRoot, Address: publicAddress, Origin: origin, RegionalConfig: f.Clusters[1].Config, ClusterID: cluster, Namespace: namespace, Workload: workload, Diagnose: diagnose})
+			})
+			return
+		}
 		if installedOngoingFocus() {
 			t.Run(installedJourneyFocus(), func(t *testing.T) {
 				qualifyInstalledOngoingSave(t, ctx, admin, p.RootID, identity, publicRoot, publicAddress, origin, diagnose)

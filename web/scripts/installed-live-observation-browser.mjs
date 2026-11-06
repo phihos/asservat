@@ -1,0 +1,35 @@
+// Installed React only: actual session, public authority and existing source
+// events. Commands carry expected original identities, never replies or permits.
+import { chromium, expect } from '@playwright/test';
+import assert from 'node:assert/strict';
+import { createInterface } from 'node:readline';
+import * as valid from '../src/generated/validate-live.js';
+import { readInstalledHistoryResponse } from './installed-history-response.mjs';
+const input=createInterface({input:process.stdin,crlfDelay:Infinity})[Symbol.asyncIterator]();
+async function command(){const line=await input.next();assert(!line.done&&Buffer.byteLength(line.value)<=16384,'bounded private command');return JSON.parse(line.value)}
+function event(value){const raw=JSON.stringify(value);assert(Buffer.byteLength(raw)<=32768,'bounded summary');process.stdout.write(raw+'\n')}
+const config=await command();assert.equal(config.mode,'installed-live');assert.equal(new URL(config.origin).protocol,'https:');assert.equal(new URL(config.proxy).hostname,'127.0.0.1');
+const browser=await chromium.launch({headless:true,proxy:{server:config.proxy,bypass:'<-loopback>'},...(process.env.ASSERVAT_CHROMIUM?{executablePath:process.env.ASSERVAT_CHROMIUM}:{})});
+const context=await browser.newContext({ignoreHTTPSErrors:true,acceptDownloads:false,locale:'en-US',viewport:{width:1440,height:900}});
+const errors=[];let stage='session',total=0;
+try{
+ await context.addCookies(config.cookies);config.cookies=[];
+ const page=await context.newPage();page.on('pageerror',()=>errors.push('pageerror'));
+ page.on('request',r=>{const u=new URL(r.url());if(u.pathname.startsWith('/api/v1/operations/')){total++;if(!['list_live_sources','open_live_watch','read_live_watch','update_live_watch','close_live_watch'].includes(u.pathname.split('/').at(-1)))errors.push('unexpected-operation')}});
+ const checked=async(response,name)=>{const read=await readInstalledHistoryResponse(response);assert.equal(read.http,200,name);assert.equal(read.body,'complete',name);const out=read.reply;assert(valid['validOutput_'+name](out),name+' closed output');assert.equal(out.status,'ok',name+' accepted');const h=await response.request().allHeaders();assert.equal(response.request().method(),'POST');assert.equal(h.origin,config.origin);assert.equal(typeof h['x-csrf-token'],'string');assert(h['x-csrf-token'].length===43);assert.equal(h.authorization,undefined);return out};
+ const wait=name=>page.waitForResponse(r=>new URL(r.url()).pathname==='/api/v1/operations/'+name&&r.request().method()==='POST');
+ await page.goto(config.origin+'/live');await expect(page.getByRole('heading',{name:'Observe existing recordings',exact:true})).toBeVisible();
+ await page.getByLabel('Cluster ID',{exact:true}).fill(config.target.cluster_id);await page.getByLabel('Namespace',{exact:true}).fill(config.target.namespace);await page.getByLabel('Workload or pod name',{exact:true}).fill(config.target.name);await page.getByRole('button',{name:'Use this target',exact:true}).click();
+ const panel=page.getByRole('region',{name:'Live observation',exact:true});await expect(panel.getByRole('button',{name:'Find live sources',exact:true})).toBeVisible();assert.equal(total,0,'entry/session shell must not query or acquire live data');event({kind:'ready'});
+ for(;;){const cmd=await command();if(cmd.kind==='finish')break;assert.equal(cmd.kind,'observe');const source=cmd.source;assert(['policy','manualSession'].includes(source.kind));assert(['packetMetadata','syscallMetadata','httpHeaders'].includes(source.projection));stage=source.kind+'/'+source.projection;const before=total;
+  const listedWait=wait('list_live_sources');await panel.getByRole('button',{name:'Find live sources',exact:true}).click();const listed=await checked(await listedWait,'list_live_sources');const choices=listed.data.sources.map((s,i)=>({s,i})).filter(x=>x.s.eligible&&x.s.pod_uid===source.pod_uid&&x.s.action_id===source.action_id&&x.s.owner_kind===source.kind&&x.s.projections.includes(source.projection));assert.equal(choices.length,1,'one exact original eligible source');await panel.getByRole('checkbox').nth(choices[0].i).check();await panel.getByRole('combobox',{name:'Projection',exact:true}).selectOption(source.projection);
+  const openedWait=wait('open_live_watch');await panel.getByRole('button',{name:'Open live view',exact:true}).click();const opened=await checked(await openedWait,'open_live_watch');assert.deepEqual(opened.data.source_session_ids,[source.source_id]);assert.equal(opened.data.projection,source.projection);const originalEnd=opened.data.expires_at;assert(Date.parse(originalEnd)<=Date.parse(source.hard_until));
+  await expect(panel.getByRole('table',{name:'Approved live observations',exact:true})).toBeVisible({timeout:5000});await expect(panel.getByRole('button',{name:/^Inspect observation /}).first()).toBeVisible();await panel.getByRole('button',{name:/^Inspect observation /}).first().click();await expect(panel.getByRole('region',{name:'Selected observation',exact:true})).toBeVisible();
+  const rendered=await panel.getByRole('table').innerText();for(const marker of source.forbidden??[])assert(!rendered.includes(marker),'source canary reached approved rows');
+  const pausedWait=wait('update_live_watch');await panel.getByRole('button',{name:'Pause view',exact:true}).click();const paused=await checked(await pausedWait,'update_live_watch');assert.equal(paused.data.state,'Paused');assert.equal(paused.data.expires_at,originalEnd);
+  const resumedWait=wait('update_live_watch');await panel.getByRole('button',{name:'Resume from now',exact:true}).click();const resumed=await checked(await resumedWait,'update_live_watch');assert.equal(resumed.data.state,'Active');assert.equal(resumed.data.expires_at,originalEnd);await expect(panel.getByRole('region',{name:'Selected observation',exact:true})).toHaveCount(0);
+  const closeWait=wait('close_live_watch');await panel.getByRole('button',{name:'Close view',exact:true}).click();const closed=await checked(await closeWait,'close_live_watch');assert.equal(closed.data.state,'Closed');assert.equal(closed.data.expires_at,originalEnd);await expect(panel.getByRole('table')).toHaveCount(0);await panel.getByRole('button',{name:'Choose another live view',exact:true}).click();
+  assert(total-before<=25,'finite episode operation bound');assert.deepEqual(errors,[]);assert.equal(await page.evaluate(()=>localStorage.length+sessionStorage.length),0);event({kind:'observed',source_id:source.source_id,projection:source.projection,watch_id:opened.data.watch_id,source_ids:opened.data.source_session_ids,expires_at:originalEnd,operations:total-before,rows_rendered:true,cleared:true});
+ }
+ assert.deepEqual(errors,[]);event({kind:'done',operations:total});
+}catch(error){console.error('installed live stage '+stage+' failed');throw error}finally{await context.close();await browser.close()}

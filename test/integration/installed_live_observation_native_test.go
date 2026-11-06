@@ -1,0 +1,545 @@
+package integration
+
+// Installed qualification uses only the real public/session/source pipelines.
+// Administrator SQL is read-only evidence, never an authority producer.
+import (
+	"bufio"
+	"context"
+	"crypto/sha256"
+	"crypto/tls"
+	"crypto/x509"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net"
+	"net/http"
+	"net/url"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"slices"
+	"strings"
+	"sync"
+	"syscall"
+	"testing"
+	"time"
+
+	liveapp "asservat.local/asservat/internal/application/live"
+	"asservat.local/asservat/internal/contracts"
+	v "asservat.local/asservat/internal/domain/live"
+	"github.com/jackc/pgx/v5/pgxpool"
+	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
+	core "k8s.io/api/core/v1"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+)
+
+type installedLiveRun struct {
+	SQL                                                             *pgxpool.Pool
+	API                                                             kubernetes.Interface
+	RootID, Installation, HubNamespace, OwnerDeployment             string
+	Identity                                                        *installedIdentity
+	PublicRoot                                                      []byte
+	Address, Origin, RegionalConfig, ClusterID, Namespace, Workload string
+	Diagnose                                                        func()
+}
+
+type installedLiveReply struct {
+	installedJourneyEnvelope
+	NextCursor *string `json:"next_cursor"`
+}
+
+// First enablement changes the existing protected administrator document only.
+// It cannot add a placement, download client, source or observation permit.
+func installedLiveSettings(in contracts.DownloadEnvironmentSettings, root, cluster, issuer string) (contracts.DownloadEnvironmentSettings, error) {
+	var out contracts.DownloadEnvironmentSettings
+	if in.Format != contracts.DownloadEnvironmentFormat || in.RootID != root || in.Revision < 1 || in.Revision >= 2147483647 || in.LiveRead != nil {
+		return out, errors.New("original disabled delivery settings required")
+	}
+	raw, err := json.Marshal(in)
+	if err != nil || json.Unmarshal(raw, &out) != nil {
+		return out, errors.New("delivery settings encoding")
+	}
+	var paths []string
+	for _, p := range in.Paths {
+		if p.TargetClusterID == cluster {
+			paths = append(paths, p.ID)
+		}
+	}
+	if len(paths) != 1 {
+		return out, errors.New("one existing installed path required")
+	}
+	clients := make([]contracts.LiveReadClient, 0, 2)
+	for _, id := range []string{"console", "mcp"} {
+		matches := 0
+		for _, c := range in.Clients {
+			if c.ID == id && c.Issuer == issuer && c.Kind == "human" && slices.Contains(c.PathIDs, paths[0]) {
+				matches++
+				clients = append(clients, contracts.LiveReadClient{Issuer: c.Issuer, ID: c.ID, Kind: c.Kind, PathIDs: slices.Clone(paths)})
+			}
+		}
+		if matches != 1 {
+			return out, errors.New("existing exact console and MCP clients required")
+		}
+	}
+	out.Revision++
+	out.LiveRead = &contracts.LiveReadSettings{Root: contracts.LiveRootSettings{Watches: 4, PrincipalWatches: 2, WorkloadWatches: 2, Rate: 1 << 20, Burst: 1 << 20}, Projections: []string{v.Packet, v.Syscall, v.HTTP}, Clients: clients, Ceilings: []contracts.LiveReadCeiling{{ClusterID: cluster, Duration: 20, Output: 1 << 20, Rate: 64 << 10, Rows: 20, Buffer: 128 << 10, RowAge: 10, Replay: 2}}}
+	encoded, err := json.Marshal(out)
+	if err != nil || len(encoded) > contracts.DownloadEnvironmentMaxBytes {
+		return contracts.DownloadEnvironmentSettings{}, errors.New("delivery settings bound")
+	}
+	return out, nil
+}
+
+func installedLiveOwnerEpoch(ctx context.Context, db *pgxpool.Pool, installation, podUID string) (string, error) {
+	rows, err := db.Query(ctx, `SELECT DISTINCT e.process_epoch::text FROM hub_owner_enrollment e JOIN hub_owner_certificate c ON c.enrollment_id=e.id JOIN fleet_current_trust t ON t.installation_id=e.installation_id AND t.issuer_epoch=e.issuer_epoch WHERE e.installation_id=$1 AND e.pod_uid=$2 AND e.usage='server' AND e.retired_at IS NULL AND e.audit_receipt_json IS NOT NULL AND c.activated_at IS NOT NULL AND c.audit_receipt_json IS NOT NULL AND c.not_after>clock_timestamp() AND NOT t.suspended AND NOT t.recovery_blocked AND t.observed_at<=clock_timestamp() AND clock_timestamp()<t.fresh_until LIMIT 2`, installation, podUID)
+	if err != nil {
+		return "", err
+	}
+	defer rows.Close()
+	var epochs []string
+	for rows.Next() {
+		var e string
+		if rows.Scan(&e) != nil {
+			return "", errors.New("owner registration shape")
+		}
+		epochs = append(epochs, e)
+	}
+	if rows.Err() != nil || len(epochs) != 1 {
+		return "", errors.New("one current activated original server epoch required")
+	}
+	return epochs[0], nil
+}
+func installedLiveReadyPod(ctx context.Context, api kubernetes.Interface, namespace, selector string) (core.Pod, error) {
+	list, err := api.CoreV1().Pods(namespace).List(ctx, meta.ListOptions{LabelSelector: selector, Limit: 3})
+	if err != nil || len(list.Items) != 1 {
+		return core.Pod{}, errors.New("one original owner Pod required")
+	}
+	p := list.Items[0]
+	if p.DeletionTimestamp != nil || len(p.Status.ContainerStatuses) != 1 || p.Status.ContainerStatuses[0].RestartCount != 0 {
+		return core.Pod{}, errors.New("owner Pod restarted or deleting")
+	}
+	for _, c := range p.Status.Conditions {
+		if c.Type == core.PodReady && c.Status == core.ConditionTrue {
+			return p, nil
+		}
+	}
+	return core.Pod{}, errors.New("owner Pod not Ready")
+}
+func installedLiveEnable(t *testing.T, ctx context.Context, c installedLiveRun) {
+	t.Helper()
+	call, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	defer cancel()
+	deployment, err := c.API.AppsV1().Deployments(c.HubNamespace).Get(call, c.OwnerDeployment, meta.GetOptions{})
+	if err != nil {
+		t.Fatal("original owner Deployment", err)
+	}
+	selector := meta.FormatLabelSelector(deployment.Spec.Selector)
+	before, err := installedLiveReadyPod(call, c.API, c.HubNamespace, selector)
+	if err != nil {
+		t.Fatal(err)
+	}
+	epoch, err := installedLiveOwnerEpoch(call, c.SQL, c.Installation, string(before.UID))
+	if err != nil {
+		t.Fatal("original activated owner", err)
+	}
+	name := contracts.OwnerDownloadEnvironmentName(c.Installation)
+	cm, err := c.API.CoreV1().ConfigMaps(c.HubNamespace).Get(call, name, meta.GetOptions{})
+	if err != nil || cm.UID == "" || cm.ResourceVersion == "" || len(cm.Data) != 1 {
+		t.Fatal("original guarded delivery source", err)
+	}
+	var current contracts.DownloadEnvironmentSettings
+	if json.Unmarshal([]byte(cm.Data[contracts.DownloadEnvironmentFile]), &current) != nil {
+		t.Fatal("guarded delivery source shape")
+	}
+	settings, err := installedLiveSettings(current, c.RootID, c.ClusterID, c.Identity.Issuer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := json.Marshal(settings)
+	if err != nil {
+		t.Fatal(err)
+	}
+	next := cm.DeepCopy()
+	next.Data[contracts.DownloadEnvironmentFile] = string(raw)
+	changed, err := c.API.CoreV1().ConfigMaps(c.HubNamespace).Update(call, next, meta.UpdateOptions{FieldValidation: "Strict"})
+	if err != nil || changed.UID != cm.UID || changed.ResourceVersion == cm.ResourceVersion {
+		t.Fatal("installation administrator delivery CAS", err)
+	}
+	uid := before.UID
+	if err = c.API.CoreV1().Pods(c.HubNamespace).Delete(call, before.Name, meta.DeleteOptions{Preconditions: &meta.Preconditions{UID: &uid}}); err != nil {
+		t.Fatal("installation administrator exact old owner deletion", err)
+	}
+	ticker := time.NewTicker(200 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		p, e := installedLiveReadyPod(call, c.API, c.HubNamespace, selector)
+		if e == nil && p.UID != before.UID {
+			newEpoch, e := installedLiveOwnerEpoch(call, c.SQL, c.Installation, string(p.UID))
+			if e == nil && newEpoch != epoch {
+				nowDeployment, e := c.API.AppsV1().Deployments(c.HubNamespace).Get(call, c.OwnerDeployment, meta.GetOptions{})
+				if e != nil || nowDeployment.UID != deployment.UID || nowDeployment.Generation != deployment.Generation {
+					t.Fatal("administrator restart changed accepted Deployment")
+				}
+				if len(p.OwnerReferences) != 1 || len(before.OwnerReferences) != 1 || p.OwnerReferences[0].UID != before.OwnerReferences[0].UID {
+					t.Fatal("restart replaced original ReplicaSet")
+				}
+				t.Logf("guarded delivery revision%d accepted; exact oldPod%s replacedby%s with distinct currentactivated server epoch; original Deployment/ReplicaSet retained", settings.Revision, before.UID, p.UID)
+				return
+			}
+		}
+		select {
+		case <-call.Done():
+			c.Diagnose()
+			t.Fatal("new owner enrollment/Ready proof unavailable", call.Err())
+		case <-ticker.C:
+		}
+	}
+}
+
+func qualifyInstalledLiveObservation(t *testing.T, ctx context.Context, c installedLiveRun) {
+	t.Helper()
+	if _, err := os.Stat("/etc/asservat-disposable-host"); err != nil {
+		t.Fatal("installed live requires disposable runner")
+	}
+	installedLiveEnable(t, ctx, c)
+	cert, err := x509.ParseCertificate(c.PublicRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.Identity.initializeProcessing(t, ctx, cert, c.Address, c.Origin, c.Diagnose)
+	roots := x509.NewCertPool()
+	roots.AddCert(cert)
+	dial := &net.Dialer{Timeout: 5 * time.Second}
+	transport := &http.Transport{Proxy: nil, ForceAttemptHTTP2: true, TLSClientConfig: &tls.Config{RootCAs: roots, MinVersion: tls.VersionTLS13}, DialContext: func(call context.Context, network, _ string) (net.Conn, error) {
+		return dial.DialContext(call, network, c.Address)
+	}}
+	defer transport.CloseIdleConnections()
+	client := sdk.NewClient(&sdk.Implementation{Name: "installed-live-observation", Version: "1"}, nil)
+	session, err := client.Connect(ctx, &sdk.StreamableClientTransport{Endpoint: strings.TrimSuffix(c.Origin, "/") + "/mcp", HTTPClient: &http.Client{Transport: installedJourneyBearer{transport, c.Identity.mcpTokenSource(c.Origin).Token}, Timeout: 45 * time.Second}, MaxRetries: -1, DisableStandaloneSSE: true}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer session.Close()
+	wire, err := contracts.NewInvestigationContracts()
+	if err != nil {
+		t.Fatal(err)
+	}
+	liveCalls := 0
+	call := func(parent context.Context, name string, input any) (installedLiveReply, string, error) {
+		var zero installedLiveReply
+		raw, e := json.Marshal(input)
+		if e != nil || wire.ValidateInput(name, raw) != nil {
+			return zero, "", errors.New("invalid authored installed input")
+		}
+		bounded, stop := context.WithTimeout(parent, 5*time.Second)
+		defer stop()
+		reply, e := session.CallTool(bounded, &sdk.CallToolParams{Name: name, Arguments: input})
+		if e != nil {
+			return zero, "", e
+		}
+		envelope, code, e := installedJourneyReplyCode(wire, name, reply)
+		if e != nil {
+			return zero, "", e
+		}
+		raw, e = json.Marshal(reply.StructuredContent)
+		if e != nil || json.Unmarshal(raw, &zero) != nil {
+			return zero, "", errors.New("installed live result shape")
+		}
+		zero.installedJourneyEnvelope = envelope
+		if strings.HasSuffix(name, "live_watch") || name == "list_live_sources" {
+			liveCalls++
+			if liveCalls > 100 {
+				return zero, "", errors.New("bounded live operation count exceeded")
+			}
+		}
+		return zero, code, nil
+	}
+	invoke := installedRecordingInvoke(func(callCtx context.Context, name string, input any) (installedJourneyEnvelope, string, error) {
+		r, code, e := call(callCtx, name, input)
+		return r.installedJourneyEnvelope, code, e
+	})
+	console := c.Identity.consoleSession(t, ctx, cert, c.Address, c.Origin)
+	browser := startInstalledLiveBrowser(t, ctx, console, c.Address, map[string]string{"cluster_id": c.ClusterID, "namespace": c.Namespace, "kind": "Deployment", "name": c.Workload})
+	defer browser.close()
+	episodes := 0
+	qualifyInstalledLiveSources(t, ctx, c.SQL, c.Identity, c.PublicRoot, c.Address, c.Origin, c.RegionalConfig, c.RootID, transport, invoke, func(callCtx context.Context, source installedLiveFixture) error {
+		episodes++
+		if episodes > 6 {
+			return errors.New("more than six original source episodes")
+		}
+		if source.SourceID == "" || source.PodUID == "" || source.ActionID == "" || !time.Now().Before(source.HardUntil) {
+			return errors.New("actual original running source required")
+		}
+		browser.begin(source)
+		if e := installedLiveMCP(t, callCtx, c.SQL, c.RootID, source, call); e != nil {
+			return e
+		}
+		browser.finishEpisode(source)
+		return nil
+	})
+	if episodes != 6 {
+		t.Fatal("incomplete installed projection/source matrix", episodes)
+	}
+	browser.close()
+	t.Logf("installed live: six original source episodes, realC3/SQL/owner/node and React+officialSDK; MCP%d live operations, no viewer acquisition", liveCalls)
+}
+
+type installedLiveCall func(context.Context, string, any) (installedLiveReply, string, error)
+
+func installedLiveMCP(t *testing.T, ctx context.Context, db *pgxpool.Pool, root string, source installedLiveFixture, call installedLiveCall) error {
+	t.Helper()
+	must := func(name string, args any, out any) (installedLiveReply, error) {
+		r, code, e := call(ctx, name, args)
+		if e != nil || code != "" || r.Status != "ok" {
+			return r, fmt.Errorf("installed live %s: %s %w", name, code, e)
+		}
+		if out != nil && json.Unmarshal(r.Data, out) != nil {
+			return r, errors.New("installed live typed result")
+		}
+		return r, nil
+	}
+	var page v.SourcePage
+	if _, e := must("list_live_sources", map[string]any{"target_ref": source.Target, "limit": 20}, &page); e != nil {
+		return e
+	}
+	var selected *v.SourceRow
+	for n := range page.Sources {
+		s := &page.Sources[n]
+		if s.ID == source.SourceID {
+			selected = s
+		}
+	}
+	if selected == nil || !selected.Eligible || selected.PodUID != source.PodUID || selected.ActionID != source.ActionID || selected.OwnerKind != source.Kind || !slices.Contains(selected.Projections, source.Projection) {
+		return errors.New("inventory substituted original source")
+	}
+	var watch v.Watch
+	request := map[string]any{"source_handles": []string{selected.Handle}, "projection": source.Projection, "idempotency_key": "live-installed-" + source.SourceID, "duration_seconds": 15, "max_output_bytes": 256 << 10}
+	if _, e := must("open_live_watch", request, &watch); e != nil {
+		return e
+	}
+	if !slices.Equal(watch.SourceIDs, []string{source.SourceID}) || watch.Cursor == nil || watch.ExpiresAt.After(source.HardUntil) {
+		return errors.New("watch extended or replaced original source")
+	}
+	before := watch
+	var priorSpent int64
+	if e := db.QueryRow(ctx, `SELECT spent FROM live_watch_control WHERE root_id=$1 AND id=$2`, root, watch.ID).Scan(&priorSpent); e != nil {
+		return e
+	}
+	readInput := map[string]any{"watch_id": watch.ID, "cursor": *watch.Cursor, "limit": 20, "wait_ms": 1000}
+	var received installedLiveReply
+	var batch *v.Batch
+	for tries := 0; tries < 4; tries++ {
+		r, e := must("read_live_watch", readInput, nil)
+		if e != nil {
+			return e
+		}
+		wrapped, _ := json.Marshal(map[string]any{"batch": r.Data})
+		decoded, e := liveapp.DecodeOwnerResult(wrapped, time.Now())
+		if e != nil || decoded.Batch == nil {
+			return errors.New("closed approved row union invalid")
+		}
+		received = r
+		batch = decoded.Batch
+		if len(batch.Rows) > 0 {
+			break
+		}
+		if r.NextCursor == nil {
+			return errors.New("quiet source lost continuation")
+		}
+		readInput["cursor"] = *r.NextCursor
+	}
+	if batch == nil || len(batch.Rows) == 0 {
+		return errors.New("real source has no qualified approved live row")
+	}
+	for _, r := range batch.Rows {
+		if r.SourceID != source.SourceID || r.PodUID != source.PodUID || r.Projection != source.Projection || r.ExpiresAt.After(source.HardUntil) || !r.Valid(time.Now()) {
+			return errors.New("row source/time/projection changed")
+		}
+		raw, _ := json.Marshal(r)
+		if bytesHaveLiveCanary(raw) {
+			return errors.New("source canary entered approved projection")
+		}
+	}
+	replay, e := must("read_live_watch", readInput, nil)
+	if e != nil {
+		return e
+	}
+	var a, b map[string]json.RawMessage
+	if json.Unmarshal(received.Data, &a) != nil || json.Unmarshal(replay.Data, &b) != nil {
+		return errors.New("replay shape")
+	}
+	if string(a["batch_id"]) != string(b["batch_id"]) || string(a["rows"]) != string(b["rows"]) {
+		return errors.New("same cursor changed retained observations")
+	}
+	var firstSpend, lastSpend int64
+	_ = json.Unmarshal(a["output_bytes_spent"], &firstSpend)
+	_ = json.Unmarshal(b["output_bytes_spent"], &lastSpend)
+	if firstSpend <= priorSpent || lastSpend <= firstSpend {
+		return errors.New("same cursor delivery did not retain charge")
+	}
+	// No returned row, cursor or HTTP preview is accepted as SQL accounting proof.
+	var sqlSpent int64
+	var state string
+	if e = db.QueryRow(ctx, `SELECT spent,state FROM live_watch_control WHERE root_id=$1 AND id=$2`, root, watch.ID).Scan(&sqlSpent, &state); e != nil || sqlSpent != lastSpend || state != "Active" {
+		return errors.New("public accounting differs from actual minimized ledger")
+	}
+	for n, mode := range []string{"Paused", "Active"} {
+		if _, e = must("update_live_watch", map[string]any{"watch_id": watch.ID, "expected_revision": watch.Revision, "idempotency_key": fmt.Sprintf("live-change-%s-%d", source.SourceID, n), "mode": mode}, &watch); e != nil {
+			return e
+		}
+		if watch.ExpiresAt != before.ExpiresAt {
+			return errors.New("view change renewed original end")
+		}
+	}
+	closeInput := map[string]any{"watch_id": watch.ID, "expected_revision": watch.Revision, "idempotency_key": "live-close-" + source.SourceID}
+	if _, e = must("close_live_watch", closeInput, &watch); e != nil {
+		return e
+	}
+	closed := watch
+	if _, e = must("close_live_watch", closeInput, &watch); e != nil || watch.ID != closed.ID || watch.Revision != closed.Revision || watch.State != "Closed" || !watch.ExpiresAt.Equal(before.ExpiresAt) {
+		return errors.New("original Close receipt replay changed")
+	}
+	return nil
+}
+func bytesHaveLiveCanary(raw []byte) bool {
+	return strings.Contains(string(raw), manualHTTPMarker) || strings.Contains(string(raw), installedLiveProducerMarker)
+}
+
+// Persistent driver is ready before a short finite HTTP source starts. Private
+// stdin contains only original test cookies and expected source metadata.
+type installedLiveBrowser struct {
+	t          *testing.T
+	in         io.WriteCloser
+	events     chan json.RawMessage
+	done       chan error
+	cancel     context.CancelFunc
+	cmd        *exec.Cmd
+	diagnostic *consoleBoundedOutput
+	once       sync.Once
+}
+
+func startInstalledLiveBrowser(t *testing.T, ctx context.Context, b *installedBrowser, address string, target map[string]string) *installedLiveBrowser {
+	t.Helper()
+	u, e := url.Parse(b.base)
+	if e != nil || b.client.Jar == nil {
+		t.Fatal("actual installed browser session missing")
+	}
+	var cookies []map[string]any
+	for _, c := range b.client.Jar.Cookies(u) {
+		cookies = append(cookies, map[string]any{"name": c.Name, "value": c.Value, "url": b.base, "httpOnly": true, "secure": true, "sameSite": "Lax"})
+	}
+	if len(cookies) == 0 {
+		t.Fatal("actual browser cookie absent")
+	}
+	call, cancel := context.WithCancel(ctx)
+	cmd := exec.CommandContext(call, "node", filepath.Join("..", "..", "web", "scripts", "installed-live-observation-browser.mjs"))
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	cmd.Cancel = func() error {
+		if cmd.Process == nil {
+			return os.ErrProcessDone
+		}
+		return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+	}
+	cmd.WaitDelay = 5 * time.Second
+	in, e := cmd.StdinPipe()
+	if e != nil {
+		t.Fatal(e)
+	}
+	out, e := cmd.StdoutPipe()
+	if e != nil {
+		t.Fatal(e)
+	}
+	diag := &consoleBoundedOutput{}
+	cmd.Stderr = diag
+	p := &installedLiveBrowser{t: t, in: in, events: make(chan json.RawMessage, 8), done: make(chan error, 1), cancel: cancel, cmd: cmd, diagnostic: diag}
+	if e = cmd.Start(); e != nil {
+		cancel()
+		t.Fatal(e)
+	}
+	go func() {
+		s := bufio.NewScanner(out)
+		s.Buffer(make([]byte, 1024), 32<<10)
+		for s.Scan() {
+			raw := append(json.RawMessage(nil), s.Bytes()...)
+			select {
+			case p.events <- raw:
+			case <-call.Done():
+				break
+			}
+		}
+		close(p.events)
+		p.done <- cmd.Wait()
+	}()
+	t.Cleanup(func() { p.cancel(); _ = p.in.Close(); p.once.Do(func() { <-p.done }) })
+	p.send(map[string]any{"mode": "installed-live", "origin": b.base, "proxy": installedHistoryBrowserTunnel(t, ctx, b.base, address), "cookies": cookies, "target": target})
+	clear(cookies)
+	var ready struct {
+		Kind string `json:"kind"`
+	}
+	p.read(&ready)
+	if ready.Kind != "ready" {
+		t.Fatal("installed browser not ready")
+	}
+	return p
+}
+func (p *installedLiveBrowser) send(v any) {
+	p.t.Helper()
+	raw, e := json.Marshal(v)
+	if e != nil || len(raw) > 16<<10 {
+		p.t.Fatal("bounded installed browser command")
+	}
+	if _, e = p.in.Write(append(raw, '\n')); e != nil {
+		p.t.Fatal("browser input unavailable")
+	}
+	clear(raw)
+}
+func (p *installedLiveBrowser) read(out any) {
+	p.t.Helper()
+	raw, ok := <-p.events
+	if !ok || json.Unmarshal(raw, out) != nil {
+		p.t.Fatal("installed browser event unavailable", p.diagnostic.String())
+	}
+}
+func (p *installedLiveBrowser) begin(s installedLiveFixture) {
+	p.send(map[string]any{"kind": "observe", "source": map[string]any{"source_id": s.SourceID, "action_id": s.ActionID, "pod_uid": s.PodUID, "kind": s.Kind, "projection": s.Projection, "hard_until": s.HardUntil, "forbidden": []string{manualHTTPMarker, installedLiveProducerMarker}}})
+}
+func (p *installedLiveBrowser) finishEpisode(s installedLiveFixture) {
+	p.t.Helper()
+	var e struct {
+		Kind, SourceID, Projection, WatchID string
+		Rows, Clear                         bool
+		Source                              string `json:"source_id"`
+		Rendered                            bool   `json:"rows_rendered"`
+		Cleared                             bool   `json:"cleared"`
+	}
+	p.read(&e)
+	if e.Kind != "observed" || e.Source != s.SourceID || e.Projection != s.Projection || !e.Rendered || !e.Cleared {
+		p.t.Fatal("actual React source/render/clear proof failed")
+	}
+}
+func (p *installedLiveBrowser) close() {
+	p.once.Do(func() {
+		p.send(map[string]any{"kind": "finish"})
+		var e struct {
+			Kind string `json:"kind"`
+		}
+		p.read(&e)
+		if e.Kind != "done" {
+			p.t.Error("installed browser did not complete")
+		}
+		_ = p.in.Close()
+		if err := <-p.done; err != nil {
+			p.t.Error("installed browser failed", p.diagnostic.String())
+		}
+		p.cancel()
+	})
+}
+
+// Digest is minimized fixture evidence only, not source or read authority.
+func installedLiveDigest(raw []byte) string {
+	sum := sha256.Sum256(raw)
+	return hex.EncodeToString(sum[:])
+}
