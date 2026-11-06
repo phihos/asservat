@@ -1,5 +1,16 @@
 # Sustained implementation progress
 
+## Second installed process run awaits publication diagnosis (2026-11-06)
+
+Signed740cef76 acknowledges the original process request; the previous missing
+remote-output start interface refusal is absent. The real collector advertises
+support, but verified publication does not appear (whole run1/530.338s,
+manual67.20s). All4,434 original inputs match Git; source is unchanged and cleanup
+completes. [Original reports](../test/results/process-discovery-native-42137147945/README.md)
+remain separate from passing local transport/driver/service checks. Exact cause
+is under read-only diagnosis; installed process/query/native parity remain
+unqualified. No replacement run or original request retry is launched.
+
 ## First installed process snapshot run remains unqualified (2026-11-06)
 
 Frozen signed `1ed068c2` runs on a disposable hosted VM. The real collector

@@ -1,0 +1,55 @@
+{
+  "candidate": "740cef76a5473810962a69229f2ba01908d8304b",
+  "runID": 42137147945,
+  "payloads": [
+    {
+      "archive": "ci-native-continuation-manual-processes.log.gz",
+      "originalBytes": 5370,
+      "originalSHA256": "383cef5ff435106da61c295b6a006ff6077f8ac9a45f5ccd07a5680976ff05ba",
+      "gzipBytes": 1676,
+      "gzipSHA256": "138753dd0dc304d6605780a3e71c1f3db24fcb80257bb3fe9b7cb7c1957a011a"
+    },
+    {
+      "archive": "context-storage-environment.json.gz",
+      "originalBytes": 572353,
+      "originalSHA256": "f48fa7fe13a56513b9ef607b9cb738c50cdd763233f6ba13e88d0eddc36a29c9",
+      "gzipBytes": 215106,
+      "gzipSHA256": "7f819f1a1b05a876a0a6086c54d71f48837faf8adbe0262cc04522a595d19f96"
+    },
+    {
+      "archive": "context-storage-kubelet.log.gz",
+      "originalBytes": 35384,
+      "originalSHA256": "6250a384179e14a649b8bbda531585e6108c6cb37513f1eb9d896dd2c83f8784",
+      "gzipBytes": 3718,
+      "gzipSHA256": "2ecdfda8b4f45209053cce54475fa0427db27c6958b69935f81047461a51f3ae"
+    },
+    {
+      "archive": "context-storage-postgres.log.gz",
+      "originalBytes": 409931,
+      "originalSHA256": "9da1e14402e966410a09cfb059940ff4418e0a838f8194ae16af1ff62748ef6c",
+      "gzipBytes": 22526,
+      "gzipSHA256": "f6e619416c32371252dc9f9d508a385a1dfc6dd95f8ff572a13b751e256d8b0e"
+    },
+    {
+      "archive": "context-storage-timing.log.gz",
+      "originalBytes": 116207,
+      "originalSHA256": "68a6a3afcb835e74957beeeab814470b0ad4c4c6bc9fb0544123510f389d376b",
+      "gzipBytes": 13945,
+      "gzipSHA256": "c1d96422179d04d0f410a6e96eba0c5950e52ff6cec4b1d7e592bc2b838dbfc6"
+    },
+    {
+      "archive": "context-storage.log.gz",
+      "originalBytes": 108917,
+      "originalSHA256": "7934e164c083e0676983b9b5e66a839530ee31242b4885f8cbff0643cacf157c",
+      "gzipBytes": 13067,
+      "gzipSHA256": "d59bf602e34db955892065bdfed925800dc91b12ec5cf4c681b9ec060674ae65"
+    },
+    {
+      "archive": "root-source-audit.json.gz",
+      "originalBytes": 598,
+      "originalSHA256": "f33fbf46377e84ea7407cfcc576989ed75492a70be884b5115a187c70e33e9da",
+      "gzipBytes": 394,
+      "gzipSHA256": "6cc4d28004def4bda465c7dc67b920a5e657e2c59d9df614ef43cc85444d8e30"
+    }
+  ]
+}
