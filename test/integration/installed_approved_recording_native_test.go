@@ -218,6 +218,11 @@ func installApprovedRecordingCollector(t *testing.T, ctx context.Context, api ku
 		// ADR-278: the administrator's opt-in encrypted-disk ring volume.
 		collector["ringDisk"] = map[string]any{"enabled": true, "bytes": ongoingSaveDiskBytes}
 	}
+	if installedJourneyFocus() == "live-observation" {
+		// The administrator's node-side live processing opt-in; hub
+		// delivery.liveRead separately authorizes viewers.
+		collector["live"] = map[string]any{"subscriptions": 4, "memoryBytes": 4 << 20, "eventsPerSecond": 2000, "bytesPerSecond": 1 << 20, "processingNanosPerSecond": 50_000_000}
+	}
 	values := map[string]any{"mode": "cluster", "collector": collector}
 	raw, _ := json.Marshal(values)
 	path := filepath.Join(t.TempDir(), "collector-values.json")
