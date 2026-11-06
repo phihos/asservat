@@ -1,5 +1,15 @@
 # Sustained implementation progress
 
+## Installed logs native-response budget mismatch (2026-11-06)
+
+Signed5fda3b3c passes capture/publication, actual MCP/React saved-query parity and
+exact query accounting, then reaches native Ready. GET503 at response admission
+exposes a24MiB session read ceiling against the existing76,742,656-byte window
+charge; no native bytes are qualified. All4,369 inputs match Git. [Original
+failure, causal read-only facts and strict cleanup](../test/results/finite-saved-logs-read-budget-5fda3b3c/README.md)
+are retained. The whole run fails586.752s; strict cleanup separately exits0.
+Planner/reader alignment and fresh native parity qualification remain next.
+
 ## Confirmed permission-epoch restart (2026-11-06)
 
 The installed browser failure exposed an acknowledged suspension followed by the
