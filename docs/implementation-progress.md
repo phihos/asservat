@@ -1,5 +1,17 @@
 # Sustained implementation progress
 
+## Installed saved-log reads and native preparation correction (2026-11-06)
+
+Signed293aa46e passes capture/publication, MCP and real React saved reads, exact
+same-source page comparison and independent query accounting. Native download
+then refuses authority/data-class (whole run1/644.649s). The missing exact raw
+logs native-type branch is corrected without changing current grant, audience,
+permission, quota or deadline checks. Old-authority RED.020s, full authorization
+race0/1.677s and independent two-file review pass.
+[Original run, local fix and strict cleanup](../test/results/finite-saved-logs-native-download/README.md)
+retain4,367 verified unchanged inputs and the failed whole-workflow verdict.
+Complete native parity and fresh installed qualification remain pending.
+
 ## Saved logs qualification stopped in installer bootstrap (2026-11-06)
 
 The fresh signed `f9412540` run exits1 before manual logs (604.063s).

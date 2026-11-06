@@ -179,3 +179,9 @@ logs parser or artifact type. The configured64MiB case requires136,740,864B and
 values, not measured stored output or overhead. A legacy record-only fixture
 was insufficient despite spare general pool bytes and is corrected before
 installation rather than topped up after admission.
+
+The installed native-download authorizer admits raw logs only with both the
+verified logs evidence kind and logs native type. Current ordinary rights, the
+original retained audience and the existing result-access child remain required;
+no share or cached response entitlement admits raw logs. This implements the
+existing native JSONL requirement, without another grant or permission surface.
