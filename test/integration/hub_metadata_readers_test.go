@@ -121,7 +121,7 @@ func (f *capacitySQLFixture) qualifySharedMetadataReaders(t *testing.T, s captur
 			}},
 			{"case", func() error {
 				out, err := cases.ResolveContextCase(call, catalog.CaseRouteQuery{RootID: s.a.RootID, CaseID: e.CaseID, Identity: query.Identity, Recovery: query.Recovery})
-				if err == nil && (out.CaseID != e.CaseID || !out.Valid(time.Now()) || len(out.Routes) != 1 || out.Routes[0] != (catalog.ContextCaseRoute{CaptureID: e.CaptureUID, ArtifactID: e.Registration.Location.ArtifactID, Target: target})) {
+				if err == nil && (out.CaseID != e.CaseID || !out.Valid(time.Now()) || len(out.Routes) != 1 || out.Routes[0] != (catalog.ContextCaseRoute{Version: record.Version, CaptureID: e.CaptureUID, ArtifactID: e.Registration.Location.ArtifactID, NativeType: e.NativeType, Target: target})) {
 					return errors.New("published case route mismatch")
 				}
 				return err
