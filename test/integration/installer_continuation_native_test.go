@@ -565,9 +565,13 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 		}
 		if installedJourneyFocus() == "live-observation" {
 			t.Run("live-observation", func(t *testing.T) {
+				administratorUser, administratorGroups, err := installedLiveAdministrator(ctx, api, prefix+"-workload-guard", prefix+"-download-environment-guard")
+				if err != nil {
+					t.Fatal(err)
+				}
+				t.Logf("installed live administrator %s groups %v from the current guards", administratorUser, administratorGroups)
 				runner := rest.CopyConfig(kc)
-				administratorUser := "system:serviceaccount:" + namespace + ":" + desired.Name + "-bootstrap-runner"
-				runner.Impersonate = rest.ImpersonationConfig{UserName: administratorUser, Groups: []string{"system:serviceaccounts", "system:serviceaccounts:" + namespace, "system:authenticated"}}
+				runner.Impersonate = rest.ImpersonationConfig{UserName: administratorUser, Groups: append(administratorGroups, "system:authenticated")}
 				administrator, err := kubernetes.NewForConfig(runner)
 				if err != nil {
 					t.Fatal(err)

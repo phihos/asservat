@@ -19,6 +19,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"sync"
@@ -567,4 +568,53 @@ func installedLiveAdministratorRBAC(ctx context.Context, api kubernetes.Interfac
 	}
 	_, err := api.RbacV1().ClusterRoleBindings().Create(ctx, &rbac.ClusterRoleBinding{ObjectMeta: meta.ObjectMeta{Name: name}, RoleRef: rbac.RoleRef{APIGroup: "rbac.authorization.k8s.io", Kind: "ClusterRole", Name: name}, Subjects: []rbac.Subject{{Kind: "User", Name: user}}}, meta.CreateOptions{})
 	return err
+}
+
+var (
+	installedLiveGuardUser  = regexp.MustCompile(`^request\.userInfo\.username == "([^"]+)"$`)
+	installedLiveGuardGroup = regexp.MustCompile(`^"([^"]+)" in request\.userInfo\.groups$`)
+)
+
+// installedLiveAdministrator reads the plain administrator clauses of both
+// current guards and returns one identity that both accept.
+func installedLiveAdministrator(ctx context.Context, api kubernetes.Interface, workloadGuard, deliveryGuard string) (string, []string, error) {
+	actors := func(name string) (users, groups []string, err error) {
+		p, err := api.AdmissionregistrationV1().ValidatingAdmissionPolicies().Get(ctx, name, meta.GetOptions{})
+		if err != nil {
+			return nil, nil, err
+		}
+		for _, v := range p.Spec.Validations {
+			for _, clause := range strings.Split(v.Expression, " || ") {
+				clause = strings.Trim(strings.TrimSpace(clause), "()")
+				if m := installedLiveGuardUser.FindStringSubmatch(clause); m != nil {
+					users = append(users, m[1])
+				} else if m := installedLiveGuardGroup.FindStringSubmatch(clause); m != nil {
+					groups = append(groups, m[1])
+				}
+			}
+		}
+		return users, groups, nil
+	}
+	wu, wg, err := actors(workloadGuard)
+	if err != nil {
+		return "", nil, err
+	}
+	du, dg, err := actors(deliveryGuard)
+	if err != nil {
+		return "", nil, err
+	}
+	for _, u := range wu {
+		if slices.Contains(du, u) {
+			return u, nil, nil
+		}
+	}
+	switch {
+	case len(du) > 0 && len(wg) > 0:
+		return du[0], wg, nil
+	case len(wu) > 0 && len(dg) > 0:
+		return wu[0], dg, nil
+	case len(wg) > 0 && len(dg) > 0:
+		return "installed-live-administrator", append(wg, dg...), nil
+	}
+	return "", nil, fmt.Errorf("no administrator accepted by both guards: workload users %v groups %v, delivery users %v groups %v", wu, wg, du, dg)
 }
