@@ -63,6 +63,11 @@ type Ring struct {
 }
 
 const ringSegmentHeader = 32
+
+// MaxMinimizedRecordBytes bounds already-validated syscall/HTTP metadata records.
+// It does not change packet ingress, BPF or the 134-byte sanitizer prefix.
+const MaxMinimizedRecordBytes = 4096
+
 const ringRecordHeader = 16
 
 var ringEndian = binary.LittleEndian
@@ -331,7 +336,7 @@ func (r *Ring) Add(frame []byte, wire uint32, at, observedAt time.Time) error {
 	return r.retain(prefix[:n], wire, at, observedAt)
 }
 
-// AddRecord retains one already-minimized fixed record (syscall metadata)
+// AddRecord retains one already-minimized typed record (syscall or HTTP metadata)
 // without the packet filter/header decoder; segments, eviction, coverage and
 // accounting are the packet ring's.
 func (r *Ring) AddRecord(record []byte, at, observedAt time.Time) error {
@@ -344,7 +349,7 @@ func (r *Ring) AddRecord(record []byte, at, observedAt time.Time) error {
 		return ErrRingClosed
 	}
 	r.state.Packets.Seen++
-	if len(record) == 0 || len(record) > Snaplen || at.IsZero() || at.Before(r.bounds.StartedAt) || at.After(observedAt) || at.Before(observedAt.Add(-r.limits.MaxAge)) || at.UnixNano() <= 0 || !time.Unix(0, at.UnixNano()).Equal(at) {
+	if len(record) == 0 || len(record) > MaxMinimizedRecordBytes || at.IsZero() || at.Before(r.bounds.StartedAt) || at.After(observedAt) || at.Before(observedAt.Add(-r.limits.MaxAge)) || at.UnixNano() <= 0 || !time.Unix(0, at.UnixNano()).Equal(at) {
 		r.state.Packets.Malformed++
 		r.cleanSince = later(r.cleanSince, observedAt.Add(time.Nanosecond))
 		return ErrInvalid
@@ -434,7 +439,7 @@ type RingPacket struct {
 	At     time.Time
 	Wire   uint32
 	Length int
-	Header [Snaplen]byte
+	Header [MaxMinimizedRecordBytes]byte
 }
 type RingSnapshot struct {
 	mu       sync.Mutex
@@ -778,3 +783,7 @@ func (w *WindowSnapshot) HistoryCoverage() RingCoverage {
 	defer w.snapshot.mu.Unlock()
 	return w.pre
 }
+
+// FilterMatch applies the ring's immutable accepted source program. It changes
+// no acquisition, ring or filter generation and retains no frame bytes.
+func (r *Ring) FilterMatch(frame []byte, wire int) bool { return r.filter.Match(frame, wire) }

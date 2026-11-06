@@ -426,6 +426,9 @@ func (s *PolicySourceRuntime) maintain(ctx context.Context, p value.RestartPolic
 		if rec.Filter != nil {
 			source.Program = slices.Clone(rec.Filter.Program)
 		}
+		if rec.HTTP != nil {
+			source.HTTP = compiler.HTTPSource(*rec)
+		}
 		if rec.Action.Kind == "syscallTrace" {
 			f := compiler.SyscallSource(*rec)
 			source.Syscalls = &f

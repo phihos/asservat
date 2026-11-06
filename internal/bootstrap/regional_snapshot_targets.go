@@ -7,6 +7,7 @@ import (
 	"asservat.local/asservat/internal/domain/targets"
 	"context"
 	"fmt"
+	"slices"
 	"time"
 )
 
@@ -46,6 +47,15 @@ func (t reportedTargets) ResolveSourceSnapshot(ctx context.Context, original tar
 			continue
 		}
 		out = targets.SourceSnapshotResolution{Original: original, Process: targets.PacketSourceObservation{PodUID: original.Request.PodUID, NodeUID: original.NodeUID, BootID: original.BootID, CollectorPodUID: original.CollectorPodUID, CollectorEpoch: original.CollectorEpoch, ObservedAt: now, FreshUntil: until}, State: targets.RecorderSourceState{SourceID: state.SourceID, Fence: state.Fence, IssuedAt: state.IssuedAt, LeafUntil: state.LeafUntil, Credit: state.Credit, ObservedBytes: state.ObservedBytes, Closed: state.Closed, Stopped: state.Stopped, InputUnknown: state.InputUnknown, SourceStoppedAt: state.SourceStoppedAt, SnapshotUntil: state.SnapshotUntil, ObservedAt: report.ObservedAt, FreshUntil: reportUntil}, ReportedAt: report.ObservedAt, ReportFreshUntil: reportUntil, ObservedAt: now, FreshUntil: until}
+		for _, mechanism := range report.Mechanisms {
+			if mechanism.Adapter == collector.AdapterAvailable {
+				for _, projection := range mechanism.LiveProjections {
+					if !slices.Contains(out.LiveProjections, projection) {
+						out.LiveProjections = append(out.LiveProjections, projection)
+					}
+				}
+			}
+		}
 		if now := t.recordings.now(); ctx.Err() != nil || !out.Valid(now) {
 			t.refused(invalidSnapshotReason(out, now))
 			return targets.SourceSnapshotResolution{}, targets.ErrUnavailable

@@ -799,8 +799,9 @@ func normalize(path string, a *expandedAction, compiler FilterCompiler, pc *peer
 	if raw && (mode != "onTrigger" || after > maxRawAfter) {
 		return refuse(value.CompositionRecorderUnavailable, path+".executionMode", "raw packets are recorded finitely for now: set actionExecutionMode onTrigger, before 0s and after at most 15s")
 	}
-	// ADR-282: HTTP header projections are manual and finite like raw packets.
-	if http && (mode != "onTrigger" || after > maxRawAfter) {
+	// Finite HTTP recordings keep their existing bound. Explicit reviewed
+	// ongoing HTTP policies use the source-purpose admission and grant path.
+	if http && mode == "onTrigger" && after > maxRawAfter {
 		return refuse(value.CompositionRecorderUnavailable, path+".executionMode", "HTTP headers are recorded finitely for now: set actionExecutionMode onTrigger, before 0s and after at most 15s")
 	}
 	if mode == "onTrigger" && before != 0 {
@@ -1282,6 +1283,17 @@ func CompileRecorder(in value.RecorderInput, filters FilterCompiler, now time.Ti
 	actions, profiles, err := expand(in.Composition, filters, pc)
 	if err != nil {
 		return value.RecorderPlan{}, err
+	}
+	for _, a := range actions {
+		var profile struct {
+			Kind string `json:"kind"`
+		}
+		if a.packet != nil {
+			_ = json.Unmarshal(a.packet.Profile, &profile)
+		}
+		if profile.Kind == "httpHeaders" && a.action.ExecutionMode == "ongoing" {
+			return value.RecorderPlan{}, refuse(value.CompositionRecorderUnavailable, "executionMode", "HTTP headers are recorded finitely for manual collection; use the explicitly reviewed ongoing policy source")
+		}
 	}
 	if len(pc.used) != len(in.Peers) {
 		// Every supplied resolution answers one action's exact query.

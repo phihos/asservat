@@ -61,6 +61,8 @@ func (n *nodePackets) startArguments(ctx context.Context, epoch string, w collec
 	rate := a.EffectiveEventsPerSecond() * a.MaxProbeBytes
 	source := collector.SourceReservation{RingBytes: working, InputBytesPerSecond: rate, InputBurstBytes: rate}
 	capture, stop := context.WithCancel(ctx)
+	var started time.Time
+	var holder *manualLiveHolder
 	n.budgetMu.Lock()
 	now := n.now()
 	for key, until := range n.observations {
@@ -91,7 +93,12 @@ func (n *nodePackets) startArguments(ctx context.Context, epoch string, w collec
 		if n.running == nil {
 			n.running = make(map[string]runningPacket)
 		}
-		n.running[p.CaptureID] = runningPacket{workID: w.ID, cancel: stop}
+		started = n.now().UTC()
+		holder = n.newManualLive(w, p, started, id)
+		if holder != nil {
+			holder.ctx = capture
+		}
+		n.running[p.CaptureID] = runningPacket{workID: w.ID, cancel: stop, live: holder}
 	}
 	n.budgetMu.Unlock()
 	if err != nil {
@@ -99,7 +106,6 @@ func (n *nodePackets) startArguments(ctx context.Context, epoch string, w collec
 		r.Reason = collector.ReasonCaptureBusy
 		return r
 	}
-	started := n.now().UTC()
 	r.Outcome, r.Reason = collector.OutcomeAccepted, ""
 	n.wg.Add(1)
 	go func() {
@@ -114,11 +120,15 @@ func (n *nodePackets) startArguments(ctx context.Context, epoch string, w collec
 			}
 			n.budgetMu.Unlock()
 		}()
-		n.runArguments(capture, epoch, w.ID, p, started, defs)
+		n.runArguments(capture, epoch, w.ID, p, started, defs, holder)
 	}()
 	return r
 }
-func (n *nodePackets) runArguments(parent context.Context, epoch, workID string, p collector.PacketCapture, started time.Time, defs []syscalls.ArgumentDefinition) {
+func (n *nodePackets) runArguments(parent context.Context, epoch, workID string, p collector.PacketCapture, started time.Time, defs []syscalls.ArgumentDefinition, holders ...*manualLiveHolder) {
+	var holder *manualLiveHolder
+	if len(holders) > 0 {
+		holder = holders[0]
+	}
 	a, b := p.Arguments, p.Arguments.Binding
 	until := started.Add(p.Duration)
 	if a.LeaseUntil.Before(until) {
@@ -161,6 +171,7 @@ func (n *nodePackets) runArguments(parent context.Context, epoch, workID string,
 				return
 			}
 		}
+		holder.argument(call, n.now())
 		event, err := syscalls.ArgumentEvent(call, header, wall, defs)
 		if err != nil {
 			footer.Malformed++
@@ -210,10 +221,12 @@ func (n *nodePackets) runArguments(parent context.Context, epoch, workID string,
 			mu.Lock()
 			defer mu.Unlock()
 			footer.LostSamples += notice.LostSamples
+			holder.notice(notice.LostSamples)
 			footer.PairGaps += decoder.Flush()
 			pairer.Flush(emit)
 		})
 	}
+	holder.Close()
 	mu.Lock()
 	footer.PairGaps += decoder.Flush()
 	pairer.Flush(emit)

@@ -35,31 +35,61 @@ func (n *nodePackets) startSyscall(ctx context.Context, epoch string, w collecto
 		r.Reason = collector.ReasonFilterUnsupported
 		return r
 	}
+	liveID := collector.Identity{}
+	if n.identity != nil {
+		liveID = n.identity()
+	}
+	capture, stopCapture := context.WithCancel(ctx)
 	n.budgetMu.Lock()
+	if _, busy := n.running[p.CaptureID]; busy || len(n.running) >= collector.MaxQueuedWork {
+		n.budgetMu.Unlock()
+		stopCapture()
+		r.Reason = collector.ReasonCaptureBusy
+		return r
+	}
 	err := n.budget().ReserveFrozen(p.MaxBytes)
+	started := n.now().UTC()
+	holder := n.newManualLive(w, p, started, liveID)
+	if holder != nil {
+		holder.ctx = capture
+	}
+	if err == nil {
+		if n.running == nil {
+			n.running = map[string]runningPacket{}
+		}
+		n.running[p.CaptureID] = runningPacket{workID: w.ID, cancel: stopCapture, live: holder}
+	}
 	n.budgetMu.Unlock()
 	if err != nil {
+		stopCapture()
 		r.Reason = collector.ReasonCaptureBusy
 		return r
 	}
 	engine := syscallEngine(n.syscallTrace, numbers, p.Syscalls.ErrorsOnly, int(p.Syscalls.MaxTrackedThreads))
-	started := n.now().UTC()
 	r.Outcome, r.Reason = collector.OutcomeAccepted, ""
 	n.wg.Add(1)
 	go func() {
 		defer n.wg.Done()
+		defer stopCapture()
 		defer func() {
 			n.budgetMu.Lock()
 			_ = n.budget().ReleaseFrozen(p.MaxBytes)
+			if run, ok := n.running[p.CaptureID]; ok && run.workID == w.ID {
+				delete(n.running, p.CaptureID)
+			}
 			n.budgetMu.Unlock()
 		}()
-		n.runSyscall(ctx, epoch, w.ID, p, engine, started)
+		n.runSyscall(capture, epoch, w.ID, p, engine, started, holder)
 	}()
 	return r
 }
 
-func (n *nodePackets) runSyscall(ctx context.Context, epoch, workID string, p collector.PacketCapture, engine observedPacketEngine, started time.Time) {
+func (n *nodePackets) runSyscall(ctx context.Context, epoch, workID string, p collector.PacketCapture, engine observedPacketEngine, started time.Time, holders ...*manualLiveHolder) {
 	capture, cancel := context.WithTimeout(ctx, p.Duration)
+	var holder *manualLiveHolder
+	if len(holders) > 0 {
+		holder = holders[0]
+	}
 	var mu sync.Mutex
 	out := make([]byte, 0, p.MaxBytes)
 	defer func() { clear(out[:cap(out)]) }()
@@ -72,6 +102,9 @@ func (n *nodePackets) runSyscall(ctx context.Context, epoch, workID string, p co
 		defer mu.Unlock()
 		seen++
 		wire += uint64(f.Wire)
+		if f.Data != nil {
+			holder.append(f, n.now())
+		}
 		if f.Data == nil { // charged but not retained (errors only)
 			unretained++
 			return
@@ -98,8 +131,10 @@ func (n *nodePackets) runSyscall(ctx context.Context, epoch, workID string, p co
 	}, func(notice gadget.InputNotice) {
 		mu.Lock()
 		lost += notice.LostSamples
+		holder.notice(notice.LostSamples)
 		mu.Unlock()
 	})
+	holder.Close()
 	// Like a packet capture, the recording completed when its own deadline
 	// ended it; an engine stop reported as that deadline is not a failure.
 	completed := errors.Is(capture.Err(), context.DeadlineExceeded)

@@ -98,6 +98,22 @@ func (s *DownloadEnvironmentSource) snapshot(ctx context.Context) (privacy.Downl
 		return out, privacy.ErrInvalid
 	}
 	out = privacy.DownloadPolicy{RootID: w.RootID, InstallationID: w.InstallationID, RecoveryEpoch: w.RecoveryEpoch, Revision: identity.Revision{UID: s.uid, Generation: w.Revision, Digest: sha256.Sum256(a)}, Suspended: w.Suspended, PermittedRegions: w.PermittedRegions, Paths: make([]privacy.DownloadPath, 0, len(w.Paths)), Clients: make([]privacy.DownloadClient, 0, len(w.Clients)), Operators: make([]privacy.ProcessingOperator, 0, len(w.Operators))}
+	if w.LiveRead != nil {
+		l := w.LiveRead
+		out.LiveRead = &privacy.LiveRead{Root: privacy.LiveRootLimits{Watches: l.Root.Watches, PrincipalWatches: l.Root.PrincipalWatches, WorkloadWatches: l.Root.WorkloadWatches, Rate: l.Root.Rate, Burst: l.Root.Burst}, Projections: l.Projections, Clients: make([]privacy.LiveClient, 0, len(l.Clients)), Ceilings: make([]privacy.LiveCeiling, 0, len(l.Ceilings))}
+		if l.Clients == nil || l.Ceilings == nil {
+			return privacy.DownloadPolicy{}, privacy.ErrInvalid
+		}
+		for _, c := range l.Clients {
+			if !validProcessingIssuer(c.Issuer) {
+				return privacy.DownloadPolicy{}, privacy.ErrInvalid
+			}
+			out.LiveRead.Clients = append(out.LiveRead.Clients, privacy.LiveClient{Issuer: c.Issuer, ID: c.ID, Kind: identity.Kind(c.Kind), PathIDs: c.PathIDs})
+		}
+		for _, c := range l.Ceilings {
+			out.LiveRead.Ceilings = append(out.LiveRead.Ceilings, privacy.LiveCeiling{ClusterID: c.ClusterID, NamespaceUID: c.NamespaceUID, WorkloadUID: c.WorkloadUID, Limits: privacy.LiveLimits{Duration: c.Duration, Output: c.Output, Rate: c.Rate, Rows: c.Rows, Buffer: c.Buffer, RowAge: c.RowAge, Replay: c.Replay}})
+		}
+	}
 	for _, p := range w.Paths {
 		worker, e := processingRevision(p.WorkerConfiguration)
 		if e != nil {

@@ -57,6 +57,7 @@ func (s *StatusCadence) Sent(at time.Time) {
 type WorkKind string
 
 const (
+	WorkLiveRead       WorkKind = "liveProjection"
 	WorkArmSource      WorkKind = "armSource"
 	WorkStopSource     WorkKind = "stopSource"
 	WorkSnapshot       WorkKind = "snapshot"
@@ -82,7 +83,7 @@ const (
 )
 
 func (k WorkKind) Valid() bool {
-	return k == WorkProfileCapture || k == WorkCancelProfileCapture || k == WorkCancelSourceSnapshot || k == WorkPacketSourceSnapshot || k == WorkArmSource || k == WorkStopSource || k == WorkSnapshot || k == WorkPeerGeneration || k == WorkPacketCapture || k == WorkPacketSource || k == WorkStopPacketSource || k == WorkSyscallCapture || k == WorkCancelPacketCapture
+	return k == WorkLiveRead || k == WorkProfileCapture || k == WorkCancelProfileCapture || k == WorkCancelSourceSnapshot || k == WorkPacketSourceSnapshot || k == WorkArmSource || k == WorkStopSource || k == WorkSnapshot || k == WorkPeerGeneration || k == WorkPacketCapture || k == WorkPacketSource || k == WorkStopPacketSource || k == WorkSyscallCapture || k == WorkCancelPacketCapture
 }
 
 // PacketCancel names one running finite packet capture by its capture ID and
@@ -110,6 +111,7 @@ type Work struct {
 	Snapshot       *SourceSnapshot
 	CancelSnapshot *SourceSnapshot
 	CancelPacket   *PacketCancel
+	Live           *LiveRead `json:",omitempty"`
 }
 
 // Packet capture bounds (ADR-248). The output cap is the interim 8 MiB per
@@ -282,7 +284,8 @@ type Receipt struct {
 func Decide(w Work, now time.Time) Receipt {
 	r := Receipt{WorkID: w.ID, Sequence: w.Sequence, Outcome: OutcomeRefused, Reason: ReasonRecorderNotImplemented}
 	switch {
-	case (w.Kind == WorkProfileCapture) != (w.Profile != nil) || w.Profile != nil && (!w.Profile.Valid() || w.NotAfter.After(w.Profile.Request.Deadline.Add(-w.Profile.Request.Parameters.Duration-2*time.Second))) ||
+	case (w.Kind == WorkLiveRead) != (w.Live != nil) || w.Live != nil && !w.Live.Valid() ||
+		(w.Kind == WorkProfileCapture) != (w.Profile != nil) || w.Profile != nil && (!w.Profile.Valid() || w.NotAfter.After(w.Profile.Request.Deadline.Add(-w.Profile.Request.Parameters.Duration-2*time.Second))) ||
 		(w.Kind == WorkCancelProfileCapture) != (w.CancelProfile != nil) || w.CancelProfile != nil && !w.CancelProfile.Valid() ||
 		!w.Kind.Valid() || (w.Kind == WorkPacketCapture || w.Kind == WorkSyscallCapture) != (w.Packet != nil) || w.Packet != nil && (!w.Packet.Valid() || (w.Kind == WorkSyscallCapture) != (w.Packet.Syscalls != nil)) ||
 		(w.Kind == WorkPacketSource) != (w.Source != nil) || w.Source != nil && (!w.Source.Valid() || w.NotAfter.After(w.Source.Permit.DispatchUntil)) ||

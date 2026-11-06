@@ -111,7 +111,8 @@ func compilePolicyAction(c value.ProfileComposition, ci int, x expandedAction, p
 	if err != nil {
 		return out, err
 	}
-	if x.packet != nil && summary.PacketProfile != "networkHeaders" {
+	ongoingHTTP := x.packet != nil && summary.PacketProfile == "httpHeaders" && summary.ExecutionMode == "ongoing" && sources
+	if x.packet != nil && summary.PacketProfile != "networkHeaders" && !ongoingHTTP {
 		return out, refuse(value.CompositionRecorderUnavailable, "profile_composition", "only network-header recording is available")
 	}
 	finiteArguments := x.arguments != nil && summary.SyscallMode == "arguments" && summary.ExecutionMode == "onTrigger"
@@ -126,7 +127,7 @@ func compilePolicyAction(c value.ProfileComposition, ci int, x expandedAction, p
 	if summary.ExecutionMode == "ongoing" && !sources {
 		return out, refuse(value.CompositionRecorderUnavailable, "profile_composition", "ongoing source and Save qualification is not enabled")
 	}
-	if summary.ExecutionMode == "ongoing" && len(x.sensitive) > 0 {
+	if summary.ExecutionMode == "ongoing" && len(x.sensitive) > 0 && (!ongoingHTTP || RawBytePredicate(summary.Filter)) {
 		return out, refuse(value.CompositionRecorderUnavailable, "profile_composition", "ongoing sources support ordinary network-header predicates only")
 	}
 	after, ok := durationValue(summary.After, true)
@@ -177,8 +178,15 @@ func compilePolicyAction(c value.ProfileComposition, ci int, x expandedAction, p
 	if finiteProfile {
 		out.ProfileEndpoint = endpoint.Clone()
 	}
-	if finiteProfile || finiteLogs {
+	if finiteProfile || finiteLogs || ongoingHTTP {
 		out.Profile.SourceClusterID, out.Profile.SourceNamespaceUID, out.Profile.SourceUID, out.Profile.Deprecated = profile.SourceClusterID, profile.SourceNamespaceUID, profile.SourceUID, profile.Deprecated
+	}
+	if ongoingHTTP {
+		h, err := validHTTPProfile("profile_composition", x.packet.Profile)
+		if err != nil {
+			return value.PolicyRecorderConfiguration{}, err
+		}
+		out.HTTP = &h
 	}
 	if finiteArguments {
 		a := *x.arguments
@@ -199,4 +207,15 @@ func compilePolicyAction(c value.ProfileComposition, ci int, x expandedAction, p
 // (ADR-273); its digest is bound into the source's ProgramDigest.
 func SyscallSource(p value.PolicyRecorderConfiguration) collector.SyscallFilter {
 	return collector.SyscallFilter{Names: slices.Clone(p.SyscallInclude), ErrorsOnly: p.Action.Result == "errors", MaxEvents: p.Action.MaxEvents, MaxTrackedThreads: p.Action.MaxTrackedThreads}
+}
+
+// HTTPSource carries only the accepted fixed projection/reassembly bounds.
+// It grants no observation authority; the committed original grant remains in
+// the purpose-specific source binding returned by admission.
+func HTTPSource(p value.PolicyRecorderConfiguration) *collector.HTTPProjection {
+	if !p.Valid() || p.HTTP == nil {
+		return nil
+	}
+	h := p.HTTP
+	return &collector.HTTPProjection{MaxFlows: h.MaxFlows, MaxHeaderBytes: h.MaxHeaderBytes, MaxFlowBytes: h.MaxFlowBytes, MaxTotalBytes: h.MaxTotalBytes, IdleTimeout: time.Duration(h.IdleMillis) * time.Millisecond}
 }

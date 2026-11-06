@@ -204,6 +204,9 @@ func withProtectedContextQueryLedger(t *testing.T, ctx context.Context, admin *p
 		p.Close()
 	}
 	query.scenario, query.published = publishQueryLedgerContext(t, f, root, enrolled, isProfile, legacyTiming, isPacket, rawPacket, rawSyscall, isLogs)
+	if hook := liveManualFixtureHook(ctx); hook != nil && hook.handled {
+		return // Explicit manual-live fixture ends before publication/query setup.
+	}
 	profile := syntheticWorkerProfile(f.input.InstallationID)
 	if isProfile || isPacket || rawSyscall || isLogs {
 		profile.MemoryBytes = value.ProfileSummaryWorkerBytes
@@ -270,6 +273,11 @@ func publishQueryLedgerContext(t *testing.T, f *capacitySQLFixture, root app.Roo
 		started, refresh = startQueryLedgerProfile(t, f, s, accepted, profileSQL)
 	} else {
 		s, accepted = f.admitManagedContextRetention(t, root, enrollment, 60)
+	}
+	if hook := liveManualFixtureHook(f.ctx); hook != nil {
+		hook.run(t, f, s, accepted, profileSQL, started, refresh)
+		hook.handled = true
+		return s, artifact.PublishedContext{}
 	}
 	return publishPreparedQueryLedgerContext(t, f, s, accepted, profileSQL, started, refresh, len(legacyTiming) > 0 && legacyTiming[0])
 }

@@ -7,7 +7,8 @@ import "time"
 // Target, executor, audience and source definition remain in the enclosing
 // accepted expectation. A producer's completion cannot change these bounds.
 type SourceSnapshotRequest struct {
-	RequireApproval                        bool `json:",omitempty"`
+	HTTP                                   RecordingHTTP `json:",omitzero"` // Exact accepted HTTP source projection; zero on old sources.
+	RequireApproval                        bool          `json:",omitempty"`
 	SourceBindingDigest                    Digest
 	SourceID, Fence, SnapshotID            string
 	SourceStartedAt, SourceHardUntil       time.Time
@@ -20,6 +21,9 @@ type SourceSnapshotRequest struct {
 // seconds; only the protected grouped-admission path selects a longer bound.
 // Exact accepted dates, source hard ends and current caller bounds still apply.
 func (s SourceSnapshotRequest) Valid() bool {
+	if s.HTTP != (RecordingHTTP{}) && !s.HTTP.Valid() {
+		return false
+	}
 	if !uuid(s.SourceID) || !uuid(s.Fence) || !uuid(s.SnapshotID) ||
 		!lifecycleTime(s.SourceStartedAt) || !lifecycleTime(s.SourceHardUntil) ||
 		s.SourceBindingDigest == (Digest{}) || !lifecycleTime(s.IssuedAt) || !lifecycleTime(s.T0) || !lifecycleTime(s.StartBy) || !lifecycleTime(s.ProcessingUntil) ||

@@ -6,6 +6,7 @@ import (
 	"encoding/json/jsontext"
 	"time"
 
+	"asservat.local/asservat/internal/adapters/httpheaders"
 	"asservat.local/asservat/internal/adapters/logs"
 	"asservat.local/asservat/internal/application/evidence"
 	"asservat.local/asservat/internal/domain/artifact"
@@ -39,6 +40,9 @@ func (v *Validator) NativeCheck(e artifact.ContextExpectation, m ContextManifest
 	case artifact.PodStatusArtifact:
 		return &documentCheck{limit: artifact.MaxContextBytes, final: func(b []byte) error { return v.ValidateNative(b, e, m) }}, nil
 	case artifact.HTTPHeadersArtifact:
+		if e.Snapshot != nil {
+			return httpheaders.NewExpectationCheck(e), nil
+		}
 		return &documentCheck{limit: artifact.HTTPHeadersNativeLimit, final: jsonObject}, nil
 	case artifact.PCAPNGArtifact:
 		if e.Snapshot != nil {

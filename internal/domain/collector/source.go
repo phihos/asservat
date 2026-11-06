@@ -10,6 +10,7 @@ import (
 // These values need committed producer authority and authenticated delivery;
 // structural validity does not confer either.
 type SourceBinding struct {
+	ObservationGrantID                                                 string   `json:",omitempty"` // Original reviewed HTTP observation grant; never replaced on renewal.
 	AudienceDigest                                                     [32]byte `json:",omitzero"`
 	RootID, PolicyUID, AcceptanceID, SourceID, Fence                   string
 	ActionID, PodUID, NodeUID, BootID, CollectorPodUID, CollectorEpoch string
@@ -22,7 +23,7 @@ func (b SourceBinding) Valid() bool {
 			return false
 		}
 	}
-	return len(b.PolicyUID) > 0 && len(b.PolicyUID) <= 128 && len(b.ActionID) > 0 && len(b.ActionID) <= 128 &&
+	return (b.ObservationGrantID == "" || validUUID(b.ObservationGrantID)) && len(b.PolicyUID) > 0 && len(b.PolicyUID) <= 128 && len(b.ActionID) > 0 && len(b.ActionID) <= 128 &&
 		b.Scope != ([32]byte{}) && b.ExpectationDigest != ([32]byte{}) && b.ResourceDigest != ([32]byte{})
 }
 
@@ -52,6 +53,7 @@ func (r SourceRingLimits) Valid() bool {
 // PacketSource is purpose-specific authenticated node work, not collection or
 // disclosure authority. The exact same resolved plan accompanies quiet renewals.
 type PacketSource struct {
+	HTTP      *HTTPProjection `json:",omitempty"` // Explicit reviewed ongoing HTTP/1 extraction; nil preserves metadata sources.
 	Permit    SourcePermit
 	Program   []planning.BPFInstruction
 	Ring      SourceRingLimits
@@ -122,6 +124,12 @@ func (s SourceStatus) Valid(observedAt time.Time) bool {
 
 func (s PacketSource) Valid() bool {
 	common := s.Permit.Valid(s.Permit.IssuedAt) && s.Ring.Valid() && s.Resources.Valid()
+	if s.HTTP != nil {
+		return common && s.Syscalls == nil && len(s.Program) > 0 && len(s.Program) <= planning.MaxFilterInstructions && s.Permit.Binding.ProgramDigest != ([32]byte{}) && validUUID(s.Permit.Binding.ObservationGrantID) && s.HTTP.valid()
+	}
+	if s.Permit.Binding.ObservationGrantID != "" {
+		return false
+	}
 	if s.Syscalls != nil {
 		return common && len(s.Program) == 0 && s.Syscalls.Valid() && s.Permit.Binding.ProgramDigest != [32]byte{}
 	}

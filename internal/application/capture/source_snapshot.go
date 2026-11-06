@@ -125,6 +125,9 @@ func (s ContextInvestigation) prepareSourceSnapshotPreview(ctx context.Context, 
 		return zero, planning.ContextPlan{}, err
 	}
 	request := artifact.SourceSnapshotRequest{SourceBindingDigest: artifact.Digest(sha256.Sum256(raw)), SourceID: source.Binding.SourceID, Fence: source.Binding.Fence, SnapshotID: s.NewID(), SourceStartedAt: source.StartedAt.UTC(), SourceHardUntil: source.HardUntil.UTC(), T0: selection.TriggeredAt.UTC(), IssuedAt: now, StartBy: identity.Earlier(now.Add(5*time.Second), identity.Earlier(source.HardUntil, deadline.Add(-time.Microsecond))), ProcessingUntil: deadline, Before: before, After: after, MaxBytes: min(rec.Action.MaxBytes, int64(artifact.RecordingNativeLimit))}
+	if rec.HTTP != nil {
+		request.HTTP = *rec.HTTP
+	}
 	if manual != nil && manual.GroupParent != nil {
 		g := manual.GroupParent
 		if g.Group == nil || manual.GroupIndex < 0 || manual.GroupIndex >= len(g.Group.Children) {

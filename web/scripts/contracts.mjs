@@ -101,6 +101,8 @@ await operationBundle(['preview_access_change'], 'access-preview');
 await operationBundle(['preview_retention_change'], 'retention-preview');
 await operationBundle(['request_policy_grant', 'request_raw_access', 'get_grant', 'list_reviews', 'decide_review', 'revoke_grant'], 'approvals');
 
+await operationBundle(['list_live_sources', 'open_live_watch', 'read_live_watch', 'update_live_watch', 'close_live_watch'], 'live');
+
 // AJV's standalone ESM source references a small fixed set of CommonJS helpers.
 // Explicit ESM imports let Vite bundle them; no browser require/eval is allowed.
 function browserModules(source) {
@@ -120,6 +122,7 @@ function browserModules(source) {
     return `import * as ${name}Module from '${path}.js';\nconst ${name} = { default: typeof ${name}Module.default === 'function' ? ${name}Module.default : ${name}Module.default.default };\n`;
   }).join('') + result;
 }
+outputs['validate-live.js'] = browserModules(outputs['validate-live.js']);
 outputs['validate-auth.js'] = browserModules(outputs['validate-auth.js']);
 outputs['validate-capture.js'] = browserModules(outputs['validate-capture.js']);
 outputs['validate-evidence.js'] = browserModules(outputs['validate-evidence.js']);

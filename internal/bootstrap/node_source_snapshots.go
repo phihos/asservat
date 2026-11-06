@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"asservat.local/asservat/internal/adapters/httpheaders"
 	"asservat.local/asservat/internal/adapters/packets"
 	"asservat.local/asservat/internal/adapters/syscalls"
 	deliveryapp "asservat.local/asservat/internal/application/delivery"
@@ -54,7 +55,11 @@ func (n *nodeSources) snapshotLocked(parent context.Context, epoch string, w col
 	}
 	source.mu.Lock()
 	p := source.meter.Permit()
-	exact := p.Binding == x.Binding && p.StartedAt.Equal(q.SourceStartedAt) && p.HardUntil.Equal(q.SourceHardUntil)
+	httpExact := source.httpConfig == nil && q.HTTP == (artifact.RecordingHTTP{})
+	if h := source.httpConfig; h != nil {
+		httpExact = q.HTTP == (artifact.RecordingHTTP{MaxFlows: h.MaxFlows, MaxHeaderBytes: h.MaxHeaderBytes, MaxFlowBytes: h.MaxFlowBytes, MaxTotalBytes: h.MaxTotalBytes, IdleMillis: h.IdleTimeout.Milliseconds()})
+	}
+	exact := httpExact && p.Binding == x.Binding && p.StartedAt.Equal(q.SourceStartedAt) && p.HardUntil.Equal(q.SourceHardUntil)
 	source.mu.Unlock()
 	if !exact {
 		r.Reason = collector.ReasonWorkUnknown
@@ -122,7 +127,11 @@ func (n *nodeSources) runSnapshot(ctx context.Context, epoch, workID string, own
 	var counters packets.Counters
 	var err error
 	nativeType, snaplen := "", packets.Snaplen
-	if copy.records {
+	nativeComplete := true
+	if h := copy.httpConfig; h != nil {
+		nativeType, snaplen = artifact.HTTPHeadersArtifact, httpheaders.Snaplen
+		native, counters, nativeComplete, err = httpheaders.EncodeSourceWindow(ctx, copy, httpheaders.Limits{MaxFlows: h.MaxFlows, MaxHeaderBytes: h.MaxHeaderBytes, MaxFlowBytes: h.MaxFlowBytes, MaxTotalBytes: h.MaxTotalBytes, IdleTimeout: h.IdleTimeout}, q.MaxBytes, acquiredFrom, acquiredUntil, coverage.Complete && !coverage.InputUnknown && !coverage.HistoryEvicted)
+	} else if copy.records {
 		nativeType, snaplen = artifact.SyscallRecordsArtifact, syscalls.RecordSize
 		native, counters, err = encodeSyscallWindow(ctx, copy, int(q.MaxBytes), copy.maxEvents, x.Binding.PodUID, x.Binding.SourceID, acquiredFrom, acquiredUntil)
 	} else {
@@ -144,8 +153,8 @@ func (n *nodeSources) runSnapshot(ctx context.Context, epoch, workID string, own
 		return
 	}
 	completed := n.now().UTC()
-	outcome := artifact.SourceSnapshotOutcome{NativeSHA256: artifact.Digest(sha256.Sum256(native)), SourceSnapshotCoverage: artifact.SourceSnapshotCoverage{Request: q, AcceptedExpectationDigest: artifact.Digest(x.ExpectationDigest), NativeBytes: int64(len(native)), Retained: counters.Retained, OutputFull: counters.OutputFull, AvailableFrom: coverage.AvailableFrom, ObservedUntil: coverage.ObservedUntil, SourceStoppedAt: coverage.SourceStoppedAt.UTC(), SourceClosedAt: coverage.SourceClosedAt.UTC(), CompletedAt: completed, HistoryComplete: pre.Complete && !coverage.InputUnknown && !coverage.HistoryEvicted, WindowComplete: coverage.Complete && counters.OutputFull == 0, HistoryEvicted: coverage.HistoryEvicted, InputUnknown: coverage.InputUnknown}}
-	result := collector.PacketResult{Snapshot: &outcome, WorkID: workID, CaptureID: x.CaptureID, StartedAt: acquiredFrom, EndedAt: acquiredUntil, Seen: counters.Seen, Retained: counters.Retained, OutputFull: counters.OutputFull, WireBytes: counters.WireBytes, CapturedBytes: int64(len(native)), Snaplen: snaplen, EngineVersion: n.version, ProgramDigest: x.Binding.ProgramDigest, NativeType: nativeType}
+	outcome := artifact.SourceSnapshotOutcome{NativeSHA256: artifact.Digest(sha256.Sum256(native)), SourceSnapshotCoverage: artifact.SourceSnapshotCoverage{Request: q, AcceptedExpectationDigest: artifact.Digest(x.ExpectationDigest), NativeBytes: int64(len(native)), Retained: counters.Retained, OutputFull: counters.OutputFull, AvailableFrom: coverage.AvailableFrom, ObservedUntil: coverage.ObservedUntil, SourceStoppedAt: coverage.SourceStoppedAt.UTC(), SourceClosedAt: coverage.SourceClosedAt.UTC(), CompletedAt: completed, HistoryComplete: pre.Complete && !coverage.InputUnknown && !coverage.HistoryEvicted, WindowComplete: coverage.Complete && nativeComplete && counters.OutputFull == 0, HistoryEvicted: coverage.HistoryEvicted, InputUnknown: coverage.InputUnknown}}
+	result := collector.PacketResult{Snapshot: &outcome, WorkID: workID, CaptureID: x.CaptureID, StartedAt: acquiredFrom, EndedAt: acquiredUntil, Seen: counters.Seen, Retained: counters.Retained, Filtered: counters.Filtered, OutputFull: counters.OutputFull, WireBytes: counters.WireBytes, CapturedBytes: int64(len(native)), Snaplen: snaplen, EngineVersion: n.version, ProgramDigest: x.Binding.ProgramDigest, NativeType: nativeType}
 	if result.Valid() && n.takeUpload(ctx, result.CapturedBytes) {
 		uploadStarted := n.now()
 		err := n.upload(ctx, epoch, result, native)
@@ -174,7 +183,10 @@ func (n *nodeSources) uploadSnapshotFailure(ctx context.Context, epoch, workID s
 	defer clear(native[:cap(native)])
 	outcome := artifact.SourceSnapshotOutcome{NativeSHA256: artifact.Digest(sha256.Sum256(native)), SourceSnapshotCoverage: artifact.SourceSnapshotCoverage{Request: x.Request, AcceptedExpectationDigest: artifact.Digest(x.ExpectationDigest), NativeBytes: int64(len(native)), CompletedAt: ended}}
 	result := collector.PacketResult{Snapshot: &outcome, WorkID: workID, CaptureID: x.CaptureID, StartedAt: started, EndedAt: ended, CapturedBytes: int64(len(native)), Snaplen: packets.Snaplen, EngineVersion: n.version, ProgramDigest: x.Binding.ProgramDigest, Failure: collector.ReasonCaptureFailed}
-	if records {
+	if x.Request.HTTP.Valid() {
+		result.NativeType = artifact.HTTPHeadersArtifact
+		result.Snaplen = httpheaders.Snaplen
+	} else if records {
 		result.NativeType = artifact.SyscallRecordsArtifact
 	}
 	if result.Valid() && n.takeUpload(ctx, result.CapturedBytes) {

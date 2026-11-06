@@ -1,0 +1,641 @@
+{
+  "name": "update_live_watch",
+  "description": "Pause/resume this viewer or replace its typed display filter. Resumes from now with a gap; cannot change acquisition, source selection, lifetime or budget.",
+  "annotations": {
+    "readOnlyHint": false,
+    "destructiveHint": false,
+    "openWorldHint": false
+  },
+  "inputSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "watch_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "expected_revision": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 1000000000
+      },
+      "idempotency_key": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128
+      },
+      "mode": {
+        "enum": [
+          "Active",
+          "Paused"
+        ]
+      },
+      "display_filter": {
+        "$ref": "#/$defs/d0"
+      }
+    },
+    "required": [
+      "watch_id",
+      "expected_revision",
+      "idempotency_key"
+    ],
+    "anyOf": [
+      {
+        "required": [
+          "mode"
+        ]
+      },
+      {
+        "required": [
+          "display_filter"
+        ]
+      }
+    ],
+    "$defs": {
+      "d0": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "all": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "field": {
+                      "const": "protocol"
+                    },
+                    "op": {
+                      "enum": [
+                        "eq",
+                        "neq"
+                      ]
+                    },
+                    "value": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    }
+                  },
+                  "required": [
+                    "field",
+                    "op",
+                    "value"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "field": {
+                      "const": "peer_uid"
+                    },
+                    "op": {
+                      "enum": [
+                        "eq",
+                        "neq"
+                      ]
+                    },
+                    "value": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    }
+                  },
+                  "required": [
+                    "field",
+                    "op",
+                    "value"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "field": {
+                      "const": "method"
+                    },
+                    "op": {
+                      "enum": [
+                        "eq",
+                        "neq"
+                      ]
+                    },
+                    "value": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    }
+                  },
+                  "required": [
+                    "field",
+                    "op",
+                    "value"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "field": {
+                      "const": "syscall"
+                    },
+                    "op": {
+                      "enum": [
+                        "eq",
+                        "neq"
+                      ]
+                    },
+                    "value": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    }
+                  },
+                  "required": [
+                    "field",
+                    "op",
+                    "value"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "field": {
+                      "const": "port"
+                    },
+                    "op": {
+                      "enum": [
+                        "eq",
+                        "neq",
+                        "gte",
+                        "lte"
+                      ]
+                    },
+                    "value": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 65535
+                    }
+                  },
+                  "required": [
+                    "field",
+                    "op",
+                    "value"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "field": {
+                      "const": "status"
+                    },
+                    "op": {
+                      "enum": [
+                        "eq",
+                        "neq",
+                        "gte",
+                        "lte"
+                      ]
+                    },
+                    "value": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 599
+                    }
+                  },
+                  "required": [
+                    "field",
+                    "op",
+                    "value"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "field": {
+                      "const": "pid"
+                    },
+                    "op": {
+                      "enum": [
+                        "eq",
+                        "neq",
+                        "gte",
+                        "lte"
+                      ]
+                    },
+                    "value": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 4194304
+                    }
+                  },
+                  "required": [
+                    "field",
+                    "op",
+                    "value"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "field": {
+                      "const": "error"
+                    },
+                    "op": {
+                      "enum": [
+                        "eq"
+                      ]
+                    },
+                    "value": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "field",
+                    "op",
+                    "value"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "field": {
+                      "const": "remote_ip"
+                    },
+                    "op": {
+                      "enum": [
+                        "eq",
+                        "neq"
+                      ]
+                    },
+                    "value": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "ipv4"
+                        },
+                        {
+                          "type": "string",
+                          "format": "ipv6"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "field",
+                    "op",
+                    "value"
+                  ]
+                }
+              ]
+            },
+            "minItems": 0,
+            "maxItems": 16
+          }
+        },
+        "required": [
+          "all"
+        ]
+      }
+    }
+  },
+  "outputSchema": {
+    "title": "Asservat mcp-result v1",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "schema_version": {
+        "const": "mcp-result/v1"
+      },
+      "request_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "data_class": {
+        "type": "string",
+        "enum": [
+          "metadata",
+          "extract",
+          "raw"
+        ]
+      },
+      "status": {
+        "type": "string",
+        "enum": [
+          "ok",
+          "pending",
+          "error"
+        ]
+      },
+      "data": {
+        "type": "object"
+      },
+      "truncated": {
+        "const": false
+      },
+      "next_cursor": {
+        "anyOf": [
+          {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "narrowing_hint": {
+        "type": "null"
+      },
+      "warnings": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "maxItems": 32,
+        "minItems": 0,
+        "uniqueItems": true
+      },
+      "provenance": {
+        "type": "array",
+        "maxItems": 0
+      }
+    },
+    "required": [
+      "schema_version",
+      "request_id",
+      "data_class",
+      "status",
+      "data",
+      "truncated",
+      "next_cursor",
+      "narrowing_hint",
+      "warnings",
+      "provenance"
+    ],
+    "allOf": [
+      {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": "ok"
+              },
+              "data": {
+                "$ref": "#/$defs/d0"
+              },
+              "data_class": {
+                "const": "metadata"
+              }
+            },
+            "required": [
+              "status",
+              "data"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": "error"
+              },
+              "data": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "message": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1024
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "navigation_uri": {
+                    "type": "string",
+                    "format": "uri",
+                    "maxLength": 2048
+                  },
+                  "responsible_role": {
+                    "enum": [
+                      "maintainer",
+                      "approver",
+                      "administrator",
+                      "none"
+                    ]
+                  },
+                  "retry_after_seconds": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 60
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ]
+              }
+            },
+            "required": [
+              "status",
+              "data"
+            ]
+          }
+        ]
+      }
+    ],
+    "$defs": {
+      "d1": {
+        "enum": [
+          "packetMetadata",
+          "httpHeaders",
+          "syscallMetadata"
+        ]
+      },
+      "d2": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "duration_seconds": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 3600
+          },
+          "max_output_bytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 67108864
+          },
+          "bytes_per_second": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 262144
+          },
+          "max_rows_per_batch": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "max_buffer_bytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1048576
+          },
+          "row_max_age_seconds": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 30
+          },
+          "replay_seconds": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 5
+          }
+        },
+        "required": [
+          "duration_seconds",
+          "max_output_bytes",
+          "bytes_per_second",
+          "max_rows_per_batch",
+          "max_buffer_bytes",
+          "row_max_age_seconds",
+          "replay_seconds"
+        ]
+      },
+      "d3": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "transient": {
+            "const": true
+          },
+          "may_contain_user_data": {
+            "const": true
+          },
+          "managed_row_max_age_seconds": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 30
+          },
+          "raw_available_live": {
+            "const": false
+          },
+          "external_copies_recallable": {
+            "const": false
+          },
+          "save_semantics": {
+            "const": "freshCurrentWindow"
+          }
+        },
+        "required": [
+          "transient",
+          "may_contain_user_data",
+          "managed_row_max_age_seconds",
+          "raw_available_live",
+          "external_copies_recallable",
+          "save_semantics"
+        ]
+      },
+      "d0": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "watch_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000000000
+          },
+          "state": {
+            "enum": [
+              "Active",
+              "Paused",
+              "Closed",
+              "Expired",
+              "Exhausted",
+              "SourceEnded",
+              "AccessLost",
+              "Disconnected"
+            ]
+          },
+          "source_session_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "minItems": 1,
+            "maxItems": 16
+          },
+          "projection": {
+            "$ref": "#/$defs/d1"
+          },
+          "accepted_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "idle_expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "limits": {
+            "$ref": "#/$defs/d2"
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4096
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "handling": {
+            "$ref": "#/$defs/d3"
+          }
+        },
+        "required": [
+          "watch_id",
+          "revision",
+          "state",
+          "source_session_ids",
+          "projection",
+          "accepted_at",
+          "expires_at",
+          "idle_expires_at",
+          "limits",
+          "cursor",
+          "handling"
+        ]
+      }
+    }
+  }
+}

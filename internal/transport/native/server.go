@@ -29,7 +29,7 @@ type ServerCredentials interface {
 // serves the exact native Handler with h2/TLS1.3 only. Handshake admission does
 // not replace the handler's current per-frame SQL, proof and serving checks.
 func Serve(ctx context.Context, listener net.Listener, roots *x509.CertPool, credentials ServerCredentials, handler *Handler, connections int) error {
-	return serve(ctx, listener, roots, nil, credentials, handler, nil, connections, 0)
+	return serve(ctx, listener, roots, nil, credentials, handler, nil, nil, connections, 0)
 }
 
 // ClientRoots returns the current client-certificate roots for one handshake.
@@ -45,7 +45,7 @@ func ServeWorker(ctx context.Context, listener net.Listener, roots ClientRoots, 
 	if roots == nil || handler == nil || handler.path != contracts.NativeWorkerPath {
 		return contracts.ErrNativeProtocol
 	}
-	return serve(ctx, listener, nil, roots, credentials, handler, nil, connections, 0)
+	return serve(ctx, listener, nil, roots, credentials, handler, nil, nil, connections, 0)
 }
 
 // ServeWithContextStart shares the accepted native port between exactly two
@@ -57,11 +57,20 @@ func ServeWithContextStart(ctx context.Context, listener net.Listener, roots *x5
 	if starts == nil || startConnections < 1 || startConnections > 64 || nativeConnections < 1 || nativeConnections+startConnections > 64 {
 		return contracts.ErrNativeProtocol
 	}
-	return serve(ctx, listener, roots, nil, credentials, handler, starts, nativeConnections, startConnections)
+	return serve(ctx, listener, roots, nil, credentials, handler, starts, nil, nativeConnections, startConnections)
+}
+
+// ServeWithLiveOwner adds one closed same-owner client purpose. It shares the
+// original native slots; context-start reservations and total caps are unchanged.
+func ServeWithLiveOwner(ctx context.Context, listener net.Listener, roots *x509.CertPool, credentials ServerCredentials, handler *Handler, starts *contextstart.Handler, live *LiveOwnerHandler, nativeConnections, startConnections int) error {
+	if live == nil || handler == nil || live.authority != handler.host || cap(live.slots) > nativeConnections || starts == nil && startConnections != 0 || starts != nil && startConnections < 1 {
+		return contracts.ErrNativeProtocol
+	}
+	return serve(ctx, listener, roots, nil, credentials, handler, starts, live, nativeConnections, startConnections)
 }
 
 // Exactly one of roots (fixed) and current (per handshake) supplies ClientCAs.
-func serve(ctx context.Context, listener net.Listener, roots *x509.CertPool, current ClientRoots, credentials ServerCredentials, handler *Handler, starts *contextstart.Handler, nativeConnections, startConnections int) error {
+func serve(ctx context.Context, listener net.Listener, roots *x509.CertPool, current ClientRoots, credentials ServerCredentials, handler *Handler, starts *contextstart.Handler, live *LiveOwnerHandler, nativeConnections, startConnections int) error {
 	connections := nativeConnections + startConnections
 	if ctx == nil || ctx.Err() != nil || listener == nil || (roots == nil) == (current == nil) || roots != nil && len(roots.Subjects()) == 0 || credentials == nil || handler == nil || nativeConnections < 1 || connections > 64 || cap(handler.slots) > nativeConnections {
 		return contracts.ErrNativeProtocol
@@ -83,7 +92,7 @@ func serve(ctx context.Context, listener net.Listener, roots *x509.CertPool, cur
 	// to the evidence-read window, so native connections reside up to 30 s.
 	residency := 30 * time.Second
 	prelude := time.Duration(0)
-	if starts != nil {
+	if starts != nil || live != nil {
 		residency, prelude = 30*time.Second, 2*time.Second
 	}
 	owned := &nativeListener{Listener: netutil.LimitListener(listener, connections), root: root, residency: residency, prelude: prelude}
@@ -193,6 +202,8 @@ func serve(ctx context.Context, listener net.Listener, roots *x509.CertPool, cur
 		selected, lifetime, slots := http.Handler(handler), 30*time.Second, nativeSlots
 		if starts != nil && r.RequestURI == contracts.APIContextStartPath {
 			selected, lifetime, slots = starts, 30*time.Second, startSlots
+		} else if live != nil && r.RequestURI == contracts.LiveOwnerPath {
+			selected, lifetime = live, 5*time.Second
 		} else if r.RequestURI != handler.path {
 			unavailable(w)
 			return

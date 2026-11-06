@@ -71,7 +71,7 @@ func restrictedPod(name, image string, args ...string) *core.Pod {
 // HTTP traffic between Restricted Pods, a capture with a libpcap-compiled
 // filter through the real collector and gadget, and the headers-only,
 // filter and count checks on the delivered PCAPNG.
-func packetCaptureNative(t *testing.T, ctx context.Context, k kubernetes.Interface, admin *rest.Config, ch *delivery.NodeChannel, view delivery.NodeView, workload, busybox, work, s3 string, results map[string]any) {
+func packetCaptureNative(t *testing.T, ctx context.Context, k kubernetes.Interface, admin *rest.Config, ch *delivery.NodeChannel, view delivery.NodeView, workload, busybox, work, s3 string, results map[string]any, live *nativeLiveQualification) {
 	t.Helper()
 	sink := &testPacketSink{results: map[string]collector.PacketResult{}, pcap: map[string][]byte{}, at: map[string]time.Time{}}
 	ch.SetPacketSink(sink)
@@ -103,7 +103,7 @@ func packetCaptureNative(t *testing.T, ctx context.Context, k kubernetes.Interfa
 		return false
 	})
 	if _, err := k.CoreV1().Pods(workload).Create(ctx, restrictedPod("client", busybox,
-		"while true; do wget -q -O /dev/null http://"+webIP+":8080/ ; wget -q -O /dev/null http://"+webIP+":9090/ ; done"), meta.CreateOptions{}); err != nil {
+		"while true; do wget -q -O /dev/null http://"+webIP+":8080/?ASSERVAT-LIVE-PRIVATE-CANARY ; wget -q -O /dev/null http://"+webIP+":9090/ ; done"), meta.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
 	wait("client Pod Running", 3*time.Minute, func() bool {
@@ -123,8 +123,16 @@ func packetCaptureNative(t *testing.T, ctx context.Context, k kubernetes.Interfa
 			p.Program, p.ProgramDigest = filter.Program, digest
 		}
 		queued := time.Now()
-		if _, err := ch.EnqueuePacket(view.Identity.NodeUID, p, queued.Add(collector.PacketCaptureStartWithin)); err != nil {
+		w, err := ch.EnqueuePacket(view.Identity.NodeUID, p, queued.Add(collector.PacketCaptureStartWithin))
+		if err != nil {
 			t.Fatal(err)
+		}
+		var original *collector.ManualLiveSource
+		if name == "filtered" && live != nil {
+			call, done := live.phase(t, ctx)
+			m := live.manual(t, call, ch, view, w, false)
+			done()
+			original = &m
 		}
 		var r collector.PacketResult
 		var b []byte
@@ -134,6 +142,11 @@ func packetCaptureNative(t *testing.T, ctx context.Context, k kubernetes.Interfa
 			r, b, at, ok = sink.get(p.CaptureID)
 			return ok
 		})
+		if original != nil {
+			call, done := live.phase(t, ctx)
+			live.ended(t, call, ch, view, w, *original)
+			done()
+		}
 		_ = os.WriteFile(filepath.Join(work, name+".pcapng"), b, 0o644)
 		return r, b, at.Sub(queued)
 	}
@@ -215,6 +228,11 @@ func packetCaptureNative(t *testing.T, ctx context.Context, k kubernetes.Interfa
 	if s3 != "" {
 		recordingEncryptedNative(t, ctx, admin, ch, sink, web, filter.Program, s3, work, results)
 		ch.SetPacketSink(sink)
+	}
+
+	// Approved HTTP source and finite observer use the SAME existing traffic.
+	if live != nil {
+		live.http(t, ctx, ch, view, string(web.UID), filter.Program, sink, results)
 	}
 
 	// 3b. A Pod that does not run on the node is reported, not captured.

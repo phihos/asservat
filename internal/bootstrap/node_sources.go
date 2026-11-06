@@ -18,6 +18,8 @@ import (
 // collection authority. Initial replay tombstones survive their original start
 // cutoff; a later renewal cannot construct a replacement engine.
 type nodeSources struct {
+	liveBudget *nodeLiveBudget
+	liveWG     sync.WaitGroup
 	// ringDir is the mounted administrator ring volume; empty means the
 	// encrypted-disk medium is unavailable on this node (ADR-278).
 	ringDir string
@@ -151,7 +153,7 @@ func (n *nodeSources) decide(parent context.Context, epoch string, w collector.W
 		n.plans = make(map[string]collector.SourceRingLimits)
 	}
 	if old := n.sources[b.SourceID]; old != nil {
-		if n.plans[b.SourceID] != source.Ring || old.Renew(source.Permit) != nil {
+		if n.plans[b.SourceID] != source.Ring || !old.sameHTTPConfig(source.HTTP) || old.Renew(source.Permit) != nil {
 			r.Reason = collector.ReasonWorkUnknown
 			return r
 		}
@@ -203,7 +205,7 @@ func (n *nodeSources) decide(parent context.Context, epoch string, w collector.W
 			return r
 		}
 	}
-	s, err := newPacketSource(parent, source.Permit, source.Resources.Node, limits, source.Program, source.Syscalls, engine, n.now, n.budget, n.budgetMu, n.log, dir)
+	s, err := newPacketSource(parent, source.Permit, source.Resources.Node, limits, source.Program, source.Syscalls, engine, n.now, n.budget, n.budgetMu, n.log, dir, source.HTTP)
 	if errors.Is(err, packets.ErrMediumUnavailable) {
 		r.Reason = collector.ReasonMediumUnavailable
 		return r
@@ -235,6 +237,7 @@ func (n *nodeSources) Close() {
 		_ = s.Close()
 	}
 	n.snapshotWG.Wait()
+	n.liveWG.Wait()
 }
 
 func (n *nodeSources) Status() ([]collector.SourceStatus, time.Time) {

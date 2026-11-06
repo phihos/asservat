@@ -1,12 +1,14 @@
 package postgres
 
 import (
+	planvalue "asservat.local/asservat/internal/domain/planning"
 	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"math"
 	"reflect"
+	"slices"
 	"time"
 
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
@@ -55,7 +57,11 @@ func sourceCheckCurrent(in app.PolicySourceCheck, now time.Time) bool {
 	if ageErr != nil || age <= 0 || age > in.Retention.ExpiresAt.Sub(in.Retention.AnchorAt) {
 		return false
 	}
-	return in.Policy.Valid() && p != nil && p.Action.ExecutionMode == "ongoing" && (p.Action.PacketProfile == "networkHeaders" || p.Action.Kind == "syscallTrace") &&
+	http := policySourceHTTP(p)
+	if p.HTTP != nil && !http {
+		return false
+	}
+	return in.Policy.Valid() && p != nil && p.Action.ExecutionMode == "ongoing" && (p.Action.PacketProfile == "networkHeaders" || p.Action.Kind == "syscallTrace" || http) &&
 		!compiler.RawBytePredicate(p.Action.Filter) && in.Authority.Valid(now) &&
 		in.Target.ExecutionClass == artifact.ContextAPIExecution && in.Target.Valid(now) && in.Node.Valid(now) &&
 		in.Target.Request.ClusterID == in.Authority.ClusterID && in.Target.Request.Namespace.UID == in.Authority.NamespaceUID && in.Target.Request.Workload.UID == in.Authority.WorkloadUID &&
@@ -165,9 +171,11 @@ func (s *PolicySources) AdmitSource(ctx context.Context, in app.PolicySourceChec
 
 		step = "grant"
 		hard := a.NotAfter
+		var observationGrant *authorization.Grant
+		http := policySourceHTTP(in.Recorder())
 		// An ordinary require-all review is checked without consuming a raw-byte
 		// grant pool. A changed attachment cannot refill this source's input credit.
-		if in.Settings.RequireRecordingApproval || policy.AuthoredGrantRef != "" {
+		if http || in.Settings.RequireRecordingApproval || policy.AuthoredGrantRef != "" {
 			if !policy.GrantAttachmentID.Valid {
 				return value.ErrDenied
 			}
@@ -186,10 +194,14 @@ func (s *PolicySources) AdmitSource(ctx context.Context, in app.PolicySourceChec
 			if err != nil {
 				return err
 			}
-			if row.PolicyAcceptanceID != policy.ActiveID || g.Policy == nil || g.Policy.Observation != nil || g.Policy.RecipeDigest != in.Recorder().RecipeDigest || authorization.CheckPolicyGrantAttachment(g, a, policy.AuthoredGrantRef, now.Time) != nil {
+			if row.PolicyAcceptanceID != policy.ActiveID || g.Policy == nil || (g.Policy.Observation != nil) != http || g.Policy.RecipeDigest != in.Recorder().RecipeDigest || authorization.CheckPolicyGrantAttachment(g, a, policy.AuthoredGrantRef, now.Time) != nil {
 				return value.ErrDenied
 			}
 			hard = identity.Earlier(hard, identity.Earlier(g.PolicyNotAfter, g.ExpiresAt))
+			if http {
+				observationGrant = &g
+				hard = identity.Earlier(hard, now.Time.Add(time.Duration(g.Policy.Observation.MaxSessionSeconds)*time.Second))
+			}
 		}
 		step = "storage"
 		storage, err := q.ObserveContextStorage(call, custodydb.ObserveContextStorageParams{RootID: id(s.root), ClusterID: id(a.ClusterID), NamespaceUid: a.NamespaceUID, WorkloadUid: a.WorkloadUID})
@@ -224,6 +236,9 @@ func (s *PolicySources) AdmitSource(ctx context.Context, in app.PolicySourceChec
 		out.Resources = limits
 
 		rate := in.BytesPerSecond
+		if observationGrant != nil {
+			rate = min(rate, observationGrant.Policy.Observation.MaxBytesPerSecond)
+		}
 		slots := in.SourceSlots
 		if limits.Node.MaxActiveSources > 0 {
 			slots = min(slots, limits.Node.MaxActiveSources)
@@ -304,6 +319,16 @@ func (s *PolicySources) AdmitSource(ctx context.Context, in app.PolicySourceChec
 				return value.ErrDenied
 			}
 			initialCredit := min(in.InitialCredit, a.Limits.MaxObservedBytes-budget.ObservedBytesSpent)
+			if observationGrant != nil {
+				initialCredit = min(initialCredit, observationGrant.Policy.Limits.MaxObservedBytes-observationGrant.PolicySpend.ObservedBytes)
+				active, err := q.CountActiveSourceGrantObservations(call, custodydb.CountActiveSourceGrantObservationsParams{RootID: id(s.root), GrantID: id(observationGrant.ID)})
+				if err != nil {
+					return err
+				}
+				if err = authorization.CheckPolicyObservationStart(*observationGrant, a, in.Target.Target(), hard.Sub(now.Time), initialCredit, active, now.Time); err != nil {
+					return value.ErrDenied
+				}
+			}
 			if initialCredit < 1 {
 				return value.ErrCapacity
 			}
@@ -314,11 +339,23 @@ func (s *PolicySources) AdmitSource(ctx context.Context, in app.PolicySourceChec
 			if n != 1 {
 				return value.ErrCapacity
 			}
+			if observationGrant != nil {
+				n, err = q.SpendPolicyGrantObservedBytes(call, custodydb.SpendPolicyGrantObservedBytesParams{RootID: id(s.root), ID: id(observationGrant.ID), Bytes: initialCredit})
+				if err != nil {
+					return err
+				}
+				if n != 1 {
+					return value.ErrCapacity
+				}
+			}
 			now, err = q.CurrentTime(call)
 			if err != nil {
 				return err
 			}
 			b := collector.SourceBinding{RootID: s.root, PolicyUID: a.PolicyUID, AcceptanceID: record.ID, SourceID: in.SourceID, Fence: in.Fence, ActionID: in.Recorder().Action.ID, PodUID: in.Node.PodUID, NodeUID: in.Node.NodeUID, BootID: in.Node.BootID, CollectorPodUID: in.Node.CollectorPodUID, CollectorEpoch: in.Node.CollectorEpoch, Scope: [32]byte(a.ScopeDigest), ExpectationDigest: [32]byte(in.Recorder().Digest), ResourceDigest: resourceDigest, AudienceDigest: [32]byte(originalAudienceDigest)}
+			if observationGrant != nil {
+				b.ObservationGrantID = observationGrant.ID
+			}
 			if in.Recorder().Filter != nil {
 				b.ProgramDigest = [32]byte(compiler.FilterProgramDigest(in.Recorder().Filter.Program))
 			}
@@ -344,6 +381,17 @@ func (s *PolicySources) AdmitSource(ctx context.Context, in app.PolicySourceChec
 				return err
 			}
 		} else {
+			prior, err := policySourceState(row)
+			if err != nil {
+				return err
+			}
+			expectedGrant := ""
+			if observationGrant != nil {
+				expectedGrant = observationGrant.ID
+			}
+			if prior.Binding.ObservationGrantID != expectedGrant || observationGrant != nil && (prior.HardUntil.After(prior.StartedAt.Add(time.Duration(observationGrant.Policy.Observation.MaxSessionSeconds)*time.Second)) || prior.HardUntil.After(observationGrant.ExpiresAt) || prior.HardUntil.After(observationGrant.PolicyNotAfter)) {
+				return value.ErrChanged
+			}
 			if row.EndedAt.Valid || row.SlotReleasedAt.Valid || row.AcceptanceID != policy.ActiveID || row.Fence != id(in.Fence) || row.AllocationID != allocation.ID || row.PodUid != in.Node.PodUID || row.BytesPerSecond > rate {
 				return value.ErrConflict
 			}
@@ -363,6 +411,9 @@ func (s *PolicySources) AdmitSource(ctx context.Context, in app.PolicySourceChec
 						return err
 					}
 					delta := min(in.AdditionalCredit, a.Limits.MaxObservedBytes-budget.ObservedBytesSpent)
+					if observationGrant != nil {
+						delta = min(delta, observationGrant.Policy.Limits.MaxObservedBytes-observationGrant.PolicySpend.ObservedBytes)
+					}
 					if delta < 0 {
 						return value.ErrChanged
 					}
@@ -373,6 +424,15 @@ func (s *PolicySources) AdmitSource(ctx context.Context, in app.PolicySourceChec
 						}
 						if n != 1 {
 							return value.ErrCapacity
+						}
+						if observationGrant != nil {
+							n, err = q.SpendPolicyGrantObservedBytes(call, custodydb.SpendPolicyGrantObservedBytesParams{RootID: id(s.root), ID: id(observationGrant.ID), Bytes: delta})
+							if err != nil {
+								return err
+							}
+							if n != 1 {
+								return value.ErrCapacity
+							}
 						}
 						row, err = q.IncreasePolicyRecordingSourceCredit(call, custodydb.IncreasePolicyRecordingSourceCreditParams{RootID: id(s.root), ID: row.ID, ExpectedCredit: row.Credit, AdditionalCredit: delta})
 						if err != nil {
@@ -553,4 +613,10 @@ func sourceBudgetBucket(d time.Duration) string {
 		return "lt3s"
 	}
 	return "ge3s"
+}
+
+// HTTP input observation is explicitly reviewed at source admission, separately
+// from ordinary approved live viewing. Other source modes keep the old path.
+func policySourceHTTP(p *planvalue.PolicyRecorderConfiguration) bool {
+	return p != nil && p.Action.Kind == "packetCapture" && p.Action.PacketProfile == "httpHeaders" && p.Action.ExecutionMode == "ongoing" && p.HTTP.Valid() && slices.Contains(p.Action.Sensitive, planvalue.ReasonHTTPHeaders)
 }

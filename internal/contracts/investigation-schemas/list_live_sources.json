@@ -1,0 +1,347 @@
+{
+  "name": "list_live_sources",
+  "description": "List authorized existing packet/syscall sources and approved live projections. Metadata only; never starts collection. Artifact shares do not grant live access.",
+  "annotations": {
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "openWorldHint": false
+  },
+  "inputSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "cursor": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 4096
+      },
+      "limit": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "target_ref": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "cluster_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "namespace": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 63
+          },
+          "kind": {
+            "enum": [
+              "Deployment",
+              "StatefulSet",
+              "Pod"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 253
+          }
+        },
+        "required": [
+          "cluster_id",
+          "namespace",
+          "kind",
+          "name"
+        ]
+      }
+    },
+    "required": [
+      "target_ref"
+    ]
+  },
+  "outputSchema": {
+    "title": "Asservat mcp-result v1",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "schema_version": {
+        "const": "mcp-result/v1"
+      },
+      "request_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "data_class": {
+        "type": "string",
+        "enum": [
+          "metadata",
+          "extract",
+          "raw"
+        ]
+      },
+      "status": {
+        "type": "string",
+        "enum": [
+          "ok",
+          "pending",
+          "error"
+        ]
+      },
+      "data": {
+        "type": "object"
+      },
+      "truncated": {
+        "const": false
+      },
+      "next_cursor": {
+        "anyOf": [
+          {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "narrowing_hint": {
+        "type": "null"
+      },
+      "warnings": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "maxItems": 32,
+        "minItems": 0,
+        "uniqueItems": true
+      },
+      "provenance": {
+        "type": "array",
+        "maxItems": 0
+      }
+    },
+    "required": [
+      "schema_version",
+      "request_id",
+      "data_class",
+      "status",
+      "data",
+      "truncated",
+      "next_cursor",
+      "narrowing_hint",
+      "warnings",
+      "provenance"
+    ],
+    "allOf": [
+      {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": "ok"
+              },
+              "data": {
+                "$ref": "#/$defs/d0"
+              },
+              "data_class": {
+                "const": "metadata"
+              }
+            },
+            "required": [
+              "status",
+              "data"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": "error"
+              },
+              "data": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "message": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1024
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "navigation_uri": {
+                    "type": "string",
+                    "format": "uri",
+                    "maxLength": 2048
+                  },
+                  "responsible_role": {
+                    "enum": [
+                      "maintainer",
+                      "approver",
+                      "administrator",
+                      "none"
+                    ]
+                  },
+                  "retry_after_seconds": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 60
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ]
+              }
+            },
+            "required": [
+              "status",
+              "data"
+            ]
+          }
+        ]
+      }
+    ],
+    "$defs": {
+      "d2": {
+        "enum": [
+          "packetMetadata",
+          "httpHeaders",
+          "syscallMetadata"
+        ]
+      },
+      "d1": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "source_handle": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "handle_expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "source_session_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workload_uid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "pod_uid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "action_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "owner_kind": {
+            "enum": [
+              "policy",
+              "manualSession"
+            ]
+          },
+          "owner_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "state": {
+            "enum": [
+              "Warming",
+              "Ready",
+              "Degraded",
+              "Stopped",
+              "Unavailable"
+            ]
+          },
+          "projections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/d2"
+            },
+            "minItems": 0,
+            "maxItems": 3,
+            "uniqueItems": true
+          },
+          "eligible": {
+            "type": "boolean"
+          },
+          "blocker_codes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "minItems": 0,
+            "maxItems": 16,
+            "uniqueItems": true
+          },
+          "save_via": {
+            "enum": [
+              "recordingSave",
+              "captureOutcome",
+              "unavailable"
+            ]
+          },
+          "lease_until": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "source_handle",
+          "handle_expires_at",
+          "source_session_id",
+          "workload_uid",
+          "pod_uid",
+          "action_id",
+          "owner_kind",
+          "owner_id",
+          "state",
+          "projections",
+          "eligible",
+          "blocker_codes",
+          "save_via",
+          "lease_until"
+        ]
+      },
+      "d0": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/d1"
+            },
+            "minItems": 0,
+            "maxItems": 100
+          }
+        },
+        "required": [
+          "sources"
+        ]
+      }
+    }
+  }
+}

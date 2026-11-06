@@ -334,6 +334,20 @@ func (s *Standby) Serve(stream Stream, now func() time.Time) error {
 // (ADR-179). It returns the region receiver's checked validity, which bounds
 // the use of the answer.
 func (r *Router) Query(ctx context.Context, cluster, method string, in, out any) (time.Time, error) {
+	return r.queryExecutor(ctx, cluster, method, in, out, nil)
+}
+
+// QueryProcess routes a passive read to the exact original regional holder.
+// The tuple is a locator, not authority; the selected receiver still undergoes
+// all existing current peer/registry/configuration checks. No replacement or
+// automatic retry is selected when the original process is unavailable.
+func (r *Router) QueryProcess(ctx context.Context, cluster, method string, in, out any, pod, epoch string) (time.Time, error) {
+	if !authorization.UUID(pod) || !authorization.UUID(epoch) {
+		return time.Time{}, fleet.ErrInvalid
+	}
+	return r.queryExecutor(ctx, cluster, method, in, out, &fleet.APIContextExecutor{PodUID: pod, ProcessEpoch: epoch})
+}
+func (r *Router) queryExecutor(ctx context.Context, cluster, method string, in, out any, executor *fleet.APIContextExecutor) (time.Time, error) {
 	if r == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(cluster) {
 		return time.Time{}, fleet.ErrInvalid
 	}
@@ -348,7 +362,9 @@ func (r *Router) Query(ctx context.Context, cluster, method string, in, out any)
 	for {
 		r.mu.Lock()
 		r.pruneLocked(cluster)
-		selected = r.selectLocked(cluster, deadline, func(s *Standby) bool { return s.queries < contracts.APIContextMaximumQueries })
+		selected = r.selectLocked(cluster, deadline, func(s *Standby) bool {
+			return s.queries < contracts.APIContextMaximumQueries && (executor == nil || s.channel.Executor.PodUID == executor.PodUID && s.channel.Executor.ProcessEpoch == executor.ProcessEpoch)
+		})
 		if r.closed {
 			r.mu.Unlock()
 			return time.Time{}, fleet.ErrUnavailable
