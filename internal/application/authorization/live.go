@@ -8,6 +8,7 @@ import (
 	live "asservat.local/asservat/internal/domain/live"
 	"asservat.local/asservat/internal/domain/targets"
 	"context"
+	"fmt"
 	"slices"
 	"time"
 )
@@ -272,19 +273,19 @@ func (s LiveSourceAuthority) finishSources(call context.Context, current identit
 	for n, source := range sources {
 		feature := decisions[n]
 		if !feature.Limits.Valid() {
-			return nil, time.Time{}, live.ErrDenied
+			return nil, time.Time{}, fmt.Errorf("%w: finish limits", live.ErrDenied)
 		}
 		source.ViewLimits = feature.Limits
 		source.Projections = slices.DeleteFunc(slices.Clone(source.Projections), func(p string) bool { return !slices.Contains(feature.Projections, p) })
 		if projection != "" && !slices.Contains(source.Projections, projection) {
-			return nil, time.Time{}, live.ErrDenied
+			return nil, time.Time{}, fmt.Errorf("%w: finish projection", live.ErrDenied)
 		}
 		until = identity.Earlier(until, feature.ValidUntil)
 		out[n] = source.Clone()
 	}
 	final, err := current.ResolveIdentity(call)
 	if err != nil || !final.Valid(s.Now()) || !sameProjectionIdentity(i, final, s.Now()) || call.Err() != nil || !s.Now().Before(until) {
-		return nil, time.Time{}, live.ErrDenied
+		return nil, time.Time{}, fmt.Errorf("%w: finish final-identity", live.ErrDenied)
 	}
 	return out, identity.Earlier(until, final.ValidUntil), nil
 }
