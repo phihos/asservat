@@ -1,0 +1,146 @@
+{
+  "worktree": "/home/phil/Projekte/asservat-capacity-unacknowledged-pair",
+  "branch": "fix/capacity-unacknowledged-pair",
+  "commits": [
+    "f49bc502a6432ec77233cabc617c352f3122f0a8",
+    "1eb93550505fcaa71c1d31bf1d90289044bdcda0"
+  ],
+  "bothSignaturesVerified": true,
+  "pushOrHosted": false,
+  "sourceFrozen": true,
+  "files": {
+    "internal/adapters/postgres/capacity_setup.go": {
+      "sha256": "a3a87ed0354d41a99b842db7591a30a8162200e88cd4de3f219641557ef62795",
+      "bytes": 13041
+    },
+    "internal/adapters/postgres/capacity_setup_pair.go": {
+      "sha256": "605bea47e3fd420e7ecfda3bbd4df1918762fda108b82bdfc48f8b24f76eb06b",
+      "bytes": 4038
+    },
+    "internal/adapters/postgres/capacity_setup_pair_test.go": {
+      "sha256": "4ce0cd4577324dde89a19d37ab161ed4bee4dacf2942e4db4aba8b784bbe1ad7",
+      "bytes": 3575
+    },
+    "test/integration/capacity_sql_matrix_test.go": {
+      "sha256": "f8d3ad3f8844b16fa2b5f99e260281fa62df2b5cc592aeb245ddd3e733494719",
+      "bytes": 23602
+    },
+    "docs/decisions/141-protected-capacity-production.md": {
+      "sha256": "476467252fb25872291b76134d59f455814fc02d0d78086a92100cd4460f5c87",
+      "bytes": 6735
+    },
+    "docs/architecture/capacity-production.md": {
+      "sha256": "6f3f37542222f26bedbf7c803ee97c1c2457c6f010d74ff73de1abff69b42820",
+      "bytes": 18442
+    },
+    "test/integration/hub_metadata_readers_test.go": {
+      "sha256": "08e42cb19920a44e076115c3f7e3e976e02e8d395d05244020812a4f8bb7bf87",
+      "bytes": 10696
+    }
+  },
+  "review": "Root reviewed six-path current transaction/receipt boundaries and subsequent exact route expectation; record repair-root-review.json, explicit messages retained by parent.",
+  "verification": [
+    {
+      "command": "go test -race -overlay=<cache>/old-pair-overlay.json ./internal/adapters/postgres -run '^TestCapacitySetupPairOnlyFinishesUnacknowledgedAbsentPair/original-expired-claim-new-current-invocation$' -count=1 -v",
+      "exit": 1,
+      "seconds": 0.053,
+      "scope": "Actual old f941 pair body with signature-only extra ignored bool compatibility; isolated Tx decision fake. Not actual service failure or authority proof."
+    },
+    {
+      "command": "go test -race ./internal/adapters/postgres -run '^TestCapacitySetup' -count=1 -v",
+      "exit": 0,
+      "seconds": 1.115
+    },
+    {
+      "command": "go test -race ./internal/adapters/kubernetes -run '^TestCapacityProjectionMaterialRejectsIncompleteAndSubstitutedSetup$' -count=1 -v",
+      "exit": 0,
+      "seconds": 1.064,
+      "scope": "Existing actual projection encoder gate incl missing receipt; no installed runtime claim."
+    },
+    {
+      "command": "go test -race ./test/integration -run '^TestCapacityProducerWithRealPostgres$' -count=1 -v",
+      "exit": 0,
+      "seconds": 1.082,
+      "scope": "External entry SKIP without fixture; compile only."
+    },
+    {
+      "command": "make spec-check architecture-check",
+      "exit": 0,
+      "scope": "13748spec assertions/1361architecture checks; documentation/design only."
+    },
+    {
+      "command": "make pre-push (fresh isolated worktree, no web/node_modules)",
+      "exit": 2,
+      "scope": "Setup failure only: missing yaml dependency; others passed. Preserved log."
+    },
+    {
+      "command": "make pre-push after exact-lockfile dependency symlink",
+      "exit": 0,
+      "scope": "All repository gates; SQLC68exact,console51files/588tests."
+    },
+    {
+      "command": "go test -race ./test/integration -run '^TestCapacityProducerWithRealPostgres$' -count=1 -v",
+      "exit": 0,
+      "seconds": 1.083,
+      "scope": "One-expression fixture compile; external entry SKIP."
+    }
+  ],
+  "campaigns": [
+    {
+      "head": "f49bc502a6432ec77233cabc617c352f3122f0a8",
+      "result": "capacity-unacknowledged-pair-f49bc502",
+      "harnessExit": 1,
+      "goExit": 1,
+      "goSeconds": 20.137,
+      "sourceCount": 4304,
+      "gitMismatches": 0,
+      "sourceUnchanged": true,
+      "cleanupFailures": [],
+      "passedNames": 87,
+      "scope": "New setup regression PASS6.03s, later obsolete metadata route literal FAIL. Whole campaign FAIL; no claim of assertions after first failure."
+    },
+    {
+      "head": "1eb93550505fcaa71c1d31bf1d90289044bdcda0",
+      "result": "capacity-unacknowledged-pair-route-fixed",
+      "harnessExit": 0,
+      "goExit": 0,
+      "goSeconds": 83.524,
+      "harnessElapsedSeconds": 86.78646366397152,
+      "sourceCount": 4304,
+      "gitMismatches": 0,
+      "sourceUnchanged": true,
+      "cleanupFailures": [],
+      "passedNames": 106,
+      "scope": "Whole selected producer matrix PASS including setup/regained original same-claim creation, exact lost receipt replay, original-phase/expiry/current authority/role/accounting/managed publication controls."
+    }
+  ],
+  "cleanup": "Joined strict fixture cleanup[] both; final owned Docker readback empty, only unrelated HAPTIC containers. No own live processes or labs. Slot released to Root.",
+  "evidenceBoundary": "Actual SQL/S3/OpenBao initial activation+fixed-role/capacity transitions; private Kubernetes role-root/guard/permission observations synthetic. Unit pair Tx is a decision fake. Installed bootstrap/first-loaded timing remains unqualified; root originalf941 first postclaim stage unknown. No original retained claim retried/mutated. Root must integrate and qualify installed logs separately.",
+  "pending": "Root cherry-pick both signed commits, final integrated prepush and fresh installed/API-only logs qualification. No repair edits, commits/push or extra services by owner.",
+  "references": {
+    "handoff.json": {
+      "sha256": "3e3e00c5543d0840b512a55803ec545ae789b84fad35d0d82a42790f45817922",
+      "bytes": 4202
+    },
+    "repair-handoff.json": {
+      "sha256": "bca286d113805aa7fd9254e6367053e04418713f4fcc89df28da4a6c90b93996",
+      "bytes": 5266
+    },
+    "repair-root-review.json": {
+      "sha256": "b3e4c26b2cbbe6714ff0bf9aab6213954f60405c1e9330fb685ca9ec81f5dccd",
+      "bytes": 2011
+    },
+    "repair-service-f49bc502-source-audit.json": {
+      "sha256": "c1110b7de3fc4aa8248480620ead6abeaf17b2893a140581f83423a995639d33",
+      "bytes": 10208
+    },
+    "route-expectation-base-proof.json": {
+      "sha256": "03d5b6b0a595e4692c2b1f28aca6f1287e2e9d0bda64ade9dcb9a4db22bfb127",
+      "bytes": 779
+    },
+    "repair-service-route-fixed-source-audit.json": {
+      "sha256": "7c4015a35c10decff65ad090760f913c95f2af7778c04436eff83c6537ff8f8f",
+      "bytes": 12398
+    }
+  }
+}

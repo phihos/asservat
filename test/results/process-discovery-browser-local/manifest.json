@@ -1,0 +1,65 @@
+{
+  "sourceHashes": {
+    "Makefile": "375d345c106313a8b9a12bd2fb8b26ed16599c48cb1f6ffc28e86e4dca6f5abd",
+    "test/integration/console_processes_query_test.go": "801443a945df31f55251018f7c8f5692f23276d3ff2d0851e7e3e65f76dc7800",
+    "web/scripts/installed-processes-browser.mjs": "e7732cae9f326a42b9e0d565b21bc60117e9142032e575fe418e0a78fc23c989"
+  },
+  "payloads": [
+    {
+      "archive": "processes-remote-start-console-browser.log.gz",
+      "originalBytes": 18180,
+      "originalSHA256": "a874c193c8b538d1d9869725be60aaf20f7ba3f61d51178864c239b68ce88136",
+      "gzipBytes": 3116,
+      "gzipSHA256": "57d23b715d570949762596970c2de6ed6d33179325947b3d44f318bfe6877f43"
+    },
+    {
+      "archive": "processes-console-driver-local.log.gz",
+      "originalBytes": 768,
+      "originalSHA256": "124b6c327a61ff634533188e0d95deee6349ac4ff4940229da5ee6a98508d9d3",
+      "gzipBytes": 361,
+      "gzipSHA256": "c7972119289980d960be81e05dada4310f223fed80044e2a3517ce437ef98738"
+    },
+    {
+      "archive": "processes-console-driver-local-fixed.log.gz",
+      "originalBytes": 893,
+      "originalSHA256": "ea1b0b7773a1309a33b843185ab80c03a7186921e3312bba870dec991f1bb190",
+      "gzipBytes": 385,
+      "gzipSHA256": "48b550fef9882a1643419398e58306414d34c13a044586fec2c82876ac7ae34d"
+    },
+    {
+      "archive": "processes-console-driver-local-final.log.gz",
+      "originalBytes": 722,
+      "originalSHA256": "c77f515abb35b3d7d5626f206bfef79c7dcc7ce0e9d13298d4fbbc9ba84e9119",
+      "gzipBytes": 396,
+      "gzipSHA256": "372559d7e19cb368bbb2a4608057f07c857f9a194285b598c21b3ec7c967d449"
+    },
+    {
+      "archive": "generated-manifest.json.gz",
+      "originalBytes": 2192,
+      "originalSHA256": "faf3671f7d8cd9e56c7f36cee666cc1af16458b0bfa3556496df010a48b49bef",
+      "gzipBytes": 757,
+      "gzipSHA256": "59c110514fc44f12580c52c4a18f6506105d38337575b5a5fc69c82d4c41d1c4"
+    },
+    {
+      "archive": "report.json.gz",
+      "originalBytes": 4138,
+      "originalSHA256": "9c5d4c92a0494c6f75bd986020094046dd9f5f58030c7fc166b1d21dcc597eb6",
+      "gzipBytes": 1857,
+      "gzipSHA256": "572598f42f2a6a120272244188ee6d41cb492cf7d5329639811ce2357f78e767"
+    },
+    {
+      "archive": "source-compiled-driver-review.json.gz",
+      "originalBytes": 1214,
+      "originalSHA256": "8b7734029f09ba743cb92283e15e78083d1c9fc4e6d58a1f9d791113e60ee4a8",
+      "gzipBytes": 729,
+      "gzipSHA256": "b1faa37d6e0d217add756fcc5408b4ad530a6d401e9e4d57f80d8bf63c5767db"
+    },
+    {
+      "archive": "processes-final-integrated-pre-push.log.gz",
+      "originalBytes": 11667,
+      "originalSHA256": "00c3b516cb508c9dcc5c7582747662e4f4e29c71c8295e85c09d2f3c63f54edd",
+      "gzipBytes": 2605,
+      "gzipSHA256": "0cb4db178b9aa8bc60c89c84a96f1193a8abbeab153c330699b38a6b72129813"
+    }
+  ]
+}

@@ -15,6 +15,12 @@ committed time and deadline over the existing exchange. The actual local
 TLS1.3/HTTP2 composition reproduces the old failure and passes after the fix;
 exact-input, replay and uncertain-dispatch controls also pass. Installed native
 acquisition remains unqualified; no original request replay has been launched.
+[Exact compiled browser-driver qualification](../test/results/process-discovery-browser-local/README.md)
+now passes locally (2.545s), with synthetic source/authority and the original
+installed driver. The existing complete browser gate passes127.928s for its
+unchanged cases. The independently reviewed capacity bootstrap repair is also
+integrated with [actual service evidence](../test/results/capacity-unacknowledged-pair-local/README.md);
+this does not substitute for fresh installed process acquisition.
 [Local transport proof and independent review](../test/results/process-discovery-start-transport/README.md)
 retain the separate local scope (full contextstart race14.120s, pre-push0).
 
