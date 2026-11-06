@@ -1,0 +1,21 @@
+{
+  "campaigns": [
+    {
+      "head": "f49bc502a6432ec77233cabc617c352f3122f0a8",
+      "sourceCount": 4304,
+      "gitVerified": 4304,
+      "sourceUnchanged": true,
+      "testExit": 1,
+      "cleanupFailures": []
+    },
+    {
+      "head": "1eb93550505fcaa71c1d31bf1d90289044bdcda0",
+      "sourceCount": 4304,
+      "gitVerified": 4304,
+      "sourceUnchanged": true,
+      "testExit": 0,
+      "cleanupFailures": []
+    }
+  ],
+  "scope": "Root independently verifies both full original Git inventories; separate failed and passing campaigns, no installed qualification."
+}

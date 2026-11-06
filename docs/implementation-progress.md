@@ -10,6 +10,12 @@ source is unchanged. Diagnostics finish before separate strict cleanup0 and
 independent zero-resource read-back. No original initialization/capture is retried.
 [Original reports, diagnosis and cleanup](../test/results/finite-saved-logs-bootstrap-f941/README.md)
 do not establish installed query-parser or complete saved-log qualification.
+The separately reviewed repair finishes only the original unacknowledged absent
+pair under current locked authority; original identity and timestamps remain
+unchanged. [Actual service qualification](../test/results/capacity-unacknowledged-pair-local/README.md)
+passes the full selected matrix (83.524s,106 names), with both original failed
+and corrected campaigns preserved and independently verified. Final integrated
+pre-push passes; fresh installed logs qualification follows.
 
 
 ## Installed saved-log pending reply fixture correction (2026-11-06)
