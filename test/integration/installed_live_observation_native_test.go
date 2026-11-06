@@ -219,6 +219,11 @@ func qualifyInstalledLiveObservation(t *testing.T, ctx context.Context, c instal
 	if _, err := os.Stat("/etc/asservat-disposable-host"); err != nil {
 		t.Fatal("installed live requires disposable runner")
 	}
+	defer func() {
+		if t.Failed() && c.Diagnose != nil {
+			c.Diagnose()
+		}
+	}()
 	installedLiveEnable(t, ctx, c)
 	cert, err := x509.ParseCertificate(c.PublicRoot)
 	if err != nil {

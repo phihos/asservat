@@ -57,6 +57,15 @@ type LiveSourceAuthority struct {
 	Automation        AutomationAuthorityReader
 	Environment       LiveEnvironment
 	Now               func() time.Time
+	// Diagnose, when set, receives a fixed refusal stage name; never inputs.
+	Diagnose func(stage string)
+}
+
+func (s LiveSourceAuthority) refuse(stage string, err error) error {
+	if s.Diagnose != nil {
+		s.Diagnose("live inventory refused at " + stage)
+	}
+	return err
 }
 
 func (s LiveSourceAuthority) configured() bool {
@@ -64,33 +73,33 @@ func (s LiveSourceAuthority) configured() bool {
 }
 func (s LiveSourceAuthority) Inventory(ctx context.Context, current identities.CurrentIdentity, target targets.WorkloadRequest, cursor string, limit int) ([]live.Source, string, error) {
 	if !s.configured() || current == nil || ctx == nil || ctx.Err() != nil || !target.Valid() || limit < 1 || limit > 100 {
-		return nil, "", live.ErrDenied
+		return nil, "", s.refuse("input", live.ErrDenied)
 	}
 	call, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	i, err := current.ResolveIdentity(call)
 	i = cloneProjectionIdentity(i)
 	if err != nil || !i.Valid(s.Now()) || !slices.Contains(i.Scopes, "evidence:read") {
-		return nil, "", live.ErrDenied
+		return nil, "", s.refuse("identity", live.ErrDenied)
 	}
 	resolved, err := s.Targets.ResolveWorkloadIdentity(call, target)
 	if err != nil || !resolved.Valid(s.Now()) || resolved.Reference != target {
-		return nil, "", live.ErrDenied
+		return nil, "", s.refuse("target", live.ErrDenied)
 	}
 	p, err := s.Workloads.WorkloadPermissions(call, resolved.Target())
 	if err != nil {
-		return nil, "", live.ErrDenied
+		return nil, "", s.refuse("workload-permissions", live.ErrDenied)
 	}
 	rights := value.WorkloadScopeEligibility(i, p, value.ReadLiveSource, resolved.Target(), s.Now())
 	if !rights.Eligible {
-		return nil, "", live.ErrDenied
+		return nil, "", s.refuse("workload-rights", live.ErrDenied)
 	}
 	until := identity.Earlier(rights.ValidUntil, resolved.FreshUntil)
 	bound, stop := context.WithDeadline(call, until)
 	defer stop()
 	records, next, err := s.Catalog.ListLiveSources(bound, resolved.Target(), cursor, limit)
 	if err != nil || len(records) > limit {
-		return nil, "", live.ErrUnavailable
+		return nil, "", s.refuse("catalog", live.ErrUnavailable)
 	}
 	out := make([]live.Source, 0, len(records))
 	for _, record := range records {
@@ -103,27 +112,31 @@ func (s LiveSourceAuthority) Inventory(ctx context.Context, current identities.C
 		// source lookup for every row in the same inventory operation.
 		pod, e := s.Permissions.Permissions(bound, source.Target)
 		if e != nil {
+			_ = s.refuse("pod-permissions", e)
 			continue
 		}
 		ordinary := value.ScopeEligibility(i, pod, value.ReadLiveSource, source.Target, s.Now())
 		if !ordinary.Eligible {
+			_ = s.refuse("pod-rights", nil)
 			continue
 		}
 		checked, sourceUntil, e := s.checkFacts(bound, i, pod, source, "", record, identity.Earlier(until, ordinary.ValidUntil))
 		if e == nil {
 			until = identity.Earlier(until, sourceUntil)
 			out = append(out, checked.Clone())
+		} else {
+			_ = s.refuse("source-facts", e)
 		}
 	}
 	if len(out) > 0 {
 		out, until, err = s.finishSources(bound, current, i, out, "", until)
 		if err != nil {
-			return nil, "", err
+			return nil, "", s.refuse("finish", err)
 		}
 	}
 	final, err := current.ResolveIdentity(bound)
 	if err != nil || !final.Valid(s.Now()) || !sameProjectionIdentity(i, final, s.Now()) || bound.Err() != nil || !s.Now().Before(until) {
-		return nil, "", live.ErrDenied
+		return nil, "", s.refuse("final-identity", live.ErrDenied)
 	}
 	return out, next, nil
 }
