@@ -360,15 +360,16 @@ func (p *permissionWorker) run(ctx context.Context) error {
 		}()
 		defer func() { <-deletion }()
 	}
-	// A failed epoch retries after the 30-second SQL controller lease, so a
-	// new epoch is not refused while the old lease is still live.
+	// Unknown suspension waits out the 30-second SQL controller lease. A
+	// positively suspended, joined epoch can rebuild from current facts sooner.
 	for ctx.Err() == nil {
-		// A stopped epoch leaves capacity scopes stale for 31 s; say why
+		// A stopped epoch fences capacity until a fresh successor; say why
 		// (ADR-197 CI continuation run 19b).
-		if err := p.reconciler.Run(ctx); ctx.Err() == nil {
-			fmt.Fprintln(os.Stderr, "permission reconciler stopped: "+regionalOutcome(err))
+		result := p.reconciler.RunEpoch(ctx)
+		if ctx.Err() == nil {
+			fmt.Fprintln(os.Stderr, "permission reconciler stopped: "+regionalOutcome(result.Err))
 		}
-		if !sleepContext(ctx, 31*time.Second) {
+		if !sleepContext(ctx, permissionEpochRestartDelay(result)) {
 			break
 		}
 	}
@@ -450,4 +451,13 @@ func (s *installedAuthorityAudit) WriteAuthorityAudit(ctx context.Context, r aud
 		return audit.Receipt{}, mounts.ErrUnavailable
 	}
 	return receipt, nil
+}
+
+// The existing controller lease is 30s; only a completed exact suspension can
+// make an earlier retry useful. This delay is scheduling, never authority.
+func permissionEpochRestartDelay(result app.PermissionEpochResult) time.Duration {
+	if result.Suspended {
+		return time.Second
+	}
+	return 31 * time.Second
 }

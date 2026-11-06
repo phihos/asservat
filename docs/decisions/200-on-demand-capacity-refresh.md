@@ -414,3 +414,47 @@ with the earlier format (RED exit 1, 0.013s). The correction passes its race tes
 candidate numeric leftovers, including a real supplied zero, remain unchanged.
 The same callback and single logging write are used; there are no extra clock
 samples or I/O calls. This format correction adds no authority or budget fact.
+
+## Confirmed permission-epoch restart scheduling (2026-11-06)
+
+The browser continuation on `d31d6bb4` passed capture, query and bearer-native
+reads, then refused browser download preparation at audit Begin. The original
+PostgreSQL diagnostic recorded a suspended permission stream at
+`00:55:04.531780Z`. Its refresh had hit SQL lock timeout `55P03`, and the
+reconciler stopped at `00:54:39.381619Z`. The existing supervisor waited 31 s:
+the next epoch reset was created at `00:55:10.397531Z` and acknowledged at
+`00:55:11.649144Z`. This was a temporary restart gap, not permanent observer
+death. The browser-session cleanup qualification helper had not run; no cleanup
+causation is established. The exact blocking capacity transaction's CPU/statement
+breakdown was not retained.
+
+The unconditional 31-second grace was an agent-authored scheduling choice to
+avoid challenging a possibly live 30-second SQL controller lease. It is not a
+maintainer requirement to remain unavailable after that exact lease has been
+positively suspended. The existing supervisor now waits one second only when a
+completed reconciler run reports acknowledged suspension of its owned epoch.
+That result is returned after its original watch and namespace-feed children
+join. Unknown or failed suspension, or failure before an epoch is obtained,
+retains the 31-second delay; parent cancellation prevents another run.
+
+This is a scheduling fact, not permission or recovery authority. A successor
+uses a new fenced epoch and independently current protected guard, full source
+LIST and complete deny observation. It builds a new journal. A failed pending
+batch is not replayed with new dates, and unknown watch gaps cannot reconstruct
+prior assignment continuity or audiences. SQL's original live-lease refusal,
+post-lock time checks, encrypted audit acknowledgement, source freshness and
+all request deadlines remain unchanged.
+
+The benefit is bounded recovery from the observed transient failure for normal
+installed deployments. There are zero new services, roles, privileges, SQL
+objects, configuration fields, background loops or timers. The same existing
+restart sleep selects 1 s or 31 s; an eligible successor performs its existing
+proof reads sooner, with no additional reads per attempt. Unconditionally
+probing every second was rejected because an unconfirmed old lease may still be
+live and each attempt would read the protected Kubernetes guard unnecessarily.
+A persistent failure after a positively suspended epoch can retry once per
+second, rather than once per 31 s; existing source/audit limits still apply.
+Rollback is a binary scheduling rollback with no schema/data migration. Local
+controlled-port regressions establish scheduling, joins and fresh reconstruction;
+they do not establish corrected installed availability or real SQL contention
+qualification.

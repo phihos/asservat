@@ -41,6 +41,17 @@ SQL checks initial review validity after obtaining its lock and again before com
 
 `BindingReconciler` starts one fenced controller epoch, checks the live guard around its full list and obtains the initial review when needed. It processes every watched binding transition in order through SQL. A → B → A therefore retires the original assignment even when the final subject list matches. Queued events remain bounded; no per-event durable work queue is created. Clean finite watch completion reconnects from the last processed opaque resource version. Compaction, malformed history, changed trust or failed acceptance ends the epoch; cancellation attempts bounded suspension, with existing five-second authority expiry remaining effective if SQL is unavailable.
 
+The existing hub-worker restarts a completed epoch after one second only when
+`RunEpoch` reports acknowledged suspension of that exact owned epoch after its
+watch and namespace-feed children have joined. Unknown suspension or no acquired
+epoch retains the 31-second wait for the original controller lease. This
+agent-authored scheduling grace is not authority. Every successor repeats the
+current protected guard and full source/deny observation with a new epoch and
+journal; it does not renew a failed snapshot or infer continuity across a watch
+gap. Parent cancellation stops the supervisor. The original `Run` error-only
+contract remains available to other callers. See the
+[observed failure and cost](../decisions/200-on-demand-capacity-refresh.md#confirmed-permission-epoch-restart-scheduling-2026-11-06).
+
 A one-second complete-list poll renews deny completeness only if it exactly agrees with the processed journal. A newer list never replaces unprocessed watch history; the coordinator catches up or expires. Watch bookmarks cannot renew this deadline. Identical projection refreshes create no additional audit records. The controller lease is renewed separately, with no extension of source observation authority. Kubernetes documents opaque resource versions, finite watch sessions and required relisting after expired history in its [API concepts](https://kubernetes.io/docs/reference/using-api/api-concepts/).
 
 The same run reconciles namespace-metadata inheritance ([ADR-242](../decisions/242-namespace-permission-inheritance.md)) and accepts decision-time sources ([ADR-245](../decisions/245-decision-time-permission-sources.md)); see the sections below. No public handler or collector is enabled by constructing this service. Source scope identity qualification, protected installation composition, complete audit backlog/retention limits and recovery fencing remain prerequisites for deployment.
