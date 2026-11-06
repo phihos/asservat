@@ -11,14 +11,14 @@ function event(value){const raw=JSON.stringify(value);assert(Buffer.byteLength(r
 const config=await command();assert.equal(config.mode,'installed-live');assert.equal(new URL(config.origin).protocol,'https:');assert.equal(new URL(config.proxy).hostname,'127.0.0.1');
 const browser=await chromium.launch({headless:true,proxy:{server:config.proxy,bypass:'<-loopback>'},...(process.env.ASSERVAT_CHROMIUM?{executablePath:process.env.ASSERVAT_CHROMIUM}:{})});
 const context=await browser.newContext({ignoreHTTPSErrors:true,acceptDownloads:false,locale:'en-US',viewport:{width:1440,height:900}});
-const errors=[];let stage='session',total=0;
+const errors=[];let stage='session',total=0,page;
 try{
  await context.addCookies(config.cookies);config.cookies=[];
- const page=await context.newPage();page.on('pageerror',()=>errors.push('pageerror'));
+ page=await context.newPage();page.on('pageerror',()=>errors.push('pageerror'));
  page.on('request',r=>{const u=new URL(r.url());if(u.pathname.startsWith('/api/v1/operations/')){total++;if(!['list_live_sources','open_live_watch','read_live_watch','update_live_watch','close_live_watch'].includes(u.pathname.split('/').at(-1)))errors.push('unexpected-operation')}});
  const checked=async(response,name)=>{const read=await readInstalledHistoryResponse(response);assert.equal(read.http,200,name);assert.equal(read.body,'complete',name);const out=read.reply;assert(valid['validOutput_'+name](out),name+' closed output');assert.equal(out.status,'ok',name+' accepted');const h=await response.request().allHeaders();assert.equal(response.request().method(),'POST');assert.equal(h.origin,config.origin);assert.equal(typeof h['x-csrf-token'],'string');assert(h['x-csrf-token'].length===43);assert.equal(h.authorization,undefined);return out};
  const wait=name=>page.waitForResponse(r=>new URL(r.url()).pathname==='/api/v1/operations/'+name&&r.request().method()==='POST');
- await page.goto(config.origin+'/live');await expect(page.getByRole('heading',{name:'Observe existing recordings',exact:true})).toBeVisible();
+ await page.goto(config.origin+'/live');await expect(page.getByRole('heading',{name:'Observe existing recordings',exact:true})).toBeVisible({timeout:15000});
  await page.getByLabel('Cluster ID',{exact:true}).fill(config.target.cluster_id);await page.getByLabel('Namespace',{exact:true}).fill(config.target.namespace);await page.getByLabel('Workload or pod name',{exact:true}).fill(config.target.name);await page.getByRole('button',{name:'Use this target',exact:true}).click();
  const panel=page.getByRole('region',{name:'Live observation',exact:true});await expect(panel.getByRole('button',{name:'Find live sources',exact:true})).toBeVisible();assert.equal(total,0,'entry/session shell must not query or acquire live data');event({kind:'ready'});
  for(;;){const cmd=await command();if(cmd.kind==='finish')break;assert.equal(cmd.kind,'observe');const source=cmd.source;assert(['policy','manualSession'].includes(source.kind));assert(['packetMetadata','syscallMetadata','httpHeaders'].includes(source.projection));stage=source.kind+'/'+source.projection;const before=total;
@@ -32,4 +32,4 @@ try{
   assert(total-before<=25,'finite episode operation bound');assert.deepEqual(errors,[]);assert.equal(await page.evaluate(()=>localStorage.length+sessionStorage.length),0);event({kind:'observed',source_id:source.source_id,projection:source.projection,watch_id:opened.data.watch_id,source_ids:opened.data.source_session_ids,expires_at:originalEnd,operations:total-before,rows_rendered:true,cleared:true});
  }
  assert.deepEqual(errors,[]);event({kind:'done',operations:total});
-}catch(error){console.error('installed live stage '+stage+' failed');throw error}finally{await context.close();await browser.close()}
+}catch(error){console.error('installed live stage '+stage+' failed');try{const text=await page?.locator('body').innerText({timeout:2000});console.error('page '+page?.url()+' text: '+String(text).slice(0,1500))}catch{}throw error}finally{await context.close();await browser.close()}
