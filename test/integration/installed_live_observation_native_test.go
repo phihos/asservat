@@ -37,8 +37,11 @@ import (
 )
 
 type installedLiveRun struct {
-	SQL                                                             *pgxpool.Pool
-	API                                                             kubernetes.Interface
+	SQL *pgxpool.Pool
+	API kubernetes.Interface
+	// Administrator is the installer's configured administrator account,
+	// the only actor the guarded delivery ConfigMap accepts updates from.
+	Administrator                                                   kubernetes.Interface
 	RootID, Installation, HubNamespace, OwnerDeployment             string
 	Identity                                                        *installedIdentity
 	PublicRoot                                                      []byte
@@ -168,7 +171,7 @@ func installedLiveEnable(t *testing.T, ctx context.Context, c installedLiveRun) 
 	}
 	next := cm.DeepCopy()
 	next.Data[contracts.DownloadEnvironmentFile] = string(raw)
-	changed, err := c.API.CoreV1().ConfigMaps(c.HubNamespace).Update(call, next, meta.UpdateOptions{FieldValidation: "Strict"})
+	changed, err := c.Administrator.CoreV1().ConfigMaps(c.HubNamespace).Update(call, next, meta.UpdateOptions{FieldValidation: "Strict"})
 	if err != nil || changed.UID != cm.UID || changed.ResourceVersion == cm.ResourceVersion {
 		t.Fatal("installation administrator delivery CAS", err)
 	}

@@ -565,7 +565,13 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 		}
 		if installedJourneyFocus() == "live-observation" {
 			t.Run("live-observation", func(t *testing.T) {
-				qualifyInstalledLiveObservation(t, ctx, installedLiveRun{SQL: admin, API: api, RootID: p.RootID, Installation: installation, HubNamespace: desired.TargetNamespace, OwnerDeployment: prefix + "-owner", Identity: identity, PublicRoot: publicRoot, Address: publicAddress, Origin: origin, RegionalConfig: f.Clusters[1].Config, ClusterID: cluster, Namespace: namespace, Workload: workload, Diagnose: diagnose})
+				runner := rest.CopyConfig(kc)
+				runner.Impersonate = rest.ImpersonationConfig{UserName: "system:serviceaccount:" + namespace + ":" + desired.Name + "-bootstrap-runner", Groups: []string{"system:serviceaccounts", "system:serviceaccounts:" + namespace, "system:authenticated"}}
+				administrator, err := kubernetes.NewForConfig(runner)
+				if err != nil {
+					t.Fatal(err)
+				}
+				qualifyInstalledLiveObservation(t, ctx, installedLiveRun{SQL: admin, API: api, Administrator: administrator, RootID: p.RootID, Installation: installation, HubNamespace: desired.TargetNamespace, OwnerDeployment: prefix + "-owner", Identity: identity, PublicRoot: publicRoot, Address: publicAddress, Origin: origin, RegionalConfig: f.Clusters[1].Config, ClusterID: cluster, Namespace: namespace, Workload: workload, Diagnose: diagnose})
 			})
 			return
 		}
