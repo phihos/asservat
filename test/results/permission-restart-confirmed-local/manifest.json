@@ -83,5 +83,20 @@
     "file": "spec-check.log.gz",
     "originalBytes": 239,
     "sha256": "7bc60714406cb11d023fcc28e18d574def848e63c40a3363c769fc490a269daf"
+  },
+  {
+    "file": "logs-port-review.json.gz",
+    "originalBytes": 3963,
+    "sha256": "6587b366515f7a38c8a42aef239a45c023e9b1378ce813997421d695fa488553"
+  },
+  {
+    "file": "logs-port-race.log.gz",
+    "originalBytes": 126,
+    "sha256": "0eb49d0fea9b9b7f7eeb7b0a9c6aa70315140d56b8ac9b718427b3b782f5e834"
+  },
+  {
+    "file": "logs-integrated-pre-push.log.gz",
+    "originalBytes": 11469,
+    "sha256": "775fc022b0cdd885de77667ac52990f459bb5e22d0d7d6913bb800fc7e07e8d5"
   }
 ]

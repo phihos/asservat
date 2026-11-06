@@ -9,3 +9,5 @@ Controlled-port scheduling regression fails with the old delay (exit1/.060s). Th
 Actual `TestPermissionAuthorityWithRealServices` passes in5.538s: 23 parent/subtest entries, PostgreSQL/S3, all4,311 inputs independently matched against the signed Git blobs, unchanged sources and empty cleanup failures. This covers the existing exact SQL suspension, reset, competing reconciler and lock-expiry contracts. The new supervisor schedule is separately covered through controlled ports. Installed restart availability and complete browser/log download workflows remain unqualified.
 
 Each compressed payload is byte-exact; `manifest.json` hashes the decompressed originals. `root-service-audit.json.gz` records the independent Git-input audit.
+
+The logs integration preserves all six exact change payloads; its worker differs only through pre-existing branch code. Independent port review is clear. Integrated affected races pass (configuration2.013s/bootstrap1.059s) and final pre-push exits0. Fresh installed logs qualification uses this integrated candidate; no installed success is asserted here.
