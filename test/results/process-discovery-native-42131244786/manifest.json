@@ -1,0 +1,62 @@
+{
+  "candidate": "1ed068c2c954154c8a7150927f45fc99786cf702",
+  "runID": 42131244786,
+  "payloads": [
+    {
+      "archive": "ci-native-continuation-manual-processes.log.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/processes-installed-native-42131244786/originals/ci-native-continuation-manual-processes.log",
+      "originalBytes": 5370,
+      "originalSHA256": "c55bf97e38e3f908c728571f55a229164981fa98f9ca924addcc903459bedfc2",
+      "gzipBytes": 1670,
+      "gzipSHA256": "d657857f812a91a99c943dc30d0ab52a18b19353c69758d45b91f8eac845eeeb"
+    },
+    {
+      "archive": "context-storage-kubelet.log.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/processes-installed-native-42131244786/originals/context-storage-kubelet.log",
+      "originalBytes": 33468,
+      "originalSHA256": "13f2bed6f86fb5cf6f7008a187caa5c10c2330648871bf3e183df5fb443946c0",
+      "gzipBytes": 3692,
+      "gzipSHA256": "49365519f2defd94d4be25909cc93925174d3e4beeda5c6483970fe54f2be495"
+    },
+    {
+      "archive": "context-storage-environment.json.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/processes-installed-native-42131244786/originals/context-storage-environment.json",
+      "originalBytes": 571968,
+      "originalSHA256": "33d3364241d129eadf2c75c22c54832c0579df8281765ce7007f1be61affc58b",
+      "gzipBytes": 215000,
+      "gzipSHA256": "fc83c009ff8f9886de257db990949f46d427da56e8b141dbab2d722370400c37"
+    },
+    {
+      "archive": "context-storage-postgres.log.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/processes-installed-native-42131244786/originals/context-storage-postgres.log",
+      "originalBytes": 409088,
+      "originalSHA256": "6ae99be2f392a07ad88abf59bdb17dc2b8e52a3c127538ed843b66ca8e2ece26",
+      "gzipBytes": 22631,
+      "gzipSHA256": "1e51c51c8297e68d5f13f37e0d10f17d8d3e0ce54a9261b504096e2a71ffd77d"
+    },
+    {
+      "archive": "context-storage-timing.log.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/processes-installed-native-42131244786/originals/context-storage-timing.log",
+      "originalBytes": 114729,
+      "originalSHA256": "1b94fe8c098fb182b8b18e52712159fbe4fa43c462a38fc6300ae1e620ad6fdc",
+      "gzipBytes": 13816,
+      "gzipSHA256": "0f03ea803bc2f48f17f02567cde244c78a997d48337d1cb1c14629f3613e1126"
+    },
+    {
+      "archive": "context-storage.log.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/processes-installed-native-42131244786/originals/context-storage.log",
+      "originalBytes": 107583,
+      "originalSHA256": "175c1a23f817c2f21f6a1a945435ac9b20983d40b3fc3d0105ac0ebf0fcf4196",
+      "gzipBytes": 12930,
+      "gzipSHA256": "721d86c50fd716478ffad08d35220964acdf2d5e439c3be63a980dbe6d011b84"
+    },
+    {
+      "archive": "root-source-audit.json.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/processes-installed-native-42131244786/root-source-audit.json",
+      "originalBytes": 1627,
+      "originalSHA256": "2955ab7dfac7a37196df5211a197bffe8fb8c5d91a12f1ed8ea210fdc14d2f37",
+      "gzipBytes": 840,
+      "gzipSHA256": "827620a841dc90029c37242ff69f8c15501aa0b49c7f7dd268a84b9048d3596a"
+    }
+  ]
+}

@@ -1,5 +1,16 @@
 # Sustained implementation progress
 
+## First installed process snapshot run remains unqualified (2026-11-06)
+
+Frozen signed `1ed068c2` runs on a disposable hosted VM. The real collector
+advertises process support and the preview succeeds, but StartProcesses returns
+unavailable after the original accepted request. No process publication, native
+parity or browser inspection is qualified (Go/harness1,537.025s; manual67.41s).
+All4,431 original inputs match Git, sources are unchanged and cleanup completes.
+[Original installed reports](../test/results/process-discovery-native-42131244786/README.md)
+remain distinct from passing local service/component tests. Dispatch diagnosis
+is pending; no replacement run or original request replay has been launched.
+
 ## Installed saved-log pending reply fixture correction (2026-11-06)
 
 Signed `10ad65e2` succeeds through capture publication and collection-grant read.
