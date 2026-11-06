@@ -185,3 +185,24 @@ verified logs evidence kind and logs native type. Current ordinary rights, the
 original retained audience and the existing result-access child remain required;
 no share or cached response entitlement admits raw logs. This implements the
 existing native JSONL requirement, without another grant or permission surface.
+
+
+The native session plan uses the same registered-type download bound as the
+framed response reader. The current large-window types are logs and pprof
+(64 MiB maximum each) and Go traces (128 MiB). Reserve the existing 4 MiB metadata
+preparation plus two complete responses: one 64 MiB window costs 76,742,656 read
+bytes, independently of a shorter accepted native cap or returned range. Thus
+logs and pprof reserve 157,679,616 read bytes; maximum Go traces reserve
+311,164,928 read bytes. Output reserves twice the accepted native cap, with the
+existing 4 KiB minimum: a 1 MiB logs capture reserves 2,097,152 output bytes;
+maximum logs/pprof reserve 134,217,728 and maximum traces 268,435,456. These are
+conservative charged-work reservations, not measured I/O, memory or overhead.
+
+The six other current registered types (pod status, metadata/raw PCAPNG,
+metadata/argument syscalls and HTTP headers) retain the existing 16 MiB output /
+24 MiB read session ceilings. Administrator limits and separately accepted
+allocation/control/key/audit backing must cover every new plan; a lower ceiling
+refuses admission. Existing sessions, deadlines, spent metadata and uncertain
+charges are never enlarged, reset or retried. This corrects the agent-authored
+logs plan omission exposed by the installed 24 MiB session refusing its first
+large-window response; it changes no permission, quota configuration or reader.
