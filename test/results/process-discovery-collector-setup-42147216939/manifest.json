@@ -1,0 +1,22 @@
+[
+  {
+    "file": "artifacts.json.gz",
+    "originalBytes": 32,
+    "sha256": "244563f989470892c537c9a4622920af0d228ee4528f7d00c64a06d6cd95856c"
+  },
+  {
+    "file": "failed-job.log.gz",
+    "originalBytes": 6804,
+    "sha256": "e283f1ee8185fd53237127a18e9df3d0aa1c784c6473881635ba5af7b0a16949"
+  },
+  {
+    "file": "root-stage-and-selection-audit.json.gz",
+    "originalBytes": 567,
+    "sha256": "4b7ac62f3cda9edd05fc7e66c855e55d98f709b9223e669e543146a398546a41"
+  },
+  {
+    "file": "run.json.gz",
+    "originalBytes": 4602,
+    "sha256": "f65da4b27103a826fd7937c28354a94c7b963ad096d9f91498a60b9979dbdc33"
+  }
+]

@@ -1,5 +1,13 @@
 # Sustained implementation progress
 
+## Process component qualification setup (2026-11-06)
+
+Native42147216939 fails before the collector run: the existing tshark package
+installation times out. No process acquisition ran. The process-only suite now
+omits that unused PCAPNG tool; all other suite selections and assertions remain.
+[Original setup failure and predicate audit](../test/results/process-discovery-collector-setup-42147216939/README.md)
+are retained. Real process source qualification remains pending.
+
 ## Process node transport composition and diagnostics (2026-11-06)
 
 Actual local TLS enrollment/Poll/dispatcher/upload/holder/Collect passes with
