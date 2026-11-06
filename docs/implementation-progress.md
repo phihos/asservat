@@ -1,5 +1,18 @@
 # Sustained implementation progress
 
+## Confirmed permission-epoch restart (2026-11-06)
+
+The installed browser failure exposed an acknowledged suspension followed by the
+unconditional31-second supervisor delay. Signed `c4789283` retries after one
+second only when the exact old epoch is suspended and all readers have joined;
+unknown suspension retains31seconds. Each successor rebuilds current authority.
+Controlled-port RED/GREEN, full pre-push and independent review pass. Actual
+PostgreSQL/S3 authority tests pass5.538s/23entries; all4,311 inputs match Git and
+cleanup is complete. [Original evidence and scope](../test/results/permission-restart-confirmed-local/README.md)
+remain explicit. Fresh installed browser/log qualification is next; this service
+run does not prove installed recovery availability.
+
+
 ## Installed saved-log reads and native preparation correction (2026-11-06)
 
 Signed293aa46e passes capture/publication, MCP and real React saved reads, exact
