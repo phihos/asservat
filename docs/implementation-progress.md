@@ -1,5 +1,17 @@
 # Sustained implementation progress
 
+## Saved logs qualification stopped in installer bootstrap (2026-11-06)
+
+The fresh signed `f9412540` run exits1 before manual logs (604.063s).
+Read-only diagnosis identifies an unacknowledged original capacity setup claim
+and no paired SQL rows: later attempts cannot finish an uncommitted first setup.
+The exact original postclaim failure remains unknown. All4,366 inputs match Git;
+source is unchanged. Diagnostics finish before separate strict cleanup0 and
+independent zero-resource read-back. No original initialization/capture is retried.
+[Original reports, diagnosis and cleanup](../test/results/finite-saved-logs-bootstrap-f941/README.md)
+do not establish installed query-parser or complete saved-log qualification.
+
+
 ## Installed saved-log pending reply fixture correction (2026-11-06)
 
 Signed `10ad65e2` succeeds through capture publication and collection-grant read.
