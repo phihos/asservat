@@ -118,8 +118,10 @@ func installedLiveReadyPod(ctx context.Context, api kubernetes.Interface, namesp
 		return core.Pod{}, errors.New("one original owner Pod required")
 	}
 	p := list.Items[0]
-	if p.DeletionTimestamp != nil || len(p.Status.ContainerStatuses) != 1 || p.Status.ContainerStatuses[0].RestartCount != 0 {
-		return core.Pod{}, errors.New("owner Pod restarted or deleting")
+	// An earlier container restart during installation is normal; the
+	// current activated server epoch below identifies the process.
+	if p.DeletionTimestamp != nil {
+		return core.Pod{}, errors.New("owner Pod deleting")
 	}
 	for _, c := range p.Status.Conditions {
 		if c.Type == core.PodReady && c.Status == core.ConditionTrue {

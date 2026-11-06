@@ -140,10 +140,6 @@ func (n *nodePackets) start(ctx context.Context, epoch string, w collector.Work)
 	} else {
 		rec, err = packets.NewRecorder(p.Program, int(p.MaxBytes), started, "asservat networkHeaders capture of one pod; frames cut at the transport header")
 	}
-	if observed, ok := rec.(*httpRecorder); ok && holder != nil {
-		observed.observedActive = func() bool { return holder.observing(n.now()) }
-		observed.observedLoss = holder.httpLoss
-	}
 	if err != nil {
 		if meter != nil {
 			meter.Close()
@@ -154,6 +150,11 @@ func (n *nodePackets) start(ctx context.Context, epoch string, w collector.Work)
 		}
 		return r
 	}
+	if observed, ok := rec.(*httpRecorder); ok && holder != nil {
+		observed.observedActive = func() bool { return holder.observing(n.now()) }
+		observed.observedLoss = holder.httpLoss
+	}
+
 	capture, stopCapture := context.WithCancel(ctx)
 	if holder != nil {
 		holder.ctx = capture
