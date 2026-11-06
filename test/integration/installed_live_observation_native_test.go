@@ -293,10 +293,11 @@ func qualifyInstalledLiveObservation(t *testing.T, ctx context.Context, c instal
 		if source.SourceID == "" || source.PodUID == "" || source.ActionID == "" || !time.Now().Before(source.HardUntil) {
 			return errors.New("actual original running source required")
 		}
-		browser.begin(source)
+		// MCP first: it waits for the original source to become eligible.
 		if e := installedLiveMCP(t, callCtx, c.SQL, c.RootID, source, call); e != nil {
 			return e
 		}
+		browser.begin(source)
 		browser.finishEpisode(source)
 		return nil
 	})
@@ -321,18 +322,32 @@ func installedLiveMCP(t *testing.T, ctx context.Context, db *pgxpool.Pool, root 
 		}
 		return r, nil
 	}
+	// A just-armed source may still be warming; wait a bounded time for the
+	// same original source to become eligible, never for a replacement.
 	var page v.SourcePage
-	if _, e := must("list_live_sources", map[string]any{"target_ref": source.Target, "limit": 20}, &page); e != nil {
-		return e
-	}
 	var selected *v.SourceRow
-	for n := range page.Sources {
-		s := &page.Sources[n]
-		if s.ID == source.SourceID {
-			selected = s
+	for attempt := 0; ; attempt++ {
+		if _, e := must("list_live_sources", map[string]any{"target_ref": source.Target, "limit": 20}, &page); e != nil {
+			return e
+		}
+		selected = nil
+		for n := range page.Sources {
+			if s := &page.Sources[n]; s.ID == source.SourceID {
+				selected = s
+			}
+		}
+		if selected != nil && selected.Eligible || attempt == 10 {
+			break
+		}
+		if e := installedJourneyPause(ctx, 2*time.Second); e != nil {
+			return e
 		}
 	}
 	if selected == nil || !selected.Eligible || selected.PodUID != source.PodUID || selected.ActionID != source.ActionID || selected.OwnerKind != source.Kind || !slices.Contains(selected.Projections, source.Projection) {
+		for _, r := range page.Sources {
+			t.Logf("listed live source %s kind=%s action=%s pod=%s state=%s eligible=%v blockers=%v projections=%v", r.ID, r.OwnerKind, r.ActionID, r.PodUID, r.State, r.Eligible, r.Blockers, r.Projections)
+		}
+		t.Logf("expected live source %s kind=%s action=%s pod=%s projection=%s", source.SourceID, source.Kind, source.ActionID, source.PodUID, source.Projection)
 		return errors.New("inventory substituted original source")
 	}
 	var watch v.Watch
