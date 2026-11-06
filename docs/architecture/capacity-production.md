@@ -87,8 +87,15 @@ control namespace/guard, account-key version and a closed qualified backing
 description. SQL setup verifies the original ten fixed role receipts, exact
 OID/name/provenance/ACLs, current recovery and acknowledged permission root.
 Its one irreversible claim and exact paired-root receipt are retained on the
-original private role root. Unknown creation is lookup-only; receipt recovery
-may verify the same committed pair but cannot create replacements.
+original private role root. A claim alone cannot project runtime credentials.
+If its first SQL transaction did not commit, a later invocation may finish the
+first atomic pair only while both rows are absent and the original claim has no
+acknowledged receipt. It must prove current exact roles, permission, protection
+and recovery after the existing locks, retaining the original claim/incarnation
+and receipt timestamps. The old claim supplies identity, never current authority.
+Both existing rows permit exact receipt recovery; a half-pair, changed identity
+or any missing pair after an acknowledged receipt is refused. No used root is
+recreated and no budget or deadline is renewed.
 
 `capacity-deployment.json`, `capacity-roles.json` and the account-only key are
 private installation-owned A-HWORK inputs, not public API/Helm user settings.

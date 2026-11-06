@@ -177,7 +177,7 @@ func (s *PublicRuntimeSQLRoles) capacitySetupTransaction(ctx context.Context, ro
 		return zero, cfg.ErrChanged
 	}
 	*at = "transaction/pair"
-	if err = s.capacitySetupPair(ctx, tx, in, receipt, roles, fresh); err != nil {
+	if err = s.capacitySetupPair(ctx, tx, in, receipt, roles, fresh, original.State.CapacitySetup.Receipt == nil); err != nil {
 		return zero, err
 	}
 	*at = "transaction/current-after"
