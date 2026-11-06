@@ -133,6 +133,9 @@ func TestLiveWatchUpgradeWithRealPostgres(t *testing.T) {
 	if _, err = pool.Exec(ctx, `INSERT INTO fleet_trust(activated_postmaster_at,activated_database_oid,installation_id,issuer_epoch,source_uid,source_generation,source_digest,suspended,recovery_blocked,observed_at,fresh_until) VALUES(pg_catalog.pg_postmaster_start_time(),(SELECT oid FROM pg_catalog.pg_database WHERE datname=pg_catalog.current_database()),$1,$2,'synthetic-live-rollback',1,$3,false,false,clock_timestamp(),clock_timestamp()+interval '30 seconds')`, installation, issuer, bytes.Repeat([]byte{42}, 32)); err != nil {
 		t.Fatal("synthetic rollback trust", err)
 	}
+	if _, err = seedSyntheticFleetObservation(ctx, pool, installation); err != nil {
+		t.Fatal("synthetic rollback fleet observation", err)
+	}
 	if _, err = pool.Exec(ctx, `INSERT INTO permission_stream(id,epoch,trust_digest,lease_until) VALUES($1,$2,$3,clock_timestamp()+interval '30 seconds')`, root, custodyID(), bytes.Repeat([]byte{1}, 32)); err != nil {
 		t.Fatal("synthetic rollback root", err)
 	}

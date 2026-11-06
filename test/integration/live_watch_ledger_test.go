@@ -188,7 +188,7 @@ func TestLiveWatchLedgerWithRealServices(t *testing.T) {
 	snapshot := func() (int64, int64) {
 		t.Helper()
 		var rows, spent int64
-		if err := lab.admin.QueryRow(ctx, `SELECT count(*),sum((CASE kind WHEN 'installation' THEN $2 WHEN 'principal' THEN $3 ELSE $3 END)::bigint*1000000-tokens_micro) FROM live_watch_account WHERE root_id=$1`, root, int64(1<<20), int64(48<<10)).Scan(&rows, &spent); err != nil {
+		if err := lab.admin.QueryRow(ctx, `SELECT count(*),sum((CASE kind WHEN 'installation' THEN $2::bigint WHEN 'principal' THEN $3::bigint ELSE $3::bigint END)::bigint*1000000-tokens_micro) FROM live_watch_account WHERE root_id=$1`, root, int64(1<<20), int64(48<<10)).Scan(&rows, &spent); err != nil {
 			t.Fatal(err)
 		}
 		return rows, spent
