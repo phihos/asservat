@@ -8,7 +8,10 @@ exposes a24MiB session read ceiling against the existing76,742,656-byte window
 charge; no native bytes are qualified. All4,369 inputs match Git. [Original
 failure, causal read-only facts and strict cleanup](../test/results/finite-saved-logs-read-budget-5fda3b3c/README.md)
 are retained. The whole run fails586.752s; strict cleanup separately exits0.
-Planner/reader alignment and fresh native parity qualification remain next.
+The one-predicate planner correction now matches the existing reader; composed
+RED/GREEN,101 selected affected races and two independent reviews pass.
+[Exact local fix evidence](../test/results/finite-saved-logs-read-plan-local/README.md)
+is separate from the pending fresh installed native parity qualification.
 
 ## Confirmed permission-epoch restart (2026-11-06)
 
