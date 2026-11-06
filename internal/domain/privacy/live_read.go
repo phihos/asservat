@@ -85,14 +85,21 @@ func (l LiveRead) valid(paths map[string]bool) bool {
 // path. A source has no store yet; ambiguous paths deny rather than selecting a
 // store on the viewer's behalf. Scope entries only lower the cluster ceiling.
 func (p DownloadPolicy) SelectLive(actor identity.Principal, target authorization.Target, projection string, now time.Time) (DownloadPath, LiveLimits, bool) {
+	path, limits, reason := p.SelectLiveReason(actor, target, projection, now)
+	return path, limits, reason == ""
+}
+
+// SelectLiveReason is SelectLive with a fixed refusal reason for diagnostics;
+// the empty reason means selected.
+func (p DownloadPolicy) SelectLiveReason(actor identity.Principal, target authorization.Target, projection string, now time.Time) (DownloadPath, LiveLimits, string) {
 	var path DownloadPath
 	var limits LiveLimits
 	if !p.Valid(now) || p.Suspended || p.LiveRead == nil || !actor.Valid() || !target.Valid() || projection != "" && !liveProjection(projection) {
-		return path, limits, false
+		return path, limits, "policy"
 	}
 	l := p.LiveRead
 	if projection != "" && !slices.Contains(l.Projections, projection) || len(l.Projections) == 0 {
-		return path, limits, false
+		return path, limits, "projection"
 	}
 	var client *LiveClient
 	for n := range l.Clients {
@@ -103,7 +110,7 @@ func (p DownloadPolicy) SelectLive(actor identity.Principal, target authorizatio
 		}
 	}
 	if client == nil {
-		return path, limits, false
+		return path, limits, "client"
 	}
 	found := false
 	for _, x := range p.Paths {
@@ -114,7 +121,7 @@ func (p DownloadPolicy) SelectLive(actor identity.Principal, target authorizatio
 			continue
 		}
 		if found {
-			return DownloadPath{}, LiveLimits{}, false
+			return DownloadPath{}, LiveLimits{}, "ambiguous-path"
 		}
 		path = x
 		found = true
@@ -133,5 +140,11 @@ func (p DownloadPolicy) SelectLive(actor identity.Principal, target authorizatio
 			limits = c.Limits
 		}
 	}
-	return path, limits, found && cluster && limits.Valid()
+	switch {
+	case !found:
+		return path, limits, "path"
+	case !cluster || !limits.Valid():
+		return path, limits, "ceiling"
+	}
+	return path, limits, ""
 }

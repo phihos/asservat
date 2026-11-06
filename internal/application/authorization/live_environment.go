@@ -5,6 +5,7 @@ import (
 	"asservat.local/asservat/internal/domain/live"
 	"asservat.local/asservat/internal/domain/privacy"
 	"context"
+	"fmt"
 	"time"
 )
 
@@ -42,7 +43,7 @@ func (s CurrentLiveEnvironment) LiveSourceReads(ctx context.Context, sources []l
 	defer stop()
 	p, e := s.Policies.DownloadPolicy(call)
 	if e != nil || p.RootID != s.RootID || p.InstallationID != s.InstallationID || p.LiveRead == nil || !s.AcceptedRoot.Valid() || p.LiveRead.Root != s.AcceptedRoot {
-		return nil, live.ErrDenied
+		return nil, fmt.Errorf("%w: live settings root", live.ErrDenied)
 	}
 	paths := make([]privacy.DownloadPath, len(sources))
 	limits := make([]privacy.LiveLimits, len(sources))
@@ -50,10 +51,10 @@ func (s CurrentLiveEnvironment) LiveSourceReads(ctx context.Context, sources []l
 		if source.Root() != s.RootID {
 			return nil, live.ErrDenied
 		}
-		var ok bool
-		paths[n], limits[n], ok = p.SelectLive(actor, source.Target, projection, s.Now())
-		if !ok {
-			return nil, live.ErrDenied
+		var reason string
+		paths[n], limits[n], reason = p.SelectLiveReason(actor, source.Target, projection, s.Now())
+		if reason != "" {
+			return nil, fmt.Errorf("%w: live settings %s", live.ErrDenied, reason)
 		}
 	}
 	until = identity.Earlier(until, p.FreshUntil)
@@ -61,7 +62,7 @@ func (s CurrentLiveEnvironment) LiveSourceReads(ctx context.Context, sources []l
 	defer cancel()
 	recovery, e := s.Recovery.RecoveryState(bounded)
 	if e != nil || !recovery.Valid(s.Now()) || recovery.InstallationID != s.InstallationID || recovery.IssuerEpoch != p.RecoveryEpoch {
-		return nil, live.ErrDenied
+		return nil, fmt.Errorf("%w: live recovery", live.ErrDenied)
 	}
 	until = identity.Earlier(until, recovery.FreshUntil)
 	final, stopFinal := context.WithDeadline(bounded, until)

@@ -63,6 +63,10 @@ type LiveSourceAuthority struct {
 
 func (s LiveSourceAuthority) refuse(stage string, err error) error {
 	if s.Diagnose != nil {
+		// Errors on this path are fixed sentinels plus fixed stage text.
+		if err != nil {
+			stage += " (" + err.Error() + ")"
+		}
 		s.Diagnose("live inventory refused at " + stage)
 	}
 	return err
@@ -259,7 +263,10 @@ func (s LiveSourceAuthority) finishSources(call context.Context, current identit
 		}
 	}
 	if err != nil || len(decisions) != len(sources) {
-		return nil, time.Time{}, live.ErrDenied
+		if err == nil {
+			err = live.ErrDenied
+		}
+		return nil, time.Time{}, err
 	}
 	out := make([]live.Source, len(sources))
 	for n, source := range sources {
