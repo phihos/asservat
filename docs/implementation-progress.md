@@ -8,8 +8,15 @@ unavailable after the original accepted request. No process publication, native
 parity or browser inspection is qualified (Go/harness1,537.025s; manual67.41s).
 All4,431 original inputs match Git, sources are unchanged and cleanup completes.
 [Original installed reports](../test/results/process-discovery-native-42131244786/README.md)
-remain distinct from passing local service/component tests. Dispatch diagnosis
-is pending; no replacement run or original request replay has been launched.
+remain distinct from passing local service/component tests. Read-only diagnosis
+finds that the actual remote prepared output lacks the process start interface;
+no node work was enqueued. The fixed operation now carries the original Pod,
+committed time and deadline over the existing exchange. The actual local
+TLS1.3/HTTP2 composition reproduces the old failure and passes after the fix;
+exact-input, replay and uncertain-dispatch controls also pass. Installed native
+acquisition remains unqualified; no original request replay has been launched.
+[Local transport proof and independent review](../test/results/process-discovery-start-transport/README.md)
+retain the separate local scope (full contextstart race14.120s, pre-push0).
 
 ## Installed saved-log pending reply fixture correction (2026-11-06)
 

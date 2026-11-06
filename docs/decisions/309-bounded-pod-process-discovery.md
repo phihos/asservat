@@ -117,3 +117,14 @@ unqualified installed blocked-source case. Repeat restores the original saved
 recipe into a fresh preview; it does not claim a repeated acquisition. The
 existing 20-minute hosted bound and inner 18-minute two-cluster bound are
 unchanged. No collector is run on the workstation.
+
+The first installed run stopped before node enqueue: the actual remote prepared
+output did not implement the process recorder interface. The existing private
+context-start exchange now forwards one `start-processes` operation with the
+exact resolved Pod, typed process expectation, original committed start and
+bounded end. The receiver spends its acquisition flag before dispatch, including
+unknown failures. Replay and replacement inputs are denied. This adds one fixed
+operation to the existing conversation, no connection, role, timer, retry or
+public API. A local TLS1.3/HTTP2 regression reproduces the missing interface and
+checks both actual operation endpoints; synthetic work/start/recorder authority
+does not qualify native acquisition or the installed workflow.

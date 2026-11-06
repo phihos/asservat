@@ -1,0 +1,44 @@
+{
+  "before": "d12a8f4d5a5a62afbb35be4e126335f581a09ea9",
+  "sourceHashes": {
+    "internal/transport/contextstart/operations.go": "687dfe770fd0326a0c6f889b1c9e86a9463e37d9e346de3c92a4dd8ae42df47b",
+    "internal/transport/contextstart/processes_start_test.go": "a33311cf2dea43b71551f023f4f4b49e34d33c078fb2f48f30d65b27f59c1fc6"
+  },
+  "payloads": [
+    {
+      "archive": "processes-remote-start-red.log.gz",
+      "originalBytes": 2578,
+      "originalSHA256": "de23203893b39a06ce1e00e968c78040fd1a650077ed5667065904b0145908c8",
+      "gzipBytes": 419,
+      "gzipSHA256": "2705aa5854c179ad7ffa81ae4a69fbf8e99874248bdcebddc8618da66ba5a0e1"
+    },
+    {
+      "archive": "processes-remote-start-final-green.log.gz",
+      "originalBytes": 1775,
+      "originalSHA256": "6bcb9258110cabfaf0638898f0dedef75ff9738c692006ca2ced98ac6599dcd0",
+      "gzipBytes": 309,
+      "gzipSHA256": "a42c616d29040785f7341b0f8ffca964efd216a0b6b9326456bc568100c81de1"
+    },
+    {
+      "archive": "processes-remote-start-full-race.log.gz",
+      "originalBytes": 69,
+      "originalSHA256": "56e547b9be452b43ea14514e45122caed04381c4edc51fee454aafdb17618e1a",
+      "gzipBytes": 80,
+      "gzipSHA256": "cca61edd02b405798cb6f67e09e9fa03552afb6280c65949408d92bccacd8928"
+    },
+    {
+      "archive": "processes-remote-start-pre-push.log.gz",
+      "originalBytes": 11666,
+      "originalSHA256": "645701193a6976df9ce03b7e9984829513cd57110314fd016e978d538ca34c76",
+      "gzipBytes": 2596,
+      "gzipSHA256": "2767e06809059a25653f44a3fdcf3376ff93b7a52e9bf4ae895c281c29fce520"
+    },
+    {
+      "archive": "source-process-start-transport-review.json.gz",
+      "originalBytes": 1435,
+      "originalSHA256": "9bca025d2320256d86c4c6e30650034a0fcf784afa898a67cf6eecc69b4719d6",
+      "gzipBytes": 791,
+      "gzipSHA256": "1faea4e66e819bc8472878339621e019425fa53275066ec3f493de7068f43719"
+    }
+  ]
+}

@@ -44,6 +44,7 @@ const (
 	// collected by a later exchange for the same verified capture.
 	opStartProfile   = "start-profile"
 	opStartLogs      = "start-logs"
+	opStartProcesses = "start-processes"
 	opStartRecording = "start-recording"
 	opCollect        = "collect-recording"
 )
@@ -265,6 +266,7 @@ var (
 	_ evidence.ContextAcquirer         = (*remoteOutput)(nil)
 	_ evidence.ContextRecorder         = (*remoteOutput)(nil)
 	_ evidence.ArgumentContextRecorder = (*remoteOutput)(nil)
+	_ evidence.ProcessesRecorder       = (*remoteOutput)(nil)
 	_ evidence.RecordingCollector      = (*HubOperations)(nil)
 )
 
@@ -277,6 +279,12 @@ func (o *remoteOutput) StartProfile(ctx context.Context, pin artifact.PinnedPod,
 func (o *remoteOutput) StartLogs(ctx context.Context, pin artifact.PinnedPod, started, until time.Time) (time.Time, error) {
 	var out recordingReply
 	err := o.h.call(ctx, opStartLogs, acquireRequest{pin, started, until}, &out)
+	return out.Queued, err
+}
+
+func (o *remoteOutput) StartProcesses(ctx context.Context, pin artifact.PinnedPod, started, until time.Time) (time.Time, error) {
+	var out recordingReply
+	err := o.h.call(ctx, opStartProcesses, acquireRequest{pin, started, until}, &out)
 	return out.Queued, err
 }
 
@@ -615,6 +623,22 @@ func (s *regionalSession) handle(ctx context.Context, q contracts.APIContextOper
 			return nil, value.ErrDenied
 		}
 		return closer.CompleteStored()
+	case opStartProcesses:
+		var r acquireRequest
+		if err := decodeOperationBody(q.Body, &r); err != nil {
+			return nil, err
+		}
+		d := s.consumed
+		recorder, ok := s.prepared.(evidence.ProcessesRecorder)
+		if s.acquired || !ok || s.resolved == nil || s.expectation == nil || s.expectation.Processes == nil || d == nil || !d.MayStart || d.Phase != value.StartCommitted || !r.Started.Equal(d.CommittedAt) || r.Until.After(d.ValidUntil) || r.Pin != s.resolved.Pin || !l.Now().Before(r.Until) {
+			return nil, value.ErrDenied
+		}
+		s.acquired = true
+		queued, err := recorder.StartProcesses(ctx, r.Pin, r.Started, r.Until)
+		if err != nil {
+			return nil, err
+		}
+		return recordingReply{Queued: queued}, nil
 	case opStartLogs:
 		var r acquireRequest
 		if err := decodeOperationBody(q.Body, &r); err != nil {
