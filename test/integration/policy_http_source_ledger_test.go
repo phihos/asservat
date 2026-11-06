@@ -125,7 +125,7 @@ func TestHTTPSourceLedgerWithRealServices(t *testing.T) {
 				target.ExecutionClass = artifact.ContextAPIExecution
 				target.NodeUID, target.NodeBootID, target.Pin.NodeName = "", "", ""
 				target.ObservedAt, target.FreshUntil = n, n.Add(5*time.Second)
-				resolved, err := privacy.Resolve(retained, privacy.Input{Target: target.Target(), PrivacyClass: "potentialPersonalData", EvidenceType: "packetCapture", RequestedSeconds: 31, AnchorAt: n}, n)
+				resolved, err := privacy.Resolve(retained, privacy.Input{Target: target.Target(), PrivacyClass: "potentialPersonalData", EvidenceType: "packetCapture", RequestedSeconds: 31, AnchorAt: n}, time.Now())
 				if err != nil {
 					t.Fatal(err)
 				}

@@ -284,7 +284,7 @@ func TestLiveWatchLedgerWithRealServices(t *testing.T) {
 	// seeded expired receipts exercise the real64-row SQL cap and ensure a
 	// refused configuration change commits only restrictive prune progress.
 	if _, err = lab.admin.Exec(ctx, `INSERT INTO live_watch_control(root_id,id,owner_id,fence,principal_key,workload_key,request_digest,key_hash,revision,state,accepted_at,expires_at,idle_until,output_limit,spent,bytes_per_second,tokens_micro,refilled_at)
-      SELECT $1,md5($1::text||'expired-receipt-'||g.idx)::uuid,$2,$3,$4,$5,$6,sha256(convert_to('expired-receipt-'||g.idx,'UTF8')),1,'Closed',clock_timestamp()-interval '3 seconds',clock_timestamp()-interval '1 second',clock_timestamp()-interval '1 second',24576,0,1,0,clock_timestamp()-interval '3 seconds' FROM generate_series(1,65) AS g(idx)`, root, request.Binding.ProcessEpoch, c.Fence, c.PrincipalKey[:], c.WorkloadKey[:], c.RequestDigest[:]); err != nil {
+      SELECT $1::uuid,md5($1::uuid::text||'expired-receipt-'||g.idx)::uuid,$2,$3,$4,$5,$6,sha256(convert_to('expired-receipt-'||g.idx,'UTF8')),1,'Closed',now()-interval '3 seconds',now()-interval '1 second',now()-interval '1 second',24576,0,1,0,now()-interval '3 seconds' FROM generate_series(1,65) AS g(idx)`, root, request.Binding.ProcessEpoch, c.Fence, c.PrincipalKey[:], c.WorkloadKey[:], c.RequestDigest[:]); err != nil {
 		t.Fatal("expired receipt maintenance input", err)
 	}
 	for _, want := range []int64{1, 0} {

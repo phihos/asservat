@@ -180,8 +180,8 @@ func TestLiveWatchUpgradeWithRealPostgres(t *testing.T) {
 		Reused  bool            `json:"reused"`
 	}
 	var result []byte
-	if err = runtimePool.QueryRow(ctx, `SELECT live_watch_create($1,$2,$3,$4,$5,$6)`, root, owner, digest[:], encodedControl, bytes.Repeat([]byte{4}, 32), control.ExpiresAt).Scan(&result); err != nil || json.Unmarshal(result, &opened) != nil || opened.Reused || opened.Control != control {
-		t.Fatal("compiled original Open", err)
+	if err = runtimePool.QueryRow(ctx, `SELECT live_watch_create($1,$2,$3,$4,$5,$6)`, root, owner, digest[:], encodedControl, bytes.Repeat([]byte{4}, 32), control.ExpiresAt).Scan(&result); err != nil || json.Unmarshal(result, &opened) != nil || opened.Reused || liveUTC(opened.Control) != control {
+		t.Fatalf("compiled original Open err=%v reused=%v\n got=%+v\nwant=%+v", err, opened.Reused, opened.Control, control)
 	}
 	control.Spent = 4 << 10
 	encodedControl, err = json.Marshal(control)
@@ -189,7 +189,7 @@ func TestLiveWatchUpgradeWithRealPostgres(t *testing.T) {
 		t.Fatal(err)
 	}
 	var charged liveapp.Control
-	if err = runtimePool.QueryRow(ctx, `SELECT live_watch_change($1,$2,$3,$4,1,4096,$5)`, root, owner, digest[:], encodedControl, control.ExpiresAt).Scan(&result); err != nil || json.Unmarshal(result, &charged) != nil || charged != control {
+	if err = runtimePool.QueryRow(ctx, `SELECT live_watch_change($1,$2,$3,$4,1,4096,$5)`, root, owner, digest[:], encodedControl, control.ExpiresAt).Scan(&result); err != nil || json.Unmarshal(result, &charged) != nil || liveUTC(charged) != control {
 		t.Fatal("compiled original Charge", err)
 	}
 	// A failed migration must not change even one retained receipt, stored debt,
@@ -244,4 +244,11 @@ func TestLiveWatchUpgradeWithRealPostgres(t *testing.T) {
 	}
 	assertRetainedDown("debt-only")
 	t.Log("pristine142→143→142 twice; final143 compiled Open/Charge; retained control and account-only debt each refuse Down23514 with exact schema/functions/history/state unchanged; HTTP/source/audit retained guards not exercised")
+}
+
+// liveUTC matches the adapter's normalization: SQL JSON renders +00:00,
+// which Go decodes as a fixed zone rather than time.UTC.
+func liveUTC(c liveapp.Control) liveapp.Control {
+	c.AcceptedAt, c.ExpiresAt, c.IdleUntil = c.AcceptedAt.UTC(), c.ExpiresAt.UTC(), c.IdleUntil.UTC()
+	return c
 }
