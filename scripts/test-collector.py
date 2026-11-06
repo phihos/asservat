@@ -14,6 +14,8 @@ on a workstation, not even with kind.
                              tcpdump gadget with a libpcap-compiled filter
                              (ADR-248), restart epoch, Restricted negative,
                              uninstall leaves workloads
+  test-collector.py processes real containerd process metadata through the same
+                             chart collector/channel; no SQL/public authority
   test-collector.py cilium   collector-cilium (S-04 row 17, EXP-02 subset):
                              the packet suite on kind without kindnet or
                              kube-proxy, with the pinned Cilium chart
@@ -183,8 +185,20 @@ def cilium(work, name, kubeconfig, report):
 RING_DISK_BYTES = 16 << 20
 
 
-def packet(work, report, cni="", ring_disk=False, profile=False):
-    suite = "collector-" + (cni or ("profile" if profile else "ringdisk" if ring_disk else "packet"))
+def collector_values(image, endpoint, roots, *, ring_disk=False, processes=False):
+    values = {"mode": "cluster", "collector": {"enabled": True, "image": image, "installationID": INSTALLATION, "clusterID": CLUSTER,
+              "connector": {"endpoint": endpoint, "serverName": "asservat-connector-nodes", "rootsPEM": roots}}}
+    if ring_disk:
+        values["collector"]["ringDisk"] = {"enabled": True, "bytes": RING_DISK_BYTES}
+    if processes:
+        values["collector"]["processDiscovery"] = {"runtime": "containerd"}
+    return values
+
+
+def packet(work, report, cni="", ring_disk=False, profile=False, processes=False):
+    if processes and (cni or ring_disk or profile):
+        raise ValueError("process collector mode cannot combine another native phase")
+    suite = "collector-" + (cni or ("processes" if processes else "profile" if profile else "ringdisk" if ring_disk else "packet"))
     run_id = secrets.token_hex(4)
     name = "asservat-collector-" + run_id
     env = dict(os.environ, TMPDIR=str(work), CGO_ENABLED="0")
@@ -256,10 +270,7 @@ def packet(work, report, cni="", ring_disk=False, profile=False):
         network = json.loads(run(["docker", "network", "inspect", "kind"]))[0]
         gateway = next(c["Gateway"] for c in network["IPAM"]["Config"] if "." in c.get("Gateway", ""))
         roots, cert, key = certificates(work, gateway)
-        values = {"mode": "cluster", "collector": {"enabled": True, "image": image, "installationID": INSTALLATION, "clusterID": CLUSTER,
-                  "connector": {"endpoint": f"https://{gateway}:{PORT}", "serverName": "asservat-connector-nodes", "rootsPEM": roots}}}
-        if ring_disk:
-            values["collector"]["ringDisk"] = {"enabled": True, "bytes": RING_DISK_BYTES}
+        values = collector_values(image, f"https://{gateway}:{PORT}", roots, ring_disk=ring_disk, processes=processes)
         (work / "values.yaml").write_text(json.dumps(values))
         rendered = run(["helm", "template", "asservat", str(ROOT / "charts/asservat"), "--namespace", "asservat-region", "--kube-version", "1.37.0", "-f", str(work / "values.yaml")])
         manifests = work / "collector.yaml"
@@ -271,7 +282,7 @@ def packet(work, report, cni="", ring_disk=False, profile=False):
             report["profileBuild"]["kindManifestRef"] = profile_image
         fixture = {"kubeconfig": str(kubeconfig), "collectorNamespace": "asservat-collector", "daemonSet": "asservat-node", "serviceAccount": "asservat-node",
                    "installationID": INSTALLATION, "clusterID": CLUSTER, "listen": f"{gateway}:{PORT}", "serverCertificate": str(cert), "serverKey": str(key),
-                   "profileImage": profile_image, "pause": fixtures[PAUSE], "busybox": fixtures[BUSYBOX], "s3": s3url, "cni": cni, "ringDiskBytes": RING_DISK_BYTES if ring_disk else 0, "work": str(work), "runner": report["runner"], "results": str(work / "native-results.json")}
+                   "processes": processes, "profileImage": profile_image, "pause": fixtures[PAUSE], "busybox": fixtures[BUSYBOX], "s3": s3url, "cni": cni, "ringDiskBytes": RING_DISK_BYTES if ring_disk else 0, "work": str(work), "runner": report["runner"], "results": str(work / "native-results.json")}
         (work / "fixture.json").write_text(json.dumps(fixture))
         started = time.monotonic()
         test = subprocess.run(["go", "test", "-tags", "libpcap", "-count=1", "-v", "-timeout", "12m", "-run", "^TestNodeCollectorWithRealKubernetes$", "./test/integration"],
@@ -282,6 +293,8 @@ def packet(work, report, cni="", ring_disk=False, profile=False):
         if profile:
             for output in work.glob("profile-*.pb.gz"):
                 shutil.copy(output, ROOT / "test/results" / (suite + "-" + output.name))
+        if processes and (work / "processes-native.json").exists():
+            shutil.copy(work / "processes-native.json", ROOT / "test/results" / (suite + "-native.json"))
         report["testSeconds"] = round(time.monotonic() - started, 1)
         if (work / "native-results.json").exists():
             report["native"] = json.loads((work / "native-results.json").read_text())
@@ -365,8 +378,8 @@ def argument_engine(work, report):
 
 
 def main():
-    if len(sys.argv) != 2 or sys.argv[1] not in ("packet", "cilium", "ringdisk", "profile", "argument-engine"):
-        raise SystemExit("usage: test-collector.py packet|cilium|ringdisk|profile|argument-engine")
+    if len(sys.argv) != 2 or sys.argv[1] not in ("packet", "cilium", "ringdisk", "profile", "processes", "argument-engine"):
+        raise SystemExit("usage: test-collector.py packet|cilium|ringdisk|profile|processes|argument-engine")
     if not GUARD.is_file():
         raise SystemExit(f"refused: {GUARD} is absent. Collector suites load BPF programs and run only on disposable CI runners or VMs.")
     results = ROOT / "test/results"
@@ -381,7 +394,7 @@ def main():
             argument_engine(work, report)
         else:
             report["sourceHashes"] = source_hashes()
-            packet(work, report, "cilium" if sys.argv[1] == "cilium" else "", ring_disk=sys.argv[1] == "ringdisk", profile=sys.argv[1] == "profile")
+            packet(work, report, "cilium" if sys.argv[1] == "cilium" else "", ring_disk=sys.argv[1] == "ringdisk", profile=sys.argv[1] == "profile", processes=sys.argv[1] == "processes")
         report["result"] = "passed"
     except BaseException:
         report["result"] = "failed"

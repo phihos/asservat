@@ -97,6 +97,7 @@ declare -A suites=(
   # that native.yml creates on its fresh runner.
   [collector-packet]="python3 scripts/test-collector.py packet"
   [collector-profile]="python3 scripts/test-collector.py profile"
+  [collector-processes]="python3 scripts/test-collector.py processes"
   [collector-argument-engine]="python3 scripts/test-collector.py argument-engine"
   # S-04 row 17 (EXP-02 subset): the packet suite on the pinned Cilium chart.
   [collector-cilium]="python3 scripts/test-collector.py cilium"

@@ -51,6 +51,32 @@ class CollectorProvenance(unittest.TestCase):
             with patch.object(fixture, "run", return_value=invalid), self.assertRaises(RuntimeError):
                 fixture.docker_config_id("fixture:run")
 
+    def test_process_mode_is_explicit_guarded_and_preserves_other_values(self):
+        plain = fixture.collector_values("image", "https://connector", "roots")
+        process = fixture.collector_values("image", "https://connector", "roots", processes=True)
+        self.assertNotIn("processDiscovery", plain["collector"])
+        self.assertEqual(process["collector"].pop("processDiscovery"), {"runtime": "containerd"})
+        self.assertEqual(process, plain)
+        ring = fixture.collector_values("image", "https://connector", "roots", ring_disk=True)
+        self.assertEqual(ring["collector"].pop("ringDisk"), {"enabled": True, "bytes": fixture.RING_DISK_BYTES})
+        self.assertEqual(ring, plain)
+        for options in ({"profile": True}, {"ring_disk": True}, {"cni": "cilium"}):
+            with self.assertRaises(ValueError):
+                fixture.packet(None, {}, processes=True, **options)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            guard = root / "guard"
+            with patch.object(fixture, "GUARD", guard), patch.object(fixture.sys, "argv", ["test-collector.py", "processes"]), patch.object(fixture, "packet") as execute, self.assertRaisesRegex(SystemExit, "refused"):
+                fixture.main()
+            execute.assert_not_called()
+            guard.touch()
+            with patch.object(fixture, "ROOT", root), patch.object(fixture, "GUARD", guard), patch.object(fixture, "runner_facts", return_value={}), patch.object(fixture, "packet") as execute, patch.object(fixture, "source_hashes", return_value={"source": "digest"}), patch.object(fixture.sys, "argv", ["test-collector.py", "processes"]), patch.dict(os.environ, {"ASSERVAT_BUILD_TMP": str(root / "scratch")}), contextlib.redirect_stdout(io.StringIO()):
+                fixture.main()
+            self.assertEqual(execute.call_args.kwargs, {"ring_disk": False, "profile": False, "processes": True})
+            report = json.loads((root / "test/results/collector-processes-report.json").read_text())
+            self.assertEqual(report["suite"], "collector-processes")
+            self.assertTrue(report["sourceUnchanged"])
+
     def test_changed_sources_fail_without_replacing_original_test_exit_or_cleanup(self):
         for test_exit, mode in [(0, "same"), (0, "changed"), (7, "same"), (7, "changed"), (0, "unreadable"), (7, "unreadable")]:
             with self.subTest(test_exit=test_exit, mode=mode), tempfile.TemporaryDirectory() as directory:

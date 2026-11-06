@@ -8,8 +8,10 @@ reproduce the installed publication failure or qualify the real kernel reader.
 A closed uploader outcome line now preserves errors without logging IDs or
 evidence; focused join/Stop/diagnostic races pass1.221s and Root review is clear.
 [Original local proof and explicit diagnostic gap](../test/results/process-discovery-transport-composed/README.md)
-remain separate from native/installed qualification. A dedicated existing
-collector-harness process mode is being prepared before another installed run.
+remain separate from native/installed qualification. The existing guarded collector harness now has an explicit process mode, with
+[exact local proof and independent review](../test/results/process-discovery-collector-mode-local/README.md).
+Its pure checks pass; actual kernel/containerd qualification is the next run,
+before another full installed campaign.
 
 ## Second installed process run awaits publication diagnosis (2026-11-06)
 

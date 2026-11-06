@@ -33,6 +33,7 @@ import (
 // NodeChannelServer that RunRegional composes) on the kind bridge, with a
 // connector account holding only the attestation reads.
 type collectorFixture struct {
+	Processes          bool   `json:"processes"`
 	Kubeconfig         string `json:"kubeconfig"`
 	CollectorNamespace string `json:"collectorNamespace"`
 	DaemonSet          string `json:"daemonSet"`
@@ -303,7 +304,9 @@ func TestNodeCollectorWithRealKubernetes(t *testing.T) {
 		t.Fatalf("status interval %v", interval)
 	}
 
-	if f.ProfileImage != "" {
+	if f.Processes {
+		processCaptureNative(t, ctx, k, s.Channel, second, workload, f.Busybox, f.Work, f.CollectorNamespace, results)
+	} else if f.ProfileImage != "" {
 		profileCaptureNative(t, ctx, k, s.Channel, second, workload, f.ProfileImage, f.Work, results)
 		profileResourcesNative(t, ctx, k, s.Channel, second, workload, f.ProfileImage, f.CollectorNamespace, results)
 	} else if f.RingDiskBytes > 0 {

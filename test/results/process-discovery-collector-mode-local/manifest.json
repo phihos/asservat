@@ -1,0 +1,72 @@
+[
+  {
+    "file": "attempt-diagnostics-delta.json.gz",
+    "originalBytes": 2075,
+    "sha256": "11ed636591df329dfe30bd68822d55155feed5eebfc0f40763c8f6a84ffa58c8"
+  },
+  {
+    "file": "attempt-diagnostics-focused.log.gz",
+    "originalBytes": 2962,
+    "sha256": "d5e677bb13313032afbb7231ad103aee484bfc0744466d0b4e9ffe13e8667024"
+  },
+  {
+    "file": "author-self-audit.json.gz",
+    "originalBytes": 4147,
+    "sha256": "b3984ac7f30be3570025a7095ef36db2192201fb3d05b3eec10f5365b1c3ae20"
+  },
+  {
+    "file": "compile-skip.log.gz",
+    "originalBytes": 286,
+    "sha256": "89b0230536c00301bac2e28815b2ec417c0a38b4b0dbec7f30f6ed1f6397311e"
+  },
+  {
+    "file": "focused-race.log.gz",
+    "originalBytes": 2962,
+    "sha256": "53cd683032fdb96369fa5f4ad3db48634b2f1839d64032044d09ca8f515fc683"
+  },
+  {
+    "file": "handoff.json.gz",
+    "originalBytes": 7005,
+    "sha256": "370920b88bee914d242230a40b2de36e91a6a1a24d0cba095e9c1663bd94c29c"
+  },
+  {
+    "file": "harness-selftests.exit.gz",
+    "originalBytes": 2,
+    "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "file": "harness-selftests.log.gz",
+    "originalBytes": 102,
+    "sha256": "5610bb341ae4df72930d9f88afd8d925eec567770a8ccf6387603ee214544c29"
+  },
+  {
+    "file": "root-independent-review.json.gz",
+    "originalBytes": 1632,
+    "sha256": "60fda9c003e7bd440de7f6fdf90649192fdf6a4edff2854f0305557c90afc05f"
+  },
+  {
+    "file": "suite-list.json.gz",
+    "originalBytes": 1588,
+    "sha256": "e9c5da286ac348757f7519fb906528178846ce6aa9ba5bf56d6c31d4b4b5ad8f"
+  },
+  {
+    "file": "tagged-compile-skip.log.gz",
+    "originalBytes": 286,
+    "sha256": "c2964f45a9d3a6312f7d5b6a0d88f79061da6597a2508380d7214aec85bd60d9"
+  },
+  {
+    "file": "root-pre-push-durable.json.gz",
+    "originalBytes": 180,
+    "sha256": "98a17e3015671a1c64d17afb1845475a8b6174714ea942c95639a2c9213cd486"
+  },
+  {
+    "file": "root-pre-push-durable.log.gz",
+    "originalBytes": 11667,
+    "sha256": "c8fc7bcce58ea9e7eeb76f410009f3ba2ee1b211bf6b78b437e18ca9557ce17b"
+  },
+  {
+    "file": "root-full-bootstrap-race.log.gz",
+    "originalBytes": 57,
+    "sha256": "57c173e8263682338512b232422e5a8169be34ab3dbd189f29fbaab918fa6f00"
+  }
+]
