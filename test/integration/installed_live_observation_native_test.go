@@ -157,7 +157,7 @@ func installedLiveEnable(t *testing.T, ctx context.Context, c installedLiveRun) 
 	name := contracts.OwnerDownloadEnvironmentName(c.Installation)
 	// Fixture-only RBAC for the configured administrator: get/update of this
 	// one ConfigMap. The admission guard independently requires the actor.
-	if err := installedLiveAdministratorRBAC(call, c.API, c.HubNamespace, name, c.AdministratorUser); err != nil {
+	if err := installedLiveAdministratorRBAC(call, c.API, name, before.Name, c.AdministratorUser); err != nil {
 		t.Fatal("fixture administrator RBAC", err)
 	}
 	cm, err := c.API.CoreV1().ConfigMaps(c.HubNamespace).Get(call, name, meta.GetOptions{})
@@ -183,7 +183,7 @@ func installedLiveEnable(t *testing.T, ctx context.Context, c installedLiveRun) 
 		t.Fatal("installation administrator delivery CAS", err)
 	}
 	uid := before.UID
-	if err = c.API.CoreV1().Pods(c.HubNamespace).Delete(call, before.Name, meta.DeleteOptions{Preconditions: &meta.Preconditions{UID: &uid}}); err != nil {
+	if err = c.Administrator.CoreV1().Pods(c.HubNamespace).Delete(call, before.Name, meta.DeleteOptions{Preconditions: &meta.Preconditions{UID: &uid}}); err != nil {
 		t.Fatal("installation administrator exact old owner deletion", err)
 	}
 	ticker := time.NewTicker(200 * time.Millisecond)
@@ -558,11 +558,13 @@ func installedLiveDigest(raw []byte) string {
 	return hex.EncodeToString(sum[:])
 }
 
-func installedLiveAdministratorRBAC(ctx context.Context, api kubernetes.Interface, namespace, configMap, user string) error {
+func installedLiveAdministratorRBAC(ctx context.Context, api kubernetes.Interface, configMap, pod, user string) error {
+	// Cluster-scoped, because the hub namespace guard admits no other writer.
+	// Rules name only the exact ConfigMap and the exact old owner Pod.
 	name := "installed-live-delivery-administrator"
-	if _, err := api.RbacV1().Roles(namespace).Create(ctx, &rbac.Role{ObjectMeta: meta.ObjectMeta{Name: name}, Rules: []rbac.PolicyRule{{APIGroups: []string{""}, Resources: []string{"configmaps"}, ResourceNames: []string{configMap}, Verbs: []string{"get", "update"}}}}, meta.CreateOptions{}); err != nil {
+	if _, err := api.RbacV1().ClusterRoles().Create(ctx, &rbac.ClusterRole{ObjectMeta: meta.ObjectMeta{Name: name}, Rules: []rbac.PolicyRule{{APIGroups: []string{""}, Resources: []string{"configmaps"}, ResourceNames: []string{configMap}, Verbs: []string{"get", "update"}}, {APIGroups: []string{""}, Resources: []string{"pods"}, ResourceNames: []string{pod}, Verbs: []string{"delete"}}}}, meta.CreateOptions{}); err != nil {
 		return err
 	}
-	_, err := api.RbacV1().RoleBindings(namespace).Create(ctx, &rbac.RoleBinding{ObjectMeta: meta.ObjectMeta{Name: name}, RoleRef: rbac.RoleRef{APIGroup: "rbac.authorization.k8s.io", Kind: "Role", Name: name}, Subjects: []rbac.Subject{{Kind: "User", Name: user}}}, meta.CreateOptions{})
+	_, err := api.RbacV1().ClusterRoleBindings().Create(ctx, &rbac.ClusterRoleBinding{ObjectMeta: meta.ObjectMeta{Name: name}, RoleRef: rbac.RoleRef{APIGroup: "rbac.authorization.k8s.io", Kind: "ClusterRole", Name: name}, Subjects: []rbac.Subject{{Kind: "User", Name: user}}}, meta.CreateOptions{})
 	return err
 }
