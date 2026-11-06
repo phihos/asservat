@@ -1,5 +1,17 @@
 # Sustained implementation progress
 
+## Installed finite saved logs passed (2026-11-06)
+
+Signed `e1477925` passes the packaged RequireAll workflow: independent reviewer,
+whole-Pod finite acquisition/publication, MCP/React/native JSONL parity, exact
+query replay/accounting, fresh history Repeat preview and Running→Cancelled Stop.
+Go exits0/635.639s (manual152.69s), harness0; all4,369 inputs match Git, sources
+are unchanged and complete cleanup is independently verified. [Original proof
+and explicit gaps](../test/results/finite-saved-logs-installed-e1477925/README.md)
+retain36350 native bytes/six origins,40 total query units and no executed Repeat
+capture. Ordinary Observe, broader matrices and sustained operation remain open.
+PR173 still needs current-head eligible CI and normal merge; no release follows.
+
 ## Installed logs native-response budget mismatch (2026-11-06)
 
 Signed5fda3b3c passes capture/publication, actual MCP/React saved-query parity and
