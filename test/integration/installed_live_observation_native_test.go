@@ -94,7 +94,7 @@ func installedLiveSettings(in contracts.DownloadEnvironmentSettings, root, clust
 }
 
 func installedLiveOwnerEpoch(ctx context.Context, db *pgxpool.Pool, installation, podUID string) (string, error) {
-	rows, err := db.Query(ctx, `SELECT DISTINCT e.process_epoch::text FROM hub_owner_enrollment e JOIN hub_owner_certificate c ON c.enrollment_id=e.id JOIN fleet_current_trust t ON t.installation_id=e.installation_id AND t.issuer_epoch=e.issuer_epoch WHERE e.installation_id=$1 AND e.pod_uid=$2 AND e.usage='server' AND e.retired_at IS NULL AND e.audit_receipt_json IS NOT NULL AND c.activated_at IS NOT NULL AND c.audit_receipt_json IS NOT NULL AND c.not_after>clock_timestamp() AND NOT t.suspended AND NOT t.recovery_blocked AND t.observed_at<=clock_timestamp() AND clock_timestamp()<t.fresh_until LIMIT 2`, installation, podUID)
+	rows, err := db.Query(ctx, `SELECT e.process_epoch::text FROM hub_owner_enrollment e JOIN hub_owner_certificate c ON c.enrollment_id=e.id JOIN fleet_current_trust t ON t.installation_id=e.installation_id AND t.issuer_epoch=e.issuer_epoch WHERE e.installation_id=$1 AND e.pod_uid=$2 AND e.usage='server' AND e.retired_at IS NULL AND e.audit_receipt_json IS NOT NULL AND c.activated_at IS NOT NULL AND c.audit_receipt_json IS NOT NULL AND c.not_after>clock_timestamp() AND NOT t.suspended AND NOT t.recovery_blocked AND t.observed_at<=clock_timestamp() AND clock_timestamp()<t.fresh_until ORDER BY c.activated_at DESC LIMIT 1`, installation, podUID)
 	if err != nil {
 		return "", err
 	}
@@ -107,8 +107,10 @@ func installedLiveOwnerEpoch(ctx context.Context, db *pgxpool.Pool, installation
 		}
 		epochs = append(epochs, e)
 	}
+	// A container restart leaves the earlier process's unexpired
+	// registration; the most recently activated one is the current process.
 	if rows.Err() != nil || len(epochs) != 1 {
-		return "", errors.New("one current activated original server epoch required")
+		return "", errors.New("current activated server epoch required")
 	}
 	return epochs[0], nil
 }
