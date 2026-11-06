@@ -1,0 +1,7 @@
+# Native process main executable fixture
+
+Native42148273094 on signed32625077 actually acquires and uploads a3536-byte process inventory from both pinned synthetic workload containers in12.692ms. The fixture then fails because it expects `/bin/busybox`, while the original `sh -c` workload reports `/bin/sh`. Both actual mains have namespacePID1 and UID65532; exact runtime/restart/source/clock pins and absent argument/environment canaries are preserved. The Go suite fails18.067s; later restart/uninstall assertions are not reached. The report records owned cluster/image cleanup and unchanged sources. All4,428 original Git inputs were independently verified.
+
+The two-file fixture correction requires the actual `/bin/sh` path and adds a wrong-executable negative control. It changes no producer, authorization, privilege, cap, deadline or native bytes. New controlled-source regression fails exit1/.015s with the old checker; final focused races pass1.080s with the external test skipped. Independent Parser review is clear. A complete fresh guarded component run remains required, and the earlier installed publication failure remains unexplained.
+
+Original artifact13471915344 ZIP is811060bytes/SHA25676e85dafcf0355df21857e5e60c355c8db006b2cfc94bff828357b6c9c0db3f8. Exact decompressed originals and reviews are hashed in `manifest.json`. Partial acquisition success does not make the whole workflow a pass.

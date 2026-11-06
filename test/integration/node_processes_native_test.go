@@ -92,7 +92,7 @@ func checkNativeProcesses(w collector.Work, peer collector.Identity, result coll
 		main := false
 		for _, row := range native.Processes {
 			if row.Identity.RuntimeID == origin.RuntimeID && row.Main && row.Identity.HostPID == origin.MainPID {
-				main = row.NamespacePID == 1 && row.UID == 65532 && row.ExecutablePath == "/bin/busybox"
+				main = row.NamespacePID == 1 && row.UID == 65532 && row.ExecutablePath == "/bin/sh"
 			}
 		}
 		if !main {

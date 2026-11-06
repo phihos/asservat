@@ -1,0 +1,52 @@
+[
+  {
+    "file": "artifacts.json.gz",
+    "originalBytes": 743,
+    "sha256": "5381563be65495ab561a85ff087a54deccf58144195c68f66d7061696077dde8"
+  },
+  {
+    "file": "ci-native-collector-processes.log.gz",
+    "originalBytes": 1142711,
+    "sha256": "23af84fdc5e1435bacf9cdef59f44d2fae8789733254de1cb8293a3d00b7d483"
+  },
+  {
+    "file": "collector-processes-native.json.gz",
+    "originalBytes": 3536,
+    "sha256": "ef01f02f0294537bcc5f91dce6f61b543c8b585a043faf081452ed8b1b82e76a"
+  },
+  {
+    "file": "collector-processes-report.json.gz",
+    "originalBytes": 1130889,
+    "sha256": "1e447e0cba5be8e4ac689079dbfe7f52f21ec02ad198c5d9a319e12ba56e38ac"
+  },
+  {
+    "file": "failed-job.log.gz",
+    "originalBytes": 1824520,
+    "sha256": "2c7d3771ad325b7e8ad39046eb13e7d8c40b43933ed9ca75cc86f9e4441e0d17"
+  },
+  {
+    "file": "main-path-green.log.gz",
+    "originalBytes": 3168,
+    "sha256": "99c351b90ae26c386e2b4b1b32c18e9addc184104e44aa0af059e2b2b70275ce"
+  },
+  {
+    "file": "main-path-red.log.gz",
+    "originalBytes": 276,
+    "sha256": "56ab500483a038329e38aa8ee6ad9f26d887a136bac81040475d64dfa143c5f2"
+  },
+  {
+    "file": "parser-main-path-independent-review.json.gz",
+    "originalBytes": 2943,
+    "sha256": "5a90500c40e09d579a6b76e489bfdc472eee588c7bd0377c5ab74afd6d3a5047"
+  },
+  {
+    "file": "root-source-and-cause-audit.json.gz",
+    "originalBytes": 1044,
+    "sha256": "14f8e0197f9af24d54ea954be746a3d25f8d32ddd4fc7c9ba397996a53905a4c"
+  },
+  {
+    "file": "run.json.gz",
+    "originalBytes": 4602,
+    "sha256": "c17c9d08f4f256f9d95ef996e276f84b5da7f2631a80e9fa65e0f9ea24d3f8fa"
+  }
+]

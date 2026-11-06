@@ -1,5 +1,16 @@
 # Sustained implementation progress
 
+## Native process acquisition and main-path fixture (2026-11-06)
+
+Native42148273094 receives both original container inventories in12.692ms, then
+fails the new fixture's `/bin/busybox` expectation: its `sh -c` workload actually
+reports `/bin/sh`. The exact-path fixture is corrected with a negative control;
+local RED/GREEN and independent review pass. All4,428 original inputs match Git,
+source is unchanged and owned cluster/image cleanup is recorded. [Original
+failure and partial scope](../test/results/process-discovery-native-main-42148273094/README.md)
+remain explicit. Full component restart/uninstall and installed publication
+remain unqualified; no producer or privilege change was made.
+
 ## Process component qualification setup (2026-11-06)
 
 Native42147216939 fails before the collector run: the existing tshark package

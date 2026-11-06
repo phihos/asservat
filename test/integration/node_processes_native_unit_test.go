@@ -26,7 +26,7 @@ func nativeProcessCheckFixture() (collector.Work, collector.Identity, collector.
 		pid := uint32(100 + n)
 		pod.Status.ContainerStatuses = append(pod.Status.ContainerStatuses, core.ContainerStatus{Name: c.Name, ContainerID: runtimeID, Ready: true, RestartCount: int32(n), State: core.ContainerState{Running: &core.ContainerStateRunning{StartedAt: meta.NewTime(now)}}})
 		native.Origins = append(native.Origins, artifact.ProcessOrigin{RuntimeID: runtimeID, RestartCount: uint32(n), MainPID: pid, Outcome: "observed"})
-		native.Processes = append(native.Processes, artifact.ProcessRecord{Identity: artifact.ProcessIdentity{PodUID: string(pod.UID), NodeBootID: peer.BootID, RuntimeID: runtimeID, RestartCount: uint32(n), HostPID: pid, StartTimeTicks: uint64(n + 1), CgroupPath: "/synthetic/pod/container", CgroupID: uint64(n + 1)}, NamespacePID: 1, ObservedAt: now, Main: true, State: "S", UID: 65532, Threads: 1, ExecutablePath: "/bin/busybox"})
+		native.Processes = append(native.Processes, artifact.ProcessRecord{Identity: artifact.ProcessIdentity{PodUID: string(pod.UID), NodeBootID: peer.BootID, RuntimeID: runtimeID, RestartCount: uint32(n), HostPID: pid, StartTimeTicks: uint64(n + 1), CgroupPath: "/synthetic/pod/container", CgroupID: uint64(n + 1)}, NamespacePID: 1, ObservedAt: now, Main: true, State: "S", UID: 65532, Threads: 1, ExecutablePath: "/bin/sh"})
 	}
 	w := collector.Work{ID: id, Sequence: 1, Kind: collector.WorkProcesses, NotAfter: now.Add(3 * time.Second), Processes: &collector.ProcessCapture{CaptureID: id, CollectorEpoch: id, ExpectationDigest: artifact.Digest{1}, Request: execution.ProcessSnapshotRequest{Pin: artifact.PinnedPod{Namespace: "synthetic", NamespaceUID: "namespace-uid", Name: pod.Name, UID: string(pod.UID), NodeName: peer.NodeName}, NodeUID: peer.NodeUID, NodeBootID: peer.BootID, Mode: artifact.ProcessAll, NativeLimit: artifact.ProcessNativeLimit, NotBefore: now, Deadline: now.Add(5 * time.Second)}}}
 	r := collector.ProcessResult{WorkID: id, CaptureID: id, PodUID: string(pod.UID), NodeUID: peer.NodeUID, NodeBootID: peer.BootID, ExpectationDigest: artifact.Digest{1}, StartedAt: now, CompletedAt: now}
@@ -78,6 +78,9 @@ func TestNativeProcessProvenanceRejectsReplacementAndSensitiveContent(t *testing
 		"missing origin": func(_ *collector.ProcessResult, n *artifact.ProcessInventory, _ *core.Pod) {
 			n.Origins = n.Origins[:1]
 			n.Processes = n.Processes[:1]
+		},
+		"wrong main executable": func(_ *collector.ProcessResult, n *artifact.ProcessInventory, _ *core.Pod) {
+			n.Processes[0].ExecutablePath = "/bin/busybox"
 		},
 		"wrong namespace PID": func(_ *collector.ProcessResult, n *artifact.ProcessInventory, _ *core.Pod) {
 			n.Processes[0].NamespacePID = 2
