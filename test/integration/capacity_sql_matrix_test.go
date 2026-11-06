@@ -12,6 +12,7 @@ import (
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
 	app "asservat.local/asservat/internal/application/capacity"
+	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
 	capturevalue "asservat.local/asservat/internal/domain/capture"
 	cfg "asservat.local/asservat/internal/domain/configuration"
@@ -35,6 +36,40 @@ func qualifyCapacityProducerSQL(t *testing.T, ctx context.Context, admin *pgxpoo
 	// Stop dependent cases after any prerequisite failure. A later missing row
 	// must not hide the actual first failed role/SQL phase.
 	if !t.Run("actual-paired-root-and-lost-receipt", func(t *testing.T) {
+		// A successful immutable claim followed by a lost reply performs no
+		// SQL setup. Resume only under another current invocation after the
+		// original effect interval, retaining every original claim field.
+		f.root.lostSetupClaim = true
+		if _, err := f.producer.InitializeCapacity(ctx, f.input, f.protection); err == nil {
+			t.Fatal("lost postclaim reply returned success")
+		}
+		if f.root.value.State.CapacitySetup == nil || f.root.value.State.CapacitySetup.Receipt != nil {
+			t.Fatal("claim without SQL supplied a runtime receipt")
+		}
+		original := *f.root.value.State.CapacitySetup
+		var beforeSources, beforeCaptures int
+		if err := admin.QueryRow(ctx, `SELECT (SELECT count(*) FROM capacity_source WHERE root_id=$1),(SELECT count(*) FROM capture_audit_root WHERE root_id=$1)`, f.input.PermissionRootID).Scan(&beforeSources, &beforeCaptures); err != nil || beforeSources != 0 || beforeCaptures != 0 {
+			t.Fatal("postclaim failure changed paired roots", beforeSources, beforeCaptures, err)
+		}
+		capacityWaitUntil(t, ctx, original.Until.Add(10*time.Millisecond))
+		f.refreshBase(t)
+		// Neither a changed original incarnation nor an acknowledged receipt
+		// can turn missing roots into a new initialization opportunity.
+		f.root.value.State.CapacitySetup.DatabaseOID++
+		if _, err := f.producer.InitializeCapacity(ctx, f.input, f.protection); err == nil {
+			t.Fatal("changed original database incarnation adopted")
+		}
+		f.root.value.State.CapacitySetup.DatabaseOID = original.DatabaseOID
+		claimedReceipt := contracts.CapacityRootSetupReceipt{Format: contracts.CapacityRootSetupFormat, OperationID: original.OperationID, InstallationID: f.input.InstallationID, InitialClaimID: f.input.InitialClaimID, PermissionRootID: f.input.PermissionRootID, RoleRootUID: f.input.RoleRootUID, RoleSetupID: f.input.RoleSetupID, InputDigest: original.InputDigest, DatabaseOID: original.DatabaseOID, PostmasterAt: original.PostmasterAt, ClaimedAt: original.ClaimedAt, Until: original.Until}
+		f.root.value.State.CapacitySetup.Receipt = &claimedReceipt
+		if _, err := f.producer.InitializeCapacity(ctx, f.input, f.protection); err == nil {
+			t.Fatal("missing roots after acknowledged receipt recreated")
+		}
+		f.root.value.State.CapacitySetup.Receipt = nil
+		if err := admin.QueryRow(ctx, `SELECT (SELECT count(*) FROM capacity_source WHERE root_id=$1),(SELECT count(*) FROM capture_audit_root WHERE root_id=$1)`, f.input.PermissionRootID).Scan(&beforeSources, &beforeCaptures); err != nil || beforeSources != 0 || beforeCaptures != 0 {
+			t.Fatal("refused setup changed paired roots", beforeSources, beforeCaptures, err)
+		}
+		f.refreshBase(t)
 		f.root.lostSetupReceipt = true
 		if _, err := f.producer.InitializeCapacity(ctx, f.input, f.protection); err == nil {
 			t.Fatal("lost setup receipt returned success")
@@ -46,7 +81,9 @@ func qualifyCapacityProducerSQL(t *testing.T, ctx context.Context, admin *pgxpoo
 		if sources != 1 || captures != 1 {
 			t.Fatalf("original paired SQL write missing: source=%d capture=%d", sources, captures)
 		}
-		original := *f.root.value.State.CapacitySetup
+		if !reflect.DeepEqual(*f.root.value.State.CapacitySetup, original) || f.root.setupClaims != 1 {
+			t.Fatal("resumed creation changed original claim or acknowledged an unknown completion")
+		}
 		f.refreshBase(t)
 		receipt, err := f.producer.InitializeCapacity(ctx, f.input, f.protection)
 		if err != nil {
