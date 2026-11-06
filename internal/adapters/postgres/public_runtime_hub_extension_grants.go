@@ -49,9 +49,6 @@ var publicRuntimeHubExtensionGrantTable = map[string][]publicRuntimeGrant{
 		{"function", "spend_adhoc_observed_bytes(uuid,uuid,bigint)", "", "EXECUTE"},
 		{"function", "spend_adhoc_observation(uuid,uuid,bigint,bigint)", "", "EXECUTE"},
 		{"function", "lock_approved_context_grant(uuid,uuid,uuid,text,text,text,bytea)", "", "EXECUTE"},
-		// Live manual-session reads lock the permission root before reading.
-		{"table", "permission_stream", "", "SELECT"},
-		{"table", "permission_stream", "id", "UPDATE"}, // row lock only
 		{"schema", "public", "", "USAGE"},
 		{"table", "authority_audit", "", "SELECT"},
 		{"table", "context_capture", "", "SELECT"},
