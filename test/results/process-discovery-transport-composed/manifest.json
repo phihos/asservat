@@ -1,0 +1,59 @@
+{
+  "base": "4c54db45017163193756221e11f88a03d6604495",
+  "sourceHashes": {
+    "internal/bootstrap/node.go": "6af03e854e1c459856d9549ea6086f871fd61cc0712740e674d17c1740796972",
+    "internal/bootstrap/node_processes.go": "5fb99f8b59fc900a8c3b783ad8489a33f27475677ed1d083e1de7c6504eb1346",
+    "internal/bootstrap/process_transport_composed_test.go": "3f5774035ceaa67654d9227f656f3f349141964b3644b2d596851e1ec83de7c1"
+  },
+  "payloads": [
+    {
+      "archive": "handoff.json.gz",
+      "originalBytes": 5728,
+      "originalSHA256": "7c7a15af54e0ee19dc3464a725c5c29d1c32ec08537ccb4ab9bc7ead4176c6b0",
+      "gzipBytes": 2413,
+      "gzipSHA256": "827d361a76e96aa950ef1e81f0478295f5013336702abd6224f0f37fea0dada0"
+    },
+    {
+      "archive": "root-review.json.gz",
+      "originalBytes": 745,
+      "originalSHA256": "4032793683f4ffc544a1394ddc271c417624c080d8275255f819689eead726d8",
+      "gzipBytes": 486,
+      "gzipSHA256": "32d78c69ac8f12c72574f1a283897e8cdb83ea2db43ac330cdd6096e40ad2141"
+    },
+    {
+      "archive": "first-focused.log.gz",
+      "originalBytes": 561,
+      "originalSHA256": "c6b5a7a75ec3d7cd111529b3ccd0b9ad9017e1d566a89c3988b5646e64eb6606",
+      "gzipBytes": 219,
+      "gzipSHA256": "a0c988a0a4f530347384317ec5937ec5bdd67760448ff2fdcd34b66b6df9e70b"
+    },
+    {
+      "archive": "corrected-focused.log.gz",
+      "originalBytes": 738,
+      "originalSHA256": "3f0e6410c2c975c77e558619a75aa1c80a60a2fdcd7d867df4dc675354559011",
+      "gzipBytes": 287,
+      "gzipSHA256": "ba64b59a166dfe8bcfbd176021615fc1711509c63cd6f7da2cb93dc00346a89c"
+    },
+    {
+      "archive": "final-focused.log.gz",
+      "originalBytes": 6840,
+      "originalSHA256": "b2af1328bd0ddfa5124d0251a5958572f84e12588cdb91b8c39645d42d5e69b3",
+      "gzipBytes": 366,
+      "gzipSHA256": "abeb335d800dd196fef319dba658577f9f166046a60c9961405b2de5a9736db3"
+    },
+    {
+      "archive": "diagnostic-red.log.gz",
+      "originalBytes": 533,
+      "originalSHA256": "c94ad8326576765657cfa69170a0039bc3e52887bc229e0ba84714b04d4b02a6",
+      "gzipBytes": 214,
+      "gzipSHA256": "f4a9ec298b2c77ab7f4c6edcf73231fe98b6d99cb35a011e4cbcd540d026d763"
+    },
+    {
+      "archive": "diagnostic-final-green.log.gz",
+      "originalBytes": 2970,
+      "originalSHA256": "f81ccc31ab04d7dd083a93b8a1079d845db2009952178aabf2ff7f71a6df972c",
+      "gzipBytes": 557,
+      "gzipSHA256": "2d979651311ecca049fb5ec3b286100d1fd31710988d6d2d0858970b0240f99a"
+    }
+  ]
+}

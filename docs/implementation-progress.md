@@ -1,5 +1,16 @@
 # Sustained implementation progress
 
+## Process node transport composition and diagnostics (2026-11-06)
+
+Actual local TLS enrollment/Poll/dispatcher/upload/holder/Collect passes with
+synthetic process metadata and authority (20 subcases,1.894s). It does not
+reproduce the installed publication failure or qualify the real kernel reader.
+A closed uploader outcome line now preserves errors without logging IDs or
+evidence; focused join/Stop/diagnostic races pass1.221s and Root review is clear.
+[Original local proof and explicit diagnostic gap](../test/results/process-discovery-transport-composed/README.md)
+remain separate from native/installed qualification. A dedicated existing
+collector-harness process mode is being prepared before another installed run.
+
 ## Second installed process run awaits publication diagnosis (2026-11-06)
 
 Signed740cef76 acknowledges the original process request; the previous missing

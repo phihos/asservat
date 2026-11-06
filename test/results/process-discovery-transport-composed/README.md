@@ -1,0 +1,7 @@
+# Local process transport composition and closed diagnostics
+
+The actual local TLS NodeChannel enrollment/status/Poll, production wire/domain conversion and dispatcher, real process upload, regional holder and encrypted local writer/Collect pass20 subcases in1.894s. Identity/authority, metadata acquirer and object-store replies are synthetic; no kernel/procfs/setns/BPF or external service is run. Stored is not published. The first incomplete-status fixture failure is preserved and does not establish a product defect.
+
+A tiny wrapper on the existing upload logs one closed acquisition/upload category (at most65B) per uploaded task. Original body/context/result/error and single attempt are unchanged. Eight category controls include an opaque secret marker that must never be logged. Diagnostic-contract RED1/.351s means missing lines, not the VM cause; final focused race0/1.221s includes actual TLS success/source-failure and existing join/Stop fences. Root independently reviews all three exact source hashes. There are zero added reads, APIs, timers, retries, roles, deadlines or state fields.
+
+Pre-dispatch refusal/expiry/identity/budget failures do not reach this wrapper. The actual installed run remains failed with unknown cause. A dedicated real collector/runtime source qualification and the full installed workflow remain required. Original reports and scope are exact gzip payloads with manifest hashes.

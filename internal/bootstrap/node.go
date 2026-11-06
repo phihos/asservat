@@ -180,7 +180,7 @@ func RunNode(ctx context.Context, podUID string) error {
 	p.packets = &nodePackets{engine: gadget.CapturePackets, syscallTrace: syscallTraceIfAvailable(mechanisms), argumentTrace: argumentTraceIfAvailable(mechanisms), argumentResources: gadget.ArgumentWorkingBytes, observedEngine: gadget.CaptureObservedPackets, identity: p.packetIdentity, upload: client.UploadCapture, available: packetAvailable(mechanisms), version: facts.Engine.Version,
 		now: time.Now, log: func(line string) { fmt.Fprintln(os.Stderr, line) }, budget: func() *collector.Budget { return p.budget }, budgetMu: &p.mu}
 	p.profiles = &nodeProfiles{identity: p.packetIdentity, acquire: acquireNodeProfile(p.packetIdentity, time.Now), upload: client.UploadProfileStream, now: time.Now, budget: func() *collector.Budget { return p.budget }, budgetMu: &p.mu}
-	p.profiles.processes, p.profiles.uploadProcesses = processAcquirer, client.UploadProcessesStream
+	p.profiles.processes, p.profiles.uploadProcesses = processAcquirer, loggedProcessUploader(client.UploadProcessesStream, p.log)
 	ringDir, removed := "", 0
 	if st, err := os.Stat(contracts.NodeRingDiskPath); err == nil && st.IsDir() && d.Ceilings.RingDiskBytes > 0 {
 		ringDir = contracts.NodeRingDiskPath

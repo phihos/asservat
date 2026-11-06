@@ -4,9 +4,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
 	"time"
 
 	"asservat.local/asservat/internal/domain/collector"
+	"asservat.local/asservat/internal/transport/node"
 )
 
 // Process discovery shares the original finite-acquisition map, budget lock,
@@ -92,4 +96,32 @@ func (n *nodeProfiles) startProcesses(ctx context.Context, epoch string, w colle
 	}()
 	r.Outcome, r.Reason = collector.OutcomeAccepted, ""
 	return r
+}
+
+// loggedProcessUploader retains the original upload/result unchanged. Diagnostic
+// output is one content-free line per task, never an error string or source ID.
+func loggedProcessUploader(upload func(context.Context, string, collector.ProcessResult, io.Reader) error, log io.Writer) func(context.Context, string, collector.ProcessResult, io.Reader) error {
+	return func(ctx context.Context, epoch string, result collector.ProcessResult, body io.Reader) error {
+		err := upload(ctx, epoch, result, body)
+		acquisition, outcome := "native-ready", "ok"
+		if result.Failure != "" {
+			acquisition = "source-failed"
+		}
+		if err != nil {
+			switch {
+			case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded), ctx.Err() != nil:
+				outcome = "canceled"
+			case errors.Is(err, node.ErrRefused):
+				outcome = "refused"
+			case errors.Is(err, node.ErrUnauthenticated):
+				outcome = "unauthenticated"
+			default:
+				outcome = "unavailable"
+			}
+		}
+		if log != nil {
+			_, _ = fmt.Fprintf(log, "node processes: acquisition=%s upload=%s\n", acquisition, outcome)
+		}
+		return err
+	}
 }
