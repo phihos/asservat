@@ -25,8 +25,9 @@ it('requires approval before querying the same saved arguments through the HTTP 
   const example = (name: string) => JSON.parse(readFileSync(new URL('../../../examples/' + name, import.meta.url), 'utf8'));
   const page = example('mcp-syscall-query-result.json');
   page.provenance = [{ artifactID: artifact.artifact_id, digest: artifact.digest }];
-  page.data.query_observed_at = new Date().toISOString();
-  page.data.query_expires_at = new Date(Date.now() + 60000).toISOString();
+  const queryObservedAt = new Date();
+  page.data.query_observed_at = queryObservedAt.toISOString();
+  page.data.query_expires_at = new Date(queryObservedAt.getTime() + 60000).toISOString();
   expect(validOutput_get_grant(grant)).toBe(true);
   expect(validOutput_syscall_query(page)).toBe(true);
   const reply = (body: unknown) => new Response(JSON.stringify(body), { headers: { 'Content-Type': 'application/json' } });
