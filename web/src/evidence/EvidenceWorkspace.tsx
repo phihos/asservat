@@ -1,3 +1,5 @@
+import { LogQueryView } from '../projection/LogQueryView';
+import { LogQuery } from '../projection/log-query';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Button } from 'react-aria-components';
 import type { Session } from '../auth/session';
@@ -78,6 +80,10 @@ function SavedPacketQuery({session,scope,caseID,artifact}:{session:Session;scope
  const [controller]=useState(()=>new PacketQuery());
  return <PacketQueryView controller={controller} session={session} scope={scope} caseID={caseID} artifact={artifact}/>;
 }
+function SavedLogQuery({session,scope,caseID,artifact}:{session:Session;scope:AbortSignal;caseID:string;artifact:Artifact}) {
+ const [controller]=useState(()=>new LogQuery());const[grant,setGrant]=useState<{id:string;session:Session;scope:AbortSignal}>();const grantID=grant?.session===session&&grant.scope===scope&&!scope.aborted?grant.id:undefined;
+ return <><RawAccessPanel session={session} scope={scope} caseID={caseID} artifacts={[artifact]} prefilledArtifactID={artifact.artifact_id} purpose="log-query" onGrant={id=>setGrant({id,session,scope})}/><LogQueryView controller={controller} session={session} scope={scope} caseID={caseID} artifactID={artifact.artifact_id} version={artifact.digest} grantID={grantID} podUID={artifact.target?.pod_uid}/></>;
+}
 function SavedRawSyscallQuery({session,scope,caseID,artifact}:{session:Session;scope:AbortSignal;caseID:string;artifact:Artifact}) {
  const [controller]=useState(()=>new SyscallQuery());
  const [grant,setGrant]=useState<{id:string;session:Session;scope:AbortSignal}>();
@@ -142,6 +148,7 @@ export default function EvidenceWorkspace({ session, scope, caseID, controller =
           {artifact.data_class === 'metadata' && ['context', 'pod-status'].includes(artifact.kind) && <SavedPodStatus session={session} scope={scope} caseID={caseID} artifactID={artifact.artifact_id}/>}
           {artifact.kind === 'packetCapture' && (artifact.native_format === 'pcapng' && artifact.data_class === 'metadata' || artifact.native_format === 'pcapng-raw' && artifact.data_class === 'raw' && state.details?.case.access !== 'shared') && <><SavedPacketSummary session={session} scope={scope} caseID={caseID} artifact={artifact}/><SavedPacketQuery session={session} scope={scope} caseID={caseID} artifact={artifact}/></>}
           {artifact.kind === 'profile' && artifact.native_format === 'pprof' && artifact.data_class === 'raw' && state.details?.case.access !== 'shared' && <><SavedProfileSummary session={session} scope={scope} caseID={caseID} artifact={artifact}/><SavedProfileComparison session={session} scope={scope} caseID={caseID} artifact={artifact} profiles={profiles}/></>}
+          {artifact.kind === 'logs' && artifact.native_format === 'asservat-logs/v1' && artifact.data_class === 'raw' && state.details?.case.access !== 'shared' && <SavedLogQuery key={caseID+artifact.artifact_id+artifact.digest} session={session} scope={scope} caseID={caseID} artifact={artifact}/>}
           {artifact.kind === 'syscallTrace' && (artifact.native_format === 'asservat-syscall-events/v1' && artifact.data_class === 'metadata' || artifact.native_format === 'asservat-syscall-arguments/v1' && artifact.data_class === 'raw' && state.details?.case.access !== 'shared') && <><SavedSyscallViews session={session} scope={scope} caseID={caseID} artifact={artifact}/>{artifact.data_class === 'raw' && <SavedRawSyscallQuery key={caseID+artifact.artifact_id+artifact.digest} session={session} scope={scope} caseID={caseID} artifact={artifact}/>}</>}
           <Button className="button" isDisabled={state.busy || pending} onPress={() => void controller.prepare(artifact)}>Download</Button>
           {state.details?.case.access !== 'shared' && <>

@@ -27,3 +27,12 @@ and process identity are mandatory. Each policy now matches its own control
 namespace so independent node/API journals can coexist. This does not replace
 the journal's exact namespace UID check. The API preparation, result and current
 qualification boundary are in [regional API execution](api-context-runner.md).
+
+The same API start profile accepts the finite logs producer's exact `logs`
+native type with a positive ceiling of 64 MiB and generated action ID. It keeps
+the original five-second start permit, executor Pod/account identity and absence
+of node/boot fields. This aligns the structural schema and reviewed CEL with
+the existing execution-domain binding; it adds no permission, runtime journal,
+retry or lifetime. The original installed logs attempt stopped at this contract
+mismatch. A synthetic server dry-run reproduced its rejection; full fresh
+installed logs qualification after the correction remains pending.

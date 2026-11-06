@@ -251,6 +251,22 @@ export interface components {
                     field: "actionExecutionMode";
                     /** @enum {unknown} */
                     value: "onTrigger" | "ongoing";
+                } | {
+                    actionID: string;
+                    /** @constant */
+                    field: "logBefore";
+                    value: string;
+                } | {
+                    actionID: string;
+                    /** @constant */
+                    field: "logAfter";
+                    value: string;
+                } | {
+                    actionID: string;
+                    /** @constant */
+                    field: "logStream";
+                    /** @enum {string} */
+                    value: "both";
                 };
                 component: {
                     id: string;
@@ -474,6 +490,22 @@ export interface components {
             field: "actionExecutionMode";
             /** @enum {unknown} */
             value: "onTrigger" | "ongoing";
+        } | {
+            actionID: string;
+            /** @constant */
+            field: "logBefore";
+            value: string;
+        } | {
+            actionID: string;
+            /** @constant */
+            field: "logAfter";
+            value: string;
+        } | {
+            actionID: string;
+            /** @constant */
+            field: "logStream";
+            /** @enum {string} */
+            value: "both";
         };
         /** @description Pinned resolved profile. A builtin definition is embedded in the release binary (ADR-243) and is identified by its definition digest alone; organization and namespace definitions name their source cluster, namespace and object. */
         Contract_capture_composition_d3d99d35a2742711: {
@@ -498,7 +530,7 @@ export interface components {
         };
         Contract_investigation_access_0d504ecd6bc8c0fd: {
             actionIds: string[];
-            operations: ("read_memory" | "debugger_command" | "pcap_query" | "syscall_query" | "download_artifact")[];
+            operations: ("debugger_command" | "download_artifact" | "get_logs" | "pcap_query" | "read_memory" | "syscall_query")[];
             /** @description Selected clients. When omitted, resolve to the authenticated requesting client before recording the review and digest. Explicit selections remain exact; replay never adds or changes a client. */
             clientIDs?: string[];
             maxArtifacts: number;
@@ -553,7 +585,7 @@ export interface components {
             actions: (({
                 actionID: string;
                 /** @enum {unknown} */
-                kind: "kubernetesSnapshot" | "logs" | "processSnapshot" | "fileRead" | "packetCapture" | "networkSnapshot" | "runtimeDiagnostic" | "kernelCore" | "liveCore" | "command" | "httpDiagnostic" | "artifactCollect" | "profile" | "syscallTrace";
+                kind: "kubernetesSnapshot" | "processSnapshot" | "fileRead" | "packetCapture" | "networkSnapshot" | "runtimeDiagnostic" | "kernelCore" | "liveCore" | "command" | "httpDiagnostic" | "artifactCollect" | "profile" | "syscallTrace";
                 /** @constant */
                 executionMode: "onTrigger";
                 /** @constant */
@@ -567,6 +599,14 @@ export interface components {
                 executionMode: "ongoing";
                 /** @enum {unknown} */
                 activation: "policyArming" | "manualSession";
+                requestedBefore: string;
+                after: string;
+            } | {
+                actionID: string;
+                /** @constant */
+                kind: "logs";
+                /** @constant */
+                executionMode: "onTrigger";
                 requestedBefore: string;
                 after: string;
             })[];
@@ -684,7 +724,7 @@ export interface components {
         } & unknown;
         Contract_investigation_access_03804ffde11279ad: {
             actionIds: string[];
-            operations: ("read_memory" | "debugger_command" | "pcap_query" | "syscall_query" | "download_artifact")[];
+            operations: ("debugger_command" | "download_artifact" | "get_logs" | "pcap_query" | "read_memory" | "syscall_query")[];
             clientIDs: string[];
             maxArtifacts: number;
             maxBytes: number;
@@ -760,7 +800,7 @@ export interface components {
                 /** @description Advisory follow-up access choices for this exact reviewed raw plan. Current authority, retained source and selected operations are checked again on submission. Absence grants no access. */
                 result_access_actions?: {
                     action_id: string;
-                    operations: ("download_artifact" | "pcap_query" | "syscall_query")[];
+                    operations: ("download_artifact" | "get_logs" | "pcap_query" | "syscall_query")[];
                 }[];
             } & unknown;
         } | {
@@ -1736,7 +1776,7 @@ export interface components {
             editableFields: {
                 actionID: string;
                 /** @enum {unknown} */
-                field: "packetPeers" | "packetFilter" | "packetBefore" | "packetAfter" | "packetRing" | "processSelector" | "processBatch" | "profileDuration" | "syscallFilter" | "syscallMode" | "syscallBefore" | "syscallAfter" | "syscallRing" | "syscallArguments" | "syscallMaxEvents" | "syscallRate" | "filePath" | "commandArgv" | "actionMaxBytes" | "actionTimeout" | "actionExecutionMode";
+                field: "packetPeers" | "packetFilter" | "packetBefore" | "packetAfter" | "packetRing" | "processSelector" | "processBatch" | "profileDuration" | "syscallFilter" | "syscallMode" | "syscallBefore" | "syscallAfter" | "syscallRing" | "syscallArguments" | "syscallMaxEvents" | "syscallRate" | "filePath" | "commandArgv" | "actionMaxBytes" | "actionTimeout" | "actionExecutionMode" | "logBefore" | "logAfter" | "logStream";
                 label: string;
                 description?: string;
             }[];

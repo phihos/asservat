@@ -55,7 +55,7 @@ func (p *preparedRecording) StartArgumentRecording(ctx context.Context, pin arti
 	defer h.mu.Unlock()
 	now = h.now()
 	h.expireLocked(now)
-	if ctx.Err() != nil || !source.Valid(now) || !permit.ValidFinite(now) || !now.Before(until) || len(h.held)+len(h.profiles) >= maxHeldRecordings || h.held[e.CaptureUID] != nil || h.profiles[e.CaptureUID] != nil {
+	if ctx.Err() != nil || !source.Valid(now) || !permit.ValidFinite(now) || !now.Before(until) || h.heldCountLocked() >= maxHeldRecordings || h.held[e.CaptureUID] != nil || h.profiles[e.CaptureUID] != nil || h.logs[e.CaptureUID] != nil {
 		return time.Time{}, value.ErrUnavailable
 	}
 	prepared := p.prepared

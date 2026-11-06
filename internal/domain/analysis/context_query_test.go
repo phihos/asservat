@@ -220,3 +220,18 @@ func TestProfileSummaryRequiresDeclaredWorkerMemoryWithoutChangingOldQueries(t *
 		t.Fatal("shared bounded worker refused")
 	}
 }
+
+func TestLogQueryCallUsesExistingOriginalInvocationBounds(t *testing.T) {
+	a := testAuthority()
+	call := ContextQueryCall{ID: queryTestID, RootID: a.Scope.RootID, Tool: "get_logs", InputFormat: "context-query-input/v1", MACVersion: "v1", InputDigest: artifact.Digest{1}, PrincipalDigest: artifact.Digest{2}, Principal: a.Scope.Principal, StartedAt: a.CheckedAt, Until: a.ValidUntil, WriteUntil: a.CheckedAt.Add(30 * time.Second)}
+	if !call.Valid(a.CheckedAt) {
+		t.Fatal("actual logs invocation rejected before admission")
+	}
+	if call.Valid(call.Until) {
+		t.Fatal("expired invocation accepted")
+	}
+	call.Tool = "logs_unregistered"
+	if call.Valid(a.CheckedAt) {
+		t.Fatal("unknown tool accepted")
+	}
+}

@@ -47,14 +47,27 @@ func profileRecorderInput(intent value.ContextIntent) bool {
 	return err == nil && kind == "profile"
 }
 
+func logsRecorderInput(intent value.ContextIntent) bool {
+	if intent.Composition == nil {
+		return false
+	}
+	kind, err := compiler.RecorderEvidenceType(*intent.Composition)
+	return err == nil && kind == "logs"
+}
+
 func acquisitionInput(intent value.ContextIntent, class artifact.ContextExecutionClass) bool {
-	return packetRecorderInput(intent, class) || class == artifact.ContextAPIExecution && profileRecorderInput(intent)
+	return packetRecorderInput(intent, class) || class == artifact.ContextAPIExecution && (profileRecorderInput(intent) || logsRecorderInput(intent))
 }
 
 // packetRecorderAvailable reports whether this composition could be recorded
 // on the target's node now. Only a known unsupported result is plan-only;
 // operational failures must not create an inert reviewed scope.
 func (s ContextInvestigation) packetRecorderAvailable(ctx context.Context, intent value.ContextIntent, target targets.PodResolution) (bool, error) {
+	// Logs uses the qualified API-class connector, not a node recorder or an
+	// extra capability probe. Existing current capability/start checks remain.
+	if logsRecorderInput(intent) {
+		return target.ExecutionClass == artifact.ContextAPIExecution, nil
+	}
 	if s.Recorders == nil || !acquisitionInput(intent, target.ExecutionClass) {
 		return false, nil
 	}
@@ -117,6 +130,14 @@ func (s ContextInvestigation) recordingPlan(ctx context.Context, p value.Context
 		}
 		return compiler.CompileContext(planning.ContextInput{CaptureID: p.CaptureID, CaseID: p.CaseID, Executor: p.Actor, Deadline: p.Deadline, Target: f.target, Retention: f.retention, Capability: f.capability, Profile: profile}, s.Now())
 	}
+	if logsRecorderInput(p.Intent) {
+		logs, err := compiler.LogsContextFromScope(*p.Intent.Composition, p.CanonicalScope)
+		if err != nil {
+			return planning.ContextPlan{}, err
+		}
+		logs.TriggeredAt = p.Intent.LogsTriggeredAt
+		return compiler.CompileContext(planning.ContextInput{CaptureID: p.CaptureID, CaseID: p.CaseID, Executor: p.Actor, Deadline: p.Deadline, Target: f.target, Retention: f.retention, Capability: f.capability, Logs: logs}, s.Now())
+	}
 	recorder, err := compiler.RecorderContextFromScope(*p.Intent.Composition, p.CanonicalScope)
 	if err != nil {
 		return planning.ContextPlan{}, err
@@ -162,14 +183,20 @@ func (s ContextInvestigation) previewRecording(ctx context.Context, source ident
 	}
 	p.CanonicalScope, p.ScopeDigest = slices.Clone(plan.CanonicalScope), plan.ScopeDigest
 	p.AssessmentRulesDigest = compiler.RecorderAssessmentRulesFor(plan.Actions)
-	recordable := compiler.AcceptableRecorder(plan).Acceptable() || compiler.AcceptableProfile(plan).Acceptable()
+	recordable := compiler.AcceptableRecorder(plan).Acceptable() || compiler.AcceptableProfile(plan).Acceptable() || compiler.AcceptableLogs(plan).Acceptable()
 	if _, _, policy := authorization.PolicyExecutor(i.Principal); policy {
 		// requireRecordingApproval above already checked the package-private
 		// accepted settings provenance. This structural plan is not a permit:
 		// admission must retain the original reviewed policy grant, and start
 		// must obtain its committed observation receipt for the actual source.
 		var acceptanceErr error
-		if profileRecorderInput(p.Intent) {
+		if logsRecorderInput(p.Intent) {
+			var accepted planning.ContextPlan
+			accepted, acceptanceErr = s.recordingPlan(ctx, p, f)
+			if acceptanceErr == nil {
+				_, _, acceptanceErr = compiler.LogsForContext(accepted)
+			}
+		} else if profileRecorderInput(p.Intent) {
 			var accepted planning.ContextPlan
 			accepted, acceptanceErr = s.recordingPlan(ctx, p, f)
 			if acceptanceErr == nil {
@@ -232,6 +259,9 @@ func (s ContextInvestigation) recordingAssessment(p value.ContextPreview, plan p
 	rp, err := compiler.RecorderPlanForContext(plan)
 	if plan.Input.Profile != nil {
 		rp, err = compiler.ProfilePlanForContext(plan)
+	}
+	if plan.Input.Logs != nil {
+		rp, err = compiler.LogsPlanForContext(plan)
 	}
 	if err != nil {
 		return err

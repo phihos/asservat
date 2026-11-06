@@ -128,7 +128,7 @@ func (s ContextCaseService) getContextCase(ctx context.Context, source identitie
 		if err != nil {
 			return zero, value.ErrUnavailable
 		}
-		if raw != nil && (!rawRecordValid(record, route, caseID) || raw.operation == authorization.ReadPacketQuery && record.NativeType != artifact.RawPCAPNGArtifact || raw.operation == authorization.ReadSyscallQuery && record.NativeType != artifact.SyscallArgumentsArtifact || record.Version != route.Version) {
+		if raw != nil && (!rawRecordValid(record, route, caseID) || raw.operation == authorization.ReadPacketQuery && record.NativeType != artifact.RawPCAPNGArtifact || raw.operation == authorization.ReadLogQuery && record.NativeType != artifact.LogsArtifact || raw.operation == authorization.ReadSyscallQuery && record.NativeType != artifact.SyscallArgumentsArtifact || record.Version != route.Version) {
 			return zero, value.ErrUnavailable
 		}
 		r := record.Retained

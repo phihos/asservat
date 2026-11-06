@@ -43,6 +43,7 @@ const (
 	// (ADR-282); the output is an extract.
 	ReasonHTTPHeaders      = "httpHeaders"
 	ReasonSyscallArguments = "syscallArguments"
+	ReasonLogs             = "logs"
 	// ReasonLiveProfile: live profiling is intrusive for approval purposes
 	// even when the mechanism is an HTTP GET (REQ-PRF-002, ADR-285).
 	ReasonLiveProfile = "liveProfile"
@@ -142,6 +143,7 @@ type RecorderAction struct {
 	// RingMedium is "encryptedDisk" for that medium (ADR-278) and empty for
 	// memory, so existing memory plans serialize exactly as before.
 	RingMedium string `json:",omitempty"`
+	LogStream  string `json:",omitempty"`
 	// Packet actions.
 	PacketProfile, Filter string
 	FilterInstructions    int

@@ -147,6 +147,10 @@ func validAdmission(a value.Admission) bool {
 
 func admissionNativeLimit(a value.Admission) bool {
 	p, r := a.Plan.Input, a.Registration
+	if p.Logs != nil {
+		logs, _, err := planning.LogsForContext(a.Plan)
+		return err == nil && p.Recorder == nil && p.Profile == nil && p.Snapshot == nil && r.NativeLimit == logs.MaxNativeBytes
+	}
 	if p.Profile != nil {
 		profile, _, err := planning.ProfileForContext(a.Plan)
 		return err == nil && p.Recorder == nil && p.Snapshot == nil && r.NativeLimit == profile.MaxBytes
@@ -644,7 +648,7 @@ func (s *ContextAdmissions) admitContextInTransaction(ctx context.Context, q *cu
 		if _, err = registerLocked(ctx, q, p, allocation, r); err != nil {
 			return err
 		}
-		if a.Plan.Input.Profile != nil {
+		if a.Plan.Input.Profile != nil || a.Plan.Input.Logs != nil {
 			if err = reserveProfileStreamLocked(ctx, q, r); err != nil {
 				return err
 			}
@@ -662,8 +666,18 @@ func (s *ContextAdmissions) admitContextInTransaction(ctx context.Context, q *cu
 			}
 			expected.NativeType, expected.DataClass = recordingNativeClass(recording)
 			expected.ActionID, expected.Recording = actionID, &recording
-			if group != nil && group.Composition {
-				expected.CompositionGroup = &artifact.CompositionGroupBinding{ParentCaptureID: group.Preview.CaptureID, ChildIndex: group.ChildIndex, ChildCount: len(group.Preview.CompositionGroup.Children)}
+		}
+		if in.Logs != nil {
+			logs, actionID, err := planning.LogsForContext(a.Plan)
+			if err != nil {
+				return value.ErrInvalid
+			}
+			expected.NativeType, expected.ActionID, expected.Logs, expected.DataClass = artifact.LogsArtifact, actionID, &logs, "raw"
+			if !in.Logs.TriggeredAt.IsZero() {
+				if _, _, policy := authorization.PolicyExecutor(in.Executor); !policy {
+					return value.ErrInvalid
+				}
+				expected.TriggeredAt = in.Logs.TriggeredAt
 			}
 		}
 		if in.Profile != nil {
@@ -691,6 +705,9 @@ func (s *ContextAdmissions) admitContextInTransaction(ctx context.Context, q *cu
 				return value.ErrInvalid
 			}
 			expected.SourceSnapshotManifest = &artifact.SourceSnapshotManifest{CanonicalScope: append(json.RawMessage(nil), a.Plan.CanonicalScope...), Binding: bindingJSON}
+		}
+		if group != nil && group.Composition && (in.Recorder != nil || in.Logs != nil) {
+			expected.CompositionGroup = &artifact.CompositionGroupBinding{ParentCaptureID: group.Preview.CaptureID, ChildIndex: group.ChildIndex, ChildCount: len(group.Preview.CompositionGroup.Children)}
 		}
 		if expected.Validate() != nil {
 			return value.ErrInvalid

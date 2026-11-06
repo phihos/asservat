@@ -65,6 +65,7 @@ const (
 	RecordingProfileUnavailable = "profileUnavailable"
 	RecordingPeersChanged       = "peerMembershipChanged"
 	RecordingPeersStale         = "peerMembershipStale"
+	RecordingTargetGone         = "targetGone"
 )
 
 // RecordingCollection is the region's answer to a collect: still recording,
@@ -74,6 +75,7 @@ const (
 // peerMembershipStale, ADR-283 part 3). Acquired is the queue instant
 // returned at start.
 type RecordingCollection struct {
+	LogsCancellation      *artifact.LogCancellation            `json:",omitempty"`
 	RecordingCancellation *artifact.RecordingCancellation      `json:",omitempty"`
 	ProfileCancellation   *artifact.ProfileCancellation        `json:",omitempty"`
 	SnapshotCancellation  *artifact.SourceSnapshotCancellation `json:",omitempty"`
@@ -88,11 +90,16 @@ type RecordingCollection struct {
 func (c RecordingCollection) Valid(r artifact.Registration) bool {
 	switch c.State {
 	case RecordingPending:
-		return c.RecordingCancellation == nil && c.ProfileCancellation == nil && c.SnapshotCancellation == nil && c.SnapshotCoverage == nil && c.Completion == (artifact.ContextWriterCompletion{}) && c.Failure == ""
+		return c.LogsCancellation == nil && c.RecordingCancellation == nil && c.ProfileCancellation == nil && c.SnapshotCancellation == nil && c.SnapshotCoverage == nil && c.Completion == (artifact.ContextWriterCompletion{}) && c.Failure == ""
 	case RecordingStored:
-		return c.RecordingCancellation == nil && c.ProfileCancellation == nil && c.SnapshotCancellation == nil && !c.Acquired.IsZero() && c.Completion.Valid(r) && !c.Completion.StoredAt.Before(c.Acquired) && c.Failure == ""
+		return c.LogsCancellation == nil && c.RecordingCancellation == nil && c.ProfileCancellation == nil && c.SnapshotCancellation == nil && !c.Acquired.IsZero() && c.Completion.Valid(r) && !c.Completion.StoredAt.Before(c.Acquired) && c.Failure == ""
 	case RecordingCancelled:
 		variants := 0
+		if c.LogsCancellation != nil && c.LogsCancellation.Valid() {
+			variants++
+		} else if c.LogsCancellation != nil {
+			return false
+		}
 		if c.ProfileCancellation != nil && c.ProfileCancellation.Valid() {
 			variants++
 		} else if c.ProfileCancellation != nil {
@@ -110,7 +117,7 @@ func (c RecordingCollection) Valid(r artifact.Registration) bool {
 		}
 		return variants == 1 && c.SnapshotCoverage == nil && c.Completion == (artifact.ContextWriterCompletion{}) && c.Failure == ""
 	case RecordingFailed:
-		return c.RecordingCancellation == nil && c.ProfileCancellation == nil && c.SnapshotCancellation == nil && c.SnapshotCoverage == nil && c.Completion == (artifact.ContextWriterCompletion{}) && (c.Failure == "captureFailed" || c.Failure == "storeUnconfirmed" || c.Failure == RecordingProfilerBusy || c.Failure == RecordingProfileUnavailable || c.Failure == RecordingPeersChanged || c.Failure == RecordingPeersStale)
+		return c.LogsCancellation == nil && c.RecordingCancellation == nil && c.ProfileCancellation == nil && c.SnapshotCancellation == nil && c.SnapshotCoverage == nil && c.Completion == (artifact.ContextWriterCompletion{}) && (c.Failure == "captureFailed" || c.Failure == "storeUnconfirmed" || c.Failure == RecordingProfilerBusy || c.Failure == RecordingProfileUnavailable || c.Failure == RecordingPeersChanged || c.Failure == RecordingPeersStale || c.Failure == RecordingTargetGone)
 	}
 	return false
 }

@@ -1,0 +1,122 @@
+[
+  {
+    "file": "context-storage-environment.json.gz",
+    "originalBytes": 562386,
+    "sha256": "a26f2011f76cf5af914a3f2cfcac627e6e7eab28f90713ca1ccaea2881b067b4"
+  },
+  {
+    "file": "context-storage-kubelet.log.gz",
+    "originalBytes": 32362,
+    "sha256": "bfc1220c31de38b8c363e57556629143f4822c197d2c95265189c8b80a505b0b"
+  },
+  {
+    "file": "context-storage-postgres.log.gz",
+    "originalBytes": 398842,
+    "sha256": "695699cdd40898fa812846c9a604b9dd9f021de9150798316f69c01af6254a56"
+  },
+  {
+    "file": "context-storage-timing.log.gz",
+    "originalBytes": 135284,
+    "sha256": "c36d9318700ec9ac795a0973667990c4887f8956b92e08102ac3f3e3a41fee50"
+  },
+  {
+    "file": "context-storage.log.gz",
+    "originalBytes": 127067,
+    "sha256": "146dd7e153b402fb8f64da088f514893f91c416cb92d4a1ff8377ca662559d19"
+  },
+  {
+    "file": "kept-cleanup-context-l-z5htvo.json.gz",
+    "originalBytes": 136,
+    "sha256": "69ea05deb7d2bcd8557b699c32a310d3280279523dcd60d91119eca68d1e02ec"
+  },
+  {
+    "file": "original-runner.json.gz",
+    "originalBytes": 407,
+    "sha256": "7622a49f83fef1fa428b49a596d6ca41ab4026c688f8bfe571474bbfa1f30d57"
+  },
+  {
+    "file": "root-cleanup-audit.json.gz",
+    "originalBytes": 276,
+    "sha256": "52b87542d8e5e106a3bdcd9819bb6a383cfb4a26ac468fcccc3e6f248e59c6aa"
+  },
+  {
+    "file": "root-source-audit.json.gz",
+    "originalBytes": 1364,
+    "sha256": "451cb3d41d8e059126a3ac64d5f016c83269159e6bca7c5acb217c508db4b3a5"
+  },
+  {
+    "file": "sql-handoff.json.gz",
+    "originalBytes": 6849,
+    "sha256": "e6e4bcc2fe52dd0127e337d99bc44615736c24ce98256b481582ce34f10270e5"
+  },
+  {
+    "file": "sql-native-control-exit.json.gz",
+    "originalBytes": 36,
+    "sha256": "e13a9d56a20f9291189d8110d9f83a681297186bd0c9f3c451585c5dba931c05"
+  },
+  {
+    "file": "sql-native-control-readonly-query.sql.gz",
+    "originalBytes": 1025,
+    "sha256": "88cba654cc10f3338fd53766f08d6193dd691eaa28f65f45fa5ec9d797e7fdbe"
+  },
+  {
+    "file": "sql-native-control.stderr.gz",
+    "originalBytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "file": "sql-native-control.stdout.gz",
+    "originalBytes": 357,
+    "sha256": "c4f1c5ae53000ab683d8aabf11a17599e98417f231cfa40e7d5bb04396757f44"
+  },
+  {
+    "file": "sql-original-readonly-query.sql.gz",
+    "originalBytes": 1414,
+    "sha256": "e1aa26f292dc163b123257c53957fc345f13cd33fad2507da019fb24ea475ff7"
+  },
+  {
+    "file": "sql-readonly-exit.json.gz",
+    "originalBytes": 210,
+    "sha256": "41262353e058a8e99b4820be0c5eb3b7a8bd9bfe36db8369a7189b03698829df"
+  },
+  {
+    "file": "sql-readonly.stderr.gz",
+    "originalBytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "file": "sql-readonly.stdout.gz",
+    "originalBytes": 756,
+    "sha256": "fbf74dc0314ba5615e7c2f44592c3040f3229408f494337da5b2faf6d3a915e1"
+  },
+  {
+    "file": "sql-stream-accounting-exit.json.gz",
+    "originalBytes": 30,
+    "sha256": "d615d21bb57267509a6bcc5e238abfbf942d75d864c2f338aab6a2dc664e90c8"
+  },
+  {
+    "file": "sql-stream-accounting-readonly-query.sql.gz",
+    "originalBytes": 1416,
+    "sha256": "c98a69767a4564f6d9de58f21288cf60953f6036146669470bf2c646a070575b"
+  },
+  {
+    "file": "sql-stream-accounting.stderr.gz",
+    "originalBytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "file": "sql-stream-accounting.stdout.gz",
+    "originalBytes": 166,
+    "sha256": "ec516d7cc7b3ae34257747f63c4ce077b94cd9ecc6138b3346e072286fcd726c"
+  },
+  {
+    "file": "strict-cleanup.json.gz",
+    "originalBytes": 295,
+    "sha256": "008456525bc51efab18d4398f096a71a676c1238da0d1e174016ae984a10f9db"
+  },
+  {
+    "file": "strict-cleanup.log.gz",
+    "originalBytes": 39,
+    "sha256": "fd49e1da5df29bc976de1e2d2773dfa4e8eeb29e99a03038d0c626f457207dc0"
+  }
+]

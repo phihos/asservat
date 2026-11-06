@@ -1,0 +1,50 @@
+{
+  "format": "deterministic-gzip/v1",
+  "members": [
+    {
+      "file": "capacity-unacknowledged-pair-f49bc502-environment.json.gz",
+      "original": "capacity-unacknowledged-pair-f49bc502-environment.json",
+      "originalSHA256": "15a3ae632fcf4f172f1afe85595ac0e85fe9869657879421ddf6163315156e96",
+      "originalBytes": 566895,
+      "compressedSHA256": "b0146e51723764201c7ed09149fc591ad4a78aff0cff2edf3f8f2eae1d27175f",
+      "compressedBytes": 207525,
+      "decompressedByteExact": true
+    },
+    {
+      "file": "capacity-unacknowledged-pair-f49bc502-postgres.log.gz",
+      "original": "capacity-unacknowledged-pair-f49bc502-postgres.log",
+      "originalSHA256": "4748dee8eb50783c4466a7fa7768dc9a42b80fc527cda2e8927ae89d23d8131c",
+      "originalBytes": 19154,
+      "compressedSHA256": "a57d1d424bdbdbf8dc71cff058c258c7c850d0bb940dbf25ee17379f59319713",
+      "compressedBytes": 3120,
+      "decompressedByteExact": true
+    },
+    {
+      "file": "capacity-unacknowledged-pair-f49bc502.log.gz",
+      "original": "capacity-unacknowledged-pair-f49bc502.log",
+      "originalSHA256": "a217197635fa0c071ea2f9bbf948dbdc58afeb9bb90361ebac846d67c99b4c4d",
+      "originalBytes": 22387,
+      "compressedSHA256": "c2690c69d65174c4e5a851459baa4b75a25a0daeaa22b71b3135d16cc644354c",
+      "compressedBytes": 2317,
+      "decompressedByteExact": true
+    },
+    {
+      "file": "capacity-unacknowledged-pair-route-fixed-environment.json.gz",
+      "original": "capacity-unacknowledged-pair-route-fixed-environment.json",
+      "originalSHA256": "3d1cf3ca7651f3edb2c42e9b15cc193aee31487745bec1e6233f8193bfdd4016",
+      "originalBytes": 570784,
+      "compressedSHA256": "729f96aadb15509e1b855c9559fb97a9c9d11ab1e894688a5c26a261c5d87441",
+      "compressedBytes": 207921,
+      "decompressedByteExact": true
+    },
+    {
+      "file": "capacity-unacknowledged-pair-route-fixed.log.gz",
+      "original": "capacity-unacknowledged-pair-route-fixed.log",
+      "originalSHA256": "bc7d2d3ba49c26075ad865ee75fdb8fa513ce4daefbb05a3e8f54dc9751f11ca",
+      "originalBytes": 27586,
+      "compressedSHA256": "7a6ca108eeb800d90456502aebb217c64fdaaa4afc5dd7c1d759431841115ecd",
+      "compressedBytes": 2970,
+      "decompressedByteExact": true
+    }
+  ]
+}

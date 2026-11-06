@@ -58,6 +58,10 @@ type RawSyscallQuerySelectionReader interface {
 	ResolveRawSyscallQuery(context.Context, identities.CurrentIdentity, string, []artifact.Digest) (RawQuerySelection, error)
 }
 
+type RawLogQuerySelectionReader interface {
+	ResolveRawLogQuery(context.Context, identities.CurrentIdentity, string, []artifact.Digest) (RawQuerySelection, error)
+}
+
 type RawQueryRequestInput struct {
 	CaseID          string
 	ArtifactDigests []artifact.Digest
@@ -115,7 +119,7 @@ func (s GrantService) RequestRaw(ctx context.Context, current identities.Current
 	if slices.Contains(in.Operations, value.GrantDownloadOperation) {
 		scopes = append(scopes, "evidence:download")
 	}
-	if slices.Contains(in.Operations, value.GrantPacketQueryOperation) || slices.Contains(in.Operations, value.GrantSyscallQueryOperation) {
+	if slices.Contains(in.Operations, value.GrantPacketQueryOperation) || slices.Contains(in.Operations, value.GrantSyscallQueryOperation) || slices.Contains(in.Operations, value.GrantLogQueryOperation) {
 		scopes = append(scopes, "evidence:raw")
 	}
 	i, err := s.human(ctx, current, scopes...)
@@ -142,7 +146,13 @@ func (s GrantService) RequestRaw(ctx context.Context, current identities.Current
 		return zero, false, ErrGrantUnavailable
 	}
 	var selected RawQuerySelection
-	if slices.Contains(in.Operations, value.GrantSyscallQueryOperation) {
+	if slices.Contains(in.Operations, value.GrantLogQueryOperation) {
+		selector, ok := s.RawSelections.(RawLogQuerySelectionReader)
+		if !ok {
+			return zero, false, ErrGrantUnavailable
+		}
+		selected, err = selector.ResolveRawLogQuery(ctx, current, in.CaseID, in.ArtifactDigests)
+	} else if slices.Contains(in.Operations, value.GrantSyscallQueryOperation) {
 		selector, ok := s.RawSelections.(RawSyscallQuerySelectionReader)
 		if !ok {
 			return zero, false, ErrGrantUnavailable
@@ -161,7 +171,7 @@ func (s GrantService) RequestRaw(ctx context.Context, current identities.Current
 		return zero, false, ErrGrantUnavailable
 	}
 	for _, entry := range selected.Review {
-		if slices.Contains(in.Operations, value.GrantSyscallQueryOperation) && entry.NativeType != artifact.SyscallArgumentsArtifact || slices.Contains(in.Operations, value.GrantPacketQueryOperation) && entry.NativeType != artifact.RawPCAPNGArtifact {
+		if slices.Contains(in.Operations, value.GrantLogQueryOperation) && entry.NativeType != artifact.LogsArtifact || slices.Contains(in.Operations, value.GrantSyscallQueryOperation) && entry.NativeType != artifact.SyscallArgumentsArtifact || slices.Contains(in.Operations, value.GrantPacketQueryOperation) && entry.NativeType != artifact.RawPCAPNGArtifact {
 			return zero, false, ErrGrantUnavailable
 		}
 	}
@@ -312,7 +322,8 @@ func (s GrantService) coveringRawSelection(ctx context.Context, i identity.Ident
 			}
 		}
 		for _, a := range selection.Artifacts {
-			if value.CheckMaterialize(g, a.Output, i.Principal.ClientID, true, s.Now()) != nil {
+			group, err := s.outputGroup(ctx, g, a.Output)
+			if err != nil || value.CheckMaterialize(g, a.Output, i.Principal.ClientID, true, s.Now(), group) != nil {
 				covered = false
 				break
 			}
@@ -344,6 +355,9 @@ func (s GrantService) rawQueryEligibility(ctx context.Context, i identity.Identi
 		if slices.Contains(g.RawQuery.Operations, value.GrantSyscallQueryOperation) {
 			op = value.ReadSyscallQuery
 		}
+		if slices.Contains(g.RawQuery.Operations, value.GrantLogQueryOperation) {
+			op = value.ReadLogQuery
+		}
 	}
 	if !g.Valid() || !RawQueryScopeMatches(g) || ReviewDigest(g, g.Review) != g.ReviewDigest {
 		return value.Result{}, value.ErrGrantInvalid
@@ -373,7 +387,7 @@ func (s GrantService) rawQueryEligibility(ctx context.Context, i identity.Identi
 // rawParentFor first preserves an existing covering collection result grant,
 // then considers exact existing-artifact approvals. CurrentResultAccess carries
 // zero spend; reservations supply the actual use and never guess available bytes.
-func (s GrantService) rawParentFor(ctx context.Context, current identities.CurrentIdentity, scope artifact.DownloadScope, actionID string, use value.GrantUse, preparing bool) (identity.Identity, value.Grant, value.VerifiedOutput, error) {
+func (s GrantService) rawParentFor(ctx context.Context, current identities.CurrentIdentity, scope artifact.DownloadScope, actionID string, use value.GrantUse, preparing bool) (identity.Identity, value.Grant, value.VerifiedOutput, *value.GrantOutputGroup, error) {
 	i, g, legacyErr := s.rawParent(ctx, current, scope)
 	missing := errors.Is(legacyErr, value.ErrApprovalRequired)
 	// A valid grant of another human is not their disclosure authority. A
@@ -382,11 +396,11 @@ func (s GrantService) rawParentFor(ctx context.Context, current identities.Curre
 		missing = true
 	}
 	if legacyErr == nil {
-		output, ok := rawOutputForScope(g, scope, actionID)
+		output, group, ok := s.grantedScopeOutput(ctx, g, scope, actionID)
 		if !ok {
 			legacyErr = value.ErrGrantScope
 		} else if actionID != "" {
-			legacyErr = value.CheckMaterialize(g, output, i.Principal.ClientID, true, s.Now())
+			legacyErr = value.CheckMaterialize(g, output, i.Principal.ClientID, true, s.Now(), group)
 			if preparing && g.Valid() && legacyErr != value.ErrGrantInvalid {
 				r := g.ResultAccess
 				if r == nil || !slices.Contains(r.ActionIDs, output.ActionID) || !slices.Contains(r.ClientIDs, i.Principal.ClientID) || !slices.Contains(r.Operations, value.GrantDownloadOperation) {
@@ -411,29 +425,29 @@ func (s GrantService) rawParentFor(ctx context.Context, current identities.Curre
 			legacyErr = value.ErrGrantPoolExhausted
 		}
 		if legacyErr == nil {
-			return i, g, output, nil
+			return i, g, output, group, nil
 		}
 	}
 	if preparing && (errors.Is(legacyErr, value.ErrGrantExpired) || errors.Is(legacyErr, value.ErrGrantRevoked) || errors.Is(legacyErr, value.ErrGrantDenied) || errors.Is(legacyErr, value.ErrGrantPoolExhausted)) {
 		missing = true
 	}
 	if s.RawStore == nil {
-		return identity.Identity{}, value.Grant{}, value.VerifiedOutput{}, legacyErr
+		return identity.Identity{}, value.Grant{}, value.VerifiedOutput{}, nil, legacyErr
 	}
 	if ctx == nil || ctx.Err() != nil || !s.ready() || !scope.Valid() || scope.RootID != s.RootID {
-		return identity.Identity{}, value.Grant{}, value.VerifiedOutput{}, value.ErrGrantInvalid
+		return identity.Identity{}, value.Grant{}, value.VerifiedOutput{}, nil, value.ErrGrantInvalid
 	}
 	var err error
 	i, err = s.human(ctx, current, "evidence:download")
 	if err != nil {
-		return i, value.Grant{}, value.VerifiedOutput{}, err
+		return i, value.Grant{}, value.VerifiedOutput{}, nil, err
 	}
 	if i.Principal != scope.Principal {
-		return i, value.Grant{}, value.VerifiedOutput{}, value.ErrGrantPrincipal
+		return i, value.Grant{}, value.VerifiedOutput{}, nil, value.ErrGrantPrincipal
 	}
 	candidates, err := s.RawStore.RawQueryCandidates(ctx, scope, use)
 	if err != nil && !errors.Is(err, ErrGrantNotFound) {
-		return i, value.Grant{}, value.VerifiedOutput{}, ErrGrantUnavailable
+		return i, value.Grant{}, value.VerifiedOutput{}, nil, ErrGrantUnavailable
 	}
 	incomplete := false
 	for _, candidate := range candidates {
@@ -453,13 +467,13 @@ func (s GrantService) rawParentFor(ctx context.Context, current identities.Curre
 		if (use.Bytes > 0 || use.Operations > 0) && !value.PoolCovers(candidate, use) {
 			continue
 		}
-		return i, candidate, output, nil
+		return i, candidate, output, nil, nil
 	}
 	if preparing && missing && !incomplete {
-		return i, value.Grant{}, value.VerifiedOutput{}, value.ErrApprovalRequired
+		return i, value.Grant{}, value.VerifiedOutput{}, nil, value.ErrApprovalRequired
 	}
 	if preparing && incomplete {
-		return i, value.Grant{}, value.VerifiedOutput{}, ErrGrantUnavailable
+		return i, value.Grant{}, value.VerifiedOutput{}, nil, ErrGrantUnavailable
 	}
-	return i, value.Grant{}, value.VerifiedOutput{}, legacyErr
+	return i, value.Grant{}, value.VerifiedOutput{}, nil, legacyErr
 }

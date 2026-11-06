@@ -2891,14 +2891,23 @@
         "maximum": 100000
       },
       "d19": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "actionID": {
+            "$ref": "#/$defs/d20"
+          },
+          "value": {},
+          "field": {}
+        },
+        "required": [
+          "actionID",
+          "field",
+          "value"
+        ],
         "oneOf": [
           {
-            "type": "object",
-            "additionalProperties": false,
             "properties": {
-              "actionID": {
-                "$ref": "#/$defs/d20"
-              },
               "field": {
                 "const": "packetPeers"
               },
@@ -3093,280 +3102,143 @@
                   "maxStaleness"
                 ]
               }
-            },
-            "required": [
-              "actionID",
-              "field",
-              "value"
-            ]
+            }
           },
           {
-            "type": "object",
-            "additionalProperties": false,
             "properties": {
-              "actionID": {
-                "$ref": "#/$defs/d20"
-              },
               "field": {
                 "const": "packetFilter"
               },
               "value": {
                 "$ref": "#/$defs/d21"
               }
-            },
-            "required": [
-              "actionID",
-              "field",
-              "value"
-            ]
+            }
           },
           {
-            "type": "object",
-            "additionalProperties": false,
             "properties": {
-              "actionID": {
-                "$ref": "#/$defs/d20"
-              },
               "field": {
                 "const": "packetBefore"
               },
               "value": {
                 "$ref": "#/$defs/d22"
               }
-            },
-            "required": [
-              "actionID",
-              "field",
-              "value"
-            ]
+            }
           },
           {
-            "type": "object",
-            "additionalProperties": false,
             "properties": {
-              "actionID": {
-                "$ref": "#/$defs/d20"
-              },
               "field": {
                 "const": "packetAfter"
               },
               "value": {
                 "$ref": "#/$defs/d23"
               }
-            },
-            "required": [
-              "actionID",
-              "field",
-              "value"
-            ]
+            }
           },
           {
-            "type": "object",
-            "additionalProperties": false,
             "properties": {
-              "actionID": {
-                "$ref": "#/$defs/d20"
-              },
               "field": {
                 "const": "packetRing"
               },
               "value": {
                 "$ref": "#/$defs/d12"
               }
-            },
-            "required": [
-              "actionID",
-              "field",
-              "value"
-            ]
+            }
           },
           {
-            "type": "object",
-            "additionalProperties": false,
             "properties": {
-              "actionID": {
-                "$ref": "#/$defs/d20"
-              },
               "field": {
-                "const": "profileDuration"
+                "enum": [
+                  "profileDuration",
+                  "actionTimeout"
+                ]
               },
               "value": {
                 "$ref": "#/$defs/d8"
               }
-            },
-            "required": [
-              "actionID",
-              "field",
-              "value"
-            ]
+            }
           },
           {
-            "type": "object",
-            "additionalProperties": false,
             "properties": {
-              "actionID": {
-                "$ref": "#/$defs/d20"
-              },
               "field": {
                 "const": "syscallFilter"
               },
               "value": {
                 "$ref": "#/$defs/d24"
               }
-            },
-            "required": [
-              "actionID",
-              "field",
-              "value"
-            ]
+            }
           },
           {
-            "type": "object",
-            "additionalProperties": false,
             "properties": {
-              "actionID": {
-                "$ref": "#/$defs/d20"
-              },
               "field": {
                 "const": "syscallMode"
               },
               "value": {
                 "$ref": "#/$defs/d25"
               }
-            },
-            "required": [
-              "actionID",
-              "field",
-              "value"
-            ]
+            }
           },
           {
-            "type": "object",
-            "additionalProperties": false,
             "properties": {
-              "actionID": {
-                "$ref": "#/$defs/d20"
-              },
               "field": {
                 "const": "syscallBefore"
               },
               "value": {
                 "$ref": "#/$defs/d26"
               }
-            },
-            "required": [
-              "actionID",
-              "field",
-              "value"
-            ]
+            }
           },
           {
-            "type": "object",
-            "additionalProperties": false,
             "properties": {
-              "actionID": {
-                "$ref": "#/$defs/d20"
-              },
               "field": {
                 "const": "syscallAfter"
               },
               "value": {
                 "$ref": "#/$defs/d27"
               }
-            },
-            "required": [
-              "actionID",
-              "field",
-              "value"
-            ]
+            }
           },
           {
-            "type": "object",
-            "additionalProperties": false,
             "properties": {
-              "actionID": {
-                "$ref": "#/$defs/d20"
-              },
               "field": {
                 "const": "syscallRing"
               },
               "value": {
                 "$ref": "#/$defs/d28"
               }
-            },
-            "required": [
-              "actionID",
-              "field",
-              "value"
-            ]
+            }
           },
           {
-            "type": "object",
-            "additionalProperties": false,
             "properties": {
-              "actionID": {
-                "$ref": "#/$defs/d20"
-              },
               "field": {
                 "const": "syscallArguments"
               },
               "value": {
                 "$ref": "#/$defs/d29"
               }
-            },
-            "required": [
-              "actionID",
-              "field",
-              "value"
-            ]
+            }
           },
           {
-            "type": "object",
-            "additionalProperties": false,
             "properties": {
-              "actionID": {
-                "$ref": "#/$defs/d20"
-              },
               "field": {
                 "const": "syscallMaxEvents"
               },
               "value": {
                 "$ref": "#/$defs/d30"
               }
-            },
-            "required": [
-              "actionID",
-              "field",
-              "value"
-            ]
+            }
           },
           {
-            "type": "object",
-            "additionalProperties": false,
             "properties": {
-              "actionID": {
-                "$ref": "#/$defs/d20"
-              },
               "field": {
                 "const": "syscallRate"
               },
               "value": {
                 "$ref": "#/$defs/d31"
               }
-            },
-            "required": [
-              "actionID",
-              "field",
-              "value"
-            ]
+            }
           },
           {
-            "type": "object",
-            "additionalProperties": false,
             "properties": {
-              "actionID": {
-                "$ref": "#/$defs/d20"
-              },
               "field": {
                 "const": "actionMaxBytes"
               },
@@ -3375,40 +3247,10 @@
                 "minimum": 1,
                 "maximum": 1099511627776
               }
-            },
-            "required": [
-              "actionID",
-              "field",
-              "value"
-            ]
+            }
           },
           {
-            "type": "object",
-            "additionalProperties": false,
             "properties": {
-              "actionID": {
-                "$ref": "#/$defs/d20"
-              },
-              "field": {
-                "const": "actionTimeout"
-              },
-              "value": {
-                "$ref": "#/$defs/d8"
-              }
-            },
-            "required": [
-              "actionID",
-              "field",
-              "value"
-            ]
-          },
-          {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "actionID": {
-                "$ref": "#/$defs/d20"
-              },
               "field": {
                 "const": "actionExecutionMode"
               },
@@ -3418,12 +3260,35 @@
                   "ongoing"
                 ]
               }
-            },
-            "required": [
-              "actionID",
-              "field",
-              "value"
-            ]
+            }
+          },
+          {
+            "properties": {
+              "field": {
+                "enum": [
+                  "logBefore",
+                  "logAfter"
+                ]
+              },
+              "value": {
+                "type": "string",
+                "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
+                "maxLength": 16
+              }
+            }
+          },
+          {
+            "properties": {
+              "field": {
+                "const": "logStream"
+              },
+              "value": {
+                "type": "string",
+                "enum": [
+                  "both"
+                ]
+              }
+            }
           }
         ]
       },

@@ -55,6 +55,7 @@ func TestCaseProjectionDiscriminatesVerifiedNativeFormat(t *testing.T) {
 		{"http-extract", "packetCapture", artifact.HTTPHeadersArtifact, "extract", artifact.HTTPHeadersFormat},
 		{"pprof", "profile", artifact.PprofArtifact, "raw", artifact.PprofFormat},
 		{"go-trace", "profile", artifact.GoTraceArtifact, "raw", artifact.GoTraceFormat},
+		{"logs", "logs", artifact.LogsArtifact, "raw", artifact.LogFormat},
 		{"context", "context", artifact.PodStatusArtifact, "metadata", artifact.ContextFormat},
 		{"context-raw", "context", artifact.PodStatusArtifact, "raw", artifact.ContextFormat},
 		{"unknown-native", "profile", "unknown", "raw", ""},
@@ -80,6 +81,9 @@ func TestCaseProjectionDiscriminatesVerifiedNativeFormat(t *testing.T) {
 				t.Fatal("incorrect public case", string(reply.Body))
 			}
 			a := envelope.Data.Artifacts[0]
+			if tc.name == "logs" && (a.Kind != "logs" || a.Completeness != "unknown") {
+				t.Fatal("verified logs mislabeled", a.Kind)
+			}
 			if a.NativeFormat != tc.want || strings.Contains(string(reply.Body), `"native_format"`) != (tc.want != "") {
 				t.Fatal("incorrect verified format", string(reply.Body))
 			}

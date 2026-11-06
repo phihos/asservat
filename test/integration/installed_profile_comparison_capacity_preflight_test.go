@@ -11,7 +11,7 @@ import (
 // Only this focus reallocates existing synthetic pool objects. Total objects,
 // every byte limit and production defaults remain unchanged.
 func installedCapacityObjectPartitions() (system, burst int64) {
-	if installedJourneyFocus() == "profile-comparison" {
+	if installedJourneyFocus() == "profile-comparison" || installedLogsFocus() {
 		return 20000, 30000
 	}
 	return 10000, 40000

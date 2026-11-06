@@ -2,10 +2,13 @@ package postgres
 
 import (
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
+	"asservat.local/asservat/internal/application/evidence"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/authorization"
+	"asservat.local/asservat/internal/domain/identity"
 	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 )
@@ -130,14 +133,14 @@ func TestContextPlanRequiresExactFiniteNativeControlAndStopBacking(t *testing.T)
 
 func TestNativeDownloadPlanUsesAcceptedTypeAndSize(t *testing.T) {
 	ceilings := ContextDownloadPlanLimits{OutputLimit: artifact.ProfileDownloadOutputBytes, ReadLimit: artifact.ProfileDownloadReadBytes, RequestLimit: 4, Duration: 5 * time.Minute}
-	for _, name := range []string{artifact.PodStatusArtifact, artifact.PCAPNGArtifact, artifact.HTTPHeadersArtifact, artifact.PprofArtifact, artifact.GoTraceArtifact} {
+	for _, name := range []string{artifact.PodStatusArtifact, artifact.PCAPNGArtifact, artifact.RawPCAPNGArtifact, artifact.SyscallRecordsArtifact, artifact.SyscallArgumentsArtifact, artifact.HTTPHeadersArtifact, artifact.LogsArtifact, artifact.PprofArtifact, artifact.GoTraceArtifact} {
 		typ, _ := artifact.LookupNativeType(name)
 		for _, size := range []int64{1, min(typ.MaxBytes, 16<<20), typ.MaxBytes} {
 			got, err := boundedNativeDownloadPlan(ceilings, typ, size)
 			if err != nil || !got.valid() {
 				t.Fatal(name, size, got, err)
 			}
-			if name == artifact.PodStatusArtifact || name == artifact.PCAPNGArtifact || name == artifact.HTTPHeadersArtifact {
+			if name != artifact.LogsArtifact && name != artifact.PprofArtifact && name != artifact.GoTraceArtifact {
 				if got.OutputLimit != 16<<20 || got.ReadLimit != 24<<20 {
 					t.Fatal("small source inflated to profile reservation", got)
 				}
@@ -156,5 +159,57 @@ func TestNativeDownloadPlanUsesAcceptedTypeAndSize(t *testing.T) {
 	old.ReadLimit = 24 << 20
 	if _, err := boundedNativeDownloadPlan(old, typ, artifact.MaxGoTraceBytes); err == nil {
 		t.Fatal("old installation ceiling silently enlarged")
+	}
+}
+
+// Compose the actual bounded plan, audited metadata accounting and domain
+// response admission. Authority facts are synthetic; this does not read or
+// decrypt managed evidence or qualify an installed native transfer.
+func TestNativeDownloadPlanFundsResponseAfterMetadata(t *testing.T) {
+	ceilings := ContextDownloadPlanLimits{OutputLimit: artifact.ProfileDownloadOutputBytes, ReadLimit: artifact.ProfileDownloadReadBytes, RequestLimit: 4, Duration: 5 * time.Minute}
+	for _, name := range []string{artifact.LogsArtifact, artifact.PprofArtifact, artifact.GoTraceArtifact} {
+		typ, ok := artifact.LookupNativeType(name)
+		if !ok {
+			t.Fatal("registered native type missing", name)
+		}
+		for _, size := range []int64{1, 1 << 20, typ.MaxBytes} {
+			t.Run(fmt.Sprintf("%s/%d", name, size), func(t *testing.T) {
+				plan, err := boundedNativeDownloadPlan(ceilings, typ, size)
+				if err != nil {
+					t.Fatal("accepted native plan", err)
+				}
+				now := time.Date(2026, 11, 6, 0, 0, 0, 0, time.UTC)
+				const id = "10000000-0000-4000-8000-000000000001"
+				authority := artifact.DownloadAuthority{Scope: artifact.DownloadScope{RootID: id, ArtifactID: id, CaptureID: id, ClusterID: id, NamespaceUID: "ns", WorkloadUID: "workload", PodUID: "pod", Version: artifact.Digest{1}, Principal: identity.Principal{Issuer: "https://id.invalid", Subject: "dev", ClientID: "console", Kind: identity.Human}}, PermissionEpoch: id, PermissionSequence: 1, ProjectionDigest: artifact.Digest{2}, DecisionDigest: artifact.Digest{3}, IdentityRevision: identity.Revision{UID: "policy", Generation: 1, Digest: artifact.Digest{4}}, CheckedAt: now, ValidUntil: now.Add(5 * time.Second), AccessUntil: now.Add(time.Hour)}
+				session := artifact.DownloadSession{ID: id, AllocationID: id, Scope: authority.Scope, RequestDigest: artifact.Digest{5}, State: artifact.DownloadPreparing, CreatedAt: now, Deadline: now.Add(plan.Duration), OutputLimit: plan.OutputLimit, ReadLimit: plan.ReadLimit, RequestLimit: plan.RequestLimit}
+				session, err = session.Start(authority, artifact.DownloadBatch{ID: id, Purpose: artifact.DownloadMetadata, ReadBytes: evidence.ContextDownloadReadWork}, now)
+				if err != nil {
+					t.Fatal("original metadata admission", err)
+				}
+				session.Active.AuditAcknowledged = true
+				session, err = session.Finish(id, 1, 0, true, false, now)
+				if err != nil || session.State != artifact.DownloadReady || session.ChargedRead != evidence.ContextDownloadReadWork || session.ChargedOutput != 0 || session.Requests != 1 {
+					t.Fatal("original metadata charge/readiness", session, err)
+				}
+				response := artifact.DownloadResponse{ID: id, SessionID: id, OwnerID: id, Plan: artifact.DownloadResponsePlan{Version: artifact.DownloadResponseVersion, Selection: artifact.DownloadSelection{Length: size}, WholeFile: true, WindowReadLimit: evidence.NativeWindowReadWork(typ)}, Until: session.Deadline}
+				after, admitted, err := session.BeginResponse(authority, response, now)
+				if err != nil || !admitted.Valid() || after.Generation != 2 || after.ChargedRead != session.ChargedRead || after.Deadline != session.Deadline || after.ReadLimit != plan.ReadLimit {
+					t.Fatalf("bounded native plan cannot fund first response after metadata: remaining=%d response=%d error=%v", session.ReadLimit-session.ChargedRead, response.Plan.ReadBytes(), err)
+				}
+				windows := (size-1)/artifact.DownloadWindowBytes + 1
+				wantReads := evidence.ContextDownloadReadWork + 2*windows*evidence.NativeWindowReadWork(typ)
+				if plan.ReadLimit != wantReads || plan.OutputLimit != max(artifact.MaxContextBytes, 2*size) || plan.RequestLimit != ceilings.RequestLimit || plan.Duration != ceilings.Duration {
+					t.Fatal("native plan lost exact original bounds", plan)
+				}
+				for _, ceiling := range []ContextDownloadPlanLimits{
+					{OutputLimit: plan.OutputLimit - 1, ReadLimit: ceilings.ReadLimit, RequestLimit: ceilings.RequestLimit, Duration: ceilings.Duration},
+					{OutputLimit: ceilings.OutputLimit, ReadLimit: wantReads - 1, RequestLimit: ceilings.RequestLimit, Duration: ceilings.Duration},
+				} {
+					if _, err := boundedNativeDownloadPlan(ceiling, typ, size); err == nil {
+						t.Fatal("administrator ceiling silently increased", ceiling)
+					}
+				}
+			})
+		}
 	}
 }

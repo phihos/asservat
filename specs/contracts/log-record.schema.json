@@ -1,0 +1,298 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/log-record.schema.json",
+  "title": "Saved raw log record v1",
+  "description": "One JSONL record. Stream-order, exact counters, original byte offsets, canonical base64, timestamp-prefix and full EOF checks are additional native codec invariants. Complete fetch never asserts complete historical log coverage.",
+  "$defs": {
+    "header": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "record",
+        "format",
+        "pod_uid",
+        "window_start",
+        "window_end",
+        "origins"
+      ],
+      "properties": {
+        "record": {
+          "const": "header"
+        },
+        "format": {
+          "const": "asservat-logs/v1"
+        },
+        "pod_uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "window_start": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "window_end": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "origins": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 128
+        }
+      }
+    },
+    "origin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "record",
+        "origin_id",
+        "container_kind",
+        "container_name",
+        "source",
+        "stream",
+        "runtime_id",
+        "restart_count"
+      ],
+      "properties": {
+        "record": {
+          "const": "origin"
+        },
+        "origin_id": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 127
+        },
+        "container_kind": {
+          "enum": [
+            "regular",
+            "init",
+            "ephemeral"
+          ]
+        },
+        "container_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 63,
+          "pattern": "^[a-z0-9](?:[-a-z0-9]*[a-z0-9])?$"
+        },
+        "source": {
+          "enum": [
+            "current",
+            "previous"
+          ]
+        },
+        "stream": {
+          "const": "combined"
+        },
+        "runtime_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "restart_count": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 4294967295
+        }
+      }
+    },
+    "fragment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "record",
+        "origin_id",
+        "line",
+        "offset",
+        "line_offset",
+        "continuation",
+        "end_line",
+        "source_time",
+        "data"
+      ],
+      "properties": {
+        "record": {
+          "const": "fragment"
+        },
+        "origin_id": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 127
+        },
+        "line": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 67108864
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 67108864
+        },
+        "line_offset": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 67108864
+        },
+        "continuation": {
+          "type": "boolean"
+        },
+        "end_line": {
+          "type": "boolean"
+        },
+        "source_time": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time",
+          "maxLength": 64
+        },
+        "data": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 5464,
+          "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+        }
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "record",
+        "origin_id",
+        "fetch_outcome",
+        "fetch_started_at",
+        "fetch_finished_at",
+        "source_bytes",
+        "fragments",
+        "lines",
+        "gaps"
+      ],
+      "properties": {
+        "record": {
+          "const": "coverage"
+        },
+        "origin_id": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 127
+        },
+        "fetch_outcome": {
+          "enum": [
+            "complete",
+            "partial",
+            "unavailable"
+          ]
+        },
+        "fetch_started_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "fetch_finished_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "source_bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 67108864
+        },
+        "fragments": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 67108864
+        },
+        "lines": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 67108864
+        },
+        "gaps": {
+          "type": "array",
+          "maxItems": 7,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "sourceUnavailable",
+              "previousUnavailable",
+              "rotationUnknown",
+              "sourceChanged",
+              "timedOut",
+              "outputFull",
+              "timestampUnknown"
+            ]
+          }
+        }
+      }
+    },
+    "footer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "record",
+        "origins",
+        "source_bytes",
+        "fragments",
+        "lines"
+      ],
+      "properties": {
+        "record": {
+          "const": "footer"
+        },
+        "origins": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 128
+        },
+        "source_bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 67108864
+        },
+        "fragments": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 67108864
+        },
+        "lines": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 67108864
+        }
+      }
+    }
+  },
+  "oneOf": [
+    {
+      "$ref": "https://asservat.io/spec/v1/log-record.schema.json#/$defs/header"
+    },
+    {
+      "$ref": "https://asservat.io/spec/v1/log-record.schema.json#/$defs/origin"
+    },
+    {
+      "$ref": "https://asservat.io/spec/v1/log-record.schema.json#/$defs/fragment"
+    },
+    {
+      "$ref": "https://asservat.io/spec/v1/log-record.schema.json#/$defs/coverage"
+    },
+    {
+      "$ref": "https://asservat.io/spec/v1/log-record.schema.json#/$defs/footer"
+    }
+  ]
+}

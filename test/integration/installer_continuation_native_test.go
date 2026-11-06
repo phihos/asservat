@@ -109,7 +109,7 @@ func prepareInstallerContinuationNative(t *testing.T, ctx context.Context, api k
 		clients = append(clients, contracts.IdentityClient{ID: "mcp", Kind: "human", ClassQualified: true})
 	}
 	var approvals *contracts.IdentityApprovals
-	if installedRecordingFocus() {
+	if installedRecordingFocus() || installedLogsFocus() {
 		// Real fresh password authentication at the reference provider's LoA1;
 		// this fixture does not configure or claim MFA/LoA2.
 		approvals = &contracts.IdentityApprovals{RequireRecordingApproval: installedJourneyFocus() != "policy-recording" && installedJourneyFocus() != "policy-arguments" && installedJourneyFocus() != "policy-profile" && !installedOngoingFocus(), StepUp: &contracts.IdentityStepUp{ACRValues: []string{"1"}, MaxAgeSeconds: 300}}
@@ -539,6 +539,12 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 				}
 			}()
 		}
+		if installedLogsFocus() {
+			t.Run("manual-logs", func(t *testing.T) {
+				qualifyInstalledManualLogs(t, ctx, admin, api, p.RootID, identity, publicRoot, publicAddress, origin, f.Clusters[1].Config, cluster, namespace, workload, diagnose)
+			})
+			return
+		}
 		if installedJourneyFocus() == "policy-profile" {
 			t.Run("policy-profile", func(t *testing.T) {
 				qualifyInstalledPolicyProfile(t, ctx, admin, p.RootID, identity, publicRoot, publicAddress, origin, f.Clusters[1].Config, diagnose)
@@ -719,7 +725,7 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 	}
 	hubKubeconfig := installedUnifiedRunnerKubeconfig(t, f.Clusters[0].Config, desired)
 	qualifyRegionalInstall(t, ctx, f, 1, admin, runnerAPI, api, hubKubeconfig, desired.TargetNamespace, issuer, journey, providers, offerMap.Data[contracts.RegionalOfferFile], installation)
-	if focus := installedJourneyFocus(); focus == "restart" || focus == "journey" || focus == "browser" || focus == "upgrade" || focus == "policy" || focus == "alert" || focus == "logresource" || focus == "chain" || focus == "share" || installedRecordingFocus() {
+	if focus := installedJourneyFocus(); focus == "restart" || focus == "journey" || focus == "browser" || focus == "upgrade" || focus == "policy" || focus == "alert" || focus == "logresource" || focus == "chain" || focus == "share" || installedRecordingFocus() || installedLogsFocus() {
 		t.Log("focused " + focus + " run complete: the second workload cluster and replay checks were not run")
 		return
 	}
@@ -1073,6 +1079,9 @@ func nativeCapacityProfile() *contracts.InstallerCapacitySettings {
 	// plus history, deriving 12 protocol records. Qualify those records upfront;
 	// its single pprof summary still charges ten conservative read-work units.
 	records := int64(8)
+	if installedLogsFocus() {
+		records = installedLogsQueryUnits
+	}
 	if installedJourneyFocus() == "manual-raw" {
 		// Two summaries (4 units) plus two independently paid packet queries
 		// (8 units) fit an originally accepted sixteen-record backing.

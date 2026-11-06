@@ -161,7 +161,7 @@ func (p resolvedProfile) wire(componentID string) wireResolved {
 // Builtin evidence kinds available as composition components in this release.
 // process-context and http-headers stay unavailable until their recorders or
 // action kinds exist (plan §2.2); go-cpu plans in preview (ADR-285).
-var builtinNames = []string{"network-connections", "syscall-activity", "go-cpu"}
+var builtinNames = []string{"network-connections", "syscall-activity", "go-cpu", "finite-logs"}
 
 func strict(b []byte, out any) error {
 	d := json.NewDecoder(bytes.NewReader(b))
@@ -285,6 +285,8 @@ func evidenceType(kind string) string {
 		return "syscallTrace"
 	case "profile":
 		return "profile"
+	case "logs":
+		return "logs"
 	}
 	return ""
 }
@@ -360,6 +362,7 @@ const (
 
 // editBinding maps a registered field to its action kinds (capture-composition x-field-bindings).
 var editBinding = map[string][]string{
+	"logBefore": {"logs"}, "logAfter": {"logs"}, "logStream": {"logs"},
 	"packetPeers": {"packetCapture"}, "packetFilter": {"packetCapture"}, "packetBefore": {"packetCapture"}, "packetAfter": {"packetCapture"}, "packetRing": {"packetCapture"},
 	"processSelector": {"liveCore"}, "processBatch": {"liveCore"}, "profileDuration": {"profile"},
 	"syscallFilter": {"syscallTrace"}, "syscallMode": {"syscallTrace"}, "syscallBefore": {"syscallTrace"}, "syscallAfter": {"syscallTrace"}, "syscallRing": {"syscallTrace"},
@@ -376,6 +379,7 @@ type expandedAction struct {
 	// profile is a profile action (ADR-285); bindings are its component's
 	// expanded endpoint bindings and endpoint the region's frozen answer.
 	profile  *profileParameters
+	logs     *logsParameters
 	bindings []endpointBinding
 	endpoint *targets.ProfileEndpointResolution
 	filter   *value.CompiledFilter
@@ -466,6 +470,12 @@ func applyEdit(path string, e value.ProfileEdit, a *expandedAction) error {
 		a.syscall.Arguments, err = json.Marshal(e.SyscallArguments)
 	case "profileDuration":
 		a.profile.Duration, err = text()
+	case "logBefore":
+		a.logs.Before, err = text()
+	case "logAfter":
+		a.logs.After, err = text()
+	case "logStream":
+		a.logs.Stream, err = text()
 	case "syscallFilter":
 		if e.Syscalls == nil {
 			return refuse(value.CompositionInvalid, path, "syscallFilter takes {mode: all} or {mode: include, names: [...]}")
@@ -648,6 +658,9 @@ func validRing(path string, r ring, before time.Duration) error {
 // normalize resolves the execution mode and validates one expanded action
 // against the action-lifecycle and mechanism rules as a whole.
 func normalize(path string, a *expandedAction, compiler FilterCompiler, pc *peerContext) error {
+	if a.logs != nil {
+		return normalizeLogs(path, a)
+	}
 	if a.profile != nil {
 		return normalizeProfile(path, a)
 	}
@@ -932,6 +945,9 @@ func expand(c value.ProfileComposition, compiler FilterCompiler, pc *peerContext
 						x.profile.Source.ProfileRef = b
 					}
 				}
+			case "logs":
+				x.logs = &logsParameters{}
+				err = strict(a.Parameters, x.logs)
 			default:
 				err = value.ErrInvalid
 			}
@@ -1212,6 +1228,9 @@ func normalizedRecorderAction(x expandedAction, componentID string) (recipeActio
 			}
 		}
 		rr = x.packet.Ring
+	} else if x.logs != nil {
+		params = x.logs
+		summary.Before, summary.After, summary.LogStream = x.logs.Before, x.logs.After, x.logs.Stream
 	} else if x.profile != nil {
 		params = x.profile
 		profileSummary(&summary, x.profile)
@@ -1328,7 +1347,7 @@ func CompileRecorder(in value.RecorderInput, filters FilterCompiler, now time.Ti
 		if x.endpoint != nil {
 			scope.ProfileEndpoints = append(scope.ProfileEndpoints, endpointRecord(id, *x.endpoint))
 		}
-		if x.profile != nil {
+		if x.profile != nil || x.logs != nil {
 			// ADR-284/285: pprof and execution traces are class raw.
 			approval.DataClass = "raw"
 		}
@@ -1486,6 +1505,12 @@ func RecorderScopeSummary(scope []byte) ([]value.RecorderAction, *value.Recorder
 					s.EndpointDigest = e.EndpointDigest
 				}
 			}
+		case "logs":
+			var p logsParameters
+			if strict(a.Parameters, &p) != nil {
+				return nil, nil, value.ErrInvalid
+			}
+			s.Before, s.After, s.LogStream = p.Before, p.After, p.Stream
 		default:
 			return nil, nil, value.ErrInvalid
 		}

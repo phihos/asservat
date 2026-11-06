@@ -14,9 +14,9 @@ ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "specs/contracts"
 DEST = ROOT / "internal/contracts/investigation-schemas"
 PREFIX = "https://asservat.io/spec/v1/"
-NAMES = ["cancel_capture", "list_recordings", "preview_recording_save", "list_diagnostics", "preview_capture", "request_capture", "resolve_capture_request", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "cancel_artifact_download", "get_file_excerpt", "get_query_result", "activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share", "explain_access", "list_capture_history", "get_capture_settings", "preview_access_change", "transfer_share", "stop_future_sharing", "preview_retention_change", "request_policy_grant", "request_raw_access", "get_grant", "list_reviews", "decide_review", "revoke_grant", "list_capture_profiles", "get_capture_profile", "get_http_headers", "get_profile_summary", "get_pcap_summary", "pcap_query", "compare_profiles", "get_syscall_summary", "get_syscall_events", "syscall_query"]
+NAMES = ["cancel_capture", "list_recordings", "preview_recording_save", "list_diagnostics", "preview_capture", "request_capture", "resolve_capture_request", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "cancel_artifact_download", "get_file_excerpt", "get_query_result", "activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share", "explain_access", "list_capture_history", "get_capture_settings", "preview_access_change", "transfer_share", "stop_future_sharing", "preview_retention_change", "request_policy_grant", "request_raw_access", "get_grant", "list_reviews", "decide_review", "revoke_grant", "list_capture_profiles", "get_capture_profile", "get_http_headers", "get_profile_summary", "get_pcap_summary", "pcap_query", "compare_profiles", "get_syscall_summary", "get_syscall_events", "syscall_query", "get_logs"]
 
-RECORDER_EDITS = ["packetPeers", "packetFilter", "packetBefore", "packetAfter", "packetRing", "syscallFilter", "syscallMode", "syscallBefore", "syscallAfter", "syscallRing", "syscallArguments", "syscallMaxEvents", "syscallRate", "actionMaxBytes", "actionTimeout", "actionExecutionMode", "profileDuration"]
+RECORDER_EDITS = ["packetPeers", "packetFilter", "packetBefore", "packetAfter", "packetRing", "syscallFilter", "syscallMode", "syscallBefore", "syscallAfter", "syscallRing", "syscallArguments", "syscallMaxEvents", "syscallRate", "actionMaxBytes", "actionTimeout", "actionExecutionMode", "profileDuration", "logBefore", "logAfter", "logStream"]
 
 
 def history_subset(name, tool):
@@ -144,6 +144,35 @@ def main():
         if o["properties"]["field"]["const"] == "packetPeers":
             o["properties"]["value"] = peers
 
+    # Overrides with identical value bounds differ only in their field tag.
+    # Represent those disjoint tags as one enum branch, retaining the exact
+    # object/value constraints while avoiding repeated schemas in discovery.
+    groups = {}
+    for override in overrides:
+        shape = copy.deepcopy(override)
+        field = shape["properties"].pop("field")["const"]
+        key = json.dumps(shape, sort_keys=True, separators=(",", ":"))
+        groups.setdefault(key, (shape, []))[1].append(field)
+    compact = []
+    for shape, fields in groups.values():
+        shape["properties"]["field"] = {"enum": fields} if len(fields) > 1 else {"const": fields[0]}
+        compact.append(shape)
+    # Object shape and action ID are common to every branch. Keep them outside
+    # oneOf; each branch then constrains only its field tag and typed value.
+    override_object = copy.deepcopy(compact[0])
+    override_object["properties"]["field"] = {}
+    override_object["properties"]["value"] = {}
+    branches = []
+    for shape in compact:
+        check = copy.deepcopy(shape)
+        check["properties"]["field"] = {}
+        check["properties"]["value"] = {}
+        if check != override_object:
+            raise ValueError("Override object bounds differ; preserve the distinct schema")
+        branches.append({"properties": {k: shape["properties"][k] for k in ("field", "value")}})
+    override_object["oneOf"] = branches
+    composition["$defs"]["override"] = override_object
+
     def localize(root):
         definitions, known = {}, {}
 
@@ -210,7 +239,7 @@ def main():
                 data["properties"]["logical_path"] = {"const": "pod-status.txt"}
                 data["properties"]["lines"]["maxItems"] = 14
             else:
-                data["properties"]["tool_name"] = {"enum": ["get_file_excerpt", "get_http_headers", "get_profile_summary", "get_pcap_summary", "pcap_query", "compare_profiles", "get_syscall_summary", "get_syscall_events", "syscall_query"]}
+                data["properties"]["tool_name"] = {"enum": ["get_file_excerpt", "get_http_headers", "get_profile_summary", "get_pcap_summary", "pcap_query", "compare_profiles", "get_syscall_summary", "get_syscall_events", "syscall_query", "get_logs"]}
                 # The Go validator additionally applies the original output
                 # schema and relational request/timing checks to this object.
             output["allOf"] = [{"oneOf": branches}]
@@ -218,7 +247,7 @@ def main():
             description["outputSchema"] = localize(output)
             result[name + ".json"] = (json.dumps(description, indent=2) + "\n").encode()
             continue
-        if name in ("get_http_headers", "get_profile_summary", "get_pcap_summary", "pcap_query", "compare_profiles", "get_syscall_summary", "get_syscall_events", "syscall_query"):
+        if name in ("get_http_headers", "get_profile_summary", "get_pcap_summary", "pcap_query", "compare_profiles", "get_syscall_summary", "get_syscall_events", "syscall_query", "get_logs"):
             # ADR-282/291: the whole canonical input and output. Each page is an
             # approved query: pending with its handle, the page served by
             # get_query_result. The cursor is the next record index bound to
@@ -245,13 +274,15 @@ def main():
                 output["properties"]["narrowing_hint"] = copy.deepcopy(common["properties"]["narrowing_hint"])
                 output["properties"]["next_cursor"] = {"type": "null"}
                 branches[0]["properties"]["provenance"] = {"type": "array", "minItems": 1, "maxItems": 1}
-            if name == "syscall_query":
+            if name in ("syscall_query", "get_logs"):
                 output["properties"]["data_class"] = {"enum": ["metadata", "raw"]}
                 output["properties"]["truncated"] = {"type": "boolean"}
                 output["properties"]["narrowing_hint"] = copy.deepcopy(common["properties"]["narrowing_hint"])
                 branches[0]["properties"]["provenance"] = {"type": "array", "minItems": 1, "maxItems": 1}
+            if name == "get_logs":
+                output["properties"]["next_cursor"] = {"anyOf": [{"type":"string", "pattern":"^[0-9]{1,8}:[0-9]{1,4}:[0-9a-f]{32}$"},{"type":"null"}]}
             output["allOf"] = [{"oneOf": branches}]
-            if name in ("pcap_query", "syscall_query"):
+            if name in ("pcap_query", "syscall_query", "get_logs"):
                 # A limited page needs the same useful hint as the canonical
                 # browser/MCP result; only its poll wrapper remains untruncated.
                 output["allOf"].extend(copy.deepcopy(common.get("allOf", [])))
@@ -271,7 +302,7 @@ def main():
             description.pop("enabledByDefault", None)
             branches = copy.deepcopy(tool["outputSchema"]["allOf"][1]["oneOf"])
             if name == "request_raw_access":
-                description["inputSchema"]["properties"]["operations"] = {"type": "array", "minItems": 1, "maxItems": 3, "uniqueItems": True, "items": {"enum": ["download_artifact", "pcap_query", "syscall_query"]}}
+                description["inputSchema"]["properties"]["operations"] = {"type": "array", "minItems": 1, "maxItems": 4, "uniqueItems": True, "items": {"enum": ["download_artifact", "get_logs", "pcap_query", "syscall_query"]}}
                 description["description"] = "Request independent approval for native download or bounded packet queries over exact existing raw artifacts. Reuse a covering approval; a download-only approval does not authorize a packet query."
             if name == "preview_recording_save":
                 # Protected recording-save reasons use the accepted opaque audit path.
@@ -331,7 +362,7 @@ def main():
             # ADR-305: download_artifact/pcap_query, at most four clients and sixteen
             # actions, a pool of at most 256 GiB; the plan must need review.
             access = copy.deepcopy(documents["investigation-access.schema.json"]["$defs"]["request"])
-            access["properties"]["operations"] = {"type": "array", "minItems": 1, "maxItems": 3, "uniqueItems": True, "items": {"enum": ["download_artifact", "pcap_query", "syscall_query"]}}
+            access["properties"]["operations"] = {"type": "array", "minItems": 1, "maxItems": 4, "uniqueItems": True, "items": {"enum": ["download_artifact", "get_logs", "pcap_query", "syscall_query"]}}
             access["properties"]["clientIDs"]["maxItems"] = 4
             access["properties"]["actionIds"]["maxItems"] = 16
             access["properties"]["actionIds"]["items"]["maxLength"] = 64
@@ -426,12 +457,17 @@ def main():
             artifacts = data["properties"]["artifacts"]
             artifacts["minItems"] = 1
             row = artifacts["items"]["properties"]
-            row["kind"] = {"enum": ["pod-status", "packetCapture", "syscallTrace", "profile"]}
+            row["kind"] = {"enum": ["pod-status", "packetCapture", "syscallTrace", "profile", "logs"]}
             # ADR-279: a raw packet capture is listed as raw; its download
             # needs the approved grant's result-access child. ADR-282: an
             # HTTP header projection is an extract.
             row["data_class"] = {"enum": ["metadata", "extract", "raw"]}
-            row["completeness"] = {"const": "complete"}
+            row["completeness"] = {"enum": ["complete", "unknown"]}
+            artifacts["items"].setdefault("allOf", []).append({
+                "if": {"properties": {"kind": {"const": "logs"}}, "required": ["kind"]},
+                "then": {"properties": {"completeness": {"const": "unknown"}}},
+                "else": {"properties": {"completeness": {"const": "complete"}}},
+            })
             notice = copy.deepcopy(documents["capture-assessment.schema.json"]["$defs"]["artifactNotice"])
             notice["properties"].pop("handlingPolicyRef", None)
             notice["properties"]["classification"] = {"const": "potentialPersonalData"}
@@ -456,7 +492,7 @@ def main():
             "name": name,
             "description": {
                 "list_diagnostics": "List the supported pod-status preset for a currently authorized named workload. No evidence collection.",
-                "preview_capture": "Preview whole-Pod status or a versioned capture composition without collection. Returns exact Pod, impact, handling and blockers. onTrigger requires before 0s. Sharing needs evidence-owner and evidence:share; eight recipients and seven days maximum (default24h).",
+                "preview_capture": "Preview whole-Pod status or a versioned capture composition without collection. Returns exact Pod, impact, handling and blockers. On-trigger packet/syscall recording requires before 0s. Sharing needs evidence-owner and evidence:share; eight recipients and seven days maximum (default24h).",
                 "request_capture": "Submit the reviewed capture preview using a stable idempotency key. Acceptance is not collection or evidence success. Retry an uncertain result with the same key and preview. Ordinary accepted replay is passive; continue_acquisition:true explicitly attempts the original accepted acquisition with current rights, without new keys or another attempt. A packet, syscall or Go profile plan whose preview has the ApprovalRequired blocker opens one review request for an independent approver (error ApprovalRequired with its approval page; read it with get_grant), optionally with result_access for your own later downloads or eligible saved packet queries; submit the same preview again after approval.",
                 "resolve_capture_request": tool["description"],
                 "get_capture": "Read authorized pod-status capture progress. No evidence bytes. Finalizing is not publication; Indeterminate must not be automatically recaptured.",

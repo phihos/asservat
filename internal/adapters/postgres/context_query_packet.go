@@ -16,6 +16,9 @@ func rawProjectionGrantOperation(scope query.ContextProjectionScope) string {
 	if scope.DisplayVersion == query.SyscallQueryDisplayVersion && scope.NativeType == artifact.SyscallArgumentsArtifact {
 		return authorization.GrantSyscallQueryOperation
 	}
+	if scope.DisplayVersion == query.LogQueryDisplayVersion && scope.NativeType == artifact.LogsArtifact {
+		return authorization.GrantLogQueryOperation
+	}
 	return ""
 }
 

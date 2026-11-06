@@ -128,6 +128,20 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 	const packetQueryDefinitions = `SELECT string_agg(pg_get_functiondef(f::regprocedure),E'\n' ORDER BY f) FROM unnest(ARRAY['public.context_query_scope_source_valid(jsonb)','public.context_query_begin_tool(jsonb)','public.context_query_read_batches(jsonb)','public.context_query_units(jsonb)','public.guard_context_query()','public.guard_context_query_child()','public.operation_audit_lane(text)','public.operation_audit_human_input_valid(text,text)','public.guard_operation_audit()','public.context_query_intent_current(uuid,uuid,jsonb,uuid,jsonb)','public.context_query_outcome_closed(uuid,uuid,jsonb,uuid)','public.guard_context_query_account()','public.read_capacity_audit_profiles(uuid,uuid,uuid,bytea,text,timestamptz,timestamptz)']) f`
 	const packetQueryShape = `SELECT jsonb_build_object('columns',(SELECT jsonb_agg(to_jsonb(c) ORDER BY c.table_name,c.ordinal_position) FROM (SELECT table_name,column_name,ordinal_position,is_nullable,data_type,column_default FROM information_schema.columns WHERE table_schema='public' AND table_name IN ('context_query','access_grant','access_grant_use','context_query_key_binding')) c),'constraints',(SELECT jsonb_agg(x ORDER BY x) FROM (SELECT conrelid::regclass::text||':'||pg_get_constraintdef(oid) x FROM pg_constraint WHERE conrelid IN ('context_query'::regclass,'access_grant'::regclass,'access_grant_use'::regclass,'context_query_key_binding'::regclass)) c),'indexes',(SELECT jsonb_agg(indexdef ORDER BY indexdef) FROM pg_indexes WHERE schemaname='public' AND tablename IN ('context_query','access_grant','access_grant_use','context_query_key_binding')))::text`
 	const rawSyscallDefinitions = `SELECT string_agg(pg_get_functiondef(f::regprocedure),E'\n' ORDER BY f) FROM unnest(ARRAY['public.context_query_scope_source_valid(jsonb)','public.context_query_begin_tool(jsonb)','public.context_query_read_batches(jsonb)','public.context_query_units(jsonb)','public.guard_context_query()','public.guard_context_query_child()','public.operation_audit_lane(text)','public.operation_audit_human_input_valid(text,text)','public.guard_operation_audit()','public.context_query_intent_current(uuid,uuid,jsonb,uuid,jsonb)','public.context_query_outcome_closed(uuid,uuid,jsonb,uuid)','public.context_packet_query_scope_grant_current(uuid,jsonb,jsonb,jsonb)','public.context_packet_query_grant_current(uuid,uuid,uuid)','public.read_capacity_audit_profiles(uuid,uuid,uuid,bytea,text,timestamptz,timestamptz)']) f`
+	const logsDefinitions = `SELECT string_agg(pg_get_functiondef(f::regprocedure),E'\n' ORDER BY f) FROM unnest(ARRAY['public.context_query_scope_source_valid(jsonb)','public.context_query_begin_tool(jsonb)','public.context_query_read_batches(jsonb)','public.context_query_units(jsonb)','public.guard_context_query()','public.guard_context_query_child()','public.operation_audit_lane(text)','public.operation_audit_human_input_valid(text,text)','public.guard_operation_audit()','public.context_query_intent_current(uuid,uuid,jsonb,uuid,jsonb)','public.context_query_outcome_closed(uuid,uuid,jsonb,uuid)','public.context_packet_query_scope_grant_current(uuid,jsonb,jsonb,jsonb)','public.context_packet_query_grant_current(uuid,uuid,uuid)','public.project_context_processing()','public.guard_snapshot_cancel()','public.require_recording_save_group_members()','public.guard_access_grant_child_scope()']) f`
+	var originalLogsFunctions, originalLogsShape string
+	if head == 141 {
+		if e = conn.QueryRow(ctx, logsDefinitions).Scan(&originalLogsFunctions); e != nil {
+			t.Fatal(e)
+		}
+		if e = conn.QueryRow(ctx, packetQueryShape).Scan(&originalLogsShape); e != nil {
+			t.Fatal(e)
+		}
+		var good bool
+		if e = conn.QueryRow(ctx, `SELECT context_query_scope_source_valid($1::jsonb)`, logsQuerySQLScope(t)).Scan(&good); e != nil || good {
+			t.Fatal("140 accepted logs query", good, e)
+		}
+	}
 	var originalRawSyscallFunctions, originalRawSyscallShape string
 	if head == 140 {
 		if e = conn.QueryRow(ctx, rawSyscallDefinitions).Scan(&originalRawSyscallFunctions); e != nil {
@@ -432,6 +446,32 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 			t.Fatal("resource projection Up after Down", from, to, e)
 		}
 		t.Log("resource projection Down restored exact validators and unchanged trust; Up restored104; no old-decoder rollback qualification")
+	}
+	if head == 141 {
+		qualifyLogsQuerySQLFunctions(t, ctx, conn)
+		if _, e = p.DownTo(ctx, 140); e != nil {
+			t.Fatal("empty logs Down", e)
+		}
+		var definitions, shape, trust string
+		if e = conn.QueryRow(ctx, logsDefinitions).Scan(&definitions); e != nil || definitions != originalLogsFunctions {
+			t.Fatal("141Down changed140 functions", e)
+		}
+		if e = conn.QueryRow(ctx, packetQueryShape).Scan(&shape); e != nil || shape != originalLogsShape {
+			t.Fatal("141Down changed140 schema/constraints/indexes", e)
+		}
+		if e = conn.QueryRow(ctx, `SELECT row_to_json(t)::text FROM fleet_trust t`).Scan(&trust); e != nil || trust != originalTrust {
+			t.Fatal("141Down changed trust", e)
+		}
+		var good bool
+		if e = conn.QueryRow(ctx, `SELECT context_query_scope_source_valid($1::jsonb)`, logsQuerySQLScope(t)).Scan(&good); e != nil || good {
+			t.Fatal("140 accepted logs after Down", good, e)
+		}
+		qualifyRawSyscallQuerySQLFunctions(t, ctx, conn)
+		if from, to, e = upgrade.Run(ctx); e != nil || from != 140 || to != 141 {
+			t.Fatal("141Up after Down", from, to, e)
+		}
+		qualifyLogsQuerySQLFunctions(t, ctx, conn)
+		t.Log("logs141Down140Up141: exact17functions/schema/constraints/indexes/trust; old tools unchanged; logs20units2batches")
 	}
 	if head == 140 {
 		qualifyRawSyscallQuerySQLFunctions(t, ctx, conn)

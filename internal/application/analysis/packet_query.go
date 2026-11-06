@@ -132,7 +132,7 @@ func (d *ContextProjectionDelivery) PacketQuery() (value.PacketQueryResult, bool
 // replayInitialQuery returns only the original handle; it neither observes a
 // worker nor consumes another poll/read/grant use.
 func (s ContextProjectionResults) replayInitialQuery(o *projectionRequest, q value.ContextQuery) (*ContextProjectionDelivery, error) {
-	if !q.Valid() || q.Scope.RootID != s.RootID || q.Scope.Principal != o.initial.Principal || (!q.Scope.PacketQuery.Valid() && q.Scope.Syscalls.View != value.SyscallQueryView) || q.Scope.BeginTool() != o.request.Call.Tool {
+	if !q.Valid() || q.Scope.RootID != s.RootID || q.Scope.Principal != o.initial.Principal || (!q.Scope.PacketQuery.Valid() && q.Scope.Syscalls.View != value.SyscallQueryView && !q.Scope.Logs.Valid()) || q.Scope.BeginTool() != o.request.Call.Tool {
 		return nil, value.ErrUnavailable
 	}
 	o.query = q
@@ -158,7 +158,7 @@ func (s ContextProjectionResults) replayInitialQuery(o *projectionRequest, q val
 	if _, e = o.CheckCurrent(o.ctx); e != nil {
 		return nil, e
 	}
-	d := &ContextProjectionDelivery{owner: o, pending: true, effect: ContextQueryReplayed, observedAt: s.Now(), queryDeadline: identity.Earlier(q.Deadline, a.AccessUntil), cleanupUntil: identity.Earlier(q.CleanupUntil, o.request.Call.WriteUntil), association: ContextProjectionAssociation{ID: s.NewID(), QueryID: q.ID, OperationID: o.request.Call.ID, PacketQuery: q.Scope.PacketQuery, Syscalls: q.Scope.Syscalls}}
+	d := &ContextProjectionDelivery{owner: o, pending: true, effect: ContextQueryReplayed, observedAt: s.Now(), queryDeadline: identity.Earlier(q.Deadline, a.AccessUntil), cleanupUntil: identity.Earlier(q.CleanupUntil, o.request.Call.WriteUntil), association: ContextProjectionAssociation{ID: s.NewID(), QueryID: q.ID, OperationID: o.request.Call.ID, PacketQuery: q.Scope.PacketQuery, Syscalls: q.Scope.Syscalls, Logs: q.Scope.Logs}}
 	if !authorization.UUID(d.association.ID) || !s.Now().Before(d.queryDeadline) || d.queryDeadline.IsZero() {
 		return nil, value.ErrUnavailable
 	}

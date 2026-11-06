@@ -903,6 +903,9 @@ func (b *regionalBudget) amount(bytes, objects int64) map[string]int64 {
 
 func installedRegionalContextReserve() (bytes, objects int64) {
 	bytes, objects = 8*1544192, 32
+	if installedLogsFocus() {
+		return installedLogsQueryUnits * 1544192, installedLogsQueryUnits * 4
+	}
 	if installedRecordingFocus() {
 		bytes = 8 * (artifact.Registration{NativeLimit: artifact.RecordingNativeLimit}).ReservedBytes()
 	}
@@ -966,7 +969,7 @@ func (b *regionalBudget) addPolicy() {
 func (b *regionalBudget) addBinding(w regionalWorkload) {
 	b.t.Helper()
 	roles := []any{"workload-maintainer"}
-	if installedRecordingFocus() {
+	if installedRecordingFocus() || installedLogsFocus() {
 		roles = append(roles, "action-approver")
 	}
 	if installedJourneyFocus() == "share" || installedJourneyFocus() == "browser" {
@@ -1015,7 +1018,7 @@ func createRegionalWorkload(t *testing.T, ctx context.Context, region kubernetes
 	// The regional workload: a labeled namespace (the selector guard admits
 	// the administrator) and a Deployment with no replicas.
 	labels := map[string]string{"team": "regional"}
-	if installedRecordingFocus() {
+	if installedRecordingFocus() || installedLogsFocus() {
 		labels["pod-security.kubernetes.io/enforce"] = "restricted"
 	}
 	ns, err := region.CoreV1().Namespaces().Create(ctx, &core.Namespace{ObjectMeta: meta.ObjectMeta{Name: name, Labels: labels}}, meta.CreateOptions{})
@@ -1024,10 +1027,14 @@ func createRegionalWorkload(t *testing.T, ctx context.Context, region kubernetes
 	}
 	labels = map[string]string{"app": "regional-app"}
 	command := []string{"/provider-proxy", "http://127.0.0.1:1", "http://127.0.0.1:1", "127.0.0.1:1"}
-	if installedJourneyFocus() == "logresource" || installedRecordingFocus() {
+	if installedJourneyFocus() == "logresource" || installedRecordingFocus() || installedLogsFocus() {
 		// ADR-241: the fixture's synthetic signal workload, which writes a
 		// requested line or keeps its CPU busy on demand.
 		command = []string{"/provider-proxy", "signals"}
+	}
+	var initContainers []core.Container
+	if installedLogsFocus() {
+		initContainers = []core.Container{{Name: "log-init", Image: image, ImagePullPolicy: core.PullIfNotPresent, Command: []string{"/provider-proxy", "signals-once"}, Resources: regionalWorkloadResources(false), SecurityContext: &core.SecurityContext{AllowPrivilegeEscalation: ptr.To(false), ReadOnlyRootFilesystem: ptr.To(true), Capabilities: &core.Capabilities{Drop: []core.Capability{"ALL"}}}}}
 	}
 	var ports []core.ContainerPort
 	var volumes []core.Volume
@@ -1065,7 +1072,7 @@ func createRegionalWorkload(t *testing.T, ctx context.Context, region kubernetes
 	app, err := region.AppsV1().Deployments(ns.Name).Create(ctx, &apps.Deployment{ObjectMeta: meta.ObjectMeta{Name: "regional-app"}, Spec: apps.DeploymentSpec{Replicas: ptr.To(int32(1)), Selector: &meta.LabelSelector{MatchLabels: labels},
 		Template: core.PodTemplateSpec{ObjectMeta: meta.ObjectMeta{Labels: labels}, Spec: core.PodSpec{AutomountServiceAccountToken: ptr.To(false), TerminationGracePeriodSeconds: ptr.To(int64(3)),
 			SecurityContext: &core.PodSecurityContext{RunAsNonRoot: ptr.To(true), RunAsUser: ptr.To(int64(65532)), SeccompProfile: &core.SeccompProfile{Type: core.SeccompProfileTypeRuntimeDefault}},
-			Volumes:         volumes, Containers: []core.Container{{Name: "app", Image: image, ImagePullPolicy: core.PullIfNotPresent, Command: command, Ports: ports, VolumeMounts: volumeMounts,
+			Volumes:         volumes, InitContainers: initContainers, Containers: []core.Container{{Name: "app", Image: image, ImagePullPolicy: core.PullIfNotPresent, Command: command, Ports: ports, VolumeMounts: volumeMounts,
 				Resources:       regionalWorkloadResources(nativePaced),
 				SecurityContext: &core.SecurityContext{AllowPrivilegeEscalation: ptr.To(false), ReadOnlyRootFilesystem: ptr.To(true), Capabilities: &core.Capabilities{Drop: []core.Capability{"ALL"}}}}}}}}}, meta.CreateOptions{})
 	if err != nil {

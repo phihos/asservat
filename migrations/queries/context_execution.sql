@@ -18,8 +18,8 @@ UPDATE context_execution SET phase='started',started_at=$3 WHERE root_id=$1 AND 
 UPDATE context_execution SET phase=$3,acquired_at=$4,completed_at=$5,copies_json=$6,copies_digest=$7 WHERE root_id=$1 AND capture_id=$2 AND phase='started' RETURNING *;
 
 -- name: ListStartedRecordings :many
--- ADR-248/273/279/281/282: started recordings (pcapng, rawPcapng, httpHeaders, syscallRecords, syscallArguments or runtime-profile expectations) whose start is at
--- or before the given instant, oldest first, for the hub's collect loop.
+-- Started recordings whose original start (logs: accepted trigger plus after)
+-- is at or before the supplied collect cutoff, oldest first. No window renewal.
 SELECT e.capture_id FROM context_execution e JOIN context_capture c ON c.id=e.capture_id AND c.root_id=e.root_id
-WHERE e.root_id=$1 AND e.phase='started' AND e.started_at<=$2 AND convert_from(c.expectation_json,'UTF8')::jsonb->>'NativeType' IN ('pcapng','rawPcapng','httpHeaders','syscallRecords','syscallArguments','pprof','goTrace')
-ORDER BY e.started_at LIMIT $3;
+WHERE e.root_id=sqlc.arg(root_id) AND e.phase='started' AND (CASE WHEN convert_from(c.expectation_json,'UTF8')::jsonb->>'NativeType'='logs' THEN (convert_from(c.expectation_json,'UTF8')::jsonb->>'TriggeredAt')::timestamptz+make_interval(secs=>(convert_from(c.expectation_json,'UTF8')::jsonb#>>'{Logs,AfterMillis}')::double precision/1000) ELSE e.started_at END)<=sqlc.arg(started_at)::timestamptz AND convert_from(c.expectation_json,'UTF8')::jsonb->>'NativeType' IN ('pcapng','rawPcapng','httpHeaders','syscallRecords','syscallArguments','pprof','goTrace','logs')
+ORDER BY e.started_at LIMIT sqlc.arg('limit');

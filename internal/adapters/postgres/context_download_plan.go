@@ -179,7 +179,7 @@ func boundedNativeDownloadPlan(l ContextDownloadPlanLimits, t artifact.NativeTyp
 	if !l.valid() || nativeLimit < 1 || nativeLimit > t.MaxBytes {
 		return l, artifact.ErrDownloadUnavailable
 	}
-	if t.Name != artifact.PprofArtifact && t.Name != artifact.GoTraceArtifact {
+	if t.DownloadLimit() <= artifact.FrameBytes {
 		l.OutputLimit = min(l.OutputLimit, int64(16<<20))
 		l.ReadLimit = min(l.ReadLimit, int64(24<<20))
 		return l, nil

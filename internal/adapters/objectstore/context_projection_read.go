@@ -29,6 +29,7 @@ type ContextProjectionReader struct {
 	packets       evidence.PacketSummarizer
 	queryPackets  evidence.PacketQuerier
 	querySyscalls evidence.SyscallQuerier
+	queryLogs     evidence.LogQuerier
 }
 
 func NewContextProjectionReader(store *CustodyStore) (*ContextProjectionReader, error) {
@@ -41,6 +42,9 @@ func NewContextProjectionReader(store *CustodyStore) (*ContextProjectionReader, 
 // ReadProjectionNative returns the scope's one result: the pod-status DTO, or
 // one rechecked httpHeaders page.
 func (r *ContextProjectionReader) ReadProjectionNative(ctx context.Context, source evidence.NativeContextSource, scope value.ContextProjectionScope, keys evidence.KeyOpener, until time.Time) (value.ProjectionResult, error) {
+	if r != nil && scope.DisplayVersion == value.LogQueryDisplayVersion {
+		return r.readLogQuery(ctx, source, scope, keys, until)
+	}
 	if r != nil && scope.DisplayVersion == value.SyscallQueryDisplayVersion {
 		return r.readSyscallQuery(ctx, source, scope, keys, until)
 	}

@@ -112,6 +112,7 @@ type GrantRevocationInput struct {
 type GrantChildRequest struct {
 	ChildID, ParentID, ClientID string
 	Output                      value.VerifiedOutput
+	Group                       *value.GrantOutputGroup `json:"-"`
 }
 
 // GrantUseRequest reserves one follow-up use (an operation ID, idempotent).
@@ -725,6 +726,9 @@ func (s GrantService) List(ctx context.Context, current identities.CurrentIdenti
 // children; an unknown or unpublished artifact never becomes a target, and
 // a repeated delivery returns the existing child.
 func (s GrantService) Materialize(ctx context.Context, parentID, clientID string, output value.VerifiedOutput) (value.GrantChild, bool, error) {
+	return s.materialize(ctx, parentID, clientID, output, nil)
+}
+func (s GrantService) materialize(ctx context.Context, parentID, clientID string, output value.VerifiedOutput, group *value.GrantOutputGroup) (value.GrantChild, bool, error) {
 	var zero value.GrantChild
 	if ctx == nil || ctx.Err() != nil || !s.ready() || !value.UUID(parentID) || !output.Valid() || !identity.Text(clientID, 256) {
 		return zero, false, value.ErrGrantInvalid
@@ -744,10 +748,16 @@ func (s GrantService) Materialize(ctx context.Context, parentID, clientID string
 	if g.Kind == value.GrantRawQuery && (!RawQueryScopeMatches(g) || ReviewDigest(g, g.Review) != g.ReviewDigest) {
 		return zero, false, value.ErrGrantScope
 	}
-	if err = value.CheckMaterialize(g, output, clientID, true, s.Now()); err != nil {
+	if group == nil {
+		group, err = s.outputGroup(ctx, g, output)
+		if err != nil {
+			return zero, false, err
+		}
+	}
+	if err = value.CheckMaterialize(g, output, clientID, true, s.Now(), group); err != nil {
 		return zero, false, err
 	}
-	return s.Store.MaterializeGrantChild(ctx, GrantChildRequest{ChildID: s.NewID(), ParentID: parentID, ClientID: clientID, Output: output}, recovery)
+	return s.Store.MaterializeGrantChild(ctx, GrantChildRequest{ChildID: s.NewID(), ParentID: parentID, ClientID: clientID, Output: output, Group: group}, recovery)
 }
 
 // Use reserves one follow-up disclosure of a child grant for the calling
@@ -869,11 +879,11 @@ func (s GrantService) CurrentResultAccessForPreparation(ctx context.Context, cur
 }
 
 func (s GrantService) currentResultAccess(ctx context.Context, current identities.CurrentIdentity, scope artifact.DownloadScope, actionID string, use value.GrantUse, preparing bool) (time.Time, error) {
-	i, g, output, err := s.rawParentFor(ctx, current, scope, actionID, use, preparing)
+	i, g, output, group, err := s.rawParentFor(ctx, current, scope, actionID, use, preparing)
 	if err != nil {
 		return time.Time{}, err
 	}
-	c, _, err := s.Materialize(ctx, g.ID, i.Principal.ClientID, output)
+	c, _, err := s.materialize(ctx, g.ID, i.Principal.ClientID, output, group)
 	if err != nil {
 		if preparing && errors.Is(err, value.ErrGrantPoolExhausted) {
 			return time.Time{}, value.ErrApprovalRequired
@@ -940,13 +950,13 @@ func (s GrantService) ReserveRawResult(ctx context.Context, current identities.C
 			return ErrGrantUnavailable
 		}
 	}
-	i, g, output, err := s.rawParentFor(ctx, current, scope, "", use, false)
+	i, g, output, group, err := s.rawParentFor(ctx, current, scope, "", use, false)
 	if err != nil {
 		return err
 	}
 	c, err := s.Store.GrantChildFor(ctx, g.ID, scope.ArtifactID, i.Principal.ClientID)
 	if errors.Is(err, ErrGrantNotFound) && g.Kind == value.GrantRawQuery {
-		c, _, err = s.Materialize(ctx, g.ID, i.Principal.ClientID, output)
+		c, _, err = s.materialize(ctx, g.ID, i.Principal.ClientID, output, group)
 	}
 	if err != nil {
 		return err

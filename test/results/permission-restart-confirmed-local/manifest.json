@@ -1,0 +1,102 @@
+[
+  {
+    "file": "actual-schedule-red.log.gz",
+    "originalBytes": 919,
+    "sha256": "d0404bb1944c003dde9c95af61957af03ca9cb30d735c23ab09c80285354bd70"
+  },
+  {
+    "file": "affected-vet.log.gz",
+    "originalBytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "file": "architecture-check.exit.gz",
+    "originalBytes": 2,
+    "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "file": "architecture-check.log.gz",
+    "originalBytes": 297,
+    "sha256": "2132b69ab48c88d853da11c23ffa5d58b265dda56c35b9ff2b109f4d6f597a67"
+  },
+  {
+    "file": "final-configuration-race.log.gz",
+    "originalBytes": 71,
+    "sha256": "99e6b910151f73d0be5ccc2562cfc0a2cd5797ea05b6f18f43d601352c66095e"
+  },
+  {
+    "file": "focused-green.log.gz",
+    "originalBytes": 2447,
+    "sha256": "eecac838537912303c2f643e7b325557d6f9f4bcb2023478d53ba30a06654edb"
+  },
+  {
+    "file": "go-architecture.log.gz",
+    "originalBytes": 113,
+    "sha256": "6304883ad2e67b4500a44f93205dbd5449585135959b6ef276ac673797a039aa"
+  },
+  {
+    "file": "handoff.json.gz",
+    "originalBytes": 7421,
+    "sha256": "d9e685d4f16b414f3614e3c582fb83c9089d8b32f40da0e1fad7e9e92a8f29f7"
+  },
+  {
+    "file": "parser-independent-review.json.gz",
+    "originalBytes": 2485,
+    "sha256": "03c4fdee50f2eeb2d125c8c8c372c1712f1cc8249602705fce8ff97208efd9ef"
+  },
+  {
+    "file": "permission-restart-authority-c4789283-environment.json.gz",
+    "originalBytes": 553414,
+    "sha256": "6338bccaccbcd1b9c24ecc52b439b426a6deb0c402dee4f7230ae401f8c1a832"
+  },
+  {
+    "file": "permission-restart-authority-c4789283.log.gz",
+    "originalBytes": 4518,
+    "sha256": "aaba1a3d5c411fac069e11bb53453909f35617c7d3f7dbd560626f39d7b95329"
+  },
+  {
+    "file": "pre-push.log.gz",
+    "originalBytes": 12008,
+    "sha256": "c2ef23e9688354706468fd8501839fe843ff9637e191963a86fc089b0279fd18"
+  },
+  {
+    "file": "real-authority-service-harness.log.gz",
+    "originalBytes": 58,
+    "sha256": "13d9351b00b35b4f3d45ead9895d2e314bf11fcbb24e40963da899359260b196"
+  },
+  {
+    "file": "root-review.json.gz",
+    "originalBytes": 1186,
+    "sha256": "16b90a60f634b9b05f6d7b9d838ac5054a078943d60741b510a7ae46a3189e1e"
+  },
+  {
+    "file": "root-service-audit.json.gz",
+    "originalBytes": 875,
+    "sha256": "688f602d5ff9d01d5307a02909604b30eb11bda3292589ff42fca5cd2070b623"
+  },
+  {
+    "file": "spec-check.exit.gz",
+    "originalBytes": 2,
+    "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "file": "spec-check.log.gz",
+    "originalBytes": 239,
+    "sha256": "7bc60714406cb11d023fcc28e18d574def848e63c40a3363c769fc490a269daf"
+  },
+  {
+    "file": "logs-port-review.json.gz",
+    "originalBytes": 3963,
+    "sha256": "6587b366515f7a38c8a42aef239a45c023e9b1378ce813997421d695fa488553"
+  },
+  {
+    "file": "logs-port-race.log.gz",
+    "originalBytes": 126,
+    "sha256": "0eb49d0fea9b9b7f7eeb7b0a9c6aa70315140d56b8ac9b718427b3b782f5e834"
+  },
+  {
+    "file": "logs-integrated-pre-push.log.gz",
+    "originalBytes": 11469,
+    "sha256": "775fc022b0cdd885de77667ac52990f459bb5e22d0d7d6913bb800fc7e07e8d5"
+  }
+]

@@ -26,6 +26,7 @@ type NativeContextReader struct {
 	packets       evidence.PacketSummarizer
 	queryPackets  evidence.PacketQuerier
 	querySyscalls evidence.SyscallQuerier
+	queryLogs     evidence.LogQuerier
 }
 
 var _ evidence.NativeContextRead = (*NativeContextReader)(nil)

@@ -19,6 +19,8 @@ Only packetCapture and syscallTrace initially support both modes. An explicit on
 
 Log retrieval can read history already retained by the runtime, without Asservat starting a new log recorder at policy activation. Continuous log/resource/probe **detectors** are distinct from evidence actions. Likewise pprof cumulative mode reads counters maintained by the application; it is still an onTrigger acquisition. Existing application flight recordings may be collected explicitly as artifacts; Asservat does not assume ownership or silently start continuous profiling.
 
+The finite logs lifecycle plan therefore records its requested historical `requestedBefore` and future `after` intervals under `onTrigger`. Either interval may be zero, but at least one is positive. This describes an API retrieval window, not an armed source or proof that the runtime retains that history. The zero-before restriction above continues to apply to on-trigger packet and syscall recording. A finite logs preview reports its actual compiled native-byte ceiling, up to the qualified 64 MiB logs limit; the legacy single-frame recorder cap does not replace it.
+
 ### SC-LIF-001
 
 Given a mixed recipe with a live core, packets, syscalls and logs, when previewed, then the core/log reads appear under On trigger and packet/syscall sources under Ongoing; save on trigger. A future-only packet variant needs explicit onTrigger and before: 0s. A natural crash uses a ready local interception permit, while an ordinary health trigger cannot claim it generated a kernel core.

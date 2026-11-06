@@ -64,7 +64,7 @@ func matchingSourceReply(w app.SourceWork, r contracts.SourceReply) bool {
 // against the current owner receiver, then queue the restrictive or arming
 // effect. An effect refusal is the closed "unavailable" state, not an error.
 func applySourceWork(ctx context.Context, r fleet.APIContextReceiver, signed []byte, local *SourceLocal, now func() time.Time) (contracts.SourceReply, error) {
-	if local == nil || local.Verifier == nil || local.Queue == nil {
+	if local == nil || local.Verifier == nil {
 		return contracts.SourceReply{}, targets.ErrUnsupported
 	}
 	auth, err := local.Verifier.VerifySourceWork(ctx, signed, r)
@@ -86,6 +86,11 @@ func applySourceWork(ctx context.Context, r fleet.APIContextReceiver, signed []b
 		return contracts.SourceReply{}, targets.ErrDenied
 	}
 	w := auth.Work
+	// API-only logs can be restricted without a node queue. Arming and all
+	// other queue-backed work retain their original node-channel requirement.
+	if local.Queue == nil && w.StopRecording == nil {
+		return contracts.SourceReply{}, targets.ErrUnsupported
+	}
 	call, cancel := context.WithDeadline(ctx, auth.ValidUntil)
 	defer cancel()
 	if call.Err() != nil || !w.Valid(now()) {

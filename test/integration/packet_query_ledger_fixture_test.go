@@ -64,7 +64,7 @@ func qualifyPacketQueryManagedLifecycle(t *testing.T, f *queryLedgerFixture) {
 	}
 	beforeAcquisition := acquisitionSnapshot()
 	baselineQueries, baselineUnits := int64(0), int64(0)
-	if f.published.Expectation.NativeType != artifact.SyscallArgumentsArtifact {
+	if f.published.Expectation.NativeType != artifact.SyscallArgumentsArtifact && f.published.Expectation.NativeType != artifact.LogsArtifact {
 		qualifySharedProjectionLifecycle(t, f)
 		baselineQueries, baselineUnits = 1, 2
 	}
@@ -135,7 +135,7 @@ func qualifyPacketQueryManagedLifecycle(t *testing.T, f *queryLedgerFixture) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	policySource := packetQueryFixturePolicy{querySQLPolicy{root: root, installation: base.input.InstallationID, epoch: recovery.IssuerEpoch, path: f.profile.Path, packet: f.published.Expectation.NativeType != artifact.SyscallArgumentsArtifact, syscall: f.published.Expectation.NativeType == artifact.SyscallArgumentsArtifact}}
+	policySource := packetQueryFixturePolicy{querySQLPolicy{root: root, installation: base.input.InstallationID, epoch: recovery.IssuerEpoch, path: f.profile.Path, packet: f.published.Expectation.NativeType != artifact.SyscallArgumentsArtifact, syscall: f.published.Expectation.NativeType == artifact.SyscallArgumentsArtifact, logs: f.published.Expectation.NativeType == artifact.LogsArtifact}}
 	queryPolicies, e := authapp.NewContextProjectionPolicies(policySource, time.Now)
 	if e != nil {
 		t.Fatal(e)
@@ -148,7 +148,10 @@ func qualifyPacketQueryManagedLifecycle(t *testing.T, f *queryLedgerFixture) {
 	scope.SourceProjectionDigest, scope.Selection = artifact.Digest{}, query.LineSelection{}
 	selection := query.PacketQuerySelection{Fields: []query.PacketQueryField{query.PacketIndex, query.PacketCapturedLength, query.PacketWireLength}, MaxPackets: 100, MaxScanBytes: 8 << 20}
 	selection.Program = packetQueryNonemptyProgram()
-	if expected.NativeType == artifact.SyscallArgumentsArtifact {
+	if expected.NativeType == artifact.LogsArtifact {
+		scope.DisplayVersion = query.LogQueryDisplayVersion
+		scope.Logs = query.LogWindow{Limit: 100}
+	} else if expected.NativeType == artifact.SyscallArgumentsArtifact {
 		scope.DisplayVersion = query.SyscallQueryDisplayVersion
 		scope.Syscalls = query.SyscallWindow{View: query.SyscallQueryView, Limit: 100}
 	} else {
@@ -157,16 +160,21 @@ func qualifyPacketQueryManagedLifecycle(t *testing.T, f *queryLedgerFixture) {
 			t.Fatal(err)
 		}
 	}
-	rawPacket := expected.NativeType == artifact.RawPCAPNGArtifact || expected.NativeType == artifact.SyscallArgumentsArtifact
+	rawPacket := expected.NativeType == artifact.RawPCAPNGArtifact || expected.NativeType == artifact.SyscallArgumentsArtifact || expected.NativeType == artifact.LogsArtifact
 	var grantStore *postgres.AccessGrants
 	if rawPacket {
 		grantStore, err = postgres.NewAccessGrants(ctx, compiled("hub-runtime"), root, s.recovery.guard)
 		if err != nil {
 			t.Fatal(err)
 		}
-		scope.RawGrantID = packetQueryManagedGrant(t, f, grantStore, scope.Principal, scope.Version, 2*query.ContextResultBytes, 2)
+		scope.RawGrantID = f.initialResultGrantID
+		if scope.RawGrantID == "" {
+			scope.RawGrantID = packetQueryManagedGrant(t, f, grantStore, scope.Principal, scope.Version, 2*query.ContextResultBytes, 2)
+		}
 		grantService := authapp.GrantService{RootID: root, InstallationID: base.input.InstallationID, Permissions: s.p, Store: grantStore, Recovery: s.recovery.reader, Now: time.Now, NewID: custodyID}
-		if expected.NativeType == artifact.SyscallArgumentsArtifact {
+		if expected.NativeType == artifact.LogsArtifact {
+			gate.LogGrants = grantService
+		} else if expected.NativeType == artifact.SyscallArgumentsArtifact {
 			gate.SyscallGrants = grantService
 		} else {
 			gate.PacketGrants = grantService
@@ -219,7 +227,19 @@ func qualifyPacketQueryManagedLifecycle(t *testing.T, f *queryLedgerFixture) {
 			a, e = gate.CheckProjectionCurrent(call, querySQLIdentity{who}, scope)
 		}
 		if e != nil {
-			t.Fatal("actual read-only authority", e)
+			// Retain the closed authority stage and sentinel categories only.
+			// Dependency error strings may contain private source details.
+			stage := "unclassified"
+			var fixed interface{ FixedStep() string }
+			if errors.As(e, &fixed) {
+				stage = fixed.FixedStep()
+			}
+			cause := e
+			var caused interface{ StepCause() error }
+			if errors.As(e, &caused) {
+				cause = caused.StepCause()
+			}
+			t.Fatalf("actual read-only authority stage=%q grantScope=%t grantPrincipal=%t grantPool=%t grantExpired=%t grantRevoked=%t grantDenied=%t deadline=%t canceled=%t", stage, errors.Is(cause, value.ErrGrantScope), errors.Is(cause, value.ErrGrantPrincipal), errors.Is(cause, value.ErrGrantPoolExhausted), errors.Is(cause, value.ErrGrantExpired), errors.Is(cause, value.ErrGrantRevoked), errors.Is(cause, value.ErrGrantDenied), errors.Is(cause, context.DeadlineExceeded), errors.Is(cause, context.Canceled))
 		}
 		a.ValidUntil = identity.Earlier(a.ValidUntil, intent.RequestUntil)
 		if !a.Valid(time.Now()) {
@@ -261,8 +281,12 @@ func qualifyPacketQueryManagedLifecycle(t *testing.T, f *queryLedgerFixture) {
 	}
 	var publicRequest query.PacketQueryRequest
 	var syscallRequest query.RawSyscallQueryRequest
+	var logsRequest query.RawLogQueryRequest
 	invocation := query.ContextQueryInvocationKey{Key: "packet-query-managed"}
-	if expected.NativeType == artifact.SyscallArgumentsArtifact {
+	if expected.NativeType == artifact.LogsArtifact {
+		logsRequest = logsQueryReplayRequest(scope, invocation.Key)
+		invocation.RequestDigest = analysisapp.RawLogQueryRequestDigest(logsRequest)
+	} else if expected.NativeType == artifact.SyscallArgumentsArtifact {
 		syscallRequest = rawSyscallQueryReplayRequest(scope, invocation.Key)
 		invocation.RequestDigest = analysisapp.RawSyscallQueryRequestDigest(syscallRequest)
 	} else {
@@ -318,7 +342,9 @@ func qualifyPacketQueryManagedLifecycle(t *testing.T, f *queryLedgerFixture) {
 		whoReplay.Scopes = append(whoReplay.Scopes, "evidence:raw")
 	}
 	whoReplay.VerifiedAt, whoReplay.ValidUntil = replayOwner.request.Call.StartedAt, replayOwner.request.Call.Until
-	if expected.NativeType == artifact.SyscallArgumentsArtifact {
+	if expected.NativeType == artifact.LogsArtifact {
+		qualifyLogsQueryReplayApplication(t, replayOwner.ctx, q, replayOwner.request, logsRequest, querySQLIdentity{whoReplay}, ledger, gate, s.recovery.reader)
+	} else if expected.NativeType == artifact.SyscallArgumentsArtifact {
 		qualifyRawSyscallQueryReplayApplication(t, replayOwner.ctx, q, replayOwner.request, syscallRequest, querySQLIdentity{whoReplay}, ledger, gate, s.recovery.reader)
 	} else {
 		qualifyPacketQueryReplayApplication(t, replayOwner.ctx, q, replayOwner.request, publicRequest, querySQLIdentity{whoReplay}, ledger, gate, s.recovery.reader)
@@ -579,7 +605,7 @@ func qualifyPacketQueryManagedLifecycle(t *testing.T, f *queryLedgerFixture) {
 	if err != nil || !stored.Equal(q) {
 		t.Fatal("lifecycle changed original query/deadlines", err)
 	}
-	t.Log("compiled " + packetQueryFixtureOperation(f) + " lifecycle: packet sources retain existing summary; four query units/two page batches, same public key/deadlines, raw pages each24KiB/one operation, actual hub/key roles and six consumed roles; native+public close; Job/Pod/issuer/join inputs synthetic")
+	t.Logf("compiled %s lifecycle: %d units/two page batches, same public key/deadlines, raw pages each24KiB/one operation, actual hub/key roles and six consumed roles; native+public close; crypto keys/Job/Pod/issuer/join inputs synthetic", packetQueryFixtureOperation(f), scope.QueryUnits())
 }
 
 func packetQueryManagedGrant(t *testing.T, f *queryLedgerFixture, store *postgres.AccessGrants, actor identity.Principal, version artifact.Digest, maxBytes, ops int64) string {
@@ -630,7 +656,9 @@ func refuseRetainedPacketQueryDowngrade(t *testing.T, f *queryLedgerFixture) {
 		t.Fatal(err)
 	}
 	target, expectedHead := int64(138), int64(139)
-	if f.published.Expectation.NativeType == artifact.SyscallArgumentsArtifact {
+	if f.published.Expectation.NativeType == artifact.LogsArtifact {
+		target, expectedHead = 140, 141
+	} else if f.published.Expectation.NativeType == artifact.SyscallArgumentsArtifact {
 		target, expectedHead = 139, 140
 	}
 	if _, err = provider.DownTo(f.base.ctx, target); err == nil {

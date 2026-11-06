@@ -13,6 +13,7 @@ import (
 
 	"asservat.local/asservat/internal/adapters/diagnostics"
 	"asservat.local/asservat/internal/adapters/httpheaders"
+	"asservat.local/asservat/internal/adapters/logs"
 	"asservat.local/asservat/internal/adapters/mtls"
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/packets"
@@ -259,6 +260,7 @@ func runWorkerNative(ctx context.Context, input WorkerStartup, trust *mtls.Worke
 		reader.ServeProfileComparisons(diagnostics.ComparePprof)
 		reader.ServeSyscallProjections(syscalls.ProjectSyscalls)
 		reader.ServeSyscallQueries(syscalls.QuerySyscallArguments)
+		reader.ServeLogQueries(logs.QueryLogs)
 		reader.ServePacketSummaries(packets.SummarizePCAPNG)
 		reader.ServePacketQueries(packets.QueryPCAPNG)
 		result, err = evidence.NewRegionalApprovedResult(ctx, input.Target, reader, time.Now)

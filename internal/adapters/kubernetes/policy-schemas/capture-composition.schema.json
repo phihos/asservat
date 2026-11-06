@@ -294,6 +294,49 @@
           "ongoing"
         ]
       }
+    },
+    "logBefore": {
+      "actionKinds": [
+        "logs"
+      ],
+      "path": [
+        "parameters",
+        "before"
+      ],
+      "valueSchema": {
+        "type": "string",
+        "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
+        "maxLength": 16
+      }
+    },
+    "logAfter": {
+      "actionKinds": [
+        "logs"
+      ],
+      "path": [
+        "parameters",
+        "after"
+      ],
+      "valueSchema": {
+        "type": "string",
+        "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
+        "maxLength": 16
+      }
+    },
+    "logStream": {
+      "actionKinds": [
+        "logs"
+      ],
+      "path": [
+        "parameters",
+        "stream"
+      ],
+      "valueSchema": {
+        "type": "string",
+        "enum": [
+          "both"
+        ]
+      }
     }
   },
   "$defs": {
@@ -793,6 +836,79 @@
               "enum": [
                 "onTrigger",
                 "ongoing"
+              ]
+            }
+          },
+          "required": [
+            "actionID",
+            "field",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "actionID": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 63
+            },
+            "field": {
+              "const": "logBefore"
+            },
+            "value": {
+              "type": "string",
+              "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
+              "maxLength": 16
+            }
+          },
+          "required": [
+            "actionID",
+            "field",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "actionID": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 63
+            },
+            "field": {
+              "const": "logAfter"
+            },
+            "value": {
+              "type": "string",
+              "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
+              "maxLength": 16
+            }
+          },
+          "required": [
+            "actionID",
+            "field",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "actionID": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 63
+            },
+            "field": {
+              "const": "logStream"
+            },
+            "value": {
+              "type": "string",
+              "enum": [
+                "both"
               ]
             }
           },

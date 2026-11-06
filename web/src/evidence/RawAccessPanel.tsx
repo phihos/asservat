@@ -10,7 +10,7 @@ const count = (value: number) => new Intl.NumberFormat().format(value);
 
 // This form retains only metadata and one immutable request after submission.
 // An uncertain reply is retried with the same identity, selection and key.
-export function RawAccessPanel({ session, scope, caseID, artifacts, prefilledArtifactID, purpose = 'download', onGrant, client = operations, newID = () => crypto.randomUUID() }: { session: Session; scope: AbortSignal; caseID: string; artifacts: Artifact[]; prefilledArtifactID?: string; purpose?: 'download' | 'packet-query' | 'syscall-query'; onGrant?: (grantID: string) => void; client?: Operations; newID?: () => string }) {
+export function RawAccessPanel({ session, scope, caseID, artifacts, prefilledArtifactID, purpose = 'download', onGrant, client = operations, newID = () => crypto.randomUUID() }: { session: Session; scope: AbortSignal; caseID: string; artifacts: Artifact[]; prefilledArtifactID?: string; purpose?: 'download' | 'packet-query' | 'syscall-query' | 'log-query'; onGrant?: (grantID: string) => void; client?: Operations; newID?: () => string }) {
   const titleID = useId();
   const [allowed, setAllowed] = useState<'download' | 'query' | 'both'>(purpose !== 'download' ? 'query' : 'download');
   const query = allowed !== 'download';
@@ -38,15 +38,15 @@ export function RawAccessPanel({ session, scope, caseID, artifacts, prefilledArt
     if (purpose === 'download') heading.current?.focus();
   }, [prefilledArtifactID, artifacts]);
   useEffect(() => () => active.current?.abort(), [scope]);
-  const queryKind = (a: Artifact) => a.kind === 'packetCapture' && a.native_format === 'pcapng-raw' ? 'packet' : a.kind === 'syscallTrace' && a.native_format === 'asservat-syscall-arguments/v1' ? 'syscall' : undefined;
-  const raw = artifacts.filter(a => a.data_class === 'raw' && (purpose === 'download' || queryKind(a) === (purpose === 'packet-query' ? 'packet' : 'syscall')));
+  const queryKind = (a: Artifact) => a.kind === 'logs' && a.native_format === 'asservat-logs/v1' ? 'log' : a.kind === 'packetCapture' && a.native_format === 'pcapng-raw' ? 'packet' : a.kind === 'syscallTrace' && a.native_format === 'asservat-syscall-arguments/v1' ? 'syscall' : undefined;
+  const raw = artifacts.filter(a => a.data_class === 'raw' && (purpose === 'download' || queryKind(a) === (purpose === 'log-query' ? 'log' : purpose === 'packet-query' ? 'packet' : 'syscall')));
   if (raw.length === 0) return null;
   const eligible = (a: Artifact) => a.verified_native_bytes !== undefined && a.target !== undefined && Date.parse(a.expires_at) > Date.now();
   const chosen = raw.filter(a => selected.includes(a.artifact_id));
   const total = chosen.reduce((n, a) => n + (a.verified_native_bytes ?? 0), 0);
   const chosenKind = chosen.length ? queryKind(chosen[0]) : undefined;
   const queryEligible = chosenKind !== undefined && chosen.every(a => queryKind(a) === chosenKind);
-  const queryLabel = chosenKind === 'syscall' || purpose === 'syscall-query' ? 'syscall argument' : 'packet';
+  const queryLabel = chosenKind === 'log' || purpose === 'log-query' ? 'log' : chosenKind === 'syscall' || purpose === 'syscall-query' ? 'syscall argument' : 'packet';
   const minimum = downloads ? Math.max(1, total) : 24576;
   const maximum = downloads ? maximumBytes : 1073741824;
   const invalid = !chosen.length || chosen.length > 64 || chosen.some(a => !eligible(a)) || query && !queryEligible || !reason.trim() || !Number.isSafeInteger(maxBytes) || maxBytes < minimum || maxBytes > maximum || !Number.isInteger(seconds) || seconds < 1 || seconds > 28800;
@@ -63,7 +63,7 @@ export function RawAccessPanel({ session, scope, caseID, artifacts, prefilledArt
     if (busy || scope.aborted) return;
     if (!request.current) {
       if (invalid) return;
-      request.current = { case_id: caseID, artifact_digests: chosen.map(a => a.digest).sort(), operations: [...(downloads ? ['download_artifact' as const] : []), ...(query ? [chosenKind === 'syscall' ? 'syscall_query' as const : 'pcap_query' as const] : [])], reason: reason.trim(), max_bytes: maxBytes, expires_in_seconds: seconds, idempotency_key: newID() };
+      request.current = { case_id: caseID, artifact_digests: chosen.map(a => a.digest).sort(), operations: [...(downloads ? ['download_artifact' as const] : []), ...(query ? [chosenKind === 'log' ? 'get_logs' as const : chosenKind === 'syscall' ? 'syscall_query' as const : 'pcap_query' as const] : [])], reason: reason.trim(), max_bytes: maxBytes, expires_in_seconds: seconds, idempotency_key: newID() };
     }
     const controller = new AbortController(); active.current = controller;
     const abort = () => controller.abort(); scope.addEventListener('abort', abort, { once: true });

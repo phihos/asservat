@@ -17,7 +17,7 @@ export type CatalogDraft = { added: Added[]; bounds?: { bytes: string; duration:
 
 // Typed edits this panel offers; other structured settings (rings, peers,
 // filters, process selectors) keep the profile's reviewed defaults here.
-const textFields = new Set(['packetFilter', 'packetBefore', 'packetAfter', 'syscallBefore', 'syscallAfter', 'syscallMode', 'actionTimeout', 'actionExecutionMode', 'profileDuration', 'filePath']);
+const textFields = new Set(['packetFilter', 'packetBefore', 'packetAfter', 'syscallBefore', 'syscallAfter', 'syscallMode', 'actionTimeout', 'actionExecutionMode', 'profileDuration', 'filePath', 'logBefore', 'logAfter', 'logStream']);
 const numberFields = new Set(['actionMaxBytes', 'syscallMaxEvents', 'syscallRate']);
 const editable = (field: Field) => textFields.has(field.field) || numberFields.has(field.field) || field.field === 'syscallArguments';
 const key = (field: Field) => field.actionID + '/' + field.field;
@@ -37,7 +37,7 @@ export function profileDefault(definition: Definition, field: Field): string {
   const action = definition.recipe.actions.find(a => a.id === field.actionID) as { parameters?: Record<string, unknown>; limits?: Record<string, unknown>; executionMode?: string } | undefined;
   const p = action?.parameters ?? {}, l = action?.limits ?? {};
   const value = ({ packetFilter: p.filter, packetBefore: p.before, packetAfter: p.after, syscallBefore: p.before, syscallAfter: p.after, syscallMode: p.mode, syscallMaxEvents: p.maxEvents, syscallRate: p.maxEventsPerSecond,
-    actionTimeout: l.timeout, actionMaxBytes: l.maxBytes, actionExecutionMode: action?.executionMode } as Record<string, unknown>)[field.field];
+    logBefore: p.before, logAfter: p.after, logStream: p.stream, actionTimeout: l.timeout, actionMaxBytes: l.maxBytes, actionExecutionMode: action?.executionMode } as Record<string, unknown>)[field.field];
   return typeof value === 'string' || typeof value === 'number' ? String(value) : '';
 }
 

@@ -28,7 +28,9 @@
         {
           "actionID": "logs",
           "kind": "logs",
-          "executionMode": "onTrigger"
+          "executionMode": "onTrigger",
+          "requestedBefore": "30s",
+          "after": "10s"
         },
         {
           "actionID": "status",

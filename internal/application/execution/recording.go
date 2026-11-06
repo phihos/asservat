@@ -24,7 +24,7 @@ type RecordingExecutions interface {
 // recording records captureFailed or storeUnconfirmed.
 func (s APIContextRunner) CollectRecording(ctx context.Context, w APIContextWork, r value.APIExecution, collector evidence.RecordingCollector) (ContextResult, error) {
 	e := w.Accepted.Expectation
-	if ctx == nil || collector == nil || s.Process == nil || s.Record == nil || s.Recovery == nil || s.Now == nil || (e.Recording == nil && e.Snapshot == nil && e.Profile == nil) || r.Phase != "started" || r.ExpectationDigest != evidence.ContextExpectationDigest(e) {
+	if ctx == nil || collector == nil || s.Process == nil || s.Record == nil || s.Recovery == nil || s.Now == nil || (e.Recording == nil && e.Snapshot == nil && e.Profile == nil && e.Logs == nil) || r.Phase != "started" || r.ExpectationDigest != evidence.ContextExpectationDigest(e) {
 		return ContextResult{}, executeStep{"collect", value.ErrInvalid}
 	}
 	completionRecorder, ok := s.Record.(APIStoredCompletionRecorder)
@@ -46,6 +46,26 @@ func (s APIContextRunner) CollectRecording(ctx context.Context, w APIContextWork
 		return ContextResult{State: "Indeterminate"}, executeStep{"ReadAPIProcess", err}
 	}
 	result := r
+	if c.State == evidence.RecordingCancelled && e.Logs != nil {
+		joined := c.LogsCancellation
+		if joined == nil || joined.CaptureID != e.CaptureUID || joined.AttemptID != e.Registration.Location.AttemptID || joined.ExpectationDigest != r.ExpectationDigest || joined.WriterPodUID != r.Process.PodUID || joined.WriterEpoch != r.Process.ProcessEpoch || joined.JoinedAt.Before(r.StartedAt) || joined.JoinedAt.After(s.Now()) {
+			return ContextResult{State: "Indeterminate"}, executeStep{"LogsCancellation", value.ErrInvalid}
+		}
+		recorder, ok := s.Record.(APILogsCancellationRecorder)
+		if !ok {
+			return ContextResult{State: "Indeterminate"}, value.ErrUnavailable
+		}
+		recovery, err := s.Recovery.RecoveryState(ctx)
+		if err != nil {
+			return ContextResult{State: "Indeterminate"}, err
+		}
+		result.Phase, result.CompletedAt = "cancelled", joined.JoinedAt.UTC()
+		result.AcquiredAt, result.Copies = time.Time{}, artifact.Copies{}
+		if _, err = recorder.RecordAPILogsCancellation(ctx, result, *joined, process, recovery); err != nil {
+			return ContextResult{State: "Indeterminate"}, err
+		}
+		return ContextResult{State: "Cancelled"}, nil
+	}
 	if c.State == evidence.RecordingCancelled && e.Profile != nil {
 		joined := c.ProfileCancellation
 		if joined == nil || joined.CaptureID != e.CaptureUID || joined.AttemptID != e.Registration.Location.AttemptID || joined.ExpectationDigest != r.ExpectationDigest || joined.WriterPodUID != r.Process.PodUID || joined.WriterEpoch != r.Process.ProcessEpoch || joined.JoinedAt.Before(r.StartedAt) || joined.JoinedAt.After(s.Now()) {
@@ -146,6 +166,10 @@ func (s APIContextRunner) CollectRecording(ctx context.Context, w APIContextWork
 
 type APIProfileCancellationRecorder interface {
 	RecordAPIProfileCancellation(context.Context, value.APIExecution, artifact.ProfileCancellation, value.APIProcessObservation, artifact.RecoveryProof) (value.APIExecution, error)
+}
+
+type APILogsCancellationRecorder interface {
+	RecordAPILogsCancellation(context.Context, value.APIExecution, artifact.LogCancellation, value.APIProcessObservation, artifact.RecoveryProof) (value.APIExecution, error)
 }
 
 // APIRecordingCancellationRecorder persists one original writer's joined Stop.

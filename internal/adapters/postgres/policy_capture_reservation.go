@@ -76,9 +76,15 @@ func lockPolicyCaptureReservation(ctx context.Context, q *custodydb.Queries, tru
 			return nil, value.ErrConflict
 		}
 	}
+	if l := a.Plan.Input.Logs; l != nil && (manual != nil || !l.TriggeredAt.Equal(occurrence.CreatedAt.Time)) {
+		return nil, value.ErrDenied
+	}
 	// Generic preflight eligibility does not authorize a different action.
 	// Bind the actual immutable plan before reserving either pool.
 	action := authorization.PolicyContextAction
+	if a.Plan.Input.Logs != nil {
+		action = "logs"
+	}
 	if a.Plan.Input.Profile != nil {
 		action = "profile"
 	}
@@ -108,6 +114,13 @@ func lockPolicyCaptureReservation(ctx context.Context, q *custodydb.Queries, tru
 		output, required = recording.MaxBytes, policyRecordingNeedsGrant(recording)
 		arguments = recording.Kind == "syscallTrace" && recording.Profile == "arguments"
 		raw = arguments || recording.Filter != nil && planning.RawBytePredicate(recording.Filter.Expression)
+	}
+	if a.Plan.Input.Logs != nil {
+		l, _, err := planning.LogsForContext(a.Plan)
+		if err != nil {
+			return nil, value.ErrInvalid
+		}
+		output, required = l.MaxNativeBytes, planning.RecorderApprovedAcceptance(a.Plan.CanonicalScope)
 	}
 	if a.Plan.Input.Profile != nil {
 		profile, _, err := planning.ProfileForContext(a.Plan)
@@ -157,6 +170,9 @@ func lockPolicyCaptureReservation(ctx context.Context, q *custodydb.Queries, tru
 			return nil, value.ErrDenied
 		}
 		if raw && (grant.Policy.Observation == nil || grant.Policy.Limits.MaxObservedBytes < 1 || arguments && grant.Policy.Limits.MaxObservedEvents < 1) {
+			return nil, value.ErrDenied
+		}
+		if a.Plan.Input.Logs != nil && !policyLogsPlanMatches(grant, a.Plan) {
 			return nil, value.ErrDenied
 		}
 		if a.Plan.Input.Profile != nil && !policyProfilePlanMatches(grant, a.Plan) {
@@ -255,6 +271,9 @@ func lockCurrentPolicyCaptureGrant(ctx context.Context, q *custodydb.Queries, ro
 	} else {
 		occurrence, err := q.ReadPolicyCaptureReservation(ctx, custodydb.ReadPolicyCaptureReservationParams{RootID: row.RootID, ReservedCaptureID: row.ID})
 		if err == nil {
+			if accepted.Expectation.Logs != nil && !accepted.Expectation.TriggeredAt.Equal(occurrence.CreatedAt.Time) {
+				return nil, value.ErrDenied
+			}
 			reservation = policyGrantReservation{PolicyUid: occurrence.PolicyUid, AcceptanceID: occurrence.AcceptanceID, GrantID: occurrence.GrantID}
 		} else {
 			// ADR-275: a further recorder's capture of an occurrence.
@@ -277,7 +296,7 @@ func lockCurrentPolicyCaptureGrant(ctx context.Context, q *custodydb.Queries, ro
 		return nil, value.ErrDenied
 	}
 	if !reservation.GrantID.Valid {
-		if accepted.Expectation.Profile != nil || policyRecordingNeedsGrant(accepted.Expectation.Recording) || accepted.Expectation.Snapshot != nil && accepted.Expectation.Snapshot.RequireApproval {
+		if accepted.Expectation.Logs != nil && planning.RecorderApprovedAcceptance(row.ScopeJson) || accepted.Expectation.Profile != nil || policyRecordingNeedsGrant(accepted.Expectation.Recording) || accepted.Expectation.Snapshot != nil && accepted.Expectation.Snapshot.RequireApproval {
 			return nil, value.ErrDenied
 		}
 		return nil, ctx.Err()
@@ -298,6 +317,9 @@ func lockCurrentPolicyCaptureGrant(ctx context.Context, q *custodydb.Queries, ro
 		grant.Policy.RecipeDigest != accepted.Expectation.RecipeDigest ||
 		authorization.CheckPolicyGrantCurrent(grant, grant.Policy.Authority, grant.Policy.Workload(), now.Time) != nil ||
 		accepted.Deadline.After(grant.PolicyNotAfter) {
+		return nil, value.ErrDenied
+	}
+	if accepted.Expectation.Logs != nil && !policyLogsAcquisitionMatches(grant, accepted.Expectation.Logs, accepted.Expectation.RecipeDigest) {
 		return nil, value.ErrDenied
 	}
 	if accepted.Expectation.Profile != nil && !policyProfileAcquisitionMatches(grant, accepted.Expectation.Profile, accepted.Expectation.RecipeDigest) {

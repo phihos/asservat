@@ -165,6 +165,11 @@ func NewPublicContextOperations(c PublicContextOperationsConfig, s PublicContext
 			return nil, err
 		}
 	}
+	if raw, ok := q.RawLogQueries(); ok {
+		if projection, err = projection.WithRawLogQueries(raw); err != nil {
+			return nil, err
+		}
+	}
 	if raw, ok := q.RawSyscallQueries(); ok {
 		if projection, err = projection.WithRawSyscallQueries(raw); err != nil {
 			return nil, err

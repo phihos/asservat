@@ -68,7 +68,7 @@ func compilePolicyRecorders(c value.ProfileComposition, filters FilterCompiler, 
 	out := make([]value.PolicyRecorderConfiguration, 0, len(actions))
 	for _, x := range actions {
 		ci := slices.IndexFunc(c.Components, func(p value.ProfileComponent) bool { return p.ID == x.componentID })
-		if x.packet == nil && x.syscall == nil && x.profile == nil || ci < 0 {
+		if x.packet == nil && x.syscall == nil && x.profile == nil && x.logs == nil || ci < 0 {
 			return nil, refuse(value.CompositionRecorderUnavailable, "profile_composition", "policy execution supports network-header packets, ongoing syscall metadata and finite syscall arguments")
 		}
 		var endpoint *value.PolicyProfileEndpoint
@@ -116,10 +116,11 @@ func compilePolicyAction(c value.ProfileComposition, ci int, x expandedAction, p
 	}
 	finiteArguments := x.arguments != nil && summary.SyscallMode == "arguments" && summary.ExecutionMode == "onTrigger"
 	finiteProfile := x.profile != nil && endpoint.Valid() && summary.ExecutionMode == "onTrigger"
+	finiteLogs := x.logs != nil && summary.ExecutionMode == "onTrigger"
 	if x.syscall != nil && !finiteArguments && (summary.SyscallMode != "metadata" || summary.ExecutionMode != "ongoing") {
 		return out, refuse(value.CompositionRecorderUnavailable, "profile_composition", "syscall policies require an ongoing metadata source or explicit finite approved arguments")
 	}
-	if summary.ExecutionMode != "onTrigger" && summary.ExecutionMode != "ongoing" || summary.ExecutionMode == "onTrigger" && summary.Before != "0s" && !finiteProfile {
+	if summary.ExecutionMode != "onTrigger" && summary.ExecutionMode != "ongoing" || summary.ExecutionMode == "onTrigger" && summary.Before != "0s" && !finiteProfile && !finiteLogs {
 		return out, refuse(value.CompositionRecorderUnavailable, "profile_composition", "select an ongoing source or an explicit onTrigger recording with before 0s")
 	}
 	if summary.ExecutionMode == "ongoing" && !sources {
@@ -129,11 +130,11 @@ func compilePolicyAction(c value.ProfileComposition, ci int, x expandedAction, p
 		return out, refuse(value.CompositionRecorderUnavailable, "profile_composition", "ongoing sources support ordinary network-header predicates only")
 	}
 	after, ok := durationValue(summary.After, true)
-	if !finiteProfile && (!ok || after > 5*time.Minute || after < time.Second && summary.ExecutionMode != "ongoing") {
+	if !finiteProfile && !finiteLogs && (!ok || after > 5*time.Minute || after < time.Second && summary.ExecutionMode != "ongoing") {
 		return out, refuse(value.CompositionRecorderUnavailable, "profile_composition", "a policy incident records between one second and five minutes")
 	}
 	for n, e := range component.Edits {
-		if !finiteProfile && e.Field == "actionMaxBytes" && e.Number > artifact.RecordingNativeLimit {
+		if !finiteProfile && !finiteLogs && e.Field == "actionMaxBytes" && e.Number > artifact.RecordingNativeLimit {
 			return out, refuse(value.CompositionInvalid, pathf("profile_composition.components[%d].overrides[%d].value", ci, n), "a capture can save at most 8 MiB in this release; lower the output limit")
 		}
 	}
@@ -175,6 +176,8 @@ func compilePolicyAction(c value.ProfileComposition, ci int, x expandedAction, p
 	out = value.PolicyRecorderConfiguration{Composition: *c.Clone(), Profile: value.ResolvedProfile{ComponentID: component.ID, Ref: component.Profile, DefinitionDigest: profile.Digest}, Action: summary, Recipe: recipe, RecipeDigest: recipeDigest, Scope: scope, Digest: digest}
 	if finiteProfile {
 		out.ProfileEndpoint = endpoint.Clone()
+	}
+	if finiteProfile || finiteLogs {
 		out.Profile.SourceClusterID, out.Profile.SourceNamespaceUID, out.Profile.SourceUID, out.Profile.Deprecated = profile.SourceClusterID, profile.SourceNamespaceUID, profile.SourceUID, profile.Deprecated
 	}
 	if finiteArguments {

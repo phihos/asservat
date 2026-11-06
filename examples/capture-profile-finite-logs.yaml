@@ -1,0 +1,70 @@
+{
+  "apiVersion": "asservat.io/v1alpha1",
+  "kind": "CaptureProfile",
+  "metadata": {
+    "name": "finite-logs.v1",
+    "namespace": "asservat-builtin-profiles"
+  },
+  "spec": {
+    "name": "finite-logs",
+    "version": "v1",
+    "definition": {
+      "displayName": "Finite whole-pod logs",
+      "description": "Saved raw logs from current and available previous container instances; combined streams and explicit coverage gaps.",
+      "recipe": {
+        "description": "Finite whole-pod logs without host access or container selection.",
+        "actions": [
+          {
+            "id": "logs",
+            "kind": "logs",
+            "parameters": {
+              "before": "10s",
+              "after": "0s",
+              "stream": "both"
+            },
+            "required": true,
+            "impact": "observe",
+            "limits": {
+              "maxBytes": 10485760,
+              "timeout": "10s"
+            },
+            "executionMode": "onTrigger"
+          }
+        ],
+        "maxTotalBytes": 10485760,
+        "maxDuration": "10s"
+      },
+      "editableFields": [
+        {
+          "actionID": "logs",
+          "field": "logBefore",
+          "label": "Historical window"
+        },
+        {
+          "actionID": "logs",
+          "field": "logAfter",
+          "label": "After-trigger window"
+        },
+        {
+          "actionID": "logs",
+          "field": "logStream",
+          "label": "Log stream"
+        },
+        {
+          "actionID": "logs",
+          "field": "actionMaxBytes",
+          "label": "Native output limit"
+        },
+        {
+          "actionID": "logs",
+          "field": "actionTimeout",
+          "label": "Completion deadline"
+        }
+      ]
+    },
+    "availability": {
+      "enabled": true,
+      "deprecated": false
+    }
+  }
+}

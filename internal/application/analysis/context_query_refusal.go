@@ -60,6 +60,10 @@ func (d *ContextProjectionDelivery) clearProjectionLocked() {
 		*d.syscallEvents = value.SyscallEventPage{}
 		d.syscallEvents = nil
 	}
+	if d.logs != nil {
+		d.logs.Clear()
+		d.logs = nil
+	}
 	if d.syscallQuery != nil {
 		d.syscallQuery.Clear()
 		d.syscallQuery = nil

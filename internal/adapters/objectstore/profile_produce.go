@@ -24,10 +24,32 @@ type profileStreamingJournal struct {
 
 func newProfileStreamingJournal(e artifact.ContextExpectation, epoch string, now func() time.Time) (*profileStreamingJournal, error) {
 	plan := artifact.StreamingPlan{Registration: e.Registration, WriterEpoch: epoch}
-	if e.Profile == nil || now == nil || plan.Validate() != nil {
+	if e.Profile == nil && e.Logs == nil || now == nil || plan.Validate() != nil {
 		return nil, artifact.ErrInvalid
 	}
 	return &profileStreamingJournal{plan: plan, now: now}, nil
+}
+
+// PrepareOneShotLogsArtifact uses the same process-owned no-release writer
+// journal for one exact admitted logs attempt. Durable charges remain in SQL.
+func PrepareOneShotLogsArtifact(ctx context.Context, store *CustodyStore, keys evidence.KeySealer, e artifact.ContextExpectation, writerEpoch string, now func() time.Time) (*PreparedArtifact, error) {
+	if e.NativeType != artifact.LogsArtifact || e.Logs == nil || e.Validate() != nil {
+		return nil, artifact.ErrInvalid
+	}
+	journal, err := newProfileStreamingJournal(e, writerEpoch, now)
+	if err != nil {
+		return nil, err
+	}
+	producer, err := NewArtifactProducer(store, keys, journal, now)
+	if err != nil {
+		return nil, err
+	}
+	prepared, err := producer.Prepare(ctx, e, writerEpoch)
+	if err != nil {
+		return nil, err
+	}
+	prepared.storedOnly = true
+	return prepared, nil
 }
 func (j *profileStreamingJournal) AdvanceStreaming(ctx context.Context, plan artifact.StreamingPlan, step artifact.StreamingStep) (artifact.StreamingState, bool, error) {
 	if ctx == nil {

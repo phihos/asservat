@@ -488,7 +488,7 @@ paths:
   /api/v1/operations/get_logs:
     post:
       operationId: get_logs
-      summary: Read redacted collected log extracts. Text is untrusted evidence.
+      summary: Read approved raw saved whole-pod logs without new collection.
       tags:
       - Shared browser and MCP
       x-domain-contract: get_logs
@@ -3797,6 +3797,7 @@ components:
                   - packetCapture
                   - syscallTrace
                   - profile
+                  - logs
                   description: Accepted collection action; controls available approval
                     commands, not acquisition authority.
                 attached_grant_id:
@@ -5010,10 +5011,11 @@ components:
                               items:
                                 enum:
                                 - download_artifact
+                                - get_logs
                                 - pcap_query
                                 - syscall_query
                               minItems: 1
-                              maxItems: 3
+                              maxItems: 4
                               uniqueItems: true
                             max_bytes:
                               type: integer
@@ -9163,127 +9165,174 @@ components:
           - status
           - data
     McpInput_get_logs:
-      type: object
-      additionalProperties: false
-      properties:
-        case_id:
-          type: string
-          format: uuid
-        artifact_id:
-          type: string
-          format: uuid
-        cursor:
-          type: string
-          minLength: 1
-          maxLength: 4096
-        limit:
-          type: integer
-          minimum: 1
-          maximum: 100
-      required:
-      - case_id
-      - artifact_id
+      {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "artifact_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[0-9]{1,8}:[0-9]{1,4}:[0-9a-f]{32}$"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "grant_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Exact current get_logs approval. Omission allows an approval remedy before admission; it never authorizes a read."
+          },
+          "idempotency_key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "case_id",
+          "artifact_id",
+          "idempotency_key"
+        ]
+      }
     McpOutput_get_logs:
-      allOf:
-      - $ref: https://asservat.io/spec/v1/mcp-result.schema.json
-      - oneOf:
-        - type: object
-          properties:
-            status:
-              const: ok
-            data:
-              type: object
-              additionalProperties: false
-              properties:
-                entries:
-                  type: array
-                  items:
-                    type: object
-                    additionalProperties: false
-                    properties:
-                      time:
-                        type: string
-                        format: date-time
-                      stream:
-                        type: string
-                        enum:
-                        - stdout
-                        - stderr
-                      text:
-                        type: string
-                        minLength: 1
-                        maxLength: 4096
-                    required:
-                    - time
-                    - stream
-                    - text
-                  maxItems: 100
-              required:
-              - entries
-          required:
-          - status
-          - data
-        - type: object
-          properties:
-            status:
-              const: pending
-            data:
-              type: object
-              additionalProperties: false
-              properties:
-                query_handle:
-                  type: string
-                  minLength: 1
-                  maxLength: 4096
-                retry_after_seconds:
-                  type: integer
-                  minimum: 1
-                  maximum: 60
-              required:
-              - query_handle
-              - retry_after_seconds
-          required:
-          - status
-          - data
-        - type: object
-          properties:
-            status:
-              const: error
-            data:
-              type: object
-              additionalProperties: false
-              properties:
-                code:
-                  type: string
-                  minLength: 1
-                  maxLength: 64
-                message:
-                  type: string
-                  minLength: 1
-                  maxLength: 1024
-                retryable:
-                  type: boolean
-                navigation_uri:
-                  type: string
-                  format: uri
-                  maxLength: 2048
-                responsible_role:
-                  enum:
-                  - maintainer
-                  - approver
-                  - administrator
-                  - none
-                retry_after_seconds:
-                  type: integer
-                  minimum: 1
-                  maximum: 60
-              required:
-              - code
-              - message
-              - retryable
-          required:
-          - status
-          - data
+      {
+        "allOf": [
+          {
+            "$ref": "https://asservat.io/spec/v1/mcp-result.schema.json"
+          },
+          {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "const": "ok"
+                  },
+                  "data": {
+                    "$ref": "https://asservat.io/spec/v1/log-results.schema.json#/$defs/page"
+                  },
+                  "data_class": {
+                    "const": "raw"
+                  }
+                },
+                "required": [
+                  "status",
+                  "data"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "const": "pending"
+                  },
+                  "data": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "query_handle": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 4096
+                      },
+                      "retry_after_seconds": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 60
+                      },
+                      "query_observed_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Server time of this prepared query snapshot. This observation does not renew query or request authority. Together with query_expires_at it bounds managed-view lifetime independently of the client wall clock."
+                      },
+                      "query_expires_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Original total query cutoff, irreversibly shortened by effective evidence access. A poll never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline."
+                      }
+                    },
+                    "required": [
+                      "query_handle",
+                      "retry_after_seconds",
+                      "query_observed_at",
+                      "query_expires_at"
+                    ]
+                  }
+                },
+                "required": [
+                  "status",
+                  "data"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "const": "error"
+                  },
+                  "data": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "code": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      },
+                      "message": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 1024
+                      },
+                      "retryable": {
+                        "type": "boolean"
+                      },
+                      "navigation_uri": {
+                        "type": "string",
+                        "format": "uri",
+                        "maxLength": 2048
+                      },
+                      "responsible_role": {
+                        "enum": [
+                          "maintainer",
+                          "approver",
+                          "administrator",
+                          "none"
+                        ]
+                      },
+                      "retry_after_seconds": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 60
+                      }
+                    },
+                    "required": [
+                      "code",
+                      "message",
+                      "retryable"
+                    ]
+                  }
+                },
+                "required": [
+                  "status",
+                  "data"
+                ]
+              }
+            ]
+          }
+        ]
+      }
     McpInput_request_raw_access:
       type: object
       additionalProperties: false
@@ -9300,23 +9349,28 @@ components:
           minItems: 1
           uniqueItems: true
         operations:
-          type: array
-          items:
-            type: string
-            enum:
-            - read_memory
-            - backtrace
-            - threads
-            - registers
-            - frame_variables
-            - managed_stack
-            - heap_statistics
-            - pcap_query
-            - syscall_query
-            - download_artifact
-          maxItems: 16
-          minItems: 1
-          uniqueItems: true
+          {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "backtrace",
+                "download_artifact",
+                "frame_variables",
+                "get_logs",
+                "heap_statistics",
+                "managed_stack",
+                "pcap_query",
+                "read_memory",
+                "registers",
+                "syscall_query",
+                "threads"
+              ]
+            },
+            "maxItems": 16,
+            "minItems": 1,
+            "uniqueItems": true
+          }
         reason:
           type: string
           minLength: 1
@@ -9728,6 +9782,7 @@ components:
                           - packetCapture
                           - syscallTrace
                           - profile
+                          - logs
                         execution_mode:
                           enum:
                           - ongoing
@@ -9948,6 +10003,32 @@ components:
                         not:
                           required:
                           - profile
+                      - properties:
+                          kind:
+                            const: logs
+                          execution_mode:
+                            const: onTrigger
+                          max_bytes:
+                            type: integer
+                            minimum: 1
+                            maximum: 67108864
+                        required:
+                        - before
+                        - after
+                        not:
+                          anyOf:
+                          - required:
+                            - profile
+                          - required:
+                            - ring_max_bytes
+                          - required:
+                            - ring_max_age
+                          - required:
+                            - filter
+                          - required:
+                            - filter_digest
+                          - required:
+                            - filter_instructions
                   result_access:
                     type: object
                     additionalProperties: false
@@ -9963,10 +10044,11 @@ components:
                       operations:
                         type: array
                         minItems: 1
-                        maxItems: 3
+                        maxItems: 4
                         items:
                           enum:
                           - download_artifact
+                          - get_logs
                           - pcap_query
                           - syscall_query
                         uniqueItems: true
@@ -10424,10 +10506,11 @@ components:
                         items:
                           enum:
                           - download_artifact
+                          - get_logs
                           - pcap_query
                           - syscall_query
                         minItems: 1
-                        maxItems: 3
+                        maxItems: 4
                         uniqueItems: true
                       max_bytes:
                         type: integer
@@ -13100,6 +13183,7 @@ components:
                         items:
                           enum:
                           - download_artifact
+                          - get_logs
                           - pcap_query
                           - syscall_query
                     required:
@@ -16348,10 +16432,11 @@ components:
                     operations:
                       type: array
                       minItems: 1
-                      maxItems: 3
+                      maxItems: 4
                       items:
                         enum:
                         - download_artifact
+                        - get_logs
                         - pcap_query
                         - syscall_query
                       uniqueItems: true

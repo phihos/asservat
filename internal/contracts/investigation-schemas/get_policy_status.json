@@ -470,7 +470,8 @@
                       "podStatus",
                       "packetCapture",
                       "syscallTrace",
-                      "profile"
+                      "profile",
+                      "logs"
                     ],
                     "description": "Accepted collection action; controls available approval commands, not acquisition authority."
                   },

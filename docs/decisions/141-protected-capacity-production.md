@@ -21,6 +21,24 @@ ordinal70 reserves and publishes; capacity-capture ordinal71 provides the
 SQL52 capture backing. Neither may impersonate the other's phase. Original
 ordinal34 is a separate read-only accepted audit-profile credential.
 
+The original implementation made a spent setup claim lookup-only even when its
+first SQL transaction had never committed. This was an agent-authored one-shot
+restriction, not a separate maintainer requirement. The retained `f9412540`
+installer failure had an immutable unacknowledged claim with 1.763939 seconds
+remaining at creation and neither paired row; subsequent attempts could never
+finish. The exact first postclaim failure was not retained, so this does not
+establish which loaded operation consumed that interval.
+
+A later invocation may finish the first atomic pair under fresh protected role,
+permission, recovery and guard authority only when the original exact claim has
+no acknowledged receipt and both rows remain absent under the existing locks.
+The claim's identifiers, input digest, database incarnation and timestamps stay
+unchanged and supply no fresh authority. A committed pair is exact lookup-only;
+half-pairs, foreign state and missing roots after an acknowledged receipt remain
+refused. Runtime projection still requires the receipt. This adds no schema,
+role, provider request, timer, retry loop or configuration: it uses the existing
+bounded invocation, locks, two atomic INSERTs and post-blocking/commit checks.
+
 Fund the root once from a fixed compiled plan covering all permitted accounts,
 records, system objects, SQL/history, backup/WAL copies, key attempts and bounded
 configuration work. Enrollment does not resize the shared capture pool. Keep

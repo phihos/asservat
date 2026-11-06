@@ -408,7 +408,8 @@ func (s *ContextQueries) AdmitQueryPoll(ctx context.Context, q value.ContextQuer
 // on first insertion, not a poll, read, worker, query unit or grant use.
 func (s *ContextQueries) RegisterQueryReplayCall(ctx context.Context, q value.ContextQuery, r value.ContextQueryRequest, a value.ContextProjectionAuthority) error {
 	supported := q.Scope.DisplayVersion == value.PacketQueryDisplayVersion && q.Scope.PacketQuery.Valid() ||
-		q.Scope.DisplayVersion == value.SyscallQueryDisplayVersion && q.Scope.NativeType == artifact.SyscallArgumentsArtifact && q.Scope.SourceFormat == artifact.SyscallArgumentsFormat && q.Scope.Syscalls.View == value.SyscallQueryView
+		q.Scope.DisplayVersion == value.SyscallQueryDisplayVersion && q.Scope.NativeType == artifact.SyscallArgumentsArtifact && q.Scope.SourceFormat == artifact.SyscallArgumentsFormat && q.Scope.Syscalls.View == value.SyscallQueryView ||
+		q.Scope.DisplayVersion == value.LogQueryDisplayVersion && q.Scope.NativeType == artifact.LogsArtifact && q.Scope.SourceFormat == artifact.LogFormat
 	if !supported || !q.Scope.Valid() || !q.InvocationKey.Valid() || r.Call.Tool != q.Scope.BeginTool() {
 		return value.ErrUnavailable
 	}

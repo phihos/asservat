@@ -10,6 +10,7 @@ import (
 	"asservat.local/asservat/internal/domain/execution"
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"crypto/tls"
 	"encoding/json"
 	pprof "github.com/google/pprof/profile"
@@ -61,18 +62,19 @@ func TestContextQueryLedgerOriginalQualification(t *testing.T) {
 }
 
 type queryLedgerFixture struct {
-	base           *capacitySQLFixture
-	enrolled       app.Enrollment
-	current        *postgres.SharedContextQueryPlans
-	policies       *authapp.ContextProjectionPolicies
-	profile        value.ContextQueryResourceProfile
-	workerProfile  authorization.DownloadWorkerProfile
-	workerObserver *evidence.WorkerConfigurationObserver
-	workerConfig   *postgres.WorkerConfigurations
-	scenario       captureAdmissionScenario
-	published      artifact.PublishedContext
-	audit          audit.AcceptedCapacityAuditProfiles
-	root           app.RootConfiguration
+	base                 *capacitySQLFixture
+	enrolled             app.Enrollment
+	current              *postgres.SharedContextQueryPlans
+	policies             *authapp.ContextProjectionPolicies
+	profile              value.ContextQueryResourceProfile
+	workerProfile        authorization.DownloadWorkerProfile
+	workerObserver       *evidence.WorkerConfigurationObserver
+	workerConfig         *postgres.WorkerConfigurations
+	scenario             captureAdmissionScenario
+	published            artifact.PublishedContext
+	audit                audit.AcceptedCapacityAuditProfiles
+	root                 app.RootConfiguration
+	initialResultGrantID string
 	// workloadGone stops refreshing the workload's capacity observation, as
 	// after the source workload's deletion (maintainer decision 2026-10-23).
 	workloadGone bool
@@ -133,12 +135,17 @@ func withProtectedContextQueryLedger(t *testing.T, ctx context.Context, admin *p
 	isPacket := len(profileSource) > 3 && profileSource[3]
 	rawPacket := len(profileSource) > 4 && profileSource[4]
 	rawSyscall := len(profileSource) > 5 && profileSource[5]
+	isLogs := len(profileSource) > 6 && profileSource[6]
+	logsGroup := len(profileSource) > 7 && profileSource[7]
 	f := newCapacitySQLFixture(t, ctx, admin, address, tlsConfig, scope, claim, administration, objects, func(f *capacitySQLFixture) {
 		queryLedgerQualification(t, f)
+		if isLogs {
+			logsLedgerFunding(t, f, logsGroup)
+		}
 		if isPacket || rawSyscall {
 			packetLedgerFunding(t, f)
 		}
-		if isProfile || isPacket || rawSyscall {
+		if isProfile || isPacket || rawSyscall || isLogs {
 			q := f.qualification.ContextQuery
 			q.Profile.Worker.MemoryBytes, q.Profile.Worker.WorkerTransientBytes = value.ProfileSummaryWorkerBytes, value.ProfileSummaryWorkerBytes
 			q.RootQueries, q.PrincipalQueries, q.WorkloadQueries = 20, 20, 20
@@ -196,9 +203,9 @@ func withProtectedContextQueryLedger(t *testing.T, ctx context.Context, admin *p
 	for _, p := range pools[processingPools:] {
 		p.Close()
 	}
-	query.scenario, query.published = publishQueryLedgerContext(t, f, root, enrolled, isProfile, legacyTiming, isPacket, rawPacket, rawSyscall)
+	query.scenario, query.published = publishQueryLedgerContext(t, f, root, enrolled, isProfile, legacyTiming, isPacket, rawPacket, rawSyscall, isLogs)
 	profile := syntheticWorkerProfile(f.input.InstallationID)
-	if isProfile || isPacket || rawSyscall {
+	if isProfile || isPacket || rawSyscall || isLogs {
 		profile.MemoryBytes = value.ProfileSummaryWorkerBytes
 		if isComparison {
 			profile.MemoryBytes = value.ProfileComparisonWorkerBytes
@@ -222,7 +229,7 @@ func withProtectedContextQueryLedger(t *testing.T, ctx context.Context, admin *p
 	if err != nil {
 		t.Fatal(err)
 	}
-	raw := querySQLPolicy{root: f.input.PermissionRootID, installation: f.input.InstallationID, epoch: recovery.IssuerEpoch, path: path, profile: isProfile, packet: isPacket, syscall: rawSyscall}
+	raw := querySQLPolicy{root: f.input.PermissionRootID, installation: f.input.InstallationID, epoch: recovery.IssuerEpoch, path: path, profile: isProfile, packet: isPacket, syscall: rawSyscall, logs: isLogs}
 	query.policies, err = authapp.NewContextProjectionPolicies(raw, time.Now)
 	if err != nil {
 		t.Fatal(err)
@@ -244,7 +251,11 @@ func publishQueryLedgerContext(t *testing.T, f *capacitySQLFixture, root app.Roo
 	packetSource := len(legacyTiming) > 1 && legacyTiming[1]
 	rawPacket := len(legacyTiming) > 2 && legacyTiming[2]
 	rawSyscall := len(legacyTiming) > 3 && legacyTiming[3]
-	if rawSyscall {
+	isLogs := len(legacyTiming) > 4 && legacyTiming[4]
+	if isLogs {
+		s, accepted, profileSQL = admitQueryLedgerProfile(t, f, root, enrollment, false, false, true)
+		started, refresh = startQueryLedgerProfile(t, f, s, accepted, profileSQL)
+	} else if rawSyscall {
 		s, accepted, profileSQL = admitQueryLedgerProfile(t, f, root, enrollment, false, true)
 		started, refresh = startQueryLedgerProfile(t, f, s, accepted, profileSQL)
 	} else if packetSource {
@@ -260,25 +271,64 @@ func publishQueryLedgerContext(t *testing.T, f *capacitySQLFixture, root app.Roo
 	} else {
 		s, accepted = f.admitManagedContextRetention(t, root, enrollment, 60)
 	}
+	return publishPreparedQueryLedgerContext(t, f, s, accepted, profileSQL, started, refresh, len(legacyTiming) > 0 && legacyTiming[0])
+}
+
+// Reuse the exact existing custody/publication flow for already admitted group
+// children; only their independent admission is different.
+func publishPreparedQueryLedgerContext(t *testing.T, f *capacitySQLFixture, s captureAdmissionScenario, accepted capture.Accepted, profileSQL *postgres.APIContextExecutions, started execution.APIExecution, refresh func() executionapp.APIExecutionCheck, legacy bool) (captureAdmissionScenario, artifact.PublishedContext) {
+	t.Helper()
+	profileSource := accepted.Expectation.Profile != nil
+	packetSource := accepted.Expectation.Recording != nil && accepted.Expectation.Recording.Kind == "packetCapture"
+	rawPacket := accepted.Expectation.NativeType == artifact.RawPCAPNGArtifact
+	rawSyscall := accepted.Expectation.NativeType == artifact.SyscallArgumentsArtifact
+	isLogs := accepted.Expectation.Logs != nil
 	e := accepted.Expectation
+	if isLogs {
+		assertLogsOriginalCollectCutoff(t, f.ctx, profileSQL, e)
+	}
 	bound, err := f.store.ForCustody(e.Registration.StoreID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	var copies artifact.Copies
 	var acquisition artifact.AcquisitionWindow
-	if profileSource || packetSource || rawSyscall {
-		producer, err := objectstore.NewArtifactProducer(bound, f.keys, unusedStreamingJournal{}, time.Now)
-		if err != nil {
-			t.Fatal(err)
+	if profileSource || packetSource || rawSyscall || isLogs {
+		var prepared *objectstore.PreparedArtifact
+		if isLogs && e.Registration.NativeLimit > artifact.FrameBytes {
+			// Match the actual connector writer: the pending SQL obligation is
+			// already charged and bound, while the process-owned journal cannot
+			// release it. Other one-frame fixture sources retain their old path.
+			plan := artifact.StreamingPlan{Registration: e.Registration, WriterEpoch: started.Process.ProcessEpoch}
+			encoded, err := json.Marshal(plan)
+			if err != nil {
+				t.Fatal(err)
+			}
+			wantDigest := sha256.Sum256(encoded)
+			var epoch string
+			var storedDigest []byte
+			var temporaryBytes, temporaryObjects int64
+			var charged bool
+			if err = f.admin.QueryRow(f.ctx, `SELECT writer_epoch::text,plan_digest,temporary_bytes,temporary_objects,released_at IS NULL FROM custody_stream WHERE attempt_id=$1`, e.Registration.Location.AttemptID).Scan(&epoch, &storedDigest, &temporaryBytes, &temporaryObjects, &charged); err != nil || epoch != plan.WriterEpoch || !bytes.Equal(storedDigest, wantDigest[:]) || temporaryBytes != plan.TemporaryBytes() || temporaryObjects != int64(1+plan.PartLimit()) || !charged {
+				t.Fatalf("original logs multipart obligation epochMatches=%t digestMatches=%t bytes=%d/%d objects=%d/%d charged=%t err=%v", epoch == plan.WriterEpoch, bytes.Equal(storedDigest, wantDigest[:]), temporaryBytes, plan.TemporaryBytes(), temporaryObjects, 1+plan.PartLimit(), charged, err)
+			}
+			prepared, err = objectstore.PrepareOneShotLogsArtifact(f.ctx, bound, f.keys, e, plan.WriterEpoch, time.Now)
+		} else {
+			producer, createErr := objectstore.NewArtifactProducer(bound, f.keys, unusedStreamingJournal{}, time.Now)
+			if createErr != nil {
+				t.Fatal(createErr)
+			}
+			prepared, err = producer.Prepare(f.ctx, e, "")
 		}
-		prepared, err := producer.Prepare(f.ctx, e, "")
 		if err != nil {
-			t.Fatal(err)
+			t.Fatal("managed original writer preparation", err)
 		}
 		var body bytes.Buffer
 		at := time.Now().UTC()
-		if rawSyscall {
+		if isLogs {
+			body.Write(logsQuerySyntheticNative(t, e, started.StartedAt, time.Now().UTC()))
+			at = time.Now().UTC()
+		} else if rawSyscall {
 			time.Sleep(2 * time.Millisecond)
 			at = time.Now().UTC().Truncate(time.Microsecond)
 			original := installedArgumentsSQLSource(t, f.ctx, f.admin, s.a.RootID)(e.CaptureUID)
@@ -387,7 +437,7 @@ func publishQueryLedgerContext(t *testing.T, f *capacitySQLFixture, root app.Roo
 	publisher := evidence.ContextPublisher{Ledger: evidence.ContextPublicationFacets{ContextAcceptanceReader: check, ContextVerificationRecorder: check, ContextVerificationAuditor: ack, ContextCatalogPublisher: publish}, Authority: contextPublicationTestGate{check: func(ctx context.Context, v artifact.ContextExpectation) (artifact.PublicationAuthority, error) {
 		return f.currentManagedPublication(ctx, s, v)
 	}}, Verifier: verifier, Audit: &objectstore.ContextVerificationObjects{Store: f.store, Seal: f.keys, Open: f.keys}, Now: time.Now}
-	if profileSource || packetSource || rawSyscall {
+	if profileSource || packetSource || rawSyscall || isLogs {
 		gatePool := f.fixturePool("api_publication_gate_runtime", "synthetic-api-publication-gate")
 		defer gatePool.Close()
 		gate, err := postgres.NewAPIContextPublicationGate(f.ctx, gatePool, s.a.RootID, guards, privacyapp.RetentionResolver{RetainedPolicies: s.retention, Now: time.Now}, s.recovery.reader)
@@ -398,7 +448,7 @@ func publishQueryLedgerContext(t *testing.T, f *capacitySQLFixture, root app.Roo
 	}
 	var probe profileAcquisitionPublicationProbe
 	if profileSource {
-		probe = qualifyProfileAcquisitionBeforePublication(t, f, s, publisher, check, e, copies, acquisition, len(legacyTiming) > 0 && legacyTiming[0])
+		probe = qualifyProfileAcquisitionBeforePublication(t, f, s, publisher, check, e, copies, acquisition, legacy)
 	}
 	published, err := publisher.Publish(f.ctx, e.CaptureUID, copies)
 	if err != nil {
@@ -418,6 +468,7 @@ type querySQLPolicy struct {
 	profile                   bool
 	packet                    bool
 	syscall                   bool
+	logs                      bool
 }
 
 func (p querySQLPolicy) DownloadPolicy(ctx context.Context) (privacy.DownloadPolicy, error) {
@@ -428,7 +479,9 @@ func (p querySQLPolicy) DownloadPolicy(ctx context.Context) (privacy.DownloadPol
 	x := p.path
 	path := artifact.DownloadPath{ID: x.ID, TargetClusterID: x.TargetClusterID, StoreID: x.StoreID, StorageRegion: x.StorageRegion, AcquisitionClusterID: x.AcquisitionClusterID, AcquisitionRegion: x.AcquisitionRegion, ConnectorClusterID: x.ConnectorClusterID, ConnectorRegion: x.ConnectorRegion, HubClusterID: x.HubClusterID, HubRegion: x.HubRegion, WorkerConfiguration: x.WorkerConfiguration, HubConfiguration: x.HubConfiguration}
 	classes, evidenceTypes := []string{"metadata"}, []string{"context"}
-	if p.syscall {
+	if p.logs {
+		classes, evidenceTypes = []string{"raw"}, []string{"logs"}
+	} else if p.syscall {
 		classes, evidenceTypes = []string{"extract"}, []string{"syscallTrace"}
 	} else if p.packet {
 		classes, evidenceTypes = []string{"extract"}, []string{"packetCapture"}

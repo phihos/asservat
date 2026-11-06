@@ -19,8 +19,8 @@ import (
 
 var _ app.RecordingExecutions = (*APIContextExecutions)(nil)
 
-// StartedRecordings lists started recordings whose execution started at or
-// before the instant, oldest first.
+// StartedRecordings lists due finite recordings, oldest first. Logs use the
+// original accepted trigger plus after interval; other paths retain start time.
 func (s *APIContextExecutions) StartedRecordings(ctx context.Context, startedBefore time.Time, limit int) ([]string, error) {
 	if limit < 1 || limit > 64 || startedBefore.IsZero() {
 		return nil, value.ErrInvalid
@@ -61,7 +61,7 @@ func (s *APIContextExecutions) ReadRecordingWork(ctx context.Context, captureID 
 			return err
 		}
 		w.CancellationRequested = row.SnapshotCancelRequestedAt.Valid
-		if w.Accepted.Expectation.Recording == nil && w.Accepted.Expectation.Snapshot == nil && w.Accepted.Expectation.Profile == nil {
+		if w.Accepted.Expectation.Recording == nil && w.Accepted.Expectation.Snapshot == nil && w.Accepted.Expectation.Profile == nil && w.Accepted.Expectation.Logs == nil {
 			return value.ErrDenied
 		}
 		if err = sourceSnapshotWork(ctx, q, s.root, &w); err != nil {

@@ -121,7 +121,7 @@ func ProjectionComparisonSourcesMatch(sources [2]NativeContextSource, scope valu
 // one recording frame, ADR-282) at the scope's case, capture and target.
 func projectionExpectation(e artifact.ContextExpectation, scope value.ContextProjectionScope) bool {
 	src, ok := scope.Source()
-	kind := e.NativeType == artifact.PCAPNGArtifact && (e.Recording != nil && e.Recording.Profile == "networkHeaders" || e.Snapshot != nil) ||
+	kind := e.NativeType == artifact.LogsArtifact && e.Logs.Valid() || e.NativeType == artifact.PCAPNGArtifact && (e.Recording != nil && e.Recording.Profile == "networkHeaders" || e.Snapshot != nil) ||
 		e.NativeType == artifact.RawPCAPNGArtifact && e.Recording != nil && e.Recording.Profile == "rawPackets" ||
 		e.NativeType == artifact.PodStatusArtifact && e.ActionID == "pod-status" && e.Recording == nil ||
 		e.NativeType == artifact.HTTPHeadersArtifact && e.Recording != nil && e.Recording.Profile == "httpHeaders" ||

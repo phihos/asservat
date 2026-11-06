@@ -12,7 +12,7 @@ import (
 // group's case and storage, and a plan whose scope the parent lists.
 func ReviewedCompositionGroupChild(p value.ContextPreview, index int, a value.Admission) bool {
 	g := p.CompositionGroup
-	if g == nil || !ValidContextPreview(p) || index < 0 || index >= len(g.Children) || a.RecordingSave != nil || a.Plan.Input.Snapshot != nil || a.Plan.Input.Recorder == nil {
+	if g == nil || !ValidContextPreview(p) || index < 0 || index >= len(g.Children) || a.RecordingSave != nil || a.Plan.Input.Snapshot != nil || (a.Plan.Input.Recorder == nil) == (a.Plan.Input.Logs == nil) || a.Plan.Input.Profile != nil {
 		return false
 	}
 	c := g.Children[index]

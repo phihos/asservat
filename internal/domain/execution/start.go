@@ -53,7 +53,8 @@ func (b Binding) Valid() bool {
 		podStatus := b.NativeType == "" && b.ActionID == "pod-status" && b.NativeBytes == artifact.MaxContextBytes
 		recording := b.NativeType == "" && recorderAction(b.ActionID) && b.NativeBytes > 0 && b.NativeBytes <= artifact.RecordingNativeLimit
 		profile := recorderAction(b.ActionID) && b.NativeBytes > 0 && (b.NativeType == artifact.PprofArtifact && b.NativeBytes <= artifact.MaxPprofBytes || b.NativeType == artifact.GoTraceArtifact && b.NativeBytes <= artifact.MaxGoTraceBytes)
-		if b.NodeUID != "" || b.NodeBootID != "" || !authorization.UUID(b.ExecutorPodUID) || !authorization.UUID(b.ExecutorAccountUID) || !podStatus && !recording && !profile || b.NotAfter.After(b.NotBefore.Add(5*time.Second)) {
+		logs := recorderAction(b.ActionID) && b.NativeType == artifact.LogsArtifact && b.NativeBytes > 0 && b.NativeBytes <= artifact.LogNativeLimit
+		if b.NodeUID != "" || b.NodeBootID != "" || !authorization.UUID(b.ExecutorPodUID) || !authorization.UUID(b.ExecutorAccountUID) || !podStatus && !recording && !profile && !logs || b.NotAfter.After(b.NotBefore.Add(5*time.Second)) {
 			return false
 		}
 	} else if b.NativeType != "" || b.ExecutionClass != artifact.ContextNodeExecution || !authorization.UUID(b.NodeUID) || !authorization.UUID(b.NodeBootID) || b.ExecutorPodUID != "" || b.ExecutorAccountUID != "" {

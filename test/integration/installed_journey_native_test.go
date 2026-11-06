@@ -972,9 +972,12 @@ func installedJourneyReplyCode(wire *contracts.InvestigationContracts, name stri
 			return installedJourneyEnvelope{}, "", errors.New("installed failure without code")
 		}
 		return out, failure.Code, nil
-	} else if out.Status != "ok" {
+	} else if out.Status != "ok" && out.Status != "pending" {
 		return installedJourneyEnvelope{}, "", errors.New("unexpected installed operation status")
 	}
+	// The tool-specific schema above decides whether pending is legal. Query
+	// callers retain its original handle/deadline; synchronous callers still
+	// require ok before reading completed data.
 	return out, "", nil
 }
 
@@ -1151,7 +1154,7 @@ func installedJourneyFocus() string { return os.Getenv("ASSERVAT_JOURNEY_FOCUS")
 // 20-minute limit; docs/implementation-progress.md records the split.
 func installedFastFixture() bool {
 	switch installedJourneyFocus() {
-	case "policy", "alert", "logresource", "browser", "restart", "upgrade", "journey", "clusters", "share", "approved-recording", "manual-syscall", "manual-arguments", "manual-mixed", "manual-raw", "manual-http", "manual-peers", "manual-profile", "profile-comparison", "native-paced", "policy-recording", "policy-arguments", "policy-profile", "ongoing-save", "ongoing-save-disk", "ongoing-incident", "ongoing-syscall", "ongoing-mixed":
+	case "policy", "alert", "logresource", "browser", "restart", "upgrade", "journey", "clusters", "share", "approved-recording", "manual-logs", "manual-syscall", "manual-arguments", "manual-mixed", "manual-raw", "manual-http", "manual-peers", "manual-profile", "profile-comparison", "native-paced", "policy-recording", "policy-arguments", "policy-profile", "ongoing-save", "ongoing-save-disk", "ongoing-incident", "ongoing-syscall", "ongoing-mixed":
 		return true
 	}
 	return false

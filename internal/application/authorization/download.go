@@ -29,7 +29,7 @@ type ContextDownloadEvidence struct {
 	// CaseID binds a recipient's share to the artifact's case (ADR-233).
 	CaseID string
 	// DataClass is the accepted expectation's class: metadata, raw for an
-	// approved raw packet capture, syscall arguments or runtime profile, or extract for an HTTP header
+	// approved raw packet capture, syscall arguments, runtime profile or logs, or extract for an HTTP header
 	// projection (ADR-282). ActionID names its action.
 	DataClass, ActionID string
 	// NativeType is a verified format discriminator, never native content.
@@ -62,12 +62,12 @@ type RawResultAccess interface {
 }
 
 // downloadClass is the record's class on the installed download path:
-// metadata, raw only for a packet capture, verified syscall arguments or runtime profile, or extract only for a
+// metadata, raw only for a packet capture, verified syscall arguments, runtime profile or logs, or extract only for a
 // packet capture's HTTP header projection (ADR-282), whose verified
 // expectation ties the class to that native type.
 func downloadClass(r ContextDownloadEvidence) (string, bool) {
 	kind := r.Retained.Input.EvidenceType
-	ok := r.DataClass == "metadata" || r.DataClass == "raw" && (kind == "packetCapture" || kind == "profile" || kind == "syscallTrace" && r.NativeType == artifact.SyscallArgumentsArtifact) || r.DataClass == "extract" && kind == "packetCapture"
+	ok := r.DataClass == "metadata" || r.DataClass == "raw" && (kind == "packetCapture" || kind == "profile" || kind == "syscallTrace" && r.NativeType == artifact.SyscallArgumentsArtifact || kind == "logs" && r.NativeType == artifact.LogsArtifact) || r.DataClass == "extract" && kind == "packetCapture"
 	return r.DataClass, ok
 }
 

@@ -35,6 +35,9 @@ func (s ProjectionSource) ReadOperation() authorization.Operation {
 	if !ok || known != s {
 		return ""
 	}
+	if s.DisplayVersion == LogQueryDisplayVersion {
+		return authorization.ReadLogQuery
+	}
 	if s.DisplayVersion == SyscallQueryDisplayVersion {
 		return authorization.ReadSyscallQuery
 	}

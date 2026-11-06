@@ -40,6 +40,9 @@ func RecorderAssessmentRulesFor(actions []value.RecorderAction) artifact.Digest 
 		if a.Kind == "syscallTrace" && a.SyscallMode == "arguments" {
 			out = artifact.Digest(sha256.Sum256([]byte(string(out[:]) + "syscall-arguments-assessment/v1;pre-read-event-byte-credit;unknown-impact;raw-path-buffer-content;no-refund")))
 		}
+		if a.Kind == "logs" {
+			out = artifact.Digest(sha256.Sum256([]byte(string(out[:]) + "finite-logs-assessment/v1;whole-pod-current-previous;combined-streams;raw-text-no-redaction;encoded-native-cap;unknown-rotation-and-impact")))
+		}
 	}
 	return out
 }
@@ -100,6 +103,9 @@ func AssessRecorder(plan value.RecorderPlan, assessmentID string, now time.Time)
 	}
 	if plan.Actions[0].Kind == "profile" {
 		out.Combined.Explanation = "Live profiling uses application and collector resources. Overhead and interaction with other profilers are not measured by this preview. The selected native byte and duration limits are ceilings, not predictions."
+	}
+	if plan.Actions[0].Kind == "logs" {
+		out.Combined.Explanation = "Uses finite Kubernetes log reads and regional encoding, encryption and upload. Shared API and collector load and latency are unmeasured. Native byte caps include provenance, JSON and base64; no text redaction is claimed."
 	}
 	var ringArmed, ringIncident, frozen, output int64
 	effects := map[string]bool{}
@@ -168,6 +174,9 @@ func AssessRecorder(plan value.RecorderPlan, assessmentID string, now time.Time)
 			}
 			out.Combined.Explanation = "Profiling overhead depends on the runtime, load and other profilers and is not measured; no profile is acquired in this release. Limits are not predictions."
 			out.Interaction = "An application-owned profiler or another Asservat profile of the same runtime domain makes the request fail with ProfilerBusy; Asservat never stops it."
+		case "logs":
+			assessed.Impact = value.AssessmentImpact{Level: "unknown", HasUnknowns: true, Effects: []string{"collectorMemory", "storageIO", "uploadContention"}, Explanation: "Finite Kubernetes log reads, encoding, encryption and upload use shared API and collector resources. Load and latency are unmeasured; byte and duration limits are ceilings."}
+			assessed.Exposure = value.AssessmentExposure{Classification: "potentialPersonalData", Basis: "conservativeMechanism", RetainedPossible: []string{"userContent", "credentials", "paths", "personalIdentifiers"}, TransientOnly: []string{}, UnknownContent: true}
 		default:
 			return value.RecorderAssessment{}, value.ErrInvalid
 		}
@@ -182,7 +191,7 @@ func AssessRecorder(plan value.RecorderPlan, assessmentID string, now time.Time)
 			quantity("collectorMemoryBytes", ringPhase, ringScope, ringRef, ringCoverage, ringMemory),
 			quantity("collectorMemoryBytes", "perIncident", "perIncidentPod", "action:"+a.ID+":maxFrozenBytes", frozenCoverage, a.MaxFrozenBytes),
 		}
-		if a.Kind == "profile" {
+		if a.Kind == "profile" || a.Kind == "logs" {
 			// A profile has no ring or frozen snapshot buffers.
 			assessed.Quantities = assessed.Quantities[:1]
 		}
@@ -196,7 +205,7 @@ func AssessRecorder(plan value.RecorderPlan, assessmentID string, now time.Time)
 	if ringArmed > 0 {
 		out.CombinedQuantities = append(out.CombinedQuantities, quantity("collectorMemoryBytes", "whileArmed", "wholePlan", "sum-of-declared-ring-limits", ringCoverage, ringArmed))
 	}
-	if plan.Actions[0].Kind != "profile" {
+	if plan.Actions[0].Kind != "profile" && plan.Actions[0].Kind != "logs" {
 		// A manual plan records one evidence type; profiles have no buffers.
 		out.CombinedQuantities = append(out.CombinedQuantities, quantity("collectorMemoryBytes", "perIncident", "wholePlan", "sum-of-declared-frozen-and-staging-limits", frozenCoverage, frozen+ringIncident))
 	}

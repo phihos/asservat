@@ -184,7 +184,7 @@ export interface components {
                 }))[];
                 result_access?: {
                     action_ids: string[];
-                    operations: ("download_artifact" | "pcap_query" | "syscall_query")[];
+                    operations: ("download_artifact" | "get_logs" | "pcap_query" | "syscall_query")[];
                     client_ids: string[];
                     max_artifacts: number;
                     max_bytes: number;
@@ -267,7 +267,7 @@ export interface components {
             /** Format: uuid */
             case_id: string;
             artifact_digests: string[];
-            operations: ("read_memory" | "backtrace" | "threads" | "registers" | "frame_variables" | "managed_stack" | "heap_statistics" | "pcap_query" | "syscall_query" | "download_artifact")[];
+            operations: ("backtrace" | "download_artifact" | "frame_variables" | "get_logs" | "heap_statistics" | "managed_stack" | "pcap_query" | "read_memory" | "registers" | "syscall_query" | "threads")[];
             reason: string;
             max_bytes: number;
             expires_in_seconds: number;
@@ -394,7 +394,7 @@ export interface components {
                 actions: ({
                     action_id: string;
                     /** @enum {unknown} */
-                    kind: "packetCapture" | "syscallTrace" | "profile";
+                    kind: "packetCapture" | "syscallTrace" | "profile" | "logs";
                     /** @enum {unknown} */
                     execution_mode: "ongoing" | "onTrigger";
                     before?: string;
@@ -445,10 +445,16 @@ export interface components {
                 } | {
                     /** @enum {unknown} */
                     kind?: "packetCapture" | "syscallTrace";
+                } | {
+                    /** @constant */
+                    kind?: "logs";
+                    /** @constant */
+                    execution_mode?: "onTrigger";
+                    max_bytes?: number;
                 }))[];
                 result_access?: {
                     action_ids: string[];
-                    operations: ("download_artifact" | "pcap_query" | "syscall_query")[];
+                    operations: ("download_artifact" | "get_logs" | "pcap_query" | "syscall_query")[];
                     client_ids: string[];
                     max_artifacts: number;
                     max_bytes: number;
@@ -568,7 +574,7 @@ export interface components {
                     /** Format: uuid */
                     case_id: string;
                     reason: string;
-                    operations: ("download_artifact" | "pcap_query" | "syscall_query")[];
+                    operations: ("download_artifact" | "get_logs" | "pcap_query" | "syscall_query")[];
                     max_bytes: number;
                     /** @constant */
                     max_operations: 10000;
@@ -807,7 +813,7 @@ export interface components {
                         /** Format: uuid */
                         case_id: string;
                         reason: string;
-                        operations: ("download_artifact" | "pcap_query" | "syscall_query")[];
+                        operations: ("download_artifact" | "get_logs" | "pcap_query" | "syscall_query")[];
                         max_bytes: number;
                         /** @constant */
                         max_operations: 10000;

@@ -91,6 +91,7 @@ func (p ContextQueryPlan) Matches(s ContextProjectionScope) bool {
 		p.WorkloadUID == s.WorkloadUID && p.Principal == s.Principal &&
 		p.AllocationRevision > 0 && p.AllocationRevision <= 1<<60 && p.PoolSource.Valid() && p.PolicySource.Valid() &&
 		p.Profile.Valid() && p.Profile.Path.TargetClusterID == s.ClusterID &&
+		(s.NativeType != artifact.LogsArtifact || p.Profile.Worker.MemoryBytes >= LogQueryWorkerBytes && p.Profile.Worker.WorkerTransientBytes >= LogQueryWorkerBytes) &&
 		(s.DisplayVersion != PacketQueryDisplayVersion || p.Profile.Worker.MemoryBytes >= PacketQueryWorkerBytes && p.Profile.Worker.WorkerTransientBytes >= PacketQueryWorkerBytes) &&
 		(s.NativeType != artifact.PCAPNGArtifact && s.NativeType != artifact.RawPCAPNGArtifact || p.Profile.Worker.MemoryBytes >= PacketSummaryWorkerBytes && p.Profile.Worker.WorkerTransientBytes >= PacketSummaryWorkerBytes) &&
 		(s.NativeType != artifact.PprofArtifact || p.Profile.Worker.MemoryBytes >= ProfileSummaryWorkerBytes && p.Profile.Worker.WorkerTransientBytes >= ProfileSummaryWorkerBytes) &&
@@ -125,7 +126,7 @@ type ContextQuery struct {
 func contextQueryTime(t time.Time) time.Time { return t.UTC().Truncate(time.Microsecond) }
 
 func (q ContextQuery) Valid() bool {
-	if q.Scope.DisplayVersion == PacketQueryDisplayVersion || q.Scope.DisplayVersion == SyscallQueryDisplayVersion {
+	if q.Scope.DisplayVersion == PacketQueryDisplayVersion || q.Scope.DisplayVersion == SyscallQueryDisplayVersion || q.Scope.DisplayVersion == LogQueryDisplayVersion {
 		if !q.InvocationKey.Valid() {
 			return false
 		}
@@ -269,7 +270,7 @@ type ContextQueryCall struct {
 func (r ContextQueryCall) Valid(now time.Time) bool {
 	return authorization.UUID(r.ID) && authorization.UUID(r.RootID) && r.InputFormat == "context-query-input/v1" &&
 		identity.Text(r.MACVersion, 64) && r.InputDigest != (artifact.Digest{}) && r.PrincipalDigest != (artifact.Digest{}) &&
-		(r.Tool == "syscall_query" || r.Tool == "pcap_query" || r.Tool == "get_pcap_summary" || r.Tool == "get_file_excerpt" || r.Tool == "get_http_headers" || r.Tool == "get_profile_summary" || r.Tool == "compare_profiles" || r.Tool == "get_syscall_summary" || r.Tool == "get_syscall_events" || r.Tool == "get_query_result") && r.Principal.Valid() &&
+		(r.Tool == "get_logs" || r.Tool == "syscall_query" || r.Tool == "pcap_query" || r.Tool == "get_pcap_summary" || r.Tool == "get_file_excerpt" || r.Tool == "get_http_headers" || r.Tool == "get_profile_summary" || r.Tool == "compare_profiles" || r.Tool == "get_syscall_summary" || r.Tool == "get_syscall_events" || r.Tool == "get_query_result") && r.Principal.Valid() &&
 		identity.Fresh(r.StartedAt, r.Until, now, identity.EvidenceReadRequestWindow) && !r.WriteUntil.Before(r.Until) &&
 		!r.WriteUntil.After(r.StartedAt.Add(30*time.Second))
 }

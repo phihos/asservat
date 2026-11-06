@@ -10,7 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-func (s *PublicRuntimeSQLRoles) capacitySetupPair(ctx context.Context, tx pgx.Tx, in capacitySetupInput, receipt contracts.CapacityRootSetupReceipt, roles []capacitySetupRole, fresh bool) error {
+func (s *PublicRuntimeSQLRoles) capacitySetupPair(ctx context.Context, tx pgx.Tx, in capacitySetupInput, receipt contracts.CapacityRootSetupReceipt, roles []capacitySetupRole, fresh, unacknowledged bool) error {
 	if len(roles) != len(contracts.CapacitySetupRolePurposes()) {
 		return cfg.ErrInvalid
 	}
@@ -36,7 +36,13 @@ func (s *PublicRuntimeSQLRoles) capacitySetupPair(ctx context.Context, tx pgx.Tx
 			return cfg.ErrChanged
 		}
 	} else {
-		if !fresh || ctx.Err() != nil || !time.Now().Before(receipt.Until) {
+		// The immutable claim identifies the original setup and incarnation;
+		// it is not current effect authority. A failed first transaction may
+		// leave both rows absent. Before any acknowledged receipt, this exact
+		// pair can finish under this invocation's current bounded authority.
+		// Once acknowledged, missing roots are never recreated. Half-pairs
+		// remain refused above, and the caller retains all post-lock checks.
+		if !unacknowledged || ctx.Err() != nil || fresh && !time.Now().Before(receipt.Until) {
 			return cfg.ErrUnavailable
 		}
 		q := in.qualification

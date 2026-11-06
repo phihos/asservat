@@ -699,6 +699,111 @@ export interface components {
                 retry_after_seconds?: number;
             };
         });
+        McpInput_get_logs: {
+            /** Format: uuid */
+            case_id: string;
+            /** Format: uuid */
+            artifact_id: string;
+            cursor?: string;
+            limit?: number;
+            /**
+             * Format: uuid
+             * @description Exact current get_logs approval. Omission allows an approval remedy before admission; it never authorizes a read.
+             */
+            grant_id?: string;
+            idempotency_key: string;
+        };
+        Contract_log_results_5bb857fd69a5246d: {
+            /** @constant */
+            kind: "logs";
+            pod_uid: string;
+            /** Format: date-time */
+            window_start: string;
+            /** Format: date-time */
+            window_end: string;
+            entries: components["schemas"]["Contract_log_results_d3f629e9c1ad4b52"][];
+            coverage: {
+                origins: number;
+                complete_origins: number;
+                partial_origins: number;
+                unavailable_origins: number;
+                unknown_timestamp_origins: number;
+                gapped_origins: number;
+                source_bytes: number;
+                total_fragments: number;
+            };
+            /** Format: date-time */
+            query_observed_at: string;
+            /** Format: date-time */
+            query_expires_at: string;
+        };
+        Contract_log_results_d3f629e9c1ad4b52: {
+            origin: {
+                origin_id: number;
+                /** @enum {unknown} */
+                container_kind: "regular" | "init" | "ephemeral";
+                container_name: string;
+                /** @enum {unknown} */
+                source: "current" | "previous";
+                /** @constant */
+                stream: "combined";
+                runtime_id: string | null;
+                restart_count: number | null;
+            };
+            fragment: number;
+            line: number;
+            offset: number;
+            line_offset: number;
+            continuation: boolean;
+            end_line: boolean;
+            /** Format: date-time */
+            source_time: string | null;
+            text: string | null;
+            bytes_base64: string | null;
+        } & ({
+            text?: string;
+            bytes_base64?: null;
+        } | {
+            text?: null;
+            bytes_base64?: string;
+        });
+        McpOutput_get_logs: components["schemas"]["Contract_mcp_result"] & ({
+            /** @constant */
+            status: "ok";
+            data: components["schemas"]["Contract_log_results_5bb857fd69a5246d"];
+            /** @constant */
+            data_class?: "raw";
+        } | {
+            /** @constant */
+            status: "pending";
+            data: {
+                query_handle: string;
+                retry_after_seconds: number;
+                /**
+                 * Format: date-time
+                 * @description Server time of this prepared query snapshot. This observation does not renew query or request authority. Together with query_expires_at it bounds managed-view lifetime independently of the client wall clock.
+                 */
+                query_observed_at: string;
+                /**
+                 * Format: date-time
+                 * @description Original total query cutoff, irreversibly shortened by effective evidence access. A poll never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline.
+                 */
+                query_expires_at: string;
+            };
+        } | {
+            /** @constant */
+            status: "error";
+            data: {
+                code: string;
+                message: string;
+                retryable: boolean;
+                /** Format: uri */
+                navigation_uri?: string;
+                /** @enum {unknown} */
+                responsible_role?: "maintainer" | "approver" | "administrator" | "none";
+                retry_after_seconds?: number;
+            };
+        });
         McpInput_get_query_result: {
             query_handle: string;
         };

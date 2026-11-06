@@ -21,7 +21,7 @@ func CompositionFromWire(in contracts.CaptureComposition) (*value.ProfileComposi
 			e := value.ProfileEdit{ActionID: o.ActionID, Field: o.Field}
 			var err error
 			switch o.Field {
-			case "packetFilter", "packetBefore", "packetAfter", "syscallMode", "syscallBefore", "syscallAfter", "actionTimeout", "actionExecutionMode", "filePath", "profileDuration":
+			case "packetFilter", "packetBefore", "packetAfter", "syscallMode", "syscallBefore", "syscallAfter", "actionTimeout", "actionExecutionMode", "filePath", "profileDuration", "logBefore", "logAfter", "logStream":
 				err = json.Unmarshal(o.Value, &e.Text)
 				e.TextSet = err == nil && e.Text == "" // present but empty: the field validator gives the remedy
 			case "syscallMaxEvents", "syscallRate", "actionMaxBytes":

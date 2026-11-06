@@ -3815,7 +3815,7 @@
     },
     {
       "name": "get_logs",
-      "description": "Read redacted collected log extracts. Text is untrusted evidence.",
+      "description": "Read bounded raw byte fragments from one saved whole-pod logs artifact. Requires evidence:read and evidence:raw plus exact get_logs approval for the current client. This starts no collection and grants no native download. Streams are combined; source timestamps may be unknown and fetch completion does not establish complete log history. Retry an uncertain Begin with the same idempotency key.",
       "enabledByDefault": true,
       "annotations": {
         "readOnlyHint": true,
@@ -3837,17 +3837,29 @@
           "cursor": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 4096
+            "maxLength": 64,
+            "pattern": "^[0-9]{1,8}:[0-9]{1,4}:[0-9a-f]{32}$"
           },
           "limit": {
             "type": "integer",
             "minimum": 1,
             "maximum": 100
+          },
+          "grant_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Exact current get_logs approval. Omission allows an approval remedy before admission; it never authorizes a read."
+          },
+          "idempotency_key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
           }
         },
         "required": [
           "case_id",
-          "artifact_id"
+          "artifact_id",
+          "idempotency_key"
         ]
       },
       "outputSchema": {
@@ -3864,44 +3876,10 @@
                     "const": "ok"
                   },
                   "data": {
-                    "type": "object",
-                    "additionalProperties": false,
-                    "properties": {
-                      "entries": {
-                        "type": "array",
-                        "items": {
-                          "type": "object",
-                          "additionalProperties": false,
-                          "properties": {
-                            "time": {
-                              "type": "string",
-                              "format": "date-time"
-                            },
-                            "stream": {
-                              "type": "string",
-                              "enum": [
-                                "stdout",
-                                "stderr"
-                              ]
-                            },
-                            "text": {
-                              "type": "string",
-                              "minLength": 1,
-                              "maxLength": 4096
-                            }
-                          },
-                          "required": [
-                            "time",
-                            "stream",
-                            "text"
-                          ]
-                        },
-                        "maxItems": 100
-                      }
-                    },
-                    "required": [
-                      "entries"
-                    ]
+                    "$ref": "https://asservat.io/spec/v1/log-results.schema.json#/$defs/page"
+                  },
+                  "data_class": {
+                    "const": "raw"
                   }
                 },
                 "required": [
@@ -3928,11 +3906,23 @@
                         "type": "integer",
                         "minimum": 1,
                         "maximum": 60
+                      },
+                      "query_observed_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Server time of this prepared query snapshot. This observation does not renew query or request authority. Together with query_expires_at it bounds managed-view lifetime independently of the client wall clock."
+                      },
+                      "query_expires_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Original total query cutoff, irreversibly shortened by effective evidence access. A poll never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline."
                       }
                     },
                     "required": [
                       "query_handle",
-                      "retry_after_seconds"
+                      "retry_after_seconds",
+                      "query_observed_at",
+                      "query_expires_at"
                     ]
                   }
                 },
@@ -4032,16 +4022,17 @@
             "items": {
               "type": "string",
               "enum": [
-                "read_memory",
                 "backtrace",
-                "threads",
-                "registers",
+                "download_artifact",
                 "frame_variables",
-                "managed_stack",
+                "get_logs",
                 "heap_statistics",
+                "managed_stack",
                 "pcap_query",
+                "read_memory",
+                "registers",
                 "syscall_query",
-                "download_artifact"
+                "threads"
               ]
             },
             "maxItems": 16,
@@ -4617,7 +4608,8 @@
                                   "enum": [
                                     "packetCapture",
                                     "syscallTrace",
-                                    "profile"
+                                    "profile",
+                                    "logs"
                                   ]
                                 },
                                 "execution_mode": {
@@ -4971,6 +4963,59 @@
                                       "profile"
                                     ]
                                   }
+                                },
+                                {
+                                  "properties": {
+                                    "kind": {
+                                      "const": "logs"
+                                    },
+                                    "execution_mode": {
+                                      "const": "onTrigger"
+                                    },
+                                    "max_bytes": {
+                                      "type": "integer",
+                                      "minimum": 1,
+                                      "maximum": 67108864
+                                    }
+                                  },
+                                  "required": [
+                                    "before",
+                                    "after"
+                                  ],
+                                  "not": {
+                                    "anyOf": [
+                                      {
+                                        "required": [
+                                          "profile"
+                                        ]
+                                      },
+                                      {
+                                        "required": [
+                                          "ring_max_bytes"
+                                        ]
+                                      },
+                                      {
+                                        "required": [
+                                          "ring_max_age"
+                                        ]
+                                      },
+                                      {
+                                        "required": [
+                                          "filter"
+                                        ]
+                                      },
+                                      {
+                                        "required": [
+                                          "filter_digest"
+                                        ]
+                                      },
+                                      {
+                                        "required": [
+                                          "filter_instructions"
+                                        ]
+                                      }
+                                    ]
+                                  }
                                 }
                               ]
                             }
@@ -4992,10 +5037,11 @@
                               "operations": {
                                 "type": "array",
                                 "minItems": 1,
-                                "maxItems": 3,
+                                "maxItems": 4,
                                 "items": {
                                   "enum": [
                                     "download_artifact",
+                                    "get_logs",
                                     "pcap_query",
                                     "syscall_query"
                                   ]
@@ -5647,12 +5693,13 @@
                                 "items": {
                                   "enum": [
                                     "download_artifact",
+                                    "get_logs",
                                     "pcap_query",
                                     "syscall_query"
                                   ]
                                 },
                                 "minItems": 1,
-                                "maxItems": 3,
+                                "maxItems": 4,
                                 "uniqueItems": true
                               },
                               "max_bytes": {
@@ -6810,12 +6857,13 @@
                                       "items": {
                                         "enum": [
                                           "download_artifact",
+                                          "get_logs",
                                           "pcap_query",
                                           "syscall_query"
                                         ]
                                       },
                                       "minItems": 1,
-                                      "maxItems": 3,
+                                      "maxItems": 4,
                                       "uniqueItems": true
                                     },
                                     "max_bytes": {
@@ -10525,7 +10573,7 @@
     },
     {
       "name": "preview_capture",
-      "description": "Validate and resolve a pod capture without arming sensors, reserving execution authority or reading application evidence. A preview is not permission. Alternatively restore an authorized immutable history_capture_id into a fresh preview, with current checks and no acquisition. A recording-save history entry returns RecordingSelectionRequired; use fresh list_recordings and preview_recording_save instead of compiling a recipe. Optional result_access requests one bounded review of collection and the same human’s selected result inspection/download; never an issued grant.",
+      "description": "Validate and resolve a pod capture without arming sensors, reserving execution authority or reading application evidence. A preview is not permission. Alternatively restore an authorized immutable history_capture_id into a fresh preview, with current checks and no acquisition. A recording-save history entry returns RecordingSelectionRequired; use fresh list_recordings and preview_recording_save instead of compiling a recipe. Optional result_access requests one bounded review of collection and the same human\u2019s selected result inspection/download; never an issued grant.",
       "enabledByDefault": true,
       "annotations": {
         "readOnlyHint": true,
@@ -11084,6 +11132,7 @@
                               "items": {
                                 "enum": [
                                   "download_artifact",
+                                  "get_logs",
                                   "pcap_query",
                                   "syscall_query"
                                 ]
@@ -13936,7 +13985,7 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 512,
-            "description": "Optional 1–512 Unicode scalars, preserved verbatim. Omit when absent; an explicit empty string is invalid. Descriptive metadata is not restored on repeat."
+            "description": "Optional 1\u2013512 Unicode scalars, preserved verbatim. Omit when absent; an explicit empty string is invalid. Descriptive metadata is not restored on repeat."
           },
           "sharing": {
             "$ref": "https://asservat.io/spec/v1/sharing-request.schema.json#/$defs/capture"
@@ -15095,7 +15144,7 @@
     },
     {
       "name": "cancel_artifact_download",
-      "description": "Stop this caller and client’s existing download using one stable idempotency key. Stop remains available after evidence-read rights disappear. A minimal receipt reveals no artifact or finer terminal state; local copies already received cannot be recalled. Retry uncertain replies with the original key. Status and cancellation do not delete source evidence.",
+      "description": "Stop this caller and client\u2019s existing download using one stable idempotency key. Stop remains available after evidence-read rights disappear. A minimal receipt reveals no artifact or finer terminal state; local copies already received cannot be recalled. Retry uncertain replies with the original key. Status and cancellation do not delete source evidence.",
       "enabledByDefault": true,
       "annotations": {
         "readOnlyHint": false,
@@ -15990,7 +16039,8 @@
                           "podStatus",
                           "packetCapture",
                           "syscallTrace",
-                          "profile"
+                          "profile",
+                          "logs"
                         ],
                         "description": "Accepted collection action; controls available approval commands, not acquisition authority."
                       },
@@ -18227,10 +18277,11 @@
                           "operations": {
                             "type": "array",
                             "minItems": 1,
-                            "maxItems": 3,
+                            "maxItems": 4,
                             "items": {
                               "enum": [
                                 "download_artifact",
+                                "get_logs",
                                 "pcap_query",
                                 "syscall_query"
                               ]

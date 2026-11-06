@@ -103,3 +103,17 @@ describe('ProfileCatalog', () => {
     expect(b.bytes).toBe(32 << 20);
   });
 });
+
+it('authors finite logs windows and combined stream as typed edits with reviewed defaults', async () => {
+ const reply=profileResult('network-connections');if(reply.status!=='ok')throw Error();const definition=reply.data.definition;
+ Object.assign(definition,{displayName:'Finite whole-Pod logs',editableFields:[{actionID:'logs',field:'logBefore',label:'Historical window'},{actionID:'logs',field:'logAfter',label:'After-trigger window'},{actionID:'logs',field:'logStream',label:'Log stream'},{actionID:'logs',field:'actionTimeout',label:'Completion deadline'}]});
+ Object.assign(definition.recipe.actions[0],{id:'logs',kind:'logs',parameters:{before:'10s',after:'0s',stream:'both'},executionMode:'onTrigger',limits:{maxBytes:10485760,timeout:'10s'}});
+ const draft:CatalogDraft={added:[{id:'saved',ref:{catalog:'builtin',name:'finite-logs',version:'v1'},definition,values:{}}],bounds:{bytes:'10485760',duration:'40s'}};
+ const client=new SyntheticOperations();client.responder=()=>import('./test-fixtures').then(m=>m.profilesResult());const onPreview=vi.fn<(c:Composition)=>void>();
+ render(<ProfileCatalog session={session} scope={new AbortController().signal} target={target} busy={false} onPreview={onPreview} client={client} initial={draft}/>);
+ expect(screen.getByLabelText('Historical window').getAttribute('placeholder')).toBe('10s');expect(screen.getByLabelText('After-trigger window').getAttribute('placeholder')).toBe('0s');expect(screen.getByLabelText('Log stream').getAttribute('placeholder')).toBe('both');
+ fireEvent.change(screen.getByLabelText('Historical window'),{target:{value:'1h'}});fireEvent.change(screen.getByLabelText('After-trigger window'),{target:{value:'30s'}});fireEvent.change(screen.getByLabelText('Completion deadline'),{target:{value:'40s'}});
+ fireEvent.click(screen.getByRole('button',{name:'Review combined recording'}));
+ expect(onPreview.mock.calls.at(-1)![0].components[0].overrides).toEqual([{actionID:'logs',field:'logBefore',value:'1h'},{actionID:'logs',field:'logAfter',value:'30s'},{actionID:'logs',field:'actionTimeout',value:'40s'}]);
+ await waitFor(()=>expect(client.calls.length).toBeGreaterThan(0));cleanup();
+});

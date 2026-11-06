@@ -1,0 +1,85 @@
+{
+  "candidate": "f9412540b2c1753d517cbb7c8b576d6e3bb796e4",
+  "payloads": [
+    {
+      "archive": "capacity-readonly-diagnosis.json.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/finite-logs-capacity-diagnosis/handoff.json",
+      "originalBytes": 4202,
+      "originalSHA256": "3e3e00c5543d0840b512a55803ec545ae789b84fad35d0d82a42790f45817922",
+      "gzipBytes": 1992,
+      "gzipSHA256": "435d9f79673cf66dbc693a1a04a519f980b0db077c267f385de91aa861a31f5d"
+    },
+    {
+      "archive": "context-storage-environment.json.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/logs-f941-bootstrap-diagnostics/originals/context-storage-environment.json",
+      "originalBytes": 561991,
+      "originalSHA256": "d5e258732292f7665f570563b0b28e26a504d3e254528e8c25a8954115baaa57",
+      "gzipBytes": 211170,
+      "gzipSHA256": "750690be8d6825b0102b709fa26e295cb4a75a104f5930256cdd2b0bf72e434c"
+    },
+    {
+      "archive": "context-storage-kubelet.log.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/logs-f941-bootstrap-diagnostics/originals/context-storage-kubelet.log",
+      "originalBytes": 7252,
+      "originalSHA256": "ebc0a3c33400118c5fa5d1bfa5428776530c30f53602dadbeef9c526aaca9b4a",
+      "gzipBytes": 872,
+      "gzipSHA256": "f5d74f3112e17c9d2f2136e24fa0a355dda27bbdcb8c47b3a82d24f398efb314"
+    },
+    {
+      "archive": "context-storage-postgres.log.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/logs-f941-bootstrap-diagnostics/originals/context-storage-postgres.log",
+      "originalBytes": 314760,
+      "originalSHA256": "76a6a2418a8de1088000e8594b59dab05d3657b35c52b685b3a0b59e778f052b",
+      "gzipBytes": 18765,
+      "gzipSHA256": "78f811b751f991579896348bedfeae183dab74f09d0f12609e7ab2b8648ec83a"
+    },
+    {
+      "archive": "context-storage-timing.log.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/logs-f941-bootstrap-diagnostics/originals/context-storage-timing.log",
+      "originalBytes": 12649,
+      "originalSHA256": "4e81f22136d5654c9fdfb6c668eed70aece16dadf8a34884190aedc4d704ce4a",
+      "gzipBytes": 2337,
+      "gzipSHA256": "6eac840912836b7b7d9b238d7136b962d7c66a930fd28b728166dcac8f8f4670"
+    },
+    {
+      "archive": "context-storage.log.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/logs-f941-bootstrap-diagnostics/originals/context-storage.log",
+      "originalBytes": 11407,
+      "originalSHA256": "b88b305472a1a8adf1a8607a40f62e19be56abc9c6eb4794af9f554c9c1e7cb4",
+      "gzipBytes": 2063,
+      "gzipSHA256": "ac50d95b433770173f48019b4622c4c5ab49579539b4ba2700b2f967cb91c41f"
+    },
+    {
+      "archive": "kept-cleanup-context-wthbmunx.json.gz",
+      "originalCachePath": "/home/phil/Projekte/asservat-finite-saved-logs/test/results/kept-cleanup-context-wthbmunx.json",
+      "originalBytes": 136,
+      "originalSHA256": "882267144d2cb5563a4dceddf2e69fc6e1da495c6a68124b8b8468abfef8b09e",
+      "gzipBytes": 130,
+      "gzipSHA256": "fbc2b6bab5d8a1bafeed158983fa2fbe32eb7a56f7a79cba35023228ebd6a6cc"
+    },
+    {
+      "archive": "root-source-audit.json.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/logs-f941-bootstrap-diagnostics/root-source-audit.json",
+      "originalBytes": 1474,
+      "originalSHA256": "29125bfb1826f1e8bb6c5737de5d71e4ec6ceb1097979c16df29e70bf3ec7b95",
+      "gzipBytes": 783,
+      "gzipSHA256": "d4f80e35942ea0319c0494f3edec1535180c20cd4bde7888550546d3888155cd"
+    },
+    {
+      "archive": "strict-cleanup-readback.json.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/logs-f941-bootstrap-diagnostics/strict-cleanup-readback.json",
+      "originalBytes": 139,
+      "originalSHA256": "97a7f4170379d01c3ff795a730e5ede13d3db84d816d13f78a4c0829145db7fb",
+      "gzipBytes": 114,
+      "gzipSHA256": "0a64ec3f7fb515d370dc0d0e0a43dec0c60821bc82df27d67e551ff102b8c114"
+    },
+    {
+      "archive": "strict-cleanup.log.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/logs-f941-bootstrap-diagnostics/strict-cleanup.log",
+      "originalBytes": 39,
+      "originalSHA256": "145ad9c106828b2fc6ef0516e6c2b03477ac333faaced0eee3f4511d7d77a78e",
+      "gzipBytes": 59,
+      "gzipSHA256": "1a16fb5d7f1b901627b4661e24c22314f185414597306ffc5ea4a67e603492d5"
+    }
+  ]
+}

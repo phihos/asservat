@@ -1,5 +1,289 @@
 # Sustained implementation progress
 
+## Installed finite saved logs passed (2026-11-06)
+
+Signed `e1477925` passes the packaged RequireAll workflow: independent reviewer,
+whole-Pod finite acquisition/publication, MCP/React/native JSONL parity, exact
+query replay/accounting, fresh history Repeat preview and Running→Cancelled Stop.
+Go exits0/635.639s (manual152.69s), harness0; all4,369 inputs match Git, sources
+are unchanged and complete cleanup is independently verified. [Original proof
+and explicit gaps](../test/results/finite-saved-logs-installed-e1477925/README.md)
+retain36350 native bytes/six origins,40 total query units and no executed Repeat
+capture. Ordinary Observe, broader matrices and sustained operation remain open.
+PR173 still needs current-head eligible CI and normal merge; no release follows.
+
+## Installed logs native-response budget mismatch (2026-11-06)
+
+Signed5fda3b3c passes capture/publication, actual MCP/React saved-query parity and
+exact query accounting, then reaches native Ready. GET503 at response admission
+exposes a24MiB session read ceiling against the existing76,742,656-byte window
+charge; no native bytes are qualified. All4,369 inputs match Git. [Original
+failure, causal read-only facts and strict cleanup](../test/results/finite-saved-logs-read-budget-5fda3b3c/README.md)
+are retained. The whole run fails586.752s; strict cleanup separately exits0.
+The one-predicate planner correction now matches the existing reader; composed
+RED/GREEN,101 selected affected races and two independent reviews pass.
+[Exact local fix evidence](../test/results/finite-saved-logs-read-plan-local/README.md)
+is separate from the pending fresh installed native parity qualification.
+
+## Confirmed permission-epoch restart (2026-11-06)
+
+The installed browser failure exposed an acknowledged suspension followed by the
+unconditional31-second supervisor delay. Signed `c4789283` retries after one
+second only when the exact old epoch is suspended and all readers have joined;
+unknown suspension retains31seconds. Each successor rebuilds current authority.
+Controlled-port RED/GREEN, full pre-push and independent review pass. Actual
+PostgreSQL/S3 authority tests pass5.538s/23entries; all4,311 inputs match Git and
+cleanup is complete. [Original evidence and scope](../test/results/permission-restart-confirmed-local/README.md)
+remain explicit. Fresh installed browser/log qualification is next; this service
+run does not prove installed recovery availability.
+
+
+## Installed saved-log reads and native preparation correction (2026-11-06)
+
+Signed293aa46e passes capture/publication, MCP and real React saved reads, exact
+same-source page comparison and independent query accounting. Native download
+then refuses authority/data-class (whole run1/644.649s). The missing exact raw
+logs native-type branch is corrected without changing current grant, audience,
+permission, quota or deadline checks. Old-authority RED.020s, full authorization
+race0/1.677s and independent two-file review pass.
+[Original run, local fix and strict cleanup](../test/results/finite-saved-logs-native-download/README.md)
+retain4,367 verified unchanged inputs and the failed whole-workflow verdict.
+Complete native parity and fresh installed qualification remain pending.
+
+## Saved logs qualification stopped in installer bootstrap (2026-11-06)
+
+The fresh signed `f9412540` run exits1 before manual logs (604.063s).
+Read-only diagnosis identifies an unacknowledged original capacity setup claim
+and no paired SQL rows: later attempts cannot finish an uncommitted first setup.
+The exact original postclaim failure remains unknown. All4,366 inputs match Git;
+source is unchanged. Diagnostics finish before separate strict cleanup0 and
+independent zero-resource read-back. No original initialization/capture is retried.
+[Original reports, diagnosis and cleanup](../test/results/finite-saved-logs-bootstrap-f941/README.md)
+do not establish installed query-parser or complete saved-log qualification.
+The separately reviewed repair finishes only the original unacknowledged absent
+pair under current locked authority; original identity and timestamps remain
+unchanged. [Actual service qualification](../test/results/capacity-unacknowledged-pair-local/README.md)
+passes the full selected matrix (83.524s,106 names), with both original failed
+and corrected campaigns preserved and independently verified. Final integrated
+pre-push passes; fresh installed logs qualification follows.
+
+
+## Installed saved-log pending reply fixture correction (2026-11-06)
+
+Signed `10ad65e2` succeeds through capture publication and collection-grant read.
+The first saved-log query returns a canonical pending handle; the installed
+fixture incorrectly rejects any status other than ok/error (Go/harness1,465.879s).
+The new SDK/parser regression reproduces this failure in.098s. A two-file test
+repair preserves that original pending handle/deadline after full tool-schema
+and SDK-error validation. Synchronous completed reads keep their ok requirement;
+no production authority, budget, retry or deadline changes. Selected journey,
+logs and packet-helper races pass16.148s; independent two-file review is clear.
+[Original failed runs and separate strict cleanup](../test/results/finite-saved-logs-query-admission/README.md)
+remain explicit. Full installed query/download/browser qualification is pending.
+
+## Finite logs approval view contract correction (2026-11-06)
+
+Fresh signed `94519f1b` acknowledges the original logs request, verifies and
+publishes its encrypted result, and serves its case. The installed run then
+fails at `get_grant` (Go/harness1,466.215s): the public action union still lists
+packet/syscall/profile only. All4,365 original Git inputs match, sources remain
+unchanged, provider logs exit0 and scratch is removed. The retained original
+report and subsequent strict cleanup remain separate; no operation was replayed.
+
+A new C20 regression reproduces the finite logs review rejection. The canonical,
+browser and embedded runtime contracts now admit an exact onTrigger logs window,
+positive64MiB maximum and no ring/filter/profile fields. Other action branches
+are byte-identical. The approval page labels Logs and reports no recording ring.
+Focused grant races pass4.922s, all29 approval UI tests pass, final pre-push passes,
+and independent eight-file review is clear with exact hash readback. A fresh
+installed disclosure/download/browser campaign is still required; collection
+publication alone does not qualify the complete logs workflow.
+
+## Finite logs typed start contract correction (2026-11-05)
+
+The repaired `a03baf86` constructor reaches output preparation in a fresh
+installed fixture, then fails at PrepareStart (Go/harness1,470.496s). Native
+server dry-run reproduces the installed CRD rejecting the exact `logs` type.
+All4,365 original sources match Git; retained original diagnostics and separate
+strict cleanup readback are [preserved](../test/results/finite-saved-logs-start-contract/README.md).
+Signed `94519f1b` adds only the existing API logs type and positive64MiB ceiling
+to the canonical start contract, reviewed CEL and CRD. Golden/negative gates,
+existing local-start races and synthetic CRD server compilation pass. Original
+roles, bindings and five-second deadlines remain. Fresh installed qualification
+is running; no installed success is claimed.
+
+## API-only saved-logs start correction (2026-11-05)
+
+Signed `ed7ebe06` passes CI42112331527, but installed42112422885 fails
+(Go/harness1,507.886s) after successful preview and independent approval.
+The original accepted capture remains prepared without a start object. A retained
+local fixture reproduces this boundary and identifies the constructor discarding
+its initialized logs holder when assigning the complete output struct. No original
+uncertain capture is retried. Both original failures and separate strict cleanup
+readback are [preserved with exact hashes](../test/results/finite-saved-logs-start-diagnosis/README.md).
+
+Signed `a03baf86` moves the existing holder initialization after that assignment.
+Its regression fails on the old constructor; full affected bootstrap/privacy
+races pass (119.024s/1.016s), as do vet, specification, architecture and final
+pre-push gates. Fresh initial human-client settings explicitly include logs;
+existing administrator policies retain their authored types. No service, timer,
+role, privilege, fallback or API call is added. A fresh API-only installed run
+is in progress; these local fixes are not an installed-success claim.
+
+## Logs preview contract correction after installed failure (2026-11-05)
+
+Signed `67a28e07` passes all15 CI jobs. Its installed run still fails before
+collection (Go/harness1,486.522s), after original Pod restart/listener readiness
+succeed. All4,363 sources match Git and cleanup completes. The [original report](../test/results/finite-saved-logs-native-42107433129/README.md)
+and local actual-compiler/C20 regression isolate a public lifecycle schema
+rejecting finite logs' requested1h history. The dedicated finite-log onTrigger
+shape now accepts historical/future windows with at least one positive interval;
+packet/syscall onTrigger still requires zero lookback. Canonical, embedded Go
+and generated browser validators are updated together.
+
+A separate64MiB preview regression reproduces the old8MiB recorder cap being
+shown for logs. The renderer now selects the qualified logs ceiling for a single
+finite logs action, with existing recorder limits unchanged. Full affected races pass (presentation419.743s, contracts12.415s, manifest2.967s);
+final pre-push exits0 including587 console tests/51files. Independent review
+finds no issues. These are local corrections; fresh installed qualification
+remains pending.
+
+## Saved-logs hosted results and targeted corrections (2026-11-05)
+
+Frozen `fb955e46` passes the hosted quota-enforced reader resource workflow;
+all4,825 inputs match Git and cleanup completes. This is synthetic reader/parser
+qualification, not installed full-worker qualification. Installed logs fail in
+synthetic listener readiness before acquisition (Go/harness1,514.443s overall),
+with4,363 exact Git inputs and cleanup[]. CI separately rejects the38,161B
+preview descriptor against the unchanged36KiB limit. [Original reports and
+failure logs](../test/results/finite-saved-logs-hosted-qualification/README.md)
+retain all three scopes.
+
+The correction asks readiness for one traffic record rather than4MiB/65,536
+flushes, retaining its2s deadline and100m fixture CPU. Connector reconfiguration
+joins old log workers before resetting closing; old terminal outcomes survive.
+Runtime schema generation shares the common closed override object and groups
+identical value constraints under disjoint field enums. The preview descriptor
+is33,387B; exact value/action bounds and36KiB budget remain unchanged. Full contracts races pass (12.128s), full bootstrap races pass (113.214s),
+and final `make pre-push` exits0 including587 console tests/51 files. The focused
+reconnect/readiness tests pass after reproduced baseline failures. Installed logs
+and full-specification completion remain pending.
+
+## Finite whole-pod logs local service qualification passed (2026-11-05)
+
+Signed `1e85a5bb` passes the mixed logs/packet/syscall service lifecycle
+(Go15.455s/16 tests), legacy raw packet (16.807s/9), raw syscall (13.821s/9)
+and pristine migration141 upgrade/rollback (6.240s/124). All four harnesses
+exit0, preserve4,300 exact Git inputs each and complete cleanup[]. Root and
+independent review verify the original reports and source hashes. Standalone
+logs retain their separate `f8c8eb5c` pass in13.320s. The20-case content-free
+PostgreSQL sizing probe passes with maximum complete key binding9,669B compact/
+11,053B JSONB under the unchanged16KiB bound. These are actual service/role
+fixtures; paid read-loop crypto/Job/issuer/transport proofs remain synthetic.
+[Original qualification history](../test/results/finite-saved-logs-service-local/README.md)
+retains all prior failures and only supersedes their specific corrected boundary.
+Installed/browser/native/history/Stop and fresh-host resource qualification are
+still pending; full S-05 and the complete specification goal remain active.
+
+ADR-308 revises the unimplemented redacted/split-stream saved-log promise to
+lossless raw JSONL and exact grant-protected saved pages with truthful combined
+stream provenance. This is an engineering decision under standing simplification
+delegation, not a newly claimed direct maintainer choice. Original incident time,
+whole-pod permissions and aggregate action limits remain binding. The builtin
+uses observe; collection review follows actual authored/protected requirements,
+while saved raw-page disclosure always requires exact independent approval.
+
+An isolated worktree based on merged main `4791f25c` composes the finite API
+collector, typed plan, encrypted streaming writer, native checker, query/grant
+ledger and browser/MCP delivery. Codec races include a near64MiB pipe,128 fair
+origins, long/empty/invalid byte records and strict EOF. TLS adapter tests exercise
+regular/init/ephemeral current/previous provenance and source-change refusal.
+Logs-only finalization waits for the actual joined completion rather than
+inventing a future fetch end. New query regressions reproduce direct callback
+expectation/fetch-window gaps, then pass exact byte reconstruction across pages,
+escaped output bounds, corruption, cancellation and late-window rejection.
+Focused authority/accounting/migration checks are local component evidence only.
+
+Actual built React and official SDK MCP component checks now pass with the real
+C18/C20/audit path and synthetic authority/providers below it; near-full escaped
+pages remain within direct/nested bounds. The encrypted reader reproduces and
+fixes a missing logs source-kind case and passes final-hash refusal with three
+key opens. Three local near64MiB reader processes finish below256MiB measured
+memory; configured500m is not runtime-qualified because observed CPU use exceeds
+its quota-consistent wall allowance on the active local scheduler. A fresh-host
+resource gate now checks actual CPU accounting as well as declarations.
+
+The private native transport regression reproduces logs being encoded as an
+HTTP-header page. The closed logs branch now preserves exact bytes and source
+version; real H2/mTLS component tests cover positive ACK, typed cursor refusal,
+wrong-Pod refusal and joined cancellation. Full native-package races pass in
+133.084s. The public three-field log edit path also passes actual conversion,
+compiler/funding and editor checks. Authority/source reads remain synthetic in
+these transport/browser components. Architecture ownership and dependency gates
+pass, including the narrow shared canonical-codec edge.
+
+Final local `make pre-push` exits0 after correcting canonical schema self
+references, the builtin example and all embedded composition bundles. It includes
+587 console tests in51 files. The full compiled console-browser gate exits0 in
+123.912s across9 top-level fixtures; browser authority/providers remain synthetic.
+Original schema failures are retained separately from the final complete pass.
+
+The first real-service logs campaign on signed `4d5d450f` fails at admission:
+its legacy record-only backing provides29,786,112B/12 objects while the64MiB
+logs final-plus-temporary declaration needs136,740,864B/14 objects. All4,299
+source hashes match Git, testExit1, providerExit0 and cleanup[]. A separate
+adapter regression reproduces missing original writer binding for large logs.
+The correction reuses existing multipart reservation/binding and large-native
+backing; focused races pass. The installed two-query FIFO helper's closed-count
+regression also passes after adding logs2 alongside existing4/7 counts, retaining
+two active workers. These local corrections do not replace a service rerun.
+
+The corrected `8aaa4162` scalar campaign advances through admission, original
+writer binding, encrypted multipart storage and publication, then fails read
+authority because new SQL incorrectly references a version column on the
+routing-only locator. Actual Go exit1/7.904s, unchanged4,300 Git inputs and
+cleanup[] are preserved. The correction joins the acknowledged verification
+digest in child-reader, group and key-current checks without new privileges.
+Targeted races and pinned generation pass; fresh service qualification remains.
+
+Scalar logs lifecycle on signed `f8c8eb5c` now passes actual Go0/13.320s,
+9run/9pass, unchanged4,300 Git inputs and cleanup[]. The real-role ledger
+exercises20-unit/two-batch funding, paid24KiB/one-operation reads, six consumed
+key roles, closure and actual C-18 same-key replay/negative controls. Synthetic
+worker/issuer/transport/crypto proof inputs retain their documented boundary.
+The first mixed campaign fails before group admission because its second fixture
+initializer attempts to replace a live accepted retention-source epoch; all4,300
+inputs match and cleanup completes. The fixture-only correction reuses original
+accepted sources/publisher with fresh request facts, preserving production checks.
+
+On `71bafc2a`, mixed admission and passive replay pass without a second charge;
+its later parent-intent lookup fails because the group parent is control-only.
+Actual Go1/8.076s, unchanged4,300 Git inputs and cleanup[] are retained. The
+fixture now follows production's per-child intent acknowledgement and exact
+original source/deadline/group checks. No production change follows this failure.
+
+The next mixed run on `6dd89c26` passes all child intents, logs publication,
+seven association negatives, materialization/replay, partial progress and parent
+Stop refusal, then fails initial C-03 query authority (Go1/10.159s). All4,300
+inputs match and cleanup completes. No PostgreSQL error or specific product
+defect is established. A fixture-only diagnostic now retains the existing
+closed refusal stage and sentinel categories without dependency strings or
+additional reads, so the next campaign can identify the actual boundary.
+
+The diagnostic `f5410ffd` mixed run isolates `raw-grant`/GrantScope (Go1/9.889s,
+unchanged4,300 Git inputs, cleanup[]). The exported group resolver incorrectly
+maps a successful transaction through `grantError(nil)`, unlike its private
+helper used by earlier materialization controls. The local correction returns
+exact output/group with nil on success, preserving existing error mapping and
+all association checks. An exported-reader assertion now precedes materialization
+and verifies unchanged disclosure spend. Focused races and independent review
+pass; the whole mixed-query lifecycle still requires its fresh result.
+
+The mixed service lifecycle is now qualified at the boundary stated above. The
+installed logs/browser/native/history/Repeat journey and installed maximum-shape
+worker evidence remain pending.
+Full S-05 and the complete specification goal remain active.
+
 ## Saved syscall queries merged with complete installed test evidence (2026-11-05)
 
 PR171 merges as `2f74df8d`; signed `51344180`, the merge and fresh main share

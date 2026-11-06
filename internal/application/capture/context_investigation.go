@@ -639,6 +639,8 @@ func (s ContextInvestigation) requestWithGroupBounds(ctx context.Context, source
 	var snapshotObserved *targets.SourceSnapshotResolution
 	if p.Intent.Snapshot != nil {
 		target, snapshotObserved, err = s.resolveSourceSnapshot(ctx, p.Intent.Snapshot)
+	} else if recording && logsRecorderInput(p.Intent) {
+		target, err = s.Targets.ResolvePod(ctx, p.Target)
 	} else if recording && s.Recorders != nil && profileRecorderInput(p.Intent) {
 		if profiles, ok := s.Recorders.(ProfileRecorders); ok {
 			target, err = profiles.ResolveProfileRecorder(ctx, p.Target)
@@ -669,7 +671,7 @@ func (s ContextInvestigation) requestWithGroupBounds(ctx context.Context, source
 	}
 	// Recording resolution checks current availability in the same regional
 	// exchange. The connector still checks the node before queueing work.
-	if recording && s.Recorders == nil {
+	if recording && s.Recorders == nil && !logsRecorderInput(p.Intent) {
 		return zero, value.ErrRecorderUnavailable
 	}
 	if p.Intent.Snapshot == nil {
@@ -767,6 +769,13 @@ func (s ContextInvestigation) requestWithGroupBounds(ctx context.Context, source
 		}
 		r.NativeLimit = acquisition.MaxBytes
 	}
+	if plan.Input.Logs != nil {
+		acquisition, _, err := compiler.LogsForContext(plan)
+		if err != nil {
+			return zero, err
+		}
+		r.NativeLimit = acquisition.MaxNativeBytes
+	}
 	if r.Validate() != nil {
 		return zero, value.ErrInvalid
 	}
@@ -776,6 +785,19 @@ func (s ContextInvestigation) requestWithGroupBounds(ctx context.Context, source
 			return zero, err
 		}
 		if !s.Now().Add(time.Duration(acquisition.TimeoutMillis)*time.Millisecond + recordingCompletionMargin).Before(r.WriteUntil) {
+			return zero, value.ErrAcquisitionClosed
+		}
+	} else if plan.Input.Logs != nil {
+		logs, _, err := compiler.LogsForContext(plan)
+		if err != nil {
+			return zero, err
+		}
+		anchor := f.retention.AnchorAt
+		if !plan.Input.Logs.TriggeredAt.IsZero() {
+			anchor = plan.Input.Logs.TriggeredAt
+		}
+		_, end, err := logs.Window(anchor)
+		if err != nil || !end.Add(recordingCompletionMargin).Before(r.WriteUntil) {
 			return zero, value.ErrAcquisitionClosed
 		}
 	} else if recording {

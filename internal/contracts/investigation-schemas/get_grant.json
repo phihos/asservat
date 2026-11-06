@@ -434,7 +434,8 @@
                               "enum": [
                                 "packetCapture",
                                 "syscallTrace",
-                                "profile"
+                                "profile",
+                                "logs"
                               ]
                             },
                             "execution_mode": {
@@ -788,6 +789,59 @@
                                   "profile"
                                 ]
                               }
+                            },
+                            {
+                              "properties": {
+                                "kind": {
+                                  "const": "logs"
+                                },
+                                "execution_mode": {
+                                  "const": "onTrigger"
+                                },
+                                "max_bytes": {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "maximum": 67108864
+                                }
+                              },
+                              "required": [
+                                "before",
+                                "after"
+                              ],
+                              "not": {
+                                "anyOf": [
+                                  {
+                                    "required": [
+                                      "profile"
+                                    ]
+                                  },
+                                  {
+                                    "required": [
+                                      "ring_max_bytes"
+                                    ]
+                                  },
+                                  {
+                                    "required": [
+                                      "ring_max_age"
+                                    ]
+                                  },
+                                  {
+                                    "required": [
+                                      "filter"
+                                    ]
+                                  },
+                                  {
+                                    "required": [
+                                      "filter_digest"
+                                    ]
+                                  },
+                                  {
+                                    "required": [
+                                      "filter_instructions"
+                                    ]
+                                  }
+                                ]
+                              }
                             }
                           ]
                         }
@@ -809,10 +863,11 @@
                           "operations": {
                             "type": "array",
                             "minItems": 1,
-                            "maxItems": 3,
+                            "maxItems": 4,
                             "items": {
                               "enum": [
                                 "download_artifact",
+                                "get_logs",
                                 "pcap_query",
                                 "syscall_query"
                               ]
@@ -1464,12 +1519,13 @@
                             "items": {
                               "enum": [
                                 "download_artifact",
+                                "get_logs",
                                 "pcap_query",
                                 "syscall_query"
                               ]
                             },
                             "minItems": 1,
-                            "maxItems": 3,
+                            "maxItems": 4,
                             "uniqueItems": true
                           },
                           "max_bytes": {

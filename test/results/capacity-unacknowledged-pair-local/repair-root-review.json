@@ -1,0 +1,42 @@
+{
+  "reviewer": "Root coordinator",
+  "scope": "Root read-only six-path diff/current transaction context and existing receipt/projection guards review",
+  "verdict": "CLEAR",
+  "evidence": "Root message: repair narrowly justified; absent/unacknowledged original pair only under independently current locked authority; no original claim change.",
+  "sourceHashes": {
+    "internal/adapters/postgres/capacity_setup.go": {
+      "sha256": "a3a87ed0354d41a99b842db7591a30a8162200e88cd4de3f219641557ef62795",
+      "bytes": 13041
+    },
+    "internal/adapters/postgres/capacity_setup_pair.go": {
+      "sha256": "605bea47e3fd420e7ecfda3bbd4df1918762fda108b82bdfc48f8b24f76eb06b",
+      "bytes": 4038
+    },
+    "internal/adapters/postgres/capacity_setup_pair_test.go": {
+      "sha256": "4ce0cd4577324dde89a19d37ab161ed4bee4dacf2942e4db4aba8b784bbe1ad7",
+      "bytes": 3575
+    },
+    "test/integration/capacity_sql_matrix_test.go": {
+      "sha256": "f8d3ad3f8844b16fa2b5f99e260281fa62df2b5cc592aeb245ddd3e733494719",
+      "bytes": 23602
+    },
+    "docs/decisions/141-protected-capacity-production.md": {
+      "sha256": "476467252fb25872291b76134d59f455814fc02d0d78086a92100cd4460f5c87",
+      "bytes": 6735
+    },
+    "docs/architecture/capacity-production.md": {
+      "sha256": "6f3f37542222f26bedbf7c803ee97c1c2457c6f010d74ff73de1abff69b42820",
+      "bytes": 18442
+    }
+  },
+  "currentHashVerification": {
+    "internal/adapters/postgres/capacity_setup.go": true,
+    "internal/adapters/postgres/capacity_setup_pair.go": true,
+    "internal/adapters/postgres/capacity_setup_pair_test.go": true,
+    "test/integration/capacity_sql_matrix_test.go": true,
+    "docs/decisions/141-protected-capacity-production.md": true,
+    "docs/architecture/capacity-production.md": true
+  },
+  "reviewerTests": "None claimed by this record; owner tests separately in repair-handoff.json",
+  "pending": "Signed checkpoint, repository native prepush, Root-confirmed retained fixture cleanup before fresh actual service."
+}

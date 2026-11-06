@@ -43,6 +43,7 @@ const (
 	// ADR-248: a recording is started within the committed start and
 	// collected by a later exchange for the same verified capture.
 	opStartProfile   = "start-profile"
+	opStartLogs      = "start-logs"
 	opStartRecording = "start-recording"
 	opCollect        = "collect-recording"
 )
@@ -270,6 +271,12 @@ var (
 func (o *remoteOutput) StartProfile(ctx context.Context, pin artifact.PinnedPod, started, until time.Time, endpoint targets.ProfileEndpointRequest) (time.Time, error) {
 	var out recordingReply
 	err := o.h.call(ctx, opStartProfile, profileRequest{pin, started, until, endpoint}, &out)
+	return out.Queued, err
+}
+
+func (o *remoteOutput) StartLogs(ctx context.Context, pin artifact.PinnedPod, started, until time.Time) (time.Time, error) {
+	var out recordingReply
+	err := o.h.call(ctx, opStartLogs, acquireRequest{pin, started, until}, &out)
 	return out.Queued, err
 }
 
@@ -608,6 +615,22 @@ func (s *regionalSession) handle(ctx context.Context, q contracts.APIContextOper
 			return nil, value.ErrDenied
 		}
 		return closer.CompleteStored()
+	case opStartLogs:
+		var r acquireRequest
+		if err := decodeOperationBody(q.Body, &r); err != nil {
+			return nil, err
+		}
+		d := s.consumed
+		recorder, ok := s.prepared.(evidence.LogsRecorder)
+		if s.acquired || !ok || s.resolved == nil || s.expectation == nil || s.expectation.Logs == nil || d == nil || !d.MayStart || d.Phase != value.StartCommitted || !r.Started.Equal(d.CommittedAt) || r.Until.After(d.ValidUntil) || r.Pin != s.resolved.Pin || !l.Now().Before(r.Until) {
+			return nil, value.ErrDenied
+		}
+		s.acquired = true
+		queued, err := recorder.StartLogs(ctx, r.Pin, r.Started, r.Until)
+		if err != nil {
+			return nil, err
+		}
+		return recordingReply{Queued: queued}, nil
 	case opStartProfile:
 		var r profileRequest
 		if err := decodeOperationBody(q.Body, &r); err != nil {

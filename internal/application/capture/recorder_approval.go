@@ -140,7 +140,8 @@ func (s ContextInvestigation) recorderRequest(ctx context.Context, source identi
 		return authorization.Grant{}, err
 	}
 	frozen := approval != nil && slices.ContainsFunc(approval.Reasons, func(r authorization.SensitiveReason) bool { return r.Code == "recordingApprovalRequired" })
-	if required != frozen {
+	combinedReview := p.CompositionGroup != nil && approval != nil && slices.ContainsFunc(approval.Reasons, func(r authorization.SensitiveReason) bool { return r.Code != "recordingApprovalRequired" })
+	if required != frozen && !(frozen && !required && combinedReview) {
 		return authorization.Grant{}, s.requestChanged("approval/settings")
 	}
 	if _, _, policy := authorization.PolicyExecutor(p.Actor); policy {

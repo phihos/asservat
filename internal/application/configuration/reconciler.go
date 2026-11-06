@@ -463,9 +463,29 @@ func (s *bindingRun) refresh(ctx context.Context) error {
 // through SQL before reading the next. Full LISTs renew deny completeness;
 // bookmarks and watch traffic do not. Audit publication is an independent role:
 // the store keeps new allows unavailable until its exact record is acknowledged.
+// PermissionEpochResult is a completed run's scheduling result, never current
+// permission authority. Suspended is true only after exact owned-epoch
+// suspension was acknowledged and all original watch/feed children joined.
+type PermissionEpochResult struct {
+	Err       error
+	Suspended bool
+}
+
+// Run preserves the original error-only caller contract.
 func (r BindingReconciler) Run(ctx context.Context) error {
+	return r.RunEpoch(ctx).Err
+}
+
+// RunEpoch lets the existing supervisor avoid waiting for a lease that this
+// completed run positively ended. A successor still reproves all source facts.
+func (r BindingReconciler) RunEpoch(ctx context.Context) PermissionEpochResult {
+	err, suspended := r.runEpoch(ctx)
+	return PermissionEpochResult{Err: err, Suspended: suspended && ctx.Err() == nil}
+}
+
+func (r BindingReconciler) runEpoch(ctx context.Context) (err error, suspended bool) {
 	if !r.valid() {
-		return value.ErrInvalid
+		return value.ErrInvalid, false
 	}
 	s := &bindingRun{r: r}
 	defer func() { s.feed.stop() }()
@@ -475,22 +495,22 @@ func (r BindingReconciler) Run(ctx context.Context) error {
 			defer cancel()
 			// Failure here leaves the original <=5s permission deadline and the
 			// bounded leader lease; no goroutine keeps renewing either of them.
-			_ = r.Store.SuspendPermissions(cleanup, s.fence)
+			suspended = r.Store.SuspendPermissions(cleanup, s.fence) == nil
 		}
 	}()
 	if err := s.start(ctx); err != nil {
-		return reconcileStep("start", err)
+		return reconcileStep("start", err), false
 	}
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 	for {
 		watch, err := r.Watcher.WatchBindings(ctx, s.journal.Cursor())
 		if err != nil {
-			return reconcileStep("watch", err)
+			return reconcileStep("watch", err), false
 		}
 		err = s.consume(ctx, watch, ticker.C)
 		if !errors.Is(err, io.EOF) {
-			return err
+			return err, false
 		}
 	}
 }

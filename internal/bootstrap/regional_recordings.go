@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/packets"
 	"asservat.local/asservat/internal/application/delivery"
@@ -78,10 +79,17 @@ type heldRecording struct {
 }
 
 type ConnectorRecordings struct {
-	nodes recordingNodes
-	pods  podNodes
-	now   func() time.Time
-	log   func(string)
+	logs                map[string]*heldLogs
+	logsContext         context.Context
+	logsRoot, logsEpoch string
+	logsWriterPod       string
+	logsClient          *kube.SavedLogClient
+	logsClosing         bool
+	logsWG              sync.WaitGroup
+	nodes               recordingNodes
+	pods                podNodes
+	now                 func() time.Time
+	log                 func(string)
 
 	// after paces the peer verifiers (time.After; tests inject a clock).
 	after func(time.Duration) <-chan time.Time
@@ -114,6 +122,11 @@ func (h *ConnectorRecordings) releaseStoreLocked(bytes int64) {
 // A pending recording that expires keeps no keys: its PreparedArtifact is
 // dropped unused (the attempt stays charged until custody cleanup).
 func (h *ConnectorRecordings) expireLocked(now time.Time) {
+	for id, p := range h.logs {
+		if p.joined && !now.Before(p.expires) {
+			delete(h.logs, id)
+		}
+	}
 	for id, p := range h.profiles {
 		if !p.storing && !now.Before(p.expires) {
 			delete(h.profiles, id)
@@ -130,6 +143,9 @@ func (h *ConnectorRecordings) expireLocked(now time.Time) {
 func (h *ConnectorRecordings) PacketRecorder(ctx context.Context, r targets.RecorderRequest) (targets.RecorderAnswer, error) {
 	if !r.Valid() {
 		return targets.RecorderAnswer{}, targets.ErrInvalid
+	}
+	if h.nodes == nil || h.pods == nil {
+		return targets.RecorderAnswer{Outcome: targets.RecorderUnavailable}, nil
 	}
 	name, err := h.pods.PodNode(ctx, r.Pin)
 	if err != nil {
@@ -202,7 +218,7 @@ func (h *ConnectorRecordings) start(ctx context.Context, p *objectstore.Prepared
 	defer h.mu.Unlock()
 	now := h.now()
 	h.expireLocked(now)
-	if _, exists := h.held[e.CaptureUID]; exists || len(h.held)+len(h.profiles) >= maxHeldRecordings || !now.Before(until) {
+	if _, exists := h.held[e.CaptureUID]; exists || h.logs[e.CaptureUID] != nil || h.heldCountLocked() >= maxHeldRecordings || !now.Before(until) {
 		return time.Time{}, value.ErrUnavailable
 	}
 	if peered && h.verifiers >= maxPeerVerifiers {
@@ -377,6 +393,9 @@ func (h *ConnectorRecordings) Collect(w fleet.APIContextWork) (evidence.Recordin
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.expireLocked(h.now())
+	if out, ok, err := h.collectLogs(w); ok {
+		return out, err
+	}
 	if out, ok, err := h.collectProfile(w); ok {
 		return out, err
 	}
@@ -496,10 +515,10 @@ func (p *preparedRecording) StartPolicyRecording(ctx context.Context, pin artifa
 	defer h.mu.Unlock()
 	now = h.now()
 	h.expireLocked(now)
-	if ctx.Err() != nil || !source.Valid(now) || !permit.ValidFinite(now) || !now.Before(until) || len(h.held)+len(h.profiles) >= maxHeldRecordings {
+	if ctx.Err() != nil || !source.Valid(now) || !permit.ValidFinite(now) || !now.Before(until) || h.heldCountLocked() >= maxHeldRecordings {
 		return time.Time{}, value.ErrUnavailable
 	}
-	if _, exists := h.held[e.CaptureUID]; exists {
+	if _, exists := h.held[e.CaptureUID]; exists || h.logs[e.CaptureUID] != nil {
 		return time.Time{}, value.ErrUnavailable
 	}
 	prepared := p.prepared

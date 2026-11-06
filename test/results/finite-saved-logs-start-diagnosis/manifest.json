@@ -1,0 +1,214 @@
+{
+  "candidate": "ed7ebe0606a464db9a5785f086eeb9233c47c7df",
+  "scope": "Failed hosted and retained local API-only logs; original source reports preserved; cleanup separately confirmed",
+  "payloads": [
+    {
+      "archive": "hosted-ci-native-continuation-manual-logs.log.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/finite-logs-installed-native-42112422885/originals/ci-native-continuation-manual-logs.log",
+      "originalBytes": 3030,
+      "originalSHA256": "cef4dd30a98a1711f30b2560f088e91e2bbf9bd4b197733d006a94f6d10dc818",
+      "gzipBytes": 1017,
+      "gzipSHA256": "e8fa915ae2a5c2a768cd72d8499ab157ac2775e58e3aeb7211da0638e39950b3"
+    },
+    {
+      "archive": "hosted-context-storage-environment.json.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/finite-logs-installed-native-42112422885/originals/context-storage-environment.json",
+      "originalBytes": 561522,
+      "originalSHA256": "cce63c59f125711680e3ebe533af17347f0880115a2b70541967422edf42c930",
+      "gzipBytes": 211018,
+      "gzipSHA256": "34c8d2a984ddef786660c791d13e3722282f8d6ee00aca0d865b3a1a0fb23169"
+    },
+    {
+      "archive": "hosted-context-storage-kubelet.log.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/finite-logs-installed-native-42112422885/originals/context-storage-kubelet.log",
+      "originalBytes": 31235,
+      "originalSHA256": "e131c33a5f05a87466ce498c46a0acb22a1d31ff9ba7bf1982d5c424cad793cb",
+      "gzipBytes": 3479,
+      "gzipSHA256": "fec88ae50dd4421ece7bde1d4d043b141f68c5226333de8c821a7b1e8ac247b1"
+    },
+    {
+      "archive": "hosted-context-storage-postgres.log.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/finite-logs-installed-native-42112422885/originals/context-storage-postgres.log",
+      "originalBytes": 367192,
+      "originalSHA256": "b931ad915dab430286a809364c13a3040cfe555b7ff510f63f9669b3ac028dba",
+      "gzipBytes": 20426,
+      "gzipSHA256": "6b01aeec036830c637c974d4e1bdfbafc4bf7e5b7d7ceb0456fb5607aa07606a"
+    },
+    {
+      "archive": "hosted-context-storage-timing.log.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/finite-logs-installed-native-42112422885/originals/context-storage-timing.log",
+      "originalBytes": 58037,
+      "originalSHA256": "9083356ac2968ff290a92387329e75364032fc6eb8eaabf993d983a9f2d1bca0",
+      "gzipBytes": 6771,
+      "gzipSHA256": "4e1122fe4157319d9b7f5f709991b180277c59d55a7b660891cdd7ff51e71dcb"
+    },
+    {
+      "archive": "hosted-context-storage.log.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/finite-logs-installed-native-42112422885/originals/context-storage.log",
+      "originalBytes": 53852,
+      "originalSHA256": "cccbbc8851f51c705f56a83d553466b5e4504a827f75386387ecda4278f7c0bf",
+      "gzipBytes": 6135,
+      "gzipSHA256": "083c57a65a83f072c9f97830662d258594d82f6b9385a8eedb255ef032a0f396"
+    },
+    {
+      "archive": "hosted-root-source-audit.json.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/finite-logs-installed-native-42112422885/root-source-audit.json",
+      "originalBytes": 595,
+      "originalSHA256": "91d1a9d315545887bf3582c8b9a4eeaa8ef67c74e087ec361995cbbfd8110767",
+      "gzipBytes": 406,
+      "gzipSHA256": "d43c609b4bfc7868cbf06d9c977043ba503dcbb4e59c5e8cbd829c72df041a53"
+    },
+    {
+      "archive": "local-causal-audit.json.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/finite-logs-local-start-diagnostics/causal-audit.json",
+      "originalBytes": 2992,
+      "originalSHA256": "2fceb45c136438c70ce9a5616dfe2fdb3fc9ed40f8179bfc1808b8e47810f2e1",
+      "gzipBytes": 1464,
+      "gzipSHA256": "040c7efff96c536cf4e4e46e05bb0642fb1d4d03b321e62aee8b45c993607f3f"
+    },
+    {
+      "archive": "local-cleanup-readback.json.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/finite-logs-local-start-diagnostics/cleanup-readback.json",
+      "originalBytes": 764,
+      "originalSHA256": "0aa12300adba5a8a613b7e02f8c36a0c4037a13174f29799492fe5fd48c6de00",
+      "gzipBytes": 496,
+      "gzipSHA256": "ee64d4d3e88a7558dfc082a8bfdb16f8780f5244a47bc0ca7718d3ec4c6cc299"
+    },
+    {
+      "archive": "local-context-storage-environment.json.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/finite-logs-local-start-diagnostics/originals/context-storage-environment.json",
+      "originalBytes": 561724,
+      "originalSHA256": "50bbab8e5ae67b81b01c9e7574cb20cb75d17c92071e0e2cb4a901de89b63e98",
+      "gzipBytes": 211066,
+      "gzipSHA256": "54b2463dc74026dd45203c96daa8227f668709db6181f21cb8399c44e284ef00"
+    },
+    {
+      "archive": "local-context-storage-kubelet.log.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/finite-logs-local-start-diagnostics/originals/context-storage-kubelet.log",
+      "originalBytes": 27305,
+      "originalSHA256": "21593fa826bbdbb6b23ccf4567324b080b2ecc8840a8d0034ff40e3409214b5f",
+      "gzipBytes": 3143,
+      "gzipSHA256": "2746258d022989e047e832ddbd9f5e77fd07022de81b1cd7e2f93ced51cd7a74"
+    },
+    {
+      "archive": "local-context-storage-postgres.log.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/finite-logs-local-start-diagnostics/originals/context-storage-postgres.log",
+      "originalBytes": 364127,
+      "originalSHA256": "5338b8f760735d3801188abd0f78296c8ba7fcfdc5d29bdd350573ec46f1b8d1",
+      "gzipBytes": 19969,
+      "gzipSHA256": "0de5f0c0aa2409fec83214bb5f232bbb91445c87bab1f614c2b258a21292b6bd"
+    },
+    {
+      "archive": "local-context-storage-timing.log.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/finite-logs-local-start-diagnostics/originals/context-storage-timing.log",
+      "originalBytes": 59030,
+      "originalSHA256": "a65b2627306600ad7e861cb33cd55f98c49cbb3936b7ca3569a1338e7694836d",
+      "gzipBytes": 6810,
+      "gzipSHA256": "bd8b41ffe8f21e159e4adf684d5367ad2447667c6fe1fc52edb3d5a3008ac0db"
+    },
+    {
+      "archive": "local-context-storage.log.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/finite-logs-local-start-diagnostics/originals/context-storage.log",
+      "originalBytes": 54782,
+      "originalSHA256": "a247ebdd969608122588c124b57c8c1828c97dc4e8e1147fb01c5792dc842613",
+      "gzipBytes": 6171,
+      "gzipSHA256": "8ecb7c065a2012f9df4efd05d68cece2fe3f84aefad32f3b0f4c906ade72cf73"
+    },
+    {
+      "archive": "local-manifest.json.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/finite-logs-local-start-diagnostics/originals/manifest.json",
+      "originalBytes": 707,
+      "originalSHA256": "8f6183b13e8e1a6d1dda01f148f48584fc487fbc8842c76cd25ab7781dfe0770",
+      "gzipBytes": 357,
+      "gzipSHA256": "9469f58797be5dbf6a4a6c71c8edff6ba78814971f235a31a45e4e8937fb05b8"
+    },
+    {
+      "archive": "fix-handoff.json.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/logs-start-composition/handoff.json",
+      "originalBytes": 7085,
+      "originalSHA256": "eb3a6b8816c64f6820075cf62a51335cf4e936d143bd5778ecdd5290870a6f32",
+      "gzipBytes": 2754,
+      "gzipSHA256": "ee6563d4c04ed9b21b3004d39e5610ca1bfa1c3ce575e27feac56b6e6c7cd574"
+    },
+    {
+      "archive": "fix-logs-start-composition-source-review.json.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/logs-start-composition-source-review.json",
+      "originalBytes": 2532,
+      "originalSHA256": "346a3c5898cf2f0fd7d10714ea87005dccbf957ba3929435b2576fbfaab0963f",
+      "gzipBytes": 1275,
+      "gzipSHA256": "4c37d66d49209a2663e8e70fb28a2bd726567453bf739fdafd0a85de8bc81864"
+    },
+    {
+      "archive": "fix-logs-start-composition-focused-green.log.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/logs-start-composition-focused-green.log",
+      "originalBytes": 115,
+      "originalSHA256": "6ee6742d593394941cd9249aa7af6bc603a7b5a674afb1bacdabb4b32d66ac69",
+      "gzipBytes": 92,
+      "gzipSHA256": "a4716d7c1a936a054fedbaf0287598f1e8c5bc5c1ffec53620e343e0f575f4e7"
+    },
+    {
+      "archive": "fix-logs-start-composition-full-affected-race.log.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/logs-start-composition-full-affected-race.log",
+      "originalBytes": 117,
+      "originalSHA256": "1e4d72d27ef405e01aa419234c99ec977ec5f4ba8968def7dcfb097c78935d4d",
+      "gzipBytes": 95,
+      "gzipSHA256": "0f50e5ff29799c1a9ef87cbdc681b6c004be2099e1b31124b292b85c97704b96"
+    },
+    {
+      "archive": "fix-logs-start-composition-gates.log.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/logs-start-composition-gates.log",
+      "originalBytes": 897,
+      "originalSHA256": "bbf4b04e02f9268a1346cd15d43e9355fba447d0918a56d3b0748cc48b56ac1e",
+      "gzipBytes": 493,
+      "gzipSHA256": "efb70bf49239d38db89382714e6ab0f34cd3273f6d2f848b143a0a10817b3227"
+    },
+    {
+      "archive": "fix-logs-start-composition-vet.log.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/logs-start-composition-vet.log",
+      "originalBytes": 0,
+      "originalSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gzipBytes": 20,
+      "gzipSHA256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "archive": "fix-logs-start-composition-npm-ci.log.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/logs-start-composition-npm-ci.log",
+      "originalBytes": 167,
+      "originalSHA256": "4bbedecdb10fe96f1f8e0d86b495b5fab3aaa86a875af67945c0f42c1da8e404",
+      "gzipBytes": 142,
+      "gzipSHA256": "784f215588b057ae22d7929149710b269639c83112ab1b1e63bd69f5138a66df"
+    },
+    {
+      "archive": "fix-logs-start-constructor-red.log.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/logs-start-constructor-red.log",
+      "originalBytes": 309,
+      "originalSHA256": "671ed55485960e5bf29e8a30881e77d48ced4baffa1989a77ba4ca77bf5410db",
+      "gzipBytes": 188,
+      "gzipSHA256": "503b5b7ba880f3d893f31e6350ba2289a3b15b051532c153fd3454e51a38147a"
+    },
+    {
+      "archive": "fix-logs-start-constructor-actual-red.log.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/logs-start-constructor-actual-red.log",
+      "originalBytes": 222,
+      "originalSHA256": "62ce65f0d3b3a347efd58c54232030c3a328219ca350d647b3d3d79da1c63684",
+      "gzipBytes": 184,
+      "gzipSHA256": "3529440920b94c1f4aaf5dfe95d25fa4fecfda4df3d39eb437c3562f8302900f"
+    },
+    {
+      "archive": "fix-logs-disclosure-seed-red.log.gz",
+      "originalCachePath": "/home/phil/.cache/asservat-build/logs-disclosure-seed-red.log",
+      "originalBytes": 600,
+      "originalSHA256": "d30e057edcc5e2d1b00e0a39fa2cec567a065e1af47292ead7cdc8dab05dac56",
+      "gzipBytes": 371,
+      "gzipSHA256": "0fe9e932135b70cdd5da66475bd24a21583fac8659f62e558f45e45e8de10298"
+    },
+    {
+      "archive": "fix-kept-cleanup-context-mrguu6p3.json.gz",
+      "originalCachePath": "/home/phil/Projekte/asservat-finite-saved-logs/test/results/kept-cleanup-context-mrguu6p3.json",
+      "originalBytes": 136,
+      "originalSHA256": "25499309b8acc83d3ba876ed285966a4e8aa82b83cf221bbfb27ab299eb08595",
+      "gzipBytes": 132,
+      "gzipSHA256": "c90b9f417ff7a0a3028d0a61f89db66ea23519507b1e6885131320f09dbbf48c"
+    }
+  ]
+}

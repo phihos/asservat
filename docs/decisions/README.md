@@ -1159,3 +1159,5 @@ The brief's domain-registration and trademark work remains a maintainer-owned pu
 - [ADR-306 — Bounded saved syscall argument queries](306-bounded-saved-syscall-queries.md): reuse the regional Go worker, canonical native decoder and exact raw grants with stable keyed replay and bounded whole-event pages; component implementation in progress, installed qualification pending.
 
 - [ADR-307 — Natural completion of exhausted projection workers](307-exhausted-projection-worker-completion.md): process-local completion only after the sole authenticated batch and final joined acknowledgement; original deadlines, multi-batch behavior and positive retirement remain. Implementation/qualification in progress.
+
+- [ADR-308 — Finite whole-pod logs and approved saved-log pages](308-finite-whole-pod-logs.md): lossless bounded API log acquisition, truthful combined-stream provenance and exact raw get_logs approval; implementation and qualification pending.

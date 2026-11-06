@@ -188,7 +188,7 @@ func (s GrantService) RequestPolicy(ctx context.Context, current identities.Curr
 	if err != nil {
 		return zero, false, err
 	}
-	if !PolicyProfileGrantScopeValid(g) {
+	if !PolicyProfileGrantScopeValid(g) || !PolicyLogsGrantScopeValid(g) {
 		return zero, false, value.ErrGrantScope
 	}
 	probe := g
