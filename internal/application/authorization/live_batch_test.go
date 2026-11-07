@@ -77,7 +77,7 @@ func TestLiveAuthorizationPhasesShareOnlyCommonObservationsAtOneAndSixteenSource
 			}
 			for phase := 1; phase <= 2; phase++ {
 				got, end, err := s.CheckSources(t.Context(), f, expected, live.Packet)
-				if err != nil || len(got) != count || !end.After(base.now) || f.podReads != count*phase || f.batchReads != phase || environment.policyReads != 2*phase || environment.recoveryReads != 2*phase {
+				if err != nil || len(got) != count || !end.After(base.now) || f.podReads != count*phase || f.batchReads != phase || environment.policyReads != phase || environment.recoveryReads != phase {
 					t.Fatalf("sources=%d phase=%d result=%d error=%v pod=%d sourcebatch=%d policy=%d recovery=%d", count, phase, len(got), err, f.podReads, f.batchReads, environment.policyReads, environment.recoveryReads)
 				}
 			}

@@ -64,26 +64,11 @@ func (s CurrentLiveEnvironment) LiveSourceReads(ctx context.Context, sources []l
 	if e != nil || !recovery.Valid(s.Now()) || recovery.InstallationID != s.InstallationID || recovery.IssuerEpoch != p.RecoveryEpoch {
 		return nil, fmt.Errorf("%w: live recovery", live.ErrDenied)
 	}
+	// One policy and one recovery observation per phase: the decision is
+	// valid only until the earlier of their original freshness bounds, so a
+	// change takes effect within that window without a confirming re-read.
 	until = identity.Earlier(until, recovery.FreshUntil)
-	final, stopFinal := context.WithDeadline(bounded, until)
-	defer stopFinal()
-	last, e := s.Policies.DownloadPolicy(final)
-	if e != nil || last.RootID != p.RootID || last.InstallationID != p.InstallationID || last.RecoveryEpoch != p.RecoveryEpoch || last.Revision != p.Revision || last.ProtectionDigest != p.ProtectionDigest {
-		return nil, fmt.Errorf("%w: live environment last-policy", live.ErrDenied)
-	}
-	for n, source := range sources {
-		path, limit, ok := last.SelectLive(actor, source.Target, projection, s.Now())
-		if !ok || path != paths[n] || limit != limits[n] {
-			return nil, fmt.Errorf("%w: live environment last-select", live.ErrDenied)
-		}
-	}
-	until = identity.Earlier(until, last.FreshUntil)
-	lastRecovery, e := s.Recovery.RecoveryState(final)
-	if e != nil || !lastRecovery.Valid(s.Now()) || lastRecovery.InstallationID != recovery.InstallationID || lastRecovery.IssuerEpoch != recovery.IssuerEpoch || lastRecovery.Revision != recovery.Revision {
-		return nil, fmt.Errorf("%w: live environment last-recovery", live.ErrDenied)
-	}
-	until = identity.Earlier(until, lastRecovery.FreshUntil)
-	if final.Err() != nil || !s.Now().Before(until) {
+	if bounded.Err() != nil || !s.Now().Before(until) {
 		return nil, fmt.Errorf("%w: live environment deadline", live.ErrDenied)
 	}
 	out := make([]LiveEnvironmentDecision, len(sources))

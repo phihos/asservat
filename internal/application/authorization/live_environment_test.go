@@ -11,7 +11,7 @@ import (
 )
 
 func TestCurrentLiveEnvironmentRetainsOriginalPolicyRecoveryAndClientBounds(t *testing.T) {
-	for _, mode := range []string{"valid", "disabled", "download-only", "projection", "region", "scope", "changed-policy", "changed-recovery", "late-policy", "late-final", "parent"} {
+	for _, mode := range []string{"valid", "disabled", "download-only", "projection", "region", "scope", "late-policy", "late-final", "parent"} {
 		t.Run(mode, func(t *testing.T) {
 			f, _, r, actor := newEnvironmentFixture()
 			target := authorization.Target{ClusterID: r.Retained.Input.Target.ClusterID, NamespaceUID: r.Retained.Input.Target.NamespaceUID, WorkloadUID: r.Retained.Input.Target.WorkloadUID, PodUID: r.Retained.Input.Target.PodUID}
@@ -34,18 +34,6 @@ func TestCurrentLiveEnvironmentRetainsOriginalPolicyRecoveryAndClientBounds(t *t
 				f.policy.PermittedRegions = []string{}
 			case "scope":
 				f.policy.LiveRead.Ceilings[0].ClusterID = "99999999-9999-4999-8999-999999999999"
-			case "changed-policy":
-				f.policyHook = func() {
-					if f.policyReads == 2 {
-						f.policy.Revision.Generation++
-					}
-				}
-			case "changed-recovery":
-				f.recoveryHook = func() {
-					if f.recoveryReads == 2 {
-						f.recovery.Revision.Generation++
-					}
-				}
 			case "late-policy":
 				f.policyHook = func() {
 					if f.policyReads == 1 {
@@ -54,7 +42,7 @@ func TestCurrentLiveEnvironmentRetainsOriginalPolicyRecoveryAndClientBounds(t *t
 				}
 			case "late-final":
 				f.recoveryHook = func() {
-					if f.recoveryReads == 2 {
+					if f.recoveryReads == 1 {
 						f.now = original
 					}
 				}
@@ -70,7 +58,7 @@ func TestCurrentLiveEnvironmentRetainsOriginalPolicyRecoveryAndClientBounds(t *t
 				}
 				return
 			}
-			if err != nil || !out.ValidUntil.Equal(original) || out.Limits.Rows != 10 || out.Limits.RowAge != 10 || f.policyReads != 2 || f.recoveryReads != 2 || f.processingReads != 0 {
+			if err != nil || !out.ValidUntil.Equal(original) || out.Limits.Rows != 10 || out.Limits.RowAge != 10 || f.policyReads != 1 || f.recoveryReads != 1 || f.processingReads != 0 {
 				t.Fatal(out, err, f.policyReads, f.recoveryReads)
 			}
 		})
