@@ -110,6 +110,8 @@ func installedProjectionBrowserSource(t *testing.T, ctx context.Context, browser
 		driver = "installed-packet-query-browser.mjs"
 	}
 	command := exec.CommandContext(call, "node", filepath.Join("..", "..", "web", "scripts", driver))
+	// Chromium children keep stdout open after node is killed; bound Wait.
+	command.WaitDelay = 5 * time.Second
 	command.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	command.Cancel = func() error {
 		if command.Process == nil {

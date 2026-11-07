@@ -524,6 +524,8 @@ func startInstalledLiveBrowser(t *testing.T, ctx context.Context, b *installedBr
 	}
 	call, cancel := context.WithCancel(ctx)
 	cmd := exec.CommandContext(call, "node", filepath.Join("..", "..", "web", "scripts", "installed-live-observation-browser.mjs"))
+	// Chromium children keep stdout open after node is killed; bound Wait.
+	cmd.WaitDelay = 5 * time.Second
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	cmd.Cancel = func() error {
 		if cmd.Process == nil {

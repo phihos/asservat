@@ -43,6 +43,8 @@ func installedSyscallQueryBrowser(t *testing.T, ctx context.Context, browser *in
 	}
 	call, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	cmd := exec.CommandContext(call, "node", filepath.Join("..", "..", "web", "scripts", "installed-syscall-query-browser.mjs"))
+	// Chromium children keep stdout open after node is killed; bound Wait.
+	cmd.WaitDelay = 5 * time.Second
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	cmd.Cancel = func() error {
 		if cmd.Process == nil {

@@ -371,6 +371,8 @@ func installedRecorderHistoryBrowser(t *testing.T, ctx context.Context, browser 
 	}
 	call, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	command := exec.CommandContext(call, "node", filepath.Join("..", "..", "web", "scripts", "installed-history-browser.mjs"))
+	// Chromium children keep stdout open after node is killed; bound Wait.
+	command.WaitDelay = 5 * time.Second
 	command.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	command.Cancel = func() error {
 		if command.Process == nil {
