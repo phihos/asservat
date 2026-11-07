@@ -163,6 +163,10 @@ func (s *Service) List(ctx context.Context, current CurrentIdentity, target targ
 	// with a bounded page rather than generate an oversized public result.
 	limit = min(limit, 20)
 	sources, next, err := s.sources.Inventory(ctx, current, target, cursor, limit)
+	if err != nil && !errors.Is(err, v.ErrDenied) && errors.Is(err, v.ErrUnavailable) {
+		// An unavailable catalog/status read is not an access decision.
+		return zero, "", fmt.Errorf("%w: %w: service:164: %v", v.ErrUnavailable, v.ErrTransient, err)
+	}
 	if err != nil || len(sources) > limit {
 		return zero, "", fmt.Errorf("%w: service:164", v.ErrDenied)
 	}
