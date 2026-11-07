@@ -282,6 +282,9 @@ func (s *Downloads) ReserveDownload(ctx context.Context, r evidence.DownloadRese
 	var out artifact.DownloadSession
 	request := r.Session
 	a := r.Authority
+	if a.Started() {
+		return out, artifact.ErrDownloadExpired
+	}
 	if !request.Valid() || request.Scope.RootID != s.root || request.Scope != a.Scope || r.IdempotencyDigest == (artifact.Digest{}) || request.State != artifact.DownloadPreparing || request.Active != nil || request.Generation != 0 || request.Requests != 0 || request.ChargedOutput != 0 || request.ChargedRead != 0 || request.EmittedBytes != 0 {
 		return out, artifact.ErrInvalid
 	}
@@ -392,6 +395,9 @@ func (s *Downloads) BeginDownloadBatch(ctx context.Context, sessionID string, a 
 }
 
 func (s *Downloads) beginDownloadBatch(ctx context.Context, sessionID string, a artifact.DownloadAuthority, b artifact.DownloadBatch, firstContext bool) (audit.DownloadIntent, error) {
+	if a.Started() {
+		return audit.DownloadIntent{}, artifact.ErrDownloadExpired
+	}
 	a.CheckedAt = a.CheckedAt.UTC()
 	a.ValidUntil = a.ValidUntil.UTC()
 	a.AccessUntil = a.AccessUntil.UTC()
@@ -474,6 +480,9 @@ func (s *Downloads) beginDownloadBatch(ctx context.Context, sessionID string, a 
 }
 
 func (s *Downloads) PermitDownloadBatch(ctx context.Context, sessionID string, a artifact.DownloadAuthority, batchID string, generation int64) error {
+	if a.Started() {
+		return artifact.ErrDownloadExpired
+	}
 	if !authorization.UUID(sessionID) || !authorization.UUID(batchID) || a.Scope.RootID != s.root {
 		return artifact.ErrInvalid
 	}
@@ -578,6 +587,9 @@ func (s *Downloads) FinishDownloadBatch(ctx context.Context, sessionID, batchID 
 // Metadata leaves the regional worker only after its exact read outcome audit.
 // This gate does not reopen the completed acquisition batch or permit file bytes.
 func (s *Downloads) PermitDownloadMetadata(ctx context.Context, sessionID string, a artifact.DownloadAuthority, batchID string, generation int64) error {
+	if a.Started() {
+		return artifact.ErrDownloadExpired
+	}
 	if !authorization.UUID(sessionID) || !authorization.UUID(batchID) || a.Scope.RootID != s.root {
 		return artifact.ErrInvalid
 	}

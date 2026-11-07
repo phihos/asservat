@@ -37,6 +37,15 @@ func TestStartedDownloadContinuesToOriginalBounds(t *testing.T) {
 			t.Fatal("continuation outlived its original bound", name)
 		}
 	}
+	// Only response windows/leases accept a continuation; a batch start never.
+	prep, a2, n2 := downloadFixture()
+	cont, _ := a2.Continue(n2.Add(time.Second), prep.Deadline)
+	if _, err := prep.Start(cont, DownloadBatch{ID: prep.ID, Purpose: DownloadMetadata, ReadBytes: 2 << 20}, n2.Add(time.Second)); err == nil {
+		t.Fatal("continuation started a batch")
+	}
+	if _, err := prep.Start(a2, DownloadBatch{ID: prep.ID, Purpose: DownloadMetadata, ReadBytes: 2 << 20}, n2.Add(time.Second)); err != nil {
+		t.Fatal("complete check refused a batch", err)
+	}
 	// A forged continuation that claims a later start than its check is invalid.
 	c.StartedAt = c.CheckedAt.Add(time.Second)
 	if c.Valid(c.CheckedAt) {

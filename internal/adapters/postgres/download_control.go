@@ -208,6 +208,9 @@ func (s *Downloads) ReadContextDownloadSource(ctx context.Context, a artifact.Do
 // acquisition lease. A historical successful preparation may support later
 // generations/Completed metadata, but never authorize another byte or key read.
 func (s *Downloads) ObserveDownload(ctx context.Context, sessionID string, a artifact.DownloadAuthority, preparation *artifact.DownloadPreparation) (artifact.DownloadObservation, error) {
+	if a.Started() {
+		return artifact.DownloadObservation{}, artifact.ErrDownloadExpired
+	}
 	var out artifact.DownloadObservation
 	if s == nil || ctx == nil || ctx.Err() != nil || a.Scope.RootID != s.root {
 		return out, artifact.ErrDownloadUnavailable

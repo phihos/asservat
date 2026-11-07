@@ -63,6 +63,17 @@ observation staleness, and the browser session needing a refresh.
 
 - `artifact.DownloadAuthority` gains `StartedAt` (omitted when zero) with
   `Started` and `Continue`. `BeginResponse` refuses a continuation.
+- Audit meaning: a window/lease record whose authority has `StartedAt` is a
+  continuation. Its `CheckedAt`/`ValidUntil` and embedded proof
+  `ObservedAt`/`ValidUntil` are the lease interval; the proofs were last
+  observed by the complete check at `StartedAt`, identified by the unchanged
+  `DecisionDigest`. The dates are restated because every downstream consumer
+  (domain `Valid`, native operation processing validity, SQL window triggers)
+  requires a five-second interval; keeping the original dates would need those
+  contracts changed for no disclosure benefit.
+- Only response windows/leases and the native response path accept a
+  continuation. Batch start/permit, reservation, observation and
+  preparation-key binding refuse it.
 - C-14 `DownloadResponseTransfer` fixes the start authority after
   `BeginDownloadResponse` and serves every later window and lease from
   `Continue`. No identity batch is opened after the start, except to authenticate

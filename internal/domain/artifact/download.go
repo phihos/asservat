@@ -61,7 +61,11 @@ type DownloadAuthority struct {
 	// Optional only for historical v1 audit decoding. Current disclosure requires it.
 	DeleteBy time.Time `json:",omitzero"`
 	// StartedAt is set only on a started response's continuation (ADR-312):
-	// the CheckedAt of the complete check that started the response.
+	// the CheckedAt of the complete check that started the response. When it
+	// is set, CheckedAt/ValidUntil and the embedded Environment, Processing and
+	// Retention ObservedAt/ValidUntil are this lease's interval, not new
+	// observations; every proof was last observed by the check at StartedAt,
+	// which DecisionDigest identifies. Audit readers must interpret them so.
 	StartedAt time.Time `json:",omitzero"`
 }
 
@@ -161,7 +165,15 @@ func (s DownloadSession) Valid() bool {
 	return (s.StopProtocol == "" || s.StopProtocol == DownloadStopProtocol) && uuid(s.ID) && uuid(s.AllocationID) && s.Scope.Valid() && s.RequestDigest != (Digest{}) && s.State.Valid() && !s.CreatedAt.IsZero() && s.Deadline.After(s.CreatedAt) && !s.Deadline.After(s.CreatedAt.Add(8*time.Hour)) && s.OutputLimit > 0 && s.OutputLimit <= MaxDownloadOutput && s.ReadLimit > 0 && s.ReadLimit <= MaxDownloadReadWork && s.RequestLimit > 0 && s.RequestLimit <= MaxDownloadRequests && s.ChargedOutput >= 0 && s.ChargedOutput <= s.OutputLimit && s.ChargedRead >= 0 && s.ChargedRead <= s.ReadLimit && s.Requests >= 0 && s.Requests <= s.RequestLimit && s.EmittedBytes >= 0 && s.EmittedBytes <= s.ChargedOutput && s.Generation >= 0
 }
 
+// current requires a complete check. Only a started response's windows and
+// leases accept its continuation (ADR-312), through startedCurrent.
 func (s DownloadSession) current(a DownloadAuthority, now time.Time) error {
+	if a.Started() {
+		return ErrDownloadExpired
+	}
+	return s.startedCurrent(a, now)
+}
+func (s DownloadSession) startedCurrent(a DownloadAuthority, now time.Time) error {
 	if !s.Valid() || !a.Valid(now) || s.Scope != a.Scope || !now.Before(s.Deadline) || !now.Before(a.AccessUntil) {
 		return ErrDownloadExpired
 	}

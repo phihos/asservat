@@ -351,6 +351,17 @@ func qualifyDownloadResponses(t *testing.T, ctx context.Context, admin *pgxpool.
 				t.Fatal("continuation refused before its original bounds")
 			}
 			window(2, continued, false)
+			// Non-response effects never accept a continuation.
+			if _, err := ledger.ObserveDownload(ctx, session.ID, continued, nil); err == nil {
+				t.Fatal("observation accepted a continuation")
+			}
+			reserve := started
+			reserve.Authority = continued
+			reserve.IdempotencyDigest = artifact.Digest{75}
+			reserve.Session.ID = custodyID()
+			if _, err := ledger.ReserveDownload(ctx, reserve); err == nil {
+				t.Fatal("reservation accepted a continuation")
+			}
 		})
 	})
 }

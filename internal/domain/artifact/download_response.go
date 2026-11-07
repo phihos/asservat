@@ -74,9 +74,6 @@ func (r DownloadResponse) Valid() bool {
 // BeginResponse starts a content response. It requires a complete current
 // check; only the response's later windows and leases accept its continuation.
 func (s DownloadSession) BeginResponse(a DownloadAuthority, r DownloadResponse, now time.Time) (DownloadSession, DownloadResponse, error) {
-	if a.Started() {
-		return s, r, ErrDownloadExpired
-	}
 	if e := s.current(a, now); e != nil {
 		return s, r, e
 	}
@@ -129,7 +126,7 @@ func (w DownloadWindow) Valid() bool {
 	return o.EmittedBytes >= 0 && o.EmittedBytes <= w.Length && !o.RecordedAt.Before(w.StartedAt) && (!o.Success || o.EmittedBytes == w.Length) && (!o.VerifiedFinal || o.Success) && (!o.Success || w.IntentAcknowledged) && (!w.OutcomeAcknowledged || w.IntentAcknowledged)
 }
 func (r DownloadResponse) current(s DownloadSession, a DownloadAuthority, owner string, now time.Time) error {
-	if e := s.current(a, now); e != nil {
+	if e := s.startedCurrent(a, now); e != nil {
 		return e
 	}
 	if !r.Valid() || r.SessionID != s.ID || r.Generation != s.Generation || r.OwnerID != owner || r.Closed || !now.Before(r.Until) {

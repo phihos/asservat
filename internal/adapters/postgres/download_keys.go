@@ -44,6 +44,10 @@ func NewDownloadKeys(ctx context.Context, pool *pgxpool.Pool, root string, scope
 // encloses key-binding/spend. Lock order remains recovery, permission, session,
 // child key record; callbacks perform no network I/O.
 func (s *Downloads) withKeyBatch(ctx context.Context, session string, a artifact.DownloadAuthority, batch string, generation int64, effect func(*custodydb.Queries, artifact.DownloadSession, time.Time) error) error {
+	// Preparation-batch keys never serve a started response (ADR-312).
+	if a.Started() {
+		return artifact.ErrDownloadExpired
+	}
 	if s == nil || s.retention == nil || s.recovery == nil || !authorization.UUID(session) || !authorization.UUID(batch) || generation < 1 || a.Scope.RootID != s.root {
 		return artifact.ErrInvalid
 	}
