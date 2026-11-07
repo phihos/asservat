@@ -33,6 +33,9 @@ var (
 	ErrConflict    = errors.New("live: revision or idempotency conflict")
 	ErrCapacity    = errors.New("live: capacity unavailable")
 	ErrUnavailable = errors.New("live: projection unavailable")
+	// ErrTransient marks a read that failed on a temporary source/status miss:
+	// nothing was disclosed and the view stays open for the next read.
+	ErrTransient = errors.New("live: temporarily unavailable")
 )
 
 func Projection(s string) bool { return s == Packet || s == HTTP || s == Syscall }

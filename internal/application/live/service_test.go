@@ -31,6 +31,7 @@ type fixture struct {
 	afterHead, afterCurrent        func()
 	source                         v.Source
 	denied                         bool
+	transient                      bool
 	broken                         bool
 	reads, heads, changes, created int
 	seq                            uint64
@@ -47,6 +48,9 @@ func (f *fixture) Inventory(context.Context, CurrentIdentity, targets.WorkloadRe
 	return []v.Source{f.source}, "", nil
 }
 func (f *fixture) Check(_ context.Context, _ CurrentIdentity, source v.Source, _ string) (v.Source, time.Time, error) {
+	if f.transient {
+		return v.Source{}, time.Time{}, v.ErrUnavailable
+	}
 	if f.denied || !source.Same(f.source) {
 		return v.Source{}, time.Time{}, v.ErrDenied
 	}
@@ -824,5 +828,30 @@ func TestLiveReadDisclosesUnderFreshCheckAfterLongWait(t *testing.T) {
 	f.afterProjection = func() { f.denied = true }
 	if denied, e := s.Read(t.Context(), i, v.Read{ID: w.ID, Cursor: batch.Cursor}); e == nil || len(denied.Rows) != 0 {
 		t.Fatal("revocation after the node read disclosed rows")
+	}
+}
+
+// A transient source/status miss fails only that read without disclosure
+// and leaves the view open; an access denial still ends it.
+func TestLiveTransientSourceMissKeepsViewOpen(t *testing.T) {
+	s, f, i, r := setup(t)
+	w, e := s.Open(t.Context(), i, r)
+	if e != nil {
+		t.Fatal(e)
+	}
+	f.add()
+	f.transient = true
+	if b, e := s.Read(t.Context(), i, v.Read{ID: w.ID, Cursor: *w.Cursor}); !errors.Is(e, v.ErrTransient) || len(b.Rows) != 0 {
+		t.Fatal("transient miss disclosed or was not marked transient", e)
+	}
+	f.transient = false
+	batch, e := s.Read(t.Context(), i, v.Read{ID: w.ID, Cursor: *w.Cursor})
+	if e != nil || len(batch.Rows) != 1 || batch.State != "Active" {
+		t.Fatal("view did not survive a transient miss", batch.State, e)
+	}
+	f.add()
+	f.denied = true
+	if _, e := s.Read(t.Context(), i, v.Read{ID: w.ID, Cursor: batch.Cursor}); e == nil || errors.Is(e, v.ErrTransient) {
+		t.Fatal("denial treated as transient", e)
 	}
 }

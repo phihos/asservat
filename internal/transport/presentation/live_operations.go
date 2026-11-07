@@ -196,6 +196,10 @@ func (s *LiveOperations) CallWithContext(ctx context.Context, current identities
 			s.Diagnose("live " + name + " refused: " + msg[:min(len(msg), 300)])
 		}
 		failure := OperationFailure{Code: "LiveUnavailable", Message: "Live observation is unavailable for this source or current access. Saved evidence and separately reviewed collection remain available.", Retryable: false}
+		if errors.Is(err, v.ErrTransient) {
+			failure.Retryable = true
+			failure.Message = "Live observation is temporarily unavailable. The view stays open; the next read checks current access again."
+		}
 		if errors.Is(err, v.ErrCapacity) {
 			failure.Code = "CapacityUnavailable"
 			failure.Message = "Live-view capacity is unavailable. Close another view or try again later."

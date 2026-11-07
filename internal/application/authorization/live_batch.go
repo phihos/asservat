@@ -6,6 +6,7 @@ import (
 	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/domain/live"
 	"context"
+	"errors"
 	"fmt"
 	"time"
 )
@@ -81,6 +82,10 @@ func (s LiveSourceAuthority) sourcePhase(ctx context.Context, current identities
 		}
 	}
 	if e != nil || len(records) != len(refs) {
+		// An unavailable catalog/status read is not an access decision.
+		if e != nil && errors.Is(e, live.ErrUnavailable) && !errors.Is(e, live.ErrDenied) {
+			return nil, time.Time{}, fmt.Errorf("%w: live_batch:83: %v", live.ErrUnavailable, e)
+		}
 		return nil, time.Time{}, fmt.Errorf("%w: live_batch:83: %v", live.ErrDenied, e)
 	}
 	out := make([]live.Source, len(records))

@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"slices"
 	"sync"
@@ -440,6 +441,11 @@ func (s *Service) current(ctx context.Context, current CurrentIdentity, st *sess
 		var e error
 		checks, phaseUntil, e = batch.CheckSources(ctx, current, st.selected, st.watch.Projection)
 		if e != nil || len(checks) != len(st.selected) {
+			// A transient source/status miss fails only this read; it is not
+			// an access decision and must not end the view.
+			if e != nil && !errors.Is(e, v.ErrDenied) && errors.Is(e, v.ErrUnavailable) {
+				return end, fmt.Errorf("%w: %w: service:442: %v", v.ErrUnavailable, v.ErrTransient, e)
+			}
 			return end, fmt.Errorf("%w: service:442: %v", v.ErrDenied, e)
 		}
 	} else {
@@ -448,6 +454,9 @@ func (s *Service) current(ctx context.Context, current CurrentIdentity, st *sess
 			var e error
 			checks[n], until, e = s.sources.Check(ctx, current, source, st.watch.Projection)
 			if e != nil {
+				if !errors.Is(e, v.ErrDenied) && errors.Is(e, v.ErrUnavailable) {
+					return end, fmt.Errorf("%w: %w: service:450: %v", v.ErrUnavailable, v.ErrTransient, e)
+				}
 				return end, fmt.Errorf("%w: service:450: %v", v.ErrDenied, e)
 			}
 			phaseUntil = minTime(phaseUntil, until)
@@ -496,7 +505,9 @@ func (s *Service) Read(ctx context.Context, current CurrentIdentity, r v.Read) (
 	}
 	end, err := s.current(ctx, current, st, i)
 	if err != nil {
-		s.clear(st, "AccessLost")
+		if !errors.Is(err, v.ErrTransient) {
+			s.clear(st, "AccessLost")
+		}
 		return zero, err
 	}
 	now := s.cfg.Now()
@@ -582,7 +593,9 @@ func (s *Service) Read(ctx context.Context, current CurrentIdentity, r v.Read) (
 		}
 		finalEnd, e := s.current(ctx, current, st, i)
 		if e != nil {
-			s.clear(st, "AccessLost")
+			if !errors.Is(e, v.ErrTransient) {
+				s.clear(st, "AccessLost")
+			}
 			return zero, e
 		}
 		// The node read stayed inside the first check's window; disclosure is
