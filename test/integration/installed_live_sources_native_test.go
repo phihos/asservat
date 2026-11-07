@@ -355,7 +355,25 @@ func (p *installedLiveProducer) manual(ctx context.Context, projection string) {
 		CaptureID string `json:"capture_id"`
 		Requested bool   `json:"cancellation_requested"`
 	}
-	p.must(ctx, "cancel_capture", map[string]any{"capture_id": id, "expected_revision": progress.Revision, "idempotency_key": "live-cancel-" + id}, &cancelled)
+	for attempt := 0; ; attempt++ {
+		err := p.read(ctx, "cancel_capture", map[string]any{"capture_id": id, "expected_revision": progress.Revision, "idempotency_key": "live-cancel-" + id}, &cancelled)
+		if err == nil {
+			break
+		}
+		// The finite window may end while Stop is sent: accept a session that
+		// completed on its own; retry a still-running one a few times.
+		p.must(ctx, "get_capture", map[string]any{"capture_id": id}, &progress)
+		if progress.Phase != "Running" {
+			p.t.Logf("installed LIVE manual capture %s completed before Stop (phase %s); Stop not exercised for this session", id, progress.Phase)
+			return
+		}
+		if attempt == 4 {
+			p.t.Fatal("LIVE original capture Stop refused while running", err)
+		}
+		if e := installedJourneyPause(ctx, time.Second); e != nil {
+			p.t.Fatal(e)
+		}
+	}
 	if cancelled.CaptureID != id || !cancelled.Requested {
 		p.t.Fatal("LIVE original capture Stop not acknowledged")
 	}
