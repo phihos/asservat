@@ -159,6 +159,11 @@ func (u *installedUnifiedRunner) waitRetired(t *testing.T, ctx context.Context, 
 		}
 		if len(pod.Status.InitContainerStatuses) == 4 && pod.Status.InitContainerStatuses[3].State.Terminated != nil {
 			u.checkPhases(t, pod, false)
+			// Measurement only: where the bootstrap minutes go, per phase.
+			for _, status := range pod.Status.InitContainerStatuses {
+				run := status.State.Terminated
+				t.Logf("unified runner phase %s ran %s", status.Name, run.FinishedAt.Sub(run.StartedAt.Time))
+			}
 			return
 		}
 		installedUnifiedPoll(t, wait)
