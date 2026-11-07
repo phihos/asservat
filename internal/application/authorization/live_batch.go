@@ -6,6 +6,7 @@ import (
 	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/domain/live"
 	"context"
+	"fmt"
 	"time"
 )
 
@@ -27,14 +28,14 @@ func (s LiveSourceAuthority) ResolveSources(ctx context.Context, current identit
 }
 func (s LiveSourceAuthority) sourcePhase(ctx context.Context, current identities.CurrentIdentity, input []live.SourceReference, expected []live.Source, projection string, resolve bool) ([]live.Source, time.Time, error) {
 	if !s.configured() || ctx == nil || ctx.Err() != nil || current == nil || len(input) < 1 || len(input) > live.MaxSources || !live.Projection(projection) {
-		return nil, time.Time{}, live.ErrDenied
+		return nil, time.Time{}, fmt.Errorf("%w: live_batch:30", live.ErrDenied)
 	}
 	call, stop := context.WithTimeout(ctx, 5*time.Second)
 	defer stop()
 	i, e := current.ResolveIdentity(call)
 	i = cloneProjectionIdentity(i)
 	if e != nil || !i.Valid(s.Now()) {
-		return nil, time.Time{}, live.ErrDenied
+		return nil, time.Time{}, fmt.Errorf("%w: live_batch:37", live.ErrDenied)
 	}
 	until := i.ValidUntil
 	refs := append([]live.SourceReference(nil), input...)
@@ -42,26 +43,26 @@ func (s LiveSourceAuthority) sourcePhase(ctx context.Context, current identities
 	seen := map[string]bool{}
 	for n, ref := range refs {
 		if !value.UUID(ref.ID) || seen[ref.ID] || ref.Kind != "policy" && ref.Kind != "manualSession" {
-			return nil, time.Time{}, live.ErrDenied
+			return nil, time.Time{}, fmt.Errorf("%w: live_batch:45", live.ErrDenied)
 		}
 		seen[ref.ID] = true
 		if resolve {
 			refs[n].Target, e = s.Catalog.LiveSourceTarget(call, ref.ID, ref.Kind)
 			if e != nil {
-				return nil, time.Time{}, live.ErrDenied
+				return nil, time.Time{}, fmt.Errorf("%w: live_batch:51: %v", live.ErrDenied, e)
 			}
 		}
 		target := refs[n].Target
 		if !target.Valid() || n > 0 && (target.ClusterID != refs[0].Target.ClusterID || target.NamespaceUID != refs[0].Target.NamespaceUID || target.WorkloadUID != refs[0].Target.WorkloadUID) {
-			return nil, time.Time{}, live.ErrDenied
+			return nil, time.Time{}, fmt.Errorf("%w: live_batch:56", live.ErrDenied)
 		}
 		permissions[n], e = s.Permissions.Permissions(call, target)
 		if e != nil {
-			return nil, time.Time{}, live.ErrDenied
+			return nil, time.Time{}, fmt.Errorf("%w: live_batch:60: %v", live.ErrDenied, e)
 		}
 		ordinary := value.ScopeEligibility(i, permissions[n], value.ReadLiveSource, target, s.Now())
 		if !ordinary.Eligible {
-			return nil, time.Time{}, live.ErrDenied
+			return nil, time.Time{}, fmt.Errorf("%w: live_batch:64", live.ErrDenied)
 		}
 		until = identity.Earlier(until, ordinary.ValidUntil)
 	}
@@ -80,13 +81,13 @@ func (s LiveSourceAuthority) sourcePhase(ctx context.Context, current identities
 		}
 	}
 	if e != nil || len(records) != len(refs) {
-		return nil, time.Time{}, live.ErrDenied
+		return nil, time.Time{}, fmt.Errorf("%w: live_batch:83: %v", live.ErrDenied, e)
 	}
 	out := make([]live.Source, len(records))
 	for n, record := range records {
 		ref := refs[n]
 		if record.Source.Root() != s.RootID || record.Source.ID() != ref.ID || record.Source.OwnerKind != ref.Kind || record.Source.Target != ref.Target {
-			return nil, time.Time{}, live.ErrDenied
+			return nil, time.Time{}, fmt.Errorf("%w: live_batch:89", live.ErrDenied)
 		}
 		want := record.Source
 		if !resolve {

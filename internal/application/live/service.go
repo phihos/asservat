@@ -440,7 +440,7 @@ func (s *Service) current(ctx context.Context, current CurrentIdentity, st *sess
 		var e error
 		checks, phaseUntil, e = batch.CheckSources(ctx, current, st.selected, st.watch.Projection)
 		if e != nil || len(checks) != len(st.selected) {
-			return end, fmt.Errorf("%w: service:442", v.ErrDenied)
+			return end, fmt.Errorf("%w: service:442: %v", v.ErrDenied, e)
 		}
 	} else {
 		for n, source := range st.selected {
@@ -448,7 +448,7 @@ func (s *Service) current(ctx context.Context, current CurrentIdentity, st *sess
 			var e error
 			checks[n], until, e = s.sources.Check(ctx, current, source, st.watch.Projection)
 			if e != nil {
-				return end, fmt.Errorf("%w: service:450", v.ErrDenied)
+				return end, fmt.Errorf("%w: service:450: %v", v.ErrDenied, e)
 			}
 			phaseUntil = minTime(phaseUntil, until)
 		}

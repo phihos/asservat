@@ -254,7 +254,8 @@ func qualifyInstalledLiveObservation(t *testing.T, ctx context.Context, c instal
 		if e != nil || wire.ValidateInput(name, raw) != nil {
 			return zero, "", errors.New("invalid authored installed input")
 		}
-		bounded, stop := context.WithTimeout(parent, 5*time.Second)
+		// The service bounds each phase at five seconds itself.
+		bounded, stop := context.WithTimeout(parent, 10*time.Second)
 		defer stop()
 		reply, e := session.CallTool(bounded, &sdk.CallToolParams{Name: name, Arguments: input})
 		if e != nil {
