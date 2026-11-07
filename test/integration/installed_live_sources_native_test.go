@@ -195,6 +195,12 @@ func (p *installedLiveProducer) submit(ctx context.Context, previewID, key strin
 		}
 		return accepted.ID
 	} else if code != "OutcomeUnknown" && code != "AcquisitionNotStarted" {
+		if code == "ReviewChanged" {
+			// The reviewed audience changed after preview (for example a just
+			// accepted binding); the caller previews again, as a user would.
+			p.t.Logf("LIVE capture request ReviewChanged for preview %s; previewing again", previewID)
+			return ""
+		}
 		p.t.Fatal("LIVE initial capture refused", code, err)
 	}
 	// Existing submit helper resolves unknown original key; it never selects a
@@ -288,13 +294,19 @@ func (p *installedLiveProducer) source(ctx context.Context, name, projection str
 func (p *installedLiveProducer) manual(ctx context.Context, projection string) {
 	p.t.Helper()
 	var preview installedApprovedRecordingPreview
-	p.wait(ctx, "finite LIVE preview", time.Minute, func(c context.Context) bool {
-		return p.read(c, "preview_capture", installedLiveManualInput(p.f.cluster, p.f.namespace, p.f.workload, projection), &preview) == nil && preview.ID != "" && len(preview.Pods) == 1
-	})
-	if preview.Pods[0].UID != p.podUID || len(preview.Lifecycle.Actions) != 1 || !time.Now().Before(preview.Expires) {
-		p.t.Fatal("LIVE manual preview changed original Pod/action")
+	id := ""
+	for attempt := 0; id == "" && attempt < 3; attempt++ {
+		p.wait(ctx, "finite LIVE preview", time.Minute, func(c context.Context) bool {
+			return p.read(c, "preview_capture", installedLiveManualInput(p.f.cluster, p.f.namespace, p.f.workload, projection), &preview) == nil && preview.ID != "" && len(preview.Pods) == 1
+		})
+		if preview.Pods[0].UID != p.podUID || len(preview.Lifecycle.Actions) != 1 || !time.Now().Before(preview.Expires) {
+			p.t.Fatal("LIVE manual preview changed original Pod/action")
+		}
+		id = p.submit(ctx, preview.ID, "live-manual-"+preview.ID)
 	}
-	id := p.submit(ctx, preview.ID, "live-manual-"+preview.ID)
+	if id == "" {
+		p.t.Fatal("LIVE manual capture review kept changing")
+	}
 	var progress struct {
 		CaptureID string `json:"capture_id"`
 		Phase     string `json:"phase"`
