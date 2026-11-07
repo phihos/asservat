@@ -115,15 +115,15 @@ jobs:
           capinfos --version | head -1
       # History, packet summaries, saved comparison and heap inspection drive installed React.
       # Reuse console CI's pinned Playwright browser/cache; no new image.
-      - if: matrix.suite == 'continuation-approved-recording' || (matrix.suite == 'continuation-profile-comparison' || matrix.suite == 'continuation-profile-comparison-heavy') || matrix.suite == 'continuation-manual-heap' || matrix.suite == 'continuation-manual-mixed' || matrix.suite == 'continuation-manual-raw' || matrix.suite == 'continuation-manual-arguments' || matrix.suite == 'continuation-manual-logs' || matrix.suite == 'continuation-ongoing-live'
+      - if: matrix.suite == 'continuation-approved-recording' || (matrix.suite == 'continuation-profile-comparison' || matrix.suite == 'continuation-profile-comparison-heavy') || matrix.suite == 'continuation-manual-heap' || matrix.suite == 'continuation-manual-mixed' || matrix.suite == 'continuation-manual-raw' || matrix.suite == 'continuation-manual-arguments' || matrix.suite == 'continuation-manual-logs' || matrix.suite == 'continuation-ongoing-live' || matrix.suite == 'continuation-ongoing-live-manual'
         id: playwright
         run: echo "version=$(node -p "require('./web/node_modules/@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
-      - if: matrix.suite == 'continuation-approved-recording' || (matrix.suite == 'continuation-profile-comparison' || matrix.suite == 'continuation-profile-comparison-heavy') || matrix.suite == 'continuation-manual-heap' || matrix.suite == 'continuation-manual-mixed' || matrix.suite == 'continuation-manual-raw' || matrix.suite == 'continuation-manual-arguments' || matrix.suite == 'continuation-manual-logs' || matrix.suite == 'continuation-ongoing-live'
+      - if: matrix.suite == 'continuation-approved-recording' || (matrix.suite == 'continuation-profile-comparison' || matrix.suite == 'continuation-profile-comparison-heavy') || matrix.suite == 'continuation-manual-heap' || matrix.suite == 'continuation-manual-mixed' || matrix.suite == 'continuation-manual-raw' || matrix.suite == 'continuation-manual-arguments' || matrix.suite == 'continuation-manual-logs' || matrix.suite == 'continuation-ongoing-live' || matrix.suite == 'continuation-ongoing-live-manual'
         uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
-      - if: matrix.suite == 'continuation-approved-recording' || (matrix.suite == 'continuation-profile-comparison' || matrix.suite == 'continuation-profile-comparison-heavy') || matrix.suite == 'continuation-manual-heap' || matrix.suite == 'continuation-manual-mixed' || matrix.suite == 'continuation-manual-raw' || matrix.suite == 'continuation-manual-arguments' || matrix.suite == 'continuation-manual-logs' || matrix.suite == 'continuation-ongoing-live'
+      - if: matrix.suite == 'continuation-approved-recording' || (matrix.suite == 'continuation-profile-comparison' || matrix.suite == 'continuation-profile-comparison-heavy') || matrix.suite == 'continuation-manual-heap' || matrix.suite == 'continuation-manual-mixed' || matrix.suite == 'continuation-manual-raw' || matrix.suite == 'continuation-manual-arguments' || matrix.suite == 'continuation-manual-logs' || matrix.suite == 'continuation-ongoing-live' || matrix.suite == 'continuation-ongoing-live-manual'
         name: Installed React browser
         timeout-minutes: 3
         working-directory: web

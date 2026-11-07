@@ -303,7 +303,11 @@ func qualifyInstalledLiveObservation(t *testing.T, ctx context.Context, c instal
 		browser.finishEpisode(source)
 		return nil
 	})
-	if episodes != 6 {
+	want := 6
+	if os.Getenv("ASSERVAT_LIVE_EPISODES") == "manual" {
+		want = 3
+	}
+	if episodes != want {
 		t.Fatal("incomplete installed projection/source matrix", episodes)
 	}
 	browser.close()

@@ -499,7 +499,13 @@ func qualifyInstalledLiveSources(t *testing.T, ctx context.Context, admin *pgxpo
 		}
 	}()
 	defer func() { cancel(); joined.Wait() }()
+	// ASSERVAT_LIVE_EPISODES=manual runs only the finite manual sessions, so
+	// a parallel CI suite reaches them without waiting for the policy sources.
+	manualOnly := os.Getenv("ASSERVAT_LIVE_EPISODES") == "manual"
 	for i, projection := range []string{"packetMetadata", "syscallMetadata", "httpHeaders"} {
+		if manualOnly {
+			break
+		}
 		current, e := f.region.CoreV1().Pods(f.namespace).Get(ctx, p.podName, meta.GetOptions{})
 		if e != nil || string(current.UID) != p.podUID {
 			t.Fatal("LIVE cannot replace its original Pod", e)
