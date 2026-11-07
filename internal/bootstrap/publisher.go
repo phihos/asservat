@@ -469,6 +469,10 @@ func (p *Publisher) Run(ctx context.Context) (err error) {
 					if errors.As(e, &staged) {
 						stage = " at " + staged.Stage
 					}
+					var step interface{ FixedStep() string }
+					if errors.As(e, &step) {
+						stage += "/" + step.FixedStep()
+					}
 					report("publish " + errorClass(e) + stage)
 				} else {
 					report("published")
