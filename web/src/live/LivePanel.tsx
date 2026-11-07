@@ -1,4 +1,4 @@
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Button } from 'react-aria-components';
 import type { Session } from '../auth/session';
 import { LiveWatch, type Target } from './watch';
@@ -15,7 +15,12 @@ function rowText(row:Row):string {
 export function LivePanel({session,scope,target,onSave,controller:provided}:{session:Session;scope:AbortSignal;target:Target;onSave?:()=>void;controller?:LiveWatch}){
  const [controller]=useState(()=>provided??new LiveWatch());const state=useSyncExternalStore(controller.subscribe,controller.snapshot);
  const [selected,setSelected]=useState<string[]>([]);const [inspected,setInspected]=useState<string>();const [projection,setProjection]=useState<Watch['projection']>('packetMetadata');const [field,setField]=useState('protocol');const [op,setOp]=useState('eq');const [value,setValue]=useState('');const [agent,setAgent]=useState(false);const targetKey=JSON.stringify(target);
- useEffect(()=>{setSelected([]);setInspected(undefined);setAgent(false);return controller.attach(session,scope,target)},[controller,session,scope,targetKey]);
+ const principalKey=session.principal.issuer+'\n'+session.principal.subject_id;
+ const latestSession=useRef(session);latestSession.current=session;
+ // Re-attach only for another principal, scope or target; a refreshed session
+ // object (new CSRF token or expiry) must not end the open view.
+ useEffect(()=>{setSelected([]);setInspected(undefined);setAgent(false);return controller.attach(latestSession.current,scope,target)},[controller,principalKey,scope,targetKey]);
+ useEffect(()=>{controller.refresh(session)},[controller,session]);
  useEffect(()=>{if(state.busy||!['active','paused'].includes(state.phase))return;const timer=setTimeout(()=>{if(document.visibilityState==='visible')void controller.read()},state.phase==='paused'?5000:state.batch?.retry_after_ms??1000);return()=>clearTimeout(timer)},[controller,state.busy,state.phase,state.batch]);
  useEffect(()=>{const visibility=()=>{if(document.visibilityState!=='visible')controller.disconnect()};document.addEventListener('visibilitychange',visibility);return()=>document.removeEventListener('visibilitychange',visibility)},[controller]);
  useEffect(()=>{setField(fields[projection][0]);setOp('eq');setValue('')},[projection]);
