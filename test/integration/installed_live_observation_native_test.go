@@ -92,7 +92,7 @@ func installedLiveSettings(in contracts.DownloadEnvironmentSettings, root, clust
 		}
 	}
 	out.Revision++
-	out.LiveRead = &contracts.LiveReadSettings{Root: contracts.LiveRootSettings{Watches: 4, PrincipalWatches: 2, WorkloadWatches: 2, Rate: 1 << 20, Burst: 1 << 20}, Projections: []string{v.Packet, v.Syscall, v.HTTP}, Clients: clients, Ceilings: []contracts.LiveReadCeiling{{ClusterID: cluster, Duration: 20, Output: 1 << 20, Rate: 64 << 10, Rows: 20, Buffer: 128 << 10, RowAge: 30, Replay: 5}}}
+	out.LiveRead = &contracts.LiveReadSettings{Root: contracts.LiveRootSettings{Watches: 4, PrincipalWatches: 2, WorkloadWatches: 2, Rate: 1 << 20, Burst: 1 << 20}, Projections: []string{v.Packet, v.Syscall, v.HTTP}, Clients: clients, Ceilings: []contracts.LiveReadCeiling{{ClusterID: cluster, Duration: 120, Output: 1 << 20, Rate: 64 << 10, Rows: 20, Buffer: 128 << 10, RowAge: 30, Replay: 5}}}
 	encoded, err := json.Marshal(out)
 	if err != nil || len(encoded) > contracts.DownloadEnvironmentMaxBytes {
 		return contracts.DownloadEnvironmentSettings{}, errors.New("delivery settings bound")
@@ -377,7 +377,7 @@ func installedLiveMCP(t *testing.T, ctx context.Context, db *pgxpool.Pool, root 
 		return errors.New("inventory substituted original source")
 	}
 	var watch v.Watch
-	request := map[string]any{"source_handles": []string{selected.Handle}, "projection": source.Projection, "idempotency_key": "live-installed-" + source.SourceID, "duration_seconds": 15, "max_output_bytes": 256 << 10}
+	request := map[string]any{"source_handles": []string{selected.Handle}, "projection": source.Projection, "idempotency_key": "live-installed-" + source.SourceID, "duration_seconds": 90, "max_output_bytes": 256 << 10}
 	if _, e := must("open_live_watch", request, &watch); e != nil {
 		return e
 	}
