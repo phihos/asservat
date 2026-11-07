@@ -9,6 +9,7 @@ import (
 	v "asservat.local/asservat/internal/domain/live"
 	"asservat.local/asservat/internal/domain/targets"
 	"context"
+	"os"
 	"sync"
 	"time"
 )
@@ -80,6 +81,12 @@ func (t reportedTargets) ResolveManualLive(ctx context.Context, in []targets.Man
 			until := identity.Earlier(identity.Earlier(at.Add(5*time.Second), deadline), original.WriteUntil)
 			unavailable := targets.ManualLiveResolution{Original: original, Unavailable: true, ObservedAt: at, FreshUntil: until}
 			out[n] = unavailable
+			reason := "holder"
+			defer func() {
+				if out[n].Unavailable {
+					manualLiveRefused(reason)
+				}
+			}()
 			h.mu.Lock()
 			p, valid := h.manualHolderLocked(original)
 			var nodeUID, workID string
@@ -95,12 +102,14 @@ func (t reportedTargets) ResolveManualLive(ctx context.Context, in []targets.Man
 				return
 			}
 			view, valid := registry.NodeByUID(nodeUID)
+			reason = "node"
 			if !valid || !view.Current || !view.LiveAvailable(original.Projection) {
 				return
 			}
 			id := view.Identity
 			m := collector.ManualLiveSource{RootID: original.RootID, CaptureID: original.CaptureID, AttemptID: original.AttemptID, ActionID: original.ActionID, WorkID: workID, PodUID: original.Target.PodUID, NodeUID: id.NodeUID, BootID: id.BootID, CollectorPodUID: id.PodUID, CollectorEpoch: id.Epoch, ExecutorPodUID: original.Executor.PodUID, ExecutorEpoch: original.Executor.ProcessEpoch, Scope: [32]byte(original.Scope), ExpectationDigest: [32]byte(original.ExpectationDigest), ObservationKind: original.ObservationKind, ObservationSessionID: original.ObservationSessionID, ObservationFence: original.ObservationFence}
 			r := collector.LiveRead{Manual: &m, Inspect: true, ClusterID: original.Target.ClusterID, NamespaceUID: original.Target.NamespaceUID, WorkloadUID: original.Target.WorkloadUID, Projection: original.Projection, PrivacyUntil: original.WriteUntil, Head: true, Limit: 1, ReplyBytes: 2048}
+			reason = "request"
 			if !r.Valid() {
 				return
 			}
@@ -108,14 +117,20 @@ func (t reportedTargets) ResolveManualLive(ctx context.Context, in []targets.Man
 			if e == nil {
 				reply, e = v.BindManualLiveReply(r, reply)
 			}
+			reason = "inspect"
+			if e != nil {
+				reason = "inspect-error"
+			}
 			if e != nil || reply.Manual == nil || reply.SourceID != m.CaptureID || reply.Fence != m.WorkID || reply.BootID != m.BootID || len(reply.Rows) != 0 || !reply.Manual.SameBinding(m) {
 				return
 			}
+			reason = "window"
 			if reply.Manual.StartedAt.Before(queued) || reply.Manual.HardUntil.Sub(reply.Manual.StartedAt) > duration {
 				return
 			}
 			until = identity.Earlier(until, reply.Manual.HardUntil)
 			current := targets.ManualLiveResolution{Original: original, Source: *reply.Manual, ObservedAt: at, FreshUntil: until}
+			reason = "holder-changed"
 			h.mu.Lock()
 			again, live := h.manualHolderLocked(original)
 			same := live && again == p && again.workID == workID && again.nodeUID == nodeUID
@@ -148,3 +163,7 @@ func (h *ConnectorRecordings) manualReadHolderLocked(r collector.LiveRead) (*hel
 	}
 	return p, true
 }
+
+// manualLiveRefused reports why a manual live source resolved unavailable;
+// fixed stage words only, on the stable doubling sequence.
+var manualLiveRefused = eventLog(os.Stderr, "regional manual live unavailable")
