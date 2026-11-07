@@ -23,7 +23,10 @@ type CurrentLiveEnvironment struct {
 
 func (s CurrentLiveEnvironment) LiveSourceRead(ctx context.Context, source live.Source, projection string, actor identity.Principal) (LiveEnvironmentDecision, error) {
 	out, e := s.LiveSourceReads(ctx, []live.Source{source}, projection, actor)
-	if e != nil || len(out) != 1 {
+	if e != nil {
+		return LiveEnvironmentDecision{}, e
+	}
+	if len(out) != 1 {
 		return LiveEnvironmentDecision{}, live.ErrDenied
 	}
 	return out[0], nil
@@ -42,7 +45,11 @@ func (s CurrentLiveEnvironment) LiveSourceReads(ctx context.Context, sources []l
 	call, stop := context.WithDeadline(ctx, until)
 	defer stop()
 	p, e := s.Policies.DownloadPolicy(call)
-	if e != nil || p.RootID != s.RootID || p.InstallationID != s.InstallationID || p.LiveRead == nil || !s.AcceptedRoot.Valid() || p.LiveRead.Root != s.AcceptedRoot {
+	if e != nil {
+		// A failed policy read is unavailability, not an access decision.
+		return nil, fmt.Errorf("%w: live settings read: %v", live.ErrUnavailable, e)
+	}
+	if p.RootID != s.RootID || p.InstallationID != s.InstallationID || p.LiveRead == nil || !s.AcceptedRoot.Valid() || p.LiveRead.Root != s.AcceptedRoot {
 		var have any
 		if e == nil && p.LiveRead != nil {
 			have = p.LiveRead.Root
@@ -65,7 +72,10 @@ func (s CurrentLiveEnvironment) LiveSourceReads(ctx context.Context, sources []l
 	bounded, cancel := context.WithDeadline(call, until)
 	defer cancel()
 	recovery, e := s.Recovery.RecoveryState(bounded)
-	if e != nil || !recovery.Valid(s.Now()) || recovery.InstallationID != s.InstallationID || recovery.IssuerEpoch != p.RecoveryEpoch {
+	if e != nil {
+		return nil, fmt.Errorf("%w: live recovery read: %v", live.ErrUnavailable, e)
+	}
+	if !recovery.Valid(s.Now()) || recovery.InstallationID != s.InstallationID || recovery.IssuerEpoch != p.RecoveryEpoch {
 		return nil, fmt.Errorf("%w: live recovery", live.ErrDenied)
 	}
 	// One policy and one recovery observation per phase: the decision is

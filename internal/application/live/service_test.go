@@ -869,3 +869,21 @@ func TestLiveTransientSourceMissKeepsViewOpen(t *testing.T) {
 		t.Fatal("denial treated as transient", e)
 	}
 }
+
+// Rows keep their managed age; the five-second check bounds the read, not
+// how long an already disclosed row stays displayable.
+func TestLiveRowExpiryIsNotTheFreshnessCheckBound(t *testing.T) {
+	s, f, i, r := setup(t)
+	w, e := s.Open(t.Context(), i, r)
+	if e != nil {
+		t.Fatal(e)
+	}
+	f.add()
+	batch, e := s.Read(t.Context(), i, v.Read{ID: w.ID, Cursor: *w.Cursor})
+	if e != nil || len(batch.Rows) != 1 {
+		t.Fatal(batch, e)
+	}
+	if !batch.Rows[0].ExpiresAt.After(f.now.Add(5*time.Second)) || batch.Rows[0].ExpiresAt.After(w.ExpiresAt) {
+		t.Fatal("row expiry is the freshness bound or exceeds the watch", batch.Rows[0].ExpiresAt, f.now, w.ExpiresAt)
+	}
+}
