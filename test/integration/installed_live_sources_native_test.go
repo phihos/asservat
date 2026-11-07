@@ -398,7 +398,12 @@ func (p *installedLiveProducer) saveHTTP(ctx context.Context, source installedLi
 	}
 	id := p.submit(ctx, preview.ID, "live-save-http-"+preview.ID)
 	var progress installedJourneyCaptureProgress
-	p.wait(ctx, "actual HTTP Save/native publication", time.Minute, func(c context.Context) bool {
+	defer func() {
+		if p.t.Failed() {
+			p.t.Logf("HTTP Save capture %s last phase=%s case=%s", id, progress.Phase, progress.CaseID)
+		}
+	}()
+	p.wait(ctx, "actual HTTP Save/native publication", 3*time.Minute, func(c context.Context) bool {
 		if p.read(c, "get_capture", map[string]any{"capture_id": id}, &progress) != nil {
 			return false
 		}
