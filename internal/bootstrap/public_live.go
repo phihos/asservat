@@ -84,7 +84,7 @@ func (d *OwnerDeployment) newPublicLive(ctx context.Context) (presentation.LiveS
 		return nil, mounts.ErrUnavailable
 	}
 	catalog := liveCatalog{ongoing: liveSourceCatalog{root: policy.RootID, candidates: candidates, policies: policies, status: status, now: time.Now}, manual: liveManualCatalog{root: policy.RootID, works: manualWorks, recovery: pc.recovery, holders: manualHolders, now: time.Now}}
-	authority := authapp.LiveSourceAuthority{Diagnose: func(stage string) { fmt.Fprintln(os.Stderr, stage) }, RootID: policy.RootID, Targets: targets, Workloads: pc.permissions, Permissions: pc.permissions, Catalog: catalog, Accepted: pc.policies, Automation: pc.automation, ObservationGrants: grants, Environment: authapp.CurrentLiveEnvironment{RootID: policy.RootID, InstallationID: policy.InstallationID, AcceptedRoot: policy.LiveRead.Root, Policies: dl.environment, Recovery: pc.recovery, Now: time.Now}, Now: time.Now}
+	authority := authapp.LiveSourceAuthority{Diagnose: func(stage string) { fmt.Fprintln(os.Stderr, stage) }, RootID: policy.RootID, Targets: targets, Workloads: pc.permissions, Permissions: pc.permissions, Catalog: catalog, Accepted: pc.policies, Automation: pc.automation, ObservationGrants: grants, Environment: authapp.CurrentLiveEnvironment{RootID: policy.RootID, InstallationID: policy.InstallationID, AcceptedRoot: policy.LiveRead.Root, Policies: livePolicies(dl), Recovery: pc.recovery, Now: time.Now}, Now: time.Now}
 	service, e := liveapp.New(liveapp.Config{RootID: policy.RootID, OwnerID: d.Runtime.binding.ProcessEpoch, Keys: pc.mac, Now: time.Now, NewID: ownerRandomID, Limits: limits, MaxWatches: int(numeric.InstallationSlots), MaxControls: int(numeric.MaxControlRecords)}, authority, liveProjectionReader{remote: remote, now: time.Now}, ledger)
 	if e != nil {
 		return nil, e
@@ -109,4 +109,13 @@ func publicLiveLimits(p privacy.LiveRead) (postgres.LiveWatchLimits, live.Limits
 	r := p.Root
 	numeric := postgres.LiveWatchLimits{InstallationSlots: int64(r.Watches), PrincipalSlots: int64(r.PrincipalWatches), WorkloadSlots: int64(r.WorkloadWatches), MemoryBytes: int64(r.Watches) * live.MaxBufferBytes, InstallationRate: r.Rate, InstallationBurst: r.Burst, PrincipalRate: r.Rate, PrincipalBurst: r.Burst, WorkloadRate: r.Rate, WorkloadBurst: r.Burst, WatchBurst: max(24<<10, limits.Rate), MaxOutputBytes: max(24<<10, limits.Output), MaxRate: limits.Rate, MaxDurationSeconds: int64(limits.Duration), MaxAccounts: 8192, MaxControlRecords: 65536}
 	return numeric, limits
+}
+
+// livePolicies reuses the downloads' bounded policy observation (accepted
+// 60 s interval); each raw read costs several Kubernetes API calls.
+func livePolicies(dl *publicDownloads) authapp.DownloadPolicyReader {
+	if dl.policies != nil {
+		return dl.policies
+	}
+	return dl.environment
 }
