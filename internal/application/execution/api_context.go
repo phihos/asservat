@@ -343,7 +343,7 @@ func (s APIContextRunner) checkObserved(ctx context.Context, current identities.
 	if err != nil {
 		return out, nil, apiCheckStep{"Process", err}
 	}
-	until := identity.Earlier(original, start.Add(identity.AuthorityRecheckInterval))
+	until := identity.Earlier(original, start.Add(identity.AuthorityRecheckInterval)) // ADR-311
 	if argumentRecording(w) && source != nil {
 		until = identity.Earlier(until, source.FreshUntil)
 	}
@@ -409,7 +409,7 @@ func (s APIContextRunner) Execute(ctx context.Context, current identities.Curren
 	if err != nil || !i.Valid(s.Now()) {
 		return zero, executeStep{"start", value.ErrDenied}
 	}
-	original := identity.Earlier(i.ValidUntil, s.Now().Add(5*time.Second))
+	original := identity.Earlier(i.ValidUntil, s.Now().Add(identity.AuthorityRecheckInterval)) // ADR-311
 	startCtx, stop := context.WithDeadline(ctx, original)
 	defer stop()
 	recovery, err := s.Recovery.RecoveryState(startCtx)
@@ -432,7 +432,7 @@ func (s APIContextRunner) ExecuteObserved(ctx context.Context, current identitie
 	}
 	now := s.Now()
 	original, bounded := ctx.Deadline()
-	if !bounded || original.After(now.Add(5*time.Second)) || ctx.Err() != nil || !now.Before(original) || !caller.Valid(now) || w.Actor != caller.Principal || w.Accepted.CaptureID != w.Accepted.Expectation.CaptureUID || !capability.Valid(now) || !recovery.Valid(now) {
+	if !bounded || original.After(now.Add(identity.AuthorityRecheckInterval)) || ctx.Err() != nil || !now.Before(original) || !caller.Valid(now) || w.Actor != caller.Principal || w.Accepted.CaptureID != w.Accepted.Expectation.CaptureUID || !capability.Valid(now) || !recovery.Valid(now) {
 		return ContextResult{}, executeStep{"start", value.ErrDenied}
 	}
 	for _, until := range []time.Time{caller.ValidUntil, capability.FreshUntil, recovery.FreshUntil} {

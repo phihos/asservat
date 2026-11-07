@@ -40,7 +40,8 @@ effect fences (recovery trust, audit request window, ledger CAS) stay.
 Frequent and harmful (every live read); risk already accepted by the maintainer;
 all deployments; precedent ADR-220/258 (30 s downloads); no new privileges; net
 fewer failure states; no tuning config; no new dependencies; far fewer API reads;
-no schema change; the first step is the smallest fix.
+one constraint relaxation (migration 00145, capture start); the first step is
+the smallest fix.
 
 ## Rollout
 
@@ -61,11 +62,14 @@ no schema change; the first step is the smallest fix.
    recovery reader keeps five seconds: SQL fences that persist recovery proofs
    (connector enrollment, migration 00049; `capacity_recovery_current`,
    00054/00065/00073) refuse longer ones, which stalled installation when the
-   default was raised (2026-11-07). Raising it needs a migration first. Capture start stays bounded near five seconds by
-   its start binding, not by these windows: SQL `context_execution.not_after
-   <= not_before + 5 s` (migration 00035) and `execution.Binding.Valid`, the
-   start phase caps (ADR-292 handoff, regional start, `Execute*`,
-   `APIContextWork`), and five-second target, capability, process and
-   hub/connector receiver observations. Widening them is a separate step
-   (new migration plus peer-observation intervals).
+   default was raised (2026-11-07). Raising it needs a migration first.
+   The capture-start chain is raised separately (dev/adr311-capture-start):
+   migration 00145 relaxes `context_execution.not_after <= not_before + 30 s`,
+   `execution.Binding`/`Request`/`PreparationCheck`, the start phase caps
+   (ADR-292 handoff, regional start, `Execute*`, `APIContextWork`, Router
+   `Attach`, the stream work lease) and the API target, capability, work-trust,
+   process-proof and receiver observations now use the interval for the
+   completed check while their reads keep five-second I/O bounds. The recovery
+   reader's window (five seconds, see above) remains the
+   start's shortest bound until that migration lands.
 5. ADR-311 and spec/AGENTS.md updates with each step.

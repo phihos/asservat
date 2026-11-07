@@ -3,6 +3,7 @@ package integration
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -29,6 +30,8 @@ import (
 func qualifyAPIExecutionPreparationBoundaries(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, create func(*testing.T, int64) captureAdmissionScenario) {
 	t.Helper()
 	t.Run("api-execution-preparation-boundaries", func(t *testing.T) {
+		// window is the synthetic observation interval of every fresh fact.
+		window := 5 * time.Second
 		setup := func(t *testing.T) (*postgres.APIContextExecutions, *postgres.APIContextExecutions, string, func() executionapp.APIExecutionCheck) {
 			t.Helper()
 			s := create(t, 1)
@@ -76,7 +79,7 @@ func qualifyAPIExecutionPreparationBoundaries(t *testing.T, ctx context.Context,
 					t.Fatal(err)
 				}
 				i := s.a.Eligibility.VerifiedIdentity
-				i.VerifiedAt, i.ValidUntil = n, n.Add(5*time.Second)
+				i.VerifiedAt, i.ValidUntil = n, n.Add(window)
 				recovery, err := s.recovery.reader.RecoveryState(ctx)
 				if err != nil {
 					t.Fatal(err)
@@ -99,16 +102,16 @@ func qualifyAPIExecutionPreparationBoundaries(t *testing.T, ctx context.Context,
 					t.Fatal(err)
 				}
 				input := s.a.Plan.Input
-				input.Target.ObservedAt, input.Target.FreshUntil = n, n.Add(5*time.Second)
-				input.Capability.ObservedAt, input.Capability.FreshUntil = n, n.Add(5*time.Second)
+				input.Target.ObservedAt, input.Target.FreshUntil = n, n.Add(window)
+				input.Capability.ObservedAt, input.Capability.FreshUntil = n, n.Add(window)
 				input.Retention = retention
 				plan, err := planning.CompileContext(input, time.Now())
 				if err != nil {
 					t.Fatal(err)
 				}
 				process.InstallationID, process.ClusterID, process.IssuerEpoch = recovery.InstallationID, input.Target.Target().ClusterID, recovery.IssuerEpoch
-				observation := value.APIProcessObservation{Binding: process, CheckedAt: n, ValidUntil: n.Add(5 * time.Second)}
-				until := n.Add(5 * time.Second)
+				observation := value.APIProcessObservation{Binding: process, CheckedAt: n, ValidUntil: n.Add(window)}
+				until := n.Add(window)
 				for _, d := range []time.Time{eligible.ValidUntil, plan.ValidUntil, recovery.FreshUntil, observation.ValidUntil, accepted.Expectation.Registration.WriteUntil} {
 					until = identity.Earlier(until, d)
 				}
@@ -133,6 +136,38 @@ func qualifyAPIExecutionPreparationBoundaries(t *testing.T, ctx context.Context,
 				t.Errorf("execution/key-wrap effects = %d/%d, want %d/0", rows, wraps, executions)
 			}
 		}
+		// ADR-311 (migration 00145): one check reused for the 30 s recheck
+		// interval persists a binding beyond the former five seconds; a
+		// longer one is refused by SQL, not only by the Go binding check.
+		t.Run("recheck-interval-binding-persists-under-sql-bound", func(t *testing.T) {
+			window = identity.AuthorityRecheckInterval
+			defer func() { window = 5 * time.Second }()
+			prepare, _, _, refresh := setup(t)
+			c := refresh()
+			if c.ValidUntil.Sub(c.CheckedAt) <= 5*time.Second {
+				t.Fatal("synthetic facts did not span the recheck interval", c.ValidUntil.Sub(c.CheckedAt))
+			}
+			r, first, err := prepare.PrepareAPIExecution(ctx, c)
+			if err != nil || !first || !r.Valid() || r.Binding.NotAfter.Sub(r.Binding.NotBefore) <= 5*time.Second || r.Binding.NotAfter.After(c.ValidUntil) {
+				t.Fatal("recheck-interval binding not persisted within its check", first, err, r.Binding.NotAfter.Sub(r.Binding.NotBefore))
+			}
+			var width time.Duration
+			if err = admin.QueryRow(ctx, `SELECT (extract(epoch FROM not_after-not_before)*1000000000)::bigint FROM context_execution WHERE capture_id=$1`, r.Binding.CaptureID).Scan((*int64)(&width)); err != nil {
+				t.Fatal(err)
+			}
+			if width != r.Binding.NotAfter.Sub(r.Binding.NotBefore) {
+				t.Error("stored binding differs", width)
+			}
+			// Rows are immutable, so check the applied bound itself.
+			var definition string
+			if err = admin.QueryRow(ctx, `SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conrelid='context_execution'::regclass AND conname='context_execution_check'`).Scan(&definition); err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(definition, "00:00:30") {
+				t.Error("binding bound is not the recheck interval:", definition)
+			}
+			counts(t, c, 1)
+		})
 		t.Run("expired-prepared-is-passive-and-runner-uncertain", func(t *testing.T) {
 			prepare, read, _, refresh := setup(t)
 			c := refresh()

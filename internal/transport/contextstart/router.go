@@ -11,6 +11,7 @@ import (
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
 )
 
 // ClusterLimit is an installed finite reservation, not a request parameter.
@@ -423,8 +424,13 @@ func (r *Router) queryExecutor(ctx context.Context, cluster, method string, in, 
 	result := <-job.result
 	return result.until, result.err
 }
+
+// Attach accepts a start bounded by the ADR-311 recheck interval. Like
+// TryAttach it needs a standby covering only ordinary work; the attachment is
+// narrowed to the selected standby's residency, a transport lifetime that the
+// start's own receiver bound then carries.
 func (r *Router) Attach(ctx context.Context, cluster, capture string) (*Attachment, error) {
-	return r.attach(ctx, cluster, capture, true, 5*time.Second)
+	return r.attach(ctx, cluster, capture, true, identity.AuthorityRecheckInterval)
 }
 
 // TryAttach is Attach without waiting for a standby: it fails at once when
@@ -451,7 +457,9 @@ func (r *Router) attach(ctx context.Context, cluster, capture string, wait bool,
 	}
 	// A completed history exchange consumes its standby. Its next empty
 	// conversation may still be opening. Wait only before selecting any work,
-	// within this caller's original bound and the existing query reserve.
+	// within ordinary work of this caller's original bound and the existing
+	// query reserve: a longer start bound does not lengthen the wait.
+	waitUntil := identity.Earlier(deadline, time.Now().Add(standbyWork))
 	var timer *time.Timer
 	defer func() {
 		if timer != nil {
@@ -465,22 +473,21 @@ func (r *Router) attach(ctx context.Context, cluster, capture string, wait bool,
 			r.mu.Unlock()
 			return nil, fleet.ErrCapacity
 		}
-		if ctx.Err() != nil || !time.Now().Before(deadline) || timer != nil && !time.Now().Before(deadline.Add(-queryReserve)) {
+		if ctx.Err() != nil || !time.Now().Before(deadline) || timer != nil && !time.Now().Before(waitUntil.Add(-queryReserve)) {
 			r.mu.Unlock()
 			return nil, fleet.ErrUnavailable
 		}
 		r.pruneLocked(cluster)
-		// A TryAttach bound beyond ordinary work (history, up to
-		// TryAttachLimit) needs only a standby that covers ordinary work: an
-		// idle standby short of the whole bound is never retired, so requiring
-		// it left history refused until the standby aged out (installed native
-		// 41525755470). The newest standby is still preferred, and the
-		// attachment is narrowed to the selected standby's residency margin.
+		// A bound beyond ordinary work (history up to TryAttachLimit, a start
+		// up to the ADR-311 interval) needs only a standby that covers ordinary
+		// work: an idle standby short of the whole bound is never retired, so
+		// requiring it left history refused until the standby aged out
+		// (installed native 41525755470). The newest standby is still
+		// preferred, and the attachment is narrowed to the selected standby's
+		// residency margin.
 		cover := deadline
-		if !wait {
-			if ordinary := time.Now().Add(standbyWork); ordinary.Before(cover) {
-				cover = ordinary
-			}
+		if ordinary := time.Now().Add(standbyWork); ordinary.Before(cover) {
+			cover = ordinary
 		}
 		selected := r.selectLocked(cluster, cover, func(*Standby) bool { return true })
 		if selected != nil {
@@ -505,7 +512,7 @@ func (r *Router) attach(ctx context.Context, cluster, capture string, wait bool,
 			return nil, fleet.ErrUnavailable
 		}
 		if timer == nil {
-			wait := time.Until(deadline.Add(-queryReserve))
+			wait := time.Until(waitUntil.Add(-queryReserve))
 			if wait <= 0 {
 				return nil, fleet.ErrUnavailable
 			}
