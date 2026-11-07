@@ -90,6 +90,7 @@ type replay struct {
 	until time.Time
 }
 type session struct {
+	lastCheck  time.Duration // diagnostics only: duration of the latest current() check
 	cancelRead context.CancelFunc
 	readJoined chan struct{}
 	timer      *time.Timer
@@ -427,6 +428,7 @@ func (s *Service) get(ctx context.Context, current CurrentIdentity, id string) (
 }
 func (s *Service) current(ctx context.Context, current CurrentIdentity, st *session, i identity.Identity) (time.Time, error) {
 	now := s.cfg.Now()
+	defer func() { st.lastCheck = s.cfg.Now().Sub(now) }()
 	end := minTime(i.ValidUntil, st.watch.ExpiresAt, st.watch.IdleUntil)
 	if !now.Before(st.watch.ExpiresAt) || !now.Before(st.watch.IdleUntil) {
 		s.clear(st, "Expired")
@@ -728,7 +730,7 @@ func defaultLimit(n int) int {
 }
 func (s *Service) charge(ctx context.Context, st *session, b v.Batch) (v.Batch, error) {
 	if b.DisclosureUntil.IsZero() || !s.cfg.Now().Before(b.DisclosureUntil) {
-		return v.Batch{}, fmt.Errorf("%w: service:708", v.ErrDenied)
+		return v.Batch{}, fmt.Errorf("%w: service:708 (late %s, last check %s)", v.ErrDenied, s.cfg.Now().Sub(b.DisclosureUntil).Round(time.Millisecond), st.lastCheck.Round(time.Millisecond))
 	}
 	call, stop := context.WithDeadline(ctx, b.DisclosureUntil)
 	defer stop()
