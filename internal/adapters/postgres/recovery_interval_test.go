@@ -28,6 +28,15 @@ func TestRecoveryObservationUsesRecheckIntervalWithinTrustRow(t *testing.T) {
 	if r, err = recoveryState(row, n, n); err != nil || !r.FreshUntil.Equal(n.Add(5*time.Second)) {
 		t.Fatal("internal recovery facet changed its five-second interval", err, r.FreshUntil)
 	}
+	// The default reader (zero window) must keep five seconds: connector
+	// enrollment and capacity SQL fences refuse longer persisted proofs.
+	var reader RecoveryReader
+	if r, err = recoveryStateWithin(row, n, n, reader.window); err != nil || !r.FreshUntil.Equal(n.Add(5*time.Second)) {
+		t.Fatal("default recovery reader exceeded the SQL five-second proof bound", err, r.FreshUntil)
+	}
+	if w := reader.ForEvidenceReads().window; w != identity.AuthorityRecheckInterval {
+		t.Fatal("evidence-read recovery reader does not use the recheck interval", w)
+	}
 	row.RecoveryBlocked = true
 	if _, err = recoveryStateWithin(row, n, n, identity.AuthorityRecheckInterval); err == nil {
 		t.Fatal("blocked recovery observed as current")
