@@ -98,7 +98,8 @@ func TestCredentialWindowDoesNotEscapeAfterBlockingPolicy(t *testing.T) {
 			f.c.ExpiresAt = f.now.Add(time.Minute)
 			f.c.KeyUntil = f.now.Add(time.Minute)
 			f.p.FreshUntil = f.now.Add(time.Minute)
-			f.advance = 6 * time.Second
+			// ADR-311: the scheduling observation lasts one recheck interval.
+			f.advance = value.AuthorityRecheckInterval + time.Second
 			switch kind {
 			case "expired-key":
 				f.c.KeyUntil = f.now.Add(time.Second)
@@ -135,7 +136,7 @@ func TestBrowserCredentialSchedulingWindowDoesNotShortenVerifiedIdentity(t *test
 	f, s := newFixture()
 	f.c.KeyUntil = f.now.Add(time.Minute)
 	observation, err := s.ObserveCredential(t.Context(), "synthetic-access")
-	if err != nil || !observation.Identity.ValidUntil.Equal(f.now.Add(30*time.Second)) || !observation.Window.FreshUntil.Equal(f.now.Add(5*time.Second)) {
+	if err != nil || !observation.Identity.ValidUntil.Equal(f.now.Add(30*time.Second)) || !observation.Window.FreshUntil.Equal(f.now.Add(value.AuthorityRecheckInterval)) {
 		t.Fatal("real verified policy and scheduling windows", err, observation)
 	}
 	identity, window, err := resolveBrowserCredential(t.Context(), s, "synthetic-access", s.Now)
