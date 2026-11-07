@@ -124,7 +124,7 @@ func projectionExpectation(e artifact.ContextExpectation, scope value.ContextPro
 	kind := e.NativeType == artifact.LogsArtifact && e.Logs.Valid() || e.NativeType == artifact.PCAPNGArtifact && (e.Recording != nil && e.Recording.Profile == "networkHeaders" || e.Snapshot != nil) ||
 		e.NativeType == artifact.RawPCAPNGArtifact && e.Recording != nil && e.Recording.Profile == "rawPackets" ||
 		e.NativeType == artifact.PodStatusArtifact && e.ActionID == "pod-status" && e.Recording == nil ||
-		e.NativeType == artifact.HTTPHeadersArtifact && e.Recording != nil && e.Recording.Profile == "httpHeaders" ||
+		e.NativeType == artifact.HTTPHeadersArtifact && (e.Recording != nil && e.Recording.Profile == "httpHeaders" || e.Snapshot != nil && e.Snapshot.HTTP.Valid()) ||
 		e.NativeType == artifact.PprofArtifact && e.Profile != nil && e.Profile.NativeType() == artifact.PprofArtifact ||
 		e.NativeType == artifact.SyscallRecordsArtifact && (e.Recording != nil && e.Recording.Profile == "metadata" || e.Snapshot != nil) ||
 		e.NativeType == artifact.SyscallArgumentsArtifact && e.Recording != nil && e.Recording.Profile == "arguments"

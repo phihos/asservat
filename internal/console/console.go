@@ -353,7 +353,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func consoleRoute(path string) bool {
-	return path == "/" || path == "/captures/new" || path == "/policies" || path == "/shares" || path == "/access-preview" || path == "/retention-preview" || path == "/approvals" || captureRoute.MatchString(path) || caseRoute.MatchString(path) || approvalRoute.MatchString(path)
+	return path == "/" || path == "/captures/new" || path == "/live" || path == "/policies" || path == "/shares" || path == "/access-preview" || path == "/retention-preview" || path == "/approvals" || captureRoute.MatchString(path) || caseRoute.MatchString(path) || approvalRoute.MatchString(path)
 }
 
 // ServeContent removes cache headers on conditional/range errors. Preserve the

@@ -3,20 +3,21 @@ package contracts
 import "time"
 
 type NodeSnapshotRequest struct {
-	RequireApproval     bool      `json:"requireApproval,omitempty"`
-	SourceBindingDigest string    `json:"sourceBindingDigest"`
-	SourceID            string    `json:"sourceID"`
-	Fence               string    `json:"fence"`
-	SnapshotID          string    `json:"snapshotID"`
-	SourceStartedAt     time.Time `json:"sourceStartedAt"`
-	SourceHardUntil     time.Time `json:"sourceHardUntil"`
-	T0                  time.Time `json:"t0"`
-	IssuedAt            time.Time `json:"issuedAt"`
-	StartBy             time.Time `json:"startBy"`
-	ProcessingUntil     time.Time `json:"processingUntil"`
-	BeforeNanos         int64     `json:"beforeNanos"`
-	AfterNanos          int64     `json:"afterNanos"`
-	MaxBytes            int64     `json:"maxBytes"`
+	HTTP                *NodeHTTPProjection `json:"http,omitempty"`
+	RequireApproval     bool                `json:"requireApproval,omitempty"`
+	SourceBindingDigest string              `json:"sourceBindingDigest"`
+	SourceID            string              `json:"sourceID"`
+	Fence               string              `json:"fence"`
+	SnapshotID          string              `json:"snapshotID"`
+	SourceStartedAt     time.Time           `json:"sourceStartedAt"`
+	SourceHardUntil     time.Time           `json:"sourceHardUntil"`
+	T0                  time.Time           `json:"t0"`
+	IssuedAt            time.Time           `json:"issuedAt"`
+	StartBy             time.Time           `json:"startBy"`
+	ProcessingUntil     time.Time           `json:"processingUntil"`
+	BeforeNanos         int64               `json:"beforeNanos"`
+	AfterNanos          int64               `json:"afterNanos"`
+	MaxBytes            int64               `json:"maxBytes"`
 }
 type NodeSourceSnapshot struct {
 	AttemptID         string              `json:"attemptID"`

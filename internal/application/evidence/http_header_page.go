@@ -15,6 +15,12 @@ type HTTPHeaderPager interface {
 	HTTPHeaderPage([]byte, *artifact.Recording, query.HTTPHeaderSelection) (query.HTTPHeaderPage, error)
 }
 
+// HTTPHeaderSnapshotPager is the closed existing-source companion; finite
+// implementations remain compatible and cannot accidentally serve snapshots.
+type HTTPHeaderSnapshotPager interface {
+	HTTPHeaderSnapshotPage([]byte, artifact.ContextExpectation, query.HTTPHeaderSelection) (query.HTTPHeaderPage, error)
+}
+
 // ReadHTTPHeaderPage is the acquisition worker's httpHeaders branch of an
 // approved query read (ADR-282). The artifact was opened with the query
 // batch's own one-use key authority (NativeArtifactOpen); the native type
@@ -33,7 +39,14 @@ func ReadHTTPHeaderPage(ctx context.Context, opened NativeArtifactSource, s Nati
 		return zero, query.ErrUnavailable
 	}
 	m := opened.Metadata()
-	limit := min(e.Registration.NativeLimit, e.Recording.MaxBytes, artifact.RecordingNativeLimit)
+	limit := min(e.Registration.NativeLimit, artifact.RecordingNativeLimit)
+	if e.Recording != nil {
+		limit = min(limit, e.Recording.MaxBytes)
+	} else if e.Snapshot != nil {
+		limit = min(limit, e.Snapshot.MaxBytes)
+	} else {
+		return zero, query.ErrUnavailable
+	}
 	if m.Format != artifact.HTTPHeadersFormat || m.Size < 1 || m.Size > limit || m.SHA256 == (artifact.Digest{}) {
 		return zero, query.ErrUnavailable
 	}
@@ -54,7 +67,17 @@ func ReadHTTPHeaderPage(ctx context.Context, opened NativeArtifactSource, s Nati
 		}
 	}
 	sel := scope.Headers.Selection(scope.CaseID, scope.ArtifactID)
-	page, err := pager.HTTPHeaderPage(native, e.Recording, sel)
+	var page query.HTTPHeaderPage
+	var err error
+	if e.Snapshot != nil {
+		p, ok := pager.(HTTPHeaderSnapshotPager)
+		if !ok {
+			return zero, query.ErrUnavailable
+		}
+		page, err = p.HTTPHeaderSnapshotPage(native, e, sel)
+	} else {
+		page, err = pager.HTTPHeaderPage(native, e.Recording, sel)
+	}
 	if errors.Is(err, query.ErrInvalidCursor) && ctx.Err() == nil {
 		return zero, query.ErrInvalidCursor
 	}

@@ -1,5 +1,25 @@
 # Sustained implementation progress
 
+## Finite approved live views: service qualification (2026-11-06)
+
+Finite UI/MCP live views over existing ongoing packet/syscall/HTTP sources and
+running manual sessions (specs/live-watch.md, migration 00143) are rebased on
+merged logs `0b182537`. Three fixture defects found in the real-service runs are
+corrected without production changes: the expired-receipt seed typed one
+parameter as uuid and text and drew separate clock reads (idle after expiry);
+the upgrade check compared SQL-decoded `+00:00` times with `UTC` values, which
+the adapter already normalizes; the HTTP source test resolved retention before
+its own observation instant. Actual PostgreSQL/S3/OpenBao runs pass:
+`TestLiveWatchLedgerWithRealServices`, `TestLiveWatchUpgradeWithRealPostgres`,
+`TestContextQueryLedgerWithRealPostgres`, the three
+`TestLiveManual*SourceWithRealServices` and libpcap
+`TestHTTPSourceLedgerWithRealServices` (each a separate owned fleet fixture).
+The installed `live-observation` focus (CI suite `continuation-ongoing-live`)
+now dispatches the real installer continuation: guarded delivery enablement,
+three policy sources and three finite manual sessions, MCP and React views,
+and HTTP Save native download through the shared helper. It has not run yet;
+no installed live qualification is claimed.
+
 ## Installed finite saved logs passed (2026-11-06)
 
 Signed `e1477925` passes the packaged RequireAll workflow: independent reviewer,

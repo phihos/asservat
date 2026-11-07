@@ -22,7 +22,7 @@ type WorkloadProjection struct {
 // inventing a Pod. It is management/review eligibility, never evidence access
 // or an executable concrete-Pod permit.
 func WorkloadScopeEligibility(i identity.Identity, p WorkloadProjection, op Operation, t WorkloadTarget, now time.Time) Result {
-	if !t.Valid() || p.Target != t || op != CollectContext && op != ReadApproved && op != ApproveAction {
+	if !t.Valid() || p.Target != t || op != CollectContext && op != ReadApproved && op != ReadLiveSource && op != ApproveAction {
 		return Result{Reason: "InvalidRequest"}
 	}
 	for _, a := range p.Allows {

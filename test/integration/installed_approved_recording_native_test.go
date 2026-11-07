@@ -218,6 +218,11 @@ func installApprovedRecordingCollector(t *testing.T, ctx context.Context, api ku
 		// ADR-278: the administrator's opt-in encrypted-disk ring volume.
 		collector["ringDisk"] = map[string]any{"enabled": true, "bytes": ongoingSaveDiskBytes}
 	}
+	if installedJourneyFocus() == "live-observation" {
+		// The administrator's node-side live processing opt-in; hub
+		// delivery.liveRead separately authorizes viewers.
+		collector["live"] = map[string]any{"subscriptions": 4, "memoryBytes": 4 << 20, "eventsPerSecond": 2000, "bytesPerSecond": 1 << 20, "processingNanosPerSecond": 50_000_000}
+	}
 	values := map[string]any{"mode": "cluster", "collector": collector}
 	raw, _ := json.Marshal(values)
 	path := filepath.Join(t.TempDir(), "collector-values.json")
@@ -1308,6 +1313,13 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 // the manual-mixed focus, returning its bytes and its filename extension.
 func installedMixedDownload(t *testing.T, ctx context.Context, transport http.RoundTripper, identity *installedIdentity, origin, artifactID, key string, invoke func(string, any) (installedJourneyEnvelope, string), read func(string, any, any), diagnose func()) ([]byte, string) {
 	t.Helper()
+	return installedNativeDownload(t, ctx, transport, identity, origin, artifactID, key, invoke, read, diagnose, ".pcapng", ".jsonl")
+}
+
+// installedNativeDownload prepares, awaits and reads one native artifact whose
+// filename extension is one of extensions.
+func installedNativeDownload(t *testing.T, ctx context.Context, transport http.RoundTripper, identity *installedIdentity, origin, artifactID, key string, invoke func(string, any) (installedJourneyEnvelope, string), read func(string, any, any), diagnose func(), extensions ...string) ([]byte, string) {
+	t.Helper()
 	var download installedJourneyDownload
 	// As in the main flow: preparation is an effect, so only the server's
 	// continuation flag permits another exact same-key prepare.
@@ -1341,7 +1353,7 @@ func installedMixedDownload(t *testing.T, ctx context.Context, transport http.Ro
 	extension := filepath.Ext(name)
 	native, readErr := io.ReadAll(io.LimitReader(response.Body, artifact.RecordingNativeLimit+1))
 	digest := sha256.Sum256(native)
-	if err != nil || readErr != nil || name != "artifact-"+artifactID+extension || (extension != ".pcapng" && extension != ".jsonl") || response.StatusCode != http.StatusOK || int64(len(native)) != *download.SizeBytes || hex.EncodeToString(digest[:]) != download.SHA256 {
+	if err != nil || readErr != nil || name != "artifact-"+artifactID+extension || !slices.Contains(extensions, extension) || response.StatusCode != http.StatusOK || int64(len(native)) != *download.SizeBytes || hex.EncodeToString(digest[:]) != download.SHA256 {
 		t.Fatal("mixed native download does not match its metadata", name, err, readErr)
 	}
 	return native, extension

@@ -311,14 +311,21 @@ func TestNodeCollectorWithRealKubernetes(t *testing.T) {
 		ringDiskNative(t, ctx, k, s.Channel, f.CollectorNamespace, f.RingDiskBytes, workload, f.Busybox, results)
 	} else {
 		// 3b. ADR-248: manual networkHeaders captures through the real gadget.
-		packetCaptureNative(t, ctx, k, admin, s.Channel, second, workload, f.Busybox, f.Work, f.S3, results)
+		var live *nativeLiveQualification
+		if f.CNI == "" {
+			live = &nativeLiveQualification{}
+		}
+		packetCaptureNative(t, ctx, k, admin, s.Channel, second, workload, f.Busybox, f.Work, f.S3, results, live)
 		if f.CNI == "cilium" {
 			cniQualificationNative(t, ctx, k, s.Channel, second, workload, f.Busybox, f.Work, results)
 		}
 
 		// 3c. ADR-273: an ongoing syscall metadata source and one saved window.
 		current, _ := s.Channel.NodeByUID(second.Identity.NodeUID)
-		syscallSourceNative(t, ctx, k, s.Channel, current, workload, f.Busybox, f.Work, results)
+		syscallSourceNative(t, ctx, k, s.Channel, current, workload, f.Busybox, f.Work, results, live)
+		if live != nil {
+			results["liveNodeQualification"] = map[string]any{"logicalReads": live.calls, "replyBytes": live.bytes, "incrementalPhaseSeconds": live.elapsed.Seconds(), "originalContextMinutes": 11, "scope": "actual packaged collector/private transport; synthetic source and observation authority; no SQL or public authority proof"}
+		}
 	}
 
 	if b, err := k.CoreV1().Pods(f.CollectorNamespace).GetLogs(first.Name, &core.PodLogOptions{LimitBytes: ptr.To[int64](8 << 10)}).DoRaw(ctx); err == nil {

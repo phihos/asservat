@@ -20,7 +20,7 @@ func (s SourceSnapshot) Valid() bool {
 	if (s.WriterPodUID != "" || s.WriterEpoch != "") && (!validUUID(s.WriterPodUID) || !validUUID(s.WriterEpoch)) {
 		return false
 	}
-	return validUUID(s.AttemptID) && s.Binding.AudienceDigest != ([32]byte{}) && s.Binding.Valid() && validUUID(s.CaptureID) && s.ExpectationDigest != ([32]byte{}) &&
+	return (s.Request.HTTP.Valid() == (s.Binding.ObservationGrantID != "")) && validUUID(s.AttemptID) && s.Binding.AudienceDigest != ([32]byte{}) && s.Binding.Valid() && validUUID(s.CaptureID) && s.ExpectationDigest != ([32]byte{}) &&
 		s.Request.Valid() && s.Request.SourceID == s.Binding.SourceID && s.Request.Fence == s.Binding.Fence
 }
 

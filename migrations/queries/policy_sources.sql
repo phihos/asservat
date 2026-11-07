@@ -26,3 +26,11 @@ WHERE s.root_id=$1 AND w.allocation_id=$2 AND w.ready_at IS NOT NULL AND w.mutat
 UPDATE policy_recording_source dst SET ended_at=clock_timestamp() WHERE (dst.root_id,dst.id) IN (
  SELECT s.root_id,s.id FROM policy_recording_source s WHERE s.root_id=$1 AND s.ended_at IS NULL AND (s.hard_until<=clock_timestamp() OR NOT EXISTS (
  SELECT 1 FROM policy_source p WHERE p.root_id=s.root_id AND p.policy_uid=s.policy_uid AND p.active_id=s.acceptance_id AND NOT p.deleted AND NOT p.suspended)) ORDER BY s.id LIMIT 64) RETURNING *;
+
+-- name: CountActiveSourceGrantObservations :one
+-- Original grant lock serializes both finite and ongoing sensitive admissions.
+SELECT ((SELECT count(*) FROM policy_recording_source WHERE root_id=sqlc.arg(root_id)::uuid
+ AND binding_json->>'ObservationGrantID'=(sqlc.arg(grant_id)::uuid)::text
+ AND slot_released_at IS NULL AND hard_until>clock_timestamp())+
+ (SELECT count(*) FROM policy_observation_session WHERE root_id=sqlc.arg(root_id)::uuid
+ AND grant_id=sqlc.arg(grant_id)::uuid AND ended_at IS NULL AND lease_until>clock_timestamp()))::bigint AS active_sessions;

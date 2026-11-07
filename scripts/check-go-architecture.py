@@ -77,6 +77,11 @@ for package in packages:
                     # perform no filesystem/network I/O or protocol/key handling;
                     # use the actual encoder rather than bespoke JSON size logic.
                     allowed |= {"encoding/base64", "encoding/json"}
+                # Live rows use the real bounded JSON encoder for their closed
+                # approved field union, typed predicates and exact byte accounting.
+                # This is pure in-memory value work, with no key or I/O port.
+                if package["ImportPath"] == module+"/internal/domain/live":
+                    allowed |= {"encoding/json"}
                 # The finite execution TLS value binds bounded PUBLIC root
                 # material to its SHA-256 identity. This pure comparison does
                 # not parse X.509, use keys, or permit network/storage/JSON I/O.
@@ -94,10 +99,10 @@ for package in packages:
             raise ValueError(f"Invalid dependency {source} -> {target}")
         if source == "bootstrap":
             continue
-        # Publication reuses the canonical data-only logs codec/checker. This
-        # narrow edge does not allow storage adapters to import collectors.
-        if source == "C-21" and target == "C-23" and relative(imported) != "internal/adapters/logs":
-            raise ValueError(f"Persistence may only reuse the canonical logs codec from C-23: {imported}")
+        # Publication reuses canonical data-only logs and approved HTTP native
+        # codecs/checkers. This exact package allowlist does not admit collectors.
+        if source == "C-21" and target == "C-23" and relative(imported) not in {"internal/adapters/logs", "internal/adapters/httpheaders"}:
+            raise ValueError(f"Persistence may only reuse canonical native codecs from C-23: {imported}")
         if source != target and target not in components[source]["allowed_dependencies"]:
             raise ValueError(f"Undeclared dependency {source} -> {target}: {imported}")
         source_layer, target_layer = components[source]["layer"], components[target]["layer"]

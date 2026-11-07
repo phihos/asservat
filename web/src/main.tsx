@@ -15,6 +15,8 @@ import { ApprovalsWorkspace } from './approvals/ApprovalsWorkspace';
 import { Shares } from './sharing/shares';
 import './styles.css';
 
+const LiveWorkspace = lazy(() => import('./live/LiveWorkspace').then(module => ({default:module.LiveWorkspace})));
+const livePage = window.location.pathname === '/live';
 const caseID = caseIDFromPath(window.location.pathname);
 // The evidence validators/view are separate chunks and load only on case navigation.
 let evidenceModule: Promise<typeof import('./evidence/EvidenceWorkspace')> | undefined;
@@ -37,5 +39,5 @@ const root = document.getElementById('root');
 if (!root) throw new Error('Missing console root');
 createRoot(root).render(<>
   <a className="skip-link" href="#main">Skip to content</a>
-  <SessionGate controller={controller}>{(session, scope) => <Suspense fallback={<p role="status">Loading evidence view…</p>}>{caseID ? <EvidenceBoundary path={"/cases/" + caseID}><EvidenceWorkspace session={session} scope={scope} caseID={caseID}/></EvidenceBoundary> : policyPage ? <PolicyWorkspace session={session} scope={scope} controller={policies}/> : sharesPage ? <SharesWorkspace session={session} scope={scope} controller={shares}/> : accessPreviewPage ? <AccessPreviewWorkspace session={session} scope={scope}/> : retentionPreviewPage ? <RetentionPreviewWorkspace session={session} scope={scope}/> : approvalsPage ? <ApprovalsWorkspace session={session} scope={scope} grantID={approvalID}/> : <CaptureWorkspace session={session} scope={scope} controller={investigation}/>}</Suspense>}</SessionGate>
+  <SessionGate controller={controller}>{(session, scope) => <Suspense fallback={<p role="status">Loading evidence view…</p>}>{caseID ? <EvidenceBoundary path={"/cases/" + caseID}><EvidenceWorkspace session={session} scope={scope} caseID={caseID}/></EvidenceBoundary> : livePage ? <LiveWorkspace session={session} scope={scope}/> : policyPage ? <PolicyWorkspace session={session} scope={scope} controller={policies}/> : sharesPage ? <SharesWorkspace session={session} scope={scope} controller={shares}/> : accessPreviewPage ? <AccessPreviewWorkspace session={session} scope={scope}/> : retentionPreviewPage ? <RetentionPreviewWorkspace session={session} scope={scope}/> : approvalsPage ? <ApprovalsWorkspace session={session} scope={scope} grantID={approvalID}/> : <CaptureWorkspace session={session} scope={scope} controller={investigation}/>}</Suspense>}</SessionGate>
 </>);

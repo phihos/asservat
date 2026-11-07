@@ -19,13 +19,28 @@ import (
 // (Content-Type, Content-Length). No URL, query, Host, connection tuple,
 // body, trailer or credential header is kept.
 type Projection struct {
-	Format    string       `json:"format"`
-	Protocol  string       `json:"protocol"`
-	StartedAt time.Time    `json:"started_at"`
-	EndedAt   time.Time    `json:"ended_at"`
-	Limits    LimitsRecord `json:"limits"`
-	Records   []Record     `json:"records"`
-	Counters  Counters     `json:"counters"`
+	Format       string                `json:"format"`
+	Protocol     string                `json:"protocol"`
+	StartedAt    time.Time             `json:"started_at"`
+	EndedAt      time.Time             `json:"ended_at"`
+	Limits       LimitsRecord          `json:"limits"`
+	Records      []Record              `json:"records"`
+	Counters     Counters              `json:"counters"`
+	SourceWindow *SourceWindowCoverage `json:"source_window,omitempty"`
+}
+
+// SourceWindowCoverage distinguishes event-window measurements from a finite
+// parser shutdown. Open/pending flows are intentionally unknown: saving never
+// closes or flushes the independently running source.
+type SourceWindowCoverage struct {
+	FramesSeen           uint64 `json:"frames_seen"`
+	FramesFiltered       uint64 `json:"frames_filtered"`
+	ObservedWireBytes    uint64 `json:"observed_wire_bytes"`
+	CounterScope         string `json:"counter_scope"`
+	OpenFlowsKnown       bool   `json:"open_flows_known"`
+	PendingRecordsKnown  bool   `json:"pending_records_known"`
+	WindowClippedRecords uint64 `json:"window_clipped_records"`
+	HistoryComplete      bool   `json:"history_complete"`
 }
 
 // LimitsRecord states the bounds the projection was produced under.
@@ -214,17 +229,27 @@ func projectContentType(v string) (string, bool) {
 	return mt, true
 }
 
-func (p *Projector) addRecord(r Record) {
+func (p *Projector) addRecord(r Record, stamps ...SourceStamp) {
 	if r.Headers == nil {
 		r.Headers = []Header{}
 	}
-	if len(p.records) >= maxRecords {
+	if (p.observer == nil || p.retainObserved) && len(p.records) >= maxRecords {
 		p.counters.RecordsDropped++
 		return
 	}
 	p.counters.Records++
 	if r.Partial {
 		p.counters.PartialRecords++
+	}
+	if p.observer != nil {
+		var stamp SourceStamp
+		if len(stamps) == 1 {
+			stamp = stamps[0]
+		}
+		p.observer(ObservedRecord{Record: r, Stamp: stamp})
+		if !p.retainObserved {
+			return
+		}
 	}
 	p.records = append(p.records, r)
 }
@@ -254,4 +279,22 @@ func (pr Projection) Encode() ([]byte, error) {
 		return nil, artifact.ErrLimit
 	}
 	return b, nil
+}
+
+// MarshalJSON leaves finite documents byte-for-byte unchanged. A saved window
+// has no parser shutdown: its open-at-close gauge is explicitly null, never a
+// fabricated measured zero. Strict canonical checking rejects numeric substitutes.
+func (pr Projection) MarshalJSON() ([]byte, error) {
+	type wire Projection
+	if pr.SourceWindow == nil {
+		return json.Marshal(wire(pr))
+	}
+	type windowCounters struct {
+		*Counters
+		OpenAtCloseFlows *uint64 `json:"open_at_close_flows"`
+	}
+	return json.Marshal(struct {
+		*wire
+		Counters windowCounters `json:"counters"`
+	}{(*wire)(&pr), windowCounters{Counters: &pr.Counters}})
 }

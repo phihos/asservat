@@ -30,6 +30,11 @@ per-step revalidation and the existing five-second interval are not immutable
 requirements. This clarification takes precedence over older instructions and
 ADRs that prescribe stricter download permission-check timing.
 
+Maintainer decision (2026-11-07, ADR-311): authority is checked once per
+operation and reused for at most `identity.AuthorityRecheckInterval` (30 s; 60 s
+for the shared delivery-policy observation), never past an original deadline.
+Do not reintroduce stacked five-second authority windows.
+
 Do not let overzealous security requirements with unproven security benefits
 stall development or cause runtime performance problems. Additional security
 mechanisms must address a concrete risk and justify their implementation and

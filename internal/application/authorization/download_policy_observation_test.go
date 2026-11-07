@@ -482,7 +482,7 @@ func TestDownloadPolicyObservationBoundsLiveReadAndRefreshesDenial(t *testing.T)
 }
 
 func TestDownloadPolicyObservationKeepsCurrentEnvironmentBoundsAndFences(t *testing.T) {
-	for _, mode := range []string{"success", "recovery-change", "processing-change", "cancel"} {
+	for _, mode := range []string{"success", "recovery-denied", "processing-denied", "cancel"} {
 		t.Run(mode, func(t *testing.T) {
 			f, s, r, actor := newEnvironmentFixture()
 			// A valid retained configuration may precede this request by 30s.
@@ -494,18 +494,11 @@ func TestDownloadPolicyObservationKeepsCurrentEnvironmentBoundsAndFences(t *test
 			defer cancel()
 			cutoff, _ := ctx.Deadline()
 			switch mode {
-			case "recovery-change":
-				f.recoveryHook = func() {
-					if f.recoveryReads == 2 {
-						f.recovery.Revision.Generation++
-					}
-				}
-			case "processing-change":
-				f.processingHook = func() {
-					if f.processingReads == 2 {
-						f.processing.Sequence++
-					}
-				}
+			case "recovery-denied":
+				// The retained policy never substitutes for the current recovery read.
+				f.recovery.IssuerEpoch = r.CaptureID
+			case "processing-denied":
+				f.processingErr = true
 			case "cancel":
 				f.processingHook = cancel
 			}
@@ -516,7 +509,7 @@ func TestDownloadPolicyObservationKeepsCurrentEnvironmentBoundsAndFences(t *test
 				}
 				return
 			}
-			if err != nil || !out.CurrentValid(f.now) || !out.ValidUntil.Equal(cutoff) || f.recoveryReads != 2 || f.processingReads != 2 {
+			if err != nil || !out.CurrentValid(f.now) || !out.ValidUntil.Equal(cutoff) || f.recoveryReads != 1 || f.processingReads != 1 {
 				t.Fatal("retained policy changed request or current checks", out.ValidUntil, cutoff, err)
 			}
 		})

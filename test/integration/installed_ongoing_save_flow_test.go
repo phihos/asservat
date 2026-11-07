@@ -757,7 +757,7 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 // Save qualification or the automatic incident snapshot.
 func installedOngoingFocus() bool {
 	f := installedJourneyFocus()
-	return f == "ongoing-save" || f == "ongoing-save-disk" || f == "ongoing-incident" || f == "ongoing-syscall" || f == "ongoing-mixed"
+	return f == "ongoing-save" || f == "ongoing-save-disk" || f == "ongoing-incident" || f == "ongoing-syscall" || f == "ongoing-mixed" || f == "live-observation"
 }
 
 // ongoingSyscallEvents checks a downloaded syscall window (ADR-273): JSON

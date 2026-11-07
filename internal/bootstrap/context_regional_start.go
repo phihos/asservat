@@ -56,7 +56,7 @@ func (s RegionalAPIContextStart) StartContext(ctx context.Context, current ident
 	// or attachment ends; the gate then refuses any later preparation.
 	gate := &preparationGate{}
 	started := s.Now().UTC().Truncate(time.Microsecond)
-	call, cancel := context.WithDeadline(ctx, started.Add(5*time.Second))
+	call, cancel := context.WithDeadline(ctx, started.Add(identity.AuthorityRecheckInterval)) // ADR-311
 	defer cancel()
 	until, _ := call.Deadline()
 	var cancels []context.CancelFunc
@@ -65,7 +65,7 @@ func (s RegionalAPIContextStart) StartContext(ctx context.Context, current ident
 			cancels[i]()
 		}
 	}()
-	// The initial context may already be shorter than this start's five seconds.
+	// The initial context may already be shorter than this start's interval.
 	// Later names identify only an input that actually shortens that bound.
 	bound := regionalStartInitialBound(ctx, started)
 	narrow := func(name string, d time.Time) {
@@ -294,7 +294,7 @@ func (p gatedPreparer) PrepareArgumentRecording(ctx context.Context, c execution
 
 // Diagnostic only: a retained caller deadline is not a fresh start interval.
 func regionalStartInitialBound(ctx context.Context, started time.Time) string {
-	if deadline, ok := ctx.Deadline(); ok && deadline.Before(started.Add(5*time.Second)) {
+	if deadline, ok := ctx.Deadline(); ok && deadline.Before(started.Add(identity.AuthorityRecheckInterval)) {
 		return "parent"
 	}
 	return "start"

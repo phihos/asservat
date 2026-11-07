@@ -54,6 +54,15 @@ type CurrentRecordingPolicies struct {
 }
 
 func (s CurrentRecordingPolicies) RecordingPolicy(ctx context.Context, name, uid string) (RecordingPolicy, error) {
+	return s.currentSourcePolicy(ctx, name, uid, true)
+}
+
+// SourcePolicy supplies the same exact current compiled source policy without
+// requiring opt-in to the separate recording Save operation. It starts nothing.
+func (s CurrentRecordingPolicies) SourcePolicy(ctx context.Context, name, uid string) (RecordingPolicy, error) {
+	return s.currentSourcePolicy(ctx, name, uid, false)
+}
+func (s CurrentRecordingPolicies) currentSourcePolicy(ctx context.Context, name, uid string, requireSave bool) (RecordingPolicy, error) {
 	var zero RecordingPolicy
 	if s.Documents == nil || s.Accepted == nil || s.CompileRecorder == nil || s.Now == nil {
 		return zero, value.ErrUnavailable
@@ -75,7 +84,7 @@ func (s CurrentRecordingPolicies) RecordingPolicy(ctx context.Context, name, uid
 	defer endCompile()
 	p, err := CompilePolicyWithRecorders(compileCtx, catalogTarget, raw, s.RecipeName, s.RecipeDigest, s.CompileRecorder)
 	a := accepted.Authority
-	if err != nil || compileCtx.Err() != nil || !s.Now().Before(compileUntil) || !source.Valid(s.Now()) || source.Suspended || source.Deleted || !a.Valid(s.Now()) || !s.Now().Before(accepted.SourceUntil) || !p.RecordingSaves || p.Recorder == nil || p.Recorder.Action.ExecutionMode != "ongoing" || RecorderPolicyScopeDigest(source.Revision.UID, accepted.IntentVersion, source.CollectionDigest, p, a.NamespaceUID, a.WorkloadUID, a.Delegation, a.Owners, a.Actions, a.Limits) != a.ScopeDigest {
+	if err != nil || compileCtx.Err() != nil || !s.Now().Before(compileUntil) || !source.Valid(s.Now()) || source.Suspended || source.Deleted || !a.Valid(s.Now()) || !s.Now().Before(accepted.SourceUntil) || requireSave && !p.RecordingSaves || p.Recorder == nil || p.Recorder.Action.ExecutionMode != "ongoing" || RecorderPolicyScopeDigest(source.Revision.UID, accepted.IntentVersion, source.CollectionDigest, p, a.NamespaceUID, a.WorkloadUID, a.Delegation, a.Owners, a.Actions, a.Limits) != a.ScopeDigest {
 		return zero, value.ErrDenied
 	}
 	return RecordingPolicy{Policy: p, Accepted: accepted}, nil

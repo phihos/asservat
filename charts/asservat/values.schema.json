@@ -1309,6 +1309,48 @@
               "maximum": 1099511627776
             }
           }
+        },
+        "live": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "description": "Optional existing node live-processing ceilings. Null disables live projections; hub delivery.liveRead independently authorizes viewers.",
+          "additionalProperties": false,
+          "required": [
+            "subscriptions",
+            "memoryBytes",
+            "eventsPerSecond",
+            "bytesPerSecond",
+            "processingNanosPerSecond"
+          ],
+          "properties": {
+            "subscriptions": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 16
+            },
+            "memoryBytes": {
+              "type": "integer",
+              "minimum": 1048576,
+              "maximum": 16777216
+            },
+            "eventsPerSecond": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000
+            },
+            "bytesPerSecond": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 268435456
+            },
+            "processingNanosPerSecond": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000000
+            }
+          }
         }
       }
     }

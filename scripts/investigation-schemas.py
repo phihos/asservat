@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "specs/contracts"
 DEST = ROOT / "internal/contracts/investigation-schemas"
 PREFIX = "https://asservat.io/spec/v1/"
-NAMES = ["cancel_capture", "list_recordings", "preview_recording_save", "list_diagnostics", "preview_capture", "request_capture", "resolve_capture_request", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "cancel_artifact_download", "get_file_excerpt", "get_query_result", "activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share", "explain_access", "list_capture_history", "get_capture_settings", "preview_access_change", "transfer_share", "stop_future_sharing", "preview_retention_change", "request_policy_grant", "request_raw_access", "get_grant", "list_reviews", "decide_review", "revoke_grant", "list_capture_profiles", "get_capture_profile", "get_http_headers", "get_profile_summary", "get_pcap_summary", "pcap_query", "compare_profiles", "get_syscall_summary", "get_syscall_events", "syscall_query", "get_logs"]
+NAMES = ["cancel_capture", "list_recordings", "preview_recording_save", "list_diagnostics", "preview_capture", "request_capture", "resolve_capture_request", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "cancel_artifact_download", "get_file_excerpt", "get_query_result", "activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share", "explain_access", "list_capture_history", "get_capture_settings", "preview_access_change", "transfer_share", "stop_future_sharing", "preview_retention_change", "request_policy_grant", "request_raw_access", "get_grant", "list_reviews", "decide_review", "revoke_grant", "list_capture_profiles", "get_capture_profile", "get_http_headers", "get_profile_summary", "get_pcap_summary", "pcap_query", "compare_profiles", "get_syscall_summary", "get_syscall_events", "syscall_query", "get_logs", "list_live_sources", "open_live_watch", "read_live_watch", "update_live_watch", "close_live_watch"]
 
 RECORDER_EDITS = ["packetPeers", "packetFilter", "packetBefore", "packetAfter", "packetRing", "syscallFilter", "syscallMode", "syscallBefore", "syscallAfter", "syscallRing", "syscallArguments", "syscallMaxEvents", "syscallRate", "actionMaxBytes", "actionTimeout", "actionExecutionMode", "profileDuration", "logBefore", "logAfter", "logStream"]
 
@@ -243,6 +243,19 @@ def main():
                 # The Go validator additionally applies the original output
                 # schema and relational request/timing checks to this object.
             output["allOf"] = [{"oneOf": branches}]
+            description["inputSchema"] = localize(description["inputSchema"])
+            description["outputSchema"] = localize(output)
+            result[name + ".json"] = (json.dumps(description, indent=2) + "\n").encode()
+            continue
+        if name in ("list_live_sources", "open_live_watch", "read_live_watch", "update_live_watch", "close_live_watch"):
+            description = copy.deepcopy(tool)
+            description.pop("enabledByDefault", None)
+            output = copy.deepcopy(common)
+            output.pop("$id", None)
+            output["properties"]["truncated"] = {"const": False}
+            output["properties"]["narrowing_hint"] = {"type": "null"}
+            output["properties"]["provenance"] = {"type": "array", "maxItems": 0}
+            output["allOf"] = [{"oneOf": copy.deepcopy(tool["outputSchema"]["allOf"][1]["oneOf"])}]
             description["inputSchema"] = localize(description["inputSchema"])
             description["outputSchema"] = localize(output)
             result[name + ".json"] = (json.dumps(description, indent=2) + "\n").encode()

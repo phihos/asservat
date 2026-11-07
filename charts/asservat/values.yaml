@@ -200,6 +200,9 @@ collector:
     frozenBytes: 268435456
     uploadBytesPerSecond: 33554432
     uploadBurstBytes: 67108864
+  # Existing node live-projection processing ceilings; null disables the
+  # mechanism. This is separate from hub delivery.liveRead viewer authority.
+  live: null
   # Optional encrypted-disk ring medium (ADR-278). When enabled, the collector
   # gets a node-local emptyDir of exactly bytes; ring segments beyond the one
   # being written are sealed there with a per-ring in-memory key, so a restart

@@ -32,6 +32,15 @@ func ReadPage(native []byte, limits Limits, limit int64, s analysis.HTTPHeaderSe
 		return analysis.HTTPHeaderPage{}, analysis.ErrInvalidCursor
 	}
 	dropped, incomplete, gaps := coverage(pr.Counters)
+	if w := pr.SourceWindow; w != nil {
+		gaps = append(gaps, "Saved event window: open flows and pending or delayed responses at its end are unknown; the source was not stopped.")
+		if !w.HistoryComplete {
+			gaps = append(gaps, "Source history is missing, evicted or contains input gaps.")
+		}
+		if w.WindowClippedRecords > 0 {
+			gaps = append(gaps, fmt.Sprintf("%d completed records omitted because their request timestamps lie outside the saved window.", w.WindowClippedRecords))
+		}
+	}
 	page := analysis.HTTPHeaderPage{ProjectionDigest: digest, Start: s.Start, Total: len(pr.Records),
 		DroppedFlows: dropped, IncompleteFlows: incomplete, CoverageGaps: gaps}
 	end := min(len(pr.Records), s.Start+s.Limit)
@@ -111,5 +120,22 @@ type RecordingPage struct{}
 
 func (RecordingPage) HTTPHeaderPage(native []byte, r *artifact.Recording, s analysis.HTTPHeaderSelection) (analysis.HTTPHeaderPage, error) {
 	limits, limit := RecordingLimits(r)
+	return ReadPage(native, limits, limit, s)
+}
+
+// ExpectationLimits accepts the exact finite recording or typed existing-source
+// snapshot; it never manufactures a recording authority for a snapshot.
+func ExpectationLimits(e artifact.ContextExpectation) (Limits, int64) {
+	if e.NativeType != artifact.HTTPHeadersArtifact {
+		return Limits{}, 0
+	}
+	if e.Snapshot != nil && e.Recording == nil && e.Snapshot.HTTP.Valid() {
+		h := e.Snapshot.HTTP
+		return Limits{MaxFlows: h.MaxFlows, MaxHeaderBytes: h.MaxHeaderBytes, MaxFlowBytes: h.MaxFlowBytes, MaxTotalBytes: h.MaxTotalBytes, IdleTimeout: time.Duration(h.IdleMillis) * time.Millisecond}, e.Snapshot.MaxBytes
+	}
+	return RecordingLimits(e.Recording)
+}
+func (RecordingPage) HTTPHeaderSnapshotPage(native []byte, e artifact.ContextExpectation, s analysis.HTTPHeaderSelection) (analysis.HTTPHeaderPage, error) {
+	limits, limit := ExpectationLimits(e)
 	return ReadPage(native, limits, limit, s)
 }

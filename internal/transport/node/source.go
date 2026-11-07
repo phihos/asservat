@@ -19,10 +19,10 @@ func WireSourceBinding(b collector.SourceBinding) contracts.NodeSourceBinding {
 	if b.ProgramDigest != [32]byte{} {
 		program = hex.EncodeToString(b.ProgramDigest[:])
 	}
-	return contracts.NodeSourceBinding{AudienceDigest: audience, RootID: b.RootID, PolicyUID: b.PolicyUID, AcceptanceID: b.AcceptanceID, SourceID: b.SourceID, Fence: b.Fence, ActionID: b.ActionID, PodUID: b.PodUID, NodeUID: b.NodeUID, BootID: b.BootID, CollectorPodUID: b.CollectorPodUID, CollectorEpoch: b.CollectorEpoch, Scope: hex.EncodeToString(b.Scope[:]), ExpectationDigest: hex.EncodeToString(b.ExpectationDigest[:]), ProgramDigest: program, ResourceDigest: hex.EncodeToString(b.ResourceDigest[:])}
+	return contracts.NodeSourceBinding{ObservationGrantID: b.ObservationGrantID, AudienceDigest: audience, RootID: b.RootID, PolicyUID: b.PolicyUID, AcceptanceID: b.AcceptanceID, SourceID: b.SourceID, Fence: b.Fence, ActionID: b.ActionID, PodUID: b.PodUID, NodeUID: b.NodeUID, BootID: b.BootID, CollectorPodUID: b.CollectorPodUID, CollectorEpoch: b.CollectorEpoch, Scope: hex.EncodeToString(b.Scope[:]), ExpectationDigest: hex.EncodeToString(b.ExpectationDigest[:]), ProgramDigest: program, ResourceDigest: hex.EncodeToString(b.ResourceDigest[:])}
 }
 func DomainSourceBinding(w contracts.NodeSourceBinding) (collector.SourceBinding, bool) {
-	b := collector.SourceBinding{RootID: w.RootID, PolicyUID: w.PolicyUID, AcceptanceID: w.AcceptanceID, SourceID: w.SourceID, Fence: w.Fence, ActionID: w.ActionID, PodUID: w.PodUID, NodeUID: w.NodeUID, BootID: w.BootID, CollectorPodUID: w.CollectorPodUID, CollectorEpoch: w.CollectorEpoch}
+	b := collector.SourceBinding{ObservationGrantID: w.ObservationGrantID, RootID: w.RootID, PolicyUID: w.PolicyUID, AcceptanceID: w.AcceptanceID, SourceID: w.SourceID, Fence: w.Fence, ActionID: w.ActionID, PodUID: w.PodUID, NodeUID: w.NodeUID, BootID: w.BootID, CollectorPodUID: w.CollectorPodUID, CollectorEpoch: w.CollectorEpoch}
 	var ok bool
 	if b.AudienceDigest, ok = digestHex(w.AudienceDigest); !ok {
 		return b, false
@@ -51,6 +51,10 @@ func WirePacketSource(s collector.PacketSource) contracts.NodePacketSource {
 	for i, ins := range s.Program {
 		w.Program[i] = contracts.NodeBPFInstruction{Code: ins.Code, Jt: ins.Jt, Jf: ins.Jf, K: ins.K}
 	}
+	if s.HTTP != nil {
+		h := s.HTTP
+		w.HTTP = &contracts.NodeHTTPProjection{MaxFlows: h.MaxFlows, MaxHeaderBytes: h.MaxHeaderBytes, MaxFlowBytes: h.MaxFlowBytes, MaxTotalBytes: h.MaxTotalBytes, IdleTimeoutMillis: h.IdleTimeout.Milliseconds()}
+	}
 	if s.Syscalls != nil {
 		w.Syscalls = &contracts.NodeSyscallFilter{Names: append([]string{}, s.Syscalls.Names...), ErrorsOnly: s.Syscalls.ErrorsOnly, MaxEvents: s.Syscalls.MaxEvents, MaxTrackedThreads: s.Syscalls.MaxTrackedThreads}
 	}
@@ -65,6 +69,10 @@ func DomainPacketSource(w contracts.NodePacketSource) (collector.PacketSource, b
 	s := collector.PacketSource{Permit: collector.SourcePermit{Binding: b, StartedAt: p.StartedAt.UTC(), HardUntil: p.HardUntil.UTC(), StartBy: p.StartBy.UTC(), IssuedAt: p.IssuedAt.UTC(), DispatchUntil: p.DispatchUntil.UTC(), LeafUntil: p.LeafUntil.UTC(), Credit: p.Credit, BytesPerSecond: p.BytesPerSecond}, Ring: collector.SourceRingLimits{MaxAge: time.Duration(r.MaxAgeNanos), MaxBytes: r.MaxBytes, SegmentBytes: r.SegmentBytes, MaxFrozenBytes: r.MaxFrozenBytes, MaxSegments: r.MaxSegments, MaxConcurrentSnapshots: r.MaxConcurrentSnapshots, EncryptedDisk: r.EncryptedDisk}, Program: make([]planning.BPFInstruction, len(w.Program))}
 	for i, ins := range w.Program {
 		s.Program[i] = planning.BPFInstruction{Code: ins.Code, Jt: ins.Jt, Jf: ins.Jf, K: ins.K}
+	}
+	if w.HTTP != nil {
+		h := w.HTTP
+		s.HTTP = &collector.HTTPProjection{MaxFlows: h.MaxFlows, MaxHeaderBytes: h.MaxHeaderBytes, MaxFlowBytes: h.MaxFlowBytes, MaxTotalBytes: h.MaxTotalBytes, IdleTimeout: time.Duration(h.IdleTimeoutMillis) * time.Millisecond}
 	}
 	if w.Syscalls != nil {
 		if len(w.Syscalls.Names) > collector.MaxSyscallFilter {

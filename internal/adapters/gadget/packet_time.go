@@ -36,7 +36,7 @@ func (c packetClock) at(raw uint64) (time.Time, bool) {
 	at := c.wall.Add(time.Duration(int64(raw) - c.mono)).UTC()
 	return at, packetWallValid(at)
 }
-func (c *packetClock) deliver(data []byte, wire uint32, raw uint64, notice func(InputNotice), deliver func(Frame)) {
+func (c *packetClock) deliver(data []byte, wire uint32, raw uint64, notice func(InputNotice), deliver func(Frame), metadata ...Frame) {
 	at, ok := c.at(raw)
 	if !ok {
 		c.invalid = true
@@ -45,7 +45,12 @@ func (c *packetClock) deliver(data []byte, wire uint32, raw uint64, notice func(
 		}
 		return
 	}
-	deliver(Frame{Data: data, Wire: wire, At: at, TimestampUnknown: raw == 0})
+	f := Frame{Data: data, Wire: wire, At: at, TimestampUnknown: raw == 0, RawTimestamp: raw, Clock: "monotonic"}
+	if len(metadata) == 1 {
+		f.DirectionKnown = metadata[0].DirectionKnown
+		f.Ingress = metadata[0].Ingress
+	}
+	deliver(f)
 }
 
 func packetMonotonicNanos(sec, nsec int64) (int64, error) {

@@ -56,6 +56,7 @@ type OwnerRuntime struct {
 	binding        value.OwnerBinding
 	pool           value.OwnerPool
 	roots          *x509.CertPool
+	ownerRootDER   [][]byte
 	server, client *mtls.OwnerCredentials
 	readiness      app.OwnerStartupReadiness
 	connections    int
@@ -102,7 +103,7 @@ func NewOwnerRuntime(ctx context.Context, c OwnerRuntimeConfig) (*OwnerRuntime, 
 	epoch[8] = (epoch[8] & 63) | 128
 	binding := value.OwnerBinding{InstallationID: c.Pool.InstallationID, ClusterID: c.Pool.ClusterID, IssuerEpoch: c.Pool.IssuerEpoch, PodUID: c.PodUID, ProcessEpoch: fmt.Sprintf("%x-%x-%x-%x-%x", epoch[:4], epoch[4:6], epoch[6:8], epoch[8:10], epoch[10:])}
 	root, cancel := context.WithCancel(ctx)
-	r := &OwnerRuntime{root: root, cancel: cancel, binding: binding, pool: c.Pool, roots: roots, connections: c.Connections, concurrency: c.Concurrency}
+	r := &OwnerRuntime{root: root, cancel: cancel, binding: binding, pool: c.Pool, roots: roots, ownerRootDER: current.Configuration.IssuerRoots, connections: c.Connections, concurrency: c.Concurrency}
 	complete := false
 	defer func() {
 		if !complete {
@@ -343,6 +344,9 @@ func (r *OwnerRuntime) Run(listener net.Listener, additional ...net.Listener) (r
 	}
 	if nativeListener != nil {
 		launch(startupRunNative, func() error {
+			if r.native.live != nil {
+				return native.ServeWithLiveOwner(r.root, nativeListener, r.native.liveRoots, r.server, r.native.handler, r.native.starts, r.native.live, r.native.connections, r.native.startConnections)
+			}
 			if r.native.starts != nil {
 				return native.ServeWithContextStart(r.root, nativeListener, r.native.roots, r.server, r.native.handler, r.native.starts, r.native.connections, r.native.startConnections)
 			}

@@ -55,5 +55,15 @@ func (p PodResolution) Valid(now time.Time) bool {
 	if p.Request.Workload.Kind == "StatefulSet" && p.Pin.ControllerUID != p.Request.Workload.UID {
 		return false
 	}
-	return p.Request.Valid() && p.Pin.Namespace == p.Request.Namespace.Name && p.Pin.NamespaceUID == p.Request.Namespace.UID && p.Pin.Name == p.Request.PodName && p.Pin.UID == p.Request.PodUID && (p.ExecutionClass == artifact.ContextAPIExecution || identity.Text(p.NodeUID, 64)) && identity.Text(p.PodResourceVersion, 128) && identity.Text(p.WorkloadResourceVersion, 128) && identity.Fresh(p.ObservedAt, p.FreshUntil, now, 5*time.Second) && (identity.Text(p.Pin.ControllerUID, 64) || p.Request.Workload.Kind == "Pod")
+	return p.Request.Valid() && p.Pin.Namespace == p.Request.Namespace.Name && p.Pin.NamespaceUID == p.Request.Namespace.UID && p.Pin.Name == p.Request.PodName && p.Pin.UID == p.Request.PodUID && (p.ExecutionClass == artifact.ContextAPIExecution || identity.Text(p.NodeUID, 64)) && identity.Text(p.PodResourceVersion, 128) && identity.Text(p.WorkloadResourceVersion, 128) && identity.Fresh(p.ObservedAt, p.FreshUntil, now, p.freshness()) && (identity.Text(p.Pin.ControllerUID, 64) || p.Request.Workload.Kind == "Pod")
+}
+
+// freshness is the longest observation interval: an API-class start uses one
+// target check for the ADR-311 recheck interval; node execution keeps five
+// seconds.
+func (p PodResolution) freshness() time.Duration {
+	if p.ExecutionClass == artifact.ContextAPIExecution {
+		return identity.AuthorityRecheckInterval
+	}
+	return 5 * time.Second
 }

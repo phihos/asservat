@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"io/fs"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -93,5 +94,38 @@ func TestInitialInstallationInventoryIncludesRecordingSaveGroupRelation(t *testi
 	}
 	if !slices.Contains(initialInstallationTables, table) {
 		t.Errorf("first-install exact inventory rejects group relation %q", table)
+	}
+}
+
+// Read the actual143 permanent relations: Goose replay alone does not exercise
+// the installer's closed catalog or its compiled preparation/activation scope.
+func TestInitialInstallationInventoryIncludesFiniteLiveRelations(t *testing.T) {
+	body, err := fs.ReadFile(migrations.Files(), "00143_finite_live_watch.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	up := strings.Split(string(body), "-- +goose Down")[0]
+	matches := regexp.MustCompile(`(?m)^CREATE TABLE (live_watch_[a-z_]+) \(`).FindAllStringSubmatch(up, -1)
+	if len(matches) != 3 {
+		t.Fatal("unexpected finite live permanent schema", len(matches))
+	}
+	for _, match := range matches {
+		table := match[1]
+		if !slices.Contains(initialInstallationTables, table) {
+			t.Errorf("first-install exact inventory refuses migrated table %q", table)
+		}
+		for _, role := range []int{0, 2} {
+			grants := initialRoleGrants(role)
+			for _, privilege := range []string{"SELECT", "MAINTAIN"} {
+				if !slices.Contains(grants, initialRoleGrant{"table", table, "", privilege}) {
+					t.Errorf("compiled initial role%d lacks existing %s scope for migrated table %q", role, privilege, table)
+				}
+			}
+			for _, g := range grants {
+				if g.object == table && g.privilege != "SELECT" && g.privilege != "MAINTAIN" {
+					t.Errorf("initial role%d gained live runtime effects %+v", role, g)
+				}
+			}
+		}
 	}
 }

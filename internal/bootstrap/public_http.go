@@ -3,6 +3,7 @@ package bootstrap
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
 	"net/http"
 	"os"
 	"sync"
@@ -89,6 +90,21 @@ func newPublicHandler(ctx context.Context, d *OwnerDeployment, a publicAuditStor
 		PublicContextOperationServices{ongoingSources: ongoingSources, Recordings: pc.recordings, Cancellations: pc.cancellations, History: pc.history, Investigation: pc.investigation, Intents: pc.intents, Regional: pc.regional, Progress: pc.progress, Cases: pc.cases, Downloads: dl.coordinator, Native: dl.native, Projection: dl.projection})
 	if err != nil {
 		return nil, &fixedStepError{"operations", mounts.ErrUnavailable}
+	}
+	liveService, err := d.newPublicLive(ctx)
+	if err != nil {
+		return nil, &fixedStepError{"live", mounts.ErrUnavailable}
+	}
+	if liveService != nil {
+		liveOperations, e := presentation.NewLiveOperations(p.Origin, liveService, time.Now)
+		if e != nil {
+			return nil, e
+		}
+		liveOperations.Diagnose = func(m string) { fmt.Fprintln(os.Stderr, m) }
+		operations, e = presentation.NewInvestigationLiveOperations(operations, liveOperations)
+		if e != nil {
+			return nil, e
+		}
 	}
 	// ADR-228: activate_policy and get_policy_status on the same audited
 	// routes, and the restart trigger that RunPublic supervises.

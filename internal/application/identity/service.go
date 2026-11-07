@@ -70,7 +70,7 @@ func (s Service) ObserveCredential(ctx context.Context, token string) (Credentia
 	if err != nil {
 		return zero, err
 	}
-	w := CredentialWindow{IssuedAt: claims.IssuedAt, TokenExpiresAt: claims.ExpiresAt, GroupsExpireAt: claims.IssuedAt.Add(p.GroupMaxAge), Policy: p.Revision, ObservedAt: started, FreshUntil: value.Earlier(started.Add(5*time.Second), i.ValidUntil)}
+	w := CredentialWindow{IssuedAt: claims.IssuedAt, TokenExpiresAt: claims.ExpiresAt, GroupsExpireAt: claims.IssuedAt.Add(p.GroupMaxAge), Policy: p.Revision, ObservedAt: started, FreshUntil: value.Earlier(started.Add(value.AuthorityRecheckInterval), i.ValidUntil)}
 	if !w.Valid(s.Now()) || ctx.Err() != nil {
 		return zero, value.ErrUnavailable
 	}

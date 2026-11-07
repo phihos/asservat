@@ -54,7 +54,7 @@ func (b Binding) Valid() bool {
 		recording := b.NativeType == "" && recorderAction(b.ActionID) && b.NativeBytes > 0 && b.NativeBytes <= artifact.RecordingNativeLimit
 		profile := recorderAction(b.ActionID) && b.NativeBytes > 0 && (b.NativeType == artifact.PprofArtifact && b.NativeBytes <= artifact.MaxPprofBytes || b.NativeType == artifact.GoTraceArtifact && b.NativeBytes <= artifact.MaxGoTraceBytes)
 		logs := recorderAction(b.ActionID) && b.NativeType == artifact.LogsArtifact && b.NativeBytes > 0 && b.NativeBytes <= artifact.LogNativeLimit
-		if b.NodeUID != "" || b.NodeBootID != "" || !authorization.UUID(b.ExecutorPodUID) || !authorization.UUID(b.ExecutorAccountUID) || !podStatus && !recording && !profile && !logs || b.NotAfter.After(b.NotBefore.Add(5*time.Second)) {
+		if b.NodeUID != "" || b.NodeBootID != "" || !authorization.UUID(b.ExecutorPodUID) || !authorization.UUID(b.ExecutorAccountUID) || !podStatus && !recording && !profile && !logs || b.NotAfter.After(b.NotBefore.Add(identity.AuthorityRecheckInterval)) {
 			return false
 		}
 	} else if b.NativeType != "" || b.ExecutionClass != artifact.ContextNodeExecution || !authorization.UUID(b.NodeUID) || !authorization.UUID(b.NodeBootID) || b.ExecutorPodUID != "" || b.ExecutorAccountUID != "" {
@@ -94,7 +94,13 @@ func (r Request) Validate(now time.Time) error {
 	if !r.Binding.Valid() || !authorization.UUID(r.ObjectUID) {
 		return ErrInvalid
 	}
-	if !identity.Fresh(r.CheckedAt, r.ValidUntil, now, 5*time.Second) || now.Before(r.Binding.NotBefore) || !now.Before(r.Binding.NotAfter) || r.ValidUntil.After(r.Binding.NotAfter) {
+	// An API start uses one check for the ADR-311 recheck interval; node
+	// execution keeps its five-second request observation.
+	interval := 5 * time.Second
+	if r.Binding.ExecutionClass == artifact.ContextAPIExecution {
+		interval = identity.AuthorityRecheckInterval
+	}
+	if !identity.Fresh(r.CheckedAt, r.ValidUntil, now, interval) || now.Before(r.Binding.NotBefore) || !now.Before(r.Binding.NotAfter) || r.ValidUntil.After(r.Binding.NotAfter) {
 		return ErrExpired
 	}
 	return nil

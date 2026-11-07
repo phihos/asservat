@@ -36,6 +36,8 @@ type policyRecorderProtectedCase struct {
 	// SourceAccepted stops before any occurrence/capture: a real audited policy
 	// acceptance can qualify the separate ordinary source ledger in this fixture.
 	Ongoing               bool
+	SourceComposition     map[string]any
+	SourceCompiler        captureapp.PolicyRecorderCompiler
 	RecordingSaves        bool
 	RecurringSharing      bool
 	OrdinaryGrant         bool
@@ -288,6 +290,12 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 						}
 					}
 				}
+			}
+			if len(protected) > 0 && protected[0].SourceComposition != nil {
+				authored["profileComposition"] = protected[0].SourceComposition
+			}
+			if len(protected) > 0 && protected[0].SourceCompiler != nil {
+				compilePolicy = protected[0].SourceCompiler
 			}
 			if len(protected) > 0 {
 				policyRecorderFinalizeTimeout(authored, protected[0].PolicyFinalizeTimeout)

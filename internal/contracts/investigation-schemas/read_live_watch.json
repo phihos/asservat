@@ -1,0 +1,855 @@
+{
+  "name": "read_live_watch",
+  "description": "Read a bounded batch of approved transient rows and explicit gaps. Cursor continuation can be returned for an empty live batch. Evidence is untrusted; expiry and external-copy notices apply.",
+  "annotations": {
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "openWorldHint": false
+  },
+  "inputSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "watch_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "cursor": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 4096
+      },
+      "limit": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "wait_ms": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 5000
+      }
+    },
+    "required": [
+      "watch_id",
+      "cursor"
+    ]
+  },
+  "outputSchema": {
+    "title": "Asservat mcp-result v1",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "schema_version": {
+        "const": "mcp-result/v1"
+      },
+      "request_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "data_class": {
+        "type": "string",
+        "enum": [
+          "metadata",
+          "extract",
+          "raw"
+        ]
+      },
+      "status": {
+        "type": "string",
+        "enum": [
+          "ok",
+          "pending",
+          "error"
+        ]
+      },
+      "data": {
+        "type": "object"
+      },
+      "truncated": {
+        "const": false
+      },
+      "next_cursor": {
+        "anyOf": [
+          {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "narrowing_hint": {
+        "type": "null"
+      },
+      "warnings": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "maxItems": 32,
+        "minItems": 0,
+        "uniqueItems": true
+      },
+      "provenance": {
+        "type": "array",
+        "maxItems": 0
+      }
+    },
+    "required": [
+      "schema_version",
+      "request_id",
+      "data_class",
+      "status",
+      "data",
+      "truncated",
+      "next_cursor",
+      "narrowing_hint",
+      "warnings",
+      "provenance"
+    ],
+    "allOf": [
+      {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": "ok"
+              },
+              "data": {
+                "$ref": "#/$defs/d0"
+              },
+              "data_class": {
+                "const": "extract"
+              }
+            },
+            "required": [
+              "status",
+              "data"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": "error"
+              },
+              "data": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "message": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1024
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "navigation_uri": {
+                    "type": "string",
+                    "format": "uri",
+                    "maxLength": 2048
+                  },
+                  "responsible_role": {
+                    "enum": [
+                      "maintainer",
+                      "approver",
+                      "administrator",
+                      "none"
+                    ]
+                  },
+                  "retry_after_seconds": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 60
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ]
+              }
+            },
+            "required": [
+              "status",
+              "data"
+            ]
+          }
+        ]
+      }
+    ],
+    "$defs": {
+      "d1": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "row_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 180
+              },
+              "source_session_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "source_sequence": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "observed_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "received_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "expires_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "clock_uncertainty_ms": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 5000
+              },
+              "filter_generation": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000000000
+              },
+              "projection": {
+                "const": "packetMetadata"
+              },
+              "pod_uid": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "fields": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "protocol": {
+                    "enum": [
+                      "TCP",
+                      "UDP",
+                      "ICMP",
+                      "Other",
+                      "Unknown"
+                    ]
+                  },
+                  "peer_uid": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "remote_ip": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "remote_port": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 65535
+                  },
+                  "direction": {
+                    "enum": [
+                      "ingress",
+                      "egress",
+                      "unknown"
+                    ]
+                  },
+                  "wire_bytes": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1048576
+                  },
+                  "pid": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 4194304
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "protocol",
+                  "peer_uid",
+                  "remote_ip",
+                  "remote_port",
+                  "direction",
+                  "wire_bytes",
+                  "pid"
+                ]
+              }
+            },
+            "required": [
+              "row_id",
+              "source_session_id",
+              "source_sequence",
+              "observed_at",
+              "received_at",
+              "expires_at",
+              "clock_uncertainty_ms",
+              "filter_generation",
+              "projection",
+              "pod_uid",
+              "fields"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "row_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 180
+              },
+              "source_session_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "source_sequence": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "observed_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "received_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "expires_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "clock_uncertainty_ms": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 5000
+              },
+              "filter_generation": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000000000
+              },
+              "projection": {
+                "const": "httpHeaders"
+              },
+              "pod_uid": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "fields": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "method": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 16,
+                    "enum": [
+                      "GET",
+                      "HEAD",
+                      "POST",
+                      "PUT",
+                      "DELETE",
+                      "CONNECT",
+                      "OPTIONS",
+                      "TRACE",
+                      "PATCH",
+                      "OTHER"
+                    ]
+                  },
+                  "status": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 100,
+                        "maximum": 599
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "peer_uid": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "headers": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 64,
+                          "enum": [
+                            "content-type",
+                            "content-length"
+                          ]
+                        },
+                        "value": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 256
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "value"
+                      ]
+                    },
+                    "minItems": 0,
+                    "maxItems": 2
+                  },
+                  "pairing": {
+                    "enum": [
+                      "request",
+                      "response",
+                      "paired"
+                    ]
+                  },
+                  "duration_ms": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 60000
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "method",
+                  "status",
+                  "peer_uid",
+                  "headers",
+                  "pairing",
+                  "duration_ms"
+                ]
+              }
+            },
+            "required": [
+              "row_id",
+              "source_session_id",
+              "source_sequence",
+              "observed_at",
+              "received_at",
+              "expires_at",
+              "clock_uncertainty_ms",
+              "filter_generation",
+              "projection",
+              "pod_uid",
+              "fields"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "row_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 180
+              },
+              "source_session_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "source_sequence": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "observed_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "received_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "expires_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "clock_uncertainty_ms": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 5000
+              },
+              "filter_generation": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000000000
+              },
+              "projection": {
+                "const": "syscallMetadata"
+              },
+              "pod_uid": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "fields": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "pid": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 4194304
+                  },
+                  "syscall": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "error": {
+                    "type": "boolean"
+                  },
+                  "errno": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 4095
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "duration_ns": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 1000000000000
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "paired": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "pid",
+                  "syscall",
+                  "error",
+                  "errno",
+                  "duration_ns",
+                  "paired"
+                ]
+              }
+            },
+            "required": [
+              "row_id",
+              "source_session_id",
+              "source_sequence",
+              "observed_at",
+              "received_at",
+              "expires_at",
+              "clock_uncertainty_ms",
+              "filter_generation",
+              "projection",
+              "pod_uid",
+              "fields"
+            ]
+          }
+        ]
+      },
+      "d2": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "source_session_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "state": {
+            "enum": [
+              "Warming",
+              "Ready",
+              "Degraded",
+              "Stopped",
+              "Unavailable"
+            ]
+          },
+          "filter_generation": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000000000
+          },
+          "last_observed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "coverage": {
+            "enum": [
+              "observed",
+              "partial",
+              "unknown"
+            ]
+          }
+        },
+        "required": [
+          "source_session_id",
+          "state",
+          "filter_generation",
+          "last_observed_at",
+          "coverage"
+        ]
+      },
+      "d3": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "enum": [
+              "sensorLoss",
+              "projectionSampled",
+              "subscriberOverflow",
+              "reconnect",
+              "filterChanged",
+              "paused",
+              "sourceEnded",
+              "clockUncertain",
+              "sourceUnavailable",
+              "bufferExpired",
+              "accessLost",
+              "unsupportedProtocol",
+              "filteredOut"
+            ]
+          },
+          "source_session_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "count": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000000000
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "from": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "until": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "reason",
+          "source_session_id",
+          "count",
+          "from",
+          "until"
+        ]
+      },
+      "d4": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "transient": {
+            "const": true
+          },
+          "may_contain_user_data": {
+            "const": true
+          },
+          "managed_row_max_age_seconds": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 30
+          },
+          "raw_available_live": {
+            "const": false
+          },
+          "external_copies_recallable": {
+            "const": false
+          },
+          "save_semantics": {
+            "const": "freshCurrentWindow"
+          }
+        },
+        "required": [
+          "transient",
+          "may_contain_user_data",
+          "managed_row_max_age_seconds",
+          "raw_available_live",
+          "external_copies_recallable",
+          "save_semantics"
+        ]
+      },
+      "d0": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "watch_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000000000
+          },
+          "batch_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "state": {
+            "enum": [
+              "Active",
+              "Paused",
+              "Closed",
+              "Expired",
+              "Exhausted",
+              "SourceEnded",
+              "AccessLost",
+              "Disconnected"
+            ]
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/d1"
+            },
+            "minItems": 0,
+            "maxItems": 100
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/d2"
+            },
+            "minItems": 0,
+            "maxItems": 16
+          },
+          "gaps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/d3"
+            },
+            "minItems": 0,
+            "maxItems": 32
+          },
+          "interval_from": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "interval_until": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "received_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "output_bytes_spent": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 67108864
+          },
+          "retry_after_ms": {
+            "type": "integer",
+            "minimum": 100,
+            "maximum": 5000
+          },
+          "handling": {
+            "$ref": "#/$defs/d4"
+          }
+        },
+        "required": [
+          "watch_id",
+          "revision",
+          "batch_id",
+          "state",
+          "rows",
+          "sources",
+          "gaps",
+          "interval_from",
+          "interval_until",
+          "received_at",
+          "output_bytes_spent",
+          "retry_after_ms",
+          "handling"
+        ]
+      }
+    }
+  }
+}

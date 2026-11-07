@@ -24,6 +24,7 @@ import (
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/collector"
+	v "asservat.local/asservat/internal/domain/live"
 	"asservat.local/asservat/internal/transport/node"
 	"github.com/google/uuid"
 )
@@ -60,6 +61,10 @@ func readNodeDeployment(ctx context.Context) (contracts.NodeDeployment, *x509.Ce
 }
 
 func validNodeDeployment(d contracts.NodeDeployment) (*x509.CertPool, error) {
+	if d.Live != nil && !nodeLiveLimits(*d.Live).Valid() {
+		return nil, mounts.ErrUnavailable
+	}
+
 	if d.Format != contracts.NodeDeploymentFormat || !authorization.UUID(d.InstallationID) || !authorization.UUID(d.ClusterID) ||
 		!node.DomainCeilings(d.Ceilings).Valid() || d.Connector.ServerName == "" || len(d.Connector.ServerName) > 253 {
 		return nil, mounts.ErrUnavailable
@@ -188,6 +193,19 @@ func RunNode(ctx context.Context, podUID string) error {
 	}
 	fmt.Fprintf(os.Stderr, "node collector ring medium: encrypted disk available=%t removedEarlier=%d\n", ringDir != "", removed)
 	p.sources = &nodeSources{ringDir: ringDir, ringDiskBytes: d.Ceilings.RingDiskBytes, log: p.packets.log, upload: client.UploadCapture, takeUpload: p.packets.takeUpload, version: facts.Engine.Version, engine: gadget.CaptureObservedPackets, syscallEngine: syscallTraceIfAvailable(mechanisms), identity: p.packetIdentity, now: time.Now, budget: budget, budgetMu: &p.mu, available: packetAvailable(mechanisms)}
+	if d.Live != nil {
+		p.sources.liveBudget = &nodeLiveBudget{limits: nodeLiveLimits(*d.Live)}
+		for n, m := range p.mechanisms {
+			if m.Adapter == collector.AdapterAvailable && m.Prerequisites {
+				switch m.Mechanism {
+				case collector.MechanismPacket:
+					p.mechanisms[n].LiveProjections = []string{v.Packet, v.HTTP}
+				case collector.MechanismSyscall:
+					p.mechanisms[n].LiveProjections = []string{v.Syscall}
+				}
+			}
+		}
+	}
 	err = p.Run(ctx)
 	p.sources.Close()
 	p.packets.wg.Wait()
@@ -463,6 +481,34 @@ func (p *nodeProcess) pollLoop(ctx context.Context, kick chan<- struct{}) error 
 			// Starting a capture takes the lock for the budget, so decide
 			// without holding it.
 			r := collector.Decide(w, p.now())
+			if uploader, liveUpload := p.client.(interface {
+				UploadLive(context.Context, string, v.NodeReply) error
+			}); liveUpload && w.Kind == collector.WorkLiveRead && p.sources != nil && p.sources.liveBudget != nil && w.Live != nil && r.Reason != collector.ReasonWorkUnknown && r.Reason != collector.ReasonWorkExpired {
+				// One finite task; registration and the closed check share the lifecycle
+				// lock so shutdown joins every task before dropping source/transport state.
+				p.sources.mu.Lock()
+				if !p.sources.closed {
+					p.sources.liveWG.Add(1)
+					go func(w collector.Work) {
+						defer p.sources.liveWG.Done()
+						call, cancel := context.WithDeadline(ctx, w.NotAfter)
+						defer cancel()
+						var reply v.NodeReply
+						var e error
+						if w.Live.Manual != nil && p.packets != nil {
+							reply, e = p.packets.readManualLive(call, w, p.sources.liveBudget)
+						} else {
+							reply, e = p.sources.readLive(call, w)
+						}
+						if e == nil && p.takeLiveUpload(reply) {
+							_ = uploader.UploadLive(call, p.epoch, reply)
+						}
+						clear(reply.Rows)
+					}(w)
+					r.Outcome, r.Reason = collector.OutcomeAccepted, ""
+				}
+				p.sources.mu.Unlock()
+			}
 			if w.Kind == collector.WorkProfileCapture && p.profiles != nil {
 				root := p.root
 				if root == nil {
@@ -569,4 +615,8 @@ func NodeDiagnostic(err error) string {
 		return err.Error() + " (" + contracts.NodeDisposableHostGuard + "); the collector runs only on disposable test hosts until it is qualified"
 	}
 	return "node collector stopped: protected node input, boot ID or process key unavailable"
+}
+
+func nodeLiveLimits(p contracts.NodeLiveProcessing) v.ProcessingLimits {
+	return v.ProcessingLimits{Subscriptions: p.Subscriptions, MemoryBytes: p.MemoryBytes, EventsPerSecond: p.EventsPerSecond, BytesPerSecond: p.BytesPerSecond, TimePerSecond: time.Duration(p.ProcessingNanosPerSecond)}
 }

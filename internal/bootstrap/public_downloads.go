@@ -38,6 +38,10 @@ func (s publicStopLedger) ClaimDownloadStopWrite(ctx context.Context, d artifact
 // publicDownloads are the ADR-180 P4 services, composed after the owner
 // runtime because native attachments bind its actual Pod and process.
 type publicDownloads struct {
+	environment authapp.DownloadPolicyReader
+	// policies is the shared bounded policy observation (60 s interval) that
+	// downloads already use; live reads use it too instead of the raw reader.
+	policies    authapp.DownloadPolicyReader
 	coordinator evidence.ContextDownloadCoordinator
 	native      ContextNativeDownloadServices
 	downloads   *postgres.Downloads
@@ -159,7 +163,7 @@ func newPublicDownloads(ctx context.Context, d *OwnerDeployment, observer, probe
 		// so prepare fails closed before any reservation; existing sessions are
 		// still readable and stoppable. Configuring a worker takes a new process.
 		coordinator.Plans = unconfiguredDownloadPlans{}
-		return &publicDownloads{native: ContextNativeDownloadServices{Stop: stop}, downloads: downloads, gate: gate, coordinator: coordinator}, nil
+		return &publicDownloads{environment: environment, policies: policies, native: ContextNativeDownloadServices{Stop: stop}, downloads: downloads, gate: gate, coordinator: coordinator}, nil
 	}
 	if err != nil || !observed.Valid(time.Now()) {
 		return nil, mounts.ErrUnavailable
@@ -296,7 +300,7 @@ func newPublicDownloads(ctx context.Context, d *OwnerDeployment, observer, probe
 		return nil, mounts.ErrUnavailable
 	}
 	coordinator.Plans = plans
-	out := &publicDownloads{native: services, downloads: downloads, gate: gate, coordinator: coordinator}
+	out := &publicDownloads{environment: environment, policies: policies, native: services, downloads: downloads, gate: gate, coordinator: coordinator}
 	out.projection, err = newPublicProjection(ctx, d, policies, processingReads, profile, jobs, dispatch, sql["download-worker"], scope, a)
 	if err != nil {
 		return nil, mounts.ErrUnavailable

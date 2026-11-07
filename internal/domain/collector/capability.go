@@ -198,6 +198,7 @@ type Availability struct {
 	// from older HTTP-only collectors. It is valid only for available goProfile.
 	ProfileTLS           bool
 	ProfileAuthorization bool
+	LiveProjections      []string `json:",omitempty"`
 }
 
 // implemented lists recorders this build provides. Increment 4 (ADR-248)

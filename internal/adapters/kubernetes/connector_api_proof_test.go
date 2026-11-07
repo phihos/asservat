@@ -46,8 +46,10 @@ func TestConnectorAPIProofCombinedReaderOwnsCredentialsAndOriginalInterval(t *te
 	ctx, cancel := context.WithDeadline(context.Background(), now.Add(time.Second))
 	defer cancel()
 	process, owned, err := p.ReadAPIProcessConnector(ctx, credentials)
-	if err != nil || process.CheckedAt != proof.observedAt || process.ValidUntil != now.Add(time.Second) || owned.ValidUntil != process.ValidUntil || owned.Request.Process != proof.proof.Process {
-		t.Fatal("combined reader changed the original proof or caller interval", err)
+	// The caller's deadline bounds this read by cancellation; the reused
+	// proof keeps exactly its original interval (ADR-311), never longer.
+	if err != nil || process.CheckedAt != proof.observedAt || process.ValidUntil != proof.validUntil || owned.ValidUntil != process.ValidUntil || owned.Request.Process != proof.proof.Process {
+		t.Fatal("combined reader changed the original proof interval", err)
 	}
 	owned.Request.ClientCSRDER[0] = 21
 	owned.Request.ServerCSRDER[0] = 22

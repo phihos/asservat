@@ -4,8 +4,10 @@
 SELECT * FROM policy_observation_session WHERE root_id=$1 AND capture_id=$2;
 
 -- name: CountActivePolicyObservations :one
-SELECT count(*) FROM policy_observation_session
-WHERE root_id=$1 AND acceptance_id=$2 AND ended_at IS NULL AND lease_until>clock_timestamp();
+SELECT ((SELECT count(*) FROM policy_observation_session o
+WHERE o.root_id=sqlc.arg(root_id)::uuid AND o.acceptance_id=sqlc.arg(acceptance_id)::uuid AND o.ended_at IS NULL AND o.lease_until>clock_timestamp())+
+(SELECT count(*) FROM policy_recording_source s WHERE s.root_id=sqlc.arg(root_id)::uuid AND s.acceptance_id=sqlc.arg(acceptance_id)::uuid
+ AND s.binding_json->>'ObservationGrantID' IS NOT NULL AND s.slot_released_at IS NULL AND s.hard_until>clock_timestamp()))::bigint;
 
 -- name: SpendPolicyObservedBytes :execrows
 UPDATE policy_acceptance SET observed_bytes_spent=observed_bytes_spent+sqlc.arg(bytes)::bigint

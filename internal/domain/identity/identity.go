@@ -27,6 +27,12 @@ var (
 // observation and lease inside it keeps its own shorter ValidUntil.
 const EvidenceReadRequestWindow = 20 * time.Second
 
+// AuthorityRecheckInterval bounds how long one operation's authority snapshot
+// (identity, eligibility, recovery) may be used before it is checked again
+// (ADR-311). It never extends an original session, grant, retention or source
+// deadline. Downloads already used this interval (ADR-220/258).
+const AuthorityRecheckInterval = 30 * time.Second
+
 // RecordingSaveRequestWindow bounds the composed admission/start/history request.
 // Each accepted snapshot retains its original T0+5s StartBy.
 const RecordingSaveRequestWindow = 15 * time.Second

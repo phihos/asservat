@@ -172,6 +172,160 @@ func (q *Queries) ListRecordingCandidates(ctx context.Context, arg ListRecording
 	return items, nil
 }
 
+const readLiveSourceObservation = `-- name: ReadLiveSourceObservation :one
+SELECT g.id, g.root_id, g.kind, g.preview_id, g.capture_id, g.cluster_id, g.namespace_uid, g.workload_uid, g.pod_uid, g.execution_digest, g.result_access_digest, g.review_digest, g.data_class, g.reasons, g.review, g.scope, g.requester_issuer, g.requester_subject, g.requester_client, g.lifetime_seconds, g.result_access, g.not_after, g.max_artifacts, g.max_bytes, g.max_operations, g.artifacts_spent, g.bytes_spent, g.operations_spent, g.idempotency_key, g.request_digest, g.requested_at, g.review_until, g.decision, g.approver_issuer, g.approver_subject, g.approver_client, g.decision_reason, g.decision_acr, g.decision_auth_time, g.decided_at, g.decision_key, g.expires_at, g.revoked_at, g.revoker_issuer, g.revoker_subject, g.revoker_client, g.revoke_key, g.revision, g.requester_kind, g.request_operation, g.requester_key, g.policy_uid, g.policy_acceptance_id, g.policy_scope, g.policy_not_after, g.policy_max_executions, g.policy_max_bytes, g.policy_max_observed_bytes, g.policy_executions_spent, g.policy_bytes_spent, g.policy_observed_bytes_spent, g.policy_observed_events_spent, g.raw_query,s.binding_json,s.started_at,s.hard_until,s.bytes_per_second,s.cluster_id AS source_cluster_id,
+ s.namespace_uid AS source_namespace_uid,s.workload_uid AS source_workload_uid,
+ p.observed_at AS policy_observed_at,p.fresh_until AS policy_fresh_until,
+ a.authority_digest,a.authored_grant_ref
+FROM policy_recording_source s JOIN policy_source p
+ ON p.root_id=s.root_id AND p.policy_uid=s.policy_uid AND p.active_id=s.acceptance_id
+JOIN policy_grant_attachment a ON a.root_id=p.root_id AND a.id=p.grant_attachment_id
+ AND a.installation_id=p.installation_id AND a.policy_uid=p.policy_uid AND a.authored_grant_ref=p.authored_grant_ref
+ AND a.acceptance_id=p.active_id AND a.grant_id=$1::uuid
+JOIN access_grant g ON g.root_id=a.root_id AND g.id=a.grant_id
+ AND g.policy_acceptance_id=s.acceptance_id AND g.policy_uid=s.policy_uid
+WHERE s.root_id=$2::uuid AND s.id=$3::uuid
+ AND s.binding_json->>'ObservationGrantID'=$1::text
+ AND NOT p.deleted AND NOT p.suspended AND s.ended_at IS NULL AND s.slot_released_at IS NULL
+`
+
+type ReadLiveSourceObservationParams struct {
+	GrantID  pgtype.UUID
+	RootID   pgtype.UUID
+	SourceID pgtype.UUID
+}
+
+type ReadLiveSourceObservationRow struct {
+	AccessGrant        AccessGrant
+	BindingJson        []byte
+	StartedAt          pgtype.Timestamptz
+	HardUntil          pgtype.Timestamptz
+	BytesPerSecond     int64
+	SourceClusterID    pgtype.UUID
+	SourceNamespaceUid string
+	SourceWorkloadUid  string
+	PolicyObservedAt   pgtype.Timestamptz
+	PolicyFreshUntil   pgtype.Timestamptz
+	AuthorityDigest    []byte
+	AuthoredGrantRef   string
+}
+
+// Existing hub duties read only protected source/grant control; nothing is spent.
+func (q *Queries) ReadLiveSourceObservation(ctx context.Context, arg ReadLiveSourceObservationParams) (ReadLiveSourceObservationRow, error) {
+	row := q.db.QueryRow(ctx, readLiveSourceObservation, arg.GrantID, arg.RootID, arg.SourceID)
+	var i ReadLiveSourceObservationRow
+	err := row.Scan(
+		&i.AccessGrant.ID,
+		&i.AccessGrant.RootID,
+		&i.AccessGrant.Kind,
+		&i.AccessGrant.PreviewID,
+		&i.AccessGrant.CaptureID,
+		&i.AccessGrant.ClusterID,
+		&i.AccessGrant.NamespaceUid,
+		&i.AccessGrant.WorkloadUid,
+		&i.AccessGrant.PodUid,
+		&i.AccessGrant.ExecutionDigest,
+		&i.AccessGrant.ResultAccessDigest,
+		&i.AccessGrant.ReviewDigest,
+		&i.AccessGrant.DataClass,
+		&i.AccessGrant.Reasons,
+		&i.AccessGrant.Review,
+		&i.AccessGrant.Scope,
+		&i.AccessGrant.RequesterIssuer,
+		&i.AccessGrant.RequesterSubject,
+		&i.AccessGrant.RequesterClient,
+		&i.AccessGrant.LifetimeSeconds,
+		&i.AccessGrant.ResultAccess,
+		&i.AccessGrant.NotAfter,
+		&i.AccessGrant.MaxArtifacts,
+		&i.AccessGrant.MaxBytes,
+		&i.AccessGrant.MaxOperations,
+		&i.AccessGrant.ArtifactsSpent,
+		&i.AccessGrant.BytesSpent,
+		&i.AccessGrant.OperationsSpent,
+		&i.AccessGrant.IdempotencyKey,
+		&i.AccessGrant.RequestDigest,
+		&i.AccessGrant.RequestedAt,
+		&i.AccessGrant.ReviewUntil,
+		&i.AccessGrant.Decision,
+		&i.AccessGrant.ApproverIssuer,
+		&i.AccessGrant.ApproverSubject,
+		&i.AccessGrant.ApproverClient,
+		&i.AccessGrant.DecisionReason,
+		&i.AccessGrant.DecisionAcr,
+		&i.AccessGrant.DecisionAuthTime,
+		&i.AccessGrant.DecidedAt,
+		&i.AccessGrant.DecisionKey,
+		&i.AccessGrant.ExpiresAt,
+		&i.AccessGrant.RevokedAt,
+		&i.AccessGrant.RevokerIssuer,
+		&i.AccessGrant.RevokerSubject,
+		&i.AccessGrant.RevokerClient,
+		&i.AccessGrant.RevokeKey,
+		&i.AccessGrant.Revision,
+		&i.AccessGrant.RequesterKind,
+		&i.AccessGrant.RequestOperation,
+		&i.AccessGrant.RequesterKey,
+		&i.AccessGrant.PolicyUid,
+		&i.AccessGrant.PolicyAcceptanceID,
+		&i.AccessGrant.PolicyScope,
+		&i.AccessGrant.PolicyNotAfter,
+		&i.AccessGrant.PolicyMaxExecutions,
+		&i.AccessGrant.PolicyMaxBytes,
+		&i.AccessGrant.PolicyMaxObservedBytes,
+		&i.AccessGrant.PolicyExecutionsSpent,
+		&i.AccessGrant.PolicyBytesSpent,
+		&i.AccessGrant.PolicyObservedBytesSpent,
+		&i.AccessGrant.PolicyObservedEventsSpent,
+		&i.AccessGrant.RawQuery,
+		&i.BindingJson,
+		&i.StartedAt,
+		&i.HardUntil,
+		&i.BytesPerSecond,
+		&i.SourceClusterID,
+		&i.SourceNamespaceUid,
+		&i.SourceWorkloadUid,
+		&i.PolicyObservedAt,
+		&i.PolicyFreshUntil,
+		&i.AuthorityDigest,
+		&i.AuthoredGrantRef,
+	)
+	return i, err
+}
+
+const readLiveSourceTarget = `-- name: ReadLiveSourceTarget :one
+SELECT s.cluster_id,s.namespace_uid,s.workload_uid,s.pod_uid
+FROM policy_recording_source s JOIN policy_source p
+ ON p.root_id=s.root_id AND p.policy_uid=s.policy_uid AND p.active_id=s.acceptance_id
+WHERE s.root_id=$1 AND s.id=$2 AND NOT p.deleted AND NOT p.suspended
+ AND s.slot_released_at IS NULL
+`
+
+type ReadLiveSourceTargetParams struct {
+	RootID pgtype.UUID
+	ID     pgtype.UUID
+}
+
+type ReadLiveSourceTargetRow struct {
+	ClusterID    pgtype.UUID
+	NamespaceUid string
+	WorkloadUid  string
+	PodUid       string
+}
+
+// Routing metadata only; C3 checks ordinary current rights before the full source.
+func (q *Queries) ReadLiveSourceTarget(ctx context.Context, arg ReadLiveSourceTargetParams) (ReadLiveSourceTargetRow, error) {
+	row := q.db.QueryRow(ctx, readLiveSourceTarget, arg.RootID, arg.ID)
+	var i ReadLiveSourceTargetRow
+	err := row.Scan(
+		&i.ClusterID,
+		&i.NamespaceUid,
+		&i.WorkloadUid,
+		&i.PodUid,
+	)
+	return i, err
+}
+
 const readRecordingSaveReservation = `-- name: ReadRecordingSaveReservation :one
 SELECT capture_id, root_id, policy_uid, acceptance_id, grant_id, reserved_bytes, accepted_at, processing_until FROM recording_save_reservation WHERE root_id=$1 AND capture_id=$2
 `

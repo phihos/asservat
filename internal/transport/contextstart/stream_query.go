@@ -10,7 +10,9 @@ import (
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
+	livevalue "asservat.local/asservat/internal/domain/live"
 	"asservat.local/asservat/internal/domain/targets"
+	"asservat.local/asservat/internal/transport/node"
 )
 
 // ADR-179 pre-work target queries. The hub asks on an idle standby; the region
@@ -381,6 +383,42 @@ func (s *frameStream) answerQuery(ctx context.Context, f contracts.APIContextFra
 	var out any
 	resolved := time.Now()
 	switch q.Method {
+	case queryManualLive:
+		out, e = s.answerManualLive(bounded, q.Body)
+
+	case queryLiveProjection:
+		var wire []contracts.NodeLiveRead
+		if decodeOperationBody(q.Body, &wire) != nil {
+			return contracts.ErrAPIContextProtocol
+		}
+		requests, valid := liveBatchValues(wire)
+		if !valid || requests[0].Root() != s.channel.RootID || requests[0].ClusterID != s.channel.Connector.Binding.ClusterID {
+			return contracts.ErrAPIContextProtocol
+		}
+		for _, r := range requests {
+			if r.Manual != nil && (r.Manual.ExecutorPodUID != s.channel.Executor.PodUID || r.Manual.ExecutorEpoch != s.channel.Executor.ProcessEpoch) {
+				return contracts.ErrAPIContextProtocol
+			}
+		}
+		if resolver, ok := s.targets.(liveProjectionTargets); ok {
+			var replies []livevalue.NodeReply
+			replies, e = resolver.ReadLiveProjections(bounded, requests)
+			if e == nil && len(replies) != len(requests) {
+				e = targets.ErrUnavailable
+			}
+			if e == nil {
+				values := make([]contracts.NodeLiveResult, len(replies))
+				for n, reply := range replies {
+					values[n], e = node.WireLiveReply(requests[n].Epoch(), reply)
+					if e != nil {
+						break
+					}
+				}
+				out = values
+			}
+		} else {
+			e = targets.ErrUnsupported
+		}
 	case queryResolveWorkloadIdentity:
 		var r targets.WorkloadRequest
 		if decodeOperationBody(q.Body, &r) != nil || !r.Valid() {

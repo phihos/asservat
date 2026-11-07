@@ -21,11 +21,27 @@ func TestDownloadEnvironmentClosedPolicyCannotInventInstalledPlacement(t *testin
 	path := privacy.DownloadPath{ID: ownerID(3), TargetClusterID: permissionCluster, StoreID: ownerID(4), StorageRegion: "storage", AcquisitionClusterID: ownerID(5), AcquisitionRegion: "regional", ConnectorClusterID: ownerID(5), ConnectorRegion: "regional", HubClusterID: ownerID(6), HubRegion: "hub", WorkerConfiguration: rev, HubConfiguration: rev}
 	wr := contracts.DownloadEnvironmentRevision{UID: rev.UID, Generation: rev.Generation, SHA256: hex.EncodeToString(rev.Digest[:])}
 	w := contracts.DownloadEnvironmentSettings{Format: contracts.DownloadEnvironmentFormat, RootID: ownerID(1), InstallationID: ownerID(1), RecoveryEpoch: ownerID(7), Revision: 1, PermittedRegions: []string{"storage", "regional", "hub"}, Paths: []contracts.DownloadEnvironmentPath{{ID: path.ID, TargetClusterID: path.TargetClusterID, StoreID: path.StoreID, StorageRegion: path.StorageRegion, AcquisitionClusterID: path.AcquisitionClusterID, AcquisitionRegion: path.AcquisitionRegion, ConnectorClusterID: path.ConnectorClusterID, ConnectorRegion: path.ConnectorRegion, HubClusterID: path.HubClusterID, HubRegion: path.HubRegion, WorkerConfiguration: wr, HubConfiguration: wr}}, Clients: []contracts.DownloadEnvironmentClient{{Issuer: "https://id.example.test", ID: "browser", Kind: "human", DataClasses: []string{"metadata"}, PrivacyClasses: []string{"potentialPersonalData"}, EvidenceTypes: []string{"context"}, Purposes: []string{"diagnostics"}, PathIDs: []string{path.ID}}}, Operators: []contracts.ProcessingOperator{{Issuer: "https://id.example.test", ClientID: "browser", Kind: "Group", ID: "privacy"}}}
-	for _, mode := range []string{"valid", "missing-client-decision", "null-paths", "missing-suspension", "unknown", "duplicate", "alias", "trailing", "uninstalled-path", "substituted-acquisition", "substituted-hub", "invented-region", "foreign-installation", "bad-issuer", "unknown-class", "replaced-source"} {
+	for _, mode := range []string{"valid", "live-valid", "live-unknown", "live-null-clients", "live-zero-limit", "missing-client-decision", "null-paths", "missing-suspension", "unknown", "duplicate", "alias", "trailing", "uninstalled-path", "substituted-acquisition", "substituted-hub", "invented-region", "foreign-installation", "bad-issuer", "unknown-class", "replaced-source"} {
 		t.Run(mode, func(t *testing.T) {
 			encoded, _ := json.Marshal(w)
 			var m map[string]any
 			_ = json.Unmarshal(encoded, &m)
+			if strings.HasPrefix(mode, "live-") {
+				l := contracts.LiveReadSettings{Root: contracts.LiveRootSettings{Watches: 16, PrincipalWatches: 4, WorkloadWatches: 4, Rate: 1 << 20, Burst: 1 << 20}, Projections: []string{"packetMetadata"}, Clients: []contracts.LiveReadClient{{Issuer: w.Clients[0].Issuer, ID: w.Clients[0].ID, Kind: w.Clients[0].Kind, PathIDs: []string{path.ID}}}, Ceilings: []contracts.LiveReadCeiling{{ClusterID: path.TargetClusterID, Duration: 60, Output: 1 << 20, Rate: 16 << 10, Rows: 10, Buffer: 64 << 10, RowAge: 10, Replay: 2}}}
+				x, _ := json.Marshal(l)
+				var live map[string]any
+				_ = json.Unmarshal(x, &live)
+				m["liveRead"] = live
+				if mode == "live-null-clients" {
+					live["clients"] = nil
+				}
+				if mode == "live-zero-limit" {
+					live["ceilings"].([]any)[0].(map[string]any)["durationSeconds"] = 0
+				}
+				if mode == "live-unknown" {
+					live["rawDownload"] = true
+				}
+			}
 			switch mode {
 			case "missing-client-decision":
 				delete(m, "clients")
@@ -76,7 +92,7 @@ func TestDownloadEnvironmentClosedPolicyCannotInventInstalledPlacement(t *testin
 			})
 			s := &DownloadEnvironmentSource{client: f.client, name: "processing", uid: ownerID(8), root: ownerID(1), installation: ownerID(1), paths: map[string]privacy.DownloadPath{path.ID: path}}
 			p, e := s.snapshot(context.Background())
-			if mode != "valid" {
+			if mode != "valid" && mode != "live-valid" {
 				if e == nil {
 					t.Fatal("invalid or unaccepted policy accepted")
 				}
@@ -84,6 +100,9 @@ func TestDownloadEnvironmentClosedPolicyCannotInventInstalledPlacement(t *testin
 			}
 			if e != nil || !p.WellFormed() || len(p.Paths) != 1 || p.Paths[0] != path {
 				t.Fatal("explicit installed placement rejected", e)
+			}
+			if mode == "live-valid" && (p.LiveRead == nil || len(p.LiveRead.Ceilings) != 1 || p.LiveRead.Ceilings[0].Limits.Rows != 10) {
+				t.Fatal("live numeric bounds lost")
 			}
 			pretty, _ := json.MarshalIndent(m, "", "  ")
 			payload.Store(string(pretty))

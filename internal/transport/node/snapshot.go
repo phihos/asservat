@@ -10,11 +10,18 @@ import (
 )
 
 func WireSnapshotRequest(s artifact.SourceSnapshotRequest) contracts.NodeSnapshotRequest {
-	return contracts.NodeSnapshotRequest{RequireApproval: s.RequireApproval, SourceBindingDigest: hex.EncodeToString(s.SourceBindingDigest[:]), SourceID: s.SourceID, Fence: s.Fence, SnapshotID: s.SnapshotID, SourceStartedAt: s.SourceStartedAt.UTC(), SourceHardUntil: s.SourceHardUntil.UTC(), T0: s.T0.UTC(), IssuedAt: s.IssuedAt.UTC(), StartBy: s.StartBy.UTC(), ProcessingUntil: s.ProcessingUntil.UTC(), BeforeNanos: int64(s.Before), AfterNanos: int64(s.After), MaxBytes: s.MaxBytes}
+	w := contracts.NodeSnapshotRequest{RequireApproval: s.RequireApproval, SourceBindingDigest: hex.EncodeToString(s.SourceBindingDigest[:]), SourceID: s.SourceID, Fence: s.Fence, SnapshotID: s.SnapshotID, SourceStartedAt: s.SourceStartedAt.UTC(), SourceHardUntil: s.SourceHardUntil.UTC(), T0: s.T0.UTC(), IssuedAt: s.IssuedAt.UTC(), StartBy: s.StartBy.UTC(), ProcessingUntil: s.ProcessingUntil.UTC(), BeforeNanos: int64(s.Before), AfterNanos: int64(s.After), MaxBytes: s.MaxBytes}
+	if h := s.HTTP; h != (artifact.RecordingHTTP{}) {
+		w.HTTP = &contracts.NodeHTTPProjection{MaxFlows: h.MaxFlows, MaxHeaderBytes: h.MaxHeaderBytes, MaxFlowBytes: h.MaxFlowBytes, MaxTotalBytes: h.MaxTotalBytes, IdleTimeoutMillis: h.IdleMillis}
+	}
+	return w
 }
 func DomainSnapshotRequest(s contracts.NodeSnapshotRequest) (artifact.SourceSnapshotRequest, bool) {
 	d, ok := digestHex(s.SourceBindingDigest)
 	r := artifact.SourceSnapshotRequest{RequireApproval: s.RequireApproval, SourceBindingDigest: artifact.Digest(d), SourceID: s.SourceID, Fence: s.Fence, SnapshotID: s.SnapshotID, SourceStartedAt: s.SourceStartedAt.UTC(), SourceHardUntil: s.SourceHardUntil.UTC(), T0: s.T0.UTC(), IssuedAt: s.IssuedAt.UTC(), StartBy: s.StartBy.UTC(), ProcessingUntil: s.ProcessingUntil.UTC(), Before: time.Duration(s.BeforeNanos), After: time.Duration(s.AfterNanos), MaxBytes: s.MaxBytes}
+	if h := s.HTTP; h != nil {
+		r.HTTP = artifact.RecordingHTTP{MaxFlows: h.MaxFlows, MaxHeaderBytes: h.MaxHeaderBytes, MaxFlowBytes: h.MaxFlowBytes, MaxTotalBytes: h.MaxTotalBytes, IdleMillis: h.IdleTimeoutMillis}
+	}
 	return r, ok && r.Valid()
 }
 func WireSourceSnapshot(s collector.SourceSnapshot) contracts.NodeSourceSnapshot {

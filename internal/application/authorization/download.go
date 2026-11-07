@@ -61,6 +61,11 @@ type RawResultAccess interface {
 	CurrentResultAccess(ctx context.Context, current identities.CurrentIdentity, scope artifact.DownloadScope, actionID string) (time.Time, error)
 }
 
+// downloadCheckTimeout is the I/O timeout of one download authority check and
+// of one live delivery-policy read. It bounds blocking work, not how long the
+// resulting authority is valid (identity.AuthorityRecheckInterval, ADR-311).
+const downloadCheckTimeout = 5 * time.Second
+
 // downloadClass is the record's class on the installed download path:
 // metadata, raw only for a packet capture, verified syscall arguments, runtime profile or logs, or extract only for a
 // packet capture's HTTP header projection (ADR-282), whose verified
@@ -110,7 +115,8 @@ func (s ContextDownloadAuthority) CheckDownloadPreparation(ctx context.Context, 
 
 // A non-nil ordinary slot belongs to one original response. Only the
 // entitlement (ordinary or shared) may survive a short identity batch; every other fact below is
-// reobserved and the resulting effect authority still lasts at most five seconds.
+// reobserved and the resulting effect authority lasts at most
+// identity.AuthorityRecheckInterval and never past any input's original end.
 func (s ContextDownloadAuthority) checkDownloadCurrent(ctx context.Context, source identities.CurrentIdentity, scope artifact.DownloadScope, ordinary **downloadEntitlement, preparing bool) (artifact.DownloadAuthority, error) {
 	var out artifact.DownloadAuthority
 	if !value.UUID(s.RootID) || source == nil || s.Permissions == nil || s.Catalog == nil || s.Retention == nil || s.Environment == nil || s.Now == nil || ctx.Err() != nil {
@@ -119,7 +125,10 @@ func (s ContextDownloadAuthority) checkDownloadCurrent(ctx context.Context, sour
 	if !scope.Valid() || scope.RootID != s.RootID {
 		return out, downloadRefusedAs("scope", artifact.ErrInvalid)
 	}
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	// The caller's original deadline bounds a response-owned authority; the
+	// check's own I/O timeout below does not.
+	original, hasOriginal := ctx.Deadline()
+	ctx, cancel := context.WithTimeout(ctx, downloadCheckTimeout)
 	defer cancel()
 	started := s.Now()
 	target := value.Target{ClusterID: scope.ClusterID, NamespaceUID: scope.NamespaceUID, WorkloadUID: scope.WorkloadUID, PodUID: scope.PodUID}
@@ -264,7 +273,7 @@ func (s ContextDownloadAuthority) checkDownloadCurrent(ctx context.Context, sour
 				// A missing grant is actionable only while the preceding ordinary
 				// checks retain their original intervals after the blocking lookup.
 				now := s.Now()
-				fresh := ctx.Err() == nil && current.Valid(now) && now.Before(started.Add(5*time.Second))
+				fresh := ctx.Err() == nil && current.Valid(now) && now.Before(started.Add(identity.AuthorityRecheckInterval))
 				for _, end := range []time.Time{initial.ValidUntil, final.ValidUntil, record.ValidUntil, resolved.ValidUntil, environment.ValidUntil, resolved.ExpiresAt} {
 					fresh = fresh && now.Before(end)
 				}
@@ -279,14 +288,12 @@ func (s ContextDownloadAuthority) checkDownloadCurrent(ctx context.Context, sour
 	if ctx.Err() != nil || !now.Before(resolved.ExpiresAt) || raw && !now.Before(resultUntil) {
 		return out, downloadRefused("audience-final", ctx.Err())
 	}
-	until := started.Add(5 * time.Second)
+	until := started.Add(identity.AuthorityRecheckInterval)
 	if raw {
 		until = identity.Earlier(until, resultUntil)
 	}
-	if ordinary != nil {
-		if deadline, ok := ctx.Deadline(); ok {
-			until = identity.Earlier(until, deadline)
-		}
+	if ordinary != nil && hasOriginal {
+		until = identity.Earlier(until, original)
 	}
 	for _, at := range []time.Time{initial.ValidUntil, final.ValidUntil, record.ValidUntil, resolved.ValidUntil, environment.ValidUntil, resolved.ExpiresAt} {
 		until = identity.Earlier(until, at)

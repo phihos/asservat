@@ -28,7 +28,7 @@ func WireStatus(epoch string, r collector.Report) contracts.NodeStatus {
 		Mechanisms: []contracts.NodeAdapter{}, Receipts: []contracts.NodeReceipt{},
 		Budget: contracts.NodeBudget{Ceilings: WireCeilings(r.Budget.Ceilings), RingReserved: r.Budget.RingReserved, FrozenReserved: r.Budget.FrozenReserved, UploadAvailable: r.Budget.UploadAvailable}}
 	for _, m := range r.Mechanisms {
-		a := contracts.NodeAdapter{Mechanism: string(m.Mechanism), Prerequisites: m.Prerequisites, Adapter: string(m.Adapter), Hook: string(m.Hook), Reasons: []string{}, ProfileTLS: m.ProfileTLS, ProfileAuthorization: m.ProfileAuthorization}
+		a := contracts.NodeAdapter{Mechanism: string(m.Mechanism), Prerequisites: m.Prerequisites, Adapter: string(m.Adapter), Hook: string(m.Hook), Reasons: []string{}, ProfileTLS: m.ProfileTLS, ProfileAuthorization: m.ProfileAuthorization, LiveProjections: append([]string(nil), m.LiveProjections...)}
 		for _, reason := range m.Reasons {
 			a.Reasons = append(a.Reasons, string(reason))
 		}
@@ -102,7 +102,17 @@ func DomainStatus(s contracts.NodeStatus) (collector.Report, bool) {
 		return collector.Report{}, false
 	}
 	for _, m := range s.Mechanisms {
-		a := collector.Availability{Mechanism: collector.Mechanism(m.Mechanism), Prerequisites: m.Prerequisites, Adapter: collector.Adapter(m.Adapter), Hook: collector.Hook(m.Hook), Reasons: []collector.Reason{}, ProfileTLS: m.ProfileTLS, ProfileAuthorization: m.ProfileAuthorization}
+		a := collector.Availability{Mechanism: collector.Mechanism(m.Mechanism), Prerequisites: m.Prerequisites, Adapter: collector.Adapter(m.Adapter), Hook: collector.Hook(m.Hook), Reasons: []collector.Reason{}, ProfileTLS: m.ProfileTLS, ProfileAuthorization: m.ProfileAuthorization, LiveProjections: append([]string(nil), m.LiveProjections...)}
+		if len(a.LiveProjections) > 3 {
+			return collector.Report{}, false
+		}
+		seenLive := map[string]bool{}
+		for _, projection := range a.LiveProjections {
+			if seenLive[projection] || !a.Prerequisites || a.Adapter != collector.AdapterAvailable || !((a.Mechanism == collector.MechanismPacket && (projection == "packetMetadata" || projection == "httpHeaders")) || (a.Mechanism == collector.MechanismSyscall && projection == "syscallMetadata")) {
+				return collector.Report{}, false
+			}
+			seenLive[projection] = true
+		}
 		if a.ProfileAuthorization && !a.ProfileTLS {
 			return collector.Report{}, false
 		}
@@ -195,6 +205,10 @@ func WireWork(w collector.Work) contracts.NodeWork {
 		}
 		out.PacketCapture = c
 	}
+	if r := w.Live; r != nil {
+		value := WireLiveRead(*r)
+		out.Live = &value
+	}
 	return out
 }
 
@@ -222,6 +236,14 @@ func DomainWork(w contracts.NodeWork) (collector.Work, bool) {
 		return collector.Work{}, false
 	}
 	out := collector.Work{ID: w.ID, Sequence: w.Sequence, Kind: collector.WorkKind(w.Kind), NotAfter: w.NotAfter.UTC().Truncate(time.Microsecond)}
+	if r := w.Live; r != nil {
+		value, ok := DomainLiveRead(*r)
+		if !ok {
+			value = collector.LiveRead{}
+		}
+		out.Live = &value
+		out.NotAfter = w.NotAfter.UTC()
+	}
 	if w.ProfileCapture != nil {
 		p, valid := DomainProfile(*w.ProfileCapture)
 		if !valid {

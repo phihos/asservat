@@ -8,7 +8,8 @@ package postgres
 // three AccessGrant tables (ADR-249), and migration 00101's encrypted history
 // parameter/quota tables (ADR-255), and 00102 policy grant settings,
 // attachments and observation sessions (ADR-259), and 00109 grouped Save
-// parents (ADR-266), and 00117's ad hoc observation spend (ADR-279).
+// parents (ADR-266), 00117's ad hoc observation spend (ADR-279), and 00143's
+// three minimized finite live control/accounting relations (ADR-310).
 // Missing or unknown relations reject first activation.
 // initialTransientTables exist only part way through migration replay: 00043
 // creates them and 00078 drops them (ADR-224). They never belong to a
@@ -115,6 +116,9 @@ var initialInstallationTables = []string{
 	"hub_owner_configuration",
 	"hub_owner_configuration_revision",
 	"hub_owner_enrollment",
+	"live_watch_account",
+	"live_watch_control",
+	"live_watch_root",
 	"local_key_configuration",
 	"local_key_version",
 	"operation_audit",

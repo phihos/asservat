@@ -103,6 +103,9 @@ func checkedProjection(b []byte, limits Limits) (Projection, error) {
 		len(pr.Records) > maxRecords || pr.Counters.Records != uint64(len(pr.Records)) {
 		return Projection{}, ErrNotProjection
 	}
+	if w := pr.SourceWindow; w != nil && (w.CounterScope != "event-window" || w.OpenFlowsKnown || w.PendingRecordsKnown || pr.Counters.OpenAtCloseFlows != 0 || w.FramesFiltered > w.FramesSeen || pr.Counters.Frames != w.FramesSeen-w.FramesFiltered) {
+		return Projection{}, ErrNotProjection
+	}
 	var partial uint64
 	prev := pr.StartedAt
 	for _, rec := range pr.Records {
@@ -150,10 +153,12 @@ func checkRecord(r Record, from, until time.Time) bool {
 // that sees the authenticated native stream in chunks. It buffers at most
 // the bound and checks on Close.
 type ProjectionCheck struct {
-	limits Limits
-	limit  int64
-	buf    bytes.Buffer
-	err    error
+	limits      Limits
+	limit       int64
+	buf         bytes.Buffer
+	err         error
+	expectation *artifact.ContextExpectation
+	frames      uint64
 }
 
 // NewProjectionCheck starts a check of a document of at most limit bytes
@@ -178,6 +183,15 @@ func (c *ProjectionCheck) Write(p []byte) error {
 	return nil
 }
 
+// NewExpectationCheck pins the source-window document to its original
+// snapshot; a finite recording cannot claim source-window semantics.
+func NewExpectationCheck(e artifact.ContextExpectation) *ProjectionCheck {
+	limits, limit := ExpectationLimits(e)
+	c := NewProjectionCheck(limits, limit)
+	c.expectation = &e
+	return c
+}
+
 // Close returns the verdict and clears the buffered document.
 func (c *ProjectionCheck) Close() error {
 	b := c.buf.Bytes()
@@ -185,6 +199,25 @@ func (c *ProjectionCheck) Close() error {
 	if c.err != nil {
 		return c.err
 	}
-	_, err := CheckProjection(bytes.NewReader(b), c.limits, c.limit)
-	return err
+	pr, err := checkedProjection(b, c.limits)
+	if err != nil {
+		return err
+	}
+	if e := c.expectation; e != nil {
+		if e.Snapshot == nil {
+			if pr.SourceWindow != nil {
+				return ErrNotProjection
+			}
+		} else {
+			q := e.Snapshot
+			if pr.SourceWindow == nil || pr.StartedAt.Before(artifact.SourceSnapshotAnchor(*q)) || pr.EndedAt.After(q.T0.Add(q.After)) || pr.EndedAt.After(q.SourceHardUntil) {
+				return ErrNotProjection
+			}
+		}
+	}
+	c.frames = pr.Counters.Frames
+	return nil
 }
+
+// PacketCount is the actual matched frame count, distinct from projected rows.
+func (c *ProjectionCheck) PacketCount() uint64 { return c.frames }

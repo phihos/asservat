@@ -78,6 +78,17 @@ and syscall sources remain unavailable. With `cluster.enabled` and an empty
 `collector.connector`, the connector installer provisions the node listener and the chart reads its endpoint and root on the
 next `helm upgrade`. See [node collector](../../docs/installation/helm.md#node-collector-test-hosts-only).
 
+Optional `collector.live` passes the existing five node-processing ceilings to
+`NodeDeployment.Live`: `subscriptions` (1–16), `memoryBytes` (1–16 MiB),
+`eventsPerSecond` (1–100,000), `bytesPerSecond` (1–256 MiB/s) and
+`processingNanosPerSecond` (1–100,000,000). All five are required together.
+The default `null` keeps the previous rendered collector configuration unchanged
+and live projections disabled. These processing reservations are separate from
+the hub's protected `delivery.liveRead` viewer policy: neither starts a source
+or grants access to one. No collector container limit is increased. Configured
+ceilings require composed resource and disposable-host qualification; they are
+not measured overhead or supported production defaults.
+
 ## Upgrade and uninstall
 
 CRDs in `crds/` are installed on a first install but **are not upgraded or deleted by Helm**. Before changing versions, review the new CRD schemas and compatibility notes, preserve existing configuration/local start records, and back up the applicable state. From the unpacked, verified new chart:

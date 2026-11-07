@@ -62,6 +62,28 @@ A reviewed `projectionRef` pins allowed fields, header allowlist/redactions, req
 
 Initial per-target parser defaults/hard maxima: 1,024 flows; 32 KiB header block; 256 KiB reassembly per flow under a shared 16 MiB total reassembly budget; 30-second idle timeout; CPU bounded by the node profile. Preview rejects a parser/ring/node allocation conflict. These maxima are explicit contract bounds requiring measurement; default sampling/overload may reduce flow coverage. Transport read depth is selected by the profile to parse complete bounded headers, not a claimed protocol-dependent safe packet prefix.
 
+An ongoing HTTP source must be explicitly authored and covered by its original
+reviewed observation grant. It uses the fixed 1,500-byte acquisition prefix and
+reserves its approved reassembly budget plus its ring before starting. An
+ordinary 134-byte network-header source cannot acquire this capability when a
+viewer opens. Source renewals retain the original grant, session end and prepaid
+wire-byte accounting; saving does not renew or flush the source.
+
+For an ongoing source, the ring contains approved records and bounded,
+content-free counter deltas with the original event clock. Save selects these
+entries from the original requested window. In `http-response-headers/v1`, the
+optional `source_window` member identifies `counter_scope: event-window`, actual
+seen/filtered frames and observed wire bytes, history continuity and completed
+records clipped because their original request times fall outside the window.
+Its `counters.open_at_close_flows` is null and open/pending cutoff state is
+explicitly unknown: the independent source was not stopped. A response completed
+after the copied cutoff may be absent even if its request was in the window.
+Projected pages preserve these gaps. Output-limit drops and retained record
+counts are separate from the frame counters. Finite documents omit
+`source_window` and retain their existing numeric close gauge and exact encoding.
+This additive producer/reader extension requires the matching installed reader;
+it is not a claim that older strict readers accept new source-window documents.
+
 HTTP/2 requires a separately qualified frame/HPACK state pack; HTTP/3 and encrypted HTTPS plaintext are unsupported in the initial profile. TLS metadata remains possible with network headers. Never fetch keys, intercept TLS, inject code or decrypt traffic implicitly. Separate approved runtime plaintext instrumentation would be a future action with its own privilege/privacy review.
 
 ### SC-NET-004

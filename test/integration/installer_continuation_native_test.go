@@ -563,6 +563,23 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 			})
 			return
 		}
+		if installedJourneyFocus() == "live-observation" {
+			t.Run("live-observation", func(t *testing.T) {
+				administratorUser, administratorGroups, err := installedLiveAdministrator(ctx, api, prefix+"-workload-guard", prefix+"-download-environment-guard")
+				if err != nil {
+					t.Fatal(err)
+				}
+				t.Logf("installed live administrator %s groups %v from the current guards", administratorUser, administratorGroups)
+				runner := rest.CopyConfig(kc)
+				runner.Impersonate = rest.ImpersonationConfig{UserName: administratorUser, Groups: append(administratorGroups, "system:authenticated")}
+				administrator, err := kubernetes.NewForConfig(runner)
+				if err != nil {
+					t.Fatal(err)
+				}
+				qualifyInstalledLiveObservation(t, ctx, installedLiveRun{SQL: admin, API: api, Administrator: administrator, AdministratorUser: administratorUser, RootID: p.RootID, Installation: installation, HubNamespace: desired.TargetNamespace, OwnerDeployment: prefix + "-owner", Identity: identity, PublicRoot: publicRoot, Address: publicAddress, Origin: origin, RegionalConfig: f.Clusters[1].Config, ClusterID: cluster, Namespace: namespace, Workload: workload, Diagnose: diagnose})
+			})
+			return
+		}
 		if installedOngoingFocus() {
 			t.Run(installedJourneyFocus(), func(t *testing.T) {
 				qualifyInstalledOngoingSave(t, ctx, admin, p.RootID, identity, publicRoot, publicAddress, origin, diagnose)
@@ -1103,8 +1120,14 @@ func nativeCapacityProfile() *contracts.InstallerCapacitySettings {
 			records = installedArgumentQueryUnits
 		}
 	}
+	// Every live list/open/read/update/close is one audited normal-lane
+	// operation for the same human; six episodes poll roughly once a second.
+	normal := int64(128)
+	if installedJourneyFocus() == "live-observation" {
+		normal = 512
+	}
 	return &contracts.InstallerCapacitySettings{Pool: "capacity", Policy: "applications", NamespaceKeys: []string{"team"}, Accounts: 16, Records: records, AdmissionSeconds: 86400,
-		Lanes:               contracts.InstallerCapacityLanes{CaptureRetainedSeconds: 10000, Normal: lane(4, 128), Resolution: lane(4, 8), Processing: lane(2, 16)},
+		Lanes:               contracts.InstallerCapacityLanes{CaptureRetainedSeconds: 10000, Normal: lane(4, normal), Resolution: lane(4, 8), Processing: lane(2, 16)},
 		StopRetainedSeconds: 10000,
 		Backup:              contracts.InstallerCapacityBackup{HorizonSeconds: 3600, CleanupBudgetSeconds: 60, ProofWindowSeconds: 60, BackupCopies: 2, WALCopies: 3},
 		Footprints:          contracts.InstallerCapacityFootprints{Capture: f(128<<10, 256<<10), Operation: f(128<<10, 256<<10), Processing: f(128<<10, 256<<10), Native: f(64<<10, 128<<10), Stop: f(128<<10, 256<<10), ProcessingState: f(16<<10, 64<<10)},

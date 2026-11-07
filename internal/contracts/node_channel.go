@@ -70,10 +70,19 @@ type NodeDeployment struct {
 	ClusterID      string                `json:"clusterID"`
 	Connector      NodeConnectorEndpoint `json:"connector"`
 	Ceilings       NodeCeilings          `json:"ceilings"`
+	Live           *NodeLiveProcessing   `json:"live,omitempty"`
 }
 
 // NodeConnectorEndpoint pins the connector's node listener, the server name
 // its certificate must carry and the roots that issued it.
+type NodeLiveProcessing struct {
+	Subscriptions            int   `json:"subscriptions"`
+	MemoryBytes              int64 `json:"memoryBytes"`
+	EventsPerSecond          int64 `json:"eventsPerSecond"`
+	BytesPerSecond           int64 `json:"bytesPerSecond"`
+	ProcessingNanosPerSecond int64 `json:"processingNanosPerSecond"`
+}
+
 type NodeConnectorEndpoint struct {
 	Endpoint   string `json:"endpoint"`
 	ServerName string `json:"serverName"`
@@ -126,7 +135,29 @@ type NodePollResponse struct {
 // NodeWork is one closed work item: armSource, stopSource, snapshot,
 // peerGeneration or packetCapture. Only packetCapture (ADR-248) carries a
 // typed payload in this version; the others carry only their identity.
+type NodeLiveRead struct {
+	Manual           *NodeManualLiveSource `json:"manual,omitempty"`
+	Inspect          bool                  `json:"inspect,omitempty"`
+	ReplyBytes       int                   `json:"replyBytes"`
+	WaitMS           int                   `json:"waitMS"`
+	Binding          NodeSourceBinding     `json:"binding"`
+	ClusterID        string                `json:"clusterID"`
+	NamespaceUID     string                `json:"namespaceUID"`
+	WorkloadUID      string                `json:"workloadUID"`
+	Projection       string                `json:"projection"`
+	PrivacyUntil     time.Time             `json:"privacyUntil"`
+	Generation       int64                 `json:"generation"`
+	AfterSequence    uint64                `json:"afterSequence"`
+	AfterLost        uint64                `json:"afterLost"`
+	AfterClockLost   uint64                `json:"afterClockLost,omitempty"`
+	AfterUnsupported uint64                `json:"afterUnsupported,omitempty"`
+	AfterSensorLost  uint64                `json:"afterSensorLost,omitempty"`
+	Head             bool                  `json:"head"`
+	Limit            int                   `json:"limit"`
+}
+
 type NodeWork struct {
+	Live                 *NodeLiveRead       `json:"live,omitempty"`
 	ID                   string              `json:"id"`
 	Sequence             uint64              `json:"sequence"`
 	Kind                 string              `json:"kind"`
@@ -151,6 +182,7 @@ type NodePacketCancel struct {
 // NodePacketSource is a distinct ordinary ongoing work purpose. Older nodes
 // reject these fields/kinds rather than interpreting them as a finite capture.
 type NodePacketSource struct {
+	HTTP              *NodeHTTPProjection  `json:"http,omitempty"`
 	Permit            NodeSourcePermit     `json:"permit"`
 	Program           []NodeBPFInstruction `json:"program"`
 	Ring              NodeSourceRingLimits `json:"ring"`
@@ -183,22 +215,23 @@ type NodeSourcePermit struct {
 	BytesPerSecond int64             `json:"bytesPerSecond"`
 }
 type NodeSourceBinding struct {
-	AudienceDigest    string `json:"audienceDigest,omitempty"`
-	RootID            string `json:"rootID"`
-	PolicyUID         string `json:"policyUID"`
-	AcceptanceID      string `json:"acceptanceID"`
-	SourceID          string `json:"sourceID"`
-	Fence             string `json:"fence"`
-	ActionID          string `json:"actionID"`
-	PodUID            string `json:"podUID"`
-	NodeUID           string `json:"nodeUID"`
-	BootID            string `json:"bootID"`
-	CollectorPodUID   string `json:"collectorPodUID"`
-	CollectorEpoch    string `json:"collectorEpoch"`
-	Scope             string `json:"scope"`
-	ExpectationDigest string `json:"expectationDigest"`
-	ProgramDigest     string `json:"programDigest"`
-	ResourceDigest    string `json:"resourceDigest"`
+	ObservationGrantID string `json:"observationGrantID,omitempty"`
+	AudienceDigest     string `json:"audienceDigest,omitempty"`
+	RootID             string `json:"rootID"`
+	PolicyUID          string `json:"policyUID"`
+	AcceptanceID       string `json:"acceptanceID"`
+	SourceID           string `json:"sourceID"`
+	Fence              string `json:"fence"`
+	ActionID           string `json:"actionID"`
+	PodUID             string `json:"podUID"`
+	NodeUID            string `json:"nodeUID"`
+	BootID             string `json:"bootID"`
+	CollectorPodUID    string `json:"collectorPodUID"`
+	CollectorEpoch     string `json:"collectorEpoch"`
+	Scope              string `json:"scope"`
+	ExpectationDigest  string `json:"expectationDigest"`
+	ProgramDigest      string `json:"programDigest"`
+	ResourceDigest     string `json:"resourceDigest"`
 }
 type NodeSourceRingLimits struct {
 	MaxAgeNanos            int64 `json:"maxAgeNanos"`
@@ -373,6 +406,7 @@ type NodeAdapter struct {
 	Reasons              []string `json:"reasons"`
 	ProfileTLS           bool     `json:"profileTLS,omitempty"`
 	ProfileAuthorization bool     `json:"profileAuthorization,omitempty"`
+	LiveProjections      []string `json:"liveProjections,omitempty"`
 }
 
 type NodeBudget struct {
