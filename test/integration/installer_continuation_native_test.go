@@ -20,6 +20,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime/pprof"
 	"sort"
 	"strconv"
 	"strings"
@@ -518,6 +519,7 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 			installedContextStandbyWindow(t, ctx, api, desired.TargetNamespace, prefix+"-owner")
 		}
 		t.Logf("installed focus %q starts (fast fixture %v)", installedJourneyFocus(), installedFastFixture())
+		installedHangWatchdog(t)
 		installedPublisherSettled = func(c context.Context) {
 			waitInstalledPublisherSettled(t, c, api, desired.TargetNamespace, installation)
 		}
@@ -1732,4 +1734,32 @@ func waitInstalledPublisherSettled(t *testing.T, ctx context.Context, api kubern
 			return
 		}
 	}
+}
+
+// installedHangWatchdog prints every goroutine stack when a failed test has not
+// finished 90 s later: a stuck cleanup would otherwise run silently into the CI
+// job limit and lose all logs.
+func installedHangWatchdog(t *testing.T) {
+	done := make(chan struct{})
+	t.Cleanup(func() { close(done) })
+	go func() {
+		tick := time.NewTicker(time.Second)
+		defer tick.Stop()
+		var failedAt time.Time
+		for {
+			select {
+			case <-done:
+				return
+			case now := <-tick.C:
+				if failedAt.IsZero() && t.Failed() {
+					failedAt = now
+				}
+				if !failedAt.IsZero() && now.Sub(failedAt) > 90*time.Second {
+					fmt.Fprintln(os.Stderr, "installed hang watchdog: failed test still running after 90 s; goroutines:")
+					_ = pprof.Lookup("goroutine").WriteTo(os.Stderr, 2)
+					return
+				}
+			}
+		}
+	}()
 }
