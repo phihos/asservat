@@ -9,6 +9,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"net"
 	"strconv"
 	"sync"
@@ -59,11 +60,11 @@ func (r liveOwnerRoute) Begin(ctx context.Context, current liveapp.CurrentIdenti
 func (d *OwnerDeployment) newLiveOwner(ctx context.Context, service *liveapp.Service, lookup liveOwnerLocator, rootID string) (*liveapp.RoutedService, error) {
 	r := d.Runtime
 	if ctx == nil || ctx.Err() != nil || r == nil || r.native == nil || r.native.handler == nil || lookup == nil || service == nil {
-		return nil, v.ErrUnavailable
+		return nil, fmt.Errorf("%w: live_owner:62", v.ErrUnavailable)
 	}
 	peers, ok := r.native.hub.(*mtls.OwnerRequestPeers)
 	if !ok || peers.Authenticator == nil {
-		return nil, v.ErrUnavailable
+		return nil, fmt.Errorf("%w: live_owner:66", v.ErrUnavailable)
 	}
 	verifier, err := mtls.NewOwnerPeerVerifierForPool(r.roots, r.pool, time.Now)
 	if err != nil {
@@ -74,7 +75,7 @@ func (d *OwnerDeployment) newLiveOwner(ctx context.Context, service *liveapp.Ser
 	// RootID comes from already accepted live composition, not public input.
 	if f.rootID == "" {
 		cancel()
-		return nil, v.ErrUnavailable
+		return nil, fmt.Errorf("%w: live_owner:77", v.ErrUnavailable)
 	}
 	name, err := mtls.OwnerServerName(r.binding)
 	if err != nil {
@@ -90,7 +91,7 @@ func (d *OwnerDeployment) newLiveOwner(ctx context.Context, service *liveapp.Ser
 	defer r.compose.Unlock()
 	if r.started.Load() || r.native.live != nil {
 		cancel()
-		return nil, v.ErrUnavailable
+		return nil, fmt.Errorf("%w: live_owner:93", v.ErrUnavailable)
 	}
 	roots := r.native.roots.Clone()
 	for _, raw := range r.ownerRootDER {
@@ -113,7 +114,7 @@ func (d *OwnerDeployment) newLiveOwner(ctx context.Context, service *liveapp.Ser
 
 func (f *liveOwnerForwarder) LocateLiveOwner(ctx context.Context, k liveapp.RouteKeys) (liveapp.OwnerCommandRoute, bool, error) {
 	if ctx == nil || ctx.Err() != nil || f.root.Err() != nil {
-		return nil, false, v.ErrUnavailable
+		return nil, false, fmt.Errorf("%w: live_owner:116", v.ErrUnavailable)
 	}
 	key := ""
 	if k.WatchID == "" {
@@ -121,14 +122,14 @@ func (f *liveOwnerForwarder) LocateLiveOwner(ctx context.Context, k liveapp.Rout
 	}
 	binding, found, err := f.lookup.LookupLiveWatchOwner(ctx, k.PrincipalKey, k.WatchID, key)
 	if f.root.Err() != nil {
-		return nil, false, v.ErrUnavailable
+		return nil, false, fmt.Errorf("%w: live_owner:124", v.ErrUnavailable)
 	}
 	if err != nil || !found {
 		return nil, found, err
 	}
 	r := f.runtime
 	if !binding.Valid() || binding.InstallationID != r.binding.InstallationID || binding.ClusterID != r.binding.ClusterID || binding.IssuerEpoch != r.binding.IssuerEpoch {
-		return nil, false, v.ErrUnavailable
+		return nil, false, fmt.Errorf("%w: live_owner:131", v.ErrUnavailable)
 	}
 	return liveOwnerRoute{f, binding}, true, nil
 }
@@ -166,7 +167,7 @@ func (f *liveOwnerForwarder) Close() {
 // current exact local server. It returns a shorter bound, never an assertion.
 func (f *liveOwnerForwarder) CheckLiveOwner(ctx context.Context, state *tls.ConnectionState, h contracts.LiveOwnerHello) (time.Time, error) {
 	if ctx == nil || ctx.Err() != nil || state == nil || state.DidResume || state.Version != tls.VersionTLS13 || state.NegotiatedProtocol != "h2" || h.RootID != f.rootID || h.OwnerID != f.runtime.binding.ProcessEpoch {
-		return time.Time{}, v.ErrDenied
+		return time.Time{}, fmt.Errorf("%w: live_owner:169", v.ErrDenied)
 	}
 	peer, err := mtls.NewOwnerClientConnection(f.verifier, state)
 	if err != nil {
@@ -175,24 +176,24 @@ func (f *liveOwnerForwarder) CheckLiveOwner(ctx context.Context, state *tls.Conn
 	owners := liveOwnerPhase(f.owners)
 	caller, err := owners.AuthenticateOwner(ctx, peer)
 	if err != nil || !caller.Valid(time.Now()) || caller.Pool != f.runtime.pool {
-		return time.Time{}, v.ErrDenied
+		return time.Time{}, fmt.Errorf("%w: live_owner:178", v.ErrDenied)
 	}
 	serving, err := owners.ObserveOwnerServing(ctx, f.runtime.server)
 	if err != nil || !serving.Valid(time.Now()) || serving.Certificate.Binding != f.runtime.binding || serving.Pool != caller.Pool || serving.ConfigurationRevision != caller.ConfigurationRevision {
-		return time.Time{}, v.ErrDenied
+		return time.Time{}, fmt.Errorf("%w: live_owner:182", v.ErrDenied)
 	}
 	until := identity.Earlier(h.Until, identity.Earlier(caller.ValidUntil, serving.ValidUntil))
 	if !time.Now().Before(until) || ctx.Err() != nil {
-		return time.Time{}, v.ErrUnavailable
+		return time.Time{}, fmt.Errorf("%w: live_owner:186", v.ErrUnavailable)
 	}
 	return until, nil
 }
 func (f *liveOwnerForwarder) begin(ctx context.Context, current liveapp.CurrentIdentity, c liveapp.Command, k liveapp.RouteKeys, binding fleet.OwnerBinding) (liveapp.CommandDelivery, error) {
 	if current == nil || ctx == nil || ctx.Err() != nil {
-		return nil, v.ErrUnavailable
+		return nil, fmt.Errorf("%w: live_owner:192", v.ErrUnavailable)
 	}
 	if !f.admit() {
-		return nil, v.ErrCapacity
+		return nil, fmt.Errorf("%w: live_owner:195", v.ErrCapacity)
 	}
 	retained := false
 	defer func() {
@@ -216,7 +217,7 @@ func (f *liveOwnerForwarder) begin(ctx context.Context, current liveapp.CurrentI
 	}()
 	route, err := f.owners.Routes.CurrentOwnerRoute(call, binding)
 	if err != nil || !route.Valid(time.Now()) || route.Endpoint.Binding != binding || route.Endpoint.Pool != f.runtime.pool || len(route.Endpoint.Addresses) == 0 {
-		return nil, v.ErrUnavailable
+		return nil, fmt.Errorf("%w: live_owner:219", v.ErrUnavailable)
 	}
 	until := identity.Earlier(k.Until, route.FreshUntil)
 	call, stopBound := context.WithDeadline(call, until)
@@ -224,13 +225,13 @@ func (f *liveOwnerForwarder) begin(ctx context.Context, current liveapp.CurrentI
 	clean = sync.OnceFunc(func() { stopBound(); previous() })
 	originalClient, err := f.runtime.client.ClientCertificate()
 	if err != nil {
-		return nil, v.ErrUnavailable
+		return nil, fmt.Errorf("%w: live_owner:227", v.ErrUnavailable)
 	}
 	var originalPeer fleet.AuthenticatedOwner
 	trust := &tls.Config{RootCAs: f.runtime.roots, GetClientCertificate: func(info *tls.CertificateRequestInfo) (*tls.Certificate, error) {
 		c, e := f.runtime.client.ClientCertificate()
 		if e != nil || c != originalClient {
-			return nil, v.ErrUnavailable
+			return nil, fmt.Errorf("%w: live_owner:233", v.ErrUnavailable)
 		}
 		return f.runtime.client.GetClientCertificate(info)
 	}}
@@ -246,10 +247,10 @@ func (f *liveOwnerForwarder) begin(ctx context.Context, current liveapp.CurrentI
 		}
 		peer, e := owners.AuthenticateOwner(ctx, conn)
 		if e != nil || !peer.Valid(time.Now()) || peer.Certificate.Binding != binding || peer.Pool != route.Endpoint.Pool || peer.Pod != route.Endpoint.Pod || peer.ReplicaSetUID != route.Endpoint.ReplicaSetUID || peer.ConfigurationRevision != route.Configuration.Configuration.Revision {
-			return time.Time{}, v.ErrUnavailable
+			return time.Time{}, fmt.Errorf("%w: live_owner:249", v.ErrUnavailable)
 		}
 		if originalPeer.Certificate.Binding.ProcessEpoch != "" && peer.Certificate != originalPeer.Certificate {
-			return time.Time{}, v.ErrUnavailable
+			return time.Time{}, fmt.Errorf("%w: live_owner:252", v.ErrUnavailable)
 		}
 		originalPeer = peer
 		return identity.Earlier(until, identity.Earlier(local, peer.ValidUntil)), nil
@@ -282,13 +283,13 @@ func (f *liveOwnerForwarder) begin(ctx context.Context, current liveapp.CurrentI
 	}
 	command, err := json.Marshal(c)
 	if err != nil || len(command) > contracts.LiveOwnerInputBytes {
-		return nil, v.ErrInvalid
+		return nil, fmt.Errorf("%w: live_owner:285", v.ErrInvalid)
 	}
 	hello := contracts.LiveOwnerHello{Format: contracts.LiveOwnerFormat, RootID: f.rootID, OwnerID: binding.ProcessEpoch, CallID: ownerRandomID(), Nonce: base64.RawURLEncoding.EncodeToString(nonce[:]), Until: until, Actor: contracts.LiveOwnerActor{Issuer: k.Actor.Issuer, Subject: k.Actor.Subject, ClientID: k.Actor.ClientID, Kind: string(k.Actor.Kind)}, Policy: contracts.LiveOwnerPolicy{UID: k.Policy.UID, Generation: k.Policy.Generation, Digest: k.Policy.Digest}, Command: command}
 	stream, err := client.Open(call, hello)
 	clear(command)
 	if err != nil {
-		return nil, v.ErrUnavailable
+		return nil, fmt.Errorf("%w: live_owner:291", v.ErrUnavailable)
 	}
 	owned := false
 	defer func() {
@@ -300,23 +301,23 @@ func (f *liveOwnerForwarder) begin(ctx context.Context, current liveapp.CurrentI
 	for {
 		raw, e := stream.Receive(call)
 		if e != nil {
-			return nil, v.ErrUnavailable
+			return nil, fmt.Errorf("%w: live_owner:303", v.ErrUnavailable)
 		}
 		frame, e := contracts.DecodeLiveOwnerFrame(bytes.NewReader(raw.Payload))
 		clear(raw.Payload)
 		if e != nil || frame.Nonce != hello.Nonce || frame.Sequence != sequence+1 || frame.Until.After(hello.Until) || !time.Now().Before(frame.Until) {
-			return nil, v.ErrUnavailable
+			return nil, fmt.Errorf("%w: live_owner:308", v.ErrUnavailable)
 		}
 		sequence = frame.Sequence
 		if frame.Kind == "current" {
 			if raw.Kind != contracts.NativeMetadataFrame {
-				return nil, v.ErrUnavailable
+				return nil, fmt.Errorf("%w: live_owner:313", v.ErrUnavailable)
 			}
 			callback, stop := context.WithDeadline(call, frame.Until)
 			who, e := current.ResolveIdentity(callback)
 			stop()
 			if e != nil || !who.Valid(time.Now()) || who.Principal != k.Actor || who.Policy != k.Policy {
-				return nil, v.ErrDenied
+				return nil, fmt.Errorf("%w: live_owner:319", v.ErrDenied)
 			}
 			until = identity.Earlier(until, identity.Earlier(frame.Until, who.ValidUntil))
 			who.ValidUntil = until
@@ -328,12 +329,12 @@ func (f *liveOwnerForwarder) begin(ctx context.Context, current liveapp.CurrentI
 			encoded, e := json.Marshal(reply)
 			clear(identityBytes)
 			if e != nil || len(encoded) > contracts.NativeCommandBytes {
-				return nil, v.ErrUnavailable
+				return nil, fmt.Errorf("%w: live_owner:331", v.ErrUnavailable)
 			}
 			e = stream.Send(call, contracts.NativeFrame{Kind: contracts.NativeCommandFrame, Payload: encoded})
 			clear(encoded)
 			if e != nil {
-				return nil, v.ErrUnavailable
+				return nil, fmt.Errorf("%w: live_owner:336", v.ErrUnavailable)
 			}
 			continue
 		}
@@ -341,22 +342,22 @@ func (f *liveOwnerForwarder) begin(ctx context.Context, current liveapp.CurrentI
 			return nil, liveOwnerFailure(frame.Failure)
 		}
 		if frame.Kind != "result" || raw.Kind != contracts.NativeMetadataFrame {
-			return nil, v.ErrUnavailable
+			return nil, fmt.Errorf("%w: live_owner:344", v.ErrUnavailable)
 		}
 		result, decodeErr := liveapp.DecodeOwnerResult(frame.Result, time.Now())
 		if decodeErr != nil {
-			return nil, v.ErrUnavailable
+			return nil, fmt.Errorf("%w: live_owner:348", v.ErrUnavailable)
 		}
 		peer := stream.Peer()
 		end, e := check(call, &peer)
 		if e != nil {
-			return nil, v.ErrUnavailable
+			return nil, fmt.Errorf("%w: live_owner:353", v.ErrUnavailable)
 		}
 		until = identity.Earlier(until, identity.Earlier(frame.Until, end))
 		// Exact route must still identify the same original process/Pod/configuration.
 		currentRoute, e := f.owners.Routes.CurrentOwnerRoute(call, binding)
 		if e != nil || !currentRoute.Valid(time.Now()) || currentRoute.Endpoint.Binding != binding || currentRoute.Endpoint.Pod != route.Endpoint.Pod || !currentRoute.Configuration.Configuration.Equal(route.Configuration.Configuration) || !time.Now().Before(until) {
-			return nil, v.ErrUnavailable
+			return nil, fmt.Errorf("%w: live_owner:359", v.ErrUnavailable)
 		}
 		until = identity.Earlier(until, currentRoute.FreshUntil)
 		if result.Batch != nil {
@@ -368,7 +369,7 @@ func (f *liveOwnerForwarder) begin(ctx context.Context, current liveapp.CurrentI
 		if f.closed {
 			f.mu.Unlock()
 			ownedCancel()
-			return nil, v.ErrUnavailable
+			return nil, fmt.Errorf("%w: live_owner:371", v.ErrUnavailable)
 		}
 		f.deliveries[d] = struct{}{}
 		f.mu.Unlock()
@@ -380,15 +381,15 @@ func (f *liveOwnerForwarder) begin(ctx context.Context, current liveapp.CurrentI
 func liveOwnerFailure(s string) error {
 	switch s {
 	case "denied":
-		return v.ErrDenied
+		return fmt.Errorf("%w: live_owner:383", v.ErrDenied)
 	case "conflict":
-		return v.ErrConflict
+		return fmt.Errorf("%w: live_owner:385", v.ErrConflict)
 	case "capacity":
-		return v.ErrCapacity
+		return fmt.Errorf("%w: live_owner:387", v.ErrCapacity)
 	case "invalid":
-		return v.ErrInvalid
+		return fmt.Errorf("%w: live_owner:389", v.ErrInvalid)
 	default:
-		return v.ErrUnavailable
+		return fmt.Errorf("%w: live_owner:391", v.ErrUnavailable)
 	}
 }
 
@@ -447,11 +448,11 @@ func (d *liveOwnerDelivery) Result() liveapp.CommandResult {
 func (d *liveOwnerDelivery) Done() <-chan struct{} { return d.ctx.Done() }
 func (d *liveOwnerDelivery) CheckDisclosure(ctx context.Context) error {
 	if ctx == nil || ctx.Err() != nil || d.ctx.Err() != nil || d.stream.Context().Err() != nil || !time.Now().Before(d.until) {
-		return v.ErrUnavailable
+		return fmt.Errorf("%w: live_owner:450", v.ErrUnavailable)
 	}
 	current, e := d.forward.runtime.client.ClientCertificate()
 	if e != nil || current != d.client {
-		return v.ErrUnavailable
+		return fmt.Errorf("%w: live_owner:454", v.ErrUnavailable)
 	}
 	return nil
 }

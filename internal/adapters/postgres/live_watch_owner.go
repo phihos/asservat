@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"errors"
+	"fmt"
 
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
 	"asservat.local/asservat/internal/domain/authorization"
@@ -20,18 +21,18 @@ import (
 func (s *LiveWatches) LookupLiveWatchOwner(ctx context.Context, principalKey [32]byte, watchID, keyHex string) (fleet.OwnerBinding, bool, error) {
 	var out fleet.OwnerBinding
 	if s == nil || s.ledger == nil || ctx == nil || ctx.Err() != nil || principalKey == ([32]byte{}) || (watchID == "") == (keyHex == "") {
-		return out, false, live.ErrInvalid
+		return out, false, fmt.Errorf("%w: live_watch_owner:23", live.ErrInvalid)
 	}
 	var key []byte
 	if watchID != "" {
 		if !authorization.UUID(watchID) {
-			return out, false, live.ErrInvalid
+			return out, false, fmt.Errorf("%w: live_watch_owner:28", live.ErrInvalid)
 		}
 	} else {
 		var err error
 		key, err = hex.DecodeString(keyHex)
 		if err != nil || len(key) != 32 || hex.EncodeToString(key) != keyHex {
-			return out, false, live.ErrInvalid
+			return out, false, fmt.Errorf("%w: live_watch_owner:34", live.ErrInvalid)
 		}
 	}
 	found := false
@@ -45,13 +46,13 @@ func (s *LiveWatches) LookupLiveWatchOwner(ctx context.Context, principalKey [32
 		}
 		out = fleet.OwnerBinding{InstallationID: uid(row.InstallationID), ClusterID: uid(row.ClusterID), IssuerEpoch: uid(row.IssuerEpoch), PodUID: uid(row.PodUid), ProcessEpoch: uid(row.ProcessEpoch)}
 		if !out.Valid() || ctx.Err() != nil {
-			return live.ErrUnavailable
+			return fmt.Errorf("%w: live_watch_owner:48", live.ErrUnavailable)
 		}
 		found = true
 		return nil
 	})
 	if err != nil {
-		return fleet.OwnerBinding{}, false, live.ErrUnavailable
+		return fleet.OwnerBinding{}, false, fmt.Errorf("%w: live_watch_owner:54", live.ErrUnavailable)
 	}
 	return out, found, nil
 }

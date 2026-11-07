@@ -5,6 +5,7 @@ import (
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/live"
 	"context"
+	"fmt"
 	"strings"
 )
 
@@ -22,7 +23,7 @@ func (c liveCatalog) LiveSourceTarget(ctx context.Context, id, kind string) (aut
 	case "manualSession":
 		return c.manual.target(ctx, id)
 	}
-	return authorization.Target{}, live.ErrInvalid
+	return authorization.Target{}, fmt.Errorf("%w: live_catalog:25", live.ErrInvalid)
 }
 func (c liveCatalog) ReadLiveSource(ctx context.Context, s live.Source) (authapp.LiveSourceRecord, error) {
 	return c.ReadLiveSourceID(ctx, s.Target, s.ID(), s.OwnerKind)
@@ -30,19 +31,19 @@ func (c liveCatalog) ReadLiveSource(ctx context.Context, s live.Source) (authapp
 func (c liveCatalog) ReadLiveSourceID(ctx context.Context, target authorization.Target, id, kind string) (authapp.LiveSourceRecord, error) {
 	rows, e := c.ReadLiveSourceRecords(ctx, []live.SourceReference{{Target: target, ID: id, Kind: kind}})
 	if e != nil || len(rows) != 1 {
-		return authapp.LiveSourceRecord{}, live.ErrUnavailable
+		return authapp.LiveSourceRecord{}, fmt.Errorf("%w: live_catalog:33", live.ErrUnavailable)
 	}
 	return rows[0], nil
 }
 func (c liveCatalog) ReadLiveSourceRecords(ctx context.Context, refs []live.SourceReference) ([]authapp.LiveSourceRecord, error) {
 	if len(refs) < 1 || len(refs) > 16 {
-		return nil, live.ErrInvalid
+		return nil, fmt.Errorf("%w: live_catalog:39", live.ErrInvalid)
 	}
 	var ongoing, manual []live.SourceReference
 	seen := map[string]bool{}
 	for _, r := range refs {
 		if seen[r.ID] {
-			return nil, live.ErrInvalid
+			return nil, fmt.Errorf("%w: live_catalog:45", live.ErrInvalid)
 		}
 		seen[r.ID] = true
 		switch r.Kind {
@@ -51,14 +52,14 @@ func (c liveCatalog) ReadLiveSourceRecords(ctx context.Context, refs []live.Sour
 		case "manualSession":
 			manual = append(manual, r)
 		default:
-			return nil, live.ErrInvalid
+			return nil, fmt.Errorf("%w: live_catalog:54", live.ErrInvalid)
 		}
 	}
 	indexed := map[string]authapp.LiveSourceRecord{}
 	if len(ongoing) > 0 {
 		rows, e := c.ongoing.ReadLiveSourceRecords(ctx, ongoing)
 		if e != nil || len(rows) != len(ongoing) {
-			return nil, live.ErrUnavailable
+			return nil, fmt.Errorf("%w: live_catalog:61", live.ErrUnavailable)
 		}
 		for _, r := range rows {
 			indexed[r.Source.ID()] = r
@@ -67,7 +68,7 @@ func (c liveCatalog) ReadLiveSourceRecords(ctx context.Context, refs []live.Sour
 	if len(manual) > 0 {
 		rows, e := c.manual.read(ctx, manual)
 		if e != nil || len(rows) != len(manual) {
-			return nil, live.ErrUnavailable
+			return nil, fmt.Errorf("%w: live_catalog:70", live.ErrUnavailable)
 		}
 		for _, r := range rows {
 			indexed[r.Source.ID()] = r
@@ -77,7 +78,7 @@ func (c liveCatalog) ReadLiveSourceRecords(ctx context.Context, refs []live.Sour
 	for n, r := range refs {
 		v, ok := indexed[r.ID]
 		if !ok || v.Source.OwnerKind != r.Kind || v.Source.Target != r.Target {
-			return nil, live.ErrDenied
+			return nil, fmt.Errorf("%w: live_catalog:80", live.ErrDenied)
 		}
 		out[n] = v
 	}
@@ -89,12 +90,12 @@ func (c liveCatalog) ReadLiveSourceRecords(ctx context.Context, refs []live.Sour
 // A family transition never arms a source or changes an existing selection.
 func (c liveCatalog) ListLiveSources(ctx context.Context, target authorization.WorkloadTarget, cursor string, limit int) ([]authapp.LiveSourceRecord, string, error) {
 	if cursor != "" && !strings.HasPrefix(cursor, "manual:") && !strings.HasPrefix(cursor, "policy:") {
-		return nil, "", live.ErrInvalid
+		return nil, "", fmt.Errorf("%w: live_catalog:92", live.ErrInvalid)
 	}
 	if cursor == "" || strings.HasPrefix(cursor, "manual:") {
 		after := strings.TrimPrefix(cursor, "manual:")
 		if after != "" && !authorization.UUID(after) {
-			return nil, "", live.ErrInvalid
+			return nil, "", fmt.Errorf("%w: live_catalog:97", live.ErrInvalid)
 		}
 		rows, next, e := c.manual.list(ctx, target, after, limit)
 		if e != nil {

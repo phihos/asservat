@@ -5,6 +5,7 @@ import (
 	"asservat.local/asservat/internal/domain/collector"
 	v "asservat.local/asservat/internal/domain/live"
 	"context"
+	"fmt"
 	"slices"
 	"time"
 )
@@ -29,11 +30,11 @@ type liveNodeAnswer struct {
 
 func (r liveProjectionReader) fetch(ctx context.Context, sources []v.Source, projection string, positions []v.Position, limit int, head bool, waitMS int) ([]liveNodeAnswer, error) {
 	if ctx == nil || ctx.Err() != nil || r.remote == nil || r.now == nil || len(sources) < 1 || len(sources) > v.MaxSources || len(positions) != len(sources) || limit < 1 || limit > v.MaxRows || !v.Projection(projection) || waitMS < 0 || waitMS > 5000 {
-		return nil, v.ErrInvalid
+		return nil, fmt.Errorf("%w: live_projection_reader:32", v.ErrInvalid)
 	}
 	deadline, ok := ctx.Deadline()
 	if !ok {
-		return nil, v.ErrInvalid
+		return nil, fmt.Errorf("%w: live_projection_reader:36", v.ErrInvalid)
 	}
 
 	results := make([]liveNodeAnswer, len(sources))
@@ -41,7 +42,7 @@ func (r liveProjectionReader) fetch(ctx context.Context, sources []v.Source, pro
 	first := sources[0]
 	for n, source := range sources {
 		if !source.Valid(r.now()) || !slices.Contains(source.Projections, projection) || source.Target.ClusterID != first.Target.ClusterID || source.Root() != first.Root() || deadline.After(r.now().Add(5*time.Second)) {
-			return nil, v.ErrUnavailable
+			return nil, fmt.Errorf("%w: live_projection_reader:44", v.ErrUnavailable)
 		}
 		requests[n] = collector.LiveRead{Binding: source.Binding, ClusterID: source.Target.ClusterID, NamespaceUID: source.Target.NamespaceUID, WorkloadUID: source.Target.WorkloadUID, Projection: projection, PrivacyUntil: source.PrivacyUntil, Generation: source.Generation, AfterSequence: positions[n].Sequence, AfterLost: positions[n].Lost, AfterClockLost: positions[n].ClockLost, AfterUnsupported: positions[n].Unsupported, AfterSensorLost: positions[n].SensorLost, Head: head, Limit: (limit + len(sources) - 1) / len(sources), WaitMS: waitMS, ReplyBytes: min(24<<10, (28<<10)/len(sources))}
 		if source.Manual != nil {
@@ -55,15 +56,15 @@ func (r liveProjectionReader) fetch(ctx context.Context, sources []v.Source, pro
 	values, e := r.remote.ReadLiveBatch(ctx, requests)
 	received := r.now()
 	if e != nil || len(values) != len(sources) || ctx.Err() != nil {
-		return nil, v.ErrUnavailable
+		return nil, fmt.Errorf("%w: live_projection_reader:58", v.ErrUnavailable)
 	}
 	for n, value := range values {
 		if sources[n].Manual != nil {
 			if value.Manual == nil || !value.Manual.SameBinding(*sources[n].Manual) || !value.Manual.StartedAt.Equal(sources[n].Manual.StartedAt) || !value.Manual.HardUntil.Equal(sources[n].Manual.HardUntil) {
-				return nil, v.ErrUnavailable
+				return nil, fmt.Errorf("%w: live_projection_reader:63", v.ErrUnavailable)
 			}
 		} else if value.Manual != nil {
-			return nil, v.ErrUnavailable
+			return nil, fmt.Errorf("%w: live_projection_reader:66", v.ErrUnavailable)
 		}
 		results[n] = liveNodeAnswer{value: value, start: started, end: received}
 	}
@@ -78,7 +79,7 @@ func (r liveProjectionReader) Head(ctx context.Context, sources []v.Source, proj
 	out := make([]v.Position, len(sources))
 	for n, a := range answers {
 		if a.err != nil || a.value.SourceID != sources[n].ID() || a.value.Fence != sources[n].Fence() || a.value.BootID != sources[n].Boot() || len(a.value.Rows) != 0 {
-			return nil, v.ErrUnavailable
+			return nil, fmt.Errorf("%w: live_projection_reader:81", v.ErrUnavailable)
 		}
 		out[n] = a.value.Position
 	}
@@ -87,7 +88,7 @@ func (r liveProjectionReader) Head(ctx context.Context, sources []v.Source, proj
 func (r liveProjectionReader) Read(ctx context.Context, sources []v.Source, projection string, positions []v.Position, limit, scan, waitMS int) (app.Projection, error) {
 	out := app.Projection{Rows: []v.Row{}, Sources: []v.SourceStatus{}, Gaps: []v.Gap{}, Positions: append([]v.Position(nil), positions...)}
 	if scan < 1 || scan > 4096 {
-		return out, v.ErrInvalid
+		return out, fmt.Errorf("%w: live_projection_reader:90", v.ErrInvalid)
 	}
 	answers, e := r.fetch(ctx, sources, projection, positions, limit, false, waitMS)
 	if e != nil {
@@ -97,11 +98,11 @@ func (r liveProjectionReader) Read(ctx context.Context, sources []v.Source, proj
 		source := sources[n]
 		id := source.ID()
 		if a.err != nil {
-			return app.Projection{}, v.ErrUnavailable
+			return app.Projection{}, fmt.Errorf("%w: live_projection_reader:100", v.ErrUnavailable)
 		}
 		p := a.value
 		if p.SourceID != id || p.Fence != source.Fence() || p.BootID != source.Boot() || p.Dropped < 0 || p.Dropped > v.MaxRows || p.Examined < 0 || p.Examined > scan-out.Examined || p.Bytes < 0 || p.Bytes > (1<<20)-out.Bytes || !p.Position.Follows(positions[n]) {
-			return app.Projection{}, v.ErrUnavailable
+			return app.Projection{}, fmt.Errorf("%w: live_projection_reader:104", v.ErrUnavailable)
 		}
 		out.Positions[n] = p.Position
 		out.Examined += p.Examined
@@ -134,7 +135,7 @@ func (r liveProjectionReader) Read(ctx context.Context, sources []v.Source, proj
 		for _, pending := range p.Rows {
 			row := pending.Row
 			if row.SourceID != id || row.PodUID != source.Pod() || row.Projection != projection || row.Sequence <= last || row.Sequence > p.Position.Sequence {
-				return app.Projection{}, v.ErrUnavailable
+				return app.Projection{}, fmt.Errorf("%w: live_projection_reader:137", v.ErrUnavailable)
 			}
 			last = row.Sequence
 			// The read deadline bounds this read, not row display; the service

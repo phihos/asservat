@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
@@ -34,15 +35,15 @@ var _ liveapp.Ledger = (*LiveWatches)(nil)
 
 func NewLiveWatches(ctx context.Context, pool *pgxpool.Pool, root, owner string, registry *OwnerEnrollments, certificate func(context.Context) (fleet.OwnerCertificate, error), limits LiveWatchLimits) (*LiveWatches, error) {
 	if ctx == nil || !authorization.UUID(root) || !authorization.UUID(owner) || registry == nil || registry.configuration == nil || certificate == nil || !limits.Valid() {
-		return nil, v.ErrInvalid
+		return nil, fmt.Errorf("%w: live_watch:37", v.ErrInvalid)
 	}
 	ledger, err := New(ctx, pool)
 	if err != nil {
-		return nil, v.ErrUnavailable
+		return nil, fmt.Errorf("%w: live_watch:41", v.ErrUnavailable)
 	}
 	encoded, err := json.Marshal(limits)
 	if err != nil {
-		return nil, v.ErrInvalid
+		return nil, fmt.Errorf("%w: live_watch:45", v.ErrInvalid)
 	}
 	return &LiveWatches{ledger: ledger, root: root, owner: owner, registry: registry, certificate: certificate, limits: limits, limitsDigest: sha256.Sum256(encoded), limitsJSON: encoded}, nil
 }
@@ -50,15 +51,15 @@ func NewLiveWatches(ctx context.Context, pool *pgxpool.Pool, root, owner string,
 func (s *LiveWatches) ownerCurrent(ctx context.Context) (fleet.OwnerRegistrationObservation, error) {
 	var zero fleet.OwnerRegistrationObservation
 	if s == nil || s.registry == nil || s.certificate == nil || ctx == nil || ctx.Err() != nil {
-		return zero, v.ErrUnavailable
+		return zero, fmt.Errorf("%w: live_watch:53", v.ErrUnavailable)
 	}
 	c, err := s.certificate(ctx)
 	if err != nil || c.Binding.ProcessEpoch != s.owner || c.Usage != "server" {
-		return zero, v.ErrUnavailable
+		return zero, fmt.Errorf("%w: live_watch:57", v.ErrUnavailable)
 	}
 	proof, err := s.registry.ReadOwnerRegistration(ctx, c)
 	if err != nil || proof.Certificate != c || proof.Enrollment.Binding.ProcessEpoch != s.owner || !proof.Valid(time.Now()) {
-		return zero, v.ErrUnavailable
+		return zero, fmt.Errorf("%w: live_watch:61", v.ErrUnavailable)
 	}
 	return proof, nil
 }
@@ -89,12 +90,12 @@ func liveError(err error) error {
 		return nil
 	}
 	if errors.Is(err, privacy.ErrConflict) {
-		return v.ErrConflict
+		return fmt.Errorf("%w: live_watch:92", v.ErrConflict)
 	}
 	if errors.Is(err, privacy.ErrCapacity) {
-		return v.ErrCapacity
+		return fmt.Errorf("%w: live_watch:95", v.ErrCapacity)
 	}
-	return v.ErrUnavailable
+	return fmt.Errorf("%w: live_watch:97", v.ErrUnavailable)
 }
 func normalizedLive(c liveapp.Control) liveapp.Control {
 	c.AcceptedAt = ownerTime(c.AcceptedAt)
@@ -105,7 +106,7 @@ func normalizedLive(c liveapp.Control) liveapp.Control {
 func decodeLive(raw []byte) (liveapp.Control, error) {
 	var c liveapp.Control
 	if queryDecode(raw, 4096, &c) != nil || !liveControlValid(c) {
-		return c, v.ErrUnavailable
+		return c, fmt.Errorf("%w: live_watch:108", v.ErrUnavailable)
 	}
 	return normalizedLive(c), nil
 }
@@ -114,7 +115,7 @@ func (s *LiveWatches) Create(ctx context.Context, c liveapp.Control, key string)
 	c = normalizedLive(c)
 	k, err := hex.DecodeString(key)
 	if s == nil || c.OwnerID != s.owner || !liveControlValid(c) || c.State != "Active" || c.Revision != 1 || c.Spent != 0 || err != nil || len(k) != 32 || hex.EncodeToString(k) != key {
-		return zero, false, v.ErrInvalid
+		return zero, false, fmt.Errorf("%w: live_watch:117", v.ErrInvalid)
 	}
 	proof, err := s.ownerCurrent(ctx)
 	if err != nil {
@@ -155,14 +156,14 @@ func (s *LiveWatches) Create(ctx context.Context, c liveapp.Control, key string)
 		return zero, false, liveError(err)
 	}
 	if configurationUnavailable {
-		return zero, false, v.ErrUnavailable
+		return zero, false, fmt.Errorf("%w: live_watch:158", v.ErrUnavailable)
 	}
 	stored, err := decodeLive(out.Control)
 	if err != nil || stored.OwnerID != s.owner || stored.PrincipalKey != c.PrincipalKey || stored.RequestDigest != c.RequestDigest {
-		return zero, false, v.ErrUnavailable
+		return zero, false, fmt.Errorf("%w: live_watch:162", v.ErrUnavailable)
 	}
 	if !out.Reused && stored != c {
-		return zero, false, v.ErrUnavailable
+		return zero, false, fmt.Errorf("%w: live_watch:165", v.ErrUnavailable)
 	}
 	return stored, out.Reused, nil
 }
@@ -170,7 +171,7 @@ func (s *LiveWatches) Change(ctx context.Context, c liveapp.Control, revision, c
 	var zero liveapp.Control
 	c = normalizedLive(c)
 	if s == nil || !liveControlValid(c) || c.OwnerID != s.owner || revision < 1 || cost < 0 || cost > 24<<10 || ctx == nil || ctx.Err() != nil {
-		return zero, v.ErrInvalid
+		return zero, fmt.Errorf("%w: live_watch:173", v.ErrInvalid)
 	}
 	// Closing this exact owner/fence is restrictive and discloses nothing. Like
 	// existing logout/stop paths, it remains possible during registry outages.
@@ -199,14 +200,14 @@ func (s *LiveWatches) Change(ctx context.Context, c liveapp.Control, revision, c
 	}
 	out, err := decodeLive(raw)
 	if err != nil || out != c {
-		return zero, v.ErrUnavailable
+		return zero, fmt.Errorf("%w: live_watch:202", v.ErrUnavailable)
 	}
 	return out, nil
 }
 func (s *LiveWatches) CurrentLive(ctx context.Context, c liveapp.Control) error {
 	c = normalizedLive(c)
 	if s == nil || !liveControlValid(c) || c.OwnerID != s.owner {
-		return v.ErrInvalid
+		return fmt.Errorf("%w: live_watch:209", v.ErrInvalid)
 	}
 	proof, err := s.ownerCurrent(ctx)
 	if err != nil {
@@ -234,7 +235,7 @@ func (s *LiveWatches) CurrentLive(ctx context.Context, c liveapp.Control) error 
 // new background loop. Schema-owner rollback can use it after all original ends.
 func (s *LiveWatches) PruneExpired(ctx context.Context) (int64, int64, error) {
 	if s == nil || ctx == nil || ctx.Err() != nil {
-		return 0, 0, v.ErrUnavailable
+		return 0, 0, fmt.Errorf("%w: live_watch:237", v.ErrUnavailable)
 	}
 	var out struct {
 		Controls int64 `json:"controls"`

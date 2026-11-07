@@ -3,6 +3,7 @@ package live
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"time"
 
@@ -25,7 +26,7 @@ type ownerResult struct {
 // DisclosureUntil travels separately in the authenticated conversation frame.
 func EncodeOwnerResult(result CommandResult) ([]byte, error) {
 	if (result.Watch == nil) == (result.Batch == nil) {
-		return nil, v.ErrInvalid
+		return nil, fmt.Errorf("%w: live_owner_codec:28", v.ErrInvalid)
 	}
 	wire := ownerResult{Watch: result.Watch}
 	if result.Batch != nil {
@@ -45,19 +46,19 @@ func ownerDecode(raw []byte, out any) error {
 	dec := json.NewDecoder(bytes.NewReader(raw))
 	dec.DisallowUnknownFields()
 	if dec.Decode(out) != nil || dec.Decode(new(any)) != io.EOF {
-		return v.ErrInvalid
+		return fmt.Errorf("%w: live_owner_codec:48", v.ErrInvalid)
 	}
 	return nil
 }
 func DecodeOwnerResult(raw []byte, now time.Time) (CommandResult, error) {
 	var wire ownerResult
 	if ownerDecode(raw, &wire) != nil || (wire.Watch == nil) == (wire.Batch == nil) {
-		return CommandResult{}, v.ErrInvalid
+		return CommandResult{}, fmt.Errorf("%w: live_owner_codec:55", v.ErrInvalid)
 	}
 	out := CommandResult{Watch: wire.Watch}
 	if b := wire.Batch; b != nil {
 		if b.Rows == nil || len(b.Rows) > v.MaxRows {
-			return CommandResult{}, v.ErrInvalid
+			return CommandResult{}, fmt.Errorf("%w: live_owner_codec:60", v.ErrInvalid)
 		}
 		batch := v.Batch(b.ownerBatchValue)
 		batch.Cursor = b.Cursor
@@ -69,7 +70,7 @@ func DecodeOwnerResult(raw []byte, now time.Time) (CommandResult, error) {
 				Fields json.RawMessage `json:"fields"`
 			}{rowValue: &rowValue{}}
 			if ownerDecode(raw, &r) != nil {
-				return CommandResult{}, v.ErrInvalid
+				return CommandResult{}, fmt.Errorf("%w: live_owner_codec:72", v.ErrInvalid)
 			}
 			row := v.Row(*r.rowValue)
 			var fields any
@@ -84,10 +85,10 @@ func DecodeOwnerResult(raw []byte, now time.Time) (CommandResult, error) {
 				row.Syscall = &v.SyscallFields{}
 				fields = row.Syscall
 			default:
-				return CommandResult{}, v.ErrInvalid
+				return CommandResult{}, fmt.Errorf("%w: live_owner_codec:87", v.ErrInvalid)
 			}
 			if ownerDecode(r.Fields, fields) != nil || !row.Valid(now) {
-				return CommandResult{}, v.ErrInvalid
+				return CommandResult{}, fmt.Errorf("%w: live_owner_codec:90", v.ErrInvalid)
 			}
 			batch.Rows[j] = row
 		}

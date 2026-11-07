@@ -68,7 +68,7 @@ func (d *OwnerDeployment) newPublicLive(ctx context.Context) (presentation.LiveS
 	numeric, limits := publicLiveLimits(*policy.LiveRead)
 	ledger, e := postgres.NewLiveWatches(ctx, pool, policy.RootID, d.Runtime.binding.ProcessEpoch, registry, func(call context.Context) (fleet.OwnerCertificate, error) {
 		if call == nil || call.Err() != nil {
-			return fleet.OwnerCertificate{}, live.ErrUnavailable
+			return fleet.OwnerCertificate{}, fmt.Errorf("%w: public_live:71", live.ErrUnavailable)
 		}
 		return d.Runtime.server.ServingCertificate()
 	}, numeric)
