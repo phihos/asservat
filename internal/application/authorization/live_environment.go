@@ -43,7 +43,11 @@ func (s CurrentLiveEnvironment) LiveSourceReads(ctx context.Context, sources []l
 	defer stop()
 	p, e := s.Policies.DownloadPolicy(call)
 	if e != nil || p.RootID != s.RootID || p.InstallationID != s.InstallationID || p.LiveRead == nil || !s.AcceptedRoot.Valid() || p.LiveRead.Root != s.AcceptedRoot {
-		return nil, fmt.Errorf("%w: live settings root", live.ErrDenied)
+		var have any
+		if e == nil && p.LiveRead != nil {
+			have = p.LiveRead.Root
+		}
+		return nil, fmt.Errorf("%w: live settings root (read %v, current %+v, accepted %+v)", live.ErrDenied, e, have, s.AcceptedRoot)
 	}
 	paths := make([]privacy.DownloadPath, len(sources))
 	limits := make([]privacy.LiveLimits, len(sources))
