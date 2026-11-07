@@ -13,8 +13,12 @@ import (
 // DownloadPolicyObservations owns one protected policy per installed reader.
 // Refresh is synchronous and belongs to its requesting caller; concurrent
 // callers may wait for that read but retain their own cancellation. No stale
-// observation survives expiry or a failed refresh. Reuse leaves a full
-// five-second request interval; a caller refreshes a thinner observation.
+// observation survives expiry or a failed refresh. An observation is valid for
+// its accepted 60-second interval (ADR-311). A cached observation is reused
+// while it is valid now and still outlives one check's I/O timeout
+// (downloadCheckTimeout), so a new check never straddles policy expiry and is
+// refused mid-check. That margin only triggers an earlier refresh; it is not an
+// authority bound, and every consumer still ends at the original FreshUntil.
 type DownloadPolicyObservations struct {
 	reader  DownloadPolicyReader
 	now     func() time.Time
@@ -48,7 +52,7 @@ func (s *DownloadPolicyObservations) DownloadPolicy(ctx context.Context) (privac
 		s.mu.Unlock()
 		return zero, err
 	}
-	if s.policy.DownloadValid(now) && s.policy.FreshUntil.Sub(now) >= 5*time.Second {
+	if s.policy.DownloadValid(now) && s.policy.FreshUntil.Sub(now) >= downloadCheckTimeout {
 		out := cloneDownloadPolicy(s.policy)
 		s.mu.Unlock()
 		return out, nil
@@ -70,7 +74,8 @@ func (s *DownloadPolicyObservations) DownloadPolicy(ctx context.Context) (privac
 		if read.err != nil {
 			return zero, read.err
 		}
-		if !read.policy.DownloadValid(now) || read.policy.FreshUntil.Sub(now) < 5*time.Second {
+		// A joined read is a new live observation: valid now suffices.
+		if !read.policy.DownloadValid(now) {
 			return zero, privacy.ErrUnavailable
 		}
 		return cloneDownloadPolicy(read.policy), nil
@@ -79,7 +84,7 @@ func (s *DownloadPolicyObservations) DownloadPolicy(ctx context.Context) (privac
 	s.flight = read
 	s.mu.Unlock()
 
-	call, cancel := context.WithTimeout(ctx, 5*time.Second)
+	call, cancel := context.WithTimeout(ctx, downloadCheckTimeout)
 	readUntil, _ := call.Deadline()
 	p, err := s.reader.DownloadPolicy(call)
 	if callErr := downloadPolicyCallError(call); callErr != nil {
@@ -99,7 +104,7 @@ func (s *DownloadPolicyObservations) DownloadPolicy(ctx context.Context) (privac
 		err = privacy.ErrUnavailable
 	}
 	if err == nil {
-		// Only a completed live five-second observation may be retained. The
+		// Only a completed live read (within its I/O timeout) may be retained. The
 		// download interval starts at that observation, never at a cache hit.
 		p = cloneDownloadPolicy(p)
 		p.FreshUntil = p.ObservedAt.Add(privacy.DownloadPolicyObservationInterval)

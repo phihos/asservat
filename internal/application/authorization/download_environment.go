@@ -45,10 +45,15 @@ func (s CurrentDownloadEnvironment) DownloadEnvironment(ctx context.Context, r C
 		return zero, downloadRefused("configuration", nil)
 	}
 	start := s.Now()
-	until := identity.Earlier(start.Add(5*time.Second), identity.Earlier(r.ValidUntil, r.Retained.Effective.ExpiresAt))
+	// One policy, recovery and processing read per check (ADR-311). A change
+	// after these reads is refused by the SQL effect fences (recovery trust,
+	// audit request window, ledger compare-and-set) and observed by the next
+	// check; no read here renews an original deadline.
+	until := identity.Earlier(start.Add(identity.AuthorityRecheckInterval), identity.Earlier(r.ValidUntil, r.Retained.Effective.ExpiresAt))
 	if d, ok := ctx.Deadline(); ok {
 		until = identity.Earlier(until, d)
 	}
+	// The catalog record keeps its own five-second observation contract.
 	if !identity.Fresh(r.ObservedAt, r.ValidUntil, start, 5*time.Second) || !start.Before(until) {
 		return zero, downloadRefusedAs("record-expired", artifact.ErrDownloadExpired)
 	}
@@ -81,25 +86,6 @@ func (s CurrentDownloadEnvironment) DownloadEnvironment(ctx context.Context, r C
 	until = identity.Earlier(until, processing.ValidUntil)
 	call, stopProcessing := context.WithDeadline(call, until)
 	defer stopProcessing()
-	last, e := s.Policies.DownloadPolicy(call)
-	if e != nil || !last.DownloadValid(s.Now()) || last.RootID != p.RootID || last.InstallationID != p.InstallationID || last.RecoveryEpoch != p.RecoveryEpoch || last.Revision != p.Revision || last.ProtectionDigest != p.ProtectionDigest {
-		return zero, downloadRefused("policy-final", e)
-	}
-	lastPath, ok := last.SelectDownload(actor, r.Retained.Input.Target.ClusterID, r.Retained.Registration.StoreID, r.PurposeRef, class, r.Retained.Input.PrivacyClass, r.Retained.Input.EvidenceType, s.Now())
-	if !ok || lastPath != path {
-		return zero, downloadRefused("path-final", nil)
-	}
-	until = identity.Earlier(until, last.FreshUntil)
-	lastRecovery, e := s.Recovery.RecoveryState(call)
-	if e != nil || !lastRecovery.Valid(s.Now()) || lastRecovery.InstallationID != recovery.InstallationID || lastRecovery.IssuerEpoch != recovery.IssuerEpoch || lastRecovery.Revision != recovery.Revision {
-		return zero, downloadRefused("recovery-final", e)
-	}
-	until = identity.Earlier(until, lastRecovery.FreshUntil)
-	lastProcessing, e := s.Processing.ContextProcessing(call, r, recovery)
-	if e != nil || !lastProcessing.Valid(s.Now()) || lastProcessing.RootID != processing.RootID || lastProcessing.Epoch != processing.Epoch || lastProcessing.Sequence != processing.Sequence || lastProcessing.CaptureID != processing.CaptureID || lastProcessing.Location != processing.Location || lastProcessing.StateDigest != processing.StateDigest {
-		return zero, downloadRefused("processing-final", e)
-	}
-	until = identity.Earlier(until, lastProcessing.ValidUntil)
 	// Full policy identity includes the durable processing version and the
 	// selected path. Observation timestamps remain separate runtime bounds.
 	b, e := json.Marshal(struct {
