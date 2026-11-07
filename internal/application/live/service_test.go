@@ -805,3 +805,24 @@ func TestLiveClosedReceiptRetryUsesCurrentActorAndOriginalControlWithoutSourceSc
 		t.Fatal("closed receipt renewed original idle deadline")
 	}
 }
+
+// A node wait that outlasts the first check's window is disclosed under the
+// fresh post-read check; revocation seen by that check still refuses.
+func TestLiveReadDisclosesUnderFreshCheckAfterLongWait(t *testing.T) {
+	s, f, i, r := setup(t)
+	w, e := s.Open(t.Context(), i, r)
+	if e != nil {
+		t.Fatal(e)
+	}
+	f.add()
+	f.afterProjection = func() { f.now = f.now.Add(6 * time.Second) }
+	batch, e := s.Read(t.Context(), i, v.Read{ID: w.ID, Cursor: *w.Cursor, WaitMS: 5000})
+	if e != nil || len(batch.Rows) != 1 || !batch.DisclosureUntil.After(f.now) {
+		t.Fatal("long wait not disclosed under fresh check", batch.DisclosureUntil, f.now, e)
+	}
+	f.add()
+	f.afterProjection = func() { f.denied = true }
+	if denied, e := s.Read(t.Context(), i, v.Read{ID: w.ID, Cursor: batch.Cursor}); e == nil || len(denied.Rows) != 0 {
+		t.Fatal("revocation after the node read disclosed rows")
+	}
+}

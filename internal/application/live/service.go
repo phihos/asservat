@@ -538,7 +538,7 @@ func (s *Service) Read(ctx context.Context, current CurrentIdentity, r v.Read) (
 			if e != nil {
 				return zero, e
 			}
-			end = minTime(end, finalEnd)
+			end = finalEnd // fresh check after the head read; see the Active branch
 			batch.DisclosureUntil = end
 			if v.Terminal(st.watch.State) {
 				batch.State = st.watch.State
@@ -585,7 +585,9 @@ func (s *Service) Read(ctx context.Context, current CurrentIdentity, r v.Read) (
 			s.clear(st, "AccessLost")
 			return zero, e
 		}
-		end = minTime(end, finalEnd)
+		// The node read stayed inside the first check's window; disclosure is
+		// authorized by this fresh check, which carries every current bound.
+		end = finalEnd
 		batch.DisclosureUntil = end
 		now = s.cfg.Now()
 		batch.Until = now
