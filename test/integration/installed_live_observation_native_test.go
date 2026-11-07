@@ -345,7 +345,7 @@ func installedLiveMCP(t *testing.T, ctx context.Context, db *pgxpool.Pool, root 
 	var selected *v.SourceRow
 	for attempt := 0; ; attempt++ {
 		r, code, e := call(ctx, "list_live_sources", map[string]any{"target_ref": source.Target, "limit": 20})
-		if e == nil && code == "LiveUnavailable" && attempt < 10 {
+		if e == nil && code == "LiveUnavailable" && attempt < 30 {
 			// Read-only inventory; record transient refusals instead of hiding them.
 			t.Logf("installed live inventory attempt %d refused LiveUnavailable; retrying", attempt)
 			if e := installedJourneyPause(ctx, 2*time.Second); e != nil {
@@ -362,8 +362,11 @@ func installedLiveMCP(t *testing.T, ctx context.Context, db *pgxpool.Pool, root 
 				selected = s
 			}
 		}
-		if selected != nil && selected.Eligible || attempt == 10 {
+		if selected != nil && selected.Eligible || attempt == 30 {
 			break
+		}
+		if selected != nil {
+			t.Logf("installed live source %s attempt %d state=%s blockers=%v; waiting", selected.ID, attempt, selected.State, selected.Blockers)
 		}
 		if e := installedJourneyPause(ctx, 2*time.Second); e != nil {
 			return e
