@@ -190,7 +190,17 @@ func (g *ConnectorAPIExecutionProtection) recheckProof(ctx context.Context, p co
 	// The fresh owned observation replaces the proof's one, so a reader gets
 	// current process/registration facts, not ones from the proof's start.
 	p.validUntil = identity.Earlier(p.validUntil, owned.HardUntil())
+	// A fresh read of the proof's own source reader also replaces the proof's
+	// source, so a setup lends a current source (not one that aged past its
+	// own five seconds while the proof is reused) from the same reader the
+	// region's later source frames use, keeping the hub's feed monotonic.
 	p.owned = owned
+	source, e := g.attester.source.ReadConnectorIdentitySource(ctx)
+	if e != nil || !source.Valid(g.attester.client.now()) || source.Roles != p.source.Roles || !source.Observation.SameSource(p.source.Observation) {
+		return fail(cfg.ErrChanged)
+	}
+	p.source = source
+	p.source.Observation.Profile = source.Observation.Profile.Clone()
 	call, stop := context.WithDeadline(ctx, identity.Earlier(p.validUntil, owned.ValidUntil))
 	defer stop()
 	if e := g.recheckNative(call, p); e != nil {
