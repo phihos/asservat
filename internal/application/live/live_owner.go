@@ -2,6 +2,7 @@ package live
 
 import (
 	"context"
+	"fmt"
 	"slices"
 	"time"
 
@@ -95,7 +96,7 @@ type RouteKeys struct {
 func (s *Service) OwnerRouteKeys(ctx context.Context, current CurrentIdentity, c Command) (RouteKeys, error) {
 	var out RouteKeys
 	if s == nil || !c.Valid() {
-		return out, v.ErrInvalid
+		return out, fmt.Errorf("%w: live_owner:98", v.ErrInvalid)
 	}
 	i, err := s.actor(ctx, current)
 	if err != nil {

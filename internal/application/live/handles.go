@@ -7,6 +7,7 @@ import (
 	"crypto/subtle"
 	"encoding/base64"
 	"encoding/hex"
+	"fmt"
 	"slices"
 	"strconv"
 	"strings"
@@ -64,7 +65,7 @@ func (s *Service) encodeSourceHandle(actor identity.Principal, source v.Source, 
 	}
 	encoded := prefix + "." + h.ID + "." + strconv.FormatInt(until.Unix(), 16) + "." + h.Version + "." + base64.RawURLEncoding.EncodeToString(mac)
 	if len(encoded) > 128 {
-		return "", time.Time{}, v.ErrInvalid
+		return "", time.Time{}, fmt.Errorf("%w: handles:67", v.ErrInvalid)
 	}
 	return encoded, until, nil
 }
@@ -72,15 +73,15 @@ func (s *Service) decodeSourceHandle(actor identity.Principal, encoded string) (
 	var h sourceHandle
 	parts := strings.Split(encoded, ".")
 	if len(encoded) > 128 || len(parts) != 5 || (parts[0] != "lv1p" && parts[0] != "lv1m") || !authorization.UUID(parts[1]) || len(parts[2]) > 11 || len(parts[3]) != 32 || len(parts[4]) != 32 {
-		return h, v.ErrDenied
+		return h, fmt.Errorf("%w: handles:75", v.ErrDenied)
 	}
 	until, e := strconv.ParseInt(parts[2], 16, 64)
 	if e != nil || strconv.FormatInt(until, 16) != parts[2] {
-		return h, v.ErrDenied
+		return h, fmt.Errorf("%w: handles:79", v.ErrDenied)
 	}
 	digest, e := hex.DecodeString(parts[3])
 	if e != nil || hex.EncodeToString(digest) != parts[3] {
-		return h, v.ErrDenied
+		return h, fmt.Errorf("%w: handles:83", v.ErrDenied)
 	}
 	clear(digest)
 	h = sourceHandle{ID: parts[1], Kind: "policy", Until: time.Unix(until, 0).UTC(), Version: parts[3]}
@@ -88,17 +89,17 @@ func (s *Service) decodeSourceHandle(actor identity.Principal, encoded string) (
 		h.Kind = "manualSession"
 	}
 	if !s.cfg.Now().Before(h.Until) || h.Until.After(s.cfg.Now().Add(time.Minute)) {
-		return sourceHandle{}, v.ErrDenied
+		return sourceHandle{}, fmt.Errorf("%w: handles:91", v.ErrDenied)
 	}
 	actual, e := base64.RawURLEncoding.Strict().DecodeString(parts[4])
 	if e != nil || len(actual) != 24 {
-		return sourceHandle{}, v.ErrDenied
+		return sourceHandle{}, fmt.Errorf("%w: handles:95", v.ErrDenied)
 	}
 	defer clear(actual)
 	expected, e := s.sourceHandleMAC(actor, h)
 	defer clear(expected)
 	if e != nil || subtle.ConstantTimeCompare(actual, expected) != 1 {
-		return sourceHandle{}, v.ErrDenied
+		return sourceHandle{}, fmt.Errorf("%w: handles:101", v.ErrDenied)
 	}
 	return h, nil
 }

@@ -4,6 +4,7 @@ import (
 	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -18,7 +19,7 @@ type Keys interface {
 func (s *Service) account(domain string, value any) ([32]byte, error) {
 	b, e := json.Marshal(value)
 	if e != nil {
-		return [32]byte{}, v.ErrInvalid
+		return [32]byte{}, fmt.Errorf("%w: cursor:21", v.ErrInvalid)
 	}
 	defer clear(b)
 	d, e := s.cfg.Keys.LiveDigest(domain, b)

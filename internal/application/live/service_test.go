@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sync"
 	"testing"
@@ -380,7 +381,7 @@ func TestLiveOpenReplayDoesNotNeedExpiredDiscoveryOrTouchSourceHead(t *testing.T
 	}
 	changed := r
 	changed.Duration = 12
-	if _, e = s.Open(t.Context(), i, changed); e != v.ErrConflict {
+	if _, e = s.Open(t.Context(), i, changed); !errors.Is(e, v.ErrConflict) {
 		t.Fatalf("changed retry: %v", e)
 	}
 	f.denied = true
@@ -412,7 +413,7 @@ func TestLiveExpiredReplayUsesAuthenticatedLaggingCursorAndFreshHead(t *testing.
 		t.Fatal("lag recovery did not start at head", fresh, e)
 	}
 	forged := lag.Cursor[:len(lag.Cursor)-1] + "z"
-	if _, e = s.Read(t.Context(), i, v.Read{ID: w.ID, Cursor: forged}); e != v.ErrConflict {
+	if _, e = s.Read(t.Context(), i, v.Read{ID: w.ID, Cursor: forged}); !errors.Is(e, v.ErrConflict) {
 		t.Fatal("forged cursor accepted", e)
 	}
 }
@@ -771,7 +772,7 @@ func TestLiveClosedReceiptRetryUsesCurrentActorAndOriginalControlWithoutSourceSc
 	}
 	changed := request
 	changed.Revision++
-	if _, e = s.Update(t.Context(), i, changed, true); e != v.ErrConflict {
+	if _, e = s.Update(t.Context(), i, changed, true); !errors.Is(e, v.ErrConflict) {
 		t.Fatal("changed key input replayed", e)
 	}
 	control := f.controls[w.ID]

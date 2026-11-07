@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"slices"
 	"sync"
 	"sync/atomic"
@@ -124,18 +125,18 @@ type Service struct {
 
 func New(c Config, s Sources, r ProjectionReader, l Ledger) (*Service, error) {
 	if !authorization.UUID(c.RootID) || !authorization.UUID(c.OwnerID) || c.Keys == nil || c.Now == nil || c.NewID == nil || !c.Limits.Valid() || c.MaxWatches < 1 || c.MaxWatches > 4096 || c.MaxControls < c.MaxWatches || c.MaxControls > 1048576 || s == nil || r == nil || l == nil {
-		return nil, v.ErrInvalid
+		return nil, fmt.Errorf("%w: service:127", v.ErrInvalid)
 	}
 	return &Service{cfg: c, sources: s, reader: r, ledger: l, sessions: map[string]*session{}, opens: map[[32]byte]string{}}, nil
 }
 func hash(value any) [32]byte { b, _ := json.Marshal(value); return sha256.Sum256(b) }
 func (s *Service) actor(ctx context.Context, current CurrentIdentity) (identity.Identity, error) {
 	if ctx == nil || ctx.Err() != nil || current == nil {
-		return identity.Identity{}, v.ErrDenied
+		return identity.Identity{}, fmt.Errorf("%w: service:134", v.ErrDenied)
 	}
 	i, err := current.ResolveIdentity(ctx)
 	if err != nil || !i.Valid(s.cfg.Now()) || !slices.Contains(i.Scopes, "evidence:read") {
-		return identity.Identity{}, v.ErrDenied
+		return identity.Identity{}, fmt.Errorf("%w: service:138", v.ErrDenied)
 	}
 	i.Groups = slices.Clone(i.Groups)
 	i.Scopes = slices.Clone(i.Scopes)
@@ -153,7 +154,7 @@ func (s *Service) List(ctx context.Context, current CurrentIdentity, target targ
 		limit = 20
 	}
 	if limit < 1 || limit > 100 || !target.Valid() {
-		return zero, "", v.ErrInvalid
+		return zero, "", fmt.Errorf("%w: service:156", v.ErrInvalid)
 	}
 	// Requested limit is an upper bound. Existing source rows have longer
 	// identities/handles than event rows; use the existing backend continuation
@@ -161,11 +162,11 @@ func (s *Service) List(ctx context.Context, current CurrentIdentity, target targ
 	limit = min(limit, 20)
 	sources, next, err := s.sources.Inventory(ctx, current, target, cursor, limit)
 	if err != nil || len(sources) > limit {
-		return zero, "", v.ErrDenied
+		return zero, "", fmt.Errorf("%w: service:164", v.ErrDenied)
 	}
 	final, err := s.actor(ctx, current)
 	if err != nil || !sameLiveIdentity(i, final) {
-		return zero, "", v.ErrDenied
+		return zero, "", fmt.Errorf("%w: service:168", v.ErrDenied)
 	}
 	out := v.SourcePage{Sources: make([]v.SourceRow, 0, len(sources))}
 	s.mu.Lock()
@@ -173,7 +174,7 @@ func (s *Service) List(ctx context.Context, current CurrentIdentity, target targ
 	now := s.cfg.Now()
 
 	if s.closed {
-		return zero, "", v.ErrUnavailable
+		return zero, "", fmt.Errorf("%w: service:176", v.ErrUnavailable)
 	}
 	for _, source := range sources {
 		if !source.ReferenceValid() {
@@ -208,7 +209,7 @@ func minTime(t time.Time, rest ...time.Time) time.Time {
 func (s *Service) Open(ctx context.Context, current CurrentIdentity, r v.Open) (v.Watch, error) {
 	var zero v.Watch
 	if !r.Valid() {
-		return zero, v.ErrInvalid
+		return zero, fmt.Errorf("%w: service:211", v.ErrInvalid)
 	}
 	if r.Duration == 0 {
 		r.Duration = v.DefaultLimits().Duration
@@ -228,11 +229,11 @@ func (s *Service) Open(ctx context.Context, current CurrentIdentity, r v.Open) (
 		Key       string
 	}{i.Principal, r.Key})
 	if keyErr != nil {
-		return zero, v.ErrUnavailable
+		return zero, fmt.Errorf("%w: service:231", v.ErrUnavailable)
 	}
 	requestDigest, digestErr := s.account("selection", r)
 	if digestErr != nil {
-		return zero, v.ErrUnavailable
+		return zero, fmt.Errorf("%w: service:235", v.ErrUnavailable)
 	}
 	s.mu.Lock()
 	prior := s.sessions[s.opens[keyDigest]]
@@ -241,7 +242,7 @@ func (s *Service) Open(ctx context.Context, current CurrentIdentity, r v.Open) (
 		prior.mu.Lock()
 		defer prior.mu.Unlock()
 		if prior.control.RequestDigest != requestDigest {
-			return zero, v.ErrConflict
+			return zero, fmt.Errorf("%w: service:244", v.ErrConflict)
 		}
 		if _, e := s.current(ctx, current, prior, i); e != nil {
 			s.clear(prior, "AccessLost")
@@ -252,7 +253,7 @@ func (s *Service) Open(ctx context.Context, current CurrentIdentity, r v.Open) (
 	s.mu.Lock()
 	if s.closed || s.active.Load()+int64(s.starting) >= int64(s.cfg.MaxWatches) || len(s.sessions)+s.starting >= s.cfg.MaxControls {
 		s.mu.Unlock()
-		return zero, v.ErrCapacity
+		return zero, fmt.Errorf("%w: service:255", v.ErrCapacity)
 	}
 	s.starting++
 	s.mu.Unlock()
@@ -263,7 +264,7 @@ func (s *Service) Open(ctx context.Context, current CurrentIdentity, r v.Open) (
 
 	if s.closed {
 		s.mu.Unlock()
-		return zero, v.ErrUnavailable
+		return zero, fmt.Errorf("%w: service:266", v.ErrUnavailable)
 	}
 
 	s.mu.Unlock()
@@ -284,12 +285,12 @@ func (s *Service) Open(ctx context.Context, current CurrentIdentity, r v.Open) (
 		var e error
 		selected, proofUntil, e = batch.ResolveSources(ctx, current, refs, r.Projection)
 		if e != nil || len(selected) != len(handles) {
-			return zero, v.ErrDenied
+			return zero, fmt.Errorf("%w: service:287", v.ErrDenied)
 		}
 		for n, h := range handles {
 			source := selected[n]
 			if source.Root() != s.cfg.RootID || source.ID() != h.ID || source.OwnerKind != h.Kind || sourceVersion(source) != h.Version {
-				return zero, v.ErrDenied
+				return zero, fmt.Errorf("%w: service:292", v.ErrDenied)
 			}
 		}
 	} else {
@@ -300,7 +301,7 @@ func (s *Service) Open(ctx context.Context, current CurrentIdentity, r v.Open) (
 			}
 			source, until, e := s.sources.Resolve(ctx, current, h.ID, h.Kind, r.Projection)
 			if e != nil || source.Root() != s.cfg.RootID || source.ID() != h.ID || source.OwnerKind != h.Kind || sourceVersion(source) != h.Version {
-				return zero, v.ErrDenied
+				return zero, fmt.Errorf("%w: service:303", v.ErrDenied)
 			}
 			selected[n] = source.Clone()
 			proofUntil = minTime(proofUntil, until)
@@ -311,12 +312,12 @@ func (s *Service) Open(ctx context.Context, current CurrentIdentity, r v.Open) (
 	seen := map[string]bool{}
 	for _, source := range selected {
 		if seen[source.ID()] || source.Target.ClusterID != first.Target.ClusterID || source.Target.NamespaceUID != first.Target.NamespaceUID || source.Target.WorkloadUID != first.Target.WorkloadUID || !slices.Contains(source.Projections, r.Projection) {
-			return zero, v.ErrInvalid
+			return zero, fmt.Errorf("%w: service:314", v.ErrInvalid)
 		}
 		seen[source.ID()] = true
 
 		if !source.Valid(s.cfg.Now()) || !s.cfg.Now().Before(proofUntil) || !slices.Contains([]string{"Warming", "Ready", "Degraded"}, source.State) {
-			return zero, v.ErrDenied
+			return zero, fmt.Errorf("%w: service:319", v.ErrDenied)
 		}
 	}
 
@@ -324,11 +325,11 @@ func (s *Service) Open(ctx context.Context, current CurrentIdentity, r v.Open) (
 	positions, err := s.reader.Head(headCall, selected, r.Projection)
 	headCancel()
 	if err != nil || len(positions) != len(selected) || !s.cfg.Now().Before(proofUntil) {
-		return zero, v.ErrUnavailable
+		return zero, fmt.Errorf("%w: service:327", v.ErrUnavailable)
 	}
 	final, err := s.actor(ctx, current)
 	if err != nil || !sameLiveIdentity(i, final) {
-		return zero, v.ErrDenied
+		return zero, fmt.Errorf("%w: service:331", v.ErrDenied)
 	}
 	now = s.cfg.Now()
 	limits := s.cfg.Limits
@@ -348,18 +349,18 @@ func (s *Service) Open(ctx context.Context, current CurrentIdentity, r v.Open) (
 		end = minTime(end, source.HardUntil, source.PrivacyUntil)
 	}
 	if !now.Before(end) {
-		return zero, v.ErrDenied
+		return zero, fmt.Errorf("%w: service:351", v.ErrDenied)
 	}
 	principalKey, keyErr := s.account("principal", struct {
 		Issuer, Subject string
 		Kind            identity.Kind
 	}{i.Principal.Issuer, i.Principal.Subject, i.Principal.Kind})
 	if keyErr != nil {
-		return zero, v.ErrUnavailable
+		return zero, fmt.Errorf("%w: service:358", v.ErrUnavailable)
 	}
 	workloadKey, keyErr := s.account("workload", []string{first.Target.ClusterID, first.Target.NamespaceUID, first.Target.WorkloadUID})
 	if keyErr != nil {
-		return zero, v.ErrUnavailable
+		return zero, fmt.Errorf("%w: service:362", v.ErrUnavailable)
 	}
 	c := Control{OwnerID: s.cfg.OwnerID, ID: s.cfg.NewID(), Fence: s.cfg.NewID(), PrincipalKey: principalKey, WorkloadKey: workloadKey, RequestDigest: requestDigest, Revision: 1, State: "Active", AcceptedAt: now, ExpiresAt: end, IdleUntil: minTime(now.Add(v.IdleAge), end), OutputLimit: limits.Output, BytesPerSecond: limits.Rate}
 	stored, reused, err := s.ledger.Create(ctx, c, hex.EncodeToString(keyDigest[:]))
@@ -367,17 +368,17 @@ func (s *Service) Open(ctx context.Context, current CurrentIdentity, r v.Open) (
 		return zero, err
 	}
 	if !s.cfg.Now().Before(proofUntil) || ctx.Err() != nil {
-		return zero, v.ErrDenied
+		return zero, fmt.Errorf("%w: service:370", v.ErrDenied)
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.closed {
-		return zero, v.ErrUnavailable
+		return zero, fmt.Errorf("%w: service:375", v.ErrUnavailable)
 	}
 	if reused {
 		old := s.sessions[stored.ID]
 		if old == nil {
-			return zero, v.ErrUnavailable
+			return zero, fmt.Errorf("%w: service:380", v.ErrUnavailable)
 		}
 		old.mu.Lock()
 		receipt := cloneWatch(old.watch)
@@ -385,7 +386,7 @@ func (s *Service) Open(ctx context.Context, current CurrentIdentity, r v.Open) (
 		return receipt, nil
 	}
 	if s.active.Load() >= int64(s.cfg.MaxWatches) {
-		return zero, v.ErrCapacity
+		return zero, fmt.Errorf("%w: service:388", v.ErrCapacity)
 	}
 	ids := make([]string, len(selected))
 	for n, source := range selected {
@@ -419,7 +420,7 @@ func (s *Service) get(ctx context.Context, current CurrentIdentity, id string) (
 	st := s.sessions[id]
 	s.mu.Unlock()
 	if st == nil || st.actor != i.Principal {
-		return nil, i, v.ErrDenied
+		return nil, i, fmt.Errorf("%w: service:422", v.ErrDenied)
 	}
 	return st, i, nil
 }
@@ -428,7 +429,7 @@ func (s *Service) current(ctx context.Context, current CurrentIdentity, st *sess
 	end := minTime(i.ValidUntil, st.watch.ExpiresAt, st.watch.IdleUntil)
 	if !now.Before(st.watch.ExpiresAt) || !now.Before(st.watch.IdleUntil) {
 		s.clear(st, "Expired")
-		return end, v.ErrUnavailable
+		return end, fmt.Errorf("%w: service:431", v.ErrUnavailable)
 	}
 	stopped := false
 	checks := make([]v.Source, len(st.selected))
@@ -439,7 +440,7 @@ func (s *Service) current(ctx context.Context, current CurrentIdentity, st *sess
 		var e error
 		checks, phaseUntil, e = batch.CheckSources(ctx, current, st.selected, st.watch.Projection)
 		if e != nil || len(checks) != len(st.selected) {
-			return end, v.ErrDenied
+			return end, fmt.Errorf("%w: service:442", v.ErrDenied)
 		}
 	} else {
 		for n, source := range st.selected {
@@ -447,7 +448,7 @@ func (s *Service) current(ctx context.Context, current CurrentIdentity, st *sess
 			var e error
 			checks[n], until, e = s.sources.Check(ctx, current, source, st.watch.Projection)
 			if e != nil {
-				return end, v.ErrDenied
+				return end, fmt.Errorf("%w: service:450", v.ErrDenied)
 			}
 			phaseUntil = minTime(phaseUntil, until)
 		}
@@ -455,23 +456,23 @@ func (s *Service) current(ctx context.Context, current CurrentIdentity, st *sess
 	for n, source := range st.selected {
 		checked, until := checks[n], phaseUntil
 		if !source.Same(checked) || !checked.Valid(s.cfg.Now()) || checked.ViewLimits.Valid() && st.watch.Limits.Tighten(checked.ViewLimits) != st.watch.Limits {
-			return end, v.ErrDenied
+			return end, fmt.Errorf("%w: service:458", v.ErrDenied)
 		}
 		if checked.State == "Stopped" {
 			stopped = true
 		}
 		if !slices.Contains(checked.Projections, st.watch.Projection) || !slices.Contains([]string{"Warming", "Ready", "Degraded", "Stopped"}, checked.State) {
-			return end, v.ErrDenied
+			return end, fmt.Errorf("%w: service:464", v.ErrDenied)
 		}
 		st.selected[n] = checked.Clone()
 		end = minTime(end, until, checked.LeaseUntil, checked.PrivacyUntil)
 	}
 	if e := s.ledger.CurrentLive(ctx, st.control); e != nil {
-		return end, v.ErrDenied
+		return end, fmt.Errorf("%w: service:470", v.ErrDenied)
 	}
 	final, e := s.actor(ctx, current)
 	if e != nil || !sameLiveIdentity(i, final) || ctx.Err() != nil || !s.cfg.Now().Before(end) {
-		return end, v.ErrDenied
+		return end, fmt.Errorf("%w: service:474", v.ErrDenied)
 	}
 	if stopped {
 		s.clear(st, "SourceEnded")
@@ -482,7 +483,7 @@ func (s *Service) current(ctx context.Context, current CurrentIdentity, st *sess
 func (s *Service) Read(ctx context.Context, current CurrentIdentity, r v.Read) (v.Batch, error) {
 	var zero v.Batch
 	if !r.Valid() {
-		return zero, v.ErrInvalid
+		return zero, fmt.Errorf("%w: service:485", v.ErrInvalid)
 	}
 	st, i, err := s.get(ctx, current, r.ID)
 	if err != nil {
@@ -491,7 +492,7 @@ func (s *Service) Read(ctx context.Context, current CurrentIdentity, r v.Read) (
 	st.mu.Lock()
 	defer st.mu.Unlock()
 	if st.reading {
-		return zero, v.ErrConflict
+		return zero, fmt.Errorf("%w: service:494", v.ErrConflict)
 	}
 	end, err := s.current(ctx, current, st, i)
 	if err != nil {
@@ -510,18 +511,18 @@ func (s *Service) Read(ctx context.Context, current CurrentIdentity, r v.Read) (
 		batch.Cursor = p.next
 		for _, row := range batch.Rows {
 			if !row.Valid(now) {
-				return zero, v.ErrConflict
+				return zero, fmt.Errorf("%w: service:513", v.ErrConflict)
 			}
 		}
 		return s.charge(ctx, st, batch)
 	}
 	position, validCursor := s.cursorPosition(st, r.Cursor)
 	if !validCursor || position > st.position {
-		return zero, v.ErrConflict
+		return zero, fmt.Errorf("%w: service:520", v.ErrConflict)
 	}
 	lagging := position < st.position
 	if !lagging && (st.watch.Cursor == nil || r.Cursor != *st.watch.Cursor) {
-		return zero, v.ErrConflict
+		return zero, fmt.Errorf("%w: service:524", v.ErrConflict)
 	}
 	batch := v.Batch{DisclosureUntil: end, WatchID: st.watch.ID, Revision: st.watch.Revision, ID: s.cfg.NewID(), State: st.watch.State, Rows: []v.Row{}, Sources: []v.SourceStatus{}, Gaps: append([]v.Gap{}, st.gap...), From: now, Until: now, ReceivedAt: now, RetryAfter: 1000, Handling: v.Notices()}
 	st.gap = nil
@@ -531,7 +532,7 @@ func (s *Service) Read(ctx context.Context, current CurrentIdentity, r v.Read) (
 			head, e := s.reader.Head(headCall, st.selected, st.watch.Projection)
 			headCancel()
 			if e != nil || len(head) != len(st.positions) {
-				return zero, v.ErrUnavailable
+				return zero, fmt.Errorf("%w: service:534", v.ErrUnavailable)
 			}
 			finalEnd, e := s.current(ctx, current, st, i)
 			if e != nil {
@@ -573,11 +574,11 @@ func (s *Service) Read(ctx context.Context, current CurrentIdentity, r v.Read) (
 		close(st.readJoined)
 		if e != nil {
 			s.clear(st, "Disconnected")
-			return zero, v.ErrUnavailable
+			return zero, fmt.Errorf("%w: service:576", v.ErrUnavailable)
 		}
 		if len(projected.Rows) > min(defaultLimit(r.Limit), st.watch.Limits.Rows) || projected.Examined < 0 || projected.Examined > 4096 || projected.Bytes < 0 || projected.Bytes > 1<<20 || len(projected.Positions) != len(st.selected) || len(projected.Gaps) > 32 || len(projected.Sources) > v.MaxSources {
 			s.clear(st, "Disconnected")
-			return zero, v.ErrUnavailable
+			return zero, fmt.Errorf("%w: service:580", v.ErrUnavailable)
 		}
 		finalEnd, e := s.current(ctx, current, st, i)
 		if e != nil {
@@ -604,14 +605,14 @@ func (s *Service) Read(ctx context.Context, current CurrentIdentity, r v.Read) (
 			for _, source := range projected.Sources {
 				if !source.Valid(now) || !slices.Contains(st.watch.SourceIDs, source.ID) || seenSources[source.ID] {
 					s.clear(st, "Disconnected")
-					return zero, v.ErrUnavailable
+					return zero, fmt.Errorf("%w: service:607", v.ErrUnavailable)
 				}
 				seenSources[source.ID] = true
 			}
 			for _, gap := range projected.Gaps {
 				if !gap.Valid(now) || gap.SourceID != nil && !slices.Contains(st.watch.SourceIDs, *gap.SourceID) {
 					s.clear(st, "Disconnected")
-					return zero, v.ErrUnavailable
+					return zero, fmt.Errorf("%w: service:614", v.ErrUnavailable)
 				}
 			}
 			batch.Sources = projected.Sources
@@ -623,7 +624,7 @@ func (s *Service) Read(ctx context.Context, current CurrentIdentity, r v.Read) (
 				idx := slices.Index(st.watch.SourceIDs, row.SourceID)
 				if idx < 0 || row.PodUID != st.selected[idx].Target.PodUID || row.Projection != st.watch.Projection || row.Sequence <= lastSequence[idx].Sequence || row.Sequence > projected.Positions[idx].Sequence {
 					s.clear(st, "Disconnected")
-					return zero, v.ErrUnavailable
+					return zero, fmt.Errorf("%w: service:626", v.ErrUnavailable)
 				}
 				lastSequence[idx].Sequence = row.Sequence
 				if row.ObservedAt.Before(st.watch.AcceptedAt) {
@@ -659,7 +660,7 @@ func (s *Service) Read(ctx context.Context, current CurrentIdentity, r v.Read) (
 			for n, pos := range projected.Positions {
 				if !pos.Follows(st.positions[n]) {
 					s.clear(st, "Disconnected")
-					return zero, v.ErrUnavailable
+					return zero, fmt.Errorf("%w: service:662", v.ErrUnavailable)
 				}
 			}
 			st.positions = append(st.positions[:0], projected.Positions...)
@@ -705,18 +706,18 @@ func defaultLimit(n int) int {
 }
 func (s *Service) charge(ctx context.Context, st *session, b v.Batch) (v.Batch, error) {
 	if b.DisclosureUntil.IsZero() || !s.cfg.Now().Before(b.DisclosureUntil) {
-		return v.Batch{}, v.ErrDenied
+		return v.Batch{}, fmt.Errorf("%w: service:708", v.ErrDenied)
 	}
 	call, stop := context.WithDeadline(ctx, b.DisclosureUntil)
 	defer stop()
 	raw, _ := json.Marshal(b)
 	cost := int64(len(raw) + 4096)
 	if cost > 24<<10 {
-		return v.Batch{}, v.ErrCapacity
+		return v.Batch{}, fmt.Errorf("%w: service:715", v.ErrCapacity)
 	}
 	if cost > st.control.OutputLimit-st.control.Spent {
 		s.clear(st, "Exhausted")
-		return v.Batch{}, v.ErrCapacity
+		return v.Batch{}, fmt.Errorf("%w: service:719", v.ErrCapacity)
 	}
 	// Durable/account-wide rate enforcement is inside the ledger transaction.
 	next := st.control
@@ -732,7 +733,7 @@ func (s *Service) charge(ctx context.Context, st *session, b v.Batch) (v.Batch, 
 	b.Spent = saved.Spent
 	if call.Err() != nil || !s.cfg.Now().Before(b.DisclosureUntil) {
 		s.clear(st, "Disconnected")
-		return v.Batch{}, v.ErrDenied
+		return v.Batch{}, fmt.Errorf("%w: service:735", v.ErrDenied)
 	}
 	return b, nil
 }
@@ -754,7 +755,7 @@ func (s *Service) clear(st *session, state string) {
 func (s *Service) Update(ctx context.Context, current CurrentIdentity, r v.Update, close bool) (v.Watch, error) {
 	var zero v.Watch
 	if !r.Valid() || !close && r.Mode == "" && r.Filter == nil {
-		return zero, v.ErrInvalid
+		return zero, fmt.Errorf("%w: service:757", v.ErrInvalid)
 	}
 	st, i, err := s.get(ctx, current, r.ID)
 	if err != nil {
@@ -763,7 +764,7 @@ func (s *Service) Update(ctx context.Context, current CurrentIdentity, r v.Updat
 	st.mu.Lock()
 	defer st.mu.Unlock()
 	if st.reading {
-		return zero, v.ErrConflict
+		return zero, fmt.Errorf("%w: service:766", v.ErrConflict)
 	}
 	digest := hash(struct {
 		R     v.Update
@@ -771,7 +772,7 @@ func (s *Service) Update(ctx context.Context, current CurrentIdentity, r v.Updat
 	}{r, close})
 	if old, ok := st.updates[r.Key]; ok {
 		if old.digest != digest {
-			return zero, v.ErrConflict
+			return zero, fmt.Errorf("%w: service:774", v.ErrConflict)
 		}
 		if close && old.watch.State == "Closed" && st.watch.State == "Closed" {
 			// A Close receipt discloses no rows and cannot reacquire the source
@@ -786,13 +787,13 @@ func (s *Service) Update(ctx context.Context, current CurrentIdentity, r v.Updat
 		return cloneWatch(old.watch), nil
 	}
 	if len(st.updates) >= 128 {
-		return zero, v.ErrCapacity
+		return zero, fmt.Errorf("%w: service:789", v.ErrCapacity)
 	}
 	if r.Revision != st.watch.Revision {
-		return zero, v.ErrConflict
+		return zero, fmt.Errorf("%w: service:792", v.ErrConflict)
 	}
 	if r.Filter != nil && !r.Filter.Valid(st.watch.Projection) {
-		return zero, v.ErrInvalid
+		return zero, fmt.Errorf("%w: service:795", v.ErrInvalid)
 	}
 	currentEnd, currentErr := s.current(ctx, current, st, i)
 	err = currentErr
@@ -801,7 +802,7 @@ func (s *Service) Update(ctx context.Context, current CurrentIdentity, r v.Updat
 		return zero, err
 	}
 	if v.Terminal(st.watch.State) && !close {
-		return zero, v.ErrConflict
+		return zero, fmt.Errorf("%w: service:804", v.ErrConflict)
 	}
 	positions := st.positions
 	if !close {
@@ -810,7 +811,7 @@ func (s *Service) Update(ctx context.Context, current CurrentIdentity, r v.Updat
 		positions, headErr = s.reader.Head(headCall, st.selected, st.watch.Projection)
 		headCancel()
 		if headErr != nil || len(positions) != len(st.positions) {
-			return zero, v.ErrUnavailable
+			return zero, fmt.Errorf("%w: service:813", v.ErrUnavailable)
 		}
 	}
 	before := st.control.Revision
@@ -865,11 +866,11 @@ func (s *Service) Update(ctx context.Context, current CurrentIdentity, r v.Updat
 // It returns no rows, reads no source, performs no charge and renews no date.
 func (s *Service) currentClosedReceipt(ctx context.Context, current CurrentIdentity, st *session, i identity.Identity) error {
 	if st.control.State != "Closed" || st.control.ID != st.watch.ID || st.actor != i.Principal || !st.control.ExpiresAt.Equal(st.watch.ExpiresAt) || !st.control.IdleUntil.Equal(st.watch.IdleUntil) {
-		return v.ErrDenied
+		return fmt.Errorf("%w: service:868", v.ErrDenied)
 	}
 	end := minTime(i.ValidUntil, st.control.ExpiresAt, st.control.IdleUntil, st.ownerEnd)
 	if !s.cfg.Now().Before(end) {
-		return v.ErrDenied
+		return fmt.Errorf("%w: service:872", v.ErrDenied)
 	}
 	call, cancel := context.WithDeadline(ctx, end)
 	defer cancel()
@@ -878,7 +879,7 @@ func (s *Service) currentClosedReceipt(ctx context.Context, current CurrentIdent
 	}
 	final, err := s.actor(call, current)
 	if err != nil || !sameLiveIdentity(i, final) || call.Err() != nil || !s.cfg.Now().Before(end) {
-		return v.ErrDenied
+		return fmt.Errorf("%w: service:881", v.ErrDenied)
 	}
 	return nil
 }

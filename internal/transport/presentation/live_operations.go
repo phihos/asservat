@@ -32,6 +32,8 @@ type LiveOperations struct {
 	service LiveService
 	wire    *contracts.InvestigationContracts
 	now     func() time.Time
+	// Diagnose, when set, receives the bounded internal refusal location.
+	Diagnose func(string)
 }
 
 func NewLiveOperations(origin string, service LiveService, now func() time.Time) (*LiveOperations, error) {
@@ -43,7 +45,7 @@ func NewLiveOperations(origin string, service LiveService, now func() time.Time)
 	if e != nil {
 		return nil, e
 	}
-	return &LiveOperations{origin, service, wire, now}, nil
+	return &LiveOperations{origin: origin, service: service, wire: wire, now: now}, nil
 }
 func NewInvestigationLiveOperations(base *InvestigationOperations, live *LiveOperations) (*InvestigationOperations, error) {
 	if live == nil {
@@ -189,6 +191,10 @@ func (s *LiveOperations) CallWithContext(ctx context.Context, current identities
 		}
 	}
 	if err != nil {
+		if s.Diagnose != nil {
+			msg := err.Error()
+			s.Diagnose("live " + name + " refused: " + msg[:min(len(msg), 300)])
+		}
 		failure := OperationFailure{Code: "LiveUnavailable", Message: "Live observation is unavailable for this source or current access. Saved evidence and separately reviewed collection remain available.", Retryable: false}
 		if errors.Is(err, v.ErrCapacity) {
 			failure.Code = "CapacityUnavailable"

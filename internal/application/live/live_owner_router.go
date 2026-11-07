@@ -2,6 +2,7 @@ package live
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -27,7 +28,7 @@ type RoutedService struct {
 
 func NewRoutedService(local *Service, lookup OwnerCommandLookup) (*RoutedService, error) {
 	if local == nil || lookup == nil {
-		return nil, v.ErrInvalid
+		return nil, fmt.Errorf("%w: live_owner_router:30", v.ErrInvalid)
 	}
 	return &RoutedService{local, lookup}, nil
 }
@@ -36,7 +37,7 @@ func (s *RoutedService) List(ctx context.Context, current CurrentIdentity, targe
 }
 func (s *RoutedService) BeginLiveCommand(ctx context.Context, current CurrentIdentity, c Command) (CommandDelivery, error) {
 	if s == nil || s.local == nil || s.lookup == nil || ctx == nil || ctx.Err() != nil {
-		return nil, v.ErrUnavailable
+		return nil, fmt.Errorf("%w: live_owner_router:39", v.ErrUnavailable)
 	}
 	call, cancel := context.WithTimeout(ctx, 5*time.Second)
 	transferred := false
@@ -57,7 +58,7 @@ func (s *RoutedService) BeginLiveCommand(ctx context.Context, current CurrentIde
 	}
 	if found {
 		if route == nil || route.OwnerID() == "" {
-			return nil, v.ErrUnavailable
+			return nil, fmt.Errorf("%w: live_owner_router:60", v.ErrUnavailable)
 		}
 		if route.OwnerID() != s.local.cfg.OwnerID {
 			d, e := route.Begin(ctx, current, c, keys)
@@ -68,7 +69,7 @@ func (s *RoutedService) BeginLiveCommand(ctx context.Context, current CurrentIde
 			return &cancelCommandDelivery{CommandDelivery: d, cancel: cancel}, nil
 		}
 	} else if c.Open == nil {
-		return nil, v.ErrUnavailable
+		return nil, fmt.Errorf("%w: live_owner_router:71", v.ErrUnavailable)
 	}
 	d, e := s.local.BeginOwnedLocalCommand(ctx, current, c, keys)
 	if e != nil {
@@ -88,7 +89,7 @@ func (s *RoutedService) Open(ctx context.Context, current CurrentIdentity, r v.O
 	defer d.Close(ctx)
 	out := d.Result()
 	if out.Watch == nil {
-		return v.Watch{}, v.ErrUnavailable
+		return v.Watch{}, fmt.Errorf("%w: live_owner_router:91", v.ErrUnavailable)
 	}
 	return *out.Watch, nil
 }
@@ -100,7 +101,7 @@ func (s *RoutedService) Read(ctx context.Context, current CurrentIdentity, r v.R
 	defer d.Close(ctx)
 	out := d.Result()
 	if out.Batch == nil {
-		return v.Batch{}, v.ErrUnavailable
+		return v.Batch{}, fmt.Errorf("%w: live_owner_router:103", v.ErrUnavailable)
 	}
 	return *out.Batch, nil
 }
@@ -112,7 +113,7 @@ func (s *RoutedService) Update(ctx context.Context, current CurrentIdentity, r v
 	defer d.Close(ctx)
 	out := d.Result()
 	if out.Watch == nil {
-		return v.Watch{}, v.ErrUnavailable
+		return v.Watch{}, fmt.Errorf("%w: live_owner_router:115", v.ErrUnavailable)
 	}
 	return *out.Watch, nil
 }
@@ -122,7 +123,7 @@ func (s *RoutedService) Update(ctx context.Context, current CurrentIdentity, r v
 // identity and checks its exact original session actor/client before effects.
 func (s *Service) BeginOwnedLocalCommand(ctx context.Context, current CurrentIdentity, c Command, keys RouteKeys) (CommandDelivery, error) {
 	if s == nil || !c.Valid() || ctx == nil || ctx.Err() != nil || !keys.Actor.Valid() || !keys.Policy.Valid() || !s.cfg.Now().Before(keys.Until) {
-		return nil, v.ErrInvalid
+		return nil, fmt.Errorf("%w: live_owner_router:125", v.ErrInvalid)
 	}
 	current = routeBoundIdentity{inner: current, keys: keys, now: s.cfg.Now}
 	var result CommandResult
@@ -150,7 +151,7 @@ func (s *Service) BeginOwnedLocalCommand(ctx context.Context, current CurrentIde
 	}
 	if result.Batch != nil {
 		if result.Batch.DisclosureUntil.IsZero() {
-			return nil, v.ErrUnavailable
+			return nil, fmt.Errorf("%w: live_owner_router:153", v.ErrUnavailable)
 		}
 		until = minTime(until, result.Batch.DisclosureUntil)
 	}
@@ -158,7 +159,7 @@ func (s *Service) BeginOwnedLocalCommand(ctx context.Context, current CurrentIde
 		until = minTime(until, result.Watch.ExpiresAt)
 	}
 	if !s.cfg.Now().Before(until) || ctx.Err() != nil {
-		return nil, v.ErrUnavailable
+		return nil, fmt.Errorf("%w: live_owner_router:161", v.ErrUnavailable)
 	}
 	owned, cancel := context.WithDeadline(ctx, until)
 	return &localCommandDelivery{ctx: owned, cancel: cancel, result: result, until: until, now: s.cfg.Now}, nil
