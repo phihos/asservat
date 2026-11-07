@@ -52,6 +52,11 @@ func installedLogsQuerySQLCheck(t *testing.T, ctx context.Context, admin *pgxpoo
 			var raw, job, binding, expectation []byte
 			var units, rootUnits, workUnits, principalUnits, expectedPrincipal, expectedRoot, queries, summaries, children, uses int
 			var bytes, ops int64
+			// Prior is everything a development-only rerun's earlier runs
+			// charged (created before this rerun started). An ordinary run passes
+			// the zero time, so every prior is zero and each total is absolute.
+			var priorRoot, priorWork, priorPrincipal, priorQueries, priorSummaries, priorUses int
+			var priorBytes, priorOps int64
 			err := admin.QueryRow(call, `SELECT w.intent_json,w.job_json,w.binding_json,c.expectation_json,context_query_units(q.query->'Scope'),b.allocated,a.allocated,p.allocated,
 (SELECT coalesce(sum(context_query_units(x.query->'Scope')),0) FROM context_query x WHERE x.root_id=q.root_id AND x.account_id=p.id),
 (SELECT coalesce(sum(context_query_units(x.query->'Scope')),0) FROM context_query x WHERE x.root_id=q.root_id),
@@ -60,9 +65,21 @@ func installedLogsQuerySQLCheck(t *testing.T, ctx context.Context, admin *pgxpoo
 (SELECT count(*) FROM context_query_key_binding k WHERE k.query_id=q.id),
 (SELECT count(*) FROM access_grant_use u WHERE u.root_id=q.root_id AND u.operation='get_logs'),
 (SELECT coalesce(sum(u.bytes),0) FROM access_grant_use u WHERE u.root_id=q.root_id AND u.operation='get_logs'),
-(SELECT coalesce(sum(u.operations),0) FROM access_grant_use u WHERE u.root_id=q.root_id AND u.operation='get_logs')
+(SELECT coalesce(sum(u.operations),0) FROM access_grant_use u WHERE u.root_id=q.root_id AND u.operation='get_logs'),
+(SELECT coalesce(sum(context_query_units(x.query->'Scope')),0) FROM context_query x WHERE x.root_id=q.root_id AND x.created_at<$4),
+(SELECT coalesce(sum(context_query_units(x.query->'Scope')),0) FROM context_query x WHERE x.root_id=q.root_id AND x.allocation_id=a.id AND x.created_at<$4),
+(SELECT coalesce(sum(context_query_units(x.query->'Scope')),0) FROM context_query x WHERE x.root_id=q.root_id AND x.account_id=p.id AND x.created_at<$4),
+(SELECT count(*) FROM context_query x WHERE x.root_id=q.root_id AND x.query->'Scope'->>'DisplayVersion'='approved-logs/v1' AND x.created_at<$4),
+(SELECT count(*) FROM context_query x WHERE x.root_id=q.root_id AND x.query->'Scope'->>'DisplayVersion' IS DISTINCT FROM 'approved-logs/v1' AND x.created_at<$4),
+(SELECT count(*) FROM access_grant_use u WHERE u.root_id=q.root_id AND u.operation='get_logs' AND u.created_at<$4),
+(SELECT coalesce(sum(u.bytes),0) FROM access_grant_use u WHERE u.root_id=q.root_id AND u.operation='get_logs' AND u.created_at<$4),
+(SELECT coalesce(sum(u.operations),0) FROM access_grant_use u WHERE u.root_id=q.root_id AND u.operation='get_logs' AND u.created_at<$4)
 FROM context_query q JOIN context_capture c ON c.root_id=q.root_id AND c.id::text=q.query#>>'{Scope,CaptureID}' JOIN context_query_backing b ON b.root_id=q.root_id JOIN context_query_allocation a ON a.id=q.allocation_id JOIN context_query_principal p ON p.id=q.account_id JOIN download_worker w ON w.id=q.worker_id AND w.query_id=q.id AND w.session_id IS NULL
-WHERE q.root_id=$1 AND q.operation_id=$2 AND q.query->'Scope'->>'ArtifactID'=$3`, root, operation, artifactID).Scan(&raw, &job, &binding, &expectation, &units, &rootUnits, &workUnits, &principalUnits, &expectedPrincipal, &expectedRoot, &queries, &summaries, &children, &uses, &bytes, &ops)
+WHERE q.root_id=$1 AND q.operation_id=$2 AND q.query->'Scope'->>'ArtifactID'=$3`, root, operation, artifactID, installedRerunStartedAt).Scan(&raw, &job, &binding, &expectation, &units, &rootUnits, &workUnits, &principalUnits, &expectedPrincipal, &expectedRoot, &queries, &summaries, &children, &uses, &bytes, &ops,
+				&priorRoot, &priorWork, &priorPrincipal, &priorQueries, &priorSummaries, &priorUses, &priorBytes, &priorOps)
+			rootUnits, expectedRoot, workUnits = rootUnits-priorRoot, expectedRoot-priorRoot, workUnits-priorWork
+			principalUnits, expectedPrincipal = principalUnits-priorPrincipal, expectedPrincipal-priorPrincipal
+			queries, summaries, uses, bytes, ops = queries-priorQueries, summaries-priorSummaries, uses-priorUses, bytes-priorBytes, ops-priorOps
 			var intent query.ContextProjectionWorkerIntent
 			var observed value.AcquisitionWorker
 			var original artifact.ContextExpectation
@@ -132,7 +149,7 @@ WHERE q.root_id=$1 AND q.operation_id=$2 AND q.query->'Scope'->>'ArtifactID'=$3`
 				if err != nil {
 					t.Fatal("raw logs query exact terminal/retirement", err)
 				}
-				t.Logf("installed raw logs query SQL: priorqueries%d queries%d/%dunits; exact account%d=root%d/workload%d; each page one24KiB/one-op original parent+child use, one three-role native/public joined batch; original Pod limit%d/500m; collection/observation unchanged", 0, queries, queries*query.LogQueryUnits, principalUnits, rootUnits, workUnits, q.Plan.Profile.Worker.MemoryBytes)
+				t.Logf("installed raw logs query SQL: priorqueries%d queries%d/%dunits; exact account%d=root%d/workload%d; each page one24KiB/one-op original parent+child use, one three-role native/public joined batch; original Pod limit%d/500m; collection/observation unchanged", priorQueries, queries, queries*query.LogQueryUnits, principalUnits, rootUnits, workUnits, q.Plan.Profile.Worker.MemoryBytes)
 			}
 			if terminalSink != nil {
 				terminalSink(finishTerminal)
