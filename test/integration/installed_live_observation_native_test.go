@@ -292,7 +292,7 @@ func qualifyInstalledLiveObservation(t *testing.T, ctx context.Context, c instal
 		if episodes > 6 {
 			return errors.New("more than six original source episodes")
 		}
-		if source.SourceID == "" || source.PodUID == "" || source.ActionID == "" || !time.Now().Before(source.HardUntil) {
+		if source.SourceID == "" || source.PodUID == "" || source.ActionID == "" || !source.HardUntil.IsZero() && !time.Now().Before(source.HardUntil) {
 			return errors.New("actual original running source required")
 		}
 		// MCP first: it waits for the original source to become eligible.
@@ -388,7 +388,7 @@ func installedLiveMCP(t *testing.T, ctx context.Context, db *pgxpool.Pool, root 
 	if _, e := must("open_live_watch", request, &watch); e != nil {
 		return e
 	}
-	if !slices.Equal(watch.SourceIDs, []string{source.SourceID}) || watch.Cursor == nil || watch.ExpiresAt.After(source.HardUntil) {
+	if !slices.Equal(watch.SourceIDs, []string{source.SourceID}) || watch.Cursor == nil || !source.HardUntil.IsZero() && watch.ExpiresAt.After(source.HardUntil) {
 		return errors.New("watch extended or replaced original source")
 	}
 	before := watch
@@ -424,7 +424,7 @@ func installedLiveMCP(t *testing.T, ctx context.Context, db *pgxpool.Pool, root 
 		return errors.New("real source has no qualified approved live row")
 	}
 	for _, r := range batch.Rows {
-		if r.SourceID != source.SourceID || r.PodUID != source.PodUID || r.Projection != source.Projection || r.ExpiresAt.After(source.HardUntil) || !r.Valid(time.Now()) {
+		if r.SourceID != source.SourceID || r.PodUID != source.PodUID || r.Projection != source.Projection || !source.HardUntil.IsZero() && r.ExpiresAt.After(source.HardUntil) || !r.Valid(time.Now()) {
 			return errors.New("row source/time/projection changed")
 		}
 		raw, _ := json.Marshal(r)
@@ -582,7 +582,7 @@ func (p *installedLiveBrowser) read(out any) {
 	}
 }
 func (p *installedLiveBrowser) begin(s installedLiveFixture) {
-	p.send(map[string]any{"kind": "observe", "source": map[string]any{"source_id": s.SourceID, "action_id": s.ActionID, "pod_uid": s.PodUID, "kind": s.Kind, "projection": s.Projection, "hard_until": s.HardUntil, "forbidden": []string{manualHTTPMarker, installedLiveProducerMarker}}})
+	p.send(map[string]any{"kind": "observe", "source": map[string]any{"source_id": s.SourceID, "action_id": s.ActionID, "pod_uid": s.PodUID, "kind": s.Kind, "projection": s.Projection, "hard_until": installedLiveHardUntil(s.HardUntil), "forbidden": []string{manualHTTPMarker, installedLiveProducerMarker}}})
 }
 func (p *installedLiveBrowser) finishEpisode(s installedLiveFixture) {
 	p.t.Helper()
@@ -680,4 +680,13 @@ func installedLiveAdministrator(ctx context.Context, api kubernetes.Interface, w
 		return "installed-live-administrator", append(wg, dg...), nil
 	}
 	return "", nil, fmt.Errorf("no administrator accepted by both guards: workload users %v groups %v, delivery users %v groups %v", wu, wg, du, dg)
+}
+
+// installedLiveHardUntil is null for a manual session, whose lease comes from
+// the live catalog rather than a known policy source hard end.
+func installedLiveHardUntil(t time.Time) any {
+	if t.IsZero() {
+		return nil
+	}
+	return t
 }
