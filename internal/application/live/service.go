@@ -659,9 +659,9 @@ func (s *Service) Read(ctx context.Context, current CurrentIdentity, r v.Read) (
 					batch.Gaps = appendLiveGap(batch.Gaps, v.Gap{Reason: reason, SourceID: &id, From: batch.From, Until: now})
 					continue
 				}
-				// Read authority here is the reader's session/permit validity; the
-				// five-second freshness re-checks bound each read, not row display.
-				row.ExpiresAt = minTime(row.ExpiresAt, i.ValidUntil, st.watch.ExpiresAt, st.selected[idx].PrivacyUntil, row.ObservedAt.Add(time.Duration(st.watch.Limits.RowAge)*time.Second-time.Duration(row.ClockUncertainty)*time.Millisecond))
+				// Read authority is re-checked by every read and a denial ends the
+				// view; it bounds each read, not how long a disclosed row displays.
+				row.ExpiresAt = minTime(row.ExpiresAt, st.watch.ExpiresAt, st.selected[idx].PrivacyUntil, row.ObservedAt.Add(time.Duration(st.watch.Limits.RowAge)*time.Second-time.Duration(row.ClockUncertainty)*time.Millisecond))
 				if !row.Valid(now) {
 					continue
 				}

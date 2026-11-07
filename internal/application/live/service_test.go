@@ -879,7 +879,10 @@ func TestLiveRowExpiryIsNotTheFreshnessCheckBound(t *testing.T) {
 		t.Fatal(e)
 	}
 	f.add()
-	batch, e := s.Read(t.Context(), i, v.Read{ID: w.ID, Cursor: *w.Cursor})
+	// The identity snapshot itself is only fresh for five seconds.
+	short := i
+	short.i.ValidUntil = f.now.Add(5 * time.Second)
+	batch, e := s.Read(t.Context(), short, v.Read{ID: w.ID, Cursor: *w.Cursor})
 	if e != nil || len(batch.Rows) != 1 {
 		t.Fatal(batch, e)
 	}
