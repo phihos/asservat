@@ -316,6 +316,21 @@ func installedLiveMCP(t *testing.T, ctx context.Context, db *pgxpool.Pool, root 
 	t.Helper()
 	must := func(name string, args any, out any) (installedLiveReply, error) {
 		r, code, e := call(ctx, name, args)
+		// A retryable refusal (for example a source lease renewing) failed only
+		// that call; retry it a bounded number of times and record each one.
+		for attempt := 1; e == nil && code == "LiveUnavailable" && attempt <= 5; attempt++ {
+			var failure struct {
+				Retryable bool `json:"retryable"`
+			}
+			if json.Unmarshal(r.Data, &failure) != nil || !failure.Retryable {
+				break
+			}
+			t.Logf("installed live %s attempt %d retryable LiveUnavailable; retrying", name, attempt)
+			if e = installedJourneyPause(ctx, time.Second); e != nil {
+				return r, e
+			}
+			r, code, e = call(ctx, name, args)
+		}
 		if e != nil || code != "" || r.Status != "ok" {
 			return r, fmt.Errorf("installed live %s: %s %w", name, code, e)
 		}
