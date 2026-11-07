@@ -327,7 +327,8 @@ func (s *Service) Open(ctx context.Context, current CurrentIdentity, r v.Open) (
 	positions, err := s.reader.Head(headCall, selected, r.Projection)
 	headCancel()
 	if err != nil || len(positions) != len(selected) || !s.cfg.Now().Before(proofUntil) {
-		return zero, fmt.Errorf("%w: service:327", v.ErrUnavailable)
+		// Nothing was created yet; the same idempotent open can be retried.
+		return zero, fmt.Errorf("%w: %w: service:327", v.ErrUnavailable, v.ErrTransient)
 	}
 	final, err := s.actor(ctx, current)
 	if err != nil || !sameLiveIdentity(i, final) {
