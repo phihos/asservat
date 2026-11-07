@@ -31,7 +31,7 @@ type fixture struct {
 	afterHead, afterCurrent        func()
 	source                         v.Source
 	denied                         bool
-	transient                      bool
+	transient, ledgerTransient     bool
 	broken                         bool
 	reads, heads, changes, created int
 	seq                            uint64
@@ -425,6 +425,9 @@ func TestLiveExpiredReplayUsesAuthenticatedLaggingCursorAndFreshHead(t *testing.
 func (f *fixture) CurrentLive(_ context.Context, c Control) error {
 	if f.afterCurrent != nil {
 		f.afterCurrent()
+	}
+	if f.ledgerTransient {
+		return v.ErrUnavailable
 	}
 	old, ok := f.controls[c.ID]
 	if !ok || old.Fence != c.Fence || old.Revision != c.Revision || old.Spent != c.Spent {
@@ -848,6 +851,17 @@ func TestLiveTransientSourceMissKeepsViewOpen(t *testing.T) {
 	batch, e := s.Read(t.Context(), i, v.Read{ID: w.ID, Cursor: *w.Cursor})
 	if e != nil || len(batch.Rows) != 1 || batch.State != "Active" {
 		t.Fatal("view did not survive a transient miss", batch.State, e)
+	}
+	f.ledgerTransient = true
+	if _, e := s.Update(t.Context(), i, v.Update{ID: w.ID, Revision: batch.Revision, Key: "pause-transient", Mode: "Paused"}, false); !errors.Is(e, v.ErrTransient) {
+		t.Fatal("transient ledger miss on update was not transient", e)
+	}
+	f.ledgerTransient = false
+	f.add()
+	if again, e := s.Read(t.Context(), i, v.Read{ID: w.ID, Cursor: batch.Cursor}); e != nil || again.State != "Active" {
+		t.Fatal("view did not survive a transient ledger miss", again.State, e)
+	} else {
+		batch = again
 	}
 	f.add()
 	f.denied = true

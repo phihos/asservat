@@ -477,6 +477,11 @@ func (s *Service) current(ctx context.Context, current CurrentIdentity, st *sess
 		end = minTime(end, until, checked.LeaseUntil, checked.PrivacyUntil)
 	}
 	if e := s.ledger.CurrentLive(ctx, st.control); e != nil {
+		// Ledger unavailability is not an access decision; a refused or
+		// changed control is.
+		if !errors.Is(e, v.ErrDenied) && errors.Is(e, v.ErrUnavailable) && ctx.Err() == nil {
+			return end, fmt.Errorf("%w: %w: service:470: %v", v.ErrUnavailable, v.ErrTransient, e)
+		}
 		return end, fmt.Errorf("%w: service:470", v.ErrDenied)
 	}
 	final, e := s.actor(ctx, current)
@@ -813,7 +818,9 @@ func (s *Service) Update(ctx context.Context, current CurrentIdentity, r v.Updat
 	currentEnd, currentErr := s.current(ctx, current, st, i)
 	err = currentErr
 	if err != nil && !close {
-		s.clear(st, "AccessLost")
+		if !errors.Is(err, v.ErrTransient) {
+			s.clear(st, "AccessLost")
+		}
 		return zero, err
 	}
 	if v.Terminal(st.watch.State) && !close {
