@@ -29,6 +29,7 @@ import (
 
 	liveapp "asservat.local/asservat/internal/application/live"
 	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/identity"
 	v "asservat.local/asservat/internal/domain/live"
 	"github.com/jackc/pgx/v5/pgxpool"
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
@@ -91,7 +92,7 @@ func installedLiveSettings(in contracts.DownloadEnvironmentSettings, root, clust
 		}
 	}
 	out.Revision++
-	out.LiveRead = &contracts.LiveReadSettings{Root: contracts.LiveRootSettings{Watches: 4, PrincipalWatches: 2, WorkloadWatches: 2, Rate: 1 << 20, Burst: 1 << 20}, Projections: []string{v.Packet, v.Syscall, v.HTTP}, Clients: clients, Ceilings: []contracts.LiveReadCeiling{{ClusterID: cluster, Duration: 20, Output: 1 << 20, Rate: 64 << 10, Rows: 20, Buffer: 128 << 10, RowAge: 10, Replay: 5}}}
+	out.LiveRead = &contracts.LiveReadSettings{Root: contracts.LiveRootSettings{Watches: 4, PrincipalWatches: 2, WorkloadWatches: 2, Rate: 1 << 20, Burst: 1 << 20}, Projections: []string{v.Packet, v.Syscall, v.HTTP}, Clients: clients, Ceilings: []contracts.LiveReadCeiling{{ClusterID: cluster, Duration: 20, Output: 1 << 20, Rate: 64 << 10, Rows: 20, Buffer: 128 << 10, RowAge: 30, Replay: 5}}}
 	encoded, err := json.Marshal(out)
 	if err != nil || len(encoded) > contracts.DownloadEnvironmentMaxBytes {
 		return contracts.DownloadEnvironmentSettings{}, errors.New("delivery settings bound")
@@ -375,6 +376,7 @@ func installedLiveMCP(t *testing.T, ctx context.Context, db *pgxpool.Pool, root 
 	}
 	readInput := map[string]any{"watch_id": watch.ID, "cursor": *watch.Cursor, "limit": 20, "wait_ms": 1000}
 	var received installedLiveReply
+	var receivedAt time.Time
 	var batch *v.Batch
 	for tries := 0; tries < 4; tries++ {
 		r, e := must("read_live_watch", readInput, nil)
@@ -386,7 +388,7 @@ func installedLiveMCP(t *testing.T, ctx context.Context, db *pgxpool.Pool, root 
 		if e != nil || decoded.Batch == nil {
 			return errors.New("closed approved row union invalid")
 		}
-		received = r
+		received, receivedAt = r, time.Now()
 		batch = decoded.Batch
 		if len(batch.Rows) > 0 {
 			break
@@ -408,6 +410,12 @@ func installedLiveMCP(t *testing.T, ctx context.Context, db *pgxpool.Pool, root 
 			return errors.New("source canary entered approved projection")
 		}
 	}
+	// Replay is retained only until the earliest row expiry and the replay
+	// ceiling, both from delivery; assert equality only inside that window.
+	replayUntil := receivedAt.Add(5 * time.Second)
+	for _, r := range batch.Rows {
+		replayUntil = identity.Earlier(replayUntil, r.ExpiresAt)
+	}
 	replay, e := must("read_live_watch", readInput, nil)
 	if e != nil {
 		return e
@@ -416,7 +424,10 @@ func installedLiveMCP(t *testing.T, ctx context.Context, db *pgxpool.Pool, root 
 	if json.Unmarshal(received.Data, &a) != nil || json.Unmarshal(replay.Data, &b) != nil {
 		return errors.New("replay shape")
 	}
-	if string(a["batch_id"]) != string(b["batch_id"]) || string(a["rows"]) != string(b["rows"]) {
+	if replayedAt := time.Now(); !replayedAt.Before(replayUntil) {
+		t.Logf("installed live replay after its retained window (%s late); equality not asserted", replayedAt.Sub(replayUntil).Round(time.Millisecond))
+	} else if string(a["batch_id"]) != string(b["batch_id"]) || string(a["rows"]) != string(b["rows"]) {
+		t.Logf("replay mismatch: received batch %s rows %d, replay batch %s, window left %s", a["batch_id"], len(batch.Rows), b["batch_id"], time.Until(replayUntil).Round(time.Millisecond))
 		return errors.New("same cursor changed retained observations")
 	}
 	var firstSpend, lastSpend int64
