@@ -94,7 +94,7 @@ func (p DownloadPolicy) SelectLive(actor identity.Principal, target authorizatio
 func (p DownloadPolicy) SelectLiveReason(actor identity.Principal, target authorization.Target, projection string, now time.Time) (DownloadPath, LiveLimits, string) {
 	var path DownloadPath
 	var limits LiveLimits
-	if !p.Valid(now) || p.Suspended || p.LiveRead == nil || !actor.Valid() || !target.Valid() || projection != "" && !liveProjection(projection) {
+	if !p.DownloadValid(now) || p.Suspended || p.LiveRead == nil || !actor.Valid() || !target.Valid() || projection != "" && !liveProjection(projection) {
 		return path, limits, "policy"
 	}
 	l := p.LiveRead

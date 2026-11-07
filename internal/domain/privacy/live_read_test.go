@@ -18,6 +18,13 @@ func TestLiveReadRequiresIndependentOptInExactClientPathAndScope(t *testing.T) {
 	if _, got, ok := p.SelectLive(a, target, "packetMetadata", now); !ok || got != limits {
 		t.Fatal("explicit live client denied", got, ok)
 	}
+	// The shared bounded download-policy observation (cached interval) is
+	// accepted, not only a raw five-second observation.
+	cached := p
+	cached.FreshUntil = cached.ObservedAt.Add(DownloadPolicyObservationInterval)
+	if _, _, ok := cached.SelectLive(a, target, "packetMetadata", now); !ok {
+		t.Fatal("bounded cached policy observation refused for live")
+	}
 	if _, ok := p.Select(a, target.ClusterID, p.Paths[0].StoreID, "diagnostics", "metadata", "potentialPersonalData", "context", now); ok {
 		t.Fatal("live opt-in enabled download")
 	}
