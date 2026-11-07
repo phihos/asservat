@@ -93,7 +93,6 @@ func (r liveProjectionReader) Read(ctx context.Context, sources []v.Source, proj
 	if e != nil {
 		return app.Projection{}, e
 	}
-	until, _ := ctx.Deadline()
 	for n, a := range answers {
 		source := sources[n]
 		id := source.ID()
@@ -138,7 +137,9 @@ func (r liveProjectionReader) Read(ctx context.Context, sources []v.Source, proj
 				return app.Projection{}, v.ErrUnavailable
 			}
 			last = row.Sequence
-			at, end, uncertainty, ok := proof.Place(pending.Nanos, id, source.Boot(), pending.Clock, source.PrivacyUntil, source.HardUntil, until)
+			// The read deadline bounds this read, not row display; the service
+			// applies the watch and privacy bounds to each disclosed row.
+			at, end, uncertainty, ok := proof.Place(pending.Nanos, id, source.Boot(), pending.Clock, source.PrivacyUntil, source.HardUntil, source.HardUntil)
 			if !ok {
 				status.Coverage = "unknown"
 				continue

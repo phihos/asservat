@@ -37,7 +37,7 @@ func TestLivePrivateProjectionUsesOriginalClockAndLossDelta(t *testing.T) {
 	ctx, cancel := context.WithDeadline(t.Context(), now.Add(5*time.Second))
 	defer cancel()
 	out, e := reader.Read(ctx, []v.Source{source}, v.Packet, []v.Position{{Sequence: 3, Lost: 5}}, 100, 4096, 0)
-	if e != nil || len(out.Rows) != 1 || !out.Rows[0].ObservedAt.Equal(now.Add(-time.Second)) || !out.Rows[0].ExpiresAt.Equal(now.Add(5*time.Second)) || len(out.Gaps) != 1 || out.Gaps[0].Count == nil || *out.Gaps[0].Count != 2 {
+	if e != nil || len(out.Rows) != 1 || !out.Rows[0].ObservedAt.Equal(now.Add(-time.Second)) || !out.Rows[0].ExpiresAt.Equal(now.Add(29*time.Second)) || len(out.Gaps) != 1 || out.Gaps[0].Count == nil || *out.Gaps[0].Count != 2 {
 		t.Fatal(out, e)
 	}
 	// The same cumulative lost count is not counted again next time.
