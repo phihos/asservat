@@ -48,7 +48,7 @@ func NewAPIContextWork(w APIContextWork, c fleetvalue.APIContextChannel, cap pla
 	if err != nil || !c.Valid() || !cap.Valid(now) || cap.ExecutionClass != artifact.ContextAPIExecution || e.ExecutionClass != artifact.ContextAPIExecution || a.State != capturevalue.IntentAudited || !authorization.CaptureActor(w.Actor) || !w.Target.Valid() || a.ScopeDigest != e.PlanDigest || w.Target.ClusterID != e.Registration.Location.ClusterID || w.Target.Namespace.UID != e.NamespaceUID || w.Target.Workload.UID != e.WorkloadUID || w.Target.PodUID != e.PodUID || !now.Before(a.Deadline) || !now.Before(e.Registration.WriteUntil) || c.Connector.Binding.ClusterID != w.Target.ClusterID || c.Executor.ImageDigest != e.CollectorImageDigest || cap.CollectorImageDigest != e.CollectorImageDigest {
 		return fleetvalue.APIContextWork{}, value.ErrDenied
 	}
-	for _, d := range []time.Time{started.Add(5 * time.Second), a.Deadline, e.Registration.WriteUntil, cap.FreshUntil} {
+	for _, d := range []time.Time{started.Add(identity.AuthorityRecheckInterval), a.Deadline, e.Registration.WriteUntil, cap.FreshUntil} {
 		until = identity.Earlier(until, d)
 	}
 	out := fleetvalue.APIContextWork{Channel: c, CaptureID: a.CaptureID, AttemptID: e.Registration.Location.AttemptID, Actor: w.Actor, Target: authorization.Target{ClusterID: w.Target.ClusterID, NamespaceUID: w.Target.Namespace.UID, WorkloadUID: w.Target.Workload.UID, PodUID: w.Target.PodUID}, ScopeDigest: a.ScopeDigest, ExpectationDigest: evidence.ContextExpectationDigest(e), IntentDigest: w.IntentDigest, BudgetDigest: budget, Capability: cap.Revision, ProjectionDigest: cap.ProjectionDigest, IssuedAt: started.UTC().Truncate(time.Microsecond), NotAfter: until.UTC().Truncate(time.Microsecond)}

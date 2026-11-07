@@ -32,7 +32,7 @@ type APIProcessObservation struct {
 }
 
 func (o APIProcessObservation) Valid(now time.Time) bool {
-	return o.Binding.Valid() && identity.Fresh(o.CheckedAt, o.ValidUntil, now, 5*time.Second)
+	return o.Binding.Valid() && identity.Fresh(o.CheckedAt, o.ValidUntil, now, identity.AuthorityRecheckInterval)
 }
 func (o APIProcessObservation) Matches(b Binding) bool {
 	return b.ExecutionClass == artifact.ContextAPIExecution && b.ClusterID == o.Binding.ClusterID && b.IssuerEpoch == o.Binding.IssuerEpoch && b.ExecutorPodUID == o.Binding.PodUID && b.ExecutorAccountUID == o.Binding.AccountUID && b.CollectorEpoch == o.Binding.ProcessEpoch
@@ -48,7 +48,7 @@ type PreparationCheck struct {
 }
 
 func (p PreparationCheck) Valid(now time.Time) bool {
-	return p.Binding.Valid() && p.Binding.ExecutionClass == artifact.ContextAPIExecution && identity.Fresh(p.CheckedAt, p.ValidUntil, now, 5*time.Second) && !p.ValidUntil.After(p.Binding.NotAfter) && !now.Before(p.Binding.NotBefore)
+	return p.Binding.Valid() && p.Binding.ExecutionClass == artifact.ContextAPIExecution && identity.Fresh(p.CheckedAt, p.ValidUntil, now, identity.AuthorityRecheckInterval) && !p.ValidUntil.After(p.Binding.NotAfter) && !now.Before(p.Binding.NotBefore)
 }
 
 type PreparedStart struct{ ObjectUID, ResourceVersion string }

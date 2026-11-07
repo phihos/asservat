@@ -24,8 +24,11 @@ type connectorAPIProof struct {
 	observedAt, validUntil time.Time
 }
 
+// valid admits one completed proof for the ADR-311 recheck interval: the
+// native proof was current when checked, and the snapshot never outlives the
+// owned process's run end or client certificate.
 func (p connectorAPIProof) valid(now time.Time) bool {
-	return p.proof.Valid(now) && p.owned.Request.Process == p.proof.Process && identity.Fresh(p.observedAt, p.validUntil, now, 5*time.Second) && !p.validUntil.After(p.proof.FreshUntil) && !p.validUntil.After(p.owned.ValidUntil)
+	return p.proof.Valid(p.proof.ObservedAt) && p.owned.Request.Process == p.proof.Process && identity.Fresh(p.observedAt, p.validUntil, now, identity.AuthorityRecheckInterval) && !p.validUntil.After(p.owned.HardUntil())
 }
 
 type connectorAPIProofFlight struct {
@@ -182,8 +185,13 @@ func (g *ConnectorAPIExecutionProtection) recheckProof(ctx context.Context, p co
 	if e != nil || owned.Request.Process != p.owned.Request.Process || owned.Registration.Certificate != p.owned.Registration.Certificate || !owned.Configuration.SameSource(p.owned.Configuration) {
 		return fail(cfg.ErrChanged)
 	}
-	p.validUntil = identity.Earlier(p.validUntil, owned.ValidUntil)
-	call, stop := context.WithDeadline(ctx, p.validUntil)
+	// The cheap reads are bounded by the fresh owned observation; the snapshot
+	// keeps its original interval, never past the process's hard end.
+	// The fresh owned observation replaces the proof's one, so a reader gets
+	// current process/registration facts, not ones from the proof's start.
+	p.validUntil = identity.Earlier(p.validUntil, owned.HardUntil())
+	p.owned = owned
+	call, stop := context.WithDeadline(ctx, identity.Earlier(p.validUntil, owned.ValidUntil))
 	defer stop()
 	if e := g.recheckNative(call, p); e != nil {
 		return fail(e)

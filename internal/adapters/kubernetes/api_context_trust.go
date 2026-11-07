@@ -168,7 +168,10 @@ func (s *APIContextWorkTrustSource) APIContextWorkTrust(ctx context.Context) (fl
 func (s *APIContextWorkTrustSource) readTrust(ctx context.Context) (fleet.APIContextWorkTrust, error) {
 	var zero fleet.APIContextWorkTrust
 	start := s.client.now()
+	// until bounds this check's reads (five seconds); valid is the ADR-311
+	// interval the completed trust check may be used for, never past recovery.
 	until := start.Add(5 * time.Second)
+	valid := start.Add(identity.AuthorityRecheckInterval)
 	if d, ok := ctx.Deadline(); ok {
 		until = identity.Earlier(until, d)
 	}
@@ -179,6 +182,7 @@ func (s *APIContextWorkTrustSource) readTrust(ctx context.Context) (fleet.APICon
 		return zero, trustStep{"recovery", cfg.ErrUnavailable}
 	}
 	until = identity.Earlier(until, recovery.FreshUntil)
+	valid = identity.Earlier(valid, recovery.FreshUntil)
 	call, stopRecovery := context.WithDeadline(call, until)
 	defer stopRecovery()
 	guard, guardUntil, e := s.protection.current(call)
@@ -205,8 +209,8 @@ func (s *APIContextWorkTrustSource) readTrust(ctx context.Context) (fleet.APICon
 	if e != nil || !last.Valid(s.client.now()) || last.InstallationID != recovery.InstallationID || last.IssuerEpoch != recovery.IssuerEpoch || last.Revision != recovery.Revision {
 		return zero, trustStep{"recovery-final", cfg.ErrChanged}
 	}
-	until = identity.Earlier(until, last.FreshUntil)
-	out, e := apiWorkTrustValue(s.installed, s.uid, start, until)
+	valid = identity.Earlier(valid, last.FreshUntil)
+	out, e := apiWorkTrustValue(s.installed, s.uid, start, valid)
 	if e != nil || call.Err() != nil || !out.Valid(s.client.now()) || !recovery.Valid(s.client.now()) || s.client.now().Before(start) {
 		return zero, trustStep{"value", cfg.ErrUnavailable}
 	}

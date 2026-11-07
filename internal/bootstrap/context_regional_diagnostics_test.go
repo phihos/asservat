@@ -10,6 +10,7 @@ import (
 	"time"
 
 	fleet "asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
 )
 
 func TestRegionalContextStartNamesInheritedDeadline(t *testing.T) {
@@ -21,8 +22,8 @@ func TestRegionalContextStartNamesInheritedDeadline(t *testing.T) {
 	}{
 		{"unbounded-parent", time.Time{}, "start"},
 		{"earlier-parent", started.Add(1500 * time.Millisecond), "parent"},
-		{"equal-parent", started.Add(5 * time.Second), "start"},
-		{"later-parent", started.Add(6 * time.Second), "start"},
+		{"equal-parent", started.Add(identity.AuthorityRecheckInterval), "start"},
+		{"later-parent", started.Add(identity.AuthorityRecheckInterval + time.Second), "start"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()

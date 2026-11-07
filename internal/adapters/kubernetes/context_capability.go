@@ -107,7 +107,10 @@ func (s *ContextCapabilitySource) ContextCapability(ctx context.Context, target 
 		return zero, cfg.ErrInvalid
 	}
 	started := s.client.now()
+	// until bounds this check's reads (five seconds); valid is the ADR-311
+	// interval the completed check may be used for, never past recovery.
 	until := started.Add(5 * time.Second)
+	valid := started.Add(identity.AuthorityRecheckInterval)
 	if d, ok := ctx.Deadline(); ok {
 		until = identity.Earlier(until, d)
 	}
@@ -118,6 +121,7 @@ func (s *ContextCapabilitySource) ContextCapability(ctx context.Context, target 
 		return zero, cfg.ErrUnavailable
 	}
 	until = identity.Earlier(until, r.FreshUntil)
+	valid = identity.Earlier(valid, r.FreshUntil)
 	call, stopRecovery := context.WithDeadline(call, until)
 	defer stopRecovery()
 	guard, guardUntil, err := s.protection.current(call)
@@ -147,7 +151,8 @@ func (s *ContextCapabilitySource) ContextCapability(ctx context.Context, target 
 		return zero, cfg.ErrChanged
 	}
 	until = identity.Earlier(until, lastRecovery.FreshUntil)
-	out.ObservedAt, out.FreshUntil = started, until
+	valid = identity.Earlier(valid, lastRecovery.FreshUntil)
+	out.ObservedAt, out.FreshUntil = started, valid
 	if call.Err() != nil || !out.Valid(s.client.now()) || !r.Valid(s.client.now()) || s.client.now().Before(started) {
 		return zero, cfg.ErrUnavailable
 	}

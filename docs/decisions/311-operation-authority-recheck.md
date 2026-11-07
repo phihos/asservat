@@ -32,3 +32,16 @@ Revocation stops disclosure at the next check, at most 30 s later (60 s for a
 delivery-policy change), instead of five seconds. SQL effect fences (recovery
 trust, audit request window, ledger compare-and-set) are unchanged. Fewer
 Kubernetes API reads per request.
+
+API capture starts use the interval end to end: the start binding (migration
+00145 relaxes `context_execution.not_after <= not_before + 30 s`;
+`execution.Binding`, `Request`, `PreparationCheck`), the start phase caps
+(phase handoff, regional start, `Execute*`, `APIContextWork` and its verified
+form, Router `Attach`), and the API target, capability, work-trust, collector
+process proof and hub/region receiver observations. Each such observation keeps
+five-second bounds on its own reads; only the completed check's validity is
+the interval, capped by hard ends (certificate `NotAfter`, process run end,
+recovery, the work's and request's original deadlines). Node execution keeps
+its five-second target and request observations; the ADR-212 one-second
+preparation headroom is unchanged. The start is still capped by the recovery
+observation until the recovery reader also uses the interval.

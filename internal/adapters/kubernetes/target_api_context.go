@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/identity"
 	value "asservat.local/asservat/internal/domain/targets"
 	"k8s.io/apimachinery/pkg/util/validation"
 )
@@ -63,7 +64,7 @@ func (c *PodTargets) resolveAPIContextPodWithPacketNode(ctx context.Context, r v
 	if ns.Deleting {
 		return value.PodResolution{}, "", value.ErrChanged
 	}
-	out := value.PodResolution{ExecutionClass: artifact.ContextAPIExecution, Request: r, Pin: artifact.PinnedPod{Namespace: r.Namespace.Name, NamespaceUID: r.Namespace.UID, Name: r.PodName, UID: r.PodUID}, PodResourceVersion: last.ref.ResourceVersion, WorkloadResourceVersion: rv, ObservedAt: start, FreshUntil: start.Add(5 * time.Second)}
+	out := value.PodResolution{ExecutionClass: artifact.ContextAPIExecution, Request: r, Pin: artifact.PinnedPod{Namespace: r.Namespace.Name, NamespaceUID: r.Namespace.UID, Name: r.PodName, UID: r.PodUID}, PodResourceVersion: last.ref.ResourceVersion, WorkloadResourceVersion: rv, ObservedAt: start, FreshUntil: start.Add(identity.AuthorityRecheckInterval)}
 	if last.owner != nil {
 		out.Pin.ControllerUID = string(last.owner.UID)
 	}

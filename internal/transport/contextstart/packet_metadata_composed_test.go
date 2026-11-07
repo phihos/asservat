@@ -357,7 +357,7 @@ func TestPacketMetadataTransportCompletionDoesNotExpireOwnedObservation(t *testi
 			f.mu.Lock()
 			observed := f.lastLocal
 			f.mu.Unlock()
-			if !time.Now().After(short) || !observed.FreshUntil.Equal(observed.ObservedAt.Add(5*time.Second)) || !observed.Valid(time.Now()) || observed.Pin.NodeName != "" {
+			if !time.Now().After(short) || !observed.FreshUntil.Equal(observed.ObservedAt.Add(identity.AuthorityRecheckInterval)) || !observed.Valid(time.Now()) || observed.Pin.NodeName != "" {
 				t.Fatal("snapshot window was inherited, restarted or node-authoritative", observed)
 			}
 		})

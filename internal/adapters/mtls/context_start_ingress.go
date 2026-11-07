@@ -207,6 +207,9 @@ func (s *ContextStartIngress) current(ctx context.Context, a contextStartConnect
 	call, stop := context.WithDeadline(ctx, started.Add(5*time.Second))
 	defer stop()
 	until, _ := call.Deadline()
+	// until bounds this check's reads; valid is the ADR-311 interval the one
+	// completed peer check may be used for, never past a certificate.
+	valid := started.Add(identity.AuthorityRecheckInterval)
 	var cancels []context.CancelFunc
 	defer func() {
 		for i := len(cancels) - 1; i >= 0; i-- {
@@ -275,6 +278,7 @@ func (s *ContextStartIngress) current(ctx context.Context, a contextStartConnect
 		return zero, value.ErrDenied
 	}
 	narrow(cert.NotAfter)
+	valid = identity.Earlier(valid, cert.NotAfter)
 	registered, e := a.Registry.ReadConnectorObservationRegistration(call, a.Profile, sources, cert)
 	if e != nil || !registered.Valid(s.now()) || registered.Certificate != cert || registered.Process != channel.Connector || registered.Revision != source.Observation.Profile.Revision {
 		switch {
@@ -294,6 +298,7 @@ func (s *ContextStartIngress) current(ctx context.Context, a contextStartConnect
 		return zero, value.ErrDenied
 	}
 	narrow(local.ValidUntil)
+	valid = identity.Earlier(valid, local.ValidUntil)
 	// The hub's own serving observation above already rests on the reused
 	// self-protection proof; only the connector source is read again.
 	finalSource, e := sources.ReadConnectorIdentitySource(call)
@@ -302,8 +307,8 @@ func (s *ContextStartIngress) current(ctx context.Context, a contextStartConnect
 		return zero, value.ErrDenied
 	}
 	narrow(finalSource.Observation.FreshUntil)
-	out := value.APIContextReceiver{Channel: channel, ObservedAt: started, ValidUntil: until}
-	if call.Err() != nil || !out.Valid(s.now()) || !source.Valid(s.now()) || !registered.Valid(s.now()) || !local.Valid(s.now()) {
+	out := value.APIContextReceiver{Channel: channel, ObservedAt: started, ValidUntil: valid}
+	if call.Err() != nil || !s.now().Before(until) || !out.Valid(s.now()) || !source.Valid(s.now()) || !registered.Valid(s.now()) || !local.Valid(s.now()) {
 		s.refuse("expired")
 		return zero, value.ErrUnavailable
 	}

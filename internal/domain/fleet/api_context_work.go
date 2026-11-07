@@ -45,7 +45,7 @@ type APIContextReceiver struct {
 }
 
 func (r APIContextReceiver) Valid(now time.Time) bool {
-	return r.Channel.Valid() && identity.Fresh(r.ObservedAt, r.ValidUntil, now, 5*time.Second)
+	return r.Channel.Valid() && identity.Fresh(r.ObservedAt, r.ValidUntil, now, identity.AuthorityRecheckInterval)
 }
 
 // APIContextWork is a signed reference to one accepted API profile. Human groups
@@ -63,7 +63,7 @@ type APIContextWork struct {
 }
 
 func (w APIContextWork) Valid(now time.Time) bool {
-	if !w.Channel.Valid() || !authorization.UUID(w.CaptureID) || !authorization.UUID(w.AttemptID) || !authorization.CaptureActor(w.Actor) || !w.Target.Valid() || w.Target.ClusterID != w.Channel.Connector.Binding.ClusterID || !w.Capability.Valid() || !identity.Fresh(w.IssuedAt, w.NotAfter, now, 5*time.Second) {
+	if !w.Channel.Valid() || !authorization.UUID(w.CaptureID) || !authorization.UUID(w.AttemptID) || !authorization.CaptureActor(w.Actor) || !w.Target.Valid() || w.Target.ClusterID != w.Channel.Connector.Binding.ClusterID || !w.Capability.Valid() || !identity.Fresh(w.IssuedAt, w.NotAfter, now, identity.AuthorityRecheckInterval) {
 		return false
 	}
 	for _, d := range []artifact.Digest{w.ScopeDigest, w.ExpectationDigest, w.IntentDigest, w.BudgetDigest, w.ProjectionDigest} {
@@ -108,7 +108,7 @@ func (t APIContextWorkTrust) Valid(now time.Time) bool {
 			return false
 		}
 	}
-	if !t.Trust.Valid(now) || t.Trust.FreshUntil.After(t.Trust.ObservedAt.Add(5*time.Second)) {
+	if !t.Trust.Valid(now) || t.Trust.FreshUntil.After(t.Trust.ObservedAt.Add(identity.AuthorityRecheckInterval)) {
 		return false
 	}
 	for _, k := range t.Trust.Keys {
@@ -130,7 +130,7 @@ type AuthenticatedAPIContextWork struct {
 }
 
 func (w AuthenticatedAPIContextWork) Valid(now time.Time) bool {
-	return w.Work.Valid(now) && identity.Text(w.KeyID, 128) && w.TrustRevision.Valid() && identity.Fresh(w.VerifiedAt, w.ValidUntil, now, 5*time.Second) && !w.ValidUntil.After(w.Work.NotAfter)
+	return w.Work.Valid(now) && identity.Text(w.KeyID, 128) && w.TrustRevision.Valid() && identity.Fresh(w.VerifiedAt, w.ValidUntil, now, identity.AuthorityRecheckInterval) && !w.ValidUntil.After(w.Work.NotAfter)
 }
 
 // APIContextOwnerCandidates is a complete bounded discovery observation. Empty

@@ -116,6 +116,9 @@ func (s *frameStream) acceptPeer(ctx context.Context, observed fleet.APIContextR
 		if s.lease != nil || len(s.leaseBounds) != 0 {
 			return fleet.APIContextReceiver{}, fleet.ErrUnavailable
 		}
+		// ctx carries the work's original deadline, not the frame's I/O
+		// bound: the lease keeps the one peer check for its ADR-311 interval
+		// (each later frame keeps its own I/O bound).
 		if d, ok := ctx.Deadline(); ok {
 			observed.ValidUntil = identity.Earlier(observed.ValidUntil, d)
 		}

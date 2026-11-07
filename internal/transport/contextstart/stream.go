@@ -199,7 +199,8 @@ func (s *frameStream) beginFrame(ctx context.Context, read bool, mode framePeerM
 		finish()
 		return nil, time.Time{}, nil, fleet.ErrUnavailable
 	}
-	observed, e = s.acceptPeer(call, observed, observedMode)
+	// The work lease takes the caller's original bound, not this frame's I/O bound.
+	observed, e = s.acceptPeer(ctx, observed, observedMode)
 	if e != nil {
 		s.interruptAt(peerStage, streamErrorReason(e))
 		finish()
@@ -540,7 +541,7 @@ func (s *frameStream) AwaitWork(ctx context.Context) (contracts.APIContextFrame,
 		s.interruptAt(streamPassivePeer, reason)
 		return empty, zero, fleet.ErrDenied
 	}
-	receiver, e = s.acceptPeer(checkCtx, receiver, mode)
+	receiver, e = s.acceptPeer(call, receiver, mode) // the passive bound, not the check's I/O bound
 	if e != nil {
 		clear(f.Payload)
 		s.interruptAt(streamPassivePeer, streamErrorReason(e))
