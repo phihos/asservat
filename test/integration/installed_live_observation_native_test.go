@@ -588,7 +588,13 @@ func (p *installedLiveBrowser) send(v any) {
 }
 func (p *installedLiveBrowser) read(out any) {
 	p.t.Helper()
-	raw, ok := <-p.events
+	var raw json.RawMessage
+	ok := false
+	select {
+	case raw, ok = <-p.events:
+	case <-time.After(3 * time.Minute):
+		// A stuck browser script must not hold the test until the CI job limit.
+	}
 	if !ok || json.Unmarshal(raw, out) != nil {
 		p.t.Fatal("installed browser event unavailable", p.diagnostic.String())
 	}
@@ -612,6 +618,12 @@ func (p *installedLiveBrowser) finishEpisode(s installedLiveFixture) {
 }
 func (p *installedLiveBrowser) close() {
 	p.once.Do(func() {
+		if p.t.Failed() {
+			// No finish handshake after a failure: the script may be stuck.
+			p.cancel()
+			<-p.done
+			return
+		}
 		p.send(map[string]any{"kind": "finish"})
 		var e struct {
 			Kind string `json:"kind"`
