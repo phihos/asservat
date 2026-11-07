@@ -77,7 +77,7 @@ MCP catalog rows expose execution_modes; preview_capture includes the protected 
 
 ### SC-LIF-005
 
-Given a user repeats a packet/syscall profile manually, when no authorized source was already recording, then preview explains the finite session and unavailable prehistory. Completion/cancellation stops that session. A source started after t0 cannot report full prehistory, and a history snapshot or catalog entry cannot revive a previous recording or grant. Browser/MCP display the same two action groups.
+Given a user repeats a packet/syscall profile manually, when no authorized source was already recording, then preview explains the finite session and unavailable prehistory. Completion/cancellation stops that session; a cancelled session stores nothing unless its storage had already started ([ADR-313](../docs/decisions/313-manual-recording-stop.md)). A source started after t0 cannot report full prehistory, and a history snapshot or catalog entry cannot revive a previous recording or grant. Browser/MCP display the same two action groups.
 
 ## REQ-LIF-006 — Preserve stopped sources for delayed exit events
 

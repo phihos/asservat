@@ -11,6 +11,7 @@ import (
 	"asservat.local/asservat/internal/adapters/postgres"
 	authapp "asservat.local/asservat/internal/application/authorization"
 	app "asservat.local/asservat/internal/application/execution"
+	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/capture"
 	value "asservat.local/asservat/internal/domain/execution"
@@ -135,7 +136,7 @@ func qualifyLiveManualStartedSource(t *testing.T, f *capacitySQLFixture, s captu
 	// live read refuses immediately. No holder or source is restarted/replaced.
 	check = refresh()
 	switch {
-	case rec.Arguments != nil:
+	case rec.Arguments != nil || rec.Profile != "rawPackets" && rec.Profile != "httpHeaders":
 		var revision int64
 		if err := f.admin.QueryRow(ctx, `SELECT progress_revision FROM context_capture WHERE root_id=$1 AND id=$2`, root, id).Scan(&revision); err != nil {
 			t.Fatal(err)
@@ -147,6 +148,33 @@ func qualifyLiveManualStartedSource(t *testing.T, f *capacitySQLFixture, s captu
 			t.Fatal("actual original finite Stop request", err)
 		}
 		// Requested Stop is not a synthetic joined/terminal node proof.
+		if result.Decision.Phase != "Running" {
+			t.Fatal("Stop request alone reported", result.Decision.Phase)
+		}
+		if rec.Arguments == nil {
+			// ADR-313: a manual metadata session joins its Stop only through
+			// the original writer's proof; the outcome stores nothing.
+			joined := artifact.RecordingCancellation{CaptureID: id, AttemptID: original.Binding.AttemptID, WriterPodUID: original.Process.PodUID, WriterEpoch: original.Process.ProcessEpoch, ExpectationDigest: original.ExpectationDigest, JoinedAt: time.Now().UTC().Truncate(time.Microsecond)}
+			cancelled := original
+			cancelled.Phase, cancelled.CompletedAt = "cancelled", joined.JoinedAt
+			replaced := joined
+			replaced.WriterEpoch = custodyID()
+			if _, err := executions.RecordAPIRecordingCancellation(ctx, cancelled, replaced, check.Process, check.Recovery); err == nil {
+				t.Fatal("replacement writer proof joined the original Stop")
+			}
+			got, err := executions.RecordAPIRecordingCancellation(ctx, cancelled, joined, check.Process, check.Recovery)
+			if err != nil || got.Phase != "cancelled" || !got.AcquiredAt.IsZero() {
+				t.Fatal("original writer metadata Stop proof", err)
+			}
+			if replay, err := executions.RecordAPIRecordingCancellation(ctx, cancelled, joined, check.Process, check.Recovery); err != nil || !reflect.DeepEqual(replay, got) {
+				t.Fatal("exact joined replay", err)
+			}
+			now = time.Now().UTC().Truncate(time.Microsecond)
+			stop.CheckedAt, stop.ValidUntil = now, identity.Earlier(check.ValidUntil, now.Add(5*time.Second))
+			if final, err := executions.RequestCaptureCancellation(ctx, stop); err != nil || final.Decision.Phase != "Cancelled" || final.Recording != nil {
+				t.Fatal("joined metadata Stop progress", final.Decision.Phase, err)
+			}
+		}
 	case rec.Profile == "rawPackets" || rec.Profile == "httpHeaders":
 		store, err := postgres.NewAccessGrants(ctx, f.roles["hub-runtime"], root, s.recovery.guard)
 		if err != nil {

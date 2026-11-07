@@ -1,5 +1,19 @@
 # Sustained implementation progress
 
+## Stop for manual packet/syscall metadata sessions (2026-11-07)
+
+Installed `continuation-ongoing-live-manual` showed `cancel_capture` returning
+NotAvailable for a running manual packetMetadata session: the hub, regional
+holder, collect runner and the `guard_snapshot_cancel` request rule accepted
+only the syscall-argument recording. ADR-313 and migration 00146 (schema 146)
+extend the existing argument Stop to every finite manual `Recording`
+expectation with the same original-writer join, stored-wins and no refund; the
+node already reports an early stop as a failure, so a cancelled session stores
+nothing. Unit/race tests for the changed packages pass, plus the three owned
+fleet fixtures `TestLiveManual{Metadata,RawPacket,Arguments}SourceWithRealServices`
+(the metadata one now records and replays the joined Stop proof). Installed
+qualification is pending.
+
 ## Finite approved live views: service qualification (2026-11-06)
 
 Finite UI/MCP live views over existing ongoing packet/syscall/HTTP sources and

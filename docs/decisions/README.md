@@ -1164,3 +1164,4 @@ The brief's domain-registration and trademark work remains a maintainer-owned pu
 
 - [ADR-310 — Finite approved live observation](310-finite-approved-live-observation.md): exact existing source epochs, bounded ephemeral scope/filter ownership, named passive inventory and qualified original clock mapping; implementation and installed qualification pending.
 - [ADR-311 — One authority check per operation](311-operation-authority-recheck.md): maintainer-accepted 30 s recheck interval, shared 60 s policy observation, transient vs denial vs ended classification; no original deadline is extended.
+- [ADR-313 — Stop for every finite manual recording](313-manual-recording-stop.md): packet/raw/HTTP/syscall metadata manual sessions reuse the argument Stop request, exact original-writer join and stored-wins; unstored partial data is discarded; installed qualification pending.

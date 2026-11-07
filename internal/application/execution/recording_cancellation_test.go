@@ -3,6 +3,7 @@ package execution
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -46,6 +47,40 @@ func TestArgumentCancellationRequiresJoinedOriginalWriter(t *testing.T) {
 	}
 }
 
+// ADR-313: every finite manual recording (packet metadata, raw packets, HTTP
+// headers, syscall metadata) joins through the same original-writer proof.
+func TestRecordingCancellationJoinsEveryManualRecording(t *testing.T) {
+	for name, edit := range map[string]func(*artifact.ContextExpectation){
+		"syscall-metadata": func(e *artifact.ContextExpectation) {
+			e.NativeType, e.DataClass, e.Recording.Profile, e.Recording.Arguments = artifact.SyscallRecordsArtifact, "metadata", "metadata", nil
+		},
+		"packet-metadata": func(e *artifact.ContextExpectation) {
+			e.NativeType, e.DataClass, e.Recording.Kind, e.Recording.Profile, e.Recording.Arguments = artifact.PCAPNGArtifact, "metadata", "packetCapture", "networkHeaders", nil
+		},
+		"raw-packets": func(e *artifact.ContextExpectation) {
+			e.NativeType, e.DataClass, e.Recording.Kind, e.Recording.Profile, e.Recording.Arguments = artifact.RawPCAPNGArtifact, "raw", "packetCapture", "rawPackets", nil
+		},
+		"http-headers": func(e *artifact.ContextExpectation) {
+			e.NativeType, e.DataClass, e.Recording.Kind, e.Recording.Profile, e.Recording.Arguments = artifact.HTTPHeadersArtifact, "extract", "packetCapture", "httpHeaders", nil
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			f, runner, _ := argumentExecutionFixture(t)
+			recorder := &argumentCancellationRecorder{apiRunnerFixture: f.apiRunnerFixture}
+			runner.Record = recorder
+			e := &f.work.Accepted.Expectation
+			recording := *e.Recording
+			e.Recording = &recording
+			edit(e)
+			r, c := argumentCancellationCollection(f)
+			out, err := runner.CollectRecording(t.Context(), f.work, r, snapshotCollectionFixture{c})
+			if err != nil || out.State != "Cancelled" || recorder.cancellations != 1 || recorder.result.Phase != "cancelled" || !recorder.result.AcquiredAt.IsZero() || recorder.result.Copies != (artifact.Copies{}) {
+				t.Fatal(out, err, recorder.cancellations)
+			}
+		})
+	}
+}
+
 func TestArgumentCancellationRejectsSubstitutionAndMixedOutcomes(t *testing.T) {
 	for name, edit := range map[string]func(*argumentRunnerFixture, *evidence.RecordingCollection){
 		"capture": func(_ *argumentRunnerFixture, c *evidence.RecordingCollection) {
@@ -69,14 +104,14 @@ func TestArgumentCancellationRejectsSubstitutionAndMixedOutcomes(t *testing.T) {
 		"future": func(f *argumentRunnerFixture, c *evidence.RecordingCollection) {
 			c.RecordingCancellation.JoinedAt = f.now.Add(time.Microsecond)
 		},
-		"native-type": func(f *argumentRunnerFixture, _ *evidence.RecordingCollection) {
-			f.work.Accepted.Expectation.NativeType = artifact.SyscallRecordsArtifact
+		"snapshot-expectation": func(f *argumentRunnerFixture, _ *evidence.RecordingCollection) {
+			f.work.Accepted.Expectation.Snapshot = &artifact.SourceSnapshotRequest{}
 		},
-		"metadata": func(f *argumentRunnerFixture, _ *evidence.RecordingCollection) {
-			f.work.Accepted.Expectation.DataClass = "metadata"
+		"profile-expectation": func(f *argumentRunnerFixture, _ *evidence.RecordingCollection) {
+			f.work.Accepted.Expectation.Profile = &artifact.GoProfileAcquisition{}
 		},
-		"ordinary-recording": func(f *argumentRunnerFixture, _ *evidence.RecordingCollection) {
-			f.work.Accepted.Expectation.Recording.Arguments = nil
+		"logs-expectation": func(f *argumentRunnerFixture, _ *evidence.RecordingCollection) {
+			f.work.Accepted.Expectation.Logs = &artifact.LogCapture{}
 		},
 		"profile-proof": func(_ *argumentRunnerFixture, c *evidence.RecordingCollection) {
 			p := c.RecordingCancellation
@@ -95,7 +130,7 @@ func TestArgumentCancellationRejectsSubstitutionAndMixedOutcomes(t *testing.T) {
 			// Keep the original execution associated with the independently supplied
 			// expectation so native/class mismatches exercise the typed Stop branch.
 			r.ExpectationDigest = evidence.ContextExpectationDigest(f.work.Accepted.Expectation)
-			if name == "native-type" || name == "metadata" || name == "ordinary-recording" {
+			if strings.HasSuffix(name, "-expectation") {
 				c.RecordingCancellation.ExpectationDigest = r.ExpectationDigest
 			}
 			out, err := runner.CollectRecording(t.Context(), f.work, r, snapshotCollectionFixture{c})
