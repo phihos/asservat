@@ -1,6 +1,6 @@
 # Authority timing: one check per operation (plan, 2026-11-07)
 
-Status: plan. Step 1 is implemented with live watch (PR #174); later steps pending.
+Status: plan. Step 1 is implemented with live watch (PR #174); step 2 (downloads) is implemented; later steps pending.
 
 ## Problem
 
@@ -47,7 +47,11 @@ no schema change; the first step is the smallest fix.
 1. Live reads use the downloads' cached policy observation instead of the raw
    Kubernetes reader (done in PR #174). Then remove the five-second phase caps in
    live and map adapter errors to unavailable; measure installed read time.
-2. Downloads read policy, recovery and processing once per check.
+2. Downloads read policy, recovery and processing once per check (done). The
+   download authority and environment caps use the recheck interval; the 5 s
+   check/policy-read I/O timeout and the catalog record's own 5 s observation
+   contract remain. A cached policy observation is reused while valid and
+   outliving one check's I/O timeout, so no check straddles its expiry.
 3. Introduce `OperationAuthority` and the classifier; delete the per-site patches.
 4. Raise identity, eligibility and recovery windows to the recheck interval
    (capture start currently also lapses: PrepareAPIExecution/expired/eligibility).
