@@ -290,8 +290,15 @@ func (s *Service) Open(ctx context.Context, current CurrentIdentity, r v.Open) (
 		}
 		var e error
 		selected, proofUntil, e = batch.ResolveSources(ctx, current, refs, r.Projection)
+		if errors.Is(e, v.ErrEnded) {
+			return zero, fmt.Errorf("service:287: %w", e)
+		}
+		if e != nil && !errors.Is(e, v.ErrDenied) && errors.Is(e, v.ErrUnavailable) {
+			// Nothing was created yet; the same idempotent open can be retried.
+			return zero, fmt.Errorf("%w: %w: service:287: %v", v.ErrUnavailable, v.ErrTransient, e)
+		}
 		if e != nil || len(selected) != len(handles) {
-			return zero, fmt.Errorf("%w: service:287", v.ErrDenied)
+			return zero, fmt.Errorf("%w: service:287: %v", v.ErrDenied, e)
 		}
 		for n, h := range handles {
 			source := selected[n]

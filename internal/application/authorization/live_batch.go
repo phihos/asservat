@@ -50,7 +50,7 @@ func (s LiveSourceAuthority) sourcePhase(ctx context.Context, current identities
 		if resolve {
 			refs[n].Target, e = s.Catalog.LiveSourceTarget(call, ref.ID, ref.Kind)
 			if e != nil {
-				return nil, time.Time{}, fmt.Errorf("%w: live_batch:51: %v", live.ErrDenied, e)
+				return nil, time.Time{}, liveBatchRefusal("live_batch:51", e)
 			}
 		}
 		target := refs[n].Target
@@ -59,7 +59,7 @@ func (s LiveSourceAuthority) sourcePhase(ctx context.Context, current identities
 		}
 		permissions[n], e = s.Permissions.Permissions(call, target)
 		if e != nil {
-			return nil, time.Time{}, fmt.Errorf("%w: live_batch:60: %v", live.ErrDenied, e)
+			return nil, time.Time{}, liveBatchRefusal("live_batch:60", e)
 		}
 		ordinary := value.ScopeEligibility(i, permissions[n], value.ReadLiveSource, target, s.Now())
 		if !ordinary.Eligible {
@@ -109,4 +109,16 @@ func (s LiveSourceAuthority) sourcePhase(ctx context.Context, current identities
 		until = identity.Earlier(until, sourceUntil)
 	}
 	return s.finishSources(bounded, current, i, out, projection, until)
+}
+
+// liveBatchRefusal keeps an ended source or an unavailable dependency read
+// distinct from an access decision; everything else is a denial.
+func liveBatchRefusal(stage string, e error) error {
+	switch {
+	case errors.Is(e, live.ErrEnded):
+		return fmt.Errorf("%s: %w", stage, e)
+	case e != nil && !errors.Is(e, live.ErrDenied) && errors.Is(e, live.ErrUnavailable):
+		return fmt.Errorf("%w: %s: %v", live.ErrUnavailable, stage, e)
+	}
+	return fmt.Errorf("%w: %s: %v", live.ErrDenied, stage, e)
 }
