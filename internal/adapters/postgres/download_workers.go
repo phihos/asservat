@@ -61,12 +61,12 @@ func (s *DownloadWorkers) withSession(ctx context.Context, session string, a art
 		return artifact.ErrInvalid
 	}
 	d := s.downloads
-	top, e := d.retention.observe(ctx, a.Scope.ClusterID)
+	top, e := d.downloadTopology(ctx, a)
 	if e != nil {
 		return e
 	}
 	return d.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		recovery, e := d.recovery.lock(ctx, q, d.root, a.Environment.Recovery())
+		recovery, e := d.lockDownloadRecovery(ctx, q, d.root, a)
 		if e != nil {
 			return e
 		}
@@ -89,8 +89,12 @@ func (s *DownloadWorkers) withSession(ctx context.Context, session string, a art
 			if a.Environment.Path.AcquisitionClusterID != s.profile.ClusterID || a.Environment.Path.WorkerConfiguration != s.profile.Configuration {
 				return time.Time{}, artifact.ErrDownloadUnavailable
 			}
-			if _, e := currentWorkerConfiguration(ctx, q, s.profile, a.Environment.RecoveryEpoch); e != nil {
-				return time.Time{}, e
+			// A started response keeps the worker configuration it started under
+			// (ADR-312); its worker certificate and native owner remain fenced.
+			if !a.Started() {
+				if _, e := currentWorkerConfiguration(ctx, q, s.profile, a.Environment.RecoveryEpoch); e != nil {
+					return time.Time{}, e
+				}
 			}
 			n, e := q.CurrentTime(ctx)
 			if e != nil {

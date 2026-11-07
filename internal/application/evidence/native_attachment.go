@@ -292,7 +292,7 @@ func (s *NativeAttachment) currentAuthority(ctx context.Context, current identit
 	if observed == nil {
 		check, e = newWorkerCurrentCheck(ctx, current, s.config.Authority, r.Scope, s.config.Now)
 	} else {
-		check, _, e = newWorkerResponseObservation(ctx, current, *observed, r.Scope, s.config.Now)
+		check, _, e = newWorkerResponseObservation(ctx, *observed, r.Scope, s.config.Now)
 	}
 	if e != nil {
 		return nil, e

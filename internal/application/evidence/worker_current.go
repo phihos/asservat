@@ -65,13 +65,13 @@ func newWorkerCurrentObservation(ctx context.Context, source identities.CurrentI
 	return c, a, nil
 }
 
-// The coordinator has already constructed its complete short authority. Bind
-// that exact value to the same current identity batch, keeping its original
-// CheckedAt/ValidUntil. Preparation and content responses share this private
-// handoff; it never creates another request or a renewable authority.
-func newWorkerResponseObservation(ctx context.Context, source identities.CurrentIdentity, a artifact.DownloadAuthority, scope artifact.DownloadScope, now func() time.Time) (*workerCurrentCheck, artifact.DownloadAuthority, error) {
+// The coordinator has already authenticated the caller and constructed this
+// exact authority: either its complete short check, or the continuation of a
+// started response (ADR-312). Keep its CheckedAt/ValidUntil; nothing is
+// observed again, and it never creates another request or a renewable authority.
+func newWorkerResponseObservation(ctx context.Context, a artifact.DownloadAuthority, scope artifact.DownloadScope, now func() time.Time) (*workerCurrentCheck, artifact.DownloadAuthority, error) {
 	var zero artifact.DownloadAuthority
-	if ctx == nil || ctx.Err() != nil || source == nil || !scope.Valid() || now == nil {
+	if ctx == nil || ctx.Err() != nil || !scope.Valid() || now == nil {
 		return nil, zero, artifact.ErrInvalid
 	}
 	started := now()
@@ -82,15 +82,8 @@ func newWorkerResponseObservation(ctx context.Context, source identities.Current
 	if deadline, ok := ctx.Deadline(); ok {
 		until = identity.Earlier(until, deadline)
 	}
-	call, cancel := context.WithDeadline(ctx, until)
-	i, err := source.ResolveIdentity(call)
-	callErr := call.Err()
-	cancel()
-	if err != nil || callErr != nil || ctx.Err() != nil || now().Before(started) || !i.Valid(now()) || i.Principal != scope.Principal || i.Policy != a.IdentityRevision || !slices.Contains(i.Scopes, "evidence:read") || !slices.Contains(i.Scopes, "evidence:download") {
-		return nil, zero, artifact.ErrDownloadUnavailable
-	}
-	c := &workerCurrentCheck{owner: ctx, observation: a, scope: scope, started: started, until: identity.Earlier(until, i.ValidUntil), now: now}
-	a, err = c.Check(ctx)
+	c := &workerCurrentCheck{owner: ctx, observation: a, scope: scope, started: started, until: until, now: now}
+	a, err := c.Check(ctx)
 	if err != nil {
 		return nil, zero, err
 	}

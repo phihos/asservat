@@ -1,6 +1,11 @@
 # ADR-233 — Recipient native download of a shared artifact (S-06 increment 3)
 
 Date: 2026-10-26. Status: accepted; implemented; qualification below.
+
+> [ADR-312](312-started-downloads-run-to-original-bounds.md) (2026-11-07)
+> supersedes the within-response share recheck in point 3: the share is read at
+> every prepare, get and content-response start, and a started response runs to
+> its original bounds, including the share's expiry, without re-reading it.
 Requirements: REQ-SHR-001/003 (narrowed as in [ADR-232](232-concrete-evidence-share.md)), the
 maintainer requirement of native download for all gathered evidence
 ([artifact downloads](../../specs/artifact-downloads.md)), S-06 (TASK-07). Plan: the S-06 plan
@@ -80,8 +85,8 @@ Results are in [implementation progress](../implementation-progress.md#s-06-incr
 
 ## Limitations
 
-- Revocation stops a running content response at the next 30-second reconstruction, not
-  instantly (as for ordinary permission changes; ADR-220). Bytes already delivered are a local
-  copy Asservat cannot delete.
+- Revocation stops a new content response (a resume or new download), not a running one,
+  which ends at its original bounds including the share's expiry (ADR-312). Bytes already
+  delivered are a local copy Asservat cannot delete.
 - Recipients share the workload's download allocation with ordinary readers; there is no separate
   per-share budget.

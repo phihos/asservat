@@ -1,5 +1,11 @@
 # ADR-220 — Reconstruct ordinary download permissions once per response interval
 
+> Superseded by [ADR-312](312-started-downloads-run-to-original-bounds.md)
+> (2026-11-07): a started content response no longer reconstructs ordinary
+> permissions. The response-owned entitlement, its 30-second cadence and the
+> bootstrap factory are removed. The private native handoff of the
+> coordinator's authority remains, without its identity re-read.
+
 Date: 2026-10-23. Status: accepted under the maintainer's implementation and
 simplification instruction; component implementation qualified; SQL and installed
 qualification pending.

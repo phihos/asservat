@@ -22,14 +22,16 @@ type responseTransferFixture struct {
 	wi                                                         audit.DownloadWindowIntent
 	size                                                       int64
 	chunks, batches, leases, begins, intents, outcomes, closed int
+	checks                                                     int
 	emitted                                                    int64
 	active                                                     bool
 	fail                                                       string
 	badHash, unverified                                        bool
 	advanceBetweenWindows                                      bool
-	slowRead                                                   int // chunk ordinal whose read outlasts its lease
-	denyAfterSlow                                              bool
-	batchLife                                                  time.Duration // identity observation length after the slow read; 5 s when zero
+	slowRead                                                   int  // chunk ordinal whose read outlasts its lease
+	revokeAfterStart                                           bool // every identity/authority check after the response start refuses
+	stopAfterFirstWindow                                       bool // explicit Stop once the first window is acknowledged
+	principal                                                  *identity.Principal
 	minWriteLease                                              time.Duration // least lease time left at any chunk write
 	backing                                                    []byte
 	windowWrite                                                time.Time
@@ -45,7 +47,11 @@ func (b *responseTestBatch) ResolveIdentity(context.Context) (identity.Identity,
 	if b.closed {
 		return identity.Identity{}, artifact.ErrDownloadExpired
 	}
-	return identity.Identity{Principal: b.f.s.Scope.Principal, Policy: b.f.a.IdentityRevision, VerifiedAt: b.f.now, ValidUntil: b.until, Scopes: []string{"evidence:read", "evidence:download"}}, nil
+	p := b.f.s.Scope.Principal
+	if b.f.principal != nil {
+		p = *b.f.principal
+	}
+	return identity.Identity{Principal: p, Policy: b.f.a.IdentityRevision, VerifiedAt: b.f.now, ValidUntil: b.until, Scopes: []string{"evidence:read", "evidence:download"}}, nil
 }
 func (b *responseTestBatch) Close() {
 	if !b.closed {
@@ -57,16 +63,12 @@ func (f *responseTransferFixture) BeginBatch(context.Context) (identities.Identi
 	if f.active {
 		return nil, identities.ErrReaderBusy
 	}
-	if f.fail == "identity" {
+	if f.fail == "identity" || f.revokeAfterStart && f.begins > 0 {
 		return nil, artifact.ErrDownloadUnavailable
 	}
 	f.active = true
 	f.batches++
-	life := 5 * time.Second
-	if f.batchLife > 0 && f.slowRead < 0 {
-		life = f.batchLife
-	}
-	return &responseTestBatch{f: f, until: f.now.Add(life)}, nil
+	return &responseTestBatch{f: f, until: f.now.Add(5 * time.Second)}, nil
 }
 func (f *responseTransferFixture) Close() { f.closed++ }
 func (f *responseTransferFixture) CheckDownloadCurrent(ctx context.Context, b identities.CurrentIdentity, s artifact.DownloadScope) (artifact.DownloadAuthority, error) {
@@ -74,10 +76,11 @@ func (f *responseTransferFixture) CheckDownloadCurrent(ctx context.Context, b id
 	if e != nil {
 		return artifact.DownloadAuthority{}, e
 	}
+	f.checks++
 	a := f.a
 	a.CheckedAt = f.now
-	a.ValidUntil = i.ValidUntil
-	if f.fail == "authority" || f.denyAfterSlow && f.slowRead < 0 {
+	a.ValidUntil = identity.Earlier(i.ValidUntil, a.AccessUntil)
+	if f.fail == "authority" || f.revokeAfterStart && f.begins > 0 {
 		return a, artifact.ErrDownloadUnavailable
 	}
 	return a, nil
@@ -153,6 +156,9 @@ func (f *responseTransferFixture) AcknowledgeDownloadWindowOutcome(context.Conte
 	}
 	var e error
 	f.s, f.r, f.w, e = f.r.AcknowledgeWindow(f.s, f.w, f.now)
+	if f.stopAfterFirstWindow {
+		f.s.State = artifact.DownloadCancelled
+	}
 	if f.advanceBetweenWindows && !f.r.Closed {
 		f.now = f.now.Add(6 * time.Second)
 	}
@@ -237,8 +243,10 @@ func TestResponseTransferMultipleWindowsReuseLeaseAndFinishWholeFile(t *testing.
 	if e := service.Transfer(context.Background(), f, req, f, f); e != nil {
 		t.Fatal(e)
 	}
-	if f.s.State != artifact.DownloadCompleted || f.emitted != f.size || f.chunks != 65 || f.intents != 2 || f.outcomes != 2 || f.leases != 2 || f.batches != 3 || f.s.Requests != 1 || f.s.ChargedOutput != f.size {
-		t.Fatalf("state=%s chunks=%d leases=%d batches=%d intent=%d outcome=%d", f.s.State, f.chunks, f.leases, f.batches, f.intents, f.outcomes)
+	// Two batches and two complete checks, all before the response starts;
+	// the second window continues the started decision (ADR-312).
+	if f.s.State != artifact.DownloadCompleted || f.emitted != f.size || f.chunks != 65 || f.intents != 2 || f.outcomes != 2 || f.leases != 2 || f.batches != 2 || f.checks != 2 || f.s.Requests != 1 || f.s.ChargedOutput != f.size {
+		t.Fatalf("state=%s chunks=%d leases=%d batches=%d checks=%d intent=%d outcome=%d", f.s.State, f.chunks, f.leases, f.batches, f.checks, f.intents, f.outcomes)
 	}
 	for _, b := range f.backing {
 		if b != 0 {
@@ -248,38 +256,98 @@ func TestResponseTransferMultipleWindowsReuseLeaseAndFinishWholeFile(t *testing.
 }
 
 // ADR-244: a local source's read that outlasts its lease is written only under
-// a fresh lease with fresh current authority; a denial then emits nothing more.
+// a renewed lease, which continues the started decision (ADR-312).
 func TestResponseTransferRenewsLeaseAfterSlowLocalRead(t *testing.T) {
 	f, service, req := newResponseTransferFixture(t, 3*artifact.DeliveryBytes)
 	f.slowRead = 2
 	if e := service.Transfer(context.Background(), f, req, f, f); e != nil {
 		t.Fatal(e)
 	}
-	if f.s.State != artifact.DownloadCompleted || f.emitted != f.size || f.leases != 2 || f.batches < 2 || f.minWriteLease < localWriteMargin {
-		t.Fatal("slow read not delivered under a fresh lease", f.s.State, f.emitted, f.leases, f.batches, f.minWriteLease)
+	if f.s.State != artifact.DownloadCompleted || f.emitted != f.size || f.leases != 2 || f.batches != 2 || f.minWriteLease < localWriteMargin {
+		t.Fatal("slow read not delivered under a renewed lease", f.s.State, f.emitted, f.leases, f.batches, f.minWriteLease)
 	}
-	// A renewal that cannot give the margin (identity about to expire) writes
-	// nothing; every earlier write started with at least the margin.
+	// A renewal that cannot give the margin (the response's original end is
+	// near) writes nothing; every earlier write started with at least the margin.
 	f, service, req = newResponseTransferFixture(t, 3*artifact.DeliveryBytes)
-	f.slowRead, f.batchLife = 2, time.Second
+	f.slowRead = 2
+	req.HardUntil = f.now.Add(7 * time.Second)
 	if e := service.Transfer(context.Background(), f, req, f, f); !errors.Is(e, artifact.ErrDownloadExpired) {
 		t.Fatal("short renewal accepted", e)
 	}
 	if f.emitted != artifact.DeliveryBytes || f.minWriteLease < localWriteMargin {
 		t.Fatal("chunk written with less than the margin", f.emitted, f.minWriteLease)
 	}
-	f, service, req = newResponseTransferFixture(t, 3*artifact.DeliveryBytes)
-	f.slowRead, f.denyAfterSlow = 2, true
-	if e := service.Transfer(context.Background(), f, req, f, f); e == nil {
-		t.Fatal("revoked authority after a slow read still delivered")
-	}
-	if f.emitted != artifact.DeliveryBytes || f.s.State == artifact.DownloadCompleted {
-		t.Fatal("chunk read under an expired lease was written", f.emitted)
-	}
 	for _, b := range f.backing {
 		if b != 0 {
 			t.Fatal("refused chunk retained")
 		}
+	}
+}
+
+// ADR-312: once started, a response does not observe identity, permission or
+// policy again. Revocation after the start (here: every later identity batch
+// and complete check refuses) does not stop it.
+func TestStartedResponseContinuesAfterPermissionChange(t *testing.T) {
+	for _, slow := range []bool{false, true} {
+		f, service, req := newResponseTransferFixture(t, 2*artifact.DownloadWindowBytes+17)
+		f.advanceBetweenWindows, f.revokeAfterStart = true, true
+		f.s.ReadLimit = 3 * artifact.DownloadWindowBytes
+		if slow {
+			f.slowRead = 2
+		}
+		if e := service.Transfer(context.Background(), f, req, f, f); e != nil {
+			t.Fatal("started response stopped after a permission change", slow, e)
+		}
+		if f.s.State != artifact.DownloadCompleted || f.emitted != f.size || f.checks != 2 || f.batches != 2 || f.intents != 3 {
+			t.Fatal("started response observed authority again", slow, f.s.State, f.emitted, f.checks, f.batches, f.intents)
+		}
+	}
+}
+
+// ADR-312: a started response still ends at each original bound and at Stop.
+func TestStartedResponseStopsAtOriginalBounds(t *testing.T) {
+	for _, bound := range []string{"retention", "credential", "session", "stop"} {
+		t.Run(bound, func(t *testing.T) {
+			f, service, req := newResponseTransferFixture(t, 2*artifact.DownloadWindowBytes+17)
+			f.advanceBetweenWindows = true
+			f.s.ReadLimit = 3 * artifact.DownloadWindowBytes
+			end := f.now.Add(8 * time.Second)
+			switch bound {
+			case "retention":
+				f.a.AccessUntil = end
+			case "credential":
+				req.HardUntil = end
+			case "session":
+				f.s.Deadline = end
+			case "stop":
+				f.stopAfterFirstWindow = true
+			}
+			e := service.Transfer(context.Background(), f, req, f, f)
+			if e == nil || f.s.State == artifact.DownloadCompleted {
+				t.Fatal("started response outlived its original bound", e, f.s.State)
+			}
+			// Windows one and two (at +0 s and +6 s) are within the bound; the
+			// third (+12 s) is not. Stop already refuses the second window.
+			want := 2 * artifact.DownloadWindowBytes
+			if bound == "stop" {
+				want = artifact.DownloadWindowBytes
+			}
+			if f.emitted != want || f.intents != int(want/artifact.DownloadWindowBytes) {
+				t.Fatal("bytes after the original bound", f.emitted, f.intents)
+			}
+		})
+	}
+}
+
+// Every content request authenticates; a request whose authenticated caller is
+// not the session's principal is refused before any accounting.
+func TestResponseTransferRefusesDifferentPrincipal(t *testing.T) {
+	f, service, req := newResponseTransferFixture(t, 17)
+	other := f.s.Scope.Principal
+	other.Subject = "someone-else"
+	f.principal = &other
+	if e := service.Transfer(context.Background(), f, req, f, f); e == nil || f.begins != 0 || f.emitted != 0 || f.s.ChargedOutput != 0 {
+		t.Fatal("different principal admitted", e, f.begins, f.emitted)
 	}
 }
 

@@ -1,5 +1,18 @@
 # Sustained implementation progress
 
+## Started downloads run to their original bounds (2026-11-07)
+
+Maintainer decision: remove rechecks after download start. [ADR-312](decisions/312-started-downloads-run-to-original-bounds.md)
+removes ADR-220's response-owned 30 s entitlement and every post-start identity,
+permission, share and policy read; later leases continue the start decision via
+`DownloadAuthority.Continue`. SQL window/lease fences keep original validity,
+effective retention cutoffs, Stop and the recovery incarnation. Affected package
+race tests pass; the real-service custody selection
+`^TestContextAdmissionWithRealServices$/^d` passes (263 s, including the new
+`started-response-continues-after-permission-suspension`). Native context
+(`make context-integration`) and installed qualification are pending. Raw
+windows still authenticate their grant-pool reservation per 64 MiB window.
+
 ## Installed finite saved logs passed (2026-11-06)
 
 Signed `e1477925` passes the packaged RequireAll workflow: independent reviewer,

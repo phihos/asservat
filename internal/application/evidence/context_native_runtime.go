@@ -121,7 +121,7 @@ func (r *ContextNativeRuntime) beginRequestAuthority(ctx context.Context, curren
 	if observed == nil {
 		check, initial, e = newWorkerCurrentObservation(call, current, r.config.Authority, session.Scope, r.config.Now)
 	} else {
-		check, initial, e = newWorkerResponseObservation(call, current, *observed, session.Scope, r.config.Now)
+		check, initial, e = newWorkerResponseObservation(call, *observed, session.Scope, r.config.Now)
 	}
 	if e != nil {
 		end()

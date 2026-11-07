@@ -47,12 +47,12 @@ func (s *Downloads) withKeyBatch(ctx context.Context, session string, a artifact
 	if s == nil || s.retention == nil || s.recovery == nil || !authorization.UUID(session) || !authorization.UUID(batch) || generation < 1 || a.Scope.RootID != s.root {
 		return artifact.ErrInvalid
 	}
-	topology, err := s.retention.observe(ctx, a.Scope.ClusterID)
+	topology, err := s.downloadTopology(ctx, a)
 	if err != nil {
 		return err
 	}
 	return s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		recovery, err := s.recovery.lock(ctx, q, a.Scope.RootID, a.Environment.Recovery())
+		recovery, err := s.lockDownloadRecovery(ctx, q, a.Scope.RootID, a)
 		if err != nil {
 			return err
 		}

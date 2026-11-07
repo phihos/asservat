@@ -80,12 +80,12 @@ func (s *Downloads) responseTransaction(ctx context.Context, sessionID string, a
 	if !authorization.UUID(sessionID) || a.Scope.RootID != s.root {
 		return artifact.ErrInvalid
 	}
-	topology, e := s.retention.observe(ctx, a.Scope.ClusterID)
+	topology, e := s.downloadTopology(ctx, a)
 	if e != nil {
 		return e
 	}
 	return s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		recovery, e := s.recovery.lock(ctx, q, s.root, a.Environment.Recovery())
+		recovery, e := s.lockDownloadRecovery(ctx, q, s.root, a)
 		if e != nil {
 			return e
 		}

@@ -8,7 +8,6 @@ import (
 	privacyapp "asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/audit"
-	"asservat.local/asservat/internal/domain/authorization"
 	"context"
 	"errors"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -16,16 +15,6 @@ import (
 	"testing"
 	"time"
 )
-
-type downloadResponsePermissionProbe struct {
-	reader authorizationapp.ProjectionReader
-	reads  int
-}
-
-func (p *downloadResponsePermissionProbe) Permissions(ctx context.Context, target authorization.Target) (authorization.Projection, error) {
-	p.reads++
-	return p.reader.Permissions(ctx, target)
-}
 
 // Called by the owned custody suite. Actual PostgreSQL/S3/encrypted paired
 // records and original published context authority; large response size and
@@ -281,30 +270,69 @@ func qualifyDownloadResponses(t *testing.T, ctx context.Context, admin *pgxpool.
 		if !errors.As(err, &immutable) || immutable.Code != "23514" {
 			t.Fatal("audit lock column changed immutable response identity", err)
 		}
-		t.Run("response-permission-cadence-keeps-sql-revocation", func(t *testing.T) {
-			// The already qualified session supplies the actual SQL scope. These
-			// calls use the real authorizer/catalog/permission/retention adapters;
-			// IdP claims remain the fixture's explicit synthetic observation.
-			_ = current()
-			probe := &downloadResponsePermissionProbe{reader: scenario.p}
-			gate.Permissions = probe
-			owned, err := gate.NewDownloadResponse(ctx, scope)
-			if err != nil {
+		t.Run("started-response-continues-after-permission-suspension", func(t *testing.T) {
+			// ADR-312: actual SQL fences a complete check after a permission
+			// suspension, while the started response's continuation still gets
+			// its next window and byte lease under the original bounds.
+			third := artifact.DownloadAllocation{ID: custodyID(), RootID: root, ClusterID: scope.ClusterID, NamespaceUID: scope.NamespaceUID, WorkloadUID: scope.WorkloadUID, OutputLimit: 1 << 30, ReadLimit: 2 << 30, SessionLimit: 4, ValidUntil: time.Now().UTC().Add(time.Minute).Truncate(time.Microsecond)}
+			if err := config.BindDownloadAllocation(ctx, third); err != nil {
 				t.Fatal(err)
 			}
-			defer owned.Close()
-			actor := stopNativeIdentity{i: gate.Identities.(downloadTestIdentity).value}
-			first, err := owned.CheckDownloadCurrent(ctx, actor, scope)
-			if err != nil || probe.reads != 2 {
-				t.Fatal("first ordinary observation", err, probe.reads)
+			thirdControl := control
+			thirdControl.ID, thirdControl.ValidUntil, thirdControl.AuditWriteUntil = third.ID, third.ValidUntil, third.ValidUntil.Add(time.Minute)
+			if err := config.BindDownloadControlAllocation(ctx, thirdControl); err != nil {
+				t.Fatal("third backing", err)
 			}
-			if _, err := ledger.ObserveDownload(ctx, second.ID, first, nil); err != nil {
-				t.Fatal("positive current SQL control", err)
+			started := reservation
+			started.Authority = current()
+			started.IdempotencyDigest = artifact.Digest{74}
+			started.Session.ID = custodyID()
+			started.Session.AllocationID = third.ID
+			started.Session.CreatedAt = time.Now().UTC()
+			started.Session.Deadline = time.Now().UTC().Add(15 * time.Second)
+			session, err := ledger.ReserveDownload(ctx, started)
+			if err != nil {
+				t.Fatal("started session", err)
 			}
-			reservation.Authority = first
-			if got, err := ledger.ReserveDownload(ctx, reservation); err != nil || got.ID != second.ID {
-				t.Fatal("positive same-key SQL control", err)
+			if _, err = worker.Prepare(ctx, "synthetic-reference", evidence.ContextDownloadRequest{SessionID: session.ID, Scope: scope, Expectation: e, Copies: published.Copies}); err != nil {
+				t.Fatal("started metadata", err)
 			}
+			a := current()
+			response, err := ledger.BeginDownloadResponse(ctx, session.ID, a, artifact.DownloadResponse{ID: custodyID(), SessionID: session.ID, OwnerID: custodyID(), Plan: request.Plan, Until: session.Deadline})
+			if err != nil {
+				t.Fatal("started response", err)
+			}
+			window := func(ordinal int64, authority artifact.DownloadAuthority, finish bool) {
+				t.Helper()
+				intent, err := ledger.BeginDownloadWindow(ctx, session.ID, response.ID, response.OwnerID, custodyID(), authority)
+				if err != nil {
+					t.Fatal("window", ordinal, err)
+				}
+				receipt, err := objects.CreateDownloadWindowIntent(ctx, intent)
+				if err != nil {
+					t.Fatal("intent write", ordinal, err)
+				}
+				if err = ack.AcknowledgeDownloadWindowIntent(ctx, intent, receipt); err != nil {
+					t.Fatal("intent acknowledgement", ordinal, err)
+				}
+				if lease, err := ledger.LeaseDownloadResponse(ctx, session.ID, response.ID, response.OwnerID, intent.Window.ID, authority); err != nil || !lease.Valid(time.Now()) {
+					t.Fatal("byte lease", ordinal, err)
+				}
+				if !finish {
+					return
+				}
+				outcome, err := ledger.FinishDownloadWindow(ctx, intent, artifact.DownloadWindowOutcome{EmittedBytes: intent.Window.Length, Success: true})
+				if err != nil {
+					t.Fatal("window outcome", ordinal, err)
+				}
+				if receipt, err = objects.CreateDownloadWindowOutcome(ctx, outcome); err != nil {
+					t.Fatal(err)
+				}
+				if err = ack.AcknowledgeDownloadWindowOutcome(ctx, outcome, receipt); err != nil {
+					t.Fatal("outcome acknowledgement", ordinal, err)
+				}
+			}
+			window(1, a, true)
 			fence, err := scenario.p.BeginPermissions(ctx, scenario.batch.RootID, scenario.batch.Epoch, scenario.batch.TrustDigest)
 			if err != nil {
 				t.Fatal(err)
@@ -312,22 +340,17 @@ func qualifyDownloadResponses(t *testing.T, ctx context.Context, admin *pgxpool.
 			if err := scenario.p.SuspendPermissions(ctx, fence); err != nil {
 				t.Fatal(err)
 			}
-			// Cadence does not impose a delayed revocation policy: the ordinary
-			// decision remains inside 30s while both existing SQL fences deny now.
-			retained, err := owned.CheckDownloadCurrent(ctx, actor, scope)
-			if err != nil || probe.reads != 2 || !retained.Valid(time.Now()) {
-				t.Fatal("response reconstructed before its cadence", err, probe.reads)
+			if !a.Valid(time.Now()) {
+				t.Fatal("complete check expired before the suspension assertion")
 			}
-			if _, err := ledger.ObserveDownload(ctx, second.ID, retained, nil); err == nil {
-				t.Fatal("current SQL read ignored suspension")
+			if _, err := ledger.ObserveDownload(ctx, session.ID, a, nil); err == nil {
+				t.Fatal("current SQL read ignored suspension for a complete check")
 			}
-			reservation.Authority = retained
-			if _, err := ledger.ReserveDownload(ctx, reservation); err == nil {
-				t.Fatal("current SQL transaction ignored suspension")
+			continued, ok := a.Continue(time.Now(), response.Until)
+			if !ok {
+				t.Fatal("continuation refused before its original bounds")
 			}
-			if !retained.Valid(time.Now()) {
-				t.Fatal("SQL refusal could be explained by ordinary short expiry")
-			}
+			window(2, continued, false)
 		})
 	})
 }
