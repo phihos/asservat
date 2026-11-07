@@ -17,10 +17,16 @@ RUN = "ab12cd34"
 
 
 class KeptCleanup(unittest.TestCase):
-    def cleanup(self, kept, labels, cache=None):
+    def cleanup(self, kept, labels, cache=None, leftovers=None):
         removed = []
+        leftovers = leftovers or {}
 
         def fake_run(args, *, data=None):
+            if "--filter" in args:
+                # Leftover verification: report only what the test left behind.
+                return "\n".join(leftovers.get(args[1] if args[1] != "ps" else "container", []))
+            if args == ["kind", "get", "clusters"]:
+                return "\n".join(leftovers.get("cluster", []) + ["unrelated-cluster"])
             if args[:2] == ["docker", "inspect"]:
                 name = args[2].removesuffix("-control-plane")
                 return json.dumps([{"Config": {"Labels": {"io.x-k8s.kind.cluster": labels.get(name, name)}}}])
@@ -50,8 +56,22 @@ class KeptCleanup(unittest.TestCase):
         code, removed, report, left = self.cleanup(kept, {})
         self.assertEqual(code, 0)
         self.assertEqual(report["cleanupFailures"], [])
+        self.assertEqual(report["leftovers"], {"containers": [], "volumes": [], "networks": [], "images": [], "clusters": []})
         self.assertIn("asservat-context-" + RUN + "-0", removed)
         self.assertFalse(left)
+
+    def test_removes_rerun_images_and_fails_on_leftovers(self):
+        kept = {"runId": RUN, "clusters": [], "containers": [], "volumes": [], "image": "asservat-context-worker:" + RUN, "rerunImages": ["asservat-context-worker:" + RUN + "-r1"], "networks": []}
+        code, removed, report, left = self.cleanup(kept, {})
+        self.assertEqual(code, 0)
+        self.assertIn("asservat-context-worker:" + RUN + "-r1", removed)
+        for kind in ("container", "volume", "network", "image", "cluster"):
+            with self.subTest(kind=kind):
+                code, _, report, left = self.cleanup(kept, {}, leftovers={kind: ["asservat-" + RUN + "-left"]})
+                self.assertEqual(code, 1)
+                self.assertIn("leftovers", report["cleanupFailures"])
+                self.assertTrue(left)
+
 
     def test_refuses_foreign_cluster_and_label(self):
         kept = {"runId": RUN, "clusters": ["haptic-cluster"], "containers": ["other"], "volumes": [], "image": None, "networks": []}
@@ -117,6 +137,37 @@ class KeptCleanup(unittest.TestCase):
             self.assertEqual(report["cleanupFailures"], ["foreign"])
             self.assertTrue(work.exists())
             self.assertTrue(left)
+
+
+class InstalledFocusRerun(unittest.TestCase):
+    def test_development_modes_refuse_ci(self):
+        for variable in ("CI", "GITHUB_ACTIONS"):
+            with self.subTest(variable=variable), patch.dict(os.environ, {variable: "true"}):
+                with self.assertRaises(RuntimeError):
+                    harness.rerun_installed("/nonexistent/kept.json")
+                with self.assertRaises(RuntimeError), patch.dict(os.environ, {"ASSERVAT_JOURNEY_FOCUS": "manual-logs"}):
+                    harness.main(initial_bootstrap_chain=True, runtime_provider_pair=True, installer_continuation=True, keep_installed=True)
+
+    def test_keep_requires_installed_rerun_focus(self):
+        with patch.dict(os.environ, {"ASSERVAT_JOURNEY_FOCUS": "journey"}):
+            os.environ.pop("CI", None)
+            os.environ.pop("GITHUB_ACTIONS", None)
+            with self.assertRaises(ValueError):
+                harness.main(initial_bootstrap_chain=True, runtime_provider_pair=True, installer_continuation=True, keep_installed=True)
+
+    def test_rerun_refuses_other_manifests(self):
+        with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("CI", None)
+            os.environ.pop("GITHUB_ACTIONS", None)
+            manifest = Path(directory)/(RUN + ".json")
+            manifest.write_text(json.dumps({"runId": RUN, "clusters": [], "containers": [], "volumes": [], "image": None, "networks": []}))
+            with self.assertRaises(ValueError):
+                harness.rerun_installed(manifest)
+
+    def test_qualification_environment_drops_development_switches(self):
+        base = {key: "1" for key in harness.DEVELOPMENT_ENVIRONMENT}
+        env = harness.qualification_environment(base, "/fixtures.json", "/work", False, False, initial_bootstrap_chain=True, runtime_provider_pair=True, installer_continuation=True)
+        self.assertFalse(set(harness.DEVELOPMENT_ENVIRONMENT) & set(env))
 
 
 class CollectorPacketCleanup(unittest.TestCase):

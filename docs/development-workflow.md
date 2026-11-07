@@ -128,7 +128,8 @@ other focuses load eBPF collectors; the harness also refuses them without
 `/etc/asservat-disposable-host`. Never create that file on a workstation.
 
 Each run is a fresh installation: clusters, database and images are never
-reused, because protected installation roots require clean state. The harness
+reused, because protected installation roots require clean state. The
+development-only rerun below is the one explicit exception. The harness
 records its phase end times in `phaseSeconds` of
 `test/results/context-storage-environment.json` and prints them at the end;
 the Go test's own lines with elapsed seconds are in
@@ -144,6 +145,79 @@ installer continuation up to the focus, about 2 minutes in the
 time: 100 s harness setup (images 31 s, services 23 s, concurrent clusters
 36 s), 664 s Go test (unified runner 28/88/38/40 s, `manual-logs` 158 s) and
 14 s cleanup, leaving no owned kind cluster, container or network.
+
+## Fast focus re-run (development only)
+
+To iterate on an authority, timing or wiring bug inside one focus, install
+once and then rerun only the focus. This is never a qualification: reports
+carry `"qualification": false`, the harness refuses these modes when `CI` or
+`GITHUB_ACTIONS` is set, and `make installed-focus` without them stays a fresh
+installation.
+
+```sh
+make installed-keep FOCUS=manual-logs   # fresh install + focus, then keep everything
+make installed-rerun                    # rebuild, redeploy if changed, focus only
+make installed-rerun                    # again, as often as needed
+make installed-teardown                 # remove the kept run, verify nothing is left
+```
+
+`installed-rerun` and `installed-teardown` use the newest manifest in
+`~/.cache/asservat-build/kept/`; pass `KEPT=<manifest>` to pick another.
+
+- **Keep** runs the ordinary fresh `installed-focus` run with
+  `--keep-installed`. Before the focus starts, the Go test writes the inputs
+  the focus needs (installation, root and cluster IDs, public endpoint and
+  root, regional target) to `installed-state.json` in the private fixture
+  directory. Afterwards the harness keeps the clusters, fixture containers,
+  images, networks and that directory, and records them in the kept manifest.
+  Go-side fixture cleanup is skipped as with `--keep-on-failure`.
+- **Rerun** (`--rerun-installed`) checks that every kept cluster and fixture
+  container still exists, is labelled for that run and is running. It then
+  rebuilds the hub binary, fixture proxy and console. If any of them differs
+  from the deployed image, it builds a new labelled image, loads it into the
+  hub cluster and moves the hub there through the product's own image change
+  (`installer-upgrade`, ADR-227), at the next release revision. Then it runs
+  only `TestInstalledFocusRerunWithKeptInstallation`. That test reopens the
+  kept database, clusters and Keycloak realm and calls the same focus function
+  as the full run. Cluster/fixture creation, the unified bootstrap runner, the
+  installer continuation and the regional install are skipped. Its log and
+  report are `test/results/installed-focus-rerun.log` and
+  `installed-focus-rerun-environment.json` (`wallSeconds`, `phaseSeconds`,
+  `imageChanged`).
+- **Teardown** (`--cleanup-kept`) removes the run's clusters, containers,
+  volumes, images (including every rerun image), networks and private
+  directory after checking each belongs to that run. Then it lists every
+  Docker container, volume, network and image labelled for the run and every
+  kind cluster named for it; anything left fails the teardown. The evidence
+  is in `test/results/kept-cleanup-<run>.json` (`leftovers`).
+
+Limits:
+
+- Only `manual-logs` is wired for reruns so far (`RERUN_FOCUSES` in the
+  harness, `installedRerunFocus` in Go). Wiring another focus means making
+  its run-once inputs (idempotency keys, synthetic source names, root-wide
+  totals, operator capacity) per-run, as for `manual-logs`.
+- Product state from earlier runs (cases, artifacts, spent query units,
+  browser sessions) stays, so a rerun is not a clean first run. Query units
+  are never refunded, so the keep run's synthetic operator settings fund four
+  focus runs instead of one (`installedKeptRuns`): query units, the normal
+  and resolution audit lanes, the regional context reserve, the pool's
+  system object partition (four runs fit the fixture's 8 GiB system byte
+  reserve) and the browser login, session and logout caps. The harness refuses a fourth rerun.
+- A rerun gives its capture/download idempotency keys and synthetic
+  ephemeral container a per-run suffix, skips processing initialization
+  once an earlier run completed it (the product refuses a second one), and its root-wide logs
+  query accounting check subtracts what was charged before the rerun
+  started. In ordinary runs these adjustments are zero or absent.
+- The image change moves hub-api, hub-worker, key service, publisher and
+  federation, and with hub-api the console. The regional connector and the
+  download/query worker Jobs keep the kept run's image; changes there need a
+  fresh keep run.
+- The keep run extends two synthetic fixture lifetimes from 30/60 minutes to
+  three hours: the OpenBao token-reviewer token and the owner issuer root.
+  Product settings are unchanged. The connector and worker fixture roots stay
+  at two hours, so reruns are refused 90 minutes after the keep run started.
+- Final qualification still starts fresh with frozen sources.
 
 ## Prefer measured simplification
 

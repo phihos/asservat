@@ -277,7 +277,17 @@ func qualifyInstalledManualLogs(t *testing.T, ctx context.Context, admin *pgxpoo
 	if err != nil {
 		t.Fatal(err)
 	}
-	identity.initializeProcessing(t, ctx, cert, address, origin, diagnose)
+	initialized := false
+	if installedRerunMode() != "" {
+		// A development-only rerun's earlier run may have initialized
+		// processing already; the product refuses a second initialization.
+		if err := admin.QueryRow(ctx, `SELECT initialized_at IS NOT NULL FROM processing_root WHERE root_id=$1`, root).Scan(&initialized); err != nil {
+			t.Fatal("kept processing state", err)
+		}
+	}
+	if !initialized {
+		identity.initializeProcessing(t, ctx, cert, address, origin, diagnose)
+	}
 	connect := func(name string, tokens *installedJourneyTokenSource) *sdk.ClientSession {
 		client := sdk.NewClient(&sdk.Implementation{Name: name, Version: "1"}, nil)
 		session, err := client.Connect(ctx, &sdk.StreamableClientTransport{Endpoint: strings.TrimSuffix(origin, "/") + "/mcp", HTTPClient: &http.Client{Transport: installedJourneyBearer{transport, tokens.Token}, Timeout: 60 * time.Second}, MaxRetries: -1, DisableStandaloneSSE: true}, nil)
@@ -384,7 +394,7 @@ func qualifyInstalledManualLogs(t *testing.T, ctx context.Context, admin *pgxpoo
 	})
 	proxy(http.MethodGet, "log", installedLogsMarker+"-current\n\n\xff\x00\n"+strings.Repeat("long-line-", 400))
 	ep := pod.DeepCopy()
-	ep.Spec.EphemeralContainers = append(ep.Spec.EphemeralContainers, core.EphemeralContainer{EphemeralContainerCommon: core.EphemeralContainerCommon{Name: "log-ephemeral", Image: pod.Spec.Containers[0].Image, ImagePullPolicy: core.PullIfNotPresent, Command: []string{"/provider-proxy", "signals-once"}, SecurityContext: &core.SecurityContext{RunAsNonRoot: ptr.To(true), RunAsUser: ptr.To(int64(65532)), AllowPrivilegeEscalation: ptr.To(false), ReadOnlyRootFilesystem: ptr.To(true), Capabilities: &core.Capabilities{Drop: []core.Capability{"ALL"}}}}})
+	ep.Spec.EphemeralContainers = append(ep.Spec.EphemeralContainers, core.EphemeralContainer{EphemeralContainerCommon: core.EphemeralContainerCommon{Name: "log-ephemeral" + installedRunSuffix(), Image: pod.Spec.Containers[0].Image, ImagePullPolicy: core.PullIfNotPresent, Command: []string{"/provider-proxy", "signals-once"}, SecurityContext: &core.SecurityContext{RunAsNonRoot: ptr.To(true), RunAsUser: ptr.To(int64(65532)), AllowPrivilegeEscalation: ptr.To(false), ReadOnlyRootFilesystem: ptr.To(true), Capabilities: &core.Capabilities{Drop: []core.Capability{"ALL"}}}}})
 	if _, err := region.CoreV1().Pods(namespace).UpdateEphemeralContainers(ctx, podName, ep, meta.UpdateOptions{}); err != nil {
 		t.Fatal("synthetic ephemeral logs source", err)
 	}
@@ -397,7 +407,7 @@ func qualifyInstalledManualLogs(t *testing.T, ctx context.Context, admin *pgxpoo
 			t.Fatal("logs setup substituted Pod")
 		}
 		for _, s := range p.Status.EphemeralContainerStatuses {
-			if s.Name == "log-ephemeral" && s.State.Terminated != nil && s.State.Terminated.ExitCode == 0 {
+			if s.Name == "log-ephemeral"+installedRunSuffix() && s.State.Terminated != nil && s.State.Terminated.ExitCode == 0 {
 				pod = *p
 				return true
 			}
@@ -488,7 +498,7 @@ func qualifyInstalledManualLogs(t *testing.T, ctx context.Context, admin *pgxpoo
 		}
 		return receipt.CaptureID, preview, grantID
 	}
-	capture, originalPreview, grantID := submit(manualLogsArguments(cluster, namespace, workload, false), "installed-original-logs")
+	capture, originalPreview, grantID := submit(manualLogsArguments(cluster, namespace, workload, false), "installed-original-logs"+installedRunSuffix())
 	var progress installedJourneyCaptureProgress
 	wait("verified encrypted logs publication", time.Minute, func() bool {
 		read("get_capture", map[string]string{"capture_id": capture}, &progress)
@@ -545,7 +555,7 @@ func qualifyInstalledManualLogs(t *testing.T, ctx context.Context, admin *pgxpoo
 		r, _ := call(rawSession, name, args)
 		return installedComparisonReply{r}
 	}
-	denied, _ := call(rawSession, "prepare_artifact_download", map[string]string{"artifact_id": a.ArtifactID, "idempotency_key": "logs-readraw-no-native"})
+	denied, _ := call(rawSession, "prepare_artifact_download", map[string]string{"artifact_id": a.ArtifactID, "idempotency_key": "logs-readraw-no-native" + installedRunSuffix()})
 	if denied.Status != "error" {
 		t.Fatal("read+raw session obtained native preparation")
 	}
@@ -575,7 +585,7 @@ func qualifyInstalledManualLogs(t *testing.T, ctx context.Context, admin *pgxpoo
 	wait("approved exact native logs download", time.Minute, func() bool {
 		name, args := "get_artifact_download", any(map[string]string{"download_id": download.DownloadID})
 		if download.DownloadID == "" || download.ContinuePreparation {
-			name, args = "prepare_artifact_download", map[string]string{"artifact_id": a.ArtifactID, "idempotency_key": "installed-logs-native"}
+			name, args = "prepare_artifact_download", map[string]string{"artifact_id": a.ArtifactID, "idempotency_key": "installed-logs-native" + installedRunSuffix()}
 		}
 		r, code := invoke(name, args)
 		return code == "" && r.Status == "ok" && json.Unmarshal(r.Data, &download) == nil && download.State != "Preparing"
@@ -625,7 +635,7 @@ func qualifyInstalledManualLogs(t *testing.T, ctx context.Context, admin *pgxpoo
 	// Repeat is a fresh preview/settings proof here, never an unexecuted repeat
 	// capture claim. Its original composition/expiry must remain unchanged.
 	qualifyManualRecorderRepeatPreview(t, capture, originalPreview, invoke, diagnose)
-	stopCapture, _, _ := submit(manualLogsArguments(cluster, namespace, workload, true), "installed-stop-logs")
+	stopCapture, _, _ := submit(manualLogsArguments(cluster, namespace, workload, true), "installed-stop-logs"+installedRunSuffix())
 	qualifyManualLogsStop(t, ctx, stopCapture, read, invoke)
 	report := map[string]any{"captureID": capture, "caseID": progress.CaseID, "podUID": podUID, "artifactID": a.ArtifactID, "grantID": grantID, "nativeBytes": len(native), "nativeSHA256": hex.EncodeToString(digest[:]), "origins": footer.Origins, "sourceBytes": footer.SourceBytes, "fragments": footer.Fragments, "queryUnits": installedLogsQueryUnits, "queries": 2, "ordinaryCollection": false, "protectedRequireAll": true, "ordinaryObserveNativeQualified": false, "independentReviewer": identity.ReviewerSubject, "querySameKeyReplay": true, "sameNativeMCPReact": true, "queryWorkersJoined": pipeline.joined, "workerRetirement": "exact terminal; positive SQL retirement required if original Job gone; surviving terminal worker remains charged", "readRawNativeDenied": true, "repeatPreviewOnly": true, "repeatCaptureExecuted": false, "stopCaptureID": stopCapture, "stop": "Running to Cancelled without artifact", "authority": "actual provisioned capture/publication/raw approval/MCP/React/native/SQL path; operator only sets up synthetic source bytes and verifies results"}
 	body, _ := json.MarshalIndent(report, "", "  ")

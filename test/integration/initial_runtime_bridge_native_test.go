@@ -377,10 +377,11 @@ func initialRuntimeNativeSource(t *testing.T, ctx context.Context, api kubernete
 }
 
 // keepFailedFixture leaves a failed native fixture's objects in place for
-// inspection when the harness runs with --keep-on-failure; the harness's
+// inspection when the harness runs with --keep-on-failure, and every run's
+// objects in the development-only --keep-installed mode; the harness's
 // --cleanup-kept removes the owned clusters and containers afterwards.
 func keepFailedFixture(t *testing.T) bool {
-	return t.Failed() && os.Getenv("ASSERVAT_KEEP_ON_FAILURE") == "1"
+	return installedKeepMode() || t.Failed() && os.Getenv("ASSERVAT_KEEP_ON_FAILURE") == "1"
 }
 
 func initialRuntimeNativeCleanup(t *testing.T, api kubernetes.Interface, namespace, installation, prefix string) {
