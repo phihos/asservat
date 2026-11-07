@@ -80,7 +80,7 @@ func (s *LiveOperations) CallWithContext(ctx context.Context, current identities
 	if e != nil || !i.Valid(s.now()) || !slices.Contains(i.Scopes, "evidence:read") {
 		return OperationReply{}, identity.ErrDenied
 	}
-	until := identity.Earlier(s.now().Add(5*time.Second), i.ValidUntil)
+	until := identity.Earlier(s.now().Add(audit.OperationRequestWindow(name)), i.ValidUntil)
 	if end, ok := ctx.Deadline(); ok {
 		until = identity.Earlier(until, end)
 	}

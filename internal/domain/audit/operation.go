@@ -65,6 +65,10 @@ func OperationRequestWindow(name string) time.Duration {
 		return identity.CapturePreviewRequestWindow
 	case "get_file_excerpt", "get_http_headers", "get_profile_summary", "get_pcap_summary", "pcap_query", "compare_profiles", "get_syscall_summary", "get_syscall_events", "syscall_query", "get_logs", "get_query_result", "prepare_artifact_download", "get_artifact_download":
 		return identity.EvidenceReadRequestWindow
+	case "list_live_sources", "open_live_watch", "read_live_watch", "update_live_watch", "close_live_watch":
+		// A live read holds two authority checks around a bounded node wait;
+		// measured installed reads take four to six seconds.
+		return identity.EvidenceReadRequestWindow
 	default:
 		return 5 * time.Second
 	}
