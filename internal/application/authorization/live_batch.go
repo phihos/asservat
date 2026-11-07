@@ -31,7 +31,7 @@ func (s LiveSourceAuthority) sourcePhase(ctx context.Context, current identities
 	if !s.configured() || ctx == nil || ctx.Err() != nil || current == nil || len(input) < 1 || len(input) > live.MaxSources || !live.Projection(projection) {
 		return nil, time.Time{}, fmt.Errorf("%w: live_batch:30", live.ErrDenied)
 	}
-	call, stop := context.WithTimeout(ctx, 5*time.Second)
+	call, stop := context.WithTimeout(ctx, identity.AuthorityRecheckInterval) // ADR-311: the request window bounds the call
 	defer stop()
 	i, e := current.ResolveIdentity(call)
 	i = cloneProjectionIdentity(i)

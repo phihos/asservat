@@ -80,7 +80,7 @@ func (s LiveSourceAuthority) Inventory(ctx context.Context, current identities.C
 	if !s.configured() || current == nil || ctx == nil || ctx.Err() != nil || !target.Valid() || limit < 1 || limit > 100 {
 		return nil, "", s.refuse("input", live.ErrDenied)
 	}
-	call, cancel := context.WithTimeout(ctx, 5*time.Second)
+	call, cancel := context.WithTimeout(ctx, identity.AuthorityRecheckInterval) // ADR-311: the request window bounds the call
 	defer cancel()
 	i, err := current.ResolveIdentity(call)
 	i = cloneProjectionIdentity(i)
@@ -150,7 +150,7 @@ func (s LiveSourceAuthority) Check(ctx context.Context, current identities.Curre
 	if !s.configured() || ctx == nil || ctx.Err() != nil || current == nil || expected.Root() != s.RootID || !expected.Target.Valid() || projection != "" && !live.Projection(projection) {
 		return zero, time.Time{}, live.ErrDenied
 	}
-	call, cancel := context.WithTimeout(ctx, 5*time.Second)
+	call, cancel := context.WithTimeout(ctx, identity.AuthorityRecheckInterval) // ADR-311: the request window bounds the call
 	defer cancel()
 	i, err := current.ResolveIdentity(call)
 	i = cloneProjectionIdentity(i)
@@ -298,7 +298,7 @@ func (s LiveSourceAuthority) Resolve(ctx context.Context, current identities.Cur
 	if !s.configured() || ctx == nil || ctx.Err() != nil || current == nil || !value.UUID(id) || (kind != "policy" && kind != "manualSession") || !live.Projection(projection) {
 		return zero, time.Time{}, live.ErrDenied
 	}
-	call, cancel := context.WithTimeout(ctx, 5*time.Second)
+	call, cancel := context.WithTimeout(ctx, identity.AuthorityRecheckInterval) // ADR-311: the request window bounds the call
 	defer cancel()
 	i, e := current.ResolveIdentity(call)
 	i = cloneProjectionIdentity(i)

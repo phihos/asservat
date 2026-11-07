@@ -38,7 +38,7 @@ func (s CurrentLiveEnvironment) LiveSourceReads(ctx context.Context, sources []l
 	if ctx == nil || ctx.Err() != nil || s.Policies == nil || s.Recovery == nil || s.Now == nil || !actor.Valid() || len(sources) < 1 || len(sources) > 100 {
 		return nil, fmt.Errorf("%w: live environment input", live.ErrDenied)
 	}
-	until := s.Now().Add(5 * time.Second)
+	until := s.Now().Add(identity.AuthorityRecheckInterval) // ADR-311
 	if d, ok := ctx.Deadline(); ok {
 		until = identity.Earlier(until, d)
 	}
