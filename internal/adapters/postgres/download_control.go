@@ -145,7 +145,7 @@ func (s *Downloads) ReadContextDownloadSource(ctx context.Context, a artifact.Do
 	if s == nil || ctx == nil || ctx.Err() != nil || a.Scope.RootID != s.root {
 		return out, artifact.ErrDownloadUnavailable
 	}
-	topology, err := s.retention.observe(ctx, a.Scope.ClusterID)
+	topology, err := s.downloadTopology(ctx, a)
 	if err != nil {
 		return out, err
 	}
@@ -154,7 +154,7 @@ func (s *Downloads) ReadContextDownloadSource(ctx context.Context, a artifact.Do
 		if err != nil {
 			return err
 		}
-		recovery, err := s.recovery.lock(ctx, q, s.root, a.Environment.Recovery())
+		recovery, err := s.lockDownloadRecovery(ctx, q, s.root, a)
 		if err != nil {
 			return err
 		}
@@ -219,7 +219,7 @@ func (s *Downloads) ObserveDownload(ctx context.Context, sessionID string, a art
 			return out, artifact.ErrInvalid
 		}
 	}
-	topology, err := s.retention.observe(ctx, a.Scope.ClusterID)
+	topology, err := s.downloadTopology(ctx, a)
 	if err != nil {
 		return out, err
 	}
@@ -228,7 +228,7 @@ func (s *Downloads) ObserveDownload(ctx context.Context, sessionID string, a art
 		if err != nil {
 			return err
 		}
-		recovery, err := s.recovery.lock(ctx, q, s.root, a.Environment.Recovery())
+		recovery, err := s.lockDownloadRecovery(ctx, q, s.root, a)
 		if err != nil {
 			return err
 		}

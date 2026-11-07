@@ -191,10 +191,44 @@ func updateDownload(ctx context.Context, q *custodydb.Queries, s artifact.Downlo
 	return err
 }
 
+// downloadTopology observes the retention topology for a complete check. A
+// started response's continuation is fenced by the effective cutoffs instead
+// (ADR-312) and needs no topology.
+func (s *Downloads) downloadTopology(ctx context.Context, a artifact.DownloadAuthority) (privacyvalue.PolicyTopology, error) {
+	if a.Started() {
+		return privacyvalue.PolicyTopology{}, nil
+	}
+	return s.retention.observe(ctx, a.Scope.ClusterID)
+}
+
+func (s *Downloads) lockDownloadRecovery(ctx context.Context, q *custodydb.Queries, root string, a artifact.DownloadAuthority) (custodydb.FleetCurrentTrust, error) {
+	if a.Started() {
+		return s.recovery.lockStarted(ctx, q, root, a.Environment.Recovery())
+	}
+	return s.recovery.lock(ctx, q, root, a.Environment.Recovery())
+}
+
 // Rechecked after blocking locks and before commit. A current permission stream
 // and published catalog row are necessary; the external gate additionally owns
 // identity, retention shortening, locality and (future) raw/share authority.
+// A started response's continuation (ADR-312) skips the permission, processing
+// and retention-policy fences: it keeps only its original bounds, the effective
+// retention cutoffs and managed deletion of the published copy, and the
+// recovery incarnation it started under.
 func (s *Downloads) downloadFence(ctx context.Context, q *custodydb.Queries, p custodydb.PermissionStream, a artifact.DownloadAuthority, topology privacyvalue.PolicyTopology, recovery custodydb.FleetCurrentTrust) error {
+	if a.Started() {
+		n, err := q.CurrentTime(ctx)
+		if err != nil {
+			return err
+		}
+		if !a.Valid(n.Time) || a.DeleteBy.IsZero() {
+			return artifact.ErrDownloadExpired
+		}
+		if err := publishedDownloadFence(ctx, q, a); err != nil {
+			return err
+		}
+		return s.recovery.checkStarted(recovery, a.Scope.RootID, a.Environment.Recovery())
+	}
 	if err := processingDownloadFence(ctx, q, a); err != nil {
 		return err
 	}
@@ -217,7 +251,16 @@ func (s *Downloads) downloadFence(ctx context.Context, q *custodydb.Queries, p c
 			return privacy.ErrFence
 		}
 	}
-	r, err := q.ReadPublishedContext(ctx, custodydb.ReadPublishedContextParams{ArtifactID: id(a.Scope.ArtifactID), RootID: p.ID})
+	if err := publishedDownloadFence(ctx, q, a); err != nil {
+		return err
+	}
+	return s.recovery.check(ctx, q, recovery, a.Scope.RootID, a.Environment.Recovery())
+}
+
+// publishedDownloadFence binds the exact published copy and its effective
+// retention cutoffs, which only ever shorten (managed deletion included).
+func publishedDownloadFence(ctx context.Context, q *custodydb.Queries, a artifact.DownloadAuthority) error {
+	r, err := q.ReadPublishedContext(ctx, custodydb.ReadPublishedContextParams{ArtifactID: id(a.Scope.ArtifactID), RootID: id(a.Scope.RootID)})
 	if err != nil {
 		return err
 	}
@@ -225,14 +268,14 @@ func (s *Downloads) downloadFence(ctx context.Context, q *custodydb.Queries, p c
 	if err != nil || a.Environment.Location != e.Registration.Location || a.Environment.StoreID != e.Registration.StoreID || e.CaptureUID != a.Scope.CaptureID || e.Registration.Location.ArtifactID != a.Scope.ArtifactID || e.Registration.Location.ClusterID != a.Scope.ClusterID || e.NamespaceUID != a.Scope.NamespaceUID || e.WorkloadUID != a.Scope.WorkloadUID || e.PodUID != a.Scope.PodUID || !bytes.Equal(r.ContextVerification.CopiesDigest, a.Scope.Version[:]) || a.AccessUntil.After(r.EffectiveExpiresAt.Time) || a.DeleteBy.After(r.EffectiveDeleteBy.Time) {
 		return privacy.ErrFence
 	}
-	n, err = q.CurrentTime(ctx)
+	n, err := q.CurrentTime(ctx)
 	if err != nil {
 		return err
 	}
 	if !a.Valid(n.Time) || !n.Time.Before(r.EffectiveExpiresAt.Time) {
 		return artifact.ErrDownloadExpired
 	}
-	return s.recovery.check(ctx, q, recovery, a.Scope.RootID, a.Environment.Recovery())
+	return nil
 }
 
 func (s *Downloads) ReserveDownload(ctx context.Context, r evidence.DownloadReservation) (artifact.DownloadSession, error) {
@@ -242,12 +285,12 @@ func (s *Downloads) ReserveDownload(ctx context.Context, r evidence.DownloadRese
 	if !request.Valid() || request.Scope.RootID != s.root || request.Scope != a.Scope || r.IdempotencyDigest == (artifact.Digest{}) || request.State != artifact.DownloadPreparing || request.Active != nil || request.Generation != 0 || request.Requests != 0 || request.ChargedOutput != 0 || request.ChargedRead != 0 || request.EmittedBytes != 0 {
 		return out, artifact.ErrInvalid
 	}
-	topology, err := s.retention.observe(ctx, a.Scope.ClusterID)
+	topology, err := s.downloadTopology(ctx, a)
 	if err != nil {
 		return out, err
 	}
 	err = s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		recovery, err := s.recovery.lock(ctx, q, a.Scope.RootID, a.Environment.Recovery())
+		recovery, err := s.lockDownloadRecovery(ctx, q, a.Scope.RootID, a)
 		if err != nil {
 			return err
 		}
@@ -356,12 +399,12 @@ func (s *Downloads) beginDownloadBatch(ctx context.Context, sessionID string, a 
 	if !authorization.UUID(sessionID) || a.Scope.RootID != s.root {
 		return out, artifact.ErrInvalid
 	}
-	topology, err := s.retention.observe(ctx, a.Scope.ClusterID)
+	topology, err := s.downloadTopology(ctx, a)
 	if err != nil {
 		return out, err
 	}
 	err = s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		recovery, err := s.recovery.lock(ctx, q, a.Scope.RootID, a.Environment.Recovery())
+		recovery, err := s.lockDownloadRecovery(ctx, q, a.Scope.RootID, a)
 		if err != nil {
 			return err
 		}
@@ -434,12 +477,12 @@ func (s *Downloads) PermitDownloadBatch(ctx context.Context, sessionID string, a
 	if !authorization.UUID(sessionID) || !authorization.UUID(batchID) || a.Scope.RootID != s.root {
 		return artifact.ErrInvalid
 	}
-	topology, err := s.retention.observe(ctx, a.Scope.ClusterID)
+	topology, err := s.downloadTopology(ctx, a)
 	if err != nil {
 		return err
 	}
 	return s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		recovery, err := s.recovery.lock(ctx, q, a.Scope.RootID, a.Environment.Recovery())
+		recovery, err := s.lockDownloadRecovery(ctx, q, a.Scope.RootID, a)
 		if err != nil {
 			return err
 		}
@@ -538,12 +581,12 @@ func (s *Downloads) PermitDownloadMetadata(ctx context.Context, sessionID string
 	if !authorization.UUID(sessionID) || !authorization.UUID(batchID) || a.Scope.RootID != s.root {
 		return artifact.ErrInvalid
 	}
-	topology, err := s.retention.observe(ctx, a.Scope.ClusterID)
+	topology, err := s.downloadTopology(ctx, a)
 	if err != nil {
 		return err
 	}
 	return s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		recovery, err := s.recovery.lock(ctx, q, a.Scope.RootID, a.Environment.Recovery())
+		recovery, err := s.lockDownloadRecovery(ctx, q, a.Scope.RootID, a)
 		if err != nil {
 			return err
 		}

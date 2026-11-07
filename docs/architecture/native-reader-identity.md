@@ -45,13 +45,11 @@ current claims; the reader itself does not decide resource entitlement.
 Replacing groups between batches is not permission to merge old and new groups
 or ignore a deny. Old or closed batches cannot resolve identity again.
 
-Under [ADR-220](../decisions/220-response-owned-download-permissions.md), C-03 may
-retain only the response's ordinary-entitlement decision for 30 seconds from its
-original reconstruction start. A new batch still authenticates current identity;
-changed claim sets trigger fresh eligibility before catalog access. The expired
-old identity is never reused as authentication. Current SQL permission fences
-remain, so known revisions/suspension may deny before the cadence cutoff. The
-response discards its private observation on Close or a failed check.
+Under [ADR-312](../decisions/312-started-downloads-run-to-original-bounds.md), a
+content response authenticates through its batches only until it starts. The
+started response opens no further batch (except to authenticate a raw window's
+grant-pool reservation) and is bounded by the reader's original hard end: the
+browser session's fixed expiry or the bearer token's expiry/group-freshness bound.
 
 `Close` cancels and joins active observations before releasing the batch slot.
 The content coordinator retains a batch through its current SQL lease and final

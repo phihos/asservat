@@ -60,10 +60,46 @@ type DownloadAuthority struct {
 	CheckedAt, ValidUntil, AccessUntil time.Time
 	// Optional only for historical v1 audit decoding. Current disclosure requires it.
 	DeleteBy time.Time `json:",omitzero"`
+	// StartedAt is set only on a started response's continuation (ADR-312):
+	// the CheckedAt of the complete check that started the response.
+	StartedAt time.Time `json:",omitzero"`
+}
+
+// Started reports a continuation of a started content response (ADR-312).
+func (a DownloadAuthority) Started() bool { return !a.StartedAt.IsZero() }
+
+// Continue restates the complete decision that started a content response as
+// its next short delivery lease (ADR-312). Nothing is observed again: identity,
+// permission, share, raw-access and policy changes after the start do not
+// reach a running response. Only the original bounds end it: AccessUntil (the
+// retention, share and raw-grant end fixed at the start), the response bound
+// until, and the SQL effect fences for effective retention cutoffs, managed
+// deletion, Stop and recovery. The embedded observation dates describe this
+// lease, not a new observation; StartedAt keeps the original check time and
+// DecisionDigest the original decision.
+func (a DownloadAuthority) Continue(now, until time.Time) (DownloadAuthority, bool) {
+	if !a.Started() {
+		a.StartedAt = a.CheckedAt
+	}
+	if now.Before(a.StartedAt) || !now.Before(a.AccessUntil) || !now.Before(until) {
+		return DownloadAuthority{}, false
+	}
+	end := identity.Earlier(now.Add(DownloadLease), identity.Earlier(a.AccessUntil, until))
+	a.CheckedAt, a.ValidUntil = now, end
+	if a.Environment != (DownloadEnvironment{}) {
+		a.Environment.ObservedAt, a.Environment.ValidUntil = now, end
+		if a.Environment.Processing != (DownloadProcessingProof{}) {
+			a.Environment.Processing.ObservedAt, a.Environment.Processing.ValidUntil = now, end
+		}
+	}
+	if a.Retention != (RetentionProof{}) {
+		a.Retention.ObservedAt, a.Retention.ValidUntil = now, end
+	}
+	return a, a.Valid(now)
 }
 
 func (a DownloadAuthority) Valid(now time.Time) bool {
-	return (a.Environment == (DownloadEnvironment{}) || (a.Environment.Valid(now) && a.Environment.RootID == a.Scope.RootID && a.Environment.Location.ClusterID == a.Scope.ClusterID && a.Environment.Location.ArtifactID == a.Scope.ArtifactID && a.Environment.Principal == a.Scope.Principal && !a.ValidUntil.After(a.Environment.ValidUntil))) && (a.Retention == (RetentionProof{}) || (a.Retention.Valid(now) && a.Retention.Matches(a.Scope.RootID, a.Scope.ClusterID, a.Scope.NamespaceUID, a.Scope.WorkloadUID, a.Scope.PodUID) && !a.ValidUntil.After(a.Retention.ValidUntil))) && a.Scope.Valid() && uuid(a.PermissionEpoch) && a.PermissionSequence > 0 && a.ProjectionDigest != (Digest{}) && a.DecisionDigest != (Digest{}) && a.IdentityRevision.Valid() && identity.Fresh(a.CheckedAt, a.ValidUntil, now, 5*time.Second) && !a.ValidUntil.After(a.AccessUntil) && (a.DeleteBy.IsZero() || a.AccessUntil.Before(a.DeleteBy))
+	return !a.StartedAt.After(a.CheckedAt) && (a.Environment == (DownloadEnvironment{}) || (a.Environment.Valid(now) && a.Environment.RootID == a.Scope.RootID && a.Environment.Location.ClusterID == a.Scope.ClusterID && a.Environment.Location.ArtifactID == a.Scope.ArtifactID && a.Environment.Principal == a.Scope.Principal && !a.ValidUntil.After(a.Environment.ValidUntil))) && (a.Retention == (RetentionProof{}) || (a.Retention.Valid(now) && a.Retention.Matches(a.Scope.RootID, a.Scope.ClusterID, a.Scope.NamespaceUID, a.Scope.WorkloadUID, a.Scope.PodUID) && !a.ValidUntil.After(a.Retention.ValidUntil))) && a.Scope.Valid() && uuid(a.PermissionEpoch) && a.PermissionSequence > 0 && a.ProjectionDigest != (Digest{}) && a.DecisionDigest != (Digest{}) && a.IdentityRevision.Valid() && identity.Fresh(a.CheckedAt, a.ValidUntil, now, 5*time.Second) && !a.ValidUntil.After(a.AccessUntil) && (a.DeleteBy.IsZero() || a.AccessUntil.Before(a.DeleteBy))
 }
 
 const (

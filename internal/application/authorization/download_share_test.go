@@ -95,42 +95,13 @@ func TestContextDownloadAuthorityShareRevokedDuringCheck(t *testing.T) {
 	}
 }
 
-// A response-owned shared entitlement uses the existing 30-second
-// reconstruction interval (ADR-220): a revocation refuses at the next
-// reconstruction, never later, and the entitlement never outlives its share.
-func TestDownloadResponseShareRecheck(t *testing.T) {
-	for _, name := range []string{"revoked", "expired"} {
-		t.Run(name, func(t *testing.T) {
-			f, shares, s, scope := shareDownloadFixture()
-			start := f.now
-			if name == "expired" {
-				shares.rows[0].ExpiresAt = start.Add(20 * time.Second)
-			}
-			owner, err := s.NewDownloadResponse(t.Context(), scope)
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer owner.Close()
-			current := credentialIdentity{f, "synthetic"}
-			currentDownloadResponseFacts(f, start)
-			if _, err := owner.CheckDownloadCurrent(t.Context(), current, scope); err != nil || shares.reads != 2 {
-				t.Fatal("first recipient check", err, shares.reads)
-			}
-			if name == "revoked" {
-				shares.rows[0].RevokedAt, shares.rows[0].Revision = start.Add(time.Second), 2
-			}
-			currentDownloadResponseFacts(f, start.Add(10*time.Second))
-			if _, err := owner.CheckDownloadCurrent(t.Context(), current, scope); err != nil || shares.reads != 2 {
-				t.Fatal("entitlement within the recheck interval", err, shares.reads)
-			}
-			at := start.Add(30 * time.Second)
-			if name == "expired" {
-				at = start.Add(20 * time.Second)
-			}
-			currentDownloadResponseFacts(f, at)
-			if _, err := owner.CheckDownloadCurrent(t.Context(), current, scope); err == nil || shares.reads != 3 {
-				t.Fatal("share not rechecked at reconstruction", err, shares.reads)
-			}
-		})
+// A started response continues to AccessUntil without another check
+// (ADR-312), so a shared decision's AccessUntil ends with its share.
+func TestSharedDownloadAccessEndsWithShare(t *testing.T) {
+	f, shares, s, scope := shareDownloadFixture()
+	shares.rows[0].ExpiresAt = f.now.Add(20 * time.Second)
+	a, err := s.CheckDownload(t.Context(), "synthetic-token", scope)
+	if err != nil || !a.AccessUntil.Equal(shares.rows[0].ExpiresAt) {
+		t.Fatal("shared access not bounded by its share", err, a.AccessUntil)
 	}
 }

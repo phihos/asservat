@@ -318,7 +318,7 @@ Current admitted parent, workload, signing and audit checks remain; certificates
 confer no evidence authority. Component checks pass; installed qualification is pending.
 
 [ADR-220 — Response-owned ordinary download permissions](220-response-owned-download-permissions.md)
-selects a fixed 30-second reconstruction cadence within one original response and
+(superseded by ADR-312) selected a fixed 30-second reconstruction cadence within one original response and
 removes duplicate native-reader authorization through an exact short handoff.
 Identity, delivery/native bounds and current SQL permission/safety fences remain;
 known changes may deny earlier. Component race checks and independent source
@@ -1161,3 +1161,5 @@ The brief's domain-registration and trademark work remains a maintainer-owned pu
 - [ADR-307 — Natural completion of exhausted projection workers](307-exhausted-projection-worker-completion.md): process-local completion only after the sole authenticated batch and final joined acknowledgement; original deadlines, multi-batch behavior and positive retirement remain. Implementation/qualification in progress.
 
 - [ADR-308 — Finite whole-pod logs and approved saved-log pages](308-finite-whole-pod-logs.md): lossless bounded API log acquisition, truthful combined-stream provenance and exact raw get_logs approval; implementation and qualification pending.
+
+- [ADR-312 — Started downloads run to their original bounds](312-started-downloads-run-to-original-bounds.md): maintainer decision; a content response is authorized completely at its start and then continues that decision without identity, permission or policy rechecks until its original bounds, effective retention cutoffs, Stop or recovery fence end it. Supersedes the post-start rechecks of ADR-220/233/258; installed qualification pending.

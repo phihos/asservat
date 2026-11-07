@@ -16,8 +16,9 @@ import (
 // DownloadResponseTransfer is one synchronous, joined response. Source and
 // destination are request-owned protected adapters, not serialized capabilities.
 // It admits one prepaid window at a time and never retries uncertain SQL/audit,
-// worker reads or HTTP writes. A fresh identity batch only replaces an expired
-// observation between completed chunks; it cannot renew an old CurrentIdentity.
+// worker reads or HTTP writes. Authentication and complete authorization happen
+// before the response starts; once started, the response continues that
+// decision (ADR-312) until an original bound, Stop or a failure ends it.
 type DownloadResponseTransfer struct {
 	Sessions  DownloadSessions
 	Responses DownloadResponses
@@ -26,9 +27,6 @@ type DownloadResponseTransfer struct {
 	Audit     DownloadWindowAcknowledgements
 	Now       func() time.Time
 	NewID     func() string
-	// Bootstrap supplies an exact-response ordinary-entitlement owner. Other
-	// authority implementations retain their existing fresh-check behavior.
-	NewResponseAuthority func(context.Context, artifact.DownloadScope) (CurrentDownloadAuthority, func(), error)
 	// RawResults reserves every raw window against its grant (ADR-279);
 	// nil refuses raw artifacts.
 	RawResults RawResultUses
@@ -38,23 +36,22 @@ func (t DownloadResponseTransfer) valid() bool {
 	return t.Sessions != nil && t.Responses != nil && t.Authority != nil && t.Objects != nil && t.Audit != nil && t.Now != nil && t.NewID != nil
 }
 
+// responseCurrent holds the response's authority. Before the response starts
+// every expired value is replaced by a complete check under a new identity
+// batch. After start it only continues the started decision (ADR-312): no
+// identity, permission or policy is observed again.
 type responseCurrent struct {
-	reader       identities.ReaderIdentity
-	authority    CurrentDownloadAuthority
-	batch        identities.IdentityBatch
-	scope        artifact.DownloadScope
-	value        artifact.DownloadAuthority
-	now          func() time.Time
-	endAuthority func()
+	reader    identities.ReaderIdentity
+	authority CurrentDownloadAuthority
+	batch     identities.IdentityBatch
+	scope     artifact.DownloadScope
+	value     artifact.DownloadAuthority
+	started   *artifact.DownloadAuthority
+	until     time.Time
+	now       func() time.Time
 }
 
-func (c *responseCurrent) close() {
-	c.closeBatch()
-	if c.endAuthority != nil {
-		c.endAuthority()
-		c.endAuthority = nil
-	}
-}
+func (c *responseCurrent) close() { c.closeBatch() }
 func (c *responseCurrent) closeBatch() {
 	if c.batch != nil {
 		c.batch.Close()
@@ -70,14 +67,29 @@ func (c *responseCurrent) get(ctx context.Context) (artifact.DownloadAuthority, 
 	return c.fresh(ctx, 0)
 }
 
-// fresh returns the current authority, observing it again when the retained
-// one has less than margin left.
+// start fixes the complete decision the response started under, bounded by the
+// response's original end.
+func (c *responseCurrent) start(a artifact.DownloadAuthority, until time.Time) {
+	c.started, c.until, c.value = &a, until, a
+}
+
+// fresh returns the current authority when it has more than margin left.
+// Otherwise, before the start, it checks completely again; after the start it
+// continues the started decision without any I/O.
 func (c *responseCurrent) fresh(ctx context.Context, margin time.Duration) (artifact.DownloadAuthority, error) {
 	if ctx.Err() != nil {
 		return artifact.DownloadAuthority{}, ctx.Err()
 	}
 	if c.batch != nil && c.value.Valid(c.now()) && c.now().Add(margin).Before(c.value.ValidUntil) {
 		return c.value, nil
+	}
+	if c.started != nil {
+		a, ok := c.started.Continue(c.now(), c.until)
+		if !ok || a.Scope != c.scope {
+			return artifact.DownloadAuthority{}, artifact.ErrDownloadExpired
+		}
+		c.value = a
+		return a, nil
 	}
 	c.closeBatch()
 	b, e := c.begin(ctx)
@@ -102,6 +114,19 @@ func (c *responseCurrent) fresh(ctx context.Context, margin time.Duration) (arti
 	}
 	c.value = a
 	return a, nil
+}
+
+// rawBatch authenticates a raw window's grant reservation (ADR-279), the one
+// per-window quota use that still resolves the caller. The reader has one
+// batch slot, so the new batch replaces the response's batch.
+func (c *responseCurrent) rawBatch(ctx context.Context) (identities.IdentityBatch, error) {
+	c.closeBatch()
+	b, e := c.begin(ctx)
+	if e != nil {
+		return nil, e
+	}
+	c.batch = b
+	return b, nil
 }
 
 // sessionBusyWait bounds how long a response waits, with no output, while
@@ -252,16 +277,6 @@ func (t DownloadResponseTransfer) transfer(ctx context.Context, reader identitie
 	}
 	current.scope = session.Scope
 	stage = "authority"
-	if t.NewResponseAuthority != nil {
-		owned, close, err := t.NewResponseAuthority(work, session.Scope)
-		if err != nil || owned == nil || close == nil {
-			if close != nil {
-				close()
-			}
-			return artifact.ErrDownloadUnavailable
-		}
-		current.authority, current.endAuthority = owned, close
-	}
 	// get must authorize even though the ingress batch already exists.
 	a, e := current.authority.CheckDownloadCurrent(preflightWork, first, session.Scope)
 	if e != nil {
@@ -322,9 +337,9 @@ func (t DownloadResponseTransfer) transfer(ctx context.Context, reader identitie
 	if e = finishPreflight(DownloadContentReady); e != nil {
 		return e
 	}
-	// End the socket's short metadata phase before waiting for a fresh body
-	// observation. The original response/caller/retention end bounds this idle
-	// phase; every actual write still requires its separate current byte lease.
+	// End the socket's short metadata phase before the body. The original
+	// response/caller/retention end bounds this idle phase; every actual write
+	// still requires its separate current byte lease.
 	until = identityvalue.Earlier(until, current.value.AccessUntil)
 	if d, ok := work.Deadline(); ok {
 		until = identityvalue.Earlier(until, d)
@@ -337,7 +352,7 @@ func (t DownloadResponseTransfer) transfer(ctx context.Context, reader identitie
 	}
 	// Metadata observation has positively joined. Its verified immutable facts
 	// remain usable, but its initial identity lease may be nearly exhausted.
-	// Close it before admitting content and acquire a distinct current batch;
+	// The response starts under a distinct complete check with a new batch;
 	// neither the old observation nor Describe is renewed or replayed.
 	current.closeBatch()
 	stage = "current"
@@ -361,6 +376,9 @@ func (t DownloadResponseTransfer) transfer(ctx context.Context, reader identitie
 	if !r.Valid() || r.Plan != plan || r.ID != request.ResponseID || r.SessionID != session.ID || r.OwnerID != request.OwnerID || r.Until.After(until) {
 		return artifact.ErrIntegrity
 	}
+	// Started (ADR-312): later windows and leases continue this decision,
+	// bounded by the response's original end, without another check.
+	current.start(a, r.Until)
 	// Always join writes before closing the durable response. Cleanup only closes
 	// this exact owner; an unknown close reply never releases accounting credit.
 	defer func() {
@@ -403,7 +421,11 @@ func (t DownloadResponseTransfer) transfer(ctx context.Context, reader identitie
 		// the window ID before any of them is read (ADR-279).
 		if raw && intent.Window.Length > 0 {
 			stage = "result-use"
-			if e = t.RawResults.ReserveRawResult(work, current.batch, session.Scope, windowID, authorization.GrantUse{Operation: authorization.GrantDownloadOperation, Bytes: intent.Window.Length}); e != nil {
+			b, e := current.rawBatch(work)
+			if e != nil {
+				return e
+			}
+			if e = t.RawResults.ReserveRawResult(work, b, session.Scope, windowID, authorization.GrantUse{Operation: authorization.GrantDownloadOperation, Bytes: intent.Window.Length}); e != nil {
 				return e
 			}
 		}
@@ -459,9 +481,9 @@ func (t DownloadResponseTransfer) transfer(ctx context.Context, reader identitie
 				// rest of the lease to authenticate its next 8 MiB frame, and a
 				// 1 MiB socket write needs time under client backpressure. Reading
 				// discloses nothing; a chunk is written only under a lease with at
-				// least localWriteMargin left, renewed with fresh current authority
-				// when shorter, or cleared. Remote sources keep their chunk
-				// acknowledgement bound to the original lease.
+				// least localWriteMargin left, renewed (continuing the started
+				// decision) when shorter, or cleared. Remote sources keep their
+				// chunk acknowledgement bound to the original lease.
 				if local && t.Now().Add(localWriteMargin).After(lease.Until) && work.Err() == nil {
 					stop()
 					stage = "lease"
@@ -471,8 +493,8 @@ func (t DownloadResponseTransfer) transfer(ctx context.Context, reader identitie
 					if e == nil && (!lease.Valid(t.Now()) || lease.ResponseID != r.ID || lease.WindowID != windowID || lease.OwnerID != r.OwnerID || lease.Generation != r.Generation || lease.Authority.Scope != session.Scope || lease.Until.After(a.ValidUntil)) {
 						e = artifact.ErrIntegrity
 					}
-					// A renewal that still cannot give the margin (for example an
-					// identity about to expire) writes nothing: the client resumes.
+					// A renewal that still cannot give the margin (the response
+					// is about to reach its original end) writes nothing.
 					if e == nil && t.Now().Add(localWriteMargin).After(lease.Until) {
 						e = artifact.ErrDownloadExpired
 					}
