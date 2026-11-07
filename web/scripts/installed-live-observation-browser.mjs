@@ -4,19 +4,22 @@ import { chromium, expect } from '@playwright/test';
 import assert from 'node:assert/strict';
 import { createInterface } from 'node:readline';
 import * as valid from '../src/generated/validate-live.js';
-import { readInstalledHistoryResponse } from './installed-history-response.mjs';
+import { parseInstalledHistoryText, readInstalledHistoryResponse } from './installed-history-response.mjs';
 const input=createInterface({input:process.stdin,crlfDelay:Infinity})[Symbol.asyncIterator]();
 async function command(){const line=await input.next();assert(!line.done&&Buffer.byteLength(line.value)<=16384,'bounded private command');return JSON.parse(line.value)}
 function event(value){const raw=JSON.stringify(value);assert(Buffer.byteLength(raw)<=32768,'bounded summary');process.stdout.write(raw+'\n')}
 const config=await command();assert.equal(config.mode,'installed-live');assert.equal(new URL(config.origin).protocol,'https:');assert.equal(new URL(config.proxy).hostname,'127.0.0.1');
 const browser=await chromium.launch({headless:true,proxy:{server:config.proxy,bypass:'<-loopback>'},...(process.env.ASSERVAT_CHROMIUM?{executablePath:process.env.ASSERVAT_CHROMIUM}:{})});
 const context=await browser.newContext({ignoreHTTPSErrors:true,acceptDownloads:false,locale:'en-US',viewport:{width:1440,height:900}});
+// Chromium may evict a reply body while the page keeps reading the live view;
+// keep the page's own consumed reply text per exact request (in-page only).
+await context.addInitScript(()=>{const original=window.fetch.bind(window);const replies=new Map();Object.defineProperty(window,'__installedReplies',{value:replies});window.fetch=async(input,init)=>{const response=await original(input,init);const path=new URL(typeof input==='string'?input:input.url,location.href).pathname;if(path.startsWith('/api/v1/operations/')&&response.status===200){const key=path+'\n'+(typeof init?.body==='string'?init.body:'');response.clone().text().then(text=>replies.set(key,text),()=>{})}return response}});
 const errors=[];let stage='session',total=0,page;
 try{
  await context.addCookies(config.cookies);config.cookies=[];
  page=await context.newPage();page.on('pageerror',()=>errors.push('pageerror'));
  page.on('request',r=>{const u=new URL(r.url());if(u.pathname.startsWith('/api/v1/operations/')){total++;if(!['list_live_sources','open_live_watch','read_live_watch','update_live_watch','close_live_watch'].includes(u.pathname.split('/').at(-1)))errors.push('unexpected-operation')}});
- const checked=async(response,name)=>{const read=await readInstalledHistoryResponse(response);assert.equal(read.http,200,name);assert.equal(read.body,'complete',name);const out=read.reply;assert(valid['validOutput_'+name](out),name+' closed output');assert.equal(out.status,'ok',name+' accepted');const h=await response.request().allHeaders();assert.equal(response.request().method(),'POST');assert.equal(h.origin,config.origin);assert.equal(typeof h['x-csrf-token'],'string');assert(h['x-csrf-token'].length===43);assert.equal(h.authorization,undefined);return out};
+ const checked=async(response,name)=>{let read=await readInstalledHistoryResponse(response);if(read.body==='read-failed'&&response.status()===200){const key=new URL(response.url()).pathname+'\n'+(response.request().postData()??'');for(let i=0;i<20&&read.body!=='complete';i++){const text=await page.evaluate(k=>{const t=window.__installedReplies.get(k);window.__installedReplies.delete(k);return t??null},key);if(text!==null){read=parseInstalledHistoryText(200,text);break}await new Promise(r=>setTimeout(r,100))}}assert.equal(read.http,200,name);assert.equal(read.body,'complete',name);const out=read.reply;assert(valid['validOutput_'+name](out),name+' closed output');assert.equal(out.status,'ok',name+' accepted');const h=await response.request().allHeaders();assert.equal(response.request().method(),'POST');assert.equal(h.origin,config.origin);assert.equal(typeof h['x-csrf-token'],'string');assert(h['x-csrf-token'].length===43);assert.equal(h.authorization,undefined);return out};
  const wait=name=>page.waitForResponse(r=>new URL(r.url()).pathname==='/api/v1/operations/'+name&&r.request().method()==='POST');
  await page.goto(config.origin+'/live');await expect(page.getByRole('heading',{name:'Observe existing recordings',exact:true})).toBeVisible({timeout:15000});
  await page.getByLabel('Cluster ID',{exact:true}).fill(config.target.cluster_id);await page.getByLabel('Namespace',{exact:true}).fill(config.target.namespace);await page.getByLabel('Workload or pod name',{exact:true}).fill(config.target.name);await page.getByRole('button',{name:'Use this target',exact:true}).click();
