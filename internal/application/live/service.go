@@ -487,8 +487,13 @@ func (s *Service) current(ctx context.Context, current CurrentIdentity, st *sess
 		return end, fmt.Errorf("%w: service:470", v.ErrDenied)
 	}
 	final, e := s.actor(ctx, current)
-	if e != nil || !sameLiveIdentity(i, final) || ctx.Err() != nil || !s.cfg.Now().Before(end) {
+	if e != nil || !sameLiveIdentity(i, final) || ctx.Err() != nil {
 		return end, fmt.Errorf("%w: service:474", v.ErrDenied)
+	}
+	if !s.cfg.Now().Before(end) {
+		// The checked bounds (for example a lease awaiting renewal) lapsed
+		// during this check; refuse this call only and re-check next time.
+		return end, fmt.Errorf("%w: %w: service:474", v.ErrUnavailable, v.ErrTransient)
 	}
 	if stopped {
 		s.clear(st, "SourceEnded")
@@ -498,6 +503,7 @@ func (s *Service) current(ctx context.Context, current CurrentIdentity, st *sess
 }
 func (s *Service) Read(ctx context.Context, current CurrentIdentity, r v.Read) (v.Batch, error) {
 	var zero v.Batch
+	var previous []v.Position // positions to restore if delivery is refused transiently
 	if !r.Valid() {
 		return zero, fmt.Errorf("%w: service:485", v.ErrInvalid)
 	}
@@ -687,11 +693,16 @@ func (s *Service) Read(ctx context.Context, current CurrentIdentity, r v.Read) (
 					return zero, fmt.Errorf("%w: service:662", v.ErrUnavailable)
 				}
 			}
+			previous = append([]v.Position(nil), st.positions...)
 			st.positions = append(st.positions[:0], projected.Positions...)
 		}
 	}
 	charged, err := s.charge(ctx, st, batch)
 	if err != nil {
+		if previous != nil && errors.Is(err, v.ErrTransient) {
+			// Nothing was disclosed; the next read returns the same rows.
+			st.positions = append(st.positions[:0], previous...)
+		}
 		return zero, err
 	}
 	st.position++
@@ -729,8 +740,13 @@ func defaultLimit(n int) int {
 	return n
 }
 func (s *Service) charge(ctx context.Context, st *session, b v.Batch) (v.Batch, error) {
-	if b.DisclosureUntil.IsZero() || !s.cfg.Now().Before(b.DisclosureUntil) {
-		return v.Batch{}, fmt.Errorf("%w: service:708 (late %s, last check %s)", v.ErrDenied, s.cfg.Now().Sub(b.DisclosureUntil).Round(time.Millisecond), st.lastCheck.Round(time.Millisecond))
+	if b.DisclosureUntil.IsZero() {
+		return v.Batch{}, fmt.Errorf("%w: service:708", v.ErrDenied)
+	}
+	if !s.cfg.Now().Before(b.DisclosureUntil) {
+		// The current bounds (for example a source lease about to renew)
+		// ended before delivery; refuse this read only.
+		return v.Batch{}, fmt.Errorf("%w: %w: service:708 (late %s, last check %s)", v.ErrUnavailable, v.ErrTransient, s.cfg.Now().Sub(b.DisclosureUntil).Round(time.Millisecond), st.lastCheck.Round(time.Millisecond))
 	}
 	call, stop := context.WithDeadline(ctx, b.DisclosureUntil)
 	defer stop()

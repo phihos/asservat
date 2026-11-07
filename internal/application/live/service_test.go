@@ -890,3 +890,25 @@ func TestLiveRowExpiryIsNotTheFreshnessCheckBound(t *testing.T) {
 		t.Fatal("row expiry is the freshness bound or exceeds the watch", batch.Rows[0].ExpiresAt, f.now, w.ExpiresAt)
 	}
 }
+
+// A source lease that lapses during a read's check (renewal pending) fails
+// only that read; after renewal the same rows are delivered.
+func TestLiveLeaseLapseDuringCheckIsTransient(t *testing.T) {
+	s, f, i, r := setup(t)
+	w, e := s.Open(t.Context(), i, r)
+	if e != nil {
+		t.Fatal(e)
+	}
+	f.add()
+	f.source.LeaseUntil = f.now.Add(time.Second)
+	f.afterCurrent = func() { f.now = f.now.Add(2 * time.Second) }
+	if b, e := s.Read(t.Context(), i, v.Read{ID: w.ID, Cursor: *w.Cursor}); !errors.Is(e, v.ErrTransient) || len(b.Rows) != 0 {
+		t.Fatal("lapsed lease was not a transient refusal", e)
+	}
+	f.afterCurrent = nil
+	f.source.LeaseUntil = f.now.Add(time.Minute)
+	batch, e := s.Read(t.Context(), i, v.Read{ID: w.ID, Cursor: *w.Cursor})
+	if e != nil || len(batch.Rows) != 1 || batch.State != "Active" {
+		t.Fatal("renewed lease did not deliver the original row", batch.State, e)
+	}
+}
