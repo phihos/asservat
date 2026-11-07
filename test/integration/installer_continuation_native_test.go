@@ -1746,6 +1746,7 @@ func installedHangWatchdog(t *testing.T) {
 		tick := time.NewTicker(time.Second)
 		defer tick.Stop()
 		var failedAt time.Time
+		started := time.Now()
 		for {
 			select {
 			case <-done:
@@ -1754,8 +1755,10 @@ func installedHangWatchdog(t *testing.T) {
 				if failedAt.IsZero() && t.Failed() {
 					failedAt = now
 				}
-				if !failedAt.IsZero() && now.Sub(failedAt) > 90*time.Second {
-					fmt.Fprintln(os.Stderr, "installed hang watchdog: failed test still running after 90 s; goroutines:")
+				// A live focus normally ends within six minutes; past nine
+				// something waits without a bound even if nothing failed.
+				if !failedAt.IsZero() && now.Sub(failedAt) > 90*time.Second || now.Sub(started) > 9*time.Minute {
+					fmt.Fprintln(os.Stderr, "installed hang watchdog: test still running (failed or past 9 min); goroutines:")
 					_ = pprof.Lookup("goroutine").WriteTo(os.Stderr, 2)
 					return
 				}
