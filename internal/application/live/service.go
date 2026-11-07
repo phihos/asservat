@@ -443,6 +443,12 @@ func (s *Service) current(ctx context.Context, current CurrentIdentity, st *sess
 	}); ok {
 		var e error
 		checks, phaseUntil, e = batch.CheckSources(ctx, current, st.selected, st.watch.Projection)
+		if errors.Is(e, v.ErrEnded) {
+			// A finite source ended: end the view normally, as a stopped source.
+			s.clear(st, "SourceEnded")
+			st.gap = []v.Gap{{Reason: "sourceEnded", From: s.cfg.Now(), Until: s.cfg.Now()}}
+			return end, nil
+		}
 		if e != nil || len(checks) != len(st.selected) {
 			// A transient source/status miss fails only this read; it is not
 			// an access decision and must not end the view.
@@ -456,6 +462,11 @@ func (s *Service) current(ctx context.Context, current CurrentIdentity, st *sess
 			var until time.Time
 			var e error
 			checks[n], until, e = s.sources.Check(ctx, current, source, st.watch.Projection)
+			if errors.Is(e, v.ErrEnded) {
+				s.clear(st, "SourceEnded")
+				st.gap = []v.Gap{{Reason: "sourceEnded", From: s.cfg.Now(), Until: s.cfg.Now()}}
+				return end, nil
+			}
 			if e != nil {
 				if !errors.Is(e, v.ErrDenied) && errors.Is(e, v.ErrUnavailable) {
 					return end, fmt.Errorf("%w: %w: service:450: %v", v.ErrUnavailable, v.ErrTransient, e)

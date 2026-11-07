@@ -295,6 +295,16 @@ func qualifyInstalledLiveObservation(t *testing.T, ctx context.Context, c instal
 		if source.SourceID == "" || source.PodUID == "" || source.ActionID == "" || !source.HardUntil.IsZero() && !time.Now().Before(source.HardUntil) {
 			return errors.New("actual original running source required")
 		}
+		if source.Kind == "manualSession" {
+			// A finite session ends within its window: observe it from React
+			// and MCP at the same time instead of one after the other.
+			browser.begin(source)
+			if e := installedLiveMCP(t, callCtx, c.SQL, c.RootID, source, call); e != nil {
+				return e
+			}
+			browser.finishEpisode(source)
+			return nil
+		}
 		// MCP first: it waits for the original source to become eligible.
 		if e := installedLiveMCP(t, callCtx, c.SQL, c.RootID, source, call); e != nil {
 			return e

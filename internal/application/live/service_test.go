@@ -32,6 +32,7 @@ type fixture struct {
 	source                         v.Source
 	denied                         bool
 	transient, ledgerTransient     bool
+	ended                          bool
 	broken                         bool
 	reads, heads, changes, created int
 	seq                            uint64
@@ -50,6 +51,9 @@ func (f *fixture) Inventory(context.Context, CurrentIdentity, targets.WorkloadRe
 func (f *fixture) Check(_ context.Context, _ CurrentIdentity, source v.Source, _ string) (v.Source, time.Time, error) {
 	if f.transient {
 		return v.Source{}, time.Time{}, v.ErrUnavailable
+	}
+	if f.ended {
+		return v.Source{}, time.Time{}, v.ErrEnded
 	}
 	if f.denied || !source.Same(f.source) {
 		return v.Source{}, time.Time{}, v.ErrDenied
@@ -910,5 +914,26 @@ func TestLiveLeaseLapseDuringCheckIsTransient(t *testing.T) {
 	batch, e := s.Read(t.Context(), i, v.Read{ID: w.ID, Cursor: *w.Cursor})
 	if e != nil || len(batch.Rows) != 1 || batch.State != "Active" {
 		t.Fatal("renewed lease did not deliver the original row", batch.State, e)
+	}
+}
+
+// An ended finite source ends the view normally instead of refusing reads.
+func TestLiveEndedFiniteSourceEndsViewAsSourceEnded(t *testing.T) {
+	s, f, i, r := setup(t)
+	w, e := s.Open(t.Context(), i, r)
+	if e != nil {
+		t.Fatal(e)
+	}
+	f.ended = true
+	batch, e := s.Read(t.Context(), i, v.Read{ID: w.ID, Cursor: *w.Cursor})
+	if e != nil || batch.State != "SourceEnded" || len(batch.Rows) != 0 {
+		t.Fatal("ended source did not end the view", batch.State, e)
+	}
+	found := false
+	for _, g := range batch.Gaps {
+		found = found || g.Reason == "sourceEnded"
+	}
+	if !found {
+		t.Fatal("ended view reported no sourceEnded gap", batch.Gaps)
 	}
 }

@@ -36,6 +36,8 @@ var (
 	// ErrTransient marks a read that failed on a temporary source/status miss:
 	// nothing was disclosed and the view stays open for the next read.
 	ErrTransient = errors.New("live: temporarily unavailable")
+	// ErrEnded marks a finite source that has ended; the view ends normally.
+	ErrEnded = errors.New("live: source ended")
 )
 
 func Projection(s string) bool { return s == Packet || s == HTTP || s == Syscall }

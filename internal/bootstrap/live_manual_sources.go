@@ -50,6 +50,10 @@ func (s liveManualCatalog) read(ctx context.Context, refs []live.SourceReference
 		ids[n] = r.ID
 	}
 	rows, e := s.works.ReadLiveManualWork(ctx, ids, recovery)
+	if e == nil && len(rows) < len(refs) {
+		// A known-ended finite session is omitted; the view ends normally.
+		return nil, fmt.Errorf("%w: live_manual_sources:53", live.ErrEnded)
+	}
 	if e != nil || len(rows) != len(refs) {
 		return nil, fmt.Errorf("%w: live_manual_sources:53", live.ErrUnavailable)
 	}

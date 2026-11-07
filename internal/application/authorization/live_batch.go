@@ -82,6 +82,9 @@ func (s LiveSourceAuthority) sourcePhase(ctx context.Context, current identities
 		}
 	}
 	if e != nil || len(records) != len(refs) {
+		if errors.Is(e, live.ErrEnded) {
+			return nil, time.Time{}, fmt.Errorf("live_batch:83: %w", e)
+		}
 		// An unavailable catalog/status read is not an access decision.
 		if e != nil && errors.Is(e, live.ErrUnavailable) && !errors.Is(e, live.ErrDenied) {
 			return nil, time.Time{}, fmt.Errorf("%w: live_batch:83: %v", live.ErrUnavailable, e)

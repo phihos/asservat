@@ -5,6 +5,7 @@ import (
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/live"
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -67,6 +68,9 @@ func (c liveCatalog) ReadLiveSourceRecords(ctx context.Context, refs []live.Sour
 	}
 	if len(manual) > 0 {
 		rows, e := c.manual.read(ctx, manual)
+		if errors.Is(e, live.ErrEnded) {
+			return nil, e
+		}
 		if e != nil || len(rows) != len(manual) {
 			return nil, fmt.Errorf("%w: live_catalog:70", live.ErrUnavailable)
 		}

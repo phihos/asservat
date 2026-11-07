@@ -50,9 +50,11 @@ func installedLiveComposition(projection string, finite bool) map[string]any {
 		timeout = "300s"
 	}
 	if finite {
-		before, after, timeout = "0s", "30s", "40s"
+		// Long enough for concurrent MCP and browser episodes; HTTP headers
+		// are capped at a 15 s finite window by planning.
+		before, after, timeout = "0s", "60s", "70s"
 		if projection == "httpHeaders" {
-			after, timeout = "12s", "20s"
+			after, timeout = "15s", "20s"
 		}
 	}
 	beforeField, afterField := "packetBefore", "packetAfter"
