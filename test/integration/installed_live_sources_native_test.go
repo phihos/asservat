@@ -565,6 +565,11 @@ func qualifyInstalledLiveSources(t *testing.T, ctx context.Context, admin *pgxpo
 		}
 		p.source(ctx, fmt.Sprintf("installed-live-%d", i), projection)
 	}
+	// ASSERVAT_LIVE_EPISODES=policy leaves the manual sessions to their own
+	// parallel suite, so each job stays within its time limit.
+	if os.Getenv("ASSERVAT_LIVE_EPISODES") == "policy" {
+		return
+	}
 	for _, projection := range []string{"packetMetadata", "syscallMetadata", "httpHeaders"} {
 		p.manual(ctx, projection)
 	}
