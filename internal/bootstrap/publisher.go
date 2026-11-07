@@ -464,7 +464,12 @@ func (p *Publisher) Run(ctx context.Context) (err error) {
 			for _, item := range pending {
 				call, end := context.WithTimeout(work, 30*time.Second)
 				if e := p.publish(call, item); e != nil {
-					report("publish " + errorClass(e))
+					stage := ""
+					var staged *evidence.PublicationStageError
+					if errors.As(e, &staged) {
+						stage = " at " + staged.Stage
+					}
+					report("publish " + errorClass(e) + stage)
 				} else {
 					report("published")
 				}

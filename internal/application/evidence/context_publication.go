@@ -66,7 +66,7 @@ func (p ContextPublisher) Publish(ctx context.Context, captureID string, copies 
 	defer cancel()
 	e, err := p.Ledger.AcceptedContextForPublication(ctx, captureID)
 	if err != nil {
-		return out, err
+		return out, PublicationStage("accepted", err)
 	}
 	if e.Validate() != nil || e.CaptureUID != captureID || !e.ServedClass() || copies.Validate(e.Registration) != nil {
 		return out, artifact.ErrInvalid
@@ -89,11 +89,11 @@ func (p ContextPublisher) Publish(ctx context.Context, captureID string, copies 
 	}
 	before, err := check()
 	if err != nil {
-		return out, err
+		return out, PublicationStage("authority", err)
 	}
 	verified, err := p.Verifier.VerifyContext(ctx, e, copies)
 	if err != nil {
-		return out, err
+		return out, PublicationStage("verify", err)
 	}
 	if !verified.Valid(e) {
 		return out, artifact.ErrIntegrity
@@ -101,41 +101,55 @@ func (p ContextPublisher) Publish(ctx context.Context, captureID string, copies 
 	verified = verified.Clone()
 	current, err := check()
 	if err != nil {
-		return out, err
+		return out, PublicationStage("authority-after-verify", err)
 	}
 	if current.RootID != before.RootID {
 		return out, privacy.ErrConflict
 	}
 	record, err := p.Ledger.RecordContextVerification(ctx, e, copies, current, verified)
 	if err != nil {
-		return out, err
+		return out, PublicationStage("record", err)
 	}
 	if !record.Valid() || record.NativeBytes != nil && *record.NativeBytes != verified.NativeBytes || record.Acquisition != nil && (verified.Acquisition == nil || !record.Acquisition.Equal(*verified.Acquisition)) || record.RootID != current.RootID || record.CaptureID != captureID || record.ArtifactID != e.Registration.Location.ArtifactID || record.AttemptID != e.Registration.Location.AttemptID || record.ScopeDigest != e.PlanDigest || record.ExpectationDigest != ContextExpectationDigest(e) || record.CopiesDigest != ContextCopiesDigest(copies) || record.VerifiedAt.After(p.Now()) || !record.WriteUntil.Equal(e.Registration.WriteUntil) || !record.ExpiresAt.Equal(e.Registration.ExpiresAt) || !record.DeleteBy.Equal(e.Registration.DeleteBy) {
 		return out, artifact.ErrIntegrity
 	}
 	receipt, err := p.Audit.WriteContextVerification(ctx, record)
 	if err != nil {
-		return out, err
+		return out, PublicationStage("audit", err)
 	}
 	if !receipt.ValidContextVerification(record.RootID, captureID) {
 		return out, artifact.ErrIntegrity
 	}
 	if err = p.Ledger.AcknowledgeContextVerification(ctx, record, receipt); err != nil {
-		return out, err
+		return out, PublicationStage("acknowledge", err)
 	}
 	current, err = check()
 	if err != nil {
-		return out, err
+		return out, PublicationStage("authority-before-publish", err)
 	}
 	if current.RootID != record.RootID {
 		return out, privacy.ErrConflict
 	}
 	out, err = p.Ledger.PublishContext(ctx, e, copies, current)
 	if err != nil {
-		return artifact.PublishedContext{}, err
+		return artifact.PublishedContext{}, PublicationStage("publish", err)
 	}
 	if out.RootID != record.RootID || out.CaptureID != captureID || !reflect.DeepEqual(out.Expectation, e) || out.Copies != copies || !out.VerifiedAt.Equal(record.VerifiedAt) || out.PublishedAt.Before(out.VerifiedAt) || !out.PublishedAt.Before(e.Registration.ExpiresAt) {
 		return artifact.PublishedContext{}, artifact.ErrIntegrity
 	}
 	return out, nil
+}
+
+// PublicationStageError names the fixed publication step that refused; it
+// carries no dependency text and keeps the original error class.
+type PublicationStageError struct {
+	Stage string
+	Err   error
+}
+
+func (e *PublicationStageError) Error() string { return "publication " + e.Stage + ": " + e.Err.Error() }
+func (e *PublicationStageError) Unwrap() error { return e.Err }
+
+func PublicationStage(stage string, err error) error {
+	return &PublicationStageError{Stage: stage, Err: err}
 }
