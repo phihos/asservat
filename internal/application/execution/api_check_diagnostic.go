@@ -1,10 +1,6 @@
 package execution
 
-import (
-	"time"
-
-	"asservat.local/asservat/internal/domain/identity"
-)
+import "time"
 
 // apiCheckStep distinguishes the fixed current-check boundary without reading
 // provider text or trusting a dependency's diagnostic labels. Its original
@@ -27,7 +23,7 @@ func (c APIExecutionCheck) limit(original, now time.Time) string {
 	for _, b := range []struct {
 		name string
 		at   time.Time
-	}{{"interval", c.CheckedAt.Add(identity.AuthorityRecheckInterval)}, {"target", in.Target.FreshUntil}, {"capability", in.Capability.FreshUntil}, {"retention", in.Retention.ValidUntil}, {"deadline", in.Deadline}, {"eligibility", c.Eligibility.ValidUntil}, {"recovery", c.Recovery.FreshUntil}, {"process", c.Process.ValidUntil}, {"write", c.Work.Accepted.Expectation.Registration.WriteUntil}} {
+	}{{"interval", c.CheckedAt.Add(5 * time.Second)}, {"target", in.Target.FreshUntil}, {"capability", in.Capability.FreshUntil}, {"retention", in.Retention.ValidUntil}, {"deadline", in.Deadline}, {"eligibility", c.Eligibility.ValidUntil}, {"recovery", c.Recovery.FreshUntil}, {"process", c.Process.ValidUntil}, {"write", c.Work.Accepted.Expectation.Registration.WriteUntil}} {
 		if !b.at.IsZero() && b.at.Before(until) {
 			name, until = b.name, b.at
 		}

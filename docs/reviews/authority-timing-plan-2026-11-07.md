@@ -51,14 +51,4 @@ no schema change; the first step is the smallest fix.
 3. Introduce `OperationAuthority` and the classifier; delete the per-site patches.
 4. Raise identity, eligibility and recovery windows to the recheck interval
    (capture start currently also lapses: PrepareAPIExecution/expired/eligibility).
-   Done for the operation recovery reader (internal configuration/owner facets
-   keep five seconds), the credential refresh-scheduling window and the API
-   start check interval; eligibility already derives from identity and the
-   30 s permission stream. Capture start stays bounded near five seconds by
-   its start binding, not by these windows: SQL `context_execution.not_after
-   <= not_before + 5 s` (migration 00035) and `execution.Binding.Valid`, the
-   start phase caps (ADR-292 handoff, regional start, `Execute*`,
-   `APIContextWork`), and five-second target, capability, process and
-   hub/connector receiver observations. Widening them is a separate step
-   (new migration plus peer-observation intervals).
 5. ADR-311 and spec/AGENTS.md updates with each step.

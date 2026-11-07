@@ -15,7 +15,7 @@ type CredentialWindow struct {
 }
 
 func (w CredentialWindow) Valid(now time.Time) bool {
-	return w.Policy.Valid() && !w.IssuedAt.IsZero() && !w.IssuedAt.After(now) && w.TokenExpiresAt.After(w.IssuedAt) && w.GroupsExpireAt.After(w.IssuedAt) && !w.GroupsExpireAt.After(w.IssuedAt.Add(5*time.Minute)) && now.Before(w.TokenExpiresAt) && now.Before(w.GroupsExpireAt) && value.Fresh(w.ObservedAt, w.FreshUntil, now, value.AuthorityRecheckInterval)
+	return w.Policy.Valid() && !w.IssuedAt.IsZero() && !w.IssuedAt.After(now) && w.TokenExpiresAt.After(w.IssuedAt) && w.GroupsExpireAt.After(w.IssuedAt) && !w.GroupsExpireAt.After(w.IssuedAt.Add(5*time.Minute)) && now.Before(w.TokenExpiresAt) && now.Before(w.GroupsExpireAt) && value.Fresh(w.ObservedAt, w.FreshUntil, now, 5*time.Second)
 }
 
 // RefreshAt is deterministic for this credential/policy. A short authorization

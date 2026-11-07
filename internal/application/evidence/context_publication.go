@@ -147,9 +147,7 @@ type PublicationStageError struct {
 	Err   error
 }
 
-func (e *PublicationStageError) Error() string {
-	return "publication " + e.Stage + ": " + e.Err.Error()
-}
+func (e *PublicationStageError) Error() string { return "publication " + e.Stage + ": " + e.Err.Error() }
 func (e *PublicationStageError) Unwrap() error { return e.Err }
 
 func PublicationStage(stage string, err error) error {
