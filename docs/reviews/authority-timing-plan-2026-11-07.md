@@ -55,10 +55,13 @@ no schema change; the first step is the smallest fix.
 3. Introduce `OperationAuthority` and the classifier; delete the per-site patches.
 4. Raise identity, eligibility and recovery windows to the recheck interval
    (capture start currently also lapses: PrepareAPIExecution/expired/eligibility).
-   Done for the operation recovery reader (internal configuration/owner facets
-   keep five seconds), the credential refresh-scheduling window and the API
-   start check interval; eligibility already derives from identity and the
-   30 s permission stream. Capture start stays bounded near five seconds by
+   Done for the evidence-read recovery reader, the credential
+   refresh-scheduling window and the API start check interval; eligibility
+   already derives from identity and the 30 s permission stream. The default
+   recovery reader keeps five seconds: SQL fences that persist recovery proofs
+   (connector enrollment, migration 00049; `capacity_recovery_current`,
+   00054/00065/00073) refuse longer ones, which stalled installation when the
+   default was raised (2026-11-07). Raising it needs a migration first. Capture start stays bounded near five seconds by
    its start binding, not by these windows: SQL `context_execution.not_after
    <= not_before + 5 s` (migration 00035) and `execution.Binding.Valid`, the
    start phase caps (ADR-292 handoff, regional start, `Execute*`,
