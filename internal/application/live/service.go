@@ -767,7 +767,7 @@ func (s *Service) charge(ctx context.Context, st *session, b v.Batch) (v.Batch, 
 	next.IdleUntil = minTime(s.cfg.Now().Add(v.IdleAge), next.ExpiresAt)
 	saved, err := s.ledger.Change(call, next, st.control.Revision, cost)
 	if err != nil {
-		return v.Batch{}, err
+		return v.Batch{}, transientLedger(err)
 	}
 	st.control = saved
 	st.watch.IdleUntil = saved.IdleUntil
@@ -854,7 +854,7 @@ func (s *Service) Update(ctx context.Context, current CurrentIdentity, r v.Updat
 		positions, headErr = s.reader.Head(headCall, st.selected, st.watch.Projection)
 		headCancel()
 		if headErr != nil || len(positions) != len(st.positions) {
-			return zero, fmt.Errorf("%w: service:813", v.ErrUnavailable)
+			return zero, fmt.Errorf("%w: %w: service:813", v.ErrUnavailable, v.ErrTransient)
 		}
 	}
 	before := st.control.Revision
@@ -870,7 +870,7 @@ func (s *Service) Update(ctx context.Context, current CurrentIdentity, r v.Updat
 	}
 	saved, err := s.ledger.Change(ctx, next, before, 0)
 	if err != nil {
-		return zero, err
+		return zero, transientLedger(err)
 	}
 	st.control = saved
 	st.positions = append(st.positions[:0], positions...)
@@ -938,4 +938,13 @@ func ReferenceKey(p identity.Principal, key string) string {
 
 func sameLiveIdentity(a, b identity.Identity) bool {
 	return a.Principal == b.Principal && a.Policy == b.Policy && slices.Equal(a.Groups, b.Groups) && slices.Equal(a.Scopes, b.Scopes)
+}
+
+// transientLedger marks an unavailable ledger write as retryable: nothing was
+// disclosed, and a retry re-checks current authority and may charge again.
+func transientLedger(err error) error {
+	if errors.Is(err, v.ErrUnavailable) && !errors.Is(err, v.ErrDenied) && !errors.Is(err, v.ErrTransient) {
+		return fmt.Errorf("%w: %w: ledger change", err, v.ErrTransient)
+	}
+	return err
 }
