@@ -12,9 +12,12 @@ import (
 
 var _ evidence.RecordingCanceller = (*ConnectorRecordings)(nil)
 
-// CancelRecording restricts a finite argument attempt. A queued node Stop is
-// only a request; the original result and regional writer must finish before
-// Collect can report cancellation. Active storage retains stored-wins behavior.
+// CancelRecording restricts one finite manual recording attempt (packet
+// metadata, raw packets, HTTP headers, syscall metadata or arguments). A
+// queued node Stop is only a request; the original result and regional writer
+// must finish before Collect can report cancellation. The node reports an
+// early stop as a failure, so an unstored result is discarded; an active
+// Store keeps stored-wins behavior.
 func (h *ConnectorRecordings) CancelRecording(ctx context.Context, stop collector.RecordingStop) error {
 	if ctx == nil || ctx.Err() != nil || !stop.Valid() {
 		return value.ErrInvalid
@@ -49,7 +52,7 @@ func (h *ConnectorRecordings) CancelRecording(ctx context.Context, stop collecto
 	if held.digest != stop.ExpectationDigest || e.Registration.Location.AttemptID != stop.AttemptID || held.recordingStop != nil && !held.recordingStop.Equal(stop) {
 		return value.ErrDenied
 	}
-	if !held.cancelOnly && (e.Recording == nil || e.Recording.Arguments == nil || e.NativeType != artifact.SyscallArgumentsArtifact || e.DataClass != "raw" || e.Registration.Location.ClusterID != stop.ClusterID || !e.Registration.WriteUntil.Equal(stop.WriteUntil)) {
+	if !held.cancelOnly && (e.Recording == nil || e.Snapshot != nil || held.snapshot != nil || e.Registration.Location.ClusterID != stop.ClusterID || !e.Registration.WriteUntil.Equal(stop.WriteUntil)) {
 		return value.ErrDenied
 	}
 	if held.outcome.State == evidence.RecordingStored || held.outcome.State == evidence.RecordingCancelled {
@@ -59,7 +62,7 @@ func (h *ConnectorRecordings) CancelRecording(ctx context.Context, stop collecto
 	if held.stopStoreWait != nil {
 		held.stopStoreWait()
 	}
-	if held.argumentResult || held.cancelOnly || held.cancelID != "" {
+	if held.resultArrived || held.cancelOnly || held.cancelID != "" {
 		return nil
 	}
 	if held.workID == "" {
@@ -86,7 +89,7 @@ func (h *ConnectorRecordings) CancelRecording(ctx context.Context, stop collecto
 // node result; unlike snapshot Stop receipts, packet Stop receipts do not join.
 func (h *ConnectorRecordings) recordingCancellation(held *heldRecording) (artifact.RecordingCancellation, bool) {
 	stop := held.recordingStop
-	if stop == nil || held.argumentSource == nil || !held.argumentJoined || held.storing || held.outcome.State == evidence.RecordingStored {
+	if stop == nil || held.cancelOnly || held.snapshot != nil || !held.resultJoined || held.storing || held.outcome.State == evidence.RecordingStored {
 		return artifact.RecordingCancellation{}, false
 	}
 	if proof := held.outcome.RecordingCancellation; proof != nil {

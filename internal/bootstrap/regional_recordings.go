@@ -57,8 +57,8 @@ type recordingNodes interface {
 type heldRecording struct {
 	argumentSource  *targets.PacketSourceObservation
 	recordingStop   *collector.RecordingStop
-	argumentResult  bool // original authenticated result arrived after engine return
-	argumentJoined  bool // result handling and local writer have returned
+	resultArrived   bool // original authenticated result arrived after engine return
+	resultJoined    bool // result handling and local writer have returned
 	storing         bool
 	stopStoreWait   context.CancelFunc // only the unread FIFO wait, never an active Store
 	cancelID        string
@@ -287,10 +287,14 @@ func (h *ConnectorRecordings) DeliverPacket(ctx context.Context, node collector.
 			_, _ = io.Copy(io.Discard, pcapng)
 			return value.ErrDenied
 		}
-		held.argumentResult = true
+	}
+	if held.snapshot == nil {
+		// The original node result is the only evidence that a manual
+		// recording's engine returned; a Stop joins only after its handling.
+		held.resultArrived = true
 		defer func() {
 			h.mu.Lock()
-			held.argumentJoined = true
+			held.resultJoined = true
 			h.mu.Unlock()
 		}()
 	}

@@ -19,7 +19,7 @@ import (
 // starts, collects, cancels or replaces a recording. Call with holder.mu held.
 func (h *ConnectorRecordings) manualHolderLocked(t targets.ManualLiveTarget) (*heldRecording, bool) {
 	p := h.held[t.CaptureID]
-	if p == nil || p.cancelRequested || p.cancelOnly || p.storing || p.argumentResult || p.argumentJoined || p.workID == "" || p.outcome.State != evidence.RecordingPending || !h.now().Before(t.WriteUntil) {
+	if p == nil || p.cancelRequested || p.cancelOnly || p.storing || p.resultArrived || p.resultJoined || p.workID == "" || p.outcome.State != evidence.RecordingPending || !h.now().Before(t.WriteUntil) {
 		return nil, false
 	}
 	e := p.expectation
@@ -154,7 +154,7 @@ func (h *ConnectorRecordings) manualReadHolderLocked(r collector.LiveRead) (*hel
 	}
 	m := *r.Manual
 	p := h.held[m.CaptureID]
-	if p == nil || p.cancelRequested || p.cancelOnly || p.storing || p.argumentResult || p.argumentJoined || p.outcome.State != evidence.RecordingPending || p.workID != m.WorkID || p.nodeUID != m.NodeUID {
+	if p == nil || p.cancelRequested || p.cancelOnly || p.storing || p.resultArrived || p.resultJoined || p.outcome.State != evidence.RecordingPending || p.workID != m.WorkID || p.nodeUID != m.NodeUID {
 		return nil, false
 	}
 	e := p.expectation
