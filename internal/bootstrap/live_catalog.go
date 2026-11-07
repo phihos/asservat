@@ -72,7 +72,7 @@ func (c liveCatalog) ReadLiveSourceRecords(ctx context.Context, refs []live.Sour
 			return nil, e
 		}
 		if e != nil || len(rows) != len(manual) {
-			return nil, fmt.Errorf("%w: live_catalog:70", live.ErrUnavailable)
+			return nil, fmt.Errorf("%w: live_catalog:70: %v (rows %d of %d)", live.ErrUnavailable, e, len(rows), len(manual))
 		}
 		for _, r := range rows {
 			indexed[r.Source.ID()] = r
