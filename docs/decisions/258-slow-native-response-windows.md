@@ -1,5 +1,12 @@
 # ADR-258 — Native response windows under slow delivery
 
+> [ADR-312](312-started-downloads-run-to-original-bounds.md) (2026-11-07)
+> supersedes the per-lease current human authority below: a started response's
+> later leases continue its start decision without identity, permission or
+> policy reads, and its SQL fences keep only original bounds, effective
+> retention cutoffs, Stop and the recovery incarnation. The finite conversation,
+> native owner renewal and per-window worker attestation are unchanged.
+
 [ADR-288](288-profile-native-streaming.md) supersedes the twenty-second response
 conversation ceiling below with a sixty-second ceiling for newly admitted
 response windows. Original recorded ends and short disclosure leases are unchanged.

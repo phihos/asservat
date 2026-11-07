@@ -70,6 +70,9 @@ type DownloadResponse struct {
 func (r DownloadResponse) Valid() bool {
 	return uuid(r.ID) && uuid(r.SessionID) && uuid(r.OwnerID) && r.Generation > 0 && r.Plan.Valid() && !r.StartedAt.IsZero() && r.Until.After(r.StartedAt) && !r.Until.After(r.StartedAt.Add(8*time.Hour)) && r.WindowCount >= 0 && r.WindowCount <= r.Plan.Windows() && r.CompletedWindows >= 0 && r.CompletedWindows <= r.WindowCount && r.EmittedBytes >= 0 && r.EmittedBytes <= r.Plan.Selection.Length && (r.ActiveWindowID == "" || uuid(r.ActiveWindowID)) && r.LeaseSequence >= 0 && (!r.LeaseUntil.After(r.Until))
 }
+
+// BeginResponse starts a content response. It requires a complete current
+// check; only the response's later windows and leases accept its continuation.
 func (s DownloadSession) BeginResponse(a DownloadAuthority, r DownloadResponse, now time.Time) (DownloadSession, DownloadResponse, error) {
 	if e := s.current(a, now); e != nil {
 		return s, r, e
@@ -123,7 +126,7 @@ func (w DownloadWindow) Valid() bool {
 	return o.EmittedBytes >= 0 && o.EmittedBytes <= w.Length && !o.RecordedAt.Before(w.StartedAt) && (!o.Success || o.EmittedBytes == w.Length) && (!o.VerifiedFinal || o.Success) && (!o.Success || w.IntentAcknowledged) && (!w.OutcomeAcknowledged || w.IntentAcknowledged)
 }
 func (r DownloadResponse) current(s DownloadSession, a DownloadAuthority, owner string, now time.Time) error {
-	if e := s.current(a, now); e != nil {
+	if e := s.startedCurrent(a, now); e != nil {
 		return e
 	}
 	if !r.Valid() || r.SessionID != s.ID || r.Generation != s.Generation || r.OwnerID != owner || r.Closed || !now.Before(r.Until) {
