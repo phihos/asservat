@@ -120,6 +120,21 @@ func newInstalledIdentity(t *testing.T, f fixture, origin, consoleSecret string)
 	return &installedIdentity{kc: kc, Issuer: kc.Issuer, RootPEM: id.RootCA, ReviewerSubject: reviewer}
 }
 
+// reopenInstalledIdentity attaches to the realm a keep run created
+// (development-only focus rerun); it creates nothing.
+func reopenInstalledIdentity(t *testing.T, f fixture, reviewer string) *installedIdentity {
+	t.Helper()
+	id := f.Identity
+	roots := x509.NewCertPool()
+	if id == nil || !roots.AppendCertsFromPEM([]byte(id.RootCA)) {
+		t.Fatal("kept Keycloak unavailable")
+	}
+	kc := &kcFixture{t: t, base: id.Base, Issuer: id.Base + "/realms/asservat", AdminUser: id.AdminUser, AdminPassword: id.AdminPassword, UserPassword: id.UserPassword}
+	kc.http = &http.Client{Timeout: 5 * time.Second, Transport: &http.Transport{Proxy: nil, TLSClientConfig: &tls.Config{RootCAs: roots, MinVersion: tls.VersionTLS12}}, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	kc.admin = kc.tokens(kc.base+"/realms/master/protocol/openid-connect/token", url.Values{"grant_type": {"password"}, "client_id": {"admin-cli"}, "username": {kc.AdminUser}, "password": {kc.AdminPassword}}, 200).Access
+	return &installedIdentity{kc: kc, Issuer: kc.Issuer, RootPEM: id.RootCA, ReviewerSubject: reviewer}
+}
+
 // installedUnrelatedGroup is eligible for sign-in but named by no AccessBinding.
 const installedUnrelatedGroup = "synthetic-unrelated-group"
 

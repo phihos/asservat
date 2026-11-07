@@ -101,6 +101,9 @@ func initialRuntimeProviderPrerequisites(t *testing.T, ctx context.Context, api 
 		t.Fatal(e)
 	}
 	t.Cleanup(func() {
+		if keepFailedFixture(t) {
+			return // the kept OpenBao Kubernetes auth still reviews tokens
+		}
 		c, end := context.WithTimeout(context.Background(), 5*time.Second)
 		defer end()
 		if e := api.RbacV1().ClusterRoles().Delete(c, role.Name, meta.DeleteOptions{Preconditions: &meta.Preconditions{UID: &role.UID}}); e != nil {
@@ -112,6 +115,9 @@ func initialRuntimeProviderPrerequisites(t *testing.T, ctx context.Context, api 
 		t.Fatal(e)
 	}
 	t.Cleanup(func() {
+		if keepFailedFixture(t) {
+			return
+		}
 		c, end := context.WithTimeout(context.Background(), 5*time.Second)
 		defer end()
 		if e := api.RbacV1().ClusterRoleBindings().Delete(c, binding.Name, meta.DeleteOptions{Preconditions: &meta.Preconditions{UID: &binding.UID}}); e != nil {
@@ -119,7 +125,7 @@ func initialRuntimeProviderPrerequisites(t *testing.T, ctx context.Context, api 
 		}
 	})
 	// The reviewer outlives the 30-minute continuation window.
-	token, e := api.CoreV1().ServiceAccounts(reviewer.Namespace).CreateToken(ctx, reviewer.Name, &auth.TokenRequest{Spec: auth.TokenRequestSpec{ExpirationSeconds: ptr.To(int64(1800))}}, meta.CreateOptions{})
+	token, e := api.CoreV1().ServiceAccounts(reviewer.Namespace).CreateToken(ctx, reviewer.Name, &auth.TokenRequest{Spec: auth.TokenRequestSpec{ExpirationSeconds: ptr.To(installedKeptLifetime(1800))}}, meta.CreateOptions{})
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -151,8 +157,12 @@ func initialRuntimeProviderPrerequisites(t *testing.T, ctx context.Context, api 
 	// Owner issuer trust is generated independently of provider HTTPS trust and
 	// selected before the first resource claim. Later owner setup must use this
 	// exact mount/root; a new CA cannot be substituted into the original source.
-	p.admin(t, ctx, http.MethodPost, "sys/mounts/owner-pki", map[string]any{"type": "pki", "config": map[string]any{"max_lease_ttl": 3600}}, 204)
-	certificate := p.admin(t, ctx, http.MethodPost, "owner-pki/root/generate/internal", map[string]any{"common_name": "synthetic original owner issuer", "ttl": "1h", "key_type": "ec", "key_bits": 256}, 200)
+	ownerLease, ownerRoot := int64(3600), "1h"
+	if installedKeepMode() {
+		ownerLease, ownerRoot = installedKeptLifetime(3600), "3h" // development-only keep run
+	}
+	p.admin(t, ctx, http.MethodPost, "sys/mounts/owner-pki", map[string]any{"type": "pki", "config": map[string]any{"max_lease_ttl": ownerLease}}, 204)
+	certificate := p.admin(t, ctx, http.MethodPost, "owner-pki/root/generate/internal", map[string]any{"common_name": "synthetic original owner issuer", "ttl": ownerRoot, "key_type": "ec", "key_bits": 256}, 200)
 	var issued struct {
 		Data struct {
 			Certificate string `json:"certificate"`

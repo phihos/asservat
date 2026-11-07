@@ -904,7 +904,7 @@ func (b *regionalBudget) amount(bytes, objects int64) map[string]int64 {
 func installedRegionalContextReserve() (bytes, objects int64) {
 	bytes, objects = 8*1544192, 32
 	if installedLogsFocus() {
-		return installedLogsQueryUnits * 1544192, installedLogsQueryUnits * 4
+		return installedKeptRuns() * installedLogsQueryUnits * 1544192, installedKeptRuns() * installedLogsQueryUnits * 4
 	}
 	if installedRecordingFocus() {
 		bytes = 8 * (artifact.Registration{NativeLimit: artifact.RecordingNativeLimit}).ReservedBytes()
@@ -958,7 +958,7 @@ func (b *regionalBudget) addPolicy() {
 		b.t.Fatal("pool")
 	}
 	spec := pool["spec"].(map[string]any)
-	spec["capacity"] = b.amount(137438953472+int64(b.index)*1073741824, 100000+int64(b.index)*1000)
+	spec["capacity"] = b.amount(137438953472+int64(b.index)*1073741824, installedPoolCapacityObjects()+int64(b.index)*1000)
 	spec["protectedAllocations"] = append(spec["protectedAllocations"].([]any), map[string]any{"budgetPolicyRef": b.policyName, "workloadSlots": 1, "protectedPerWorkload": b.amount(1073741824, 1000)})
 	body, _ = json.Marshal(pool)
 	if err = b.client.Put().AbsPath(b.base + "evidencestoragepools/capacity").Body(body).Do(b.ctx).Error(); err != nil {
