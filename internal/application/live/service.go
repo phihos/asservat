@@ -773,6 +773,12 @@ func (s *Service) charge(ctx context.Context, st *session, b v.Batch) (v.Batch, 
 	st.watch.IdleUntil = saved.IdleUntil
 	b.Spent = saved.Spent
 	if call.Err() != nil || !s.cfg.Now().Before(b.DisclosureUntil) {
+		if ctx.Err() == nil {
+			// The charge committed but the current bounds lapsed before
+			// delivery: refuse this read only. The spend stays charged
+			// (conservative) and the next read re-delivers the same rows.
+			return v.Batch{}, fmt.Errorf("%w: %w: service:735", v.ErrUnavailable, v.ErrTransient)
+		}
 		s.clear(st, "Disconnected")
 		return v.Batch{}, fmt.Errorf("%w: service:735", v.ErrDenied)
 	}
