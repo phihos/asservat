@@ -462,6 +462,17 @@ func regionalLogs(t *testing.T, ctx context.Context, api kubernetes.Interface) {
 				}
 			}
 		}
+		// Live lines from the whole log: capacity polling pushes them out of
+		// the head and tail windows above.
+		if stream, err := api.CoreV1().Pods("asservat-connector").GetLogs(p.Name, &core.PodLogOptions{Timestamps: true, LimitBytes: ptr.To(int64(16 << 20))}).Stream(ctx); err == nil {
+			b, _ := io.ReadAll(io.LimitReader(stream, 16<<20))
+			stream.Close()
+			for _, line := range strings.Split(string(b), "\n") {
+				if strings.Contains(line, " live") {
+					t.Log("regional live:", line)
+				}
+			}
+		}
 	}
 }
 

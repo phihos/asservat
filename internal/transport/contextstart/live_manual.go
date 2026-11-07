@@ -98,7 +98,10 @@ func (t Targets) ResolveManualLive(ctx context.Context, in []targets.ManualLiveT
 						return
 					}
 				}
-				if !v.Valid(t.Now()) || v.FreshUntil.After(until) {
+				// The region bounds its reply by its own call; the hub's query
+				// window can end slightly earlier. Clip to it (only shortens).
+				v.FreshUntil = identity.Earlier(v.FreshUntil, until)
+				if !v.Valid(t.Now()) {
 					errs <- fmt.Errorf("%w: manual-reply-fresh", targets.ErrUnavailable)
 					return
 				}

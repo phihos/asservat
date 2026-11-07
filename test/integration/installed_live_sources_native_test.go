@@ -433,16 +433,24 @@ func (p *installedLiveProducer) saveHTTP(ctx context.Context, source installedLi
 	defer func() {
 		if p.t.Failed() {
 			p.t.Logf("HTTP Save capture %s last phase=%s case=%s", id, progress.Phase, progress.CaseID)
-			c, end := context.WithTimeout(context.Background(), 5*time.Second)
+			c, end := context.WithTimeout(context.Background(), 20*time.Second)
 			defer end()
 			for _, q := range []string{
-				`SELECT left(row_to_json(c)::text,2000) FROM context_capture c WHERE root_id=$1 AND id=$2`,
+				`SELECT left((to_jsonb(c)-'scope_json'-'request_key'-'submission_digest'-'scope_digest')::text,3000) FROM context_capture c WHERE root_id=$1 AND id=$2`,
 				`SELECT left(json_build_object('phase',e.phase,'not_before',e.not_before,'not_after',e.not_after,'started_at',e.started_at,'completed_at',e.completed_at)::text,600) FROM context_execution e WHERE root_id=$1 AND capture_id=$2`,
 				`SELECT left(coalesce(json_agg(r)::text,'none'),2000) FROM recording_save_reservation r WHERE r::text LIKE '%'||$2||'%' AND $1<>''`,
 			} {
 				var row string
 				err := p.admin.QueryRow(c, q, p.root, id).Scan(&row)
 				p.t.Logf("HTTP Save diagnostics: %s err=%v", row, err)
+			}
+			// Print hub/regional logs now: a later cleanup can exceed the job limit.
+			if ns, e := p.f.region.CoreV1().Namespaces().List(c, meta.ListOptions{}); e == nil {
+				for _, n := range ns.Items {
+					if n.Name == "asservat-connector" || strings.HasSuffix(n.Name, "-target") {
+						installedPodDiagnostics(p.t, c, p.f.region, n.Name, n.Name, "")
+					}
+				}
 			}
 		}
 	}()
