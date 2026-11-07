@@ -131,11 +131,11 @@ func (s liveManualCatalog) records(ctx context.Context, rows []executionapp.Live
 		}
 		resolved, e := s.holders.ResolveManualLive(ctx, originals)
 		if e != nil || len(resolved) != len(originals) {
-			return nil, fmt.Errorf("%w: live_manual_sources:129", live.ErrUnavailable)
+			return nil, fmt.Errorf("%w: live_manual_sources:129 (%v, %d of %d)", live.ErrUnavailable, e, len(resolved), len(originals))
 		}
 		for n, r := range resolved {
 			if r.Original != originals[n] || !r.Valid(s.now()) {
-				return nil, fmt.Errorf("%w: live_manual_sources:133", live.ErrUnavailable)
+				return nil, fmt.Errorf("%w: live_manual_sources:133 (same %t)", live.ErrUnavailable, r.Original == originals[n])
 			}
 			if r.Unavailable {
 				continue

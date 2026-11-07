@@ -8,6 +8,7 @@ import (
 	"asservat.local/asservat/internal/transport/node"
 	"context"
 	"encoding/json"
+	"fmt"
 	"sync"
 	"time"
 )
@@ -80,12 +81,12 @@ func (t Targets) ResolveManualLive(ctx context.Context, in []targets.ManualLiveT
 			first := g.values[0]
 			until, e := t.Router.QueryProcess(call, first.Target.ClusterID, queryManualLive, g.values, &reply, first.Executor.PodUID, first.Executor.ProcessEpoch)
 			if e != nil || len(reply) != len(g.values) || call.Err() != nil || !t.Now().Before(until) {
-				errs <- targets.ErrUnavailable
+				errs <- fmt.Errorf("%w: manual-query (%v, replies %d of %d)", targets.ErrUnavailable, e, len(reply), len(g.values))
 				return
 			}
 			for n, w := range reply {
 				if w.CaptureID != g.values[n].CaptureID || (w.Source == nil) != w.Unavailable {
-					errs <- targets.ErrUnavailable
+					errs <- fmt.Errorf("%w: manual-reply-shape", targets.ErrUnavailable)
 					return
 				}
 				v := targets.ManualLiveResolution{Original: g.values[n], Unavailable: w.Unavailable, ObservedAt: w.ObservedAt, FreshUntil: w.FreshUntil}
@@ -93,12 +94,12 @@ func (t Targets) ResolveManualLive(ctx context.Context, in []targets.ManualLiveT
 					var ok bool
 					v.Source, ok = node.DomainManualLive(*w.Source)
 					if !ok {
-						errs <- targets.ErrUnavailable
+						errs <- fmt.Errorf("%w: manual-reply-source", targets.ErrUnavailable)
 						return
 					}
 				}
 				if !v.Valid(t.Now()) || v.FreshUntil.After(until) {
-					errs <- targets.ErrUnavailable
+					errs <- fmt.Errorf("%w: manual-reply-fresh", targets.ErrUnavailable)
 					return
 				}
 				out[g.indices[n]] = v
@@ -107,8 +108,11 @@ func (t Targets) ResolveManualLive(ctx context.Context, in []targets.ManualLiveT
 	}
 	wg.Wait()
 	close(errs)
-	if len(errs) > 0 || call.Err() != nil {
-		return nil, targets.ErrUnavailable
+	if len(errs) > 0 {
+		return nil, <-errs
+	}
+	if call.Err() != nil {
+		return nil, fmt.Errorf("%w: manual-deadline", targets.ErrUnavailable)
 	}
 	return out, nil
 }

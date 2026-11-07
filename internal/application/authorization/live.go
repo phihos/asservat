@@ -104,7 +104,7 @@ func (s LiveSourceAuthority) Inventory(ctx context.Context, current identities.C
 	defer stop()
 	records, next, err := s.Catalog.ListLiveSources(bound, resolved.Target(), cursor, limit)
 	if err != nil || len(records) > limit {
-		return nil, "", s.refuse("catalog", live.ErrUnavailable)
+		return nil, "", s.refuse("catalog", fmt.Errorf("%w: %v", live.ErrUnavailable, err))
 	}
 	out := make([]live.Source, 0, len(records))
 	for _, record := range records {
