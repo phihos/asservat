@@ -152,7 +152,9 @@ func (p *installedLiveProducer) review(ctx context.Context, id string) installed
 	p.t.Helper()
 	var before installedLiveGrant
 	p.must(ctx, "get_grant", map[string]any{"grant_id": id}, &before)
-	if before.ID != id || before.Phase != "Pending" || before.NotAfter == nil {
+	// A Pending ad-hoc capture grant has no not_after yet (it carries the
+	// preview deadline); a policy grant has its authority end from the start.
+	if before.ID != id || before.Phase != "Pending" {
 		p.t.Fatal("LIVE review is not original Pending grant", before)
 	}
 	p.browser.approvedRecordingStepUp(p.t, ctx, p.reviewer, id)
@@ -164,7 +166,7 @@ func (p *installedLiveProducer) review(ctx context.Context, id string) installed
 	}
 	var approved installedLiveGrant
 	p.must(ctx, "get_grant", map[string]any{"grant_id": id}, &approved)
-	if approved.ID != id || approved.Phase != "Approved" || approved.Decision == nil || approved.Decision.By.Subject != p.reviewer.ReviewerSubject || approved.NotAfter == nil || !approved.NotAfter.Equal(*before.NotAfter) {
+	if approved.ID != id || approved.Phase != "Approved" || approved.Decision == nil || approved.Decision.By.Subject != p.reviewer.ReviewerSubject || approved.NotAfter == nil || before.NotAfter != nil && !approved.NotAfter.Equal(*before.NotAfter) {
 		p.t.Fatal("LIVE reviewer changed original grant/clock", approved)
 	}
 	return approved
