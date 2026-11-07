@@ -314,7 +314,7 @@ func qualifyInstalledLiveObservation(t *testing.T, ctx context.Context, c instal
 		return nil
 	})
 	want := 6
-	if os.Getenv("ASSERVAT_LIVE_EPISODES") == "manual" {
+	if m := os.Getenv("ASSERVAT_LIVE_EPISODES"); m == "manual" || m == "policy" {
 		want = 3
 	}
 	if episodes != want {
