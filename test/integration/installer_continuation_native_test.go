@@ -1124,7 +1124,7 @@ func nativeCapacityProfile() *contracts.InstallerCapacitySettings {
 	// operation for the same human; six episodes poll roughly once a second.
 	normal := int64(128)
 	if installedJourneyFocus() == "live-observation" {
-		normal = 2048
+		normal = 512
 	}
 	return &contracts.InstallerCapacitySettings{Pool: "capacity", Policy: "applications", NamespaceKeys: []string{"team"}, Accounts: 16, Records: records, AdmissionSeconds: 86400,
 		Lanes:               contracts.InstallerCapacityLanes{CaptureRetainedSeconds: 10000, Normal: lane(4, normal), Resolution: lane(4, 8), Processing: lane(2, 16)},
