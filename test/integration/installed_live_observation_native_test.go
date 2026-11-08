@@ -633,10 +633,18 @@ func (p *installedLiveBrowser) close() {
 			p.t.Error("installed browser did not complete")
 		}
 		_ = p.in.Close()
-		if err := <-p.done; err != nil {
-			p.t.Error("installed browser failed", p.diagnostic.String())
+		// The script reported done; its browser process may linger after
+		// stdin closes, so bound the exit wait and then stop it.
+		select {
+		case err := <-p.done:
+			if err != nil {
+				p.t.Error("installed browser failed", p.diagnostic.String())
+			}
+			p.cancel()
+		case <-time.After(15 * time.Second):
+			p.cancel()
+			<-p.done
 		}
-		p.cancel()
 	})
 }
 
