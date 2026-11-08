@@ -183,9 +183,17 @@ try {
     await page.evaluate(() => document.fonts.ready);
     for (const width of [375, 320]) {
       await page.setViewportSize({ width, height: 740 });
-      const layout = await page.evaluate(() => ({ viewport: innerWidth, document: document.documentElement.scrollWidth, timing: document.querySelector('table[aria-label="Profile collection timing"]').getBoundingClientRect().width }));
+      // Profile sections must contain their tables: the page gutter otherwise hides
+      // a font- and data-dependent overflow that crosses the viewport in CI.
+      const layout = await page.evaluate(() => ({ viewport: innerWidth, document: document.documentElement.scrollWidth, timing: document.querySelector('table[aria-label="Profile collection timing"]').getBoundingClientRect().width, sections: [...document.querySelectorAll('section[aria-labelledby="profile-collection-timing"], section[aria-label="Saved profile comparison"], section[aria-label="Saved profile summary"]')].filter(node => node.scrollWidth > node.clientWidth).map(node => `${node.getAttribute('aria-label') ?? node.getAttribute('aria-labelledby') ?? 'section'} ${node.scrollWidth}>${node.clientWidth}`) }));
       process.stderr.write('installed comparison timing mobile ' + JSON.stringify(layout) + '\n');
+      if (layout.document > layout.viewport) {
+        // Name the widest overflowing elements so one failed run identifies the layout cause.
+        const wide = await page.evaluate(() => [...document.body.querySelectorAll('*')].map(node => ({ node, right: node.getBoundingClientRect().right })).filter(({ right }) => right > innerWidth).sort((a, b) => b.right - a.right).slice(0, 6).map(({ node, right }) => `${node.tagName.toLowerCase()}${node.className ? '.' + String(node.className).split(' ').join('.') : ''}[${node.getAttribute('aria-label') ?? ''}] right=${right.toFixed(1)} text=${JSON.stringify((node.textContent ?? '').slice(0, 40))}`));
+        process.stderr.write('installed comparison overflow ' + JSON.stringify(wide) + '\n');
+      }
       assert(layout.document <= layout.viewport, 'profile collection timing preserves page width after fonts load');
+      assert.deepEqual(layout.sections, [], 'profile sections contain their tables after fonts load');
       await expect(timing).toBeVisible();
       await expect(timing.getByRole('row')).toHaveCount(profiles.length + 1);
     }
