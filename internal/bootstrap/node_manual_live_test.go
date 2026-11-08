@@ -198,6 +198,9 @@ func TestManualLiveArgumentTapUsesOriginalPermitAndNeverProjectsValues(t *testin
 		t.Fatal("original argument holder", head, e)
 	}
 	original := *head.Manual
+	if !original.StartedAt.Equal(original.StartedAt.Truncate(time.Microsecond)) {
+		t.Fatal("argument live start finer than the decoded result", original.StartedAt)
+	}
 	request.Live.Manual = &original
 	request.Live.Inspect = false
 	request.Live.Head = false
@@ -412,6 +415,9 @@ func TestManualLiveMetadataSyscallTapAndStopKeepOriginalSource(t *testing.T) {
 		t.Fatal("metadata invented a sensitive observation", head, e)
 	}
 	original := *head.Manual
+	if !original.StartedAt.Equal(original.StartedAt.Truncate(time.Microsecond)) {
+		t.Fatal("syscall live start finer than the decoded result", original.StartedAt) // native run 42480440424
+	}
 	q.Live.Manual = &original
 	q.Live.Inspect = false
 	q.Live.Head = false

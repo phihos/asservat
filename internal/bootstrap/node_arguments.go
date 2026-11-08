@@ -93,7 +93,7 @@ func (n *nodePackets) startArguments(ctx context.Context, epoch string, w collec
 		if n.running == nil {
 			n.running = make(map[string]runningPacket)
 		}
-		started = n.now().UTC()
+		started = n.now().UTC().Truncate(time.Microsecond) // one instant for live binding and result, as in node_packets.go
 		holder = n.newManualLive(w, p, started, id)
 		if holder != nil {
 			holder.ctx = capture
