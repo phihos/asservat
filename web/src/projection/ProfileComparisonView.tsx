@@ -36,7 +36,7 @@ export function ProfileComparisonView({ controller, session, scope, caseID, arti
     {state.phase === 'pending' && <><p role="status">The saved comparison is being prepared.</p><Button className="button secondary" isDisabled={!state.canCheck} onPress={() => void controller.check()}>Check comparison result</Button></>}
     {state.phase === 'result' && comparison && <>
       <p>{comparison.sample_type} · {comparison.unit}{comparison.normalization === 'perSecond' ? ' per second' : ' · raw totals'} · cumulative function costs</p>
-      <table aria-label="Profile acquisition details"><thead><tr><th>Detail</th><th>Baseline</th><th>Incident</th></tr></thead><tbody>
+      <table className="profile-summary" aria-label="Profile acquisition details"><thead><tr><th>Detail</th><th>Baseline</th><th>Incident</th></tr></thead><tbody>
         <tr><th>Profile type</th><td>{comparison.baseline.profile_type}</td><td>{comparison.incident.profile_type}</td></tr>
         <tr><th>Collection mode</th><td>{comparison.baseline.mode}</td><td>{comparison.incident.mode}</td></tr>
         <tr><th>Forced garbage collection</th><td>{comparison.baseline.force_gc ? 'Yes' : 'No'}</td><td>{comparison.incident.force_gc ? 'Yes' : 'No'}</td></tr>
