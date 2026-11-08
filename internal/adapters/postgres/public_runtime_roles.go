@@ -13,10 +13,10 @@ import (
 	"sync"
 	"time"
 
+	app "asservat.local/asservat/internal/application/fleet"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/authorization"
 	cfg "asservat.local/asservat/internal/domain/configuration"
-	"asservat.local/asservat/internal/domain/identity"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -201,7 +201,7 @@ func (s *PublicRuntimeSQLRoles) Provision(ctx context.Context) (contracts.Public
 		// a bracket of roles' claim, role step and completion inside it, then
 		// one closing proof.
 		err = scoped.WithPublicRoleOperation(ctx, func(op context.Context) error {
-			bracket := identity.Bracket{Now: time.Now, Reserve: publicRoleBracketReserve,
+			bracket := app.Bracket{Now: time.Now, Reserve: publicRoleBracketReserve,
 				Open:  func(c context.Context) (time.Time, error) { d, _ := c.Deadline(); return d, nil },
 				Close: scoped.ClosePublicRoleOperation}
 			_, e := bracket.Run(op, func(step context.Context) (bool, error) {

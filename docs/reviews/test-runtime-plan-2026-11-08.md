@@ -243,3 +243,11 @@ check. Measured on PR runs (job durations from the Actions API):
 The shards' test steps are now 210–340 s; the rest is setup (48–86 s, mostly
 the 1.8 GB Go cache restore) and test-time noise. Step 2's setup trims are the
 next lever toward ≤ 5 min.
+
+### Step 5: installer step brackets (ADR-316)
+
+Per-step request counts showed the repeated proofs were round trips, not
+limiter waits (no waits ≥ 100 ms). `resources/advance` 26.2 s → 1.4 s and
+`public/roles-provision` 26.3 s → 4.7 s; the continuation's step sum fell
+from 145 s to 92 s (`continuation-manual-logs` 42482871889 → 42483849394).
+`owner/installation` (22.3 s, 2452 requests) remains the largest step.

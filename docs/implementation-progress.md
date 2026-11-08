@@ -1,5 +1,23 @@
 # Sustained implementation progress
 
+## Installer step brackets (2026-11-08, ADR-316)
+
+Option 4 of docs/reviews/test-runtime-plan-2026-11-08.md. The continuation now
+prints per-step Kubernetes request counts and guard-check callers after each
+`done in` line. `InitialRuntimeResources.Advance` and
+`PublicRuntimeSQLRoles.Provision` run their items in `fleet.Bracket`s: one
+opening proof, items while 2 s of its original deadline remain, one closing
+proof. Per-item claims, CAS writes, lookups, SQL transactions and deadlines
+are unchanged.
+
+- `continuation-manual-logs` before (42482871889 at `34436e2b`) and after
+  (42483849394 at `6b41158c`, pass): `resources/advance` 26.2 s / 3154
+  requests → 1.4 s / 160; `public/roles-provision` 26.3 s / 1405 → 4.7 s /
+  313; continuation step sum 145 s → 92 s; Go test 507 s (passing ADR-315
+  run 42481403687) → 454 s.
+- Not converted: `owner/installation` (22.3 s, 2452 requests over 26
+  composed provider operations) is the next candidate.
+
 ## Batched initial schema brackets (2026-11-08, ADR-315)
 
 Option 3 of docs/reviews/test-runtime-plan-2026-11-08.md. `InitialSchema.Run`

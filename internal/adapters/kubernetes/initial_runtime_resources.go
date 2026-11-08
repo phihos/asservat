@@ -479,7 +479,7 @@ func (s *InitialRuntimeResources) Advance(ctx context.Context) (contracts.Initia
 		var phase int
 		var obj *core.Secret
 		var until time.Time
-		bracket := identity.Bracket{Now: s.now, Reserve: initialRuntimeBracketReserve,
+		bracket := app.Bracket{Now: s.now, Reserve: initialRuntimeBracketReserve,
 			Open: func(open context.Context) (time.Time, error) {
 				var e error
 				if until, phase, e = s.currentPhase(open); e != nil {

@@ -2,7 +2,9 @@
 
 Date: 2026-10-15. Status: accepted; implemented. Native qualification passed
 ([continuation run 18](../../test/results/adr183-continuation-native-18/result.json)):
-all 66 public roles and the projection.
+all 66 public roles and the projection. Decision 3 and the completion proofs
+of decision 4 are superseded by [ADR-316](316-installer-step-brackets.md):
+one operation now covers a bracket of roles and ends with one closing proof.
 Requirements: REQ-DEP-005, REQ-DB-005, S-02; TASK-11.
 Builds on [ADR-173](173-work-scoped-process-observation.md) and
 [ADR-184](184-promoted-owner-first-launch.md).
