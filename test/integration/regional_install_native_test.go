@@ -122,11 +122,11 @@ func qualifyRegionalInstall(t *testing.T, ctx context.Context, f fixture, index 
 		clear(history)
 		args = append(args, "--history-credential", historyFile)
 	}
-	if executor && installedJourneyFocus() == "alert" && index == 1 {
+	if executor && installedAnyFocus("alert") && index == 1 {
 		// ADR-231: the operator's in-cluster Alertmanager, named at install.
 		args = append(args, "--alertmanager", installAlertmanager(t, ctx, region, f.AlertmanagerImage))
 	}
-	if executor && installedJourneyFocus() == "logresource" && index == 1 {
+	if executor && installedAnyFocus("logresource") && index == 1 {
 		// ADR-241: the workload cluster's metrics API, started early for its
 		// warm-up (no installer input names it).
 		installMetricsServer(t, ctx, region, f.MetricsServerImage)
@@ -137,7 +137,7 @@ func qualifyRegionalInstall(t *testing.T, ctx context.Context, f fixture, index 
 		}
 		args = append(args, "--collector-namespace", "asservat-collector", "--collector-name", "asservat-node")
 	}
-	if executor && (installedProfileFocus() || installedJourneyFocus() == "policy-profile") && index == 1 {
+	if executor && installedAnyFocusMatch(func() bool { return installedProfileFocus() || installedJourneyFocus() == "policy-profile" }) && index == 1 {
 		configured := manualProfileEndpoints()
 		if installedTLSProfileTransport() {
 			roots := manualProfileTLSFixture(t, f.ProfileTLSDirectory).Roots
@@ -912,7 +912,17 @@ func (b *regionalBudget) amount(bytes, objects int64) map[string]int64 {
 	return map[string]int64{"bytes": bytes, "objects": objects}
 }
 
+// installedRegionalContextReserve is the workload's context reserve: each
+// focus of a multi-focus run adds its own (installedEachFocus).
 func installedRegionalContextReserve() (bytes, objects int64) {
+	installedEachFocus(func() {
+		b, o := installedFocusContextReserve()
+		bytes, objects = bytes+b, objects+o
+	})
+	return bytes, objects
+}
+
+func installedFocusContextReserve() (bytes, objects int64) {
 	bytes, objects = 8*1544192, 32
 	if installedLogsFocus() {
 		return installedKeptRuns() * installedLogsQueryUnits * 1544192, installedKeptRuns() * installedLogsQueryUnits * 4
@@ -977,18 +987,25 @@ func (b *regionalBudget) addPolicy() {
 	}
 }
 
-func (b *regionalBudget) addBinding(w regionalWorkload) {
-	b.t.Helper()
+// installedRegionalBindingRoles are the maintainer binding's roles. A share
+// or browser focus adds evidence-owner for every focus of its installation.
+func installedRegionalBindingRoles() []any {
 	roles := []any{"workload-maintainer"}
 	if installedRecordingFocus() || installedLogsFocus() {
 		roles = append(roles, "action-approver")
 	}
-	if installedJourneyFocus() == "share" || installedJourneyFocus() == "browser" {
+	if installedAnyFocus("share") || installedAnyFocus("browser") {
 		// ADR-232: the developer group also owns the workload's evidence, so
 		// its captures' retained audience includes the evidence-owner role.
 		// The browser focus shares from the console session.
 		roles = append(roles, "evidence-owner")
 	}
+	return roles
+}
+
+func (b *regionalBudget) addBinding(w regionalWorkload) {
+	b.t.Helper()
+	roles := installedRegionalBindingRoles()
 	b.binding = map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "AccessBinding", "metadata": map[string]any{"name": b.bindingName}, "spec": map[string]any{"effect": "Allow",
 		"subjects": []any{map[string]any{"kind": "Group", "issuer": b.issuer, "id": "synthetic-group"}}, "roles": roles,
 		"scope":  map[string]any{"clusterID": b.cluster, "namespaceRef": map[string]any{"name": w.ns.Name, "uid": string(w.ns.UID)}, "workloads": []any{map[string]any{"kind": "Deployment", "name": w.app.Name, "uid": string(w.app.UID)}}},
@@ -1038,9 +1055,10 @@ func createRegionalWorkload(t *testing.T, ctx context.Context, region kubernetes
 	}
 	labels = map[string]string{"app": "regional-app"}
 	command := []string{"/provider-proxy", "http://127.0.0.1:1", "http://127.0.0.1:1", "127.0.0.1:1"}
-	if installedJourneyFocus() == "logresource" || installedRecordingFocus() || installedLogsFocus() {
+	if installedAnyFocus("logresource") || installedRecordingFocus() || installedLogsFocus() {
 		// ADR-241: the fixture's synthetic signal workload, which writes a
-		// requested line or keeps its CPU busy on demand.
+		// requested line or keeps its CPU busy on demand. A pod-status focus
+		// sharing the logresource installation reads the same idle workload.
 		command = []string{"/provider-proxy", "signals"}
 	}
 	var initContainers []core.Container
@@ -1050,7 +1068,7 @@ func createRegionalWorkload(t *testing.T, ctx context.Context, region kubernetes
 	var ports []core.ContainerPort
 	var volumes []core.Volume
 	var volumeMounts []core.VolumeMount
-	if installedProfileFocus() || installedJourneyFocus() == "policy-profile" {
+	if installedAnyFocusMatch(func() bool { return installedProfileFocus() || installedJourneyFocus() == "policy-profile" }) {
 		command = []string{"/profile-native"}
 		if installedAcceptedHeavyComparison() {
 			command = append(command, "--accepted-heavy")

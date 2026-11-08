@@ -23,6 +23,13 @@ fixture = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(fixture)
 
 
+
+def native_needs(suite):
+    """The runner setup native.yml gives suite (ci-native.sh --matrix)."""
+    out = subprocess.check_output([str(Path(__file__).with_name("ci-native.sh")), "--matrix", json.dumps([suite])], text=True)
+    return json.loads(out)["include"][0]
+
+
 class RegionalContextSelection(unittest.TestCase):
     def test_manual_logs_api_only_focus_and_resource_selector(self):
         with patch.dict(os.environ, {"ASSERVAT_JOURNEY_FOCUS":"manual-logs"}):
@@ -31,7 +38,7 @@ class RegionalContextSelection(unittest.TestCase):
         source=Path(fixture.__file__).read_text()
         collector=next(line for line in source.splitlines() if line.strip().startswith("collector_qualification ="))
         self.assertNotIn('"manual-logs"',collector)
-        self.assertIn('report["installedLogsQueryQualification"] = installer_continuation and focus == "manual-logs"',source)
+        self.assertIn('report["installedLogsQueryQualification"] = installer_continuation and "manual-logs" in foci',source)
         selected=json.loads(subprocess.check_output([str(Path(__file__).with_name("ci-native.sh")),"--list"],text=True))
         self.assertIn("continuation-manual-logs",selected)
         self.assertIn("logs-resource",selected)
@@ -126,8 +133,7 @@ class RegionalContextSelection(unittest.TestCase):
         with patch.dict(os.environ,accepted,clear=True):
             self.assertEqual(fixture.qualification_go_timeout(installer_continuation=True),"18m")
             self.assertEqual(fixture.qualification_cluster_count(3,installer_continuation=True),2)
-        workflow=(Path(__file__).resolve().parents[1]/".github/workflows/native.yml").read_text()
-        self.assertIn("matrix.suite != 'continuation-manual-profile-auth'",workflow)
+        self.assertFalse(native_needs("continuation-manual-profile-auth")["tshark"])
 
     def test_tls_transport_alias_is_closed_and_keeps_cpu_limits(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -152,8 +158,7 @@ class RegionalContextSelection(unittest.TestCase):
             self.assertEqual(fixture.qualification_profile_transport(os.environ),"tls")
             self.assertEqual(fixture.qualification_go_timeout(installer_continuation=True),"18m")
             self.assertEqual(fixture.qualification_cluster_count(3,installer_continuation=True),2)
-        workflow=(Path(__file__).resolve().parents[1]/".github/workflows/native.yml").read_text()
-        self.assertIn("matrix.suite != 'continuation-manual-profile-tls'",workflow)
+        self.assertFalse(native_needs("continuation-manual-profile-tls")["tshark"])
 
     def test_accepted_heavy_alias_keeps_existing_focus_limits_and_pins_variant(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -171,9 +176,10 @@ class RegionalContextSelection(unittest.TestCase):
         with self.assertRaises(ValueError):
             fixture.qualification_profile_variant({"ASSERVAT_JOURNEY_FOCUS":"manual-profile","ASSERVAT_PROFILE_VARIANT":"accepted-heavy"})
         workflow=(Path(__file__).resolve().parents[1]/".github/workflows/native.yml").read_text()
-        for step in ("Disposable-host guard","tshark"):
-            at=workflow.index("name: "+step)
-            self.assertIn("continuation-profile-comparison-heavy",workflow[workflow.rfind("      - if:",0,at):at])
+        heavy=native_needs("continuation-profile-comparison-heavy")
+        self.assertTrue(heavy["guard"])
+        self.assertFalse(heavy["tshark"])
+        self.assertTrue(heavy["builder"])
         self.assertIn("timeout-minutes: 20",workflow)
         source=(Path(__file__).resolve().parents[1]/"test/integration/installed_profile_comparison_native_test.go").read_text()
         self.assertLess(source.index("resources[0](index, handle, operation, pair, true)"),source.index("\n\tproofs.flush(t)"))
@@ -308,7 +314,7 @@ class RegionalContextSelection(unittest.TestCase):
         self.assertEqual(fixture.qualification_profile_variant({}), "cpu")
         self.assertIn('report["installedProfileVariant"] = profile_variant', inspect.getsource(fixture.main))
         workflow = (Path(__file__).resolve().parents[1]/".github/workflows/native.yml").read_text()
-        self.assertIn("matrix.suite != 'continuation-manual-heap'", workflow)
+        self.assertFalse(native_needs("continuation-manual-heap")["tshark"])
         self.assertIn("timeout-minutes: 20", workflow)
 
     def test_heap_summary_precedes_authorized_native_preparation(self):
@@ -350,10 +356,10 @@ class RegionalContextSelection(unittest.TestCase):
     def test_policy_recording_workflow_installs_guard_and_offline_reader(self):
         source = (Path(__file__).resolve().parents[1]/".github/workflows/native.yml").read_text()
         self.assertIn("timeout-minutes: 20", source)
-        for name in ("Disposable-host guard", "tshark"):
+        for name, need in (("Disposable-host guard", "guard"), ("tshark", "tshark")):
             step = source.index("name: " + name)
-            condition = source[source.rfind("      - if:", 0, step):step]
-            self.assertIn("continuation-policy-recording", condition)
+            self.assertIn("      - if: matrix." + need + "\n", source[source.rfind("      - if:", 0, step):step])
+            self.assertTrue(native_needs("continuation-policy-recording")[need])
         suites = (Path(__file__).with_name("ci-native.sh")).read_text()
         self.assertIn("[continuation-policy-recording]", suites)
         self.assertIn("ASSERVAT_JOURNEY_FOCUS=policy-recording", suites)
@@ -362,11 +368,14 @@ class RegionalContextSelection(unittest.TestCase):
         source = (Path(__file__).resolve().parents[1]/".github/workflows/native.yml").read_text()
         guard = source.index("name: Disposable-host guard")
         reader = source.index("name: tshark")
+        self.assertIn("      - if: matrix.guard\n", source[source.rfind("      - if:", 0, guard):guard])
+        self.assertIn("      - if: matrix.tshark\n", source[source.rfind("      - if:", 0, reader):reader])
         suites = Path(__file__).with_name("ci-native.sh").read_text()
         for focus in ("policy-arguments", "policy-profile"):
             with self.subTest(focus=focus):
-                self.assertIn("matrix.suite == 'continuation-" + focus + "'", source[source.rfind("      - if:", 0, guard):guard])
-                self.assertIn("matrix.suite != 'continuation-" + focus + "'", source[source.rfind("      - if:", 0, reader):reader])
+                needs = native_needs("continuation-" + focus)
+                self.assertTrue(needs["guard"])
+                self.assertFalse(needs["tshark"])
                 self.assertIn("[continuation-" + focus + "]", suites)
                 self.assertIn("ASSERVAT_JOURNEY_FOCUS=" + focus, suites)
                 with patch.dict(os.environ, {"ASSERVAT_JOURNEY_FOCUS": focus}):
@@ -394,7 +403,7 @@ class RegionalContextSelection(unittest.TestCase):
                                            ("policy-arguments", True, False),
                                            (None, False, False)):
             with self.subTest(focus=focus):
-                self.assertEqual(eval(expression, {}, {"focus": focus, "collector_qualification": collector}), expected)
+                self.assertEqual(eval(expression, {}, {"foci": [focus] if focus else [], "collector_qualification": collector}), expected)
 
     def test_traffic_probe_prelude_reaches_selection_without_external_effects(self):
         # Stop at selection, before cache/build/container work. This catches

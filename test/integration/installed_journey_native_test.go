@@ -543,7 +543,7 @@ func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, ro
 		// read fit its 32 KiB/48 MiB allocation. Stop needs a nonterminal
 		// session; stopping the completed first download proves AlreadyTerminal.
 		stopReply, err := readReply(ctx, "prepare_artifact_download", map[string]string{
-			"artifact_id": investigation.Artifacts[0].ArtifactID, "idempotency_key": "installed-journey-stop-download",
+			"artifact_id": investigation.Artifacts[0].ArtifactID, "idempotency_key": keys + "-stop-download",
 		})
 		var stopDownload installedJourneyDownload
 		if err != nil || stopReply.Status != "ok" || installedJourneyDecode(stopReply.Data, &stopDownload) != nil ||
@@ -567,9 +567,9 @@ func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, ro
 		// not a private explanation of the individual wire error.
 		deny(true)
 		until("the revocation", 2*time.Minute, false)
-		refused("installed-journey-revoked")
+		refused(keys + "-revoked")
 		stopCtx, stopEnd := context.WithDeadline(ctx, stopDownload.ExpiresAt)
-		stopReceipts, err := installedJourneyStopTwice(stopCtx, readReply, stopDownload.DownloadID, "installed-journey-stop")
+		stopReceipts, err := installedJourneyStopTwice(stopCtx, readReply, stopDownload.DownloadID, keys+"-stop")
 		stopEnd()
 		for attempt, receipt := range stopReceipts {
 			if receipt.RequestID != "" {
@@ -639,7 +639,7 @@ func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, ro
 		}
 		healthy()
 		until("the expiry", 2*time.Minute, false)
-		refused("installed-journey-expired")
+		refused(keys + "-expired")
 		healthy()
 		checkDeleted()
 		t.Log("installed journey: after original expiry, case and new preparation refused while current workload diagnostics succeeded; independent deletion verified")
@@ -1148,8 +1148,20 @@ func installedJourneyHold(t *testing.T, ctx context.Context, dir string, wire *c
 // "logresource": install with metrics-server and the ADR-241 log and resource
 // policy phases.
 // "share": install, a short journey and the ADR-232 share/read/revoke checks.
-// Empty runs everything in one (longer) run.
-func installedJourneyFocus() string { return os.Getenv("ASSERVAT_JOURNEY_FOCUS") }
+// Empty runs everything in one (longer) run. A comma-separated list runs
+// several compatible focuses in sequence on one installation
+// (installed_multi_focus_test.go); while one of them runs this returns it, and
+// during the shared bootstrap it returns the first, whose bootstrap every
+// listed focus must share (installedFocusBootstrapSignature).
+func installedJourneyFocus() string {
+	if installedFocusCurrent != "" {
+		return installedFocusCurrent
+	}
+	if foci := installedJourneyFoci(); len(foci) > 1 {
+		return foci[0]
+	}
+	return os.Getenv("ASSERVAT_JOURNEY_FOCUS")
+}
 
 // installedFastFixture selects the feature focuses that start from the shortest
 // path to a working installation. They run the same product installation,

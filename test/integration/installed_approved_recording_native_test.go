@@ -213,11 +213,11 @@ func installApprovedRecordingCollector(t *testing.T, ctx context.Context, api ku
 		t.Fatal("installed collector endpoint", err)
 	}
 	collector := map[string]any{"enabled": true, "image": image, "installationID": installation, "clusterID": cluster, "connector": source.Data}
-	if installedJourneyFocus() == "ongoing-save-disk" {
+	if installedAnyFocus("ongoing-save-disk") {
 		// ADR-278: the administrator's opt-in encrypted-disk ring volume.
 		collector["ringDisk"] = map[string]any{"enabled": true, "bytes": ongoingSaveDiskBytes}
 	}
-	if installedJourneyFocus() == "live-observation" {
+	if installedAnyFocus("live-observation") {
 		// The administrator's node-side live processing opt-in; hub
 		// delivery.liveRead separately authorizes viewers.
 		collector["live"] = map[string]any{"subscriptions": 4, "memoryBytes": 4 << 20, "eventsPerSecond": 2000, "bytesPerSecond": 1 << 20, "processingNanosPerSecond": 50_000_000}

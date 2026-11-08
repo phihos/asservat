@@ -53,8 +53,40 @@ func installedContinuationSoftBudget(focus string) time.Duration {
 // parents immediately, so starting it on the continuation subtest also covers
 // every focus subtest.
 func installedHangWatchdog(t *testing.T) {
-	focus := installedJourneyFocus()
-	stop := startHangWatchdog(t.Failed, fmt.Sprintf("%s (focus %q)", t.Name(), focus), installedFailureGrace, installedContinuationSoftBudget(focus), time.Second, os.Stderr)
+	focus := os.Getenv("ASSERVAT_JOURNEY_FOCUS")
+	stop := startHangWatchdog(t.Failed, fmt.Sprintf("%s (focus %q)", t.Name(), focus), installedFailureGrace, installedGroupSoftBudget(installedJourneyFoci()), time.Second, os.Stderr)
+	t.Cleanup(stop)
+}
+
+// installedContinuationBeforeFocus is the part of each focus' budget spent in
+// the continuation before the focus starts (measured 175 s on 2026-11-08,
+// about 1.4 times that). A multi-focus run pays it once.
+const installedContinuationBeforeFocus = 4 * time.Minute
+
+// installedFocusSoftBudget is the soft budget of one focus subtest of a
+// multi-focus run: its single-run budget without the continuation part.
+func installedFocusSoftBudget(focus string) time.Duration {
+	return installedContinuationSoftBudget(focus) - installedContinuationBeforeFocus
+}
+
+// installedGroupSoftBudget is the continuation subtest's budget: unchanged
+// for one focus, the shared continuation part plus every focus' own budget
+// for several.
+func installedGroupSoftBudget(foci []string) time.Duration {
+	if len(foci) <= 1 {
+		return installedContinuationSoftBudget(installedJourneyFocus())
+	}
+	budget := installedContinuationBeforeFocus
+	for _, focus := range foci {
+		budget += installedFocusSoftBudget(focus)
+	}
+	return budget
+}
+
+// installedFocusHangWatchdog watches one focus subtest of a multi-focus run
+// against its own budget, so the dump names the focus that hangs.
+func installedFocusHangWatchdog(t *testing.T, focus string) {
+	stop := startHangWatchdog(t.Failed, fmt.Sprintf("%s (focus %q)", t.Name(), focus), installedFailureGrace, installedFocusSoftBudget(focus), time.Second, os.Stderr)
 	t.Cleanup(stop)
 }
 

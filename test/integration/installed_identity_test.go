@@ -267,6 +267,12 @@ func (s *installedJourneyTokenSource) Token(ctx context.Context) (string, error)
 // repeats, the audited change. The console origin is dialled at address.
 func (i *installedIdentity) initializeProcessing(t *testing.T, ctx context.Context, publicRoot *x509.Certificate, address, origin string, diagnose func()) {
 	t.Helper()
+	if installedProcessingInitialized {
+		// The product refuses a second initialization; an earlier focus of
+		// this multi-focus run initialized processing through the console.
+		t.Log("installed journey: processing already initialized by an earlier focus of this run")
+		return
+	}
 	roots := x509.NewCertPool()
 	roots.AddCert(publicRoot)
 	if !roots.AppendCertsFromPEM([]byte(i.RootPEM)) {
@@ -341,6 +347,7 @@ func (i *installedIdentity) initializeProcessing(t *testing.T, ctx context.Conte
 			RequestID string `json:"requestID"`
 		}
 		if status == http.StatusOK && json.Unmarshal(b, &receipt) == nil && receipt.State == "initialized" && receipt.RequestID == key {
+			installedProcessingInitialized = true
 			t.Log("installed journey: the processing operator initialized processing through the console")
 			return
 		}
