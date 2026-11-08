@@ -1160,7 +1160,7 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
                                  "imageHashes": image_hashes(image_dir), "reruns": 0, "rerunImages": []})
                 (cache/"kept").mkdir(exist_ok=True)
                 manifest = cache/"kept"/(run_id+".json")
-                manifest.write_text(json.dumps(kept, indent=2)+"\n")
+                write_environment_report(manifest, kept)
                 keep_work = True
                 report["keptResources"] = str(manifest)
                 report["keptWorkDirectory"] = str(work)
@@ -1389,6 +1389,7 @@ def rerun_installed(path):
         report["phaseSeconds"][name] = round(time.monotonic()-began, 1)
     scratch = Path(tempfile.mkdtemp(prefix="asservat-rerun-build-", dir=tempfile.gettempdir()))
     exit_code = 1
+    go_started = False
     try:
         image_dir = scratch/"image"
         image_dir.mkdir()
@@ -1405,13 +1406,17 @@ def rerun_installed(path):
             # hub-worker, key service, publisher and federation to this image.
             (image_dir/"Dockerfile").write_text("FROM scratch\nCOPY asservat /asservat\nCOPY provider-proxy /provider-proxy\nCOPY console /usr/share/asservat/console\nUSER 65532:65532\n")
             tag = "asservat-context-worker:"+run_id+"-r"+str(number)
-            kept["rerunImages"].append(tag)
-            Path(path).write_text(json.dumps(kept, indent=2)+"\n")  # teardown removes it even if this run fails
+            if tag not in kept["rerunImages"]:  # a retried number reuses its tag
+                kept["rerunImages"].append(tag)
+            write_environment_report(Path(path), kept)  # teardown removes it even if this run fails
             run(["docker", "build", "--network=none", "--label", "asservat.test="+run_id, "-t", tag, str(image_dir)])
             env["ASSERVAT_INSTALLED_RELEASE_IMAGE"] = load_kept_image(tag, kept["clusters"][0], run_id)
             report["releaseImage"] = env["ASSERVAT_INSTALLED_RELEASE_IMAGE"]
             phase("imageLoaded")
         command = ["go", "test", "-count=1", "-v", "-run", "^"+RERUN_TEST+"$", "-timeout", "18m", "./test/integration"]
+        # Only a launched focus spends a funded run; a build or load failure
+        # before it can be retried with the same number.
+        go_started = True
         exit_code = record_go_output(command, env, results, report, "installed-focus-rerun")
         phase("goTestEnd")
         report["goTestExit"] = exit_code
@@ -1426,8 +1431,9 @@ def rerun_installed(path):
             kept["hubImage"] = report["releaseImage"] if exit_code == 0 else None
     finally:
         shutil.rmtree(scratch, ignore_errors=True)
-        kept["reruns"] = number
-        Path(path).write_text(json.dumps(kept, indent=2)+"\n")
+        if go_started:
+            kept["reruns"] = number
+        write_environment_report(Path(path), kept)  # atomic: an interrupt keeps it readable
         report["sourceUnchangedDuringTest"] = report["sourceHashes"] == source_hashes()
         if not report["sourceUnchangedDuringTest"]:
             exit_code = 1
