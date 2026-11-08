@@ -217,6 +217,25 @@ func TestNodeCollectorWithRealKubernetes(t *testing.T) {
 		return len(p) == 1 && p[0].Status.Phase == core.PodRunning
 	})
 	first := collectorPods()[0]
+	// A failing phase reports the collector's own log tail (synthetic
+	// workload only), so a node-side refusal is named in the same run.
+	t.Cleanup(func() {
+		if !t.Failed() {
+			return
+		}
+		c, end := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+		defer end()
+		l, err := k.CoreV1().Pods(f.CollectorNamespace).List(c, meta.ListOptions{LabelSelector: "app.kubernetes.io/name=asservat-node"})
+		if err != nil {
+			t.Log("collector log tail unavailable", err)
+			return
+		}
+		for _, pod := range l.Items {
+			if b, err := k.CoreV1().Pods(f.CollectorNamespace).GetLogs(pod.Name, &core.PodLogOptions{LimitBytes: ptr.To[int64](32 << 10)}).DoRaw(c); err == nil {
+				t.Logf("collector %s log tail:\n%s", pod.Name, b)
+			}
+		}
+	})
 	var firstReportAt time.Time
 	var view delivery.NodeView
 	wait("enrollment and first report", 2*time.Minute, func() bool {

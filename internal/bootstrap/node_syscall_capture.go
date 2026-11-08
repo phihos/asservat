@@ -48,7 +48,7 @@ func (n *nodePackets) startSyscall(ctx context.Context, epoch string, w collecto
 		return r
 	}
 	err := n.budget().ReserveFrozen(p.MaxBytes)
-	started := n.now().UTC()
+	started := n.now().UTC().Truncate(time.Microsecond) // the decoded result's precision, as in node_packets.go
 	holder := n.newManualLive(w, p, started, liveID)
 	if holder != nil {
 		holder.ctx = capture

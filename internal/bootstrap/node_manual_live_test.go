@@ -198,6 +198,9 @@ func TestManualLiveArgumentTapUsesOriginalPermitAndNeverProjectsValues(t *testin
 		t.Fatal("original argument holder", head, e)
 	}
 	original := *head.Manual
+	if !original.StartedAt.Equal(original.StartedAt.Truncate(time.Microsecond)) {
+		t.Fatal("argument live start finer than the decoded result", original.StartedAt)
+	}
 	request.Live.Manual = &original
 	request.Live.Inspect = false
 	request.Live.Head = false
@@ -262,7 +265,8 @@ func TestManualLiveHTTPUsesSameFiniteSanitizerAndOriginalClock(t *testing.T) {
 	}
 	callback := make(chan func(gadget.Frame), 1)
 	var engines atomic.Int32
-	n := &nodePackets{available: true, identity: func() collector.Identity { return id }, now: time.Now, budget: func() *collector.Budget { return budget }, budgetMu: &mu, log: func(string) {}, upload: func(context.Context, string, collector.PacketResult, []byte) error { return nil }, engine: func(context.Context, string, int, func(gadget.Frame)) (gadget.CaptureStats, error) {
+	uploaded := make(chan collector.PacketResult, 1)
+	n := &nodePackets{available: true, identity: func() collector.Identity { return id }, now: time.Now, budget: func() *collector.Budget { return budget }, budgetMu: &mu, log: func(string) {}, upload: func(_ context.Context, _ string, r collector.PacketResult, _ []byte) error { uploaded <- r; return nil }, engine: func(context.Context, string, int, func(gadget.Frame)) (gadget.CaptureStats, error) {
 		t.Error("unobserved HTTP fallback")
 		return gadget.CaptureStats{}, nil
 	}, observedEngine: func(ctx context.Context, pod string, snap int, deliver func(gadget.Frame), _ func(gadget.InputNotice)) (gadget.CaptureStats, error) {
@@ -333,6 +337,16 @@ func TestManualLiveHTTPUsesSameFiniteSanitizerAndOriginalClock(t *testing.T) {
 	if processing.held != 0 {
 		t.Fatal("HTTP source join left projection resources")
 	}
+	// The hub decodes PacketResult times at microsecond precision; the live
+	// binding must name that same instant (native run 42472479320).
+	select {
+	case r := <-uploaded:
+		if !original.StartedAt.Equal(original.StartedAt.Truncate(time.Microsecond)) || !r.StartedAt.Equal(original.StartedAt) {
+			t.Fatal("live original start differs from the uploaded result", original.StartedAt, r.StartedAt)
+		}
+	default:
+		t.Fatal("joined HTTP capture uploaded no result")
+	}
 }
 
 func TestManualLiveSixteenSourcesCanRetainOneWholeRowWithinPrivateBudget(t *testing.T) {
@@ -401,6 +415,9 @@ func TestManualLiveMetadataSyscallTapAndStopKeepOriginalSource(t *testing.T) {
 		t.Fatal("metadata invented a sensitive observation", head, e)
 	}
 	original := *head.Manual
+	if !original.StartedAt.Equal(original.StartedAt.Truncate(time.Microsecond)) {
+		t.Fatal("syscall live start finer than the decoded result", original.StartedAt) // native run 42480440424
+	}
 	q.Live.Manual = &original
 	q.Live.Inspect = false
 	q.Live.Head = false

@@ -54,6 +54,26 @@ type flow struct {
 	p      *Projector
 	halves [2]*half
 	fifo   []pending
+	// released: the flow slot was returned once both directions stopped,
+	// before the assembler itself completed the connection.
+	released bool
+}
+
+// release ends the flow's record production and returns its slot once. It
+// runs when both directions are done, which can precede the assembler's own
+// completion: a stopped direction whose sequence tracking broke (a truncated
+// frame) never sees its FIN in order, and the connection lingers until the
+// idle or page-bound flush.
+func (f *flow) release() {
+	if f.released {
+		return
+	}
+	f.released = true
+	for _, e := range f.fifo {
+		f.p.addRecord(Record{Timestamp: e.at, Method: e.method, Partial: true}, e.stamp)
+	}
+	f.fifo = nil
+	f.p.active--
 }
 
 func (f *flow) half(dir reassembly.TCPFlowDirection) *half {
@@ -63,22 +83,23 @@ func (f *flow) half(dir reassembly.TCPFlowDirection) *half {
 	return f.halves[1]
 }
 
-// Accept refuses bytes the direction will not parse, so no page is queued
-// for them: a stopped direction, one that never saw its SYN, or a frame
-// whose TCP payload was truncated (except their FIN/RST, see below).
-func (f *flow) Accept(tcp *layers.TCP, _ gopacket.CaptureInfo, dir reassembly.TCPFlowDirection, nextSeq reassembly.Sequence, _ *bool, _ reassembly.AssemblerContext) bool {
+// Accept keeps the assembler's sequence tracking for every direction, so its
+// in-order FIN closes the connection and frees the flow slot; ReassembledSG
+// discards the bytes of a stopped direction (contiguous bytes queue no page).
+// Refusing those bytes left the later FIN out of order, so the slot stayed
+// held until the idle flush (native run 42476393300). A direction that never
+// saw its SYN starts at its first segment; a truncated frame stops the
+// direction and is refused, since its short payload would desynchronize the
+// sequence (that flow is released once both directions are done).
+func (f *flow) Accept(tcp *layers.TCP, _ gopacket.CaptureInfo, dir reassembly.TCPFlowDirection, nextSeq reassembly.Sequence, start *bool, _ reassembly.AssemblerContext) bool {
 	h := f.half(dir)
-	// A stopped direction still passes FIN/RST so the assembler closes the
-	// connection and frees its flow slot; ReassembledSG discards its bytes.
 	switch {
-	case h.done:
-		return tcp.FIN || tcp.RST
-	case nextSeq == invalidSequence && !tcp.SYN:
-		h.close(stopMidstream)
-		return tcp.FIN || tcp.RST
 	case f.p.ctx.truncated:
 		h.close(stopGap)
 		return tcp.FIN || tcp.RST
+	case nextSeq == invalidSequence && !tcp.SYN:
+		h.close(stopMidstream)
+		*start = true
 	}
 	return true
 }
@@ -109,19 +130,18 @@ func (f *flow) ReassembledSG(sg reassembly.ScatterGather, _ reassembly.Assembler
 // a response into partial records.
 func (f *flow) ReassemblyComplete(reassembly.AssemblerContext) bool {
 	p := f.p
+	open := !f.released
 	f.halves[0].close(stopNone)
 	f.halves[1].close(stopNone)
-	for _, e := range f.fifo {
-		p.addRecord(Record{Timestamp: e.at, Method: e.method, Partial: true}, e.stamp)
+	if open {
+		switch p.phase {
+		case phaseIdle:
+			p.counters.IdleClosedFlows++
+		case phaseFinal:
+			p.counters.OpenAtCloseFlows++
+		}
 	}
-	f.fifo = nil
-	switch p.phase {
-	case phaseIdle:
-		p.counters.IdleClosedFlows++
-	case phaseFinal:
-		p.counters.OpenAtCloseFlows++
-	}
-	p.active--
+	f.release()
 	return true
 }
 
@@ -265,6 +285,9 @@ func (h *half) settle() {
 	}
 	h.done = true
 	h.p.counters.count(h.reason)
+	if f := h.f; f != nil && f.halves[0].done && f.halves[1].done && f.p.phase == phaseLive {
+		f.release()
+	}
 }
 
 func (h *half) run() {
