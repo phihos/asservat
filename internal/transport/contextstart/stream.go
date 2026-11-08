@@ -38,6 +38,7 @@ type frameStream struct {
 	pumpDone                     chan struct{}
 	awaited                      bool
 	leaseStarted                 bool
+	terminalReceiptSent          bool
 	historyWork                  bool
 	lease                        *framePeerLease
 	leaseBounds                  []framePeerBound
@@ -309,6 +310,11 @@ func (s *frameStream) send(ctx context.Context, f contracts.APIContextFrame) (ti
 		s.interruptAt(stage, reason)
 		return time.Time{}, fleet.ErrUnavailable
 	}
+	if f.Kind == contracts.APIContextReceiptFrame || f.Kind == contracts.HistoryReceiptFrame {
+		s.mu.Lock()
+		s.terminalReceiptSent = true
+		s.mu.Unlock()
+	}
 	return until, nil
 }
 
@@ -370,7 +376,7 @@ func (s *frameStream) startReader() (<-chan contracts.APIContextFrame, error) {
 func (s *frameStream) sentTerminalReceipt() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.leaseStarted && s.lease != nil && !s.lease.regional && s.lease.phase == peerReceipt
+	return s.terminalReceiptSent
 }
 
 func (s *frameStream) awaitPeerClose(ctx context.Context) {
@@ -380,10 +386,13 @@ func (s *frameStream) awaitPeerClose(ctx context.Context) {
 	if pump == nil {
 		return
 	}
+	grace := time.NewTimer(2 * time.Second)
+	defer grace.Stop()
 	select {
 	case <-pump:
 	case <-s.ctx.Done():
 	case <-ctx.Done():
+	case <-grace.C:
 	}
 }
 func (s *frameStream) Receive(ctx context.Context) (contracts.APIContextFrame, error) {
