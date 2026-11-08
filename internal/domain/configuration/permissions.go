@@ -4,6 +4,7 @@ package configuration
 
 import (
 	"errors"
+	"fmt"
 	"slices"
 	"time"
 
@@ -13,11 +14,12 @@ import (
 )
 
 var (
-	ErrInvalid     = errors.New("invalid permission observation request")
-	ErrUnavailable = errors.New("permission configuration unavailable")
-	ErrDenied      = errors.New("permission configuration read denied")
-	ErrChanged     = errors.New("permission source identity changed")
-	ErrLimit       = errors.New("permission configuration limit exceeded")
+	ErrInvalid            = errors.New("invalid permission observation request")
+	ErrUnavailable        = errors.New("permission configuration unavailable")
+	ErrDenied             = errors.New("permission configuration read denied")
+	ErrChanged            = errors.New("permission source identity changed")
+	ErrWorkerTokenRotated = fmt.Errorf("%w: mounted worker token rotated", ErrChanged)
+	ErrLimit              = errors.New("permission configuration limit exceeded")
 )
 
 type Resource struct {

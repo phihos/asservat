@@ -61,7 +61,9 @@ The operation binds the bearer bytes actually sent by the existing observer and
 probe transports. Each later request must use the same original client and exact
 bytes, and final mounted-token reads must match both. Token rotation cancels
 this finite operation; a shared client pointer alone cannot adopt replacement
-credentials. No token is logged or persisted. Separate independent source
+credentials. Rotation alone does not invalidate an earlier accepted capacity
+source: that source retains its original expiry while the next operation proves
+the replacement token. No token is logged or persisted. Separate independent source
 observations retain their own actual denials and original dates; no native proof
 or successful source value is cached across operations.
 

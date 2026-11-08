@@ -3,6 +3,7 @@ package bootstrap
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"reflect"
 	"sync"
 	"time"
@@ -14,6 +15,7 @@ import (
 	fleetapp "asservat.local/asservat/internal/application/fleet"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
+	cfg "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/identity"
 )
 
@@ -259,6 +261,12 @@ func (p *providerCapacitySourceOperation) InvalidateCapacitySource(ctx context.C
 		return err
 	}
 	defer done(providerCapacityInvalidated)
+	p.mu.Lock()
+	op := p.native
+	p.mu.Unlock()
+	if op != nil && op.TokenRotated() {
+		return nil
+	}
 	if !p.invalidationBound(root, revision, r, observed, until) {
 		return mounts.ErrUnavailable
 	}
@@ -292,7 +300,7 @@ func (p *providerCapacitySourceOperation) AcceptCapacitySource(ctx context.Conte
 			observed = observed.Truncate(time.Microsecond).Add(time.Microsecond)
 		}
 		until = until.Truncate(time.Microsecond)
-		if call.Err() == nil && p.invalidationBound(in.RootID, revision, recovery, observed, until) {
+		if !errors.Is(err, cfg.ErrWorkerTokenRotated) && call.Err() == nil && p.invalidationBound(in.RootID, revision, recovery, observed, until) {
 			_ = p.owner.journal.InvalidateCapacitySource(call, in.RootID, revision, recovery, observed, until)
 		}
 		return zero, mounts.ErrUnavailable

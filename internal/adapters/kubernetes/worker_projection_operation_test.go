@@ -3,11 +3,13 @@ package kubernetes
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 	"time"
 
 	"asservat.local/asservat/internal/contracts"
+	cfg "asservat.local/asservat/internal/domain/configuration"
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -81,6 +83,32 @@ func TestWorkerProjectionOperationCountsBothCurrentPassesAndOneDenial(t *testing
 				t.Fatal("one-use final repeated")
 			}
 		})
+	}
+}
+
+func TestWorkerProjectionOperationTokenRotationFailsClosed(t *testing.T) {
+	f := newWorkerProjectionOperationFixture(t)
+	op, _, err := f.reader.worker.BeginCapacityProjectionOperation(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer op.Close()
+	file, err := f.files.Create("kube-observer.token")
+	if err == nil {
+		_, err = file.Write([]byte("rotated"))
+	}
+	if closeErr := file.Close(); err == nil {
+		err = closeErr
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = op.Finish(context.Background())
+	if !errors.Is(err, cfg.ErrWorkerTokenRotated) || !errors.Is(err, cfg.ErrChanged) {
+		t.Fatalf("rotated token was not distinguished from a changed projection: %v", err)
+	}
+	if !op.TokenRotated() || op.Context().Err() == nil || !op.FreshUntil().IsZero() {
+		t.Fatal("token rotation left the original operation usable or lost its classification")
 	}
 }
 
