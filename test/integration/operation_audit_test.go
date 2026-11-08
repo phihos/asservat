@@ -100,12 +100,14 @@ func qualifyOperationAudits(t *testing.T, ctx context.Context, admin *pgxpool.Po
 			db.Close()
 			t.Fatal(err)
 		}
+		grants := preserveFixtureGrants(t, ctx, admin)
 		t.Cleanup(func() {
 			restore, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 			if _, err := provider.Up(restore); err != nil {
 				t.Error("restore current audit schema", err)
 			}
+			grants(restore)
 			db.Close()
 		})
 		if _, err := provider.DownTo(ctx, 125); err != nil {
@@ -124,6 +126,7 @@ func qualifyOperationAudits(t *testing.T, ctx context.Context, admin *pgxpool.Po
 		if _, err := provider.Up(ctx); err != nil {
 			t.Fatal("preview window upgrade", err)
 		}
+		grants(ctx)
 		// Exact audit replay never repeats the two object creations or charges.
 		if e = gate.Finish(ctx, result); e != nil {
 			t.Fatal("exact outcome replay", e)

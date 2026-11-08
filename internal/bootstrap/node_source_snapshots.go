@@ -155,7 +155,13 @@ func (n *nodeSources) runSnapshot(ctx context.Context, epoch, workID string, own
 	completed := n.now().UTC()
 	outcome := artifact.SourceSnapshotOutcome{NativeSHA256: artifact.Digest(sha256.Sum256(native)), SourceSnapshotCoverage: artifact.SourceSnapshotCoverage{Request: q, AcceptedExpectationDigest: artifact.Digest(x.ExpectationDigest), NativeBytes: int64(len(native)), Retained: counters.Retained, OutputFull: counters.OutputFull, AvailableFrom: coverage.AvailableFrom, ObservedUntil: coverage.ObservedUntil, SourceStoppedAt: coverage.SourceStoppedAt.UTC(), SourceClosedAt: coverage.SourceClosedAt.UTC(), CompletedAt: completed, HistoryComplete: pre.Complete && !coverage.InputUnknown && !coverage.HistoryEvicted, WindowComplete: coverage.Complete && nativeComplete && counters.OutputFull == 0, HistoryEvicted: coverage.HistoryEvicted, InputUnknown: coverage.InputUnknown}}
 	result := collector.PacketResult{Snapshot: &outcome, WorkID: workID, CaptureID: x.CaptureID, StartedAt: acquiredFrom, EndedAt: acquiredUntil, Seen: counters.Seen, Retained: counters.Retained, Filtered: counters.Filtered, OutputFull: counters.OutputFull, WireBytes: counters.WireBytes, CapturedBytes: int64(len(native)), Snaplen: snaplen, EngineVersion: n.version, ProgramDigest: x.Binding.ProgramDigest, NativeType: nativeType}
-	if result.Valid() && n.takeUpload(ctx, result.CapturedBytes) {
+	if !result.Valid() {
+		// Never upload an inconsistent result, but name the refusal instead
+		// of ending the snapshot silently.
+		n.snapshotFailed(x, "result", fmt.Errorf("inconsistent %s result: seen=%d retained=%d filtered=%d outputFull=%d bytes=%d snaplen=%d window %s..%s", nativeType, counters.Seen, counters.Retained, counters.Filtered, counters.OutputFull, len(native), snaplen, acquiredFrom.Format(time.RFC3339Nano), acquiredUntil.Format(time.RFC3339Nano)))
+		return
+	}
+	if n.takeUpload(ctx, result.CapturedBytes) {
 		uploadStarted := n.now()
 		err := n.upload(ctx, epoch, result, native)
 		if n.log != nil {
