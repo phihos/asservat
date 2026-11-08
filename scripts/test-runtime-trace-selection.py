@@ -35,7 +35,9 @@ class RuntimeTraceSelection(unittest.TestCase):
         source=(root/'test/integration/installed_approved_recording_native_test.go').read_text()
         self.assertLess(source.index('qualifyRuntimeTraceSummaryDenied('),source.index('\n\tprepareDownload()'))
         self.assertLess(source.index('qualifyManualRuntimeTraceNative('),source.index('qualifyManualProfileNative('))
-        self.assertIn("matrix.suite != 'continuation-manual-trace'",(root/'.github/workflows/native.yml').read_text())
+        needs=json.loads(subprocess.check_output([str(root/'scripts/ci-native.sh'),'--matrix',json.dumps(['continuation-manual-trace'])],text=True))['include'][0]
+        self.assertFalse(needs['tshark'])
+        self.assertTrue(needs['guard'])
         self.assertIn('timeout-minutes: 20',(root/'.github/workflows/native.yml').read_text())
 
 if __name__ == '__main__': unittest.main()

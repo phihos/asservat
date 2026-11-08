@@ -70,7 +70,23 @@ type configurationWorkerTokenInterval struct {
 	active  int
 	closed  bool
 	failed  bool
+	rotated bool
 	changed chan struct{}
+}
+
+// classify maps a failure after an observed token rotation to the domain's
+// rotation sentinel. The current operation still fails; earlier accepted state
+// is not fenced merely because the projected credential refreshed.
+func (p *configurationWorkerTokenInterval) classify(err error) error {
+	if err == nil || p == nil {
+		return err
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.rotated {
+		return cfg.ErrWorkerTokenRotated
+	}
+	return err
 }
 
 func (s *ConfigurationWorkerProviderReader) beginTokenInterval(ctx context.Context) (context.Context, *configurationWorkerTokenInterval, error) {
@@ -135,6 +151,7 @@ func (p *configurationWorkerTokenInterval) enter(ctx context.Context, client *co
 	if len(p.tokens[index]) == 0 {
 		p.tokens[index] = bytes.Clone(token)
 	} else if !bytes.Equal(p.tokens[index], token) {
+		p.rotated = true
 		p.failLocked()
 		return nil, cfg.ErrChanged
 	}
@@ -173,9 +190,11 @@ func (p *configurationWorkerTokenInterval) mountedCurrent(ctx context.Context) e
 		}
 		value, err := mounts.Read(ctx, client.files, client.file, 16<<10)
 		p.mu.Lock()
-		match := err == nil && contracts.ValidWorkerToken(value) && len(p.tokens[i]) != 0 && bytes.Equal(value, p.tokens[i])
+		valid := err == nil && contracts.ValidWorkerToken(value) && len(p.tokens[i]) != 0
+		match := valid && bytes.Equal(value, p.tokens[i])
 		clear(value)
 		if !match {
+			p.rotated = p.rotated || valid
 			p.failLocked()
 		}
 		p.mu.Unlock()

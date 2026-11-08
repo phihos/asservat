@@ -66,6 +66,9 @@ func (s *CapacitySourceObserver) Observe(ctx context.Context) (AcceptedCapacityS
 	// Failure can only fence the observed CAS sequence, within this invocation's
 	// original interval. Losing that CAS never suppresses a later accepted read.
 	failed := func(step string, e error) (AcceptedCapacitySource, error) {
+		if errors.Is(e, cfg.ErrWorkerTokenRotated) {
+			return zero, stage(step, e)
+		}
 		if live.Err() == nil && r.Valid(s.Now()) && s.Now().Before(until) {
 			at := started
 			if at.Nanosecond()%1000 != 0 {

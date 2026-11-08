@@ -213,11 +213,11 @@ func installApprovedRecordingCollector(t *testing.T, ctx context.Context, api ku
 		t.Fatal("installed collector endpoint", err)
 	}
 	collector := map[string]any{"enabled": true, "image": image, "installationID": installation, "clusterID": cluster, "connector": source.Data}
-	if installedJourneyFocus() == "ongoing-save-disk" {
+	if installedAnyFocus("ongoing-save-disk") {
 		// ADR-278: the administrator's opt-in encrypted-disk ring volume.
 		collector["ringDisk"] = map[string]any{"enabled": true, "bytes": ongoingSaveDiskBytes}
 	}
-	if installedJourneyFocus() == "live-observation" {
+	if installedAnyFocus("live-observation") {
 		// The administrator's node-side live processing opt-in; hub
 		// delivery.liveRead separately authorizes viewers.
 		collector["live"] = map[string]any{"subscriptions": 4, "memoryBytes": 4 << 20, "eventsPerSecond": 2000, "bytesPerSecond": 1 << 20, "processingNanosPerSecond": 50_000_000}
@@ -1201,7 +1201,7 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 		t.Logf("manual raw recording %s: %d packets on port 8080, %d kept payload beyond %d header bytes, largest %d (cap %d), %d bytes", receipt.CaptureID, s.Packets, s.Payload, artifact.RecordingSnaplen, s.MaxCaptured, manualRawTCPCap, len(native))
 		return
 	}
-	path := "../results/approved-recording.pcapng"
+	path := "../results/approved-recording" + installedFocusKeySuffix() + ".pcapng"
 	if err := os.WriteFile(path, native, 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -1301,7 +1301,7 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 	if closedIntent.State != "closed" {
 		t.Fatal("fresh original intent did not close")
 	}
-	if _, code := invoke("request_capture", map[string]string{"preview_id": closedPreview.ID, "idempotency_key": "another-key-cannot-revive-closed-preview"}); code != "ReviewChanged" && code != "NotAvailable" {
+	if _, code := invoke("request_capture", map[string]string{"preview_id": closedPreview.ID, "idempotency_key": "another-key-cannot-revive-closed-preview" + installedFocusKeySuffix()}); code != "ReviewChanged" && code != "NotAvailable" {
 		t.Fatal("closed public intent became a fresh start", code)
 	}
 	if measurement != nil {
@@ -1312,7 +1312,7 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 	}
 	report := map[string]any{"captureID": receipt.CaptureID, "grantID": grantID, "previewID": preview.ID, "executionDigest": preview.Digest, "independentReviewerSubject": reviewer.ReviewerSubject, "previewExpiresAt": preview.Expires, "submittedAt": submitted, "remainingRealWaitSeconds": realWait.Seconds(), "nativeSHA256": hex.EncodeToString(digest[:]), "nativeBytes": len(native), "tsharkPackets": len(lines), "assurance": "real signed Keycloak fresh password LoA1, not MFA", "authorization": "public product request/decision/admission; no fixture grant rows"}
 	raw, _ := json.MarshalIndent(report, "", "  ")
-	if err := os.WriteFile("../results/approved-recording-report.json", append(raw, '\n'), 0600); err != nil {
+	if err := os.WriteFile("../results/approved-recording"+installedFocusKeySuffix()+"-report.json", append(raw, '\n'), 0600); err != nil {
 		t.Fatal(err)
 	}
 	t.Logf("independent approved exact preview submitted after real expiry; %d native PCAPNG packets/%d bytes verified in tshark", len(lines), len(native))

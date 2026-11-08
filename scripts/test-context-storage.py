@@ -429,17 +429,60 @@ def qualify_direct_helper_issuer(env, report):
         raise RuntimeError("Selected direct helper issuer regression failed or did not execute")
 
 
+# Installed focuses that load the node collector (disposable-host guard).
+COLLECTOR_FOCUSES = ("approved-recording", "manual-syscall", "manual-arguments", "manual-mixed", "manual-raw", "manual-http", "manual-peers", "manual-profile", "profile-comparison", "native-paced", "policy-recording", "policy-arguments", "policy-profile", "ongoing-save", "ongoing-save-disk", "ongoing-incident", "ongoing-syscall", "ongoing-mixed", "live-observation")
+# Installed focuses with one hub and one workload cluster.
+TWO_CLUSTER_FOCUSES = ("restart", "journey", "browser", "upgrade", "policy", "alert", "logresource", "chain", "share", "manual-logs") + COLLECTOR_FOCUSES
+# Focuses that may share one installation with others (ASSERVAT_JOURNEY_FOCUS=a,b):
+# chain alone keeps the full installation-process checks and the default
+# kubelet resync, clusters needs a third cluster.
+SOLO_FOCUSES = ("chain", "clusters")
+
+
+def journey_foci(environ=os.environ):
+    """ASSERVAT_JOURNEY_FOCUS as a list: one focus, or several compatible
+    focuses run in sequence on one installation (comma-separated). The Go test
+    refuses focuses whose shared bootstrap differs
+    (installedFocusBootstrapSignature)."""
+    value = environ.get("ASSERVAT_JOURNEY_FOCUS") or ""
+    foci = value.split(",") if value else []
+    if len(foci) > 1 and (len(set(foci)) != len(foci) or any(not re.fullmatch(r"[a-z-]+", f) or f in SOLO_FOCUSES or f not in TWO_CLUSTER_FOCUSES for f in foci)):
+        raise ValueError("several focuses must be distinct two-cluster focuses other than " + ", ".join(SOLO_FOCUSES) + ": " + value)
+    return foci
+
+
 def qualification_cluster_count(default_count, installer_continuation=False):
     """Owned topology: one hub plus one workload cluster for these focuses."""
-    if installer_continuation and os.environ.get("ASSERVAT_JOURNEY_FOCUS") in ("restart", "journey", "browser", "upgrade", "policy", "alert", "logresource", "chain", "share", "approved-recording", "manual-logs", "manual-syscall", "manual-arguments", "manual-mixed", "manual-raw", "manual-http", "manual-peers", "manual-profile", "profile-comparison", "native-paced", "policy-recording", "policy-arguments", "policy-profile", "ongoing-save", "ongoing-save-disk", "ongoing-incident", "ongoing-syscall", "ongoing-mixed", "live-observation"):
+    foci = journey_foci()
+    if installer_continuation and foci and all(f in TWO_CLUSTER_FOCUSES for f in foci):
         return 2
     return default_count
+
+
+def focus_results(output, foci):
+    """Each focus subtest's result and seconds from go test -v output; a focus
+    without a result line did not run."""
+    results = {f: {"result": "notRun", "seconds": None} for f in foci}
+    for line in output.splitlines():
+        match = re.fullmatch(r"\s*--- (PASS|FAIL|SKIP): TestInitialBootstrapChainWithRealServices/installer-continuation/([a-z-]+) \(([\d.]+)s\)", line)
+        if match and match.group(2) in results:
+            results[match.group(2)] = {"result": match.group(1).lower(), "seconds": float(match.group(3))}
+    return results
+
+
+def qualification_collector(foci):
+    """Whether the focuses load the node collector; never a mix."""
+    collector = [f in COLLECTOR_FOCUSES for f in foci]
+    if any(collector) and not all(collector):
+        raise ValueError("focuses with and without the node collector cannot share one installation: " + ",".join(foci))
+    return bool(foci) and all(collector)
 
 
 def qualification_go_timeout(helm_bootstrap=False, runtime_provider_owner=False, installer_continuation=False, native_traffic_probe=False):
     if native_traffic_probe:
         return "2m"
-    if installer_continuation and os.environ.get("ASSERVAT_JOURNEY_FOCUS") in ("approved-recording", "manual-logs", "manual-syscall", "manual-arguments", "manual-mixed", "manual-raw", "manual-http", "manual-peers", "manual-profile", "profile-comparison", "native-paced", "policy-recording", "policy-arguments", "policy-profile", "ongoing-save", "ongoing-save-disk", "ongoing-incident", "ongoing-syscall", "ongoing-mixed", "live-observation"):
+    foci = journey_foci()
+    if installer_continuation and foci and all(f in COLLECTOR_FOCUSES + ("manual-logs",) for f in foci):
         return "18m"
     if installer_continuation:
         # The installed journey waits for its capture's ten-minute expiry; the
@@ -615,6 +658,7 @@ def collect_profile_containment_artifacts(work, results):
 
 def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=False, initial_bootstrap_chain=False, helm_bootstrap=False, regional_context_start=None, runtime_object_roundtrip=False, owner_provider_auth=False, runtime_provider_pair=False, runtime_provider_worker=False, runtime_provider_owner=False, installer_continuation=False, helm_cluster=False, keep_on_failure=False, keep_installed=False):
     focus = os.environ.get("ASSERVAT_JOURNEY_FOCUS")
+    foci = journey_foci()
     if keep_installed:
         refuse_development_mode_in_ci("--keep-installed")
         if not (installer_continuation and runtime_provider_pair and initial_bootstrap_chain) or focus not in RERUN_FOCUSES:
@@ -626,8 +670,8 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
     profile_variant = qualification_profile_variant(os.environ)
     if profile_variant == "accepted-heavy" and not installer_continuation:
         raise ValueError("Accepted-heavy requires the installed comparison continuation")
-    collector_qualification = installer_continuation and focus in ("approved-recording", "manual-syscall", "manual-arguments", "manual-mixed", "manual-raw", "manual-http", "manual-peers", "manual-profile", "profile-comparison", "native-paced", "policy-recording", "policy-arguments", "policy-profile", "ongoing-save", "ongoing-save-disk", "ongoing-incident", "ongoing-syscall", "ongoing-mixed", "live-observation")
-    native_paced = installer_continuation and focus == "native-paced"
+    collector_qualification = installer_continuation and qualification_collector(foci)
+    native_paced = installer_continuation and "native-paced" in foci
     native_traffic_probe = test_pattern == NATIVE_TRAFFIC_PROBE
     guard = Path("/etc/asservat-disposable-host")
     if collector_qualification and not guard.is_file():
@@ -669,9 +713,9 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
         # ADR-227 focused upgrade run: a second release image of the same
         # build, differing only by a label, so its digest differs.
         upgrade_tag = None
-        upgrade = installer_continuation and os.environ.get("ASSERVAT_JOURNEY_FOCUS") == "upgrade"
-        alert = installer_continuation and os.environ.get("ASSERVAT_JOURNEY_FOCUS") == "alert"
-        signals = installer_continuation and os.environ.get("ASSERVAT_JOURNEY_FOCUS") == "logresource"
+        upgrade = installer_continuation and "upgrade" in foci
+        alert = installer_continuation and "alert" in foci
+        signals = installer_continuation and "logresource" in foci
         registry = None
         registry_nodes = []
         build_scratch = None
@@ -702,19 +746,19 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
                 build_scratch = Path(tempfile.mkdtemp(prefix="asservat-"+build_scope+"-build-", dir=tempfile.gettempdir()))
                 report["buildScratch"] = str(build_scratch)
             report["goVersion"] = run(["go", "version"])
-            report["installedHistoryBrowserQualification"] = collector_qualification and focus == "approved-recording"
-            report["installedProfileComparisonBrowserQualification"] = collector_qualification and focus == "profile-comparison"
-            report["installedPacketSummaryBrowserQualification"] = collector_qualification and focus in ("manual-mixed", "manual-raw")
-            report["installedPacketQueryQualification"] = collector_qualification and focus == "manual-raw"
-            report["installedRawSyscallQueryQualification"] = collector_qualification and focus == "manual-arguments"
-            report["installedLogsQueryQualification"] = installer_continuation and focus == "manual-logs"
-            report["installedHeapBrowserQualification"] = collector_qualification and focus == "manual-profile" and profile_variant == "heap"
-            report["installedProfileAuth"] = profile_auth if collector_qualification and focus == "manual-profile" else None
-            report["installedProfileTransport"] = profile_transport if collector_qualification and focus == "manual-profile" else None
-            report["installedProfileVariant"] = profile_variant if collector_qualification and focus in ("manual-profile","profile-comparison") else None
-            report["installedPolicyRecordingFocus"] = collector_qualification and focus == "policy-recording"
-            report["installedPolicyArgumentsFocus"] = collector_qualification and focus == "policy-arguments"
-            report["installedPolicyProfileFocus"] = collector_qualification and focus == "policy-profile"
+            report["installedHistoryBrowserQualification"] = collector_qualification and "approved-recording" in foci
+            report["installedProfileComparisonBrowserQualification"] = collector_qualification and "profile-comparison" in foci
+            report["installedPacketSummaryBrowserQualification"] = collector_qualification and any(f in ("manual-mixed", "manual-raw") for f in foci)
+            report["installedPacketQueryQualification"] = collector_qualification and "manual-raw" in foci
+            report["installedRawSyscallQueryQualification"] = collector_qualification and "manual-arguments" in foci
+            report["installedLogsQueryQualification"] = installer_continuation and "manual-logs" in foci
+            report["installedHeapBrowserQualification"] = collector_qualification and "manual-profile" in foci and profile_variant == "heap"
+            report["installedProfileAuth"] = profile_auth if collector_qualification and "manual-profile" in foci else None
+            report["installedProfileTransport"] = profile_transport if collector_qualification and "manual-profile" in foci else None
+            report["installedProfileVariant"] = profile_variant if collector_qualification and any(f in ("manual-profile","profile-comparison") for f in foci) else None
+            report["installedPolicyRecordingFocus"] = collector_qualification and "policy-recording" in foci
+            report["installedPolicyArgumentsFocus"] = collector_qualification and "policy-arguments" in foci
+            report["installedPolicyProfileFocus"] = collector_qualification and "policy-profile" in foci
             report["sourceHashes"] = source_hashes()
             report.update({"harnessState": "setup", "goTestExit": None, "testExit": None, "cleanupComplete": False})
             write_environment_report(ROOT/"test/results/context-storage-environment.json", report)
@@ -778,7 +822,7 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
             if profile_variant == "accepted-heavy":
                 containment_fixture = prepare_profile_containment_fixture(build_env,work,image_dir,report)
                 helper_copy += "COPY profile-heavy-baseline.pb.gz /profile-heavy-baseline.pb.gz\nCOPY profile-heavy-incident.pb.gz /profile-heavy-incident.pb.gz\nCOPY worker-resource-probe /worker-resource-probe\n"
-            if focus in ("manual-profile", "profile-comparison", "policy-profile"):
+            if any(f in ("manual-profile", "profile-comparison", "policy-profile") for f in foci):
                 subprocess.run(["go", "build", "-trimpath", "-buildvcs=false", "-o", str(image_dir/"profile-native"), "./test/fixtures/profile-native/main.go"], cwd=ROOT, env=build_env, check=True)
                 helper_copy += "COPY profile-native /profile-native\n"
                 report["profileWorkloadSHA256"] = hashlib.sha256((image_dir/"profile-native").read_bytes()).hexdigest()
@@ -1109,6 +1153,12 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
             report["passedTests"] = passed
             if not passed:
                 exit_code = 1
+            if installer_continuation and len(foci) > 1:
+                # Each focus of a multi-focus run is its own subtest; every
+                # one must pass (a later one is not run after a failure).
+                report["focusResults"] = focus_results(output, foci)
+                if any(r["result"] != "pass" for r in report["focusResults"].values()):
+                    exit_code = 1
             if owner_provider_auth and "TestOwnerProviderAuthenticationWithRealKubernetesAndOpenBao" not in passed:
                 report["missingRequiredOwnerProviderAuthentication"] = True
                 exit_code = 1

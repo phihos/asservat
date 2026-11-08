@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
     inputs:
       suite:
-        description: "Suite from scripts/ci-native.sh --list, or all"
+        description: "Suite from scripts/ci-native.sh --names, or all"
         default: all
       run:
         description: "Optional Go test filter (custody, fleet and context only)"
@@ -19,18 +19,20 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
-      suites: ${{ steps.select.outputs.suites }}
+      matrix: ${{ steps.select.outputs.matrix }}
     steps:
       - uses: actions/checkout@v7
         with: { sparse-checkout: scripts, filter: "blob:none" }
       - id: select
         env:
           SUITE: ${{ inputs.suite || 'all' }}
+        # The matrix names each suite's runner setup (ci-native.sh needs).
         run: |
-          all=$(scripts/ci-native.sh --list)
-          if [[ $SUITE == all ]]; then echo "suites=$all" >> "$GITHUB_OUTPUT"; exit; fi
-          python3 -c 'import json,sys; assert sys.argv[2] in json.loads(sys.argv[1]) + ["context", "custody"], "unknown suite"' "$all" "$SUITE"
-          echo "suites=[\"$SUITE\"]" >> "$GITHUB_OUTPUT"
+          if [[ $SUITE == all ]]; then suites=$(scripts/ci-native.sh --list); else
+            python3 -c 'import json,sys; assert sys.argv[2] in json.loads(sys.argv[1]) + ["context", "custody"], "unknown suite"' "$(scripts/ci-native.sh --names)" "$SUITE"
+            suites="[\"$SUITE\"]"
+          fi
+          echo "matrix=$(scripts/ci-native.sh --matrix "$suites")" >> "$GITHUB_OUTPUT"
 
   native:
     needs: select
@@ -39,8 +41,7 @@ jobs:
     timeout-minutes: 20
     strategy:
       fail-fast: false
-      matrix:
-        suite: ${{ fromJSON(needs.select.outputs.suites) }}
+      matrix: ${{ fromJSON(needs.select.outputs.matrix) }}
     name: ${{ matrix.suite }}
     steps:
       # The job's end (timeout-minutes above, less 15 s already spent setting up
@@ -69,44 +70,44 @@ jobs:
       # Pull every digest-pinned fixture image in the background; the harness
       # pull of the same reference joins the in-flight one.
       - name: Pull pinned images
-        if: matrix.suite != 'logs-resource'
+        if: matrix.pull
         env:
-          NATIVE_SUITE: "${{ matrix.suite }}"
+          BUILDER: "${{ matrix.builder }}"
         run: |
           builder=()
-          if [[ $NATIVE_SUITE == continuation-manual-raw || $NATIVE_SUITE == continuation-manual-arguments || $NATIVE_SUITE == continuation-manual-syscall || $NATIVE_SUITE == continuation-profile-comparison || $NATIVE_SUITE == continuation-profile-comparison-heavy || $NATIVE_SUITE == continuation-policy-profile ]]; then
+          if [[ $BUILDER == true ]]; then
             builder=(experiments/syscall-argument-budget/pins.json)
           fi
           grep -ohE '[a-z0-9./-]+@sha256:[0-9a-f]{64}' scripts/test-*.py "${builder[@]}" | sort -u > /tmp/images
           nohup sh -c 'while read -r i; do docker pull -q "$i" & done < /tmp/images; wait' > /tmp/pulls.log 2>&1 &
       - uses: ./.github/actions/setup
         with:
-          go-cache: "native-${{ startsWith(matrix.suite, 'continuation-') && 'installed' || startsWith(matrix.suite, 'collector-') && 'collector' || 'race' }}"
+          go-cache: ${{ matrix.go-cache }}
           # Node builds the installed console and drives its browser checks.
-          console: "${{ startsWith(matrix.suite, 'continuation-') }}"
-          sql-tools: "${{ matrix.suite != 'logs-resource' && !startsWith(matrix.suite, 'collector-') }}"
-          kind: "${{ matrix.suite != 'logs-resource' }}"
-          helm: "${{ startsWith(matrix.suite, 'helm') || startsWith(matrix.suite, 'collector-') || matrix.suite == 'continuation-approved-recording' || startsWith(matrix.suite, 'continuation-manual-') || (matrix.suite == 'continuation-profile-comparison' || matrix.suite == 'continuation-profile-comparison-heavy') || matrix.suite == 'continuation-native-paced' || matrix.suite == 'continuation-policy-recording' || matrix.suite == 'continuation-policy-arguments' || matrix.suite == 'continuation-policy-profile' || startsWith(matrix.suite, 'continuation-ongoing-') }}"
+          console: ${{ matrix.console }}
+          sql-tools: ${{ matrix.sql-tools }}
+          kind: ${{ matrix.kind }}
+          helm: ${{ matrix.helm }}
       # ADR-243 decision 4: the harness's product image links the pinned
       # static libpcap (make hub-binary), shared with ci.yml's pcap-check
       # cache; building it needs flex and bison. The collector image does not.
-      - if: "matrix.suite != 'logs-resource' && !startsWith(matrix.suite, 'collector-')"
+      - if: matrix.libpcap
         id: libpcap
         uses: actions/cache@v6
         with:
           path: ~/.cache/asservat-build/libpcap-1.11.0
           key: libpcap-1.11.0-${{ runner.os }}-${{ hashFiles('scripts/build-libpcap.sh') }}
-      - if: "matrix.suite != 'logs-resource' && !startsWith(matrix.suite, 'collector-') && steps.libpcap.outputs.cache-hit != 'true'"
+      - if: matrix.libpcap && steps.libpcap.outputs.cache-hit != 'true'
         run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends flex bison
       # ADR-246: collector suites load BPF programs into the runner's kernel.
       # This fresh, disposable VM is the only place that creates the guard
       # file without which the harness and the collector refuse to start.
-      - if: startsWith(matrix.suite, 'collector-') || matrix.suite == 'continuation-approved-recording' || (startsWith(matrix.suite, 'continuation-manual-') && matrix.suite != 'continuation-manual-logs') || (matrix.suite == 'continuation-profile-comparison' || matrix.suite == 'continuation-profile-comparison-heavy') || matrix.suite == 'continuation-native-paced' || matrix.suite == 'continuation-policy-recording' || matrix.suite == 'continuation-policy-arguments' || matrix.suite == 'continuation-policy-profile' || startsWith(matrix.suite, 'continuation-ongoing-')
+      - if: matrix.guard
         name: Disposable-host guard
         run: sudo touch /etc/asservat-disposable-host
       # ADR-248: the collector suites open the downloaded PCAPNG with tshark
       # (offline file read only; nothing captures on the runner itself).
-      - if: matrix.suite != 'continuation-manual-profile' && matrix.suite != 'continuation-manual-profile-tls' && matrix.suite != 'continuation-manual-profile-auth' && matrix.suite != 'continuation-manual-heap' && matrix.suite != 'continuation-manual-trace' && matrix.suite != 'continuation-profile-comparison' && matrix.suite != 'continuation-profile-comparison-heavy' && matrix.suite != 'continuation-manual-arguments' && matrix.suite != 'continuation-policy-arguments' && matrix.suite != 'continuation-policy-profile' && (startsWith(matrix.suite, 'collector-') || matrix.suite == 'continuation-approved-recording' || (startsWith(matrix.suite, 'continuation-manual-') && matrix.suite != 'continuation-manual-logs') || (matrix.suite == 'continuation-profile-comparison' || matrix.suite == 'continuation-profile-comparison-heavy') || matrix.suite == 'continuation-native-paced' || matrix.suite == 'continuation-policy-recording' || matrix.suite == 'continuation-policy-arguments' || matrix.suite == 'continuation-policy-profile' || startsWith(matrix.suite, 'continuation-ongoing-'))
+      - if: matrix.tshark
         name: tshark
         timeout-minutes: 3
         run: |
@@ -122,15 +123,15 @@ jobs:
           capinfos --version | head -1
       # History, packet summaries, saved comparison and heap inspection drive installed React.
       # Reuse console CI's pinned Playwright browser/cache; no new image.
-      - if: matrix.suite == 'continuation-approved-recording' || (matrix.suite == 'continuation-profile-comparison' || matrix.suite == 'continuation-profile-comparison-heavy') || matrix.suite == 'continuation-manual-heap' || matrix.suite == 'continuation-manual-mixed' || matrix.suite == 'continuation-manual-raw' || matrix.suite == 'continuation-manual-arguments' || matrix.suite == 'continuation-manual-logs' || matrix.suite == 'continuation-ongoing-live' || matrix.suite == 'continuation-ongoing-live-manual'
+      - if: matrix.playwright
         id: playwright
         run: echo "version=$(node -p "require('./web/node_modules/@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
-      - if: matrix.suite == 'continuation-approved-recording' || (matrix.suite == 'continuation-profile-comparison' || matrix.suite == 'continuation-profile-comparison-heavy') || matrix.suite == 'continuation-manual-heap' || matrix.suite == 'continuation-manual-mixed' || matrix.suite == 'continuation-manual-raw' || matrix.suite == 'continuation-manual-arguments' || matrix.suite == 'continuation-manual-logs' || matrix.suite == 'continuation-ongoing-live' || matrix.suite == 'continuation-ongoing-live-manual'
+      - if: matrix.playwright
         uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
-      - if: matrix.suite == 'continuation-approved-recording' || (matrix.suite == 'continuation-profile-comparison' || matrix.suite == 'continuation-profile-comparison-heavy') || matrix.suite == 'continuation-manual-heap' || matrix.suite == 'continuation-manual-mixed' || matrix.suite == 'continuation-manual-raw' || matrix.suite == 'continuation-manual-arguments' || matrix.suite == 'continuation-manual-logs' || matrix.suite == 'continuation-ongoing-live' || matrix.suite == 'continuation-ongoing-live-manual'
+      - if: matrix.playwright
         name: Installed React browser
         timeout-minutes: 3
         working-directory: web

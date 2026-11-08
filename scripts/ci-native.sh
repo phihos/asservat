@@ -108,8 +108,92 @@ declare -A suites=(
   # restart, full volume).
   [collector-ringdisk]="python3 scripts/test-collector.py ringdisk"
 )
+# Grouped installed suites: several focuses after one bootstrap
+# (ASSERVAT_JOURNEY_FOCUS=a,b), each focus its own subtest, run in the order
+# listed; a later focus runs only after the earlier ones passed, behind a
+# teardown of their policies, bindings and sources (installedFocusTeardown).
+# The Go test refuses focuses whose bootstrap differs or whose order is
+# unsafe (installed_multi_focus_test.go). A group's name joins its members,
+# whose commands may differ only in their focus (a member with further
+# fixture variables, such as the profile or live variants, needs its own
+# installation). The member suites stay dispatchable for targeted
+# reruns; the "all" dispatch runs each group instead of its members.
+# Measured focus durations and the bins are in
+# docs/reviews/test-runtime-plan-2026-11-08.md (step 6).
+groups=(
+  "journey policy"
+  "browser alert"
+  "share logresource"
+  "restart upgrade"
+  "approved-recording manual-mixed"
+  "manual-http manual-peers"
+)
+declare -A grouped=()
+for group in "${groups[@]}"; do
+  name="" foci="" rest=""
+  for member in $group; do
+    command=${suites[continuation-$member]:?unknown group member $member}
+    [[ $command =~ ^env\ ASSERVAT_JOURNEY_FOCUS=([a-z-]+)\ (.*)$ && ${BASH_REMATCH[2]} != *=* ]] || { echo "group member $member sets more than its focus" >&2; exit 2; }
+    [[ -z $rest || $rest == "${BASH_REMATCH[2]}" ]] || { echo "group $group: member commands differ" >&2; exit 2; }
+    foci+=${foci:+,}${BASH_REMATCH[1]} rest=${BASH_REMATCH[2]} name+=${name:++}$member grouped[continuation-$member]=1
+  done
+  suites[continuation-$name]="env ASSERVAT_JOURNEY_FOCUS=$foci $rest"
+done
+# The setup each suite needs on its runner (native.yml): suite names joined
+# by + need what any member needs.
+needs() {
+  local suite=$1 part installed=false collector=false helm=false guard=false tshark=false playwright=false builder=false
+  local base=${suite#continuation-}
+  [[ $suite == continuation-* ]] && installed=true
+  [[ $suite == collector-* ]] && collector=true
+  for part in ${base//+/ }; do
+    [[ $installed == true ]] && part=continuation-$part || part=$suite
+    case $part in
+      helm*|collector-*|continuation-approved-recording|continuation-manual-*|continuation-profile-comparison*|continuation-native-paced|continuation-policy-recording|continuation-policy-arguments|continuation-policy-profile|continuation-ongoing-*) helm=true ;;
+    esac
+    case $part in
+      continuation-manual-logs) ;;
+      collector-*|continuation-approved-recording|continuation-manual-*|continuation-profile-comparison*|continuation-native-paced|continuation-policy-recording|continuation-policy-arguments|continuation-policy-profile|continuation-ongoing-*)
+        guard=true
+        case $part in
+          continuation-manual-profile*|continuation-manual-heap|continuation-manual-trace|continuation-profile-comparison*|continuation-manual-arguments|continuation-policy-arguments|continuation-policy-profile) ;;
+          *) tshark=true ;;
+        esac ;;
+    esac
+    case $part in
+      continuation-approved-recording|continuation-profile-comparison*|continuation-manual-heap|continuation-manual-mixed|continuation-manual-raw|continuation-manual-arguments|continuation-manual-logs|continuation-ongoing-live|continuation-ongoing-live-manual) playwright=true ;;
+    esac
+    case $part in
+      continuation-manual-raw|continuation-manual-arguments|continuation-manual-syscall|continuation-profile-comparison*|continuation-policy-profile) builder=true ;;
+    esac
+  done
+  local go_cache=race
+  [[ $installed == true ]] && go_cache=installed
+  [[ $collector == true ]] && go_cache=collector
+  local plain=true
+  [[ $suite == logs-resource ]] && plain=false
+  local sql=$plain
+  [[ $collector == true ]] && sql=false
+  printf '{"suite":"%s","go-cache":"native-%s","console":%s,"sql-tools":%s,"kind":%s,"pull":%s,"libpcap":%s,"helm":%s,"guard":%s,"tshark":%s,"playwright":%s,"builder":%s}' \
+    "$suite" "$go_cache" "$installed" "$sql" "$plain" "$plain" "$sql" "$helm" "$guard" "$tshark" "$playwright" "$builder"
+}
 if [[ ${1:-} == --list ]]; then
+  # The "all" dispatch: every suite except the members of a group.
+  for suite in "${!suites[@]}"; do [[ -n ${grouped[$suite]:-} ]] || echo "$suite"; done | sort | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read().split()))'
+  exit
+fi
+if [[ ${1:-} == --names ]]; then
+  # Every dispatchable suite, grouped members included.
   printf '%s\n' "${!suites[@]}" | sort | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read().split()))'
+  exit
+fi
+if [[ ${1:-} == --matrix ]]; then
+  # native.yml's job matrix for a JSON list of suites.
+  sep="" out='{"include":['
+  for suite in $(python3 -c 'import json,sys; print(" ".join(json.loads(sys.argv[1])))' "${2:?suites JSON}"); do
+    out+=$sep$(needs "$suite") sep=,
+  done
+  echo "$out]}"
   exit
 fi
 # context and custody exist only for filtered dispatch (ci-native.sh SUITE

@@ -21,6 +21,7 @@ type capacityObserverFixture struct {
 	lastDeadline                                                       time.Time
 	phase                                                              func(string)
 	fail                                                               string
+	failure                                                            error
 }
 
 func (f *capacityObserverFixture) step(ctx context.Context, name string) error {
@@ -31,6 +32,9 @@ func (f *capacityObserverFixture) step(ctx context.Context, name string) error {
 		f.phase(name)
 	}
 	if name == f.fail {
+		if f.failure != nil {
+			return f.failure
+		}
 		return cfg.ErrUnavailable
 	}
 	return ctx.Err()
@@ -149,6 +153,22 @@ func TestCapacitySourceObserverFailureFencesOnlyObservedCAS(t *testing.T) {
 		})
 	}
 }
+func TestCapacitySourceObserverTokenRotationDoesNotFenceAcceptedSource(t *testing.T) {
+	for _, phase := range []string{"protection", "source"} {
+		t.Run(phase, func(t *testing.T) {
+			s, f := capacityObserverTestFixture()
+			f.fail, f.failure = phase, cfg.ErrWorkerTokenRotated
+			_, err := s.Observe(context.Background())
+			if !errors.Is(err, cfg.ErrWorkerTokenRotated) || !errors.Is(err, cfg.ErrUnavailable) {
+				t.Fatalf("rotation did not fail the current observation: %v", err)
+			}
+			if f.invalidations != 0 || f.accepts != 0 {
+				t.Fatal("credential rotation fenced earlier accepted state or accepted the failed observation")
+			}
+		})
+	}
+}
+
 func TestCapacitySourceObserverCancellationCannotDetachInvalidation(t *testing.T) {
 	s, f := capacityObserverTestFixture()
 	ctx, cancel := context.WithCancel(context.Background())

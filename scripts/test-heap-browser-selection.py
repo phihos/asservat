@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Pure installed-fixture wiring checks; no browser, cluster or collection."""
+import json
 import os
 import re
 from pathlib import Path
@@ -26,13 +27,14 @@ class HeapBrowserSelection(unittest.TestCase):
         browser_steps = [step for step in steps if step.get('id') == 'playwright' or step.get('name') == 'Installed React browser' or step.get('uses') == 'actions/cache@v6' and step.get('with', {}).get('path') == '~/.cache/ms-playwright']
         self.assertEqual(len(browser_steps), 3)
         for step in browser_steps:
-            self.assertIn("matrix.suite == 'continuation-manual-heap'", step['if'])
-            self.assertIn("matrix.suite == 'continuation-profile-comparison'", step['if'])
-            self.assertIn("matrix.suite == 'continuation-profile-comparison-heavy'", step['if'])
+            self.assertEqual("matrix.playwright", step['if'])
+        for suite in ('continuation-manual-heap', 'continuation-profile-comparison', 'continuation-profile-comparison-heavy'):
+            out = subprocess.check_output([str(ROOT/'scripts/ci-native.sh'), '--matrix', json.dumps([suite])], text=True)
+            self.assertTrue(json.loads(out)['include'][0]['playwright'], suite)
         self.assertIn('timeout-minutes: 20', (ROOT/'.github/workflows/native.yml').read_text())
         source=(ROOT/'scripts/test-context-storage.py').read_text()
         self.assertIn('ROOT/"web/scripts/installed-profile-comparison-browser.mjs"',source)
-        self.assertIn('report["installedHeapBrowserQualification"] = collector_qualification and focus == "manual-profile" and profile_variant == "heap"',source)
+        self.assertIn('report["installedHeapBrowserQualification"] = collector_qualification and "manual-profile" in foci and profile_variant == "heap"',source)
         target = (ROOT/'Makefile').read_text().split('console-browser-check: console-build', 1)[1].split('\n\n', 1)[0]
         pattern = re.search(r"-run '([^']+)'", target).group(1).replace('$$', '$')
         for name in ('Browser', 'NativeRestart', 'ProfileComparison', 'HeapProfile', 'PacketSummary'):

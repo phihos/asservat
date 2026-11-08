@@ -107,19 +107,14 @@ func prepareInstallerContinuationNative(t *testing.T, ctx context.Context, api k
 		issuer, providerRoots = identity.Issuer, identity.RootPEM
 		clients = append(clients, contracts.IdentityClient{ID: "mcp", Kind: "human", ClassQualified: true})
 	}
-	var approvals *contracts.IdentityApprovals
-	if installedRecordingFocus() || installedLogsFocus() {
-		// Real fresh password authentication at the reference provider's LoA1;
-		// this fixture does not configure or claim MFA/LoA2.
-		approvals = &contracts.IdentityApprovals{RequireRecordingApproval: installedJourneyFocus() != "policy-recording" && installedJourneyFocus() != "policy-arguments" && installedJourneyFocus() != "policy-profile" && !installedOngoingFocus(), StepUp: &contracts.IdentityStepUp{ACRValues: []string{"1"}, MaxAgeSeconds: 300}}
-	}
+	approvals := installedIdentityApprovals()
 	document, _ := json.Marshal(contracts.InstallerContinuation{Format: contracts.InstallerContinuationFormat, Namespace: namespace,
 		WorkerProvider:      contracts.InstallerProviderSelection{AuthMount: providers.worker.AuthMount, AuthMountAccessor: providers.worker.AuthMountAccessor},
 		OwnerProvider:       contracts.InstallerProviderSelection{AuthMount: providers.owner.AuthMount, AuthMountAccessor: providers.owner.AuthMountAccessor},
 		OwnerIssuerRootsPEM: roots.String(), OwnerPKIMount: "owner-pki", OwnerConnections: 4, OwnerConcurrency: 2,
 		// ADR-185: synthetic browser identity settings exercise the public sources step.
 		Public: &contracts.InstallerPublicSettings{Origin: origin, Issuer: issuer, ClientID: "console",
-			MaxLifetimeSeconds: 3600, MaxLogins: 8 * int(installedKeptRuns()), MaxSessions: 8 * int(installedKeptRuns()), MaxLogoutEvents: 8 * int(installedKeptRuns()), Clients: clients,
+			MaxLifetimeSeconds: 3600, MaxLogins: 8 * int(installedFundedRuns()), MaxSessions: 8 * int(installedFundedRuns()), MaxLogoutEvents: 8 * int(installedFundedRuns()), Clients: clients,
 			EligibleGroups: []string{"synthetic-group", installedUnrelatedGroup}, GroupMaxAgeSeconds: 300, Approvals: approvals,
 			// ADR-190: the operator's synthetic capacity profile and release operator.
 			Capacity: nativeCapacityProfile(),
@@ -500,7 +495,7 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 	}
 	// The hub-worker crash costs about a minute; within the 20-minute split it
 	// runs in the restart run (and the unsplit run) only.
-	if focus := installedJourneyFocus(); focus == "" || focus == "restart" {
+	if installedJourneyFocus() == "" || installedAnyFocus("restart") {
 		installerCrashHubWorker(t, ctx, api, desired.TargetNamespace, prefix+"-worker")
 		if _, restarted := installerHubRetentionReadyEpoch(t, ctx, api, admin, desired.TargetNamespace, installation, p.RootID, original.Plan.ClusterID, sequence, epoch); restarted == epoch {
 			t.Fatal("restarted hub-worker kept the old retention epoch")
@@ -512,7 +507,9 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 	// The first installed S-02 slice runs once the regional workload holds a
 	// fresh binding; it reads the public root generated during provider apply.
 	publicAddress := net.JoinHostPort(nodeInternalIP(t, ctx, api, f.Clusters[0].NodeUID), "31450")
-	journey := func(cluster, namespace, workload string, deny func(bool), gone func(string)) {
+	// runFocus runs the current focus; journey runs every listed focus, each
+	// as its own subtest when there are several (installedRunFoci).
+	runFocus := func(t *testing.T, cluster, namespace, workload string, deny func(bool), gone func(string)) {
 		if installedFastFixture() {
 			installedContextStandbyWindow(t, ctx, api, desired.TargetNamespace, prefix+"-owner")
 		}
@@ -739,6 +736,15 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 			run(cluster, namespace, workload, nil, nil)
 			t.Log("installed journey: after a PostgreSQL restart the installation re-activated without operator action; a new capture was collected, published and downloaded")
 		}
+	}
+	journey := func(cluster, namespace, workload string, deny func(bool), gone func(string)) {
+		// The regional install records the operator's hub access and the
+		// workload's cluster client just before it calls journey.
+		iso := installedFocusIsolation{SQL: admin, Root: p.RootID, Identity: identity, PublicRoot: publicRoot, Address: publicAddress, Origin: origin, Namespace: namespace, Workload: workload}
+		if target := installedPolicyTarget; target != nil {
+			iso.Hub, iso.Base, iso.Region = target.hub, target.base, target.region
+		}
+		installedRunFoci(t, ctx, iso, func(t *testing.T) { runFocus(t, cluster, namespace, workload, deny, gone) })
 	}
 	hubKubeconfig := installedUnifiedRunnerKubeconfig(t, f.Clusters[0].Config, desired)
 	qualifyRegionalInstall(t, ctx, f, 1, admin, runnerAPI, api, hubKubeconfig, desired.TargetNamespace, issuer, journey, providers, offerMap.Data[contracts.RegionalOfferFile], installation)
@@ -1094,10 +1100,32 @@ func nativeCapacityProfile() *contracts.InstallerCapacitySettings {
 	lane := func(accounts, records int64) contracts.InstallerCapacityLane {
 		return contracts.InstallerCapacityLane{Accounts: accounts, Records: records, RetainedSeconds: 10000}
 	}
+	// Several focuses on one installation each get their own funding: the
+	// per-focus records and normal-lane records add up (installedEachFocus).
+	var records, normal int64
+	installedEachFocus(func() {
+		r, n := installedFocusCapacityRecords()
+		records, normal = records+r, normal+n
+	})
+	return &contracts.InstallerCapacitySettings{Pool: "capacity", Policy: "applications", NamespaceKeys: []string{"team"}, Accounts: 16, Records: records, AdmissionSeconds: 86400,
+		Lanes:               contracts.InstallerCapacityLanes{CaptureRetainedSeconds: 10000, Normal: lane(4, normal*installedKeptRuns()), Resolution: lane(4, 8*installedFundedRuns()), Processing: lane(2, 16)},
+		StopRetainedSeconds: 10000,
+		Backup:              contracts.InstallerCapacityBackup{HorizonSeconds: 3600, CleanupBudgetSeconds: 60, ProofWindowSeconds: 60, BackupCopies: 2, WALCopies: 3},
+		Footprints:          contracts.InstallerCapacityFootprints{Capture: f(128<<10, 256<<10), Operation: f(128<<10, 256<<10), Processing: f(128<<10, 256<<10), Native: f(64<<10, 128<<10), Stop: f(128<<10, 256<<10), ProcessingState: f(16<<10, 64<<10)},
+		PurgeLeases:         4,
+		Processing:          contracts.InstallerCapacityProcessing{MaxRules: 2, MaxRootTransitions: 512},
+		Metadata:            contracts.InstallerCapacityMetadata{FixedRowBytes: 1 << 20, AccountRowBytes: 256 << 10, RecordRowBytes: 128 << 10, RecordWALBytes: 8 << 20, RecordKeyAttempts: 16, TransitionWALBytes: 1 << 20, ConfigurationTransitions: 4096},
+		Envelope:            contracts.InstallerCapacityEnvelope{SystemObjects: contracts.InstallerCapacityAmount{Bytes: 1 << 50, Objects: 1 << 50}, SQLBytes: 1 << 50, BackupBytes: 1 << 50, WALBytes: 1 << 50, KeyAttempts: 1 << 50},
+		Backends:            []contracts.InstallerCapacityBackend{{StorageProfile: "dedicated", Usable: contracts.InstallerCapacityAmount{Bytes: 1 << 50, Objects: 1000000000}}}}
+}
+
+// installedFocusCapacityRecords is the current focus' records per account
+// and normal-lane records (before the keep run's multiplier).
+func installedFocusCapacityRecords() (records, normal int64) {
 	// The manual profile journey reserves 48 evidence objects for four captures
 	// plus history, deriving 12 protocol records. Qualify those records upfront;
 	// its single pprof summary still charges ten conservative read-work units.
-	records := int64(8)
+	records = int64(8)
 	if installedLogsFocus() {
 		records = installedLogsQueryUnits * installedKeptRuns() // one focus run; a keep run funds its reruns
 	}
@@ -1124,20 +1152,11 @@ func nativeCapacityProfile() *contracts.InstallerCapacitySettings {
 	}
 	// Every live list/open/read/update/close is one audited normal-lane
 	// operation for the same human; six episodes poll roughly once a second.
-	normal := int64(128)
+	normal = 128
 	if installedJourneyFocus() == "live-observation" {
 		normal = 512
 	}
-	return &contracts.InstallerCapacitySettings{Pool: "capacity", Policy: "applications", NamespaceKeys: []string{"team"}, Accounts: 16, Records: records, AdmissionSeconds: 86400,
-		Lanes:               contracts.InstallerCapacityLanes{CaptureRetainedSeconds: 10000, Normal: lane(4, normal*installedKeptRuns()), Resolution: lane(4, 8*installedKeptRuns()), Processing: lane(2, 16)},
-		StopRetainedSeconds: 10000,
-		Backup:              contracts.InstallerCapacityBackup{HorizonSeconds: 3600, CleanupBudgetSeconds: 60, ProofWindowSeconds: 60, BackupCopies: 2, WALCopies: 3},
-		Footprints:          contracts.InstallerCapacityFootprints{Capture: f(128<<10, 256<<10), Operation: f(128<<10, 256<<10), Processing: f(128<<10, 256<<10), Native: f(64<<10, 128<<10), Stop: f(128<<10, 256<<10), ProcessingState: f(16<<10, 64<<10)},
-		PurgeLeases:         4,
-		Processing:          contracts.InstallerCapacityProcessing{MaxRules: 2, MaxRootTransitions: 512},
-		Metadata:            contracts.InstallerCapacityMetadata{FixedRowBytes: 1 << 20, AccountRowBytes: 256 << 10, RecordRowBytes: 128 << 10, RecordWALBytes: 8 << 20, RecordKeyAttempts: 16, TransitionWALBytes: 1 << 20, ConfigurationTransitions: 4096},
-		Envelope:            contracts.InstallerCapacityEnvelope{SystemObjects: contracts.InstallerCapacityAmount{Bytes: 1 << 50, Objects: 1 << 50}, SQLBytes: 1 << 50, BackupBytes: 1 << 50, WALBytes: 1 << 50, KeyAttempts: 1 << 50},
-		Backends:            []contracts.InstallerCapacityBackend{{StorageProfile: "dedicated", Usable: contracts.InstallerCapacityAmount{Bytes: 1 << 50, Objects: 1000000000}}}}
+	return records, normal
 }
 
 // installNativeCapacityObjects creates the operator's pool and budget policy

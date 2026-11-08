@@ -56,6 +56,9 @@ func TestInitialBootstrapChainWithRealServices(t *testing.T) {
 		t.Fatal("owned single-cluster/native services unavailable")
 	}
 	installedMode := os.Getenv("ASSERVAT_INSTALLER_CONTINUATION") == "1"
+	if err := installedFocusGroupError(); installedMode && err != nil {
+		t.Fatal("focuses cannot share one installation:", err)
+	}
 	if installedMode && os.Getenv("ASSERVAT_JOURNEY_FOCUS") == "native-paced" && (len(f.Clusters) < 2 || !f.NativeTrafficHelper.validForNode(f.Clusters[1].Pod.NodeName)) {
 		t.Fatal("native traffic helper descriptor unavailable before bootstrap")
 	}

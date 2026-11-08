@@ -115,7 +115,7 @@ func (s *InstalledWorkerProjectionReader) beginProjectionOperation(ctx context.C
 		err = p.tokens.mountedCurrent(p.ctx)
 	}
 	if err != nil {
-		return nil, err
+		return nil, p.tokens.classify(err)
 	}
 	if err = initialHandoverDeadline(p.ctx, s.client.now, p.until); err != nil {
 		return nil, err
@@ -143,6 +143,17 @@ func (p *WorkerProjectionOperation) FreshUntil() time.Time {
 		return time.Time{}
 	}
 	return p.until
+}
+
+// TokenRotated reports only the mechanical credential-refresh classification;
+// it never makes the failed operation or its facts valid.
+func (p *WorkerProjectionOperation) TokenRotated() bool {
+	if p == nil || p.self != p || p.tokens == nil {
+		return false
+	}
+	p.tokens.mu.Lock()
+	defer p.tokens.mu.Unlock()
+	return p.tokens.rotated
 }
 
 func (p *WorkerProjectionOperation) Finish(ctx context.Context) error {
@@ -189,7 +200,7 @@ func (p *WorkerProjectionOperation) Finish(ctx context.Context) error {
 		p.cancel()
 	}
 	p.mu.Unlock()
-	return err
+	return p.tokens.classify(err)
 }
 
 func (p *WorkerProjectionOperation) Close() {

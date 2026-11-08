@@ -146,6 +146,43 @@ time: 100 s harness setup (images 31 s, services 23 s, concurrent clusters
 36 s), 664 s Go test (unified runner 28/88/38/40 s, `manual-logs` 158 s) and
 14 s cleanup, leaving no owned kind cluster, container or network.
 
+## Several focuses per installation
+
+`ASSERVAT_JOURNEY_FOCUS=a,b` runs compatible focuses in sequence after one
+bootstrap, each as its own subtest
+`installer-continuation/<focus>` with its own watchdog budget, result and
+timing (`focusResults` in `context-storage-environment.json`). This is how
+the `all` dispatch runs most installed suites: `scripts/ci-native.sh`
+defines groups such as `continuation-journey+policy`, which replace their
+members in `--list`; each member (`continuation-journey`) stays a
+dispatchable suite for targeted reruns (`--names` lists both).
+`make installed-focus` accepts one focus only.
+
+Only focuses with the same bootstrap share an installation:
+`installedFocusBootstrapSignature` (in
+`test/integration/installed_multi_focus_test.go`) compares what the
+bootstrap derives from the focus (fast fixture, clusters, collector,
+approvals, console scopes, object partitions), and the Go test refuses a
+list that differs, repeats a focus, includes `chain` or `clusters`, puts
+an order-sensitive focus in the wrong place (`installedLastFoci`,
+`installedFirstFoci`), or holds two focuses that add an automation
+AccessBinding for the workload (`installedAutomationFoci`: a deleted
+automation binding keeps its basis row, which makes the next one's
+delegation ambiguous). Group members in `ci-native.sh` may differ only in
+their focus, so the profile and live variants keep their own runs. Additive fixture parts (Alertmanager,
+metrics-server, the upgrade image, the hub-worker crash, the
+evidence-owner role, collector ring disk and live values) are installed
+when any listed focus needs them. Per-focus budgets add up (root records,
+normal and resolution lanes, the workload's context reserve, identity
+limits), so no focus runs on what an earlier one left. Processing is
+initialized once. Between two focuses the teardown deactivates every
+active policy over MCP, waits until every recording source has ended and
+released its slot, deletes the AccessBindings the finished focus added and
+waits until they leave the permission projection, waits until the shared
+workload trigger budget holds what the next focus spends, and waits until
+the workload is available. A later focus does not start after a failure.
+
+
 ## Fast focus re-run (development only)
 
 To iterate on an authority, timing or wiring bug inside one focus, install
