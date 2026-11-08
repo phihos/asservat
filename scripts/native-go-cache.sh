@@ -65,6 +65,8 @@ fresh=$tmp/native-modcache
 GOMODCACHE=$fresh go clean -modcache
 GOMODCACHE=$fresh GOPROXY=file://$mods/cache/download,https://proxy.golang.org go mod download
 go clean -modcache
+chmod -R u+w "$mods" 2>/dev/null || true
+rm -rf "$mods"
 mv "$fresh" "$mods"
 find "$mods/cache/download" -name '*.zip' -delete
 GOPROXY=off builds

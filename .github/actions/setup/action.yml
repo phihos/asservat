@@ -120,15 +120,21 @@ runs:
       shell: bash
       run: |
         f=~/.cache/asservat-build/downloads/kind-v0.33.0-linux-amd64
+        sum="aee6151561422756b764a4ae28e7f44cda5af5a9eead3cc9985112b1de8d8e0d  $f"
         mkdir -p "${f%/*}"
-        [[ -s $f ]] || curl -fsSL --retry 5 --retry-all-errors -o "$f" https://kind.sigs.k8s.io/dl/v0.33.0/kind-linux-amd64
-        echo "aee6151561422756b764a4ae28e7f44cda5af5a9eead3cc9985112b1de8d8e0d  $f" | sha256sum -c -
+        if ! { [[ -s $f ]] && sha256sum -c - <<< "$sum"; }; then
+          curl -fsSL --retry 5 --retry-all-errors -o "$f" https://kind.sigs.k8s.io/dl/v0.33.0/kind-linux-amd64
+          sha256sum -c - <<< "$sum"
+        fi
         sudo install -m 0755 "$f" /usr/local/bin/kind
     - if: inputs.helm == 'true'
       shell: bash
       run: |
         f=~/.cache/asservat-build/downloads/helm-v4.3.0-linux-amd64.tar.gz
+        sum="86584a54def73570558f66f5111cc53dfed56689637ae32c1201205d494f54fb  $f"
         mkdir -p "${f%/*}"
-        [[ -s $f ]] || curl -fsSL --retry 5 --retry-all-errors -o "$f" https://get.helm.sh/helm-v4.3.0-linux-amd64.tar.gz
-        echo "86584a54def73570558f66f5111cc53dfed56689637ae32c1201205d494f54fb  $f" | sha256sum -c -
+        if ! { [[ -s $f ]] && sha256sum -c - <<< "$sum"; }; then
+          curl -fsSL --retry 5 --retry-all-errors -o "$f" https://get.helm.sh/helm-v4.3.0-linux-amd64.tar.gz
+          sha256sum -c - <<< "$sum"
+        fi
         sudo tar -xzf "$f" -C /usr/local/bin --strip-components=1 linux-amd64/helm
