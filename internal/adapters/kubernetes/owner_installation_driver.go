@@ -286,10 +286,9 @@ func (s *ProviderOwnerInstallation) Run(ctx context.Context) (result OwnerInstal
 				}
 				return true, nil
 			case 4:
-				// The launch starts the owner workload, the one effect here that
-				// is not an inert object or role: it always opens its own
-				// bracket, so a complete proof directly precedes it.
-				if inBracket > 0 && launchPhase == 0 {
+				// Every launch attempt opens its own bracket so a complete proof
+				// directly precedes the workload-starting effect.
+				if inBracket > 0 {
 					return false, nil
 				}
 				if launchPhase == 2 || !normal(ctx) {

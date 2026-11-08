@@ -21,7 +21,7 @@ func TestOwnerInstallationBracketBoundsRequests(t *testing.T) {
 	t.Cleanup(driver.Close)
 	f.api.requests.Store(0)
 	out, err := driver.Run(context.Background())
-	if err != nil || !out.Complete || out.Calls != 20 || out.Finalizations != 8 || out.Inspections != 0 || out.Brackets < 2 {
+	if err != nil || !out.Complete || out.Calls != 20 || out.Finalizations != 8 || out.Inspections != 0 || out.Brackets < 3 {
 		t.Fatal("bracketed installation", out, err)
 	}
 	if f.roles.creates != len(contracts.OwnerIdentityRolePurposes()) || projectionEffectCounts(f) != [4]int32{8, 1, 1, 1} {
