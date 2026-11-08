@@ -8,8 +8,19 @@ Before pushing, run `make pre-push PYTHON=<spec-venv>/bin/python`. It runs, in
 parallel, the fast gates of CI's `checks`, `go` and `console` jobs: the
 specification/architecture/design/schema/CRD/Helm gates and harness self-tests,
 `sql-check`, `console-check` (including generated-contract drift), `go vet`,
-`go-architecture-check` and a `gofmt` check. It starts no fixture and runs no
-race or browser test, so it does not replace the `test` shards or native suites.
+`go-architecture-check`, a `gofmt` check and `go-affected-test`. The last runs,
+with the test shards' `-race` flags and Go's test cache, every package containing
+a file changed since the merge base with `origin/main` (including uncommitted
+and untracked files), every package whose build or tests import one, and every
+package whose tests read a changed path through a relative literal; `go.mod` or
+`go.sum` changes select all packages. The Kubernetes adapter runs as parallel
+duration-balanced partitions; when it is only a reverse dependency, its tests
+recorded above 20 s on CI (about 30 of 700) are skipped and listed (`ASSERVAT_AFFECTED_FULL=1`
+runs them). pcap-check's libpcap-tagged tests run when their packages are
+affected and the pinned libpcap is built. Pre-push starts no fixture or browser
+test and does not replace the `test` shards or native suites. A test that
+fails under the parallel load is rerun once alone and reported; only a repeated
+failure fails the gate.
 
 Implemented console component gates are `make console-install`,
 `make console-check`, `make console-build` and `make console-browser-check`.

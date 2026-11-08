@@ -219,13 +219,14 @@ initial-schema-handover-integration:
 
 # Fast local gates before a push: the checks job's gates and self-tests, the
 # go job's vet and sql-check, the console job's console-check (including
-# generated-contract drift) and gofmt. No fixtures, race tests or browser.
+# generated-contract drift), gofmt and the test shards' race tests for the
+# packages the diff affects (go-affected-test). No fixtures or browser.
 # Use the spec virtual environment: make pre-push PYTHON=<spec-venv>/bin/python
 PRE_PUSH_GATES := spec-check architecture-check design-check openapi-check live-check download-check investigation-check \
 	go-architecture-check manifest-schema-check investigation-schema-check permission-schema-check policy-schema-check \
 	permission-crd-check control-schema-check start-crd-check retention-crd-check capacity-crd-check helm-check \
-	gate-self-tests sql-check console-check gofmt-check go-vet
-.PHONY: pre-push gate-self-tests gofmt-check go-vet
+	gate-self-tests sql-check console-check gofmt-check go-vet go-affected-test
+.PHONY: pre-push gate-self-tests gofmt-check go-vet go-affected-test
 pre-push:
 	$(MAKE) -k -j4 -O $(PRE_PUSH_GATES)
 
@@ -237,6 +238,11 @@ gofmt-check:
 
 go-vet:
 	TMPDIR="$(ASSERVAT_BUILD_TMP)" go vet ./...
+
+# Race tests of packages the diff against origin/main (plus uncommitted and
+# untracked files) changes, and of every package whose tests reach them.
+go-affected-test:
+	LIBPCAP_PREFIX="$(LIBPCAP_PREFIX)" TMPDIR="$(ASSERVAT_BUILD_TMP)" $(PYTHON) scripts/test-affected-go.py
 
 # Metadata-only capability qualification; one owned pinned S3 fixture, no collector.
 .PHONY: history-storage-integration
