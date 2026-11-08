@@ -75,6 +75,23 @@ func installedProjectionSQLCheck(t *testing.T, ctx context.Context, admin *pgxpo
 			limit, stop := context.WithTimeout(ctx, 10*time.Second)
 			defer stop()
 			lastState := "no observation"
+			// The worker Pod's memory limit is read as soon as the worker is
+			// bound: after its last batch the product retires the Job and its
+			// Pod, which raced the completed-query readback below (native run
+			// 42481390256: pods "asservat-query-..." not found).
+			var seenPod string
+			var seenLimit int64
+			workerLimit := func(b value.AcquisitionWorkerBinding) (int64, bool) {
+				if seenPod != "" {
+					return seenLimit, seenPod == b.PodUID
+				}
+				pod, err := api.CoreV1().Pods(b.Namespace).Get(limit, b.Pod, meta.GetOptions{})
+				if err != nil || string(pod.UID) != b.PodUID || len(pod.Spec.Containers) != 1 {
+					return 0, false
+				}
+				seenPod, seenLimit = b.PodUID, pod.Spec.Containers[0].Resources.Limits.Memory().Value()
+				return seenLimit, true
+			}
 			for limit.Err() == nil {
 				var id, worker string
 				var polls, batches, workers, keys, closed int
@@ -85,6 +102,13 @@ func installedProjectionSQLCheck(t *testing.T, ctx context.Context, admin *pgxpo
      (SELECT count(*) FROM context_query_batch b WHERE b.query_id=q.id AND b.closed AND b.native_closed)
      FROM context_query q WHERE q.root_id=$1 AND q.operation_id=$2 AND q.query->'Scope'->>'ArtifactID'=$3`, root, operation, artifact).Scan(&id, &worker, &polls, &batches, &active, &uncertain, &workers, &keys, &closed)
 				lastState = fmt.Sprintf("query=%s handle=%s workers=%d polls=%d batches=%d keys=%d closed=%d active=%t uncertain=%t err=%v", id, handle, workers, polls, batches, keys, closed, active, uncertain, err)
+				if err == nil && worker != "" && seenPod == "" {
+					var rawBinding []byte
+					var bound value.AcquisitionWorkerBinding
+					if admin.QueryRow(limit, `SELECT binding_json FROM download_worker WHERE root_id=$1 AND query_id=$2 AND id=$3 AND binding_json IS NOT NULL`, root, id, worker).Scan(&rawBinding) == nil && json.Unmarshal(rawBinding, &bound) == nil {
+						workerLimit(bound)
+					}
+				}
 				if err == nil && (handle == "" || id == handle) && worker != "" && workers == 1 && polls <= 4 && batches >= 1 && batches <= 2 && keys == batches && closed == batches && !active && !uncertain {
 					t.Logf("installed approved query: one exact shared worker, %d paid poll(s), %d joined batch(es), three consumed key roles per batch; no native session", polls, batches)
 					var intent query.ContextProjectionWorkerIntent
@@ -103,9 +127,8 @@ func installedProjectionSQLCheck(t *testing.T, ctx context.Context, admin *pgxpo
 						if err := admin.QueryRow(limit, "SELECT context_query_units(query->'Scope') FROM context_query WHERE root_id=$1 AND id=$2", root, id).Scan(&units); err != nil || units != 10 {
 							t.Fatal("profile summary source charge", units, err)
 						}
-						pod, err := api.CoreV1().Pods(observed.Binding.Namespace).Get(limit, observed.Binding.Pod, meta.GetOptions{})
-						if err != nil || string(pod.UID) != observed.Binding.PodUID || len(pod.Spec.Containers) != 1 || pod.Spec.Containers[0].Resources.Limits.Memory().Value() != intent.Query.Plan.Profile.Worker.MemoryBytes {
-							t.Fatal("profile summary actual worker memory limit", err)
+						if memory, ok := workerLimit(observed.Binding); !ok || memory != intent.Query.Plan.Profile.Worker.MemoryBytes {
+							t.Fatal("profile summary actual worker memory limit", memory, ok)
 						}
 						t.Log("installed profile summary: exact 384 MiB installed Pod limit and transient declaration, ten query units, one consumed three-key batch")
 					}
@@ -126,9 +149,8 @@ func installedProjectionSQLCheck(t *testing.T, ctx context.Context, admin *pgxpo
 						if err := admin.QueryRow(limit, "SELECT context_query_units(query->'Scope') FROM context_query WHERE root_id=$1 AND id=$2", root, id).Scan(&units); err != nil || units != wantUnits {
 							t.Fatal("syscall projection source charge", units, err)
 						}
-						pod, err := api.CoreV1().Pods(observed.Binding.Namespace).Get(limit, observed.Binding.Pod, meta.GetOptions{})
-						if err != nil || string(pod.UID) != observed.Binding.PodUID || len(pod.Spec.Containers) != 1 || pod.Spec.Containers[0].Resources.Limits.Memory().Value() != intent.Query.Plan.Profile.Worker.MemoryBytes {
-							t.Fatal("syscall projection actual worker memory limit", err)
+						if memory, ok := workerLimit(observed.Binding); !ok || memory != intent.Query.Plan.Profile.Worker.MemoryBytes {
+							t.Fatal("syscall projection actual worker memory limit", memory, ok)
 						}
 						t.Logf("installed syscall view: exact 384 MiB installed Pod limit and transient declaration, %d query units/%d configured read batches, one consumed three-key batch", wantUnits, wantBatches)
 					}
