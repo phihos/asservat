@@ -620,8 +620,13 @@ func (s *Service) Read(ctx context.Context, current CurrentIdentity, r v.Read) (
 		st.cancelRead = nil
 		close(st.readJoined)
 		if e != nil {
-			s.clear(st, "Disconnected")
-			return zero, fmt.Errorf("%w: service:576", v.ErrUnavailable)
+			// A failed node read disclosed nothing and the next read runs a
+			// fresh check: keep the view and let the client retry.
+			if errors.Is(e, v.ErrEnded) || errors.Is(e, v.ErrDenied) {
+				s.clear(st, "Disconnected")
+				return zero, fmt.Errorf("%w: service:576: %v", v.ErrUnavailable, e)
+			}
+			return zero, fmt.Errorf("%w: %w: service:576: %v", v.ErrUnavailable, v.ErrTransient, e)
 		}
 		if len(projected.Rows) > min(defaultLimit(r.Limit), st.watch.Limits.Rows) || projected.Examined < 0 || projected.Examined > 4096 || projected.Bytes < 0 || projected.Bytes > 1<<20 || len(projected.Positions) != len(st.selected) || len(projected.Gaps) > 32 || len(projected.Sources) > v.MaxSources {
 			s.clear(st, "Disconnected")

@@ -937,3 +937,23 @@ func TestLiveEndedFiniteSourceEndsViewAsSourceEnded(t *testing.T) {
 		t.Fatal("ended view reported no sourceEnded gap", batch.Gaps)
 	}
 }
+
+// A failed node read discloses nothing and is retryable; the same view reads
+// again without reopening.
+func TestLiveFailedNodeReadIsRetryable(t *testing.T) {
+	s, f, i, r := setup(t)
+	w, e := s.Open(t.Context(), i, r)
+	if e != nil {
+		t.Fatal(e)
+	}
+	f.add()
+	f.broken = true
+	if out, e := s.Read(t.Context(), i, v.Read{ID: w.ID, Cursor: *w.Cursor}); !errors.Is(e, v.ErrTransient) || len(out.Rows) != 0 {
+		t.Fatal("failed node read disclosed or was not retryable", e)
+	}
+	f.broken = false
+	out, e := s.Read(t.Context(), i, v.Read{ID: w.ID, Cursor: *w.Cursor})
+	if e != nil || len(out.Rows) != 1 || out.State != "Active" {
+		t.Fatal("view did not survive a failed node read", out.State, e)
+	}
+}
