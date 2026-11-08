@@ -176,16 +176,24 @@ Options considered and rejected:
 
 ### 2.3 Projected installed-focus job
 
-| Segment | Today | After options 2–5, 7–9 |
-| --- | ---: | ---: |
-| Job setup | 100 | 60 |
-| Harness | 80 | 55 |
-| Operator prerequisites | 9 | 9 |
-| Unified runner | 197 | 127 |
-| Continuation | 259 | 140 |
-| Focus | 77–307 | unchanged |
-| Tail | 34 | 14 |
-| **Fixed part** | **679** | **about 405 (6.8 min)** |
+Projection with options 2–5 and 7–9 applied (option 6 changes runner time,
+not one job's latency). Each projected figure is today's median minus the
+named option's estimated saving, using a value inside its range from section
+2.2; none is measured.
+
+| Segment | Today (measured) | Projected | Derived from |
+| --- | ---: | ---: | --- |
+| Job setup | 100 | 60 | −40 option 5 (35–45) |
+| Harness | 80 | 55 | −25 option 9 (13–40) |
+| Operator prerequisites | 9 | 9 | unchanged |
+| Unified runner | 197 | 127 | −70 option 3 (schema batching) |
+| Continuation (Pod 181 + test side 88, measured separately, median 259) | 259 | 140 | −50 option 2 (35–65), −40 option 4 (35–50), −29 option 7 (25–45) |
+| Focus | 77–307 | unchanged | |
+| Tail | 34 | 14 | −20 option 8 |
+| **Fixed part** | **679** | **about 405 (6.8 min)** | sum of the rows above |
+
+Section 1.1's "about 645 s before the focus" is the same 679 s without the
+34 s tail.
 
 ## 3. Targets and order
 
