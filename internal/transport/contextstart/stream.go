@@ -296,6 +296,11 @@ func (s *frameStream) send(ctx context.Context, f contracts.APIContextFrame) (ti
 		stage = streamFlush
 		e = s.flush()
 		reason = streamErrorReason(e)
+		if e == nil && (f.Kind == contracts.APIContextReceiptFrame || f.Kind == contracts.HistoryReceiptFrame) {
+			s.mu.Lock()
+			s.terminalReceiptSent = true
+			s.mu.Unlock()
+		}
 	}
 	if e != nil {
 		if reason == streamNoReason {
@@ -309,11 +314,6 @@ func (s *frameStream) send(ctx context.Context, f contracts.APIContextFrame) (ti
 	if reason != streamNoReason {
 		s.interruptAt(stage, reason)
 		return time.Time{}, fleet.ErrUnavailable
-	}
-	if f.Kind == contracts.APIContextReceiptFrame || f.Kind == contracts.HistoryReceiptFrame {
-		s.mu.Lock()
-		s.terminalReceiptSent = true
-		s.mu.Unlock()
 	}
 	return until, nil
 }
