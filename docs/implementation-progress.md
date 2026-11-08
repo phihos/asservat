@@ -1,5 +1,21 @@
 # Sustained implementation progress
 
+## Batched initial schema brackets (2026-11-08, ADR-315)
+
+Option 3 of docs/reviews/test-runtime-plan-2026-11-08.md. `InitialSchema.Run`
+applies migrations in brackets of one root lease, one locked session and one
+incarnation/history/inventory check instead of five root proofs, two sessions
+and two inventories per migration; per-migration transactions, exact-prefix
+resume, the original five-second deadline and the final inventory are unchanged.
+
+- Owned PostgreSQL (`TestInitialSchemaWithRealPostgres`, race, 124 migrations):
+  22.8 s and 730 root reads before, 2.1 s and 6 root reads after; slowest
+  migration interval 0.058 s. `TestCustodyUpgradeSchemaWithRealPostgres` passes.
+- Native runs at `d521d4ae`: `continuation-chain` 42479242063 and
+  `continuation-manual-logs` 42479244330 both pass. Unified runner `schema`
+  phase 87 s median → 3 s (chain) and 2 s (manual-logs); jobs 824 s and 674 s
+  (manual-logs 719 s median before).
+
 ## Installed-suite setup trims and kubelet resync (2026-11-08)
 
 Step 2 and the cheap parts of step 3 of docs/reviews/test-runtime-plan-2026-11-08.md.
