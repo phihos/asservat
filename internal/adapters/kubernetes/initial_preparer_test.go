@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -47,6 +48,7 @@ type preparerFixture struct {
 	server      *httptest.Server
 	client      *rest.Config
 	extra       func(http.ResponseWriter, *http.Request) bool // held under fixture lock
+	requests    atomic.Int64
 }
 
 func (f *preparerFixture) clock() time.Time {
@@ -99,6 +101,7 @@ func newPreparerFixturePlan(t *testing.T, fault string, plan contracts.InitialPr
 	policy := map[string]any{"/apis/admissionregistration.k8s.io/v1/validatingadmissionpolicies/continuity": cp, "/apis/admissionregistration.k8s.io/v1/validatingadmissionpolicybindings/continuity": cb, "/apis/admissionregistration.k8s.io/v1/validatingadmissionpolicies/staging-guard": sp, "/apis/admissionregistration.k8s.io/v1/validatingadmissionpolicybindings/staging-guard": sb}
 	anchor := core.ConfigMap{ObjectMeta: meta.ObjectMeta{Name: f.plan.ProbeName, Namespace: "bootstrap", UID: types.UID(ownerID(9)), ResourceVersion: "1"}, Data: map[string]string{"probe": "public"}}
 	f.server = httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		f.requests.Add(1)
 		f.mu.Lock()
 		defer f.mu.Unlock()
 		if f.extra != nil && f.extra(w, r) {

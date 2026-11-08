@@ -31,7 +31,7 @@ func TestProviderOwnerInstallationRunsFiniteOriginalSequence(t *testing.T) {
 
 func TestProviderOwnerInstallationStopsKnownSpentAttemptWithoutPolling(t *testing.T) {
 	f := newOwnerProjectionOperationPreparedFixture(t, false)
-	f.roles.beforeCurrent = func() { f.fault.Store(6) }
+	f.roles.beforeCurrent = func() { f.fault.Store(3) } // accepted configuration changes
 	driver, err := NewProviderOwnerInstallation(f.projection, f.roles)
 	if err != nil {
 		t.Fatal(err)
