@@ -178,6 +178,12 @@ func qualifyArgumentProcessingSQL(t *testing.T, ctx context.Context, admin *pgxp
 				}
 			} else {
 				// Existing metadata and profile rows do not block129 rollback.
+				// Argument captures committed by earlier cases of this shared
+				// fixture would (their own guard, checked above); hide them inside
+				// this rolled-back transaction so only this case's rows count.
+				exec("SET LOCAL session_replication_role=replica")
+				exec(`UPDATE context_capture SET expectation_json=convert_to(jsonb_set(convert_from(expectation_json,'UTF8')::jsonb,'{NativeType}','"probeHidden"')::text,'UTF8') WHERE id<>$1 AND convert_from(expectation_json,'UTF8')::jsonb->>'NativeType'='syscallArguments'`, accepted.CaptureID)
+				exec("SET LOCAL session_replication_role=origin")
 				exec(down)
 			}
 		})

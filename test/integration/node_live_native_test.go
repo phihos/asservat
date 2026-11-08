@@ -231,7 +231,7 @@ func nativeHTTPSource(view delivery.NodeView, pod string, program []planning.BPF
 	resources := collector.SourceResources{PolicyUID: "synthetic-reviewed-http-policy"}
 	h := nativeHTTPProjection()
 	b := collector.SourceBinding{RootID: uuid.NewString(), PolicyUID: resources.PolicyUID, AcceptanceID: uuid.NewString(), SourceID: uuid.NewString(), Fence: uuid.NewString(), ActionID: "native-live-http", ObservationGrantID: uuid.NewString(), AudienceDigest: [32]byte{9}, PodUID: pod, NodeUID: id.NodeUID, BootID: id.BootID, CollectorPodUID: id.PodUID, CollectorEpoch: id.Epoch, Scope: [32]byte{1}, ExpectationDigest: [32]byte{2}, ProgramDigest: [32]byte(compiler.FilterProgramDigest(program)), ResourceDigest: delivery.SourceResourcesDigest(resources)}
-	return collector.PacketSource{HTTP: &h, Permit: collector.SourcePermit{Binding: b, StartedAt: now, IssuedAt: now, HardUntil: now.Add(30 * time.Second), StartBy: now.Add(5 * time.Second), DispatchUntil: now.Add(5 * time.Second), LeafUntil: now.Add(30 * time.Second), Credit: 128 << 20, BytesPerSecond: 16 << 20}, Program: program, Resources: resources, Ring: collector.SourceRingLimits{MaxAge: 15 * time.Second, MaxBytes: 4 << 20, SegmentBytes: 1 << 20, MaxSegments: 4, MaxFrozenBytes: 1 << 20, MaxConcurrentSnapshots: 1}}
+	return collector.PacketSource{HTTP: &h, Permit: collector.SourcePermit{Binding: b, StartedAt: now, IssuedAt: now, HardUntil: now.Add(30 * time.Second), StartBy: now.Add(5 * time.Second), DispatchUntil: now.Add(5 * time.Second), LeafUntil: now.Add(30 * time.Second), Credit: 128 << 20, BytesPerSecond: 16 << 20}, Program: program, Resources: resources, Ring: collector.SourceRingLimits{MaxAge: 15 * time.Second, MaxBytes: 16 << 20, SegmentBytes: 4 << 20, MaxSegments: 4, MaxFrozenBytes: 8 << 20, MaxConcurrentSnapshots: 1}}
 }
 func (n *nativeLiveQualification) sourceRows(t *testing.T, ctx context.Context, ch *delivery.NodeChannel, s collector.PacketSource, projection string) collector.LiveRead {
 	t.Helper()
@@ -324,7 +324,10 @@ func (n *nativeLiveQualification) http(t *testing.T, parent context.Context, ch 
 	}
 	n.ended(t, ctx, ch, view, w, original)
 	issued := time.Now().UTC().Truncate(time.Microsecond)
-	snapshot := collector.SourceSnapshot{Binding: b, CaptureID: uuid.NewString(), AttemptID: uuid.NewString(), ExpectationDigest: [32]byte{4}, Request: artifact.SourceSnapshotRequest{SourceBindingDigest: artifact.Digest(delivery.SourceBindingDigest(b)), SourceID: b.SourceID, Fence: b.Fence, SnapshotID: uuid.NewString(), SourceStartedAt: source.Permit.StartedAt, SourceHardUntil: source.Permit.HardUntil, T0: issued, IssuedAt: issued, StartBy: issued.Add(5 * time.Second), ProcessingUntil: issued.Add(10 * time.Second), Before: 3 * time.Second, MaxBytes: 1 << 20}}
+	// The synthetic HTTP load reaches about 1 MB/s (native run 42475454686
+	// refused a 1 MiB copy of the 3 s pre-window at window: CaptureBusy), so
+	// the source ring, frozen copy and saved output allow 8 MiB.
+	snapshot := collector.SourceSnapshot{Binding: b, CaptureID: uuid.NewString(), AttemptID: uuid.NewString(), ExpectationDigest: [32]byte{4}, Request: artifact.SourceSnapshotRequest{SourceBindingDigest: artifact.Digest(delivery.SourceBindingDigest(b)), SourceID: b.SourceID, Fence: b.Fence, SnapshotID: uuid.NewString(), SourceStartedAt: source.Permit.StartedAt, SourceHardUntil: source.Permit.HardUntil, T0: issued, IssuedAt: issued, StartBy: issued.Add(5 * time.Second), ProcessingUntil: issued.Add(10 * time.Second), Before: 3 * time.Second, MaxBytes: 8 << 20}}
 	snapshot.Request.HTTP = artifact.RecordingHTTP{MaxFlows: p.HTTP.MaxFlows, MaxHeaderBytes: p.HTTP.MaxHeaderBytes, MaxFlowBytes: p.HTTP.MaxFlowBytes, MaxTotalBytes: p.HTTP.MaxTotalBytes, IdleMillis: p.HTTP.IdleTimeout.Milliseconds()}
 	call, cancel = context.WithTimeout(ctx, 4*time.Second)
 	snapshotWork, e := ch.EnqueueSourceSnapshot(call, snapshot)
@@ -341,7 +344,7 @@ func (n *nativeLiveQualification) http(t *testing.T, parent context.Context, ch 
 	if saved.Failure != "" || saved.NativeType != artifact.HTTPHeadersArtifact || saved.Snapshot == nil {
 		t.Fatal("HTTP source saved window", saved)
 	}
-	savedCount, e := httpheaders.CheckProjection(bytes.NewReader(native), limits, 1<<20)
+	savedCount, e := httpheaders.CheckProjection(bytes.NewReader(native), limits, snapshot.Request.MaxBytes)
 	if e != nil || savedCount == 0 {
 		t.Fatal("HTTP saved native canonical check", savedCount, e)
 	}
