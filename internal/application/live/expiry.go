@@ -26,6 +26,7 @@ func (s *Service) armLocked(st *session) {
 func (s *Service) eraseDetails(st *session) {
 	clear(st.replay)
 	st.replay = map[string]replay{}
+	st.paid = nil
 	clear(st.filter.All)
 	st.filter.All = nil
 	clear(st.selected)

@@ -47,25 +47,21 @@ func (s CurrentLiveEnvironment) LiveSourceReads(ctx context.Context, sources []l
 	p, e := s.Policies.DownloadPolicy(call)
 	if e != nil {
 		// A failed policy read is unavailability, not an access decision.
-		return nil, fmt.Errorf("%w: live settings read: %v", live.ErrUnavailable, e)
+		return nil, fmt.Errorf("%w: live_environment:settings-read: %v", live.ErrUnavailable, e)
 	}
 	if p.RootID != s.RootID || p.InstallationID != s.InstallationID || p.LiveRead == nil || !s.AcceptedRoot.Valid() || p.LiveRead.Root != s.AcceptedRoot {
-		var have any
-		if e == nil && p.LiveRead != nil {
-			have = p.LiveRead.Root
-		}
-		return nil, fmt.Errorf("%w: live settings root (read %v, current %+v, accepted %+v)", live.ErrDenied, e, have, s.AcceptedRoot)
+		return nil, fmt.Errorf("%w: live_environment:settings-root", live.ErrDenied)
 	}
 	paths := make([]privacy.DownloadPath, len(sources))
 	limits := make([]privacy.LiveLimits, len(sources))
 	for n, source := range sources {
 		if source.Root() != s.RootID {
-			return nil, fmt.Errorf("%w: live environment source-root", live.ErrDenied)
+			return nil, fmt.Errorf("%w: live_environment:source-root", live.ErrDenied)
 		}
 		var reason string
 		paths[n], limits[n], reason = p.SelectLiveReason(actor, source.Target, projection, s.Now())
 		if reason != "" {
-			return nil, fmt.Errorf("%w: live settings %s", live.ErrDenied, reason)
+			return nil, fmt.Errorf("%w: live_environment:settings-%s", live.ErrDenied, reason)
 		}
 	}
 	until = identity.Earlier(until, p.FreshUntil)
@@ -73,10 +69,10 @@ func (s CurrentLiveEnvironment) LiveSourceReads(ctx context.Context, sources []l
 	defer cancel()
 	recovery, e := s.Recovery.RecoveryState(bounded)
 	if e != nil {
-		return nil, fmt.Errorf("%w: live recovery read: %v", live.ErrUnavailable, e)
+		return nil, fmt.Errorf("%w: live_environment:recovery-read: %v", live.ErrUnavailable, e)
 	}
 	if !recovery.Valid(s.Now()) || recovery.InstallationID != s.InstallationID || recovery.IssuerEpoch != p.RecoveryEpoch {
-		return nil, fmt.Errorf("%w: live recovery", live.ErrDenied)
+		return nil, fmt.Errorf("%w: live_environment:recovery", live.ErrDenied)
 	}
 	// One policy and one recovery observation per phase: the decision is
 	// valid only until the earlier of their original freshness bounds, so a

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"net/netip"
 	"slices"
+	"strings"
 	"time"
 
 	"asservat.local/asservat/internal/domain/authorization"
@@ -39,6 +40,44 @@ var (
 	// ErrEnded marks a finite source that has ended; the view ends normally.
 	ErrEnded = errors.New("live: source ended")
 )
+
+// Diagnostic returns fixed words for a refusal: its sentinel class plus the
+// first producer-owned location markers (for example "service:442"). It never
+// includes identifiers, inputs or dependency error text, so refusal logs stay
+// free of user data and cannot become a decision oracle beyond the class.
+func Diagnostic(err error) string {
+	class := "other"
+	for _, c := range []struct {
+		err  error
+		word string
+	}{{ErrTransient, "transient"}, {ErrEnded, "ended"}, {ErrCapacity, "capacity"}, {ErrConflict, "conflict"}, {ErrInvalid, "invalid"}, {ErrDenied, "denied"}, {ErrUnavailable, "unavailable"}} {
+		if errors.Is(err, c.err) {
+			class = c.word
+			break
+		}
+	}
+	if err == nil {
+		return class
+	}
+	// Nested producer markers (outer first) name the refusing stage chain.
+	markers := 0
+	for _, word := range strings.Fields(err.Error()) {
+		word = strings.TrimRight(word, ":,;)")
+		prefix, suffix, ok := strings.Cut(word, ":")
+		if ok && slices.Contains(diagnosticPrefixes, prefix) && suffix != "" && len(suffix) <= 24 && strings.Trim(suffix, "0123456789abcdefghijklmnopqrstuvwxyz-") == "" {
+			if markers == 0 {
+				class += " at"
+			}
+			class += " " + word
+			if markers++; markers == 4 {
+				break
+			}
+		}
+	}
+	return class
+}
+
+var diagnosticPrefixes = []string{"service", "live_environment", "handles", "cursor", "live_batch", "live_catalog", "live_manual_sources", "live_owner", "live_owner_codec", "live_owner_router", "live_projection_reader", "live_sources", "live_watch", "public_live"}
 
 func Projection(s string) bool { return s == Packet || s == HTTP || s == Syscall }
 func Terminal(s string) bool   { return s != "Active" && s != "Paused" && s != "Disconnected" }

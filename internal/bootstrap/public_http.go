@@ -3,7 +3,6 @@ package bootstrap
 import (
 	"context"
 	"crypto/tls"
-	"fmt"
 	"net/http"
 	"os"
 	"sync"
@@ -100,7 +99,7 @@ func newPublicHandler(ctx context.Context, d *OwnerDeployment, a publicAuditStor
 		if e != nil {
 			return nil, e
 		}
-		liveOperations.Diagnose = func(m string) { fmt.Fprintln(os.Stderr, m) }
+		liveOperations.Diagnose = eventLog(os.Stderr, "live operation refused")
 		operations, e = presentation.NewInvestigationLiveOperations(operations, liveOperations)
 		if e != nil {
 			return nil, e
