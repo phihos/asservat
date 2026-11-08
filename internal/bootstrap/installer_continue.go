@@ -377,6 +377,13 @@ func (k *InstallerContinuation) at(step string) {
 	now := time.Now()
 	if k.step != "" && !k.started.IsZero() {
 		fmt.Fprintf(os.Stdout, "installer continuation: %s done in %s\n", k.step, now.Sub(k.started).Round(time.Millisecond))
+		// Per-step Kubernetes traffic of the installer's own clients.
+		if line := kube.OpeningStatsLine(); line != "" {
+			fmt.Fprintf(os.Stdout, "installer continuation: %s kubernetes %s\n", k.step, line)
+		}
+		if line := kube.GuardCallersLine(); line != "" {
+			fmt.Fprintf(os.Stdout, "installer continuation: %s %s\n", k.step, line)
+		}
 	}
 	k.step, k.started = step, now
 }

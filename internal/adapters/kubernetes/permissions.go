@@ -16,6 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/rest"
 )
 
@@ -81,6 +82,10 @@ func newBoundedAPI(config *rest.Config) (rest.Interface, error) {
 	// installer's one-shot commands request; each client keeps its own limiter.
 	if c.QPS != OpeningQPS || c.Burst != OpeningBurst {
 		c.QPS, c.Burst = 20, 20
+	} else if c.RateLimiter == nil {
+		// The same bucket, counted for the installer's per-step diagnostics.
+		c.RateLimiter = measuredLimiter{flowcontrol.NewTokenBucketRateLimiter(OpeningQPS, OpeningBurst)}
+		c.Wrap(func(t http.RoundTripper) http.RoundTripper { return measuredTransport{t} })
 	}
 	c.Timeout = 5 * time.Second
 	c.WarningHandlerWithContext = rest.NoWarnings{}
