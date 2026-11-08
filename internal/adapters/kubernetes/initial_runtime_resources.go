@@ -306,39 +306,35 @@ func (s *InitialRuntimeResources) read(ctx context.Context) (contracts.InitialRu
 	}
 	return s.decode(ctx, b)
 }
-func (s *InitialRuntimeResources) write(ctx context.Context, obj *core.Secret, v contracts.InitialRuntimeResourceState) (contracts.InitialRuntimeResourceSnapshot, error) {
+
+// writeProved is the CAS journal write under an already completed phase-0
+// proof whose original deadline is until (ADR-316 brackets).
+func (s *InitialRuntimeResources) writeProved(ctx context.Context, obj *core.Secret, v contracts.InitialRuntimeResourceState, until time.Time) (contracts.InitialRuntimeResourceSnapshot, *core.Secret, error) {
 	var zero contracts.InitialRuntimeResourceSnapshot
 	if obj == nil || !s.valid(v) || !s.now().Before(v.Until) {
-		return zero, cfg.ErrChanged
-	}
-	until, phase, e := s.currentPhase(ctx)
-	if e != nil {
-		return zero, e
-	}
-	if phase != 0 {
-		return zero, cfg.ErrChanged
+		return zero, nil, cfg.ErrChanged
 	}
 	ctx, end := context.WithDeadline(ctx, identity.Earlier(until, v.Until))
 	defer end()
 	data, e := json.Marshal(v)
 	if e != nil || len(data) > contracts.InitialRuntimeResourcesMaxBytes {
-		return zero, cfg.ErrInvalid
+		return zero, nil, cfg.ErrInvalid
 	}
 	next := obj.DeepCopy()
 	next.Data = map[string][]byte{"state.json": data}
 	body, e := json.Marshal(next)
 	if e != nil {
-		return zero, cfg.ErrInvalid
+		return zero, nil, cfg.ErrInvalid
 	}
 	raw, e := s.preparer.creator.api.Put().AbsPath(s.path()).Param("fieldValidation", "Strict").MaxRetries(0).Body(body).DoRaw(ctx)
 	if e != nil {
-		return zero, cfg.ErrUnavailable
+		return zero, nil, cfg.ErrUnavailable
 	}
-	got, _, e := s.decode(ctx, raw)
+	got, written, e := s.decode(ctx, raw)
 	if e != nil || got.UID != string(obj.UID) || got.ResourceVersion == obj.ResourceVersion || !equalJSON(got.State, v) {
-		return zero, cfg.ErrChanged
+		return zero, nil, cfg.ErrChanged
 	}
-	return got, nil
+	return got, written, nil
 }
 
 // Create is an explicit fresh setup action. A caller recovering any unknown
@@ -467,105 +463,134 @@ func initialRuntimeResourceAnnotations(obj runtime.Object, m metav1.Object, oper
 	return deployment && m.GetGeneration() == 1 && len(annotations) == 2 && annotations["deployment.kubernetes.io/revision"] == "1"
 }
 
-// Advance handles only the next compiled item. A recorded unacknowledged claim
-// is lookup-only forever, including after restart and after its effect deadline.
-// Absence is never evidence that CREATE did not happen or permission to retry.
+// initialRuntimeBracketReserve is the lease left that another item needs:
+// its claim, CREATE, lookup and receipt plus the closing proof (ADR-316).
+const initialRuntimeBracketReserve = 2 * time.Second
+
+// Advance handles the next compiled items under one bracket (ADR-316): one
+// opening proof, then items in order while its original deadline leaves the
+// reserve, then one closing proof. A recorded unacknowledged claim is
+// lookup-only forever, including after restart and after its effect
+// deadline. Absence is never evidence that CREATE did not happen or
+// permission to retry.
 func (s *InitialRuntimeResources) Advance(ctx context.Context) (contracts.InitialRuntimeResourceSnapshot, error) {
 	var out contracts.InitialRuntimeResourceSnapshot
 	e := s.operation(ctx, func(call context.Context) error {
-		until, e := s.current(call)
-		if e != nil {
-			return e
+		var phase int
+		var obj *core.Secret
+		var until time.Time
+		bracket := app.Bracket{Now: s.now, Reserve: initialRuntimeBracketReserve,
+			Open: func(open context.Context) (time.Time, error) {
+				var e error
+				if until, phase, e = s.currentPhase(open); e != nil {
+					return time.Time{}, e
+				}
+				read, end := context.WithDeadline(open, until)
+				defer end()
+				out, obj, e = s.read(read)
+				return until, e
+			},
+			Close: func(closing context.Context) error { _, e := s.current(closing); return e },
 		}
-		call, end := context.WithDeadline(call, until)
-		defer end()
-		start, obj, e := s.read(call)
-		if e != nil {
-			return e
-		}
-		v := start.State
-		if !s.now().Before(v.Until) {
-			return cfg.ErrUnavailable
-		}
-		call, setupEnd := context.WithDeadline(call, v.Until)
-		defer setupEnd()
-		index := len(v.Objects)
-		fresh := false
-		if index > 0 && v.Objects[index-1].Receipt == nil {
-			index--
-		}
-		if index == len(initialRuntimeResourceItems) {
-			out = start
-			return nil
-		}
-		want, e := s.object(v, index)
-		if e != nil {
-			return e
-		}
-		if index == len(v.Objects) {
-			id, e := prepUUID()
-			if e != nil {
-				return e
+		_, e := bracket.Run(call, func(item context.Context) (bool, error) {
+			next, object, done, e := s.advanceItem(item, out, obj, phase, until)
+			if e != nil || done {
+				return false, e
 			}
-			now := s.now().UTC().Truncate(time.Microsecond)
-			deadline, _ := call.Deadline()
-			deadline = deadline.UTC().Truncate(time.Microsecond)
-			claim := contracts.InitialRuntimeResourceClaim{Item: initialRuntimeResourceItems[index], OperationID: id, TemplateDigest: preparationDigest(want.object), ClaimedAt: now, Until: deadline}
-			v.Objects = append(v.Objects, claim)
-			ack, e := s.write(call, obj, v)
-			if e != nil {
-				return e
-			}
-			// Only this positive exact acknowledgement owns the original CREATE.
-			fresh = true
-			start = ack
-		}
-		claim := v.Objects[index]
-		accessor, _ := meta.Accessor(want.object)
-		path := want.collection + "/" + accessor.GetName()
-		if fresh {
-			var effectEnd context.CancelFunc
-			call, effectEnd = context.WithDeadline(call, claim.Until)
-			defer effectEnd()
-			if _, e = s.current(call); e != nil {
-				return e
-			}
-			accessor.SetAnnotations(map[string]string{initialRuntimeResourceMarker: claim.OperationID})
-			body, e := json.Marshal(want.object)
-			if e != nil {
-				return cfg.ErrInvalid
-			}
-			raw, e := s.preparer.creator.api.Post().AbsPath(want.collection).Param("fieldValidation", "Strict").MaxRetries(0).Body(body).DoRaw(call)
-			if e != nil {
-				return cfg.ErrUnavailable
-			}
-			if _, e = s.verified(call, raw, v, index); e != nil {
-				return e
-			}
-		}
-		// Independent lookup verifies the exact original generated object. It
-		// cannot authorize a replacement CREATE or synthesize another operation.
-		raw, e := s.preparer.creator.api.Get().AbsPath(path).MaxRetries(0).DoRaw(call)
-		if e != nil {
-			return cfg.ErrUnavailable
-		}
-		receipt, e := s.verified(call, raw, v, index)
-		if e != nil {
-			return e
-		}
-		if _, e = s.current(call); e != nil {
-			return e
-		}
-		latest, object, e := s.read(call)
-		if e != nil || latest.UID != start.UID || !equalJSON(latest.State, v) {
-			return cfg.ErrChanged
-		}
-		v.Objects[index].Receipt = &receipt
-		out, e = s.write(call, object, v)
+			out, obj = next, object
+			return true, nil
+		})
 		return e
 	})
 	if e != nil {
 		return contracts.InitialRuntimeResourceSnapshot{}, e
 	}
 	return out, nil
+}
+
+// advanceItem claims, creates, verifies and receipts the next item under the
+// bracket's phase-0 proof; done reports that no item remains.
+func (s *InitialRuntimeResources) advanceItem(call context.Context, start contracts.InitialRuntimeResourceSnapshot, obj *core.Secret, phase int, until time.Time) (contracts.InitialRuntimeResourceSnapshot, *core.Secret, bool, error) {
+	var zero contracts.InitialRuntimeResourceSnapshot
+	v := start.State
+	v.Objects = append([]contracts.InitialRuntimeResourceClaim(nil), v.Objects...)
+	if !s.now().Before(v.Until) {
+		return zero, nil, false, cfg.ErrUnavailable
+	}
+	call, setupEnd := context.WithDeadline(call, v.Until)
+	defer setupEnd()
+	index := len(v.Objects)
+	fresh := false
+	if index > 0 && v.Objects[index-1].Receipt == nil {
+		index--
+	}
+	if index == len(initialRuntimeResourceItems) {
+		return start, obj, true, nil
+	}
+	// Journal claim and receipt writes require the original guard (ADR-187).
+	if phase != 0 {
+		return zero, nil, false, cfg.ErrChanged
+	}
+	want, e := s.object(v, index)
+	if e != nil {
+		return zero, nil, false, e
+	}
+	if index == len(v.Objects) {
+		id, e := prepUUID()
+		if e != nil {
+			return zero, nil, false, e
+		}
+		now := s.now().UTC().Truncate(time.Microsecond)
+		deadline, _ := call.Deadline()
+		deadline = deadline.UTC().Truncate(time.Microsecond)
+		claim := contracts.InitialRuntimeResourceClaim{Item: initialRuntimeResourceItems[index], OperationID: id, TemplateDigest: preparationDigest(want.object), ClaimedAt: now, Until: deadline}
+		v.Objects = append(v.Objects, claim)
+		ack, written, e := s.writeProved(call, obj, v, until)
+		if e != nil {
+			return zero, nil, false, e
+		}
+		// Only this positive exact acknowledgement owns the original CREATE.
+		fresh = true
+		start, obj = ack, written
+	}
+	claim := v.Objects[index]
+	accessor, _ := meta.Accessor(want.object)
+	path := want.collection + "/" + accessor.GetName()
+	if fresh {
+		var effectEnd context.CancelFunc
+		call, effectEnd = context.WithDeadline(call, claim.Until)
+		defer effectEnd()
+		accessor.SetAnnotations(map[string]string{initialRuntimeResourceMarker: claim.OperationID})
+		body, e := json.Marshal(want.object)
+		if e != nil {
+			return zero, nil, false, cfg.ErrInvalid
+		}
+		raw, e := s.preparer.creator.api.Post().AbsPath(want.collection).Param("fieldValidation", "Strict").MaxRetries(0).Body(body).DoRaw(call)
+		if e != nil {
+			return zero, nil, false, cfg.ErrUnavailable
+		}
+		if _, e = s.verified(call, raw, v, index); e != nil {
+			return zero, nil, false, e
+		}
+	}
+	// Independent lookup verifies the exact original generated object. It
+	// cannot authorize a replacement CREATE or synthesize another operation.
+	raw, e := s.preparer.creator.api.Get().AbsPath(path).MaxRetries(0).DoRaw(call)
+	if e != nil {
+		return zero, nil, false, cfg.ErrUnavailable
+	}
+	receipt, e := s.verified(call, raw, v, index)
+	if e != nil {
+		return zero, nil, false, e
+	}
+	latest, object, e := s.read(call)
+	if e != nil || latest.UID != start.UID || !equalJSON(latest.State, v) {
+		return zero, nil, false, cfg.ErrChanged
+	}
+	v.Objects[index].Receipt = &receipt
+	out, written, e := s.writeProved(call, object, v, until)
+	if e != nil {
+		return zero, nil, false, e
+	}
+	return out, written, false, nil
 }

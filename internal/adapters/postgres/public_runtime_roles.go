@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	app "asservat.local/asservat/internal/application/fleet"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/authorization"
 	cfg "asservat.local/asservat/internal/domain/configuration"
@@ -183,18 +184,38 @@ func (s *PublicRuntimeSQLRoles) Provision(ctx context.Context) (contracts.Public
 	if err != nil || snapshot.State.Input != s.input {
 		return zero, cfg.ErrUnavailable
 	}
-	for _, purpose := range contracts.PublicRuntimeRolePurposes() {
+	purposes := contracts.PublicRuntimeRolePurposes()
+	for next := 0; next < len(purposes); {
 		if ctx.Err() != nil {
 			return zero, cfg.ErrUnavailable
 		}
-		// ADR-186: a root that scopes one proof to one role operation runs the
-		// claim, role step and completion inside it.
-		run := func(op context.Context) error { return s.provisionPublicRole(op, purpose) }
-		if scoped, ok := s.root.(publicRoleOperator); ok {
-			err = scoped.WithPublicRoleOperation(ctx, run)
-		} else {
-			err = run(ctx)
+		scoped, ok := s.root.(publicRoleOperator)
+		if !ok {
+			if err = s.provisionPublicRole(ctx, purposes[next]); err != nil {
+				return zero, err
+			}
+			next++
+			continue
 		}
+		// ADR-186/316: a root that scopes one proof to one role operation runs
+		// a bracket of roles' claim, role step and completion inside it, then
+		// one closing proof.
+		err = scoped.WithPublicRoleOperation(ctx, func(op context.Context) error {
+			bracket := app.Bracket{Now: time.Now, Reserve: publicRoleBracketReserve,
+				Open:  func(c context.Context) (time.Time, error) { d, _ := c.Deadline(); return d, nil },
+				Close: scoped.ClosePublicRoleOperation}
+			_, e := bracket.Run(op, func(step context.Context) (bool, error) {
+				if next == len(purposes) {
+					return false, nil
+				}
+				if e := s.provisionPublicRole(step, purposes[next]); e != nil {
+					return false, e
+				}
+				next++
+				return true, nil
+			})
+			return e
+		})
 		if err != nil {
 			return zero, err
 		}
@@ -221,7 +242,13 @@ func (s *PublicRuntimeSQLRoles) Verify(ctx context.Context) (contracts.PublicRun
 // publicRoleOperator is the optional ADR-186 root capability.
 type publicRoleOperator interface {
 	WithPublicRoleOperation(context.Context, func(context.Context) error) error
+	ClosePublicRoleOperation(context.Context) error
 }
+
+// publicRoleBracketReserve is the operation time left that another role
+// needs: its claim, CREATE ROLE transaction, SCRAM login and completion plus
+// the closing proof (ADR-316).
+const publicRoleBracketReserve = 2 * time.Second
 
 func (s *PublicRuntimeSQLRoles) provisionPublicRole(ctx context.Context, purpose string) error {
 	at := strconv.Itoa(slices.Index(contracts.PublicRuntimeRolePurposes(), purpose)+1) + "/" + strconv.Itoa(len(contracts.PublicRuntimeRolePurposes()))
