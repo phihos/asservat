@@ -576,8 +576,8 @@ func TestPublicRoleStateRejectsIncompletePriorInventory(t *testing.T) {
 	}
 }
 
-// ADR-186: one role operation proves the current state once at its start and
-// once before the completing write; inner reads only fetch the journal.
+// ADR-186/316: one role operation proves the current state once at its
+// start; inner reads only fetch the journal.
 func TestPublicRoleOperationBoundsAPIRequests(t *testing.T) {
 	f := newPublicRoleRootFixtureWithWorker(t, false, false, true)
 	if _, err := f.root.OpenPublicRuntimeRoles(t.Context()); err != nil {
@@ -610,6 +610,63 @@ func TestPublicRoleOperationBoundsAPIRequests(t *testing.T) {
 		return f.root.WithPublicRoleOperation(op, func(context.Context) error { return nil })
 	}); err == nil {
 		t.Fatal("nested role operation accepted")
+	}
+}
+
+// ADR-316: a role bracket runs several roles' claim and completion under one
+// opening proof and ends with one closing proof. A closing proof that fails
+// fails the bracket; the completed receipts remain exact for replay.
+func TestPublicRoleBracketProvesOncePerBracket(t *testing.T) {
+	f := newPublicRoleRootFixtureWithWorker(t, false, false, true)
+	if _, err := f.root.OpenPublicRuntimeRoles(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.root.ClosePublicRoleOperation(t.Context()); err == nil {
+		t.Fatal("closing proof outside a role operation accepted")
+	}
+	purposes := contracts.PublicRuntimeRolePurposes()
+	run := func(from, to int, closing func()) error {
+		return f.root.WithPublicRoleOperation(t.Context(), func(op context.Context) error {
+			for n := from; n < to; n++ {
+				original, fresh, e := f.root.ClaimPublicRuntimeRole(op, purposes[n], 123, time.Now().Add(-time.Hour))
+				if e != nil || !fresh {
+					return errors.Join(e, errors.New("claim"))
+				}
+				ordinal, _ := contracts.PublicRuntimeRoleOrdinal(purposes[n])
+				name := "as_" + strings.ReplaceAll(f.input.InstallationID, "-", "") + "_pub_" + string([]byte{'0' + byte(ordinal/10), '0' + byte(ordinal%10)})
+				if e = f.root.CompletePublicRuntimeRole(op, original, purposes[n], contracts.PublicRuntimeRoleReceipt{RoleName: name, RoleOID: uint32(100 + n), LayoutDigest: f.input.LayoutDigest}); e != nil {
+					return e
+				}
+			}
+			closing()
+			return f.root.ClosePublicRoleOperation(op)
+		})
+	}
+	f.requests.Store(0)
+	if err := run(0, 4, func() {}); err != nil {
+		t.Fatal(err)
+	}
+	// Two full proofs plus the journal reads and writes of four roles; one
+	// role with per-role proofs alone took up to 60 requests (above).
+	if n := f.requests.Load(); n > 90 {
+		t.Fatal("role bracket exceeded two proofs", n)
+	}
+	// Lost closing proof: the administrator is revoked inside the bracket.
+	if err := run(4, 6, func() { f.badAdmin.Store(true) }); err == nil {
+		t.Fatal("bracket succeeded without its closing proof")
+	}
+	f.badAdmin.Store(false)
+	snapshot, err := f.root.ReadPublicRuntimeRoles(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for n := 0; n < 6; n++ {
+		if snapshot.State.Roles[n].Receipt == nil {
+			t.Fatal("bracket lost a completed receipt", n)
+		}
+	}
+	if snapshot.State.Roles[6].Claim != nil {
+		t.Fatal("bracket claimed beyond its steps")
 	}
 }
 

@@ -488,17 +488,8 @@ func (s *PublicRuntimeRoleRoot) CompletePublicRuntimeRole(ctx context.Context, o
 		return err
 	}
 	defer end()
-	// ADR-186: the role step's blocking work intervened; prove again before
-	// the completing write, never beyond the operation's original deadline.
-	if publicRoleOperationOf(ctx) != nil {
-		until, e := s.current(ctx)
-		if e != nil {
-			return e
-		}
-		var narrow context.CancelFunc
-		ctx, narrow = context.WithDeadline(ctx, until)
-		defer narrow()
-	}
+	// Inside a role bracket (ADR-316) the opening proof covers this write and
+	// the bracket's closing proof follows the last completion.
 	old, object, err := s.read(ctx)
 	if err != nil {
 		return err
@@ -519,15 +510,26 @@ func (s *PublicRuntimeRoleRoot) CompletePublicRuntimeRole(ctx context.Context, o
 	if !runtimeRoleStateValid(s.input, next, s.client.now()) {
 		return cfg.ErrInvalid
 	}
-	if _, err = s.update(ctx, old, object, next, old.ValidUntil); err != nil {
+	// An unknown outcome here is replayed by lookup, which accepts only the
+	// exact stored receipt.
+	_, err = s.update(ctx, old, object, next, old.ValidUntil)
+	return err
+}
+
+// ClosePublicRoleOperation is the closing proof of a role bracket (ADR-316):
+// one full current proof after the bracket's last completion, within the
+// operation's original deadline.
+func (s *PublicRuntimeRoleRoot) ClosePublicRoleOperation(ctx context.Context) error {
+	if publicRoleOperationOf(ctx) == nil {
+		return cfg.ErrUnavailable
+	}
+	ctx, end, err := s.enter(ctx)
+	if err != nil {
 		return err
 	}
-	// The completing write stays bracketed: an unknown outcome here is replayed
-	// by lookup, which accepts only the exact stored receipt.
-	if publicRoleOperationOf(ctx) != nil {
-		if _, err = s.current(ctx); err != nil {
-			return cfg.ErrUnavailable
-		}
+	defer end()
+	if _, err = s.current(ctx); err != nil {
+		return cfg.ErrUnavailable
 	}
 	return nil
 }
