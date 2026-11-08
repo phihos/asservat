@@ -114,8 +114,9 @@ declare -A suites=(
 # teardown of their policies, bindings and sources (installedFocusTeardown).
 # The Go test refuses focuses whose bootstrap differs or whose order is
 # unsafe (installed_multi_focus_test.go). A group's name joins its members,
-# and its command joins their environments (a variable set by several
-# members must agree). The member suites stay dispatchable for targeted
+# whose commands may differ only in their focus (a member with further
+# fixture variables, such as the profile or live variants, needs its own
+# installation). The member suites stay dispatchable for targeted
 # reruns; the "all" dispatch runs each group instead of its members.
 # Measured focus durations and the bins are in
 # docs/reviews/test-runtime-plan-2026-11-08.md (step 6).
@@ -124,37 +125,19 @@ groups=(
   "browser alert"
   "share logresource"
   "restart upgrade"
-  "ongoing-save ongoing-live-manual"
-  "ongoing-mixed ongoing-live"
-  "ongoing-syscall policy-arguments"
-  "ongoing-incident policy-recording"
+  "approved-recording manual-mixed"
   "manual-http manual-peers"
 )
 declare -A grouped=()
 for group in "${groups[@]}"; do
-  name="" foci="" harness=""
-  unset env
-  declare -A env=()
+  name="" foci="" rest=""
   for member in $group; do
-    words=(${suites[continuation-$member]:?unknown group member $member})
-    [[ ${words[0]} == env ]] || { echo "group member $member has no env prefix" >&2; exit 2; }
-    rest=()
-    for word in "${words[@]:1}"; do
-      if [[ -z ${rest[*]} && $word == *=* ]]; then
-        key=${word%%=*} value=${word#*=}
-        if [[ $key == ASSERVAT_JOURNEY_FOCUS ]]; then foci+=${foci:+,}$value; continue; fi
-        [[ -z ${env[$key]:-} || ${env[$key]} == "$value" ]] || { echo "group $group: $key differs" >&2; exit 2; }
-        env[$key]=$value
-      else
-        rest+=("$word")
-      fi
-    done
-    [[ -z $harness || $harness == "${rest[*]}" ]] || { echo "group $group: harness commands differ" >&2; exit 2; }
-    harness=${rest[*]} name+=${name:++}$member grouped[continuation-$member]=1
+    command=${suites[continuation-$member]:?unknown group member $member}
+    [[ $command =~ ^env\ ASSERVAT_JOURNEY_FOCUS=([a-z-]+)\ (.*)$ && ${BASH_REMATCH[2]} != *=* ]] || { echo "group member $member sets more than its focus" >&2; exit 2; }
+    [[ -z $rest || $rest == "${BASH_REMATCH[2]}" ]] || { echo "group $group: member commands differ" >&2; exit 2; }
+    foci+=${foci:+,}${BASH_REMATCH[1]} rest=${BASH_REMATCH[2]} name+=${name:++}$member grouped[continuation-$member]=1
   done
-  assignments=""
-  for key in $(printf '%s\n' "${!env[@]}" | sort); do assignments+=" $key=${env[$key]}"; done
-  suites[continuation-$name]="env ASSERVAT_JOURNEY_FOCUS=$foci$assignments $harness"
+  suites[continuation-$name]="env ASSERVAT_JOURNEY_FOCUS=$foci $rest"
 done
 # The setup each suite needs on its runner (native.yml): suite names joined
 # by + need what any member needs.

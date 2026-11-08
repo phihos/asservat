@@ -31,9 +31,17 @@ import (
 // re-enrolls the owner. The first-only focuses check installation-wide
 // counts (journey's capture count, browser's grant state, share's
 // list_shares lengths), so they run before any other focus.
+//
+// At most one focus per run may add an automation AccessBinding for the
+// workload: WorkloadDelegation (FindAutomationBases) counts every recorded
+// automation basis of the workload, including those of deleted bindings
+// whose assignments are retired, and denies activation when it finds two
+// (measured: native runs 42490633243 and 42490635112, which reached the
+// teardown with a retired binding still counted).
 var (
-	installedLastFoci  = []string{"policy", "alert", "logresource", "policy-recording", "live-observation"}
-	installedFirstFoci = []string{"journey", "browser", "share"}
+	installedLastFoci       = []string{"policy", "alert", "logresource", "policy-recording", "live-observation"}
+	installedFirstFoci      = []string{"journey", "browser", "share"}
+	installedAutomationFoci = []string{"policy", "alert", "logresource", "policy-recording", "policy-arguments", "policy-profile", "live-observation", "ongoing-save", "ongoing-save-disk", "ongoing-incident", "ongoing-syscall", "ongoing-mixed"}
 )
 
 // Several installed focuses in one run (ASSERVAT_JOURNEY_FOCUS=a,b,c): one
@@ -61,6 +69,16 @@ var installedFocusCurrent string
 // installedProcessingInitialized records that this test process initialized
 // processing (ADR-210: once per installation).
 var installedProcessingInitialized bool
+
+// installedFocusKeySuffix keeps a fixed idempotency key or result file name
+// of a code path that several listed focuses share apart: empty for a single
+// focus (inputs unchanged), "-<focus>" in a multi-focus run.
+func installedFocusKeySuffix() string {
+	if len(installedJourneyFoci()) <= 1 {
+		return ""
+	}
+	return "-" + installedJourneyFocus()
+}
 
 // installedFocusCount is the number of listed focuses, at least one.
 func installedFocusCount() int64 {
@@ -144,12 +162,14 @@ func installedFocusGroupError() error {
 	seen := map[string]bool{}
 	var first string
 	var failure error
-	index := -1
+	index, automation := -1, ""
 	installedEachFocus(func() {
 		focus := installedJourneyFocus()
 		index++
 		switch {
 		case failure != nil:
+		case slices.Contains(installedAutomationFoci, focus) && automation != "":
+			failure = fmt.Errorf("focus %q and %q both add an automation binding for the workload", automation, focus)
 		case seen[focus]:
 			failure = fmt.Errorf("focus %q listed twice", focus)
 		case focus == "chain" || focus == "clusters" || focus == "":
@@ -164,6 +184,9 @@ func installedFocusGroupError() error {
 			failure = fmt.Errorf("focus %q needs another bootstrap than %q: %s, not %s", focus, foci[0], installedFocusBootstrapSignature(), first)
 		}
 		seen[focus] = true
+		if slices.Contains(installedAutomationFoci, focus) {
+			automation = focus
+		}
 	})
 	return failure
 }
@@ -338,9 +361,11 @@ WHERE s.root_id=$1 AND NOT s.deleted AND (a.record#>>'{Authority,NotAfter}')::ti
 		removed, removedUIDs = append(removed, name), append(removedUIDs, uids[name])
 	}
 	if len(removedUIDs) > 0 {
-		wait("removed bindings unprojected", 2*time.Minute, func(c context.Context) (bool, error) {
+		// Basis rows stay as history; the removal retires their assignments.
+		wait("removed bindings retired", 2*time.Minute, func(c context.Context) (bool, error) {
 			var left int
-			err := iso.SQL.QueryRow(c, `SELECT count(*) FROM permission_basis WHERE uid=ANY($1)`, removedUIDs).Scan(&left)
+			err := iso.SQL.QueryRow(c, `SELECT count(*) FROM permission_assignment a JOIN permission_basis b ON a.stream_id=b.stream_id AND a.basis_key=b.basis_key
+WHERE b.uid=ANY($1) AND a.retired_at IS NULL`, removedUIDs).Scan(&left)
 			return left == 0, err
 		})
 	}

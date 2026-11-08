@@ -58,7 +58,7 @@ class MultiFocusSelection(unittest.TestCase):
     def test_groups_replace_their_members_in_all(self):
         everything, names = native("--list"), native("--names")
         groups = [n for n in names if "+" in n]
-        self.assertGreaterEqual(len(groups), 8)
+        self.assertGreaterEqual(len(groups), 6)
         for group in groups:
             self.assertIn(group, everything)
             for member in group.removeprefix("continuation-").split("+"):
@@ -68,14 +68,14 @@ class MultiFocusSelection(unittest.TestCase):
         # A member's suite still dispatches alone for targeted reruns.
         self.assertIn("continuation-journey", names)
 
-    def test_group_command_joins_focuses_and_environments(self):
+    def test_group_command_joins_focuses(self):
         with tempfile.TemporaryDirectory() as directory:
             fake = Path(directory)/"python3"
             fake.write_text('#!/usr/bin/python3\nimport json,os,sys\nprint(json.dumps({"args":sys.argv[1:],"focus":os.environ.get("ASSERVAT_JOURNEY_FOCUS"),"episodes":os.environ.get("ASSERVAT_LIVE_EPISODES")}))\n')
             fake.chmod(0o755)
             env = dict(os.environ, PATH=directory+os.pathsep+os.environ["PATH"])
-            result = subprocess.run([NATIVE, "continuation-ongoing-mixed+ongoing-live"], env=env, capture_output=True, text=True, check=True)
-            self.assertEqual(json.loads(result.stdout), {"args": ["scripts/test-context-storage.py", "--initial-bootstrap-chain", "--runtime-provider-pair", "--installer-continuation"], "focus": "ongoing-mixed,live-observation", "episodes": "policy"})
+            result = subprocess.run([NATIVE, "continuation-manual-http+manual-peers"], env=env, capture_output=True, text=True, check=True)
+            self.assertEqual(json.loads(result.stdout), {"args": ["scripts/test-context-storage.py", "--initial-bootstrap-chain", "--runtime-provider-pair", "--installer-continuation"], "focus": "manual-http,manual-peers", "episodes": None})
             result = subprocess.run([NATIVE, "continuation-journey+policy"], env=env, capture_output=True, text=True, check=True)
             self.assertEqual(json.loads(result.stdout)["focus"], "journey,policy")
             self.assertIsNone(json.loads(result.stdout)["episodes"])

@@ -65,6 +65,7 @@ func TestInstalledFocusGroupRefusals(t *testing.T) {
 		"journey,journey":                  "listed twice",
 		"ongoing-save,native-paced":        "needs another bootstrap",
 		"live-observation,ongoing-syscall": "must run last",
+		"manual-http,live-observation":     "needs another bootstrap",
 	} {
 		t.Run(foci, func(t *testing.T) {
 			t.Setenv("ASSERVAT_JOURNEY_FOCUS", foci)

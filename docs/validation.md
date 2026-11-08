@@ -93,8 +93,9 @@ weights from downloaded records. Pushes that change only documentation outside
 `docs/interfaces/`, recorded results, the design prototype or root Markdown run
 only the documentation and schema gates. The documentation, schema, SQL, Helm,
 console (`console-check`, no Go) and console browser gates run as parallel jobs. Native suites run only
-on dispatch (`native.yml`, suites from `scripts/ci-native.sh --list`), each on a
-fresh runner; their `test/results` output is uploaded as a run artifact. A CI run
+on dispatch (`native.yml`, suites from `scripts/ci-native.sh --list`; grouped
+installed suites run several focuses after one bootstrap, see
+docs/development-workflow.md), each on a fresh runner; their `test/results` output is uploaded as a run artifact. A CI run
 is recorded like a local run: run URL, exit, selected tests and the harness's
 source hashes. The custody suite (`make custody-integration`, about 16 minutes
 locally) runs in CI as `custody-1` … `custody-4` (`CUSTODY_SHARDS` in
