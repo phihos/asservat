@@ -60,7 +60,10 @@ through the bracket itself, and each migration is reviewed embedded DDL.
    equals the last applied version) and checks the root again, then unlocks and
    discards the session, so no lock count or idle session outlives the bracket.
 
-A bracket that applies no migration fails rather than loop. Completion stays a
+A bracket whose opening checks leave less than the reserve applies nothing and
+is retried with a fresh lease, at most three times in a row, then fails at the
+`migration-lease-reserve` phase. If the session cannot be reclaimed, idle pool
+sessions are closed so no lock lingers. Completion stays a
 separate bracket with the unchanged final inventory, grants and root
 completion. One run now needs about two brackets (six root reads) instead of
 730 reads.
@@ -94,8 +97,8 @@ no per-step authority reads.
 4. Precedent: Goose `Up`, Flyway and Liquibase apply all pending migrations under
    one lock acquisition; this keeps Goose's per-version transactions.
 5. Privileges, credentials, network access: none added.
-6. New failure states: one (a bracket without time for a migration), which
-   fails like any other unavailable step.
+6. New failure states: one (a bracket without time for a migration), retried
+   up to three times and then failing like any other unavailable step.
 7. Configuration: none; the reserve is a constant.
 8. External dependencies: none new; relies on PostgreSQL session advisory locks
    and `pg_backend_pid`, both already used or standard.
@@ -119,6 +122,7 @@ proofs for incremental runs.
 
 `TestInitialSchemaWithRealPostgres` now stops a first bracket early through a
 short root lease, loses its closing proof, requires an exact partial prefix with
-the failure at that version, resumes in later brackets, and fails if the resume
+the failure at that version, resumes after one bracket opened below the reserve,
+and fails if the resume
 needs as many root reads as migrations. Installed timings are recorded in
 [implementation progress](../implementation-progress.md).

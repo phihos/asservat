@@ -27,6 +27,7 @@ type syntheticSchemaRoot struct {
 	record                               *contracts.InitialPreparationSchema
 	reads, failRead, claims, completions int
 	shortRead                            int
+	shortLease                           time.Duration
 	loseCompletion                       bool
 	expired                              bool
 }
@@ -40,8 +41,8 @@ func (r *syntheticSchemaRoot) ReadInitialSchema(ctx context.Context) (contracts.
 	}
 	until := time.Now().Add(5 * time.Second)
 	if r.reads == r.shortRead {
-		// Leaves a bracket only a few migrations beyond the step reserve.
-		until = time.Now().Add(2300 * time.Millisecond)
+		// Shortens one bracket's lease below or just above the step reserve.
+		until = time.Now().Add(r.shortLease)
 	}
 	if r.expired {
 		until = time.Now().Add(-time.Second)
@@ -167,7 +168,7 @@ func TestInitialSchemaWithRealPostgres(t *testing.T) {
 		// one (ADR-315): a short opening lease stops the batch early and the lost
 		// closing proof stops the run after a committed prefix.
 		root.reads = 0
-		root.shortRead, root.failRead = 2, 3
+		root.shortRead, root.shortLease, root.failRead = 2, 2300*time.Millisecond, 3
 		runError := s.Run(ctx)
 		if runError == nil {
 			t.Fatal("lost current proof did not stop")
@@ -182,7 +183,9 @@ func TestInitialSchemaWithRealPostgres(t *testing.T) {
 			t.Fatal("first bracket did not retain an exact partial prefix")
 		}
 		original := *root.record
-		root.shortRead, root.failRead = 0, 0
+		// The resume's first bracket opens with less than the step reserve: it
+		// applies nothing and the run retries with a fresh lease.
+		root.shortRead, root.shortLease, root.failRead = root.reads+2, time.Second, 0
 		root.loseCompletion = true
 		started, reads := time.Now(), root.reads
 		e = s.Run(ctx)

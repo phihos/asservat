@@ -1,15 +1,15 @@
 {
   "scope": "storage custody, permission acceptance and bounded context admission components; synthetic control provenance only; no public acquisition or disclosure",
   "images": {
-    "asservat-custody-zzfxa5di-postgres": {
+    "asservat-custody-y8kcy5ra-postgres": {
       "requested": "postgres@sha256:afc7e2d441324c0388fa80c3d24f733b4194a4eb7f47dd8ee2b08eb1a24a647c",
       "imageID": "sha256:afc7e2d441324c0388fa80c3d24f733b4194a4eb7f47dd8ee2b08eb1a24a647c",
-      "containerID": "4fa68d5548784a9c303d7d8cb70334063370632c4e0f7d081b9dec5237750b78"
+      "containerID": "22962e6ebc47986a01d1e30e634ba2622ccfba79cce5e6128dd33a413101bc6a"
     },
-    "asservat-custody-zzfxa5di-s3": {
+    "asservat-custody-y8kcy5ra-s3": {
       "requested": "chrislusf/seaweedfs@sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d",
       "imageID": "sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d",
-      "containerID": "04175f1958556c97ee6d5b66300fc26ffca9be3f2e872e929865dd8b8195c3ef"
+      "containerID": "ed8fbfe28fedb671b435eb68cb0693414fa97f7e46832cfee5957e8dbf28348c"
     }
   },
   "sourceHashes": {
@@ -1398,7 +1398,7 @@
     "internal/adapters/postgres/initial_runtime_bridge.go": "7c0dbc89361df94e4b0a35980de770fd31e2f28f038ba56ec94a956bacbfeff9",
     "internal/adapters/postgres/initial_runtime_owner_bridge.go": "67f2df9c1f4f3b73176466ee5a1f5d546a860a39d0b36c54cdd056d65920990a",
     "internal/adapters/postgres/initial_runtime_owner_bridge_test.go": "b8fe3ff886e28b937f95755ad0a1fbe50aafeca1c1060aa4354a6ffd4e63798d",
-    "internal/adapters/postgres/initial_schema.go": "8450c58f9c1bf12d23b64c1583bdc61a4f5e6e0a65cc3f22e14f3773d3c93514",
+    "internal/adapters/postgres/initial_schema.go": "253e22ea9e9b10abed6ca8e4b7fac95f156b071df340b51c0a21feb60f633e43",
     "internal/adapters/postgres/initial_schema_bundle.go": "7b041a65ab8fd9c14e2a53a2f24fead3d9184c2b248474a07903068bb837658f",
     "internal/adapters/postgres/initial_schema_checks.go": "348ecf99b8ef2f6a0d8bffeacb4c0bcab2bcfb1ef3d6c7d88aa54b70b69b2011",
     "internal/adapters/postgres/initial_schema_completion.go": "d4d250ddc137af6d2516bff92afd6d23d897669e89f154226481661f887111e6",
@@ -4154,7 +4154,7 @@
     "test/integration/initial_schema_activation_test.go": "a5d8f3b12377e581bf351d632db6cdabecfd4d9d4fa1d9187bef9de025c4658e",
     "test/integration/initial_schema_consumption_test.go": "4af253df716870f8fe066806fff248e1e2a3e78bc75d6e676ee636a2ae44f5ed",
     "test/integration/initial_schema_handover_test.go": "8f027eea1dc672c3fcfe428ddc17138f7ed280844924759a9b97364a5ec385c7",
-    "test/integration/initial_schema_test.go": "e6d45ff382863a58dbb301c41d42960b954536ba75d2eb4ee7601b4fef5dfa7d",
+    "test/integration/initial_schema_test.go": "4e799d81ec8d9a033ba763016322b28648f83812c2aaded9f937df32c1c14ee9",
     "test/integration/initial_sql_roles_test.go": "2435eeb0408a0fdb83d8f1011b4dfad4f8b9362a91e31e075096acbf45b67b9a",
     "test/integration/installation_witness_test.go": "0203dd41521a8d65a7390acaaa0dd89a88b54a7172c1ea8fa4479e8e478316dd",
     "test/integration/installed_approved_recording_native_test.go": "b7b8f0bc574884ff86ba2309972931a04e2f6bb247babf2d4221420bb4e83732",
@@ -4502,7 +4502,7 @@
       "phase": "suite",
       "testExit": 0,
       "incarnation": {
-        "serverStart": "2026-11-08T12:10:42.656482+00:00",
+        "serverStart": "2026-11-08T12:38:03.90832+00:00",
         "databaseOID": "16384"
       },
       "passedTestNames": [
@@ -4523,7 +4523,7 @@
         "TestInitialSchemaWithRealPostgres/activation-consumes-original-schema-incarnation/changed-database",
         "TestInitialSchemaWithRealPostgres/activation-consumes-original-schema-incarnation/changed-postmaster"
       ],
-      "testElapsedSeconds": 44.54071385401767,
+      "testElapsedSeconds": 45.44145980710164,
       "qualificationExit": 0
     }
   ],

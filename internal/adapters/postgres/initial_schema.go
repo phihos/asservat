@@ -76,9 +76,12 @@ func (s *InitialSchema) Run(ctx context.Context) error {
 		return cfg.ErrUnavailable
 	}
 	defer s.running.Store(false)
-	// Every bracket applies at least one migration or fails, so Head+1 brackets
-	// bound the run.
-	for bracket := int64(0); bracket <= s.bundle.Head+1; bracket++ {
+	// A bracket whose lease left no time for one migration applies nothing and
+	// is retried with a fresh lease, at most initialSchemaStalls times in a row.
+	// Every other bracket applies at least one migration or fails, so the loop
+	// is bounded.
+	previous, stalls := int64(-1), 0
+	for bracket := int64(0); bracket <= (s.bundle.Head+1)*(initialSchemaStalls+2); bracket++ {
 		next, done, e := s.inspect(ctx, true)
 		var failure initialSchemaFailure
 		if errors.As(e, &failure) {
@@ -96,6 +99,14 @@ func (s *InitialSchema) Run(ctx context.Context) error {
 			}
 			return nil
 		}
+		if next == previous {
+			if stalls++; stalls > initialSchemaStalls {
+				return initialSchemaFailure{phase: "migration-lease-reserve", version: next, cause: cfg.ErrUnavailable}
+			}
+		} else {
+			stalls = 0
+		}
+		previous = next
 	}
 	return cfg.ErrUnavailable
 }
@@ -107,6 +118,10 @@ const initialSchemaLockID int64 = 0x4153534552565343
 // on PostgreSQL 18, ADR-315) plus the closing history read and root proof,
 // with margin for a slow cluster. A bracket that stops early leaves the rest to the next bracket.
 const initialSchemaStepReserve = 2 * time.Second
+
+// initialSchemaStalls bounds consecutive retried brackets that applied nothing
+// because the opening checks left less than the step reserve.
+const initialSchemaStalls = 3
 
 type initialSchemaLease struct {
 	owner     *InitialSchema
@@ -400,6 +415,9 @@ func (s *InitialSchema) batch(l *initialSchemaLease, head int64) (int64, error) 
 	defer end()
 	c, e := s.db.Conn(reclaim)
 	if e != nil {
+		// Close any idle session that may still hold this bracket's lock.
+		s.db.SetMaxIdleConns(0)
+		s.db.SetMaxIdleConns(1)
 		return applied, initialSchemaFailure{phase: "migration", version: applied + 1, cause: cfg.ErrUnavailable}
 	}
 	l.conn = c
@@ -414,8 +432,9 @@ func (s *InitialSchema) batch(l *initialSchemaLease, head int64) (int64, error) 
 		return applied, failed
 	}
 	if applied == head {
-		// The lease left no time for one migration; never loop without progress.
-		return applied, initialSchemaFailure{phase: "migration", version: head + 1, cause: cfg.ErrUnavailable}
+		// The lease left no time for one migration. Nothing ran, so the next
+		// bracket retries with a fresh lease; Run bounds such brackets.
+		return applied, nil
 	}
 	h, exists, e := initialSchemaHistory(l.ctx, c, s.bundle.Head, l.record.DDLRole.OID)
 	if e != nil || !exists || h != applied {
