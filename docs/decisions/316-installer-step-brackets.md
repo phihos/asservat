@@ -73,13 +73,32 @@ compiled inert objects or roles that the opening proof authorized; the next
 bracket and every later step still fail closed. Journal changes by anyone
 else are still rejected by the per-item CAS writes and re-reads.
 
-Not converted: `owner/installation`. Its 26 operations are separate
-components (identity roles, projection, launch) whose preflight, post-lock
-scope and final bracket compose the source, retained resources and bridge
-proofs differently per phase; one bracket across them needs a restructured
-provider operation. It is the next candidate. `capacity/initialize` and
-`bridge/settle` wait for the kubelet and the Deployment controller and are
-outside this rule.
+- **Owner installation** (`ProviderOwnerInstallation.Run`, amended
+  2026-11-08 below): the driver runs its fixed sequence as one operation per
+  step: open the role journal, each role phase, the role verification, each
+  projection execution with its finalization, each launch execution with its
+  finalization. The opening proof is one complete
+  `readOwnerIdentityOperationNative` (handover proof with the phase-two
+  guard, source guards and independent probes, administrator, owner account
+  and Service, accepted configuration, role journal); the bracket's deadline
+  is the earliest of that call, the handover proof, the source observation
+  and its fleet administration. Inside a bracket the operations' native
+  preflight, post-lock scope, SQL-callback current and final reads become
+  the bracket read: bridge journal, resource journal between two
+  phase-policy reads with its fixed inventory, owner Deployment, accepted
+  configuration (re-read, it bounds that operation) and role journal. The
+  resource journal may differ from the opening proof only in the owner
+  identity and launch claims. Each operation keeps its SQL bridge lock, role
+  and projection claims, CAS writes, child-object reads, provider
+  observation, finalization, unknown-result inspection and deadlines. The
+  closing proof is another complete native read, compared with the opening
+  proof's originals.
+  The launch, which starts the owner workload and is the one effect here
+  that is not an inert object or role, always opens its own bracket, so a
+  complete proof directly precedes it.
+
+`capacity/initialize` and `bridge/settle` wait for the kubelet and the
+Deployment controller and are outside this rule.
 
 ## Complexity checklist
 
