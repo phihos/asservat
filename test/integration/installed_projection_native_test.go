@@ -37,7 +37,13 @@ type installedProjectionCheck func(artifactID string) func(queryID, operationID 
 // native session, used one original query worker and consumed actual key slots.
 // It supplies no runtime input, grants or product authority.
 func installedProjectionSQLCheck(t *testing.T, ctx context.Context, admin *pgxpool.Pool, api kubernetes.Interface, root string, terminalSink ...func(func())) installedProjectionCheck {
-	workerPods := installedRecordWorkerPods(t, ctx, api)
+	return installedProjectionSQLCheckPods(t, ctx, admin, api, installedRecordWorkerPods(t, ctx, api), root, terminalSink...)
+}
+
+// installedProjectionSQLCheckPods reuses a caller's Pod recorder that was
+// started before the query, so a worker retired before this check is built
+// remains observable.
+func installedProjectionSQLCheckPods(t *testing.T, ctx context.Context, admin *pgxpool.Pool, api kubernetes.Interface, workerPods *installedWorkerPods, root string, terminalSink ...func(func())) installedProjectionCheck {
 	return func(artifact string) func(string, string) func() {
 		t.Helper()
 		countDownloads := func() int {
@@ -104,7 +110,7 @@ func installedProjectionSQLCheck(t *testing.T, ctx context.Context, admin *pgxpo
 						if err := admin.QueryRow(limit, "SELECT context_query_units(query->'Scope') FROM context_query WHERE root_id=$1 AND id=$2", root, id).Scan(&units); err != nil || units != 10 {
 							t.Fatal("profile summary source charge", units, err)
 						}
-						memory, err := workerPods.memoryLimit(observed.Binding)
+						memory, _, err := workerPods.limits(observed.Binding)
 						if err != nil || memory != intent.Query.Plan.Profile.Worker.MemoryBytes {
 							t.Fatal("profile summary actual worker memory limit", memory, err)
 						}
@@ -127,7 +133,7 @@ func installedProjectionSQLCheck(t *testing.T, ctx context.Context, admin *pgxpo
 						if err := admin.QueryRow(limit, "SELECT context_query_units(query->'Scope') FROM context_query WHERE root_id=$1 AND id=$2", root, id).Scan(&units); err != nil || units != wantUnits {
 							t.Fatal("syscall projection source charge", units, err)
 						}
-						memory, err := workerPods.memoryLimit(observed.Binding)
+						memory, _, err := workerPods.limits(observed.Binding)
 						if err != nil || memory != intent.Query.Plan.Profile.Worker.MemoryBytes {
 							t.Fatal("syscall projection actual worker memory limit", memory, err)
 						}

@@ -54,25 +54,25 @@ func installedRecordWorkerPods(t *testing.T, ctx context.Context, api kubernetes
 	return r
 }
 
-// memoryLimit requires every recorded state of the exact bound Pod to carry
-// one container with the same memory limit, and returns it.
-func (r *installedWorkerPods) memoryLimit(b value.AcquisitionWorkerBinding) (int64, error) {
+// limits requires every recorded state of the exact bound Pod to carry one
+// container with unchanged limits, and returns its memory bytes and CPU millis.
+func (r *installedWorkerPods) limits(b value.AcquisitionWorkerBinding) (int64, int64, error) {
 	r.mu.Lock()
 	states := r.seen[types.UID(b.PodUID)]
 	r.mu.Unlock()
 	if len(states) == 0 {
-		return 0, errors.New("bound query worker Pod was never observed")
+		return 0, 0, errors.New("bound query worker Pod was never observed")
 	}
-	var limit int64
+	var memory, cpu int64
 	for i, pod := range states {
 		if pod.Name != b.Pod || pod.Namespace != b.Namespace || len(pod.Spec.Containers) != 1 {
-			return 0, errors.New("observed query worker Pod differs from its binding")
+			return 0, 0, errors.New("observed query worker Pod differs from its binding")
 		}
-		memory := pod.Spec.Containers[0].Resources.Limits.Memory().Value()
-		if i > 0 && memory != limit {
-			return 0, errors.New("query worker Pod memory limit changed")
+		limits := pod.Spec.Containers[0].Resources.Limits
+		if i > 0 && (limits.Memory().Value() != memory || limits.Cpu().MilliValue() != cpu) {
+			return 0, 0, errors.New("query worker Pod limits changed")
 		}
-		limit = memory
+		memory, cpu = limits.Memory().Value(), limits.Cpu().MilliValue()
 	}
-	return limit, nil
+	return memory, cpu, nil
 }
