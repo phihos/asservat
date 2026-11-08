@@ -59,6 +59,9 @@ Do not refresh retained facts, reselect a Pod, retry admission
 or repeat an effect. Cancel and join hint work on every early return.
 No SQL schema, public response, permission, quota, demand lifetime or
 five-second authority interval changes.
+[ADR-314](314-cold-storage-preview-retry.md) adds one complete second
+preview attempt, with every fact read again, after a readiness-tail refusal;
+it retries no admission or effect.
 
 ## Response scheduling refinement (2026-10-27)
 

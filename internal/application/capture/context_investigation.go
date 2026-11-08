@@ -329,7 +329,7 @@ func (s ContextInvestigation) plan(p value.ContextPreview, f contextFacts) (plan
 // Preview observes authorized metadata and writes only a bounded draft. It does
 // not reserve custody/storage, write acquisition intent or start a collector.
 func (s ContextInvestigation) Preview(ctx context.Context, source identities.CurrentIdentity, intent value.ContextIntent) (result ContextPreviewResult, failure error) {
-	return s.preview(ctx, source, intent, nil)
+	return retryColdStorage(ctx, func() (ContextPreviewResult, error) { return s.preview(ctx, source, intent, nil) })
 }
 
 // PreviewRepeat is Preview for "Collect again" (ADR-236): every current check
@@ -340,7 +340,7 @@ func (s ContextInvestigation) PreviewRepeat(ctx context.Context, source identiti
 	if !authorization.UUID(original.ClusterID) || !identity.Text(original.NamespaceUID, 64) || !identity.Text(original.WorkloadUID, 64) {
 		return ContextPreviewResult{}, previewFailure("repeat/original", value.ErrInvalid)
 	}
-	return s.preview(ctx, source, intent, &original)
+	return retryColdStorage(ctx, func() (ContextPreviewResult, error) { return s.preview(ctx, source, intent, &original) })
 }
 
 func (s ContextInvestigation) preview(ctx context.Context, source identities.CurrentIdentity, intent value.ContextIntent, original *authorization.Target) (result ContextPreviewResult, failure error) {
