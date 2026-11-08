@@ -10,8 +10,8 @@ go.mod or go.sum changes select everything. Flags match CI's test shards
 are not rerun.
 
 Each package is one `go test` process; the Kubernetes adapter (CI's
-duration-balanced partitions) and the other packages that dominate CI's
-shard 0 run as several partitions; SLOTS processes run at once, changed
+duration-balanced partitions) and the other packages that CI splits
+by test run as several partitions; SLOTS processes run at once, changed
 packages and the longest jobs first. When the Kubernetes adapter is only a
 reverse dependency, its tests above HEAVY_SECONDS on CI (the time budget: ~30
 of ~700 tests, over half its run time) are skipped and listed;
@@ -41,7 +41,7 @@ EVERYTHING = {"go.mod", "go.sum"}
 HEAVY_SECONDS = 20
 SLOTS = int(os.environ.get("ASSERVAT_AFFECTED_SLOTS", "8"))
 KUBERNETES_PARTS = 8
-# CI shard 0's longest packages (seconds under -race on CI): partitions.
+# CI's longest split packages (seconds under -race on CI): local partitions.
 SPLIT = {"internal/transport/presentation": (5, 520), "internal/transport/native": (2, 146),
          "internal/bootstrap": (3, 135), "internal/transport/mcp": (2, 123)}
 # pcap-check's libpcap-tagged selections (package dir, -run pattern or None).
@@ -142,7 +142,7 @@ def package_jobs(path, direct, full):
     short = path.removeprefix(MODULE)
     if path == KUBERNETES:
         names = listed(path)
-        weights = json.loads(gate.DURATIONS.read_text())
+        weights = json.loads(gate.DURATIONS.read_text())["tests"].get(short, {})
         skipped = [] if direct or full else sorted(n for n in names if weights.get(n, 5) > HEAVY_SECONDS)
         kept = [n for n in names if n not in skipped]
         parts = gate.balanced(kept, weights, min(KUBERNETES_PARTS, len(kept)))
@@ -151,7 +151,7 @@ def package_jobs(path, direct, full):
     if short in SPLIT:
         names = listed(path)
         count, seconds = min(SPLIT[short][0], len(names)), SPLIT[short][1]
-        parts = gate.balanced(names, {}, count)
+        parts = gate.balanced(names, json.loads(gate.DURATIONS.read_text())["tests"].get(short, {}), count)
         return [Job(f"{short} {i}/{count}", path, direct, part, seconds / count) for i, part in enumerate(parts, 1)], []
     return [Job(short, path, direct)], []
 

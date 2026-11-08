@@ -1,6 +1,9 @@
 name: Toolchain
 description: Go, Python, optional console modules and pinned SQL/kind/Helm tools, all cached.
 inputs:
+  go:
+    description: Install Go and restore the shared module/build cache.
+    default: "true"
   console:
     description: Restore or install web/node_modules.
     default: "false"
@@ -16,13 +19,15 @@ inputs:
 runs:
   using: composite
   steps:
-    - uses: actions/setup-go@v7
+    - if: inputs.go == 'true'
+      uses: actions/setup-go@v7
       with:
         go-version-file: go.mod
         cache: false
     # One shared module/build cache. Only the main-branch build job saves it;
     # Go's content-addressed cache stays useful when restored from an older key.
-    - uses: actions/cache/restore@v6
+    - if: inputs.go == 'true'
+      uses: actions/cache/restore@v6
       with:
         path: |
           ~/go/pkg/mod
