@@ -11,7 +11,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"os/exec"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -367,7 +366,8 @@ func (p *initialRuntimeNativeProviders) provisionAudit(t *testing.T, ctx context
 	}
 	clear(raw)
 	runID := strings.TrimSuffix(strings.TrimPrefix(fixtureScope.Container, "asservat-"), "-s3")
-	inspect := exec.CommandContext(ctx, "docker", "inspect", "--format", "{{ index .Config.Labels \"asservat.test\" }}", fixtureScope.Container)
+	inspect, inspectDone := installedBoundedCommand(ctx, installedDockerTimeout, "docker", "inspect", "--format", "{{ index .Config.Labels \"asservat.test\" }}", fixtureScope.Container)
+	defer inspectDone()
 	label, e := inspect.Output()
 	if e != nil || strings.TrimSpace(string(label)) != runID {
 		t.Fatal("refuse non-owned S3 administration", e)
@@ -376,7 +376,8 @@ func (p *initialRuntimeNativeProviders) provisionAudit(t *testing.T, ctx context
 	bucket := p.desired.AuditStore.Bucket
 	shell := "s3.configure -user=administrator -access_key=synthetic-only -secret_key=synthetic-only-secret -actions=Admin,Read,Write,List -apply\n" +
 		"s3.configure -user=configuration -access_key=configuration-synthetic -secret_key=configuration-synthetic-secret -actions=Read:" + bucket + "/" + prefix + "*,Write:" + bucket + "/" + prefix + "* -apply\n"
-	command := exec.CommandContext(ctx, "docker", "exec", "-i", fixtureScope.Container, "/usr/bin/weed", "shell", "-master=localhost:9333", "-filer=localhost:8888")
+	command, commandDone := installedBoundedCommand(ctx, installedDockerTimeout, "docker", "exec", "-i", fixtureScope.Container, "/usr/bin/weed", "shell", "-master=localhost:9333", "-filer=localhost:8888")
+	defer commandDone()
 	command.Stdin = strings.NewReader(shell)
 	output, e := command.CombinedOutput()
 	clear(output)

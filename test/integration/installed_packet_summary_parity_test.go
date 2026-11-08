@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/netip"
-	"os/exec"
 	"reflect"
 	"slices"
 	"strconv"
@@ -30,7 +29,7 @@ func installedPacketSummaryTshark(t *testing.T, ctx context.Context, path string
 			break
 		}
 	}
-	out, err := exec.CommandContext(ctx, "tshark", args...).Output()
+	out, err := installedOutput(ctx, installedLocalToolTimeout, "tshark", args...)
 	if err != nil {
 		t.Fatal("original packet file failed numeric tshark decode", err)
 	}

@@ -230,7 +230,7 @@ pre-push:
 	$(MAKE) -k -j4 -O $(PRE_PUSH_GATES)
 
 gate-self-tests:
-	for f in scripts/test-ci-changes.py scripts/test-go-shards.py scripts/test-kept-cleanup.py scripts/test-*-selection.py scripts/test-direct-helper-regression.py scripts/test-collector-provenance.py; do $(PYTHON) "$$f" || exit 1; done
+	for f in scripts/test-ci-changes.py scripts/test-go-shards.py scripts/test-kept-cleanup.py scripts/test-*-selection.py scripts/test-direct-helper-regression.py scripts/test-collector-provenance.py scripts/test-pod-log-stream.py; do $(PYTHON) "$$f" || exit 1; done
 
 gofmt-check:
 	@unformatted=$$(gofmt -l api cmd internal migrations test); if [ -n "$$unformatted" ]; then echo "gofmt needed:"; echo "$$unformatted"; exit 1; fi

@@ -13,7 +13,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -470,7 +469,7 @@ func qualifyInstalledPolicyRecording(t *testing.T, ctx context.Context, admin *p
 	if err = os.WriteFile(file, native, 0600); err != nil {
 		t.Fatal(err)
 	}
-	out, err := exec.CommandContext(ctx, "tshark", policyRecordingFieldArgs(file)...).Output()
+	out, err := installedOutput(ctx, installedLocalToolTimeout, "tshark", policyRecordingFieldArgs(file)...)
 	if err != nil {
 		t.Fatal("offline native Wireshark read", err)
 	}

@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"os"
-	"os/exec"
 	"strings"
 	"testing"
 
@@ -86,7 +85,7 @@ func qualifyManualHeapNative(t *testing.T, ctx context.Context, native []byte, c
 	if err := os.WriteFile(path, native, 0600); err != nil {
 		t.Fatal(err)
 	}
-	out, err := exec.CommandContext(ctx, "go", "tool", "pprof", "-top", "-sample_index=inuse_space", "-symbolize=none", path).CombinedOutput()
+	out, err := installedCombinedOutput(ctx, installedLocalToolTimeout, "go", "tool", "pprof", "-top", "-sample_index=inuse_space", "-symbolize=none", path)
 	if err != nil || !strings.Contains(string(out), "main.main") {
 		t.Fatalf("native pprof cannot open retained fixture heap allocation samples: %v\n%s", err, out)
 	}

@@ -24,7 +24,6 @@ import (
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"mime"
-	"os/exec"
 )
 
 // This is an installed production-path qualification, never an authority
@@ -430,8 +429,7 @@ func qualifyInstalledFiniteRawPolicy(t *testing.T, ctx context.Context, admin *p
 		if !found || a.NativeFormat != "pprof" {
 			t.Fatal("policy profile lacks actual workload samples/native format")
 		}
-		command := exec.CommandContext(ctx, "go", "tool", "pprof", "-top", "-symbolize=none", nativeFile)
-		output, err := command.CombinedOutput()
+		output, err := installedCombinedOutput(ctx, installedLocalToolTimeout, "go", "tool", "pprof", "-top", "-symbolize=none", nativeFile)
 		if err != nil || !strings.Contains(string(output), "main.burnCPU") {
 			t.Fatal("policy native profile did not open with pprof", err)
 		}

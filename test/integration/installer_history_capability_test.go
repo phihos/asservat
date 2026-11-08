@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
-	"os/exec"
 	"strings"
 	"testing"
 
@@ -35,13 +34,14 @@ func installerRegionalHistoryCredential(t *testing.T, ctx context.Context, p *in
 	}
 	clear(raw)
 	runID := strings.TrimSuffix(strings.TrimPrefix(native.Container, "asservat-"), "-s3")
-	label, err := exec.CommandContext(ctx, "docker", "inspect", "--format", "{{ index .Config.Labels \"asservat.test\" }}", native.Container).Output()
+	label, err := installedOutput(ctx, installedDockerTimeout, "docker", "inspect", "--format", "{{ index .Config.Labels \"asservat.test\" }}", native.Container)
 	if err != nil || strings.TrimSpace(string(label)) != runID {
 		t.Fatal("refuse non-owned history storage administration", err)
 	}
 	key, secret := "history-"+cluster, "synthetic-history-secret-"+cluster
 	shell := "s3.configure -user=" + capability.Identity + " -access_key=" + key + " -secret_key=" + secret + " -actions=" + strings.Join(capability.SeaweedIdentityActions, ",") + " -apply\n"
-	command := exec.CommandContext(ctx, "docker", "exec", "-i", native.Container, "/usr/bin/weed", "shell", "-master=localhost:9333", "-filer=localhost:8888")
+	command, commandDone := installedBoundedCommand(ctx, installedDockerTimeout, "docker", "exec", "-i", native.Container, "/usr/bin/weed", "shell", "-master=localhost:9333", "-filer=localhost:8888")
+	defer commandDone()
 	command.Stdin = strings.NewReader(shell)
 	if output, e := command.CombinedOutput(); e != nil {
 		clear(output)

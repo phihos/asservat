@@ -399,6 +399,7 @@ func TestInitialBootstrapChainWithRealServices(t *testing.T) {
 				t.Fatal("installer continuation owns the provider-pair network without fixture continuation")
 			}
 			t.Run("installer-continuation", func(t *testing.T) {
+				installedHangWatchdog(t)
 				qualifyInstallerContinuationNative(t, ctx, direct, f.Clusters[0].Config, api, admin, f, desired, configuration, unified)
 			})
 		} else if os.Getenv("ASSERVAT_INITIAL_RUNTIME_PROVIDER_WORKER") == "1" {

@@ -7,7 +7,6 @@ import (
 	"errors"
 	"io"
 	"os"
-	"os/exec"
 	"strings"
 	"testing"
 	"time"
@@ -42,7 +41,8 @@ func (o *initialRuntimeNativeOwner) provisionOwnerAudit(t *testing.T, ctx contex
 	}
 	clear(raw)
 	runID := strings.TrimSuffix(strings.TrimPrefix(native.Container, "asservat-"), "-s3")
-	inspect := exec.CommandContext(ctx, "docker", "inspect", "--format", "{{ index .Config.Labels \"asservat.test\" }}", native.Container)
+	inspect, inspectDone := installedBoundedCommand(ctx, installedDockerTimeout, "docker", "inspect", "--format", "{{ index .Config.Labels \"asservat.test\" }}", native.Container)
+	defer inspectDone()
 	label, err := inspect.Output()
 	if err != nil || strings.TrimSpace(string(label)) != runID {
 		t.Fatal("refuse non-owned owner audit provider administration", err)
@@ -93,7 +93,8 @@ func (o *initialRuntimeNativeOwner) provisionOwnerAudit(t *testing.T, ctx contex
 	if _, err = admin.PutBucketPolicy(ctx, &s3.PutBucketPolicyInput{Bucket: &bucket, Policy: aws.String(string(policyRaw))}); err != nil {
 		t.Fatal("extend owned exact runtime deletion denial", err)
 	}
-	command := exec.CommandContext(ctx, "docker", "exec", "-i", native.Container, "/usr/bin/weed", "shell", "-master=localhost:9333", "-filer=localhost:8888")
+	command, commandDone := installedBoundedCommand(ctx, installedDockerTimeout, "docker", "exec", "-i", native.Container, "/usr/bin/weed", "shell", "-master=localhost:9333", "-filer=localhost:8888")
+	defer commandDone()
 	command.Stdin = strings.NewReader("s3.configure -user=owner -access_key=owner-synthetic -secret_key=owner-synthetic-secret -actions=Read:" + bucket + "/" + prefixes[0] + "*,Write:" + bucket + "/" + prefixes[0] + "*,Read:" + bucket + "/" + prefixes[1] + "*,Write:" + bucket + "/" + prefixes[1] + "* -apply\n")
 	output, err := command.CombinedOutput()
 	clear(output)

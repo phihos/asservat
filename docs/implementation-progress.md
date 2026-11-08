@@ -1,5 +1,21 @@
 # Sustained implementation progress
 
+## Installed runs keep their logs when a test hangs (2026-11-08)
+
+Failed installed tests hung in cleanup into the 20-minute job limit and lost
+the hub/regional logs collected there. Test-harness changes only:
+the goroutine-dump watchdog now runs on the installer-continuation subtest for
+every focus (failure + 90 s, or a per-focus soft budget); native.yml exports
+`ASSERVAT_CI_JOB_DEADLINE` and the harness bounds `go test -timeout` by it
+less a 60 s cleanup margin (go test starts about 4 min 54 s into the job, so
+about 850-920 s instead of 18m/60m), recorded as `effectiveGoTimeout`;
+`scripts/pod_log_stream.py` follows every owned Pod container instance into
+`test/results/pod-logs/` while the test runs; external commands and cleanup
+receives in installed helpers are bounded. Runs 42453073840
+(continuation-manual-logs, 24 streamed logs, 922 s timeout) and 42453079266
+(continuation-ongoing-live, 21 including the node collector, 874 s) passed
+with the logs in their artifacts and no watchdog dump.
+
 ## Stop for manual packet/syscall metadata sessions (2026-11-07)
 
 Installed `continuation-ongoing-live-manual` showed `cancel_capture` returning

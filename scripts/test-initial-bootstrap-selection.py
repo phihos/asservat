@@ -79,6 +79,29 @@ class BootstrapSelection(unittest.TestCase):
         self.assertEqual(fixture.qualification_go_timeout(helm_bootstrap=True), "12m")
         self.assertEqual(fixture.qualification_go_timeout(runtime_provider_owner=True), "14m")
 
+    def test_ci_job_deadline_bounds_go_timeout(self):
+        # Local runs: no deadline, static value unchanged.
+        self.assertEqual(fixture.ci_bounded_go_timeout("60m", {}), "60m")
+        # go test started 4 min 54 s into a 20-minute job (the measured live
+        # focus): Go's timeout fires CI_JOB_CLEANUP_MARGIN before the job end.
+        start = 1_000_000
+        deadline = {"ASSERVAT_CI_JOB_DEADLINE": str(start + 20 * 60)}
+        now = start + 294
+        self.assertEqual(fixture.ci_bounded_go_timeout("60m", deadline, now), str(20 * 60 - 294 - fixture.CI_JOB_CLEANUP_MARGIN) + "s")
+        self.assertEqual(fixture.ci_bounded_go_timeout("18m", deadline, now), "846s")
+        self.assertEqual(fixture.ci_bounded_go_timeout("2m", deadline, now), "120s")
+        self.assertEqual(fixture.ci_bounded_go_timeout(None, deadline, now), "846s")
+        with self.assertRaises(RuntimeError):
+            fixture.ci_bounded_go_timeout("60m", deadline, start + 20 * 60 - fixture.CI_JOB_CLEANUP_MARGIN - 30)
+        with self.assertRaises(ValueError):
+            fixture.ci_bounded_go_timeout("1h", deadline, now)
+
+    def test_native_workflow_deadline_matches_job_timeout(self):
+        workflow = (Path(__file__).parent.parent / ".github/workflows/native.yml").read_text()
+        native = workflow[workflow.index("\n  native:"):]
+        minutes = int(native.split("timeout-minutes:", 1)[1].split()[0])
+        self.assertIn("ASSERVAT_CI_JOB_DEADLINE=$(( $(date +%%s) + %d * 60 - 15 ))" % minutes, native)
+
     def test_exact_empty_database_selection(self):
         self.assertEqual(fixture.qualification_selection(None, False, False, True), ("^TestInitialBootstrapChainWithRealServices$", 1))
         with patch.object(fixture.subprocess, "run", side_effect=AssertionError("fixture migration attempted")), patch.object(fixture, "run", side_effect=AssertionError("fixture SQL grants attempted")):

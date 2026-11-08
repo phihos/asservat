@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"os"
-	"os/exec"
 	"strings"
 	"testing"
 	"time"
@@ -113,7 +112,7 @@ func validateManualRuntimeTrace(ctx context.Context, native []byte, path string)
 	}
 	call, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
-	out, err := exec.CommandContext(call, "go", "tool", "trace", "-pprof=sched", path).Output()
+	out, err := installedOutput(call, installedLocalToolTimeout, "go", "tool", "trace", "-pprof=sched", path)
 	if err != nil {
 		return nil, err
 	}
