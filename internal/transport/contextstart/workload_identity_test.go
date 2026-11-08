@@ -3,6 +3,7 @@ package contextstart
 import (
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/domain/targets"
 	"context"
 	"testing"
@@ -22,7 +23,7 @@ func TestWorkloadIdentityQueryRetainsOriginalRootAndDeadlines(t *testing.T) {
 			defer router.Close()
 			ctx, cancel := context.WithTimeout(t.Context(), 4*time.Second)
 			defer cancel()
-			receiver := fleet.APIContextReceiver{Channel: work.Work.Channel, ObservedAt: now, ValidUntil: now.Add(5 * time.Second)}
+			receiver := fleet.APIContextReceiver{Channel: work.Work.Channel, Window: identity.Check(now, identity.Recheck).Narrow(now.Add(5 * time.Second))}
 			standby, err := router.RegisterStandby(context.Background(), receiver, func(context.Context) (fleet.APIContextReceiver, error) { return receiver, nil })
 			if err != nil {
 				t.Fatal(err)

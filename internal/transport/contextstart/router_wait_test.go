@@ -1,6 +1,7 @@
 package contextstart
 
 import (
+	"asservat.local/asservat/internal/domain/identity"
 	"context"
 	"errors"
 	"testing"
@@ -33,7 +34,7 @@ func TestRouterQueryWaitsForNextStandbyWithinDeadline(t *testing.T) {
 	}()
 	time.Sleep(200 * time.Millisecond)
 	now := time.Now()
-	receiver := fleet.APIContextReceiver{Channel: work.Work.Channel, ObservedAt: now, ValidUntil: now.Add(5 * time.Second)}
+	receiver := fleet.APIContextReceiver{Channel: work.Work.Channel, Window: identity.Check(now, identity.Recheck).Narrow(now.Add(5 * time.Second))}
 	standby, err := router.RegisterStandby(context.Background(), receiver, func(context.Context) (fleet.APIContextReceiver, error) { return receiver, nil })
 	if err != nil {
 		t.Fatal(err)

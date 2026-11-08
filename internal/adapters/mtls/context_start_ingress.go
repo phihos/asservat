@@ -209,7 +209,7 @@ func (s *ContextStartIngress) current(ctx context.Context, a contextStartConnect
 	until, _ := call.Deadline()
 	// until bounds this check's reads; valid is the ADR-311 interval the one
 	// completed peer check may be used for, never past a certificate.
-	valid := started.Add(identity.AuthorityRecheckInterval)
+	valid := identity.Check(started, identity.Recheck)
 	var cancels []context.CancelFunc
 	defer func() {
 		for i := len(cancels) - 1; i >= 0; i-- {
@@ -278,7 +278,7 @@ func (s *ContextStartIngress) current(ctx context.Context, a contextStartConnect
 		return zero, value.ErrDenied
 	}
 	narrow(cert.NotAfter)
-	valid = identity.Earlier(valid, cert.NotAfter)
+	valid = valid.Narrow(cert.NotAfter)
 	registered, e := a.Registry.ReadConnectorObservationRegistration(call, a.Profile, sources, cert)
 	if e != nil || !registered.Valid(s.now()) || registered.Certificate != cert || registered.Process != channel.Connector || registered.Revision != source.Observation.Profile.Revision {
 		switch {
@@ -298,7 +298,7 @@ func (s *ContextStartIngress) current(ctx context.Context, a contextStartConnect
 		return zero, value.ErrDenied
 	}
 	narrow(local.ValidUntil)
-	valid = identity.Earlier(valid, local.ValidUntil)
+	valid = valid.Narrow(local.ValidUntil)
 	// The hub's own serving observation above already rests on the reused
 	// self-protection proof; only the connector source is read again.
 	finalSource, e := sources.ReadConnectorIdentitySource(call)
@@ -307,7 +307,7 @@ func (s *ContextStartIngress) current(ctx context.Context, a contextStartConnect
 		return zero, value.ErrDenied
 	}
 	narrow(finalSource.Observation.FreshUntil)
-	out := value.APIContextReceiver{Channel: channel, ObservedAt: started, ValidUntil: valid}
+	out := value.APIContextReceiver{Channel: channel, Window: valid}
 	if call.Err() != nil || !s.now().Before(until) || !out.Valid(s.now()) || !source.Valid(s.now()) || !registered.Valid(s.now()) || !local.Valid(s.now()) {
 		s.refuse("expired")
 		return zero, value.ErrUnavailable

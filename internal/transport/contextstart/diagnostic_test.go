@@ -1,6 +1,7 @@
 package contextstart
 
 import (
+	"asservat.local/asservat/internal/domain/identity"
 	"bytes"
 	"context"
 	"errors"
@@ -91,7 +92,7 @@ func diagnosticStream(t *testing.T, ctx context.Context, check ReceiverCheck, re
 	}
 	if check == nil {
 		check = func(context.Context) (fleet.APIContextReceiver, error) {
-			return fleet.APIContextReceiver{Channel: w.Work.Channel, ObservedAt: w.VerifiedAt, ValidUntil: w.ValidUntil}, nil
+			return fleet.APIContextReceiver{Channel: w.Work.Channel, Window: identity.Check(w.VerifiedAt, identity.Recheck).Narrow(w.ValidUntil)}, nil
 		}
 	}
 	if reader == nil {
@@ -177,7 +178,7 @@ func TestContextStreamDiagnosticPeerAndDeadlineBranches(t *testing.T) {
 				checks, deadlines := 0, 0
 				check := func(context.Context) (fleet.APIContextReceiver, error) {
 					checks++
-					r := fleet.APIContextReceiver{Channel: w.Work.Channel, ObservedAt: w.VerifiedAt, ValidUntil: w.ValidUntil}
+					r := fleet.APIContextReceiver{Channel: w.Work.Channel, Window: identity.Check(w.VerifiedAt, identity.Recheck).Narrow(w.ValidUntil)}
 					switch name {
 					case "private-error":
 						return r, &streamPrivateError{}
@@ -186,7 +187,7 @@ func TestContextStreamDiagnosticPeerAndDeadlineBranches(t *testing.T) {
 					case "denied":
 						return r, fleet.ErrDenied
 					case "invalid-peer":
-						r.ValidUntil = r.ObservedAt
+						r.Window = r.Window.Narrow(r.Window.From())
 					case "changed-peer":
 						r.Channel.ExchangeID = "00000000-0000-4000-8000-000000000099"
 					}
@@ -341,7 +342,7 @@ func TestContextStreamDiagnosticRetainedReadDeadline(t *testing.T) {
 	var checks, interrupts atomic.Int32
 	check := func(context.Context) (fleet.APIContextReceiver, error) {
 		checks.Add(1)
-		return fleet.APIContextReceiver{Channel: w.Work.Channel, ObservedAt: start, ValidUntil: until}, nil
+		return fleet.APIContextReceiver{Channel: w.Work.Channel, Window: identity.Check(start, identity.Recheck).Narrow(until)}, nil
 	}
 	s := diagnosticStream(t, nil, check, local, io.Discard, local.SetReadDeadline, local.SetWriteDeadline, nil, func() { interrupts.Add(1); _ = local.Close() })
 	written := make(chan error, 1)
@@ -413,7 +414,7 @@ func TestContextStreamDiagnosticOriginalOwnerAndCallCancellation(t *testing.T) {
 		defer reader.Close()
 		defer writer.Close()
 		s := diagnosticStream(t, nil, func(context.Context) (fleet.APIContextReceiver, error) {
-			return fleet.APIContextReceiver{Channel: w.Work.Channel, ObservedAt: n, ValidUntil: until}, nil
+			return fleet.APIContextReceiver{Channel: w.Work.Channel, Window: identity.Check(n, identity.Recheck).Narrow(until)}, nil
 		}, nil, writer, nil, nil, nil, func() { _ = writer.CloseWithError(context.DeadlineExceeded) })
 		if e := s.Send(context.Background(), contracts.APIContextFrame{Kind: contracts.APIContextResultFrame, Payload: []byte("{}")}); !errors.Is(e, fleet.ErrUnavailable) {
 			t.Fatal("short bound allowed write")
@@ -473,7 +474,7 @@ func TestContextStreamDiagnosticOriginalHubRunErrorAndJoinedAttachment(t *testin
 	resident, record := NewStreamDiagnosticContext(resident)
 	ctx, end := context.WithDeadline(resident, w.ValidUntil)
 	defer end()
-	receiver := fleet.APIContextReceiver{Channel: w.Work.Channel, ObservedAt: w.VerifiedAt, ValidUntil: w.ValidUntil}
+	receiver := fleet.APIContextReceiver{Channel: w.Work.Channel, Window: identity.Check(w.VerifiedAt, identity.Recheck).Narrow(w.ValidUntil)}
 	check := func(context.Context) (fleet.APIContextReceiver, error) { return receiver, nil }
 	standby, e := router.RegisterStandby(resident, receiver, check)
 	if e != nil {
@@ -547,7 +548,7 @@ func TestContextStreamDiagnosticRegionalVerificationAndIsolation(t *testing.T) {
 	}
 	reader, writer := io.Pipe()
 	defer writer.Close()
-	receiver := fleet.APIContextReceiver{Channel: w.Work.Channel, ObservedAt: w.VerifiedAt, ValidUntil: w.ValidUntil}
+	receiver := fleet.APIContextReceiver{Channel: w.Work.Channel, Window: identity.Check(w.VerifiedAt, identity.Recheck).Narrow(w.ValidUntil)}
 	checks := 0
 	check := func(context.Context) (fleet.APIContextReceiver, error) { checks++; return receiver, nil }
 	s := diagnosticStream(t, ctx, check, reader, io.Discard, nil, nil, nil, func() { _ = reader.Close() })
@@ -560,7 +561,8 @@ func TestContextStreamDiagnosticRegionalVerificationAndIsolation(t *testing.T) {
 	e := ServeRegionalOperations(ctx, s, receiver, streamDiagnosticVerifier(func(c context.Context, b []byte, r fleet.APIContextReceiver) (fleet.AuthenticatedAPIContextWork, error) {
 		verifications++
 		expected := receiver
-		expected.ValidUntil, _ = ctx.Deadline() // The work lease retains the shorter original caller.
+		deadline, _ := ctx.Deadline() // The work lease retains the shorter original caller.
+		expected.Window = expected.Window.Narrow(deadline)
 		if c != ctx || r != expected || string(b) != "signed" {
 			t.Fatal("original verifier input changed")
 		}
@@ -639,14 +641,14 @@ func TestContextStreamDiagnosticAdmissionAndPassiveBranches(t *testing.T) {
 			checks := 0
 			check := func(context.Context) (fleet.APIContextReceiver, error) {
 				checks++
-				r := fleet.APIContextReceiver{Channel: w.Work.Channel, ObservedAt: w.VerifiedAt, ValidUntil: w.ValidUntil}
+				r := fleet.APIContextReceiver{Channel: w.Work.Channel, Window: identity.Check(w.VerifiedAt, identity.Recheck).Narrow(w.ValidUntil)}
 				switch name {
 				case "peer-private":
 					return r, &streamPrivateError{}
 				case "peer-changed":
 					r.Channel.ExchangeID = "00000000-0000-4000-8000-000000000099"
 				case "peer-invalid":
-					r.ValidUntil = r.ObservedAt
+					r.Window = r.Window.Narrow(r.Window.From())
 				}
 				return r, nil
 			}

@@ -75,7 +75,7 @@ func TestContextStartLocalUsesTheConnectorAlreadyProvedByItsExecutor(t *testing.
 	if err != nil || !executor.Valid() || observed.Request.Process != observed.Registration.Process {
 		t.Fatal("duplicate connector observations exhausted the original local interval", err)
 	}
-	if source.reads.Load() != 2 || until.After(original) || until.After(observed.ValidUntil) {
+	if source.reads.Load() != 2 || until.Until().After(original) || until.Until().After(observed.ValidUntil) {
 		t.Fatal("local proof repeated source work or renewed its original bounds", source.reads.Load())
 	}
 }

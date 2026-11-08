@@ -73,7 +73,7 @@ func TestContextStartActualHTTP2RestartObservationQuery(t *testing.T) {
 	hub := contextstart.Targets{Router: f.router, Now: time.Now}
 	request := targets.RestartRequest{WorkloadRequest: targets.WorkloadRequest{ClusterID: work.Target.ClusterID, Namespace: "app", Kind: "Deployment", Name: "app"}}
 	o, err := hub.ObserveWorkloadRestarts(ctx, request)
-	if err != nil || len(o.Pods) != targets.MaxRestartPods || o.Workload.UID != work.Target.WorkloadUID || o.FreshUntil.After(exchange.Receiver().ValidUntil.Add(time.Second)) {
+	if err != nil || len(o.Pods) != targets.MaxRestartPods || o.Workload.UID != work.Target.WorkloadUID || o.FreshUntil.After(exchange.Receiver().Window.Until().Add(time.Second)) {
 		t.Fatal("restart observation", err, len(o.Pods))
 	}
 	// A probe observation of 128 Pods still fits one answer frame.

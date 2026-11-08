@@ -1,6 +1,7 @@
 package contextstart
 
 import (
+	"asservat.local/asservat/internal/domain/identity"
 	"context"
 	"errors"
 	"testing"
@@ -54,7 +55,7 @@ func TestFiniteArgumentSourceAndStartUseOneFramedConversation(t *testing.T) {
 			ports.Starts = local
 			ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
 			defer cancel()
-			receiver := fleet.APIContextReceiver{Channel: w.Channel, ObservedAt: n, ValidUntil: w.NotAfter}
+			receiver := fleet.APIContextReceiver{Channel: w.Channel, Window: identity.Check(n, identity.Recheck).Narrow(w.NotAfter)}
 			hub, region := historyStreamPair(t, ctx, receiver)
 			joined := make(chan error, 1)
 			go func() {

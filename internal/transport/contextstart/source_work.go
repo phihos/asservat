@@ -168,7 +168,7 @@ func (r *Router) DeliverSource(ctx context.Context, cluster string, sign func(fl
 // SourceWorkEnd retains all original precommit/target/receiver bounds, while
 // the separate active leaf remains within its committed thirty-second limit.
 func SourceWorkEnd(w app.SourceWork, r fleet.APIContextReceiver) time.Time {
-	return identity.Earlier(w.Source.Permit.DispatchUntil, identity.Earlier(w.Target.FreshUntil, identity.Earlier(w.Node.FreshUntil, r.ValidUntil)))
+	return identity.Earlier(w.Source.Permit.DispatchUntil, identity.Earlier(w.Target.FreshUntil, identity.Earlier(w.Node.FreshUntil, r.Window.Until())))
 }
 
 // sourceDeliveryStep names where a source-work query stopped (answer label,

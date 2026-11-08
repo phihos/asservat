@@ -206,7 +206,7 @@ func (s *frameStream) beginFrame(ctx context.Context, read bool, mode framePeerM
 		finish()
 		return nil, time.Time{}, nil, fleet.ErrUnavailable
 	}
-	until = identity.Earlier(until, observed.ValidUntil)
+	until = identity.Earlier(until, observed.Window.Until())
 	bounded, narrow := context.WithDeadline(call, until)
 	// A socket write deadline does not necessarily interrupt a blocked HTTP/2
 	// request-body pipe. Join an explicit callback at the shorter original peer

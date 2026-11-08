@@ -1,6 +1,7 @@
 package contextstart
 
 import (
+	"asservat.local/asservat/internal/domain/identity"
 	"context"
 	"errors"
 	"strings"
@@ -73,7 +74,7 @@ func TestTargetQueryReportsFinalValidationInsteadOfTransportSuccess(t *testing.T
 			ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
 			defer cancel()
 			observed := time.Now()
-			receiver := fleet.APIContextReceiver{Channel: work.Work.Channel, ObservedAt: observed, ValidUntil: observed.Add(5 * time.Second)}
+			receiver := fleet.APIContextReceiver{Channel: work.Work.Channel, Window: identity.Check(observed, identity.Recheck).Narrow(observed.Add(5 * time.Second))}
 			standby, err := router.RegisterStandby(context.Background(), receiver, func(context.Context) (fleet.APIContextReceiver, error) { return receiver, nil })
 			if err != nil {
 				t.Fatal(err)

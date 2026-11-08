@@ -1,6 +1,7 @@
 package contextstart
 
 import (
+	"asservat.local/asservat/internal/domain/identity"
 	"context"
 	"testing"
 	"time"
@@ -24,7 +25,7 @@ func TestPacketTargetOneQueryPreservesEveryOriginalBound(t *testing.T) {
 			defer router.Close()
 			ctx, cancel := context.WithTimeout(t.Context(), 4*time.Second)
 			defer cancel()
-			receiver := fleet.APIContextReceiver{Channel: work.Work.Channel, ObservedAt: now, ValidUntil: now.Add(5 * time.Second)}
+			receiver := fleet.APIContextReceiver{Channel: work.Work.Channel, Window: identity.Check(now, identity.Recheck).Narrow(now.Add(5 * time.Second))}
 			standby, err := router.RegisterStandby(context.Background(), receiver, func(context.Context) (fleet.APIContextReceiver, error) { return receiver, nil })
 			if err != nil {
 				t.Fatal(err)

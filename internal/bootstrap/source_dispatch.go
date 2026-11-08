@@ -99,7 +99,7 @@ func (d RegionalSourceDispatch) StopSource(ctx context.Context, cluster string, 
 	defer cancel()
 	var step string
 	return d.deliver(call, cluster, &step, func(r fleet.APIContextReceiver) fleetapp.SourceWork {
-		return fleetapp.SourceWork{Channel: r.Channel, Stop: true, StopIssuedAt: issued, Source: collector.PacketSource{Permit: collector.SourcePermit{Binding: binding}}, NotAfter: identity.Earlier(issued.Add(5*time.Second), r.ValidUntil)}
+		return fleetapp.SourceWork{Channel: r.Channel, Stop: true, StopIssuedAt: issued, Source: collector.PacketSource{Permit: collector.SourcePermit{Binding: binding}}, NotAfter: identity.Earlier(issued.Add(5*time.Second), r.Window.Until())}
 	})
 }
 
@@ -114,7 +114,7 @@ func (d RegionalSourceDispatch) CancelSourceSnapshot(ctx context.Context, cluste
 	defer cancel()
 	var step string
 	return d.deliver(call, cluster, &step, func(r fleet.APIContextReceiver) fleetapp.SourceWork {
-		return fleetapp.SourceWork{Channel: r.Channel, StopSnapshot: &snapshot, StopIssuedAt: issued, NotAfter: identity.Earlier(issued.Add(5*time.Second), r.ValidUntil)}
+		return fleetapp.SourceWork{Channel: r.Channel, StopSnapshot: &snapshot, StopIssuedAt: issued, NotAfter: identity.Earlier(issued.Add(5*time.Second), r.Window.Until())}
 	})
 }
 
@@ -127,7 +127,7 @@ func (d RegionalSourceDispatch) CancelProfile(ctx context.Context, cluster strin
 	defer cancel()
 	var step string
 	return d.deliver(call, cluster, &step, func(r fleet.APIContextReceiver) fleetapp.SourceWork {
-		return fleetapp.SourceWork{Channel: r.Channel, StopProfile: &stop, StopIssuedAt: issued, NotAfter: identity.Earlier(issued.Add(5*time.Second), r.ValidUntil)}
+		return fleetapp.SourceWork{Channel: r.Channel, StopProfile: &stop, StopIssuedAt: issued, NotAfter: identity.Earlier(issued.Add(5*time.Second), r.Window.Until())}
 	})
 }
 
@@ -140,6 +140,6 @@ func (d RegionalSourceDispatch) CancelRecording(ctx context.Context, cluster str
 	defer cancel()
 	var step string
 	return d.deliver(call, cluster, &step, func(r fleet.APIContextReceiver) fleetapp.SourceWork {
-		return fleetapp.SourceWork{Channel: r.Channel, StopRecording: &stop, StopIssuedAt: issued, NotAfter: identity.Earlier(issued.Add(5*time.Second), r.ValidUntil)}
+		return fleetapp.SourceWork{Channel: r.Channel, StopRecording: &stop, StopIssuedAt: issued, NotAfter: identity.Earlier(issued.Add(5*time.Second), r.Window.Until())}
 	})
 }

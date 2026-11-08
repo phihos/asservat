@@ -2,6 +2,7 @@ package native_test
 
 import (
 	fleetapp "asservat.local/asservat/internal/application/fleet"
+	"asservat.local/asservat/internal/domain/identity"
 	"context"
 	"crypto/tls"
 	"errors"
@@ -32,7 +33,7 @@ func (s *sharedStartIngress) AuthenticateContextStart(ctx context.Context, peer 
 	c := fleet.APIContextChannel{RootID: nativeID, ExchangeID: hello.Channel.ExchangeID, Challenge: nativeID, Hub: fleet.OwnerBinding{InstallationID: nativeID, ClusterID: nativeID, IssuerEpoch: nativeID, PodUID: nativeID, ProcessEpoch: nativeID}, Connector: fleet.ConnectorProcessIdentity{Binding: fleet.PeerBinding{InstallationID: nativeID, ClusterID: nativeID, IssuerEpoch: nativeID, PeerID: nativeID, Role: fleet.ConnectorPeer}, PodUID: nativeID, ProcessEpoch: nativeID}, ConnectorLeaf: artifact.Digest{1}, Executor: fleet.APIContextExecutor{NamespaceUID: nativeID, AccountUID: nativeID, PodUID: nativeID, ProcessEpoch: "22222222-2222-4222-8222-222222222222", StartupDigest: artifact.Digest{2}, ImageDigest: artifact.Digest{3}}}
 	check := func(call context.Context) (fleet.APIContextReceiver, error) {
 		n := time.Now()
-		return fleet.APIContextReceiver{Channel: c, ObservedAt: n, ValidUntil: n.Add(5 * time.Second)}, call.Err()
+		return fleet.APIContextReceiver{Channel: c, Window: identity.Check(n, identity.Recheck).Narrow(n.Add(5 * time.Second))}, call.Err()
 	}
 	r, e := check(ctx)
 	return r, check, e

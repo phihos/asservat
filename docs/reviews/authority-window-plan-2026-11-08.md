@@ -1,6 +1,6 @@
 # Authority windows: one type and a gate (plan, 2026-11-08)
 
-Status: plan. Extends step 3 of
+Status: plan; rollout step 1 implemented. Extends step 3 of
 [authority-timing-plan-2026-11-07](authority-timing-plan-2026-11-07.md).
 
 ## Problem
@@ -54,6 +54,13 @@ stay allowed; they bound blocking work, not authority.
 ## Rollout
 
 1. Type, property test and gate with the current baseline (no behavior change).
+   Done: `identity.Window` (internal/domain/identity/window.go), the SQL fence
+   test for `context_execution_check`, `capacity_recovery_current` and the two
+   connector recovery locks, `make authority-window-check` (part of go-check
+   and pre-push) with `scripts/authority-windows-baseline.txt` (362 sites in
+   262 files). Worked example: `fleet.APIContextReceiver` carries a `Window`;
+   the regional receiver check builds it at its own start instead of the
+   PR #174 clip.
 2. Convert the request paths that broke: live watch, capture start/regional
    receiver, downloads, MCP/browser identity. Each conversion deletes its
    per-site patches.

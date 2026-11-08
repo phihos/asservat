@@ -1,6 +1,7 @@
 package contextstart
 
 import (
+	"asservat.local/asservat/internal/domain/identity"
 	"context"
 	"encoding/json"
 	"errors"
@@ -33,7 +34,7 @@ func newQueryLifecycleFixture(t *testing.T, parent context.Context, check Receiv
 	t.Helper()
 	w := workFixture()
 	now := time.Now()
-	f := &queryLifecycleFixture{receiver: fleet.APIContextReceiver{Channel: w.Work.Channel, ObservedAt: now, ValidUntil: now.Add(time.Second)}}
+	f := &queryLifecycleFixture{receiver: fleet.APIContextReceiver{Channel: w.Work.Channel, Window: identity.Check(now, identity.Recheck).Narrow(now.Add(time.Second))}}
 	f.passiveUntil, _ = parent.Deadline()
 	if check == nil {
 		check = func(context.Context) (fleet.APIContextReceiver, error) { return f.receiver, nil }
@@ -135,7 +136,7 @@ func TestContextQueryCompletedAnswerRetainsProofAndFiniteCounts(t *testing.T) {
 					if !errors.As(err, &closed) || !errors.Is(err, targets.ErrDenied) {
 						t.Fatal("closed denial lost", err)
 					}
-				} else if err != nil || !until.Equal(f.receiver.ValidUntil) {
+				} else if err != nil || !until.Equal(f.receiver.Window.Until()) {
 					t.Fatal("successful proof changed", until, err)
 				}
 				if f.stream.Context().Err() != nil {
@@ -208,9 +209,9 @@ func TestContextQueryCompletionKeepsEveryOriginalBound(t *testing.T) {
 			var calls atomic.Int32
 			check := func(context.Context) (fleet.APIContextReceiver, error) {
 				now := time.Now()
-				r := fleet.APIContextReceiver{Channel: workFixture().Work.Channel, ObservedAt: now, ValidUntil: now.Add(time.Second)}
+				r := fleet.APIContextReceiver{Channel: workFixture().Work.Channel, Window: identity.Check(now, identity.Recheck).Narrow(now.Add(time.Second))}
 				if int(calls.Add(1)) == earlierCheck {
-					r.ValidUntil = early
+					r.Window = r.Window.Narrow(early)
 				}
 				return r, nil
 			}
@@ -241,9 +242,9 @@ func TestContextQueryAnswerCutoffIncludesEarlierFrameProofs(t *testing.T) {
 			var checks atomic.Int32
 			check := func(context.Context) (fleet.APIContextReceiver, error) {
 				now := time.Now()
-				r := fleet.APIContextReceiver{Channel: workFixture().Work.Channel, ObservedAt: now, ValidUntil: now.Add(time.Second)}
+				r := fleet.APIContextReceiver{Channel: workFixture().Work.Channel, Window: identity.Check(now, identity.Recheck).Narrow(now.Add(time.Second))}
 				if int(checks.Add(1)) == earlierCheck {
-					r.ValidUntil = early
+					r.Window = r.Window.Narrow(early)
 				}
 				return r, nil
 			}
@@ -267,7 +268,7 @@ func TestContextQueryReuseChecksNewSourceAndRejectsRevokedPeer(t *testing.T) {
 			return fleet.APIContextReceiver{}, fleet.ErrDenied
 		}
 		now := time.Now()
-		return fleet.APIContextReceiver{Channel: workFixture().Work.Channel, ObservedAt: now, ValidUntil: now.Add(time.Second)}, nil
+		return fleet.APIContextReceiver{Channel: workFixture().Work.Channel, Window: identity.Check(now, identity.Recheck).Narrow(now.Add(time.Second))}, nil
 	}
 	f := newQueryLifecycleFixture(t, parent, check, nil)
 	if _, err := f.stream.query(ctx, queryResolvePod, struct{}{}, &struct{}{}); err != nil {

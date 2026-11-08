@@ -1,6 +1,7 @@
 package contextstart
 
 import (
+	"asservat.local/asservat/internal/domain/identity"
 	"bytes"
 	"context"
 	"io"
@@ -20,7 +21,7 @@ func TestContextStreamShortPeerDeadlineInterruptsBlockedRequestPipe(t *testing.T
 	defer read.Close()
 	defer write.Close()
 	check := func(context.Context) (fleet.APIContextReceiver, error) {
-		return fleet.APIContextReceiver{Channel: w.Work.Channel, ObservedAt: start, ValidUntil: until}, nil
+		return fleet.APIContextReceiver{Channel: w.Work.Channel, Window: identity.Check(start, identity.Recheck).Narrow(until)}, nil
 	}
 	// A request-body pipe has no socket deadline of its own. Merely setting the
 	// underlying HTTP/2 connection deadline cannot be its cancellation owner.
@@ -51,7 +52,7 @@ func TestContextStreamSpendsFiniteFrameBudgetAcrossDirections(t *testing.T) {
 	read, write := io.Pipe()
 	defer write.Close()
 	check := func(context.Context) (fleet.APIContextReceiver, error) {
-		return fleet.APIContextReceiver{Channel: w.Work.Channel, ObservedAt: w.VerifiedAt, ValidUntil: w.ValidUntil}, nil
+		return fleet.APIContextReceiver{Channel: w.Work.Channel, Window: identity.Check(w.VerifiedAt, identity.Recheck).Narrow(w.ValidUntil)}, nil
 	}
 	s, e := newFrameStream(context.Background(), w.Work.Channel, check, read, io.Discard, func(time.Time) error { return nil }, func(time.Time) error { return nil }, func() error { return nil }, func() { read.Close() })
 	if e != nil {
@@ -93,7 +94,7 @@ func TestContextStreamPassiveFirstWaitDoesNotConsumePeerLease(t *testing.T) {
 	check := func(context.Context) (fleet.APIContextReceiver, error) {
 		checks.Add(1)
 		n := time.Now()
-		return fleet.APIContextReceiver{Channel: w.Work.Channel, ObservedAt: n, ValidUntil: n.Add(40 * time.Millisecond)}, nil
+		return fleet.APIContextReceiver{Channel: w.Work.Channel, Window: identity.Check(n, identity.Recheck).Narrow(n.Add(40 * time.Millisecond))}, nil
 	}
 	s, e := newFrameStream(ctx, w.Work.Channel, check, read, io.Discard, func(d time.Time) error { deadline <- d; return nil }, func(time.Time) error { return nil }, func() error { return nil }, func() { read.Close() })
 	if e != nil {
@@ -124,7 +125,7 @@ func TestContextStreamEOFJoinsBlockedHubOperation(t *testing.T) {
 	read, write := io.Pipe()
 	defer write.Close()
 	check := func(context.Context) (fleet.APIContextReceiver, error) {
-		return fleet.APIContextReceiver{Channel: w.Work.Channel, ObservedAt: w.VerifiedAt, ValidUntil: w.ValidUntil}, nil
+		return fleet.APIContextReceiver{Channel: w.Work.Channel, Window: identity.Check(w.VerifiedAt, identity.Recheck).Narrow(w.ValidUntil)}, nil
 	}
 	s, e := newFrameStream(context.Background(), w.Work.Channel, check, read, io.Discard, func(time.Time) error { return nil }, func(time.Time) error { return nil }, func() error { return nil }, func() { read.Close() })
 	if e != nil {

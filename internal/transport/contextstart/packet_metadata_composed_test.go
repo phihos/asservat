@@ -288,7 +288,7 @@ func newPacketMetadataFixture(t *testing.T) *packetMetadataFixture {
 			if ctx.Err() != nil || !now.Before(until) {
 				return fleet.APIContextReceiver{}, fleet.ErrUnavailable
 			}
-			return fleet.APIContextReceiver{Channel: f.channel, ObservedAt: now, ValidUntil: until}, nil
+			return fleet.APIContextReceiver{Channel: f.channel, Window: identity.Check(now, identity.Recheck).Narrow(until)}, nil
 		}
 	}
 	stream := func(socket net.Conn, c ReceiverCheck) *frameStream {

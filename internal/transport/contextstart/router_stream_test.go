@@ -1,6 +1,7 @@
 package contextstart
 
 import (
+	"asservat.local/asservat/internal/domain/identity"
 	"bytes"
 	"context"
 	"errors"
@@ -33,7 +34,7 @@ func newRouterStreamFixture(t *testing.T) *routerStreamFixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	receiver := fleet.APIContextReceiver{Channel: w.Work.Channel, ObservedAt: w.VerifiedAt, ValidUntil: w.ValidUntil}
+	receiver := fleet.APIContextReceiver{Channel: w.Work.Channel, Window: identity.Check(w.VerifiedAt, identity.Recheck).Narrow(w.ValidUntil)}
 	check := func(context.Context) (fleet.APIContextReceiver, error) { return receiver, nil }
 	standby, err := r.RegisterStandby(context.Background(), receiver, check)
 	if err != nil {
@@ -121,7 +122,7 @@ func TestRouterWithdrawsCancelledStreamBeforeSocketCleanup(t *testing.T) {
 
 func TestRouterStreamCancellationKeepsCaptureChargedUntilJoined(t *testing.T) {
 	f := newRouterStreamFixture(t)
-	ctx, cancel := context.WithDeadline(context.Background(), f.receiver.ValidUntil)
+	ctx, cancel := context.WithDeadline(context.Background(), f.receiver.Window.Until())
 	defer cancel()
 	w := workFixture().Work
 	w.Channel = f.receiver.Channel

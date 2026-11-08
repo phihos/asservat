@@ -151,7 +151,7 @@ func (s RegionalRecordingCollect) Collect(ctx context.Context, captureID string)
 	if err != nil {
 		return "", execution.ErrUnavailable
 	}
-	until = identity.Earlier(until, receiver.ValidUntil)
+	until = identity.Earlier(until, receiver.Window.Until())
 	if receiver.Channel.Connector.Binding.InstallationID != recovery.InstallationID || receiver.Channel.Connector.Binding.IssuerEpoch != recovery.IssuerEpoch {
 		return "", execution.ErrDenied
 	}

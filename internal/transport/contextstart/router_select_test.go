@@ -1,6 +1,7 @@
 package contextstart
 
 import (
+	"asservat.local/asservat/internal/domain/identity"
 	"context"
 	"errors"
 	"testing"
@@ -25,7 +26,7 @@ func TestRouterSelectsStandbyThatOutlivesTheWork(t *testing.T) {
 		channel := work.Work.Channel
 		channel.ExchangeID = exchange
 		now := time.Now()
-		receiver := fleet.APIContextReceiver{Channel: channel, ObservedAt: now, ValidUntil: now.Add(5 * time.Second)}
+		receiver := fleet.APIContextReceiver{Channel: channel, Window: identity.Check(now, identity.Recheck).Narrow(now.Add(5 * time.Second))}
 		s, err := router.RegisterStandby(ctx, receiver, func(context.Context) (fleet.APIContextReceiver, error) { return receiver, nil })
 		if err != nil {
 			t.Fatal(err)
@@ -90,7 +91,7 @@ func TestRouterSelectionReadsAndPruneRetiresOnlyIdleEndingStandbys(t *testing.T)
 		channel.Connector.Binding.ClusterID = clusterID
 		channel.ExchangeID = exchange
 		now := time.Now()
-		receiver := fleet.APIContextReceiver{Channel: channel, ObservedAt: now, ValidUntil: now.Add(5 * time.Second)}
+		receiver := fleet.APIContextReceiver{Channel: channel, Window: identity.Check(now, identity.Recheck).Narrow(now.Add(5 * time.Second))}
 		s, err := router.RegisterStandby(ctx, receiver, func(context.Context) (fleet.APIContextReceiver, error) { return receiver, nil })
 		if err != nil {
 			t.Fatal(err)

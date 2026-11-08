@@ -4,6 +4,7 @@ import (
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/collector"
 	"asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
 	v "asservat.local/asservat/internal/domain/live"
 	"bytes"
 	"context"
@@ -39,7 +40,7 @@ func TestLiveRegionalQueryChecksOriginalChannelAndNeverAcquires(t *testing.T) {
 				r.ClusterID = "22222222-2222-4222-8222-222222222222"
 			}
 			resolver := &liveQueryResolver{reply: v.NodeReply{WorkID: r.Binding.SourceID, SourceID: r.Binding.SourceID, Fence: r.Binding.Fence, BootID: r.Binding.BootID, Clock: "monotonic", Sample: 100, Rows: []v.StampedRow{}, Position: v.Position{Sequence: 1}}}
-			receiver := fleet.APIContextReceiver{Channel: work.Channel, ObservedAt: now, ValidUntil: now.Add(5 * time.Second)}
+			receiver := fleet.APIContextReceiver{Channel: work.Channel, Window: identity.Check(now, identity.Recheck).Narrow(now.Add(5 * time.Second))}
 			var output bytes.Buffer
 			checks := 0
 			stream, e := newFrameStream(ctx, work.Channel, func(context.Context) (fleet.APIContextReceiver, error) { checks++; return receiver, nil }, bytes.NewReader(nil), &output, func(time.Time) error { return nil }, func(time.Time) error { return nil }, func() error { return nil }, func() {})

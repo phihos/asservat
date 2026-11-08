@@ -191,7 +191,7 @@ func (s *APIContextWorkSignatures) VerifyAPIContextWork(ctx context.Context, enc
 	if e != nil || !jsontext.Value(payload).IsValid() || !bytes.Equal(canonical, payload) {
 		return out, value.ErrInvalid
 	}
-	call, stop := context.WithDeadline(ctx, identity.Earlier(w.NotAfter, receiver.ValidUntil))
+	call, stop := context.WithDeadline(ctx, identity.Earlier(w.NotAfter, receiver.Window.Until()))
 	defer stop()
 	first, key, e := s.current(call, w, h["kid"])
 	if e != nil {
