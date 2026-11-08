@@ -1,6 +1,7 @@
 package contextstart
 
 import (
+	"asservat.local/asservat/internal/domain/identity"
 	"context"
 	"errors"
 	"testing"
@@ -18,7 +19,7 @@ func TestRouterQueryExcludesAttachmentUntilJoinedResult(t *testing.T) {
 		t.Fatal(err)
 	}
 	now := time.Now()
-	receiver := fleet.APIContextReceiver{Channel: w.Work.Channel, ObservedAt: now, ValidUntil: now.Add(5 * time.Second)}
+	receiver := fleet.APIContextReceiver{Channel: w.Work.Channel, Window: identity.Check(now, identity.Recheck).Narrow(now.Add(5 * time.Second))}
 	standby, err := router.RegisterStandby(context.Background(), receiver, func(context.Context) (fleet.APIContextReceiver, error) { return receiver, nil })
 	if err != nil {
 		t.Fatal(err)
@@ -66,7 +67,7 @@ func TestRouterQueryExcludesAttachmentUntilJoinedResult(t *testing.T) {
 	if queries != 1 {
 		t.Error("another query reserved the busy standby", queries)
 	}
-	job.result <- queryResult{until: receiver.ValidUntil}
+	job.result <- queryResult{until: receiver.Window.Until()}
 	if err := <-done; err != nil {
 		t.Fatal(err)
 	}
@@ -80,7 +81,7 @@ func TestRouterWaitingQueryWakesWhenJoinedQueryReleasesStandby(t *testing.T) {
 		t.Fatal(err)
 	}
 	now := time.Now()
-	receiver := fleet.APIContextReceiver{Channel: w.Work.Channel, ObservedAt: now, ValidUntil: now.Add(5 * time.Second)}
+	receiver := fleet.APIContextReceiver{Channel: w.Work.Channel, Window: identity.Check(now, identity.Recheck).Narrow(now.Add(5 * time.Second))}
 	standby, err := router.RegisterStandby(context.Background(), receiver, func(context.Context) (fleet.APIContextReceiver, error) { return receiver, nil })
 	if err != nil {
 		t.Fatal(err)
@@ -115,13 +116,13 @@ func TestRouterWaitingQueryWakesWhenJoinedQueryReleasesStandby(t *testing.T) {
 	if spent != 1 {
 		t.Error("busy standby consumed another query count", spent)
 	}
-	first.result <- queryResult{until: receiver.ValidUntil}
+	first.result <- queryResult{until: receiver.Window.Until()}
 	if err := <-firstDone; err != nil {
 		t.Fatal(err)
 	}
 	select {
 	case second := <-standby.query:
-		second.result <- queryResult{until: receiver.ValidUntil}
+		second.result <- queryResult{until: receiver.Window.Until()}
 	case <-time.After(300 * time.Millisecond):
 		t.Fatal("released standby did not wake waiting query")
 	}
@@ -143,7 +144,7 @@ func TestRouterCancellationBeforeHandoffReleasesBusyWithoutRefund(t *testing.T) 
 		t.Fatal(err)
 	}
 	now := time.Now()
-	receiver := fleet.APIContextReceiver{Channel: w.Work.Channel, ObservedAt: now, ValidUntil: now.Add(5 * time.Second)}
+	receiver := fleet.APIContextReceiver{Channel: w.Work.Channel, Window: identity.Check(now, identity.Recheck).Narrow(now.Add(5 * time.Second))}
 	standby, err := router.RegisterStandby(context.Background(), receiver, func(context.Context) (fleet.APIContextReceiver, error) { return receiver, nil })
 	if err != nil {
 		t.Fatal(err)
@@ -209,7 +210,7 @@ func TestRouterRetiresExhaustedStandbyOnlyWithAnother(t *testing.T) {
 		register := func(exchange string) *Standby {
 			channel := w.Work.Channel
 			channel.ExchangeID = exchange
-			receiver := fleet.APIContextReceiver{Channel: channel, ObservedAt: now, ValidUntil: now.Add(5 * time.Second)}
+			receiver := fleet.APIContextReceiver{Channel: channel, Window: identity.Check(now, identity.Recheck).Narrow(now.Add(5 * time.Second))}
 			s, err := router.RegisterStandby(context.Background(), receiver, func(context.Context) (fleet.APIContextReceiver, error) { return receiver, nil })
 			if err != nil {
 				t.Fatal(err)
@@ -263,7 +264,7 @@ func TestRouterTryAttachDoesNotWait(t *testing.T) {
 		t.Fatal("try attach waited or succeeded without a standby", err, time.Since(started))
 	}
 	now := time.Now()
-	receiver := fleet.APIContextReceiver{Channel: w.Work.Channel, ObservedAt: now, ValidUntil: now.Add(5 * time.Second)}
+	receiver := fleet.APIContextReceiver{Channel: w.Work.Channel, Window: identity.Check(now, identity.Recheck).Narrow(now.Add(5 * time.Second))}
 	standby, err := router.RegisterStandby(context.Background(), receiver, func(context.Context) (fleet.APIContextReceiver, error) { return receiver, nil })
 	if err != nil {
 		t.Fatal(err)
@@ -294,7 +295,7 @@ func TestRouterTryAttachNarrowsToAnAgedStandby(t *testing.T) {
 	residence, endResidence := context.WithTimeout(context.Background(), 12*time.Second)
 	defer endResidence()
 	now := time.Now()
-	receiver := fleet.APIContextReceiver{Channel: w.Work.Channel, ObservedAt: now, ValidUntil: now.Add(5 * time.Second)}
+	receiver := fleet.APIContextReceiver{Channel: w.Work.Channel, Window: identity.Check(now, identity.Recheck).Narrow(now.Add(5 * time.Second))}
 	standby, err := router.RegisterStandby(residence, receiver, func(context.Context) (fleet.APIContextReceiver, error) { return receiver, nil })
 	if err != nil {
 		t.Fatal(err)

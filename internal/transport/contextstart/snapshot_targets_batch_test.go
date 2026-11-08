@@ -1,6 +1,7 @@
 package contextstart
 
 import (
+	"asservat.local/asservat/internal/domain/identity"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -136,7 +137,7 @@ func TestSnapshotBatchSixteenUsesTwoRealFramedRouterQueries(t *testing.T) {
 		t.Fatal("sixteen-member selection did not use two queries", len(got), count, err)
 	}
 	for index, value := range got {
-		if value.Original != requests[index] || value.FreshUntil.After(f.receiver.ValidUntil) || !value.ReportedAt.Equal(replies[index].ReportedAt) {
+		if value.Original != requests[index] || value.FreshUntil.After(f.receiver.Window.Until()) || !value.ReportedAt.Equal(replies[index].ReportedAt) {
 			t.Fatal("changed target/freshness/report", index)
 		}
 	}
@@ -157,7 +158,7 @@ func TestSnapshotBatchRejectsPartialSwappedAndExpiredAnswers(t *testing.T) {
 				replies[1] = targets.SourceSnapshotResolution{}
 			}
 			work := workFixture()
-			receiver := fleet.APIContextReceiver{Channel: work.Work.Channel, ObservedAt: now, ValidUntil: now.Add(5 * time.Second)}
+			receiver := fleet.APIContextReceiver{Channel: work.Work.Channel, Window: identity.Check(now, identity.Recheck).Narrow(now.Add(5 * time.Second))}
 			ctx, cancel := context.WithTimeout(t.Context(), time.Second)
 			defer cancel()
 			router, err := NewRouter(RouterLimits{Standby: 1, Captures: 1, Clusters: []ClusterLimit{{requests[0].Request.ClusterID, 1, 1}}})
@@ -184,7 +185,7 @@ func TestSnapshotBatchRejectsPartialSwappedAndExpiredAnswers(t *testing.T) {
 				if mode == "deadline" {
 					cancel()
 				}
-				job.result <- queryResult{until: receiver.ValidUntil}
+				job.result <- queryResult{until: receiver.Window.Until()}
 			}()
 			got, err := hub.ResolveSourceSnapshots(ctx, requests)
 			<-joined
@@ -218,7 +219,7 @@ func TestSnapshotBatchDoesNotRefreshEarlierChunkProof(t *testing.T) {
 	base := replies[0].ObservedAt
 	now := base
 	work := workFixture()
-	receiver := fleet.APIContextReceiver{Channel: work.Work.Channel, ObservedAt: base, ValidUntil: base.Add(5 * time.Second)}
+	receiver := fleet.APIContextReceiver{Channel: work.Work.Channel, Window: identity.Check(base, identity.Recheck).Narrow(base.Add(5 * time.Second))}
 	ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
 	defer cancel()
 	router, err := NewRouter(RouterLimits{Standby: 1, Captures: 1, Clusters: []ClusterLimit{{requests[0].Request.ClusterID, 1, 1}}})

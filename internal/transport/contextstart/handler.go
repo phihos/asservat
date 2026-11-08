@@ -168,7 +168,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	stream.frames = 2
 	stream.bytes = contracts.APIContextWorkBytes + 5 + contracts.APIContextSourceBytes + 5 // Same ceilings as the connector.
 	current.Store(stream)
-	if controller.SetWriteDeadline(receiver.ValidUntil) != nil || !time.Now().Before(receiver.ValidUntil) {
+	if controller.SetWriteDeadline(receiver.Window.Until()) != nil || !time.Now().Before(receiver.Window.Until()) {
 		return
 	}
 	w.Header().Set("Content-Type", contracts.APIContextStartMedia)

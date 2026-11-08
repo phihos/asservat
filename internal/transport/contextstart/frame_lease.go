@@ -6,7 +6,6 @@ import (
 
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/fleet"
-	"asservat.local/asservat/internal/domain/identity"
 )
 
 // A work lease belongs to one frameStream and only bounds transport. It is
@@ -87,7 +86,7 @@ func (s *frameStream) observePeer(ctx context.Context, mode framePeerMode) (flee
 	}
 	s.lease.final = true
 	s.mu.Unlock()
-	call, cancel := context.WithDeadline(ctx, old.ValidUntil)
+	call, cancel := context.WithDeadline(ctx, old.Window.Until())
 	defer cancel()
 	observed, e := s.check(call)
 	if e != nil {
@@ -120,22 +119,22 @@ func (s *frameStream) acceptPeer(ctx context.Context, observed fleet.APIContextR
 		// bound: the lease keeps the one peer check for its ADR-311 interval
 		// (each later frame keeps its own I/O bound).
 		if d, ok := ctx.Deadline(); ok {
-			observed.ValidUntil = identity.Earlier(observed.ValidUntil, d)
+			observed.Window = observed.Window.Narrow(d)
 		}
 		if !observed.Valid(time.Now()) {
 			return fleet.APIContextReceiver{}, fleet.ErrUnavailable
 		}
 		s.lease = &framePeerLease{receiver: observed, regional: s.awaited, history: s.historyWork}
-		recordWorkPeerDeadline(ctx, observed.ValidUntil)
+		recordWorkPeerDeadline(ctx, observed.Window.Until())
 	case peerFinal:
 		if s.lease == nil || !s.lease.final || len(s.leaseBounds) != 1 || !s.lease.receiver.Valid(time.Now()) {
 			return fleet.APIContextReceiver{}, fleet.ErrUnavailable
 		}
-		currentUntil := observed.ValidUntil
+		currentUntil := observed.Window.Until()
 		observed = s.lease.receiver
-		observed.ValidUntil = identity.Earlier(observed.ValidUntil, currentUntil)
+		observed.Window = observed.Window.Narrow(currentUntil)
 		if d, ok := ctx.Deadline(); ok {
-			observed.ValidUntil = identity.Earlier(observed.ValidUntil, d)
+			observed.Window = observed.Window.Narrow(d)
 		}
 		if !observed.Valid(time.Now()) {
 			return fleet.APIContextReceiver{}, fleet.ErrUnavailable
@@ -146,7 +145,7 @@ func (s *frameStream) acceptPeer(ctx context.Context, observed fleet.APIContextR
 	}
 	// Expiry cancels even when the caller is between frames or blocked inside
 	// the application. It never waits for another Send/Receive to notice it.
-	bound, cancel := context.WithDeadline(s.ctx, observed.ValidUntil)
+	bound, cancel := context.WithDeadline(s.ctx, observed.Window.Until())
 	done := make(chan struct{})
 	stop := context.AfterFunc(bound, func() { s.interruptAt(streamWorkPeerLease, streamErrorReason(bound.Err())); close(done) })
 	s.leaseBounds = append(s.leaseBounds, framePeerBound{stop: stop, cancel: cancel, done: done})

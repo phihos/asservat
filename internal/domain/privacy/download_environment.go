@@ -11,7 +11,7 @@ import (
 
 // DownloadPolicyObservationInterval bounds download-only reuse of a protected
 // policy observation. It does not extend an operation or administrative proof.
-const DownloadPolicyObservationInterval = 60 * time.Second
+const DownloadPolicyObservationInterval = identity.PolicyObservationInterval
 
 type DownloadPath = artifact.DownloadPath
 

@@ -175,7 +175,7 @@ func (s RegionalAPIContextStart) startOnce(ctx context.Context, current identiti
 	if e != nil {
 		return notStarted
 	}
-	narrow("receiver", receiver.ValidUntil)
+	narrow("receiver", receiver.Window.Until())
 	if receiver.Channel.Connector.Binding.InstallationID != recovery.InstallationID || receiver.Channel.Connector.Binding.IssuerEpoch != recovery.IssuerEpoch {
 		return execution.ErrDenied
 	}

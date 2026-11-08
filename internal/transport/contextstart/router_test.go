@@ -1,6 +1,7 @@
 package contextstart
 
 import (
+	"asservat.local/asservat/internal/domain/identity"
 	"context"
 	"testing"
 	"time"
@@ -27,7 +28,7 @@ func TestContextRouterReservedClusterCapacityAndClosing(t *testing.T) {
 		channel.Connector.Binding.ClusterID = cluster
 		channel.ExchangeID = exchange
 		now := time.Now()
-		receiver := fleet.APIContextReceiver{Channel: channel, ObservedAt: now, ValidUntil: now.Add(5 * time.Second)}
+		receiver := fleet.APIContextReceiver{Channel: channel, Window: identity.Check(now, identity.Recheck).Narrow(now.Add(5 * time.Second))}
 		s, e := router.RegisterStandby(resident, receiver, func(context.Context) (fleet.APIContextReceiver, error) { return receiver, nil })
 		if e != nil {
 			t.Fatal(e)
@@ -38,7 +39,7 @@ func TestContextRouterReservedClusterCapacityAndClosing(t *testing.T) {
 	same := work.Work.Channel
 	same.ExchangeID = "00000000-0000-4000-8000-000000000098"
 	n := time.Now()
-	obs := fleet.APIContextReceiver{Channel: same, ObservedAt: n, ValidUntil: n.Add(5 * time.Second)}
+	obs := fleet.APIContextReceiver{Channel: same, Window: identity.Check(n, identity.Recheck).Narrow(n.Add(5 * time.Second))}
 	if _, e = router.RegisterStandby(resident, obs, func(context.Context) (fleet.APIContextReceiver, error) { return obs, nil }); e == nil {
 		t.Fatal("one cluster stole another's standby reservation")
 	}

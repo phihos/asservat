@@ -222,7 +222,7 @@ func (s *frameStream) query(ctx context.Context, method string, in, out any) (ti
 		// Nothing was sent for this query yet: a build failure returns the
 		// stream to its passive residence like an answered query.
 		if in, e = build(receiver); e != nil {
-			if c := s.completeQuery(call, receiver.ValidUntil); c != nil {
+			if c := s.completeQuery(call, receiver.Window.Until()); c != nil {
 				return time.Time{}, c
 			}
 			return time.Time{}, errQueryAnswer{e}
@@ -280,7 +280,7 @@ func (s *frameStream) query(ctx context.Context, method string, in, out any) (ti
 	}
 	// Both finite frame calls have joined. A matched answer also acknowledges
 	// the outbound query; only now can either hub socket timer leave this phase.
-	until := identity.Earlier(receiver.ValidUntil, identity.Earlier(sentUntil, receivedUntil))
+	until := identity.Earlier(receiver.Window.Until(), identity.Earlier(sentUntil, receivedUntil))
 	if e := s.completeQuery(call, until); e != nil {
 		return time.Time{}, e
 	}
@@ -380,7 +380,7 @@ func (s *frameStream) answerQuery(ctx context.Context, f contracts.APIContextFra
 		return fleet.ErrUnavailable
 	}
 	until, _ := call.Deadline()
-	bounded, stop := context.WithDeadline(call, identity.Earlier(until, owner.ValidUntil))
+	bounded, stop := context.WithDeadline(call, identity.Earlier(until, owner.Window.Until()))
 	defer stop()
 	var out any
 	resolved := time.Now()

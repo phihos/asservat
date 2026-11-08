@@ -188,8 +188,8 @@ func (f *contextStartTLSFixture) workWithSigner(t *testing.T, receiver value.API
 	t.Helper()
 	n := time.Now().UTC().Truncate(time.Microsecond)
 	until := n.Add(2 * time.Second)
-	if receiver.ValidUntil.Before(until) {
-		until = receiver.ValidUntil.UTC().Truncate(time.Microsecond)
+	if receiver.Window.Until().Before(until) {
+		until = receiver.Window.Until().UTC().Truncate(time.Microsecond)
 	}
 	actor := identity.Principal{Issuer: "https://synthetic.invalid", Subject: "human", ClientID: "console", Kind: identity.Human}
 	rev := identity.Revision{UID: ownerTestID, Generation: 1, Digest: artifact.Digest{1}}
@@ -220,7 +220,7 @@ func (f *contextStartTLSFixture) workSigner(t *testing.T, receiver value.APICont
 	rev := identity.Revision{UID: ownerTestID, Generation: 1, Digest: artifact.Digest{1}}
 	reader := contextStartTrust(func(context.Context) (value.APIContextWorkTrust, error) {
 		now := time.Now().UTC().Truncate(time.Microsecond)
-		until := identity.Earlier(now.Add(5*time.Second), receiver.ValidUntil)
+		until := identity.Earlier(now.Add(5*time.Second), receiver.Window.Until())
 		return value.APIContextWorkTrust{RootID: f.rootID, InstallationID: f.owner.InstallationID, ClusterID: receiver.Channel.Connector.Binding.ClusterID, IssuerEpoch: f.owner.IssuerEpoch, Trust: value.WorkTrust{Revision: rev, ObservedAt: now, FreshUntil: until, Keys: []value.WorkKey{{ID: "purpose-only-test-key", ClusterID: receiver.Channel.Connector.Binding.ClusterID, IssuerEpoch: f.owner.IssuerEpoch, PublicKey: pub, NotBefore: created.Add(-time.Minute), NotAfter: created.Add(time.Minute)}}}}, nil
 	})
 	signer, err := jose.NewAPIContextWorkSignatures(reader, "purpose-only-test-key", func(context.Context) crypto.Signer { return key }, time.Now)

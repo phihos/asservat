@@ -557,8 +557,8 @@ func (a *Attachment) Receiver(ctx context.Context) (fleet.APIContextReceiver, er
 	if e != nil || call.Err() != nil || a.ctx.Err() != nil || !live || !receiver.Valid(time.Now()) || receiver.Channel != a.standby.channel {
 		return fleet.APIContextReceiver{}, fleet.ErrUnavailable
 	}
-	if d, ok := a.ctx.Deadline(); ok && d.Before(receiver.ValidUntil) {
-		receiver.ValidUntil = d
+	if d, ok := a.ctx.Deadline(); ok {
+		receiver.Window = receiver.Window.Narrow(d)
 	}
 	if !receiver.Valid(time.Now()) {
 		return fleet.APIContextReceiver{}, fleet.ErrUnavailable

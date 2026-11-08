@@ -206,7 +206,7 @@ func newRegionalObservationFixture(t *testing.T) (*regionalObservationFixture, p
 	f.work = executionapp.APIContextWork{Accepted: capture.Accepted{CaptureID: e.CaptureUID, State: capture.IntentAudited, ScopeDigest: e.PlanDigest, Expectation: e, Pin: f.target.Pin, CreatedAt: now, Deadline: e.Registration.WriteUntil}, Target: f.target.Request, Actor: f.identity.Principal, IntentDigest: artifact.Digest{1}}
 	f.process = value.APIProcessObservation{Binding: value.APIProcessBinding{InstallationID: id(44), ClusterID: id(2), IssuerEpoch: id(3), NamespaceUID: id(45), AccountUID: id(46), PodUID: id(47), ProcessEpoch: id(48), StartupDigest: artifact.Digest{1}, ImageDigest: image}, CheckedAt: now, ValidUntil: now.Add(5 * time.Second)}
 	channel := fleet.APIContextChannel{RootID: id(41), ExchangeID: id(50), Challenge: id(51), Hub: fleet.OwnerBinding{InstallationID: id(44), ClusterID: id(52), IssuerEpoch: id(3), PodUID: id(53), ProcessEpoch: id(54)}, Connector: fleet.ConnectorProcessIdentity{Binding: fleet.PeerBinding{InstallationID: id(44), ClusterID: id(2), IssuerEpoch: id(3), PeerID: id(55), Role: fleet.ConnectorPeer}, PodUID: id(47), ProcessEpoch: id(56)}, ConnectorLeaf: artifact.Digest{1}, Executor: fleet.APIContextExecutor{NamespaceUID: id(45), AccountUID: id(46), PodUID: id(47), ProcessEpoch: id(48), StartupDigest: artifact.Digest{1}, ImageDigest: image}}
-	f.receiver = fleet.APIContextReceiver{Channel: channel, ObservedAt: now, ValidUntil: now.Add(5 * time.Second)}
+	f.receiver = fleet.APIContextReceiver{Channel: channel, Window: identity.Check(now, identity.Recheck).Narrow(now.Add(5 * time.Second))}
 	return f, cap, settings
 }
 
@@ -347,7 +347,7 @@ func TestRegionalStartReusesPreludeBeforeFirstPreparation(t *testing.T) {
 	if f.workReads != 1 || observer.Load() != 18 || probe.Load() != 6 {
 		t.Fatal("preparation repeated its already observed prelude", f.workReads, observer.Load(), probe.Load())
 	}
-	if f.check.Work.Actor != f.identity.Principal || f.check.Work.Accepted.CaptureID != f.work.Accepted.CaptureID || f.check.ValidUntil.After(f.identity.ValidUntil) || f.check.ValidUntil.After(f.receiver.ValidUntil) {
+	if f.check.Work.Actor != f.identity.Principal || f.check.Work.Accepted.CaptureID != f.work.Accepted.CaptureID || f.check.ValidUntil.After(f.identity.ValidUntil) || f.check.ValidUntil.After(f.receiver.Window.Until()) {
 		t.Fatal("handoff changed identity, capture or original deadline")
 	}
 }

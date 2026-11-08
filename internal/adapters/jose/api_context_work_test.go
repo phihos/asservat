@@ -37,7 +37,7 @@ func apiWorkFixture(t *testing.T) (value.APIContextWork, value.APIContextReceive
 		t.Fatal(e)
 	}
 	trust := value.APIContextWorkTrust{RootID: channel.RootID, InstallationID: hub.InstallationID, ClusterID: conn.Binding.ClusterID, IssuerEpoch: hub.IssuerEpoch, Trust: value.WorkTrust{Revision: identity.Revision{UID: "work-source", Generation: 1, Digest: [32]byte{10}}, ObservedAt: now, FreshUntil: now.Add(5 * time.Second), Keys: []value.WorkKey{{ID: "current", ClusterID: conn.Binding.ClusterID, IssuerEpoch: hub.IssuerEpoch, PublicKey: pub, NotBefore: now.Add(-time.Hour), NotAfter: now.Add(time.Hour)}}}}
-	receiver := value.APIContextReceiver{Channel: channel, ObservedAt: now, ValidUntil: work.NotAfter}
+	receiver := value.APIContextReceiver{Channel: channel, Window: identity.Check(now, identity.Recheck).Narrow(work.NotAfter)}
 	if !work.Valid(now) || !receiver.Valid(now) || !trust.Valid(now) {
 		t.Fatal("fixture invalid")
 	}
@@ -197,12 +197,12 @@ func TestAPIContextWorkClampsShorterOriginalPeerProof(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	receiver.ValidUntil = receiver.ObservedAt.Add(3 * time.Second)
+	receiver.Window = receiver.Window.Narrow(receiver.Window.From().Add(3 * time.Second))
 	checked, e := s.VerifyAPIContextWork(context.Background(), encoded, receiver)
-	if e != nil || !checked.ValidUntil.Equal(receiver.ValidUntil) {
+	if e != nil || !checked.ValidUntil.Equal(receiver.Window.Until()) {
 		t.Fatalf("overlapping original intervals were rejected or widened: %v", e)
 	}
-	*now = receiver.ValidUntil
+	*now = receiver.Window.Until()
 	if _, e = s.VerifyAPIContextWork(context.Background(), encoded, receiver); e == nil {
 		t.Fatal("expired original peer observation was refreshed")
 	}

@@ -243,7 +243,7 @@ func (s *APIContextWorkSignatures) VerifySourceWork(ctx context.Context, encoded
 	case w.Channel != r.Channel:
 		return out, workStep{"source-channel", value.ErrDenied}
 	}
-	call, stop := context.WithDeadline(ctx, identity.Earlier(w.NotAfter, r.ValidUntil))
+	call, stop := context.WithDeadline(ctx, identity.Earlier(w.NotAfter, r.Window.Until()))
 	defer stop()
 	firstRead := time.Now()
 	first, key, e := s.sourceCurrent(call, w, h["kid"])
@@ -256,7 +256,7 @@ func (s *APIContextWorkSignatures) VerifySourceWork(ctx context.Context, encoded
 		}
 		return out, workStep{step, e}
 	}
-	until := identity.Earlier(w.NotAfter, identity.Earlier(r.ValidUntil, first.Trust.FreshUntil))
+	until := identity.Earlier(w.NotAfter, identity.Earlier(r.Window.Until(), first.Trust.FreshUntil))
 	bounded, cancel := context.WithDeadline(call, until)
 	defer cancel()
 	actual, e := jws.Verify(encoded, jws.WithKey(jwa.EdDSAEd25519(), ed25519.PublicKey(key.PublicKey)))

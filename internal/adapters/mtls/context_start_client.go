@@ -211,19 +211,19 @@ func (c *ContextStartClient) Close() {
 		e.Close()
 	}
 }
-func (c *ContextStartClient) local(ctx context.Context, expected *value.APIContextChannel) (ConnectorProcessObservation, value.APIContextExecutor, time.Time, error) {
+func (c *ContextStartClient) local(ctx context.Context, expected *value.APIContextChannel) (ConnectorProcessObservation, value.APIContextExecutor, identity.Window, error) {
 	return c.localWithReader(ctx, expected, nil)
 }
 
-func (c *ContextStartClient) localWithReader(ctx context.Context, expected *value.APIContextChannel, reader ContextStartProcessReader) (ConnectorProcessObservation, value.APIContextExecutor, time.Time, error) {
+func (c *ContextStartClient) localWithReader(ctx context.Context, expected *value.APIContextChannel, reader ContextStartProcessReader) (ConnectorProcessObservation, value.APIContextExecutor, identity.Window, error) {
 	var zero ConnectorProcessObservation
 	started := c.now()
 	call, stop := context.WithDeadline(ctx, started.Add(5*time.Second))
 	defer stop()
 	until, _ := call.Deadline()
-	// until bounds this check's reads; valid is the ADR-311 interval the
+	// until bounds this check's reads; valid is the ADR-311 window the
 	// completed check may be used for, never past a process hard end.
-	valid := started.Add(identity.AuthorityRecheckInterval)
+	valid := identity.Check(started, identity.Recheck)
 	var observed ConnectorProcessObservation
 	var process executionvalue.APIProcessObservation
 	var e error
@@ -241,10 +241,10 @@ func (c *ContextStartClient) localWithReader(ctx context.Context, expected *valu
 		}
 	}
 	if e != nil {
-		return zero, value.APIContextExecutor{}, time.Time{}, e
+		return zero, value.APIContextExecutor{}, identity.Window{}, e
 	}
 	if !process.Valid(c.now()) {
-		return zero, value.APIContextExecutor{}, time.Time{}, value.ErrUnavailable
+		return zero, value.APIContextExecutor{}, identity.Window{}, value.ErrUnavailable
 	}
 	until = identity.Earlier(until, observed.ValidUntil)
 	b := process.Binding
@@ -252,15 +252,15 @@ func (c *ContextStartClient) localWithReader(ctx context.Context, expected *valu
 	executor := value.APIContextExecutor{NamespaceUID: b.NamespaceUID, AccountUID: b.AccountUID, PodUID: b.PodUID, ProcessEpoch: b.ProcessEpoch, StartupDigest: b.StartupDigest, ImageDigest: b.ImageDigest}
 	if !identity.Fresh(observed.ObservedAt, observed.ValidUntil, c.now(), 5*time.Second) || !observed.Registration.Valid(c.now()) || !observed.Configuration.Valid(c.now()) || observed.Request.Process != p ||
 		!executor.Valid() || b.InstallationID != p.Binding.InstallationID || b.ClusterID != p.Binding.ClusterID || b.IssuerEpoch != p.Binding.IssuerEpoch || b.PodUID != p.PodUID || b.ProcessEpoch == p.ProcessEpoch || observed.Configuration.Profile.RootID != c.rootID {
-		return zero, value.APIContextExecutor{}, time.Time{}, value.ErrDenied
+		return zero, value.APIContextExecutor{}, identity.Window{}, value.ErrDenied
 	}
 	until = identity.Earlier(until, process.ValidUntil)
-	valid = identity.Earlier(valid, identity.Earlier(process.ValidUntil, observed.HardUntil()))
+	valid = valid.Narrow(process.ValidUntil, observed.HardUntil())
 	if expected != nil && (expected.RootID != c.rootID || expected.Connector != p || expected.ConnectorLeaf != observed.Registration.Certificate.Digest || expected.Executor != executor) {
-		return zero, value.APIContextExecutor{}, time.Time{}, value.ErrDenied
+		return zero, value.APIContextExecutor{}, identity.Window{}, value.ErrDenied
 	}
 	if call.Err() != nil || !c.now().Before(until) {
-		return zero, value.APIContextExecutor{}, time.Time{}, value.ErrUnavailable
+		return zero, value.APIContextExecutor{}, identity.Window{}, value.ErrUnavailable
 	}
 	return observed, executor, valid, nil
 }
@@ -283,16 +283,16 @@ func (c *ContextStartClient) currentWithOpeningDiagnostic(ctx context.Context, c
 		diagnostic.at("process-first")
 	}
 	localStart := time.Now()
-	_, _, until, e := c.localWithReader(call, &channel, reader)
+	_, _, local, e := c.localWithReader(call, &channel, reader)
 	auditapp.MarkStep(ctx, "r-local", localStart)
 	if e != nil {
 		return zero, receiverCheckStep{"local", e}
 	}
-	// The local check started slightly later and bounds itself by its own
-	// start; this receiver's interval starts at started.
-	until = identity.Earlier(until, started.Add(identity.AuthorityRecheckInterval))
-	diagnostic.bound(until)
-	call, stopLocal := context.WithDeadline(call, until)
+	// This receiver's window starts at its own check; the local check started
+	// later, so only its end narrows the window (PR #174).
+	window := identity.Check(started, identity.Recheck).Narrow(local.Until())
+	diagnostic.bound(window.Until())
+	call, stopLocal := context.WithDeadline(call, window.Until())
 	defer stopLocal()
 	if afterOwner {
 		diagnostic.at("owner-closing")
@@ -307,23 +307,23 @@ func (c *ContextStartClient) currentWithOpeningDiagnostic(ctx context.Context, c
 	}
 	// The owner was authenticated by this check; the receiver uses that one
 	// check for the ADR-311 interval, never past the owner's certificate.
-	until = identity.Earlier(until, owner.Certificate.NotAfter)
-	diagnostic.bound(until)
+	window = window.Narrow(owner.Certificate.NotAfter)
+	diagnostic.bound(window.Until())
 	if afterOwner {
 		diagnostic.at("process-final")
 		// Finish may have shortened the local bound before the owner read; the
 		// read above carries that bound into it. This final cheap read also
 		// detects a local change while owner authentication was blocking.
-		finalCall, stopFinal := context.WithDeadline(call, until)
-		_, _, finalUntil, err := c.localWithReader(finalCall, &channel, reader)
+		finalCall, stopFinal := context.WithDeadline(call, window.Until())
+		_, _, final, err := c.localWithReader(finalCall, &channel, reader)
 		stopFinal()
 		if err != nil {
 			return zero, err
 		}
-		until = identity.Earlier(until, finalUntil)
-		diagnostic.bound(until)
+		window = window.Narrow(final.Until())
+		diagnostic.bound(window.Until())
 	}
-	out := value.APIContextReceiver{Channel: channel, ObservedAt: started, ValidUntil: until}
+	out := value.APIContextReceiver{Channel: channel, Window: window}
 	if call.Err() != nil || c.root.Err() != nil || !out.Valid(c.now()) {
 		// Both halves succeeded, but the check's own bound (its five seconds,
 		// the reused local proof or the owner certificate) ended meanwhile.
@@ -422,10 +422,11 @@ func (c *ContextStartClient) open(ctx context.Context, owner value.OwnerBinding,
 		}
 	}
 	diagnostic.at("process-open")
-	local, executor, bound, e := c.localWithReader(setup, nil, owned)
+	local, executor, localWindow, e := c.localWithReader(setup, nil, owned)
 	if e != nil {
 		return nil, e
 	}
+	bound := localWindow.Until()
 	diagnostic.bound(bound)
 	setup, stopLocal := context.WithDeadline(setup, bound)
 	defer stopLocal()
@@ -515,7 +516,7 @@ func (c *ContextStartClient) open(ctx context.Context, owner value.OwnerBinding,
 	if e != nil {
 		return nil, e
 	}
-	bound = identity.Earlier(bound, receiver.ValidUntil)
+	bound = identity.Earlier(bound, receiver.Window.Until())
 	diagnostic.bound(bound)
 	if setup.Err() != nil || !c.now().Before(bound) || socket.SetDeadline(bound) != nil {
 		return nil, value.ErrUnavailable
@@ -638,7 +639,7 @@ func (c *ContextStartClient) open(ctx context.Context, owner value.OwnerBinding,
 	if e != nil || !final.Valid(c.now()) || phase.Err() != nil {
 		return nil, value.ErrUnavailable
 	}
-	diagnostic.bound(final.ValidUntil)
+	diagnostic.bound(final.Window.Until())
 	diagnostic.at("close")
 	if owned != nil {
 		// Join before publishing the exchange or releasing setup ownership.

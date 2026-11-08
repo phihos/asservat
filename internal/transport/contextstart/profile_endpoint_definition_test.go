@@ -1,6 +1,7 @@
 package contextstart
 
 import (
+	"asservat.local/asservat/internal/domain/identity"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -38,7 +39,7 @@ func TestProfileEndpointDefinitionCrossesExistingRegionalExchange(t *testing.T) 
 			w := workFixture()
 			cluster := w.Work.Target.ClusterID
 			now := time.Now()
-			receiver := fleet.APIContextReceiver{Channel: w.Work.Channel, ObservedAt: now, ValidUntil: now.Add(5 * time.Second)}
+			receiver := fleet.APIContextReceiver{Channel: w.Work.Channel, Window: identity.Check(now, identity.Recheck).Narrow(now.Add(5 * time.Second))}
 			router, err := NewRouter(RouterLimits{Standby: 1, Captures: 1, Clusters: []ClusterLimit{{cluster, 1, 1}}})
 			if err != nil {
 				t.Fatal(err)
@@ -109,7 +110,7 @@ func TestProfileEndpointDefinitionCrossesExistingRegionalExchange(t *testing.T) 
 			if mode == "cancelled" {
 				cancel()
 			}
-			job.result <- queryResult{until: receiver.ValidUntil, err: resultErr}
+			job.result <- queryResult{until: receiver.Window.Until(), err: resultErr}
 			err = <-done
 			success := mode == "answer" || mode == "tls-answer" || mode == "credential-answer"
 			if success && err != nil || !success && err == nil {

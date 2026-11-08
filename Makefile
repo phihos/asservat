@@ -48,7 +48,7 @@ investigation-check:
 
 # Product component gates. The integration target creates/removes owned fixtures.
 .PHONY: go-check go-architecture-check context-integration
-go-check: manifest-schema-check permission-schema-check policy-schema-check permission-crd-check control-schema-check start-crd-check retention-crd-check capacity-crd-check profile-crd-check investigation-schema-check
+go-check: manifest-schema-check permission-schema-check policy-schema-check permission-crd-check control-schema-check start-crd-check retention-crd-check capacity-crd-check profile-crd-check investigation-schema-check authority-window-check
 	go vet ./...
 	# Preserve race/count/deadline checks with exact sequential Kubernetes groups.
 	$(PYTHON) scripts/test-go-shards.py
@@ -56,6 +56,12 @@ go-check: manifest-schema-check permission-schema-check policy-schema-check perm
 
 go-architecture-check:
 	$(PYTHON) scripts/check-go-architecture.py
+
+# New hand-built authority validity windows fail; the baseline only shrinks
+# (docs/reviews/authority-window-plan-2026-11-08.md). -write updates it.
+.PHONY: authority-window-check
+authority-window-check:
+	TMPDIR="$(ASSERVAT_BUILD_TMP)" go run scripts/check-authority-windows.go
 
 context-integration:
 	$(PYTHON) scripts/test-context-storage.py
@@ -241,7 +247,7 @@ initial-schema-handover-integration:
 PRE_PUSH_GATES := spec-check architecture-check design-check openapi-check live-check download-check investigation-check \
 	go-architecture-check manifest-schema-check investigation-schema-check permission-schema-check policy-schema-check \
 	permission-crd-check control-schema-check start-crd-check retention-crd-check capacity-crd-check helm-check \
-	gate-self-tests sql-check console-check gofmt-check go-vet go-affected-test
+	gate-self-tests sql-check console-check gofmt-check go-vet go-affected-test authority-window-check
 .PHONY: pre-push gate-self-tests gofmt-check go-vet go-affected-test
 pre-push:
 	$(MAKE) -k -j4 -O $(PRE_PUSH_GATES)

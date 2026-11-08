@@ -1,6 +1,7 @@
 package contextstart
 
 import (
+	"asservat.local/asservat/internal/domain/identity"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -35,7 +36,7 @@ func TestPacketTargetRegionalQueryDispatchAndUnsupportedPeerFailClosed(t *testin
 			request := targets.Request{ClusterID: work.Work.Channel.Connector.Binding.ClusterID, Namespace: cfg.NamespaceRef{Name: "app", UID: "namespace"}, Workload: cfg.WorkloadRef{Kind: "Deployment", Name: "app", UID: "deployment"}, PodName: "app-0", PodUID: "pod"}
 			target := targets.PodResolution{ExecutionClass: artifact.ContextAPIExecution, Request: request, Pin: artifact.PinnedPod{Namespace: "app", NamespaceUID: "namespace", Name: "app-0", UID: "pod", ControllerUID: "rs"}, PodResourceVersion: "1", WorkloadResourceVersion: "1", ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
 			resolver := &packetQueryResolver{resolution: targets.RecorderResolution{Target: target, Recorder: targets.RecorderAnswer{Outcome: targets.RecorderAvailable}}}
-			receiver := fleet.APIContextReceiver{Channel: work.Work.Channel, ObservedAt: now, ValidUntil: now.Add(5 * time.Second)}
+			receiver := fleet.APIContextReceiver{Channel: work.Work.Channel, Window: identity.Check(now, identity.Recheck).Narrow(now.Add(5 * time.Second))}
 			checks := 0
 			var output bytes.Buffer
 			stream, err := newFrameStream(ctx, work.Work.Channel, func(context.Context) (fleet.APIContextReceiver, error) { checks++; return receiver, nil }, bytes.NewReader(nil), &output, func(time.Time) error { return nil }, func(time.Time) error { return nil }, func() error { return nil }, func() {})

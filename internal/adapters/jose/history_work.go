@@ -159,13 +159,13 @@ func (s *APIContextWorkSignatures) VerifyHistoryWork(ctx context.Context, encode
 	if e != nil || !w.Matches(r, s.now()) {
 		return out, value.ErrDenied
 	}
-	call, stop := context.WithDeadline(ctx, identity.Earlier(w.Authority.NotAfter, r.ValidUntil))
+	call, stop := context.WithDeadline(ctx, identity.Earlier(w.Authority.NotAfter, r.Window.Until()))
 	defer stop()
 	first, key, e := s.historyCurrent(call, w, h["kid"])
 	if e != nil {
 		return out, e
 	}
-	until := identity.Earlier(w.Authority.NotAfter, identity.Earlier(r.ValidUntil, first.Trust.FreshUntil))
+	until := identity.Earlier(w.Authority.NotAfter, identity.Earlier(r.Window.Until(), first.Trust.FreshUntil))
 	bounded, cancel := context.WithDeadline(call, until)
 	defer cancel()
 	actual, e := jws.Verify(encoded, jws.WithKey(jwa.EdDSAEd25519(), ed25519.PublicKey(key.PublicKey)))

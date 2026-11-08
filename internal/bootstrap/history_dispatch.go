@@ -120,7 +120,7 @@ func (d RegionalHistoryDispatch) PrepareHistory(ctx context.Context, cluster, ca
 		case <-pause.C:
 		}
 	}
-	until = identity.Earlier(until, r.ValidUntil)
+	until = identity.Earlier(until, r.Window.Until())
 	// The attachment retains call's cancellation. Its joined Close is the owner;
 	// do not cancel it at this preparation boundary.
 	return &regionalHistorySession{attachment: a, receiver: r, signer: d.Signer, now: d.Now, until: until, cancel: cancel, report: d.Report}, nil

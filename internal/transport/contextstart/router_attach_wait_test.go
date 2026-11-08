@@ -1,6 +1,7 @@
 package contextstart
 
 import (
+	"asservat.local/asservat/internal/domain/identity"
 	"context"
 	"errors"
 	"testing"
@@ -96,8 +97,8 @@ func TestHistoryAttachmentWaitsAfterJoinedExchange(t *testing.T) {
 		t.Helper()
 		r := receiver
 		r.Channel.ExchangeID = exchange
-		r.ObservedAt = time.Now()
-		r.ValidUntil = r.ObservedAt.Add(5 * time.Second)
+		now := time.Now()
+		r.Window = identity.Check(now, identity.Recheck).Narrow(now.Add(5 * time.Second))
 		s, e := router.RegisterStandby(t.Context(), r, func(context.Context) (fleet.APIContextReceiver, error) { return r, nil })
 		if e != nil {
 			t.Fatal(e)

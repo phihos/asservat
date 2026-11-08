@@ -1,6 +1,7 @@
 package contextstart
 
 import (
+	"asservat.local/asservat/internal/domain/identity"
 	"context"
 	"io"
 	"sync/atomic"
@@ -39,7 +40,7 @@ func TestContextStreamWorkLeaseFitsOriginalRateBudget(t *testing.T) {
 						}
 					}
 				}
-				return fleet.APIContextReceiver{Channel: w.Work.Channel, ObservedAt: start, ValidUntil: w.ValidUntil}, nil
+				return fleet.APIContextReceiver{Channel: w.Work.Channel, Window: identity.Check(start, identity.Recheck).Narrow(w.ValidUntil)}, nil
 			}
 			stream, e := newFrameStream(ctx, w.Work.Channel, check, input, io.Discard,
 				func(time.Time) error { return nil }, func(time.Time) error { return nil },

@@ -6,6 +6,7 @@ import (
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
 	"bytes"
 	"context"
 	"net"
@@ -54,7 +55,7 @@ func historyFixture() (fleetapp.HistoryWork, fleet.APIContextReceiver, capture.H
 	for i := range copies {
 		copies[i] = artifact.CopyReceipt{VersionID: "v", ETag: "etag", Bytes: 1, SHA256: artifact.Digest{byte(i + 1)}}
 	}
-	return fleetapp.HistoryWork{Channel: w.Channel, Authority: a}, fleet.APIContextReceiver{Channel: w.Channel, ObservedAt: n, ValidUntil: n.Add(5 * time.Second)}, b, copies
+	return fleetapp.HistoryWork{Channel: w.Channel, Authority: a}, fleet.APIContextReceiver{Channel: w.Channel, Window: identity.Check(n, identity.Recheck).Narrow(n.Add(5 * time.Second))}, b, copies
 }
 
 // Synthetic effect authority and storage, actual bounded stream framing. Real

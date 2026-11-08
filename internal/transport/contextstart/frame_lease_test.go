@@ -1,6 +1,7 @@
 package contextstart
 
 import (
+	"asservat.local/asservat/internal/domain/identity"
 	"context"
 	"errors"
 	"fmt"
@@ -52,7 +53,7 @@ func TestContextStreamWorkLeaseExpiresBetweenFramesWithoutRefresh(t *testing.T) 
 	check := func(context.Context) (fleet.APIContextReceiver, error) {
 		calls.Add(1)
 		now := time.Now()
-		return fleet.APIContextReceiver{Channel: w.Work.Channel, ObservedAt: now, ValidUntil: now.Add(150 * time.Millisecond)}, nil
+		return fleet.APIContextReceiver{Channel: w.Work.Channel, Window: identity.Check(now, identity.Recheck).Narrow(now.Add(150 * time.Millisecond))}, nil
 	}
 	s, write := leaseTestStream(t, ctx, w.Work.Channel, check)
 	first := leaseTestWork(t, s, write, ctx)
@@ -61,7 +62,7 @@ func TestContextStreamWorkLeaseExpiresBetweenFramesWithoutRefresh(t *testing.T) 
 	case <-time.After(time.Second):
 		t.Fatal("idle lease expiry did not cancel its original stream")
 	}
-	if time.Now().Before(first.ValidUntil) {
+	if time.Now().Before(first.Window.Until()) {
 		t.Fatal("lease canceled before its bound")
 	}
 	if e := s.Send(ctx, contracts.APIContextFrame{Kind: contracts.APIContextOperationResponseFrame, Payload: []byte("reply")}); !errors.Is(e, fleet.ErrUnavailable) {
@@ -103,7 +104,7 @@ func TestContextStreamWorkLeaseFinalObservationCannotExtendOriginal(t *testing.T
 					}
 					final = until
 				}
-				return fleet.APIContextReceiver{Channel: w.Work.Channel, ObservedAt: now, ValidUntil: until}, nil
+				return fleet.APIContextReceiver{Channel: w.Work.Channel, Window: identity.Check(now, identity.Recheck).Narrow(until)}, nil
 			}
 			s, write := leaseTestStream(t, ctx, w.Work.Channel, check)
 			first := leaseTestWork(t, s, write, ctx)
@@ -111,14 +112,14 @@ func TestContextStreamWorkLeaseFinalObservationCannotExtendOriginal(t *testing.T
 				t.Fatal(e)
 			}
 			got, _, e := s.observePeer(ctx, peerFrame)
-			if e != nil || got.ObservedAt != first.ObservedAt || got.Channel != first.Channel || got.ValidUntil.After(first.ValidUntil) {
+			if e != nil || got.Window.From() != first.Window.From() || got.Channel != first.Channel || got.Window.Until().After(first.Window.Until()) {
 				t.Fatal("final proof replaced original lease", got, e)
 			}
 			bound := original
 			if shorter {
 				bound = final
 			}
-			if !got.ValidUntil.Equal(bound) {
+			if !got.Window.Until().Equal(bound) {
 				t.Fatal("earliest original/current bound lost")
 			}
 			select {
@@ -144,7 +145,7 @@ func TestContextStreamWorkLeaseFinalCurrentNegativeIsTerminal(t *testing.T) {
 				secret := &streamPrivateError{}
 				check := func(c context.Context) (fleet.APIContextReceiver, error) {
 					now := time.Now()
-					out := fleet.APIContextReceiver{Channel: w.Work.Channel, ObservedAt: now, ValidUntil: now.Add(5 * time.Second)}
+					out := fleet.APIContextReceiver{Channel: w.Work.Channel, Window: identity.Check(now, identity.Recheck).Narrow(now.Add(5 * time.Second))}
 					if calls.Add(1) == 2 {
 						switch reason {
 						case "private-error":
@@ -207,7 +208,7 @@ func TestContextStreamWorkLeaseRejectsUnexpectedFrameOrder(t *testing.T) {
 				calls := 0
 				s, write := leaseTestStream(t, ctx, w.Work.Channel, func(context.Context) (fleet.APIContextReceiver, error) {
 					calls++
-					return fleet.APIContextReceiver{Channel: w.Work.Channel, ObservedAt: w.VerifiedAt, ValidUntil: w.ValidUntil}, nil
+					return fleet.APIContextReceiver{Channel: w.Work.Channel, Window: identity.Check(w.VerifiedAt, identity.Recheck).Narrow(w.ValidUntil)}, nil
 				})
 				if regional {
 					leaseTestWork(t, s, write, ctx)
@@ -246,7 +247,7 @@ func TestContextStreamWorkLeaseRejectsUnexpectedFrameOrder(t *testing.T) {
 		calls := 0
 		s, write := leaseTestStream(t, ctx, w.Work.Channel, func(context.Context) (fleet.APIContextReceiver, error) {
 			calls++
-			return fleet.APIContextReceiver{Channel: w.Work.Channel, ObservedAt: w.VerifiedAt, ValidUntil: w.ValidUntil}, nil
+			return fleet.APIContextReceiver{Channel: w.Work.Channel, Window: identity.Check(w.VerifiedAt, identity.Recheck).Narrow(w.ValidUntil)}, nil
 		})
 		leaseTestWork(t, s, write, ctx)
 		write(contracts.APIContextFrame{Kind: contracts.APIContextOperationRequestFrame, Payload: []byte("request")})
@@ -269,7 +270,7 @@ func TestContextStreamWorkLeaseCallerCancellationAndFinalJoin(t *testing.T) {
 		calls := 0
 		s, write := leaseTestStream(t, ctx, w.Work.Channel, func(context.Context) (fleet.APIContextReceiver, error) {
 			calls++
-			return fleet.APIContextReceiver{Channel: w.Work.Channel, ObservedAt: w.VerifiedAt, ValidUntil: w.ValidUntil}, nil
+			return fleet.APIContextReceiver{Channel: w.Work.Channel, Window: identity.Check(w.VerifiedAt, identity.Recheck).Narrow(w.ValidUntil)}, nil
 		})
 		leaseTestWork(t, s, write, ctx)
 		write(contracts.APIContextFrame{Kind: contracts.APIContextOperationRequestFrame, Payload: []byte("request")})
@@ -300,7 +301,7 @@ func TestContextStreamWorkLeaseCallerCancellationAndFinalJoin(t *testing.T) {
 				close(canceled)
 				<-release
 			}
-			return fleet.APIContextReceiver{Channel: w.Work.Channel, ObservedAt: w.VerifiedAt, ValidUntil: w.ValidUntil}, nil
+			return fleet.APIContextReceiver{Channel: w.Work.Channel, Window: identity.Check(w.VerifiedAt, identity.Recheck).Narrow(w.ValidUntil)}, nil
 		})
 		leaseTestWork(t, s, write, ctx)
 		result := make(chan error, 1)
@@ -341,8 +342,8 @@ func TestContextStreamWorkLeaseAwaitWorkExposesShorterCallerToVerifier(t *testin
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	until, _ := ctx.Deadline()
-	proof := fleet.APIContextReceiver{Channel: w.Work.Channel, ObservedAt: w.VerifiedAt, ValidUntil: w.ValidUntil}
-	if !proof.ValidUntil.After(until) {
+	proof := fleet.APIContextReceiver{Channel: w.Work.Channel, Window: identity.Check(w.VerifiedAt, identity.Recheck).Narrow(w.ValidUntil)}
+	if !proof.Window.Until().After(until) {
 		t.Fatal("fixture lacks original shorter caller")
 	}
 	calls := 0
@@ -352,7 +353,7 @@ func TestContextStreamWorkLeaseAwaitWorkExposesShorterCallerToVerifier(t *testin
 	local := &countingLocal{}
 	e := ServeRegionalOperations(ctx, s, proof, streamDiagnosticVerifier(func(c context.Context, _ []byte, r fleet.APIContextReceiver) (fleet.AuthenticatedAPIContextWork, error) {
 		verified++
-		if r.Channel != proof.Channel || r.ObservedAt != proof.ObservedAt || !r.ValidUntil.Equal(until) {
+		if r.Channel != proof.Channel || r.Window.From() != proof.Window.From() || !r.Window.Until().Equal(until) {
 			t.Error("verifier received a later cutoff than the work lease")
 		}
 		if d, ok := c.Deadline(); !ok || d.After(until) {
@@ -372,7 +373,7 @@ func TestContextStreamWorkLeaseConcurrentCloseStopsAndJoinsOnce(t *testing.T) {
 	ctx, cancel := context.WithDeadline(context.Background(), w.ValidUntil)
 	defer cancel()
 	s, write := leaseTestStream(t, ctx, w.Work.Channel, func(context.Context) (fleet.APIContextReceiver, error) {
-		return fleet.APIContextReceiver{Channel: w.Work.Channel, ObservedAt: w.VerifiedAt, ValidUntil: w.ValidUntil}, nil
+		return fleet.APIContextReceiver{Channel: w.Work.Channel, Window: identity.Check(w.VerifiedAt, identity.Recheck).Narrow(w.ValidUntil)}, nil
 	})
 	leaseTestWork(t, s, write, ctx)
 	s.mu.Lock()

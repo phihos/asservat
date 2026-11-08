@@ -2,6 +2,7 @@ package contextstart
 
 import (
 	deliveryapp "asservat.local/asservat/internal/application/delivery"
+	"asservat.local/asservat/internal/domain/identity"
 	"context"
 	"errors"
 	"testing"
@@ -52,7 +53,7 @@ func sourceStreamWorkFixture() (app.SourceWork, fleet.APIContextReceiver) {
 	p := collector.SourcePermit{Binding: collector.SourceBinding{RootID: base.Channel.RootID, PolicyUID: "policy", AcceptanceID: base.AttemptID, SourceID: id, Fence: id, ActionID: "packets", PodUID: base.Target.PodUID, NodeUID: id, BootID: id, CollectorPodUID: id, CollectorEpoch: id, Scope: [32]byte{1}, ExpectationDigest: [32]byte{2}, ResourceDigest: deliveryapp.SourceResourcesDigest(resources)}, StartedAt: now, HardUntil: now.Add(time.Hour), StartBy: now.Add(5 * time.Second), IssuedAt: now, DispatchUntil: now.Add(5 * time.Second), LeafUntil: now.Add(30 * time.Second), Credit: 1 << 20, BytesPerSecond: 1 << 20}
 	target := targets.PodResolution{ExecutionClass: artifact.ContextAPIExecution, Request: targets.Request{ClusterID: base.Target.ClusterID, Namespace: configuration.NamespaceRef{Name: "app", UID: base.Target.NamespaceUID}, Workload: configuration.WorkloadRef{Kind: "Deployment", Name: "app", UID: base.Target.WorkloadUID}, PodName: "app-0", PodUID: base.Target.PodUID}, Pin: artifact.PinnedPod{Namespace: "app", NamespaceUID: base.Target.NamespaceUID, Name: "app-0", UID: base.Target.PodUID, ControllerUID: id}, PodResourceVersion: "1", WorkloadResourceVersion: "1", ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
 	w := app.SourceWork{Channel: base.Channel, Target: target, Node: targets.PacketSourceObservation{PodUID: p.Binding.PodUID, NodeUID: p.Binding.NodeUID, BootID: p.Binding.BootID, CollectorPodUID: p.Binding.CollectorPodUID, CollectorEpoch: p.Binding.CollectorEpoch, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}, Source: collector.PacketSource{Permit: p, Resources: resources, Ring: collector.SourceRingLimits{MaxAge: time.Minute, MaxBytes: 1024, SegmentBytes: 256, MaxSegments: 4, MaxFrozenBytes: 1024, MaxConcurrentSnapshots: 2}}, NotAfter: now.Add(3 * time.Second)}
-	return w, fleet.APIContextReceiver{Channel: base.Channel, ObservedAt: now, ValidUntil: now.Add(5 * time.Second)}
+	return w, fleet.APIContextReceiver{Channel: base.Channel, Window: identity.Check(now, identity.Recheck).Narrow(now.Add(5 * time.Second))}
 }
 
 type sourceSnapshotCanceller struct {

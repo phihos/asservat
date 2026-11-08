@@ -39,13 +39,15 @@ func (c APIContextChannel) Valid() bool {
 	return authorization.UUID(c.RootID) && authorization.UUID(c.ExchangeID) && authorization.UUID(c.Challenge) && c.Hub.Valid() && c.Connector.Valid() && c.ConnectorLeaf != (artifact.Digest{}) && c.Executor.Valid() && c.Hub.InstallationID == c.Connector.Binding.InstallationID && c.Hub.IssuerEpoch == c.Connector.Binding.IssuerEpoch && c.Executor.PodUID == c.Connector.PodUID && c.Executor.ProcessEpoch != c.Connector.ProcessEpoch
 }
 
+// APIContextReceiver is one completed receiver check. Its window starts at
+// that check; inner checks only narrow it (ADR-311).
 type APIContextReceiver struct {
-	Channel                APIContextChannel
-	ObservedAt, ValidUntil time.Time
+	Channel APIContextChannel
+	Window  identity.Window
 }
 
 func (r APIContextReceiver) Valid(now time.Time) bool {
-	return r.Channel.Valid() && identity.Fresh(r.ObservedAt, r.ValidUntil, now, identity.AuthorityRecheckInterval)
+	return r.Channel.Valid() && r.Window.Kind() == identity.Recheck && r.Window.Valid(now)
 }
 
 // APIContextWork is a signed reference to one accepted API profile. Human groups

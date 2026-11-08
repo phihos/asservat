@@ -6,6 +6,7 @@ import (
 	"asservat.local/asservat/internal/domain/collector"
 	"asservat.local/asservat/internal/domain/execution"
 	"asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
 	v "asservat.local/asservat/internal/domain/live"
 	"asservat.local/asservat/internal/domain/targets"
 	"asservat.local/asservat/internal/transport/node"
@@ -34,7 +35,7 @@ func TestLiveManualQueryKeepsOriginalRegionalProcess(t *testing.T) {
 			c.Executor.ProcessEpoch = "00000000-0000-4000-8000-000000000093"
 		}
 		now := time.Now()
-		receiver := fleet.APIContextReceiver{Channel: c, ObservedAt: now, ValidUntil: now.Add(5 * time.Second)}
+		receiver := fleet.APIContextReceiver{Channel: c, Window: identity.Check(now, identity.Recheck).Narrow(now.Add(5 * time.Second))}
 		s, e := r.RegisterStandby(t.Context(), receiver, func(context.Context) (fleet.APIContextReceiver, error) { return receiver, nil })
 		if e != nil {
 			t.Fatal(e)
@@ -128,7 +129,7 @@ func TestLiveManualRegionalCompactReplyRebindsSixteenOriginals(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer router.Close()
-			receiver := fleet.APIContextReceiver{Channel: c, ObservedAt: now, ValidUntil: now.Add(5 * time.Second)}
+			receiver := fleet.APIContextReceiver{Channel: c, Window: identity.Check(now, identity.Recheck).Narrow(now.Add(5 * time.Second))}
 			standby, err := router.RegisterStandby(t.Context(), receiver, func(context.Context) (fleet.APIContextReceiver, error) { return receiver, nil })
 			if err != nil {
 				t.Fatal(err)
