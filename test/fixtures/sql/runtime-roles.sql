@@ -390,7 +390,7 @@ GRANT USAGE ON SCHEMA public TO context_case_read_runtime;
 GRANT SELECT ON goose_db_version,context_case_locator,fleet_current_trust TO context_case_read_runtime;
 GRANT UPDATE(installation_id) ON fleet_current_trust TO context_case_read_runtime;
 GRANT SELECT(artifact_id,capture_id,root_id) ON context_catalog TO context_case_read_runtime;
--- expectation_json: ReadContextCaseRoutes reports each route's NativeType (PR 169).
+-- expectation_json: ReadContextCaseRoutes reports each route's NativeType (PR 150).
 GRANT SELECT(id,root_id,attempt_id,expectation_json) ON context_capture TO context_case_read_runtime;
 GRANT SELECT(capture_id,root_id,audit_acknowledged_at,copies_digest) ON context_verification TO context_case_read_runtime;
 GRANT SELECT(id,artifact_id,state,copies_digest,effective_expires_at) ON custody_attempt TO context_case_read_runtime;

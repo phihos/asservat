@@ -346,7 +346,7 @@ func (n *nativeLiveQualification) http(t *testing.T, parent context.Context, ch 
 	}
 	savedCount, e := httpheaders.CheckProjection(bytes.NewReader(native), limits, snapshot.Request.MaxBytes)
 	if e != nil || savedCount == 0 {
-		t.Fatal("HTTP saved native canonical check", savedCount, e)
+		t.Fatal("HTTP saved native canonical check", savedCount, e, string(native)) // synthetic workload headers only
 	}
 	stopAt := time.Now()
 	call, cancel = context.WithTimeout(ctx, 3*time.Second)
