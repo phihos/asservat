@@ -14,8 +14,14 @@ page.on('pageerror',e=>errors.push(e.message));
 page.on('console',m=>{if(/violates.*Content Security Policy|Refused to (execute|apply|load)/i.test(m.text()))errors.push(m.text())});
 page.on('request',r=>{const u=new URL(r.url());if(u.origin!==origin)foreign.push(r.url());if(u.pathname.startsWith('/api/v1/operations/'))calls.push({name:u.pathname.split('/').at(-1),input:r.postDataJSON()})});
 page.on('response',r=>{if(new URL(r.url()).pathname.startsWith('/api/v1/operations/'))responses.push(r)});
+// The console aborts an in-flight read_live_watch on pause/close; Chromium then
+// discards that response's body. Such a body is unreadable to the page too, so
+// only its status and headers are checked; every completed body still is.
+const aborted=new Set();
+page.on('requestfailed',q=>{if(new URL(q.url()).pathname.startsWith('/api/v1/operations/'))aborted.add(q)});
+const json=async r=>{try{return await r.json()}catch(error){if(aborted.has(r.request()))return undefined;throw new Error(`${r.request().method()} ${new URL(r.url()).pathname} body: ${error.message}`)}};
 const waitOp=name=>page.waitForResponse(r=>new URL(r.url()).pathname==='/api/v1/operations/'+name&&r.request().method()==='POST');
-async function checked(r,name){assert.equal(r.status(),200);const h=await r.request().allHeaders();assert.equal(h.origin,origin);assert.equal(h['x-csrf-token'],'C'.repeat(43));assert.equal(h.authorization,undefined);const out=await r.json();assert(valid['validOutput_'+name](out),name+' generated output');assert.equal(out.status,'ok',JSON.stringify(out));return out}
+async function checked(r,name){assert.equal(r.status(),200);const h=await r.request().allHeaders();assert.equal(h.origin,origin);assert.equal(h['x-csrf-token'],'C'.repeat(43));assert.equal(h.authorization,undefined);const out=await json(r);if(out===undefined&&aborted.has(r.request()))return out;assert(valid['validOutput_'+name](out),name+' generated output');assert.equal(out.status,'ok',JSON.stringify(out));return out}
 const emit=async projection=>{const r=await page.evaluate(async({origin,projection})=>{const r=await fetch(origin+'/test/live-event',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({projection})});return r.status},{origin,projection});assert.equal(r,204)};
 try{
  await page.goto(origin+'/captures/new');
