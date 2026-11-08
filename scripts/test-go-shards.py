@@ -89,6 +89,22 @@ class GoShards(unittest.TestCase):
         self.assertTrue(all(any(p == gate.MODULE + "big" for p, _ in part) for part in parts))
         self.assertEqual(gate.plan_digest(parts), gate.plan_digest(gate.balanced(list(reversed(list(weights))), weights, 8)))
 
+    def test_plan_charges_runs_and_keeps_short_tests_together(self):
+        # Two long tests per package and many 0 s tests: without the run charge
+        # the short ones all land in one shard as dozens of nearly empty groups.
+        weights = {(f"p{p}", f"TestLong{i}"): 60.0 for p in range(4) for i in range(2)}
+        weights.update({(f"p{p}", f"TestShort{i:03}"): 0.0 for p in range(4) for i in range(120)})
+        weights[("whole", "")] = 1.0
+        parts = gate.planned(weights, 4)
+        self.assertEqual(parts, gate.planned(dict(reversed(list(weights.items()))), 4))
+        self.assertEqual(sorted(u for part in parts for u in part), sorted(weights))
+        runs = [sum(-(-sum(1 for u in part if u[0] == p and u[1]) // gate.SHARD_SIZE) for p in {u[0] for u in part})
+                for part in parts]
+        self.assertLessEqual(sum(runs), 4 * 3 + 4 + 1)  # plain balanced(): 20
+        for bad in (0, len(weights) + 1):
+            with self.subTest(count=bad), self.assertRaises(ValueError):
+                gate.planned(weights, bad)
+
     def test_whole_package_results_must_be_exactly_one_per_package(self):
         def encode(events):
             return "\n".join(json.dumps({"Package": p, "Action": a, **({"Test": t} if t else {})}) for p, a, t in events)

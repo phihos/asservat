@@ -42,6 +42,9 @@ SPLIT = {KUBERNETES} | {MODULE + p for p in (
 # CI; unknown packages and tests weigh DEFAULT_WEIGHT.
 DURATIONS = Path(__file__).with_name("go-test-durations.json")
 DEFAULT_WEIGHT = 5
+# Measured on CI (run 42460940268): a shard's step time minus its tests'
+# elapsed time is about this much per `go test` run.
+GROUP_SECONDS = 4
 NAME = re.compile(r"(?:Test|Fuzz|Example)[A-Za-z0-9_]*\Z")
 
 
@@ -102,6 +105,36 @@ def balanced(names, weights, count):
         part[2].append(name)
     parts = [sorted(b[2]) for b in bins]
     if Counter(n for part in parts for n in part) != Counter(names):
+        raise ValueError("CI partition does not cover the inventory exactly once")
+    return parts
+
+
+def planned(weights, count):
+    """Longest-first partition of units that also charges each `go test` run.
+
+    Each shard pays about GROUP_SECONDS (link, start, discovery) for its one
+    whole-package run and for every group of up to SHARD_SIZE tests of a split
+    package, so a unit goes to the shard where its weight plus any new run
+    costs least. This keeps a package's many short tests together instead of
+    leaving one shard with dozens of nearly empty groups.
+    """
+    if count < 1 or len(weights) < count:
+        raise ValueError("Invalid CI partition")
+    bins = [[0.0, index, Counter(), []] for index in range(count)]
+
+    def cost(part, unit):
+        package, name = unit
+        key = package if name else ""
+        opens = part[2][key] % SHARD_SIZE == 0 if name else part[2][key] == 0
+        return part[0] + weights[unit] + (GROUP_SECONDS if opens else 0)
+
+    for unit in sorted(weights, key=lambda u: (-weights[u], u)):
+        part = min(bins, key=lambda b: (cost(b, unit), b[1]))
+        part[0] = cost(part, unit)
+        part[2][unit[0] if unit[1] else ""] += 1
+        part[3].append(unit)
+    parts = [sorted(b[3]) for b in bins]
+    if Counter(u for part in parts for u in part) != Counter(weights.keys()):
         raise ValueError("CI partition does not cover the inventory exactly once")
     return parts
 
@@ -246,17 +279,17 @@ def run_shard(packages, index, count):
     # One parallel discovery; -p overrides the shard's GOFLAGS=-p=2.
     inventory = discovered_inventory(run(["go", "test", *FLAGS, "-p=4", "-list", "^(Test|Fuzz|Example)", *split], capture=True), split)
     weights = units(packages, inventory, json.loads(DURATIONS.read_text()))
-    parts = balanced(list(weights), weights, count)
-    if Counter(u for part in parts for u in part) != Counter(weights.keys()):
-        raise ValueError("CI partition does not cover the discovered inventory exactly once")
+    parts = planned(weights, count)
     part = parts[index]
     whole = [p for p, name in part if not name]
     tests = {}
     for package, name in part:
         if name:
             tests.setdefault(package, []).append(name)
+    runs = bool(whole) + sum(len(shards(names)) for names in tests.values())
     print(f"CI shard {index}/{count}: {len(whole)} whole packages, {sum(map(len, tests.values()))} tests of "
-          f"{len(tests)} split packages, estimated {sum(weights[u] for u in part):.0f}s", flush=True)
+          f"{len(tests)} split packages in {runs} runs, estimated {sum(weights[u] for u in part) + runs * GROUP_SECONDS:.0f}s",
+          flush=True)
     measured_packages, measured_tests = {}, {}
     if whole:
         output = run(["go", "test", *FLAGS, "-json", *whole], json_stream=True)
