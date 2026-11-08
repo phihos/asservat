@@ -552,7 +552,7 @@ func TestProviderOwnerInstallationUnknownReceiptConsumesSingleFinalizer(t *testi
 }
 func TestProviderOwnerInstallationFailedFinalizerDoesNotInspectAgain(t *testing.T) {
 	f := newOwnerProjectionOperationPreparedFixture(t, false)
-	f.verification.beforeFinalizeCurrent = func() { f.fault.Store(6) }
+	f.verification.beforeFinalizeCurrent = func() { f.fault.Store(3) } // accepted configuration changes
 	driver, err := NewProviderOwnerInstallation(f.projection, f.roles)
 	if err != nil {
 		t.Fatal(err)

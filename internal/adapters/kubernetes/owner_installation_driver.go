@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	fleetapp "asservat.local/asservat/internal/application/fleet"
 	"asservat.local/asservat/internal/contracts"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 )
@@ -27,6 +28,7 @@ type OwnerInstallationResult struct {
 	Calls           int
 	Inspections     int
 	Finalizations   int
+	Brackets        int // installation brackets opened (ADR-316)
 }
 
 // ProviderOwnerInstallation is a single invocation of the original fixed
@@ -43,6 +45,7 @@ type ProviderOwnerInstallation struct {
 	closed     bool
 	projection *ProviderOwnerProjection
 	sql        OwnerInstallationSQL
+	reserve    time.Duration // bracket reserve; tests raise it to one operation per bracket
 }
 
 func NewProviderOwnerInstallation(projection *ProviderOwnerProjection, sql OwnerInstallationSQL) (*ProviderOwnerInstallation, error) {
@@ -50,7 +53,7 @@ func NewProviderOwnerInstallation(projection *ProviderOwnerProjection, sql Owner
 		return nil, cfg.ErrInvalid
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	return &ProviderOwnerInstallation{ctx: ctx, cancel: cancel, projection: projection, sql: sql}, nil
+	return &ProviderOwnerInstallation{ctx: ctx, cancel: cancel, projection: projection, sql: sql, reserve: ownerInstallationBracketReserve}, nil
 }
 
 func (s *ProviderOwnerInstallation) Close() {
@@ -130,173 +133,223 @@ func (s *ProviderOwnerInstallation) Run(ctx context.Context) (result OwnerInstal
 	// and at most one independent unknown-result inspection.
 	// These counters are invocation-wide, not a per-phase retry allowance.
 	normalCalls := 0
-	normal := func() bool {
-		if normalCalls >= 22 || call.Err() != nil {
+	normal := func(ctx context.Context) bool {
+		if normalCalls >= 22 || ctx.Err() != nil {
 			return false
 		}
 		out.Calls++
 		normalCalls++
 		return true
 	}
-	inspect := func(err error) bool {
+	inspect := func(ctx context.Context, err error) bool {
 		var phase *ownerInstallationPhaseError
 		if errors.As(err, &phase) && phase.stop == OwnerInstallationSpent {
 			return false
 		}
-		if out.Inspections != 0 || call.Err() != nil || !originalEnd.IsZero() && !root.resources.now().Before(originalEnd) {
+		if out.Inspections != 0 || ctx.Err() != nil || !originalEnd.IsZero() && !root.resources.now().Before(originalEnd) {
 			return false
 		}
 		out.Inspections++
 		out.Calls++
 		return true
 	}
-	if !normal() {
-		return fail(cfg.ErrUnavailable)
-	}
-	roles, err := root.OpenProviderOwnerIdentityRoles(call)
-	if err != nil && inspect(err) {
-		roles, err = root.InspectProviderOwnerIdentityRoles(call)
-	}
-	if err != nil {
-		return fail(err)
-	}
-	originalEnd = roles.State.Until
-	out.RoleRootUID = roles.UID
-	call, rootEnd := context.WithDeadline(call, originalEnd)
-	defer rootEnd()
-	if call.Err() != nil {
-		return fail(cfg.ErrUnavailable)
-	}
-	for i, purpose := range contracts.OwnerIdentityRolePurposes() {
-		out.Phase = purpose
-		if roles.State.Roles[i].Receipt != nil {
-			continue
-		}
-		complete := false
-		for phase := 0; phase < 2; phase++ {
-			if !normal() {
-				return fail(cfg.ErrUnavailable)
-			}
-			result, e := root.AdvanceProviderOwnerIdentityRole(call, purpose, s.sql)
-			if e != nil && inspect(e) {
-				result, e = root.InspectProviderOwnerIdentityRole(call, purpose, s.sql)
-			}
-			if e != nil {
-				return fail(e)
-			}
-			roles = result.Snapshot
-			if result.Status == OwnerIdentityRoleAdvanceComplete && roles.State.Roles[i].Receipt != nil {
-				complete = true
-				break
-			}
-			if result.Status != OwnerIdentityRoleAdvancePending || roles.State.Roles[i].Claim == nil || roles.State.Roles[i].Receipt != nil {
-				return fail(cfg.ErrChanged)
-			}
-		}
-		if !complete {
-			return fail(cfg.ErrUnavailable)
-		}
-	}
-	out.Phase = "verify-four-roles"
-	if !normal() {
-		return fail(cfg.ErrUnavailable)
-	}
-	_, err = root.VerifyProviderOwnerIdentityRoles(call, s.sql)
-	if err != nil && inspect(err) {
-		_, err = root.VerifyProviderOwnerIdentityRoles(call, s.sql)
-	}
-	if err != nil {
-		return fail(err)
-	}
-	out.Phase = "projection"
-	rank := -1
-	projectionComplete := false
-	for phase := 0; phase < 6; phase++ {
-		if !normal() {
-			return fail(cfg.ErrUnavailable)
-		}
-		e := s.projection.Execute(call)
+	// One projection or launch execution and its mandatory finalization; both
+	// run under the same caller context, which bounds the finalization.
+	pair := func(ctx context.Context, execute func(context.Context) error) (OwnerProjectionAdvance, error) {
+		e := execute(ctx)
 		var result OwnerProjectionAdvance
 		if e != nil {
-			if inspect(e) {
+			if inspect(ctx, e) {
 				first := projectionFixedCodes(e)
 				out.Finalizations++
-				result, e = s.projection.Finalize(call)
+				result, e = s.projection.Finalize(ctx)
 				if e != nil {
 					e = &ownerProjectionInspectionDiagnostic{cause: e, first: first, inspection: projectionFixedCodes(e)}
 				}
 			}
 		} else {
 			if out.Finalizations >= 8 {
-				return fail(cfg.ErrUnavailable)
+				return result, cfg.ErrUnavailable
 			}
 			out.Calls++
 			out.Finalizations++
-			result, e = s.projection.Finalize(call)
+			result, e = s.projection.Finalize(ctx)
 		}
-		if e != nil {
-			return fail(e)
+		return result, e
+	}
+	// The fixed sequence as one operation per step, so that operations sharing
+	// the same opening proof run in installation brackets (ADR-316).
+	var roles contracts.OwnerIdentityRoleSnapshot
+	stage, role, rolePhase, projectionPhase, launchPhase, rank := 0, 0, 0, 0, 0, -1
+	inBracket := 0
+	step := func(ctx context.Context) (more bool, err error) {
+		defer func() {
+			if more {
+				inBracket++
+			}
+		}()
+		if !originalEnd.IsZero() {
+			var end context.CancelFunc
+			ctx, end = context.WithDeadline(ctx, originalEnd)
+			defer end()
 		}
-		next := ownerInstallationProjectionRank(result.Snapshot.State.OwnerIdentity)
-		if next <= rank {
-			return fail(cfg.ErrChanged)
-		}
-		rank = next
-		out.ResourceRootUID = result.Snapshot.UID
-		if rank == 6 && result.Status == OwnerProjectionAdvanceComplete {
-			projectionComplete = true
-			break
-		}
-		if rank == 6 || result.Status == OwnerProjectionAdvanceComplete {
-			return fail(cfg.ErrChanged)
+		for {
+			switch stage {
+			case 0:
+				if !normal(ctx) {
+					return false, cfg.ErrUnavailable
+				}
+				opened, err := root.OpenProviderOwnerIdentityRoles(ctx)
+				if err != nil && inspect(ctx, err) {
+					opened, err = root.InspectProviderOwnerIdentityRoles(ctx)
+				}
+				if err != nil {
+					return false, err
+				}
+				roles, originalEnd = opened, opened.State.Until
+				out.RoleRootUID = opened.UID
+				if !root.resources.now().Before(originalEnd) {
+					return false, cfg.ErrUnavailable
+				}
+				stage = 1
+				return true, nil
+			case 1:
+				purposes := contracts.OwnerIdentityRolePurposes()
+				if role == len(purposes) {
+					stage = 2
+					continue
+				}
+				purpose := purposes[role]
+				out.Phase = purpose
+				if roles.State.Roles[role].Receipt != nil {
+					role++
+					continue
+				}
+				if rolePhase == 2 {
+					return false, cfg.ErrUnavailable
+				}
+				if !normal(ctx) {
+					return false, cfg.ErrUnavailable
+				}
+				rolePhase++
+				result, e := root.AdvanceProviderOwnerIdentityRole(ctx, purpose, s.sql)
+				if e != nil && inspect(ctx, e) {
+					result, e = root.InspectProviderOwnerIdentityRole(ctx, purpose, s.sql)
+				}
+				if e != nil {
+					return false, e
+				}
+				roles = result.Snapshot
+				if result.Status == OwnerIdentityRoleAdvanceComplete && roles.State.Roles[role].Receipt != nil {
+					role, rolePhase = role+1, 0
+					return true, nil
+				}
+				if result.Status != OwnerIdentityRoleAdvancePending || roles.State.Roles[role].Claim == nil || roles.State.Roles[role].Receipt != nil {
+					return false, cfg.ErrChanged
+				}
+				return true, nil
+			case 2:
+				out.Phase = "verify-four-roles"
+				if !normal(ctx) {
+					return false, cfg.ErrUnavailable
+				}
+				_, err := root.VerifyProviderOwnerIdentityRoles(ctx, s.sql)
+				if err != nil && inspect(ctx, err) {
+					_, err = root.VerifyProviderOwnerIdentityRoles(ctx, s.sql)
+				}
+				if err != nil {
+					return false, err
+				}
+				out.Phase, stage = "projection", 3
+				return true, nil
+			case 3:
+				if projectionPhase == 6 || !normal(ctx) {
+					return false, cfg.ErrUnavailable
+				}
+				projectionPhase++
+				result, e := pair(ctx, s.projection.Execute)
+				if e != nil {
+					return false, e
+				}
+				next := ownerInstallationProjectionRank(result.Snapshot.State.OwnerIdentity)
+				if next <= rank {
+					return false, cfg.ErrChanged
+				}
+				rank = next
+				out.ResourceRootUID = result.Snapshot.UID
+				if rank == 6 && result.Status == OwnerProjectionAdvanceComplete {
+					out.Phase, stage = "launch", 4
+					return true, nil
+				}
+				if rank == 6 || result.Status == OwnerProjectionAdvanceComplete {
+					return false, cfg.ErrChanged
+				}
+				return true, nil
+			case 4:
+				// Every launch attempt opens its own bracket so a complete proof
+				// directly precedes the workload-starting effect.
+				if inBracket > 0 {
+					return false, nil
+				}
+				if launchPhase == 2 || !normal(ctx) {
+					return false, cfg.ErrUnavailable
+				}
+				launchPhase++
+				result, e := pair(ctx, s.projection.ExecuteLaunch)
+				if e != nil {
+					return false, e
+				}
+				claim := result.Snapshot.State.OwnerLaunch
+				if claim == nil {
+					return false, cfg.ErrChanged
+				}
+				out.OperationID = claim.OperationID
+				if result.Status == OwnerProjectionAdvanceComplete && claim.Receipt != nil {
+					out.Phase, stage = "launch-receipt", 5
+					return true, nil
+				}
+				if result.Status != OwnerProjectionAdvancePending || claim.Receipt != nil {
+					return false, cfg.ErrChanged
+				}
+				return true, nil
+			default:
+				return false, nil
+			}
 		}
 	}
-	if !projectionComplete {
-		return fail(cfg.ErrUnavailable)
-	}
-	out.Phase = "launch"
-	for phase := 0; phase < 2; phase++ {
-		if !normal() {
+	// Each bracket opens with one complete native proof of the protected root
+	// and closes with another after its last operation; a failed operation or
+	// closing proof ends the invocation as a failed per-operation proof did.
+	for stage != 5 {
+		if call.Err() != nil {
 			return fail(cfg.ErrUnavailable)
 		}
-		e := s.projection.ExecuteLaunch(call)
-		var result OwnerProjectionAdvance
-		if e != nil {
-			if inspect(e) {
-				first := projectionFixedCodes(e)
-				out.Finalizations++
-				result, e = s.projection.Finalize(call)
-				if e != nil {
-					e = &ownerProjectionInspectionDiagnostic{cause: e, first: first, inspection: projectionFixedCodes(e)}
-				}
-			}
-		} else {
-			if out.Finalizations >= 8 {
-				return fail(cfg.ErrUnavailable)
-			}
-			out.Calls++
-			out.Finalizations++
-			result, e = s.projection.Finalize(call)
+		b := &ownerBracket{root: root}
+		inBracket = 0
+		owned := func(ctx context.Context) context.Context {
+			return context.WithValue(ctx, ownerProjectionControllerKey{}, s.projection)
 		}
-		if e != nil {
-			return fail(e)
+		bracket := fleetapp.Bracket{
+			Now:     root.resources.now,
+			Reserve: s.reserve,
+			Open:    func(ctx context.Context) (time.Time, error) { return root.openOwnerBracket(owned(ctx), b) },
+			Close:   func(ctx context.Context) error { return root.closeOwnerBracket(owned(ctx), b) },
 		}
-		claim := result.Snapshot.State.OwnerLaunch
-		if claim == nil {
-			return fail(cfg.ErrChanged)
-		}
-		out.OperationID = claim.OperationID
-		if result.Status == OwnerProjectionAdvanceComplete && claim.Receipt != nil {
-			out.Complete = true
-			out.Phase = "launch-receipt"
-			return out, nil
-		}
-		if result.Status != OwnerProjectionAdvancePending || claim.Receipt != nil {
-			return fail(cfg.ErrChanged)
+		_, err := bracket.Run(withOwnerBracket(call, b), step)
+		root.endOwnerBracket(b)
+		out.Brackets++
+		if err != nil {
+			return fail(err)
 		}
 	}
-	return fail(cfg.ErrUnavailable)
+	out.Complete = true
+	return out, nil
 }
+
+// ownerInstallationBracketReserve is the bracket lease that another
+// operation needs: one role transition, or one projection or launch
+// execution with its finalization, plus an unknown-result inspection.
+const ownerInstallationBracketReserve = 2 * time.Second
 
 func ownerInstallationProjectionRank(p *contracts.OwnerIdentityProjectionClaim) int {
 	if p == nil {

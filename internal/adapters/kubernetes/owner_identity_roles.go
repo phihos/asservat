@@ -43,6 +43,7 @@ type OwnerIdentityRoleRoot struct {
 	joined                           sync.WaitGroup
 	ownerOperation                   *OwnerIdentityOperation  // fresh-only admitted phase; guarded by mu
 	splitProjection                  *ProviderOwnerProjection // one controller retains all uncertain projection spend
+	bracket                          *ownerBracket            // open installation bracket (ADR-316); guarded by mu
 }
 
 func (s *OwnerIdentityRoleRoot) Close() {

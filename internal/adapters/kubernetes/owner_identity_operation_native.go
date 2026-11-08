@@ -13,7 +13,6 @@ import (
 	apps "k8s.io/api/apps/v1"
 	auth "k8s.io/api/authentication/v1"
 	core "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -42,6 +41,9 @@ func (s *OwnerIdentityRoleRoot) readOwnerIdentityOperationNative(ctx context.Con
 	var zero ownerIdentityOperationNative
 	if s == nil || s.bridge == nil || s.resources == nil || s.accepted == nil || ctx == nil || ctx.Err() != nil || s.resources.ownerLayout != contracts.OwnerProviderInstalledLayout || !ownerIdentityDigestValid(layout) {
 		return zero, cfg.ErrInvalid
+	}
+	if b := s.bracketOf(ctx); b != nil && layout == s.input.LayoutDigest {
+		return s.readOwnerBracketNative(ctx, b, withRoles)
 	}
 	until, ok := ctx.Deadline()
 	if !ok {
@@ -153,24 +155,8 @@ func (s *OwnerIdentityRoleRoot) readOwnerIdentityOperationNative(ctx context.Con
 		}
 		bounded, stop := context.WithDeadline(call, until)
 		defer stop()
-		raw, err := s.bridge.source.client.api.Get().AbsPath(s.path() + "/" + s.name()).MaxRetries(0).DoRaw(bounded)
-		defer clear(raw)
-		if apierrors.IsNotFound(err) {
-			if s.operationRootUID != "" {
-				return zero, cfg.ErrChanged
-			}
-			out.missing = true
-		} else if err != nil {
+		if out.roles, out.object, out.missing, err = s.readOwnerIdentityRolesJournal(bounded, until); err != nil {
 			return zero, err
-		} else {
-			out.roles, out.object, err = s.decode(raw, until)
-			if err != nil {
-				return zero, err
-			}
-			if s.operationRootUID != "" && out.roles.UID != s.operationRootUID || s.pendingOperationRoot != nil && !equalJSON(out.roles.State, *s.pendingOperationRoot) {
-				return zero, cfg.ErrChanged
-			}
-
 		}
 	}
 	if initialHandoverDeadline(call, s.resources.now, until) != nil {

@@ -35,23 +35,33 @@ func (s *OwnerIdentityRoleRoot) readOwnerIdentityOperationCurrentScope(ctx conte
 	var source configurationWorkerNative
 	var retained initialRuntimeRetainedResources
 	var failures [2]error
-	var joined sync.WaitGroup
-	joined.Add(2)
-	go func() {
-		defer joined.Done()
-		source, failures[0] = s.bridge.source.readConfigurationWorkerCurrent(call, initial.source)
-		if failures[0] != nil {
-			cancel()
-		}
-	}()
-	go func() {
-		defer joined.Done()
+	// Inside an installation bracket (ADR-316) the source and its guards were
+	// proved by the opening proof and are proved again by the closing one;
+	// only the mutable journals, the owner Deployment, the role journal and
+	// the accepted configuration are read again here.
+	bracket := s.bracketOf(ctx)
+	if bracket != nil {
+		source = initial.source
 		retained, failures[1] = s.readOwnerIdentityOperationJournals(call, initial.retained, expectedResource)
-		if failures[1] != nil {
-			cancel()
-		}
-	}()
-	joined.Wait()
+	} else {
+		var joined sync.WaitGroup
+		joined.Add(2)
+		go func() {
+			defer joined.Done()
+			source, failures[0] = s.bridge.source.readConfigurationWorkerCurrent(call, initial.source)
+			if failures[0] != nil {
+				cancel()
+			}
+		}()
+		go func() {
+			defer joined.Done()
+			retained, failures[1] = s.readOwnerIdentityOperationJournals(call, initial.retained, expectedResource)
+			if failures[1] != nil {
+				cancel()
+			}
+		}()
+		joined.Wait()
+	}
 	for i, err := range failures {
 		if err != nil {
 			return zero, ownerOperationError([2]ownerOperationCheck{ownerCurrentSource, ownerCurrentJournals}[i], err)
@@ -70,19 +80,22 @@ func (s *OwnerIdentityRoleRoot) readOwnerIdentityOperationCurrentScope(ctx conte
 		return zero, ownerOperationError(ownerCurrentDeployment, err)
 	}
 	source.ownerDeployment = deployment
-	account, err := ownerResource[core.ServiceAccount](reader, bounded, "/api/v1/namespaces/"+s.input.Namespace.Name+"/serviceaccounts/"+s.input.ServiceAccount.Name, "v1", "ServiceAccount")
-	if err != nil {
-		return zero, ownerOperationError(ownerCurrentAccountRead, err)
-	}
-	if !equalJSON(account, initial.account) || s.ownerIdentityOperationOriginalObject(bounded, account, retained.resources.State, 0) != nil {
-		return zero, ownerOperationError(ownerCurrentAccount, cfg.ErrChanged)
-	}
-	service, err := ownerResource[core.Service](reader, bounded, "/api/v1/namespaces/"+s.input.Namespace.Name+"/services/"+initial.service.Name, "v1", "Service")
-	if err != nil {
-		return zero, ownerOperationError(ownerCurrentServiceRead, err)
-	}
-	if !equalJSON(service, initial.service) || s.ownerIdentityOperationOriginalObject(bounded, service, retained.resources.State, 12) != nil {
-		return zero, ownerOperationError(ownerCurrentService, cfg.ErrChanged)
+	account, service := initial.account, initial.service
+	if bracket == nil {
+		account, err = ownerResource[core.ServiceAccount](reader, bounded, "/api/v1/namespaces/"+s.input.Namespace.Name+"/serviceaccounts/"+s.input.ServiceAccount.Name, "v1", "ServiceAccount")
+		if err != nil {
+			return zero, ownerOperationError(ownerCurrentAccountRead, err)
+		}
+		if !equalJSON(account, initial.account) || s.ownerIdentityOperationOriginalObject(bounded, account, retained.resources.State, 0) != nil {
+			return zero, ownerOperationError(ownerCurrentAccount, cfg.ErrChanged)
+		}
+		service, err = ownerResource[core.Service](reader, bounded, "/api/v1/namespaces/"+s.input.Namespace.Name+"/services/"+initial.service.Name, "v1", "Service")
+		if err != nil {
+			return zero, ownerOperationError(ownerCurrentServiceRead, err)
+		}
+		if !equalJSON(service, initial.service) || s.ownerIdentityOperationOriginalObject(bounded, service, retained.resources.State, 12) != nil {
+			return zero, ownerOperationError(ownerCurrentService, cfg.ErrChanged)
+		}
 	}
 	var roles contracts.OwnerIdentityRoleSnapshot
 	var object *core.Secret
@@ -103,9 +116,11 @@ func (s *OwnerIdentityRoleRoot) readOwnerIdentityOperationCurrentScope(ctx conte
 			}
 		}
 	}
-	ns, err := s.bridge.source.client.namespace(bounded, s.bridge.source.client.control)
-	if err != nil || ns.Deleting {
-		return zero, ownerOperationError(ownerCurrentNamespace, cfg.ErrChanged)
+	if bracket == nil {
+		ns, err := s.bridge.source.client.namespace(bounded, s.bridge.source.client.control)
+		if err != nil || ns.Deleting {
+			return zero, ownerOperationError(ownerCurrentNamespace, cfg.ErrChanged)
+		}
 	}
 	accepted, err := s.accepted.ReadOwnerConfiguration(bounded)
 	until = identity.Earlier(until, accepted.FreshUntil)

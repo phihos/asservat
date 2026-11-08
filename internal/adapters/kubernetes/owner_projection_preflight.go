@@ -27,6 +27,7 @@ type ownerProjectionPreflight struct {
 	account  core.ServiceAccount
 	service  core.Service
 	until    time.Time
+	bracket  *ownerBracket // set when the preflight belongs to an installation bracket
 }
 type ownerProjectionPreflightKey struct{}
 
@@ -90,6 +91,22 @@ func (s *OwnerIdentityProjection) readProjectionPreflight(ctx context.Context, p
 	until, ok := ctx.Deadline()
 	if !ok {
 		return zero, cfg.ErrUnavailable
+	}
+	// Inside an installation bracket (ADR-316) the opening proof supplies the
+	// source prefix, owner account and Service; complete re-reads the
+	// mutable journals, the owner Deployment and the accepted configuration.
+	if b := root.bracketOf(ctx); b != nil {
+		source := b.opening.source
+		if !proof.configuration.Equal(source.owner) {
+			return zero, ownerOperationError(ownerNativeOriginalConfiguration, cfg.ErrChanged)
+		}
+		until = identity.Earlier(until, identity.Earlier(proof.until, b.until))
+		if initialHandoverDeadline(ctx, root.resources.now, until) != nil {
+			return zero, ownerOperationError(ownerNativeInitialDeadline, cfg.ErrUnavailable)
+		}
+		out := &ownerProjectionPreflight{root: root, used: &atomic.Bool{}, retained: b.opening.retained, source: &ownerProjectionSourcePrefix{fleet: source.fleet, owner: source.owner}, account: b.opening.account, service: b.opening.service, until: until, bracket: b}
+		out.self = out
+		return out, nil
 	}
 	call, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -191,6 +208,9 @@ func (s *ownerProjectionPreflight) complete(ctx context.Context, proof ownerIden
 	}
 	call, stop := context.WithDeadline(ctx, identity.Earlier(deadline, s.until))
 	defer stop()
+	if s.bracket != nil {
+		return s.completeInBracket(call, proof)
+	}
 	// Recheck the complete actual tail without constructing a proof marker yet.
 	tail, err := s.source.readTail(call)
 	if err != nil {
@@ -283,4 +303,26 @@ func (s *ownerProjectionPreflight) complete(ctx context.Context, proof ownerIden
 		return zero, ownerOperationError(ownerNativeFinalDeadline, cfg.ErrUnavailable)
 	}
 	return ownerIdentityOperationNative{retained: retained, source: source, input: root.input, accepted: accepted, account: account, service: service, roles: roles, object: object, until: until}, nil
+}
+
+// completeInBracket is complete for a preflight inside an installation
+// bracket: the bracket's journal, owner Deployment, accepted configuration and
+// role journal reads, bound to this projection's provider observation.
+func (s *ownerProjectionPreflight) completeInBracket(ctx context.Context, proof ownerIdentityProviderObservation) (ownerIdentityOperationNative, error) {
+	var zero ownerIdentityOperationNative
+	root := s.root
+	if root.bracketOf(ctx) != s.bracket {
+		return zero, ownerOperationError(ownerNativeSource, cfg.ErrUnavailable)
+	}
+	actual, err := root.readOwnerBracketNative(ctx, s.bracket, true)
+	if err != nil {
+		return zero, err
+	}
+	if actual.missing || actual.roles.UID != root.operationRootUID {
+		return zero, &ownerProjectionDiagnostic{check: projectionCheckInitialNative, cause: cfg.ErrUnavailable}
+	}
+	if !actual.accepted.Configuration.Equal(proof.configuration) {
+		return zero, ownerOperationError(ownerNativeAcceptedEqual, cfg.ErrUnavailable)
+	}
+	return actual, nil
 }
