@@ -80,6 +80,10 @@ refreshed binding with the same selection. One demand attempt and all
 original non-storage authority deadlines bound both phases. Changed storage,
 invalid observations, errors or expired retained facts stop consumption;
 neither the demand nor the wait supplies authority or retries admission.
+A preview whose binding was expired and whose demanded refresh had not landed
+when its readiness ended runs one more complete attempt, with every fact read
+again, if its request window has at least two seconds left
+([ADR-314](../decisions/314-cold-storage-preview-retry.md)).
 
 `capacity-root-setup.json` is a private generated administrator input. It binds
 original installation/activation, permission root, public role-root UID/setup,

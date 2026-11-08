@@ -42,14 +42,14 @@ const profileRepeatPreviewWindow = 8 * time.Second
 // errors are reported only after eligibility, so they disclose nothing about
 // an unauthorized target. The libpcap compiler runs on the hub (S2).
 func (s ContextInvestigation) PreviewComposition(ctx context.Context, source identities.CurrentIdentity, intent value.ContextIntent) (result RecorderPreviewResult, failure error) {
-	return s.previewComposition(ctx, source, intent, nil)
+	return retryColdStorage(ctx, func() (RecorderPreviewResult, error) { return s.previewComposition(ctx, source, intent, nil) })
 }
 
 func (s ContextInvestigation) PreviewCompositionRepeat(ctx context.Context, source identities.CurrentIdentity, intent value.ContextIntent, original authorization.Target) (RecorderPreviewResult, error) {
 	if !authorization.UUID(original.ClusterID) || !identity.Text(original.NamespaceUID, 64) || !identity.Text(original.WorkloadUID, 64) {
 		return RecorderPreviewResult{}, value.ErrInvalid
 	}
-	return s.previewComposition(ctx, source, intent, &original)
+	return retryColdStorage(ctx, func() (RecorderPreviewResult, error) { return s.previewComposition(ctx, source, intent, &original) })
 }
 func (s ContextInvestigation) previewComposition(ctx context.Context, source identities.CurrentIdentity, intent value.ContextIntent, original *authorization.Target) (result RecorderPreviewResult, failure error) {
 	defer func() { s.reportPreviewFailure(failure) }()
