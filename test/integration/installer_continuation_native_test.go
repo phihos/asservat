@@ -1755,10 +1755,10 @@ func installedHangWatchdog(t *testing.T) {
 				if failedAt.IsZero() && t.Failed() {
 					failedAt = now
 				}
-				// A live focus normally ends within six minutes; past nine
+				// A live focus normally ends within three minutes; past four
 				// something waits without a bound even if nothing failed.
-				if !failedAt.IsZero() && now.Sub(failedAt) > 90*time.Second || now.Sub(started) > 9*time.Minute {
-					fmt.Fprintln(os.Stderr, "installed hang watchdog: test still running (failed or past 9 min); goroutines:")
+				if !failedAt.IsZero() && now.Sub(failedAt) > 90*time.Second || now.Sub(started) > 4*time.Minute {
+					fmt.Fprintln(os.Stderr, "installed hang watchdog: test still running (failed or past 4 min); goroutines:")
 					_ = pprof.Lookup("goroutine").WriteTo(os.Stderr, 2)
 					return
 				}
