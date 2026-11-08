@@ -217,7 +217,20 @@ Limits:
   three hours: the OpenBao token-reviewer token and the owner issuer root.
   Product settings are unchanged. The connector and worker fixture roots stay
   at two hours, so reruns are refused 90 minutes after the keep run started.
+- Hub image changes are not yet reliable for `manual-logs`. In both measured
+  image-change reruns the hub moved and settled, but the focus's
+  single-attempt `preview_capture` right after the move was refused with
+  `facts/storage/expired/readiness-tail` (an immediate second call
+  succeeded). Use reruns to iterate on Go test code, which the rerun always
+  recompiles; after hub product changes keep a fresh installation.
 - Final qualification still starts fresh with frozen sources.
+
+Measured on 2026-11-08: `installed-keep FOCUS=manual-logs` 669 s (setup
+58 s, Go test 608 s, focus 155 s); `installed-rerun` without an image change
+184 s (rebuild and hash 8 s, focus 175 s); image-change reruns 232 s and
+133 s (image built and loaded in 21–23 s, then the failure above);
+`installed-teardown` 52 s, after which no kind cluster, container, network
+or image of the run was left.
 
 ## Prefer measured simplification
 

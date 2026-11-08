@@ -13,7 +13,7 @@ import (
 func installedCapacityObjectPartitions() (system, burst int64) {
 	if installedJourneyFocus() == "profile-comparison" || installedLogsFocus() {
 		// A development-only keep run funds installedKeptRuns() logs focus
-		// runs (75392 system objects for four); ordinary runs are unchanged.
+		// runs (80000 system objects for four); ordinary runs are unchanged.
 		return 20000 * installedKeptRuns(), 30000
 	}
 	return 10000, 40000
