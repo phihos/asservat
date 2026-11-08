@@ -41,10 +41,52 @@ type RegionalAPIContextStart struct {
 
 var _ captureapp.ContextAcceptedStart = RegionalAPIContextStart{}
 
+// startRetryLeft is the least remaining start interval for which a not-started
+// attempt is repeated: an attach wait, the receiver check, signing and the
+// ADR-212 one-second floor before the first preparation insert.
+const startRetryLeft = 2 * time.Second
+
+// startRetryPause spaces repeated attempts; startAttempts bounds them.
+const (
+	startRetryPause = 250 * time.Millisecond
+	startAttempts   = 3
+)
+
+// StartContext repeats an attempt that ended not started (only reads
+// happened, no SQL preparation was entered and the attachment joined) while
+// the first attempt's interval keeps startRetryLeft. A standby exchange lost
+// mid-run otherwise left an admitted Save Pending until its caller continued.
+// Every attempt runs inside that one interval and the caller's context: no
+// deadline is renewed, and a prepared, denied, expired or uncertain run is
+// never repeated (ADR-250).
 func (s RegionalAPIContextStart) StartContext(ctx context.Context, current identities.CurrentIdentity, id string) error {
 	if ctx == nil || ctx.Err() != nil || current == nil || !authorization.UUID(id) || s.Runner.Read == nil || s.Runner.Capabilities == nil || s.Runner.Recovery == nil || s.Signer == nil || s.Router == nil || s.Now == nil {
 		return execution.ErrInvalid
 	}
+	window, cancel := context.WithDeadline(ctx, s.Now().UTC().Truncate(time.Microsecond).Add(identity.AuthorityRecheckInterval)) // ADR-311
+	defer cancel()
+	until, _ := window.Deadline()
+	for attempt := 1; ; attempt++ {
+		err := s.startOnce(window, current, id)
+		if !errors.Is(err, capturevalue.ErrAcquisitionNotStarted) || attempt == startAttempts || until.Sub(s.Now()) < startRetryLeft+startRetryPause {
+			return err
+		}
+		if s.Report != nil {
+			s.Report("retry not-started start-left" + fleetapp.RemainingBucket(window, s.Now()))
+		}
+		pause := time.NewTimer(startRetryPause)
+		select {
+		case <-window.Done():
+			pause.Stop()
+			return err
+		case <-pause.C:
+		}
+	}
+}
+
+func (s RegionalAPIContextStart) startOnce(ctx context.Context, current identities.CurrentIdentity, id string) error {
+	// Diagnostics only: the joined conversation's first stream interruption.
+	ctx, diagnostics := contextstart.NewStreamDiagnosticContext(ctx)
 	// A temporary unavailability before the run, or a run that failed as
 	// temporarily unavailable without entering the one-use SQL preparation
 	// (or whose preparation rolled back before its insert, ADR-212), leaves
@@ -56,7 +98,7 @@ func (s RegionalAPIContextStart) StartContext(ctx context.Context, current ident
 	// or attachment ends; the gate then refuses any later preparation.
 	gate := &preparationGate{}
 	started := s.Now().UTC().Truncate(time.Microsecond)
-	call, cancel := context.WithDeadline(ctx, started.Add(5*time.Second))
+	call, cancel := context.WithDeadline(ctx, started.Add(identity.AuthorityRecheckInterval)) // ADR-311
 	defer cancel()
 	until, _ := call.Deadline()
 	var cancels []context.CancelFunc
@@ -65,7 +107,7 @@ func (s RegionalAPIContextStart) StartContext(ctx context.Context, current ident
 			cancels[i]()
 		}
 	}()
-	// The initial context may already be shorter than this start's five seconds.
+	// The initial context may already be shorter than this start's interval.
 	// Later names identify only an input that actually shortens that bound.
 	bound := regionalStartInitialBound(ctx, started)
 	narrow := func(name string, d time.Time) {
@@ -182,7 +224,11 @@ func (s RegionalAPIContextStart) StartContext(ctx context.Context, current ident
 	gate.close()
 	if e != nil && state == "" {
 		if s.Report != nil {
-			s.Report("dispatch (" + regionalOutcome(e) + ") start-left" + fleetapp.RemainingBucket(call, s.Now()) + " bound=" + bound)
+			// Join the conversation first so its stream stage is recorded;
+			// the deferred Close is then a no-op.
+			left := fleetapp.RemainingBucket(call, s.Now())
+			attachment.Close()
+			s.Report("dispatch (" + regionalOutcome(e) + ") start-left" + left + " bound=" + bound + streamInterruptionLabel(diagnostics))
 		}
 		if gate.notStarted() {
 			return notStarted
@@ -201,6 +247,15 @@ func (s RegionalAPIContextStart) StartContext(ctx context.Context, current ident
 		return notStarted
 	}
 	return execution.ErrUnavailable
+}
+
+// streamInterruptionLabel names a recorded first stream interruption by its
+// fixed stage and reason codes only.
+func streamInterruptionLabel(d *contextstart.StreamDiagnostics) string {
+	if v := d.Interruption(); v.Present() {
+		return " stream=" + v.Stage() + "/" + v.Reason()
+	}
+	return ""
 }
 
 // preparationGate records whether a run entered the one-use SQL preparation
@@ -294,7 +349,7 @@ func (p gatedPreparer) PrepareArgumentRecording(ctx context.Context, c execution
 
 // Diagnostic only: a retained caller deadline is not a fresh start interval.
 func regionalStartInitialBound(ctx context.Context, started time.Time) string {
-	if deadline, ok := ctx.Deadline(); ok && deadline.Before(started.Add(5*time.Second)) {
+	if deadline, ok := ctx.Deadline(); ok && deadline.Before(started.Add(identity.AuthorityRecheckInterval)) {
 		return "parent"
 	}
 	return "start"

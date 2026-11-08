@@ -1871,6 +1871,43 @@ type HubOwnerEnrollment struct {
 	RetiredAt        pgtype.Timestamptz
 }
 
+type LiveWatchAccount struct {
+	RootID      pgtype.UUID
+	Kind        string
+	AccountKey  []byte
+	TokensMicro int64
+	RefilledAt  pgtype.Timestamptz
+}
+
+type LiveWatchControl struct {
+	RootID         pgtype.UUID
+	ID             pgtype.UUID
+	OwnerID        pgtype.UUID
+	Fence          pgtype.UUID
+	PrincipalKey   []byte
+	WorkloadKey    []byte
+	RequestDigest  []byte
+	KeyHash        []byte
+	Revision       int64
+	State          string
+	AcceptedAt     pgtype.Timestamptz
+	ExpiresAt      pgtype.Timestamptz
+	IdleUntil      pgtype.Timestamptz
+	OutputLimit    int64
+	Spent          int64
+	BytesPerSecond int64
+	TokensMicro    int64
+	RefilledAt     pgtype.Timestamptz
+}
+
+type LiveWatchRoot struct {
+	RootID         pgtype.UUID
+	InstallationID pgtype.UUID
+	IssuerEpoch    pgtype.UUID
+	LimitsDigest   []byte
+	Limits         []byte
+}
+
 type LocalKeyConfiguration struct {
 	InstallationID pgtype.UUID
 	Purpose        string

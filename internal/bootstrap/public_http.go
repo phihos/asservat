@@ -90,6 +90,21 @@ func newPublicHandler(ctx context.Context, d *OwnerDeployment, a publicAuditStor
 	if err != nil {
 		return nil, &fixedStepError{"operations", mounts.ErrUnavailable}
 	}
+	liveService, err := d.newPublicLive(ctx)
+	if err != nil {
+		return nil, &fixedStepError{"live", mounts.ErrUnavailable}
+	}
+	if liveService != nil {
+		liveOperations, e := presentation.NewLiveOperations(p.Origin, liveService, time.Now)
+		if e != nil {
+			return nil, e
+		}
+		liveOperations.Diagnose = eventLog(os.Stderr, "live operation refused")
+		operations, e = presentation.NewInvestigationLiveOperations(operations, liveOperations)
+		if e != nil {
+			return nil, e
+		}
+	}
 	// ADR-228: activate_policy and get_policy_status on the same audited
 	// routes, and the restart trigger that RunPublic supervises.
 	policies, trigger, err := composePublicPolicies(PublicContextOperationsConfig{RootID: root, InstallationID: installation, PublicOrigin: p.Origin, CollectionEnabled: true, Now: time.Now, NewID: ownerRandomID},

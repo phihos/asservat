@@ -76,10 +76,13 @@ export class BrowserSession {
         const sameIdentity = previous && previous.principal.issuer === value.principal.issuer && previous.principal.subject_id === value.principal.subject_id;
         const until = Math.min(Date.parse(value.expires_at), sameIdentity ? Date.parse(previous.expires_at) : Infinity);
         if (until <= Date.now()) throw new SessionFailure(401);
-        this.invalidate();
-        this.scope = new AbortController();
+        // The same user keeps the page's data scope, so open views survive a
+        // refresh; another identity gets a new scope and the old one aborts.
+        let scope = sameIdentity ? this.scope : undefined;
+        if (scope) this.clearTimers();
+        else { this.invalidate(); scope = this.scope = new AbortController(); }
         this.csrf = value.csrf_token;
-        this.publish({ phase: 'active', session: { ...value, expires_at: new Date(until).toISOString() }, scope: this.scope.signal });
+        this.publish({ phase: 'active', session: { ...value, expires_at: new Date(until).toISOString() }, scope: scope.signal });
         this.expiry = setTimeout(() => this.expire(), until - Date.now());
         this.scheduleRefresh(until);
       } catch (error) {

@@ -88,3 +88,18 @@ excludes today; that is a separate decision.
 Component tests: router selection/retirement (`TestRouterSelectsStandbyThatOutlivesTheWork`),
 preparation gate, runner pre-effect classification, headroom refusal class and public projection.
 Installed native results are recorded in [implementation progress](../implementation-progress.md).
+
+## Amendment (2026-11-08): repeat a not-started start within its interval
+
+Installed CI showed an admitted HTTP-header Save whose standby exchange ended during the hub run's
+`ResolveSourceSnapshot` (`dispatch (unavailable) ... bound=receiver`) staying `Pending` with no
+execution row; the client did not continue it. `RegionalAPIContextStart` now repeats an attempt
+that ended `ErrAcquisitionNotStarted` (decision 3: only reads happened, no SQL preparation was
+entered, and the attachment joined) on the next standby, at most three attempts 250 ms apart,
+while the first attempt's ADR-311 interval keeps at least 2 s. All attempts run inside that one
+interval and the caller's context, so no original deadline is renewed; a prepared, denied,
+expired or uncertain attempt is never repeated, and an attempt's ordinary checks rerun in full.
+The client contract is unchanged: a request that still ends not started returns
+`AcquisitionNotStarted` for explicit continuation. The dispatch diagnostic line also names the
+joined conversation's first stream interruption (`stream=<stage>/<reason>`). Component test:
+`TestRegionalStartRepeatsNotStartedAttemptOnNextStandby`.

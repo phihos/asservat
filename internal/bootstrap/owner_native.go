@@ -45,6 +45,8 @@ type OwnerContextStartRuntimeConfig struct {
 }
 type ownerNativeRuntime struct {
 	roots            *x509.CertPool
+	liveRoots        *x509.CertPool
+	live             *native.LiveOwnerHandler
 	router           *native.HubRouter
 	handler          *native.Handler
 	connections      int

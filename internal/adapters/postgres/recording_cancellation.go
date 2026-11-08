@@ -37,7 +37,7 @@ func (s *APIContextExecutions) RecordAPIRecordingCancellation(ctx context.Contex
 			return err
 		}
 		e := accepted.Expectation
-		if !capture.SnapshotCancelRequestedAt.Valid || !argumentCancellationMatches(e, r, proof) {
+		if !capture.SnapshotCancelRequestedAt.Valid || !recordingCancellationMatches(e, r, proof) {
 			return execution.ErrDenied
 		}
 		row, err := q.LockAPIExecution(ctx, custodydb.LockAPIExecutionParams{RootID: id(s.root), CaptureID: capture.ID})
@@ -89,10 +89,14 @@ func (s *APIContextExecutions) RecordAPIRecordingCancellation(ctx context.Contex
 	return out, captureError(err)
 }
 
-func argumentCancellationExpected(e artifact.ContextExpectation) bool {
-	return e.NativeType == artifact.SyscallArgumentsArtifact && e.DataClass == "raw" && e.Recording != nil && e.Recording.Kind == "syscallTrace" && e.Recording.Profile == "arguments" && e.Recording.Arguments != nil && e.Snapshot == nil && e.Profile == nil
+// recordingCancellationExpected reports a finite manual recording (packet
+// metadata, raw packets, HTTP headers, syscall metadata or arguments) whose
+// Stop joins through the original writer's RecordingCancellation. Existing
+// source snapshots, profiles and logs keep their own proofs.
+func recordingCancellationExpected(e artifact.ContextExpectation) bool {
+	return e.Recording != nil && e.Snapshot == nil && e.Profile == nil && e.Logs == nil
 }
 
-func argumentCancellationMatches(e artifact.ContextExpectation, r execution.APIExecution, proof artifact.RecordingCancellation) bool {
-	return argumentCancellationExpected(e) && proof.Valid() && proof.CaptureID == e.CaptureUID && proof.AttemptID == e.Registration.Location.AttemptID && proof.WriterPodUID == r.Process.PodUID && proof.WriterEpoch == r.Process.ProcessEpoch && proof.ExpectationDigest == r.ExpectationDigest && proof.ExpectationDigest == evidence.ContextExpectationDigest(e)
+func recordingCancellationMatches(e artifact.ContextExpectation, r execution.APIExecution, proof artifact.RecordingCancellation) bool {
+	return recordingCancellationExpected(e) && proof.Valid() && proof.CaptureID == e.CaptureUID && proof.AttemptID == e.Registration.Location.AttemptID && proof.WriterPodUID == r.Process.PodUID && proof.WriterEpoch == r.Process.ProcessEpoch && proof.ExpectationDigest == r.ExpectationDigest && proof.ExpectationDigest == evidence.ContextExpectationDigest(e)
 }

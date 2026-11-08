@@ -14,6 +14,7 @@ const DownloadEnvironmentMaxBytes = 128 << 10
 // Private administrator policy. No endpoint, credential, raw artifact content,
 // subject search index, or caller-selected processing placement is accepted.
 type DownloadEnvironmentSettings struct {
+	LiveRead         *LiveReadSettings           `json:"liveRead,omitempty"`
 	Format           string                      `json:"format"`
 	RootID           string                      `json:"rootID"`
 	InstallationID   string                      `json:"installationID"`
@@ -89,4 +90,38 @@ func DownloadPathFor(installationID string, t DownloadEnvironmentPathTemplate, t
 	return DownloadEnvironmentPath{ID: id, TargetClusterID: targetClusterID, StoreID: t.StoreID, StorageRegion: t.StorageRegion,
 		AcquisitionClusterID: t.AcquisitionClusterID, AcquisitionRegion: t.AcquisitionRegion, ConnectorClusterID: t.ConnectorClusterID, ConnectorRegion: t.ConnectorRegion,
 		HubClusterID: t.HubClusterID, HubRegion: t.HubRegion, WorkerConfiguration: t.WorkerConfiguration, HubConfiguration: t.HubConfiguration}
+}
+
+// LiveReadSettings is missing by default. It never enables native downloads.
+type LiveReadSettings struct {
+	Root        LiveRootSettings  `json:"root"`
+	Projections []string          `json:"projections"`
+	Clients     []LiveReadClient  `json:"clients"`
+	Ceilings    []LiveReadCeiling `json:"ceilings"`
+}
+type LiveReadClient struct {
+	Issuer  string   `json:"issuer"`
+	ID      string   `json:"id"`
+	Kind    string   `json:"kind"`
+	PathIDs []string `json:"pathIDs"`
+}
+type LiveReadCeiling struct {
+	ClusterID    string `json:"clusterID"`
+	NamespaceUID string `json:"namespaceUID,omitempty"`
+	WorkloadUID  string `json:"workloadUID,omitempty"`
+	Duration     int    `json:"durationSeconds"`
+	Output       int64  `json:"maxOutputBytes"`
+	Rate         int64  `json:"bytesPerSecond"`
+	Rows         int    `json:"maxRowsPerBatch"`
+	Buffer       int    `json:"maxBufferBytes"`
+	RowAge       int    `json:"rowMaxAgeSeconds"`
+	Replay       int    `json:"replaySeconds"`
+}
+
+type LiveRootSettings struct {
+	Watches          int   `json:"maxWatches"`
+	PrincipalWatches int   `json:"maxWatchesPerPrincipal"`
+	WorkloadWatches  int   `json:"maxWatchesPerWorkload"`
+	Rate             int64 `json:"bytesPerSecond"`
+	Burst            int64 `json:"burstBytes"`
 }

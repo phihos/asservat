@@ -30,6 +30,7 @@ func (n *nodePackets) cancel(w collector.Work) collector.Receipt {
 	n.budgetMu.Unlock()
 	if ok {
 		running.cancel()
+		running.live.Close()
 	}
 	r.Outcome, r.Reason = collector.OutcomeAccepted, ""
 	return r

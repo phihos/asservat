@@ -18,6 +18,19 @@ type ConnectorProcessObservation struct {
 	Registration           app.ConnectorLeafRegistration
 	Configuration          value.ConnectorCredentialObservation
 	ObservedAt, ValidUntil time.Time
+	// RunUntil is the process's own hard run end. An operation reusing this
+	// check for the ADR-311 interval never extends past it.
+	RunUntil time.Time
+}
+
+// HardUntil is the earliest hard end of this observed process: its run end and
+// client certificate. An observation without a recorded run end keeps its own
+// ValidUntil, so nothing is extended.
+func (o ConnectorProcessObservation) HardUntil() time.Time {
+	if o.RunUntil.IsZero() {
+		return o.ValidUntil
+	}
+	return identity.Earlier(o.RunUntil, o.Registration.Certificate.NotAfter)
 }
 
 func (c *ConnectorProcessCredentials) ObserveConnectorProcess(ctx context.Context) (ConnectorProcessObservation, error) {
@@ -119,7 +132,7 @@ func (c *ConnectorProcessCredentials) observeConnectorProcess(ctx context.Contex
 	if c.closed || c.root.Err() != nil || c.active != p || p.retired || p.installed[0] != cert || call.Err() != nil || !identity.Fresh(start, until, c.now(), 5*time.Second) || !first.Valid(c.now()) || !registered.Valid(c.now()) {
 		return zero, value.ErrUnavailable
 	}
-	return ConnectorProcessObservation{Request: r, Registration: registered, Configuration: first.Observation, ObservedAt: start, ValidUntil: until}, nil
+	return ConnectorProcessObservation{Request: r, Registration: registered, Configuration: first.Observation, ObservedAt: start, ValidUntil: until, RunUntil: runUntil}, nil
 }
 
 // ConfirmConnectorProcessAt closes the executor proof locally (ADR-199): the
@@ -180,5 +193,6 @@ func (c *ConnectorProcessCredentials) ConfirmConnectorProcessAt(ctx context.Cont
 	out.Configuration = source.Observation
 	out.Configuration.Profile = source.Observation.Profile.Clone()
 	out.ValidUntil = until
+	out.RunUntil = runUntil
 	return out, nil
 }

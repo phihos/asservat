@@ -61,6 +61,7 @@ type nodePackets struct {
 // runningPacket is one registered running packet capture: the ID of the
 // work item that started it and the cancellation of its capture context.
 type runningPacket struct {
+	live   *manualLiveHolder
 	workID string
 	cancel context.CancelFunc
 }
@@ -121,10 +122,19 @@ func (n *nodePackets) start(ctx context.Context, epoch string, w collector.Work)
 		}
 	}
 	started := n.now().UTC()
+	liveID := collector.Identity{}
+	if n.identity != nil {
+		liveID = n.identity()
+	}
+	holder := n.newManualLive(w, p, started, liveID)
 	var rec frameRecorder
 	var err error
 	if h := p.HTTP; h != nil {
-		rec, err = newHTTPRecorder(p.Program, p.MaxBytes, started, *h)
+		if holder != nil {
+			rec, err = newHTTPRecorder(p.Program, p.MaxBytes, started, *h, func(r httpheaders.ObservedRecord) { holder.http(r, n.now()) })
+		} else {
+			rec, err = newHTTPRecorder(p.Program, p.MaxBytes, started, *h)
+		}
 	} else if raw := p.Raw; raw != nil {
 		rec, err = packets.NewRawRecorder(p.Program, int(p.MaxBytes), started, "asservat rawPackets capture of one pod; frames cut at the approved prefix caps", packets.RawLimits{Snaplen: raw.Snaplen, TCP: raw.TCP, UDP: raw.UDP, ICMP: raw.ICMP})
 	} else {
@@ -140,7 +150,15 @@ func (n *nodePackets) start(ctx context.Context, epoch string, w collector.Work)
 		}
 		return r
 	}
+	if observed, ok := rec.(*httpRecorder); ok && holder != nil {
+		observed.observedActive = func() bool { return holder.observing(n.now()) }
+		observed.observedLoss = holder.httpLoss
+	}
+
 	capture, stopCapture := context.WithCancel(ctx)
+	if holder != nil {
+		holder.ctx = capture
+	}
 	n.budgetMu.Lock()
 	if _, busy := n.running[p.CaptureID]; busy || len(n.running) >= collector.MaxQueuedWork {
 		n.budgetMu.Unlock()
@@ -182,7 +200,7 @@ func (n *nodePackets) start(ctx context.Context, epoch string, w collector.Work)
 		if n.running == nil {
 			n.running = make(map[string]runningPacket)
 		}
-		n.running[p.CaptureID] = runningPacket{workID: w.ID, cancel: stopCapture}
+		n.running[p.CaptureID] = runningPacket{workID: w.ID, cancel: stopCapture, live: holder}
 	}
 	n.budgetMu.Unlock()
 	if err != nil {
@@ -204,7 +222,7 @@ func (n *nodePackets) start(ctx context.Context, epoch string, w collector.Work)
 		}()
 		// A cancel ends capture like a node stop: runObserved reports the
 		// early stop as a failure, never as a shorter recording.
-		n.runObserved(capture, epoch, w.ID, p, rec, started, meter)
+		n.runObserved(capture, epoch, w.ID, p, rec, started, meter, holder)
 		n.budgetMu.Lock()
 		if running, ok := n.running[p.CaptureID]; ok && running.workID == w.ID {
 			delete(n.running, p.CaptureID)
@@ -224,12 +242,36 @@ func (n *nodePackets) run(ctx context.Context, epoch, workID string, p collector
 	n.runObserved(ctx, epoch, workID, p, rec, started, nil)
 }
 
-func (n *nodePackets) runObserved(ctx context.Context, epoch, workID string, p collector.PacketCapture, rec frameRecorder, started time.Time, meter *LocalObservationGate) {
+func (n *nodePackets) runObserved(ctx context.Context, epoch, workID string, p collector.PacketCapture, rec frameRecorder, started time.Time, meter *LocalObservationGate, holders ...*manualLiveHolder) {
 	capture, cancel := context.WithTimeout(ctx, p.Duration)
 	var stats gadget.CaptureStats
 	var err error
+	var holder *manualLiveHolder
+	if len(holders) > 0 {
+		holder = holders[0]
+	}
+	engine := n.engine
+	observed := n.observedEngine
+	if holder != nil {
+		engine = func(call context.Context, pod string, snaplen int, deliver func(gadget.Frame)) (gadget.CaptureStats, error) {
+			return n.engine(call, pod, snaplen, func(f gadget.Frame) {
+				deliver(f)
+				if holder.projection != "httpHeaders" && (meter == nil || meter.Context().Err() == nil) {
+					holder.append(f, n.now())
+				}
+			})
+		}
+		observed = func(call context.Context, pod string, snaplen int, deliver func(gadget.Frame), notice func(gadget.InputNotice)) (gadget.CaptureStats, error) {
+			return n.observedEngine(call, pod, snaplen, func(f gadget.Frame) {
+				deliver(f)
+				if holder.projection != "httpHeaders" && meter.Context().Err() == nil {
+					holder.append(f, n.now())
+				}
+			}, func(input gadget.InputNotice) { notice(input); holder.notice(input.LostSamples) })
+		}
+	}
 	if meter == nil {
-		stats, err = runPacketEngine(capture, n.engine, p.PodUID, rec, nil)
+		stats, err = runPacketEngine(capture, engine, p.PodUID, rec, nil)
 	} else {
 		// A queued goroutine cannot inherit a fresh start window. Recheck
 		// original finite fit and current enrollment immediately before engine.
@@ -239,9 +281,10 @@ func (n *nodePackets) runObserved(ctx context.Context, epoch, workID string, p c
 			meter.Close()
 			err = ErrObservationExpired
 		} else {
-			stats, err = runObservedPacketEngine(capture, n.observedEngine, p.PodUID, rec, meter)
+			stats, err = runObservedPacketEngine(capture, observed, p.PodUID, rec, meter)
 		}
 	}
+	holder.Close()
 	// The capture completed when its own deadline ended it; a later node
 	// stop does not discard that result. A capture the node stopped early is
 	// reported as failed, never as a shorter recording.

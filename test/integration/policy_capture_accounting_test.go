@@ -103,6 +103,13 @@ func attachPolicyAccountingGrantMode(t *testing.T, ctx context.Context, admin *p
 			g.Policy.Limits.MaxObservedBytes = a.Limits.MaxObservedBytes
 			g.Policy.Limits.MaxObservedEvents = min(a.Limits.MaxObservedEvents, 10)
 			g.Policy.Observation = &authorization.ObservationLimits{MaxSessionSeconds: int64(timeout / time.Second), MaxObservedBytes: a.Limits.MaxObservedBytes, MaxObservedEvents: g.Policy.Limits.MaxObservedEvents, MaxBytesPerSecond: planvalue.SensitiveMaxBytesPerSecond, MaxConcurrentSessions: 1}
+			if recorder[0].HTTP != nil {
+				// Explicit source-review fixture limits, independent of the
+				// incident Save timeout. The original grant holds them.
+				g.Reasons = []authorization.SensitiveReason{{ActionID: recorder[0].Action.ID, Code: planvalue.ReasonHTTPHeaders}}
+				g.Policy.Observation.MaxSessionSeconds = 60
+				g.Policy.Observation.MaxBytesPerSecond = 1 << 20
+			}
 		}
 	}
 	if !observation && len(recorder) == 1 {

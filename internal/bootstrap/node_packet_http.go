@@ -1,6 +1,7 @@
 package bootstrap
 
 import (
+	"asservat.local/asservat/internal/adapters/gadget"
 	"time"
 
 	"asservat.local/asservat/internal/adapters/httpheaders"
@@ -36,13 +37,15 @@ var (
 // directions, dropped records and values) is accounted in the document's
 // own counters, not in the frame counters.
 type httpRecorder struct {
-	filter   *packets.Filter
-	proj     *httpheaders.Projector
-	maxBytes int64
-	counters packets.Counters
+	observedActive func() bool
+	observedLoss   func(httpheaders.Counters, httpheaders.Counters)
+	filter         *packets.Filter
+	proj           *httpheaders.Projector
+	maxBytes       int64
+	counters       packets.Counters
 }
 
-func newHTTPRecorder(program []planning.BPFInstruction, maxBytes int64, started time.Time, h collector.HTTPProjection) (*httpRecorder, error) {
+func newHTTPRecorder(program []planning.BPFInstruction, maxBytes int64, started time.Time, h collector.HTTPProjection, observers ...func(httpheaders.ObservedRecord)) (*httpRecorder, error) {
 	if len(program) == 0 {
 		return nil, packets.ErrInvalid
 	}
@@ -58,7 +61,16 @@ func newHTTPRecorder(program []planning.BPFInstruction, maxBytes int64, started 
 	if maxBytes < 1 || maxBytes > collector.MaxPacketCaptureBytes {
 		return nil, httpheaders.ErrInvalid
 	}
-	proj, err := httpheaders.NewProjector(httpheaders.Limits{MaxFlows: h.MaxFlows, MaxHeaderBytes: h.MaxHeaderBytes, MaxFlowBytes: h.MaxFlowBytes, MaxTotalBytes: h.MaxTotalBytes, IdleTimeout: h.IdleTimeout}, started)
+	limits := httpheaders.Limits{MaxFlows: h.MaxFlows, MaxHeaderBytes: h.MaxHeaderBytes, MaxFlowBytes: h.MaxFlowBytes, MaxTotalBytes: h.MaxTotalBytes, IdleTimeout: h.IdleTimeout}
+	var proj *httpheaders.Projector
+	if len(observers) > 1 {
+		return nil, httpheaders.ErrInvalid
+	}
+	if len(observers) == 1 {
+		proj, err = httpheaders.NewObservedProjector(limits, started, observers[0])
+	} else {
+		proj, err = httpheaders.NewProjector(limits, started)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -67,7 +79,12 @@ func newHTTPRecorder(program []planning.BPFInstruction, maxBytes int64, started 
 
 func (r *httpRecorder) Snaplen() int { return httpheaders.Snaplen }
 
-func (r *httpRecorder) Add(frame []byte, wire uint32, at time.Time) {
+func (r *httpRecorder) Add(frame []byte, wire uint32, at time.Time) { r.add(frame, wire, at, nil) }
+func (r *httpRecorder) AddFrame(frame gadget.Frame) {
+	stamp := httpheaders.SourceStamp{RawTimestamp: frame.RawTimestamp, Clock: frame.Clock}
+	r.add(frame.Data, frame.Wire, frame.At, &stamp)
+}
+func (r *httpRecorder) add(frame []byte, wire uint32, at time.Time, stamp *httpheaders.SourceStamp) {
 	r.counters.Seen++
 	if int(wire) < len(frame) {
 		wire = uint32(len(frame))
@@ -76,9 +93,23 @@ func (r *httpRecorder) Add(frame []byte, wire uint32, at time.Time) {
 		r.counters.Filtered++
 		return
 	}
+	observe := r.observedActive != nil && r.observedActive()
+	var before httpheaders.Counters
+	if observe {
+		before = r.proj.SourceCounters()
+	}
+	defer func() {
+		if observe && r.observedLoss != nil {
+			r.observedLoss(before, r.proj.SourceCounters())
+		}
+	}()
 	r.counters.Retained++
 	r.counters.WireBytes += uint64(wire)
-	r.proj.Add(frame, wire, at)
+	if stamp == nil {
+		r.proj.Add(frame, wire, at)
+	} else {
+		r.proj.AddObserved(frame, wire, at, *stamp)
+	}
 }
 
 // Close completes every open flow and encodes the projection within the

@@ -23,7 +23,7 @@ import (
 // syscall metadata source on a Restricted Pod through the real collector and
 // pinned traceloop eBPF program, then one saved window as JSON Lines. The
 // source work is synthetic test authority, delivered in-process.
-func syscallSourceNative(t *testing.T, ctx context.Context, k kubernetes.Interface, ch *delivery.NodeChannel, view delivery.NodeView, workload, busybox, work string, results map[string]any) {
+func syscallSourceNative(t *testing.T, ctx context.Context, k kubernetes.Interface, ch *delivery.NodeChannel, view delivery.NodeView, workload, busybox, work string, results map[string]any, live *nativeLiveQualification) {
 	t.Helper()
 	sink := &testPacketSink{results: map[string]collector.PacketResult{}, pcap: map[string][]byte{}, at: map[string]time.Time{}}
 	ch.SetPacketSink(sink)
@@ -40,7 +40,7 @@ func syscallSourceNative(t *testing.T, ctx context.Context, k kubernetes.Interfa
 	if !view.RecorderAvailable(collector.MechanismSyscall) {
 		t.Fatalf("syscall recorder not available on the runner: %+v", view.Report.Mechanisms)
 	}
-	pod, err := k.CoreV1().Pods(workload).Create(ctx, restrictedPod("syscalls", busybox, "while true; do cat /proc/self/stat > /dev/null; usleep 100000; done"), meta.CreateOptions{})
+	pod, err := k.CoreV1().Pods(workload).Create(ctx, restrictedPod("syscalls", busybox, "while true; do cat /proc/self/stat > /dev/null; printf ASSERVAT-LIVE-PRIVATE-CANARY > /dev/null; usleep 100000; done"), meta.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,6 +81,12 @@ func syscallSourceNative(t *testing.T, ctx context.Context, k kubernetes.Interfa
 	})
 	if err := waitFor(ctx, 6*time.Second); err != nil {
 		t.Fatal(err)
+	}
+
+	if live != nil {
+		callLive, doneLive := live.phase(t, ctx)
+		live.sourceRows(t, callLive, ch, source, "syscallMetadata")
+		doneLive()
 	}
 
 	issued := time.Now().UTC().Truncate(time.Microsecond)
@@ -136,6 +142,10 @@ func syscallSourceNative(t *testing.T, ctx context.Context, k kubernetes.Interfa
 	cancel()
 	if err != nil {
 		t.Fatal("syscall source stop", err)
+	}
+
+	if live != nil {
+		live.syscalls(t, ctx, ch, view, string(pod.UID), sink, results)
 	}
 }
 

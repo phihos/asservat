@@ -86,7 +86,8 @@ func TestContextSubmissionSlowAdmissionLeavesBoundedStartPhase(t *testing.T) {
 			x.intentHook = func() {
 				f.now = original.Add(6 * time.Second)
 				if mode == "phase-expired" {
-					f.now = original.Add(8 * time.Second)
+					// The ADR-311 phase bound is clipped by the request window.
+					f.now = original.Add(identity.RecordingSaveRequestWindow)
 				}
 				if mode == "cancelled" {
 					cancel()
@@ -96,9 +97,11 @@ func TestContextSubmissionSlowAdmissionLeavesBoundedStartPhase(t *testing.T) {
 				if mode == "fresh-start-denied" {
 					return value.ErrDenied
 				}
+				// The phase gets the ADR-311 interval from the handoff (t+3s),
+				// still clipped by the original request window.
 				until, _ := call.Deadline()
-				if !until.Equal(original.Add(8 * time.Second)) {
-					t.Errorf("start did not retain its original five-second phase bound: %v", until.Sub(original))
+				if want := identity.Earlier(original.Add(3*time.Second+identity.AuthorityRecheckInterval), callerUntil); !until.Equal(want) {
+					t.Errorf("start did not retain its original phase bound: %v, want %v", until.Sub(original), want.Sub(original))
 				}
 				return nil
 			}}

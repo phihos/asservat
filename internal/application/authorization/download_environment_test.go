@@ -67,10 +67,12 @@ func newEnvironmentFixture() (*environmentFixture, CurrentDownloadEnvironment, C
 func TestCurrentDownloadEnvironmentRequiresIndependentPolicyProcessingRecovery(t *testing.T) {
 	f, s, r, a := newEnvironmentFixture()
 	out, e := s.DownloadEnvironment(context.Background(), r, a)
-	if e != nil || !out.Valid(f.now) || out.Path != f.policy.Paths[0] || out.Processing != f.processing || out.RecoveryRevision != f.recovery.Revision || f.policyReads != 2 || f.recoveryReads != 2 || f.processingReads != 2 {
-		t.Fatal("incomplete composed environment", e)
+	// ADR-311: one policy, recovery and processing read per check; SQL effect
+	// fences reject a change after them and the next check observes it.
+	if e != nil || !out.Valid(f.now) || out.Path != f.policy.Paths[0] || out.Processing != f.processing || out.RecoveryRevision != f.recovery.Revision || f.policyReads != 1 || f.recoveryReads != 1 || f.processingReads != 1 {
+		t.Fatal("incomplete composed environment", e, f.policyReads, f.recoveryReads, f.processingReads)
 	}
-	for _, mode := range []string{"client", "purpose", "processing-missing", "processing-denied", "processing-substitution", "recovery", "policy-change", "recovery-change", "processing-change"} {
+	for _, mode := range []string{"client", "purpose", "processing-missing", "processing-denied", "processing-substitution", "recovery"} {
 		t.Run(mode, func(t *testing.T) {
 			f, s, r, a := newEnvironmentFixture()
 			switch mode {
@@ -86,24 +88,6 @@ func TestCurrentDownloadEnvironmentRequiresIndependentPolicyProcessingRecovery(t
 				f.processing.CaptureID = f.processing.RootID
 			case "recovery":
 				f.recovery.IssuerEpoch = r.CaptureID
-			case "policy-change":
-				f.policyHook = func() {
-					if f.policyReads == 2 {
-						f.policy.Revision.Generation++
-					}
-				}
-			case "processing-change":
-				f.processingHook = func() {
-					if f.processingReads == 2 {
-						f.processing.Sequence++
-					}
-				}
-			case "recovery-change":
-				f.recoveryHook = func() {
-					if f.recoveryReads == 2 {
-						f.recovery.Revision.Generation++
-					}
-				}
 			}
 			if _, e := s.DownloadEnvironment(context.Background(), r, a); e == nil {
 				t.Fatal("missing/contradictory authority accepted")
@@ -115,7 +99,7 @@ func TestCurrentDownloadEnvironmentRequiresIndependentPolicyProcessingRecovery(t
 	}
 }
 func TestCurrentDownloadEnvironmentPreservesEarliestDeadlineAfterBlockingWork(t *testing.T) {
-	for _, at := range []string{"policy", "processing", "final-recovery"} {
+	for _, at := range []string{"policy", "processing", "recovery"} {
 		t.Run(at, func(t *testing.T) {
 			f, s, r, a := newEnvironmentFixture()
 			original := f.now.Add(time.Second)
@@ -124,15 +108,15 @@ func TestCurrentDownloadEnvironmentPreservesEarliestDeadlineAfterBlockingWork(t 
 			switch at {
 			case "policy":
 				f.policyHook = func() {
-					if f.policyReads == 2 {
+					if f.policyReads == 1 {
 						advance()
 					}
 				}
 			case "processing":
 				f.processingHook = advance
-			case "final-recovery":
+			case "recovery":
 				f.recoveryHook = func() {
-					if f.recoveryReads == 2 {
+					if f.recoveryReads == 1 {
 						advance()
 					}
 				}
@@ -154,5 +138,57 @@ func TestCurrentDownloadEnvironmentPreservesEarliestDeadlineAfterBlockingWork(t 
 	before := f.policyReads
 	if _, e = s.DownloadEnvironment(ctx, r, a); e == nil || f.policyReads != before {
 		t.Fatal("canceled caller admitted")
+	}
+}
+
+// A change after one check's single reads is not polled within that check; the
+// SQL effect fences compare the carried revisions, and the next check observes
+// the current state: a revision change is carried forward and a revocation or
+// recovery change refuses.
+func TestCurrentDownloadEnvironmentNextCheckObservesChange(t *testing.T) {
+	for _, mode := range []string{"policy-revision", "recovery-revision", "processing-sequence", "client-revoked", "recovery-epoch", "processing-denied"} {
+		t.Run(mode, func(t *testing.T) {
+			f, s, r, a := newEnvironmentFixture()
+			first, e := s.DownloadEnvironment(context.Background(), r, a)
+			if e != nil {
+				t.Fatal(e)
+			}
+			switch mode {
+			case "policy-revision":
+				f.policy.Revision.Generation++
+			case "recovery-revision":
+				f.recovery.Revision.Generation++
+			case "processing-sequence":
+				f.processing.Sequence++
+			case "client-revoked":
+				f.policy.Clients = nil
+			case "recovery-epoch":
+				f.recovery.IssuerEpoch = r.CaptureID
+			case "processing-denied":
+				f.processingErr = true
+			}
+			next, e := s.DownloadEnvironment(context.Background(), r, a)
+			if f.policyReads != 2 {
+				t.Fatal("next check reused the previous policy read", f.policyReads)
+			}
+			switch mode {
+			case "policy-revision":
+				if e != nil || next.Revision.Generation == first.Revision.Generation || next.Revision.Digest == first.Revision.Digest {
+					t.Fatal("changed policy revision not carried to the effect fences", e)
+				}
+			case "recovery-revision":
+				if e != nil || next.RecoveryRevision == first.RecoveryRevision {
+					t.Fatal("changed recovery revision not carried to the effect fences", e)
+				}
+			case "processing-sequence":
+				if e != nil || next.Processing.Sequence == first.Processing.Sequence {
+					t.Fatal("changed processing state not carried to the effect fences", e)
+				}
+			default:
+				if e == nil {
+					t.Fatal("revocation or recovery change accepted at the next check", mode)
+				}
+			}
+		})
 	}
 }

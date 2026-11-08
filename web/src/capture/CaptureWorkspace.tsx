@@ -11,6 +11,7 @@ import { PlanDiff } from './PlanDiff';
 import { planFromPreview } from './plan-diff';
 import { SaveAsProfile } from './SaveAsProfile';
 import { CaptureSubmission } from './CaptureSubmission';
+const LivePanel = lazy(() => import('../live/LivePanel').then(module => ({ default: module.LivePanel })));
 const RecordingsPanel = lazy(() => import('../recordings/RecordingsPanel').then(module => ({ default: module.RecordingsPanel })));
 
 const phases: Record<Progress['phase'], string> = {
@@ -165,6 +166,7 @@ export function CaptureWorkspace({ session, scope, controller }: { session: Sess
     <div className="page-intro"><h1 ref={heading} tabIndex={-1}>{title}</h1>
       {state.stage === 'target' && <p>Choose a production workload or pod, then review the available diagnostics before collecting. To collect automatically on restarts, use <a href="/policies">automatic policies</a>. See <a href="/shares">shared evidence</a>.</p>}
     </div>
+    {(state.stage === 'target' || state.stage === 'diagnostics' || state.stage === 'progress') && <details><summary>Observe existing recorders</summary><Suspense fallback={<p role="status">Loading live-view tools…</p>}><LivePanel session={session} scope={scope} target={draft.target} onSave={controller.showRecordings}/></Suspense></details>}
     {state.error && <p role="alert" className="notice">{state.error}</p>}
     {state.error && (state.stage === 'target' || state.stage === 'diagnostics' || state.stage === 'review') && draft.target.name && <WhyAccess key={JSON.stringify(draft.target)} session={session} scope={scope} target={draft.target} operation="capture"/>}
     {state.stage === 'target' && <form onSubmit={event => { event.preventDefault(); if ((event.nativeEvent as SubmitEvent).submitter?.getAttribute('value') === 'recordings') controller.showRecordings(); else void controller.discover(); }} aria-busy={state.busy}>

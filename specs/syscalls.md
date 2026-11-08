@@ -124,7 +124,9 @@ values cannot supply their own trusted source identity. This historical lookup
 does not renew collection authority or require the original observation lease
 to remain active.
 
-For a finite argument capture, Stop is restricted to its original attempt and
+For a finite argument capture (and, under
+[ADR-313](../docs/decisions/313-manual-recording-stop.md), every finite manual
+packet/syscall recording), Stop is restricted to its original attempt and
 regional writer. A node acknowledgement means only that cancellation was
 requested. `Cancelled` requires the original acquisition result after reader
 and attachment shutdown, together with regional writer completion. An uncertain

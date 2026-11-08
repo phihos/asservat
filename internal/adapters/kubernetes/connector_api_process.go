@@ -305,7 +305,11 @@ func (g *ConnectorAPIExecutionProtection) produceProof(ctx context.Context) (con
 		return connectorAPIProof{}, cfg.ErrUnavailable
 	}
 	start := g.attester.client.now()
+	// until bounds this proof's reads (five seconds); the completed proof is
+	// used for the ADR-311 recheck interval, never past the owned process's
+	// run end or certificate.
 	until := start.Add(5 * time.Second)
+	valid := start.Add(identity.AuthorityRecheckInterval)
 	if d, ok := ctx.Deadline(); ok {
 		until = identity.Earlier(until, d)
 	}
@@ -337,6 +341,7 @@ func (g *ConnectorAPIExecutionProtection) produceProof(ctx context.Context) (con
 		return connectorAPIProof{}, stage("owned-process", e)
 	}
 	until = identity.Earlier(until, owned.ValidUntil)
+	valid = identity.Earlier(valid, owned.HardUntil())
 	call, c1 := context.WithDeadline(call, until)
 	defer c1()
 	mark("owned-process")
@@ -404,11 +409,12 @@ func (g *ConnectorAPIExecutionProtection) produceProof(ctx context.Context) (con
 		return connectorAPIProof{}, stage("owned-process-after", cfg.ErrChanged)
 	}
 	until = identity.Earlier(until, final.ValidUntil)
+	valid = identity.Earlier(valid, final.HardUntil())
 	if call.Err() != nil || !identity.Fresh(start, until, g.attester.client.now(), 5*time.Second) || !proof.Valid(g.attester.client.now()) {
 		return connectorAPIProof{}, stage("fresh", cfg.ErrUnavailable)
 	}
 	closed.Observation.Profile = closed.Observation.Profile.Clone()
-	return connectorAPIProof{proof: proof.Clone(), owned: owned, source: closed, observedAt: start, validUntil: until}, nil
+	return connectorAPIProof{proof: proof.Clone(), owned: owned, source: closed, observedAt: start, validUntil: valid}, nil
 }
 
 type ConnectorAPIExecutionProcess struct {
@@ -464,11 +470,20 @@ func (p *ConnectorAPIExecutionProcess) readAPIProcess(ctx context.Context) (valu
 	if p == nil || ctx == nil || p.parent.Err() != nil {
 		return zero, mtls.ConnectorProcessObservation{}, value.ErrUnavailable
 	}
-	// The enclosing observation owns its original five-second interval. The
-	// guard starts later and must not return a deadline beyond CheckedAt + 5s.
+	// The enclosing observation owns its original recheck interval (ADR-311).
+	// The guard's own proof keeps its earlier start and interval. The caller's
+	// deadline bounds this read's work by cancellation, not the validity of
+	// the reused proof: the proof's own reads keep their five-second bound.
 	start := p.guard.attester.client.now()
-	call, cancel := context.WithDeadline(ctx, start.Add(5*time.Second))
+	call, cancel := context.WithDeadline(context.WithoutCancel(ctx), start.Add(identity.AuthorityRecheckInterval))
 	defer cancel()
+	callerDone := make(chan struct{})
+	stopCaller := context.AfterFunc(ctx, func() { cancel(); close(callerDone) })
+	defer func() {
+		if !stopCaller() {
+			<-callerDone
+		}
+	}()
 	done := make(chan struct{})
 	stop := context.AfterFunc(p.parent, func() { cancel(); close(done) })
 	defer func() {
@@ -482,7 +497,7 @@ func (p *ConnectorAPIExecutionProcess) readAPIProcess(ctx context.Context) (valu
 		return zero, mtls.ConnectorProcessObservation{}, value.ErrUnavailable
 	}
 	out := value.APIProcessObservation{Binding: p.binding, CheckedAt: proof.observedAt, ValidUntil: until}
-	if call.Err() != nil || p.parent.Err() != nil || !out.Valid(p.guard.attester.client.now()) {
+	if call.Err() != nil || ctx.Err() != nil || p.parent.Err() != nil || !out.Valid(p.guard.attester.client.now()) {
 		return zero, mtls.ConnectorProcessObservation{}, value.ErrUnavailable
 	}
 	owned := proof.owned

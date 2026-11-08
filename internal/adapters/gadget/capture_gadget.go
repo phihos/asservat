@@ -199,6 +199,7 @@ func CaptureObservedPackets(ctx context.Context, podUID string, snaplen int, del
 				return ErrEngineUnavailable
 			}
 			payload, size, raw := ds.GetField("payload"), ds.GetField("packet_size"), ds.GetField("timestamp_raw")
+			direction := ds.GetField("packet_type")
 			if payload == nil || size == nil || raw == nil {
 				return ErrEngineUnavailable
 			}
@@ -215,7 +216,13 @@ func CaptureObservedPackets(ctx context.Context, podUID string, snaplen int, del
 				if payloadErr != nil {
 					return nil
 				}
-				clock.deliver(b, wire, ts, notice, deliver)
+				metadata := Frame{}
+				if direction != nil {
+					value, e := direction.Uint8(data)
+					metadata.DirectionKnown = e == nil && value <= 1
+					metadata.Ingress = value == 1
+				}
+				clock.deliver(b, wire, ts, notice, deliver, metadata)
 				return nil
 			}, 10000)
 		}),

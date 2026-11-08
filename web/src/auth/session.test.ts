@@ -67,6 +67,19 @@ describe('browser session lifecycle', () => {
     expect(controller.snapshot().phase).toBe('active');
   });
 
+  it('keeps the data scope across a same-user refresh so open views stay open', async () => {
+    fetcher.mockResolvedValueOnce(token()).mockResolvedValueOnce(json(session()));
+    await controller.resume();
+    const first = controller.snapshot();
+    if (first.phase !== 'active') throw new Error('not active');
+    fetcher.mockResolvedValueOnce(token()).mockResolvedValueOnce(json(session()));
+    await controller.resume();
+    const second = controller.snapshot();
+    if (second.phase !== 'active') throw new Error('not active');
+    expect(second.scope).toBe(first.scope);
+    expect(first.scope.aborted).toBe(false);
+  });
+
   it('bounds busy retries without clearing the current page or extending its deadline', async () => {
     const until = Date.now() + 120_000;
     fetcher.mockResolvedValueOnce(token()).mockResolvedValueOnce(json(session({ expires_at: new Date(until).toISOString() })));

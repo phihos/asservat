@@ -387,8 +387,7 @@ func (p *Publisher) publish(ctx context.Context, item postgres.PendingContextPub
 	// ADR-282: an HTTP header projection is rechecked as a document: strict
 	// canonical decode, the accepted limits and only approved header values.
 	verifier.WithStreamCheck(artifact.HTTPHeadersArtifact, func(e artifact.ContextExpectation) objectstore.StreamCheck {
-		limits, maxBytes := httpheaders.RecordingLimits(e.Recording)
-		return httpheaders.NewProjectionCheck(limits, maxBytes)
+		return httpheaders.NewExpectationCheck(e)
 	})
 	// ADR-284: a Go endpoint profile is decompressed and parsed within fixed
 	// bounds; an execution trace is read to its end within an event cap.
@@ -465,7 +464,16 @@ func (p *Publisher) Run(ctx context.Context) (err error) {
 			for _, item := range pending {
 				call, end := context.WithTimeout(work, 30*time.Second)
 				if e := p.publish(call, item); e != nil {
-					report("publish " + errorClass(e))
+					stage := ""
+					var staged *evidence.PublicationStageError
+					if errors.As(e, &staged) {
+						stage = " at " + staged.Stage
+					}
+					var step interface{ FixedStep() string }
+					if errors.As(e, &step) {
+						stage += "/" + step.FixedStep()
+					}
+					report("publish " + errorClass(e) + stage)
 				} else {
 					report("published")
 				}

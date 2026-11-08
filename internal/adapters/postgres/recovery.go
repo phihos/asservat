@@ -20,14 +20,17 @@ type RecoveryReader struct {
 }
 
 // ForEvidenceReads returns a reader whose observations stay current for up to
-// identity.EvidenceReadRequestWindow (still bounded by the trust row's own
-// fresh_until). Only evidence-read composition may use it.
+// identity.AuthorityRecheckInterval (ADR-311; still bounded by the trust row's
+// own fresh_until and the 20 s evidence-read request). Only evidence-read
+// composition may use it. The default reader keeps five seconds: SQL fences
+// that persist recovery proofs (connector enrollment, migration 00049;
+// capacity_recovery_current, 00054/00065/00073) admit at most five seconds.
 func (s *RecoveryReader) ForEvidenceReads() *RecoveryReader {
 	if s == nil {
 		return nil
 	}
 	out := *s
-	out.window = identity.EvidenceReadRequestWindow
+	out.window = identity.AuthorityRecheckInterval
 	return &out
 }
 
@@ -47,7 +50,7 @@ func recoveryState(row custodydb.FleetCurrentTrust, started, now time.Time) (val
 	return recoveryStateWithin(row, started, now, 5*time.Second)
 }
 func recoveryStateWithin(row custodydb.FleetCurrentTrust, started, now time.Time, window time.Duration) (value.RecoveryState, error) {
-	if window <= 0 || window > identity.EvidenceReadRequestWindow {
+	if window <= 0 || window > identity.AuthorityRecheckInterval {
 		window = 5 * time.Second
 	}
 	if row.Suspended || row.RecoveryBlocked || !identity.Fresh(row.ObservedAt.Time, row.FreshUntil.Time, now, 30*time.Second) {

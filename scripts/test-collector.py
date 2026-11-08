@@ -258,6 +258,11 @@ def packet(work, report, cni="", ring_disk=False, profile=False):
         roots, cert, key = certificates(work, gateway)
         values = {"mode": "cluster", "collector": {"enabled": True, "image": image, "installationID": INSTALLATION, "clusterID": CLUSTER,
                   "connector": {"endpoint": f"https://{gateway}:{PORT}", "serverName": "asservat-connector-nodes", "rootsPEM": roots}}}
+        if not profile and not ring_disk and not cni:
+            # Existing production node-processing authority; no fixture patch.
+            values["collector"]["live"] = {"subscriptions": 4, "memoryBytes": 4 << 20,
+                "eventsPerSecond": 100000, "bytesPerSecond": 256 << 20,
+                "processingNanosPerSecond": 100000000}
         if ring_disk:
             values["collector"]["ringDisk"] = {"enabled": True, "bytes": RING_DISK_BYTES}
         (work / "values.yaml").write_text(json.dumps(values))

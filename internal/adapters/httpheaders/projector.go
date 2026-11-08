@@ -121,13 +121,16 @@ func (c *frameContext) GetCaptureInfo() gopacket.CaptureInfo { return c.ci }
 // Projector builds one capture's projection. It is not safe for concurrent
 // use and holds at most the limits' state.
 type Projector struct {
-	limits    Limits
-	started   time.Time
-	last      time.Time
-	now       time.Time
-	lastFlush time.Time
-	phase     phase
-	closed    bool
+	observer       func(ObservedRecord)
+	retainObserved bool
+	stamp          SourceStamp
+	limits         Limits
+	started        time.Time
+	last           time.Time
+	now            time.Time
+	lastFlush      time.Time
+	phase          phase
+	closed         bool
 
 	eth     layers.Ethernet
 	ip4     layers.IPv4
@@ -169,6 +172,11 @@ func validTime(t time.Time) bool {
 // Add processes one engine frame: captured bytes (at most Snaplen) and the
 // original wire length.
 func (p *Projector) Add(frame []byte, wire uint32, at time.Time) {
+	p.addObserved(frame, wire, at, SourceStamp{})
+}
+
+func (p *Projector) addObserved(frame []byte, wire uint32, at time.Time, stamp SourceStamp) {
+	p.stamp = stamp
 	if p.closed {
 		return
 	}

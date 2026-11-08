@@ -72,7 +72,7 @@ func TestRegionalArgumentStopNeedsOriginalResult(t *testing.T) {
 				return
 			}
 			if mode == "unknown-start" {
-				if len(h.held) != 1 || h.held[e.CaptureUID].argumentJoined {
+				if len(h.held) != 1 || h.held[e.CaptureUID].resultJoined {
 					t.Fatal("unknown effect lost")
 				}
 				return

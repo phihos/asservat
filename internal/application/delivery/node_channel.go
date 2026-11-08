@@ -174,6 +174,7 @@ type nodeEntry struct {
 	// captures are packetCapture items still awaiting their result, by work
 	// ID; a receipt does not remove them, delivery or the deadline does.
 	captures map[string]pendingCapture
+	live     map[string]*pendingLive
 }
 
 type NodeChannel struct {
@@ -440,6 +441,7 @@ func (c *NodeChannel) Report(p NodePeer, epoch string, r collector.Report) error
 	e.work = kept
 	stored := r
 	stored.Sources = append([]collector.SourceStatus(nil), r.Sources...)
+	stored.Mechanisms = cloneNodeMechanisms(r.Mechanisms)
 	e.report, e.reportedAt = &stored, now
 	e.reports++
 	view := c.view(e, now)
@@ -453,7 +455,7 @@ func (c *NodeChannel) Report(p NodePeer, epoch string, r collector.Report) error
 // Enqueue queues one work item without payload for the node's current
 // process and wakes its poll. Packet captures use EnqueuePacket.
 func (c *NodeChannel) Enqueue(nodeUID string, kind collector.WorkKind, notAfter time.Time) (collector.Work, error) {
-	if !kind.Valid() || kind == collector.WorkProfileCapture || kind == collector.WorkCancelProfileCapture || kind == collector.WorkPacketCapture || kind == collector.WorkSyscallCapture || kind == collector.WorkPacketSource || kind == collector.WorkStopPacketSource || kind == collector.WorkCancelPacketCapture {
+	if !kind.Valid() || kind == collector.WorkLiveRead || kind == collector.WorkProfileCapture || kind == collector.WorkCancelProfileCapture || kind == collector.WorkPacketCapture || kind == collector.WorkSyscallCapture || kind == collector.WorkPacketSource || kind == collector.WorkStopPacketSource || kind == collector.WorkCancelPacketCapture {
 		return collector.Work{}, ErrNodeInvalid
 	}
 	return c.enqueue(nodeUID, kind, notAfter, nil, nil, nil)
@@ -528,6 +530,7 @@ func (c *NodeChannel) view(e *nodeEntry, now time.Time) NodeView {
 	if e.report != nil {
 		r := *e.report
 		r.Sources = append([]collector.SourceStatus(nil), e.report.Sources...)
+		r.Mechanisms = cloneNodeMechanisms(e.report.Mechanisms)
 		v.Report = &r
 		v.Current = now.Sub(e.reportedAt) <= collector.StatusStaleAfter
 	}
@@ -544,5 +547,14 @@ func (c *NodeChannel) Nodes() []NodeView {
 		out = append(out, c.view(e, now))
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Identity.NodeName < out[j].Identity.NodeName })
+	return out
+}
+
+func cloneNodeMechanisms(in []collector.Availability) []collector.Availability {
+	out := append([]collector.Availability(nil), in...)
+	for n := range out {
+		out[n].Reasons = append([]collector.Reason(nil), in[n].Reasons...)
+		out[n].LiveProjections = append([]string(nil), in[n].LiveProjections...)
+	}
 	return out
 }

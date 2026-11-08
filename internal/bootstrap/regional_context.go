@@ -291,7 +291,7 @@ func (r *regionalContext) run(ctx context.Context, credentials *mtls.ConnectorPr
 		output.recordings.configureLogs(ctx, r.rootID, r.logsClient, r.podUID, process.ProcessEpoch())
 		defer output.recordings.closeLogs()
 	}
-	local := contextstart.RegionalLocal{Process: process, Targets: reportedTargets{r.targets, timedEventLog(os.Stderr, "regional target answer"), r.output.recordings}, Local: preparer, Starts: r.journal, Output: output, Collector: r.collector, Source: r.source, Now: time.Now}
+	local := contextstart.RegionalLocal{Process: process, Targets: reportedTargets{r.targets, timedEventLog(os.Stderr, "regional target answer"), r.output.recordings, timedEventLog(os.Stderr, "regional source snapshot refused")}, Local: preparer, Starts: r.journal, Output: output, Collector: r.collector, Source: r.source, Now: time.Now}
 	local.History = &contextstart.HistoryLocal{Verifier: r.verifier, Effects: regionalHistoryObjects{objects: r.history, root: r.rootID, cluster: r.c.TrustSettings.ClusterID, epoch: process.ProcessEpoch(), now: time.Now}, Report: timedEventLog(os.Stderr, "regional history timing")}
 	if r.output.recordings != nil {
 		local.Recordings = r.output.recordings
@@ -392,6 +392,9 @@ type reportedTargets struct {
 	*kube.PodTargets
 	report     func(string, string)
 	recordings *ConnectorRecordings
+	// refusal receives a source snapshot refusal's fixed reason as the event
+	// and a producer-owned count as payload; nil leaves it silent.
+	refusal func(string, string)
 }
 
 // PacketRecorder answers the hub's ADR-248 availability query; a connector

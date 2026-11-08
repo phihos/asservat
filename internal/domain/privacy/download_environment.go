@@ -26,6 +26,7 @@ type DownloadClient struct {
 type ProcessingOperator struct{ Issuer, ClientID, Kind, ID string }
 
 type DownloadPolicy struct {
+	LiveRead                              *LiveRead
 	RootID, InstallationID, RecoveryEpoch string
 	Revision                              identity.Revision
 	ProtectionDigest                      artifact.Digest
@@ -60,6 +61,9 @@ func (p DownloadPolicy) WellFormed() bool {
 			return false
 		}
 		paths[x.ID] = true
+	}
+	if p.LiveRead != nil && !p.LiveRead.valid(paths) {
+		return false
 	}
 	clients := map[[2]string]bool{}
 	for _, c := range p.Clients {

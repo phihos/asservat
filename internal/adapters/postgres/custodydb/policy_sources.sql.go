@@ -11,6 +11,27 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countActiveSourceGrantObservations = `-- name: CountActiveSourceGrantObservations :one
+SELECT ((SELECT count(*) FROM policy_recording_source WHERE root_id=$1::uuid
+ AND binding_json->>'ObservationGrantID'=($2::uuid)::text
+ AND slot_released_at IS NULL AND hard_until>clock_timestamp())+
+ (SELECT count(*) FROM policy_observation_session WHERE root_id=$1::uuid
+ AND grant_id=$2::uuid AND ended_at IS NULL AND lease_until>clock_timestamp()))::bigint AS active_sessions
+`
+
+type CountActiveSourceGrantObservationsParams struct {
+	RootID  pgtype.UUID
+	GrantID pgtype.UUID
+}
+
+// Original grant lock serializes both finite and ongoing sensitive admissions.
+func (q *Queries) CountActiveSourceGrantObservations(ctx context.Context, arg CountActiveSourceGrantObservationsParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countActiveSourceGrantObservations, arg.RootID, arg.GrantID)
+	var active_sessions int64
+	err := row.Scan(&active_sessions)
+	return active_sessions, err
+}
+
 const countPolicyRecordingSources = `-- name: CountPolicyRecordingSources :one
 SELECT count(*) AS source_count,COALESCE(sum(bytes_per_second),0)::bigint AS input_rate FROM policy_recording_source WHERE root_id=$1 AND allocation_id=$2 AND slot_released_at IS NULL
 `

@@ -43,7 +43,11 @@ func (p *packetInput) add(f gadget.Frame) {
 	if p.meter != nil && p.meter.Consume(f.Wire, len(f.Data)) != nil {
 		return
 	}
-	p.recorder.Add(f.Data, f.Wire, f.At)
+	if stamped, ok := p.recorder.(interface{ AddFrame(gadget.Frame) }); ok {
+		stamped.AddFrame(f)
+	} else {
+		p.recorder.Add(f.Data, f.Wire, f.At)
+	}
 }
 
 // runPacketEngine joins the existing synchronous engine before returning. A

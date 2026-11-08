@@ -112,7 +112,9 @@ func (s PolicyGrantPlans) PolicyGrantPlan(ctx context.Context, policy, name stri
 		// rate-times-duration estimate. Prepare debits each original session
 		// from both the acceptance and attached grant before any observation.
 		review.ObservationLimits = &authapp.GrantObservationLimits{MaxSessionSeconds: int64(min(timeout, duration+10*time.Second) / time.Second), MaxObservedBytes: observed, MaxObservedEvents: a.Limits.MaxObservedEvents, MaxBytesPerSecond: arguments.MaxBytesPerSecond, MaxConcurrentSessions: 1}
-	} else if slices.Contains(action.Sensitive, planning.ReasonRawBytePredicate) {
+	} else if slices.Contains(action.Sensitive, planning.ReasonRawBytePredicate) || slices.Contains(action.Sensitive, planning.ReasonHTTPHeaders) {
+		// REQ-AUT-006: HTTP header projections (ADR-282) also need finite
+		// observation limits, as in the manual plan.
 		duration, err := time.ParseDuration(action.Timeout)
 		observed := min(planning.SensitiveMaxObservedBytes, a.Limits.MaxObservedBytes)
 		if err != nil || duration < time.Second || observed < 1 {

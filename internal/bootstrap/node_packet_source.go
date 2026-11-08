@@ -8,8 +8,10 @@ import (
 	"time"
 
 	"asservat.local/asservat/internal/adapters/gadget"
+	"asservat.local/asservat/internal/adapters/httpheaders"
 	"asservat.local/asservat/internal/adapters/packets"
 	deliveryapp "asservat.local/asservat/internal/application/delivery"
+	liveapp "asservat.local/asservat/internal/application/live"
 	compiler "asservat.local/asservat/internal/application/planning"
 	"asservat.local/asservat/internal/domain/collector"
 	"asservat.local/asservat/internal/domain/planning"
@@ -22,17 +24,29 @@ import (
 const packetSourceStopGrace = 30 * time.Second
 
 type packetSource struct {
-	mu                             sync.Mutex
-	ctx                            context.Context
-	cancel                         context.CancelFunc
-	ring                           *packets.Ring
-	meter                          *collector.SourceMeter
-	now                            func() time.Time
-	timer                          *time.Timer
-	timerAt                        time.Time
-	stoppedUntil                   time.Time
-	closed, engineExited, released bool
-	inputUnknown                   bool
+	httpConfig                         *collector.HTTPProjection
+	httpProjector                      *httpheaders.Projector
+	httpObserved                       func(httpheaders.ObservedRecord)
+	httpGaps                           func(httpheaders.Counters)
+	httpAccounting, httpLastAccounting httpheaders.SourceAccounting
+	httpEntryAt                        time.Time
+	httpFailure                        error
+	httpClosed                         bool
+	httpLost                           uint64
+	mu                                 sync.Mutex
+	live                               *nodeLiveCohort
+	liveProgram                        []planning.BPFInstruction
+	liveCounters                       *liveapp.BufferCounters
+	ctx                                context.Context
+	cancel                             context.CancelFunc
+	ring                               *packets.Ring
+	meter                              *collector.SourceMeter
+	now                                func() time.Time
+	timer                              *time.Timer
+	timerAt                            time.Time
+	stoppedUntil                       time.Time
+	closed, engineExited, released     bool
+	inputUnknown                       bool
 	// records marks a syscall source: frames are fixed records, and drops
 	// (rate, stale time, lost samples) are ring gaps that the saved window's
 	// coverage reports, not a source stop or source-level InputUnknown, which
@@ -49,8 +63,22 @@ type packetSource struct {
 	log func(string)
 }
 
-func newPacketSource(parent context.Context, permit collector.SourcePermit, lowering collector.PolicyLimits, limits packets.RingLimits, program []planning.BPFInstruction, syscallFilter *collector.SyscallFilter, engine observedPacketEngine, now func() time.Time, budget *collector.Budget, budgetMu *sync.Mutex, log func(string), ringDir string) (*packetSource, error) {
+func newPacketSource(parent context.Context, permit collector.SourcePermit, lowering collector.PolicyLimits, limits packets.RingLimits, program []planning.BPFInstruction, syscallFilter *collector.SyscallFilter, engine observedPacketEngine, now func() time.Time, budget *collector.Budget, budgetMu *sync.Mutex, log func(string), ringDir string, httpConfigs ...*collector.HTTPProjection) (*packetSource, error) {
 	if parent == nil || parent.Err() != nil || engine == nil || now == nil || budget == nil || budgetMu == nil || !permit.Startable(now()) {
+		return nil, collector.ErrInvalid
+	}
+	if len(httpConfigs) > 1 {
+		return nil, collector.ErrInvalid
+	}
+	var h *collector.HTTPProjection
+	if len(httpConfigs) == 1 && httpConfigs[0] != nil {
+		copy := *httpConfigs[0]
+		h = &copy
+		if syscallFilter != nil || len(program) == 0 || permit.Binding.ObservationGrantID == "" {
+			return nil, collector.ErrInvalid
+		}
+	}
+	if h == nil && permit.Binding.ObservationGrantID != "" {
 		return nil, collector.ErrInvalid
 	}
 	var actual [32]byte
@@ -74,6 +102,9 @@ func newPacketSource(parent context.Context, permit collector.SourcePermit, lowe
 	if limits.MaxSegments < 2 || limits.MaxSegments > 64 || limits.SegmentBytes <= 0 || limits.SegmentBytes > 64<<20 {
 		return nil, collector.ErrInvalid
 	}
+	if h != nil {
+		r.RingBytes += int64(h.MaxTotalBytes)
+	}
 	budgetMu.Lock()
 	err := budget.ReserveSourceWithin(r, lowering)
 	budgetMu.Unlock()
@@ -95,7 +126,17 @@ func newPacketSource(parent context.Context, permit collector.SourcePermit, lowe
 		release()
 		return nil, err
 	}
-	s := &packetSource{ctx: ctx, cancel: cancel, ring: ring, meter: meter, now: now, done: make(chan struct{}), release: release, budget: budget, budgetMu: budgetMu, lowering: lowering, records: syscallFilter != nil, log: log}
+	s := &packetSource{ctx: ctx, cancel: cancel, ring: ring, meter: meter, now: now, done: make(chan struct{}), release: release, budget: budget, budgetMu: budgetMu, lowering: lowering, records: syscallFilter != nil, log: log, liveProgram: append([]planning.BPFInstruction(nil), program...)}
+	if h != nil {
+		s.httpConfig = h
+		s.httpProjector, err = httpheaders.NewSourceProjector(httpheaders.Limits{MaxFlows: h.MaxFlows, MaxHeaderBytes: h.MaxHeaderBytes, MaxFlowBytes: h.MaxFlowBytes, MaxTotalBytes: h.MaxTotalBytes, IdleTimeout: h.IdleTimeout}, permit.StartedAt, s.observeHTTPRecordLocked)
+		if err != nil {
+			cancel()
+			_ = ring.Close()
+			release()
+			return nil, err
+		}
+	}
 	if syscallFilter != nil {
 		s.maxEvents = syscallFilter.MaxEvents
 	}
@@ -171,6 +212,11 @@ func (s *packetSource) stopLocked(err error) {
 			s.log(fmt.Sprintf("node collector: source %s stopped: %v", s.meter.Permit().Binding.SourceID, err))
 		}
 		s.cancel()
+		if s.live != nil {
+			s.live.Close()
+		}
+		clear(s.liveProgram)
+		s.liveProgram = nil
 		if s.timer != nil {
 			s.timer.Stop()
 		}
@@ -181,6 +227,9 @@ func (s *packetSource) stopLocked(err error) {
 		}
 		if p.HardUntil.Before(closedAt) {
 			closedAt = p.HardUntil
+		}
+		if s.httpConfig != nil {
+			s.closeHTTPLocked(closedAt)
 		}
 		_ = s.ring.CloseAt(closedAt)
 	}
@@ -210,6 +259,14 @@ func (s *packetSource) add(f gadget.Frame) {
 		s.stopLocked(ErrObservationClosed)
 		return
 	}
+	if s.httpConfig != nil {
+		s.addHTTPFrameLocked(f, now)
+		s.scheduleLocked()
+		return
+	}
+	if s.live != nil {
+		s.live.append(f, now)
+	}
 	if err := s.ring.Add(f.Data, f.Wire, f.At, now); err != nil {
 		s.inputUnknown = true
 		s.stopLocked(err)
@@ -217,10 +274,16 @@ func (s *packetSource) add(f gadget.Frame) {
 	}
 	s.scheduleLocked()
 }
-func (s *packetSource) notice(gadget.InputNotice) {
+func (s *packetSource) notice(notice gadget.InputNotice) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.httpConfig != nil {
+		s.httpLost += notice.LostSamples
+	}
 	_ = s.ring.Gap(s.now())
+	if s.live != nil {
+		s.live.sensorLoss(max(uint64(1), notice.LostSamples))
+	}
 	if !s.records {
 		s.inputUnknown = true
 		s.stopLocked(ErrObservationClosed)
@@ -242,6 +305,9 @@ func (s *packetSource) addRecordLocked(f gadget.Frame, now time.Time) {
 	}
 	if len(f.Data) == 0 {
 		return // charged but not retained (result: errors)
+	}
+	if s.live != nil {
+		s.live.append(f, now)
 	}
 	at := f.At
 	if at.After(now) {
@@ -267,11 +333,18 @@ func (s *packetSource) run(engine observedPacketEngine, pod string) {
 	var stats gadget.CaptureStats
 	var err error
 	if !closed {
-		stats, err = engine(s.ctx, pod, packets.Snaplen, s.add, s.notice)
+		snaplen := packets.Snaplen
+		if s.httpConfig != nil {
+			snaplen = httpheaders.Snaplen
+		}
+		stats, err = engine(s.ctx, pod, snaplen, s.add, s.notice)
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.engineExited = true
+	if s.httpConfig != nil && stats.LostSamples > s.httpLost {
+		s.httpLost = stats.LostSamples
+	}
 	if stats.LostSamples > 0 {
 		_ = s.ring.Gap(s.now())
 		if !s.records {
@@ -291,6 +364,13 @@ func (s *packetSource) run(engine observedPacketEngine, pod string) {
 	// its existing history for at most the existing default stop grace, also
 	// capped by the current leaf/hard end. Cancellation fabricates no stop.
 	now := s.now()
+	if s.httpConfig != nil {
+		s.closeHTTPLocked(now)
+		if s.httpFailure != nil {
+			s.stopLocked(s.httpFailure)
+			return
+		}
+	}
 	if err = s.ring.Stop(now); err != nil {
 		s.stopLocked(err)
 		return
@@ -346,15 +426,16 @@ func (s *packetSource) BeginWindow(processing context.Context, window packets.Ri
 		release()
 		return nil, err
 	}
-	return &packetSourceSnapshot{copy: copy, release: release, records: s.records, maxEvents: s.maxEvents}, nil
+	return &packetSourceSnapshot{copy: copy, release: release, records: s.records, maxEvents: s.maxEvents, httpConfig: s.httpConfig}, nil
 }
 
 type packetSourceSnapshot struct {
-	records   bool  // syscall records, encoded as JSON Lines
-	maxEvents int64 // syscall events per saved window
-	copy      *packets.WindowSnapshot
-	once      sync.Once
-	release   func()
+	httpConfig *collector.HTTPProjection
+	records    bool  // syscall records, encoded as JSON Lines
+	maxEvents  int64 // syscall events per saved window
+	copy       *packets.WindowSnapshot
+	once       sync.Once
+	release    func()
 }
 
 // Close follows joined processing/upload and erases the copy before releasing

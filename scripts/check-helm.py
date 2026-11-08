@@ -444,6 +444,37 @@ def check_collector(directory):
     assert data["immutable"] is True
     node = json.loads(data["data"]["node.json"])
     assert node["format"] == "asservat-node-deployment/v1" and node["ceilings"] == {"maxActiveSources": 16, "inputBytesPerSecond": 16777216, "inputBurstBytes": 16777216, "ringBytes": 268435456, "frozenBytes": 268435456, "uploadBytesPerSecond": 33554432, "uploadBurstBytes": 67108864}
+    # Existing typed node-processing ceilings, independent of the hub's
+    # delivery.liveRead viewer policy. Omission/null preserves every old byte.
+    assert "live" not in node
+    disabled_live = copy.deepcopy(base)
+    disabled_live["collector"]["live"] = None
+    assert render(disabled_live) == docs, "null live processing changed old resources"
+    live_bounds = {"subscriptions": (1, 16), "memoryBytes": (1048576, 16777216),
+                   "eventsPerSecond": (1, 100000), "bytesPerSecond": (1, 268435456),
+                   "processingNanosPerSecond": (1, 100000000)}
+    for edge in (0, 1):
+        requested = {name: bounds[edge] for name, bounds in live_bounds.items()}
+        enabled_live = copy.deepcopy(base)
+        enabled_live["collector"]["live"] = requested
+        rendered_live = render(enabled_live)
+        live_node = json.loads(next(r for r in rendered_live if r["kind"] == "ConfigMap")["data"]["node.json"])
+        assert live_node == {**node, "live": requested}, "node processing bounds were dropped or changed"
+        live_ds = next(r for r in rendered_live if r["kind"] == "DaemonSet")
+        old_ds = next(r for r in docs if r["kind"] == "DaemonSet")
+        assert live_ds["spec"]["template"]["spec"]["containers"][0]["resources"] == old_ds["spec"]["template"]["spec"]["containers"][0]["resources"], "live mapping changed the container limit"
+    for name, bounds in live_bounds.items():
+        for invalid in (bounds[0] - 1, bounds[1] + 1):
+            bad = copy.deepcopy(enabled_live)
+            bad["collector"]["live"][name] = invalid
+            render(bad, ok=False)
+        missing = copy.deepcopy(enabled_live)
+        del missing["collector"]["live"][name]
+        render(missing, ok=False)
+    for invalid in ({}, {**requested, "enabled": True}, {**requested, "subscriptions": "1"}):
+        bad = copy.deepcopy(base)
+        bad["collector"]["live"] = invalid
+        render(bad, ok=False)
     zero = json.loads(json.dumps(base))
     zero["collector"]["ceilings"] = {"maxActiveSources": 0, "inputBytesPerSecond": 0, "inputBurstBytes": 0}
     zero_docs = render(zero)

@@ -1129,3 +1129,26 @@ func TestRingAddRecordBypassesPacketDecoder(t *testing.T) {
 		t.Fatalf("state %+v", st.Packets)
 	}
 }
+
+func TestMinimizedRecordBoundDoesNotWidenPacketIngress(t *testing.T) {
+	r, now := ringFixture(t, func(l *RingLimits) { l.SegmentBytes = 8192; l.MaxBytes = 32768; l.MaxFrozenBytes = 32768 })
+	record := bytes.Repeat([]byte{'x'}, MaxMinimizedRecordBytes)
+	if err := r.AddRecord(record, now, now); err != nil {
+		t.Fatal("bounded minimized record refused", err)
+	}
+	if err := r.AddRecord(append(bytes.Clone(record), 'x'), now, now); !errors.Is(err, ErrInvalid) {
+		t.Fatal("overbound record silently truncated", err)
+	}
+	if err := r.Add(record, uint32(len(record)), now, now); !errors.Is(err, ErrInvalid) {
+		t.Fatal("minimized record bound widened packet input", err)
+	}
+	copy := ringCopy(t, r, now, now.Add(time.Second), now.Add(time.Second))
+	row, err := ringNext(copy)
+	if err != nil || row.Length != len(record) || !bytes.Equal(row.Header[:row.Length], record) {
+		t.Fatal("minimized record was truncated", err)
+	}
+	if Snaplen != 134 {
+		t.Fatal("packet/BPF prefix changed")
+	}
+	t.Logf("iterator scratch=%dB; packet sanitizer=%dB; minimized record cap=%dB", len(row.Header), Snaplen, MaxMinimizedRecordBytes)
+}

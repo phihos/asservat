@@ -693,6 +693,9 @@ func (s *ContextAdmissions) admitContextInTransaction(ctx context.Context, q *cu
 				return value.ErrInvalid
 			}
 			nativeType := artifact.PCAPNGArtifact
+			if in.Snapshot.Request.HTTP != (artifact.RecordingHTTP{}) {
+				nativeType, expected.DataClass = artifact.HTTPHeadersArtifact, "extract"
+			}
 			if in.Snapshot.ActionKind == "syscallTrace" {
 				nativeType = artifact.SyscallRecordsArtifact
 			}

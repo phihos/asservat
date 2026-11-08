@@ -9,6 +9,7 @@ import (
 
 	"asservat.local/asservat/internal/domain/artifact"
 	cfg "asservat.local/asservat/internal/domain/configuration"
+	"asservat.local/asservat/internal/domain/identity"
 	value "asservat.local/asservat/internal/domain/targets"
 )
 
@@ -105,11 +106,11 @@ func TestPacketTargetReusesFinalExactPodWithoutNodeAuthority(t *testing.T) {
 			}
 			if mode == "short-parent" || mode == "short-parent-generic" {
 				deadline, _ := ctx.Deadline()
-				if !p.FreshUntil.Equal(start.Add(5*time.Second)) || !p.FreshUntil.After(deadline) {
+				if !p.FreshUntil.Equal(start.Add(identity.AuthorityRecheckInterval)) || !p.FreshUntil.After(deadline) {
 					t.Fatal("completed API metadata inherited caller I/O deadline", p, deadline)
 				}
 			}
-			if !p.ObservedAt.Equal(start) || p.FreshUntil.After(start.Add(5*time.Second)) {
+			if !p.ObservedAt.Equal(start) || p.FreshUntil.After(start.Add(identity.AuthorityRecheckInterval)) {
 				t.Fatal("original target times extended", p)
 			}
 		})

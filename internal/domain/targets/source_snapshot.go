@@ -4,6 +4,7 @@ import (
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/identity"
+	"slices"
 	"time"
 )
 
@@ -43,6 +44,7 @@ func (s SourceSnapshotTarget) Valid() bool {
 // bounded report of that exact retained source. Local snapshot admission still
 // checks its actual current leaf/grace and capacity without arming anything.
 type SourceSnapshotResolution struct {
+	LiveProjections              []string `json:",omitempty"`
 	Original                     SourceSnapshotTarget
 	Process                      PacketSourceObservation
 	State                        RecorderSourceState
@@ -51,6 +53,11 @@ type SourceSnapshotResolution struct {
 }
 
 func (s SourceSnapshotResolution) Valid(now time.Time) bool {
+	for n, p := range s.LiveProjections {
+		if !slices.Contains([]string{"packetMetadata", "syscallMetadata", "httpHeaders"}, p) || slices.Contains(s.LiveProjections[:n], p) {
+			return false
+		}
+	}
 	p, t, state := s.Process, s.Original, s.State
 	return t.Valid() && p.Valid(now) && p.PodUID == t.Request.PodUID && p.NodeUID == t.NodeUID && p.BootID == t.BootID && p.CollectorPodUID == t.CollectorPodUID && p.CollectorEpoch == t.CollectorEpoch &&
 		identity.Fresh(s.ObservedAt, s.FreshUntil, now, 5*time.Second) && !s.FreshUntil.After(p.FreshUntil) && !s.ReportedAt.After(s.ObservedAt) && s.ReportFreshUntil.After(s.ReportedAt) && now.Before(s.ReportFreshUntil) && !s.FreshUntil.After(s.ReportFreshUntil) &&

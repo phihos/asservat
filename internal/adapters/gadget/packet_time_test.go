@@ -148,3 +148,16 @@ func TestPacketClockArrivalFallbackIsExplicitWithoutChangingFiniteFrame(t *testi
 		t.Fatal("legacy finite arrival bytes/timestamp changed", frames)
 	}
 }
+
+func TestLiveFrameCarriesOriginalClockAndDirectionWithoutExtraReads(t *testing.T) {
+	c, walls, monos, _ := packetClockFixture(t)
+	raw := uint64(time.Hour)
+	var got Frame
+	c.deliver([]byte{1}, 1, raw, nil, func(f Frame) { got = f }, Frame{DirectionKnown: true, Ingress: true})
+	if got.RawTimestamp != raw || got.Clock != "monotonic" || !got.DirectionKnown || !got.Ingress || *walls != 2 || *monos != 1 {
+		t.Fatal(got, *walls, *monos)
+	}
+	if n := testing.AllocsPerRun(100, func() { c.deliver(nil, 0, raw, nil, func(Frame) {}, Frame{DirectionKnown: true}) }); n != 0 {
+		t.Fatal("per-row metadata allocation", n)
+	}
+}

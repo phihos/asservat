@@ -685,6 +685,33 @@ func TestInstalledJourneySubmitContinuesAcceptedRefusedStart(t *testing.T) {
 	}
 }
 
+// A caller that already holds the original reply's AcquisitionNotStarted must
+// resolve and continue; a plain same-key request_capture would passively replay
+// the admitted capture as "ok" and leave it Pending (installed LIVE HTTP Save).
+func TestInstalledJourneyRecoverSubmittedNeverReplaysNotStartedCapture(t *testing.T) {
+	var calls []string
+	id, err := installedJourneyRecoverSubmitted(t.Context(), func(name string, arguments any, data any) (string, string) {
+		calls = append(calls, name)
+		switch name {
+		case "request_capture":
+			if arguments.(map[string]any)["continue_acquisition"] != true {
+				t.Fatal("not-started capture replayed without continuation", arguments)
+			}
+			data.(*struct {
+				CaptureID string `json:"capture_id"`
+			}).CaptureID = "original"
+		case "resolve_capture_request":
+			*data.(*installedJourneyDisposition) = installedJourneyDisposition{State: "accepted", CaptureID: "original"}
+		case "get_capture":
+			*data.(*installedJourneyCaptureProgress) = installedJourneyCaptureProgress{CaptureID: "original", Phase: "Pending"}
+		}
+		return "ok", ""
+	}, map[string]any{"preview_id": "preview", "idempotency_key": "key"}, "AcquisitionNotStarted")
+	if err != nil || id != "original" || !reflect.DeepEqual(calls, []string{"resolve_capture_request", "get_capture", "request_capture"}) {
+		t.Fatal(id, err, calls)
+	}
+}
+
 func TestInstalledJourneyReviewsAgainOnlyAfterAcknowledgedClosure(t *testing.T) {
 	var keys []any
 	id, err := installedJourneyReviewAndSubmit(t.Context(), func(name string, arguments any, data any) (string, string) {

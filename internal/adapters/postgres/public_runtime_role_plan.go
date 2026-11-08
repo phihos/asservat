@@ -102,6 +102,9 @@ func publicRuntimeDutyGrants(purpose string) ([]publicRuntimeGrant, bool) {
 }
 
 func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
+	if purpose == "live-watch" {
+		return publicRuntimeLiveWatchGrants(), true
+	}
 	if out, ok := publicRuntimeCapacityGrants(purpose); ok {
 		return out, true
 	}

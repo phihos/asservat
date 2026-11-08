@@ -88,7 +88,7 @@ func (s APIContextRunner) CollectRecording(ctx context.Context, w APIContextWork
 	}
 	if c.State == evidence.RecordingCancelled && e.Recording != nil {
 		joined := c.RecordingCancellation
-		if e.NativeType != artifact.SyscallArgumentsArtifact || e.DataClass != "raw" || e.Recording.Kind != "syscallTrace" || e.Recording.Profile != "arguments" || e.Recording.Arguments == nil || e.Snapshot != nil || joined == nil || joined.CaptureID != e.CaptureUID || joined.AttemptID != e.Registration.Location.AttemptID || joined.ExpectationDigest != r.ExpectationDigest || joined.WriterPodUID != r.Process.PodUID || joined.WriterEpoch != r.Process.ProcessEpoch || joined.JoinedAt.Before(r.StartedAt) || joined.JoinedAt.After(s.Now()) {
+		if e.Snapshot != nil || e.Profile != nil || e.Logs != nil || joined == nil || joined.CaptureID != e.CaptureUID || joined.AttemptID != e.Registration.Location.AttemptID || joined.ExpectationDigest != r.ExpectationDigest || joined.WriterPodUID != r.Process.PodUID || joined.WriterEpoch != r.Process.ProcessEpoch || joined.JoinedAt.Before(r.StartedAt) || joined.JoinedAt.After(s.Now()) {
 			return ContextResult{State: "Indeterminate"}, executeStep{"RecordingCancellation", value.ErrInvalid}
 		}
 		recorder, ok := s.Record.(APIRecordingCancellationRecorder)

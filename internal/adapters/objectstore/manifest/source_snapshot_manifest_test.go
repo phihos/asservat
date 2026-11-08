@@ -20,6 +20,10 @@ func TestSyscallSourceSnapshotManifest(t *testing.T) {
 	sourceSnapshotManifest(t, artifact.SyscallRecordsArtifact)
 }
 
+func TestHTTPSourceSnapshotManifest(t *testing.T) {
+	sourceSnapshotManifest(t, artifact.HTTPHeadersArtifact)
+}
+
 func sourceSnapshotManifest(t *testing.T, nativeType string) {
 	t.Helper()
 	v, e, l, c, _ := recorderFixture(t)
@@ -29,6 +33,10 @@ func sourceSnapshotManifest(t *testing.T, nativeType string) {
 	binding := json.RawMessage(`{"NodeUID":"original-node","BootID":"original-boot","CollectorPodUID":"original-collector","CollectorEpoch":"original-epoch"}`)
 	e.PlanDigest = artifact.Digest(sha256.Sum256(scope))
 	q := artifact.SourceSnapshotRequest{SourceBindingDigest: artifact.Digest(sha256.Sum256(binding)), SourceID: e.Lifecycle.SourceSessionID, Fence: testID(32), SnapshotID: e.Lifecycle.SnapshotID, SourceStartedAt: e.Lifecycle.SourceStartedAt, SourceHardUntil: e.TriggeredAt.Add(time.Hour), T0: e.TriggeredAt, IssuedAt: e.TriggeredAt, StartBy: e.TriggeredAt.Add(time.Second), ProcessingUntil: e.TriggeredAt.Add(15 * time.Second), Before: e.Lifecycle.RequestedBefore, After: e.Lifecycle.After, MaxBytes: 65536}
+	if nativeType == artifact.HTTPHeadersArtifact {
+		e.DataClass = "extract"
+		q.HTTP = artifact.RecordingHTTP{MaxFlows: 16, MaxHeaderBytes: 8192, MaxFlowBytes: 65536, MaxTotalBytes: 1048576, IdleMillis: 10000}
+	}
 	e.Snapshot = &q
 	e.SourceSnapshotManifest = &artifact.SourceSnapshotManifest{CanonicalScope: scope, Binding: binding}
 	e.Registration.NativeLimit = q.MaxBytes

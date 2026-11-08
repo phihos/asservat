@@ -167,7 +167,7 @@ func TestRegionalArgumentStartUnknownReplyCannotReuseWriter(t *testing.T) {
 			t.Fatal("unknown reply accepted")
 		}
 	}
-	if nodes.expected != 1 || len(nodes.work) != 1 || p.prepared != nil || len(h.held) != 1 || h.held[e.CaptureUID].workID != "" || h.held[e.CaptureUID].argumentJoined {
+	if nodes.expected != 1 || len(nodes.work) != 1 || p.prepared != nil || len(h.held) != 1 || h.held[e.CaptureUID].workID != "" || h.held[e.CaptureUID].resultJoined {
 		t.Fatal("unknown enqueue refilled writer", nodes.expected)
 	}
 }

@@ -1,5 +1,38 @@
 # Sustained implementation progress
 
+## Stop for manual packet/syscall metadata sessions (2026-11-07)
+
+Installed `continuation-ongoing-live-manual` showed `cancel_capture` returning
+NotAvailable for a running manual packetMetadata session: the hub, regional
+holder, collect runner and the `guard_snapshot_cancel` request rule accepted
+only the syscall-argument recording. ADR-313 and migration 00146 (schema 146)
+extend the existing argument Stop to every finite manual `Recording`
+expectation with the same original-writer join, stored-wins and no refund; the
+node already reports an early stop as a failure, so a cancelled session stores
+nothing. Unit/race tests for the changed packages pass, plus the three owned
+fleet fixtures `TestLiveManual{Metadata,RawPacket,Arguments}SourceWithRealServices`
+(the metadata one now records and replays the joined Stop proof). Installed
+qualification is pending.
+
+## Finite approved live views: service qualification (2026-11-06)
+
+Finite UI/MCP live views over existing ongoing packet/syscall/HTTP sources and
+running manual sessions (specs/live-watch.md, migration 00143) are rebased on
+merged logs `0b182537`. Three fixture defects found in the real-service runs are
+corrected without production changes: the expired-receipt seed typed one
+parameter as uuid and text and drew separate clock reads (idle after expiry);
+the upgrade check compared SQL-decoded `+00:00` times with `UTC` values, which
+the adapter already normalizes; the HTTP source test resolved retention before
+its own observation instant. Actual PostgreSQL/S3/OpenBao runs pass:
+`TestLiveWatchLedgerWithRealServices`, `TestLiveWatchUpgradeWithRealPostgres`,
+`TestContextQueryLedgerWithRealPostgres`, the three
+`TestLiveManual*SourceWithRealServices` and libpcap
+`TestHTTPSourceLedgerWithRealServices` (each a separate owned fleet fixture).
+The installed `live-observation` focus (CI suite `continuation-ongoing-live`)
+now dispatches the real installer continuation: guarded delivery enablement,
+three policy sources and three finite manual sessions, MCP and React views,
+and HTTP Save native download through the shared helper. It has not run yet;
+no installed live qualification is claimed.
 ## Started downloads run to their original bounds (2026-11-07)
 
 Maintainer decision: remove rechecks after download start. [ADR-312](decisions/312-started-downloads-run-to-original-bounds.md)

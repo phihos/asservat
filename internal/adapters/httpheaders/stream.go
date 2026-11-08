@@ -43,6 +43,7 @@ var errStopped = errors.New("direction stopped")
 
 // pending is a request awaiting its response: the projected method only.
 type pending struct {
+	stamp  SourceStamp
 	method string
 	at     time.Time
 	tunnel bool
@@ -111,7 +112,7 @@ func (f *flow) ReassemblyComplete(reassembly.AssemblerContext) bool {
 	f.halves[0].close(stopNone)
 	f.halves[1].close(stopNone)
 	for _, e := range f.fifo {
-		p.addRecord(Record{Timestamp: e.at, Method: e.method, Partial: true})
+		p.addRecord(Record{Timestamp: e.at, Method: e.method, Partial: true}, e.stamp)
 	}
 	f.fifo = nil
 	switch p.phase {
@@ -323,7 +324,7 @@ func (h *half) request() bool {
 		return false
 	}
 	h.p.counters.Requests++
-	e := pending{method: projectMethod(req.Method), at: h.p.now}
+	e := pending{method: projectMethod(req.Method), at: h.p.now, stamp: h.p.stamp}
 	upgrade := req.Header.Get("Upgrade")
 	switch {
 	case req.Method == http.MethodConnect:
@@ -367,7 +368,7 @@ func (h *half) response() bool {
 		return true // interim response; the final one follows
 	}
 	h.f.fifo = h.f.fifo[1:]
-	h.p.addRecord(h.p.record(e, resp))
+	h.p.addRecord(h.p.record(e, resp), e.stamp)
 	switch {
 	case e.tunnel: // counted by the request direction
 		h.setReason(stopTunnel)

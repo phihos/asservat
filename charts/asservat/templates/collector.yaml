@@ -29,6 +29,9 @@
 {{- $_ := set $ceilings "inputBurstBytes" (int64 $c.ceilings.inputBurstBytes) }}
 {{- end }}
 {{- $input := dict "format" "asservat-node-deployment/v1" "installationID" $c.installationID "clusterID" $c.clusterID "connector" (dict "endpoint" $conn.endpoint "serverName" $conn.serverName "rootsPEM" $conn.rootsPEM) "ceilings" $ceilings }}
+{{- if $c.live }}
+{{- $_ := set $input "live" $c.live }}
+{{- end }}
 {{- $json := toJson $input }}
 {{- $digest := sha256sum $json }}
 # ADR-246: the collector namespace is the only namespace with the privileged

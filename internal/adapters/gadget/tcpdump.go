@@ -37,8 +37,13 @@ var (
 // snapshot length of leading bytes, the original length on the wire and the
 // kernel timestamp converted to wall time.
 type Frame struct {
-	Data []byte
-	Wire uint32
+	// Original kernel clock value is retained only for approved transient time
+	// placement. Zero/missing never becomes an arrival-time live observation.
+	RawTimestamp            uint64
+	Clock                   string
+	DirectionKnown, Ingress bool
+	Data                    []byte
+	Wire                    uint32
 	// TimestampUnknown marks legacy arrival fallback. False alone does not
 	// qualify hub/node clock placement or continuous event-time coverage.
 	// This bit fits the existing padding before At on supported 64-bit nodes.

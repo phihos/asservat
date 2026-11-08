@@ -16,7 +16,8 @@ import (
 // The reviewed selection excludes acceptance/dispatch clocks. Those clocks are
 // immutable accepted execution facts, carried separately in the expectation.
 type sourceWindowSelection struct {
-	RequireApproval                  bool `json:",omitempty"`
+	HTTP                             artifact.RecordingHTTP `json:",omitzero"`
+	RequireApproval                  bool                   `json:",omitempty"`
 	SourceBindingDigest              artifact.Digest
 	SourceID, Fence, SnapshotID      string
 	SourceStartedAt, SourceHardUntil time.Time
@@ -84,7 +85,7 @@ func compileSourceSnapshotContext(in value.ContextInput, now time.Time) (value.C
 	}
 	q := s.Request
 	version := "source-window/v1"
-	scope := sourceWindowScope{OriginalTarget: s.SourceTarget, SourceAudienceDigest: s.SourceAudienceDigest, Version: version, CaptureID: in.CaptureID, CaseID: in.CaseID, Executor: principal{in.Executor.Issuer, in.Executor.Subject, in.Executor.ClientID, string(in.Executor.Kind)}, Target: in.Target.Target(), Namespace: in.Target.Request.Namespace.Name, PodName: in.Target.Request.PodName, ActionID: s.ActionID, PolicyUID: s.PolicyUID, TriggerKind: s.TriggerKind, ExecutionDigest: s.ExecutionDigest, RecipeDigest: s.RecipeDigest, CollectorDigest: in.Capability.CollectorImageDigest, CapabilityDigest: artifact.Digest(in.Capability.Revision.Digest), Selection: sourceWindowSelection{q.RequireApproval, q.SourceBindingDigest, q.SourceID, q.Fence, q.SnapshotID, q.SourceStartedAt.UTC(), q.SourceHardUntil.UTC(), q.Before, q.After, q.MaxBytes}, Retention: effectiveRetention{s.ActionID, r.PurposeRef, r.PrivacyClass, r.EvidenceType, r.RequestedSeconds, r.MaximumSeconds, r.DeletionBudgetSeconds, policies}}
+	scope := sourceWindowScope{OriginalTarget: s.SourceTarget, SourceAudienceDigest: s.SourceAudienceDigest, Version: version, CaptureID: in.CaptureID, CaseID: in.CaseID, Executor: principal{in.Executor.Issuer, in.Executor.Subject, in.Executor.ClientID, string(in.Executor.Kind)}, Target: in.Target.Target(), Namespace: in.Target.Request.Namespace.Name, PodName: in.Target.Request.PodName, ActionID: s.ActionID, PolicyUID: s.PolicyUID, TriggerKind: s.TriggerKind, ExecutionDigest: s.ExecutionDigest, RecipeDigest: s.RecipeDigest, CollectorDigest: in.Capability.CollectorImageDigest, CapabilityDigest: artifact.Digest(in.Capability.Revision.Digest), Selection: sourceWindowSelection{q.HTTP, q.RequireApproval, q.SourceBindingDigest, q.SourceID, q.Fence, q.SnapshotID, q.SourceStartedAt.UTC(), q.SourceHardUntil.UTC(), q.Before, q.After, q.MaxBytes}, Retention: effectiveRetention{s.ActionID, r.PurposeRef, r.PrivacyClass, r.EvidenceType, r.RequestedSeconds, r.MaximumSeconds, r.DeletionBudgetSeconds, policies}}
 	raw, err := json.Marshal(scope)
 	if err != nil {
 		return bad()

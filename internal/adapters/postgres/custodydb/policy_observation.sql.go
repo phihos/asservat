@@ -29,8 +29,10 @@ func (q *Queries) CountActiveAdHocObservations(ctx context.Context, arg CountAct
 }
 
 const countActivePolicyObservations = `-- name: CountActivePolicyObservations :one
-SELECT count(*) FROM policy_observation_session
-WHERE root_id=$1 AND acceptance_id=$2 AND ended_at IS NULL AND lease_until>clock_timestamp()
+SELECT ((SELECT count(*) FROM policy_observation_session o
+WHERE o.root_id=$1::uuid AND o.acceptance_id=$2::uuid AND o.ended_at IS NULL AND o.lease_until>clock_timestamp())+
+(SELECT count(*) FROM policy_recording_source s WHERE s.root_id=$1::uuid AND s.acceptance_id=$2::uuid
+ AND s.binding_json->>'ObservationGrantID' IS NOT NULL AND s.slot_released_at IS NULL AND s.hard_until>clock_timestamp()))::bigint
 `
 
 type CountActivePolicyObservationsParams struct {
@@ -40,9 +42,9 @@ type CountActivePolicyObservationsParams struct {
 
 func (q *Queries) CountActivePolicyObservations(ctx context.Context, arg CountActivePolicyObservationsParams) (int64, error) {
 	row := q.db.QueryRow(ctx, countActivePolicyObservations, arg.RootID, arg.AcceptanceID)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
 }
 
 const insertArgumentObservation = `-- name: InsertArgumentObservation :one

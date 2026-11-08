@@ -11,6 +11,7 @@ import (
 // profile definitions, typed edits, recipe bytes and compiled filter programs.
 // Accepted policy authority adds the real workload and future-replica rules.
 type PolicyRecorderConfiguration struct {
+	HTTP            *artifact.RecordingHTTP `json:",omitempty"`
 	Composition     ProfileComposition
 	Profile         ResolvedProfile
 	ProfileEndpoint *PolicyProfileEndpoint `json:",omitempty"`
@@ -25,6 +26,9 @@ type PolicyRecorderConfiguration struct {
 }
 
 func (p PolicyRecorderConfiguration) Valid() bool {
+	if p.HTTP != nil && (p.Action.Kind != "packetCapture" || p.Action.PacketProfile != "httpHeaders") {
+		return false
+	}
 	logs := p.Action.Kind == "logs" && p.Action.ExecutionMode == "onTrigger" && p.Action.LogStream == "both" && p.Filter == nil && p.Arguments == nil && p.ProfileEndpoint == nil && len(p.SyscallInclude) == 0
 	if logs {
 		before, e1 := time.ParseDuration(p.Action.Before)
@@ -49,8 +53,12 @@ func (p PolicyRecorderConfiguration) Valid() bool {
 		return false
 	}
 	arguments := p.Action.Kind == "syscallTrace" && p.Action.SyscallMode == "arguments" && p.Action.ExecutionMode == "onTrigger" && p.Filter == nil && p.Arguments.Valid() && slices.Contains(p.Action.Sensitive, ReasonSyscallArguments) && len(p.SyscallInclude) > 0 && len(p.SyscallInclude) <= 6 && slices.IsSorted(p.SyscallInclude)
+	http := p.Action.Kind == "packetCapture" && p.Action.PacketProfile == "httpHeaders" && p.Action.ExecutionMode == "ongoing" && p.HTTP.Valid() && p.Filter != nil && len(p.Filter.Program) > 0 && p.Arguments == nil && p.ProfileEndpoint == nil && len(p.SyscallInclude) == 0 && slices.Contains(p.Action.Sensitive, ReasonHTTPHeaders)
+	if p.HTTP != nil && !http {
+		return false
+	}
 	kind := p.Arguments == nil && (p.Action.Kind == "packetCapture" && p.Action.PacketProfile == "networkHeaders" && len(p.SyscallInclude) == 0 ||
-		p.Action.Kind == "syscallTrace" && p.Action.SyscallMode == "metadata" && p.Action.ExecutionMode == "ongoing" && p.Filter == nil && len(p.SyscallInclude) <= 128 && slices.IsSorted(p.SyscallInclude)) || arguments
+		p.Action.Kind == "syscallTrace" && p.Action.SyscallMode == "metadata" && p.Action.ExecutionMode == "ongoing" && p.Filter == nil && len(p.SyscallInclude) <= 128 && slices.IsSorted(p.SyscallInclude)) || arguments || http
 	lifecycle := p.Action.ExecutionMode == "onTrigger" && p.Action.Before == "0s"
 	if arguments {
 		after, err := time.ParseDuration(p.Action.After)

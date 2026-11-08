@@ -42,7 +42,7 @@ func syscallEngine(trace syscallTraceEngine, numbers []uint16, errorsOnly bool, 
 		}
 		pairer := syscalls.NewPairer(maxTrackedThreads)
 		emit := func(c syscalls.Call) {
-			f := gadget.Frame{Wire: syscallEventCredit, At: bootWall.Add(time.Duration(c.Time()))}
+			f := gadget.Frame{Wire: syscallEventCredit, At: bootWall.Add(time.Duration(c.Time())), RawTimestamp: c.Time(), Clock: "boottime"}
 			// result: errors still charges every observed call (spec), but
 			// retains only failures.
 			if _, failed := syscalls.Errno(c.Ret); !errorsOnly || (c.Status == syscalls.Returned || c.Status == syscalls.Unmatched) && failed {
