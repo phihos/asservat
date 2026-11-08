@@ -221,3 +221,25 @@ Ordered steps, each its own PR with before/after medians recorded:
 
 The savings above are estimates from the measured medians in section 1, not
 results.
+
+## 4. Results
+
+### Step 1: unit test shards (PR #183)
+
+`check-go-tests.py` now plans 14 shards over small packages plus the
+top-level tests of nine split packages, weighted by CI records and charging
+about 4 s per `go test` run; `console-check` runs without Go beside the browser
+check. Measured on PR runs (job durations from the Actions API):
+
+| Job | Before (main `447ea64f`, run 42458467070) | Run 42460940268 (first plan) | Run 42461755736 (run charge, CI weights) |
+| --- | ---: | ---: | ---: |
+| `test` slowest shard | 1183 s (`0/10`) | 537 s (`12/14`, 40 near-empty groups) | 401 s |
+| `test` other shards | 209–366 s | 281–410 s | 286–397 s |
+| `go` | 201 s | 149 s | 142 s |
+| `console` | 369 s (check + browser) | 72 s (check only) | 71 s |
+| `console-browser` | — | 264 s | 276 s |
+| Run wall (created → completed) | 1226 s | 559 s | 423 s |
+
+The shards' test steps are now 210–340 s; the rest is setup (48–86 s, mostly
+the 1.8 GB Go cache restore) and test-time noise. Step 2's setup trims are the
+next lever toward ≤ 5 min.
