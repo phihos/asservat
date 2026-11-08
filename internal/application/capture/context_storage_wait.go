@@ -122,6 +122,10 @@ func (s ContextInvestigation) awaitStorage(ctx context.Context, target targets.P
 	return storageDemandAcknowledged
 }
 
+// storageReadinessTailStage is the refusal of an expired binding whose
+// demanded refresh had not landed when this attempt's readiness ended.
+const storageReadinessTailStage = "facts/storage/expired/readiness-tail"
+
 type contextStorageSelectionChange struct{}
 
 func (contextStorageSelectionChange) Error() string { return "context storage selection changed" }
@@ -238,13 +242,13 @@ func (s ContextInvestigation) consumeStorage(ctx context.Context, f contextFacts
 			if expiredSource {
 				// The typed read was recognized. Keep the original error, and
 				// distinguish the bounded readiness decision from a read failure.
-				reason := "readiness-tail"
+				stage := storageReadinessTailStage
 				if s.Refresh == nil {
-					reason = "refresh-unavailable"
+					stage = "facts/storage/expired/refresh-unavailable"
 				} else if w.demand == storageDemandFailed {
-					reason = "demand-failed"
+					stage = "facts/storage/expired/demand-failed"
 				}
-				return zero, previewFailure("facts/storage/expired/"+reason, err)
+				return zero, previewFailure(stage, err)
 			}
 			return zero, previewFailure("facts/storage", contextStorageMarginRefusal{})
 		}

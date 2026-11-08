@@ -1,6 +1,10 @@
 package capture
 
-import "errors"
+import (
+	"context"
+	"errors"
+	"time"
+)
 
 // contextPreviewFailure keeps a private, fixed stage without including target,
 // identity, provider or SQL error text. Unwrap preserves public classification.
@@ -47,4 +51,26 @@ func previewEligibilityFailure(reason string) string {
 	default:
 		return "facts/eligibility"
 	}
+}
+
+// coldStorageRetryRoom is the request-window time a second preview attempt
+// needs: a warm installed preview measured 0.6 s, plus the 750 ms response
+// reserve. A scheduling choice, not an authority interval (ADR-314).
+const coldStorageRetryRoom = 2 * time.Second
+
+// retryColdStorage runs one more complete preview attempt when the first
+// ended at the readiness tail: its binding had expired and the refresh it
+// demanded had not landed yet (ADR-314). The second attempt reads identity,
+// recovery, target and every other fact again under its own bounds; nothing
+// from the first attempt is reused and the caller's deadline is unchanged.
+func retryColdStorage[T any](ctx context.Context, attempt func() (T, error)) (T, error) {
+	r, err := attempt()
+	var failure *contextPreviewFailure
+	if !errors.As(err, &failure) || failure.stage != storageReadinessTailStage || ctx.Err() != nil {
+		return r, err
+	}
+	if deadline, ok := ctx.Deadline(); ok && time.Until(deadline) < coldStorageRetryRoom {
+		return r, err
+	}
+	return attempt()
 }
