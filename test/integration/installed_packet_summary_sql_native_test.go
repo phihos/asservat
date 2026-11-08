@@ -11,7 +11,6 @@ import (
 	"asservat.local/asservat/internal/domain/artifact"
 	value "asservat.local/asservat/internal/domain/authorization"
 	"github.com/jackc/pgx/v5/pgxpool"
-	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -25,6 +24,7 @@ func installedPacketSummarySQLCheck(t *testing.T, ctx context.Context, admin *pg
 // The raw four-query qualification captures each live SQL/Pod proof now and
 // queues only its independent original terminal wait; other foci stay serial.
 func installedPacketSummarySQLCheckWithTerminal(t *testing.T, ctx context.Context, admin *pgxpool.Pool, api kubernetes.Interface, root string, rawSource bool, terminalSink func(func())) installedProjectionCheck {
+	workerPods := installedRecordWorkerPods(t, ctx, api)
 	wantType, wantFormat, wantDisplay := artifact.PCAPNGArtifact, artifact.PCAPNGFormat, query.PacketSummaryDisplayVersion
 	if rawSource {
 		wantType, wantFormat, wantDisplay = artifact.RawPCAPNGArtifact, artifact.RawPCAPNGFormat, query.RawPacketSummaryDisplayVersion
@@ -35,9 +35,9 @@ func installedPacketSummarySQLCheckWithTerminal(t *testing.T, ctx context.Contex
 			t.Fatal("packet capture count snapshot", err)
 		}
 		var waitTerminal func()
-		shared := installedProjectionSQLCheck(t, ctx, admin, api, root)
+		shared := installedProjectionSQLCheckPods(t, ctx, admin, api, workerPods, root)
 		if terminalSink != nil {
-			shared = installedProjectionSQLCheck(t, ctx, admin, api, root, func(wait func()) { waitTerminal = wait })
+			shared = installedProjectionSQLCheckPods(t, ctx, admin, api, workerPods, root, func(wait func()) { waitTerminal = wait })
 		}
 		verify := shared(artifactID)
 		return func(handle, operation string) func() {
@@ -70,8 +70,8 @@ WHERE q.root_id=$1 AND q.operation_id=$2 AND q.query->'Scope'->>'ArtifactID'=$3`
 					t.Fatalf("packet accounting mismatch: units=%d want=%d children=%d want1 queries=%d root=%d workload=%d want=%d principal=%d exact_account_units=%d", units, query.PacketSummaryQueryUnits, rows, queries, rootSpent, workloadSpent, queries*query.PacketSummaryQueryUnits, principalSpent, expectedPrincipal)
 				}
 				observed.Intent = intent.Worker
-				pod, err := api.CoreV1().Pods(observed.Binding.Namespace).Get(call, observed.Binding.Pod, meta.GetOptions{})
-				if !observed.Valid() || err != nil || string(pod.UID) != observed.Binding.PodUID || len(pod.Spec.Containers) != 1 || pod.Spec.Containers[0].Resources.Limits.Memory().Value() != intent.Query.Plan.Profile.Worker.MemoryBytes || pod.Spec.Containers[0].Resources.Limits.Cpu().MilliValue() != 500 {
+				memory, cpu, err := workerPods.limits(observed.Binding)
+				if !observed.Valid() || err != nil || memory != intent.Query.Plan.Profile.Worker.MemoryBytes || cpu != 500 {
 					stop()
 					t.Fatal("packet original worker actual384MiB/500m Pod", err)
 				}

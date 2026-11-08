@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/jackc/pgx/v5/pgxpool"
-	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"testing"
 	"time"
@@ -17,6 +16,7 @@ import (
 // This is operator-only readback. It permits ONLY the explicitly reviewed page
 // disclosure deltas; accepted collection/observation state stays byte-exact.
 func installedSyscallQuerySQLCheck(t *testing.T, ctx context.Context, admin *pgxpool.Pool, api kubernetes.Interface, root string, retained *[]func(), terminalSink func(func()), requireReplay ...bool) installedProjectionCheck {
+	workerPods := installedRecordWorkerPods(t, ctx, api)
 	return func(artifactID string) func(string, string) func() {
 		t.Helper()
 		snapshot := func() string {
@@ -102,8 +102,8 @@ WHERE q.root_id=$1 AND q.operation_id=$2 AND q.query->'Scope'->>'ArtifactID'=$3`
 				t.Fatalf("raw syscall query exact Begin/replay journal calls=%d/%d valid=%t err=%v", begins, wantBegins, validCalls, err)
 			}
 			observed.Intent = intent.Worker
-			pod, e := api.CoreV1().Pods(observed.Binding.Namespace).Get(call, observed.Binding.Pod, meta.GetOptions{})
-			if err != nil || !validUses || !observed.Valid() || e != nil || string(pod.UID) != observed.Binding.PodUID || len(pod.Spec.Containers) != 1 || pod.Spec.Containers[0].Resources.Limits.Memory().Value() != q.Plan.Profile.Worker.MemoryBytes || pod.Spec.Containers[0].Resources.Limits.Cpu().MilliValue() != 500 {
+			memory, cpu, e := workerPods.limits(observed.Binding)
+			if err != nil || !validUses || !observed.Valid() || e != nil || memory != q.Plan.Profile.Worker.MemoryBytes || cpu != 500 {
 				stop()
 				t.Fatal("raw syscall query exact batch/use or original worker Pod", err, e)
 			}
@@ -111,7 +111,7 @@ WHERE q.root_id=$1 AND q.operation_id=$2 AND q.query->'Scope'->>'ArtifactID'=$3`
 			// Start the existing no-further-effect snapshot AFTER the explicitly
 			// accounted page debit, then reuse its exact joined-batch/key/terminal proof.
 			var waitTerminal func()
-			shared := installedProjectionSQLCheck(t, ctx, admin, api, root, func(wait func()) { waitTerminal = wait })
+			shared := installedProjectionSQLCheckPods(t, ctx, admin, api, workerPods, root, func(wait func()) { waitTerminal = wait })
 			retirement := shared(artifactID)(handle, operation)
 			finishTerminal := func() {
 				if waitTerminal == nil {

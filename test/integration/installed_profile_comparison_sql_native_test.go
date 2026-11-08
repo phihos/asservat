@@ -21,6 +21,7 @@ import (
 // The returned live check captures exact SQL/key/source/Pod evidence immediately;
 // its result defers only terminal inspection and later-demand retirement.
 func installedProfileComparisonSQLCheck(t *testing.T, ctx context.Context, admin *pgxpool.Pool, api kubernetes.Interface, root string) installedProfileComparisonCheck {
+	workerPods := installedRecordWorkerPods(t, ctx, api)
 	return func(sources [2]installedProfileComparisonSource) func(string, string) func() func() {
 		t.Helper()
 		snapshot := func() string {
@@ -86,9 +87,9 @@ func installedProfileComparisonSQLCheck(t *testing.T, ctx context.Context, admin
 					if !observed.Valid() || q.Plan.Profile.Worker.MemoryBytes != query.ProfileComparisonWorkerBytes || q.Plan.Profile.Worker.WorkerTransientBytes != query.ProfileComparisonWorkerBytes || q.BaselinePlan.Profile.Worker.MemoryBytes != query.ProfileComparisonWorkerBytes || q.BaselinePlan.Profile.Worker.WorkerTransientBytes != query.ProfileComparisonWorkerBytes {
 						t.Fatal("comparison lacks exact installed384MiB physical/transient reservation")
 					}
-					pod, err := api.CoreV1().Pods(observed.Binding.Namespace).Get(wait, observed.Binding.Pod, meta.GetOptions{})
-					if err != nil || string(pod.UID) != observed.Binding.PodUID || len(pod.Spec.Containers) != 1 || pod.Spec.Containers[0].Resources.Limits.Memory().Value() != query.ProfileComparisonWorkerBytes {
-						t.Fatal("comparison actual exact384MiB Pod", err)
+					memory, _, err := workerPods.limits(observed.Binding)
+					if err != nil || memory != query.ProfileComparisonWorkerBytes {
+						t.Fatal("comparison actual exact384MiB Pod", memory, err)
 					}
 					rows, err := admin.Query(wait, `SELECT child_id::text,batch_id::text,source_ordinal,binding FROM context_query_key_binding WHERE query_id=$1 AND used_roles=7 ORDER BY source_ordinal`, id)
 					if err != nil {
