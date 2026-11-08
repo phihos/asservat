@@ -565,6 +565,24 @@ class RegionalContextSelection(unittest.TestCase):
                 ("^TestContextAdmissionWithRealServices$/^native-regional-api-" + mode + "$", 2),
             )
 
+    def test_fast_kubelet_sync_only_for_installed_feature_focuses(self):
+        self.assertEqual(fixture.kubelet_sync_frequency(True, "manual-logs"), "5s")
+        self.assertIsNone(fixture.kubelet_sync_frequency(True, "chain"))
+        self.assertIsNone(fixture.kubelet_sync_frequency(False, "manual-logs"))
+        mount = {"hostPath": "/owned", "containerPath": "/var"}
+        config = fixture.kind_cluster_config(mounts=[mount], sync_frequency="5s")
+        self.assertEqual(config["nodes"], [{"role": "control-plane", "extraMounts": [mount]}])
+        self.assertEqual(json.loads(config["kubeadmConfigPatches"][0]),
+                         {"apiVersion": "kubelet.config.k8s.io/v1beta1", "kind": "KubeletConfiguration", "syncFrequency": "5s"})
+        default = fixture.kind_cluster_config(helm=True)
+        self.assertEqual([n["role"] for n in default["nodes"]], ["control-plane", "worker"])
+        self.assertNotIn("kubeadmConfigPatches", default)
+        # The native audit patch extends the node, never the kubelet patch.
+        with tempfile.TemporaryDirectory() as directory:
+            fixture.native_kube_audit.configure(config, Path(directory), 0)
+        self.assertEqual(len(config["kubeadmConfigPatches"]), 1)
+        self.assertEqual(config["nodes"][0]["extraMounts"][0], mount)
+
     def test_native_audit_configuration_keeps_original_mounts_and_no_bodies(self):
         audit = fixture.native_kube_audit
         original = {"nodes": [{"role": "control-plane", "extraMounts": [{"hostPath": "/owned-volume", "containerPath": "/var/lib/etcd"}]}]}

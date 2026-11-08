@@ -1,5 +1,50 @@
 # Sustained implementation progress
 
+## Installed-suite setup trims and kubelet resync (2026-11-08)
+
+Step 2 and the cheap parts of step 3 of docs/reviews/test-runtime-plan-2026-11-08.md.
+CI and harness changes only; no product code, deadline or cadence changed.
+
+- Kind kubelets of installed feature focuses use `syncFrequency: 5s`
+  (`kind_cluster_config`, recorded as `kubeletSyncFrequency`), so mounted
+  projection Secrets appear within seconds. `continuation-chain` and every
+  non-installed suite keep kind's 1-minute default, so the slow-resync path
+  (`projectionMountWait`, the 3-minute permission mount bound) stays
+  qualified by chain. The product's own waits are unchanged upper bounds.
+- The harness creates the kind clusters while the images build and the
+  services start, joining them before per-cluster setup; a setup failure
+  waits for creation before cleanup or log export.
+- Installed test-side condition polls (`installedPoll`) are 250 ms instead
+  of 1–2 s; product intervals such as the 35 s standby window are unchanged.
+- Native jobs restore a per-kind Go cache (`scripts/native-go-cache.sh`,
+  saved by ci.yml's `native-go-cache` matrix on main or a dispatch):
+  installed 863 MB, race 1097 MB, collector 856 MB compressed instead of the
+  1960 MB unit cache, with module zips and tool modules removed. The Go and
+  Node toolchains, kind/Helm downloads and sql-tools (keyed on its pinned
+  install lines) are cached; Node is installed only for `continuation-*`.
+
+Measured medians in seconds (baseline: main and harness-only branches,
+2026-11-07/08; after: this branch; n per cell in brackets):
+
+| Segment | manual-logs before → after | ongoing-live before → after | chain before → after |
+| --- | --- | --- | --- |
+| setup action | 74 [3] → 54 [2] | 77 [3] → 49 [3] | 84 [1] → 96 [3]¹ |
+| harness to `go test` | 80 [2] → 62 [2] | 114 [1] → 97 [3] | 74 [1] → 62 [3] |
+| unified runner | 198 → 198 | 197 → 198 | 199 → 197 |
+| continuation to focus | 263 [3] → 203 [2] | 251 [3] → 205 [3] | 390 [1] → 390 [3] |
+| capacity/initialize (Pod) | 37 → 10 | 43 → 10 | default resync |
+| focus | 154 → 151 | 146 → 149 | 23 → 26 |
+| **job** | **840 → 719** | **908 → 766** | **824 → 812** |
+
+¹ GitHub release downloads returned 504 for part of the day; Node setup took
+15–68 s in those jobs (now cached), and the Go cache extract varied 16–29 s.
+Setup-go itself dropped from 19–33 s to 1–5 s with the cached toolchain.
+
+`context-2`, `permission` and `collector-packet` fail identically on main and
+on this branch (main runs 42466290062, 42466931328, 42467310226); one
+`continuation-manual-logs` run failed at the known repeat-preview
+`readiness-tail` refusal that PR #185 addresses.
+
 ## Installed runs keep their logs when a test hangs (2026-11-08)
 
 Failed installed tests hung in cleanup into the 20-minute job limit and lost

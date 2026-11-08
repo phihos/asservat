@@ -81,7 +81,9 @@ jobs:
           nohup sh -c 'while read -r i; do docker pull -q "$i" & done < /tmp/images; wait' > /tmp/pulls.log 2>&1 &
       - uses: ./.github/actions/setup
         with:
-          console: "${{ matrix.suite != 'logs-resource' && !startsWith(matrix.suite, 'collector-') }}"
+          go-cache: "native-${{ startsWith(matrix.suite, 'continuation-') && 'installed' || startsWith(matrix.suite, 'collector-') && 'collector' || 'race' }}"
+          # Node builds the installed console and drives its browser checks.
+          console: "${{ startsWith(matrix.suite, 'continuation-') }}"
           sql-tools: "${{ matrix.suite != 'logs-resource' && !startsWith(matrix.suite, 'collector-') }}"
           kind: "${{ matrix.suite != 'logs-resource' }}"
           helm: "${{ startsWith(matrix.suite, 'helm') || startsWith(matrix.suite, 'collector-') || matrix.suite == 'continuation-approved-recording' || startsWith(matrix.suite, 'continuation-manual-') || (matrix.suite == 'continuation-profile-comparison' || matrix.suite == 'continuation-profile-comparison-heavy') || matrix.suite == 'continuation-native-paced' || matrix.suite == 'continuation-policy-recording' || matrix.suite == 'continuation-policy-arguments' || matrix.suite == 'continuation-policy-profile' || startsWith(matrix.suite, 'continuation-ongoing-') }}"
