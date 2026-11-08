@@ -571,6 +571,30 @@ def prepare_profile_containment_fixture(build_env, work, image_dir, report):
     return metadata
 
 
+# Kind's kubelet refreshes mounted Secret/ConfigMap volumes only on a Pod
+# resync: syncFrequency, default 1m with up to 1.5x jitter. The installed
+# bootstrap waits on such refreshes (capacity projection, ReadyAt). Feature
+# focuses resync every 5 s; the chain focus keeps the default so the product's
+# slow-resync path (projectionMountWait, permission mount bound) stays qualified.
+FAST_KUBELET_SYNC = "5s"
+
+
+def kubelet_sync_frequency(installer_continuation, focus):
+    return FAST_KUBELET_SYNC if installer_continuation and focus != "chain" else None
+
+
+def kind_cluster_config(*, helm=False, mounts=(), sync_frequency=None):
+    """The kind Cluster config of one owned cluster (a single control plane
+    unless helm adds a worker); mounts go on the control plane."""
+    nodes = [{"role": "control-plane"}] + ([{"role": "worker"}] if helm else [])
+    if mounts:
+        nodes[0]["extraMounts"] = list(mounts)
+    config = {"kind": "Cluster", "apiVersion": "kind.x-k8s.io/v1alpha4", "nodes": nodes}
+    if sync_frequency:
+        config["kubeadmConfigPatches"] = [json.dumps({"apiVersion": "kubelet.config.k8s.io/v1beta1", "kind": "KubeletConfiguration", "syncFrequency": sync_frequency})]
+    return config
+
+
 def collect_profile_containment_artifacts(work, results):
     """Collect only this run's fixed synthetic producer/observer files at terminal."""
     artifacts = work / "profile-containment"
@@ -669,6 +693,7 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
             report["phaseSeconds"][name] = round(time.monotonic()-began, 1)
         keycloak_ready = None
         compile_ahead = None
+        cluster_pool, cluster_futures = None, []
         try:
             if runtime_provider_pair or direct_observation:
                 if shutil.disk_usage(tempfile.gettempdir()).free < 4 * 1024**3:
@@ -696,6 +721,48 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
             if helm_bootstrap:
                 report["helmVersion"] = run(["helm", "version", "--short"])
                 report["images"]["registry"] = REGISTRY
+            run(["docker", "network", "create", "--internal", "--label", "asservat.test="+run_id, network])
+            created_network = True
+            run(["docker", "network", "create", "--label", "asservat.test="+run_id, kind_network])
+            created_kind_network = True
+            os.environ["KIND_EXPERIMENTAL_DOCKER_NETWORK"] = kind_network
+            # Create every owned cluster concurrently (each takes about 40 s)
+            # while the images build and the services start; per-cluster setup
+            # after the join below runs in order as before. The clusters need
+            # neither images nor services.
+            sync_frequency = kubelet_sync_frequency(installer_continuation, focus)
+            report["kubeletSyncFrequency"] = sync_frequency or "kind default (1m)"
+            creates = []
+            existing = run(["kind", "get", "clusters"]).splitlines()
+            for index in range(cluster_count):
+                name = network+"-"+str(index)
+                config = work/("kube-"+str(index))
+                # Refuse collisions before recording ownership; never reuse a cluster.
+                if name in existing: raise RuntimeError("cluster name collision")
+                clusters.append(name)
+                print("Creating owned synthetic cluster", index+1, flush=True)
+                # Retain only until our finally cleanup so setup failures can be
+                # diagnosed; Kind's default removes the evidence immediately.
+                create = ["kind", "create", "cluster", "--name", name, "--image", NODE, "--kubeconfig", str(config), "--wait", "90s", "--retain"]
+                mounts = []
+                if runtime_provider_pair and index == 0 and not helm_bootstrap:
+                    mounts.append(prepare_ephemeral_node(name, run_id, containers, ephemeral_volumes))
+                    report["ephemeralNodeState"] = {"volume":ephemeral_volumes[-1], "maxBytes":3*1024**3, "storage":"tmpfs", "scope":"Synthetic API node only; original startup/product deadlines, no persistence qualification"}
+                if collector_qualification and index == 1:
+                    mounts.append({"hostPath": str(guard), "containerPath": str(guard), "readOnly": True})
+                kind_config = kind_cluster_config(helm=helm_bootstrap, mounts=mounts, sync_frequency=sync_frequency)
+                if native_paced:
+                    # Extend the provider-pair/collector configuration; never
+                    # replace its tmpfs or disposable-host guard mounts.
+                    native_kube_audit.configure(kind_config, work, index)
+                config_path = work/("kind-"+str(index)+".json")
+                config_path.write_text(json.dumps(kind_config))
+                creates.append(create + ["--config", str(config_path)])
+            # Every create joins the owned network created above
+            # (KIND_EXPERIMENTAL_DOCKER_NETWORK); none sets up a shared one, so
+            # all run concurrently.
+            cluster_pool = concurrent.futures.ThreadPoolExecutor(max_workers=max(1, len(creates)))
+            cluster_futures = [cluster_pool.submit(run, create) for create in creates]
             image_dir = work/"worker-image"
             image_dir.mkdir()
             build_env = os.environ.copy()
@@ -756,11 +823,6 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
             # cache; the real `go test` still builds (and reports) everything.
             compile_ahead = subprocess.Popen(["go", "test", "-count=1"] + ([] if installer_continuation else ["-race"]) + ["-run", "^$", test_package],
                                              cwd=ROOT, env={**os.environ, "TMPDIR": str(build_scratch or work)}, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
-            run(["docker", "network", "create", "--internal", "--label", "asservat.test="+run_id, network])
-            created_network = True
-            run(["docker", "network", "create", "--label", "asservat.test="+run_id, kind_network])
-            created_kind_network = True
-            os.environ["KIND_EXPERIMENTAL_DOCKER_NETWORK"] = kind_network
             if helm_bootstrap:
                 registry = HelmRegistry(work, network, run_id, containers, run)
                 registry.upload(worker_tag, worker_info["Id"])
@@ -857,49 +919,9 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
             if helm_bootstrap:
                 fixture["helmBootstrap"] = {"registryConfig": registry.material(), "productBinary": str(image_dir/"asservat"), "chartArchive": str(chart_archive)}
             phase("servicesStarted")
-            # Create every owned cluster concurrently (each takes about 40 s);
-            # per-cluster setup below then runs in order as before.
-            creates = []
-            existing = run(["kind", "get", "clusters"]).splitlines()
-            for index in range(cluster_count):
-                name = network+"-"+str(index)
-                config = work/("kube-"+str(index))
-                # Refuse collisions before recording ownership; never reuse a cluster.
-                if name in existing: raise RuntimeError("cluster name collision")
-                clusters.append(name)
-                print("Creating owned synthetic cluster", index+1, flush=True)
-                # Retain only until our finally cleanup so setup failures can be
-                # diagnosed; Kind's default removes the evidence immediately.
-                create = ["kind", "create", "cluster", "--name", name, "--image", NODE, "--kubeconfig", str(config), "--wait", "90s", "--retain"]
-                if helm_bootstrap:
-                    kind_config = work/"kind-helm.json"
-                    kind_config.write_text(json.dumps({"kind":"Cluster","apiVersion":"kind.x-k8s.io/v1alpha4","nodes":[{"role":"control-plane"},{"role":"worker"}]}))
-                    create += ["--config", str(kind_config)]
-                elif runtime_provider_pair and index == 0:
-                    mount = prepare_ephemeral_node(name, run_id, containers, ephemeral_volumes)
-                    kind_config = work/"kind-provider-pair.json"
-                    kind_config.write_text(json.dumps({"kind":"Cluster", "apiVersion":"kind.x-k8s.io/v1alpha4", "nodes":[{"role":"control-plane", "extraMounts":[mount]}]}))
-                    create += ["--config", str(kind_config)]
-                    report["ephemeralNodeState"] = {"volume":ephemeral_volumes[-1], "maxBytes":3*1024**3, "storage":"tmpfs", "scope":"Synthetic API node only; original startup/product deadlines, no persistence qualification"}
-                if collector_qualification and index == 1:
-                    kind_config = work / "kind-approved-collector.json"
-                    kind_config.write_text(json.dumps({"kind": "Cluster", "apiVersion": "kind.x-k8s.io/v1alpha4", "nodes": [{"role": "control-plane", "extraMounts": [{"hostPath": str(guard), "containerPath": str(guard), "readOnly": True}]}]}))
-                    create += ["--config", str(kind_config)]
-                if native_paced:
-                    # Extend the provider-pair/collector configuration; never
-                    # replace its tmpfs or disposable-host guard mounts.
-                    audit_config = json.loads(kind_config.read_text())
-                    native_kube_audit.configure(audit_config, work, index)
-                    kind_config = work / ("kind-native-paced-" + str(index) + ".json")
-                    kind_config.write_text(json.dumps(audit_config))
-                    create = create[:create.index("--config")] + ["--config", str(kind_config)]
-                creates.append(create)
-            # Every create joins the owned network created above
-            # (KIND_EXPERIMENTAL_DOCKER_NETWORK); none sets up a shared one, so
-            # all run concurrently.
-            with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, len(creates))) as pool:
-                for future in [pool.submit(run, create) for create in creates]:
-                    future.result()
+            # Join the cluster creation started before the image build.
+            for future in cluster_futures:
+                future.result()
             phase("clustersCreated")
             for index in range(cluster_count):
                 name = network+"-"+str(index)
@@ -1129,6 +1151,8 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
             print("Component test exit:", exit_code, flush=True)
         except subprocess.CalledProcessError as exc:
             (ROOT/"test/results/context-storage-fixture-error.log").write_text(exc.stderr or str(exc.returncode))
+            if cluster_pool is not None:
+                cluster_pool.shutdown(wait=True)  # export finished clusters only
             for name in clusters:
                 try:
                     info = json.loads(run(["docker", "inspect", name+"-control-plane"]))[0]
@@ -1141,6 +1165,10 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
         finally:
             report["testExit"] = exit_code
             failures = []
+            # A setup failure can leave cluster creation running; let it end
+            # before the cleanup below deletes those clusters.
+            if cluster_pool is not None:
+                cluster_pool.shutdown(wait=True)
             # Stop a still-running compile-ahead (setup failure) before any
             # scratch removal below.
             if compile_ahead is not None and compile_ahead.poll() is None:

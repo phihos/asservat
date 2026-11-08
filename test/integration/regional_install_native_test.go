@@ -170,7 +170,7 @@ func qualifyRegionalInstall(t *testing.T, ctx context.Context, f fixture, index 
 	peer := envelope.Binding.PeerID
 	waitActive := func(except string) string {
 		t.Helper()
-		for until := time.Now().Add(3 * time.Minute); time.Now().Before(until); time.Sleep(time.Second) {
+		for until := time.Now().Add(3 * time.Minute); time.Now().Before(until); time.Sleep(installedPoll) {
 			var pod string
 			e := admin.QueryRow(ctx, `SELECT p.pod_uid::text FROM connector_identity_process p WHERE p.root_id=$1 AND p.peer_id=$2 AND p.accepted_at IS NOT NULL AND p.pod_uid::text<>$3
  AND EXISTS(SELECT 1 FROM connector_credential_attempt c WHERE c.id=p.client_current_id AND c.activated_at IS NOT NULL)
@@ -502,7 +502,7 @@ func qualifyRegionalExecutor(t *testing.T, ctx context.Context, admin *pgxpool.P
 		t.Fatal("join record's connector protection is not the staged generation 1")
 	}
 	t.Log("join record printed and stored; its connector protection is the staged generation 1")
-	for until := time.Now().Add(2 * time.Minute); ; time.Sleep(2 * time.Second) {
+	for until := time.Now().Add(2 * time.Minute); ; time.Sleep(installedPoll) {
 		if regionalLogContains(ctx, region, "regional context start active") {
 			t.Log("regional executor composed from the settings it read by name")
 			// ADR-197 spike part B: the first hub conversation of each purpose.
@@ -559,7 +559,7 @@ func qualifyRegionalJoin(t *testing.T, ctx context.Context, hub, hubObserver kub
 		t.Fatal("catalog does not hold the joined entry", err)
 	}
 	t.Log("installer-cluster-join wrote the slot's sources, topology and catalog entry; the rerun was exact")
-	for until := time.Now().Add(3 * time.Minute); ; time.Sleep(2 * time.Second) {
+	for until := time.Now().Add(3 * time.Minute); ; time.Sleep(installedPoll) {
 		restarts, ready := hubAPIState(t, ctx, hub, namespace, owner)
 		if restarts > before && ready {
 			t.Log("hub-api restarted its process on the catalog change and is Ready with the joined entry")
@@ -688,7 +688,7 @@ func qualifyRegionalCapacity(t *testing.T, ctx context.Context, admin *pgxpool.P
 		}
 		budget, w = existing.budget, existing.workload
 	}
-	for until := time.Now().Add(2 * time.Minute); ; time.Sleep(2 * time.Second) {
+	for until := time.Now().Add(2 * time.Minute); ; time.Sleep(installedPoll) {
 		var digest []byte
 		if err := admin.QueryRow(ctx, `SELECT guard_digest FROM capacity_cluster_qualification WHERE root_id=$1 AND cluster_id=$2`, root, cluster).Scan(&digest); err == nil {
 			if hex.EncodeToString(digest) != j.Capacity.NamespaceGuardDigest {
@@ -702,7 +702,7 @@ func qualifyRegionalCapacity(t *testing.T, ctx context.Context, admin *pgxpool.P
 		}
 	}
 	t.Log("hub-api recorded the join's write-once capacity qualification")
-	for until := time.Now().Add(2 * time.Minute); !regionalLogContains(ctx, region, "regional capacity standby active"); time.Sleep(2 * time.Second) {
+	for until := time.Now().Add(2 * time.Minute); !regionalLogContains(ctx, region, "regional capacity standby active"); time.Sleep(installedPoll) {
 		if time.Now().After(until) {
 			regionalLogs(t, ctx, region)
 			t.Fatal("regional capacity standby did not compose")
@@ -725,7 +725,7 @@ func qualifyRegionalCapacity(t *testing.T, ctx context.Context, admin *pgxpool.P
 	}
 	bindingRow := `FROM capacity_workload w JOIN context_storage_binding b ON b.root_id=w.root_id AND b.allocation_id=w.allocation_id
  WHERE w.root_id=$1 AND w.cluster_id=$2 AND w.namespace_uid=$3 AND w.workload_uid=$4`
-	for until := time.Now().Add(5 * time.Minute); ; time.Sleep(time.Second) {
+	for until := time.Now().Add(5 * time.Minute); ; time.Sleep(installedPoll) {
 		var ready bool
 		e := admin.QueryRow(ctx, `SELECT w.ready_at IS NOT NULL `+bindingRow, root, cluster, string(ns.UID), string(app.UID)).Scan(&ready)
 		if e == nil && ready {
@@ -866,7 +866,7 @@ func qualifyRegionalCapacity(t *testing.T, ctx context.Context, admin *pgxpool.P
 					if err = region.CoreV1().Pods(ns.Name).Delete(ctx, pod.Name, meta.DeleteOptions{GracePeriodSeconds: ptr.To(int64(0)), Preconditions: &meta.Preconditions{UID: &pod.UID}}); err != nil {
 						t.Fatal("reviewed Pod deletion", err)
 					}
-					for until := time.Now().Add(time.Minute); ; time.Sleep(time.Second) {
+					for until := time.Now().Add(time.Minute); ; time.Sleep(installedPoll) {
 						current, err := region.CoreV1().Pods(ns.Name).Get(ctx, pod.Name, meta.GetOptions{})
 						if apierrors.IsNotFound(err) || err == nil && current.UID != pod.UID {
 							return

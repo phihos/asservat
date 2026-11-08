@@ -16,9 +16,23 @@ inputs:
   helm:
     description: Install the pinned Helm binary.
     default: "false"
+  go-cache:
+    description: "full: the module/build cache of every unit-test build; native-installed, native-race or native-collector: the smaller one of that kind of native suite (scripts/native-go-cache.sh)."
+    default: full
 runs:
   using: composite
   steps:
+    # setup-go downloads the toolchain into the runner's tool cache on every
+    # job unless it is already there; keep that directory in the Actions cache.
+    - if: inputs.go == 'true'
+      id: go-version
+      shell: bash
+      run: echo "version=$(sed -n 's/^go //p; s/^toolchain go//p' go.mod | tail -1)" >> "$GITHUB_OUTPUT"
+    - if: inputs.go == 'true'
+      uses: actions/cache@v6
+      with:
+        path: ${{ runner.tool_cache }}/go/${{ steps.go-version.outputs.version }}
+        key: go-toolchain-${{ runner.os }}-${{ runner.arch }}-${{ steps.go-version.outputs.version }}
     - if: inputs.go == 'true'
       uses: actions/setup-go@v7
       with:
@@ -26,7 +40,7 @@ runs:
         cache: false
     # One shared module/build cache. Only the main-branch build job saves it;
     # Go's content-addressed cache stays useful when restored from an older key.
-    - if: inputs.go == 'true'
+    - if: inputs.go == 'true' && !startsWith(inputs.go-cache, 'native-')
       uses: actions/cache/restore@v6
       with:
         path: |
@@ -36,6 +50,19 @@ runs:
         restore-keys: |
           go-${{ runner.os }}-${{ hashFiles('go.sum') }}-
           go-${{ runner.os }}-
+    # Saved by ci.yml's native-go-cache job; the full cache is only the
+    # fallback before one exists for this go.sum.
+    - if: inputs.go == 'true' && startsWith(inputs.go-cache, 'native-')
+      uses: actions/cache/restore@v6
+      with:
+        path: |
+          ~/go/pkg/mod
+          ~/.cache/go-build
+        key: go-${{ inputs.go-cache }}-${{ runner.os }}-${{ hashFiles('go.sum') }}-${{ github.sha }}
+        restore-keys: |
+          go-${{ inputs.go-cache }}-${{ runner.os }}-${{ hashFiles('go.sum') }}-
+          go-${{ runner.os }}-${{ hashFiles('go.sum') }}-
+          go-${{ inputs.go-cache }}-${{ runner.os }}-
     - shell: bash
       run: mkdir -p ~/.cache/asservat-build/tmp
     - uses: actions/setup-python@v7
@@ -60,25 +87,41 @@ runs:
       shell: bash
       run: make console-install
 
+    # Keyed on the pinned install lines, not on every Makefile edit.
+    - if: inputs.sql-tools == 'true'
+      id: sqlpins
+      shell: bash
+      run: echo "pins=$(grep 'go install ' Makefile | sha256sum | cut -c1-16)" >> "$GITHUB_OUTPUT"
     - if: inputs.sql-tools == 'true'
       id: sqltools
       uses: actions/cache@v6
       with:
         path: ~/.cache/asservat-build/bin
-        key: sql-tools-${{ runner.os }}-${{ hashFiles('Makefile') }}
+        key: sql-tools-${{ runner.os }}-${{ steps.sqlpins.outputs.pins }}
     - if: inputs.sql-tools == 'true' && steps.sqltools.outputs.cache-hit != 'true'
       shell: bash
       run: make sql-tools
 
+    # Pinned downloads, cached so a release-host outage does not fail the job;
+    # the checksum is verified on every use.
+    - if: inputs.kind == 'true' || inputs.helm == 'true'
+      uses: actions/cache@v6
+      with:
+        path: ~/.cache/asservat-build/downloads
+        key: downloads-${{ runner.os }}-kind-v0.33.0-helm-v4.3.0-${{ inputs.kind }}-${{ inputs.helm }}
     - if: inputs.kind == 'true'
       shell: bash
       run: |
-        curl -fsSLo /tmp/kind https://kind.sigs.k8s.io/dl/v0.33.0/kind-linux-amd64
-        echo "aee6151561422756b764a4ae28e7f44cda5af5a9eead3cc9985112b1de8d8e0d  /tmp/kind" | sha256sum -c -
-        sudo install -m 0755 /tmp/kind /usr/local/bin/kind
+        f=~/.cache/asservat-build/downloads/kind-v0.33.0-linux-amd64
+        mkdir -p "${f%/*}"
+        [[ -s $f ]] || curl -fsSL --retry 5 --retry-all-errors -o "$f" https://kind.sigs.k8s.io/dl/v0.33.0/kind-linux-amd64
+        echo "aee6151561422756b764a4ae28e7f44cda5af5a9eead3cc9985112b1de8d8e0d  $f" | sha256sum -c -
+        sudo install -m 0755 "$f" /usr/local/bin/kind
     - if: inputs.helm == 'true'
       shell: bash
       run: |
-        curl -fsSLo /tmp/helm.tgz https://get.helm.sh/helm-v4.3.0-linux-amd64.tar.gz
-        echo "86584a54def73570558f66f5111cc53dfed56689637ae32c1201205d494f54fb  /tmp/helm.tgz" | sha256sum -c -
-        sudo tar -xzf /tmp/helm.tgz -C /usr/local/bin --strip-components=1 linux-amd64/helm
+        f=~/.cache/asservat-build/downloads/helm-v4.3.0-linux-amd64.tar.gz
+        mkdir -p "${f%/*}"
+        [[ -s $f ]] || curl -fsSL --retry 5 --retry-all-errors -o "$f" https://get.helm.sh/helm-v4.3.0-linux-amd64.tar.gz
+        echo "86584a54def73570558f66f5111cc53dfed56689637ae32c1201205d494f54fb  $f" | sha256sum -c -
+        sudo tar -xzf "$f" -C /usr/local/bin --strip-components=1 linux-amd64/helm

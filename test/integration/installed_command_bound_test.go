@@ -98,3 +98,9 @@ func TestInstalledBoundedCommandStopsHeldPipes(t *testing.T) {
 		t.Fatal("unexpected receive")
 	}
 }
+
+// installedPoll is the test side's interval between reads of a condition the
+// installed product reaches on its own (Pod Ready, SQL rows, log lines). It
+// bounds only how late the test notices; product cadences and deadlines are
+// unchanged.
+const installedPoll = 250 * time.Millisecond

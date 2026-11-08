@@ -327,7 +327,7 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 		select {
 		case <-limit.Done():
 			t.Fatal("continuation did not finish within the original window", limit.Err())
-		case <-time.After(time.Second):
+		case <-time.After(installedPoll):
 		}
 	}
 	if !applied[1] || !applied[3] || len(applied) != 2 {
@@ -380,7 +380,7 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 		if time.Now().After(until) {
 			t.Fatal("permission stream not fresh and acknowledged", e, initial, fresh, pending, total)
 		}
-		time.Sleep(time.Second)
+		time.Sleep(installedPoll)
 	}
 	// ADR-190: capacity initialized for the same root before the owner launch.
 	var sources int
@@ -449,7 +449,7 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 			installedProcessDiagnostics(t, ctx, api, desired.TargetNamespace, prefix+"-worker", prefix+"-owner")
 			t.Fatal("capacity root not ready", e)
 		}
-		time.Sleep(time.Second)
+		time.Sleep(installedPoll)
 	}
 	// ADR-194: the owner launched promoted. Its download sources exist, the
 	// operator public Secret was written, and the owner Pod is Ready: capacity
@@ -1292,7 +1292,7 @@ func installerPromotedOwnerReady(t *testing.T, ctx context.Context, api kubernet
 			installedProcessDiagnostics(t, ctx, api, namespace, name)
 			t.Fatal("promoted owner not Ready", err)
 		}
-		time.Sleep(time.Second)
+		time.Sleep(installedPoll)
 	}
 }
 
@@ -1351,7 +1351,7 @@ func installerHubRetentionReadyEpoch(t *testing.T, ctx context.Context, api kube
 		if time.Now().After(until) {
 			t.Fatal("hub retention source not Ready", e, sequence)
 		}
-		time.Sleep(2 * time.Second)
+		time.Sleep(installedPoll)
 	}
 }
 
@@ -1408,7 +1408,7 @@ func installerCrashHubWorker(t *testing.T, ctx context.Context, api kubernetes.I
 		if time.Now().After(until) {
 			t.Fatal("hub-worker not restarted", e)
 		}
-		time.Sleep(time.Second)
+		time.Sleep(installedPoll)
 	}
 }
 
@@ -1487,7 +1487,7 @@ func installerKeyServiceInstalled(t *testing.T, ctx context.Context, api kuberne
 		if time.Now().After(until) {
 			t.Fatal("key service endpoint not refusing an unknown client as expected", e)
 		}
-		time.Sleep(2 * time.Second)
+		time.Sleep(installedPoll)
 	}
 	pods, err := api.CoreV1().Pods(namespace).List(ctx, meta.ListOptions{})
 	if err != nil {
@@ -1555,7 +1555,7 @@ func installerOwnerExposed(t *testing.T, ctx context.Context, api kubernetes.Int
 			installedProcessDiagnostics(t, ctx, api, namespace, "asservat-"+strings.ReplaceAll(installation, "-", "")+"-owner")
 			t.Fatal("owner native port not reachable", e)
 		}
-		time.Sleep(2 * time.Second)
+		time.Sleep(installedPoll)
 	}
 }
 
@@ -1584,7 +1584,7 @@ func installedPostgresRestart(t *testing.T, ctx context.Context, admin *pgxpool.
 	// The fixture's own pooled connections died with the server.
 	admin.Reset()
 	started := time.Now()
-	for until := started.Add(3 * time.Minute); ; time.Sleep(2 * time.Second) {
+	for until := started.Add(3 * time.Minute); ; time.Sleep(installedPoll) {
 		var active bool
 		err := admin.QueryRow(ctx, `SELECT NOT recovery_blocked AND NOT suspended AND fresh_until>clock_timestamp() FROM fleet_current_trust WHERE installation_id=$1`, installation).Scan(&active)
 		if err == nil && active {
@@ -1597,7 +1597,7 @@ func installedPostgresRestart(t *testing.T, ctx context.Context, admin *pgxpool.
 	t.Logf("installed journey: PostgreSQL restarted; trust root re-activated after %s", time.Since(started).Round(time.Second))
 	// The permission reconciler's epoch fails with the restart and retries
 	// after its 30 s SQL controller lease; authority is stale until then.
-	for until := time.Now().Add(3 * time.Minute); ; time.Sleep(2 * time.Second) {
+	for until := time.Now().Add(3 * time.Minute); ; time.Sleep(installedPoll) {
 		var current bool
 		err := admin.QueryRow(ctx, `SELECT COALESCE(bool_and(observed_at>pg_postmaster_start_time() AND fresh_until>clock_timestamp()),false) FROM permission_stream`).Scan(&current)
 		if err == nil && current {
@@ -1642,7 +1642,7 @@ func installedContextStandbyWindow(t *testing.T, ctx context.Context, api kubern
 	if err != nil {
 		t.Fatal("hub-api deployment", err)
 	}
-	for until := time.Now().Add(2 * time.Minute); ; time.Sleep(time.Second) {
+	for until := time.Now().Add(2 * time.Minute); ; time.Sleep(installedPoll) {
 		pods, err := api.CoreV1().Pods(namespace).List(ctx, meta.ListOptions{LabelSelector: meta.FormatLabelSelector(d.Spec.Selector)})
 		var started time.Time
 		if err == nil && len(pods.Items) == 1 && len(pods.Items[0].Status.ContainerStatuses) == 1 {
@@ -1676,7 +1676,7 @@ func installedHubSettled(t *testing.T, ctx context.Context, api kubernetes.Inter
 	var since time.Time
 	var last map[string]int32
 	start := time.Now()
-	for until := start.Add(5 * time.Minute); ; time.Sleep(2 * time.Second) {
+	for until := start.Add(5 * time.Minute); ; time.Sleep(installedPoll) {
 		current, ready, err := installedHubContainers(ctx, api, namespace)
 		if err != nil || !ready || !maps.Equal(current, last) {
 			since = time.Time{}
@@ -1706,7 +1706,7 @@ func installedHubSettled(t *testing.T, ctx context.Context, api kubernetes.Inter
 // pending.
 func waitInstalledPublisherSettled(t *testing.T, ctx context.Context, api kubernetes.Interface, namespace, installation string) {
 	t.Helper()
-	for until := time.Now().Add(2 * time.Minute); ; time.Sleep(time.Second) {
+	for until := time.Now().Add(2 * time.Minute); ; time.Sleep(installedPoll) {
 		changed := time.Time{}
 		if cm, err := api.CoreV1().ConfigMaps(namespace).Get(ctx, contracts.OwnerClusterCatalogName(installation), meta.GetOptions{}); err == nil {
 			changed = cm.CreationTimestamp.Time

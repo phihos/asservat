@@ -192,6 +192,37 @@ jobs:
       - run: cd web && npx playwright install --only-shell chromium
       - run: make console-browser-check
 
+  # The smaller Go caches native.yml restores (setup go-cache: native-<kind>):
+  # only what one kind of native suite builds, compiled for this commit. Saved
+  # on main (and on a dispatch, for its branch); no required check needs them.
+  native-go-cache:
+    needs: changes
+    if: needs.changes.outputs.code == 'true' && (github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      matrix:
+        kind: [installed, race, collector]
+    name: native-go-cache (${{ matrix.kind }})
+    steps:
+      - uses: actions/checkout@v7
+        with: { filter: "blob:none", sparse-checkout: "${{ env.CHECKOUT_SPARSE }}", sparse-checkout-cone-mode: false }
+      - uses: ./.github/actions/setup
+      - id: libpcap
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/asservat-build/libpcap-1.11.0
+          key: libpcap-1.11.0-${{ runner.os }}-${{ hashFiles('scripts/build-libpcap.sh') }}
+      - if: steps.libpcap.outputs.cache-hit != 'true'
+        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends flex bison
+      - run: scripts/native-go-cache.sh ${{ matrix.kind }}
+      - uses: actions/cache/save@v6
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: go-native-${{ matrix.kind }}-${{ runner.os }}-${{ hashFiles('go.sum') }}-${{ github.sha }}
+
   # The one check the branch ruleset requires (a skipped matrix job reports
   # no per-shard checks). changes and checks must pass; go, test and the
   # console jobs may be skipped only when changes classified the push as
