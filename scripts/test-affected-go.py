@@ -182,8 +182,9 @@ def results(stream):
 
 def execute(job):
     started = time.monotonic()
-    result = subprocess.run(job.command(), cwd=ROOT, env=job.env, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    return result.returncode, result.stdout, time.monotonic() - started
+    # stderr (build diagnostics, linker warnings) stays out of the -json stream.
+    result = subprocess.run(job.command(), cwd=ROOT, env=job.env, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    return result.returncode, result.stdout, result.stderr, time.monotonic() - started
 
 
 def main():
@@ -211,8 +212,9 @@ def main():
         futures = {pool.submit(execute, job): job for job in jobs}
         for future in concurrent.futures.as_completed(futures):
             job = futures[future]
-            code, stream, seconds = future.result()
+            code, stream, errors, seconds = future.result()
             failed, output = results(stream)
+            output += errors
             if job.names is not None and code == 0:
                 try:
                     gate.checked_shard_events(stream, job.package, job.names)
@@ -229,7 +231,8 @@ def main():
             retry = Job(job.label, job.package, job.direct, tags=job.tags, env=job.env, json_output=False,
                         run="^(" + "|".join(re.escape(n) for n in failed) + ")$")
             print(f"rerunning alone: {job.label}: {' '.join(failed)}", flush=True)
-            code, alone, _ = execute(retry)
+            code, alone, alone_errors, _ = execute(retry)
+            alone += alone_errors
             if code == 0:
                 flaky.append(f"{job.label}: {' '.join(failed)}")
                 continue
