@@ -216,16 +216,25 @@ func (s *LiveWatches) CurrentLive(ctx context.Context, c liveapp.Control) error 
 	call, stop := context.WithDeadline(ctx, proof.FreshUntil)
 	defer stop()
 	body, _ := json.Marshal(c)
+	refused := false
 	err = s.ledger.transaction(call, func(q *custodydb.Queries) error {
+		refused = false
 		ok, e := q.CurrentLiveWatch(call, custodydb.CurrentLiveWatchParams{RootID: id(s.root), OwnerID: id(s.owner), LimitsDigest: s.limitsDigest[:], Control: body, OriginalUntil: ts(proof.FreshUntil)})
 		if e != nil {
 			return liveSQLError(e)
 		}
 		if !ok {
+			refused = true
 			return privacy.ErrUnavailable
 		}
 		return liveBound(call, q, proof.FreshUntil)
 	})
+	if err != nil && refused {
+		// The ledger answered: this control (fence, revision, spend, state or
+		// expiry) is no longer current. That is a refusal that ends the view,
+		// not an outage the caller may retry.
+		return fmt.Errorf("%w: live_watch:not-current", v.ErrDenied)
+	}
 	return liveError(err)
 }
 

@@ -177,8 +177,8 @@ func TestLiveWatchLedgerWithRealServices(t *testing.T) {
 	}
 	bad := c
 	bad.Fence = custodyID()
-	if err = ledger.CurrentLive(ctx, bad); err == nil {
-		t.Fatal("changed fence current")
+	if err = ledger.CurrentLive(ctx, bad); !errors.Is(err, live.ErrDenied) || errors.Is(err, live.ErrUnavailable) {
+		t.Fatal("changed fence must be a refusal, not an outage", err)
 	}
 	c.Spent += 24 << 10
 	c, err = ledger.Change(ctx, c, c.Revision, 24<<10)

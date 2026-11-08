@@ -32,7 +32,8 @@ type LiveOperations struct {
 	service LiveService
 	wire    *contracts.InvestigationContracts
 	now     func() time.Time
-	// Diagnose, when set, receives the bounded internal refusal location.
+	// Diagnose, when set, receives fixed operation, class and location words
+	// only; never identifiers, inputs or dependency error text.
 	Diagnose func(string)
 }
 
@@ -192,8 +193,7 @@ func (s *LiveOperations) CallWithContext(ctx context.Context, current identities
 	}
 	if err != nil {
 		if s.Diagnose != nil {
-			msg := err.Error()
-			s.Diagnose("live " + name + " refused: " + msg[:min(len(msg), 300)])
+			s.Diagnose(name + " " + v.Diagnostic(err))
 		}
 		failure := OperationFailure{Code: "LiveUnavailable", Message: "Live observation is unavailable for this source or current access. Saved evidence and separately reviewed collection remain available.", Retryable: false}
 		if errors.Is(err, v.ErrTransient) {

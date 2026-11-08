@@ -58,17 +58,14 @@ type LiveSourceAuthority struct {
 	Automation        AutomationAuthorityReader
 	Environment       LiveEnvironment
 	Now               func() time.Time
-	// Diagnose, when set, receives a fixed refusal stage name; never inputs.
-	Diagnose func(stage string)
+	// Diagnose, when set, receives fixed stage and class words only; never
+	// identifiers, inputs or dependency error text.
+	Diagnose func(event string)
 }
 
 func (s LiveSourceAuthority) refuse(stage string, err error) error {
 	if s.Diagnose != nil {
-		// Errors on this path are fixed sentinels plus fixed stage text.
-		if err != nil {
-			stage += " (" + err.Error() + ")"
-		}
-		s.Diagnose("live inventory refused at " + stage)
+		s.Diagnose(stage + " " + live.Diagnostic(err))
 	}
 	return err
 }
@@ -104,7 +101,7 @@ func (s LiveSourceAuthority) Inventory(ctx context.Context, current identities.C
 	defer stop()
 	records, next, err := s.Catalog.ListLiveSources(bound, resolved.Target(), cursor, limit)
 	if err != nil || len(records) > limit {
-		return nil, "", s.refuse("catalog", fmt.Errorf("%w: %v", live.ErrUnavailable, err))
+		return nil, "", s.refuse("catalog", live.ErrUnavailable)
 	}
 	out := make([]live.Source, 0, len(records))
 	for _, record := range records {

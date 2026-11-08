@@ -957,3 +957,43 @@ func TestLiveFailedNodeReadIsRetryable(t *testing.T) {
 		t.Fatal("view did not survive a failed node read", out.State, e)
 	}
 }
+
+// A charge that committed before its bounds lapsed is never charged again:
+// the retry delivers the same paid rows under a fresh check, and a denial on
+// that check discloses nothing.
+func TestLiveCommittedChargeLapseRedeliversWithoutSecondCharge(t *testing.T) {
+	for _, deny := range []bool{false, true} {
+		s, f, i, r := setup(t)
+		w, e := s.Open(t.Context(), i, r)
+		if e != nil {
+			t.Fatal(e)
+		}
+		f.add()
+		f.source.LeaseUntil = f.now.Add(time.Second)
+		f.afterChange = func() { f.now = f.now.Add(2 * time.Second) }
+		if b, e := s.Read(t.Context(), i, v.Read{ID: w.ID, Cursor: *w.Cursor}); !errors.Is(e, v.ErrTransient) || len(b.Rows) != 0 {
+			t.Fatal("lapsed committed charge was not a transient refusal", e)
+		}
+		spent, changes := f.controls[w.ID].Spent, f.changes
+		if spent == 0 {
+			t.Fatal("committed spend was refunded")
+		}
+		f.afterChange = nil
+		f.source.LeaseUntil = f.now.Add(time.Minute)
+		f.denied = deny
+		batch, e := s.Read(t.Context(), i, v.Read{ID: w.ID, Cursor: *w.Cursor})
+		if deny {
+			if e == nil || errors.Is(e, v.ErrTransient) || len(batch.Rows) != 0 {
+				t.Fatal("paid rows disclosed outside current authority", e)
+			}
+			continue
+		}
+		if e != nil || len(batch.Rows) != 1 || batch.Spent != spent || f.changes != changes || f.controls[w.ID].Spent != spent {
+			t.Fatal("paid rows were charged again or not delivered", e, len(batch.Rows), f.changes-changes, f.controls[w.ID].Spent-spent)
+		}
+		next, e := s.Read(t.Context(), i, v.Read{ID: w.ID, Cursor: batch.Cursor})
+		if e != nil || len(next.Rows) != 0 {
+			t.Fatal("paid rows repeated after delivery", e, len(next.Rows))
+		}
+	}
+}

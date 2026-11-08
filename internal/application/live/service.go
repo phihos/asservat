@@ -89,8 +89,20 @@ type replay struct {
 	next  string
 	until time.Time
 }
+
+// paidBatch is a batch whose spend committed but whose delivery was refused
+// because its checked bounds lapsed. The next read with the same cursor
+// delivers it under a fresh check instead of charging the same rows again.
+type paidBatch struct {
+	cursor  string
+	batch   v.Batch
+	advance bool // a head read: delivery advances the cursor
+}
+
+// errPaidUndelivered marks a committed charge whose delivery was refused.
+var errPaidUndelivered = errors.New("live: charged batch not delivered")
+
 type session struct {
-	lastCheck  time.Duration // diagnostics only: duration of the latest current() check
 	cancelRead context.CancelFunc
 	readJoined chan struct{}
 	timer      *time.Timer
@@ -104,6 +116,7 @@ type session struct {
 	positions  []v.Position
 	position   uint64
 	replay     map[string]replay
+	paid       *paidBatch
 	gap        []v.Gap
 	reading    bool
 	updates    map[string]updateReceipt
@@ -440,7 +453,6 @@ func (s *Service) get(ctx context.Context, current CurrentIdentity, id string) (
 }
 func (s *Service) current(ctx context.Context, current CurrentIdentity, st *session, i identity.Identity) (time.Time, error) {
 	now := s.cfg.Now()
-	defer func() { st.lastCheck = s.cfg.Now().Sub(now) }()
 	end := minTime(i.ValidUntil, st.watch.ExpiresAt, st.watch.IdleUntil)
 	if !now.Before(st.watch.ExpiresAt) || !now.Before(st.watch.IdleUntil) {
 		s.clear(st, "Expired")
@@ -552,6 +564,20 @@ func (s *Service) Read(ctx context.Context, current CurrentIdentity, r v.Read) (
 			delete(st.replay, c)
 		}
 	}
+	if p := st.paid; p != nil && p.cursor == r.Cursor {
+		batch, ok := s.paidDelivery(st, p, end, now)
+		if ok && !s.cfg.Now().Before(end) {
+			// Bounds lapsed again; keep the paid batch for the next read.
+			return zero, fmt.Errorf("%w: %w: service:paid", v.ErrUnavailable, v.ErrTransient)
+		}
+		st.paid = nil
+		if ok {
+			if !p.advance {
+				return batch, nil
+			}
+			return s.delivered(st, r.Cursor, batch), nil
+		}
+	}
 	if p, ok := st.replay[r.Cursor]; ok {
 		batch := v.CloneBatch(p.batch)
 		batch.DisclosureUntil = minTime(batch.DisclosureUntil, end)
@@ -561,7 +587,14 @@ func (s *Service) Read(ctx context.Context, current CurrentIdentity, r v.Read) (
 				return zero, fmt.Errorf("%w: service:513", v.ErrConflict)
 			}
 		}
-		return s.charge(ctx, st, batch)
+		charged, err := s.charge(ctx, st, batch)
+		if errors.Is(err, errPaidUndelivered) {
+			st.paid = &paidBatch{cursor: r.Cursor, batch: v.CloneBatch(charged)}
+		}
+		if err != nil {
+			return zero, err
+		}
+		return charged, nil
 	}
 	position, validCursor := s.cursorPosition(st, r.Cursor)
 	if !validCursor || position > st.position {
@@ -727,12 +760,44 @@ func (s *Service) Read(ctx context.Context, current CurrentIdentity, r v.Read) (
 	}
 	charged, err := s.charge(ctx, st, batch)
 	if err != nil {
-		if previous != nil && errors.Is(err, v.ErrTransient) {
-			// Nothing was disclosed; the next read returns the same rows.
+		if errors.Is(err, errPaidUndelivered) {
+			// The spend committed: keep the positions past these rows and
+			// deliver the paid batch on the next read, never charging it twice.
+			st.paid = &paidBatch{cursor: r.Cursor, batch: v.CloneBatch(charged), advance: true}
+		} else if previous != nil && errors.Is(err, v.ErrTransient) {
+			// Nothing was charged or disclosed; the next read returns the same rows.
 			st.positions = append(st.positions[:0], previous...)
 		}
 		return zero, err
 	}
+	return s.delivered(st, r.Cursor, charged), nil
+}
+
+// paidDelivery returns a previously charged batch under the fresh check that
+// just passed (end). Rows past their own expiry become gaps; a changed
+// revision/cursor or ended view drops the batch (its spend stays charged).
+func (s *Service) paidDelivery(st *session, p *paidBatch, end, now time.Time) (v.Batch, bool) {
+	if v.Terminal(st.watch.State) || p.batch.Revision != st.watch.Revision || p.advance && (st.watch.Cursor == nil || *st.watch.Cursor != p.cursor) {
+		return v.Batch{}, false
+	}
+	batch := v.CloneBatch(p.batch)
+	batch.DisclosureUntil = end
+	rows := batch.Rows[:0]
+	for _, row := range batch.Rows {
+		if row.Valid(now) {
+			rows = append(rows, row)
+			continue
+		}
+		id := row.SourceID
+		batch.Gaps = appendLiveGap(batch.Gaps, v.Gap{Reason: "bufferExpired", SourceID: &id, From: batch.From, Until: now})
+	}
+	batch.Rows = rows
+	return batch, true
+}
+
+// delivered advances the head cursor past a charged batch and retains it for
+// bounded replay.
+func (s *Service) delivered(st *session, cursor string, charged v.Batch) v.Batch {
 	st.position++
 	next := s.cursor(st)
 	st.watch.Cursor = &next
@@ -754,12 +819,12 @@ func (s *Service) Read(ctx context.Context, current CurrentIdentity, r v.Read) (
 		// A valid delivered batch may exceed a smaller accepted replay
 		// buffer. Retain none rather than exceeding it or trimming paid rows.
 		if len(raw) <= st.watch.Limits.Buffer {
-			st.replay[r.Cursor] = replay{v.CloneBatch(charged), next, expiry}
+			st.replay[cursor] = replay{v.CloneBatch(charged), next, expiry}
 		}
 		s.armLocked(st)
 	}
 	s.armLocked(st)
-	return charged, nil
+	return charged
 }
 func defaultLimit(n int) int {
 	if n == 0 {
@@ -774,7 +839,7 @@ func (s *Service) charge(ctx context.Context, st *session, b v.Batch) (v.Batch, 
 	if !s.cfg.Now().Before(b.DisclosureUntil) {
 		// The current bounds (for example a source lease about to renew)
 		// ended before delivery; refuse this read only.
-		return v.Batch{}, fmt.Errorf("%w: %w: service:708 (late %s, last check %s)", v.ErrUnavailable, v.ErrTransient, s.cfg.Now().Sub(b.DisclosureUntil).Round(time.Millisecond), st.lastCheck.Round(time.Millisecond))
+		return v.Batch{}, fmt.Errorf("%w: %w: service:708", v.ErrUnavailable, v.ErrTransient)
 	}
 	call, stop := context.WithDeadline(ctx, b.DisclosureUntil)
 	defer stop()
@@ -802,9 +867,9 @@ func (s *Service) charge(ctx context.Context, st *session, b v.Batch) (v.Batch, 
 	if call.Err() != nil || !s.cfg.Now().Before(b.DisclosureUntil) {
 		if ctx.Err() == nil {
 			// The charge committed but the current bounds lapsed before
-			// delivery: refuse this read only. The spend stays charged
-			// (conservative) and the next read re-delivers the same rows.
-			return v.Batch{}, fmt.Errorf("%w: %w: service:735", v.ErrUnavailable, v.ErrTransient)
+			// delivery: refuse this read only. The spend stays charged and
+			// the caller keeps b to deliver, uncharged, after a fresh check.
+			return b, fmt.Errorf("%w: %w: %w: service:735", v.ErrUnavailable, v.ErrTransient, errPaidUndelivered)
 		}
 		s.clear(st, "Disconnected")
 		return v.Batch{}, fmt.Errorf("%w: service:735", v.ErrDenied)
@@ -821,6 +886,7 @@ func (s *Service) clear(st *session, state string) {
 		s.active.Add(-1)
 	}
 	clear(st.replay)
+	st.paid = nil
 	st.gap = nil
 	if v.Terminal(state) && !st.reading {
 		s.eraseDetails(st)

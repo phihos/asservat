@@ -2,10 +2,30 @@ package live
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
 )
+
+func TestDiagnosticCarriesOnlyFixedClassAndMarkers(t *testing.T) {
+	dependency := errors.New("dial tcp postgres:5432: user alice@example.test pod 0f7c secret-token")
+	inner := fmt.Errorf("%w: live_batch:83: %v", ErrUnavailable, dependency)
+	err := fmt.Errorf("%w: %w: service:442: %v", ErrUnavailable, ErrTransient, inner)
+	if got := Diagnostic(err); got != "transient at service:442 live_batch:83" {
+		t.Fatalf("diagnostic %q", got)
+	}
+	if got := Diagnostic(fmt.Errorf("%w: live_watch:not-current", ErrDenied)); got != "denied at live_watch:not-current" {
+		t.Fatalf("diagnostic %q", got)
+	}
+	if got := Diagnostic(dependency); got != "other" {
+		t.Fatalf("dependency text leaked: %q", got)
+	}
+	if got := Diagnostic(nil); got != "other" {
+		t.Fatalf("nil diagnostic %q", got)
+	}
+}
 
 func testRow(now time.Time) Row {
 	return Row{ID: "source:1", SourceID: "11111111-1111-4111-8111-111111111111", Sequence: 1, ObservedAt: now.Add(-time.Second), ReceivedAt: now, ExpiresAt: now.Add(29 * time.Second), Projection: Packet, PodUID: "pod", Packet: &PacketFields{Protocol: "TCP", RemoteIP: "192.0.2.2", RemotePort: 8080, Direction: "unknown", WireBytes: 64}}
