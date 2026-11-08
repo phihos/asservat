@@ -32,21 +32,8 @@ WHERE n.nspname='public' AND p.proacl IS NOT NULL AND x.grantee<>p.proowner AND 
 // snapshot (GRANT is idempotent; nothing is revoked or widened).
 func preserveFixtureGrants(t *testing.T, ctx context.Context, admin *pgxpool.Pool) func(context.Context) {
 	t.Helper()
-	rows, err := admin.Query(ctx, fixtureGrantsSQL)
-	if err != nil {
-		t.Fatal("snapshot fixture grants", err)
-	}
-	var grants []string
-	for rows.Next() {
-		var g string
-		if err = rows.Scan(&g); err != nil {
-			rows.Close()
-			t.Fatal("snapshot fixture grants", err)
-		}
-		grants = append(grants, g)
-	}
-	rows.Close()
-	if err = rows.Err(); err != nil || len(grants) == 0 {
+	grants, err := listFixtureGrants(ctx, admin)
+	if err != nil || len(grants) == 0 {
 		t.Fatal("snapshot fixture grants", len(grants), err)
 	}
 	return func(ctx context.Context) {
@@ -56,5 +43,36 @@ func preserveFixtureGrants(t *testing.T, ctx context.Context, admin *pgxpool.Poo
 				return
 			}
 		}
+		after, err := listFixtureGrants(ctx, admin)
+		if err != nil {
+			t.Error("verify restored fixture grants", err)
+			return
+		}
+		have := map[string]bool{}
+		for _, g := range after {
+			have[g] = true
+		}
+		for _, g := range grants {
+			if !have[g] {
+				t.Error("fixture grant not restored", g)
+			}
+		}
 	}
+}
+
+func listFixtureGrants(ctx context.Context, admin *pgxpool.Pool) ([]string, error) {
+	rows, err := admin.Query(ctx, fixtureGrantsSQL)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var grants []string
+	for rows.Next() {
+		var g string
+		if err = rows.Scan(&g); err != nil {
+			return nil, err
+		}
+		grants = append(grants, g)
+	}
+	return grants, rows.Err()
 }

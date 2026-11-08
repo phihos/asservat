@@ -29,7 +29,9 @@ func TestInstallerEvidenceBucketPolicyMatchesProviderReadback(t *testing.T) {
 // evidence bucket policy; the deletion fixture accepts exactly those extras.
 func TestInstalledDeletionPolicyAcceptsOnlyRegionalHistoryExtras(t *testing.T) {
 	base := installerEvidenceBucketPolicy("initial-bootstrap-chain-evidence")
-	with := func(statement string) string { return strings.Replace(base, `}],"Version"`, `},`+statement+`],"Version"`, 1) }
+	with := func(statement string) string {
+		return strings.Replace(base, `}],"Version"`, `},`+statement+`],"Version"`, 1)
+	}
 	history := `{"Sid":"AllowHistoryObjects7c4b","Effect":"Allow","Principal":{"AWS":"arn:aws:iam::000000000000:user/history"},"Action":["s3:GetObject"],"Resource":"arn:aws:s3:::initial-bootstrap-chain-evidence/h/*"}`
 	if with(history) == base {
 		t.Fatal("fixture statement not appended")
