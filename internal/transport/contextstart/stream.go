@@ -300,10 +300,10 @@ func (s *frameStream) send(ctx context.Context, f contracts.APIContextFrame) (ti
 		if reason == streamNoReason {
 			reason = streamErrorReason(e)
 		}
-	} else if err := call.Err(); err != nil {
-		stage, reason = streamSendResult, streamErrorReason(err)
 	} else if !time.Now().Before(until) {
 		stage, reason = streamSendResult, streamExpired
+	} else if err := call.Err(); err != nil && f.Kind != contracts.APIContextReceiptFrame && f.Kind != contracts.HistoryReceiptFrame {
+		stage, reason = streamSendResult, streamErrorReason(err)
 	}
 	if reason != streamNoReason {
 		s.interruptAt(stage, reason)
@@ -345,7 +345,9 @@ func (s *frameStream) startReader() (<-chan contracts.APIContextFrame, error) {
 			}
 			if reason != streamNoReason {
 				clear(f.Payload)
-				s.interruptAt(streamRead, reason)
+				if !s.sentTerminalReceipt() {
+					s.interruptAt(streamRead, reason)
+				}
 				return
 			}
 			select {
@@ -354,15 +356,35 @@ func (s *frameStream) startReader() (<-chan contracts.APIContextFrame, error) {
 				clear(f.Payload)
 				return
 			}
-			// Receipt is the protocol's terminal frame. No later body value is accepted
-			// or used. Let its exact semantic check finish before joined Close, avoiding
-			// an EOF race against an already received terminal acknowledgement.
+			// Receipt is the region's terminal inbound frame. No later body value is
+			// accepted or used. Let the exact receipt check finish before joined
+			// Close, avoiding an EOF race when the server exits after flush.
 			if f.Kind == contracts.APIContextReceiptFrame || f.Kind == contracts.HistoryReceiptFrame {
 				return
 			}
 		}
 	}()
 	return s.incoming, nil
+}
+
+func (s *frameStream) sentTerminalReceipt() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.leaseStarted && s.lease != nil && !s.lease.regional && s.lease.phase == peerReceipt
+}
+
+func (s *frameStream) awaitPeerClose(ctx context.Context) {
+	s.mu.Lock()
+	pump := s.pumpDone
+	s.mu.Unlock()
+	if pump == nil {
+		return
+	}
+	select {
+	case <-pump:
+	case <-s.ctx.Done():
+	case <-ctx.Done():
+	}
 }
 func (s *frameStream) Receive(ctx context.Context) (contracts.APIContextFrame, error) {
 	f, _, e := s.receive(ctx)

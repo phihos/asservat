@@ -425,6 +425,7 @@ func TestContextStartSetupActualHTTP2UnderOriginalNativeLimiterModel(t *testing.
 	// Start this synthetic source observation at the actual opening, not at
 	// the unrelated TLS certificate fixture's whole-second creation time.
 	// The clock remains fixed thereafter; no observation is refreshed in flight.
+	p.f.connector.realClock.Store(false)
 	p.f.connector.advance.Store(int64(time.Since(p.f.connector.now)))
 	started := time.Now()
 	exchange, err := p.f.client.Open(ctx, p.f.owner)

@@ -153,9 +153,12 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer standby.Finish()
+	var served atomic.Bool
 	stream, e := newFrameStream(standby.Context(), receiver.Channel, check, r.Body, w, controller.SetReadDeadline, controller.SetWriteDeadline, controller.Flush, func() {
 		_ = controller.SetReadDeadline(time.Now())
-		_ = controller.SetWriteDeadline(time.Now())
+		if !served.Load() {
+			_ = controller.SetWriteDeadline(time.Now())
+		}
 		_ = r.Body.Close()
 	})
 	if e != nil {
@@ -187,4 +190,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = standby.Serve(stream, time.Now)
+	if stream.sentTerminalReceipt() {
+		served.Store(true)
+		stream.awaitPeerClose(standby.Context())
+	}
 }

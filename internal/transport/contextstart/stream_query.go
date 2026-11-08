@@ -214,6 +214,12 @@ func (s *frameStream) query(ctx context.Context, method string, in, out any) (ti
 	receiver, e := s.check(call)
 	markQuery(ctx, "q-check", checked)
 	if e != nil || !receiver.Valid(time.Now()) || receiver.Channel != s.channel {
+		// An ended stream owner cancels this check through the router, and its
+		// own AfterFunc records that cause concurrently. Attribute a check that
+		// failed after the owner ended to the owner, deterministically.
+		if c := s.ctx.Err(); c != nil {
+			s.record(streamOwner, streamErrorReason(c))
+		}
 		s.record(streamHubQueryCheck, queryCheckReason(e))
 		s.interruptAt(streamSendPeer, streamPeerInvalid)
 		return time.Time{}, fleet.ErrUnavailable
