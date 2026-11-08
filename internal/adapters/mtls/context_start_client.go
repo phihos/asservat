@@ -288,6 +288,9 @@ func (c *ContextStartClient) currentWithOpeningDiagnostic(ctx context.Context, c
 	if e != nil {
 		return zero, receiverCheckStep{"local", e}
 	}
+	// The local check started slightly later and bounds itself by its own
+	// start; this receiver's interval starts at started.
+	until = identity.Earlier(until, started.Add(identity.AuthorityRecheckInterval))
 	diagnostic.bound(until)
 	call, stopLocal := context.WithDeadline(call, until)
 	defer stopLocal()
