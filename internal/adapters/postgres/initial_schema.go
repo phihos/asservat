@@ -271,8 +271,8 @@ func (s *InitialSchema) inspect(ctx context.Context, claim bool) (next int64, do
 		return 0, false, cfg.ErrUnavailable
 	}
 	l.conn = conn
-	// The bracket's session is discarded after unlock, so a lock count left by
-	// an interrupted step can never outlive the bracket.
+	// The bracket's session is discarded after unlock, so its advisory lock
+	// never outlives the bracket, even after an uncertain unlock.
 	defer func() {
 		if e := l.unlock(); e != nil && err == nil {
 			err = e
