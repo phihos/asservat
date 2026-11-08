@@ -38,6 +38,7 @@ type frameStream struct {
 	pumpDone                     chan struct{}
 	awaited                      bool
 	leaseStarted                 bool
+	terminalReceiptSent          bool
 	historyWork                  bool
 	lease                        *framePeerLease
 	leaseBounds                  []framePeerBound
@@ -295,15 +296,20 @@ func (s *frameStream) send(ctx context.Context, f contracts.APIContextFrame) (ti
 		stage = streamFlush
 		e = s.flush()
 		reason = streamErrorReason(e)
+		if e == nil && (f.Kind == contracts.APIContextReceiptFrame || f.Kind == contracts.HistoryReceiptFrame) {
+			s.mu.Lock()
+			s.terminalReceiptSent = true
+			s.mu.Unlock()
+		}
 	}
 	if e != nil {
 		if reason == streamNoReason {
 			reason = streamErrorReason(e)
 		}
-	} else if err := call.Err(); err != nil {
-		stage, reason = streamSendResult, streamErrorReason(err)
 	} else if !time.Now().Before(until) {
 		stage, reason = streamSendResult, streamExpired
+	} else if err := call.Err(); err != nil && f.Kind != contracts.APIContextReceiptFrame && f.Kind != contracts.HistoryReceiptFrame {
+		stage, reason = streamSendResult, streamErrorReason(err)
 	}
 	if reason != streamNoReason {
 		s.interruptAt(stage, reason)
@@ -345,7 +351,9 @@ func (s *frameStream) startReader() (<-chan contracts.APIContextFrame, error) {
 			}
 			if reason != streamNoReason {
 				clear(f.Payload)
-				s.interruptAt(streamRead, reason)
+				if !s.sentTerminalReceipt() {
+					s.interruptAt(streamRead, reason)
+				}
 				return
 			}
 			select {
@@ -354,15 +362,38 @@ func (s *frameStream) startReader() (<-chan contracts.APIContextFrame, error) {
 				clear(f.Payload)
 				return
 			}
-			// Receipt is the protocol's terminal frame. No later body value is accepted
-			// or used. Let its exact semantic check finish before joined Close, avoiding
-			// an EOF race against an already received terminal acknowledgement.
+			// Receipt is the region's terminal inbound frame. No later body value is
+			// accepted or used. Let the exact receipt check finish before joined
+			// Close, avoiding an EOF race when the server exits after flush.
 			if f.Kind == contracts.APIContextReceiptFrame || f.Kind == contracts.HistoryReceiptFrame {
 				return
 			}
 		}
 	}()
 	return s.incoming, nil
+}
+
+func (s *frameStream) sentTerminalReceipt() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.terminalReceiptSent
+}
+
+func (s *frameStream) awaitPeerClose(ctx context.Context) {
+	s.mu.Lock()
+	pump := s.pumpDone
+	s.mu.Unlock()
+	if pump == nil {
+		return
+	}
+	grace := time.NewTimer(2 * time.Second)
+	defer grace.Stop()
+	select {
+	case <-pump:
+	case <-s.ctx.Done():
+	case <-ctx.Done():
+	case <-grace.C:
+	}
 }
 func (s *frameStream) Receive(ctx context.Context) (contracts.APIContextFrame, error) {
 	f, _, e := s.receive(ctx)

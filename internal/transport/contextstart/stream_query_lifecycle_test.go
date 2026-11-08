@@ -360,3 +360,23 @@ func TestContextQueryCompletedStandbyExpiresAtOriginalParent(t *testing.T) {
 		t.Fatal("expired standby reused")
 	}
 }
+
+// An ended stream owner cancels an in-flight query check through the router;
+// the owner's AfterFunc records that cause concurrently with the failed check.
+// The first interruption must name the owner, not a peer-check denial.
+func TestContextQueryCheckAfterOwnerEndIsOwnerInterruption(t *testing.T) {
+	for i := 0; i < 50; i++ {
+		parent, end := context.WithTimeout(context.Background(), 2*time.Second)
+		f := newQueryLifecycleFixture(t, parent, func(context.Context) (fleet.APIContextReceiver, error) {
+			end()
+			return fleet.APIContextReceiver{}, fleet.ErrDenied
+		}, nil)
+		if _, err := f.stream.query(context.Background(), queryResolvePod, struct{}{}, &struct{}{}); !errors.Is(err, fleet.ErrUnavailable) {
+			t.Fatal("check after owner end", err)
+		}
+		if v := f.stream.interruption(); v.Stage() != "owner" || v.Reason() != "canceled" {
+			t.Fatal("check failure after owner end was not attributed to the owner", v.Stage(), v.Reason())
+		}
+		end()
+	}
+}

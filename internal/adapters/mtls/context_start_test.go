@@ -66,6 +66,10 @@ func newContextStartTLSFixture(t *testing.T) *contextStartTLSFixture {
 	if e := connector.Reconcile(context.Background()); e != nil {
 		t.Fatal(e)
 	}
+	// Enrollment uses a whole-second clock because X.509 serializes certificate
+	// validity to seconds; switch to the live clock afterwards so runtime source
+	// and registration observations stay aligned with time.Now in client/ingress.
+	cf.realClock.Store(true)
 	n := time.Now().UTC().Truncate(time.Second)
 	ca := newOwnerTestCA(t, n)
 	permit := ownerPermit(n, [][]byte{ca.cert.Raw}, artifact.Digest{1}, "server")

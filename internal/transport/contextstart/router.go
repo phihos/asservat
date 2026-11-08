@@ -597,13 +597,22 @@ func (a *Attachment) dispatch(w fleet.APIContextWork, signed []byte, run func(co
 	a.standby.job <- job
 	a.router.mu.Unlock()
 	a.mu.Unlock()
+	// After handoff to s.job, Standby.Serve (or Standby.Finish if Serve exited
+	// before receiving the job) always writes to job.result and links both
+	// a.ctx and s.ctx to the operation. Do not race <-a.standby.ctx.Done()
+	// against <-job.result, or a regional peer that closes its HTTP/2 stream
+	// right after receiving the terminal receipt can cause dispatch to discard
+	// a completed result.
 	select {
 	case result := <-job.result:
 		return result.state, result.err
-	case <-a.ctx.Done():
-		return "", fleet.ErrUnavailable
-	case <-a.standby.ctx.Done():
-		return "", fleet.ErrUnavailable
+	case <-a.standby.done:
+		select {
+		case result := <-job.result:
+			return result.state, result.err
+		default:
+			return "", fleet.ErrUnavailable
+		}
 	}
 }
 

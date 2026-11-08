@@ -158,3 +158,128 @@ func TestContextStreamEOFJoinsBlockedHubOperation(t *testing.T) {
 		t.Fatal("EOF conversation succeeded")
 	}
 }
+
+func terminalReceiptTestStream(t *testing.T, flush func() error) (*frameStream, *io.PipeWriter) {
+	t.Helper()
+	w := workFixture()
+	ctx, cancel := context.WithDeadline(context.Background(), w.ValidUntil)
+	t.Cleanup(cancel)
+	read, write := io.Pipe()
+	check := func(context.Context) (fleet.APIContextReceiver, error) {
+		return fleet.APIContextReceiver{Channel: w.Work.Channel, Window: identity.Check(w.VerifiedAt, identity.Recheck).Narrow(w.ValidUntil)}, nil
+	}
+	s, e := newFrameStream(ctx, w.Work.Channel, check, read, io.Discard, func(time.Time) error { return nil }, func(time.Time) error { return nil }, flush, func() { _ = read.Close() })
+	if e != nil {
+		t.Fatal(e)
+	}
+	t.Cleanup(func() { _ = s.Close(); _ = read.Close(); _ = write.Close() })
+	if e = s.Send(ctx, contracts.APIContextFrame{Kind: contracts.APIContextWorkFrame, Payload: []byte("signed")}); e != nil {
+		t.Fatal(e)
+	}
+	written := make(chan error, 1)
+	go func() {
+		written <- contracts.WriteAPIContextFrame(write, contracts.APIContextFrame{Kind: contracts.APIContextResultFrame, Payload: []byte("result")})
+	}()
+	result, e := s.Receive(ctx)
+	clear(result.Payload)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if e = <-written; e != nil {
+		t.Fatal(e)
+	}
+	return s, write
+}
+
+func TestContextStreamTerminalReceiptRequiresSuccessfulFlush(t *testing.T) {
+	var flushes atomic.Int32
+	s, _ := terminalReceiptTestStream(t, func() error {
+		if flushes.Add(1) == 2 {
+			return fleet.ErrDenied
+		}
+		return nil
+	})
+	e := s.Send(context.Background(), contracts.APIContextFrame{Kind: contracts.APIContextReceiptFrame, Payload: []byte("receipt")})
+	if e == nil {
+		t.Fatal("failed receipt flush succeeded")
+	}
+	if s.sentTerminalReceipt() {
+		t.Fatal("failed receipt flush was reported as delivered")
+	}
+	if got := s.interruption().Stage(); got != "flush" {
+		t.Fatal("failed receipt flush was not retained", got)
+	}
+}
+
+func TestContextStreamReadFailureDuringReceiptFlushIsTerminal(t *testing.T) {
+	entered, release := make(chan struct{}), make(chan struct{})
+	var flushes atomic.Int32
+	s, write := terminalReceiptTestStream(t, func() error {
+		if flushes.Add(1) == 2 {
+			close(entered)
+			<-release
+		}
+		return nil
+	})
+	done := make(chan error, 1)
+	go func() {
+		done <- s.Send(context.Background(), contracts.APIContextFrame{Kind: contracts.APIContextReceiptFrame, Payload: []byte("receipt")})
+	}()
+	select {
+	case <-entered:
+	case <-time.After(time.Second):
+		t.Fatal("receipt flush not entered")
+	}
+	if s.sentTerminalReceipt() {
+		t.Error("in-flight receipt flush was reported as delivered")
+	}
+	if e := write.Close(); e != nil {
+		t.Fatal(e)
+	}
+	s.mu.Lock()
+	pump := s.pumpDone
+	s.mu.Unlock()
+	select {
+	case <-pump:
+	case <-time.After(time.Second):
+		t.Fatal("reader did not observe EOF")
+	}
+	if got := s.interruption().Stage(); got != "read" {
+		t.Error("read failure during receipt flush was dropped", got)
+	}
+	close(release)
+	<-done
+}
+
+func TestContextStreamPeerCloseWaitHasFixedGrace(t *testing.T) {
+	w := workFixture()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	read, write := io.Pipe()
+	defer write.Close()
+	check := func(context.Context) (fleet.APIContextReceiver, error) {
+		return fleet.APIContextReceiver{Channel: w.Work.Channel, Window: identity.Check(w.VerifiedAt, identity.Recheck).Narrow(w.ValidUntil)}, nil
+	}
+	s, e := newFrameStream(ctx, w.Work.Channel, check, read, io.Discard, func(time.Time) error { return nil }, func(time.Time) error { return nil }, func() error { return nil }, func() { _ = read.Close() })
+	if e != nil {
+		t.Fatal(e)
+	}
+	if _, e = s.startReader(); e != nil {
+		t.Fatal(e)
+	}
+	started := time.Now()
+	s.awaitPeerClose(ctx)
+	if elapsed := time.Since(started); elapsed < 1500*time.Millisecond || elapsed >= 4*time.Second {
+		t.Fatal("peer-close wait did not use the fixed two-second grace", elapsed)
+	}
+	if ctx.Err() != nil {
+		t.Fatal("peer-close grace waited for the original standby deadline")
+	}
+	closed := make(chan struct{})
+	go func() { _ = s.Close(); close(closed) }()
+	select {
+	case <-closed:
+	case <-time.After(time.Second):
+		t.Fatal("stream cleanup remained blocked after peer-close grace")
+	}
+}
