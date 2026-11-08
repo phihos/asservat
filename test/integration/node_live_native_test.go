@@ -322,6 +322,10 @@ func (n *nativeLiveQualification) http(t *testing.T, parent context.Context, ch 
 	if err != nil || finiteCount == 0 {
 		t.Fatal("finite HTTP observer lost native evidence", finiteCount, err)
 	}
+	var finiteSummary map[string]json.RawMessage
+	if json.Unmarshal(body, &finiteSummary) == nil {
+		t.Logf("finite HTTP projection: %d records, counters %s", finiteCount, finiteSummary["counters"])
+	}
 	n.ended(t, ctx, ch, view, w, original)
 	issued := time.Now().UTC().Truncate(time.Microsecond)
 	// The synthetic HTTP load reaches about 1 MB/s (native run 42475454686

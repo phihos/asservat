@@ -168,7 +168,7 @@ func (n *nodeSources) runSnapshot(ctx context.Context, epoch, workID string, own
 		uploadStarted := n.now()
 		err := n.upload(ctx, epoch, result, native)
 		if n.log != nil {
-			n.log(fmt.Sprintf("node collector: source %s snapshot %s: %d events, %d bytes, completed %s, upload %s (%v)", x.Binding.SourceID, q.SnapshotID, counters.Retained, len(native), completed.Format(time.RFC3339Nano), n.now().Sub(uploadStarted).Round(10*time.Millisecond), err))
+			n.log(fmt.Sprintf("node collector: source %s snapshot %s: %d events, %d bytes, completed %s, upload %s (%v); source %s", x.Binding.SourceID, q.SnapshotID, counters.Retained, len(native), completed.Format(time.RFC3339Nano), n.now().Sub(uploadStarted).Round(10*time.Millisecond), err, n.sourceCounters(x.Binding.SourceID)))
 		}
 	}
 }
@@ -222,5 +222,10 @@ func (n *nodeSources) sourceCounters(id string) string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	st := s.ring.State()
-	return fmt.Sprintf("seen=%d retained=%d malformed=%d evicted=%d observed=%dB closed=%t", st.Packets.Seen, st.Packets.Retained, st.Packets.Malformed, st.HistoryEvicted, s.meter.ObservedBytes(), s.closed)
+	out := fmt.Sprintf("seen=%d retained=%d malformed=%d evicted=%d observed=%dB closed=%t", st.Packets.Seen, st.Packets.Retained, st.Packets.Malformed, st.HistoryEvicted, s.meter.ObservedBytes(), s.closed)
+	if s.httpProjector != nil {
+		// Content-free cumulative projector counters (flows, stops, limits).
+		out += fmt.Sprintf(" http=%+v", s.httpProjector.SourceCounters())
+	}
+	return out
 }
