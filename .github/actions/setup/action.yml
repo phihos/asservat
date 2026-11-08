@@ -110,9 +110,13 @@ runs:
       run: make sql-tools
 
     # Pinned downloads, cached so a release-host outage does not fail the job;
-    # the checksum is verified on every use.
+    # the checksum is verified on every use. The cache is saved right after
+    # the downloads (below), not at job end: a post-job save happens only for
+    # a passing job, so failing native jobs on main never left a main-scoped
+    # entry and every run hit the release host (504s, native run 42471672035).
     - if: inputs.kind == 'true' || inputs.helm == 'true'
-      uses: actions/cache@v6
+      id: downloads
+      uses: actions/cache/restore@v6
       with:
         path: ~/.cache/asservat-build/downloads
         key: downloads-${{ runner.os }}-kind-v0.33.0-helm-v4.3.0-${{ inputs.kind }}-${{ inputs.helm }}
@@ -123,7 +127,10 @@ runs:
         sum="aee6151561422756b764a4ae28e7f44cda5af5a9eead3cc9985112b1de8d8e0d  $f"
         mkdir -p "${f%/*}"
         if ! { [[ -s $f ]] && sha256sum -c - <<< "$sum"; }; then
-          curl -fsSL --retry 5 --retry-all-errors -o "$f" https://kind.sigs.k8s.io/dl/v0.33.0/kind-linux-amd64
+          # kind.sigs.k8s.io/dl redirects to the GitHub release; try it directly
+          # when the redirector is down.
+          curl -fsSL --retry 5 --retry-all-errors -o "$f" https://kind.sigs.k8s.io/dl/v0.33.0/kind-linux-amd64 ||
+            curl -fsSL --retry 5 --retry-all-errors -o "$f" https://github.com/kubernetes-sigs/kind/releases/download/v0.33.0/kind-linux-amd64
           sha256sum -c - <<< "$sum"
         fi
         sudo install -m 0755 "$f" /usr/local/bin/kind
@@ -138,3 +145,8 @@ runs:
           sha256sum -c - <<< "$sum"
         fi
         sudo tar -xzf "$f" -C /usr/local/bin --strip-components=1 linux-amd64/helm
+    - if: (inputs.kind == 'true' || inputs.helm == 'true') && steps.downloads.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v6
+      with:
+        path: ~/.cache/asservat-build/downloads
+        key: downloads-${{ runner.os }}-kind-v0.33.0-helm-v4.3.0-${{ inputs.kind }}-${{ inputs.helm }}

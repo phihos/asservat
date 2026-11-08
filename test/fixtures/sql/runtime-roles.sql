@@ -390,7 +390,8 @@ GRANT USAGE ON SCHEMA public TO context_case_read_runtime;
 GRANT SELECT ON goose_db_version,context_case_locator,fleet_current_trust TO context_case_read_runtime;
 GRANT UPDATE(installation_id) ON fleet_current_trust TO context_case_read_runtime;
 GRANT SELECT(artifact_id,capture_id,root_id) ON context_catalog TO context_case_read_runtime;
-GRANT SELECT(id,root_id,attempt_id) ON context_capture TO context_case_read_runtime;
+-- expectation_json: ReadContextCaseRoutes reports each route's NativeType (PR 150).
+GRANT SELECT(id,root_id,attempt_id,expectation_json) ON context_capture TO context_case_read_runtime;
 GRANT SELECT(capture_id,root_id,audit_acknowledged_at,copies_digest) ON context_verification TO context_case_read_runtime;
 GRANT SELECT(id,artifact_id,state,copies_digest,effective_expires_at) ON custody_attempt TO context_case_read_runtime;
 
@@ -641,6 +642,9 @@ GRANT SELECT(root_id,capture_id),DELETE ON policy_observation_session TO context
 -- production capture-admit, capture-history and preview cleanup purposes
 -- (public_runtime_role_plan.go).
 GRANT SELECT,INSERT ON recording_save_group TO capture_runtime;
+-- The audited capture admission's replay lookup reads save groups too
+-- (findRecordingGroupRequest, as the production capture-admit purpose).
+GRANT SELECT ON recording_save_group TO capture_operation_admit_runtime;
 GRANT SELECT ON recording_save_group TO context_progress_read_runtime,context_deadline_runtime;
 GRANT UPDATE(id) ON recording_save_group TO context_progress_read_runtime; -- row lock (production hub-metadata-read)
 GRANT SELECT,DELETE ON recording_selection_set TO context_preview_cleanup_runtime;

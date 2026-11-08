@@ -119,12 +119,14 @@ func TestProfileCapacityProducerWithRealPostgres(t *testing.T) {
 		// the original head, including after Fatal or a cancelled test context,
 		// so a shared fixture cannot strand later suites on an older schema.
 		restored := false
+		grants := preserveFixtureGrants(t, ctx, admin)
 		restore := func() error {
 			cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
 			defer cancel()
 			if _, err := provider.UpTo(cleanup, originalHead); err != nil {
 				return err
 			}
+			grants(cleanup)
 			head, err := provider.GetDBVersion(cleanup)
 			if err != nil {
 				return err

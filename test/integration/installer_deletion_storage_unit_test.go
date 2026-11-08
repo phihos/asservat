@@ -24,3 +24,32 @@ func TestInstallerEvidenceBucketPolicyMatchesProviderReadback(t *testing.T) {
 		}
 	})
 }
+
+// A regional install merges its cluster-suffixed history statements into the
+// evidence bucket policy; the deletion fixture accepts exactly those extras.
+func TestInstalledDeletionPolicyAcceptsOnlyRegionalHistoryExtras(t *testing.T) {
+	base := installerEvidenceBucketPolicy("initial-bootstrap-chain-evidence")
+	with := func(statement string) string {
+		return strings.Replace(base, `}],"Version"`, `},`+statement+`],"Version"`, 1)
+	}
+	history := `{"Sid":"AllowHistoryObjects7c4b","Effect":"Allow","Principal":{"AWS":"arn:aws:iam::000000000000:user/history"},"Action":["s3:GetObject"],"Resource":"arn:aws:s3:::initial-bootstrap-chain-evidence/h/*"}`
+	if with(history) == base {
+		t.Fatal("fixture statement not appended")
+	}
+	if got, ok := installedDeletionInstalledPolicy(base, base); !ok {
+		t.Fatal("base policy refused", got)
+	}
+	if got, ok := installedDeletionInstalledPolicy(with(history), base); !ok {
+		t.Fatal("regional history statement refused", got)
+	}
+	for name, policy := range map[string]string{
+		"foreign extra": with(`{"Sid":"AllowEverything","Effect":"Allow","Principal":"*","Action":"s3:*","Resource":"*"}`),
+		"unsuffixed":    with(strings.Replace(history, "AllowHistoryObjects7c4b", "AllowHistoryObjects", 1)),
+		"changed base":  strings.Replace(base, `"Action":"s3:PutObject"`, `"Action":["s3:PutObject"]`, 1),
+		"missing base":  strings.Replace(base, `"Sid":"DenyEvidenceRead"`, `"Sid":"DenyEvidenceReadX"`, 1),
+	} {
+		if _, ok := installedDeletionInstalledPolicy(policy, base); ok {
+			t.Fatal(name, "accepted")
+		}
+	}
+}

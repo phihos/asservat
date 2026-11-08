@@ -327,18 +327,41 @@ func qualifyRawQueryRollback(t *testing.T, ctx context.Context, admin *pgxpool.P
 	if err != nil {
 		t.Fatal(err)
 	}
+	grants := preserveFixtureGrants(t, ctx, admin)
 	defer func() {
 		c, end := context.WithTimeout(context.Background(), 30*time.Second)
 		defer end()
 		if _, err := p.UpTo(c, original); err != nil {
 			t.Error(err)
 		}
+		grants(c)
 	}()
-	if _, err = p.DownTo(ctx, 130); err == nil || !strings.Contains(err.Error(), "retained raw-query grants prevent rollback") {
+	// A newer migration's own retained-state refusal stops the downgrade first
+	// when earlier cases of the shared fixture left such rows (as in
+	// qualifyNativeLengthRollbackRefusal).
+	expected, refusal := int64(131), "retained raw-query grants prevent rollback"
+	for _, newer := range []struct {
+		version       int64
+		exists, cause string
+	}{
+		{134, "SELECT EXISTS(SELECT 1 FROM context_verification WHERE acquisition_started_at IS NOT NULL)", "retained acquisition-window verification prevents rollback"},
+		{135, "SELECT EXISTS(SELECT 1 FROM context_execution WHERE phase='profileUnavailable')", "retained profile-unavailable execution prevents rollback"},
+	} {
+		var retained bool
+		if original >= newer.version {
+			if err = admin.QueryRow(ctx, newer.exists).Scan(&retained); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if retained {
+			expected, refusal = newer.version, newer.cause
+		}
+	}
+	if _, err = p.DownTo(ctx, 130); err == nil || !strings.Contains(err.Error(), refusal) {
 		t.Fatal("retained raw downgrade", err)
 	}
 	head, err := p.GetDBVersion(ctx)
-	if err != nil || head != 131 {
+	if err != nil || head != expected {
 		t.Fatal("raw refusal changed schema", head, err)
 	}
 }

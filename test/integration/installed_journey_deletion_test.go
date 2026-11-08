@@ -107,8 +107,11 @@ WHERE c.root_id=$1 AND c.artifact_id=$2 AND a.state='stored_unpublished'`, root,
 		}
 		fault := &installedDeletionFault{store: store, bucket: evidenceBucket}
 		fault.original, err = fault.read(before)
-		if err != nil || !installedDeletionSamePolicy(fault.original, installerEvidenceBucketPolicy(evidenceBucket)) {
-			t.Fatal("installed deletion: unexpected original fixture policy", err)
+		if err != nil {
+			t.Fatal("installed deletion: original fixture policy unavailable", err)
+		}
+		if unexpected, ok := installedDeletionInstalledPolicy(fault.original, installerEvidenceBucketPolicy(evidenceBucket)); !ok {
+			t.Fatal("installed deletion: unexpected original fixture policy", unexpected)
 		}
 		fault.denied, err = installedDeletionFaultPolicy(fault.original, evidenceBucket, loc)
 		if err != nil {

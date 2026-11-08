@@ -81,7 +81,9 @@ func qualifyContextCase(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 		"DELETE FROM context_case_locator",
 		"UPDATE context_catalog SET published_at=published_at",
 		"UPDATE context_capture SET deadline=deadline",
-		"SELECT expectation_json FROM context_capture LIMIT 0",
+		// SELECT expectation_json is required since PR 150: ReadContextCaseRoutes
+		// reports each route's NativeType from the immutable expectation.
+		"SELECT deadline FROM context_capture LIMIT 0",
 		"SELECT project_context_case_locator()",
 		"SELECT protect_context_case_locator()",
 	} {

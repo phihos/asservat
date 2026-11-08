@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -55,6 +56,38 @@ func installedDeletionFaultPolicy(original, bucket string, loc artifact.Location
 	policy["Statement"], _ = json.Marshal(statements)
 	out, err := json.Marshal(policy)
 	return string(out), err
+}
+
+// installedDeletionInstalledPolicy reports whether the installed evidence
+// bucket policy holds every statement of the installer's evidence policy and
+// otherwise only the per-cluster history statements that a regional install
+// merges into the same bucket (installerRegionalHistoryCredential; their Sids
+// carry the cluster suffix). It returns the unexpected Sids otherwise.
+func installedDeletionInstalledPolicy(actual, evidence string) ([]string, bool) {
+	var a, e struct {
+		Version   string
+		Statement []map[string]any
+	}
+	if json.Unmarshal([]byte(actual), &a) != nil || json.Unmarshal([]byte(evidence), &e) != nil || a.Version != e.Version {
+		return nil, false
+	}
+	var unexpected []string
+	for _, want := range e.Statement {
+		if !slices.ContainsFunc(a.Statement, func(got map[string]any) bool { return reflect.DeepEqual(got, want) }) {
+			unexpected = append(unexpected, fmt.Sprint("missing ", want["Sid"]))
+		}
+	}
+	history := []string{"AllowHistoryObjects", "AllowHistoryInventory", "DenyForeignHistoryInventory", "DenyEvidenceAccess", "DenyHistoryAdministration"}
+	for _, got := range a.Statement {
+		if slices.ContainsFunc(e.Statement, func(want map[string]any) bool { return reflect.DeepEqual(got, want) }) {
+			continue
+		}
+		sid, _ := got["Sid"].(string)
+		if !slices.ContainsFunc(history, func(p string) bool { return strings.HasPrefix(sid, p) && len(sid) > len(p) }) {
+			unexpected = append(unexpected, fmt.Sprint("extra ", got["Sid"]))
+		}
+	}
+	return unexpected, len(unexpected) == 0
 }
 
 func installedDeletionSamePolicy(a, b string) bool {
