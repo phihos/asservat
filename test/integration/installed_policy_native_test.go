@@ -12,7 +12,6 @@ import (
 	"maps"
 	"net"
 	"net/http"
-	"os/exec"
 	"slices"
 	"strings"
 	"testing"
@@ -826,14 +825,14 @@ func installedKillContainer(t *testing.T, ctx context.Context, pod core.Pod) boo
 	if !strings.HasPrefix(node, "asservat-") || cluster == node {
 		t.Fatal("regional Pod not on an owned harness node", node)
 	}
-	label, err := exec.CommandContext(ctx, "docker", "inspect", "--format", "{{ index .Config.Labels \"io.x-k8s.kind.cluster\" }}", node).Output()
+	label, err := installedOutput(ctx, installedDockerTimeout, "docker", "inspect", "--format", "{{ index .Config.Labels \"io.x-k8s.kind.cluster\" }}", node)
 	if err != nil || strings.TrimSpace(string(label)) != cluster {
 		t.Fatal("node container not owned by this harness cluster", err)
 	}
-	ids, err := exec.CommandContext(ctx, "docker", "exec", node, "crictl", "ps", "-q", "--state", "running", "--label", "io.kubernetes.pod.uid="+string(pod.UID), "--name", "app").Output()
+	ids, err := installedOutput(ctx, installedDockerTimeout, "docker", "exec", node, "crictl", "ps", "-q", "--state", "running", "--label", "io.kubernetes.pod.uid="+string(pod.UID), "--name", "app")
 	id := strings.TrimSpace(string(ids))
 	if err != nil || id == "" || strings.Contains(id, "\n") {
 		return false
 	}
-	return exec.CommandContext(ctx, "docker", "exec", node, "crictl", "stop", "--timeout", "0", id).Run() == nil
+	return installedRun(ctx, installedDockerTimeout, "docker", "exec", node, "crictl", "stop", "--timeout", "0", id) == nil
 }

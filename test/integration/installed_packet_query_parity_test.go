@@ -11,7 +11,6 @@ import (
 	"github.com/gopacket/gopacket/pcapgo"
 	"io"
 	"net/netip"
-	"os/exec"
 	"reflect"
 	"strconv"
 	"strings"
@@ -28,7 +27,7 @@ func installedPacketQueryTshark(t *testing.T, ctx context.Context, path string, 
 	for _, f := range fields {
 		args = append(args, "-e", f)
 	}
-	out, err := exec.CommandContext(ctx, "tshark", args...).Output()
+	out, err := installedOutput(ctx, installedLocalToolTimeout, "tshark", args...)
 	if err != nil {
 		t.Fatal("original raw packet query tshark", err)
 	}

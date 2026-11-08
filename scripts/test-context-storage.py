@@ -26,6 +26,7 @@ import urllib.request
 
 from helm_registry import HelmRegistry, REGISTRY, verify_registry_cleanup
 import native_kube_audit
+from pod_log_stream import PodLogStreamer
 
 ROOT = Path(__file__).resolve().parents[1]
 SEAWEED = "chrislusf/seaweedfs@sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d"
@@ -123,7 +124,7 @@ def source_hashes():
     files += [ROOT/"experiments/syscall-argument-budget"/name for name in ("prepare.py", "pins.json", "program.patch", "budget.h")]
     files += [ROOT/"web/package.json", ROOT/"web/package-lock.json", ROOT/"web/scripts/installed-history-browser.mjs", ROOT/"web/scripts/installed-history-response.mjs", ROOT/"web/scripts/installed-profile-comparison-browser.mjs", ROOT/"web/scripts/installed-packet-summary-browser.mjs", ROOT/"web/scripts/installed-packet-query-browser.mjs", ROOT/"web/scripts/installed-syscall-query-browser.mjs", ROOT/"web/scripts/installed-profile-case-proof.mjs", ROOT/"web/src/generated/validate-auth.js", ROOT/"web/src/generated/validate-evidence.js"]
     files += list((ROOT/"cmd").rglob("*.go")) + list((ROOT/"internal").rglob("*.go")) + list((ROOT/"test/integration").rglob("*.go"))
-    files += [ROOT/"scripts/helm_registry.py", ROOT/"scripts/native_kube_audit.py"] + list((ROOT/"charts/asservat").rglob("*"))
+    files += [ROOT/"scripts/helm_registry.py", ROOT/"scripts/native_kube_audit.py", ROOT/"scripts/pod_log_stream.py"] + list((ROOT/"charts/asservat").rglob("*"))
     files = [p for p in files if p.is_file()]
     files += list((ROOT/"internal").rglob("*.json")) + list((ROOT/"migrations").rglob("*.sql")) + list((ROOT/"migrations").rglob("*.go")) + list((ROOT/"test/fixtures").rglob("*.sql")) + list((ROOT/"test/fixtures").rglob("*.go"))
     return {str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(files)}
@@ -427,6 +428,32 @@ def qualification_go_timeout(helm_bootstrap=False, runtime_provider_owner=False,
     return "14m" if runtime_provider_owner else ("12m" if helm_bootstrap else "30m")
 
 
+# Seconds kept free after go test for this harness's failure diagnostics and
+# cleanup (measured: under 10 s after a pass, kubelet journals bounded to 2 x 10 s
+# after a failure) and the job's artifact upload/post steps (measured: <= 10 s).
+CI_JOB_CLEANUP_MARGIN = 60
+
+
+def ci_bounded_go_timeout(static, environ=os.environ, now=None):
+    """Bound go test -timeout by the CI job deadline, so Go's own timeout fires
+    (printing every goroutine) and this harness still records and uploads
+    results before the runner cancels the job. ASSERVAT_CI_JOB_DEADLINE is the
+    job's Unix end time, set by .github/workflows/native.yml; local runs keep
+    the static value."""
+    deadline = environ.get("ASSERVAT_CI_JOB_DEADLINE", "")
+    if not deadline:
+        return static
+    remaining = int(deadline) - int(time.time() if now is None else now) - CI_JOB_CLEANUP_MARGIN
+    if remaining < 60:
+        raise RuntimeError("CI job deadline leaves under one minute for go test")
+    if static:
+        match = re.fullmatch(r"(\d+)m", static)
+        if not match:
+            raise ValueError("static go timeout must be whole minutes")
+        remaining = min(remaining, int(match.group(1)) * 60)
+    return str(remaining) + "s"
+
+
 def qualification_profile_auth(base):
     auth = base.get("ASSERVAT_PROFILE_AUTH", "") or "none"
     if auth not in ("none", "required") or (auth == "required" and (base.get("ASSERVAT_JOURNEY_FOCUS") != "manual-profile" or (base.get("ASSERVAT_PROFILE_TRANSPORT", "") or "http") != "tls" or (base.get("ASSERVAT_PROFILE_VARIANT", "") or "cpu") != "cpu")):
@@ -598,6 +625,7 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
         registry = None
         registry_nodes = []
         build_scratch = None
+        log_streamer = None
         audit_started = False
         audit_nodes = []
         report = {"scope": "component integration, not S-02 release acceptance", "runtimeProviderPairQualification": runtime_provider_pair, "runtimeProviderWorkerQualification": runtime_provider_worker, "runtimeProviderOwnerQualification": runtime_provider_owner, "installerContinuationQualification": installer_continuation, "aggregateGoTimeout": qualification_go_timeout(helm_bootstrap, runtime_provider_owner, installer_continuation, native_traffic_probe), "bootstrapFixtureSeconds": (2700 if installer_continuation else 720 if runtime_provider_owner else 480) if initial_bootstrap_chain else None, "images": {"s3": SEAWEED, "kms": BAO, "kubernetes": NODE, "postgres": POSTGRES}, "clusters": [], "testPattern": test_pattern, "testPackage": test_package, "runtimeObjectRoundTripQualification": runtime_object_roundtrip, "ownerProviderAuthenticationQualification": owner_provider_auth, "initialHandoverQualification": initial_handover, "initialSchemaHandoverQualification": initial_schema_handover, "initialBootstrapChainQualification": initial_bootstrap_chain, "helmBootstrapQualification": helm_bootstrap and not helm_cluster, "helmClusterQualification": helm_cluster, "regionalContextStartQualification": regional_context_start, "fixtureMigratesDatabase": not (initial_schema_handover or initial_bootstrap_chain or helm_bootstrap)}
@@ -989,9 +1017,6 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
             aggregate_timeout = qualification_go_timeout(helm_bootstrap, runtime_provider_owner, installer_continuation, native_traffic_probe)
             if os.environ.get("ASSERVAT_JOURNEY_HOLD") and installer_continuation:
                 aggregate_timeout = "150m"  # local debugging hold only
-            if aggregate_timeout:
-                command += ["-timeout", aggregate_timeout]
-            command += [test_package]
             report["journeyFocus"] = os.environ.get("ASSERVAT_JOURNEY_FOCUS", "")
             if native_paced:
                 for index, cluster in enumerate(fixture["clusters"]):
@@ -1000,11 +1025,27 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
                     run(["kubectl", "--kubeconfig", cluster["config"], "--request-timeout=5s", "get", "--raw", "/readyz"])
                 audit_started = True
             compile_ahead.wait()
+            # Bound by the CI job deadline only now, when go test starts.
+            aggregate_timeout = ci_bounded_go_timeout(aggregate_timeout)
+            report["effectiveGoTimeout"] = aggregate_timeout
+            if aggregate_timeout:
+                command += ["-timeout", aggregate_timeout]
+            command += [test_package]
             phase("goTestStart")
             # Each output line also goes, with its elapsed seconds, to a timing
             # log, so slow phases are measured rather than guessed.
-            exit_code = record_go_output(command, env, ROOT/"test/results", report)
-            phase("goTestEnd")
+            if installer_continuation or helm_bootstrap:
+                # Pod logs reach test/results as they are written: Go cleanup
+                # collection is lost when a timeout ends the test process.
+                shutil.rmtree(ROOT/"test/results/pod-logs", ignore_errors=True)
+                log_streamer = PodLogStreamer([(name, work/("kube-"+str(index))) for index, name in enumerate(clusters)], ROOT/"test/results/pod-logs").start()
+            try:
+                exit_code = record_go_output(command, env, ROOT/"test/results", report)
+                phase("goTestEnd")
+            finally:
+                if log_streamer is not None:
+                    report["podLogStream"] = log_streamer.stop()
+                    log_streamer = None
             report["goTestExit"] = exit_code
             raw_output = (ROOT/"test/results/context-storage.log").read_bytes()
             try:
@@ -1060,7 +1101,7 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
                 with (ROOT/"test/results/context-storage-kubelet.log").open("w") as diagnostics:
                     for name in clusters:
                         diagnostics.write("Owned node: "+name+"-control-plane\n")
-                        result = subprocess.run(["docker", "exec", name+"-control-plane", "journalctl", "--unit", "kubelet", "--since", "-5min", "--no-pager", "-n", "80"], capture_output=True, text=True, timeout=15)
+                        result = subprocess.run(["docker", "exec", name+"-control-plane", "journalctl", "--unit", "kubelet", "--since", "-5min", "--no-pager", "-n", "80"], capture_output=True, text=True, timeout=10)
                         diagnostics.write(result.stdout[-32768:])
             print("Component test exit:", exit_code, flush=True)
         except subprocess.CalledProcessError as exc:

@@ -76,7 +76,7 @@ func TestInstalledPolicyRecordingNativeFieldCLI(t *testing.T) {
 			if err = os.WriteFile(file, native, 0600); err != nil {
 				t.Fatal(err)
 			}
-			out, err := exec.CommandContext(t.Context(), "tshark", policyRecordingFieldArgs(file)...).Output()
+			out, err := installedOutput(t.Context(), installedLocalToolTimeout, "tshark", policyRecordingFieldArgs(file)...)
 			if err != nil {
 				t.Fatal("actual offline CLI", err)
 			}

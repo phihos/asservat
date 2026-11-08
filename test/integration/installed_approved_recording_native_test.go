@@ -16,7 +16,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -229,25 +228,29 @@ func installApprovedRecordingCollector(t *testing.T, ctx context.Context, api ku
 	if err := os.WriteFile(path, raw, 0600); err != nil {
 		t.Fatal(err)
 	}
-	render := exec.CommandContext(ctx, "helm", approvedRecordingCollectorRenderArgs(connectorNamespace, path)...)
+	// Hang bounds only: a local render, an apply and a 90 s rollout wait.
+	render, rendered := installedBoundedCommand(ctx, 2*time.Minute, "helm", approvedRecordingCollectorRenderArgs(connectorNamespace, path)...)
 	manifest, err := render.Output()
+	rendered()
 	if err != nil {
 		t.Fatal("official collector chart", err)
 	}
-	apply := exec.CommandContext(ctx, "kubectl", "--kubeconfig", config, "apply", "-f", "-")
+	apply, applied := installedBoundedCommand(ctx, 2*time.Minute, "kubectl", "--kubeconfig", config, "apply", "-f", "-")
+	defer applied()
 	apply.Stdin = bytes.NewReader(manifest)
 	if out, err := apply.CombinedOutput(); err != nil {
 		t.Fatalf("collector apply: %v %s", err, out)
 	}
-	roll := exec.CommandContext(ctx, "kubectl", "--kubeconfig", config, "-n", "asservat-collector", "rollout", "status", "daemonset/asservat-node", "--timeout=90s")
+	roll, rolled := installedBoundedCommand(ctx, 3*time.Minute, "kubectl", "--kubeconfig", config, "-n", "asservat-collector", "rollout", "status", "daemonset/asservat-node", "--timeout=90s")
+	defer rolled()
 	if out, err := roll.CombinedOutput(); err != nil {
 		t.Fatalf("collector readiness: %v %s", err, out)
 	}
 	t.Cleanup(func() {
 		if t.Failed() {
-			c, end := context.WithTimeout(context.Background(), 10*time.Second)
+			logs, end := installedBoundedCommand(context.Background(), 10*time.Second, "kubectl", "--kubeconfig", config, "-n", "asservat-collector", "logs", "-l", "app.kubernetes.io/name=asservat-node", "--tail=100", "--prefix")
 			defer end()
-			out, _ := exec.CommandContext(c, "kubectl", "--kubeconfig", config, "-n", "asservat-collector", "logs", "-l", "app.kubernetes.io/name=asservat-node", "--tail=100", "--prefix").CombinedOutput()
+			out, _ := logs.CombinedOutput()
 			t.Logf("collector diagnostics: %s", out)
 		}
 	})
@@ -645,7 +648,13 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 			t.Fatal("exact peer traffic target is unavailable", err)
 		}
 		go func() { peerRuns <- manualPeersTraffic(traffic, regionalConfig, namespace, pod.Status.PodIP) }()
-		defer func() { endTraffic(); t.Logf("peer client completed %d bounded traffic runs", <-peerRuns) }()
+		defer func() {
+			endTraffic()
+			// A run is bounded at one minute plus the command wait delay.
+			if runs, ok := installedAwait(t, "peer traffic client", peerRuns, 90*time.Second); ok {
+				t.Logf("peer client completed %d bounded traffic runs", runs)
+			}
+		}()
 	}
 	submitted := time.Now()
 	var receipt struct {
@@ -1196,7 +1205,7 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 	if err := os.WriteFile(path, native, 0600); err != nil {
 		t.Fatal(err)
 	}
-	out, err := exec.CommandContext(ctx, "tshark", "-r", path, "-T", "fields", "-e", "tcp.port").Output()
+	out, err := installedOutput(ctx, installedLocalToolTimeout, "tshark", "-r", path, "-T", "fields", "-e", "tcp.port")
 	if err != nil {
 		t.Fatal("native PCAPNG did not open in tshark", err)
 	}
@@ -1210,12 +1219,12 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 		}
 	}
 	if measurement != nil {
-		stats, err := exec.CommandContext(ctx, "capinfos", "-M", "-I", path).Output()
+		stats, err := installedOutput(ctx, installedLocalToolTimeout, "capinfos", "-M", "-I", path)
 		if err != nil || len(stats) == 0 || len(stats) > 65536 {
 			t.Fatal("native PCAPNG interface statistics unavailable", err)
 		}
 		measurement.PCAPInterfaceStatistics = string(stats)
-		timestamps, err := exec.CommandContext(ctx, "tshark", "-r", path, "-T", "fields", "-e", "frame.time_epoch").Output()
+		timestamps, err := installedOutput(ctx, installedLocalToolTimeout, "tshark", "-r", path, "-T", "fields", "-e", "frame.time_epoch")
 		if err != nil || len(timestamps) > 16<<20 {
 			t.Fatal("native packet timestamps unavailable", err)
 		}

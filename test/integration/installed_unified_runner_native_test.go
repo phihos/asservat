@@ -9,7 +9,6 @@ import (
 	"encoding/pem"
 	"errors"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -329,16 +328,16 @@ func installedUnifiedStop(t *testing.T, ctx context.Context, pod *core.Pod, owne
 	if node != ownedNode || !strings.HasPrefix(node, "asservat-") || cluster == node {
 		t.Fatal("unified runner is not on an owned harness node")
 	}
-	label, err := exec.CommandContext(ctx, "docker", "inspect", "--format", "{{ index .Config.Labels \"io.x-k8s.kind.cluster\" }}", node).Output()
+	label, err := installedOutput(ctx, installedDockerTimeout, "docker", "inspect", "--format", "{{ index .Config.Labels \"io.x-k8s.kind.cluster\" }}", node)
 	if err != nil || strings.TrimSpace(string(label)) != cluster {
 		t.Fatal("runner node ownership differs", err)
 	}
-	ids, err := exec.CommandContext(ctx, "docker", "exec", node, "crictl", "ps", "-q", "--no-trunc", "--label", "io.kubernetes.pod.uid="+string(pod.UID), "--name", "continue").Output()
+	ids, err := installedOutput(ctx, installedDockerTimeout, "docker", "exec", node, "crictl", "ps", "-q", "--no-trunc", "--label", "io.kubernetes.pod.uid="+string(pod.UID), "--name", "continue")
 	id := strings.TrimSpace(string(ids))
 	if err != nil || id == "" || strings.Contains(id, "\n") || pod.Status.ContainerStatuses[0].ContainerID != "containerd://"+id {
 		t.Fatal("exact original continuation container missing", err)
 	}
-	if err = exec.CommandContext(ctx, "docker", "exec", node, "crictl", "stop", id).Run(); err != nil {
+	if err = installedRun(ctx, installedDockerTimeout, "docker", "exec", node, "crictl", "stop", id); err != nil {
 		t.Fatal("owned continuation interruption", err)
 	}
 }

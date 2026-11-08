@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
@@ -104,11 +103,13 @@ func createManualPeersClient(t *testing.T, ctx context.Context, region kubernete
 func manualPeersTraffic(ctx context.Context, regionalConfig, namespace, targetIP string) (runs int) {
 	for ctx.Err() == nil {
 		deadline := time.Now().Add(8 * time.Second).UTC().Format(time.RFC3339Nano)
-		command := exec.CommandContext(ctx, "kubectl", "--kubeconfig", regionalConfig, "-n", namespace, "exec", "-i", manualPeersClient, "--", "/provider-proxy", "traffic-client", targetIP, deadline)
+		// One run takes about eight seconds; the minute bounds a stuck exec stream.
+		command, done := installedBoundedCommand(ctx, time.Minute, "kubectl", "--kubeconfig", regionalConfig, "-n", namespace, "exec", "-i", manualPeersClient, "--", "/provider-proxy", "traffic-client", targetIP, deadline)
 		// Wait closes the held-open pipe after the client exits.
 		if _, err := command.StdinPipe(); err == nil && command.Start() == nil && command.Wait() == nil {
 			runs++
 		}
+		done()
 		if installedJourneyPause(ctx, 500*time.Millisecond) != nil {
 			return runs
 		}
@@ -166,7 +167,7 @@ func qualifyManualPeersPCAP(t *testing.T, ctx context.Context, native []byte, pe
 	if strings.Contains(peer, ":") {
 		family = "ipv6"
 	}
-	out, err := exec.CommandContext(ctx, "tshark", "-r", path, "-T", "fields", "-e", family+".src", "-e", family+".dst", "-e", "tcp.port").Output()
+	out, err := installedOutput(ctx, installedLocalToolTimeout, "tshark", "-r", path, "-T", "fields", "-e", family+".src", "-e", family+".dst", "-e", "tcp.port")
 	if err != nil {
 		t.Fatal("peer PCAPNG did not open in tshark", err)
 	}
@@ -174,7 +175,7 @@ func qualifyManualPeersPCAP(t *testing.T, ctx context.Context, native []byte, pe
 	if err != nil {
 		t.Fatal("peer PCAPNG", err)
 	}
-	others, err := exec.CommandContext(ctx, "tshark", "-r", path, "-Y", "!("+family+".addr=="+peer+")").Output()
+	others, err := installedOutput(ctx, installedLocalToolTimeout, "tshark", "-r", path, "-Y", "!("+family+".addr=="+peer+")")
 	if err != nil {
 		t.Fatal("peer PCAPNG display filter", err)
 	}

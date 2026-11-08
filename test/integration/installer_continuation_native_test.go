@@ -18,9 +18,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"runtime/pprof"
 	"sort"
 	"strconv"
 	"strings"
@@ -519,7 +517,6 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 			installedContextStandbyWindow(t, ctx, api, desired.TargetNamespace, prefix+"-owner")
 		}
 		t.Logf("installed focus %q starts (fast fixture %v)", installedJourneyFocus(), installedFastFixture())
-		installedHangWatchdog(t)
 		installedPublisherSettled = func(c context.Context) {
 			waitInstalledPublisherSettled(t, c, api, desired.TargetNamespace, installation)
 		}
@@ -858,7 +855,8 @@ func installerEvidenceCredential(t *testing.T, ctx context.Context, p *initialRu
 	key, secret := "regional-evidence-"+cluster[:8], "regional-evidence-secret-"+cluster[:8]
 	shell := "s3.configure -user=administrator -access_key=synthetic-only -secret_key=synthetic-only-secret -actions=Admin,Read,Write,List -apply\n" +
 		"s3.configure -user=regional-evidence-" + cluster[:8] + " -access_key=" + key + " -secret_key=" + secret + " -actions=Write:" + bucket + "/v1/" + cluster + "/* -apply\n"
-	command := exec.CommandContext(ctx, "docker", "exec", "-i", native.Container, "/usr/bin/weed", "shell", "-master=localhost:9333", "-filer=localhost:8888")
+	command, commandDone := installedBoundedCommand(ctx, installedDockerTimeout, "docker", "exec", "-i", native.Container, "/usr/bin/weed", "shell", "-master=localhost:9333", "-filer=localhost:8888")
+	defer commandDone()
 	command.Stdin = strings.NewReader(shell)
 	if output, e := command.CombinedOutput(); e != nil {
 		clear(output)
@@ -891,7 +889,7 @@ func installerOperatorStorage(t *testing.T, ctx context.Context, p *initialRunti
 	}
 	clear(raw)
 	runID := strings.TrimSuffix(strings.TrimPrefix(native.Container, "asservat-"), "-s3")
-	label, err := exec.CommandContext(ctx, "docker", "inspect", "--format", "{{ index .Config.Labels \"asservat.test\" }}", native.Container).Output()
+	label, err := installedOutput(ctx, installedDockerTimeout, "docker", "inspect", "--format", "{{ index .Config.Labels \"asservat.test\" }}", native.Container)
 	if err != nil || strings.TrimSpace(string(label)) != runID || len(actions) == 0 {
 		t.Fatal("refuse non-owned S3 administration", err)
 	}
@@ -899,7 +897,8 @@ func installerOperatorStorage(t *testing.T, ctx context.Context, p *initialRunti
 	key, secret := user+"-continuation", user+"-continuation-secret"
 	shell := "s3.configure -user=administrator -access_key=synthetic-only -secret_key=synthetic-only-secret -actions=Admin,Read,Write,List -apply\n" +
 		"s3.configure -user=" + user + " -access_key=" + key + " -secret_key=" + secret + " -actions=" + strings.Join(actions, ",") + " -apply\n"
-	command := exec.CommandContext(ctx, "docker", "exec", "-i", native.Container, "/usr/bin/weed", "shell", "-master=localhost:9333", "-filer=localhost:8888")
+	command, commandDone := installedBoundedCommand(ctx, installedDockerTimeout, "docker", "exec", "-i", native.Container, "/usr/bin/weed", "shell", "-master=localhost:9333", "-filer=localhost:8888")
+	defer commandDone()
 	command.Stdin = strings.NewReader(shell)
 	if output, e := command.CombinedOutput(); e != nil {
 		clear(output)
@@ -1387,16 +1386,16 @@ func installerCrashHubWorker(t *testing.T, ctx context.Context, api kubernetes.I
 	if !strings.HasPrefix(node, "asservat-") || cluster == node {
 		t.Fatal("hub-worker not on an owned harness node", node)
 	}
-	label, err := exec.CommandContext(ctx, "docker", "inspect", "--format", "{{ index .Config.Labels \"io.x-k8s.kind.cluster\" }}", node).Output()
+	label, err := installedOutput(ctx, installedDockerTimeout, "docker", "inspect", "--format", "{{ index .Config.Labels \"io.x-k8s.kind.cluster\" }}", node)
 	if err != nil || strings.TrimSpace(string(label)) != cluster {
 		t.Fatal("node container not owned by this harness cluster", err)
 	}
-	ids, err := exec.CommandContext(ctx, "docker", "exec", node, "crictl", "ps", "-q", "--label", "io.kubernetes.pod.uid="+string(pod.UID), "--name", pod.Status.ContainerStatuses[0].Name).Output()
+	ids, err := installedOutput(ctx, installedDockerTimeout, "docker", "exec", node, "crictl", "ps", "-q", "--label", "io.kubernetes.pod.uid="+string(pod.UID), "--name", pod.Status.ContainerStatuses[0].Name)
 	id := strings.TrimSpace(string(ids))
 	if err != nil || id == "" || strings.Contains(id, "\n") {
 		t.Fatal("hub-worker container", err)
 	}
-	if err = exec.CommandContext(ctx, "docker", "exec", node, "crictl", "stop", id).Run(); err != nil {
+	if err = installedRun(ctx, installedDockerTimeout, "docker", "exec", node, "crictl", "stop", id); err != nil {
 		t.Fatal("hub-worker container stop", err)
 	}
 	for until := time.Now().Add(2 * time.Minute); ; {
@@ -1564,7 +1563,7 @@ func installerOwnerExposed(t *testing.T, ctx context.Context, api kubernetes.Int
 func installedPostgresRestart(t *testing.T, ctx context.Context, admin *pgxpool.Pool, container, installation string) {
 	t.Helper()
 	ip := func() string {
-		out, err := exec.CommandContext(ctx, "docker", "inspect", "--format", "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}", container).Output()
+		out, err := installedOutput(ctx, installedDockerTimeout, "docker", "inspect", "--format", "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}", container)
 		if err != nil {
 			t.Fatal("PostgreSQL container address", err)
 		}
@@ -1574,7 +1573,7 @@ func installedPostgresRestart(t *testing.T, ctx context.Context, admin *pgxpool.
 	if container == "" || !strings.HasPrefix(container, "asservat-") || before == "" {
 		t.Fatal("owned PostgreSQL container unknown", container)
 	}
-	if out, err := exec.CommandContext(ctx, "docker", "restart", container).CombinedOutput(); err != nil {
+	if out, err := installedCombinedOutput(ctx, installedDockerTimeout, "docker", "restart", container); err != nil {
 		t.Fatal("PostgreSQL restart", err, string(out))
 	}
 	if after := ip(); after != before {
@@ -1734,35 +1733,4 @@ func waitInstalledPublisherSettled(t *testing.T, ctx context.Context, api kubern
 			return
 		}
 	}
-}
-
-// installedHangWatchdog prints every goroutine stack when a failed test has not
-// finished 90 s later: a stuck cleanup would otherwise run silently into the CI
-// job limit and lose all logs.
-func installedHangWatchdog(t *testing.T) {
-	done := make(chan struct{})
-	t.Cleanup(func() { close(done) })
-	go func() {
-		tick := time.NewTicker(time.Second)
-		defer tick.Stop()
-		var failedAt time.Time
-		started := time.Now()
-		for {
-			select {
-			case <-done:
-				return
-			case now := <-tick.C:
-				if failedAt.IsZero() && t.Failed() {
-					failedAt = now
-				}
-				// A live focus normally ends within three minutes; past four
-				// something waits without a bound even if nothing failed.
-				if !failedAt.IsZero() && now.Sub(failedAt) > 90*time.Second || now.Sub(started) > 4*time.Minute {
-					fmt.Fprintln(os.Stderr, "installed hang watchdog: test still running (failed or past 4 min); goroutines:")
-					_ = pprof.Lookup("goroutine").WriteTo(os.Stderr, 2)
-					return
-				}
-			}
-		}
-	}()
 }

@@ -563,7 +563,13 @@ func startInstalledLiveBrowser(t *testing.T, ctx context.Context, b *installedBr
 		close(p.events)
 		p.done <- cmd.Wait()
 	}()
-	t.Cleanup(func() { p.cancel(); _ = p.in.Close(); p.once.Do(func() { <-p.done }) })
+	// Cancel kills the process group; WaitDelay then closes held pipes, so the
+	// join normally ends within seconds. The bound reports a stuck reader.
+	t.Cleanup(func() {
+		p.cancel()
+		_ = p.in.Close()
+		p.once.Do(func() { installedAwait(t, "installed live browser", p.done, 30*time.Second) })
+	})
 	p.send(map[string]any{"mode": "installed-live", "origin": b.base, "proxy": installedHistoryBrowserTunnel(t, ctx, b.base, address), "cookies": cookies, "target": target})
 	clear(cookies)
 	var ready struct {
@@ -621,7 +627,7 @@ func (p *installedLiveBrowser) close() {
 		if p.t.Failed() {
 			// No finish handshake after a failure: the script may be stuck.
 			p.cancel()
-			<-p.done
+			installedAwait(p.t, "installed live browser", p.done, 30*time.Second)
 			return
 		}
 		p.send(map[string]any{"kind": "finish"})
@@ -643,7 +649,7 @@ func (p *installedLiveBrowser) close() {
 			p.cancel()
 		case <-time.After(15 * time.Second):
 			p.cancel()
-			<-p.done
+			installedAwait(p.t, "installed live browser", p.done, 30*time.Second)
 		}
 	})
 }

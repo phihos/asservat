@@ -202,7 +202,7 @@ func qualifyInstalledRecorderHistory(t *testing.T, ctx context.Context, browser 
 	if err := os.WriteFile(path, native, 0600); err != nil {
 		t.Fatal(err)
 	}
-	output, err := exec.CommandContext(ctx, "tshark", "-r", path, "-T", "fields", "-e", "frame.time_epoch", "-e", "tcp.dstport").Output()
+	output, err := installedOutput(ctx, installedLocalToolTimeout, "tshark", "-r", path, "-T", "fields", "-e", "frame.time_epoch", "-e", "tcp.dstport")
 	if err != nil {
 		t.Fatal("repeated native PCAPNG unreadable", err)
 	}

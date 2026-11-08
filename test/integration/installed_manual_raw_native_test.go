@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"strconv"
 	"strings"
 	"testing"
@@ -188,7 +187,7 @@ func qualifyManualRawPCAP(t *testing.T, ctx context.Context, native []byte) manu
 	if err := os.WriteFile(path, native, 0600); err != nil {
 		t.Fatal(err)
 	}
-	out, err := exec.CommandContext(ctx, "tshark", "-r", path, "-T", "fields", "-e", "tcp.port", "-e", "frame.cap_len", "-e", "frame.len").Output()
+	out, err := installedOutput(ctx, installedLocalToolTimeout, "tshark", "-r", path, "-T", "fields", "-e", "tcp.port", "-e", "frame.cap_len", "-e", "frame.len")
 	if err != nil {
 		t.Fatal("raw PCAPNG did not open in tshark", err)
 	}

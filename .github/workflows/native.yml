@@ -43,6 +43,11 @@ jobs:
         suite: ${{ fromJSON(needs.select.outputs.suites) }}
     name: ${{ matrix.suite }}
     steps:
+      # The job's end (timeout-minutes above, less 15 s already spent setting up
+      # the job). The harness bounds go test -timeout by it, so Go prints its
+      # stacks and the results upload before the runner cancels the job.
+      - name: Job deadline
+        run: echo "ASSERVAT_CI_JOB_DEADLINE=$(( $(date +%s) + 20 * 60 - 15 ))" >> "$GITHUB_ENV"
       - uses: actions/checkout@v7
         with:
           filter: "blob:none"

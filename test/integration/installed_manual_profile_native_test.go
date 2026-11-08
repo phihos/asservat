@@ -6,7 +6,6 @@ import (
 	"errors"
 	"net/url"
 	"os"
-	"os/exec"
 	"reflect"
 	"strings"
 	"testing"
@@ -289,7 +288,7 @@ func qualifyManualProfileNative(t *testing.T, ctx context.Context, native []byte
 		args = append(args, "-sample_index=cpu", "-nodecount=20", "-nodefraction=0", "-compact_labels=true")
 		wantFunction = "synthetic."
 	}
-	out, err := exec.CommandContext(ctx, "go", append(args, path)...).CombinedOutput()
+	out, err := installedCombinedOutput(ctx, installedLocalToolTimeout, "go", append(args, path)...)
 	if err != nil || !strings.Contains(string(out), wantFunction) {
 		diagnostic := out
 		if heavy && len(diagnostic) > 16<<10 {

@@ -13,7 +13,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -580,7 +579,7 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 		} else {
 			var incidentFile string
 			incidentNative, incidentFile = fetchNative(published(incidentID), "native-ongoing-incident-download", "ongoing-incident.pcapng")
-			incidentOut, err := exec.CommandContext(ctx, "tshark", ongoingSaveFieldArgs(incidentFile)...).Output()
+			incidentOut, err := installedOutput(ctx, installedLocalToolTimeout, "tshark", ongoingSaveFieldArgs(incidentFile)...)
 			if err != nil {
 				t.Fatal("offline incident Wireshark read", err)
 			}
@@ -640,7 +639,7 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 	caseID := published(captureID)
 	native, file := fetchNative(caseID, "native-ongoing-pcap-download", "ongoing-save.pcapng")
 	digest := sha256.Sum256(native)
-	out, err := exec.CommandContext(ctx, "tshark", ongoingSaveFieldArgs(file)...).Output()
+	out, err := installedOutput(ctx, installedLocalToolTimeout, "tshark", ongoingSaveFieldArgs(file)...)
 	if err != nil {
 		t.Fatal("offline native Wireshark read", err)
 	}
