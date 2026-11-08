@@ -102,20 +102,39 @@ def write_environment_report(path, report):
     temporary.replace(path)
 
 
-def record_go_output(command, env, results, report):
+def record_go_output(command, env, results, report, name="context-storage"):
     """Retain the original child output and elapsed line times."""
     report["harnessState"] = "running"
-    write_environment_report(results/"context-storage-environment.json", report)
+    write_environment_report(results/(name+"-environment.json"), report)
     began = time.monotonic()
     # SIGTERM/hard runner cancellation may bypass finally. Persist every
     # received line now; a partial file never supplies a terminal verdict.
-    with (results/"context-storage.log").open("wb", buffering=0) as log, (results/"context-storage-timing.log").open("wb", buffering=0) as timing:
+    with (results/(name+".log")).open("wb", buffering=0) as log, (results/(name+"-timing.log")).open("wb", buffering=0) as timing:
         process = subprocess.Popen(command, cwd=ROOT, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         with process.stdout:
             for line in process.stdout:
                 log.write(line)
                 timing.write(("%8.1f " % (time.monotonic() - began)).encode() + line)
         return process.wait()
+
+
+def build_hub_binaries(image_dir, build_env):
+    # ADR-243 decision 4: the product binary links the pinned static libpcap
+    # filter compiler (cgo, tags libpcap,netgo,osusergo, fully static for the
+    # FROM-scratch image), built as make pcap-check builds it. The fixture
+    # helpers stay cgo-free.
+    subprocess.run(["make", "--no-print-directory", "hub-binary", "HUB_BINARY="+str(image_dir/"asservat"), "ASSERVAT_BUILD_TMP="+build_env["TMPDIR"]], cwd=ROOT, env=build_env, check=True)
+    subprocess.run(["go", "build", "-trimpath", "-buildvcs=false", "-o", str(image_dir/"provider-proxy"), "./test/fixtures/provider-proxy/main.go"], cwd=ROOT, env=build_env, check=True)
+
+
+def build_console(image_dir, build_env):
+    """Build the image-owned console package (ADR-194); returns its digest."""
+    subprocess.run(["npm", "exec", "--offline", "--", "vite", "build", "--outDir", str(image_dir/"console"), "--emptyOutDir", "--logLevel", "warn"], cwd=ROOT/"web", env=build_env, check=True)
+    digest = hashlib.sha256()
+    for path in sorted((image_dir/"console").rglob("*")):
+        if path.is_file():
+            digest.update(str(path.relative_to(image_dir/"console")).encode() + b"\0" + path.read_bytes())
+    return digest.hexdigest()
 
 
 def source_hashes():
@@ -218,6 +237,9 @@ def qualification_selection(test_pattern, initial_handover, initial_schema_hando
 def qualification_environment(base, fixture_path, work, initial_handover, initial_schema_handover, initial_bootstrap_chain=False, helm_bootstrap=False, regional_context_start=None, runtime_object_roundtrip=False, owner_provider_auth=False, runtime_provider_pair=False, runtime_provider_worker=False, runtime_provider_owner=False, installer_continuation=False):
     env = base.copy()
     env["ASSERVAT_CONTEXT_FIXTURES"] = str(fixture_path)
+    # Development-only keep/rerun switches never leak from the caller's shell.
+    for key in DEVELOPMENT_ENVIRONMENT:
+        env.pop(key, None)
     for key in ("ASSERVAT_INITIAL_HANDOVER_NATIVE", "ASSERVAT_INITIAL_SCHEMA_HANDOVER_NATIVE", "ASSERVAT_INITIAL_BOOTSTRAP_CHAIN_NATIVE", "ASSERVAT_HELM_BOOTSTRAP_NATIVE", "ASSERVAT_CONTEXT_REGIONAL_START_NATIVE", "ASSERVAT_RUNTIME_OBJECT_ROUNDTRIP_NATIVE", "ASSERVAT_OWNER_PROVIDER_AUTH_NATIVE"):
         env.pop(key, None)
     if initial_handover:
@@ -567,8 +589,12 @@ def collect_profile_containment_artifacts(work, results):
     return {"directory": str(destination), "files": collected, "scope": "explicit terminal collection from the private harness directory, including failed runs"}
 
 
-def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=False, initial_bootstrap_chain=False, helm_bootstrap=False, regional_context_start=None, runtime_object_roundtrip=False, owner_provider_auth=False, runtime_provider_pair=False, runtime_provider_worker=False, runtime_provider_owner=False, installer_continuation=False, helm_cluster=False, keep_on_failure=False):
+def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=False, initial_bootstrap_chain=False, helm_bootstrap=False, regional_context_start=None, runtime_object_roundtrip=False, owner_provider_auth=False, runtime_provider_pair=False, runtime_provider_worker=False, runtime_provider_owner=False, installer_continuation=False, helm_cluster=False, keep_on_failure=False, keep_installed=False):
     focus = os.environ.get("ASSERVAT_JOURNEY_FOCUS")
+    if keep_installed:
+        refuse_development_mode_in_ci("--keep-installed")
+        if not (installer_continuation and runtime_provider_pair and initial_bootstrap_chain) or focus not in RERUN_FOCUSES:
+            raise ValueError("--keep-installed needs the installer continuation and a rerun focus: " + ", ".join(RERUN_FOCUSES))
     profile_auth = qualification_profile_auth(os.environ)
     profile_transport = qualification_profile_transport(os.environ)
     if profile_transport == "tls" and not installer_continuation:
@@ -629,6 +655,10 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
         audit_started = False
         audit_nodes = []
         report = {"scope": "component integration, not S-02 release acceptance", "runtimeProviderPairQualification": runtime_provider_pair, "runtimeProviderWorkerQualification": runtime_provider_worker, "runtimeProviderOwnerQualification": runtime_provider_owner, "installerContinuationQualification": installer_continuation, "aggregateGoTimeout": qualification_go_timeout(helm_bootstrap, runtime_provider_owner, installer_continuation, native_traffic_probe), "bootstrapFixtureSeconds": (2700 if installer_continuation else 720 if runtime_provider_owner else 480) if initial_bootstrap_chain else None, "images": {"s3": SEAWEED, "kms": BAO, "kubernetes": NODE, "postgres": POSTGRES}, "clusters": [], "testPattern": test_pattern, "testPackage": test_package, "runtimeObjectRoundTripQualification": runtime_object_roundtrip, "ownerProviderAuthenticationQualification": owner_provider_auth, "initialHandoverQualification": initial_handover, "initialSchemaHandoverQualification": initial_schema_handover, "initialBootstrapChainQualification": initial_bootstrap_chain, "helmBootstrapQualification": helm_bootstrap and not helm_cluster, "helmClusterQualification": helm_cluster, "regionalContextStartQualification": regional_context_start, "fixtureMigratesDatabase": not (initial_schema_handover or initial_bootstrap_chain or helm_bootstrap)}
+        if keep_installed:
+            report["qualification"] = False
+            report["developmentMode"] = "keep-installed: the installation is left running for --rerun-installed; never a qualification"
+        state_path = work/"installed-state.json"
         exit_code = 1
         # Harness phase end times in seconds since start, so slow setup is
         # measured (report "phaseSeconds"; the Go test has its own timing log).
@@ -675,12 +705,7 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
                 installed_budget = json.loads(subprocess.check_output(
                     ["go", "run", "./test/fixtures/installed-sql-budget/main.go"], cwd=ROOT, env=build_env, text=True))
                 report["postgresqlConnectionBudget"] = installed_budget
-            # ADR-243 decision 4: the product binary links the pinned static
-            # libpcap filter compiler (cgo, tags libpcap,netgo,osusergo, fully
-            # static for the FROM-scratch image), built as make pcap-check
-            # builds it. The fixture helpers stay cgo-free.
-            subprocess.run(["make", "--no-print-directory", "hub-binary", "HUB_BINARY="+str(image_dir/"asservat"), "ASSERVAT_BUILD_TMP="+build_env["TMPDIR"]], cwd=ROOT, env=build_env, check=True)
-            subprocess.run(["go", "build", "-trimpath", "-buildvcs=false", "-o", str(image_dir/"provider-proxy"), "./test/fixtures/provider-proxy/main.go"], cwd=ROOT, env=build_env, check=True)
+            build_hub_binaries(image_dir, build_env)
             helper_copy = ""
             containment_fixture = None
             if profile_variant == "accepted-heavy":
@@ -698,13 +723,8 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
             if installer_continuation:
                 # ADR-194: the promoted hub-api serves the image-owned console
                 # package; build it fresh into the image, never from web/dist.
-                subprocess.run(["npm", "exec", "--offline", "--", "vite", "build", "--outDir", str(image_dir/"console"), "--emptyOutDir", "--logLevel", "warn"], cwd=ROOT/"web", env=build_env, check=True)
+                report["consolePackageSHA256"] = build_console(image_dir, build_env)
                 helper_copy += "COPY console /usr/share/asservat/console\n"
-                digest = hashlib.sha256()
-                for path in sorted((image_dir/"console").rglob("*")):
-                    if path.is_file():
-                        digest.update(str(path.relative_to(image_dir/"console")).encode() + b"\0" + path.read_bytes())
-                report["consolePackageSHA256"] = digest.hexdigest()
             (image_dir/"Dockerfile").write_text("FROM scratch\nCOPY asservat /asservat\nCOPY provider-proxy /provider-proxy\n"+helper_copy+"USER 65532:65532\n")
             worker_tag = "asservat-context-worker:"+run_id
             run(["docker", "build", "--network=none", "--label", "asservat.test="+run_id, "-t", worker_tag, str(image_dir)])
@@ -1007,6 +1027,9 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
                 env["TMPDIR"] = str(build_scratch)
             if keep_on_failure:
                 env["ASSERVAT_KEEP_ON_FAILURE"] = "1"
+            if keep_installed:
+                env["ASSERVAT_INSTALLED_KEEP"] = "1"
+                env["ASSERVAT_INSTALLED_STATE"] = str(state_path)
 
             # The installed journey's test process is a client waiting on
             # Kubernetes; the product runs in Pods built without -race. Race
@@ -1164,17 +1187,29 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
             # --keep-on-failure (local debugging only): leave this run's own
             # clusters and labelled containers for inspection and record them;
             # --cleanup-kept removes exactly these later with its own evidence.
-            keep = keep_on_failure and exit_code != 0 and bool(clusters)
+            # --keep-installed (development only) keeps every run that reached
+            # its focus, passed or not: the Go test wrote the state first.
+            installed_kept = keep_installed and state_path.is_file() and bool(clusters)
+            keep = (keep_on_failure and exit_code != 0 or installed_kept) and bool(clusters)
             if keep:
                 kept = {"runId": run_id, "clusters": clusters, "containers": containers, "volumes": ephemeral_volumes, "image": worker_tag, "upgradeImage": upgrade_tag, "collectorImage": collector_tag, "workDirectory": str(work),
                         "networks": [n for n, made in ((network, created_network), (kind_network, created_kind_network)) if made]}
+                if installed_kept:
+                    kept.update({"mode": KEPT_INSTALLED_MODE, "qualification": False, "focus": focus, "keptAt": time.time(),
+                                 "notAfter": time.time() - (time.monotonic() - began) + KEPT_INSTALLED_SECONDS,
+                                 "fixtures": str(work/"fixtures.json"), "state": str(state_path), "hubImage": fixture["workerImage"],
+                                 "imageHashes": image_hashes(image_dir), "reruns": 0, "rerunImages": []})
                 (cache/"kept").mkdir(exist_ok=True)
                 manifest = cache/"kept"/(run_id+".json")
-                manifest.write_text(json.dumps(kept, indent=2)+"\n")
+                write_environment_report(manifest, kept)
                 keep_work = True
                 report["keptResources"] = str(manifest)
                 report["keptWorkDirectory"] = str(work)
-                print("Kept failed fixture for inspection:", manifest, flush=True)
+                if installed_kept:
+                    print("Kept installation (development only, not a qualification):", manifest, flush=True)
+                    print("  rerun the focus with: python3 scripts/test-context-storage.py --rerun-installed", manifest, flush=True)
+                else:
+                    print("Kept failed fixture for inspection:", manifest, flush=True)
                 print("  private fixture directory:", work, flush=True)
                 for name in clusters:
                     print("  kubeconfig: kind get kubeconfig --name", name, flush=True)
@@ -1236,9 +1271,36 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
         return exit_code
 
 
+def kept_work_directory(kept, path):
+    """The kept run's private directory, or None if the manifest names any
+    other path: a manifest cannot turn cleanup into an arbitrary removal."""
+    cache = (Path(os.environ.get("XDG_CACHE_HOME", Path.home()/".cache"))/"asservat-build").resolve()
+    candidate = Path(kept["workDirectory"])
+    manifest = Path(path)
+    if (not candidate.is_absolute() or candidate.is_symlink()
+            or candidate.parent.resolve() != cache
+            or not candidate.name.startswith("context-")
+            or candidate.name.replace("_", "-") != kept["runId"]
+            or manifest.is_symlink() or manifest.name != kept["runId"]+".json"
+            or manifest.parent.resolve() != cache/"kept"):
+        return None
+    return candidate
+
+
+def kept_leftovers(run_id):
+    """Every Docker object labelled with, and every kind cluster named for, this run."""
+    leftovers = {}
+    for kind, command in (("containers", ["docker", "ps", "-a", "--format", "{{.Names}}"]), ("volumes", ["docker", "volume", "ls", "--format", "{{.Name}}"]),
+                          ("networks", ["docker", "network", "ls", "--format", "{{.Name}}"]), ("images", ["docker", "image", "ls", "--format", "{{.Repository}}:{{.Tag}}"])):
+        leftovers[kind] = [n for n in run(command[:-2] + ["--filter", "label=asservat.test="+run_id] + command[-2:]).splitlines() if n]
+    leftovers["clusters"] = [n for n in run(["kind", "get", "clusters"]).splitlines() if run_id in n]
+    return leftovers
+
+
 def cleanup_kept(path):
-    """Remove one --keep-on-failure run's own recorded resources, checking each
-    name or label against that run, and write cleanup evidence."""
+    """Remove one kept run's own recorded resources, checking each name or
+    label against that run, verify nothing labelled for the run is left and
+    write cleanup evidence."""
     kept = json.loads(Path(path).read_text())
     run_id = kept["runId"]
     if not re.fullmatch(r"[a-z0-9-]{4,64}", run_id):
@@ -1246,27 +1308,18 @@ def cleanup_kept(path):
     failures = []
     work = None
     if "workDirectory" in kept:
-        # A manifest cannot turn cleanup into an arbitrary recursive removal.
         # Keep the original path so fixtures.json and kubeconfig references work.
-        cache = (Path(os.environ.get("XDG_CACHE_HOME", Path.home()/".cache"))/"asservat-build").resolve()
-        candidate = Path(kept["workDirectory"])
-        manifest = Path(path)
-        if (not candidate.is_absolute() or candidate.is_symlink()
-                or candidate.parent.resolve() != cache
-                or not candidate.name.startswith("context-")
-                or candidate.name.replace("_", "-") != run_id
-                or manifest.is_symlink() or manifest.name != run_id+".json"
-                or manifest.parent.resolve() != cache/"kept"):
-            failures.append(str(candidate))
-        else:
-            work = candidate
+        work = kept_work_directory(kept, path)
+        if work is None:
+            failures.append(str(kept["workDirectory"]))
     for name in reversed(kept["clusters"]):
         try:
             info = json.loads(run(["docker", "inspect", name+"-control-plane"]))[0]
             assert run_id in name and info["Config"]["Labels"]["io.x-k8s.kind.cluster"] == name
             run(["kind", "delete", "cluster", "--name", name])
         except Exception: failures.append(name)
-    for kind, names in (("container", reversed(kept["containers"])), ("volume", kept["volumes"]), ("image", [i for i in (kept["image"], kept.get("upgradeImage"), kept.get("collectorImage")) if i]), ("network", kept["networks"])):
+    images = [i for i in (kept["image"], kept.get("upgradeImage"), kept.get("collectorImage"), *kept.get("rerunImages", [])) if i]
+    for kind, names in (("container", reversed(kept["containers"])), ("volume", kept["volumes"]), ("image", images), ("network", kept["networks"])):
         for name in names:
             try:
                 info = json.loads(run(["docker", kind, "inspect", name]))[0]
@@ -1280,13 +1333,158 @@ def cleanup_kept(path):
         except OSError:
             failures.append(str(work))
     report = {"runId": run_id, "manifest": str(path), "cleanupFailures": failures}
+    try:
+        report["leftovers"] = kept_leftovers(run_id)
+        report["workDirectoryRemoved"] = work is not None and not work.exists()
+    except (subprocess.CalledProcessError, OSError) as exc:
+        report["leftoverCheckError"] = type(exc).__name__
+        failures.append("leftover-verification")
+    if any(report.get("leftovers", {}).values()):
+        failures.append("leftovers")
     (ROOT/"test/results"/("kept-cleanup-"+run_id+".json")).write_text(json.dumps(report, indent=2)+"\n")
     if failures:
         print("Kept fixture cleanup failed for:", ", ".join(failures), flush=True)
         return 1
     Path(path).unlink()
-    print("Kept fixture removed:", run_id, flush=True)
+    print("Kept fixture removed:", run_id, "- verified no labelled container, volume, network, image or kind cluster is left", flush=True)
     return 0
+
+
+# Development-only fast focus loop (docs/development-workflow.md). A keep run
+# is an ordinary fresh installation whose fixtures stay up afterwards; a rerun
+# runs only the focus on it. Neither is a qualification, and CI refuses both.
+RERUN_FOCUSES = ("manual-logs",)
+KEPT_INSTALLED_MODE = "installed-focus"
+# The keep run extends the synthetic reviewer token and owner issuer root to
+# three hours; the connector and worker fixture PKI roots stay at two. Reruns
+# stop 90 minutes after the keep run started, inside all of them.
+KEPT_INSTALLED_SECONDS = 90 * 60
+# The keep run's synthetic capacity funds this many focus runs in total
+# (installedKeptRuns in Go): the keep run and three reruns.
+KEPT_INSTALLED_RUNS = 4
+DEVELOPMENT_ENVIRONMENT = ("ASSERVAT_INSTALLED_KEEP", "ASSERVAT_INSTALLED_STATE", "ASSERVAT_INSTALLED_RERUN", "ASSERVAT_INSTALLED_RERUN_ID", "ASSERVAT_INSTALLED_RELEASE_IMAGE")
+RERUN_TEST = "TestInstalledFocusRerunWithKeptInstallation"
+
+
+def refuse_development_mode_in_ci(option):
+    if os.environ.get("CI") or os.environ.get("GITHUB_ACTIONS"):
+        raise RuntimeError(option + " is a development-only loop and never runs in CI; qualification always uses a fresh installation")
+
+
+def image_hashes(image_dir):
+    """The rebuilt hub image's content: product binary, fixture proxy and console."""
+    hashes = {name: hashlib.sha256((image_dir/name).read_bytes()).hexdigest() for name in ("asservat", "provider-proxy")}
+    digest = hashlib.sha256()
+    for path in sorted((image_dir/"console").rglob("*")):
+        if path.is_file():
+            digest.update(str(path.relative_to(image_dir/"console")).encode() + b"\0" + path.read_bytes())
+    hashes["console"] = digest.hexdigest()
+    return hashes
+
+
+def load_kept_image(tag, cluster, run_id):
+    """Load one rebuilt image into the kept hub node; returns its digest reference."""
+    node = cluster+"-control-plane"
+    if run(["docker", "inspect", "--format", '{{ index .Config.Labels "io.x-k8s.kind.cluster" }}', node]) != cluster or run_id not in cluster:
+        raise RuntimeError("kept hub node ownership differs")
+    run(["kind", "load", "docker-image", tag, "--name", cluster])
+    native = "docker.io/library/"+tag
+    matches = [row.split()[2] for row in run(["docker", "exec", node, "ctr", "-n", "k8s.io", "images", "ls"]).splitlines() if row.split()[0] == native]
+    if len(matches) != 1 or not matches[0].startswith("sha256:"):
+        raise RuntimeError("loaded rebuilt image identity unavailable")
+    reference = "docker.io/library/asservat-context-worker@"+matches[0]
+    run(["docker", "exec", node, "ctr", "-n", "k8s.io", "images", "tag", native, reference])
+    return reference
+
+
+def rerun_installed(path):
+    """Run only the kept focus on a kept installation. Development only."""
+    refuse_development_mode_in_ci("--rerun-installed")
+    began, started_at = time.monotonic(), time.time()
+    kept = json.loads(Path(path).read_text())
+    run_id = kept.get("runId", "")
+    if kept.get("mode") != KEPT_INSTALLED_MODE or not re.fullmatch(r"[a-z0-9-]{4,64}", run_id) or kept.get("focus") not in RERUN_FOCUSES:
+        raise ValueError("not a --keep-installed manifest")
+    work = kept_work_directory(kept, path)
+    if work is None or not work.is_dir():
+        raise ValueError("kept private directory differs from the manifest")
+    if time.time() > kept["notAfter"]:
+        raise RuntimeError("kept installation is older than its synthetic credential window; tear it down (--cleanup-kept) and keep a fresh one")
+    for name in kept["clusters"]:
+        if run_id not in name or run(["docker", "inspect", "--format", '{{ index .Config.Labels "io.x-k8s.kind.cluster" }}', name+"-control-plane"]) != name:
+            raise RuntimeError("kept cluster missing or not owned: "+name)
+    for name in kept["containers"]:
+        info = json.loads(run(["docker", "inspect", name]))[0]
+        if info["Config"]["Labels"].get("asservat.test") != run_id or (not name.endswith("-seed") and not info["State"]["Running"]):
+            raise RuntimeError("kept fixture container missing, foreign or stopped: "+name)
+    number = kept["reruns"] + 1
+    if number >= KEPT_INSTALLED_RUNS:
+        raise RuntimeError("kept installation's synthetic capacity funds no further focus run; tear it down (--cleanup-kept) and keep a fresh one")
+    results = ROOT/"test/results"
+    report = {"qualification": False, "scope": "development-only focus rerun on a kept installation; never a qualification",
+              "runId": run_id, "rerun": number, "focus": kept["focus"], "manifest": str(path),
+              "skipped": ["cluster and fixture creation", "unified bootstrap runner", "installer continuation", "regional install"],
+              "phaseSeconds": {}, "sourceHashes": source_hashes(), "goTestExit": None}
+
+    def phase(name):
+        report["phaseSeconds"][name] = round(time.monotonic()-began, 1)
+    scratch = Path(tempfile.mkdtemp(prefix="asservat-rerun-build-", dir=tempfile.gettempdir()))
+    exit_code = 1
+    go_started = False
+    try:
+        image_dir = scratch/"image"
+        image_dir.mkdir()
+        build_env = dict(os.environ, TMPDIR=str(scratch), CGO_ENABLED="0")
+        build_hub_binaries(image_dir, build_env)
+        build_console(image_dir, build_env)
+        hashes = image_hashes(image_dir)
+        phase("imageInputsBuilt")
+        env = qualification_environment(os.environ, kept["fixtures"], scratch, False, False)
+        env.update({"ASSERVAT_INSTALLED_RERUN": kept["state"], "ASSERVAT_INSTALLED_RERUN_ID": str(number), "ASSERVAT_JOURNEY_FOCUS": kept["focus"]})
+        report["imageChanged"] = hashes != kept["imageHashes"]
+        if report["imageChanged"]:
+            # The product's own image change (installer-upgrade) moves hub-api,
+            # hub-worker, key service, publisher and federation to this image.
+            (image_dir/"Dockerfile").write_text("FROM scratch\nCOPY asservat /asservat\nCOPY provider-proxy /provider-proxy\nCOPY console /usr/share/asservat/console\nUSER 65532:65532\n")
+            tag = "asservat-context-worker:"+run_id+"-r"+str(number)
+            if tag not in kept["rerunImages"]:  # a retried number reuses its tag
+                kept["rerunImages"].append(tag)
+            write_environment_report(Path(path), kept)  # teardown removes it even if this run fails
+            run(["docker", "build", "--network=none", "--label", "asservat.test="+run_id, "-t", tag, str(image_dir)])
+            env["ASSERVAT_INSTALLED_RELEASE_IMAGE"] = load_kept_image(tag, kept["clusters"][0], run_id)
+            report["releaseImage"] = env["ASSERVAT_INSTALLED_RELEASE_IMAGE"]
+            phase("imageLoaded")
+        command = ["go", "test", "-count=1", "-v", "-run", "^"+RERUN_TEST+"$", "-timeout", "18m", "./test/integration"]
+        # Only a launched focus spends a funded run; a build or load failure
+        # before it can be retried with the same number.
+        go_started = True
+        exit_code = record_go_output(command, env, results, report, "installed-focus-rerun")
+        phase("goTestEnd")
+        report["goTestExit"] = exit_code
+        output = (results/"installed-focus-rerun.log").read_bytes().decode("utf-8", errors="replace")
+        report["passedTests"] = [line.strip().split()[2] for line in output.splitlines() if line.strip().startswith("--- PASS: Test")]
+        if RERUN_TEST+"/"+kept["focus"] not in report["passedTests"]:
+            exit_code = 1
+        if report["imageChanged"]:
+            # A failed run may have stopped anywhere in the image change; the
+            # next rerun then changes the image again instead of assuming it.
+            kept["imageHashes"] = hashes if exit_code == 0 else None
+            kept["hubImage"] = report["releaseImage"] if exit_code == 0 else None
+    finally:
+        shutil.rmtree(scratch, ignore_errors=True)
+        if go_started:
+            kept["reruns"] = number
+        write_environment_report(Path(path), kept)  # atomic: an interrupt keeps it readable
+        report["sourceUnchangedDuringTest"] = report["sourceHashes"] == source_hashes()
+        if not report["sourceUnchangedDuringTest"]:
+            exit_code = 1
+        report["testExit"] = exit_code
+        report["wallSeconds"] = round(time.monotonic()-began, 1)
+        report["startedAt"] = started_at
+        report["harnessState"] = "finished"
+        write_environment_report(results/"installed-focus-rerun-environment.json", report)
+        print("Rerun", number, "of", kept["focus"], "on kept", run_id, "exit", exit_code, "in", report["wallSeconds"], "s (not a qualification); phases:", report["phaseSeconds"], flush=True)
+    return exit_code
 
 
 if __name__ == "__main__":
@@ -1304,16 +1502,20 @@ if __name__ == "__main__":
     parser.add_argument("--runtime-provider-owner", action="store_true", help="Continue the original running worker through owner roles, projection and actual in-Pod paired identity; requires --initial-bootstrap-chain --runtime-provider-pair --runtime-provider-worker.")
     parser.add_argument("--installer-continuation", action="store_true", help="ADR-183: after the original bootstrap chain, run the actual installer-continue Pod and the actual applier through worker and owner launch; requires --initial-bootstrap-chain --runtime-provider-pair.")
     parser.add_argument("--keep-on-failure", action="store_true", help="Local debugging: on failure keep this run's own clusters and labelled containers, record them, and skip the Go fixtures' own cleanup. Remove them with --cleanup-kept.")
-    parser.add_argument("--cleanup-kept", metavar="MANIFEST", help="Remove one kept run's recorded resources after checking each belongs to that run; writes test/results/kept-cleanup-<run>.json.")
+    parser.add_argument("--keep-installed", action="store_true", help="Development only, never a qualification: keep this fresh installation and its fixtures after the focus for --rerun-installed. Requires the installer continuation and a rerun focus; refused in CI.")
+    parser.add_argument("--rerun-installed", metavar="MANIFEST", help="Development only, never a qualification: rebuild the hub image, move the kept hub to it if it changed, and run only the kept focus; writes test/results/installed-focus-rerun-environment.json.")
+    parser.add_argument("--cleanup-kept", metavar="MANIFEST", help="Remove one kept run's recorded resources after checking each belongs to that run, then verify none is left; writes test/results/kept-cleanup-<run>.json.")
     parser.add_argument("--runtime-provider-worker", action="store_true", help="Continue the original provider pair through actual launch and in-Pod accepted owner observation; requires --initial-bootstrap-chain --runtime-provider-pair.")
     args = parser.parse_args()
     if args.cleanup_kept:
         raise SystemExit(cleanup_kept(args.cleanup_kept))
+    (ROOT/"test/results").mkdir(parents=True, exist_ok=True)
+    if args.rerun_installed:
+        raise SystemExit(rerun_installed(args.rerun_installed))
     if (args.initial_handover or args.initial_schema_handover or args.initial_bootstrap_chain) and args.test_pattern is not None:
         parser.error("Installation qualification cannot be combined with --run")
     if sum((args.initial_handover, args.initial_schema_handover, args.initial_bootstrap_chain)) > 1:
         parser.error("Select exactly one installation qualification")
     if args.test_pattern is not None and not 1 <= len(args.test_pattern) <= 256:
         parser.error("--run must contain 1 to 256 characters")
-    (ROOT/"test/results").mkdir(parents=True, exist_ok=True)
-    raise SystemExit(main(args.test_pattern, initial_handover=args.initial_handover, initial_schema_handover=args.initial_schema_handover, initial_bootstrap_chain=args.initial_bootstrap_chain, helm_bootstrap=args.helm_bootstrap, regional_context_start=args.regional_context_start, runtime_object_roundtrip=args.runtime_object_roundtrip, owner_provider_auth=args.owner_provider_auth, runtime_provider_pair=args.runtime_provider_pair, runtime_provider_worker=args.runtime_provider_worker, runtime_provider_owner=args.runtime_provider_owner, installer_continuation=args.installer_continuation, helm_cluster=args.helm_cluster, keep_on_failure=args.keep_on_failure))
+    raise SystemExit(main(args.test_pattern, initial_handover=args.initial_handover, initial_schema_handover=args.initial_schema_handover, initial_bootstrap_chain=args.initial_bootstrap_chain, helm_bootstrap=args.helm_bootstrap, regional_context_start=args.regional_context_start, runtime_object_roundtrip=args.runtime_object_roundtrip, owner_provider_auth=args.owner_provider_auth, runtime_provider_pair=args.runtime_provider_pair, runtime_provider_worker=args.runtime_provider_worker, runtime_provider_owner=args.runtime_provider_owner, installer_continuation=args.installer_continuation, helm_cluster=args.helm_cluster, keep_on_failure=args.keep_on_failure, keep_installed=args.keep_installed))

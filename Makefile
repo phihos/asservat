@@ -71,6 +71,22 @@ installed-focus:
 	mkdir -p "$(ASSERVAT_BUILD_TMP)"
 	TMPDIR="$(ASSERVAT_BUILD_TMP)" ASSERVAT_JOURNEY_FOCUS="$(FOCUS)" $(PYTHON) scripts/test-context-storage.py --initial-bootstrap-chain --runtime-provider-pair --installer-continuation $(ARGS)
 
+# Development only, never a qualification (docs/development-workflow.md):
+# installed-keep installs once and keeps it; installed-rerun runs only the
+# focus on it (KEPT defaults to the newest kept manifest); installed-teardown
+# removes it and verifies nothing is left.
+KEPT ?= $(shell ls -t $(HOME)/.cache/asservat-build/kept/context-*.json 2>/dev/null | head -n 1)
+.PHONY: installed-keep installed-rerun installed-teardown
+installed-keep:
+	$(MAKE) --no-print-directory installed-focus FOCUS="$(or $(FOCUS),manual-logs)" ARGS="--keep-installed $(ARGS)"
+installed-rerun:
+	$(if $(KEPT),,$(error no kept installation; run make installed-keep))
+	mkdir -p "$(ASSERVAT_BUILD_TMP)"
+	TMPDIR="$(ASSERVAT_BUILD_TMP)" $(PYTHON) scripts/test-context-storage.py --rerun-installed "$(KEPT)"
+installed-teardown:
+	$(if $(KEPT),,$(error no kept installation))
+	$(PYTHON) scripts/test-context-storage.py --cleanup-kept "$(KEPT)"
+
 .PHONY: go-vuln-check
 go-vuln-check:
 	go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...

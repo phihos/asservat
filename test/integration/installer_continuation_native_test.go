@@ -119,7 +119,7 @@ func prepareInstallerContinuationNative(t *testing.T, ctx context.Context, api k
 		OwnerIssuerRootsPEM: roots.String(), OwnerPKIMount: "owner-pki", OwnerConnections: 4, OwnerConcurrency: 2,
 		// ADR-185: synthetic browser identity settings exercise the public sources step.
 		Public: &contracts.InstallerPublicSettings{Origin: origin, Issuer: issuer, ClientID: "console",
-			MaxLifetimeSeconds: 3600, MaxLogins: 8, MaxSessions: 8, MaxLogoutEvents: 8, Clients: clients,
+			MaxLifetimeSeconds: 3600, MaxLogins: 8 * int(installedKeptRuns()), MaxSessions: 8 * int(installedKeptRuns()), MaxLogoutEvents: 8 * int(installedKeptRuns()), Clients: clients,
 			EligibleGroups: []string{"synthetic-group", installedUnrelatedGroup}, GroupMaxAgeSeconds: 300, Approvals: approvals,
 			// ADR-190: the operator's synthetic capacity profile and release operator.
 			Capacity: nativeCapacityProfile(),
@@ -520,16 +520,17 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 		installedPublisherSettled = func(c context.Context) {
 			waitInstalledPublisherSettled(t, c, api, desired.TargetNamespace, installation)
 		}
-		diagnose := func() {
-			installedCapacityCurrentDiagnostics(ctx, admin.QueryRow, p.RootID, installation, t.Logf)
-			installedSQLActivityDiagnostics(ctx, admin.Query, installation, t.Logf)
-			installedProcessDiagnostics(t, ctx, api, desired.TargetNamespace, prefix+"-owner", prefix+"-worker", contracts.PublisherName(installation))
-			c, end := context.WithTimeout(ctx, 20*time.Second)
-			defer end()
-			installedPodDiagnostics(t, c, api, contracts.DownloadWorkerNamespaceName(installation), "download-worker", "")
-			if installedJourneyFocus() == "manual-mixed" {
-				installedPacketSummaryJobDiagnostics(c, api, contracts.DownloadWorkerNamespaceName(installation), t.Logf)
+		diagnose := installedHubDiagnose(t, ctx, admin, api, p.RootID, installation, desired.TargetNamespace, prefix)
+		if installedKeepMode() {
+			// Development-only keep run: record the focus inputs before the
+			// focus, so a failing first focus can still be rerun.
+			reviewer := ""
+			if identity != nil {
+				reviewer = identity.ReviewerSubject
 			}
+			writeInstalledKeptState(t, installedKeptState{Focus: installedJourneyFocus(), Installation: installation, RootID: p.RootID, ClusterID: original.Plan.ClusterID,
+				Name: desired.Name, BootstrapNamespace: desired.BootstrapNamespace, TargetNamespace: desired.TargetNamespace, Image: desired.Image, Postgres: desired.Postgres,
+				PublicRoot: publicRoot, PublicAddress: publicAddress, Origin: origin, ReviewerSubject: reviewer, RegionalCluster: cluster, RegionalNamespace: namespace, Workload: workload})
 		}
 		if installedJourneyFocus() == "manual-mixed" || installedJourneyFocus() == "manual-profile" && (installedHeapProfileVariant() || installedRuntimeTraceVariant()) {
 			defer func() {
@@ -1098,7 +1099,7 @@ func nativeCapacityProfile() *contracts.InstallerCapacitySettings {
 	// its single pprof summary still charges ten conservative read-work units.
 	records := int64(8)
 	if installedLogsFocus() {
-		records = installedLogsQueryUnits
+		records = installedLogsQueryUnits * installedKeptRuns() // one focus run; a keep run funds its reruns
 	}
 	if installedJourneyFocus() == "manual-raw" {
 		// Two summaries (4 units) plus two independently paid packet queries
@@ -1128,7 +1129,7 @@ func nativeCapacityProfile() *contracts.InstallerCapacitySettings {
 		normal = 512
 	}
 	return &contracts.InstallerCapacitySettings{Pool: "capacity", Policy: "applications", NamespaceKeys: []string{"team"}, Accounts: 16, Records: records, AdmissionSeconds: 86400,
-		Lanes:               contracts.InstallerCapacityLanes{CaptureRetainedSeconds: 10000, Normal: lane(4, normal), Resolution: lane(4, 8), Processing: lane(2, 16)},
+		Lanes:               contracts.InstallerCapacityLanes{CaptureRetainedSeconds: 10000, Normal: lane(4, normal*installedKeptRuns()), Resolution: lane(4, 8*installedKeptRuns()), Processing: lane(2, 16)},
 		StopRetainedSeconds: 10000,
 		Backup:              contracts.InstallerCapacityBackup{HorizonSeconds: 3600, CleanupBudgetSeconds: 60, ProofWindowSeconds: 60, BackupCopies: 2, WALCopies: 3},
 		Footprints:          contracts.InstallerCapacityFootprints{Capture: f(128<<10, 256<<10), Operation: f(128<<10, 256<<10), Processing: f(128<<10, 256<<10), Native: f(64<<10, 128<<10), Stop: f(128<<10, 256<<10), ProcessingState: f(16<<10, 64<<10)},
@@ -1149,8 +1150,9 @@ func installNativeCapacityObjects(t *testing.T, ctx context.Context, api kuberne
 	}
 	upload := map[string]int64{"bytesPerSecond": 134217728, "burstBytes": 16777216}
 	systemObjects, burstObjects := installedCapacityObjectPartitions()
+	capacityObjects := installedPoolCapacityObjects()
 	pool := map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "EvidenceStoragePool", "metadata": map[string]any{"name": "capacity"}, "spec": map[string]any{
-		"storageProfileRef": "dedicated", "capacity": amount(137438953472, 100000), "safetyHeadroom": amount(17179869184, 10000), "systemReserve": amount(8589934592, systemObjects), "sharedBurst": amount(42949672960, burstObjects),
+		"storageProfileRef": "dedicated", "capacity": amount(137438953472, capacityObjects), "safetyHeadroom": amount(17179869184, 10000), "systemReserve": amount(8589934592, systemObjects), "sharedBurst": amount(42949672960, burstObjects),
 		"protectedAllocations": []any{map[string]any{"budgetPolicyRef": "applications", "workloadSlots": 4, "protectedPerWorkload": amount(17179869184, 10000)}},
 		"upload":               upload, "maxUploadRequestsPerSecond": 100, "capacityAssurance": "qualifiedReservedBackend"}}
 	policy := map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "EvidenceBudgetPolicy", "metadata": map[string]any{"name": "applications"}, "spec": map[string]any{

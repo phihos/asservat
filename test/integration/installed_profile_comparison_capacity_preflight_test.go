@@ -12,9 +12,22 @@ import (
 // every byte limit and production defaults remain unchanged.
 func installedCapacityObjectPartitions() (system, burst int64) {
 	if installedJourneyFocus() == "profile-comparison" || installedLogsFocus() {
-		return 20000, 30000
+		// A development-only keep run funds installedKeptRuns() logs focus
+		// runs (80000 system objects for four); ordinary runs are unchanged.
+		return 20000 * installedKeptRuns(), 30000
 	}
 	return 10000, 40000
+}
+
+// installedPoolCapacityObjects is the native pool's object capacity; a
+// development-only keep run's larger system partition is added on top, so
+// every other partition is unchanged.
+func installedPoolCapacityObjects() int64 {
+	system, _ := installedCapacityObjectPartitions()
+	if installedKeepMode() && installedLogsFocus() {
+		return 100000 + system - 20000
+	}
+	return 100000
 }
 
 // Protect the actual native account/record and pool-object coupling using the

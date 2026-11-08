@@ -274,7 +274,7 @@ class RegionalContextSelection(unittest.TestCase):
         source=inspect.getsource(fixture.main)
         terminal=source.index('finally:\n            report["testExit"]')
         collect=source.index("collect_profile_containment_artifacts(work",terminal)
-        cleanup=source.index('keep = keep_on_failure',terminal)
+        cleanup=source.index('keep = (keep_on_failure',terminal)
         self.assertLess(terminal,collect)
         self.assertLess(collect,cleanup)
         self.assertIsNone(fixture.collect_profile_containment_artifacts(root/"absent",results))
