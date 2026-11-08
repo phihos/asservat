@@ -106,6 +106,45 @@ cannot survive job teardown, and the existing 20-minute job limit stays in
 force. Do not introduce a remote-access service, paid VM or persistent runner
 merely to implement this debugging preference.
 
+## Local installed loop
+
+Installed focuses that start no node collector run on this workstation with
+Docker and kind, in about 13 minutes instead of a hosted round trip:
+
+```sh
+cd web && npm ci --prefer-offline && cd ..   # once per fresh worktree
+make installed-focus FOCUS=manual-logs       # ARGS=--keep-on-failure to retain a failure
+```
+
+This is the `continuation-<focus>` command from `scripts/ci-native.sh` with
+`TMPDIR` on `~/.cache/asservat-build/tmp` (the harness needs 4 GiB of build
+scratch; `/tmp` is a small zram disk). It owns two fresh kind clusters
+(three for `clusters`) and needs about 10 GiB of free memory.
+
+Local-capable focuses: `chain`, `journey`, `browser`, `restart`, `clusters`,
+`upgrade`, `policy`, `alert`, `logresource`, `share`, `manual-logs`
+(`LOCAL_FOCUSES` in the Makefile; the target rejects every other value). All
+other focuses load eBPF collectors; the harness also refuses them without
+`/etc/asservat-disposable-host`. Never create that file on a workstation.
+
+Each run is a fresh installation: clusters, database and images are never
+reused, because protected installation roots require clean state. The harness
+records its phase end times in `phaseSeconds` of
+`test/results/context-storage-environment.json` and prints them at the end;
+the Go test's own lines with elapsed seconds are in
+`test/results/context-storage-timing.log`. A warm local run (2026-11-07)
+spent about 55 s in harness setup (previously about 100 s: Keycloak now
+starts while the clusters are created, all clusters are created
+concurrently, and the Go test package compiles meanwhile), 200 s in the
+unified bootstrap runner
+(produce 28 s, schema 84 s, prepare 38 s, retire 39 s), 215 s in the
+installer continuation up to the focus, about 2 minutes in the
+`manual-logs` focus and its cleanup, and 15 s removing fixtures. A measured
+`make installed-focus FOCUS=manual-logs` on 2026-11-08 took 777 s wall
+time: 100 s harness setup (images 31 s, services 23 s, concurrent clusters
+36 s), 664 s Go test (unified runner 28/88/38/40 s, `manual-logs` 158 s) and
+14 s cleanup, leaving no owned kind cluster, container or network.
+
 ## Prefer measured simplification
 
 Fix the demonstrated bottleneck first. For example, sharing immutable compiled

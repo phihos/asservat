@@ -15,6 +15,7 @@ import hashlib
 import os
 import re
 import shutil
+import signal
 from pathlib import Path
 import subprocess
 import sys
@@ -298,18 +299,22 @@ def start_keycloak(work, network, run_id, containers, report):
     (certs/"key.pem").write_bytes(key)  # written last: it starts Keycloak
     (certs/"key.pem").chmod(0o444)
     tls = ssl.create_default_context(cafile=str(ca))
-    for _ in range(180):
-        try:
-            with urllib.request.urlopen(f"https://{ip}:8443/realms/master/.well-known/openid-configuration", context=tls, timeout=2) as response:
-                if response.status == 200:
-                    break
-        except (OSError, ValueError):
-            pass
-        time.sleep(1)
-    else:
+    started = time.monotonic()
+
+    def wait():
+        # The same readiness bound as before, counted from Keycloak's start;
+        # the caller creates the owned clusters meanwhile.
+        while time.monotonic() - started < 180:
+            try:
+                with urllib.request.urlopen(f"https://{ip}:8443/realms/master/.well-known/openid-configuration", context=tls, timeout=2) as response:
+                    if response.status == 200:
+                        return
+            except (OSError, ValueError):
+                pass
+            time.sleep(1)
         raise RuntimeError("owned Keycloak not ready")
     report["keycloak"] = {"image": KEYCLOAK, "address": ip, "scope": "synthetic realm and user; private network only"}
-    return {"base": f"https://{ip}:8443", "rootCA": ca.read_text(), "adminUser": "fixture-admin", "adminPassword": admin_password, "userPassword": user_password}
+    return {"base": f"https://{ip}:8443", "rootCA": ca.read_text(), "adminUser": "fixture-admin", "adminPassword": admin_password, "userPassword": user_password}, wait
 
 
 def prepare_fixture_database(cache, work, dsn, pgname, initial_schema_handover):
@@ -597,6 +602,15 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
         audit_nodes = []
         report = {"scope": "component integration, not S-02 release acceptance", "runtimeProviderPairQualification": runtime_provider_pair, "runtimeProviderWorkerQualification": runtime_provider_worker, "runtimeProviderOwnerQualification": runtime_provider_owner, "installerContinuationQualification": installer_continuation, "aggregateGoTimeout": qualification_go_timeout(helm_bootstrap, runtime_provider_owner, installer_continuation, native_traffic_probe), "bootstrapFixtureSeconds": (2700 if installer_continuation else 720 if runtime_provider_owner else 480) if initial_bootstrap_chain else None, "images": {"s3": SEAWEED, "kms": BAO, "kubernetes": NODE, "postgres": POSTGRES}, "clusters": [], "testPattern": test_pattern, "testPackage": test_package, "runtimeObjectRoundTripQualification": runtime_object_roundtrip, "ownerProviderAuthenticationQualification": owner_provider_auth, "initialHandoverQualification": initial_handover, "initialSchemaHandoverQualification": initial_schema_handover, "initialBootstrapChainQualification": initial_bootstrap_chain, "helmBootstrapQualification": helm_bootstrap and not helm_cluster, "helmClusterQualification": helm_cluster, "regionalContextStartQualification": regional_context_start, "fixtureMigratesDatabase": not (initial_schema_handover or initial_bootstrap_chain or helm_bootstrap)}
         exit_code = 1
+        # Harness phase end times in seconds since start, so slow setup is
+        # measured (report "phaseSeconds"; the Go test has its own timing log).
+        began = time.monotonic()
+        report["phaseSeconds"] = {}
+
+        def phase(name):
+            report["phaseSeconds"][name] = round(time.monotonic()-began, 1)
+        keycloak_ready = None
+        compile_ahead = None
         try:
             if runtime_provider_pair or direct_observation:
                 if shutil.disk_usage(tempfile.gettempdir()).free < 4 * 1024**3:
@@ -688,6 +702,12 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
                 if upgrade_info["Id"] == worker_info["Id"]:
                     raise RuntimeError("upgrade image has the original image's digest")
                 report["upgradeBuild"] = {"dockerImageID": upgrade_info["Id"], "tag": upgrade_tag}
+            phase("imagesBuilt")
+            # Compile the Go test package while the fixtures start: same flags
+            # as the run below, output discarded. It only fills the Go build
+            # cache; the real `go test` still builds (and reports) everything.
+            compile_ahead = subprocess.Popen(["go", "test", "-count=1"] + ([] if installer_continuation else ["-race"]) + ["-run", "^$", test_package],
+                                             cwd=ROOT, env={**os.environ, "TMPDIR": str(build_scratch or work)}, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
             run(["docker", "network", "create", "--internal", "--label", "asservat.test="+run_id, network])
             created_network = True
             run(["docker", "network", "create", "--label", "asservat.test="+run_id, kind_network])
@@ -774,7 +794,7 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
             if native_paced:
                 fixture["nativeSQLStatistics"] = True
             if installer_continuation:
-                fixture["identity"] = start_keycloak(work, network, run_id, containers, report)
+                fixture["identity"], keycloak_ready = start_keycloak(work, network, run_id, containers, report)
             if alert:
                 fixture["alertmanagerImage"] = ALERTMANAGER
                 report["images"]["alertmanager"] = ALERTMANAGER
@@ -788,6 +808,7 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
             fixture["twoClusterPods"] = two_cluster_pods
             if helm_bootstrap:
                 fixture["helmBootstrap"] = {"registryConfig": registry.material(), "productBinary": str(image_dir/"asservat"), "chartArchive": str(chart_archive)}
+            phase("servicesStarted")
             # Create every owned cluster concurrently (each takes about 40 s);
             # per-cluster setup below then runs in order as before.
             creates = []
@@ -825,13 +846,13 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
                     kind_config.write_text(json.dumps(audit_config))
                     create = create[:create.index("--config")] + ["--config", str(kind_config)]
                 creates.append(create)
-            # The first create alone sets up Kind's shared Docker network; the
-            # rest run concurrently.
-            if creates:
-                run(creates[0])
-            with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, len(creates)-1)) as pool:
-                for future in [pool.submit(run, create) for create in creates[1:]]:
+            # Every create joins the owned network created above
+            # (KIND_EXPERIMENTAL_DOCKER_NETWORK); none sets up a shared one, so
+            # all run concurrently.
+            with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, len(creates))) as pool:
+                for future in [pool.submit(run, create) for create in creates]:
                     future.result()
+            phase("clustersCreated")
             for index in range(cluster_count):
                 name = network+"-"+str(index)
                 config = work/("kube-"+str(index))
@@ -945,6 +966,10 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
                 report["clusters"].append({"name": name, "nodeImage": NODE, "workloadImage": pause, "podUID": pod["metadata"]["uid"]})
             if native_paced or native_traffic_probe:
                 require_native_traffic_helper(fixture, clusters[1 if native_paced else 0])
+            phase("clustersPrepared")
+            if keycloak_ready is not None:
+                keycloak_ready()
+                phase("keycloakReady")
             path = work/"fixtures.json"
             path.touch(mode=0o600)
             path.write_text(json.dumps(fixture))
@@ -974,9 +999,12 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
                     audit_nodes.append((owned, cluster["config"]))
                     run(["kubectl", "--kubeconfig", cluster["config"], "--request-timeout=5s", "get", "--raw", "/readyz"])
                 audit_started = True
+            compile_ahead.wait()
+            phase("goTestStart")
             # Each output line also goes, with its elapsed seconds, to a timing
             # log, so slow phases are measured rather than guessed.
             exit_code = record_go_output(command, env, ROOT/"test/results", report)
+            phase("goTestEnd")
             report["goTestExit"] = exit_code
             raw_output = (ROOT/"test/results/context-storage.log").read_bytes()
             try:
@@ -1049,6 +1077,11 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
         finally:
             report["testExit"] = exit_code
             failures = []
+            # Stop a still-running compile-ahead (setup failure) before any
+            # scratch removal below.
+            if compile_ahead is not None and compile_ahead.poll() is None:
+                os.killpg(compile_ahead.pid, signal.SIGKILL)  # with its compiler children
+                compile_ahead.wait()
             try:
                 artifacts = collect_profile_containment_artifacts(work, ROOT/"test/results")
                 if artifacts is not None:
@@ -1147,6 +1180,8 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
                 except OSError:
                     failures.append(str(build_scratch))
             report["cleanupFailures"] = failures
+            phase("cleanedUp")
+            print("Harness phases (seconds since start):", report["phaseSeconds"], flush=True)
             # Setup failures still need an actual source comparison. This is
             # provenance only and never turns an unexecuted test into a pass.
             if "sourceHashes" in report:

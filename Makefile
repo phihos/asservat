@@ -60,6 +60,17 @@ go-architecture-check:
 context-integration:
 	$(PYTHON) scripts/test-context-storage.py
 
+# Local installed loop (docs/development-workflow.md): one installed focus on
+# owned kind clusters, e.g. make installed-focus FOCUS=manual-logs. The harness
+# refuses collector focuses without the disposable-host guard; this target
+# additionally accepts only the collector-free focuses below.
+LOCAL_FOCUSES = chain journey browser restart clusters upgrade policy alert logresource share manual-logs
+.PHONY: installed-focus
+installed-focus:
+	$(if $(and $(filter 1,$(words $(FOCUS))),$(filter $(FOCUS),$(LOCAL_FOCUSES))),,$(error FOCUS must be one collector-free focus: $(LOCAL_FOCUSES)))
+	mkdir -p "$(ASSERVAT_BUILD_TMP)"
+	TMPDIR="$(ASSERVAT_BUILD_TMP)" ASSERVAT_JOURNEY_FOCUS="$(FOCUS)" $(PYTHON) scripts/test-context-storage.py --initial-bootstrap-chain --runtime-provider-pair --installer-continuation $(ARGS)
+
 .PHONY: go-vuln-check
 go-vuln-check:
 	go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
