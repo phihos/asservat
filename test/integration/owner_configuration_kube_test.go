@@ -156,8 +156,17 @@ func exerciseOwnerConfiguration(t *testing.T, ctx context.Context, f fixture, ad
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = routes.CurrentOwnerRoute(ctx, b); err == nil {
-		t.Fatal("suspended configuration permitted route")
+	// OwnerRoutes reuses a recent route while routeReuseMargin of its own
+	// original interval remains (PR 106), so suspension must refuse every
+	// route read once that route's original interval ends, never later.
+	for {
+		if _, err = routes.CurrentOwnerRoute(ctx, b); err != nil {
+			break
+		}
+		if time.Now().After(route.FreshUntil) {
+			t.Fatal("suspended configuration permitted route after the reused route ended")
+		}
+		time.Sleep(100 * time.Millisecond)
 	}
 	wire.Suspended = false
 	wire.Revision++

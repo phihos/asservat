@@ -110,7 +110,7 @@
           "type": "string",
           "format": "date-time",
           "maxLength": 32,
-          "description": "Original immutable start deadline. apiContextStart/v1 is at most five seconds after notBefore; the historical node profile is at most sixty seconds. Native CEL and the execution domain enforce these relational bounds."
+          "description": "Original immutable start deadline. apiContextStart/v1 is at most identity.AuthorityRecheckInterval (30 seconds, ADR-311) after notBefore; the historical node profile is at most sixty seconds. Native CEL and the execution domain enforce these relational bounds."
         },
         "executorPodUID": {
           "type": "string",

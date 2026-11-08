@@ -156,7 +156,11 @@ func TestContextCapabilityWithRealKubernetes(t *testing.T) {
 		t.Fatal("native capability protection never became available", err)
 	}
 	first, err := source.ContextCapability(ctx, target)
-	if err != nil || !first.Valid(time.Now()) || first.Revision.UID != string(object.UID) || first.ProjectionDigest != projection || first.FreshUntil.Sub(first.ObservedAt) > 5*time.Second {
+	// ADR-311: a completed check is valid for the recheck interval, capped by
+	// the recovery observation it read (this fixture's five seconds from its
+	// own, slightly later read), not five seconds from the check's start; the
+	// one-second slack still rejects an uncapped 30-second interval.
+	if err != nil || !first.Valid(time.Now()) || first.Revision.UID != string(object.UID) || first.ProjectionDigest != projection || first.FreshUntil.Sub(first.ObservedAt) > 6*time.Second {
 		t.Fatal("original capability observation", err)
 	}
 	unchanged := func() {

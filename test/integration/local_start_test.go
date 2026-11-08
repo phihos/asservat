@@ -16,6 +16,7 @@ import (
 	"asservat.local/asservat/internal/domain/configuration"
 	value "asservat.local/asservat/internal/domain/execution"
 	fleetvalue "asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
 	"github.com/google/uuid"
 	corev1 "k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
@@ -238,7 +239,7 @@ func TestLocalStartWithRealKubernetes(t *testing.T) {
 		b.NodeBootID = ""
 		b.ExecutorPodUID = uuid.NewString()
 		b.ExecutorAccountUID = uuid.NewString()
-		b.NotAfter = b.NotBefore.Add(5 * time.Second)
+		b.NotAfter = b.NotBefore.Add(identity.AuthorityRecheckInterval) // ADR-311 start binding interval
 		spec, e := kube.LocalStartSpec(b)
 		if e != nil {
 			t.Fatal(e)
@@ -248,7 +249,7 @@ func TestLocalStartWithRealKubernetes(t *testing.T) {
 		_ = json.Unmarshal(data, &m)
 		o := &unstructured.Unstructured{Object: map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "CapacityReservation", "metadata": map[string]any{"name": "start-" + b.AttemptID, "namespace": ns.Name}, "spec": m}}
 		wide := o.DeepCopy()
-		_ = unstructured.SetNestedField(wide.Object, b.NotBefore.Add(6*time.Second).Format(time.RFC3339Nano), "spec", "notAfter")
+		_ = unstructured.SetNestedField(wide.Object, b.NotBefore.Add(identity.AuthorityRecheckInterval+time.Second).Format(time.RFC3339Nano), "spec", "notAfter")
 		if _, e = capacity.Create(ctx, wide, meta.CreateOptions{DryRun: []string{meta.DryRunAll}}); !apierrors.IsInvalid(e) {
 			t.Fatalf("API profile accepted an extended original interval: %v", e)
 		}

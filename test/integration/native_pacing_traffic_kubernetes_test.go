@@ -27,7 +27,16 @@ func TestNativePacingTrafficWithRealKubernetes(t *testing.T) {
 	}
 	var f fixture
 	raw, err := os.ReadFile(path)
-	if err != nil || json.Unmarshal(raw, &f) != nil || len(f.Clusters) != 1 || f.WorkerImage == "" || !f.NativeTrafficHelper.validForNode(f.Clusters[0].Pod.NodeName) {
+	if err != nil || json.Unmarshal(raw, &f) != nil {
+		t.Fatal("context fixture unreadable")
+	}
+	// The harness installs the helper only for this exact probe selection
+	// (scripts/ci-native.sh suite native-traffic); a shard of the whole
+	// context suite has no helper and two clusters.
+	if f.NativeTrafficHelper.Cluster == "" {
+		t.Skip("run scripts/test-context-storage.py --run '^TestNativePacingTrafficWithRealKubernetes$'")
+	}
+	if len(f.Clusters) != 1 || f.WorkerImage == "" || !f.NativeTrafficHelper.validForNode(f.Clusters[0].Pod.NodeName) {
 		t.Fatal("owned traffic descriptor unavailable before probe")
 	}
 	ctx, cancel := context.WithTimeout(t.Context(), 90*time.Second)

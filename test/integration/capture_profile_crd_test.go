@@ -133,11 +133,15 @@ func TestCaptureProfilesWithRealKubernetes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// The builtins come first; their count grows with the release catalog
+	// (go-cpu in #147, finite-logs in #173), so the two published versions
+	// follow however many builtins there are.
+	builtins := len(compiler.DescribeProfiles("builtin", nil))
 	described := compiler.DescribeProfiles("", listed)
-	if len(described) != 4 || described[2].Ref != orgRef || described[2].Available || described[3].Ref != localRef || !described[3].Available {
+	if builtins < 2 || len(described) != builtins+2 || described[builtins].Ref != orgRef || described[builtins].Available || described[builtins+1].Ref != localRef || !described[builtins+1].Available {
 		t.Fatalf("listed = %+v", described)
 	}
-	if digest, ok := compiler.BuiltinProfileDigest("network-connections"); !ok || described[2].Digest == digest {
+	if digest, ok := compiler.BuiltinProfileDigest("network-connections"); !ok || described[builtins].Digest == digest {
 		t.Fatal("a renamed organization definition kept the builtin identity")
 	}
 	target.Request.Namespace.UID = other.UID
