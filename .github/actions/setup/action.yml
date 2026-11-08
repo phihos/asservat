@@ -73,6 +73,13 @@ runs:
     - shell: bash
       run: pip install --disable-pip-version-check -q -r requirements-spec.txt
 
+    # As for Go: a cached Node 26 in the tool cache satisfies setup-node
+    # without its download (15-70 s measured on 2026-11-08).
+    - if: inputs.console == 'true'
+      uses: actions/cache@v6
+      with:
+        path: ${{ runner.tool_cache }}/node/26.*
+        key: node-toolchain-${{ runner.os }}-${{ runner.arch }}-26-${{ hashFiles('web/package-lock.json') }}
     - if: inputs.console == 'true'
       uses: actions/setup-node@v7
       with:
