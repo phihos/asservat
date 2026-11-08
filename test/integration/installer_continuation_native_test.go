@@ -583,6 +583,14 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 			})
 			return
 		}
+		if focus := installedJourneyFocus(); focus == "journey-store-failure" || focus == "journey-start-failure" {
+			// S-02 exit failure states against the installed run (object store,
+			// capacity, hub disconnect, key service; docs/implementation-status.md).
+			t.Run(focus, func(t *testing.T) {
+				qualifyInstalledJourneyFailures(t, ctx, admin, providers, evidenceBucket, p.RootID, identity, publicRoot, publicAddress, origin, api, desired.TargetNamespace, prefix+"-worker", cluster, namespace, workload, diagnose)
+			})
+			return
+		}
 		if installedRecordingFocus() {
 			t.Run("approved-recording", func(t *testing.T) {
 				var measurement *nativePacingMeasurement
@@ -748,7 +756,7 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 	}
 	hubKubeconfig := installedUnifiedRunnerKubeconfig(t, f.Clusters[0].Config, desired)
 	qualifyRegionalInstall(t, ctx, f, 1, admin, runnerAPI, api, hubKubeconfig, desired.TargetNamespace, issuer, journey, providers, offerMap.Data[contracts.RegionalOfferFile], installation)
-	if focus := installedJourneyFocus(); focus == "restart" || focus == "journey" || focus == "browser" || focus == "upgrade" || focus == "policy" || focus == "alert" || focus == "logresource" || focus == "chain" || focus == "share" || installedRecordingFocus() || installedLogsFocus() {
+	if focus := installedJourneyFocus(); focus == "restart" || focus == "journey" || focus == "browser" || focus == "upgrade" || focus == "policy" || focus == "alert" || focus == "logresource" || focus == "chain" || focus == "share" || focus == "journey-store-failure" || focus == "journey-start-failure" || installedRecordingFocus() || installedLogsFocus() {
 		t.Log("focused " + focus + " run complete: the second workload cluster and replay checks were not run")
 		return
 	}

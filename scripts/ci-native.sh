@@ -36,6 +36,14 @@ declare -A suites=(
   # them (installedFastFixture, docs/implementation-progress.md).
   [continuation-chain]="env ASSERVAT_JOURNEY_FOCUS=chain $context --initial-bootstrap-chain --runtime-provider-pair --installer-continuation"
   [continuation-journey]="env ASSERVAT_JOURNEY_FOCUS=journey $context --initial-bootstrap-chain --runtime-provider-pair --installer-continuation"
+  # S-02 exit failure states in the installed run: an object-store failure
+  # ends an accepted capture Indeterminate/StorageOutcomeUnconfirmed and an
+  # exhausted workload context reserve refuses CapacityUnavailable.
+  [continuation-journey-store-failure]="env ASSERVAT_JOURNEY_FOCUS=journey-store-failure $context --initial-bootstrap-chain --runtime-provider-pair --installer-continuation"
+  # ADR-223: a hub-worker crash during an accepted capture never repeats the
+  # collection and resolves terminal; a key-service failure before the start
+  # stays Pending until the original deadline marks Indeterminate.
+  [continuation-journey-start-failure]="env ASSERVAT_JOURNEY_FOCUS=journey-start-failure $context --initial-bootstrap-chain --runtime-provider-pair --installer-continuation"
   [continuation-approved-recording]="env ASSERVAT_JOURNEY_FOCUS=approved-recording $context --initial-bootstrap-chain --runtime-provider-pair --installer-continuation"
   [continuation-manual-syscall]="env ASSERVAT_JOURNEY_FOCUS=manual-syscall $context --initial-bootstrap-chain --runtime-provider-pair --installer-continuation"
   [continuation-manual-logs]="env ASSERVAT_JOURNEY_FOCUS=manual-logs $context --initial-bootstrap-chain --runtime-provider-pair --installer-continuation"
