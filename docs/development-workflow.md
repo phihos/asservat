@@ -109,7 +109,7 @@ merely to implement this debugging preference.
 ## Local installed loop
 
 Installed focuses that start no node collector run on this workstation with
-Docker and kind, in about 11 minutes instead of a hosted round trip:
+Docker and kind, in about 13 minutes instead of a hosted round trip:
 
 ```sh
 cd web && npm ci --prefer-offline && cd ..   # once per fresh worktree
@@ -122,8 +122,9 @@ scratch; `/tmp` is a small zram disk). It owns two fresh kind clusters
 (three for `clusters`) and needs about 10 GiB of free memory.
 
 Local-capable focuses: `chain`, `journey`, `browser`, `restart`, `clusters`,
-`upgrade`, `policy`, `alert`, `logresource`, `share`, `manual-logs`. All other
-focuses load eBPF collectors; the harness refuses them without
+`upgrade`, `policy`, `alert`, `logresource`, `share`, `manual-logs`
+(`LOCAL_FOCUSES` in the Makefile; the target rejects every other value). All
+other focuses load eBPF collectors; the harness also refuses them without
 `/etc/asservat-disposable-host`. Never create that file on a workstation.
 
 Each run is a fresh installation: clusters, database and images are never
@@ -138,7 +139,11 @@ concurrently, and the Go test package compiles meanwhile), 200 s in the
 unified bootstrap runner
 (produce 28 s, schema 84 s, prepare 38 s, retire 39 s), 215 s in the
 installer continuation up to the focus, about 2 minutes in the
-`manual-logs` focus and its cleanup, and 15 s removing fixtures.
+`manual-logs` focus and its cleanup, and 15 s removing fixtures. A measured
+`make installed-focus FOCUS=manual-logs` on 2026-11-08 took 777 s wall
+time: 100 s harness setup (images 31 s, services 23 s, concurrent clusters
+36 s), 664 s Go test (unified runner 28/88/38/40 s, `manual-logs` 158 s) and
+14 s cleanup, leaving no owned kind cluster, container or network.
 
 ## Prefer measured simplification
 

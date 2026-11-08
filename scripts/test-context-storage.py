@@ -15,6 +15,7 @@ import hashlib
 import os
 import re
 import shutil
+import signal
 from pathlib import Path
 import subprocess
 import sys
@@ -706,8 +707,7 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
             # as the run below, output discarded. It only fills the Go build
             # cache; the real `go test` still builds (and reports) everything.
             compile_ahead = subprocess.Popen(["go", "test", "-count=1"] + ([] if installer_continuation else ["-race"]) + ["-run", "^$", test_package],
-                                             cwd=ROOT, env={**os.environ, "TMPDIR": str(build_scratch or work)}, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            cleanup.callback(lambda: compile_ahead.poll() is None and (compile_ahead.kill(), compile_ahead.wait()))
+                                             cwd=ROOT, env={**os.environ, "TMPDIR": str(build_scratch or work)}, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
             run(["docker", "network", "create", "--internal", "--label", "asservat.test="+run_id, network])
             created_network = True
             run(["docker", "network", "create", "--label", "asservat.test="+run_id, kind_network])
@@ -1077,6 +1077,11 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
         finally:
             report["testExit"] = exit_code
             failures = []
+            # Stop a still-running compile-ahead (setup failure) before any
+            # scratch removal below.
+            if compile_ahead is not None and compile_ahead.poll() is None:
+                os.killpg(compile_ahead.pid, signal.SIGKILL)  # with its compiler children
+                compile_ahead.wait()
             try:
                 artifacts = collect_profile_containment_artifacts(work, ROOT/"test/results")
                 if artifacts is not None:
