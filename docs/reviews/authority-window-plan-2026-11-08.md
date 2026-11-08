@@ -7,15 +7,17 @@ Status: plan. Extends step 3 of
 
 Every check builds its validity by hand: `identity.Earlier(...)` chains,
 `identity.Fresh(observed, until, now, 5*time.Second)` and literal durations.
-On main there are 988 non-test `5*time.Second` literals in 555 files, about
-1,400 `Earlier` calls and 266 `Fresh` calls. When ADR-311 moved checks to a
+On main (c512de5c) a plain search of non-test Go files under `internal/` finds
+about 990 `5*time.Second` literals in about 550 files (validity and I/O
+timeouts together), about 1,400 `Earlier` calls and about 270 `Fresh` calls.
+These are orders of magnitude, not the gate baseline (see Gate). When ADR-311 moved checks to a
 30 s interval, the sites that were missed failed on installed systems one per
 CI run:
 
 - capture start, manual live and download sites still bounded at 5 s;
 - the regional receiver check returned its local check's later start plus
   30 s, so `Fresh(started, until, now, 30s)` refused its own result
-  (`regional-query-bound`, fixed in 8249e79c);
+  (`regional-query-bound`, fixed in PR #174);
 - SQL fences that persist proofs (00035, 00049, 00054/65/73) refused longer
   windows than the Go side produced.
 
@@ -24,14 +26,16 @@ interval differs between producer and consumer".
 
 ## Mechanism
 
-1. `identity.Window{From, Until time.Time}` built only by
-   `identity.Check(start, interval)`; methods `Narrow(t ...time.Time) Window`
-   (only shortens), `Valid(now)`, and `Within(interval)` for consumers.
-   `From` is the check's own start and cannot be changed; `Narrow` never
-   extends `Until`. A zero Window is invalid.
-2. Producers return a `Window` instead of separate `ObservedAt/ValidUntil`
-   pairs; consumers call `w.Within(identity.AuthorityRecheckInterval)` instead
-   of `Fresh(..., 5*time.Second)`. Both sides then use one named interval.
+1. `identity.Window{From, Until time.Time, Kind}` built only by
+   `identity.Check(start, kind)`; methods `Narrow(t ...time.Time) Window`
+   (only shortens), `Valid(now)`. `From` is the check's own start and cannot be
+   changed; `Narrow` never extends `Until`. A zero Window is invalid.
+2. `Kind` names the interval, one constant per kind, so producer and consumer
+   cannot disagree: `Recheck` (ADR-311, 30 s), `PolicyObservation` (60 s),
+   and `SQLFenced` (5 s, only for proofs that SQL fences persist, see 4).
+   Consumers call `w.Valid(now)`; the window's own kind supplies the bound
+   instead of a literal at the call site. Producers return a `Window` instead
+   of separate `ObservedAt/ValidUntil` pairs.
 3. Property test: for every producer converted, `Until <= From + interval`
    for any sequence of inner checks with later starts (the regional bug).
 4. SQL: the persisted proofs keep their own bounds; each fence names its
@@ -40,10 +44,11 @@ interval differs between producer and consumer".
 
 ## Gate
 
-`make go-check` gains a small script that counts non-test `5*time.Second`
-literals used as validity (in `Fresh`/`Add` for `ValidUntil`/`FreshUntil`/
-`until`) per file against a checked-in baseline. New ones fail; removing them
-lowers the baseline. I/O timeouts (`context.WithTimeout(..., 5*time.Second)`)
+`make go-check` gains a small script that counts, per non-test file, duration
+literals passed to `identity.Fresh`/`value.Fresh` or added to a time assigned
+to a `ValidUntil`/`FreshUntil`/`until` name (go/ast, not grep). Its first run
+writes the checked-in baseline; that file, not the numbers above, is the
+gate. New sites fail; converting sites lowers the baseline. I/O timeouts (`context.WithTimeout(..., 5*time.Second)`)
 stay allowed; they bound blocking work, not authority.
 
 ## Rollout
@@ -56,7 +61,8 @@ stay allowed; they bound blocking work, not authority.
 
 ## Complexity checklist
 
-1. Frequent and harmful: yes, about ten installed CI failures on 2026-11-07/08.
+1. Frequent and harmful: yes, the installed live-watch and capture-start runs of
+   2026-11-07/08 (PR #174) failed repeatedly on this class.
 2. Maintainer already accepted relaxed intervals (AGENTS.md, ADR-311).
 3. All deployments. 4. Precedent: one shared interval constant already exists.
 5. No privileges. 6. Fewer failure states (one validity rule).
