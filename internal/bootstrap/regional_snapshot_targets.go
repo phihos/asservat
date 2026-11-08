@@ -62,14 +62,18 @@ func (t reportedTargets) ResolveSourceSnapshot(ctx context.Context, original tar
 		}
 		return out, nil
 	}
-	t.refused(fmt.Sprintf("missing sources=%d", len(report.Sources)))
+	t.refusedWith("missing", fmt.Sprintf("sources=%d", len(report.Sources)))
 	return out, targets.ErrUnavailable
 }
 
 // refused logs a fixed source snapshot refusal reason; no identifiers.
-func (t reportedTargets) refused(reason string) {
-	if t.report != nil {
-		t.report("source-snapshot", reason)
+func (t reportedTargets) refused(reason string) { t.refusedWith(reason, "") }
+
+// Each reason is its own event key: one shared key printed only the reasons
+// at the 1st, 2nd, 4th... refusal, hiding any other reason in between.
+func (t reportedTargets) refusedWith(reason, count string) {
+	if t.refusal != nil {
+		t.refusal(reason, count)
 	}
 }
 

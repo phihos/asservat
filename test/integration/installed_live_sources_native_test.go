@@ -219,7 +219,16 @@ func (p *installedLiveProducer) submit(ctx context.Context, previewID, key strin
 		}
 		return r.Status, c
 	}
-	id, e := installedJourneySubmit(ctx, call, request)
+	// After approval the reviewed request is submitted again. An original
+	// OutcomeUnknown/AcquisitionNotStarted is resolved and continued instead:
+	// a plain same-key request only replays the admitted, unstarted capture.
+	var id string
+	var e error
+	if code == "ApprovalRequired" {
+		id, e = installedJourneySubmit(ctx, call, request)
+	} else {
+		id, e = installedJourneyRecoverSubmitted(ctx, call, request, code)
+	}
 	if e != nil {
 		p.t.Fatal("LIVE original capture resolution", e)
 	}

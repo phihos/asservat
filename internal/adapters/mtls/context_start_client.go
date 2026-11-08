@@ -6,6 +6,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
+	"errors"
 	"io"
 	"net"
 	"net/http"
@@ -321,7 +322,9 @@ func (c *ContextStartClient) currentWithOpeningDiagnostic(ctx context.Context, c
 	}
 	out := value.APIContextReceiver{Channel: channel, ObservedAt: started, ValidUntil: until}
 	if call.Err() != nil || c.root.Err() != nil || !out.Valid(c.now()) {
-		return zero, value.ErrUnavailable
+		// Both halves succeeded, but the check's own bound (its five seconds,
+		// the reused local proof or the owner certificate) ended meanwhile.
+		return zero, receiverCheckStep{"bound", errors.Join(value.ErrUnavailable, call.Err())}
 	}
 	return out, nil
 }

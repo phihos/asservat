@@ -1,6 +1,7 @@
 package bootstrap
 
 import (
+	"bytes"
 	"context"
 	"testing"
 	"time"
@@ -53,5 +54,31 @@ func TestSourceSnapshotResolutionUsesRetainedPinAndActualStopGrace(t *testing.T)
 	clock.set(p.LeafUntil)
 	if _, err = resolver.ResolveSourceSnapshot(ctx, original); err == nil {
 		t.Fatal("natural grace widened expired source leaf")
+	}
+}
+
+// Each fixed refusal reason is its own event under the region's refusal prefix,
+// so a later different reason is not hidden behind an earlier one's count.
+func TestSourceSnapshotRefusalReasonsReachTheirOwnLogEvents(t *testing.T) {
+	start := time.Now().UTC().Truncate(time.Microsecond)
+	clock := &packetRingClock{at: start.Add(3 * time.Second)}
+	p := sourceOwnerPermit(start)
+	id := p.Binding.PodUID
+	request := targets.Request{ClusterID: id, Namespace: configuration.NamespaceRef{Name: "app", UID: id}, Workload: configuration.WorkloadRef{Kind: "Pod", Name: "old-pod", UID: id}, PodName: "old-pod", PodUID: id}
+	original := targets.SourceSnapshotTarget{Request: request, Pin: artifact.PinnedPod{Namespace: "app", NamespaceUID: id, Name: "old-pod", UID: id}, NodeUID: p.Binding.NodeUID, BootID: p.Binding.BootID, CollectorPodUID: p.Binding.CollectorPodUID, CollectorEpoch: p.Binding.CollectorEpoch, SourceID: p.Binding.SourceID, Fence: p.Binding.Fence, BindingDigest: [32]byte{1}}
+	registry := &retainedSourceRegistry{view: delivery.NodeView{Identity: collector.Identity{NodeUID: p.Binding.NodeUID, BootID: p.Binding.BootID, PodUID: p.Binding.CollectorPodUID, Epoch: p.Binding.CollectorEpoch}, Current: true, Report: &collector.Report{ObservedAt: start.Add(2 * time.Second)}}}
+	var out bytes.Buffer
+	resolver := reportedTargets{recordings: &ConnectorRecordings{nodes: registry, now: clock.now}, refusal: timedEventLog(&out, "regional source snapshot refused")}
+	ctx, cancel := context.WithDeadline(t.Context(), start.Add(time.Minute))
+	defer cancel()
+	if _, err := resolver.ResolveSourceSnapshot(ctx, original); err == nil {
+		t.Fatal("resolved a source absent from the report")
+	}
+	registry.view.Current = false
+	if _, err := resolver.ResolveSourceSnapshot(ctx, original); err == nil {
+		t.Fatal("resolved through a stale node view")
+	}
+	if got := out.String(); got != "regional source snapshot refused: missing (1), sources=0\nregional source snapshot refused: node (1)\n" {
+		t.Fatalf("refusal reasons lost: %q", got)
 	}
 }

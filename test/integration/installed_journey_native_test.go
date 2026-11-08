@@ -895,6 +895,14 @@ func installedJourneySubmit(ctx context.Context, call func(name string, argument
 		}
 		return accepted.CaptureID, nil
 	}
+	return installedJourneyRecoverSubmitted(ctx, call, request, code)
+}
+
+// installedJourneyRecoverSubmitted resolves and, when admitted but not started,
+// explicitly continues an original request_capture that already returned code.
+// A plain same-key resubmission would only replay the acceptance passively
+// (ADR-134), leaving an admitted capture unstarted.
+func installedJourneyRecoverSubmitted(ctx context.Context, call func(name string, arguments any, data any) (string, string), request map[string]any, code string) (string, error) {
 	acceptedID := ""
 	closed, err := installedJourneyRecoverCapture(ctx, code, func() (installedJourneyDisposition, error) {
 		var d installedJourneyDisposition

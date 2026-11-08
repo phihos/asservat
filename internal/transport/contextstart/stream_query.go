@@ -372,6 +372,8 @@ func (s *frameStream) answerQuery(ctx context.Context, f contracts.APIContextFra
 				stage = streamRegionalQueryLocal
 			case "owner":
 				stage = streamRegionalQueryOwnerAuth
+			case "bound":
+				stage = streamRegionalQueryBound
 			}
 		}
 		s.record(stage, queryCheckReason(e))

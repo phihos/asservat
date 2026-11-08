@@ -69,10 +69,14 @@ const (
 	streamRegionalQueryWrite
 	streamRegionalQueryLocal
 	streamRegionalQueryOwnerAuth
+	// Both halves of the region's check passed, but its own bound ended.
+	// An untagged regional-query-owner failure is then only an exchange or
+	// caller context that ended before the check.
+	streamRegionalQueryBound
 )
 
 func (v StreamInterruption) Stage() string {
-	names := [...]string{"none", "owner", "close", "send-admission", "receive-admission", "send-call", "receive-call", "send-peer", "receive-peer", "send-bound", "receive-bound", "send-deadline", "receive-deadline", "write", "flush", "read", "send-result", "receive-result", "passive-call", "passive-deadline", "passive-frame", "passive-peer", "hub-setup", "hub-send", "hub-receive", "hub-operations", "hub-result", "hub-receipt", "regional-setup", "regional-work", "regional-verify", "regional-operations", "regional-result", "regional-receipt", "work-peer-lease", "hub-query", "hub-query-source", "hub-query-check", "regional-query-owner", "regional-query-write", "regional-query-local", "regional-query-owner-auth"}
+	names := [...]string{"none", "owner", "close", "send-admission", "receive-admission", "send-call", "receive-call", "send-peer", "receive-peer", "send-bound", "receive-bound", "send-deadline", "receive-deadline", "write", "flush", "read", "send-result", "receive-result", "passive-call", "passive-deadline", "passive-frame", "passive-peer", "hub-setup", "hub-send", "hub-receive", "hub-operations", "hub-result", "hub-receipt", "regional-setup", "regional-work", "regional-verify", "regional-operations", "regional-result", "regional-receipt", "work-peer-lease", "hub-query", "hub-query-source", "hub-query-check", "regional-query-owner", "regional-query-write", "regional-query-local", "regional-query-owner-auth", "regional-query-bound"}
 	if int(v.stage) >= len(names) {
 		return "unknown"
 	}
