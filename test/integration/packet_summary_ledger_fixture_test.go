@@ -143,6 +143,7 @@ func refuseRetainedPacketSummaryDowngrade(t *testing.T, f *queryLedgerFixture) {
 	}
 	// Later additive migrations may commit their Down before the retained138
 	// audit refuses. Restore that prefix, including the original predicate ACL.
+	grants := preserveFixtureGrants(t, f.base.ctx, f.base.admin)
 	defer func() {
 		cleanup, stop := context.WithTimeout(context.WithoutCancel(f.base.ctx), 30*time.Second)
 		defer stop()
@@ -150,6 +151,7 @@ func refuseRetainedPacketSummaryDowngrade(t *testing.T, f *queryLedgerFixture) {
 			t.Error("restore packet schema prefix", e)
 			return
 		}
+		grants(cleanup)
 		if originalHead >= 139 {
 			restorePacketQueryFixturePredicate(t, cleanup, f)
 		}

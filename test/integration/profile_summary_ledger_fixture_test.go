@@ -357,6 +357,7 @@ func refuseRetainedProfileSummaryDowngrade(t *testing.T, f *queryLedgerFixture) 
 	}
 	// Goose may have committed later Down migrations before the retained
 	// source refuses. Repair that prefix on every exit, including Fatal/cancel.
+	grants := preserveFixtureGrants(t, f.base.ctx, f.base.admin)
 	defer func() {
 		cleanup, cancel := context.WithTimeout(context.WithoutCancel(f.base.ctx), 30*time.Second)
 		defer cancel()
@@ -364,6 +365,7 @@ func refuseRetainedProfileSummaryDowngrade(t *testing.T, f *queryLedgerFixture) 
 			t.Error("restore schema after summary rollback", err)
 			return
 		}
+		grants(cleanup)
 		restored, err := provider.GetDBVersion(cleanup)
 		if err != nil || restored != head {
 			t.Error("summary rollback did not restore original schema head", restored, head, err)

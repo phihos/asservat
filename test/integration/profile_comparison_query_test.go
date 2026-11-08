@@ -323,12 +323,14 @@ func refuseRetainedComparisonDowngrade(t *testing.T, f *queryLedgerFixture) {
 			stop, refusal = 134, "retained acquisition-window verification prevents rollback"
 		}
 	}
+	grants := preserveFixtureGrants(t, f.base.ctx, f.base.admin)
 	defer func() {
 		cleanup, cancel := context.WithTimeout(context.WithoutCancel(f.base.ctx), 30*time.Second)
 		defer cancel()
 		if _, e := provider.UpTo(cleanup, original); e != nil {
 			t.Error("restore schema after comparison rollback refusal", e)
 		}
+		grants(cleanup)
 	}()
 	var before, after []byte
 	snapshot := func(out *[]byte) {

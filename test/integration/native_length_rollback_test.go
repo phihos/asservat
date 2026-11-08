@@ -45,12 +45,14 @@ func qualifyNativeLengthRollbackRefusal(t *testing.T, ctx context.Context, admin
 	}
 	// A later migration may down first; restore the original release even when
 	// SQL130 refuses, so subsequent fixture cases see the compiled schema.
+	grants := preserveFixtureGrants(t, ctx, admin)
 	defer func() {
 		restore, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 		if _, err := provider.UpTo(restore, original); err != nil {
 			t.Error("restore newer schema after expected refusal", err)
 		}
+		grants(restore)
 	}()
 	if _, err = provider.DownTo(ctx, 129); err == nil || !strings.Contains(err.Error(), refusal) {
 		t.Fatal("retained verification metadata downgrade", err)

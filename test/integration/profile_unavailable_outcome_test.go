@@ -91,17 +91,22 @@ func refuseRetainedProfileUnavailableDowngrade(t *testing.T, ctx context.Context
 	if err != nil {
 		t.Fatal(err)
 	}
+	grants := preserveFixtureGrants(t, ctx, admin)
 	defer func() {
 		cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
 		defer cancel()
 		if _, err := provider.UpTo(cleanup, head); err != nil {
 			t.Error("restore schema after refusal downgrade probe", err)
 		}
+		grants(cleanup)
 	}()
 	if _, err := provider.DownTo(ctx, 134); err == nil || !strings.Contains(err.Error(), "retained profile-unavailable execution prevents rollback") {
 		t.Fatal("retained new terminal phase did not refuse rollback", err)
 	}
-	if after, err := provider.GetDBVersion(ctx); err != nil || after != head {
-		t.Fatal("refused downgrade changed original head", after, head, err)
+	// Goose downs one migration per transaction: every migration after 135
+	// downs first (their own Downs carry no retained-state refusal), then 135
+	// refuses and stays applied. The deferred UpTo restores the original head.
+	if after, err := provider.GetDBVersion(ctx); err != nil || after != 135 {
+		t.Fatal("refused downgrade did not stop at migration 135", after, head, err)
 	}
 }

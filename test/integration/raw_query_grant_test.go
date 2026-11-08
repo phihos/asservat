@@ -327,12 +327,14 @@ func qualifyRawQueryRollback(t *testing.T, ctx context.Context, admin *pgxpool.P
 	if err != nil {
 		t.Fatal(err)
 	}
+	grants := preserveFixtureGrants(t, ctx, admin)
 	defer func() {
 		c, end := context.WithTimeout(context.Background(), 30*time.Second)
 		defer end()
 		if _, err := p.UpTo(c, original); err != nil {
 			t.Error(err)
 		}
+		grants(c)
 	}()
 	if _, err = p.DownTo(ctx, 130); err == nil || !strings.Contains(err.Error(), "retained raw-query grants prevent rollback") {
 		t.Fatal("retained raw downgrade", err)
