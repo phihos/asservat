@@ -1,0 +1,36 @@
+=== RUN   TestInitialSchemaWithRealPostgres
+=== RUN   TestInitialSchemaWithRealPostgres/reject-nonempty-schema-before-root-claim
+=== RUN   TestInitialSchemaWithRealPostgres/original-prefix-resume-and-lost-completion
+    initial_schema_test.go:180: original prefix phase=migration version=22 head_read_ok=true head=22 claims=1 root_reads=3 constraints_read_ok=true primary=1 not_null=4 other=0
+    initial_schema_test.go:191: resume applied 124 migrations in 2.069948599s with 6 root reads; slowest migration interval 0.058s (read ok true)
+=== RUN   TestInitialSchemaWithRealPostgres/runtime-manager-has-only-exact-grant-union
+=== RUN   TestInitialSchemaWithRealPostgres/reject-unknown-relation-aaa_unknown_initial_relation
+=== RUN   TestInitialSchemaWithRealPostgres/reject-unknown-relation-zzz_unknown_initial_relation
+=== RUN   TestInitialSchemaWithRealPostgres/reject-metadata-extra-check
+=== RUN   TestInitialSchemaWithRealPostgres/reject-metadata-missing-not-null
+=== RUN   TestInitialSchemaWithRealPostgres/reject-metadata-wrong-primary-key
+=== RUN   TestInitialSchemaWithRealPostgres/reject-foreign-down-or-reordered-history
+=== RUN   TestInitialSchemaWithRealPostgres/changed-instance-bundle-and-expired-root-deny
+=== RUN   TestInitialSchemaWithRealPostgres/held-original-session-lock-never-taken-over
+=== RUN   TestInitialSchemaWithRealPostgres/completed-schema-read-only-resume-after-child-creation
+=== RUN   TestInitialSchemaWithRealPostgres/activation-consumes-original-schema-incarnation
+=== RUN   TestInitialSchemaWithRealPostgres/activation-consumes-original-schema-incarnation/changed-database
+=== RUN   TestInitialSchemaWithRealPostgres/activation-consumes-original-schema-incarnation/changed-postmaster
+--- PASS: TestInitialSchemaWithRealPostgres (4.28s)
+    --- PASS: TestInitialSchemaWithRealPostgres/reject-nonempty-schema-before-root-claim (0.01s)
+    --- PASS: TestInitialSchemaWithRealPostgres/original-prefix-resume-and-lost-completion (2.45s)
+    --- PASS: TestInitialSchemaWithRealPostgres/runtime-manager-has-only-exact-grant-union (0.04s)
+    --- PASS: TestInitialSchemaWithRealPostgres/reject-unknown-relation-aaa_unknown_initial_relation (0.08s)
+    --- PASS: TestInitialSchemaWithRealPostgres/reject-unknown-relation-zzz_unknown_initial_relation (0.08s)
+    --- PASS: TestInitialSchemaWithRealPostgres/reject-metadata-extra-check (0.07s)
+    --- PASS: TestInitialSchemaWithRealPostgres/reject-metadata-missing-not-null (0.07s)
+    --- PASS: TestInitialSchemaWithRealPostgres/reject-metadata-wrong-primary-key (0.07s)
+    --- PASS: TestInitialSchemaWithRealPostgres/reject-foreign-down-or-reordered-history (0.07s)
+    --- PASS: TestInitialSchemaWithRealPostgres/changed-instance-bundle-and-expired-root-deny (0.05s)
+    --- PASS: TestInitialSchemaWithRealPostgres/held-original-session-lock-never-taken-over (0.05s)
+    --- PASS: TestInitialSchemaWithRealPostgres/completed-schema-read-only-resume-after-child-creation (0.13s)
+    --- PASS: TestInitialSchemaWithRealPostgres/activation-consumes-original-schema-incarnation (0.50s)
+        --- PASS: TestInitialSchemaWithRealPostgres/activation-consumes-original-schema-incarnation/changed-database (0.03s)
+        --- PASS: TestInitialSchemaWithRealPostgres/activation-consumes-original-schema-incarnation/changed-postmaster (0.01s)
+PASS
+ok  	asservat.local/asservat/test/integration	5.349s

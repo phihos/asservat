@@ -26,6 +26,7 @@ type syntheticSchemaRoot struct {
 	mu                                   sync.Mutex
 	record                               *contracts.InitialPreparationSchema
 	reads, failRead, claims, completions int
+	shortRead                            int
 	loseCompletion                       bool
 	expired                              bool
 }
@@ -38,6 +39,10 @@ func (r *syntheticSchemaRoot) ReadInitialSchema(ctx context.Context) (contracts.
 		return contracts.InitialPreparationRoot{}, time.Time{}, cfg.ErrUnavailable
 	}
 	until := time.Now().Add(5 * time.Second)
+	if r.reads == r.shortRead {
+		// Leaves a bracket only a few migrations beyond the step reserve.
+		until = time.Now().Add(2300 * time.Millisecond)
+	}
 	if r.expired {
 		until = time.Now().Add(-time.Second)
 	}
@@ -158,8 +163,11 @@ func TestInitialSchemaWithRealPostgres(t *testing.T) {
 		}
 	})
 	if !t.Run("original-prefix-resume-and-lost-completion", func(t *testing.T) {
+		// Read 2 is the first bracket's opening root check and read 3 its closing
+		// one (ADR-315): a short opening lease stops the batch early and the lost
+		// closing proof stops the run after a committed prefix.
 		root.reads = 0
-		root.failRead = 8
+		root.shortRead, root.failRead = 2, 3
 		runError := s.Run(ctx)
 		if runError == nil {
 			t.Fatal("lost current proof did not stop")
@@ -170,13 +178,21 @@ func TestInitialSchemaWithRealPostgres(t *testing.T) {
 		var primary, required, other int
 		constraintError := sqlAdmin.QueryRow(ctx, `SELECT count(*) FILTER (WHERE contype='p'),count(*) FILTER (WHERE contype='n'),count(*) FILTER (WHERE contype NOT IN ('p','n')) FROM pg_constraint WHERE conrelid=to_regclass('public.goose_db_version')`).Scan(&primary, &required, &other)
 		t.Logf("original prefix phase=%s version=%d head_read_ok=%t head=%d claims=%d root_reads=%d constraints_read_ok=%t primary=%d not_null=%d other=%d", phase, version, headError == nil, head, root.claims, root.reads, constraintError == nil, primary, required, other)
-		if headError != nil || head < 1 {
-			t.Fatal("first transactional prefix not retained")
+		if headError != nil || head < 1 || int64(head) >= postgres.CompiledSchemaVersion || phase != "migration" || version != int64(head) {
+			t.Fatal("first bracket did not retain an exact partial prefix")
 		}
 		original := *root.record
-		root.failRead = 0
+		root.shortRead, root.failRead = 0, 0
 		root.loseCompletion = true
-		if e = s.Run(ctx); e == nil || root.record.CompletedAt == nil {
+		started, reads := time.Now(), root.reads
+		e = s.Run(ctx)
+		var slowest float64
+		slowestError := sqlAdmin.QueryRow(ctx, `SELECT COALESCE(max(extract(epoch FROM d)),0)::float8 FROM (SELECT tstamp-lag(tstamp) OVER (ORDER BY id) d FROM public.goose_db_version WHERE version_id>$1) s`, head).Scan(&slowest)
+		t.Logf("resume applied %d migrations in %s with %d root reads; slowest migration interval %.3fs (read ok %t)", postgres.CompiledSchemaVersion-int64(head), time.Since(started), root.reads-reads, slowest, slowestError == nil)
+		if root.reads-reads >= int(postgres.CompiledSchemaVersion-int64(head)) {
+			t.Fatal("schema run did not batch migrations under shared root leases")
+		}
+		if e == nil || root.record.CompletedAt == nil {
 			t.Fatal("lost completion acknowledgement not modeled", e)
 		}
 		if root.record.AttemptID != original.AttemptID || root.record.ClaimedAt != original.ClaimedAt || root.claims != 1 {

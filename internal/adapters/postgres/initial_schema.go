@@ -51,7 +51,9 @@ func NewInitialSchema(c *pgx.ConnConfig, root InitialSchemaRoot, manager contrac
 	copy.ConnectTimeout = 5 * time.Second
 	db := stdlib.OpenDB(*copy)
 	db.SetMaxOpenConns(1)
-	db.SetMaxIdleConns(0)
+	// One idle slot lets a bracket hand its locked session to Goose; every
+	// bracket discards that session when it ends.
+	db.SetMaxIdleConns(1)
 	db.SetConnMaxLifetime(time.Minute)
 	return &InitialSchema{db: db, root: root, manager: manager, bundle: b}, nil
 }
@@ -62,16 +64,26 @@ func (s *InitialSchema) Close() error {
 	return s.db.Close()
 }
 
-// Run applies at most the finite embedded prefix. Each step has its own current
-// original five-second lease; an uncertain SQL/Kubernetes reply stops the run.
-// Resuming inspects the same attempt. A completed root permits read-only replay.
+// Run applies at most the finite embedded prefix in brackets (ADR-315). Each
+// bracket has one current original five-second root lease: it checks the root,
+// database incarnation, history and inventory once, applies as many pending
+// migrations as the remaining lease allows in order, each in its own
+// transaction on the same locked session, and ends with a history and root
+// check. An uncertain SQL/Kubernetes reply stops the run. Resuming inspects the
+// same attempt. A completed root permits read-only replay.
 func (s *InitialSchema) Run(ctx context.Context) error {
 	if s == nil || ctx == nil || ctx.Err() != nil || !s.running.CompareAndSwap(false, true) {
 		return cfg.ErrUnavailable
 	}
 	defer s.running.Store(false)
-	for step := int64(0); step <= s.bundle.Head+1; step++ {
+	// Every bracket applies at least one migration or fails, so Head+1 brackets
+	// bound the run.
+	for bracket := int64(0); bracket <= s.bundle.Head+1; bracket++ {
 		next, done, e := s.inspect(ctx, true)
+		var failure initialSchemaFailure
+		if errors.As(e, &failure) {
+			return e
+		}
 		if e != nil {
 			return initialSchemaFailure{phase: "inspection", cause: e}
 		}
@@ -84,14 +96,17 @@ func (s *InitialSchema) Run(ctx context.Context) error {
 			}
 			return nil
 		}
-		if e = s.apply(ctx, next); e != nil {
-			return initialSchemaFailure{phase: "migration", version: next, cause: e}
-		}
 	}
 	return cfg.ErrUnavailable
 }
 
 const initialSchemaLockID int64 = 0x4153534552565343
+
+// initialSchemaStepReserve is the lease time a bracket must still have before
+// it starts another migration: the slowest embedded migration (under 0.1 s
+// on PostgreSQL 18, ADR-315) plus the closing history read and root proof,
+// with margin for a slow cluster. A bracket that stops early leaves the rest to the next bracket.
+const initialSchemaStepReserve = 2 * time.Second
 
 type initialSchemaLease struct {
 	owner     *InitialSchema
@@ -173,6 +188,12 @@ func (l *initialSchemaLease) unlock() error {
 		return nil
 	}
 	l.locked = false
+	if l.conn == nil {
+		// The bracket's session was not reclaimed from the pool after its
+		// migrations. The pool discards a broken session, and a later bracket that
+		// receives an intact one discards it after use, which releases the lock.
+		return cfg.ErrUnavailable
+	}
 	cleanup, end := context.WithTimeout(context.WithoutCancel(l.ctx), time.Second)
 	defer end()
 	var released bool
@@ -182,6 +203,16 @@ func (l *initialSchemaLease) unlock() error {
 		return cfg.ErrUnavailable
 	}
 	return nil
+}
+
+// discard closes the bracket's session instead of returning it to the pool.
+func (l *initialSchemaLease) discard() {
+	if l.conn == nil {
+		return
+	}
+	_ = l.conn.Raw(func(any) error { return driver.ErrBadConn })
+	_ = l.conn.Close()
+	l.conn = nil
 }
 func (l *initialSchemaLease) verifyOriginal() error {
 	var v contracts.InitialPreparationSchema
@@ -239,11 +270,14 @@ func (s *InitialSchema) inspect(ctx context.Context, claim bool) (next int64, do
 	if e != nil {
 		return 0, false, cfg.ErrUnavailable
 	}
-	defer conn.Close()
+	l.conn = conn
+	// The bracket's session is discarded after unlock, so a lock count left by
+	// an interrupted step can never outlive the bracket.
 	defer func() {
-		if e := l.unlock(); e != nil {
+		if e := l.unlock(); e != nil && err == nil {
 			err = e
 		}
+		l.discard()
 	}()
 	if e = l.lock(conn); e != nil {
 		return 0, false, e
@@ -321,28 +355,93 @@ func (s *InitialSchema) inspect(ctx context.Context, claim bool) (next int64, do
 	if e = l.checkRoot(); e != nil {
 		return 0, false, e
 	}
+	if head == s.bundle.Head {
+		return head + 1, false, nil
+	}
+	head, e = s.batch(l, head)
+	if e != nil {
+		return 0, false, e
+	}
 	return head + 1, false, nil
 }
 
-// gooseStepLocker is private to a single ApplyVersion invocation. It acquires
-// and validates the original DB/root before Goose initializes or executes SQL.
-type gooseStepLocker struct {
+// batch applies pending versions after head in order while the bracket's lease
+// leaves initialSchemaStepReserve, then rechecks the history and the root. The
+// one-connection pool hands Goose the bracket's own locked session; each step
+// proves it is that session before Goose runs SQL. The returned head is the
+// last version this bracket applied.
+func (s *InitialSchema) batch(l *initialSchemaLease, head int64) (int64, error) {
+	var pid int32
+	if e := l.conn.QueryRowContext(l.ctx, "SELECT pg_backend_pid()").Scan(&pid); e != nil {
+		return head, cfg.ErrUnavailable
+	}
+	store, _ := database.NewStore(database.DialectPostgres, "public.goose_db_version")
+	locker := &gooseBatchLocker{lease: l, pid: pid}
+	p, e := goose.NewProvider(goose.DialectCustom, s.db, migrations.Files(), goose.WithStore(initialSchemaStore{store}), goose.WithSessionLocker(locker), goose.WithDisableGlobalRegistry(true), goose.WithAllowOutofOrder(false), goose.WithVerbose(false))
+	if e != nil {
+		return head, cfg.ErrInvalid
+	}
+	// Return the locked session to the pool, where it is the only connection.
+	_ = l.conn.Close()
+	l.conn = nil
+	applied := head
+	var failed error
+	for v := head + 1; v <= s.bundle.Head && time.Until(l.until) >= initialSchemaStepReserve; v++ {
+		locker.version = v
+		if _, e = p.ApplyVersion(l.ctx, v, true); e != nil {
+			failed = initialSchemaFailure{phase: "migration", version: v, cause: cfg.ErrUnavailable}
+			break
+		}
+		applied = v
+	}
+	// Reclaim the session for the closing checks, the unlock and the discard.
+	// The detached bounded context only lets a failed bracket still discard it.
+	reclaim, end := context.WithTimeout(context.WithoutCancel(l.ctx), time.Second)
+	defer end()
+	c, e := s.db.Conn(reclaim)
+	if e != nil {
+		return applied, initialSchemaFailure{phase: "migration", version: applied + 1, cause: cfg.ErrUnavailable}
+	}
+	l.conn = c
+	var same bool
+	if e = c.QueryRowContext(reclaim, "SELECT pg_backend_pid()=$1", pid).Scan(&same); e != nil || !same {
+		// A replacement session holds no lock of this bracket; the original
+		// session ended with its lock.
+		l.locked = false
+		return applied, initialSchemaFailure{phase: "migration", version: applied + 1, cause: cfg.ErrChanged}
+	}
+	if failed != nil {
+		return applied, failed
+	}
+	if applied == head {
+		// The lease left no time for one migration; never loop without progress.
+		return applied, initialSchemaFailure{phase: "migration", version: head + 1, cause: cfg.ErrUnavailable}
+	}
+	h, exists, e := initialSchemaHistory(l.ctx, c, s.bundle.Head, l.record.DDLRole.OID)
+	if e != nil || !exists || h != applied {
+		return applied, initialSchemaFailure{phase: "migration", version: applied, cause: cfg.ErrChanged}
+	}
+	if e = l.checkRoot(); e != nil {
+		return applied, initialSchemaFailure{phase: "migration", version: applied, cause: e}
+	}
+	return applied, nil
+}
+
+// gooseBatchLocker lets Goose run one version on the bracket's session. The
+// bracket already holds the advisory lock and checked the root, incarnation and
+// inventory; each step requires the same backend, the exact preceding history
+// head and a current lease. Unlock is the bracket's, after its closing checks.
+type gooseBatchLocker struct {
 	lease   *initialSchemaLease
+	pid     int32
 	version int64
 }
 
-func (g *gooseStepLocker) SessionLock(ctx context.Context, c *sql.Conn) (err error) {
+func (g *gooseBatchLocker) SessionLock(_ context.Context, c *sql.Conn) error {
 	l := g.lease
-	defer func() {
-		if err != nil {
-			_ = l.unlock()
-		}
-	}()
-	if e := l.lock(c); e != nil {
-		return e
-	}
-	if e := l.verifyOriginal(); e != nil {
-		return e
+	var same bool
+	if e := c.QueryRowContext(l.ctx, "SELECT pg_backend_pid()=$1", g.pid).Scan(&same); e != nil || !same {
+		return cfg.ErrChanged
 	}
 	if l.completed || l.record.AttemptID == "" {
 		return cfg.ErrChanged
@@ -351,28 +450,9 @@ func (g *gooseStepLocker) SessionLock(ctx context.Context, c *sql.Conn) (err err
 	if e != nil || !exists || head+1 != g.version {
 		return cfg.ErrChanged
 	}
-	if e = initialSchemaInventory(l.ctx, c, false, true, l.record.DDLRole.OID); e != nil {
-		return e
-	}
-	return l.checkRoot()
+	return l.current()
 }
-func (g *gooseStepLocker) SessionUnlock(_ context.Context, c *sql.Conn) error {
-	l := g.lease
-	// Goose calls cleanup with a detached context. Authority checks deliberately
-	// use the original lease, never that detached cleanup context.
-	head, exists, e := initialSchemaHistory(l.ctx, c, l.owner.bundle.Head, l.record.DDLRole.OID)
-	if e == nil && (!exists || head != g.version) {
-		e = cfg.ErrUnavailable
-	}
-	if e == nil {
-		e = l.checkRoot()
-	}
-	unlock := l.unlock()
-	if e != nil {
-		return cfg.ErrUnavailable
-	}
-	return unlock
-}
+func (g *gooseBatchLocker) SessionUnlock(context.Context, *sql.Conn) error { return nil }
 
 type initialSchemaStore struct{ database.Store }
 
@@ -387,22 +467,6 @@ func (s initialSchemaStore) TableExists(ctx context.Context, db database.DBTxCon
 	e := db.QueryRowContext(ctx, "SELECT to_regclass('public.goose_db_version') IS NOT NULL").Scan(&exists)
 	return exists, e
 }
-func (s *InitialSchema) apply(ctx context.Context, version int64) error {
-	l, e := s.lease(ctx)
-	if e != nil {
-		return e
-	}
-	defer func() { l.stop() }()
-	store, _ := database.NewStore(database.DialectPostgres, "public.goose_db_version")
-	p, e := goose.NewProvider(goose.DialectCustom, s.db, migrations.Files(), goose.WithStore(initialSchemaStore{store}), goose.WithSessionLocker(&gooseStepLocker{l, version}), goose.WithDisableGlobalRegistry(true), goose.WithAllowOutofOrder(false), goose.WithVerbose(false))
-	if e != nil {
-		return cfg.ErrInvalid
-	}
-	if _, e = p.ApplyVersion(l.ctx, version, true); e != nil {
-		return cfg.ErrUnavailable
-	}
-	return l.current()
-}
 func (s *InitialSchema) finish(ctx context.Context) (err error) {
 	l, e := s.lease(ctx)
 	if e != nil {
@@ -413,11 +477,12 @@ func (s *InitialSchema) finish(ctx context.Context) (err error) {
 	if e != nil {
 		return cfg.ErrUnavailable
 	}
-	defer conn.Close()
+	l.conn = conn
 	defer func() {
-		if e := l.unlock(); e != nil {
+		if e := l.unlock(); e != nil && err == nil {
 			err = e
 		}
+		l.discard()
 	}()
 	if e = l.lock(conn); e != nil {
 		return e
