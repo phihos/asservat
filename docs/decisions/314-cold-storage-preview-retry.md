@@ -25,6 +25,13 @@ ten seconds. Installed `continuation-manual-logs` failed this way in runs
 42460732876, 42455366262, 42456491656, 42457527896 and 42459705978; in
 42460732876 the refresh landed 0.97 s after the refusal.
 
+The history repeat ("Collect again" from `get_capture_settings`, routed to
+`PreviewCompositionRepeat` for a recorder composition) fails the same way:
+installed `continuation-manual-arguments` runs 42481392180 and 42484191702
+refused the repeat `preview_capture` at this stage after 4.8 s, with
+`p-await-storage@>=3s` in the hub timing line. The settings read before it is
+not the bound; it finishes in under a second.
+
 ## Decision
 
 When a capture preview attempt (`Preview`, `PreviewRepeat`,

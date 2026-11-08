@@ -89,3 +89,32 @@ func TestContextPreviewRetriesColdStorageWithinRequestWindow(t *testing.T) {
 		})
 	}
 }
+
+// Installed runs 42481392180 and 42484191702: "Collect again" from capture
+// history for a recorder composition hit the same cold binding. The refusal
+// came from previewComposition's own five-second phase, 4.8 s into a 15 s
+// preview_capture request window.
+func TestHistoryRecorderRepeatRetriesColdStorageWithinRequestWindow(t *testing.T) {
+	f, s, _ := historyRecordingFixture(t)
+	cold := &coldStorage{f: f, land: 4500 * time.Millisecond}
+	f.svc.Storage, f.svc.Refresh = cold, cold
+	var failures []string
+	f.svc.ReportPreviewFailure = func(stage string) { failures = append(failures, stage) }
+	s.Previews = f.svc
+	ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
+	defer cancel()
+	deadline, _ := ctx.Deadline()
+	result, _, err := s.PreviewRepeat(ctx, f.source(t, ctx), fixtureID(41), nil)
+	if time.Now().After(deadline) {
+		t.Fatal("repeat preview ran past the request window")
+	}
+	if len(failures) == 0 || failures[0] != storageReadinessTailStage {
+		t.Fatal("first attempt did not end at the readiness tail", failures)
+	}
+	if err != nil || result.Recorder == nil || !result.Recorder.Recordable || result.Preview.Intent.RepeatedFrom == nil {
+		t.Fatal("cold storage refused a history repeat with room for one more attempt", err, failures)
+	}
+	if len(failures) != 1 {
+		t.Fatal("more than one retry", failures)
+	}
+}
