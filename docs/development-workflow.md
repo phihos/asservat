@@ -163,9 +163,13 @@ Only focuses with the same bootstrap share an installation:
 `test/integration/installed_multi_focus_test.go`) compares what the
 bootstrap derives from the focus (fast fixture, clusters, collector,
 approvals, console scopes, object partitions), and the Go test refuses a
-list that differs, repeats a focus, includes `chain` or `clusters`, or puts
+list that differs, repeats a focus, includes `chain` or `clusters`, puts
 an order-sensitive focus in the wrong place (`installedLastFoci`,
-`installedFirstFoci`). Additive fixture parts (Alertmanager,
+`installedFirstFoci`), or holds two focuses that add an automation
+AccessBinding for the workload (`installedAutomationFoci`: a deleted
+automation binding keeps its basis row, which makes the next one's
+delegation ambiguous). Group members in `ci-native.sh` may differ only in
+their focus, so the profile and live variants keep their own runs. Additive fixture parts (Alertmanager,
 metrics-server, the upgrade image, the hub-worker crash, the
 evidence-owner role, collector ring disk and live values) are installed
 when any listed focus needs them. Per-focus budgets add up (root records,
