@@ -37,6 +37,7 @@ type installedProjectionCheck func(artifactID string) func(queryID, operationID 
 // native session, used one original query worker and consumed actual key slots.
 // It supplies no runtime input, grants or product authority.
 func installedProjectionSQLCheck(t *testing.T, ctx context.Context, admin *pgxpool.Pool, api kubernetes.Interface, root string, terminalSink ...func(func())) installedProjectionCheck {
+	workerPods := installedRecordWorkerPods(t, ctx, api)
 	return func(artifact string) func(string, string) func() {
 		t.Helper()
 		countDownloads := func() int {
@@ -103,9 +104,9 @@ func installedProjectionSQLCheck(t *testing.T, ctx context.Context, admin *pgxpo
 						if err := admin.QueryRow(limit, "SELECT context_query_units(query->'Scope') FROM context_query WHERE root_id=$1 AND id=$2", root, id).Scan(&units); err != nil || units != 10 {
 							t.Fatal("profile summary source charge", units, err)
 						}
-						pod, err := api.CoreV1().Pods(observed.Binding.Namespace).Get(limit, observed.Binding.Pod, meta.GetOptions{})
-						if err != nil || string(pod.UID) != observed.Binding.PodUID || len(pod.Spec.Containers) != 1 || pod.Spec.Containers[0].Resources.Limits.Memory().Value() != intent.Query.Plan.Profile.Worker.MemoryBytes {
-							t.Fatal("profile summary actual worker memory limit", err)
+						memory, err := workerPods.memoryLimit(observed.Binding)
+						if err != nil || memory != intent.Query.Plan.Profile.Worker.MemoryBytes {
+							t.Fatal("profile summary actual worker memory limit", memory, err)
 						}
 						t.Log("installed profile summary: exact 384 MiB installed Pod limit and transient declaration, ten query units, one consumed three-key batch")
 					}
@@ -126,9 +127,9 @@ func installedProjectionSQLCheck(t *testing.T, ctx context.Context, admin *pgxpo
 						if err := admin.QueryRow(limit, "SELECT context_query_units(query->'Scope') FROM context_query WHERE root_id=$1 AND id=$2", root, id).Scan(&units); err != nil || units != wantUnits {
 							t.Fatal("syscall projection source charge", units, err)
 						}
-						pod, err := api.CoreV1().Pods(observed.Binding.Namespace).Get(limit, observed.Binding.Pod, meta.GetOptions{})
-						if err != nil || string(pod.UID) != observed.Binding.PodUID || len(pod.Spec.Containers) != 1 || pod.Spec.Containers[0].Resources.Limits.Memory().Value() != intent.Query.Plan.Profile.Worker.MemoryBytes {
-							t.Fatal("syscall projection actual worker memory limit", err)
+						memory, err := workerPods.memoryLimit(observed.Binding)
+						if err != nil || memory != intent.Query.Plan.Profile.Worker.MemoryBytes {
+							t.Fatal("syscall projection actual worker memory limit", memory, err)
 						}
 						t.Logf("installed syscall view: exact 384 MiB installed Pod limit and transient declaration, %d query units/%d configured read batches, one consumed three-key batch", wantUnits, wantBatches)
 					}
