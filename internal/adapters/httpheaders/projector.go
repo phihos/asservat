@@ -25,18 +25,27 @@ const Snaplen = 1500
 
 // Spec maxima (REQ-NET-004, packet-capture.schema.json httpHeaders).
 const (
-	MaxFlows         = 1024
-	MaxHeaderBytes   = 32 << 10
-	MaxFlowBytes     = 256 << 10
-	MaxTotalBytes    = 16 << 20
-	MaxIdleTimeout   = 30 * time.Second
-	minIdleTimeout   = time.Second
-	readBuffer       = 4 << 10 // bufio size per direction; also net/http's chunk-line maximum
-	pageBytes        = 1900    // gopacket v1.7.4 reassembly page size
-	maxPipeline      = 32      // queued requests awaiting a response per flow
-	invalidSequence  = -1      // gopacket's "no start seen" sequence
-	flushInterval    = time.Second
-	maxYear, minYear = 9999, 1970
+	MaxFlows        = 1024
+	MaxHeaderBytes  = 32 << 10
+	MaxFlowBytes    = 256 << 10
+	MaxTotalBytes   = 16 << 20
+	MaxIdleTimeout  = 30 * time.Second
+	minIdleTimeout  = time.Second
+	readBuffer      = 4 << 10 // bufio size per direction; also net/http's chunk-line maximum
+	pageBytes       = 1900    // gopacket v1.7.4 reassembly page size
+	maxPipeline     = 32      // queued requests awaiting a response per flow
+	invalidSequence = -1      // gopacket's "no start seen" sequence
+	flushInterval   = time.Second
+	// stalledFlowAge: when every flow slot is held, a new connection's SYN
+	// first closes flows that have seen no frame for this long (at most the
+	// idle timeout). A flow whose FIN/RST was never captured (input lost,
+	// another capture on the same pod) otherwise holds its slot for the whole
+	// idle timeout, and on a busy pod every later connection hits the flow
+	// limit (native run 42479876034). The flow cap itself is unchanged.
+	stalledFlowAge = 2 * time.Second
+	// stalledFlushInterval bounds how often a refused SYN may scan for them.
+	stalledFlushInterval = 100 * time.Millisecond
+	maxYear, minYear     = 9999, 1970
 )
 
 var ErrInvalid = errors.New("http header projector input invalid")
@@ -129,6 +138,7 @@ type Projector struct {
 	last           time.Time
 	now            time.Time
 	lastFlush      time.Time
+	lastStalled    time.Time
 	phase          phase
 	closed         bool
 
@@ -232,6 +242,12 @@ func (p *Projector) addObserved(frame []byte, wire uint32, at time.Time, stamp S
 		p.lastFlush = at
 		p.phase = phaseIdle
 		p.asm.FlushCloseOlderThan(at.Add(-p.limits.IdleTimeout))
+		p.phase = phaseLive
+	}
+	if p.active >= p.limits.MaxFlows && p.tcp.SYN && !p.tcp.ACK && at.Sub(p.lastStalled) >= stalledFlushInterval {
+		p.lastStalled = at
+		p.phase = phaseIdle
+		p.asm.FlushCloseOlderThan(at.Add(-min(stalledFlowAge, p.limits.IdleTimeout)))
 		p.phase = phaseLive
 	}
 	p.ctx = frameContext{ci: gopacket.CaptureInfo{Timestamp: at, CaptureLength: len(frame), Length: int(wire)}, truncated: truncated}

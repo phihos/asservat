@@ -391,6 +391,37 @@ func TestStoppedFlowReleasesSlotOnFIN(t *testing.T) {
 	}
 }
 
+// Flows whose FIN/RST was never captured (lost input, or another capture on
+// the same pod displacing this one) must not hold every slot for the whole
+// idle timeout: a new connection's SYN closes flows stalled for
+// stalledFlowAge, while a full table of recently active flows still refuses
+// it (native run 42479876034).
+func TestStalledFlowsDoNotExhaustTheTable(t *testing.T) {
+	get := []byte("GET / HTTP/1.1\r\nHost: h\r\n\r\n")
+	ok := []byte("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n")
+	l := DefaultLimits()
+	l.MaxFlows = 2
+	l.IdleTimeout = 10 * time.Second
+	f := newFeeder(t, l)
+	for i := range 2 {
+		lost := newConn(uint16(42300 + i))
+		f.addGroups(lost.handshake(), lost.data(true, get)) // response and FINs never captured
+	}
+	early := newConn(42310)
+	f.addGroups(early.handshake(), early.data(true, get), early.data(false, ok))
+	f.at = f.at.Add(stalledFlowAge + time.Second)
+	late := newConn(42311)
+	f.addGroups(late.handshake(), late.data(true, get), late.data(false, ok))
+	f.add(late.fin(false), late.fin(true))
+	pr, n, _ := f.close(t)
+	if n.Flows != 3 || n.IdleClosedFlows != 2 || n.FlowLimitFrames != 5 || n.PartialRecords != 2 {
+		t.Fatalf("records %+v counters %+v", pr.Records, n)
+	}
+	if last := pr.Records[len(pr.Records)-1]; last.Status != 200 || last.Partial {
+		t.Fatalf("admitted flow lost its record: %+v", pr.Records)
+	}
+}
+
 // A direction that stopped parsing and then still carries bytes (a TLS stream
 // after its first record, a frame truncated by the engine, a response half
 // whose SYN-ACK was not captured) must still free its flow slot when the
