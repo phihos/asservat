@@ -10,29 +10,23 @@ A mandatory `DownloadEnvironmentReader` independently checks current recovery, p
 
 After catalog/privacy/environment I/O, resolve identity and permissions again and re-evaluate the original audience. Changed identity policy or permission revision requires a fresh attempt; removed membership/rights or new denies refuse the download. The final lease is bounded by every original observation, current rights, effective retention, and at most five seconds from the initial check. A fresh later read cannot renew an earlier decision. The content-minimized decision digest records this provenance without retaining the credential or native evidence.
 
-For one original content response, [ADR-220](../decisions/220-response-owned-download-permissions.md)
-adds a separate ordinary-entitlement owner. A successful complete construction
-stores copied identity claims, exact scope/audience, permission revision and
-contributing assignments, with a cutoff at the original pre-I/O start plus 30
-seconds. It does not retain a reusable complete authority or change projection
-freshness. Each short batch still authenticates the same principal/client and
-reads current catalog, retention and environment facts. Changed policy/groups/
-scopes require fresh target eligibility before catalog access; mismatched audience
-or version refuses. At the cutoff, reconstruct before more output. Failure in
-refresh or later safety reads closes the owner, and Close cancels/joins blocked
-work. New GETs/preparation construct independently. Every emitted authority stays
-within five seconds and all original caller/session/access/observation limits.
-Known SQL permission changes may deny earlier; 30 seconds is reconstruction
-cadence, not a revocation guarantee. The concrete native response consumes the
-coordinator's exact short authority privately rather than reconstructing it.
+A started content response is not checked again
+([ADR-312](../decisions/312-started-downloads-run-to-original-bounds.md), superseding
+ADR-220's response-owned 30-second entitlement). The transfer runs this complete
+check before the response starts; afterwards `DownloadAuthority.Continue` restates
+that decision as at-most-five-second delivery leases without I/O, ending at
+`AccessUntil` and the response's original end. `AccessUntil` is the retention end,
+narrowed to an admitting share's expiry or the raw grant child's end. The native
+response consumes the coordinator's exact authority privately and does not
+re-read identity.
 
 [ADR-233](../decisions/233-recipient-native-download.md) adds the concrete-share branch of
 [ADR-232](../decisions/232-concrete-evidence-share.md): only when ordinary target eligibility
 refuses, the caller's own shares of exactly the scope's artifact and version are read before the
 catalog lookup (no admitting share, no lookup); after the catalog read the share must also name
 the artifact's case, its pinned manager must be in the original audience, and the final check
-re-reads the share. A share-admitted response entitlement uses the same 30-second reconstruction,
-bounded by the share's expiry, and the decision digest binds the share ID and revision. Current
+re-reads the share. A started response is not rechecked and ends no later than the share's expiry
+(ADR-312); the decision digest binds the share ID and revision. Current
 denies win, `evidence:download` is required, and sessions are charged to the workload's existing
 allocation.
 

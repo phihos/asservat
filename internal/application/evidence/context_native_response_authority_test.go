@@ -64,7 +64,9 @@ func TestContextNativeResponseCheckedChunkStillReachesCurrentSQL(t *testing.T) {
 }
 
 func TestContextNativeResponseCheckedAuthorityPreservesOriginalCutoffs(t *testing.T) {
-	for _, cutoff := range []string{"caller", "session", "identity", "authority"} {
+	// The identity cutoff is the coordinator's: it narrows ValidUntil before
+	// the handoff, which never reads identity again (ADR-312).
+	for _, cutoff := range []string{"caller", "session", "authority"} {
 		t.Run(cutoff, func(t *testing.T) {
 			f, sql, runtime, metadata := warmContextRuntimeFixture(t)
 			original := f.a
@@ -93,8 +95,6 @@ func TestContextNativeResponseCheckedAuthorityPreservesOriginalCutoffs(t *testin
 					t.Fatal("short original metadata", err)
 				}
 				release()
-			case "identity":
-				f.identity.ValidUntil = short
 			case "authority":
 				original.ValidUntil = short
 			}
@@ -118,8 +118,10 @@ func TestContextNativeResponseCheckedAuthorityPreservesOriginalCutoffs(t *testin
 	}
 }
 
-func TestContextNativeResponseCheckedAuthorityRejectsChangedIdentityAndScope(t *testing.T) {
-	for _, change := range []string{"principal", "policy", "scope", "expired", "cancelled", "identity-expired", "scopes"} {
+// The handoff consumes the coordinator's authority without reading identity
+// (ADR-312); a changed identity after the coordinator's check cannot stop it.
+func TestContextNativeResponseCheckedAuthorityRejectsChangedScope(t *testing.T) {
+	for _, change := range []string{"scope", "expired", "cancelled"} {
 		t.Run(change, func(t *testing.T) {
 			f, sql, runtime, _ := warmContextRuntimeFixture(t)
 			a := f.a
@@ -131,24 +133,30 @@ func TestContextNativeResponseCheckedAuthorityRejectsChangedIdentityAndScope(t *
 			}
 			defer source.Close()
 			switch change {
-			case "principal":
-				f.identity.Principal.ClientID = "changed"
-			case "policy":
-				f.identity.Policy.Generation++
 			case "scope":
 				a.Scope.ArtifactID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
 			case "expired":
 				a.ValidUntil = f.now
 			case "cancelled":
 				cancel()
-			case "identity-expired":
-				f.identity.ValidUntil = f.now
-			case "scopes":
-				f.identity.Scopes = []string{"evidence:read"}
 			}
 			if _, _, err := source.describeChecked(ctx, f, f.s, a); err == nil || sql.reads != 0 {
 				t.Fatal("invalid handoff reached SQL", change, sql.reads, err)
 			}
 		})
+	}
+}
+
+func TestContextNativeResponseCheckedAuthorityIgnoresLaterIdentity(t *testing.T) {
+	f, sql, runtime, _ := warmContextRuntimeFixture(t)
+	f.identity.Policy.Generation++
+	f.identity.Scopes = []string{"evidence:read"}
+	source, err := NewContextNativeResponse(t.Context(), runtime)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer source.Close()
+	if _, _, err := source.describeChecked(t.Context(), f, f.s, f.a); err != nil || sql.reads == 0 || f.count("current-authority") != 0 {
+		t.Fatal("handoff observed identity again", err, sql.reads, f.count("current-authority"))
 	}
 }

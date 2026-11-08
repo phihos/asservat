@@ -1,0 +1,16 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/download-response-window-accounting
+=== RUN   TestContextAdmissionWithRealServices/download-response-window-accounting/retained-window-intent-empty
+=== RUN   TestContextAdmissionWithRealServices/download-response-window-accounting/retained-window-intent-null
+=== RUN   TestContextAdmissionWithRealServices/download-response-window-accounting/retained-window-intent-empty#01
+=== RUN   TestContextAdmissionWithRealServices/download-response-window-accounting/retained-window-intent-null#01
+=== RUN   TestContextAdmissionWithRealServices/download-response-window-accounting/started-response-continues-after-permission-suspension
+--- PASS: TestContextAdmissionWithRealServices (3.81s)
+    --- PASS: TestContextAdmissionWithRealServices/download-response-window-accounting (3.40s)
+        --- PASS: TestContextAdmissionWithRealServices/download-response-window-accounting/retained-window-intent-empty (0.06s)
+        --- PASS: TestContextAdmissionWithRealServices/download-response-window-accounting/retained-window-intent-null (0.06s)
+        --- PASS: TestContextAdmissionWithRealServices/download-response-window-accounting/retained-window-intent-empty#01 (0.06s)
+        --- PASS: TestContextAdmissionWithRealServices/download-response-window-accounting/retained-window-intent-null#01 (0.06s)
+        --- PASS: TestContextAdmissionWithRealServices/download-response-window-accounting/started-response-continues-after-permission-suspension (0.55s)
+PASS
+ok  	asservat.local/asservat/test/integration	4.879s

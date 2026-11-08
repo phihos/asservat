@@ -6,6 +6,6 @@
   "interfaces": 14,
   "domainEntitiesMapped": 49,
   "requirementsMapped": 176,
-  "positiveChecks": 1363,
+  "positiveChecks": 1358,
   "rejectedInvalidCases": 120
 }

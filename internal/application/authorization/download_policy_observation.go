@@ -163,3 +163,7 @@ func cloneDownloadPolicy(p privacy.DownloadPolicy) privacy.DownloadPolicy {
 	}
 	return p
 }
+
+// downloadCheckTimeout is the I/O timeout of one live delivery-policy read. It
+// bounds blocking work, not how long the resulting observation is valid.
+const downloadCheckTimeout = 5 * time.Second

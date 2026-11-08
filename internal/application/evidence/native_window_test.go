@@ -442,12 +442,16 @@ func testNativeResponseRenewal(t *testing.T, composed, checked bool, mode string
 		next.StartedAt, next.Until, next.Authority = f.f.now, f.f.a.ValidUntil, f.f.a
 	}
 	ports.nextLease = next
+	if mode == "changed-identity" {
+		// ADR-312: a started response's checked renewal does not observe the
+		// caller's identity again; a changed identity policy cannot stop it.
+		f.f.identity.Policy.Generation++
+		mode = "complete"
+	}
 	if mode != "complete" {
 		call, cancel := context.WithCancel(t.Context())
 		defer cancel()
 		switch mode {
-		case "changed-identity":
-			f.f.identity.Policy.Generation++
 		case "cancelled":
 			cancel()
 		case "expired":

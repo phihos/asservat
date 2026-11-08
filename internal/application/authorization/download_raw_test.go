@@ -93,34 +93,17 @@ func TestContextDownloadAuthorityRawRefusesShareRecipient(t *testing.T) {
 	}
 }
 
-// A response-owned entitlement is never kept for raw: every check of the
-// same response repeats ordinary rights and the grant facet.
-func TestDownloadResponseNeverCachesRaw(t *testing.T) {
+// A started response continues to AccessUntil without another check
+// (ADR-312), so a raw decision's AccessUntil ends with its grant child.
+func TestRawDownloadAccessEndsWithGrant(t *testing.T) {
 	for _, evidenceType := range []string{"packetCapture", "profile", "syscallTrace", "logs"} {
 		t.Run(evidenceType, func(t *testing.T) {
 			f, s, scope := newDownloadAuthorityFixture()
 			p := rawDownload(f, &s, evidenceType)
-			owner, err := s.NewDownloadResponse(t.Context(), scope)
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer owner.Close()
-			current := credentialIdentity{f, "synthetic"}
-			start := f.now
-			currentDownloadResponseFacts(f, start)
-			p.until = start.Add(2 * time.Second)
-			if _, err = owner.CheckDownloadCurrent(t.Context(), current, scope); err != nil || p.calls != 1 {
-				t.Fatal("first raw check", err)
-			}
-			reads := f.policyReads
-			currentDownloadResponseFacts(f, start.Add(time.Second))
-			p.until = start.Add(3 * time.Second)
-			if _, err = owner.CheckDownloadCurrent(t.Context(), current, scope); err != nil || p.calls != 2 || f.policyReads != reads+2 {
-				t.Fatal("raw entitlement reused", err, p.calls, f.policyReads-reads)
-			}
-			p.err = value.ErrGrantRevoked
-			if _, err = owner.CheckDownloadCurrent(t.Context(), current, scope); err == nil {
-				t.Fatal("revoked grant admitted within the response")
+			p.until = f.now.Add(90 * time.Second)
+			a, err := s.CheckDownload(t.Context(), "synthetic-token", scope)
+			if err != nil || !a.AccessUntil.Equal(p.until) {
+				t.Fatal("raw access not bounded by its grant", err, a.AccessUntil, p.until)
 			}
 		})
 	}

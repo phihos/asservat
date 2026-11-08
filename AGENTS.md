@@ -28,7 +28,8 @@ handling, but use a relaxed, bounded recheck interval. Select and document a
 practical interval using measured end-to-end runtime behavior. Immediate or
 per-step revalidation and the existing five-second interval are not immutable
 requirements. This clarification takes precedence over older instructions and
-ADRs that prescribe stricter download permission-check timing.
+ADRs that prescribe stricter download permission-check timing. The 2026-11-07
+maintainer decision (ADR-312, below) removes rechecks after a download starts.
 
 Maintainer decision (2026-11-07, ADR-311): authority is checked once per
 operation and reused for at most `identity.AuthorityRecheckInterval` (30 s; 60 s
@@ -110,14 +111,17 @@ Component checks pass; real SQL and installed qualification require integrated
 ADR-219/221. Do not describe a whole resolution request as guaranteed to finish
 under ordinary-pool saturation merely because its audit connections are reserved.
 
-ADR-220 gives each original content response one ordinary-entitlement observation
-with a 30-second reconstruction cutoff anchored before its first read. Keep new
-identity/safety facts and every effect/native lease within their original five
-seconds; unchanged SQL permission fences may deny earlier. Changed claims require
-fresh eligibility before catalog access; failed refresh closes the response owner.
-The private native response handoff consumes the exact checked short authority.
-Read docs/decisions/220-response-owned-download-permissions.md; no raw/share grant,
-new GET, preparation or other response inherits this observation.
+Maintainer decision (2026-11-07, verbatim): "Please remove these rechecks after
+download start if that causes too many problems." ADR-312 supersedes ADR-220's
+response-owned 30-second entitlement and the per-lease authority rechecks of
+ADR-233/258. Each content GET authenticates the session's principal/client and
+completes full authorization before its response starts; the started response
+then continues that decision (`DownloadAuthority.Continue`) with no identity,
+permission, share or policy reads until its original bounds end it: caller
+session/token expiry, session deadline, `AccessUntil` (retention, share or raw
+grant end), effective retention cutoffs/managed deletion, Stop, the recovery
+incarnation and byte/audit reservations. Do not reintroduce post-start rechecks.
+Read docs/decisions/312-started-downloads-run-to-original-bounds.md.
 
 ADR-218 consumes download readiness at its check and plan freshness through
 acknowledged session reservation. Their expiry after consumption does not shorten

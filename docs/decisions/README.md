@@ -318,7 +318,7 @@ Current admitted parent, workload, signing and audit checks remain; certificates
 confer no evidence authority. Component checks pass; installed qualification is pending.
 
 [ADR-220 — Response-owned ordinary download permissions](220-response-owned-download-permissions.md)
-selects a fixed 30-second reconstruction cadence within one original response and
+(superseded by ADR-312) selected a fixed 30-second reconstruction cadence within one original response and
 removes duplicate native-reader authorization through an exact short handoff.
 Identity, delivery/native bounds and current SQL permission/safety fences remain;
 known changes may deny earlier. Component race checks and independent source
@@ -1165,3 +1165,4 @@ The brief's domain-registration and trademark work remains a maintainer-owned pu
 - [ADR-310 — Finite approved live observation](310-finite-approved-live-observation.md): exact existing source epochs, bounded ephemeral scope/filter ownership, named passive inventory and qualified original clock mapping; implementation and installed qualification pending.
 - [ADR-311 — One authority check per operation](311-operation-authority-recheck.md): maintainer-accepted 30 s recheck interval, shared 60 s policy observation, transient vs denial vs ended classification; no original deadline is extended.
 - [ADR-313 — Stop for every finite manual recording](313-manual-recording-stop.md): packet/raw/HTTP/syscall metadata manual sessions reuse the argument Stop request, exact original-writer join and stored-wins; unstored partial data is discarded; installed qualification pending.
+- [ADR-312 — Started downloads run to their original bounds](312-started-downloads-run-to-original-bounds.md): maintainer decision; a content response is authorized completely at its start and then continues that decision without identity, permission or policy rechecks until its original bounds, effective retention cutoffs, Stop or recovery fence end it. Supersedes the post-start rechecks of ADR-220/233/258; installed qualification pending.

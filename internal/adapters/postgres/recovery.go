@@ -132,6 +132,27 @@ func (g *RecoveryTransactionGuard) check(ctx context.Context, q *custodydb.Queri
 	return err
 }
 
+// lockStarted serves a started download response's continuation (ADR-312).
+// The installation must still be the incarnation the response started under
+// and neither suspended nor recovery-blocked; observation freshness and the
+// trust source revision are not reobserved.
+func (g *RecoveryTransactionGuard) lockStarted(ctx context.Context, q *custodydb.Queries, root string, a artifact.RecoveryProof) (custodydb.FleetCurrentTrust, error) {
+	if g == nil || root != g.root || a.InstallationID != g.installation {
+		return custodydb.FleetCurrentTrust{}, value.ErrUnavailable
+	}
+	row, err := q.ShareFleetTrust(ctx, id(g.installation))
+	if err != nil {
+		return row, err
+	}
+	return row, g.checkStarted(row, root, a)
+}
+func (g *RecoveryTransactionGuard) checkStarted(row custodydb.FleetCurrentTrust, root string, a artifact.RecoveryProof) error {
+	if g == nil || root != g.root || a.InstallationID != g.installation || uid(row.InstallationID) != g.installation || a.IssuerEpoch != uid(row.IssuerEpoch) || row.Suspended || row.RecoveryBlocked {
+		return value.ErrDenied
+	}
+	return nil
+}
+
 // Read/audit/configuration facets may omit guards. All effect methods reject
 // that composition; both guards bind the same private permission root.
 type EffectTransactionGuards struct {
