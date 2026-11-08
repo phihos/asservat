@@ -127,9 +127,12 @@ jobs:
             ~/.cache/go-build
           key: go-${{ runner.os }}-${{ hashFiles('go.sum') }}-${{ github.sha }}
 
-  # scripts/check-go-tests.py --shard: shard 0 runs every package except the
-  # Kubernetes adapter; shards 1-9 run duration-balanced parts of its tests
-  # (weights measured on CI). Nine parts reach the floor set by its longest test.
+  # scripts/check-go-tests.py --shard I/N: every shard discovers the same
+  # inventory (whole small packages, top-level tests of the SPLIT packages)
+  # and runs its part of one CI-weighted, disjoint partition. ci-ok checks
+  # the uploaded records: one plan, every unit executed exactly once.
+  # Refresh the weights: gh run download <run> -p 'go-test-shard-*' -D <dir>,
+  # then check-go-tests.py --update-weights <dir>.
   test:
     needs: changes
     if: needs.changes.outputs.code == 'true'
@@ -138,19 +141,39 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
-    name: test (${{ matrix.shard }}/10)
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
+    name: test (${{ matrix.shard }}/${{ strategy.job-total }})
     steps:
       - uses: actions/checkout@v7
         with: { filter: "blob:none", sparse-checkout: "${{ env.CHECKOUT_SPARSE }}", sparse-checkout-cone-mode: false }
       - uses: ./.github/actions/setup
-      # Shard 0 runs ~56 packages under -race: two at a time, as the local
-      # gate (GOFLAGS=-p=2), not four, which starved timing-bound tests.
-      - run: python3 scripts/check-go-tests.py --shard ${{ matrix.shard }}/10
+      # Whole packages run under -race two at a time, as the local gate
+      # (GOFLAGS=-p=2), not four, which starved timing-bound tests.
+      - run: python3 scripts/check-go-tests.py --shard ${{ matrix.shard }}/${{ strategy.job-total }}
         env:
-          GOFLAGS: ${{ matrix.shard == 0 && '-p=2' || '' }}
+          GOFLAGS: -p=2
+          ASSERVAT_GO_TEST_RECORD: ${{ runner.temp }}/go-test-shard-${{ matrix.shard }}.json
+      - uses: actions/upload-artifact@v7
+        with:
+          name: go-test-shard-${{ matrix.shard }}
+          path: ${{ runner.temp }}/go-test-shard-${{ matrix.shard }}.json
+          retention-days: 30
 
+  # console-check needs no Go; the browser check builds the console and the
+  # Go integration package, so it runs beside it on its own runner.
   console:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with: { filter: "blob:none", sparse-checkout: "${{ env.CHECKOUT_SPARSE }}", sparse-checkout-cone-mode: false }
+      - uses: ./.github/actions/setup
+        with: { go: "false", console: "true" }
+      - run: make console-check
+
+  console-browser:
     needs: changes
     if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-24.04
@@ -167,14 +190,15 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
       - run: cd web && npx playwright install --only-shell chromium
-      - run: make console-check console-browser-check
+      - run: make console-browser-check
 
   # The one check the branch ruleset requires (a skipped matrix job reports
-  # no per-shard checks). changes and checks must pass; go, test and console
-  # may be skipped only when changes classified the push as docs-only.
+  # no per-shard checks). changes and checks must pass; go, test and the
+  # console jobs may be skipped only when changes classified the push as
+  # docs-only.
   ci-ok:
     if: always()
-    needs: [changes, checks, go, test, console]
+    needs: [changes, checks, go, test, console, console-browser]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -185,7 +209,17 @@ jobs:
           GO: ${{ needs.go.result }}
           TEST: ${{ needs.test.result }}
           CONSOLE: ${{ needs.console.result }}
+          BROWSER: ${{ needs.console-browser.result }}
         run: |
-          echo "changes=$CHANGES code=$CODE checks=$CHECKS go=$GO test=$TEST console=$CONSOLE"
+          echo "changes=$CHANGES code=$CODE checks=$CHECKS go=$GO test=$TEST console=$CONSOLE console-browser=$BROWSER"
           [[ $CHANGES == success && $CHECKS == success ]]
-          [[ $CODE == false ]] || [[ $GO == success && $TEST == success && $CONSOLE == success ]]
+          [[ $CODE == false ]] || [[ $GO == success && $TEST == success && $CONSOLE == success && $BROWSER == success ]]
+      - if: needs.test.result == 'success'
+        uses: actions/checkout@v7
+        with: { sparse-checkout: scripts/check-go-tests.py, sparse-checkout-cone-mode: false }
+      - if: needs.test.result == 'success'
+        uses: actions/download-artifact@v7
+        with: { pattern: go-test-shard-*, path: "${{ runner.temp }}/go-test-shards" }
+      # The shard count of the test matrix (test-go-shards.py checks it).
+      - if: needs.test.result == 'success'
+        run: python3 scripts/check-go-tests.py --verify-union 14 "$RUNNER_TEMP/go-test-shards"

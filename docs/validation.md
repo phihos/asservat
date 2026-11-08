@@ -76,15 +76,23 @@ Actual run/terminal events must cover the selected names exactly once. Existing
 skips are reported; omitted or duplicate execution fails. This avoids an aggregate
 timeout as the package grows, without extending any runtime authority deadline.
 
-GitHub Actions (`.github/workflows/ci.yml`) runs the same gate on every push as
-ten jobs: `check-go-tests.py --shard 0/10` runs every non-Kubernetes package,
-shards 1–9 a deterministic, duration-balanced partition of the discovered
-Kubernetes inventory (`scripts/go-test-durations.json`, measured on CI; unknown
-tests weigh five seconds). Pushes that change only documentation outside
+GitHub Actions (`.github/workflows/ci.yml`) runs the same tests on every push as
+fourteen jobs (`check-go-tests.py --shard I/14`). Every shard discovers the same
+inventory: each small package as one unit, and each top-level test of the
+packages in `SPLIT` (the Kubernetes adapter and the other packages that take
+over a minute under `-race` on CI, such as `transport/presentation`) as its own
+unit. A deterministic longest-first partition by CI-measured weights
+(`scripts/go-test-durations.json`; unknown packages and tests weigh five
+seconds) assigns every unit to exactly one shard. A shard runs its whole
+packages in one `go test -json` (two at a time) and must see exactly one result
+per package, then its split tests in the exact groups and event checks above.
+Each shard uploads a record of the plan, its executed units and measured times;
+`ci-ok` fails unless all fourteen records share one plan and together executed
+every unit exactly once. `check-go-tests.py --update-weights <dir>` refreshes the
+weights from downloaded records. Pushes that change only documentation outside
 `docs/interfaces/`, recorded results, the design prototype or root Markdown run
-only the documentation and schema gates. Each shard keeps the flags, groups and exact event checks above; the
-partition is unit-tested to cover the inventory exactly once. The documentation,
-schema, SQL, Helm and console gates run as parallel jobs. Native suites run only
+only the documentation and schema gates. The documentation, schema, SQL, Helm,
+console (`console-check`, no Go) and console browser gates run as parallel jobs. Native suites run only
 on dispatch (`native.yml`, suites from `scripts/ci-native.sh --list`), each on a
 fresh runner; their `test/results` output is uploaded as a run artifact. A CI run
 is recorded like a local run: run URL, exit, selected tests and the harness's
