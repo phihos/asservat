@@ -10,6 +10,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -230,7 +231,7 @@ func nativeHTTPSource(view delivery.NodeView, pod string, program []planning.BPF
 	resources := collector.SourceResources{PolicyUID: "synthetic-reviewed-http-policy"}
 	h := nativeHTTPProjection()
 	b := collector.SourceBinding{RootID: uuid.NewString(), PolicyUID: resources.PolicyUID, AcceptanceID: uuid.NewString(), SourceID: uuid.NewString(), Fence: uuid.NewString(), ActionID: "native-live-http", ObservationGrantID: uuid.NewString(), AudienceDigest: [32]byte{9}, PodUID: pod, NodeUID: id.NodeUID, BootID: id.BootID, CollectorPodUID: id.PodUID, CollectorEpoch: id.Epoch, Scope: [32]byte{1}, ExpectationDigest: [32]byte{2}, ProgramDigest: [32]byte(compiler.FilterProgramDigest(program)), ResourceDigest: delivery.SourceResourcesDigest(resources)}
-	return collector.PacketSource{HTTP: &h, Permit: collector.SourcePermit{Binding: b, StartedAt: now, IssuedAt: now, HardUntil: now.Add(30 * time.Second), StartBy: now.Add(5 * time.Second), DispatchUntil: now.Add(5 * time.Second), LeafUntil: now.Add(30 * time.Second), Credit: 128 << 20, BytesPerSecond: 16 << 20}, Program: program, Resources: resources, Ring: collector.SourceRingLimits{MaxAge: 15 * time.Second, MaxBytes: 4 << 20, SegmentBytes: 1 << 20, MaxSegments: 4, MaxFrozenBytes: 1 << 20, MaxConcurrentSnapshots: 1}}
+	return collector.PacketSource{HTTP: &h, Permit: collector.SourcePermit{Binding: b, StartedAt: now, IssuedAt: now, HardUntil: now.Add(30 * time.Second), StartBy: now.Add(5 * time.Second), DispatchUntil: now.Add(5 * time.Second), LeafUntil: now.Add(30 * time.Second), Credit: 128 << 20, BytesPerSecond: 16 << 20}, Program: program, Resources: resources, Ring: collector.SourceRingLimits{MaxAge: 15 * time.Second, MaxBytes: 16 << 20, SegmentBytes: 4 << 20, MaxSegments: 4, MaxFrozenBytes: 8 << 20, MaxConcurrentSnapshots: 1}}
 }
 func (n *nativeLiveQualification) sourceRows(t *testing.T, ctx context.Context, ch *delivery.NodeChannel, s collector.PacketSource, projection string) collector.LiveRead {
 	t.Helper()
@@ -323,23 +324,29 @@ func (n *nativeLiveQualification) http(t *testing.T, parent context.Context, ch 
 	}
 	n.ended(t, ctx, ch, view, w, original)
 	issued := time.Now().UTC().Truncate(time.Microsecond)
-	snapshot := collector.SourceSnapshot{Binding: b, CaptureID: uuid.NewString(), AttemptID: uuid.NewString(), ExpectationDigest: [32]byte{4}, Request: artifact.SourceSnapshotRequest{SourceBindingDigest: artifact.Digest(delivery.SourceBindingDigest(b)), SourceID: b.SourceID, Fence: b.Fence, SnapshotID: uuid.NewString(), SourceStartedAt: source.Permit.StartedAt, SourceHardUntil: source.Permit.HardUntil, T0: issued, IssuedAt: issued, StartBy: issued.Add(5 * time.Second), ProcessingUntil: issued.Add(10 * time.Second), Before: 3 * time.Second, MaxBytes: 1 << 20}}
+	// The synthetic HTTP load reaches about 1 MB/s (native run 42475454686
+	// refused a 1 MiB copy of the 3 s pre-window at window: CaptureBusy), so
+	// the source ring, frozen copy and saved output allow 8 MiB.
+	snapshot := collector.SourceSnapshot{Binding: b, CaptureID: uuid.NewString(), AttemptID: uuid.NewString(), ExpectationDigest: [32]byte{4}, Request: artifact.SourceSnapshotRequest{SourceBindingDigest: artifact.Digest(delivery.SourceBindingDigest(b)), SourceID: b.SourceID, Fence: b.Fence, SnapshotID: uuid.NewString(), SourceStartedAt: source.Permit.StartedAt, SourceHardUntil: source.Permit.HardUntil, T0: issued, IssuedAt: issued, StartBy: issued.Add(5 * time.Second), ProcessingUntil: issued.Add(10 * time.Second), Before: 3 * time.Second, MaxBytes: 8 << 20}}
 	snapshot.Request.HTTP = artifact.RecordingHTTP{MaxFlows: p.HTTP.MaxFlows, MaxHeaderBytes: p.HTTP.MaxHeaderBytes, MaxFlowBytes: p.HTTP.MaxFlowBytes, MaxTotalBytes: p.HTTP.MaxTotalBytes, IdleMillis: p.HTTP.IdleTimeout.Milliseconds()}
 	call, cancel = context.WithTimeout(ctx, 4*time.Second)
-	_, e = ch.EnqueueSourceSnapshot(call, snapshot)
+	snapshotWork, e := ch.EnqueueSourceSnapshot(call, snapshot)
 	cancel()
 	if e != nil {
 		t.Fatal("HTTP saved native dispatch", e)
 	}
 	var saved collector.PacketResult
 	var native []byte
-	nativeLiveWait(t, ctx, "HTTP source saved window", func() bool { var ok bool; saved, native, _, ok = sink.get(snapshot.CaptureID); return ok })
+	waitFrom := time.Now()
+	nativeLiveWaitDiagnosed(t, ctx, "HTTP source saved window", func() bool { var ok bool; saved, native, _, ok = sink.get(snapshot.CaptureID); return ok }, func() string {
+		return nativeSourceDiagnosis(ch, b, snapshotWork.ID, waitFrom, n.elapsed)
+	})
 	if saved.Failure != "" || saved.NativeType != artifact.HTTPHeadersArtifact || saved.Snapshot == nil {
 		t.Fatal("HTTP source saved window", saved)
 	}
-	savedCount, e := httpheaders.CheckProjection(bytes.NewReader(native), limits, 1<<20)
+	savedCount, e := httpheaders.CheckProjection(bytes.NewReader(native), limits, snapshot.Request.MaxBytes)
 	if e != nil || savedCount == 0 {
-		t.Fatal("HTTP saved native canonical check", savedCount, e)
+		t.Fatal("HTTP saved native canonical check", savedCount, e, string(native)) // synthetic workload headers only
 	}
 	stopAt := time.Now()
 	call, cancel = context.WithTimeout(ctx, 3*time.Second)
@@ -370,13 +377,44 @@ func (n *nativeLiveQualification) http(t *testing.T, parent context.Context, ch 
 }
 func nativeLiveWait(t *testing.T, ctx context.Context, name string, ready func() bool) {
 	t.Helper()
+	nativeLiveWaitDiagnosed(t, ctx, name, ready, nil)
+}
+
+// nativeLiveWaitDiagnosed reports diagnose() with the failure, so a timeout
+// names the node-side state instead of only the context error.
+func nativeLiveWaitDiagnosed(t *testing.T, ctx context.Context, name string, ready func() bool, diagnose func() string) {
+	t.Helper()
 	for !ready() {
 		select {
 		case <-ctx.Done():
+			if diagnose != nil {
+				t.Fatal(name, ctx.Err(), diagnose())
+			}
 			t.Fatal(name, ctx.Err())
 		case <-time.After(100 * time.Millisecond):
 		}
 	}
+}
+
+// nativeSourceDiagnosis names the snapshot work's receipt and the source's
+// latest reported status; it carries no evidence bytes.
+func nativeSourceDiagnosis(ch *delivery.NodeChannel, b collector.SourceBinding, workID string, waitFrom time.Time, phaseElapsed time.Duration) string {
+	view, ok := ch.NodeByUID(b.NodeUID)
+	if !ok || view.Report == nil {
+		return "no current node report"
+	}
+	out := fmt.Sprintf("waited=%s earlier-phases=%s report-seq=%d observed=%s", time.Since(waitFrom).Round(time.Millisecond), phaseElapsed.Round(time.Millisecond), view.Report.Sequence, view.Report.ObservedAt.Format(time.RFC3339Nano))
+	for _, r := range view.Report.Receipts {
+		if r.WorkID == workID {
+			out += fmt.Sprintf(" receipt=%s/%s", r.Outcome, r.Reason)
+		}
+	}
+	for _, src := range view.Report.Sources {
+		if src.SourceID == b.SourceID {
+			out += fmt.Sprintf(" source closed=%t stopped=%t inputUnknown=%t observed=%d/%d leafUntil=%s snapshotUntil=%s", src.Closed, src.Stopped, src.InputUnknown, src.ObservedBytes, src.Credit, src.LeafUntil.Format(time.RFC3339Nano), src.SnapshotUntil.Format(time.RFC3339Nano))
+		}
+	}
+	return out
 }
 func nativeSyscallCapture(view delivery.NodeView, pod string, args bool) collector.PacketCapture {
 	now := time.Now().UTC()

@@ -390,3 +390,49 @@ func TestStoppedFlowReleasesSlotOnFIN(t *testing.T) {
 		t.Fatalf("records %d counters %+v", len(pr.Records), n)
 	}
 }
+
+// A direction that stopped parsing and then still carries bytes (a TLS stream
+// after its first record, a frame truncated by the engine, a response half
+// whose SYN-ACK was not captured) must still free its flow slot when the
+// connection closes. Native run 42476393300: with every slot held by such
+// flows, all later frames of a busy pod hit the flow limit.
+func TestStoppedDirectionWithLaterBytesReleasesSlotOnFIN(t *testing.T) {
+	get := []byte("GET / HTTP/1.1\r\nHost: h\r\n\r\n")
+	ok := []byte("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n")
+	cases := map[string]func(f *feeder, c *conn){
+		"tls-then-more-records": func(f *feeder, c *conn) {
+			f.addGroups(c.handshake(), c.data(true, []byte{0x16, 0x03, 0x01, 0x00, 0x05, 1, 2, 3, 4, 5}), c.data(true, []byte{0x17, 0x03, 0x03, 0x00, 0x03, 9, 9, 9}), c.data(false, []byte{0x16, 0x03, 0x03, 0x00, 0x02, 7, 7}))
+		},
+		"truncated-then-more-bytes": func(f *feeder, c *conn) {
+			f.addGroups(c.handshake(), c.data(true, get))
+			body := strings.Repeat("x", 4000)
+			frames := c.data(false, []byte("HTTP/1.1 200 OK\r\nContent-Length: 4000\r\n\r\n"+body), 1400, 1600, 1400)
+			f.add(frames[0])
+			f.at = f.at.Add(time.Millisecond)
+			f.p.Add(frames[1][:Snaplen], uint32(len(frames[1])), f.at)
+			f.add(frames[2:]...)
+		},
+		"response-half-without-syn-ack": func(f *feeder, c *conn) {
+			hs := c.handshake()
+			f.add(hs[0], hs[2])
+			f.addGroups(c.data(true, get), c.data(false, ok), c.data(false, ok))
+		},
+	}
+	for name, run := range cases {
+		t.Run(name, func(t *testing.T) {
+			l := DefaultLimits()
+			l.MaxFlows = 1
+			f := newFeeder(t, l)
+			stopped := newConn(42200)
+			run(f, stopped)
+			f.add(stopped.fin(false), stopped.fin(true))
+			plain := newConn(42201)
+			f.addGroups(plain.handshake(), plain.data(true, get), plain.data(false, ok))
+			f.add(plain.fin(false), plain.fin(true))
+			pr, n, _ := f.close(t)
+			if n.Flows != 2 || n.FlowLimitFrames != 0 || len(pr.Records) == 0 || pr.Records[len(pr.Records)-1].Status != 200 {
+				t.Fatalf("records %+v counters %+v", pr.Records, n)
+			}
+		})
+	}
+}

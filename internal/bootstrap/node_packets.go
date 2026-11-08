@@ -121,7 +121,11 @@ func (n *nodePackets) start(ctx context.Context, epoch string, w collector.Work)
 			return r
 		}
 	}
-	started := n.now().UTC()
+	// Microsecond precision, like the hub's decoded PacketResult.StartedAt
+	// (transport/node DomainPacketResult): the finite live binding (holder
+	// started/until) and the uploaded result must name the same instant, or a
+	// live view's original StartedAt never matches the stored capture.
+	started := n.now().UTC().Truncate(time.Microsecond)
 	liveID := collector.Identity{}
 	if n.identity != nil {
 		liveID = n.identity()

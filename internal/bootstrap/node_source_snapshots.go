@@ -29,9 +29,17 @@ func (n *nodeSources) snapshotLocked(parent context.Context, epoch string, w col
 	x := *w.Snapshot
 	q := x.Request
 	now := n.now()
-	if !x.Valid() || [32]byte(q.SourceBindingDigest) != deliveryapp.SourceBindingDigest(x.Binding) || q.IssuedAt.After(now) || !now.Before(w.NotAfter) || n.upload == nil || n.takeUpload == nil {
-		r.Reason = collector.ReasonWorkUnknown
+	// Each refusal names its stage in the collector log (content-free), so a
+	// saved window that never starts is diagnosable from the node.
+	refuse := func(reason collector.Reason, stage string) collector.Receipt {
+		r.Reason = reason
+		if n.log != nil {
+			n.log(fmt.Sprintf("node collector: source %s snapshot %s refused at %s: %s", x.Binding.SourceID, q.SnapshotID, stage, reason))
+		}
 		return r
+	}
+	if !x.Valid() || [32]byte(q.SourceBindingDigest) != deliveryapp.SourceBindingDigest(x.Binding) || q.IssuedAt.After(now) || !now.Before(w.NotAfter) || n.upload == nil || n.takeUpload == nil {
+		return refuse(collector.ReasonWorkUnknown, "work")
 	}
 	for id, s := range n.snapshots {
 		if s.joined && !now.Before(s.work.Request.StartBy) {
@@ -45,13 +53,11 @@ func (n *nodeSources) snapshotLocked(parent context.Context, epoch string, w col
 		return r
 	}
 	if len(n.snapshots) >= collector.MaxQueuedWork {
-		r.Reason = collector.ReasonCaptureBusy
-		return r
+		return refuse(collector.ReasonCaptureBusy, "busy")
 	}
 	source := n.sources[x.Binding.SourceID]
 	if source == nil {
-		r.Reason = collector.ReasonWorkUnknown
-		return r
+		return refuse(collector.ReasonWorkUnknown, "source")
 	}
 	source.mu.Lock()
 	p := source.meter.Permit()
@@ -62,15 +68,13 @@ func (n *nodeSources) snapshotLocked(parent context.Context, epoch string, w col
 	exact := httpExact && p.Binding == x.Binding && p.StartedAt.Equal(q.SourceStartedAt) && p.HardUntil.Equal(q.SourceHardUntil)
 	source.mu.Unlock()
 	if !exact {
-		r.Reason = collector.ReasonWorkUnknown
-		return r
+		return refuse(collector.ReasonWorkUnknown, "binding")
 	}
 	processing, cancel := context.WithDeadline(parent, q.ProcessingUntil)
 	copy, err := source.BeginWindow(processing, packets.RingWindow{From: q.T0.Add(-q.Before), Until: q.T0.Add(q.After)}, q.T0, q.MaxBytes)
 	if err != nil {
 		cancel()
-		r.Reason = collector.ReasonCaptureBusy
-		return r
+		return refuse(collector.ReasonCaptureBusy, "window")
 	}
 	n.budgetMu.Lock()
 	err = n.budget.ReserveFrozenWithin(q.MaxBytes, source.lowering)
@@ -78,8 +82,7 @@ func (n *nodeSources) snapshotLocked(parent context.Context, epoch string, w col
 	if err != nil {
 		copy.Close()
 		cancel()
-		r.Reason = collector.ReasonCaptureBusy
-		return r
+		return refuse(collector.ReasonCaptureBusy, "budget")
 	}
 	if n.snapshots == nil {
 		n.snapshots = make(map[string]*nodeSourceSnapshot)
@@ -155,7 +158,13 @@ func (n *nodeSources) runSnapshot(ctx context.Context, epoch, workID string, own
 	completed := n.now().UTC()
 	outcome := artifact.SourceSnapshotOutcome{NativeSHA256: artifact.Digest(sha256.Sum256(native)), SourceSnapshotCoverage: artifact.SourceSnapshotCoverage{Request: q, AcceptedExpectationDigest: artifact.Digest(x.ExpectationDigest), NativeBytes: int64(len(native)), Retained: counters.Retained, OutputFull: counters.OutputFull, AvailableFrom: coverage.AvailableFrom, ObservedUntil: coverage.ObservedUntil, SourceStoppedAt: coverage.SourceStoppedAt.UTC(), SourceClosedAt: coverage.SourceClosedAt.UTC(), CompletedAt: completed, HistoryComplete: pre.Complete && !coverage.InputUnknown && !coverage.HistoryEvicted, WindowComplete: coverage.Complete && nativeComplete && counters.OutputFull == 0, HistoryEvicted: coverage.HistoryEvicted, InputUnknown: coverage.InputUnknown}}
 	result := collector.PacketResult{Snapshot: &outcome, WorkID: workID, CaptureID: x.CaptureID, StartedAt: acquiredFrom, EndedAt: acquiredUntil, Seen: counters.Seen, Retained: counters.Retained, Filtered: counters.Filtered, OutputFull: counters.OutputFull, WireBytes: counters.WireBytes, CapturedBytes: int64(len(native)), Snaplen: snaplen, EngineVersion: n.version, ProgramDigest: x.Binding.ProgramDigest, NativeType: nativeType}
-	if result.Valid() && n.takeUpload(ctx, result.CapturedBytes) {
+	if !result.Valid() {
+		// Never upload an inconsistent result, but name the refusal instead
+		// of ending the snapshot silently.
+		n.snapshotFailed(x, "result", fmt.Errorf("inconsistent %s result: seen=%d retained=%d filtered=%d outputFull=%d bytes=%d snaplen=%d window %s..%s", nativeType, counters.Seen, counters.Retained, counters.Filtered, counters.OutputFull, len(native), snaplen, acquiredFrom.Format(time.RFC3339Nano), acquiredUntil.Format(time.RFC3339Nano)))
+		return
+	}
+	if n.takeUpload(ctx, result.CapturedBytes) {
 		uploadStarted := n.now()
 		err := n.upload(ctx, epoch, result, native)
 		if n.log != nil {
