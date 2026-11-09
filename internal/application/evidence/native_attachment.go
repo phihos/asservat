@@ -167,10 +167,12 @@ func (s *NativeAttachment) open(ctx context.Context, r ContextDownloadRequest, k
 		currentOrigin = origin
 		a, e := check(bound)
 		if e != nil || !a.Valid(c.Now()) || !a.Environment.CurrentValid(c.Now()) || a.Environment.Path != operation.Path || a.Environment.Processing.Epoch != operation.Processing.Epoch || a.Environment.Processing.Sequence != operation.Processing.Sequence || a.Environment.Processing.StateDigest != operation.Processing.StateDigest || a.Scope != r.Scope {
+			log.Printf("native attachment current refused: err=%v valid=%t environment=%t path=%t epoch=%t sequence=%t digest=%t scope=%t", e, a.Valid(c.Now()), a.Environment.CurrentValid(c.Now()), a.Environment.Path == operation.Path, a.Environment.Processing.Epoch == operation.Processing.Epoch, a.Environment.Processing.Sequence == operation.Processing.Sequence, a.Environment.Processing.StateDigest == operation.Processing.StateDigest, a.Scope == r.Scope)
 			return value.NativeLease{}, artifact.ErrDownloadUnavailable
 		}
 		l, e := c.Origins.Recheck(bound, origin)
 		if e != nil || !l.Operation.Equal(operation) || origin.Proof.Binding != c.Enrollment.Worker.Binding.Acquisition() {
+			log.Printf("native attachment recheck refused: err=%v operation=%t binding=%t", e, l.Operation.Equal(operation), origin.Proof.Binding == c.Enrollment.Worker.Binding.Acquisition())
 			return value.NativeLease{}, artifact.ErrDownloadUnavailable
 		}
 		l.Until = identity.Earlier(l.Until, identity.Earlier(a.ValidUntil, end))
