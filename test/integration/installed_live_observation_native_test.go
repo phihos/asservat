@@ -313,14 +313,20 @@ func qualifyInstalledLiveObservation(t *testing.T, ctx context.Context, c instal
 			}
 			return nil
 		}
-		// MCP first: it waits for the original source to become eligible.
+		// The fanout episode holds React open while MCP exercises the shared ceiling.
 		c.Failover = episodes == 1 && os.Getenv("ASSERVAT_LIVE_EPISODES") == "policy"
 		c.Fanout = episodes == 1
+		if c.Fanout {
+			browser.begin(source)
+			c.BeforeFailover = func() { browser.finishEpisode(source) }
+		}
 		if e := installedLiveMCP(t, callCtx, c.SQL, c.RootID, source, call, c); e != nil {
 			return e
 		}
-		browser.begin(source)
-		browser.finishEpisode(source)
+		if !c.Fanout {
+			browser.begin(source)
+			browser.finishEpisode(source)
+		}
 		return nil
 	})
 	want := 6
@@ -750,6 +756,7 @@ func (p *installedLiveBrowser) begin(s installedLiveFixture) {
 }
 func (p *installedLiveBrowser) finishEpisode(s installedLiveFixture) {
 	p.t.Helper()
+	p.send(map[string]any{"kind": "release"})
 	var e struct {
 		Kind, SourceID, Projection, WatchID string
 		Rows, Clear                         bool
