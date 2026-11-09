@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"log"
 	"sync"
 	"time"
 )
@@ -284,10 +285,12 @@ func (s NativeOrigins) proofBound(ctx context.Context, o NativeOrigin) (time.Tim
 	}
 	admission := o.response
 	if admission == nil || admission.proof.Proof.Acquisition() != o.Proof || !admission.proof.Valid(admission.at) || admission.at.Before(o.Lease.Operation.StartedAt) || !o.Lease.Operation.CurrentValid(s.Now()) {
+		log.Printf("native response proof refused: nil=%t acquisition=%t valid=%t before=%t current=%t", admission == nil, admission != nil && admission.proof.Proof.Acquisition() == o.Proof, admission != nil && admission.proof.Valid(admission.at), admission != nil && admission.at.Before(o.Lease.Operation.StartedAt), o.Lease.Operation.CurrentValid(s.Now()))
 		return time.Time{}, artifact.ErrDownloadUnavailable
 	}
 	until := identity.Earlier(o.Lease.Operation.Until, identity.Earlier(admission.proof.TokenNotAfter, o.Proof.Peer.NotAfter))
 	if !s.Now().Before(until) {
+		log.Printf("native response proof expired: until=%s", until)
 		return time.Time{}, artifact.ErrDownloadExpired
 	}
 	return until, nil
