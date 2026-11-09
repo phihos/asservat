@@ -239,7 +239,7 @@ func (s *NativeAttachment) open(ctx context.Context, r ContextDownloadRequest, k
 			if next == nil || !SameNativeWindow(delivery, l) || l.Sequence <= delivery.Sequence || !l.Valid(c.Now()) || !c.Now().Before(end) || ctx.Err() != nil {
 				return artifact.ErrDownloadUnavailable
 			}
-			_, a, err := newWorkerResponseObservation(bound, l.Authority, r.Scope, c.Now)
+			observed, a, err := newWorkerResponseObservation(ctx, l.Authority, r.Scope, c.Now)
 			if err != nil {
 				return err
 			}
@@ -256,7 +256,7 @@ func (s *NativeAttachment) open(ctx context.Context, r ContextDownloadRequest, k
 				return artifact.ErrDownloadUnavailable
 			}
 			c.Origins.Recent.put(nativeObservationKey{operation.Reference, currentOrigin.Proof.Peer}, renewed, c.Now())
-			check, delivery = next, l
+			check, delivery = observed.Check, l
 			return nil
 		}
 	}

@@ -343,7 +343,7 @@ func testNativeResponseRenewal(t *testing.T, composed, checked bool, mode string
 		f.f.a.ValidUntil = f.f.now.Add(400 * time.Millisecond)
 		f.f.identity.ValidUntil = f.f.a.ValidUntil
 	}
-	body := []byte("0123456789abcdefg")
+	body := []byte("0123456789abcdefghijklmn")
 	ports := &windowNativePorts{exchange: &windowExchange{body: body}}
 	en := *f.lookup.value.Enrollment
 	peer := value.KeyPeer{InstallationID: en.Worker.Binding.InstallationID, PeerID: en.Worker.Binding.PodUID, Role: "acquisition", Certificate: artifact.Digest{31}, NotBefore: f.f.now.Add(-time.Second), NotAfter: en.Worker.Intent.RunUntil}
@@ -476,7 +476,7 @@ func testNativeResponseRenewal(t *testing.T, composed, checked bool, mode string
 		return
 	}
 	last, err := read(t.Context(), f.f, next, 10, 7)
-	if err != nil || !bytes.Equal(last.Bytes, body[10:]) {
+	if err != nil || !bytes.Equal(last.Bytes, body[10:17]) {
 		t.Fatal("renewed exact cursor", err, "renewals", ports.renewals)
 	}
 	clear(last.Bytes)
@@ -497,7 +497,18 @@ func testNativeResponseRenewal(t *testing.T, composed, checked bool, mode string
 	if err = source.AcknowledgeNativeChunk(t.Context(), next, 10, 7); err != nil {
 		t.Fatal(err)
 	}
-	wantAuthorityChecks := 2
+	third := next
+	third.Sequence++
+	ports.nextLease = third
+	last, err = read(t.Context(), f.f, third, 17, 7)
+	if err != nil || !bytes.Equal(last.Bytes, body[17:]) {
+		t.Fatal("retained renewal checker lost the exact remaining cursor", err, "renewals", ports.renewals)
+	}
+	clear(last.Bytes)
+	if err = source.AcknowledgeNativeChunk(t.Context(), third, 17, 7); err != nil {
+		t.Fatal(err)
+	}
+	wantAuthorityChecks := 3
 	if composed {
 		wantAuthorityChecks++
 	}
@@ -507,7 +518,7 @@ func testNativeResponseRenewal(t *testing.T, composed, checked bool, mode string
 	if got := f.f.count("current-authority"); got != wantAuthorityChecks {
 		t.Fatalf("full C03 checks=%d want=%d: coordinator handoff repeated authority or direct path bypassed it", got, wantAuthorityChecks)
 	}
-	if ports.registrations != 1 || ports.renewals != 1 || ports.releases != 1 {
+	if ports.registrations != 1 || ports.renewals != 2 || ports.releases != 1 {
 		t.Fatal("renewal reopened/refilled conversation", ports.registrations, ports.renewals, ports.releases)
 	}
 }
