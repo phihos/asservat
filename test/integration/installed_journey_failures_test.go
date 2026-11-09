@@ -604,7 +604,7 @@ func (f *installedFailureRun) legHubDisconnect(api kubernetes.Interface, hubName
 	defer endCommit()
 	for {
 		var stored bool
-		err := f.admin.QueryRow(commitWait, `SELECT EXISTS(SELECT 1 FROM custody_attempt a JOIN context_capture c ON c.attempt_id=a.id AND c.id=a.artifact_id WHERE c.root_id=$1 AND c.id=$2::uuid AND a.state='stored_unpublished')`, f.root, captureID).Scan(&stored)
+		err := f.admin.QueryRow(commitWait, `SELECT EXISTS(SELECT 1 FROM custody_attempt a JOIN context_capture c ON c.attempt_id=a.id WHERE c.root_id=$1 AND c.id=$2::uuid AND a.state='stored_unpublished')`, f.root, captureID).Scan(&stored)
 		if err == nil && stored {
 			break
 		}
