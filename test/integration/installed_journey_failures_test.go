@@ -578,9 +578,9 @@ func installedHubWorkerProcess(t *testing.T, ctx context.Context, api kubernetes
 	return node, strconv.Itoa(inspected.Info.PID)
 }
 
-// legHubDisconnect kills the prelocated hub-worker as soon as custody commits,
-// before its SQL completion can be recorded (ADR-223). Reconnect never repeats
-// collection or imports the committed regional result.
+// legHubDisconnect kills the prelocated hub-worker while the capture is in
+// flight, then proves custody committed without its completion reply (ADR-223).
+// Reconnect never repeats collection or imports the committed regional result.
 func (f *installedFailureRun) legHubDisconnect(api kubernetes.Interface, hubNamespace, workerDeployment string) {
 	f.t.Helper()
 	restarts := installedHubRestarts(f.t, f.ctx, api, hubNamespace)
@@ -600,6 +600,9 @@ func (f *installedFailureRun) legHubDisconnect(api kubernetes.Interface, hubName
 			f.t.Fatal("installed disconnect leg: no in-flight start before the pause", err)
 		}
 	}
+	if err := installedRun(f.ctx, installedDockerTimeout, "docker", "exec", node, "kill", "-KILL", process); err != nil {
+		f.t.Fatal("lost-reply hub-worker kill", err)
+	}
 	commitWait, endCommit := context.WithTimeout(f.ctx, 60*time.Second)
 	defer endCommit()
 	for {
@@ -611,9 +614,6 @@ func (f *installedFailureRun) legHubDisconnect(api kubernetes.Interface, hubName
 		if installedJourneyPause(commitWait, time.Millisecond) != nil {
 			f.t.Fatal("installed disconnect leg: regional completion never committed", err)
 		}
-	}
-	if err := installedRun(f.ctx, installedDockerTimeout, "docker", "exec", node, "kill", "-KILL", process); err != nil {
-		f.t.Fatal("lost-reply hub-worker kill", err)
 	}
 	installedHubSettled(f.t, f.ctx, api, hubNamespace, restarts)
 	originalCode, _ := f.requestReply(<-response)
