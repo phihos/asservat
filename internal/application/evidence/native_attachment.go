@@ -8,6 +8,7 @@ import (
 	value "asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/identity"
 	"context"
+	"log"
 	"sync"
 	"time"
 )
@@ -257,6 +258,7 @@ func (s *NativeAttachment) open(ctx context.Context, r ContextDownloadRequest, k
 			}
 			c.Origins.Recent.put(nativeObservationKey{operation.Reference, currentOrigin.Proof.Peer}, renewed, c.Now())
 			check, delivery = registrationBoundCheck(observed, r), l
+			log.Printf("native response renewed: sequence=%d until=%s authorityUntil=%s", l.Sequence, l.Until, a.ValidUntil)
 			return nil
 		}
 	}
