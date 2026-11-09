@@ -409,7 +409,7 @@ func qualifyInstalledJourneyFailures(t *testing.T, ctx context.Context, admin *p
 		run.legStoreUnconfirmed(providers, evidenceBucket)
 		run.legCapacityUnavailable()
 	case "journey-start-failure":
-		run.legCompletionLost()
+		run.legCompletionLost(providers, evidenceBucket)
 		run.legKeyServiceDown()
 	default:
 		t.Fatal("unknown failure focus", installedJourneyFocus())
@@ -536,12 +536,14 @@ func (f *installedFailureRun) legCapacityUnavailable() {
 }
 
 // legCompletionLost rejects only the hub's durable stored transition after the
-// region committed custody. This deterministically exercises the lost-reply
-// state (ADR-223) without racing a process kill against a small capture.
+// region committed its four ciphertext objects. This deterministically
+// exercises the lost-reply state (ADR-223) without racing a process kill.
 // Replay never repeats collection or imports the committed regional result.
-func (f *installedFailureRun) legCompletionLost() {
+func (f *installedFailureRun) legCompletionLost(providers *initialRuntimeNativeProviders, evidenceBucket string) {
 	f.t.Helper()
-	previewID, _, captureID, deadline := f.preview()
+	store := s3.New(s3.Options{Region: providers.desired.AuditStore.Region, BaseEndpoint: aws.String(providers.desired.AuditStore.Endpoint), UsePathStyle: true,
+		Credentials: credentials.NewStaticCredentialsProvider("synthetic-only", "synthetic-only-secret", ""), HTTPClient: providers.client, RetryMaxAttempts: 1})
+	previewID, loc, captureID, deadline := f.preview()
 	dropCompletionFault := func(ctx context.Context) error {
 		_, err := f.admin.Exec(ctx, `DROP TRIGGER IF EXISTS fixture_lost_completion ON context_execution; DROP FUNCTION IF EXISTS fixture_lost_completion();`)
 		return err
@@ -571,27 +573,37 @@ FOR EACH ROW EXECUTE FUNCTION fixture_lost_completion();`, f.root, captureID))
 	}
 	key := f.keys + "-disconnect"
 	response := f.startRequest(previewID, key)
-	commitWait, endCommit := context.WithTimeout(f.ctx, 60*time.Second)
-	defer endCommit()
-	for {
-		var stored bool
-		err := f.admin.QueryRow(commitWait, `SELECT EXISTS(SELECT 1 FROM custody_attempt a JOIN context_capture c ON c.attempt_id=a.id WHERE c.root_id=$1 AND c.id=$2::uuid AND a.state='stored_unpublished')`, f.root, captureID).Scan(&stored)
-		if err == nil && stored {
-			break
-		}
-		if installedJourneyPause(commitWait, time.Millisecond) != nil {
-			f.t.Fatal("installed disconnect leg: regional completion never committed", err)
-		}
+	originalCode, _ := f.requestReply(<-response)
+	f.t.Logf("installed disconnect leg: original public operation resolved %s", originalCode)
+	if originalCode == "" {
+		f.t.Fatal("installed disconnect leg: completion loss returned success")
 	}
 	phaseRead, endPhase := context.WithTimeout(f.ctx, 10*time.Second)
-	var executionPhase string
-	err = f.admin.QueryRow(phaseRead, `SELECT phase FROM context_execution WHERE root_id=$1 AND capture_id=$2::uuid`, f.root, captureID).Scan(&executionPhase)
+	var executionPhase, custodyState string
+	err = f.admin.QueryRow(phaseRead, `SELECT e.phase,a.state FROM context_execution e JOIN context_capture c ON c.root_id=e.root_id AND c.id=e.capture_id JOIN custody_attempt a ON a.id=c.attempt_id WHERE e.root_id=$1 AND e.capture_id=$2::uuid`, f.root, captureID).Scan(&executionPhase, &custodyState)
 	endPhase()
 	if err != nil {
-		f.t.Fatal("installed disconnect leg: execution phase unreadable after completion loss", err)
+		f.t.Fatal("installed disconnect leg: execution/custody state unreadable after completion loss", err)
 	}
-	if executionPhase != "started" {
-		f.t.Fatal("installed disconnect leg: regional completion was recorded despite the fault", executionPhase)
+	if executionPhase != "started" || custodyState != "reserved" {
+		f.t.Fatal("installed disconnect leg: wrong unrecorded completion state", executionPhase, custodyState)
+	}
+	objectRead, endObjects := context.WithTimeout(f.ctx, 10*time.Second)
+	prefix := loc.Prefix()
+	objects, err := store.ListObjectsV2(objectRead, &s3.ListObjectsV2Input{Bucket: &evidenceBucket, Prefix: &prefix, MaxKeys: aws.Int32(4)})
+	endObjects()
+	count := 0
+	if objects != nil {
+		count = len(objects.Contents)
+	}
+	if err != nil || objects == nil || aws.ToBool(objects.IsTruncated) || count != 4 {
+		f.t.Fatal("installed disconnect leg: regional ciphertext inventory incomplete", count, err)
+	}
+	want := map[string]bool{prefix + "data": true, prefix + "index": true, prefix + "manifest": true, prefix + "commit": true}
+	for _, object := range objects.Contents {
+		if object.Key == nil || !want[*object.Key] {
+			f.t.Fatal("installed disconnect leg: unexpected regional ciphertext object", object.Key)
+		}
 	}
 	restore, endRestore := context.WithTimeout(f.ctx, 10*time.Second)
 	err = dropCompletionFault(restore)
@@ -599,8 +611,6 @@ FOR EACH ROW EXECUTE FUNCTION fixture_lost_completion();`, f.root, captureID))
 	if err != nil {
 		f.t.Fatal("installed disconnect leg: remove completion loss", err)
 	}
-	originalCode, _ := f.requestReply(<-response)
-	f.t.Logf("installed disconnect leg: original public operation resolved %s", originalCode)
 	// The hub replays the original request passively: same capture, no new
 	// admission, execution or attempt.
 	f.resolveAccepted(previewID, key, captureID)
