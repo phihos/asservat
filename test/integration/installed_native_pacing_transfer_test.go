@@ -135,7 +135,34 @@ func qualifyInstalledNativePacing(t *testing.T, ctx context.Context, m *nativePa
 	// Keep comparison data bounded by the already authenticated 8 MiB native
 	// file. Only the control is retained as PCAPNG; other bodies stream to hashes.
 	paced := prepare("paced")
-	consume("paced", paced, 0, int64(len(native)), false, nil, nativePacingInterval, io.Discard, true)
+	suspended := false
+	defer func() {
+		if !suspended {
+			return
+		}
+		restore, end := context.WithTimeout(context.Background(), 10*time.Second)
+		defer end()
+		if _, err := m.admin.Exec(restore, "UPDATE permission_stream SET suspended=false WHERE id=$1", m.root); err != nil {
+			t.Errorf("restore pacing permission projection: %v", err)
+		}
+	}()
+	suspension := &nativePacingWriteHook{writer: io.Discard, hook: func() error {
+		suspended = true
+		_, err := m.admin.Exec(ctx, "UPDATE permission_stream SET suspended=true WHERE id=$1", m.root)
+		return err
+	}}
+	consume("paced", paced, 0, int64(len(native)), false, nil, nativePacingInterval, suspension, true)
+	if !suspended {
+		t.Fatal("paced response never reached its permission-suspension byte")
+	}
+	refused, code := invoke("prepare_artifact_download", map[string]string{"artifact_id": artifactID, "idempotency_key": "installed-native-suspended-start"})
+	if code != "NotAvailable" || refused.Status != "error" {
+		t.Fatal("suspended permission allowed a new download response", code, refused.Status)
+	}
+	if _, err := m.admin.Exec(ctx, "UPDATE permission_stream SET suspended=false WHERE id=$1", m.root); err != nil {
+		t.Fatal("restore pacing permission projection", err)
+	}
+	suspended = false
 	pacedPhase := m.Phases[len(m.Phases)-1]
 	if pacedPhase.Name != "paced" {
 		t.Fatal("paced measurement phase missing")
@@ -165,6 +192,24 @@ func qualifyInstalledNativePacing(t *testing.T, ctx context.Context, m *nativePa
 	}
 	// PCAPNG/tshark validation in the parent must still pass before Complete
 	// becomes true. Revocation/cancellation/concurrency are separate open gates.
+}
+
+type nativePacingWriteHook struct {
+	writer  io.Writer
+	hook    func() error
+	called  bool
+	callErr error
+}
+
+func (w *nativePacingWriteHook) Write(p []byte) (int, error) {
+	if !w.called {
+		w.called = true
+		w.callErr = w.hook()
+	}
+	if w.callErr != nil {
+		return 0, w.callErr
+	}
+	return w.writer.Write(p)
 }
 
 func minTime(a, b time.Time) time.Time {
