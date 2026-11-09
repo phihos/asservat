@@ -56,14 +56,14 @@ func captureAdmissionPoolConfig(dsn string, transport *tls.Config) (*pgxpool.Con
 	}
 	pc.ConnConfig.TLSConfig = transport
 	pc.ConnConfig.Fallbacks = nil
-	pc.MaxConns = 16
+	pc.MaxConns = 8
 	return pc, nil
 }
 
 // The installed one-connection profile (bootstrap providerInputs.sqlConfig):
 // MaxConns=1, no warm minimum, 30-second idle and five-minute jittered lifetime.
 // Native15 exhausted the unchanged 48-slot server only because the journey used
-// the 16-connection fixture profile above. This does not raise any limit, and
+// the previous 16-connection fixture profile above. This does not raise any limit, and
 // idle expiry is not admission control; a nested same-pool acquisition now
 // waits on its original deadline exactly as it would in the installed hub.
 func installedSQLPoolProfile(pc *pgxpool.Config) *pgxpool.Config {
@@ -197,8 +197,8 @@ func TestContextAdmissionWithRealServices(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	seedRetention := newRetentionEffectFixtures(t, ctx, poolFor, store, keys)
-	seedRecovery := newRecoveryEffectFixtures(t, ctx, admin, poolFor)
+	seedRetention, resetRetention := newRetentionEffectFixtures(t, ctx, poolFor, store, keys)
+	seedRecovery, resetRecovery := newRecoveryEffectFixtures(t, ctx, admin, poolFor)
 	if native == nil {
 		// Every pool opened below the shared fixtures above must be closed by
 		// its own subtest or helper; leaked idle connections exhausted the
@@ -410,7 +410,18 @@ func TestContextAdmissionWithRealServices(t *testing.T) {
 			return create(t, 1)
 		})
 	})
-	qualifyContextPublications(t, ctx, admin, poolFor, store, keys, create, authorityPool.Reset)
+	qualifyContextPublications(t, ctx, admin, poolFor, store, keys, create, func() {
+		// Joined bursts also release the shared parent fixture's idle pools;
+		// the native exchange below needs about 40 of the 48 server slots.
+		authorityPool.Reset()
+		admin.Reset()
+		capturePool.Reset()
+		custodyPool.Reset()
+		controlPool.Reset()
+		auditPool.Reset()
+		resetRetention()
+		resetRecovery()
+	})
 	qualifyRetentionCatchup(t, ctx, admin, poolFor, store, keys, create)
 	qualifyRetentionPreview(t, ctx, admin, poolFor, store, keys, create)
 	charges := func(t *testing.T, s scenario, want int64) {

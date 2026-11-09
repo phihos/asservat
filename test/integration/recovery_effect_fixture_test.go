@@ -18,7 +18,7 @@ type recoveryEffectFixture struct {
 	guard        *postgres.RecoveryTransactionGuard
 }
 
-func newRecoveryEffectFixtures(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool) func(*testing.T, string) *recoveryEffectFixture {
+func newRecoveryEffectFixtures(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool) (func(*testing.T, string) *recoveryEffectFixture, func()) {
 	pool := poolFor("peer_read_runtime", "synthetic-peer-read")
 	t.Cleanup(pool.Close)
 	return func(t *testing.T, root string) *recoveryEffectFixture {
@@ -41,5 +41,5 @@ func newRecoveryEffectFixtures(t *testing.T, ctx context.Context, admin *pgxpool
 			t.Fatal(err)
 		}
 		return f
-	}
+	}, pool.Reset
 }

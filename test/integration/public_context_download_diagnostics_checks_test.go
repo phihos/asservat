@@ -278,7 +278,7 @@ func TestPublicJourneySQLPoolConstructorCompatibility(t *testing.T) {
 			if err != nil {
 				t.Fatal("fixture pool configuration failed")
 			}
-			if pc.MaxConns != 16 || pc.MinConns != 0 || pc.ConnConfig.TLSConfig != transport || len(pc.ConnConfig.Fallbacks) != 0 || pc.ConnConfig.Tracer != nil {
+			if pc.MaxConns != 8 || pc.MinConns != 0 || pc.ConnConfig.TLSConfig != transport || len(pc.ConnConfig.Fallbacks) != 0 || pc.ConnConfig.Tracer != nil {
 				t.Fatal("fixture pool configuration changed")
 			}
 			var calls atomic.Int32

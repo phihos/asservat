@@ -53,7 +53,8 @@ func (f *capacitySQLFixture) prepareManagedContext(t *testing.T, root app.RootCo
 	target := capacityNativeTarget(f.input.ControlClusterID, f.namespace, f.workloads[0], n)
 	policyInput := capacityNativeRetentionPolicy()
 	policyInput.Policy.DefaultSeconds = retentionSeconds
-	retention := newRetentionEffectFixturesWithPolicy(t, f.ctx, f.fixturePool, f.store, f.keys, policyInput, additional...)(t, f.input.PermissionRootID, target.Target())
+	retentionFactory, _ := newRetentionEffectFixturesWithPolicy(t, f.ctx, f.fixturePool, f.store, f.keys, policyInput, additional...)
+	retention := retentionFactory(t, f.input.PermissionRootID, target.Target())
 	recovery := &recoveryEffectFixture{installation: f.input.InstallationID}
 	var err error
 	recovery.observation, err = readSyntheticFleetObservationBinding(f.ctx, f.admin, f.input.InstallationID)

@@ -43,8 +43,17 @@ func qualifyNativeLengthRollbackRefusal(t *testing.T, ctx context.Context, admin
 			expected, refusal = 135, "retained profile-unavailable execution prevents rollback"
 		}
 	}
+	if original >= 145 {
+		var retained bool
+		if err := admin.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM context_execution WHERE not_after>not_before+interval '5 seconds')").Scan(&retained); err != nil {
+			t.Fatal(err)
+		}
+		if retained {
+			expected, refusal = 145, "API start bindings beyond five seconds prevent downgrade"
+		}
+	}
 	// A later migration may down first; restore the original release even when
-	// SQL130 refuses, so subsequent fixture cases see the compiled schema.
+	// the retained guard refuses, so later cases see the compiled schema.
 	grants := preserveFixtureGrants(t, ctx, admin)
 	defer func() {
 		restore, cancel := context.WithTimeout(context.Background(), 30*time.Second)

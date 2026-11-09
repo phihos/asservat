@@ -212,7 +212,7 @@ func qualifyRecordingTransactions(t *testing.T, ctx context.Context, admin *pgxp
 			t.Fatal(err)
 		}
 		verified := s.a.Eligibility.VerifiedIdentity
-		verified.VerifiedAt, verified.ValidUntil = n, n.Add(5*time.Second)
+		verified.VerifiedAt, verified.ValidUntil = n, n.Add(30*time.Second)
 		recovery, err := s.recovery.reader.RecoveryState(ctx)
 		if err != nil {
 			t.Fatal(err)
@@ -227,8 +227,8 @@ func qualifyRecordingTransactions(t *testing.T, ctx context.Context, admin *pgxp
 		}
 		eligible := authorization.ContextEligibility(verified, projection, s.a.Eligibility.Target, time.Now())
 		current := s.a.Plan.Input
-		current.Target.ObservedAt, current.Target.FreshUntil = n, n.Add(5*time.Second)
-		current.Capability.ObservedAt, current.Capability.FreshUntil = n, n.Add(5*time.Second)
+		current.Target.ObservedAt, current.Target.FreshUntil = n, n.Add(30*time.Second)
+		current.Capability.ObservedAt, current.Capability.FreshUntil = n, n.Add(30*time.Second)
 		if current.Retention, err = privacy.Resolve(policies, privacy.Input{Target: current.Target.Target(), PrivacyClass: "potentialPersonalData", EvidenceType: e.Type().EvidenceType, RequestedSeconds: e.RequestedAgeSeconds, AnchorAt: e.Registration.AnchorAt}, time.Now()); err != nil {
 			t.Fatal(err)
 		}
@@ -241,8 +241,15 @@ func qualifyRecordingTransactions(t *testing.T, ctx context.Context, admin *pgxp
 		if err != nil || plan.ScopeDigest != e.PlanDigest {
 			t.Fatal("execution plan of the recording", err)
 		}
-		process := value.APIProcessObservation{Binding: value.APIProcessBinding{InstallationID: recovery.InstallationID, ClusterID: current.Target.Target().ClusterID, IssuerEpoch: recovery.IssuerEpoch, NamespaceUID: custodyID(), AccountUID: custodyID(), PodUID: custodyID(), ProcessEpoch: custodyID(), StartupDigest: artifact.Digest{1}, ImageDigest: e.CollectorImageDigest}, CheckedAt: n, ValidUntil: n.Add(5 * time.Second)}
-		until := n.Add(5 * time.Second)
+		n = time.Now().UTC().Truncate(time.Microsecond)
+		s.batch.ObservedAt, s.batch.FreshUntil = n, n.Add(5*time.Second)
+		if err = s.p.RefreshPermissions(ctx, s.batch); err != nil {
+			t.Fatal(err)
+		}
+		verified.VerifiedAt, verified.ValidUntil = n, n.Add(30*time.Second)
+		eligible = authorization.ContextEligibility(verified, projection, s.a.Eligibility.Target, time.Now())
+		process := value.APIProcessObservation{Binding: value.APIProcessBinding{InstallationID: recovery.InstallationID, ClusterID: current.Target.Target().ClusterID, IssuerEpoch: recovery.IssuerEpoch, NamespaceUID: custodyID(), AccountUID: custodyID(), PodUID: custodyID(), ProcessEpoch: custodyID(), StartupDigest: artifact.Digest{1}, ImageDigest: e.CollectorImageDigest}, CheckedAt: n, ValidUntil: n.Add(30 * time.Second)}
+		until := n.Add(30 * time.Second)
 		for _, d := range []time.Time{eligible.ValidUntil, plan.ValidUntil, recovery.FreshUntil, process.ValidUntil} {
 			if d.Before(until) {
 				until = d

@@ -623,6 +623,12 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 		if _, err = f.reader.RetainedAudience(ctx, f.e.Registration.Location.ArtifactID); err == nil {
 			t.Fatal("deletion-pending artifact remained visible")
 		}
+		// Join the eight-way publication burst before the processing and native
+		// download fixtures need the same bounded server connections.
+		releasePermissionBurst()
+		for _, pool := range []*pgxpool.Pool{verifierPool, auditPool, publishPool, readerPool, intentPool} {
+			pool.Reset()
+		}
 	})
 	t.Run("verification-audit-failure-stays-invisible", func(t *testing.T) {
 		f := setup(t)

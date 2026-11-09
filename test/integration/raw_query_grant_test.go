@@ -346,6 +346,7 @@ func qualifyRawQueryRollback(t *testing.T, ctx context.Context, admin *pgxpool.P
 	}{
 		{134, "SELECT EXISTS(SELECT 1 FROM context_verification WHERE acquisition_started_at IS NOT NULL)", "retained acquisition-window verification prevents rollback"},
 		{135, "SELECT EXISTS(SELECT 1 FROM context_execution WHERE phase='profileUnavailable')", "retained profile-unavailable execution prevents rollback"},
+		{145, "SELECT EXISTS(SELECT 1 FROM context_execution WHERE not_after>not_before+interval '5 seconds')", "API start bindings beyond five seconds prevent downgrade"},
 	} {
 		var retained bool
 		if original >= newer.version {
