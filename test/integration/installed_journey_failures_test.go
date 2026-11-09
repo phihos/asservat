@@ -609,7 +609,7 @@ func (f *installedFailureRun) legHubDisconnect(api kubernetes.Interface, hubName
 		}
 	})
 	setup, endSetup := context.WithTimeout(f.ctx, 10*time.Second)
-	_, err = f.admin.Exec(setup, fmt.Sprintf(`CREATE FUNCTION fixture_lost_reply_pause() RETURNS trigger
+	_, err = listener.Exec(setup, fmt.Sprintf(`CREATE FUNCTION fixture_lost_reply_pause() RETURNS trigger
 LANGUAGE plpgsql SET search_path=pg_catalog,pg_temp AS $$
 BEGIN
  IF NEW.id='%s'::uuid AND NEW.state='stored_unpublished' AND OLD.state IS DISTINCT FROM NEW.state THEN
@@ -648,6 +648,7 @@ FOR EACH ROW EXECUTE FUNCTION fixture_lost_reply_pause();`, loc.AttemptID))
 	if notification.Payload != loc.AttemptID {
 		f.t.Fatal("installed disconnect leg: custody notification changed attempts", notification.Payload, loc.AttemptID)
 	}
+	listener.Release()
 	if _, err = killer.Write([]byte("kill -KILL " + process + "\n")); err != nil {
 		f.t.Fatal("lost-reply hub-worker kill", err)
 	}
