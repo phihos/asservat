@@ -46,6 +46,7 @@ type liveOwnerFacts struct {
 	entered    chan struct{}
 	afterRead  func()
 	empty      bool
+	transient  bool
 	delay      time.Duration
 }
 
@@ -108,6 +109,9 @@ func (f *liveOwnerFacts) Read(ctx context.Context, ss []v.Source, p string, posi
 			return liveapp.Projection{}, ctx.Err()
 		case <-f.block:
 		}
+	}
+	if f.transient {
+		return liveapp.Projection{}, fmt.Errorf("%w: %w: synthetic source miss", v.ErrUnavailable, v.ErrTransient)
 	}
 	now := time.Now()
 	rows := []v.Row{}
@@ -378,6 +382,15 @@ func TestLiveOwnerActualH2CurrentIdentityAndJoinedDelivery(t *testing.T) {
 		})
 	}
 }
+func TestLiveOwnerActualH2PreservesTransientRead(t *testing.T) {
+	f := newLiveOwnerH2Fixture(t, 1)
+	f.facts.transient = true
+	_, err := f.begin(t.Context(), liveapp.Command{Read: &v.Read{ID: f.watch.ID, Cursor: *f.watch.Cursor}})
+	if !errors.Is(err, v.ErrTransient) || !errors.Is(err, v.ErrUnavailable) {
+		t.Fatal("private owner forwarding lost the transient source class", err)
+	}
+}
+
 func TestLiveOwnerActualH2RejectsChangedIngressAndCanceledRead(t *testing.T) {
 	for _, mode := range []string{"client", "principal", "policy", "client-after-read", "expired-after-read", "cancel", "final-cutoff", "peer-revoked", "close-canceled"} {
 		t.Run(mode, func(t *testing.T) {

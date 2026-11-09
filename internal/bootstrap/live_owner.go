@@ -388,6 +388,8 @@ func liveOwnerFailure(s string) error {
 		return fmt.Errorf("%w: live_owner:387", v.ErrCapacity)
 	case "invalid":
 		return fmt.Errorf("%w: live_owner:389", v.ErrInvalid)
+	case "transient":
+		return fmt.Errorf("%w: %w: live_owner:391", v.ErrUnavailable, v.ErrTransient)
 	default:
 		return fmt.Errorf("%w: live_owner:391", v.ErrUnavailable)
 	}

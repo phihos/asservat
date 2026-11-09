@@ -26,6 +26,15 @@ func TestLiveOwnerClosedFramesAndBounds(t *testing.T) {
 		if _, e := DecodeLiveOwnerFrame(bytes.NewReader(b)); e != nil {
 			t.Fatal(kind, e)
 		}
+		if kind == "error" {
+			f.Failure = "transient"
+			b, _ = json.Marshal(f)
+			if _, e := DecodeLiveOwnerFrame(bytes.NewReader(b)); e != nil {
+				t.Fatal("transient failure frame", e)
+			}
+			f.Failure = "unavailable"
+			b, _ = json.Marshal(f)
+		}
 		for _, mode := range []string{"nonce", "sequence", "extra", "union", "too-large"} {
 			g := f
 			switch mode {

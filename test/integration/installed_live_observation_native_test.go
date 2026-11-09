@@ -549,12 +549,22 @@ func installedLiveMCP(t *testing.T, ctx context.Context, db *pgxpool.Pool, root 
 				return e
 			}
 		}
-		if len(recovered.Rows) != 0 {
-			return errors.New("live failover replayed retained rows")
+		if recovered.WatchID != watch.ID || recovered.Revision != watch.Revision || len(recovered.Rows) != 0 {
+			return errors.New("live failover changed the view or replayed retained rows")
 		}
-		if recovered.State == "Active" && r.NextCursor == nil {
+		if recovered.State == "Closed" {
+			if r.NextCursor != nil {
+				return errors.New("live failover closed view retained continuation")
+			}
+			if e = db.QueryRow(ctx, `SELECT spent,state FROM live_watch_control WHERE root_id=$1 AND id=$2`, root, watch.ID).Scan(&sqlSpent, &state); e != nil || sqlSpent != lastSpend || state != "Closed" {
+				return errors.New("live failover terminal reply differs from minimized ledger")
+			}
+			return nil
+		}
+		if r.NextCursor == nil {
 			return errors.New("live failover lost continuation without closing the view")
 		}
+		closeInput["expected_revision"] = recovered.Revision
 		if _, e = must("close_live_watch", closeInput, &watch); e != nil {
 			return e
 		}

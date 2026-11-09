@@ -12,3 +12,9 @@ SELECT live_watch_prune(sqlc.arg(root_id)::uuid)::jsonb;
 
 -- name: LookupLiveWatchOwner :one
 SELECT installation_id::uuid,cluster_id::uuid,issuer_epoch::uuid,pod_uid::uuid,process_epoch::uuid FROM live_watch_owner(sqlc.arg(root_id)::uuid,sqlc.arg(principal_key)::bytea,sqlc.narg(watch_id)::uuid,sqlc.narg(key_hash)::bytea);
+
+-- name: ReadLiveControl :one
+SELECT live_watch_read_control(sqlc.arg(root_id)::uuid,sqlc.arg(principal_key)::bytea,sqlc.arg(watch_id)::uuid);
+
+-- name: CloseLiveControl :one
+SELECT live_watch_close_control(sqlc.arg(root_id)::uuid,sqlc.arg(principal_key)::bytea,sqlc.arg(watch_id)::uuid,sqlc.arg(expected_revision)::bigint,sqlc.arg(fence)::uuid);

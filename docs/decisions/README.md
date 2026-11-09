@@ -1,5 +1,10 @@
 # Decision records
 
+[ADR-317 — Terminal recovery after live-owner loss](317-terminal-live-owner-recovery.md)
+ends the minimized view after full principal/client cursor verification instead
+of adopting private source/filter state into a replacement owner. Component and
+real-PostgreSQL checks pass; installed failover qualification remains pending.
+
 [ADR-305 — Bounded saved-packet queries](305-bounded-saved-packet-queries.md)
 defines the next metadata/raw query workflow using the existing libpcap compiler
 and Go evaluator, exact raw-query grants and per-batch disclosure accounting.

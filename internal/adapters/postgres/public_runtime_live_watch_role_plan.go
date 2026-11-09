@@ -10,5 +10,7 @@ func publicRuntimeLiveWatchGrants() []publicRuntimeGrant {
 		{"function", "live_watch_change(uuid,uuid,bytea,jsonb,bigint,bigint,timestamptz)", "", "EXECUTE"},
 		{"function", "live_watch_current(uuid,uuid,bytea,jsonb,timestamptz)", "", "EXECUTE"},
 		{"function", "live_watch_owner(uuid,bytea,uuid,bytea)", "", "EXECUTE"},
+		{"function", "live_watch_read_control(uuid,bytea,uuid)", "", "EXECUTE"},
+		{"function", "live_watch_close_control(uuid,bytea,uuid,bigint,uuid)", "", "EXECUTE"},
 	}
 }
