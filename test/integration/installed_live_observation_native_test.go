@@ -47,6 +47,7 @@ type installedLiveRun struct {
 	Administrator                                                   kubernetes.Interface
 	AdministratorUser                                               string
 	RootID, Installation, HubNamespace, OwnerDeployment             string
+	Failover                                                        bool
 	Identity                                                        *installedIdentity
 	PublicRoot                                                      []byte
 	Address, Origin, RegionalConfig, ClusterID, Namespace, Workload string
@@ -299,14 +300,16 @@ func qualifyInstalledLiveObservation(t *testing.T, ctx context.Context, c instal
 			// A finite session ends within its window: observe it from React
 			// and MCP at the same time instead of one after the other.
 			browser.begin(source)
-			if e := installedLiveMCP(t, callCtx, c.SQL, c.RootID, source, call, episodes == 1 && os.Getenv("ASSERVAT_LIVE_EPISODES") == "policy", c); e != nil {
+			c.Failover = episodes == 1 && os.Getenv("ASSERVAT_LIVE_EPISODES") == "policy"
+			if e := installedLiveMCP(t, callCtx, c.SQL, c.RootID, source, call, c); e != nil {
 				return e
 			}
 			browser.finishEpisode(source)
 			return nil
 		}
 		// MCP first: it waits for the original source to become eligible.
-		if e := installedLiveMCP(t, callCtx, c.SQL, c.RootID, source, call, episodes == 1 && os.Getenv("ASSERVAT_LIVE_EPISODES") == "policy", c); e != nil {
+		c.Failover = episodes == 1 && os.Getenv("ASSERVAT_LIVE_EPISODES") == "policy"
+		if e := installedLiveMCP(t, callCtx, c.SQL, c.RootID, source, call, c); e != nil {
 			return e
 		}
 		browser.begin(source)
@@ -374,7 +377,7 @@ func installedLiveRestartOwner(t *testing.T, ctx context.Context, c installedLiv
 	}
 }
 
-func installedLiveMCP(t *testing.T, ctx context.Context, db *pgxpool.Pool, root string, source installedLiveFixture, call installedLiveCall, failover bool, run installedLiveRun) error {
+func installedLiveMCP(t *testing.T, ctx context.Context, db *pgxpool.Pool, root string, source installedLiveFixture, call installedLiveCall, run installedLiveRun) error {
 	t.Helper()
 	must := func(name string, args any, out any) (installedLiveReply, error) {
 		r, code, e := call(ctx, name, args)
@@ -523,21 +526,31 @@ func installedLiveMCP(t *testing.T, ctx context.Context, db *pgxpool.Pool, root 
 		return errors.New("public accounting differs from actual minimized ledger")
 	}
 	closeInput := map[string]any{"watch_id": watch.ID, "expected_revision": watch.Revision, "idempotency_key": "live-close-" + source.SourceID}
-	if failover {
+	if run.Failover {
 		installedLiveRestartOwner(t, ctx, run)
-		r, e := must("read_live_watch", readInput, nil)
-		if e != nil {
-			return e
-		}
 		var recovered v.Batch
-		if json.Unmarshal(r.Data, &recovered) != nil {
-			return errors.New("live failover response shape")
+		var r installedLiveReply
+		for attempt := 0; attempt < 12; attempt++ {
+			r, e = must("read_live_watch", readInput, nil)
+			if e == nil {
+				if json.Unmarshal(r.Data, &recovered) != nil {
+					return errors.New("live failover response shape")
+				}
+				if recovered.State == "Closed" || recovered.State == "Active" && len(recovered.Gaps) != 0 {
+					break
+				}
+			} else if !strings.Contains(e.Error(), "LiveUnavailable") {
+				return e
+			}
+			if attempt == 11 {
+				return errors.New("live failover produced no explicit gap or closed state")
+			}
+			if e = installedJourneyPause(ctx, time.Second); e != nil {
+				return e
+			}
 		}
 		if len(recovered.Rows) != 0 {
 			return errors.New("live failover replayed retained rows")
-		}
-		if recovered.State == "Active" && len(recovered.Gaps) == 0 {
-			return errors.New("live failover produced no explicit gap or closed state")
 		}
 		if recovered.State == "Active" && r.NextCursor == nil {
 			return errors.New("live failover lost continuation without closing the view")
