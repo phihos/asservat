@@ -2,7 +2,6 @@ package postgres
 
 import (
 	"context"
-	"log"
 	"time"
 
 	"asservat.local/asservat/internal/application/evidence"
@@ -80,7 +79,6 @@ func (s *NativeReaders) ReadDownloadWorkerIdentity(ctx context.Context, session 
 }
 func (s *NativeReaders) ObserveNativeOperation(ctx context.Context, ref value.NativeReference, peer value.KeyPeer) (out value.NativeLease, err error) {
 	if s == nil || ref.InstallationID != s.installation {
-		log.Printf("native reader installation refused: %t", s == nil)
 		return out, artifact.ErrDownloadUnavailable
 	}
 	err = s.withWorker(ctx, ref.SessionID, ref.WorkerID, func(call context.Context, owners *NativeOwners, _ value.DownloadWorkerIdentity) error {

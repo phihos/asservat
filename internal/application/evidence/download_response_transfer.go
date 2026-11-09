@@ -10,7 +10,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"errors"
-	"log"
 	"time"
 )
 
@@ -69,9 +68,10 @@ func (c *responseCurrent) get(ctx context.Context) (artifact.DownloadAuthority, 
 }
 
 // start fixes the complete decision the response started under, bounded by the
-// response's original end.
+// response's original end. Every later window, including the first, continues it.
 func (c *responseCurrent) start(a artifact.DownloadAuthority, until time.Time) {
 	c.started, c.until, c.value = &a, until, a
+	c.value.StartedAt = a.CheckedAt
 }
 
 // fresh returns the current authority when it has more than margin left.
@@ -81,7 +81,6 @@ func (c *responseCurrent) fresh(ctx context.Context, margin time.Duration) (arti
 	if ctx.Err() != nil {
 		return artifact.DownloadAuthority{}, ctx.Err()
 	}
-	log.Printf("native response fresh: now=%s margin=%s valueUntil=%s started=%t", c.now(), margin, c.value.ValidUntil, c.started != nil)
 	if c.batch != nil && c.value.Valid(c.now()) && c.now().Add(margin).Before(c.value.ValidUntil) {
 		return c.value, nil
 	}
@@ -91,7 +90,6 @@ func (c *responseCurrent) fresh(ctx context.Context, margin time.Duration) (arti
 			return artifact.DownloadAuthority{}, artifact.ErrDownloadExpired
 		}
 		c.value = a
-		log.Printf("native response authority continued: until=%s", a.ValidUntil)
 		return a, nil
 	}
 	c.closeBatch()

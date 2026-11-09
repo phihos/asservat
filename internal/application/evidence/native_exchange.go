@@ -2,7 +2,6 @@ package evidence
 
 import (
 	"errors"
-	"log"
 
 	"asservat.local/asservat/internal/domain/artifact"
 	value "asservat.local/asservat/internal/domain/authorization"
@@ -186,12 +185,6 @@ func (g *NativeFrameGate) Check(ctx context.Context) (value.NativeLease, error) 
 	stop()
 	g.mu.Lock()
 	valid := err == nil && callErr == nil && !g.closed && g.ctx.Err() == nil && l.Valid(g.now()) && l.Operation.CurrentValid(g.now()) && sameNativeOperation(l.Operation, g.lease.Operation) && l.Certificate == g.lease.Certificate && (l.Sequence == g.lease.Sequence || l.Operation.Kind == value.NativeResponse && l.Sequence > g.lease.Sequence)
-	step := ""
-	var named interface{ FixedStep() string }
-	if errors.As(err, &named) {
-		step = named.FixedStep()
-	}
-	log.Printf("native frame gate: valid=%t err=%v step=%s callErr=%v sequence=%d gateSequence=%d until=%s gateUntil=%s", valid, err, step, callErr, l.Sequence, g.lease.Sequence, l.Until, g.until)
 	if valid {
 		end := identity.Earlier(g.until, gateCeiling(l))
 		if end.Before(g.until) {

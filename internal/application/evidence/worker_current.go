@@ -2,7 +2,6 @@ package evidence
 
 import (
 	"context"
-	"log"
 	"slices"
 	"sync"
 	"time"
@@ -117,7 +116,6 @@ func (c *workerCurrentCheck) Check(ctx context.Context) (artifact.DownloadAuthor
 	a := c.observation
 	a.ValidUntil = c.until
 	if ctx.Err() != nil || c.owner.Err() != nil || n.Before(c.started) || !n.Before(c.until) || !a.Valid(n) || !a.Environment.Valid(n) || !a.Retention.Valid(n) || a.Scope != c.scope {
-		log.Printf("native response check failed: now=%s until=%s authorityUntil=%s ownerErr=%v callErr=%v valid=%t environment=%t retention=%t scope=%t", n, c.until, a.ValidUntil, c.owner.Err(), ctx.Err(), a.Valid(n), a.Environment.Valid(n), a.Retention.Valid(n), a.Scope == c.scope)
 		return zero, artifact.ErrDownloadExpired
 	}
 	return a, nil

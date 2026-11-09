@@ -22,7 +22,7 @@ type responseTransferFixture struct {
 	wi                                                         audit.DownloadWindowIntent
 	size                                                       int64
 	chunks, batches, leases, begins, intents, outcomes, closed int
-	checks                                                     int
+	checks, unstartedWindows                                   int
 	emitted                                                    int64
 	active                                                     bool
 	fail                                                       string
@@ -92,6 +92,9 @@ func (f *responseTransferFixture) BeginDownloadResponse(_ context.Context, _ str
 	return f.r, e
 }
 func (f *responseTransferFixture) BeginDownloadWindow(_ context.Context, _, _, _, id string, a artifact.DownloadAuthority) (audit.DownloadWindowIntent, error) {
+	if !a.Started() {
+		f.unstartedWindows++
+	}
 	var e error
 	writeUntil := f.s.Deadline.Add(time.Minute)
 	if !f.windowWrite.IsZero() {
@@ -298,8 +301,8 @@ func TestStartedResponseContinuesAfterPermissionChange(t *testing.T) {
 		if e := service.Transfer(context.Background(), f, req, f, f); e != nil {
 			t.Fatal("started response stopped after a permission change", slow, e)
 		}
-		if f.s.State != artifact.DownloadCompleted || f.emitted != f.size || f.checks != 2 || f.batches != 2 || f.intents != 3 {
-			t.Fatal("started response observed authority again", slow, f.s.State, f.emitted, f.checks, f.batches, f.intents)
+		if f.s.State != artifact.DownloadCompleted || f.emitted != f.size || f.checks != 2 || f.batches != 2 || f.intents != 3 || f.unstartedWindows != 0 {
+			t.Fatal("started response observed authority again", slow, f.s.State, f.emitted, f.checks, f.batches, f.intents, f.unstartedWindows)
 		}
 	}
 }
