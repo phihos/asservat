@@ -299,14 +299,14 @@ func qualifyInstalledLiveObservation(t *testing.T, ctx context.Context, c instal
 			// A finite session ends within its window: observe it from React
 			// and MCP at the same time instead of one after the other.
 			browser.begin(source)
-			if e := installedLiveMCP(t, callCtx, c.SQL, c.RootID, source, call); e != nil {
+			if e := installedLiveMCP(t, callCtx, c.SQL, c.RootID, source, call, episodes == 1 && os.Getenv("ASSERVAT_LIVE_EPISODES") == "policy", c); e != nil {
 				return e
 			}
 			browser.finishEpisode(source)
 			return nil
 		}
 		// MCP first: it waits for the original source to become eligible.
-		if e := installedLiveMCP(t, callCtx, c.SQL, c.RootID, source, call); e != nil {
+		if e := installedLiveMCP(t, callCtx, c.SQL, c.RootID, source, call, episodes == 1 && os.Getenv("ASSERVAT_LIVE_EPISODES") == "policy", c); e != nil {
 			return e
 		}
 		browser.begin(source)
@@ -326,7 +326,55 @@ func qualifyInstalledLiveObservation(t *testing.T, ctx context.Context, c instal
 
 type installedLiveCall func(context.Context, string, any) (installedLiveReply, string, error)
 
-func installedLiveMCP(t *testing.T, ctx context.Context, db *pgxpool.Pool, root string, source installedLiveFixture, call installedLiveCall) error {
+func installedLiveRestartOwner(t *testing.T, ctx context.Context, c installedLiveRun) {
+	t.Helper()
+	call, cancel := context.WithTimeout(ctx, 3*time.Minute)
+	defer cancel()
+	deployment, err := c.API.AppsV1().Deployments(c.HubNamespace).Get(call, c.OwnerDeployment, meta.GetOptions{})
+	if err != nil {
+		t.Fatal("live failover owner Deployment", err)
+	}
+	selector := meta.FormatLabelSelector(deployment.Spec.Selector)
+	before, err := installedLiveReadyPod(call, c.API, c.HubNamespace, selector)
+	if err != nil {
+		t.Fatal(err)
+	}
+	epoch, err := installedLiveOwnerEpoch(call, c.SQL, c.Installation, string(before.UID))
+	if err != nil {
+		t.Fatal("live failover original activated owner", err)
+	}
+	uid := before.UID
+	if err = c.Administrator.CoreV1().Pods(c.HubNamespace).Delete(call, before.Name, meta.DeleteOptions{Preconditions: &meta.Preconditions{UID: &uid}}); err != nil {
+		t.Fatal("live failover exact old owner deletion", err)
+	}
+	ticker := time.NewTicker(200 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		p, e := installedLiveReadyPod(call, c.API, c.HubNamespace, selector)
+		if e == nil && p.UID != before.UID {
+			newEpoch, e := installedLiveOwnerEpoch(call, c.SQL, c.Installation, string(p.UID))
+			if e == nil && newEpoch != epoch {
+				nowDeployment, e := c.API.AppsV1().Deployments(c.HubNamespace).Get(call, c.OwnerDeployment, meta.GetOptions{})
+				if e != nil || nowDeployment.UID != deployment.UID || nowDeployment.Generation != deployment.Generation {
+					t.Fatal("live failover changed accepted Deployment")
+				}
+				if len(p.OwnerReferences) != 1 || len(before.OwnerReferences) != 1 || p.OwnerReferences[0].UID != before.OwnerReferences[0].UID {
+					t.Fatal("live failover replaced original ReplicaSet")
+				}
+				t.Logf("live failover: exact oldPod%s replacedby%s with distinct currentactivated server epoch; original Deployment/ReplicaSet retained", before.UID, p.UID)
+				return
+			}
+		}
+		select {
+		case <-call.Done():
+			c.Diagnose()
+			t.Fatal("live failover owner enrollment/Ready proof unavailable", call.Err())
+		case <-ticker.C:
+		}
+	}
+}
+
+func installedLiveMCP(t *testing.T, ctx context.Context, db *pgxpool.Pool, root string, source installedLiveFixture, call installedLiveCall, failover bool, run installedLiveRun) error {
 	t.Helper()
 	must := func(name string, args any, out any) (installedLiveReply, error) {
 		r, code, e := call(ctx, name, args)
@@ -474,6 +522,35 @@ func installedLiveMCP(t *testing.T, ctx context.Context, db *pgxpool.Pool, root 
 	if e = db.QueryRow(ctx, `SELECT spent,state FROM live_watch_control WHERE root_id=$1 AND id=$2`, root, watch.ID).Scan(&sqlSpent, &state); e != nil || sqlSpent != lastSpend || state != "Active" {
 		return errors.New("public accounting differs from actual minimized ledger")
 	}
+	closeInput := map[string]any{"watch_id": watch.ID, "expected_revision": watch.Revision, "idempotency_key": "live-close-" + source.SourceID}
+	if failover {
+		installedLiveRestartOwner(t, ctx, run)
+		r, e := must("read_live_watch", readInput, nil)
+		if e != nil {
+			return e
+		}
+		var recovered v.Batch
+		if json.Unmarshal(r.Data, &recovered) != nil {
+			return errors.New("live failover response shape")
+		}
+		if len(recovered.Rows) != 0 {
+			return errors.New("live failover replayed retained rows")
+		}
+		if recovered.State == "Active" && len(recovered.Gaps) == 0 {
+			return errors.New("live failover produced no explicit gap or closed state")
+		}
+		if recovered.State == "Active" && r.NextCursor == nil {
+			return errors.New("live failover lost continuation without closing the view")
+		}
+		if _, e = must("close_live_watch", closeInput, &watch); e != nil {
+			return e
+		}
+		closed := watch
+		if _, e = must("close_live_watch", closeInput, &watch); e != nil || watch.ID != closed.ID || watch.Revision != closed.Revision || watch.State != "Closed" || !watch.ExpiresAt.Equal(before.ExpiresAt) {
+			return errors.New("live failover Close replay changed the original view")
+		}
+		return nil
+	}
 	for n, mode := range []string{"Paused", "Active"} {
 		if _, e = must("update_live_watch", map[string]any{"watch_id": watch.ID, "expected_revision": watch.Revision, "idempotency_key": fmt.Sprintf("live-change-%s-%d", source.SourceID, n), "mode": mode}, &watch); e != nil {
 			return e
@@ -482,7 +559,6 @@ func installedLiveMCP(t *testing.T, ctx context.Context, db *pgxpool.Pool, root 
 			return errors.New("view change renewed original end")
 		}
 	}
-	closeInput := map[string]any{"watch_id": watch.ID, "expected_revision": watch.Revision, "idempotency_key": "live-close-" + source.SourceID}
 	if _, e = must("close_live_watch", closeInput, &watch); e != nil {
 		return e
 	}
