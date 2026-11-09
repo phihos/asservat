@@ -239,7 +239,7 @@ func (s *NativeOwners) ObserveNativeOperation(ctx context.Context, ref value.Nat
 		}
 		row, e := q.LockNativeOwner(ctx, custodydb.LockNativeOwnerParams{WorkerID: id(ref.WorkerID), RootID: id(s.workers.downloads.root)})
 		if e != nil {
-			return e
+			return sqlStep{"native-observe-owner-read", e}
 		}
 		if row.Closed || row.RetiredAt.Valid || row.LeaseSequence != seq || !bytes.Equal(row.OperationJson, initial.OperationJson) || !bytes.Equal(row.AuthorityJson, initial.AuthorityJson) || row.Fence != ref.Fence || peer.PeerID != o.WorkerPodUID {
 			return sqlStep{"native-observe-owner", artifact.ErrDownloadUnavailable}
@@ -249,7 +249,7 @@ func (s *NativeOwners) ObserveNativeOperation(ctx context.Context, ref value.Nat
 		}
 		clock, e := q.CurrentTime(ctx)
 		if e != nil {
-			return e
+			return sqlStep{"native-observe-clock", e}
 		}
 		now = clock.Time.UTC()
 		end = identity.Earlier(end, identity.Earlier(row.LeaseUntil.Time, peer.NotAfter))
@@ -259,13 +259,19 @@ func (s *NativeOwners) ObserveNativeOperation(ctx context.Context, ref value.Nat
 		}
 		return nil
 	})
-	if e != nil || ctx.Err() != nil || !out.Valid(time.Now()) {
-		step := "native-observe-session"
+	if e != nil {
+		step := "native-observe-transaction"
 		var named interface{ FixedStep() string }
 		if errors.As(e, &named) {
 			step = named.FixedStep()
 		}
 		return value.NativeLease{}, sqlStep{step, artifact.ErrDownloadUnavailable}
+	}
+	if ctx.Err() != nil {
+		return value.NativeLease{}, sqlStep{"native-observe-context", artifact.ErrDownloadUnavailable}
+	}
+	if !out.Valid(time.Now()) {
+		return value.NativeLease{}, sqlStep{"native-observe-current", artifact.ErrDownloadUnavailable}
 	}
 	return out, nil
 }
