@@ -746,12 +746,14 @@ func (p *installedLiveBrowser) read(out any) {
 func (p *installedLiveBrowser) begin(s installedLiveFixture) {
 	p.send(map[string]any{"kind": "observe", "source": map[string]any{"source_id": s.SourceID, "action_id": s.ActionID, "pod_uid": s.PodUID, "kind": s.Kind, "projection": s.Projection, "hard_until": installedLiveHardUntil(s.HardUntil), "forbidden": []string{manualHTTPMarker, installedLiveProducerMarker}}})
 	var opened struct {
-		Kind, SourceID, Projection, WatchID string
-		Source                              string `json:"source_id"`
+		Kind       string `json:"kind"`
+		Source     string `json:"source_id"`
+		Projection string `json:"projection"`
+		WatchID    string `json:"watch_id"`
 	}
 	p.read(&opened)
 	if opened.Kind != "opened" || opened.Source != s.SourceID || opened.Projection != s.Projection || opened.WatchID == "" {
-		p.t.Fatal("actual React open proof failed")
+		p.t.Fatal("actual React open proof failed", opened, p.diagnostic.String())
 	}
 }
 func (p *installedLiveBrowser) finishEpisode(s installedLiveFixture) {
