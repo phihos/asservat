@@ -578,9 +578,9 @@ func installedHubWorkerProcess(t *testing.T, ctx context.Context, api kubernetes
 	return node, strconv.Itoa(inspected.Info.PID)
 }
 
-// legHubDisconnect holds the recovery update lock while custody commits, then
-// kills the hub-worker before its completion can pass the FOR SHARE recovery
-// read (ADR-223). Reconnect never repeats collection or imports the result.
+// legHubDisconnect kills the prelocated hub-worker as soon as custody commits,
+// before its SQL completion can be recorded (ADR-223). Reconnect never repeats
+// collection or imports the committed regional result.
 func (f *installedFailureRun) legHubDisconnect(api kubernetes.Interface, hubNamespace, workerDeployment string) {
 	f.t.Helper()
 	restarts := installedHubRestarts(f.t, f.ctx, api, hubNamespace)
@@ -600,20 +600,6 @@ func (f *installedFailureRun) legHubDisconnect(api kubernetes.Interface, hubName
 			f.t.Fatal("installed disconnect leg: no in-flight start before the pause", err)
 		}
 	}
-	lock, err := f.admin.Begin(f.ctx)
-	if err != nil {
-		f.t.Fatal("lost-reply recovery lock", err)
-	}
-	if _, err = lock.Exec(f.ctx, "SELECT 1 FROM fleet_current_trust FOR UPDATE"); err != nil {
-		_ = lock.Rollback(f.ctx)
-		f.t.Fatal("lost-reply recovery lock", err)
-	}
-	locked := true
-	f.t.Cleanup(func() {
-		if locked {
-			_ = lock.Rollback(context.Background())
-		}
-	})
 	commitWait, endCommit := context.WithTimeout(f.ctx, 60*time.Second)
 	defer endCommit()
 	for {
@@ -622,17 +608,13 @@ func (f *installedFailureRun) legHubDisconnect(api kubernetes.Interface, hubName
 		if err == nil && stored {
 			break
 		}
-		if installedJourneyPause(commitWait, 10*time.Millisecond) != nil {
+		if installedJourneyPause(commitWait, time.Millisecond) != nil {
 			f.t.Fatal("installed disconnect leg: regional completion never committed", err)
 		}
 	}
 	if err := installedRun(f.ctx, installedDockerTimeout, "docker", "exec", node, "kill", "-KILL", process); err != nil {
 		f.t.Fatal("lost-reply hub-worker kill", err)
 	}
-	if err := lock.Rollback(f.ctx); err != nil {
-		f.t.Fatal("lost-reply recovery unlock", err)
-	}
-	locked = false
 	installedHubSettled(f.t, f.ctx, api, hubNamespace, restarts)
 	originalCode, _ := f.requestReply(<-response)
 	if originalCode == "" {
