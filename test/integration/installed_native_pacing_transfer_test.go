@@ -188,6 +188,24 @@ func qualifyInstalledNativePacing(t *testing.T, ctx context.Context, m *nativePa
 	if code != "NotAvailable" || refused.Status != "error" {
 		t.Fatal("suspended permission allowed a new download response", code, refused.Status)
 	}
+	if _, err := m.admin.Exec(ctx, "UPDATE permission_stream SET suspended=false WHERE id=$1", m.root); err != nil {
+		t.Fatal("restore pacing permission projection", err)
+	}
+	suspended = false
+	restoredUntil := time.Now().Add(30 * time.Second)
+	for {
+		var restored bool
+		err := m.admin.QueryRow(ctx, "SELECT coalesce(NOT suspended AND initial_audit_id IS NOT NULL AND fresh_until>clock_timestamp() AND lease_until>clock_timestamp(),false) FROM permission_stream WHERE id=$1", m.root).Scan(&restored)
+		if err == nil && restored {
+			break
+		}
+		if time.Now().After(restoredUntil) {
+			t.Fatal("restored permission projection did not become fresh", restored, err)
+		}
+		if err := installedJourneyPause(ctx, 100*time.Millisecond); err != nil {
+			t.Fatal(err)
+		}
+	}
 	if len(m.Bodies) != 5 || m.Bodies["unpaced"].SHA256 != m.Bodies["paced"].SHA256 {
 		t.Fatal("native comparison set incomplete")
 	}
