@@ -345,7 +345,7 @@ func qualifyNativeExchangePhase(t *testing.T, ctx context.Context, f nativeExcha
 		if f.mixedOnly {
 			qualifyNativeMixedOwners(t, ctx, f, owners, ownerPool, enrollment, peer, session, metadata, objects)
 		} else {
-			qualifyNativeOwnerRenewal(t, ctx, f, owners, enrollment, peer, session, metadata, objects)
+			qualifyNativeOwnerRenewal(t, ctx, f, owners, readers, enrollment, peer, session, metadata, objects)
 		}
 		return
 	}

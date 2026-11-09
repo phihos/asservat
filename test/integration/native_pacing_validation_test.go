@@ -55,3 +55,26 @@ func TestNativePacingOriginalDeadlineClosesBlockedRead(t *testing.T) {
 		t.Fatal("blocked read escaped original caller deadline", err, destination.Len())
 	}
 }
+
+func TestNativePacingWriteHookRunsOnce(t *testing.T) {
+	calls := 0
+	var out bytes.Buffer
+	hook := &nativePacingWriteHook{writer: &out, hook: func() error { calls++; return nil }}
+	for range 2 {
+		if n, err := hook.Write([]byte("x")); err != nil || n != 1 {
+			t.Fatal("paced write hook", n, err)
+		}
+	}
+	if calls != 1 || out.String() != "xx" {
+		t.Fatal("write hook did not preserve delivery", calls, out.String())
+	}
+	failure := &nativePacingWriteHook{writer: &out, hook: func() error { calls++; return context.Canceled }}
+	for range 2 {
+		if n, err := failure.Write([]byte("x")); n != 0 || err != context.Canceled {
+			t.Fatal("write hook failure was not retained", n, err)
+		}
+	}
+	if calls != 2 {
+		t.Fatal("failed hook was retried", calls)
+	}
+}

@@ -16,7 +16,7 @@ import (
 
 // Four cumulative sessions cover the control, paced whole, two ranges sharing
 // one session, and stale If-Range. No uncertain preparation or body is retried.
-func qualifyInstalledNativePacing(t *testing.T, ctx context.Context, m *nativePacingMeasurement, transport *http.Transport, identity *installedIdentity, origin, artifactID string, control installedJourneyDownload, native []byte, invoke func(string, any) (installedJourneyEnvelope, string), read func(string, any, any), diagnose func()) {
+func qualifyInstalledNativePacing(t *testing.T, ctx context.Context, m *nativePacingMeasurement, transport *http.Transport, identity *installedIdentity, origin, artifactID string, control installedJourneyDownload, native []byte, invoke func(string, any) (installedJourneyEnvelope, string), callOnce func(context.Context, string, any) (installedJourneyEnvelope, string, error), read func(string, any, any), diagnose func()) {
 	t.Helper()
 	if control.ETag == "" || strings.HasPrefix(control.ETag, "W/") || sha256.Sum256(native) != m.Bodies["unpaced"].SHA256 {
 		t.Fatal("authenticated control lacks strong immutable metadata")
@@ -155,7 +155,63 @@ func qualifyInstalledNativePacing(t *testing.T, ctx context.Context, m *nativePa
 		t.Fatal("native resumed ranges changed full artifact hash")
 	}
 	stale := prepare("stale")
-	consume("stale-ifrange", stale, 0, int64(len(native)), false, map[string]string{"Range": "bytes=0-1023", "If-Range": "\"fixture-stale-version\""}, 0, io.Discard, false)
+	suspended := false
+	defer func() {
+		if !suspended {
+			return
+		}
+		restore, end := context.WithTimeout(context.Background(), 10*time.Second)
+		defer end()
+		if _, err := m.admin.Exec(restore, "UPDATE permission_stream SET suspended=false WHERE id=$1", m.root); err != nil {
+			t.Errorf("restore pacing permission projection: %v", err)
+		}
+	}()
+	suspension := &nativePacingWriteHook{writer: io.Discard, hook: func() error {
+		suspended = true
+		_, err := m.admin.Exec(ctx, "UPDATE permission_stream SET suspended=true WHERE id=$1", m.root)
+		return err
+	}}
+	consume("stale-ifrange", stale, 0, int64(len(native)), false, map[string]string{"Range": "bytes=0-1023", "If-Range": "\"fixture-stale-version\""}, nativePacingInterval, suspension, false)
+	if !suspended {
+		t.Fatal("started response never reached its permission-suspension byte")
+	}
+	// The source observer may clear a direct SQL suspension while the long
+	// response runs. Reapply and verify it at the fresh admission boundary.
+	if _, err := m.admin.Exec(ctx, "UPDATE permission_stream SET suspended=true WHERE id=$1", m.root); err != nil {
+		t.Fatal("suspend fresh preparation permission projection", err)
+	}
+	var stillSuspended bool
+	if err := m.admin.QueryRow(ctx, "SELECT suspended FROM permission_stream WHERE id=$1", m.root).Scan(&stillSuspended); err != nil || !stillSuspended {
+		t.Fatal("fresh preparation suspension was not retained", stillSuspended, err)
+	}
+	refused, code, callErr := callOnce(ctx, "prepare_artifact_download", map[string]string{"artifact_id": artifactID, "idempotency_key": "installed-native-suspended-start"})
+	// Audit admission may refuse with HTTP Service Unavailable before an
+	// operation envelope exists; an admitted operation returns NotAvailable.
+	if callErr != nil && !strings.Contains(callErr.Error(), "Service Unavailable") {
+		diagnose()
+		t.Fatal("fresh preparation failed unexpectedly", callErr)
+	}
+	if callErr == nil && (code != "NotAvailable" || refused.Status != "error") {
+		t.Fatal("suspended permission allowed a new download response", code, refused.Status)
+	}
+	if _, err := m.admin.Exec(ctx, "UPDATE permission_stream SET suspended=false WHERE id=$1", m.root); err != nil {
+		t.Fatal("restore pacing permission projection", err)
+	}
+	suspended = false
+	restoredUntil := time.Now().Add(30 * time.Second)
+	for {
+		var restored bool
+		err := m.admin.QueryRow(ctx, "SELECT coalesce(NOT suspended AND initial_audit_id IS NOT NULL AND fresh_until>clock_timestamp() AND lease_until>clock_timestamp(),false) FROM permission_stream WHERE id=$1", m.root).Scan(&restored)
+		if err == nil && restored {
+			break
+		}
+		if time.Now().After(restoredUntil) {
+			t.Fatal("restored permission projection did not become fresh", restored, err)
+		}
+		if err := installedJourneyPause(ctx, 100*time.Millisecond); err != nil {
+			t.Fatal(err)
+		}
+	}
 	if len(m.Bodies) != 5 || m.Bodies["unpaced"].SHA256 != m.Bodies["paced"].SHA256 {
 		t.Fatal("native comparison set incomplete")
 	}
@@ -165,6 +221,24 @@ func qualifyInstalledNativePacing(t *testing.T, ctx context.Context, m *nativePa
 	}
 	// PCAPNG/tshark validation in the parent must still pass before Complete
 	// becomes true. Revocation/cancellation/concurrency are separate open gates.
+}
+
+type nativePacingWriteHook struct {
+	writer  io.Writer
+	hook    func() error
+	called  bool
+	callErr error
+}
+
+func (w *nativePacingWriteHook) Write(p []byte) (int, error) {
+	if !w.called {
+		w.called = true
+		w.callErr = w.hook()
+	}
+	if w.callErr != nil {
+		return 0, w.callErr
+	}
+	return w.writer.Write(p)
 }
 
 func minTime(a, b time.Time) time.Time {

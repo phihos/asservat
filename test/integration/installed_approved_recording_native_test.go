@@ -1256,7 +1256,7 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 			t.Fatal(err)
 		}
 		measurement.NearFullBytes = *download.SizeBytes
-		qualifyInstalledNativePacing(t, ctx, measurement, transport, identity, origin, evidence.Artifacts[0].ID, download, native, invoke, read, diagnose)
+		qualifyInstalledNativePacing(t, ctx, measurement, transport, identity, origin, evidence.Artifacts[0].ID, download, native, invoke, callOnce, read, diagnose)
 	}
 	var finishChecks func() error
 	if measurement != nil {

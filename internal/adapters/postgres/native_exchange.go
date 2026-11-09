@@ -216,51 +216,62 @@ func (s *NativeOwners) claimNativeOperation(ctx context.Context, en value.Worker
 func (s *NativeOwners) ObserveNativeOperation(ctx context.Context, ref value.NativeReference, peer value.KeyPeer) (value.NativeLease, error) {
 	var out value.NativeLease
 	if s == nil || ctx == nil || ctx.Err() != nil || !ref.Valid() || !peer.Valid(time.Now()) || peer.Role != "acquisition" || peer.InstallationID != ref.InstallationID {
-		return out, artifact.ErrDownloadUnavailable
+		return out, sqlStep{"native-observe-input", artifact.ErrDownloadUnavailable}
 	}
 	initial, e := custodydb.New(s.workers.downloads.ledger.pool).ReadNativeOwner(ctx, custodydb.ReadNativeOwnerParams{WorkerID: id(ref.WorkerID), RootID: id(s.workers.downloads.root)})
 	if e != nil {
-		return out, artifact.ErrDownloadUnavailable
+		return out, sqlStep{"native-observe-read", e}
 	}
 	o, a, e := decodeNativeOwner(initial)
 	if e != nil || o.Reference != ref || !o.CurrentValid(time.Now()) || o.Path != a.Environment.Path || !sameNativeProcessingState(o.Processing, a.Environment.Processing) {
-		return out, artifact.ErrDownloadUnavailable
+		return out, sqlStep{"native-observe-decode", e}
 	}
 	ctx, cancel := context.WithDeadline(ctx, identity.Earlier(a.ValidUntil, initial.LeaseUntil.Time))
 	defer cancel()
 	e = s.workers.withSession(ctx, ref.SessionID, a, func(q *custodydb.Queries, p artifact.DownloadSession, now time.Time) error {
 		seq, end, e := nativeParent(ctx, q, p, o, now, false)
 		if e != nil {
-			return e
+			return sqlStep{"native-observe-parent", e}
 		}
 		en, e := nativeWorker(ctx, q, s.workers.downloads.root, o)
 		if e != nil {
-			return e
+			return sqlStep{"native-observe-worker", e}
 		}
 		row, e := q.LockNativeOwner(ctx, custodydb.LockNativeOwnerParams{WorkerID: id(ref.WorkerID), RootID: id(s.workers.downloads.root)})
 		if e != nil {
-			return e
+			return sqlStep{"native-observe-owner-read", e}
 		}
 		if row.Closed || row.RetiredAt.Valid || row.LeaseSequence != seq || !bytes.Equal(row.OperationJson, initial.OperationJson) || !bytes.Equal(row.AuthorityJson, initial.AuthorityJson) || row.Fence != ref.Fence || peer.PeerID != o.WorkerPodUID {
-			return artifact.ErrDownloadUnavailable
+			return sqlStep{"native-observe-owner", artifact.ErrDownloadUnavailable}
 		}
 		if e = activeWorkerCertificate(ctx, q, en.Worker, peer); e != nil {
-			return e
+			return sqlStep{"native-observe-certificate", e}
 		}
 		clock, e := q.CurrentTime(ctx)
 		if e != nil {
-			return e
+			return sqlStep{"native-observe-clock", e}
 		}
 		now = clock.Time.UTC()
 		end = identity.Earlier(end, identity.Earlier(row.LeaseUntil.Time, peer.NotAfter))
 		out = value.NativeLease{Operation: o, Certificate: peer.Certificate, Sequence: seq, ObservedAt: row.LeaseStarted.Time.UTC(), Until: end.UTC()}
 		if !out.Valid(now) || !peer.Valid(now) {
-			return artifact.ErrDownloadExpired
+			return sqlStep{"native-observe-expired", artifact.ErrDownloadExpired}
 		}
 		return nil
 	})
-	if e != nil || ctx.Err() != nil || !out.Valid(time.Now()) {
-		return value.NativeLease{}, artifact.ErrDownloadUnavailable
+	if e != nil {
+		step := "native-observe-transaction"
+		var named interface{ FixedStep() string }
+		if errors.As(e, &named) {
+			step = named.FixedStep()
+		}
+		return value.NativeLease{}, sqlStep{step, artifact.ErrDownloadUnavailable}
+	}
+	if ctx.Err() != nil {
+		return value.NativeLease{}, sqlStep{"native-observe-context", artifact.ErrDownloadUnavailable}
+	}
+	if !out.Valid(time.Now()) {
+		return value.NativeLease{}, sqlStep{"native-observe-current", artifact.ErrDownloadUnavailable}
 	}
 	return out, nil
 }
@@ -293,21 +304,21 @@ func (s *NativeOwners) RenewNativeOperation(ctx context.Context, ref value.Nativ
 		// as they do during original admission and observation.
 		seq, end, err := nativeParent(call, q, parent, o, clock.Time, true)
 		if err != nil {
-			return err
+			return sqlStep{"native-renew-parent", err}
 		}
 		en, err := nativeWorker(call, q, s.workers.downloads.root, o)
 		if err != nil {
-			return err
+			return sqlStep{"native-renew-worker", err}
 		}
 		row, err := q.LockNativeOwner(call, custodydb.LockNativeOwnerParams{WorkerID: id(ref.WorkerID), RootID: id(s.workers.downloads.root)})
 		if err != nil {
 			return err
 		}
 		if row.Closed || row.RetiredAt.Valid || row.Fence != ref.Fence || !bytes.Equal(row.OperationJson, initial.OperationJson) || seq <= row.LeaseSequence {
-			return artifact.ErrDownloadConflict
+			return sqlStep{"native-renew-owner", artifact.ErrDownloadConflict}
 		}
 		if err := activeWorkerCertificate(call, q, en.Worker, peer); err != nil {
-			return err
+			return sqlStep{"native-renew-certificate", err}
 		}
 		clock, err = q.CurrentTime(call)
 		if err != nil {
@@ -316,7 +327,7 @@ func (s *NativeOwners) RenewNativeOperation(ctx context.Context, ref value.Nativ
 		now := clock.Time.UTC()
 		end = identity.Earlier(end, identity.Earlier(a.ValidUntil, identity.Earlier(o.Until, peer.NotAfter))).UTC().Truncate(time.Microsecond)
 		if !a.Valid(now) || !o.CurrentValid(now) || !peer.Valid(now) || !now.Before(end) || o.Until.After(parent.Deadline) || o.Until.After(a.AccessUntil) {
-			return artifact.ErrDownloadExpired
+			return sqlStep{"native-renew-expired", artifact.ErrDownloadExpired}
 		}
 		encoded, err := json.Marshal(a)
 		if err != nil || len(encoded) > 16384 {
@@ -333,7 +344,12 @@ func (s *NativeOwners) RenewNativeOperation(ctx context.Context, ref value.Nativ
 		return call.Err()
 	})
 	if err != nil || call.Err() != nil || !out.Valid(time.Now()) {
-		return value.NativeLease{}, artifact.ErrDownloadUnavailable
+		step := "native-renew-session"
+		var named interface{ FixedStep() string }
+		if errors.As(err, &named) {
+			step = named.FixedStep()
+		}
+		return value.NativeLease{}, sqlStep{step, artifact.ErrDownloadUnavailable}
 	}
 	return out, nil
 }

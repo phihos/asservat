@@ -224,9 +224,17 @@ permission, share and policy read; later leases continue the start decision via
 effective retention cutoffs, Stop and the recovery incarnation. Affected package
 race tests pass; the real-service custody selection
 `^TestContextAdmissionWithRealServices$/^d` passes (263 s, including the new
-`started-response-continues-after-permission-suspension`). Native context
-(`make context-integration`) and installed qualification are pending. Raw
-windows still authenticate their grant-pool reservation per 64 MiB window.
+`started-response-continues-after-permission-suspension`). `make context-integration`
+passed (Go test 1027.230 s). Installed run
+[42591125143](../test/results/started-downloads-native-42591125143/README.md)
+passed on `724f7860`: the final 8,388,476-byte response crossed permission
+suspension with unchanged bytes, fresh preparation was refused, and all four
+paced/range/stale sessions completed. Go test took 479.054 s; source hashes were
+unchanged and cleanup had no failures. The implementation also renews native
+response observations without losing registration bindings and marks the first
+window as started; temporary diagnostics were removed. Full `pre-push`, Gitar
+review and eligible PR CI passed. Raw windows still authenticate their
+grant-pool reservation per 64 MiB window.
 
 ## Installed finite saved logs passed (2026-11-06)
 

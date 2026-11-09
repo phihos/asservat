@@ -2,6 +2,7 @@ package integration
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -16,7 +17,7 @@ import (
 // metadata preparation. Human/bootstrap/Pod-proof inputs remain the parent
 // fixture's explicit synthetic facts; the SQL, encrypted audit and registered
 // worker certificate are real. It does not claim a paced end-to-end transfer.
-func qualifyNativeOwnerRenewal(t *testing.T, ctx context.Context, f nativeExchangeFixture, owners *postgres.NativeOwners, enrollment value.WorkerEnrollment, peer value.KeyPeer, session artifact.DownloadSession, metadata artifact.NativeDownloadMetadata, objects *objectstore.DownloadWindowAuditObjects) {
+func qualifyNativeOwnerRenewal(t *testing.T, ctx context.Context, f nativeExchangeFixture, owners *postgres.NativeOwners, readers *postgres.NativeReaders, enrollment value.WorkerEnrollment, peer value.KeyPeer, session artifact.DownloadSession, metadata artifact.NativeDownloadMetadata, objects *objectstore.DownloadWindowAuditObjects) {
 	t.Helper()
 	a := f.authority()
 	responseID, ownerID, windowID := custodyID(), custodyID(), custodyID()
@@ -71,11 +72,18 @@ func qualifyNativeOwnerRenewal(t *testing.T, ctx context.Context, f nativeExchan
 	if _, err := owners.ObserveNativeOperation(ctx, o.Reference, peer); err == nil {
 		t.Fatal("expired original observation remained usable")
 	}
-	a = f.authority()
-	second, err := f.runtime.LeaseDownloadResponse(ctx, session.ID, responseID, ownerID, windowID, a)
-	if err != nil || second.Sequence <= first.Sequence {
-		t.Fatal("new delivery lease", err)
+	continued, ok := a.Continue(time.Now(), response.Until)
+	if !ok {
+		t.Fatal("continued response authority unavailable")
 	}
+	if _, err := f.admin.Exec(ctx, "UPDATE permission_stream SET suspended=true WHERE id=$1", session.Scope.RootID); err != nil {
+		t.Fatal("suspend renewal permissions", err)
+	}
+	second, err := f.runtime.LeaseDownloadResponse(ctx, session.ID, responseID, ownerID, windowID, continued)
+	if err != nil || second.Sequence <= first.Sequence {
+		t.Fatal("new delivery lease after permission suspension", err)
+	}
+	a = continued
 	foreign := peer
 	foreign.PeerID = custodyID()
 	if _, err := owners.RenewNativeOperation(ctx, o.Reference, a, foreign); err == nil {
@@ -93,14 +101,22 @@ func qualifyNativeOwnerRenewal(t *testing.T, ctx context.Context, f nativeExchan
 	}
 	l, err := owners.RenewNativeOperation(ctx, o.Reference, a, peer)
 	if err != nil || !l.Valid(time.Now()) || !l.Operation.Equal(o) || l.Sequence != second.Sequence || l.Until.After(o.Until) {
-		t.Fatal("fresh native renewal changed the original operation or deadline", err)
+		t.Fatal("fresh native renewal after permission suspension changed the original operation or deadline", err)
 	}
-	observed, err := owners.ObserveNativeOperation(ctx, o.Reference, peer)
+	observed, err := readers.ObserveNativeOperation(ctx, o.Reference, peer)
+	if _, restoreErr := f.admin.Exec(ctx, "UPDATE permission_stream SET suspended=false WHERE id=$1", session.Scope.RootID); restoreErr != nil {
+		t.Fatal("restore renewal permissions", restoreErr)
+	}
 	if err != nil || observed.Sequence != second.Sequence || !observed.Operation.Equal(o) {
-		t.Fatal("renewed native observation", err)
+		t.Fatal("renewed native observation after permission suspension", err)
 	}
 	if _, err := owners.RenewNativeOperation(ctx, o.Reference, a, peer); err == nil {
 		t.Fatal("same sequence replay renewed twice")
+	} else {
+		var step interface{ FixedStep() string }
+		if !errors.As(err, &step) || step.FixedStep() != "native-renew-owner" {
+			t.Fatal("transaction discarded the native renewal stage", err)
+		}
 	}
 	if err := owners.CompleteNativeOperation(ctx, observed); err != nil {
 		t.Fatal("close renewed native owner", err)

@@ -68,40 +68,40 @@ func (s *DownloadWorkers) withSession(ctx context.Context, session string, a art
 	return d.ledger.transaction(ctx, func(q *custodydb.Queries) error {
 		recovery, e := d.lockDownloadRecovery(ctx, q, d.root, a)
 		if e != nil {
-			return e
+			return sqlStep{"native-session-recovery", e}
 		}
 		root, e := q.LockPermissionStream(ctx, id(d.root))
 		if e != nil {
-			return e
+			return sqlStep{"native-session-permission", e}
 		}
 		row, e := q.LockDownloadSession(ctx, custodydb.LockDownloadSessionParams{ID: id(session), RootID: id(d.root)})
 		if e != nil {
-			return e
+			return sqlStep{"native-session-load", e}
 		}
 		parent, e := loadDownload(ctx, q, row)
 		if e != nil {
-			return e
+			return sqlStep{"native-session-parent", e}
 		}
 		check := func() (time.Time, error) {
 			if e := d.downloadFence(ctx, q, root, a, top, recovery); e != nil {
-				return time.Time{}, e
+				return time.Time{}, sqlStep{"native-session-fence", e}
 			}
 			if a.Environment.Path.AcquisitionClusterID != s.profile.ClusterID || a.Environment.Path.WorkerConfiguration != s.profile.Configuration {
-				return time.Time{}, artifact.ErrDownloadUnavailable
+				return time.Time{}, sqlStep{"native-session-profile", artifact.ErrDownloadUnavailable}
 			}
 			// A started response keeps the worker configuration it started under
 			// (ADR-312); its worker certificate and native owner remain fenced.
 			if !a.Started() {
 				if _, e := currentWorkerConfiguration(ctx, q, s.profile, a.Environment.RecoveryEpoch); e != nil {
-					return time.Time{}, e
+					return time.Time{}, sqlStep{"native-session-configuration", e}
 				}
 			}
 			n, e := q.CurrentTime(ctx)
 			if e != nil {
-				return time.Time{}, e
+				return time.Time{}, sqlStep{"native-session-clock", e}
 			}
 			if !a.Valid(n.Time) || parent.Scope != a.Scope || parent.State.Terminal() || !n.Time.Before(parent.Deadline) {
-				return n.Time, artifact.ErrDownloadExpired
+				return n.Time, sqlStep{"native-session-expiry", artifact.ErrDownloadExpired}
 			}
 			return n.Time, nil
 		}

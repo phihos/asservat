@@ -68,9 +68,10 @@ func (c *responseCurrent) get(ctx context.Context) (artifact.DownloadAuthority, 
 }
 
 // start fixes the complete decision the response started under, bounded by the
-// response's original end.
+// response's original end. Every later window, including the first, continues it.
 func (c *responseCurrent) start(a artifact.DownloadAuthority, until time.Time) {
 	c.started, c.until, c.value = &a, until, a
+	c.value.StartedAt = a.CheckedAt
 }
 
 // fresh returns the current authority when it has more than margin left.
