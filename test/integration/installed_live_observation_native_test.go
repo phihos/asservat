@@ -308,7 +308,7 @@ func qualifyInstalledLiveObservation(t *testing.T, ctx context.Context, c instal
 			if e := installedLiveMCP(t, callCtx, c.SQL, c.RootID, source, call, c); e != nil {
 				return e
 			}
-			if !c.Failover {
+			if !c.Failover && !c.Fanout {
 				browser.finishEpisode(source)
 			}
 			return nil
@@ -533,43 +533,54 @@ func installedLiveMCP(t *testing.T, ctx context.Context, db *pgxpool.Pool, root 
 		return errors.New("public accounting differs from actual minimized ledger")
 	}
 	if run.Fanout {
+		if run.BeforeFailover != nil {
+			run.BeforeFailover()
+		}
 		var active int
-		for attempt := 0; attempt < 10; attempt++ {
-			if e = db.QueryRow(ctx, `SELECT count(*) FROM live_watch_control WHERE root_id=$1 AND state IN ('Active','Paused','Disconnected')`, root).Scan(&active); e != nil {
-				return e
-			}
-			if active == 2 {
-				break
-			}
-			if e = installedJourneyPause(ctx, 100*time.Millisecond); e != nil {
-				return e
-			}
+		if e = db.QueryRow(ctx, `SELECT count(*) FROM live_watch_control WHERE root_id=$1 AND state IN ('Active','Paused','Disconnected')`, root).Scan(&active); e != nil || active != 1 {
+			return errors.New("principal ceiling fixture did not retain only the original MCP view")
 		}
-		if active != 2 {
-			return errors.New("principal ceiling fixture did not retain two original views")
-		}
-		extra := make(map[string]any, len(request))
+		secondInput := make(map[string]any, len(request))
 		for key, value := range request {
-			extra[key] = value
+			secondInput[key] = value
 		}
-		extra["idempotency_key"] = "live-ceiling-" + source.SourceID
-		refusal, code, e := call(ctx, "open_live_watch", extra)
+		secondInput["idempotency_key"] = "live-ceiling-second-" + source.SourceID
+		var second v.Watch
+		if _, e = must("open_live_watch", secondInput, &second); e != nil {
+			return e
+		}
+		if second.ID == watch.ID || !slices.Equal(second.SourceIDs, watch.SourceIDs) {
+			return errors.New("principal ceiling opened a duplicate or substituted view")
+		}
+		secondBefore := second
+		if e = db.QueryRow(ctx, `SELECT count(*) FROM live_watch_control WHERE root_id=$1 AND state IN ('Active','Paused','Disconnected')`, root).Scan(&active); e != nil || active != 2 {
+			return errors.New("principal ceiling fixture did not retain two MCP views")
+		}
+		thirdInput := make(map[string]any, len(request))
+		for key, value := range request {
+			thirdInput[key] = value
+		}
+		thirdInput["idempotency_key"] = "live-ceiling-third-" + source.SourceID
+		refusal, code, e := call(ctx, "open_live_watch", thirdInput)
 		var failure struct {
 			Retryable bool `json:"retryable"`
 		}
 		if e != nil || code != "CapacityUnavailable" || refusal.Status != "error" || json.Unmarshal(refusal.Data, &failure) != nil || failure.Retryable {
 			return fmt.Errorf("third concurrent view was not refused by the principal ceiling: %s %w", code, e)
 		}
-		if e = db.QueryRow(ctx, `SELECT count(*) FROM live_watch_control WHERE root_id=$1 AND state IN ('Active','Paused','Disconnected')`, root).Scan(&active); e != nil || active != 2 {
-			return errors.New("principal ceiling refusal changed the original views")
+		if _, e = must("close_live_watch", map[string]any{"watch_id": second.ID, "expected_revision": second.Revision, "idempotency_key": "live-ceiling-second-close-" + source.SourceID}, &second); e != nil {
+			return e
 		}
-		t.Log("installed live principal ceiling: third concurrent view refused CapacityUnavailable; two original controls retained")
+		if second.State != "Closed" || !second.ExpiresAt.Equal(secondBefore.ExpiresAt) {
+			return errors.New("principal ceiling close changed the second view")
+		}
+		if e = db.QueryRow(ctx, `SELECT count(*) FROM live_watch_control WHERE root_id=$1 AND state IN ('Active','Paused','Disconnected')`, root).Scan(&active); e != nil || active != 1 {
+			return errors.New("principal ceiling refusal or second close changed the original view")
+		}
+		t.Log("installed live principal ceiling: third concurrent view refused CapacityUnavailable; original MCP view retained")
 	}
 	closeInput := map[string]any{"watch_id": watch.ID, "expected_revision": watch.Revision, "idempotency_key": "live-close-" + source.SourceID}
 	if run.Failover {
-		if run.BeforeFailover != nil {
-			run.BeforeFailover()
-		}
 		installedLiveRestartOwner(t, ctx, run)
 		var recovered v.Batch
 		var r installedLiveReply
