@@ -42,14 +42,14 @@ func (s *NativeReaders) withWorker(ctx context.Context, session, worker string, 
 	defer stop()
 	observation, err := readWorkerIdentity(call, s.downloads.ledger, s.downloads.root, s.installation, nil, session)
 	if err != nil || !observation.Valid(time.Now()) || worker != "" && observation.Worker.Intent.ID != worker {
-		return artifact.ErrDownloadUnavailable
+		return sqlStep{"native-worker-identity", artifact.ErrDownloadUnavailable}
 	}
 	current, finish := context.WithDeadline(call, observation.FreshUntil)
 	defer finish()
 	owners := &NativeOwners{&DownloadWorkers{s.downloads, observation.Worker.Intent.Profile}}
 	err = read(current, owners, observation)
 	if current.Err() != nil || !observation.Valid(time.Now()) {
-		return artifact.ErrDownloadExpired
+		return sqlStep{"native-worker-current", artifact.ErrDownloadExpired}
 	}
 	return err
 }

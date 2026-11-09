@@ -16,7 +16,7 @@ import (
 // metadata preparation. Human/bootstrap/Pod-proof inputs remain the parent
 // fixture's explicit synthetic facts; the SQL, encrypted audit and registered
 // worker certificate are real. It does not claim a paced end-to-end transfer.
-func qualifyNativeOwnerRenewal(t *testing.T, ctx context.Context, f nativeExchangeFixture, owners *postgres.NativeOwners, enrollment value.WorkerEnrollment, peer value.KeyPeer, session artifact.DownloadSession, metadata artifact.NativeDownloadMetadata, objects *objectstore.DownloadWindowAuditObjects) {
+func qualifyNativeOwnerRenewal(t *testing.T, ctx context.Context, f nativeExchangeFixture, owners *postgres.NativeOwners, readers *postgres.NativeReaders, enrollment value.WorkerEnrollment, peer value.KeyPeer, session artifact.DownloadSession, metadata artifact.NativeDownloadMetadata, objects *objectstore.DownloadWindowAuditObjects) {
 	t.Helper()
 	a := f.authority()
 	responseID, ownerID, windowID := custodyID(), custodyID(), custodyID()
@@ -99,15 +99,15 @@ func qualifyNativeOwnerRenewal(t *testing.T, ctx context.Context, f nativeExchan
 		t.Fatal("changed processing state renewed the original operation")
 	}
 	l, err := owners.RenewNativeOperation(ctx, o.Reference, a, peer)
-	if _, restoreErr := f.admin.Exec(ctx, "UPDATE permission_stream SET suspended=false WHERE id=$1", session.Scope.RootID); restoreErr != nil {
-		t.Fatal("restore renewal permissions", restoreErr)
-	}
 	if err != nil || !l.Valid(time.Now()) || !l.Operation.Equal(o) || l.Sequence != second.Sequence || l.Until.After(o.Until) {
 		t.Fatal("fresh native renewal after permission suspension changed the original operation or deadline", err)
 	}
-	observed, err := owners.ObserveNativeOperation(ctx, o.Reference, peer)
+	observed, err := readers.ObserveNativeOperation(ctx, o.Reference, peer)
+	if _, restoreErr := f.admin.Exec(ctx, "UPDATE permission_stream SET suspended=false WHERE id=$1", session.Scope.RootID); restoreErr != nil {
+		t.Fatal("restore renewal permissions", restoreErr)
+	}
 	if err != nil || observed.Sequence != second.Sequence || !observed.Operation.Equal(o) {
-		t.Fatal("renewed native observation", err)
+		t.Fatal("renewed native observation after permission suspension", err)
 	}
 	if _, err := owners.RenewNativeOperation(ctx, o.Reference, a, peer); err == nil {
 		t.Fatal("same sequence replay renewed twice")
