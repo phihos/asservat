@@ -578,16 +578,25 @@ func installedHubWorkerProcess(t *testing.T, ctx context.Context, api kubernetes
 	return node, strconv.Itoa(inspected.Info.PID)
 }
 
-// legHubDisconnect kills the prelocated hub-worker while a fixture-only pause
-// holds the exact regional custody transition, before its completion reply can
-// return. The pause is observable in pg_stat_activity, so the crash does not
-// race acquisition or storage. Reconnect never repeats or imports the result.
+// legHubDisconnect kills the prelocated hub-worker when PostgreSQL reports the
+// exact regional custody commit. NOTIFY is visible only after commit, so the
+// result is durable while its completion reply is still in flight (ADR-223).
+// Reconnect never repeats collection or imports the committed regional result.
 func (f *installedFailureRun) legHubDisconnect(api kubernetes.Interface, hubNamespace, workerDeployment string) {
 	f.t.Helper()
 	restarts := installedHubRestarts(f.t, f.ctx, api, hubNamespace)
 	node, process := installedHubWorkerProcess(f.t, f.ctx, api, hubNamespace, workerDeployment)
 	previewID, loc, captureID, deadline := f.preview()
-	marker := "asservat-lost-reply-" + loc.AttemptID
+	pauseWait, endPause := context.WithTimeout(f.ctx, 60*time.Second)
+	defer endPause()
+	listener, err := f.admin.Acquire(pauseWait)
+	if err != nil {
+		f.t.Fatal("installed disconnect leg: custody listener", err)
+	}
+	defer listener.Release()
+	if _, err = listener.Exec(pauseWait, `LISTEN asservat_lost_reply`); err != nil {
+		f.t.Fatal("installed disconnect leg: listen for custody commit", err)
+	}
 	dropPause := func(ctx context.Context) error {
 		_, err := f.admin.Exec(ctx, `DROP TRIGGER IF EXISTS fixture_lost_reply_pause ON custody_attempt; DROP FUNCTION IF EXISTS fixture_lost_reply_pause();`)
 		return err
@@ -600,37 +609,46 @@ func (f *installedFailureRun) legHubDisconnect(api kubernetes.Interface, hubName
 		}
 	})
 	setup, endSetup := context.WithTimeout(f.ctx, 10*time.Second)
-	_, err := f.admin.Exec(setup, fmt.Sprintf(`CREATE FUNCTION fixture_lost_reply_pause() RETURNS trigger
+	_, err = f.admin.Exec(setup, fmt.Sprintf(`CREATE FUNCTION fixture_lost_reply_pause() RETURNS trigger
 LANGUAGE plpgsql SET search_path=pg_catalog,pg_temp AS $$
 BEGIN
  IF NEW.id='%s'::uuid AND NEW.state='stored_unpublished' AND OLD.state IS DISTINCT FROM NEW.state THEN
-  PERFORM set_config('application_name','%s',true);
-  PERFORM pg_sleep(5);
+  PERFORM pg_notify('asservat_lost_reply',NEW.id::text);
  END IF;
  RETURN NEW;
 END;
 $$;
 CREATE TRIGGER fixture_lost_reply_pause BEFORE UPDATE ON custody_attempt
-FOR EACH ROW EXECUTE FUNCTION fixture_lost_reply_pause();`, loc.AttemptID, marker))
+FOR EACH ROW EXECUTE FUNCTION fixture_lost_reply_pause();`, loc.AttemptID))
 	endSetup()
 	if err != nil {
-		f.t.Fatal("installed disconnect leg: install bounded custody pause", err)
+		f.t.Fatal("installed disconnect leg: install custody commit notification", err)
 	}
+	command, cancel := installedBoundedCommand(f.ctx, 5*time.Minute, "docker", "exec", "-i", node, "sh")
+	defer cancel()
+	command.Stdout, command.Stderr = io.Discard, io.Discard
+	killer, err := command.StdinPipe()
+	if err != nil {
+		f.t.Fatal("lost-reply hub-worker shell", err)
+	}
+	if err = command.Start(); err != nil {
+		f.t.Fatal("lost-reply hub-worker shell start", err)
+	}
+	defer func() {
+		_ = killer.Close()
+		_ = command.Process.Kill()
+		_ = command.Wait()
+	}()
 	key := f.keys + "-disconnect"
 	response := f.startRequest(previewID, key)
-	pauseWait, endPause := context.WithTimeout(f.ctx, 60*time.Second)
-	defer endPause()
-	for {
-		var paused bool
-		err := f.admin.QueryRow(pauseWait, `SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE application_name=$1)`, marker).Scan(&paused)
-		if err == nil && paused {
-			break
-		}
-		if installedJourneyPause(pauseWait, 10*time.Millisecond) != nil {
-			f.t.Fatal("installed disconnect leg: regional custody pause was not entered", err)
-		}
+	notification, err := listener.Conn().WaitForNotification(pauseWait)
+	if err != nil {
+		f.t.Fatal("installed disconnect leg: regional custody did not commit", err)
 	}
-	if err := installedRun(f.ctx, installedDockerTimeout, "docker", "exec", node, "kill", "-KILL", process); err != nil {
+	if notification.Payload != loc.AttemptID {
+		f.t.Fatal("installed disconnect leg: custody notification changed attempts", notification.Payload, loc.AttemptID)
+	}
+	if _, err = killer.Write([]byte("kill -KILL " + process + "\n")); err != nil {
 		f.t.Fatal("lost-reply hub-worker kill", err)
 	}
 	commitWait, endCommit := context.WithTimeout(f.ctx, 60*time.Second)
