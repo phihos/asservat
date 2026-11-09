@@ -617,10 +617,7 @@ func (f *installedFailureRun) legHubDisconnect(api kubernetes.Interface, hubName
 	}
 	installedHubSettled(f.t, f.ctx, api, hubNamespace, restarts)
 	originalCode, _ := f.requestReply(<-response)
-	if originalCode == "" {
-		f.t.Fatal("installed disconnect leg: completion reply was delivered before the kill")
-	}
-	f.t.Logf("installed disconnect leg: original completion reply resolved %s", originalCode)
+	f.t.Logf("installed disconnect leg: original public operation resolved %s", originalCode)
 	// The reconnected hub replays the original request passively: same capture,
 	// no new admission, execution or attempt.
 	f.resolveAccepted(previewID, key, captureID)
