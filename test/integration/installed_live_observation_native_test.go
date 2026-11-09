@@ -589,6 +589,7 @@ func installedLiveMCP(t *testing.T, ctx context.Context, db *pgxpool.Pool, root 
 			return errors.New("view change renewed original end")
 		}
 	}
+	closeInput["expected_revision"] = watch.Revision
 	if _, e = must("close_live_watch", closeInput, &watch); e != nil {
 		return e
 	}
