@@ -578,44 +578,59 @@ func installedHubWorkerProcess(t *testing.T, ctx context.Context, api kubernetes
 	return node, strconv.Itoa(inspected.Info.PID)
 }
 
-// legHubDisconnect kills the prelocated hub-worker through an already-open
-// node shell, then proves custody committed without its completion reply
-// (ADR-223). Reconnect never repeats collection or imports the result.
+// legHubDisconnect kills the prelocated hub-worker while a fixture-only pause
+// holds the exact regional custody transition, before its completion reply can
+// return. The pause is observable in pg_stat_activity, so the crash does not
+// race acquisition or storage. Reconnect never repeats or imports the result.
 func (f *installedFailureRun) legHubDisconnect(api kubernetes.Interface, hubNamespace, workerDeployment string) {
 	f.t.Helper()
 	restarts := installedHubRestarts(f.t, f.ctx, api, hubNamespace)
 	node, process := installedHubWorkerProcess(f.t, f.ctx, api, hubNamespace, workerDeployment)
-	command, cancel := installedBoundedCommand(f.ctx, 5*time.Minute, "docker", "exec", "-i", node, "sh")
-	defer cancel()
-	command.Stdout, command.Stderr = io.Discard, io.Discard
-	killer, err := command.StdinPipe()
+	previewID, loc, captureID, deadline := f.preview()
+	marker := "asservat-lost-reply-" + loc.AttemptID
+	dropPause := func(ctx context.Context) error {
+		_, err := f.admin.Exec(ctx, `DROP TRIGGER IF EXISTS fixture_lost_reply_pause ON custody_attempt; DROP FUNCTION IF EXISTS fixture_lost_reply_pause();`)
+		return err
+	}
+	f.t.Cleanup(func() {
+		cleanup, end := context.WithTimeout(context.Background(), 10*time.Second)
+		defer end()
+		if err := dropPause(cleanup); err != nil {
+			f.t.Errorf("installed disconnect leg: restore custody trigger: %v", err)
+		}
+	})
+	setup, endSetup := context.WithTimeout(f.ctx, 10*time.Second)
+	_, err := f.admin.Exec(setup, fmt.Sprintf(`CREATE FUNCTION fixture_lost_reply_pause() RETURNS trigger
+LANGUAGE plpgsql SET search_path=pg_catalog,pg_temp AS $$
+BEGIN
+ IF NEW.id='%s'::uuid AND NEW.state='stored_unpublished' AND OLD.state IS DISTINCT FROM NEW.state THEN
+  PERFORM set_config('application_name','%s',true);
+  PERFORM pg_sleep(5);
+ END IF;
+ RETURN NEW;
+END;
+$$;
+CREATE TRIGGER fixture_lost_reply_pause BEFORE UPDATE ON custody_attempt
+FOR EACH ROW EXECUTE FUNCTION fixture_lost_reply_pause();`, loc.AttemptID, marker))
+	endSetup()
 	if err != nil {
-		f.t.Fatal("lost-reply hub-worker shell", err)
+		f.t.Fatal("installed disconnect leg: install bounded custody pause", err)
 	}
-	if err = command.Start(); err != nil {
-		f.t.Fatal("lost-reply hub-worker shell start", err)
-	}
-	defer func() {
-		_ = killer.Close()
-		_ = command.Process.Kill()
-		_ = command.Wait()
-	}()
-	previewID, _, captureID, deadline := f.preview()
 	key := f.keys + "-disconnect"
 	response := f.startRequest(previewID, key)
-	startWait, end := context.WithTimeout(f.ctx, 60*time.Second)
-	defer end()
+	pauseWait, endPause := context.WithTimeout(f.ctx, 60*time.Second)
+	defer endPause()
 	for {
-		var phase string
-		err := f.admin.QueryRow(startWait, `SELECT phase FROM context_execution WHERE root_id=$1 AND capture_id=$2::uuid`, f.root, captureID).Scan(&phase)
-		if err == nil && phase == "started" {
+		var paused bool
+		err := f.admin.QueryRow(pauseWait, `SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE application_name=$1)`, marker).Scan(&paused)
+		if err == nil && paused {
 			break
 		}
-		if installedJourneyPause(startWait, time.Millisecond) != nil {
-			f.t.Fatal("installed disconnect leg: no in-flight start before the crash", err)
+		if installedJourneyPause(pauseWait, 10*time.Millisecond) != nil {
+			f.t.Fatal("installed disconnect leg: regional custody pause was not entered", err)
 		}
 	}
-	if _, err = killer.Write([]byte("kill -KILL " + process + "\n")); err != nil {
+	if err := installedRun(f.ctx, installedDockerTimeout, "docker", "exec", node, "kill", "-KILL", process); err != nil {
 		f.t.Fatal("lost-reply hub-worker kill", err)
 	}
 	commitWait, endCommit := context.WithTimeout(f.ctx, 60*time.Second)
@@ -639,6 +654,12 @@ func (f *installedFailureRun) legHubDisconnect(api kubernetes.Interface, hubName
 	}
 	if executionPhase != "started" {
 		f.t.Fatal("installed disconnect leg: regional completion was recorded before the crash", executionPhase)
+	}
+	restore, endRestore := context.WithTimeout(f.ctx, 10*time.Second)
+	err = dropPause(restore)
+	endRestore()
+	if err != nil {
+		f.t.Fatal("installed disconnect leg: remove bounded custody pause", err)
 	}
 	installedHubSettled(f.t, f.ctx, api, hubNamespace, restarts)
 	originalCode, _ := f.requestReply(<-response)
