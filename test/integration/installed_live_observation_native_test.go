@@ -533,28 +533,9 @@ func installedLiveMCP(t *testing.T, ctx context.Context, db *pgxpool.Pool, root 
 		return errors.New("public accounting differs from actual minimized ledger")
 	}
 	if run.Fanout {
-		if run.BeforeFailover != nil {
-			run.BeforeFailover()
-		}
 		var active int
-		if e = db.QueryRow(ctx, `SELECT count(*) FROM live_watch_control WHERE root_id=$1 AND state IN ('Active','Paused','Disconnected')`, root).Scan(&active); e != nil || active != 1 {
-			return errors.New("principal ceiling fixture did not retain only the original MCP view")
-		}
-		secondInput := make(map[string]any, len(request))
-		for key, value := range request {
-			secondInput[key] = value
-		}
-		secondInput["idempotency_key"] = "live-ceiling-second-" + source.SourceID
-		var second v.Watch
-		if _, e = must("open_live_watch", secondInput, &second); e != nil {
-			return e
-		}
-		if second.ID == watch.ID || !slices.Equal(second.SourceIDs, watch.SourceIDs) {
-			return errors.New("principal ceiling opened a duplicate or substituted view")
-		}
-		secondBefore := second
 		if e = db.QueryRow(ctx, `SELECT count(*) FROM live_watch_control WHERE root_id=$1 AND state IN ('Active','Paused','Disconnected')`, root).Scan(&active); e != nil || active != 2 {
-			return errors.New("principal ceiling fixture did not retain two MCP views")
+			return errors.New("principal ceiling fixture did not retain React and MCP views")
 		}
 		thirdInput := make(map[string]any, len(request))
 		for key, value := range request {
@@ -568,16 +549,13 @@ func installedLiveMCP(t *testing.T, ctx context.Context, db *pgxpool.Pool, root 
 		if e != nil || code != "CapacityUnavailable" || refusal.Status != "error" || json.Unmarshal(refusal.Data, &failure) != nil || failure.Retryable {
 			return fmt.Errorf("third concurrent view was not refused by the principal ceiling: %s %w", code, e)
 		}
-		if _, e = must("close_live_watch", map[string]any{"watch_id": second.ID, "expected_revision": second.Revision, "idempotency_key": "live-ceiling-second-close-" + source.SourceID}, &second); e != nil {
-			return e
+		if e = db.QueryRow(ctx, `SELECT count(*) FROM live_watch_control WHERE root_id=$1 AND state IN ('Active','Paused','Disconnected')`, root).Scan(&active); e != nil || active != 2 {
+			return errors.New("principal ceiling refusal changed the original views")
 		}
-		if second.State != "Closed" || !second.ExpiresAt.Equal(secondBefore.ExpiresAt) {
-			return errors.New("principal ceiling close changed the second view")
+		if run.BeforeFailover != nil {
+			run.BeforeFailover()
 		}
-		if e = db.QueryRow(ctx, `SELECT count(*) FROM live_watch_control WHERE root_id=$1 AND state IN ('Active','Paused','Disconnected')`, root).Scan(&active); e != nil || active != 1 {
-			return errors.New("principal ceiling refusal or second close changed the original view")
-		}
-		t.Log("installed live principal ceiling: third concurrent view refused CapacityUnavailable; original MCP view retained")
+		t.Log("installed live principal ceiling: third concurrent view refused CapacityUnavailable; React and MCP views retained")
 	}
 	closeInput := map[string]any{"watch_id": watch.ID, "expected_revision": watch.Revision, "idempotency_key": "live-close-" + source.SourceID}
 	if run.Failover {
@@ -761,6 +739,14 @@ func (p *installedLiveBrowser) read(out any) {
 }
 func (p *installedLiveBrowser) begin(s installedLiveFixture) {
 	p.send(map[string]any{"kind": "observe", "source": map[string]any{"source_id": s.SourceID, "action_id": s.ActionID, "pod_uid": s.PodUID, "kind": s.Kind, "projection": s.Projection, "hard_until": installedLiveHardUntil(s.HardUntil), "forbidden": []string{manualHTTPMarker, installedLiveProducerMarker}}})
+	var opened struct {
+		Kind, SourceID, Projection, WatchID string
+		Source                              string `json:"source_id"`
+	}
+	p.read(&opened)
+	if opened.Kind != "opened" || opened.Source != s.SourceID || opened.Projection != s.Projection || opened.WatchID == "" {
+		p.t.Fatal("actual React open proof failed")
+	}
 }
 func (p *installedLiveBrowser) finishEpisode(s installedLiveFixture) {
 	p.t.Helper()
