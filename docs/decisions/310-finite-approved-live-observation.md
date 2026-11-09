@@ -1,6 +1,6 @@
 # ADR-310: Finite approved live observation
 
-Status: implementation in progress; runtime and installed qualification pending.
+Status: implemented; component, real-service and installed policy/manual qualification passed. Wider environment and sustained-operation qualification remains open.
 
 ## Decision
 
@@ -65,10 +65,14 @@ but does not fulfill the complete accepted live workflow.
 Focused domain, current source/viewer authority, bounded C-13 replay/closure,
 public audit, metadata adapter and React tests are local component evidence.
 Local production composition covers owner routing, source-clock placement,
-SQL aggregate accounting and ongoing HTTP snapshots. Its fixtures have explicitly
-scoped synthetic authority facts; real SQL/service, bounded-resource, installed
-node and complete browser/MCP/native qualification remain pending.
-No public runtime is enabled by the optional constructors alone.
+SQL aggregate accounting and ongoing HTTP snapshots. Real PostgreSQL/S3/OpenBao
+ledger, upgrade, manual-source and HTTP-source fixtures pass. Installed native
+runs 42542873758 (policy) and 42542876337 (manual) at `beff40d2` pass packet,
+syscall and HTTP projections through real C-03/SQL/owner/node delivery to MCP
+and React, including separate HTTP Save/download and joined manual cancellation.
+Both artifacts record unchanged sources and complete cleanup. These named
+fixtures do not qualify wider CNI, grouped/argument/peer or sustained-operation
+profiles.
 
 The live read uses a distinct closed purpose on current authenticated channels.
 Peer authentication supplies transport identity, not a viewer permit: composed
