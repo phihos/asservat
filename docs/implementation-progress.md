@@ -1,5 +1,44 @@
 # Sustained implementation progress
 
+## Installed S-02 failure-state exits (2026-11-09)
+
+Test/CI qualification only; product behavior, contracts, authority and deadlines
+are unchanged. Two standalone native suites cover the remaining installed S-02
+failure exits without combining their fault windows in one 20-minute job:
+`continuation-journey-store-failure` and `continuation-journey-start-failure`.
+
+- Owned-fixture store/capacity run passed (`make installed-focus
+  FOCUS=journey-store-failure`, harness 406.6 s, focus 26.82 s). A scoped S3
+  Put denial for the exact regional attempt produced
+  `Indeterminate`/`StorageOutcomeUnconfirmed`, retained one execution/custody
+  attempt and restored the original bucket policy. Three retained admissions
+  then exhausted the fixture workload reserve; `CapacityUnavailable` persisted
+  after every accepted capture was terminal.
+- Owned-fixture disconnect/KMS run passed (`make installed-focus
+  FOCUS=journey-start-failure`, harness 542.4 s, Go test 477.929 s, focus
+  205.55 s). The hub-worker crash resolved `Succeeded` after reconnect, with
+  one admission, at most one execution, one custody attempt and the original
+  capture on replay. KMS disconnection after the public operation's audited
+  Begin but before the intent seal left a durable capture `Pending` after KMS
+  recovery; its original deadline produced
+  `Indeterminate`/`DeadlineOutcomeUnconfirmed`, with zero executions.
+- Failed injection attempts remain qualification evidence, not product passes:
+  the first store leg incorrectly required immediate request success instead of
+  accepting retryable `OutcomeUnknown` and resolving the committed admission;
+  disconnecting KMS before `request_capture` refused the public audit Begin
+  with no capture row, so the fault moved to the post-Begin/pre-intent window.
+  Native store run 42537529239 passed at `fcb9cb7d`; native start run
+  42537531440 reached the intended KMS failure but its single immediate
+  post-reconnect `get_capture` hit the hub's still-unavailable audit seal. The
+  test now uses its existing bounded `Pending` poll; the fresh local run above
+  passed with that recovery boundary.
+- Focused unit tests and `go vet ./test/integration` pass;
+  `scripts/test-regional-context-selection.py` passes all 40 tests;
+  `make spec-check architecture-check` passes. The integrated candidate's
+  `make pre-push` passes, including race tests of `test/integration` (107 s)
+  and all 611 console tests. Exact-head native CI remains the required
+  independent qualification before merge.
+
 ## Installer step brackets (2026-11-08, ADR-316)
 
 Option 4 of docs/reviews/test-runtime-plan-2026-11-08.md. The continuation now

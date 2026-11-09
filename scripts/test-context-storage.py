@@ -432,7 +432,7 @@ def qualify_direct_helper_issuer(env, report):
 # Installed focuses that load the node collector (disposable-host guard).
 COLLECTOR_FOCUSES = ("approved-recording", "manual-syscall", "manual-arguments", "manual-mixed", "manual-raw", "manual-http", "manual-peers", "manual-profile", "profile-comparison", "native-paced", "policy-recording", "policy-arguments", "policy-profile", "ongoing-save", "ongoing-save-disk", "ongoing-incident", "ongoing-syscall", "ongoing-mixed", "live-observation")
 # Installed focuses with one hub and one workload cluster.
-TWO_CLUSTER_FOCUSES = ("restart", "journey", "browser", "upgrade", "policy", "alert", "logresource", "chain", "share", "manual-logs") + COLLECTOR_FOCUSES
+TWO_CLUSTER_FOCUSES = ("restart", "journey", "browser", "upgrade", "policy", "alert", "logresource", "chain", "share", "manual-logs", "journey-store-failure", "journey-start-failure") + COLLECTOR_FOCUSES
 # Focuses that may share one installation with others (ASSERVAT_JOURNEY_FOCUS=a,b):
 # chain alone keeps the full installation-process checks and the default
 # kubelet resync, clusters needs a third cluster.

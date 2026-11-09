@@ -92,15 +92,19 @@ preview/request/inspection/download with reply parity, duplicate and conflicting
 Range resume, catalog minimization, an unrelated principal refused exactly as for absent
 objects, Stop, Deny revocation, expiry refusal, a failed cleanup that retains its charges and
 verified deletion; the second cluster completes capture, publication and native download.
-Still not installed-qualified, against the
-[S-02 exit](architecture/implementation-slices.md#s-02-exit-in-detail):
-
-- hub disconnect/reconnect importing a committed result (documented limitation, ADR-223:
-  a lost regional completion reply is not imported and the collection is never repeated);
-- object/KMS failure states in the installed run: object-store failure reports
-  `Indeterminate`/`StorageOutcomeUnconfirmed` and exhausted capacity `CapacityUnavailable`
-  (component tests); a key-service failure before the start stays Pending until the deadline
-  marks it Indeterminate.
+The remaining failure states of the
+[S-02 exit](architecture/implementation-slices.md#s-02-exit-in-detail) have installed
+qualification in `continuation-journey-store-failure` and
+`continuation-journey-start-failure`: an object-store write refusal ends
+`Indeterminate`/`StorageOutcomeUnconfirmed` with charges retained; an exhausted
+workload reserve returns `CapacityUnavailable` even with no capture in flight;
+a hub-worker crash never repeats collection and replay returns the original
+capture; and a KMS failure after admission but before the intent seal stays
+`Pending` after KMS recovery until the original deadline marks it
+`Indeterminate`/`DeadlineOutcomeUnconfirmed`. The disconnect case accepts either
+a delivered `Succeeded` outcome or the documented ADR-223 lost-reply outcome:
+a committed regional artifact whose completion reply was lost is not imported,
+and its capture ends Indeterminate after the original deadline.
 
 A lost target is installed-qualified in [native109](../test/results/resumed-c62e02ac-native109/README.md):
 a request for a deleted reviewed Pod returns `TargetGone`; a started capture records
