@@ -541,7 +541,7 @@ func (f *installedFailureRun) legCapacityUnavailable() {
 }
 
 // installedPauseHubWorker freezes the exact owned hub-worker process without
-// terminating it. The caller must kill the returned container after the regional
+// terminating it. The caller must kill the returned process after the regional
 // commit; a stopped process cannot receive the completion reply.
 func installedPauseHubWorker(t *testing.T, ctx context.Context, api kubernetes.Interface, namespace, deployment string) (string, string) {
 	t.Helper()
@@ -576,10 +576,11 @@ func installedPauseHubWorker(t *testing.T, ctx context.Context, api kubernetes.I
 	if json.Unmarshal(raw, &inspected) != nil || inspected.Info.PID <= 1 || err != nil {
 		t.Fatal("lost-reply hub-worker process", err)
 	}
-	if err = installedRun(ctx, installedDockerTimeout, "docker", "exec", node, "kill", "-STOP", strconv.Itoa(inspected.Info.PID)); err != nil {
+	pid := strconv.Itoa(inspected.Info.PID)
+	if err = installedRun(ctx, installedDockerTimeout, "docker", "exec", node, "kill", "-STOP", pid); err != nil {
 		t.Fatal("lost-reply hub-worker pause", err)
 	}
-	return node, id
+	return node, pid
 }
 
 // legHubDisconnect freezes the hub-worker before the regional store commits,
@@ -598,15 +599,15 @@ func (f *installedFailureRun) legHubDisconnect(api kubernetes.Interface, hubName
 	for {
 		var phase string
 		err := f.admin.QueryRow(startWait, `SELECT phase FROM context_execution WHERE root_id=$1 AND capture_id=$2::uuid`, f.root, captureID).Scan(&phase)
-		if err == nil && phase != "prepared" {
+		if err == nil && phase == "started" {
 			break
 		}
 		if installedJourneyPause(startWait, 250*time.Millisecond) != nil {
-			f.t.Fatal("installed disconnect leg: no recorded start before the pause", err)
+			f.t.Fatal("installed disconnect leg: no in-flight start before the pause", err)
 		}
 	}
 	restarts := installedHubRestarts(f.t, f.ctx, api, hubNamespace)
-	node, container := installedPauseHubWorker(f.t, f.ctx, api, hubNamespace, workerDeployment)
+	node, process := installedPauseHubWorker(f.t, f.ctx, api, hubNamespace, workerDeployment)
 	paused := true
 	f.t.Cleanup(func() {
 		if !paused {
@@ -614,21 +615,23 @@ func (f *installedFailureRun) legHubDisconnect(api kubernetes.Interface, hubName
 		}
 		cleanup, end := context.WithTimeout(context.Background(), installedDockerTimeout)
 		defer end()
-		if err := installedRun(cleanup, installedDockerTimeout, "docker", "exec", node, "kill", "-KILL", container); err != nil {
+		if err := installedRun(cleanup, installedDockerTimeout, "docker", "exec", node, "kill", "-KILL", process); err != nil {
 			f.t.Errorf("lost-reply hub-worker cleanup: %v", err)
 		}
 	})
+	commitWait, endCommit := context.WithTimeout(f.ctx, 60*time.Second)
+	defer endCommit()
 	for {
 		var stored bool
-		err := f.admin.QueryRow(startWait, `SELECT EXISTS(SELECT 1 FROM custody_attempt a JOIN context_capture c ON c.attempt_id=a.id AND c.root_id=a.root_id WHERE c.root_id=$1 AND c.id=$2::uuid AND a.state='stored_unpublished')`, f.root, captureID).Scan(&stored)
+		err := f.admin.QueryRow(commitWait, `SELECT EXISTS(SELECT 1 FROM custody_attempt a JOIN context_capture c ON c.attempt_id=a.id AND c.root_id=a.root_id WHERE c.root_id=$1 AND c.id=$2::uuid AND a.state='stored_unpublished')`, f.root, captureID).Scan(&stored)
 		if err == nil && stored {
 			break
 		}
-		if installedJourneyPause(startWait, 10*time.Millisecond) != nil {
+		if installedJourneyPause(commitWait, 10*time.Millisecond) != nil {
 			f.t.Fatal("installed disconnect leg: regional completion never committed", err)
 		}
 	}
-	if err := installedRun(f.ctx, installedDockerTimeout, "docker", "exec", node, "kill", "-KILL", container); err != nil {
+	if err := installedRun(f.ctx, installedDockerTimeout, "docker", "exec", node, "kill", "-KILL", process); err != nil {
 		f.t.Fatal("lost-reply hub-worker kill", err)
 	}
 	paused = false
