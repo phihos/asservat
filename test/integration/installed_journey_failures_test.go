@@ -578,9 +578,9 @@ func installedHubWorkerProcess(t *testing.T, ctx context.Context, api kubernetes
 	return node, strconv.Itoa(inspected.Info.PID)
 }
 
-// legHubDisconnect freezes the hub-worker before the regional store commits,
-// then kills it before a completion reply can be received (ADR-223). Reconnect
-// never repeats collection or imports the committed regional result.
+// legHubDisconnect holds the recovery update lock while custody commits, then
+// kills the hub-worker before its completion can pass the FOR SHARE recovery
+// read (ADR-223). Reconnect never repeats collection or imports the result.
 func (f *installedFailureRun) legHubDisconnect(api kubernetes.Interface, hubNamespace, workerDeployment string) {
 	f.t.Helper()
 	restarts := installedHubRestarts(f.t, f.ctx, api, hubNamespace)
@@ -600,18 +600,18 @@ func (f *installedFailureRun) legHubDisconnect(api kubernetes.Interface, hubName
 			f.t.Fatal("installed disconnect leg: no in-flight start before the pause", err)
 		}
 	}
-	if err := installedRun(f.ctx, installedDockerTimeout, "docker", "exec", node, "kill", "-STOP", process); err != nil {
-		f.t.Fatal("lost-reply hub-worker pause", err)
+	lock, err := f.admin.Begin(f.ctx)
+	if err != nil {
+		f.t.Fatal("lost-reply recovery lock", err)
 	}
-	paused := true
+	if _, err = lock.Exec(f.ctx, "SELECT 1 FROM fleet_current_trust FOR UPDATE"); err != nil {
+		_ = lock.Rollback(f.ctx)
+		f.t.Fatal("lost-reply recovery lock", err)
+	}
+	locked := true
 	f.t.Cleanup(func() {
-		if !paused {
-			return
-		}
-		cleanup, end := context.WithTimeout(context.Background(), installedDockerTimeout)
-		defer end()
-		if err := installedRun(cleanup, installedDockerTimeout, "docker", "exec", node, "kill", "-KILL", process); err != nil {
-			f.t.Errorf("lost-reply hub-worker cleanup: %v", err)
+		if locked {
+			_ = lock.Rollback(context.Background())
 		}
 	})
 	commitWait, endCommit := context.WithTimeout(f.ctx, 60*time.Second)
@@ -629,7 +629,10 @@ func (f *installedFailureRun) legHubDisconnect(api kubernetes.Interface, hubName
 	if err := installedRun(f.ctx, installedDockerTimeout, "docker", "exec", node, "kill", "-KILL", process); err != nil {
 		f.t.Fatal("lost-reply hub-worker kill", err)
 	}
-	paused = false
+	if err := lock.Rollback(f.ctx); err != nil {
+		f.t.Fatal("lost-reply recovery unlock", err)
+	}
+	locked = false
 	installedHubSettled(f.t, f.ctx, api, hubNamespace, restarts)
 	originalCode, _ := f.requestReply(<-response)
 	if originalCode == "" {
