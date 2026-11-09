@@ -1,5 +1,33 @@
 # Sustained implementation progress
 
+## Installed live observation policy and manual paths (2026-11-09)
+
+ADR-310's accepted live workflow now has installed qualification for all three
+approved projections on both ongoing policy sources and finite manual sessions.
+No product or test code changed in this evidence slice. Committed provenance:
+[policy run](../test/results/live-observation-policy-native-42542873758/README.md),
+[manual run](../test/results/live-observation-manual-native-42542876337/README.md).
+
+- Guarded native `continuation-ongoing-live` run 42542873758 at `beff40d2`
+  passed (Go test 431.893 s, focus 150.46 s). Packet, syscall and HTTP policy
+  sources delivered through real C-03/SQL/owner/node to MCP and React, with 25
+  bounded MCP live operations and no viewer acquisition. Actual deactivation
+  ended the sources. The separate HTTP Save downloaded 3,148 native bytes
+  (SHA-256 `c4d5df6a8e8c832cb3705b054f393ee8e6f7aeff88058485a45b936b1241089f`);
+  transient live rows were not persisted or reused as evidence.
+- Guarded native `continuation-ongoing-live-manual` run 42542876337 at the same
+  commit passed (Go test 367.075 s, focus 90.45 s). Finite packet, syscall and
+  HTTP sessions delivered through MCP and React with 24 live operations; each
+  viewer attached before publication and actual cancellation joined the
+  original executor without replacement.
+- Both artifacts record unchanged sources, removed build scratch and no cleanup
+  failures. Local `TestInstalledLiveObservationUsesFastOriginalTopology`,
+  `TestInstalledContinuationSoftBudgetsCoverEveryFocus` and
+  `TestLiveObservationOfficialMCPBoundary` pass. Collector tests ran only on
+  guarded disposable GitHub runners.
+- This supersedes the older unrun/manual-Stop-pending notes for these named
+  paths. Grouped/argument/peer matrices and sustained operation remain open.
+
 ## Installed HTTP-header query (2026-11-09)
 
 ADR-282 slice 5's already-composed `get_http_headers` path is now
