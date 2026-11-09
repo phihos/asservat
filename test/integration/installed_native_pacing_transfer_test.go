@@ -16,7 +16,7 @@ import (
 
 // Four cumulative sessions cover the control, paced whole, two ranges sharing
 // one session, and stale If-Range. No uncertain preparation or body is retried.
-func qualifyInstalledNativePacing(t *testing.T, ctx context.Context, m *nativePacingMeasurement, transport *http.Transport, identity *installedIdentity, origin, artifactID string, control installedJourneyDownload, native []byte, invoke func(string, any) (installedJourneyEnvelope, string), read func(string, any, any), diagnose func()) {
+func qualifyInstalledNativePacing(t *testing.T, ctx context.Context, m *nativePacingMeasurement, transport *http.Transport, identity *installedIdentity, origin, artifactID string, control installedJourneyDownload, native []byte, invoke func(string, any) (installedJourneyEnvelope, string), callOnce func(context.Context, string, any) (installedJourneyEnvelope, string, error), read func(string, any, any), diagnose func()) {
 	t.Helper()
 	if control.ETag == "" || strings.HasPrefix(control.ETag, "W/") || sha256.Sum256(native) != m.Bodies["unpaced"].SHA256 {
 		t.Fatal("authenticated control lacks strong immutable metadata")
@@ -184,8 +184,14 @@ func qualifyInstalledNativePacing(t *testing.T, ctx context.Context, m *nativePa
 	if err := m.admin.QueryRow(ctx, "SELECT suspended FROM permission_stream WHERE id=$1", m.root).Scan(&stillSuspended); err != nil || !stillSuspended {
 		t.Fatal("fresh preparation suspension was not retained", stillSuspended, err)
 	}
-	refused, code := invoke("prepare_artifact_download", map[string]string{"artifact_id": artifactID, "idempotency_key": "installed-native-suspended-start"})
-	if code != "NotAvailable" || refused.Status != "error" {
+	refused, code, callErr := callOnce(ctx, "prepare_artifact_download", map[string]string{"artifact_id": artifactID, "idempotency_key": "installed-native-suspended-start"})
+	// Audit admission may refuse with HTTP Service Unavailable before an
+	// operation envelope exists; an admitted operation returns NotAvailable.
+	if callErr != nil && !strings.Contains(callErr.Error(), "Service Unavailable") {
+		diagnose()
+		t.Fatal("fresh preparation failed unexpectedly", callErr)
+	}
+	if callErr == nil && (code != "NotAvailable" || refused.Status != "error") {
 		t.Fatal("suspended permission allowed a new download response", code, refused.Status)
 	}
 	if _, err := m.admin.Exec(ctx, "UPDATE permission_stream SET suspended=false WHERE id=$1", m.root); err != nil {
