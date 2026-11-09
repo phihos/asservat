@@ -1,7 +1,7 @@
 # ADR-312 — Started downloads run to their original bounds
 
-Date: 2026-11-07. Status: accepted (maintainer decision); component and real-SQL
-regressions implemented; installed qualification pending.
+Date: 2026-11-07. Status: accepted (maintainer decision); component, real-SQL
+and installed native regressions passed (run 42591125143).
 Requirements: REQ-DLD-002/003/004, S-02. Supersedes the post-start recheck parts
 of [ADR-220](220-response-owned-download-permissions.md),
 [ADR-233](233-recipient-native-download.md) and
