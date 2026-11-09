@@ -81,6 +81,7 @@ func (c *responseCurrent) fresh(ctx context.Context, margin time.Duration) (arti
 	if ctx.Err() != nil {
 		return artifact.DownloadAuthority{}, ctx.Err()
 	}
+	log.Printf("native response fresh: now=%s margin=%s valueUntil=%s started=%t", c.now(), margin, c.value.ValidUntil, c.started != nil)
 	if c.batch != nil && c.value.Valid(c.now()) && c.now().Add(margin).Before(c.value.ValidUntil) {
 		return c.value, nil
 	}
