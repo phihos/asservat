@@ -587,10 +587,7 @@ func (f *installedFailureRun) legHubDisconnect(api kubernetes.Interface, hubName
 	node, process := installedHubWorkerProcess(f.t, f.ctx, api, hubNamespace, workerDeployment)
 	previewID, _, captureID, deadline := f.preview()
 	key := f.keys + "-disconnect"
-	code, got := f.request(previewID, key)
-	if code != "" || got != captureID {
-		f.t.Fatal("installed disconnect leg: request not admitted once", code, got, captureID)
-	}
+	response := f.startRequest(previewID, key)
 	startWait, end := context.WithTimeout(f.ctx, 60*time.Second)
 	defer end()
 	for {
@@ -634,6 +631,11 @@ func (f *installedFailureRun) legHubDisconnect(api kubernetes.Interface, hubName
 	}
 	paused = false
 	installedHubSettled(f.t, f.ctx, api, hubNamespace, restarts)
+	originalCode, _ := f.requestReply(<-response)
+	if originalCode == "" {
+		f.t.Fatal("installed disconnect leg: completion reply was delivered before the kill")
+	}
+	f.t.Logf("installed disconnect leg: original completion reply resolved %s", originalCode)
 	// The reconnected hub replays the original request passively: same capture,
 	// no new admission, execution or attempt.
 	f.resolveAccepted(previewID, key, captureID)
