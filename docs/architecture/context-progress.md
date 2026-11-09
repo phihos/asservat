@@ -69,8 +69,9 @@ freshness, cancellation and separately authorized navigation. The native
 fixture source adds real SQL role denials, API-only admission/replay, concurrent
 once-only deadline observation, retained uncertain storage charges, actual
 retention shortening at revision exhaustion, and verification/audit/publication
-revision transitions. Native qualification must be recorded after the owned
-custody suite runs; compiling/skipping that fixture is not a passing SQL run.
+revision transitions. The targeted [real-SQL deadline-observer run](../../test/results/lost-completion-sql.log)
+passed with unchanged sources and complete cleanup; the full custody suite is
+not claimed as a pass. Installed completion-loss evidence is linked in ADR-223.
 
 Pending composition includes protected capability
 production, case navigation, distributed execution/publication and public

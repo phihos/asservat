@@ -1,6 +1,6 @@
 # ADR-223 — Lost regional completion replies end Indeterminate
 
-Date: 2026-10-24. Status: implemented; real SQL and installed qualification pending.
+Date: 2026-10-24. Status: implemented; real SQL and installed completion-loss recovery qualified.
 Related: [ADR-104](104-regional-api-context-execution.md),
 [ADR-105](105-durable-context-progress.md),
 [ADR-205](205-installed-context-deletion.md).
@@ -74,5 +74,24 @@ repeating collection.
 S-02 exit item 6 is satisfied for duplicate and reconnected starts (one effect,
 `AlreadyStarted`), not by importing results whose reply was lost. Those end
 Indeterminate after their deadline. Unit tests cover the runner, the progress
-projection and the sweep. The real-SQL observer grants under the installed role
-plan are not yet qualified.
+projection and the sweep.
+
+[Installed run 42630012490](../../test/results/lost-completion-native-42630012490/README.md)
+qualifies the recovery state through the real storage, execution, replay,
+progress and deadline-observer path. A scoped trigger rejected only the hub's
+`started → stored` transition after all four regional ciphertext objects
+committed; execution stayed `started` and custody `reserved`. Replay named the
+original capture without another execution or custody attempt, and the original
+deadline produced stable `Indeterminate/DeadlineOutcomeUnconfirmed`. This is a
+deterministic completion-loss fixture, not a measurement of TCP packet-loss
+timing. The separate pre-start KMS failure also reached the same terminal state
+with zero executions.
+
+The [targeted real-PostgreSQL observer run](../../test/results/lost-completion-sql.log)
+also passed: both the original deadline role and the installed `context-cleanup`
+role produced one durable transition under concurrency, public progress changed
+to the expected indeterminate reason, and repeated/reverse mutations were denied
+without refunding the charge. Its environment report records unchanged sources
+and no cleanup failures. A broader custody run had unrelated publication,
+profile and download rollback-check failures; it is not claimed as a full-suite
+pass and those checks were not changed by this qualification slice.
