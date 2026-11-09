@@ -216,15 +216,15 @@ func (s *NativeOwners) claimNativeOperation(ctx context.Context, en value.Worker
 func (s *NativeOwners) ObserveNativeOperation(ctx context.Context, ref value.NativeReference, peer value.KeyPeer) (value.NativeLease, error) {
 	var out value.NativeLease
 	if s == nil || ctx == nil || ctx.Err() != nil || !ref.Valid() || !peer.Valid(time.Now()) || peer.Role != "acquisition" || peer.InstallationID != ref.InstallationID {
-		return out, artifact.ErrDownloadUnavailable
+		return out, sqlStep{"native-observe-input", artifact.ErrDownloadUnavailable}
 	}
 	initial, e := custodydb.New(s.workers.downloads.ledger.pool).ReadNativeOwner(ctx, custodydb.ReadNativeOwnerParams{WorkerID: id(ref.WorkerID), RootID: id(s.workers.downloads.root)})
 	if e != nil {
-		return out, artifact.ErrDownloadUnavailable
+		return out, sqlStep{"native-observe-read", e}
 	}
 	o, a, e := decodeNativeOwner(initial)
 	if e != nil || o.Reference != ref || !o.CurrentValid(time.Now()) || o.Path != a.Environment.Path || !sameNativeProcessingState(o.Processing, a.Environment.Processing) {
-		return out, artifact.ErrDownloadUnavailable
+		return out, sqlStep{"native-observe-decode", e}
 	}
 	ctx, cancel := context.WithDeadline(ctx, identity.Earlier(a.ValidUntil, initial.LeaseUntil.Time))
 	defer cancel()
