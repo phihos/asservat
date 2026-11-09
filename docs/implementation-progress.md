@@ -4,7 +4,9 @@
 
 ADR-310's accepted live workflow now has installed qualification for all three
 approved projections on both ongoing policy sources and finite manual sessions.
-No product or test code changed in this evidence slice.
+No product or test code changed in this evidence slice. Committed provenance:
+[policy run](../test/results/live-observation-policy-native-42542873758/README.md),
+[manual run](../test/results/live-observation-manual-native-42542876337/README.md).
 
 - Guarded native `continuation-ongoing-live` run 42542873758 at `beff40d2`
   passed (Go test 431.893 s, focus 150.46 s). Packet, syscall and HTTP policy
