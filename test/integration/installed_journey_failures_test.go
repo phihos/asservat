@@ -682,10 +682,7 @@ func (f *installedFailureRun) legKeyServiceDown() {
 	}
 	installedFailureKMSConnected(f.t, f.ctx, network, container, true)
 	disconnected = false
-	pending, ok := f.progress(f.ctx, captureID)
-	if !ok || pending.Phase != "Pending" {
-		f.t.Fatal("installed key-service leg: capture did not stay Pending after KMS recovery", pending.Phase, ok)
-	}
+	f.waitPhase("the still-pending capture after KMS recovery", captureID, time.Now().Add(30*time.Second), "Pending")
 	// Recovery does not continue the failed start. The hub-worker's SQL-only
 	// deadline observer marks the original capture at its original deadline.
 	deadlineWait, endDeadline := context.WithDeadline(f.ctx, deadline.Add(75*time.Second))

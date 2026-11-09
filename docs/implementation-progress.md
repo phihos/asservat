@@ -15,8 +15,8 @@ failure exits without combining their fault windows in one 20-minute job:
   then exhausted the fixture workload reserve; `CapacityUnavailable` persisted
   after every accepted capture was terminal.
 - Owned-fixture disconnect/KMS run passed (`make installed-focus
-  FOCUS=journey-start-failure`, harness 654.0 s, Go test 498.718 s, focus
-  221.37 s). The hub-worker crash resolved `Succeeded` after reconnect, with
+  FOCUS=journey-start-failure`, harness 542.4 s, Go test 477.929 s, focus
+  205.55 s). The hub-worker crash resolved `Succeeded` after reconnect, with
   one admission, at most one execution, one custody attempt and the original
   capture on replay. KMS disconnection after the public operation's audited
   Begin but before the intent seal left a durable capture `Pending` after KMS
@@ -27,6 +27,11 @@ failure exits without combining their fault windows in one 20-minute job:
   accepting retryable `OutcomeUnknown` and resolving the committed admission;
   disconnecting KMS before `request_capture` refused the public audit Begin
   with no capture row, so the fault moved to the post-Begin/pre-intent window.
+  Native store run 42537529239 passed at `fcb9cb7d`; native start run
+  42537531440 reached the intended KMS failure but its single immediate
+  post-reconnect `get_capture` hit the hub's still-unavailable audit seal. The
+  test now uses its existing bounded `Pending` poll; the fresh local run above
+  passed with that recovery boundary.
 - Focused unit tests and `go vet ./test/integration` pass;
   `scripts/test-regional-context-selection.py` passes all 40 tests;
   `make spec-check architecture-check` passes. The integrated candidate's
