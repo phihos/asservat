@@ -10,6 +10,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"errors"
+	"log"
 	"time"
 )
 
@@ -89,6 +90,7 @@ func (c *responseCurrent) fresh(ctx context.Context, margin time.Duration) (arti
 			return artifact.DownloadAuthority{}, artifact.ErrDownloadExpired
 		}
 		c.value = a
+		log.Printf("native response authority continued: until=%s", a.ValidUntil)
 		return a, nil
 	}
 	c.closeBatch()
