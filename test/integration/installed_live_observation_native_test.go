@@ -48,6 +48,7 @@ type installedLiveRun struct {
 	AdministratorUser                                               string
 	RootID, Installation, HubNamespace, OwnerDeployment             string
 	Failover                                                        bool
+	Fanout                                                          bool
 	BeforeFailover                                                  func()
 	Identity                                                        *installedIdentity
 	PublicRoot                                                      []byte
@@ -302,22 +303,30 @@ func qualifyInstalledLiveObservation(t *testing.T, ctx context.Context, c instal
 			// and MCP at the same time instead of one after the other.
 			browser.begin(source)
 			c.Failover = episodes == 1 && os.Getenv("ASSERVAT_LIVE_EPISODES") == "policy"
+			c.Fanout = episodes == 1
 			c.BeforeFailover = func() { browser.finishEpisode(source) }
 			if e := installedLiveMCP(t, callCtx, c.SQL, c.RootID, source, call, c); e != nil {
 				return e
 			}
-			if !c.Failover {
+			if !c.Failover && !c.Fanout {
 				browser.finishEpisode(source)
 			}
 			return nil
 		}
-		// MCP first: it waits for the original source to become eligible.
+		// The fanout episode holds React open while MCP exercises the shared ceiling.
 		c.Failover = episodes == 1 && os.Getenv("ASSERVAT_LIVE_EPISODES") == "policy"
+		c.Fanout = episodes == 1
+		if c.Fanout {
+			browser.begin(source)
+			c.BeforeFailover = func() { browser.finishEpisode(source) }
+		}
 		if e := installedLiveMCP(t, callCtx, c.SQL, c.RootID, source, call, c); e != nil {
 			return e
 		}
-		browser.begin(source)
-		browser.finishEpisode(source)
+		if !c.Fanout {
+			browser.begin(source)
+			browser.finishEpisode(source)
+		}
 		return nil
 	})
 	want := 6
@@ -529,11 +538,33 @@ func installedLiveMCP(t *testing.T, ctx context.Context, db *pgxpool.Pool, root 
 	if e = db.QueryRow(ctx, `SELECT spent,state FROM live_watch_control WHERE root_id=$1 AND id=$2`, root, watch.ID).Scan(&sqlSpent, &state); e != nil || sqlSpent != lastSpend || state != "Active" {
 		return errors.New("public accounting differs from actual minimized ledger")
 	}
-	closeInput := map[string]any{"watch_id": watch.ID, "expected_revision": watch.Revision, "idempotency_key": "live-close-" + source.SourceID}
-	if run.Failover {
+	if run.Fanout {
+		var active int
+		if e = db.QueryRow(ctx, `SELECT count(*) FROM live_watch_control WHERE root_id=$1 AND state IN ('Active','Paused','Disconnected')`, root).Scan(&active); e != nil || active != 2 {
+			return errors.New("principal ceiling fixture did not retain React and MCP views")
+		}
+		thirdInput := make(map[string]any, len(request))
+		for key, value := range request {
+			thirdInput[key] = value
+		}
+		thirdInput["idempotency_key"] = "live-ceiling-third-" + source.SourceID
+		refusal, code, e := call(ctx, "open_live_watch", thirdInput)
+		var failure struct {
+			Retryable bool `json:"retryable"`
+		}
+		if e != nil || code != "CapacityUnavailable" || refusal.Status != "error" || json.Unmarshal(refusal.Data, &failure) != nil || failure.Retryable {
+			return fmt.Errorf("third concurrent view was not refused by the principal ceiling: %s %w", code, e)
+		}
+		if e = db.QueryRow(ctx, `SELECT count(*) FROM live_watch_control WHERE root_id=$1 AND state IN ('Active','Paused','Disconnected')`, root).Scan(&active); e != nil || active != 2 {
+			return errors.New("principal ceiling refusal changed the original views")
+		}
 		if run.BeforeFailover != nil {
 			run.BeforeFailover()
 		}
+		t.Log("installed live principal ceiling: third concurrent view refused CapacityUnavailable; React and MCP views retained")
+	}
+	closeInput := map[string]any{"watch_id": watch.ID, "expected_revision": watch.Revision, "idempotency_key": "live-close-" + source.SourceID}
+	if run.Failover {
 		installedLiveRestartOwner(t, ctx, run)
 		var recovered v.Batch
 		var r installedLiveReply
@@ -714,9 +745,20 @@ func (p *installedLiveBrowser) read(out any) {
 }
 func (p *installedLiveBrowser) begin(s installedLiveFixture) {
 	p.send(map[string]any{"kind": "observe", "source": map[string]any{"source_id": s.SourceID, "action_id": s.ActionID, "pod_uid": s.PodUID, "kind": s.Kind, "projection": s.Projection, "hard_until": installedLiveHardUntil(s.HardUntil), "forbidden": []string{manualHTTPMarker, installedLiveProducerMarker}}})
+	var opened struct {
+		Kind       string `json:"kind"`
+		Source     string `json:"source_id"`
+		Projection string `json:"projection"`
+		WatchID    string `json:"watch_id"`
+	}
+	p.read(&opened)
+	if opened.Kind != "opened" || opened.Source != s.SourceID || opened.Projection != s.Projection || opened.WatchID == "" {
+		p.t.Fatal("actual React open proof failed", opened, p.diagnostic.String())
+	}
 }
 func (p *installedLiveBrowser) finishEpisode(s installedLiveFixture) {
 	p.t.Helper()
+	p.send(map[string]any{"kind": "release"})
 	var e struct {
 		Kind, SourceID, Projection, WatchID string
 		Rows, Clear                         bool

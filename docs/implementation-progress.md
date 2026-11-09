@@ -1,5 +1,30 @@
 # Sustained implementation progress
 
+## Shared React and MCP live-view principal ceiling (2026-11-10)
+
+The installed live-observation fixture now proves that React and MCP views share one principal's two watch slots. The browser emits an explicit `opened` event and remains open until Go sends `release`; the third concurrent open with a fresh idempotency key must return `CapacityUnavailable`. Both original controls remain active, and subsequent policy episodes complete. This is test-only qualification with no production or permission change.
+
+- Guarded native `continuation-ongoing-live` run
+  [42718907496](../test/results/live-principal-ceiling-42718907496/README.md)
+  passed at `4fdb3fb2` (Go test 422.27 s, focus 146.53 s). The third open was
+  refused while React and MCP were verifiably active. The original MCP view
+  then completed owner-failover recovery and all three policy projections
+  completed their ordinary paths, with 24 bounded MCP operations and no viewer
+  acquisition.
+- The separate HTTP Save downloaded 2,945 native bytes (SHA-256
+  `8b6cdc0cc71577fb089947e40edbb9267f42b37b7129143690b8e032198fbfb1`).
+  Source hashes were unchanged, build scratch was removed and cleanup had no
+  failures. Full `make pre-push`, PR CI run 42718916862 (`ci-ok`) and Gitar
+  review passed.
+- Run 42712800039 had already passed the MCP-only ceiling, but was not used as
+  the cross-surface proof. Earlier 42710638099 exposed React closing before
+  the count, and 42715109504 exposed the open-proof mismatch. They are not
+  recorded as the final React+MCP qualification.
+
+This closes the named shared-principal ceiling path, not multi-principal or
+installation-wide overload, incident-priority or sustained-throughput
+qualification. The broader specification remains active.
+
 ## Terminal live-view owner failover (2026-11-09)
 
 [ADR-317](decisions/317-terminal-live-owner-recovery.md) and migration 00147 close a live view after original-owner route/transport loss without adopting its private source/filter session. The receiving owner verifies the original cursor against the complete principal/client and minimized control, then closes only that control. Revision, accepted/idle/hard expiry and cumulative spend are unchanged; the terminal empty batch carries a reconnect gap and no continuation. A dedicated `ErrOwnerLost` distinguishes route, dial/TLS and premature-stream failures from every reachable-owner error frame, including ordinary and transient unavailability.
