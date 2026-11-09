@@ -615,6 +615,10 @@ func (f *installedFailureRun) legHubDisconnect(api kubernetes.Interface, hubName
 			f.t.Fatal("installed disconnect leg: regional completion never committed", err)
 		}
 	}
+	var executionPhase string
+	if err := f.admin.QueryRow(commitWait, `SELECT phase FROM context_execution WHERE root_id=$1 AND capture_id=$2::uuid`, f.root, captureID).Scan(&executionPhase); err != nil || executionPhase != "started" {
+		f.t.Fatal("installed disconnect leg: regional completion was recorded before the kill", executionPhase, err)
+	}
 	installedHubSettled(f.t, f.ctx, api, hubNamespace, restarts)
 	originalCode, _ := f.requestReply(<-response)
 	f.t.Logf("installed disconnect leg: original public operation resolved %s", originalCode)
@@ -627,7 +631,20 @@ func (f *installedFailureRun) legHubDisconnect(api kubernetes.Interface, hubName
 	if _, executions, attempts := f.counts(captureID); executions > 1 || attempts != 1 {
 		f.t.Fatal("installed disconnect leg: collection was repeated after the reconnect", executions, attempts)
 	}
-	progress := f.waitPhase("a terminal disconnected capture", captureID, deadline.Add(90*time.Second), "Indeterminate")
+	deadlineWait, endDeadline := context.WithDeadline(f.ctx, deadline.Add(75*time.Second))
+	defer endDeadline()
+	for {
+		var observed bool
+		err := f.admin.QueryRow(deadlineWait, `SELECT deadline_observed_at IS NOT NULL FROM context_capture WHERE root_id=$1 AND id=$2::uuid`, f.root, captureID).Scan(&observed)
+		if err == nil && observed {
+			break
+		}
+		if installedJourneyPause(deadlineWait, 2*time.Second) != nil {
+			progress, ok := f.progress(f.ctx, captureID)
+			f.t.Fatalf("installed disconnect leg: original deadline was never observed (capture %s, progress %+v, readable %t): %v", captureID, progress, ok, err)
+		}
+	}
+	progress := f.waitPhase("a terminal disconnected capture", captureID, time.Now().Add(45*time.Second), "Indeterminate")
 	reason := installedFailureReason(progress)
 	if reason != "DeadlineOutcomeUnconfirmed" {
 		f.t.Fatal("installed disconnect leg: wrong indeterminate reason", reason)
