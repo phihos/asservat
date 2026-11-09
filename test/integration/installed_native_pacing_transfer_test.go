@@ -155,6 +155,15 @@ func qualifyInstalledNativePacing(t *testing.T, ctx context.Context, m *nativePa
 	if !suspended {
 		t.Fatal("paced response never reached its permission-suspension byte")
 	}
+	// The source observer may clear a direct SQL suspension while the long
+	// response runs. Reapply and verify it at the fresh admission boundary.
+	if _, err := m.admin.Exec(ctx, "UPDATE permission_stream SET suspended=true WHERE id=$1", m.root); err != nil {
+		t.Fatal("suspend fresh preparation permission projection", err)
+	}
+	var stillSuspended bool
+	if err := m.admin.QueryRow(ctx, "SELECT suspended FROM permission_stream WHERE id=$1", m.root).Scan(&stillSuspended); err != nil || !stillSuspended {
+		t.Fatal("fresh preparation suspension was not retained", stillSuspended, err)
+	}
 	refused, code := invoke("prepare_artifact_download", map[string]string{"artifact_id": artifactID, "idempotency_key": "installed-native-suspended-start"})
 	if code != "NotAvailable" || refused.Status != "error" {
 		t.Fatal("suspended permission allowed a new download response", code, refused.Status)
