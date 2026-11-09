@@ -256,7 +256,7 @@ func (s *NativeAttachment) open(ctx context.Context, r ContextDownloadRequest, k
 				return artifact.ErrDownloadUnavailable
 			}
 			c.Origins.Recent.put(nativeObservationKey{operation.Reference, currentOrigin.Proof.Peer}, renewed, c.Now())
-			check, delivery = observed.Check, l
+			check, delivery = registrationBoundCheck(observed, r), l
 			return nil
 		}
 	}
@@ -297,6 +297,10 @@ func (s *NativeAttachment) currentAuthority(ctx context.Context, current identit
 	if e != nil {
 		return nil, e
 	}
+	return registrationBoundCheck(check, r), nil
+}
+
+func registrationBoundCheck(check *workerCurrentCheck, r ContextDownloadRequest) NativePreparationCheck {
 	return func(call context.Context) (artifact.DownloadAuthority, error) {
 		a, e := check.Check(call)
 		if e != nil {
@@ -306,5 +310,5 @@ func (s *NativeAttachment) currentAuthority(ctx context.Context, current identit
 			return artifact.DownloadAuthority{}, artifact.ErrDownloadUnavailable
 		}
 		return a, nil
-	}, nil
+	}
 }

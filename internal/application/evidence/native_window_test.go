@@ -508,6 +508,11 @@ func testNativeResponseRenewal(t *testing.T, composed, checked bool, mode string
 	if err = source.AcknowledgeNativeChunk(t.Context(), third, 17, 7); err != nil {
 		t.Fatal(err)
 	}
+	changedStore := third
+	changedStore.Authority.Environment.StoreID = "replacement-store"
+	if _, err = read(t.Context(), f.f, changedStore, 17, 7); err == nil {
+		t.Fatal("renewed check accepted a different artifact store")
+	}
 	wantAuthorityChecks := 3
 	if composed {
 		wantAuthorityChecks++
