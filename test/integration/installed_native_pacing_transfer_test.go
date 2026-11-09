@@ -172,6 +172,20 @@ func qualifyInstalledNativePacing(t *testing.T, ctx context.Context, m *nativePa
 		t.Fatal("restore pacing permission projection", err)
 	}
 	suspended = false
+	restoredUntil := time.Now().Add(30 * time.Second)
+	for {
+		var restored bool
+		err := m.admin.QueryRow(ctx, "SELECT coalesce(NOT suspended AND initial_audit_id IS NOT NULL AND fresh_until>clock_timestamp() AND lease_until>clock_timestamp(),false) FROM permission_stream WHERE id=$1", m.root).Scan(&restored)
+		if err == nil && restored {
+			break
+		}
+		if time.Now().After(restoredUntil) {
+			t.Fatal("restored permission projection did not become fresh", restored, err)
+		}
+		if err := installedJourneyPause(ctx, 100*time.Millisecond); err != nil {
+			t.Fatal(err)
+		}
+	}
 	pacedPhase := m.Phases[len(m.Phases)-1]
 	if pacedPhase.Name != "paced" {
 		t.Fatal("paced measurement phase missing")
