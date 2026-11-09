@@ -540,10 +540,9 @@ func (f *installedFailureRun) legCapacityUnavailable() {
 	f.t.Logf("installed failure journey: after %d retained admissions the workload's context reserve refused request_capture CapacityUnavailable with no capture in flight", len(accepted))
 }
 
-// installedPauseHubWorker freezes the exact owned hub-worker process without
-// terminating it. The caller must kill the returned process after the regional
-// commit; a stopped process cannot receive the completion reply.
-func installedPauseHubWorker(t *testing.T, ctx context.Context, api kubernetes.Interface, namespace, deployment string) (string, string) {
+// installedHubWorkerProcess locates the exact owned process before a capture
+// starts, so pausing it later needs only one kill syscall on the owned node.
+func installedHubWorkerProcess(t *testing.T, ctx context.Context, api kubernetes.Interface, namespace, deployment string) (string, string) {
 	t.Helper()
 	pods, err := api.CoreV1().Pods(namespace).List(ctx, meta.ListOptions{LabelSelector: installerWorkerSelector(t, ctx, api, namespace, deployment)})
 	if err != nil || len(pods.Items) != 1 || len(pods.Items[0].Status.ContainerStatuses) != 1 {
@@ -576,11 +575,7 @@ func installedPauseHubWorker(t *testing.T, ctx context.Context, api kubernetes.I
 	if json.Unmarshal(raw, &inspected) != nil || inspected.Info.PID <= 1 || err != nil {
 		t.Fatal("lost-reply hub-worker process", err)
 	}
-	pid := strconv.Itoa(inspected.Info.PID)
-	if err = installedRun(ctx, installedDockerTimeout, "docker", "exec", node, "kill", "-STOP", pid); err != nil {
-		t.Fatal("lost-reply hub-worker pause", err)
-	}
-	return node, pid
+	return node, strconv.Itoa(inspected.Info.PID)
 }
 
 // legHubDisconnect freezes the hub-worker before the regional store commits,
@@ -588,6 +583,8 @@ func installedPauseHubWorker(t *testing.T, ctx context.Context, api kubernetes.I
 // never repeats collection or imports the committed regional result.
 func (f *installedFailureRun) legHubDisconnect(api kubernetes.Interface, hubNamespace, workerDeployment string) {
 	f.t.Helper()
+	restarts := installedHubRestarts(f.t, f.ctx, api, hubNamespace)
+	node, process := installedHubWorkerProcess(f.t, f.ctx, api, hubNamespace, workerDeployment)
 	previewID, _, captureID, deadline := f.preview()
 	key := f.keys + "-disconnect"
 	code, got := f.request(previewID, key)
@@ -602,12 +599,13 @@ func (f *installedFailureRun) legHubDisconnect(api kubernetes.Interface, hubName
 		if err == nil && phase == "started" {
 			break
 		}
-		if installedJourneyPause(startWait, 250*time.Millisecond) != nil {
+		if installedJourneyPause(startWait, time.Millisecond) != nil {
 			f.t.Fatal("installed disconnect leg: no in-flight start before the pause", err)
 		}
 	}
-	restarts := installedHubRestarts(f.t, f.ctx, api, hubNamespace)
-	node, process := installedPauseHubWorker(f.t, f.ctx, api, hubNamespace, workerDeployment)
+	if err := installedRun(f.ctx, installedDockerTimeout, "docker", "exec", node, "kill", "-STOP", process); err != nil {
+		f.t.Fatal("lost-reply hub-worker pause", err)
+	}
 	paused := true
 	f.t.Cleanup(func() {
 		if !paused {
