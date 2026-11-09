@@ -2,6 +2,7 @@ package integration
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -111,6 +112,11 @@ func qualifyNativeOwnerRenewal(t *testing.T, ctx context.Context, f nativeExchan
 	}
 	if _, err := owners.RenewNativeOperation(ctx, o.Reference, a, peer); err == nil {
 		t.Fatal("same sequence replay renewed twice")
+	} else {
+		var step interface{ FixedStep() string }
+		if !errors.As(err, &step) || step.FixedStep() != "native-renew-owner" {
+			t.Fatal("transaction discarded the native renewal stage", err)
+		}
 	}
 	if err := owners.CompleteNativeOperation(ctx, observed); err != nil {
 		t.Fatal("close renewed native owner", err)

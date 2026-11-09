@@ -161,6 +161,10 @@ func (l *Ledger) transaction(ctx context.Context, f func(*custodydb.Queries) err
 			authapp.ErrGrantConflict, authapp.ErrGrantNotFound, authvalue.ErrGrantInvalid, authvalue.ErrGrantNotPending, authvalue.ErrSelfApproval,
 			authvalue.ErrGrantPoolExhausted, authvalue.ErrGrantScope, authvalue.ErrGrantRevoked, authvalue.ErrGrantExpired, authvalue.ErrGrantDenied, authvalue.ErrStepUpRequired} {
 			if errors.Is(err, sentinel) {
+				var named interface{ FixedStep() string }
+				if errors.As(err, &named) {
+					return err
+				}
 				return sentinel
 			}
 		}
@@ -181,6 +185,10 @@ func (l *Ledger) transaction(ctx context.Context, f func(*custodydb.Queries) err
 		}
 		for _, sentinel := range []error{fleetvalue.ErrCapacity, fleetvalue.ErrConflict, fleetvalue.ErrPending, fleetvalue.ErrInvalid, fleetvalue.ErrDenied, fleetvalue.ErrUnavailable, capturevalue.ErrSettingsUnavailable, capturevalue.ErrSettingsTooLarge, capturevalue.ErrHistoryUnavailable, capturevalue.ErrStorageBindingExpired, capturevalue.ErrInvalid, capturevalue.ErrSharingDenied, capturevalue.ErrDenied, capturevalue.ErrChanged, capturevalue.ErrUnavailable, capturevalue.ErrCapacity, capturevalue.ErrProcessingCoverage, capturevalue.ErrConflict, artifact.ErrInvalid, artifact.ErrIntegrity, artifact.ErrLimit, artifact.ErrDownloadConflict, artifact.ErrDownloadUnavailable, artifact.ErrDownloadCapacity, artifact.ErrDownloadExpired, privacy.ErrConflict, privacy.ErrCapacity, privacy.ErrExpired, privacy.ErrFence, privacy.ErrNotDue, configuration.ErrInvalid, configuration.ErrChanged, configuration.ErrLimit, configuration.ErrDenied, configuration.ErrUnavailable, configuration.ErrRetentionHistoryBehind, configuration.ErrRetentionObservationObsolete, fleetvalue.ErrClusterCredentialDenied, fleetvalue.ErrClusterCredentialFenced} {
 			if errors.Is(err, sentinel) {
+				var named interface{ FixedStep() string }
+				if errors.As(err, &named) {
+					return err
+				}
 				return sentinel
 			}
 		}
