@@ -1,5 +1,25 @@
 # Sustained implementation progress
 
+## Installed HTTP-header query (2026-11-09)
+
+ADR-282 slice 5's already-composed `get_http_headers` path is now
+installed-qualified. No product or test code changed in this evidence slice.
+
+- Guarded native `continuation-manual-http` run 42541295943 at `ebf77dcf`
+  passed (Go test 466.078 s). The capture produced 21 approved HTTP/1 records;
+  three MCP pages returned all 21 with records, counters, gaps, digest and
+  cursors equal to `httpheaders.ReadPage` on the downloaded bytes. A foreign
+  cursor returned `InvalidCursor`. The artifact records
+  `sourceUnchangedDuringTest: true`, `buildScratchRemoved: true` and no cleanup
+  failures.
+- Local baseline passed `TestInstalledManualHTTPRequestCompiles`,
+  `TestInstalledManualHTTPProjectionFields`, and the complete
+  `internal/adapters/httpheaders`, `internal/application/analysis` and
+  `internal/transport/presentation` package tests. The collector focus ran only
+  on the guarded disposable GitHub runner, never on the workstation.
+- This closes TASK-08's explicit installed manual-http read gap, not the wider
+  HTTP/CNI matrices or other analysis workflows.
+
 ## Installed S-02 failure-state exits (2026-11-09)
 
 Test/CI qualification only; product behavior, contracts, authority and deadlines

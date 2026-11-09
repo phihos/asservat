@@ -256,13 +256,15 @@ frame, charged as two accepted query units; no SQL row or profile added.
 composition. 11. A synchronous read without the ledger would bypass the
 query accounting and worker key custody.
 
-Remaining: the installed manual-http focus now reads up to three pages over
-MCP and compares them with `httpheaders.ReadPage` on the downloaded bytes
-(not yet run natively); real-PostgreSQL admission of an extract query (its
-two-unit charge through the guards) is covered only by the function checks
-of the upgrade test and the native focus; worker transient memory for one
-page (about three frame-sized buffers) is within the 256 MiB Job limit but
-above the profile's declared 8 MiB per unit.
+Installed qualification: native run 42541295943 at `ebf77dcf` passed the
+manual-http focus. Its 21 records arrived over three MCP pages, every field
+and gap counter matched `httpheaders.ReadPage` on the downloaded bytes, and a
+foreign cursor returned `InvalidCursor`; sources stayed unchanged and fixture
+cleanup passed. Real-PostgreSQL admission of an extract query (its two-unit
+charge through the guards) is covered by the function checks of the upgrade
+test and this native focus. Worker transient memory for one page (about three
+frame-sized buffers) is within the 256 MiB Job limit but above the profile's
+declared 8 MiB per unit.
 
 The live acquisition worker caps (16 per installation, two per workload and
 two per principal, shared with downloads) count a projection worker until its
