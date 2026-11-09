@@ -1,0 +1,6 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/overdue-observation-is-durable-once-and-never-refunds
+--- PASS: TestContextAdmissionWithRealServices (1.96s)
+    --- PASS: TestContextAdmissionWithRealServices/overdue-observation-is-durable-once-and-never-refunds (1.58s)
+PASS
+ok  	asservat.local/asservat/test/integration	3.021s

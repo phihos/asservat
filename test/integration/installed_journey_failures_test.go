@@ -37,20 +37,17 @@ import (
 //     CapacityUnavailable, including once no capture is in flight.
 //
 // Focus journey-start-failure:
-//   - a hub-worker crash during an accepted capture never repeats the
-//     collection (ADR-223): one admission, at most one execution and one
-//     custody attempt, a replayed request names the original capture and the
-//     capture resolves terminal (Succeeded, or Indeterminate once the
-//     original deadline passes with the completion reply lost);
+//   - a lost completion after regional custody commit never repeats collection
+//     (ADR-223): one admission/execution/custody attempt, replay names the
+//     original capture and its original deadline ends it Indeterminate;
 //   - a key-service failure before the start leaves the capture Pending until
 //     its original deadline marks it Indeterminate/DeadlineOutcomeUnconfirmed;
 //     it never starts afterwards either.
 //
-// Faults touch only owned fixtures: one scoped bucket-policy statement armed
-// and exactly restored like the deletion fault, the owned kind node's kubelet
-// restart of the hub-worker container (installerCrashHubWorker) and a network
-// disconnect of the owned OpenBao dev container (never a stop: dev mode keeps
-// all keys in memory). Nothing weakens authorization, custody or deadlines.
+// Faults touch only owned fixtures: one scoped bucket-policy statement, one
+// exact completion-transition trigger and a network disconnect of the owned
+// OpenBao dev container (never a stop: dev mode keeps all keys in memory).
+// Nothing weakens authorization, custody or deadlines.
 
 const installedStoreFaultSID = "DenyInstalledJourneyAttemptStore"
 
@@ -412,7 +409,7 @@ func qualifyInstalledJourneyFailures(t *testing.T, ctx context.Context, admin *p
 		run.legStoreUnconfirmed(providers, evidenceBucket)
 		run.legCapacityUnavailable()
 	case "journey-start-failure":
-		run.legHubDisconnect(api, hubNamespace, workerDeployment)
+		run.legCompletionLost(providers, evidenceBucket)
 		run.legKeyServiceDown()
 	default:
 		t.Fatal("unknown failure focus", installedJourneyFocus())
@@ -538,49 +535,107 @@ func (f *installedFailureRun) legCapacityUnavailable() {
 	f.t.Logf("installed failure journey: after %d retained admissions the workload's context reserve refused request_capture CapacityUnavailable with no capture in flight", len(accepted))
 }
 
-// legHubDisconnect: the hub-worker is crashed on its owned kind node while an
-// accepted capture runs. Reconnection never repeats the collection (ADR-223):
-// one admission, at most one execution, one custody attempt; the replayed
-// request names the original capture; the capture resolves terminal (a lost
-// completion reply ends Indeterminate at the original deadline, never a
-// second collection; a delivered reply ends Succeeded).
-func (f *installedFailureRun) legHubDisconnect(api kubernetes.Interface, hubNamespace, workerDeployment string) {
+// legCompletionLost rejects only the hub's durable stored transition after the
+// region committed its four ciphertext objects. This deterministically
+// exercises the lost-reply state (ADR-223) without racing a process kill.
+// Replay never repeats collection or imports the committed regional result.
+func (f *installedFailureRun) legCompletionLost(providers *initialRuntimeNativeProviders, evidenceBucket string) {
 	f.t.Helper()
-	previewID, _, captureID, deadline := f.preview()
+	store := s3.New(s3.Options{Region: providers.desired.AuditStore.Region, BaseEndpoint: aws.String(providers.desired.AuditStore.Endpoint), UsePathStyle: true,
+		Credentials: credentials.NewStaticCredentialsProvider("synthetic-only", "synthetic-only-secret", ""), HTTPClient: providers.client, RetryMaxAttempts: 1})
+	previewID, loc, captureID, deadline := f.preview()
+	dropCompletionFault := func(ctx context.Context) error {
+		_, err := f.admin.Exec(ctx, `DROP TRIGGER IF EXISTS fixture_lost_completion ON context_execution; DROP FUNCTION IF EXISTS fixture_lost_completion();`)
+		return err
+	}
+	f.t.Cleanup(func() {
+		cleanup, end := context.WithTimeout(context.Background(), 10*time.Second)
+		defer end()
+		if err := dropCompletionFault(cleanup); err != nil {
+			f.t.Errorf("installed disconnect leg: restore completion guard: %v", err)
+		}
+	})
+	setup, endSetup := context.WithTimeout(f.ctx, 10*time.Second)
+	_, err := f.admin.Exec(setup, fmt.Sprintf(`CREATE FUNCTION fixture_lost_completion() RETURNS trigger
+LANGUAGE plpgsql SET search_path=pg_catalog,pg_temp AS $$
+BEGIN
+ IF NEW.root_id='%s'::uuid AND NEW.capture_id='%s'::uuid AND OLD.phase='started' AND NEW.phase='stored' THEN
+  RAISE EXCEPTION 'fixture lost regional completion reply' USING ERRCODE='55000';
+ END IF;
+ RETURN NEW;
+END;
+$$;
+CREATE TRIGGER fixture_lost_completion BEFORE UPDATE ON context_execution
+FOR EACH ROW EXECUTE FUNCTION fixture_lost_completion();`, f.root, captureID))
+	endSetup()
+	if err != nil {
+		f.t.Fatal("installed disconnect leg: install completion loss", err)
+	}
 	key := f.keys + "-disconnect"
-	code, got := f.request(previewID, key)
-	if code != "" || got != captureID {
-		f.t.Fatal("installed disconnect leg: request not admitted once", code, got, captureID)
+	response := f.startRequest(previewID, key)
+	originalCode, _ := f.requestReply(<-response)
+	f.t.Logf("installed disconnect leg: original public operation resolved %s", originalCode)
+	if originalCode == "" {
+		f.t.Fatal("installed disconnect leg: completion loss returned success")
 	}
-	// Crash once the start is durably recorded (or the capture has already
-	// passed it), so the outage intersects the regional completion path.
-	startWait, end := context.WithTimeout(f.ctx, 60*time.Second)
-	defer end()
-	for {
-		var phase string
-		err := f.admin.QueryRow(startWait, `SELECT phase FROM context_execution WHERE root_id=$1 AND capture_id=$2::uuid`, f.root, captureID).Scan(&phase)
-		if err == nil && phase != "prepared" {
-			break
-		}
-		if installedJourneyPause(startWait, 250*time.Millisecond) != nil {
-			f.t.Fatal("installed disconnect leg: no recorded start before the crash", err)
+	phaseRead, endPhase := context.WithTimeout(f.ctx, 10*time.Second)
+	var executionPhase, custodyState string
+	err = f.admin.QueryRow(phaseRead, `SELECT e.phase,a.state FROM context_execution e JOIN context_capture c ON c.root_id=e.root_id AND c.id=e.capture_id JOIN custody_attempt a ON a.id=c.attempt_id WHERE e.root_id=$1 AND e.capture_id=$2::uuid`, f.root, captureID).Scan(&executionPhase, &custodyState)
+	endPhase()
+	if err != nil {
+		f.t.Fatal("installed disconnect leg: execution/custody state unreadable after completion loss", err)
+	}
+	if executionPhase != "started" || custodyState != "reserved" {
+		f.t.Fatal("installed disconnect leg: wrong unrecorded completion state", executionPhase, custodyState)
+	}
+	objectRead, endObjects := context.WithTimeout(f.ctx, 10*time.Second)
+	prefix := loc.Prefix()
+	objects, err := store.ListObjectsV2(objectRead, &s3.ListObjectsV2Input{Bucket: &evidenceBucket, Prefix: &prefix, MaxKeys: aws.Int32(4)})
+	endObjects()
+	count := 0
+	if objects != nil {
+		count = len(objects.Contents)
+	}
+	if err != nil || objects == nil || aws.ToBool(objects.IsTruncated) || count != 4 {
+		f.t.Fatal("installed disconnect leg: regional ciphertext inventory incomplete", count, err)
+	}
+	want := map[string]bool{prefix + "data": true, prefix + "index": true, prefix + "manifest": true, prefix + "commit": true}
+	for _, object := range objects.Contents {
+		if object.Key == nil || !want[*object.Key] {
+			f.t.Fatal("installed disconnect leg: unexpected regional ciphertext object", object.Key)
 		}
 	}
-	restarts := installedHubRestarts(f.t, f.ctx, api, hubNamespace)
-	installerCrashHubWorker(f.t, f.ctx, api, hubNamespace, workerDeployment)
-	installedHubSettled(f.t, f.ctx, api, hubNamespace, restarts)
-	// The reconnected hub replays the original request passively: same capture,
-	// no new admission, execution or attempt.
+	restore, endRestore := context.WithTimeout(f.ctx, 10*time.Second)
+	err = dropCompletionFault(restore)
+	endRestore()
+	if err != nil {
+		f.t.Fatal("installed disconnect leg: remove completion loss", err)
+	}
+	// The hub replays the original request passively: same capture, no new
+	// admission, execution or attempt.
 	f.resolveAccepted(previewID, key, captureID)
 	if code, again := f.request(previewID, key); code != "" || again != captureID {
 		f.t.Fatal("installed disconnect leg: replayed request did not return the original capture", code, again, captureID)
 	}
 	if _, executions, attempts := f.counts(captureID); executions > 1 || attempts != 1 {
-		f.t.Fatal("installed disconnect leg: collection was repeated after the reconnect", executions, attempts)
+		f.t.Fatal("installed disconnect leg: collection was repeated after completion loss", executions, attempts)
 	}
-	progress := f.waitPhase("a terminal disconnected capture", captureID, deadline.Add(90*time.Second), "Succeeded", "Indeterminate")
+	deadlineWait, endDeadline := context.WithDeadline(f.ctx, deadline.Add(75*time.Second))
+	defer endDeadline()
+	for {
+		var observed bool
+		err := f.admin.QueryRow(deadlineWait, `SELECT deadline_observed_at IS NOT NULL FROM context_capture WHERE root_id=$1 AND id=$2::uuid`, f.root, captureID).Scan(&observed)
+		if err == nil && observed {
+			break
+		}
+		if installedJourneyPause(deadlineWait, 2*time.Second) != nil {
+			progress, ok := f.progress(f.ctx, captureID)
+			f.t.Fatalf("installed disconnect leg: original deadline was never observed (capture %s, progress %+v, readable %t): %v", captureID, progress, ok, err)
+		}
+	}
+	progress := f.waitPhase("a terminal disconnected capture", captureID, time.Now().Add(45*time.Second), "Indeterminate")
 	reason := installedFailureReason(progress)
-	if progress.Phase == "Indeterminate" && reason != "DeadlineOutcomeUnconfirmed" {
+	if reason != "DeadlineOutcomeUnconfirmed" {
 		f.t.Fatal("installed disconnect leg: wrong indeterminate reason", reason)
 	}
 	// One deadline-observer sweep later the outcome and cardinality stand.
@@ -593,7 +648,7 @@ func (f *installedFailureRun) legHubDisconnect(api kubernetes.Interface, hubName
 	if after, ok := f.progress(f.ctx, captureID); !ok || after.Phase != progress.Phase {
 		f.t.Fatal("installed disconnect leg: terminal outcome changed", progress.Phase, after.Phase)
 	}
-	f.t.Logf("installed failure journey: hub-worker crash during capture %s resolved %s (%s); the reconnected hub never repeated the collection", captureID, progress.Phase, reason)
+	f.t.Logf("installed failure journey: capture %s committed regional custody but its completion was not recorded; the result was not imported and the capture resolved Indeterminate (%s) without another collection", captureID, reason)
 }
 
 // legKeyServiceDown disconnects the owned OpenBao container after the public

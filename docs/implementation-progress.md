@@ -1,5 +1,36 @@
 # Sustained implementation progress
 
+## Installed completion-loss and pre-start deadline recovery (2026-11-09)
+
+[ADR-223](decisions/223-lost-regional-completion-reply.md) now has installed
+qualification for its durable unrecorded-completion state and the separate
+pre-start KMS failure. No production behavior changed in this slice; the fixture
+was simplified after process-kill attempts proved too racy for a small capture.
+
+- Guarded native `continuation-journey-start-failure` run
+  [42630012490](../test/results/lost-completion-native-42630012490/README.md)
+  passed at `20e56205`: Go test 611.45 s, focus 331.58 s. A scoped trigger
+  rejected only the exact `started → stored` transition after all four regional
+  ciphertext objects committed. Execution stayed `started`, custody `reserved`,
+  and the public operation returned `OutcomeUnknown`.
+- Passive resolution/replay named the original capture with one admission, at
+  most one execution and one custody attempt. The result was not imported and
+  collection was not repeated. The installed deadline observer then produced
+  stable `Indeterminate/DeadlineOutcomeUnconfirmed`. This qualifies recovery,
+  not a separate TCP packet-loss timing measurement.
+- The KMS leg returned `OutcomeUnknown` after its audited Begin, remained
+  `Pending` after reconnection with zero executions, and reached the same
+  terminal reason at its original deadline. KMS connectivity was restored.
+- The [targeted real-SQL observer run](../test/results/lost-completion-sql.log)
+  passed (3.021 s), including concurrent once-only observation through both the
+  original and installed cleanup roles, denied history rewrites and retained
+  charges. A separate full `custody-integration` run also passed this subtest but
+  failed unrelated profile, publication and download rollback checks; it is not
+  recorded as a full-suite pass and those paths were not changed here.
+- The artifact records unchanged sources, removed build scratch and no cleanup
+  failures. Full `make pre-push`, eligible PR CI run 42630023231 (`ci-ok`) and
+  Gitar review passed before this documentation checkpoint.
+
 ## Installed live observation policy and manual paths (2026-11-09)
 
 ADR-310's accepted live workflow now has installed qualification for all three
