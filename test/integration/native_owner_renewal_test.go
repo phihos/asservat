@@ -71,11 +71,18 @@ func qualifyNativeOwnerRenewal(t *testing.T, ctx context.Context, f nativeExchan
 	if _, err := owners.ObserveNativeOperation(ctx, o.Reference, peer); err == nil {
 		t.Fatal("expired original observation remained usable")
 	}
-	a = f.authority()
-	second, err := f.runtime.LeaseDownloadResponse(ctx, session.ID, responseID, ownerID, windowID, a)
-	if err != nil || second.Sequence <= first.Sequence {
-		t.Fatal("new delivery lease", err)
+	continued, ok := a.Continue(time.Now(), response.Until)
+	if !ok {
+		t.Fatal("continued response authority unavailable")
 	}
+	if _, err := f.admin.Exec(ctx, "UPDATE permission_stream SET suspended=true WHERE id=$1", session.Scope.RootID); err != nil {
+		t.Fatal("suspend renewal permissions", err)
+	}
+	second, err := f.runtime.LeaseDownloadResponse(ctx, session.ID, responseID, ownerID, windowID, continued)
+	if err != nil || second.Sequence <= first.Sequence {
+		t.Fatal("new delivery lease after permission suspension", err)
+	}
+	a = continued
 	foreign := peer
 	foreign.PeerID = custodyID()
 	if _, err := owners.RenewNativeOperation(ctx, o.Reference, a, foreign); err == nil {
@@ -92,8 +99,11 @@ func qualifyNativeOwnerRenewal(t *testing.T, ctx context.Context, f nativeExchan
 		t.Fatal("changed processing state renewed the original operation")
 	}
 	l, err := owners.RenewNativeOperation(ctx, o.Reference, a, peer)
+	if _, restoreErr := f.admin.Exec(ctx, "UPDATE permission_stream SET suspended=false WHERE id=$1", session.Scope.RootID); restoreErr != nil {
+		t.Fatal("restore renewal permissions", restoreErr)
+	}
 	if err != nil || !l.Valid(time.Now()) || !l.Operation.Equal(o) || l.Sequence != second.Sequence || l.Until.After(o.Until) {
-		t.Fatal("fresh native renewal changed the original operation or deadline", err)
+		t.Fatal("fresh native renewal after permission suspension changed the original operation or deadline", err)
 	}
 	observed, err := owners.ObserveNativeOperation(ctx, o.Reference, peer)
 	if err != nil || observed.Sequence != second.Sequence || !observed.Operation.Equal(o) {
