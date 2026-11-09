@@ -249,11 +249,10 @@ def main(fleet=False, test_pattern=None, database_recovery=False, initial_instal
             # individual authority/provider/retention deadline changes.
             # The unselected local full suite then reached 900 seconds as well
             # (context admission 806.77 seconds, the 256 MiB custody case still
-            # running; 2026-10-27). CI runs CUSTODY_SHARDS (each at most about
-            # 520 seconds of tests) under the 900-second limit; only the local
-            # full run gets 1050 seconds, keeping it within 20 minutes.
+            # running; 2026-10-27). Full and targeted aggregate runs get 1050
+            # seconds, keeping them within 20 minutes; CI shards stay far below it.
             full_custody = not (fleet or initial_installation or database_recovery or connector_retirement or scoped_audit or owner_audit_inventory)
-            test_timeout = 2400 if connector_retirement else ((900 if test_pattern else 1050) if full_custody else 300)
+            test_timeout = 2400 if connector_retirement else (1050 if full_custody else 300)
             report["connectorRetirementRealtime"] = connector_retirement
             report["goTestTimeoutSeconds"] = test_timeout
             report["harnessTestTimeoutSeconds"] = test_timeout + 60

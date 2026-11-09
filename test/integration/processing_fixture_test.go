@@ -150,6 +150,10 @@ func newProcessingTestFixture(t *testing.T, ctx context.Context, poolFor func(st
 			}
 		}
 		if err != nil {
+			var count int
+			var names string
+			_ = normalPool.QueryRow(ctx, `SELECT count(*),coalesce(string_agg(DISTINCT usename||'@'||application_name,','),'') FROM pg_stat_activity WHERE datname=current_database()`).Scan(&count, &names)
+			t.Logf("processing audit construction: PostgreSQL connections=%d applications=%s", count, names)
 			t.Fatal(err)
 		}
 		objects, err := objectstore.NewClosedOperationAuditObjects(store, p.StoreID, keys, keys)

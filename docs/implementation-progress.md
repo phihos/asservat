@@ -1,5 +1,26 @@
 # Sustained implementation progress
 
+## Custody fixture rollback and connection qualification (2026-11-09)
+
+The complete context-admission fixture passes again after concrete rollback,
+connection-lifecycle and start-window failures. This is a fixture-only change;
+production behavior, authority and deadlines are unchanged.
+
+- Rollback probes recognize migration 145's retained 30-second API start
+  bindings, so shared-fixture order no longer reports the valid newer guard as
+  an unexpected failure.
+- Joined publication bursts and shared parent/retention/recovery pools reset
+  idle connections. Lifecycle role pools reset before pending reads, absence
+  acknowledgement, finalization and history release. Pools are capped at eight
+  connections; the 48-slot server and concurrent checks remain unchanged.
+- The recording start fixture uses ADR-311's 30-second target/capability/process
+  observations and refreshes the separate five-second permission observation
+  immediately before preparation.
+- [Complete real-SQL evidence](../test/results/custody-fixtures-complete-verification/README.md):
+  877.834 s, unchanged sources, removed build scratch and no cleanup failures.
+  The targeted recording case also passes. Full `make pre-push` passes,
+  including the affected integration suite and all 611 console tests.
+
 ## Installed completion-loss and pre-start deadline recovery (2026-11-09)
 
 [ADR-223](decisions/223-lost-regional-completion-reply.md) now has installed

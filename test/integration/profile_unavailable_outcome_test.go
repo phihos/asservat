@@ -100,13 +100,22 @@ func refuseRetainedProfileUnavailableDowngrade(t *testing.T, ctx context.Context
 		}
 		grants(cleanup)
 	}()
-	if _, err := provider.DownTo(ctx, 134); err == nil || !strings.Contains(err.Error(), "retained profile-unavailable execution prevents rollback") {
+	expected, refusal := int64(135), "retained profile-unavailable execution prevents rollback"
+	if head >= 145 {
+		var retained bool
+		if err := admin.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM context_execution WHERE not_after>not_before+interval '5 seconds')").Scan(&retained); err != nil {
+			t.Fatal(err)
+		}
+		if retained {
+			expected, refusal = 145, "API start bindings beyond five seconds prevent downgrade"
+		}
+	}
+	if _, err := provider.DownTo(ctx, 134); err == nil || !strings.Contains(err.Error(), refusal) {
 		t.Fatal("retained new terminal phase did not refuse rollback", err)
 	}
-	// Goose downs one migration per transaction: every migration after 135
-	// downs first (their own Downs carry no retained-state refusal), then 135
-	// refuses and stays applied. The deferred UpTo restores the original head.
-	if after, err := provider.GetDBVersion(ctx); err != nil || after != 135 {
-		t.Fatal("refused downgrade did not stop at migration 135", after, head, err)
+	// Goose downs one migration per transaction: every migration after the
+	// retained guard downs first, then that guard refuses and stays applied.
+	if after, err := provider.GetDBVersion(ctx); err != nil || after != expected {
+		t.Fatal("refused downgrade stopped at the wrong migration", after, expected, head, err)
 	}
 }

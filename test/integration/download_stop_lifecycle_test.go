@@ -40,8 +40,15 @@ func qualifyDownloadStopLifecycle(t *testing.T, ctx context.Context, admin *pgxp
 			objects                              *objectstore.DownloadStopCleanupObjects
 			verifyObjects                        *objectstore.DownloadStopCleanupVerifier
 			cleanupPool, verifyPool, finalPool   *pgxpool.Pool
+			pendingPool                          *pgxpool.Pool
 			pending                              *postgres.DownloadStops
 			horizon                              int64
+		}
+		reset := func(g *group) {
+			g.cleanupPool.Reset()
+			g.verifyPool.Reset()
+			g.finalPool.Reset()
+			g.pendingPool.Reset()
 		}
 		var groups []*group
 		// Both histories share the same actual end, so the fixture waits once through
@@ -134,7 +141,7 @@ func qualifyDownloadStopLifecycle(t *testing.T, ctx context.Context, admin *pgxp
 			if h == 2 {
 				qualifyStopBackingExpiryAfterLock(t, ctx, admin, ledger, config, current(), backing, scope, deadline)
 			}
-			g := &group{scenario: scenario, allocation: allocation, writer: facet(producerPool), cleanup: facet(cleanupPool), verifier: facet(verifyPool), finalizer: facet(finalPool), cleanupPool: cleanupPool, verifyPool: verifyPool, finalPool: finalPool, horizon: h}
+			g := &group{scenario: scenario, allocation: allocation, writer: facet(producerPool), cleanup: facet(cleanupPool), verifier: facet(verifyPool), finalizer: facet(finalPool), cleanupPool: cleanupPool, verifyPool: verifyPool, finalPool: finalPool, pendingPool: producerPool, horizon: h}
 			stops, e := postgres.NewDownloadStops(ctx, stopPool, root)
 			if e != nil {
 				t.Fatal(e)
@@ -243,6 +250,9 @@ func qualifyDownloadStopLifecycle(t *testing.T, ctx context.Context, admin *pgxp
 				g.records = append(g.records, record{session, mode, state})
 			}
 			groups = append(groups, g)
+			// Both groups' role pools remain usable, but idle setup connections
+			// must not crowd the later finalization and history workers.
+			reset(g)
 		}
 		wait := func(until time.Time) {
 			t.Helper()
@@ -260,6 +270,11 @@ func qualifyDownloadStopLifecycle(t *testing.T, ctx context.Context, admin *pgxp
 		for _, g := range groups {
 			wait(g.records[0].state.Binding.OriginalPurgeAt)
 			refreshAuditFixtureRecovery(t, ctx, admin, g.scenario.recovery.observation, 30*time.Second)
+			reset(g)
+			var connectionCount int
+			var connectionRoles string
+			_ = admin.QueryRow(ctx, `SELECT count(*),coalesce(string_agg(DISTINCT usename,','),'') FROM pg_stat_activity WHERE datname=current_database()`).Scan(&connectionCount, &connectionRoles)
+			t.Logf("lifecycle pending: PostgreSQL connections=%d roles=%s", connectionCount, connectionRoles)
 			pending, e := g.pending.PendingDownloadStops(ctx)
 			if e != nil || len(pending) != 0 {
 				t.Fatal("expired/unclaimed/exhausted rows still consume active pending slots", len(pending), e)
@@ -344,6 +359,7 @@ func qualifyDownloadStopLifecycle(t *testing.T, ctx context.Context, admin *pgxp
 				if e != nil {
 					t.Fatal(e)
 				}
+				reset(g)
 				if e = g.verifyObjects.VerifyDownloadStopAbsence(ctx, lease); e != nil {
 					t.Fatal(e)
 				}
@@ -404,6 +420,7 @@ func qualifyDownloadStopLifecycle(t *testing.T, ctx context.Context, admin *pgxp
 			if e != nil || len(keys) != 1 {
 				t.Fatal("bounded due history", len(keys), e)
 			}
+			reset(g)
 			type release struct {
 				result audit.OperationHistoryRelease
 				err    error
