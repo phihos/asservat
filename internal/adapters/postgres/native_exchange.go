@@ -260,7 +260,12 @@ func (s *NativeOwners) ObserveNativeOperation(ctx context.Context, ref value.Nat
 		return nil
 	})
 	if e != nil || ctx.Err() != nil || !out.Valid(time.Now()) {
-		return value.NativeLease{}, sqlStep{"native-observe-session", e}
+		step := "native-observe-session"
+		var named interface{ FixedStep() string }
+		if errors.As(e, &named) {
+			step = named.FixedStep()
+		}
+		return value.NativeLease{}, sqlStep{step, artifact.ErrDownloadUnavailable}
 	}
 	return out, nil
 }
@@ -333,7 +338,12 @@ func (s *NativeOwners) RenewNativeOperation(ctx context.Context, ref value.Nativ
 		return call.Err()
 	})
 	if err != nil || call.Err() != nil || !out.Valid(time.Now()) {
-		return value.NativeLease{}, sqlStep{"native-renew-session", err}
+		step := "native-renew-session"
+		var named interface{ FixedStep() string }
+		if errors.As(err, &named) {
+			step = named.FixedStep()
+		}
+		return value.NativeLease{}, sqlStep{step, artifact.ErrDownloadUnavailable}
 	}
 	return out, nil
 }
