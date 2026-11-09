@@ -53,7 +53,7 @@ func (r ownerFailingRoute) Begin(context.Context, CurrentIdentity, Command, Rout
 	if r.err != nil {
 		return nil, r.err
 	}
-	return nil, v.ErrUnavailable
+	return nil, errors.Join(v.ErrUnavailable, v.ErrOwnerLost)
 }
 
 type ownerFailingLookup struct{ route OwnerCommandRoute }
@@ -147,6 +147,16 @@ func TestLiveOwnerFailureClosesOnlyTheOriginalClientView(t *testing.T) {
 	}
 	if got := f.controls[w.ID]; got != before || f.reads != 0 {
 		t.Fatal("refused recovery changed control or read a source", got, f.reads)
+	}
+	healthy, err := NewRoutedService(second, ownerFailingLookup{ownerFailingRoute{owner: s.cfg.OwnerID, err: v.ErrUnavailable}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = healthy.Read(t.Context(), who, request); !errors.Is(err, v.ErrUnavailable) || errors.Is(err, v.ErrOwnerLost) {
+		t.Fatal("healthy owner failure became owner loss", err)
+	}
+	if got := f.controls[w.ID]; got != before {
+		t.Fatal("healthy owner failure closed the view", got)
 	}
 	transient, err := NewRoutedService(second, ownerFailingLookup{ownerFailingRoute{owner: s.cfg.OwnerID, err: errors.Join(v.ErrUnavailable, v.ErrTransient)}})
 	if err != nil {

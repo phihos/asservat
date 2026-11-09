@@ -217,7 +217,7 @@ func (f *liveOwnerForwarder) begin(ctx context.Context, current liveapp.CurrentI
 	}()
 	route, err := f.owners.Routes.CurrentOwnerRoute(call, binding)
 	if err != nil || !route.Valid(time.Now()) || route.Endpoint.Binding != binding || route.Endpoint.Pool != f.runtime.pool || len(route.Endpoint.Addresses) == 0 {
-		return nil, fmt.Errorf("%w: live_owner:219", v.ErrUnavailable)
+		return nil, fmt.Errorf("%w: %w: live_owner:219", v.ErrUnavailable, v.ErrOwnerLost)
 	}
 	until := identity.Earlier(k.Until, route.FreshUntil)
 	call, stopBound := context.WithDeadline(call, until)
@@ -289,7 +289,7 @@ func (f *liveOwnerForwarder) begin(ctx context.Context, current liveapp.CurrentI
 	stream, err := client.Open(call, hello)
 	clear(command)
 	if err != nil {
-		return nil, fmt.Errorf("%w: live_owner:291", v.ErrUnavailable)
+		return nil, fmt.Errorf("%w: %w: live_owner:291", v.ErrUnavailable, v.ErrOwnerLost)
 	}
 	owned := false
 	defer func() {
@@ -301,17 +301,17 @@ func (f *liveOwnerForwarder) begin(ctx context.Context, current liveapp.CurrentI
 	for {
 		raw, e := stream.Receive(call)
 		if e != nil {
-			return nil, fmt.Errorf("%w: live_owner:303", v.ErrUnavailable)
+			return nil, fmt.Errorf("%w: %w: live_owner:303", v.ErrUnavailable, v.ErrOwnerLost)
 		}
 		frame, e := contracts.DecodeLiveOwnerFrame(bytes.NewReader(raw.Payload))
 		clear(raw.Payload)
 		if e != nil || frame.Nonce != hello.Nonce || frame.Sequence != sequence+1 || frame.Until.After(hello.Until) || !time.Now().Before(frame.Until) {
-			return nil, fmt.Errorf("%w: live_owner:308", v.ErrUnavailable)
+			return nil, fmt.Errorf("%w: %w: live_owner:308", v.ErrUnavailable, v.ErrOwnerLost)
 		}
 		sequence = frame.Sequence
 		if frame.Kind == "current" {
 			if raw.Kind != contracts.NativeMetadataFrame {
-				return nil, fmt.Errorf("%w: live_owner:313", v.ErrUnavailable)
+				return nil, fmt.Errorf("%w: %w: live_owner:313", v.ErrUnavailable, v.ErrOwnerLost)
 			}
 			callback, stop := context.WithDeadline(call, frame.Until)
 			who, e := current.ResolveIdentity(callback)
@@ -334,7 +334,7 @@ func (f *liveOwnerForwarder) begin(ctx context.Context, current liveapp.CurrentI
 			e = stream.Send(call, contracts.NativeFrame{Kind: contracts.NativeCommandFrame, Payload: encoded})
 			clear(encoded)
 			if e != nil {
-				return nil, fmt.Errorf("%w: live_owner:336", v.ErrUnavailable)
+				return nil, fmt.Errorf("%w: %w: live_owner:336", v.ErrUnavailable, v.ErrOwnerLost)
 			}
 			continue
 		}
@@ -342,22 +342,22 @@ func (f *liveOwnerForwarder) begin(ctx context.Context, current liveapp.CurrentI
 			return nil, liveOwnerFailure(frame.Failure)
 		}
 		if frame.Kind != "result" || raw.Kind != contracts.NativeMetadataFrame {
-			return nil, fmt.Errorf("%w: live_owner:344", v.ErrUnavailable)
+			return nil, fmt.Errorf("%w: %w: live_owner:344", v.ErrUnavailable, v.ErrOwnerLost)
 		}
 		result, decodeErr := liveapp.DecodeOwnerResult(frame.Result, time.Now())
 		if decodeErr != nil {
-			return nil, fmt.Errorf("%w: live_owner:348", v.ErrUnavailable)
+			return nil, fmt.Errorf("%w: %w: live_owner:348", v.ErrUnavailable, v.ErrOwnerLost)
 		}
 		peer := stream.Peer()
 		end, e := check(call, &peer)
 		if e != nil {
-			return nil, fmt.Errorf("%w: live_owner:353", v.ErrUnavailable)
+			return nil, fmt.Errorf("%w: %w: live_owner:353", v.ErrUnavailable, v.ErrOwnerLost)
 		}
 		until = identity.Earlier(until, identity.Earlier(frame.Until, end))
 		// Exact route must still identify the same original process/Pod/configuration.
 		currentRoute, e := f.owners.Routes.CurrentOwnerRoute(call, binding)
 		if e != nil || !currentRoute.Valid(time.Now()) || currentRoute.Endpoint.Binding != binding || currentRoute.Endpoint.Pod != route.Endpoint.Pod || !currentRoute.Configuration.Configuration.Equal(route.Configuration.Configuration) || !time.Now().Before(until) {
-			return nil, fmt.Errorf("%w: live_owner:359", v.ErrUnavailable)
+			return nil, fmt.Errorf("%w: %w: live_owner:359", v.ErrUnavailable, v.ErrOwnerLost)
 		}
 		until = identity.Earlier(until, currentRoute.FreshUntil)
 		if result.Batch != nil {

@@ -21,9 +21,12 @@ product requirement.
 When a remote original owner cannot complete a non-transient forwarding
 operation, the receiving owner ends the view instead of adopting it:
 
-1. Resolve the current identity and original owner route as before. Source-read
-   transient errors, access denial, conflicts, capacity failures and caller
-   cancellation keep their existing behavior and do not take this path.
+1. Resolve the current identity and original owner route as before. Recovery
+   requires the dedicated `ErrOwnerLost` sentinel, emitted only for route,
+   dial/TLS or premature-stream failures. Every error frame from a reachable
+   owner—including ordinary `ErrUnavailable`, source-read transient errors,
+   access denial, conflicts, capacity failures and caller cancellation—keeps
+   its existing behavior and cannot close the durable control.
 2. Read only the minimized durable control. Validate the original cursor using
    its MAC over watch/fence/selection/revision/position/budget and the complete
    principal, including client ID. A same-human different client cannot close

@@ -63,7 +63,7 @@ func (s *RoutedService) BeginLiveCommand(ctx context.Context, current CurrentIde
 		}
 		if route.OwnerID() != s.local.cfg.OwnerID {
 			d, e := route.Begin(ctx, current, c, keys)
-			if e != nil && c.Read != nil && ctx.Err() == nil && errors.Is(e, v.ErrUnavailable) && !errors.Is(e, v.ErrTransient) && !errors.Is(e, v.ErrDenied) && !errors.Is(e, v.ErrConflict) && !errors.Is(e, v.ErrCapacity) && !errors.Is(e, v.ErrInvalid) {
+			if e != nil && c.Read != nil && ctx.Err() == nil && errors.Is(e, v.ErrOwnerLost) {
 				d, e = s.local.BeginRecoveredLocalCommand(ctx, current, *c.Read, keys, route.OwnerID())
 			}
 			if e != nil {

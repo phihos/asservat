@@ -48,6 +48,7 @@ type installedLiveRun struct {
 	AdministratorUser                                               string
 	RootID, Installation, HubNamespace, OwnerDeployment             string
 	Failover                                                        bool
+	BeforeFailover                                                  func()
 	Identity                                                        *installedIdentity
 	PublicRoot                                                      []byte
 	Address, Origin, RegionalConfig, ClusterID, Namespace, Workload string
@@ -301,10 +302,13 @@ func qualifyInstalledLiveObservation(t *testing.T, ctx context.Context, c instal
 			// and MCP at the same time instead of one after the other.
 			browser.begin(source)
 			c.Failover = episodes == 1 && os.Getenv("ASSERVAT_LIVE_EPISODES") == "policy"
+			c.BeforeFailover = func() { browser.finishEpisode(source) }
 			if e := installedLiveMCP(t, callCtx, c.SQL, c.RootID, source, call, c); e != nil {
 				return e
 			}
-			browser.finishEpisode(source)
+			if !c.Failover {
+				browser.finishEpisode(source)
+			}
 			return nil
 		}
 		// MCP first: it waits for the original source to become eligible.
@@ -527,6 +531,9 @@ func installedLiveMCP(t *testing.T, ctx context.Context, db *pgxpool.Pool, root 
 	}
 	closeInput := map[string]any{"watch_id": watch.ID, "expected_revision": watch.Revision, "idempotency_key": "live-close-" + source.SourceID}
 	if run.Failover {
+		if run.BeforeFailover != nil {
+			run.BeforeFailover()
+		}
 		installedLiveRestartOwner(t, ctx, run)
 		var recovered v.Batch
 		var r installedLiveReply
