@@ -254,6 +254,12 @@ func (s NativeOrigins) Recheck(ctx context.Context, original NativeOrigin) (valu
 		s.Recent.put(key, l, observedAt)
 	}
 	if e != nil {
+		step := ""
+		var named interface{ FixedStep() string }
+		if errors.As(e, &named) {
+			step = named.FixedStep()
+		}
+		log.Printf("native origin observe refused: err=%v step=%s", e, step)
 		return value.NativeLease{}, collapsed("observe", artifact.ErrDownloadUnavailable, e)
 	}
 	if !sameNativeOperation(l.Operation, original.Lease.Operation) || (l.Sequence != original.Lease.Sequence && !(l.Operation.Kind == value.NativeResponse && l.Sequence > original.Lease.Sequence)) || l.Certificate != original.Lease.Certificate {
