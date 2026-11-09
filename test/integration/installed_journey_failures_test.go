@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -24,6 +25,7 @@ import (
 	"github.com/aws/smithy-go"
 	"github.com/jackc/pgx/v5/pgxpool"
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -538,12 +540,51 @@ func (f *installedFailureRun) legCapacityUnavailable() {
 	f.t.Logf("installed failure journey: after %d retained admissions the workload's context reserve refused request_capture CapacityUnavailable with no capture in flight", len(accepted))
 }
 
-// legHubDisconnect: the hub-worker is crashed on its owned kind node while an
-// accepted capture runs. Reconnection never repeats the collection (ADR-223):
-// one admission, at most one execution, one custody attempt; the replayed
-// request names the original capture; the capture resolves terminal (a lost
-// completion reply ends Indeterminate at the original deadline, never a
-// second collection; a delivered reply ends Succeeded).
+// installedPauseHubWorker freezes the exact owned hub-worker process without
+// terminating it. The caller must kill the returned container after the regional
+// commit; a stopped process cannot receive the completion reply.
+func installedPauseHubWorker(t *testing.T, ctx context.Context, api kubernetes.Interface, namespace, deployment string) (string, string) {
+	t.Helper()
+	pods, err := api.CoreV1().Pods(namespace).List(ctx, meta.ListOptions{LabelSelector: installerWorkerSelector(t, ctx, api, namespace, deployment)})
+	if err != nil || len(pods.Items) != 1 || len(pods.Items[0].Status.ContainerStatuses) != 1 {
+		t.Fatal("lost-reply hub-worker Pod", err)
+	}
+	pod := pods.Items[0]
+	node, before := pod.Spec.NodeName, pod.Status.ContainerStatuses[0].RestartCount
+	if before != 0 {
+		t.Fatal("hub-worker restarted before the lost-reply pause", before)
+	}
+	cluster := strings.TrimSuffix(strings.TrimSuffix(node, "-control-plane"), "-worker")
+	if !strings.HasPrefix(node, "asservat-") || cluster == node {
+		t.Fatal("lost-reply hub-worker not on an owned harness node", node)
+	}
+	label, err := installedOutput(ctx, installedDockerTimeout, "docker", "inspect", "--format", "{{ index .Config.Labels \"io.x-k8s.kind.cluster\" }}", node)
+	if err != nil || strings.TrimSpace(string(label)) != cluster {
+		t.Fatal("lost-reply node container not owned by this harness cluster", err)
+	}
+	ids, err := installedOutput(ctx, installedDockerTimeout, "docker", "exec", node, "crictl", "ps", "-q", "--label", "io.kubernetes.pod.uid="+string(pod.UID), "--name", pod.Status.ContainerStatuses[0].Name)
+	id := strings.TrimSpace(string(ids))
+	if err != nil || id == "" || strings.Contains(id, "\n") {
+		t.Fatal("lost-reply hub-worker container", err)
+	}
+	raw, err := installedOutput(ctx, installedDockerTimeout, "docker", "exec", node, "crictl", "inspect", id)
+	var inspected struct {
+		Info struct {
+			PID int `json:"pid"`
+		} `json:"info"`
+	}
+	if json.Unmarshal(raw, &inspected) != nil || inspected.Info.PID <= 1 || err != nil {
+		t.Fatal("lost-reply hub-worker process", err)
+	}
+	if err = installedRun(ctx, installedDockerTimeout, "docker", "exec", node, "kill", "-STOP", strconv.Itoa(inspected.Info.PID)); err != nil {
+		t.Fatal("lost-reply hub-worker pause", err)
+	}
+	return node, id
+}
+
+// legHubDisconnect freezes the hub-worker before the regional store commits,
+// then kills it before a completion reply can be received (ADR-223). Reconnect
+// never repeats collection or imports the committed regional result.
 func (f *installedFailureRun) legHubDisconnect(api kubernetes.Interface, hubNamespace, workerDeployment string) {
 	f.t.Helper()
 	previewID, _, captureID, deadline := f.preview()
@@ -552,8 +593,6 @@ func (f *installedFailureRun) legHubDisconnect(api kubernetes.Interface, hubName
 	if code != "" || got != captureID {
 		f.t.Fatal("installed disconnect leg: request not admitted once", code, got, captureID)
 	}
-	// Crash once the start is durably recorded (or the capture has already
-	// passed it), so the outage intersects the regional completion path.
 	startWait, end := context.WithTimeout(f.ctx, 60*time.Second)
 	defer end()
 	for {
@@ -563,11 +602,36 @@ func (f *installedFailureRun) legHubDisconnect(api kubernetes.Interface, hubName
 			break
 		}
 		if installedJourneyPause(startWait, 250*time.Millisecond) != nil {
-			f.t.Fatal("installed disconnect leg: no recorded start before the crash", err)
+			f.t.Fatal("installed disconnect leg: no recorded start before the pause", err)
 		}
 	}
 	restarts := installedHubRestarts(f.t, f.ctx, api, hubNamespace)
-	installerCrashHubWorker(f.t, f.ctx, api, hubNamespace, workerDeployment)
+	node, container := installedPauseHubWorker(f.t, f.ctx, api, hubNamespace, workerDeployment)
+	paused := true
+	f.t.Cleanup(func() {
+		if !paused {
+			return
+		}
+		cleanup, end := context.WithTimeout(context.Background(), installedDockerTimeout)
+		defer end()
+		if err := installedRun(cleanup, installedDockerTimeout, "docker", "exec", node, "kill", "-KILL", container); err != nil {
+			f.t.Errorf("lost-reply hub-worker cleanup: %v", err)
+		}
+	})
+	for {
+		var stored bool
+		err := f.admin.QueryRow(startWait, `SELECT EXISTS(SELECT 1 FROM custody_attempt a JOIN context_capture c ON c.attempt_id=a.id AND c.root_id=a.root_id WHERE c.root_id=$1 AND c.id=$2::uuid AND a.state='stored_unpublished')`, f.root, captureID).Scan(&stored)
+		if err == nil && stored {
+			break
+		}
+		if installedJourneyPause(startWait, 10*time.Millisecond) != nil {
+			f.t.Fatal("installed disconnect leg: regional completion never committed", err)
+		}
+	}
+	if err := installedRun(f.ctx, installedDockerTimeout, "docker", "exec", node, "kill", "-KILL", container); err != nil {
+		f.t.Fatal("lost-reply hub-worker kill", err)
+	}
+	paused = false
 	installedHubSettled(f.t, f.ctx, api, hubNamespace, restarts)
 	// The reconnected hub replays the original request passively: same capture,
 	// no new admission, execution or attempt.
@@ -578,9 +642,9 @@ func (f *installedFailureRun) legHubDisconnect(api kubernetes.Interface, hubName
 	if _, executions, attempts := f.counts(captureID); executions > 1 || attempts != 1 {
 		f.t.Fatal("installed disconnect leg: collection was repeated after the reconnect", executions, attempts)
 	}
-	progress := f.waitPhase("a terminal disconnected capture", captureID, deadline.Add(90*time.Second), "Succeeded", "Indeterminate")
+	progress := f.waitPhase("a terminal disconnected capture", captureID, deadline.Add(90*time.Second), "Indeterminate")
 	reason := installedFailureReason(progress)
-	if progress.Phase == "Indeterminate" && reason != "DeadlineOutcomeUnconfirmed" {
+	if reason != "DeadlineOutcomeUnconfirmed" {
 		f.t.Fatal("installed disconnect leg: wrong indeterminate reason", reason)
 	}
 	// One deadline-observer sweep later the outcome and cardinality stand.
@@ -593,7 +657,7 @@ func (f *installedFailureRun) legHubDisconnect(api kubernetes.Interface, hubName
 	if after, ok := f.progress(f.ctx, captureID); !ok || after.Phase != progress.Phase {
 		f.t.Fatal("installed disconnect leg: terminal outcome changed", progress.Phase, after.Phase)
 	}
-	f.t.Logf("installed failure journey: hub-worker crash during capture %s resolved %s (%s); the reconnected hub never repeated the collection", captureID, progress.Phase, reason)
+	f.t.Logf("installed failure journey: hub-worker crash during capture %s lost the regional completion reply; the committed result was not imported and the capture resolved Indeterminate (%s) without another collection", captureID, reason)
 }
 
 // legKeyServiceDown disconnects the owned OpenBao container after the public
