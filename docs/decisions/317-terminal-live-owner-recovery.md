@@ -1,7 +1,7 @@
 # ADR-317: Terminal recovery after live-owner loss
 
-Status: implemented; component and real-PostgreSQL qualification passed.
-Installed owner-failover qualification is pending.
+Status: implemented; component, real-PostgreSQL and installed owner-failover
+qualification passed. Wider live-view matrices and sustained operation remain open.
 
 ## Context
 
@@ -76,6 +76,8 @@ already in-memory principal; its public `live1` shape is unchanged.
 - Real PostgreSQL qualification covers exact control reads, wrong principal and
   fence refusal, idempotent close and original accounting bounds under the
   compiled hub role. Migration generation and affected package/vet gates pass.
-- Installed native qualification must still prove Pod replacement, terminal MCP
-  behavior, unchanged SQL accounting and cleanup before this path is called
-  installed-qualified.
+- Installed native run [42705246482](../../test/results/live-owner-failover-42705246482/README.md)
+  passed at `c890dc86`: exact Pod replacement and a new activated epoch,
+  terminal same-revision MCP close, unchanged SQL spend, unchanged sources and
+  no cleanup failures. This is the named policy/MCP path, not every client or
+  sustained-operation profile.

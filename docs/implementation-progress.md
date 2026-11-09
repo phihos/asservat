@@ -1,5 +1,35 @@
 # Sustained implementation progress
 
+## Terminal live-view owner failover (2026-11-09)
+
+[ADR-317](decisions/317-terminal-live-owner-recovery.md) and migration 00147 close a live view after original-owner route/transport loss without adopting its private source/filter session. The receiving owner verifies the original cursor against the complete principal/client and minimized control, then closes only that control. Revision, accepted/idle/hard expiry and cumulative spend are unchanged; the terminal empty batch carries a reconnect gap and no continuation. A dedicated `ErrOwnerLost` distinguishes route, dial/TLS and premature-stream failures from every reachable-owner error frame, including ordinary and transient unavailability.
+
+- Guarded native `continuation-ongoing-live` run
+  [42705246482](../test/results/live-owner-failover-42705246482/README.md)
+  passed at `c890dc86` (Go test 428.42 s, focus 157.14 s). The exact original
+  owner Pod was replaced with a distinct activated server epoch while retaining
+  Deployment and ReplicaSet identity. The MCP view closed at its original
+  revision with unchanged SQL spend and no retained rows or continuation.
+- Packet, syscall and HTTP policy sources completed ordinary MCP and React
+  paths after recovery, with 21 bounded MCP operations and no viewer
+  acquisition. React closed normally before owner deletion; this is not a
+  React-failover claim. The separate HTTP Save downloaded 3,036 native bytes
+  (SHA-256 `f21821cc73c113ba55f507766df819210b293ba12189e2df7df88e573c3f7d93`).
+- Real-PostgreSQL control and upgrade/rollback fixtures passed with wrong
+  principal/fence refusal, idempotent close and original accounting bounds.
+  Full `make pre-push`, PR CI run 42703180422 (`ci-ok`) and Gitar review passed.
+  Native source hashes were unchanged, build scratch was removed and cleanup
+  had no failures.
+- Earlier run 42689236964 reproduced the missing terminal state; 42700800627
+  passed failover then exposed the ordinary-close stale-revision fixture bug;
+  42703171355 failed before failover during policy activation. They are not
+  recorded as passes. The final run used the corrected close revision and
+  fresh activation deadlines, not a longer source lease.
+
+This closes the named installed policy/MCP owner-failover gap. It does not
+qualify cursor-less close-after-loss, every live-view matrix or sustained
+operation. The broader specification remains active.
+
 ## Custody fixture rollback and connection qualification (2026-11-09)
 
 The complete context-admission fixture passes again after concrete rollback,
