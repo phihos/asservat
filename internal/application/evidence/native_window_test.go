@@ -332,7 +332,7 @@ func TestContextNativeResponseRenewalPreservesCursorAndRejectsDowngrade(t *testi
 }
 
 func TestContextNativeResponseCheckedRenewalReusesCoordinatorAuthority(t *testing.T) {
-	for _, mode := range []string{"complete", "changed-identity", "cancelled", "expired"} {
+	for _, mode := range []string{"complete", "continued", "changed-identity", "cancelled", "expired"} {
 		t.Run(mode, func(t *testing.T) { testNativeResponseRenewal(t, true, true, mode) })
 	}
 }
@@ -442,6 +442,16 @@ func testNativeResponseRenewal(t *testing.T, composed, checked bool, mode string
 		next.StartedAt, next.Until, next.Authority = f.f.now, f.f.a.ValidUntil, f.f.a
 	}
 	ports.nextLease = next
+	if mode == "continued" {
+		timer := time.NewTimer(time.Until(lease.Until.Add(20 * time.Millisecond)))
+		defer timer.Stop()
+		select {
+		case <-t.Context().Done():
+			t.Fatal(t.Context().Err())
+		case <-timer.C:
+		}
+		mode = "complete"
+	}
 	if mode == "changed-identity" {
 		// ADR-312: a started response's checked renewal does not observe the
 		// caller's identity again; a changed identity policy cannot stop it.

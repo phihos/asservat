@@ -239,7 +239,7 @@ func (s *NativeAttachment) open(ctx context.Context, r ContextDownloadRequest, k
 			if next == nil || !SameNativeWindow(delivery, l) || l.Sequence <= delivery.Sequence || !l.Valid(c.Now()) || !c.Now().Before(end) || ctx.Err() != nil {
 				return artifact.ErrDownloadUnavailable
 			}
-			a, err := next(bound)
+			_, a, err := newWorkerResponseObservation(bound, l.Authority, r.Scope, c.Now)
 			if err != nil {
 				return err
 			}
