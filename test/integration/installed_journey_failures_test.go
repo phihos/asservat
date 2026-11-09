@@ -414,7 +414,7 @@ func qualifyInstalledJourneyFailures(t *testing.T, ctx context.Context, admin *p
 		run.legStoreUnconfirmed(providers, evidenceBucket)
 		run.legCapacityUnavailable()
 	case "journey-start-failure":
-		run.legHubDisconnect(api, hubNamespace, workerDeployment)
+		run.legHubDisconnect(providers, evidenceBucket, api, hubNamespace, workerDeployment)
 		run.legKeyServiceDown()
 	default:
 		t.Fatal("unknown failure focus", installedJourneyFocus())
@@ -578,14 +578,16 @@ func installedHubWorkerProcess(t *testing.T, ctx context.Context, api kubernetes
 	return node, strconv.Itoa(inspected.Info.PID)
 }
 
-// legHubDisconnect kills the prelocated hub-worker while the capture is in
-// flight, then proves custody committed without its completion reply (ADR-223).
-// Reconnect never repeats collection or imports the committed regional result.
-func (f *installedFailureRun) legHubDisconnect(api kubernetes.Interface, hubNamespace, workerDeployment string) {
+// legHubDisconnect kills the prelocated hub-worker after the region completes
+// its first ciphertext object, then proves custody committed without the
+// completion reply (ADR-223). Reconnect never repeats collection or imports it.
+func (f *installedFailureRun) legHubDisconnect(providers *initialRuntimeNativeProviders, evidenceBucket string, api kubernetes.Interface, hubNamespace, workerDeployment string) {
 	f.t.Helper()
 	restarts := installedHubRestarts(f.t, f.ctx, api, hubNamespace)
 	node, process := installedHubWorkerProcess(f.t, f.ctx, api, hubNamespace, workerDeployment)
-	previewID, _, captureID, deadline := f.preview()
+	store := s3.New(s3.Options{Region: providers.desired.AuditStore.Region, BaseEndpoint: aws.String(providers.desired.AuditStore.Endpoint), UsePathStyle: true,
+		Credentials: credentials.NewStaticCredentialsProvider("synthetic-only", "synthetic-only-secret", ""), HTTPClient: providers.client, RetryMaxAttempts: 1})
+	previewID, loc, captureID, deadline := f.preview()
 	key := f.keys + "-disconnect"
 	response := f.startRequest(previewID, key)
 	startWait, end := context.WithTimeout(f.ctx, 60*time.Second)
@@ -597,7 +599,22 @@ func (f *installedFailureRun) legHubDisconnect(api kubernetes.Interface, hubName
 			break
 		}
 		if installedJourneyPause(startWait, time.Millisecond) != nil {
-			f.t.Fatal("installed disconnect leg: no in-flight start before the pause", err)
+			f.t.Fatal("installed disconnect leg: no in-flight start before the crash", err)
+		}
+	}
+	// SQL's started marker can precede the regional acquisition message. Waiting
+	// for the data object proves the region is autonomously storing its capture;
+	// the index, manifest and custody commit still precede its completion reply.
+	objectWait, endObject := context.WithTimeout(f.ctx, 60*time.Second)
+	defer endObject()
+	prefix := loc.Prefix() + "data"
+	for {
+		objects, err := store.ListObjectsV2(objectWait, &s3.ListObjectsV2Input{Bucket: &evidenceBucket, Prefix: &prefix, MaxKeys: aws.Int32(1)})
+		if err == nil && objects != nil && len(objects.Contents) == 1 {
+			break
+		}
+		if installedJourneyPause(objectWait, 10*time.Millisecond) != nil {
+			f.t.Fatal("installed disconnect leg: no regional data object to bracket the crash", err)
 		}
 	}
 	if err := installedRun(f.ctx, installedDockerTimeout, "docker", "exec", node, "kill", "-KILL", process); err != nil {
@@ -615,9 +632,15 @@ func (f *installedFailureRun) legHubDisconnect(api kubernetes.Interface, hubName
 			f.t.Fatal("installed disconnect leg: regional completion never committed", err)
 		}
 	}
+	phaseRead, endPhase := context.WithTimeout(f.ctx, 10*time.Second)
 	var executionPhase string
-	if err := f.admin.QueryRow(commitWait, `SELECT phase FROM context_execution WHERE root_id=$1 AND capture_id=$2::uuid`, f.root, captureID).Scan(&executionPhase); err != nil || executionPhase != "started" {
-		f.t.Fatal("installed disconnect leg: regional completion was recorded before the kill", executionPhase, err)
+	err := f.admin.QueryRow(phaseRead, `SELECT phase FROM context_execution WHERE root_id=$1 AND capture_id=$2::uuid`, f.root, captureID).Scan(&executionPhase)
+	endPhase()
+	if err != nil {
+		f.t.Fatal("installed disconnect leg: execution phase unreadable after the crash", err)
+	}
+	if executionPhase != "started" {
+		f.t.Fatal("installed disconnect leg: regional completion was recorded before the crash", executionPhase)
 	}
 	installedHubSettled(f.t, f.ctx, api, hubNamespace, restarts)
 	originalCode, _ := f.requestReply(<-response)
