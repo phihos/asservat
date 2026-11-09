@@ -48,6 +48,7 @@ type installedLiveRun struct {
 	AdministratorUser                                               string
 	RootID, Installation, HubNamespace, OwnerDeployment             string
 	Failover                                                        bool
+	Fanout                                                          bool
 	BeforeFailover                                                  func()
 	Identity                                                        *installedIdentity
 	PublicRoot                                                      []byte
@@ -302,6 +303,7 @@ func qualifyInstalledLiveObservation(t *testing.T, ctx context.Context, c instal
 			// and MCP at the same time instead of one after the other.
 			browser.begin(source)
 			c.Failover = episodes == 1 && os.Getenv("ASSERVAT_LIVE_EPISODES") == "policy"
+			c.Fanout = episodes == 1
 			c.BeforeFailover = func() { browser.finishEpisode(source) }
 			if e := installedLiveMCP(t, callCtx, c.SQL, c.RootID, source, call, c); e != nil {
 				return e
@@ -313,6 +315,7 @@ func qualifyInstalledLiveObservation(t *testing.T, ctx context.Context, c instal
 		}
 		// MCP first: it waits for the original source to become eligible.
 		c.Failover = episodes == 1 && os.Getenv("ASSERVAT_LIVE_EPISODES") == "policy"
+		c.Fanout = episodes == 1
 		if e := installedLiveMCP(t, callCtx, c.SQL, c.RootID, source, call, c); e != nil {
 			return e
 		}
@@ -528,6 +531,39 @@ func installedLiveMCP(t *testing.T, ctx context.Context, db *pgxpool.Pool, root 
 	var state string
 	if e = db.QueryRow(ctx, `SELECT spent,state FROM live_watch_control WHERE root_id=$1 AND id=$2`, root, watch.ID).Scan(&sqlSpent, &state); e != nil || sqlSpent != lastSpend || state != "Active" {
 		return errors.New("public accounting differs from actual minimized ledger")
+	}
+	if run.Fanout {
+		var active int
+		for attempt := 0; attempt < 10; attempt++ {
+			if e = db.QueryRow(ctx, `SELECT count(*) FROM live_watch_control WHERE root_id=$1 AND state IN ('Active','Paused','Disconnected')`, root).Scan(&active); e != nil {
+				return e
+			}
+			if active == 2 {
+				break
+			}
+			if e = installedJourneyPause(ctx, 100*time.Millisecond); e != nil {
+				return e
+			}
+		}
+		if active != 2 {
+			return errors.New("principal ceiling fixture did not retain two original views")
+		}
+		extra := make(map[string]any, len(request))
+		for key, value := range request {
+			extra[key] = value
+		}
+		extra["idempotency_key"] = "live-ceiling-" + source.SourceID
+		refusal, code, e := call(ctx, "open_live_watch", extra)
+		var failure struct {
+			Retryable bool `json:"retryable"`
+		}
+		if e != nil || code != "CapacityUnavailable" || refusal.Status != "error" || json.Unmarshal(refusal.Data, &failure) != nil || failure.Retryable {
+			return fmt.Errorf("third concurrent view was not refused by the principal ceiling: %s %w", code, e)
+		}
+		if e = db.QueryRow(ctx, `SELECT count(*) FROM live_watch_control WHERE root_id=$1 AND state IN ('Active','Paused','Disconnected')`, root).Scan(&active); e != nil || active != 2 {
+			return errors.New("principal ceiling refusal changed the original views")
+		}
+		t.Log("installed live principal ceiling: third concurrent view refused CapacityUnavailable; two original controls retained")
 	}
 	closeInput := map[string]any{"watch_id": watch.ID, "expected_revision": watch.Revision, "idempotency_key": "live-close-" + source.SourceID}
 	if run.Failover {
