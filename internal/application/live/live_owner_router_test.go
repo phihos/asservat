@@ -42,6 +42,26 @@ func (r ownerTestRoute) OwnerID() string { return r.s.cfg.OwnerID }
 func (r ownerTestRoute) Begin(ctx context.Context, who CurrentIdentity, c Command, k RouteKeys) (CommandDelivery, error) {
 	return r.s.BeginOwnedLocalCommand(ctx, who, c, k)
 }
+
+type ownerFailingRoute struct {
+	owner string
+	err   error
+}
+
+func (r ownerFailingRoute) OwnerID() string { return r.owner }
+func (r ownerFailingRoute) Begin(context.Context, CurrentIdentity, Command, RouteKeys) (CommandDelivery, error) {
+	if r.err != nil {
+		return nil, r.err
+	}
+	return nil, errors.Join(v.ErrUnavailable, v.ErrOwnerLost)
+}
+
+type ownerFailingLookup struct{ route OwnerCommandRoute }
+
+func (f ownerFailingLookup) LocateLiveOwner(context.Context, RouteKeys) (OwnerCommandRoute, bool, error) {
+	return f.route, true, nil
+}
+
 func secondOwner(t *testing.T, s *Service, f *fixture) *Service {
 	t.Helper()
 	c := s.cfg
@@ -107,6 +127,64 @@ func TestLiveOwnerRoutesOriginalSessionAndSameKeyWithoutTakeover(t *testing.T) {
 		t.Fatal("unexpected extra locator reads", lookup.calls)
 	}
 }
+func TestLiveOwnerFailureClosesOnlyTheOriginalClientView(t *testing.T) {
+	s, f, who, open := setup(t)
+	w, err := s.Open(t.Context(), who, open)
+	if err != nil {
+		t.Fatal(err)
+	}
+	before := f.controls[w.ID]
+	second := secondOwner(t, s, f)
+	routed, err := NewRoutedService(second, ownerFailingLookup{ownerFailingRoute{owner: s.cfg.OwnerID}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := v.Read{ID: w.ID, Cursor: *w.Cursor, Limit: 20}
+	other := who
+	other.i.Principal.ClientID = "mcp"
+	if _, err = routed.Read(t.Context(), other, request); err == nil {
+		t.Fatal("another client closed the lost owner's view")
+	}
+	if got := f.controls[w.ID]; got != before || f.reads != 0 {
+		t.Fatal("refused recovery changed control or read a source", got, f.reads)
+	}
+	healthy, err := NewRoutedService(second, ownerFailingLookup{ownerFailingRoute{owner: s.cfg.OwnerID, err: v.ErrUnavailable}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = healthy.Read(t.Context(), who, request); !errors.Is(err, v.ErrUnavailable) || errors.Is(err, v.ErrOwnerLost) {
+		t.Fatal("healthy owner failure became owner loss", err)
+	}
+	if got := f.controls[w.ID]; got != before {
+		t.Fatal("healthy owner failure closed the view", got)
+	}
+	transient, err := NewRoutedService(second, ownerFailingLookup{ownerFailingRoute{owner: s.cfg.OwnerID, err: errors.Join(v.ErrUnavailable, v.ErrTransient)}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = transient.Read(t.Context(), who, request); !errors.Is(err, v.ErrTransient) {
+		t.Fatal("transient source miss became terminal owner recovery", err)
+	}
+	if got := f.controls[w.ID]; got != before {
+		t.Fatal("transient source miss closed the view", got)
+	}
+	batch, err := routed.Read(t.Context(), who, request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	after := f.controls[w.ID]
+	if batch.WatchID != w.ID || batch.Revision != w.Revision || batch.State != "Closed" || len(batch.Rows) != 0 || len(batch.Gaps) != 1 || batch.Gaps[0].Reason != "reconnect" || batch.Cursor != "" || batch.Spent != before.Spent {
+		t.Fatal("owner failure did not return a terminal empty original-revision batch", batch)
+	}
+	if after.State != "Closed" || after.Revision != before.Revision || !after.ExpiresAt.Equal(before.ExpiresAt) || !after.IdleUntil.Equal(before.IdleUntil) || after.Spent != before.Spent || len(second.sessions) != 0 || f.reads != 0 {
+		t.Fatal("recovery renewed, adopted or read private session state", after)
+	}
+	replayed, err := routed.Read(t.Context(), who, request)
+	if err != nil || replayed.State != "Closed" || replayed.Revision != before.Revision || len(replayed.Rows) != 0 {
+		t.Fatal("terminal recovery was not stable", replayed, err)
+	}
+}
+
 func TestLiveOwnerRouteKeysMatchExistingAdmissionAndKeepClientsSeparate(t *testing.T) {
 	s, f, who, open := setup(t)
 	k, err := s.OwnerRouteKeys(t.Context(), who, Command{Open: &open})

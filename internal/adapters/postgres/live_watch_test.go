@@ -81,7 +81,7 @@ func TestLiveWatchUsesExistingHubCredentialWithoutTablePrivileges(t *testing.T) 
 		t.Fatal("hub role")
 	}
 	expected := publicRuntimeLiveWatchGrants()
-	if len(expected) != 6 {
+	if len(expected) != 8 {
 		t.Fatal("unexpected effect surface")
 	}
 	for _, want := range expected {

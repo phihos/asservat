@@ -22,8 +22,9 @@ import (
 	"github.com/pressly/goose/v3"
 )
 
-// Pristine143 Up/Down/Up against the integrated142 baseline; no installed role,
-// source delivery or live traffic claim follows from a schema round trip.
+// Pristine143 Up/Down/Up against the integrated142 baseline, plus147 recovery
+// Up/Down before the schema143 role checks; no installed role, source delivery
+// or live traffic claim follows from a schema round trip.
 func TestLiveWatchUpgradeWithRealPostgres(t *testing.T) {
 	path := os.Getenv("ASSERVAT_CUSTODY_FIXTURES")
 	if path == "" {
@@ -123,8 +124,8 @@ func TestLiveWatchUpgradeWithRealPostgres(t *testing.T) {
 			t.Fatal("new helper retained at142", helpers, err)
 		}
 	}
-	if _, err = provider.UpTo(ctx, 143); err != nil {
-		t.Fatal("final143 Up", err)
+	if _, err = provider.UpTo(ctx, 147); err != nil {
+		t.Fatal("final147 Up", err)
 	}
 	// Exercise the actual fixed SQL Open/Charge functions under the compiled
 	// hub duty. Trust, permission root and owner identity are synthetic here;
@@ -146,6 +147,13 @@ func TestLiveWatchUpgradeWithRealPostgres(t *testing.T) {
 		}
 		return grants
 	})
+	if _, err = provider.DownTo(ctx, 143); err != nil {
+		t.Fatal("147 Down", err)
+	}
+	var recoveryFunctions int
+	if err = pool.QueryRow(ctx, `SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public' AND p.proname IN ('live_watch_read_control','live_watch_close_control')`).Scan(&recoveryFunctions); err != nil || recoveryFunctions != 0 {
+		t.Fatal("147 recovery function retained at143", recoveryFunctions, err)
+	}
 	runtimeConfig := pc.Copy()
 	runtimeConfig.ConnConfig.User = role
 	runtimeConfig.ConnConfig.Password = "synthetic-live-rollback"
@@ -243,7 +251,7 @@ func TestLiveWatchUpgradeWithRealPostgres(t *testing.T) {
 		t.Fatal("account-only original debt", controls, accounts, debt, err)
 	}
 	assertRetainedDown("debt-only")
-	t.Log("pristine142→143→142 twice; final143 compiled Open/Charge; retained control and account-only debt each refuse Down23514 with exact schema/functions/history/state unchanged; HTTP/source/audit retained guards not exercised")
+	t.Log("pristine142→143→142 twice; 147 Up/Down removes only recovery functions before the schema143 compiled Open/Charge checks; retained control and account-only debt each refuse Down23514 with exact schema/functions/history/state unchanged; HTTP/source/audit retained guards not exercised")
 }
 
 // liveUTC matches the adapter's normalization: SQL JSON renders +00:00,

@@ -35,18 +35,20 @@ import (
 // are synthetic. Two identity reads per source phase model the existing batched
 // C3 contract, independent of selected source count; this is no SQL/API proof.
 type liveOwnerFacts struct {
-	mu         sync.Mutex
-	sources    []v.Source
-	controls   map[string]liveapp.Control
-	keys       map[string]string
-	count      atomic.Int32
-	reads      atomic.Int32
-	phaseUntil time.Time
-	block      chan struct{}
-	entered    chan struct{}
-	afterRead  func()
-	empty      bool
-	delay      time.Duration
+	mu          sync.Mutex
+	sources     []v.Source
+	controls    map[string]liveapp.Control
+	keys        map[string]string
+	count       atomic.Int32
+	reads       atomic.Int32
+	phaseUntil  time.Time
+	block       chan struct{}
+	entered     chan struct{}
+	afterRead   func()
+	empty       bool
+	transient   bool
+	unavailable bool
+	delay       time.Duration
 }
 
 func (f *liveOwnerFacts) Inventory(context.Context, liveapp.CurrentIdentity, targets.WorkloadRequest, string, int) ([]v.Source, string, error) {
@@ -108,6 +110,12 @@ func (f *liveOwnerFacts) Read(ctx context.Context, ss []v.Source, p string, posi
 			return liveapp.Projection{}, ctx.Err()
 		case <-f.block:
 		}
+	}
+	if f.transient {
+		return liveapp.Projection{}, fmt.Errorf("%w: %w: synthetic source miss", v.ErrUnavailable, v.ErrTransient)
+	}
+	if f.unavailable {
+		return liveapp.Projection{}, v.ErrUnavailable
 	}
 	now := time.Now()
 	rows := []v.Row{}
@@ -378,6 +386,28 @@ func TestLiveOwnerActualH2CurrentIdentityAndJoinedDelivery(t *testing.T) {
 		})
 	}
 }
+func TestLiveOwnerActualH2DistinguishesSourceAndOwnerFailures(t *testing.T) {
+	f := newLiveOwnerH2Fixture(t, 1)
+	for _, mode := range []string{"transient", "unavailable"} {
+		f.facts.transient = mode == "transient"
+		f.facts.unavailable = mode == "unavailable"
+		_, err := f.begin(t.Context(), liveapp.Command{Read: &v.Read{ID: f.watch.ID, Cursor: *f.watch.Cursor}})
+		if mode == "transient" && !errors.Is(err, v.ErrTransient) {
+			t.Fatal("private owner forwarding lost the transient source class", err)
+		}
+		if !errors.Is(err, v.ErrUnavailable) || errors.Is(err, v.ErrOwnerLost) {
+			t.Fatal("reachable owner error frame became owner loss", mode, err)
+		}
+	}
+	f.facts.transient = false
+	f.facts.unavailable = false
+	f.server.Close()
+	_, err := f.begin(t.Context(), liveapp.Command{Read: &v.Read{ID: f.watch.ID, Cursor: *f.watch.Cursor}})
+	if !errors.Is(err, v.ErrOwnerLost) || !errors.Is(err, v.ErrUnavailable) {
+		t.Fatal("dial failure was not marked as owner loss", err)
+	}
+}
+
 func TestLiveOwnerActualH2RejectsChangedIngressAndCanceledRead(t *testing.T) {
 	for _, mode := range []string{"client", "principal", "policy", "client-after-read", "expired-after-read", "cancel", "final-cutoff", "peer-revoked", "close-canceled"} {
 		t.Run(mode, func(t *testing.T) {

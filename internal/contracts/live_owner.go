@@ -70,7 +70,7 @@ func DecodeLiveOwnerFrame(r io.Reader) (LiveOwnerFrame, error) {
 			return LiveOwnerFrame{}, ErrNativeProtocol
 		}
 	case "error":
-		if len(f.Result) != 0 || len(f.Identity) != 0 || (f.Failure != "denied" && f.Failure != "unavailable" && f.Failure != "conflict" && f.Failure != "capacity" && f.Failure != "invalid") {
+		if len(f.Result) != 0 || len(f.Identity) != 0 || (f.Failure != "denied" && f.Failure != "unavailable" && f.Failure != "transient" && f.Failure != "conflict" && f.Failure != "capacity" && f.Failure != "invalid") {
 			return LiveOwnerFrame{}, ErrNativeProtocol
 		}
 	default:

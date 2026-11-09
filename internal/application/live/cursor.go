@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/identity"
 	v "asservat.local/asservat/internal/domain/live"
 )
 
@@ -29,10 +30,11 @@ func (s *Service) cursorDigest(st *session, position uint64) (artifact.Digest, e
 	b, e := json.Marshal(struct {
 		ID, Fence            string
 		Principal, Selection [32]byte
+		Actor                identity.Principal
 		Revision             int64
 		Position             uint64
 		OutputLimit          int64
-	}{st.watch.ID, st.control.Fence, st.control.PrincipalKey, st.control.RequestDigest, st.watch.Revision, position, st.control.OutputLimit})
+	}{st.watch.ID, st.control.Fence, st.control.PrincipalKey, st.control.RequestDigest, st.actor, st.watch.Revision, position, st.control.OutputLimit})
 	if e != nil {
 		return artifact.Digest{}, e
 	}

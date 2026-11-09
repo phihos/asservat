@@ -217,6 +217,8 @@ func (p *liveOwnerIdentity) sendResult(ctx context.Context, result app.CommandRe
 			f.Failure = "capacity"
 		case errors.Is(err, v.ErrInvalid):
 			f.Failure = "invalid"
+		case errors.Is(err, v.ErrTransient):
+			f.Failure = "transient"
 		default:
 			f.Failure = "unavailable"
 		}

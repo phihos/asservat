@@ -115,6 +115,24 @@ func (f *fixture) Change(_ context.Context, c Control, expected, cost int64) (Co
 	}
 	return c, nil
 }
+func (f *fixture) ReadLiveControl(_ context.Context, principal [32]byte, watch string) (Control, error) {
+	c, ok := f.controls[watch]
+	if !ok || c.PrincipalKey != principal {
+		return Control{}, v.ErrUnavailable
+	}
+	return c, nil
+}
+func (f *fixture) CloseLiveControl(_ context.Context, c Control) (Control, error) {
+	prior, ok := f.controls[c.ID]
+	if !ok || prior.PrincipalKey != c.PrincipalKey || prior.Revision != c.Revision || prior.Fence != c.Fence {
+		return Control{}, v.ErrConflict
+	}
+	if prior.State == "Active" || prior.State == "Paused" || prior.State == "Disconnected" {
+		prior.State = "Closed"
+		f.controls[c.ID] = prior
+	}
+	return prior, nil
+}
 func setup(t *testing.T) (*Service, *fixture, fixedIdentity, v.Open) {
 	t.Helper()
 	now := time.Now().UTC()

@@ -34,6 +34,8 @@ var (
 	ErrConflict    = errors.New("live: revision or idempotency conflict")
 	ErrCapacity    = errors.New("live: capacity unavailable")
 	ErrUnavailable = errors.New("live: projection unavailable")
+	// ErrOwnerLost marks only route/transport loss of the original view owner.
+	ErrOwnerLost = errors.New("live: owner lost")
 	// ErrTransient marks a read that failed on a temporary source/status miss:
 	// nothing was disclosed and the view stays open for the next read.
 	ErrTransient = errors.New("live: temporarily unavailable")
@@ -50,7 +52,7 @@ func Diagnostic(err error) string {
 	for _, c := range []struct {
 		err  error
 		word string
-	}{{ErrTransient, "transient"}, {ErrEnded, "ended"}, {ErrCapacity, "capacity"}, {ErrConflict, "conflict"}, {ErrInvalid, "invalid"}, {ErrDenied, "denied"}, {ErrUnavailable, "unavailable"}} {
+	}{{ErrTransient, "transient"}, {ErrEnded, "ended"}, {ErrCapacity, "capacity"}, {ErrConflict, "conflict"}, {ErrInvalid, "invalid"}, {ErrDenied, "denied"}, {ErrOwnerLost, "owner-lost"}, {ErrUnavailable, "unavailable"}} {
 		if errors.Is(err, c.err) {
 			class = c.word
 			break

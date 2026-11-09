@@ -40,6 +40,31 @@ func (q *Queries) ChangeLiveWatch(ctx context.Context, arg ChangeLiveWatchParams
 	return column_1, err
 }
 
+const closeLiveControl = `-- name: CloseLiveControl :one
+SELECT live_watch_close_control($1::uuid,$2::bytea,$3::uuid,$4::bigint,$5::uuid)
+`
+
+type CloseLiveControlParams struct {
+	RootID           pgtype.UUID
+	PrincipalKey     []byte
+	WatchID          pgtype.UUID
+	ExpectedRevision int64
+	Fence            pgtype.UUID
+}
+
+func (q *Queries) CloseLiveControl(ctx context.Context, arg CloseLiveControlParams) ([]byte, error) {
+	row := q.db.QueryRow(ctx, closeLiveControl,
+		arg.RootID,
+		arg.PrincipalKey,
+		arg.WatchID,
+		arg.ExpectedRevision,
+		arg.Fence,
+	)
+	var live_watch_close_control []byte
+	err := row.Scan(&live_watch_close_control)
+	return live_watch_close_control, err
+}
+
 const configureLiveWatch = `-- name: ConfigureLiveWatch :one
 SELECT live_watch_configure($1::uuid,$2::uuid,$3::uuid,$4::bytea,$5::jsonb)::boolean
 `
@@ -163,4 +188,21 @@ func (q *Queries) PruneLiveWatch(ctx context.Context, rootID pgtype.UUID) ([]byt
 	var column_1 []byte
 	err := row.Scan(&column_1)
 	return column_1, err
+}
+
+const readLiveControl = `-- name: ReadLiveControl :one
+SELECT live_watch_read_control($1::uuid,$2::bytea,$3::uuid)
+`
+
+type ReadLiveControlParams struct {
+	RootID       pgtype.UUID
+	PrincipalKey []byte
+	WatchID      pgtype.UUID
+}
+
+func (q *Queries) ReadLiveControl(ctx context.Context, arg ReadLiveControlParams) ([]byte, error) {
+	row := q.db.QueryRow(ctx, readLiveControl, arg.RootID, arg.PrincipalKey, arg.WatchID)
+	var live_watch_read_control []byte
+	err := row.Scan(&live_watch_read_control)
+	return live_watch_read_control, err
 }

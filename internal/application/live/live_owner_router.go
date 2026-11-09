@@ -2,6 +2,7 @@ package live
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -62,6 +63,9 @@ func (s *RoutedService) BeginLiveCommand(ctx context.Context, current CurrentIde
 		}
 		if route.OwnerID() != s.local.cfg.OwnerID {
 			d, e := route.Begin(ctx, current, c, keys)
+			if e != nil && c.Read != nil && ctx.Err() == nil && errors.Is(e, v.ErrOwnerLost) {
+				d, e = s.local.BeginRecoveredLocalCommand(ctx, current, *c.Read, keys, route.OwnerID())
+			}
 			if e != nil {
 				return nil, e
 			}

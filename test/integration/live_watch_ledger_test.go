@@ -246,6 +246,27 @@ func TestLiveWatchLedgerWithRealServices(t *testing.T) {
 	if _, err = ledger.Change(ctx, third, 1, 24<<10); !errors.Is(err, live.ErrCapacity) {
 		t.Fatal("close/reopen reset shared ancestor debt", err)
 	}
+	third.Spent -= 24 << 10
+	recovered, err := ledger.ReadLiveControl(ctx, third.PrincipalKey, third.ID)
+	if err != nil || recovered != third {
+		t.Fatal("exact minimized recovery control", recovered, err)
+	}
+	if _, err = ledger.ReadLiveControl(ctx, [32]byte{9}, third.ID); !errors.Is(err, live.ErrUnavailable) {
+		t.Fatal("foreign principal read recovery control", err)
+	}
+	wrongFence := third
+	wrongFence.Fence = custodyID()
+	if _, err = ledger.CloseLiveControl(ctx, wrongFence); !errors.Is(err, live.ErrConflict) {
+		t.Fatal("recovery closed a changed fence", err)
+	}
+	third, err = ledger.CloseLiveControl(ctx, third)
+	if err != nil || third.State != "Closed" || third.Revision != recovered.Revision || !third.ExpiresAt.Equal(recovered.ExpiresAt) || !third.IdleUntil.Equal(recovered.IdleUntil) || third.Spent != recovered.Spent {
+		t.Fatal("recovery close changed original control bounds", third, recovered, err)
+	}
+	replayed, err := ledger.CloseLiveControl(ctx, third)
+	if err != nil || replayed != third {
+		t.Fatal("recovery close was not idempotent", replayed, err)
+	}
 	changed := limits
 	changed.PrincipalBurst++
 	replacement, err := postgres.NewLiveWatches(ctx, pool, root, request.Binding.ProcessEpoch, owners.reader, current, changed)
