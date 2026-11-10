@@ -2,17 +2,16 @@
 import { expect } from '@playwright/test';
 import assert from 'node:assert/strict';
 import { validProcessingInventory, validProcessingReceipt } from '../src/generated/validate-processing.js';
+import { validInput_search_processing_evidence, validOutput_search_processing_evidence } from '../src/generated/validate-processing-discovery.js';
 
-export async function processingJourney({ page, origin, artifactID, casePath, restricted = async () => {}, released = async () => {}, stage = () => {} }) {
+export async function processingJourney({ page, origin, artifactID, casePath, parents = [], restricted = async () => {}, discovered = async () => {}, released = async () => {}, stage = () => {} }) {
   const selected = '/processing/artifacts/' + artifactID;
   stage('case-navigation');
-  if (casePath) {
-    await page.goto(origin + casePath);
-    const link = page.getByRole('link', { name: 'Manage processing restriction', exact: true });
-    stage('artifact-link');
-    await expect(link).toHaveAttribute('href', selected);
-    await link.click();
-  } else await page.goto(origin + selected);
+  await page.goto(origin + casePath);
+  const link = page.getByRole('link', { name: 'Manage processing restriction', exact: true });
+  stage('artifact-link');
+  await expect(link).toHaveAttribute('href', selected);
+  await link.click();
   stage('selected-page');
   await expect(page.getByRole('heading', { name: 'Processing restrictions', exact: true })).toBeVisible();
   await expect(page.getByLabel('Artifact ID', { exact: true })).toHaveValue(artifactID);
@@ -56,6 +55,43 @@ export async function processingJourney({ page, origin, artifactID, casePath, re
   const row = inventory.rules.find(rule => rule.id === restriction.receipt.ruleID);
   assert(row && row.state === 'restricted' && row.revision === 1, 'persisted exact restriction after reload');
   const panel = page.getByRole('region', { name: 'Processing rule ' + row.id, exact: true });
+  stage('restricted-discovery');
+  const caseID = casePath.split('/').at(-1);
+  const search = page.getByRole('region', { name: 'Find evidence', exact: true });
+  await search.getByLabel('Case ID', { exact: true }).fill(caseID);
+  const discoveryResponse = page.waitForResponse(r => new URL(r.url()).pathname === '/api/v1/operations/search_processing_evidence' && r.request().method() === 'POST');
+  await search.getByRole('button', { name: 'Search evidence', exact: true }).click();
+  const discovery = await discoveryResponse;
+  assert.equal(discovery.status(), 200, 'processing discovery HTTP status ' + discovery.status());
+  const query = discovery.request().postDataJSON(), headers = await discovery.request().allHeaders();
+  assert(validInput_search_processing_evidence(query), 'closed discovery query contract');
+  assert.deepEqual(Object.keys(query).sort(), ['case_id', 'limit']);
+  assert.equal(query.case_id, caseID, 'search uses the exact case');
+  assert.equal(headers.origin, origin, 'discovery exact origin');
+  assert.equal(headers['x-csrf-token'].length, 43, 'discovery CSRF length');
+  const body = await discovery.body(), reply = JSON.parse(body.toString('utf8'));
+  assert(validOutput_search_processing_evidence(reply), 'closed discovery response contract');
+  assert.equal(reply.status, 'ok');
+  assert.equal(reply.data_class, 'metadata');
+  assert.equal(reply.data.candidates.length, 1, 'exact case has one published candidate');
+  const candidate = reply.data.candidates[0];
+  assert.equal(candidate.artifact_id, artifactID);
+  assert.equal(candidate.case_id, caseID);
+  assert.equal(candidate.origin, parents.length ? 'derived' : 'capture');
+  assert.deepEqual(candidate.parents, parents, 'recorded direct lineage');
+  const result = search.getByRole('article', { name: 'Evidence candidate ' + artifactID, exact: true });
+  await expect(result.getByRole('heading', { name: 'Artifact ' + artifactID, exact: true })).toBeVisible();
+  if (parents.length) {
+    await expect(result.getByText('Recorded direct parents', { exact: true })).toBeVisible();
+    await expect(result.getByRole('listitem')).toHaveText(parents);
+  } else await expect(result.getByText('Original capture', { exact: true })).toBeVisible();
+  const artifact = page.getByLabel('Artifact ID', { exact: true });
+  await expect(artifact).toHaveValue('');
+  await result.getByRole('button', { name: 'Select artifact for restriction', exact: true }).click();
+  await expect(artifact).toHaveValue(artifactID);
+  await expect(artifact).toBeFocused();
+  await expect(panel.getByText('State: restricted. Revision 1.', { exact: true })).toBeVisible();
+  await discovered({ discovery: { requestID: reply.request_id, candidate, responseBytes: body.length } });
   stage('release');
   const response = page.waitForResponse(r => new URL(r.url()).pathname === '/api/v1/processing/changes');
   await panel.getByRole('button', { name: 'Release restriction', exact: true }).click();

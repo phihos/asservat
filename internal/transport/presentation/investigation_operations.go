@@ -103,6 +103,13 @@ func NewInvestigationLiveCapacityOperations(base *InvestigationOperations, capac
 	return withOperations(base, capacity)
 }
 
+func NewInvestigationProcessingDiscoveryOperations(base *InvestigationOperations, discovery *ProcessingDiscoveryOperations) (*InvestigationOperations, error) {
+	if discovery == nil {
+		return nil, ErrOperationsConfiguration
+	}
+	return withOperations(base, discovery)
+}
+
 // NewInvestigationGrantOperations adds the ADR-249 grant operations the same way.
 func NewInvestigationGrantOperations(base *InvestigationOperations, grants *GrantOperations) (*InvestigationOperations, error) {
 	if grants == nil {
@@ -248,6 +255,8 @@ func (s *InvestigationOperations) CallWithContext(ctx context.Context, current i
 	case *RetentionPreviewOperations:
 		return p.CallWithContext(ctx, current, call, name, raw)
 	case *LiveCapacityOperations:
+		return p.CallWithContext(ctx, current, call, name, raw)
+	case *ProcessingDiscoveryOperations:
 		return p.CallWithContext(ctx, current, call, name, raw)
 	case *GrantOperations:
 		return p.CallWithContext(ctx, current, call, name, raw)

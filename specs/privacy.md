@@ -145,6 +145,19 @@ conflict requires refreshed state and another explicit decision. Existing
 started responses retain ADR-312's original bounds. The console never treats an
 administrative deadline or missing browser state as release.
 
+### SC-PRV-011
+
+Given a retained published artifact under a processing restriction, a current
+privacy operator can find it by its system-issued case ID or by the original
+workload identity and a half-open acquisition interval. An optional exact
+purpose filters the bounded page. The result shows effective custody dates and
+the direct parent IDs recorded at publication. Empty filtered pages can carry
+a continuation. An ordinary evidence reader cannot run this search, and the
+server commits its audit outcome before returning metadata. Search findings do
+not establish that any user appears in the evidence or that all derivatives
+are known. The operator can select an exact result for the existing explicit
+restriction action.
+
 ## REQ-PRV-007 — External agents, transfers and operational privacy
 
 Apply locality policy to raw storage, decryption, derived results, hub indexes, backups, support bundles and configured event destinations. The hub region and authorized remote client disclosures are part of the data-flow inventory. Local raw storage alone does not establish that all personal data remains in that region. The administrator approves clients/data classes for external AI disclosure and supplies the relevant organizational handling policy. Authentication/client allowlisting constrains recipients, but cannot establish or enforce their eventual model provider, geography, logging or retention.

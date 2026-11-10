@@ -286,7 +286,7 @@ func (s *AuditedOperations) call(ctx context.Context, current identities.Current
 			rejection = IngressInvalid
 		} else if normalized, err = s.normalize(name, raw); err != nil {
 			rejection = IngressInvalid
-		} else if !slices.Contains(initial.Scopes, "evidence:read") {
+		} else if name != processingDiscoveryOperation && !slices.Contains(initial.Scopes, "evidence:read") {
 			rejection = IngressDenied
 		} else if (name == "prepare_artifact_download" || name == "get_artifact_download") && !slices.Contains(initial.Scopes, "evidence:download") {
 			rejection, downloadScopeDenied = IngressDenied, true
@@ -543,6 +543,13 @@ func (s *AuditedOperations) normalize(name string, raw []byte) ([]byte, error) {
 		}
 		return json.Marshal(in)
 	}
+	if name == processingDiscoveryOperation {
+		query, err := processingDiscoveryQuery(raw)
+		if err != nil {
+			return nil, err
+		}
+		return json.Marshal(query)
+	}
 	if name == "preview_retention_change" {
 		var in RetentionPreviewInput
 		if json.Unmarshal(raw, &in) != nil {
@@ -648,6 +655,11 @@ func (s *AuditedOperations) result(in audit.OperationIntent, reply OperationRepl
 				Artifacts             []struct {
 					ID string `json:"artifact_id"`
 				} `json:"artifacts"`
+				Candidates []struct {
+					ArtifactID string `json:"artifact_id"`
+					CaptureID  string `json:"capture_id"`
+					CaseID     string `json:"case_id"`
+				} `json:"candidates"`
 			}
 			if json.Unmarshal(envelope.Data, &refs) != nil {
 				return out, auditapp.ErrUnavailable
@@ -693,6 +705,17 @@ func (s *AuditedOperations) result(in audit.OperationIntent, reply OperationRepl
 			}
 			for _, a := range refs.Artifacts {
 				out.ArtifactIDs = append(out.ArtifactIDs, a.ID)
+			}
+			if in.Name == processingDiscoveryOperation {
+				for _, candidate := range refs.Candidates {
+					out.ArtifactIDs = append(out.ArtifactIDs, candidate.ArtifactID)
+					if !slices.Contains(out.CaseIDs, candidate.CaseID) {
+						out.CaseIDs = append(out.CaseIDs, candidate.CaseID)
+					}
+					if !slices.Contains(out.CaptureIDs, candidate.CaptureID) {
+						out.CaptureIDs = append(out.CaptureIDs, candidate.CaptureID)
+					}
+				}
 			}
 			if in.Name == "get_http_headers" || in.Name == "get_profile_summary" || in.Name == "get_pcap_summary" || in.Name == "pcap_query" || in.Name == "compare_profiles" || syscallQueryOperation(in.Name) {
 				// ADR-282: the disclosed page names its one artifact as provenance.

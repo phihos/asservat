@@ -62,8 +62,12 @@ func (s ProcessingChanges) authority(ctx context.Context, source ProcessingIdent
 		return zero, value.ErrUnavailable
 	}
 	p, e := s.Policies.DownloadPolicy(ctx)
-	if e != nil || p.RootID != s.RootID || p.InstallationID != s.InstallationID || !p.Operator(i, s.Now()) {
+	now := s.Now()
+	if e != nil || ctx.Err() != nil || p.RootID != s.RootID || p.InstallationID != s.InstallationID || !p.Valid(now) || !i.Valid(now) {
 		return zero, value.ErrUnavailable
+	}
+	if !p.Operator(i, now) {
+		return zero, identity.ErrDenied
 	}
 	r, e := s.Recovery.RecoveryState(ctx)
 	if e != nil {
@@ -107,7 +111,7 @@ func (s ProcessingChanges) Change(ctx context.Context, source ProcessingIdentity
 	defer stop()
 	authority, e := s.authority(call, source, started, until)
 	if e != nil {
-		return zero, e
+		return zero, value.ErrUnavailable
 	}
 	until = authority.ValidUntil.UTC().Truncate(time.Microsecond)
 	call, stopOriginal := context.WithDeadline(call, until)

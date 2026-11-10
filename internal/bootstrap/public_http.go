@@ -224,6 +224,14 @@ func newPublicHandler(ctx context.Context, d *OwnerDeployment, a publicAuditStor
 			return nil, &fixedStepError{"processing-inventory", mounts.ErrUnavailable}
 		}
 		services.ProcessingRules = publicProcessingInventory{privacyapp.ProcessingRuleInventory{RootID: root, InstallationID: installation, Policies: pc.processingPolicy, Recovery: pc.recovery, Inventory: inventory, Now: time.Now}}
+		discovery, err := presentation.NewProcessingDiscoveryOperations(p.Origin, time.Now, ownerRandomID,
+			privacyapp.ProcessingEvidenceDiscovery{RootID: root, InstallationID: installation, Policies: pc.processingPolicy, Recovery: pc.recovery, Discovery: inventory, Now: time.Now})
+		if err != nil {
+			return nil, &fixedStepError{"processing-discovery", err}
+		}
+		if services.Operations, err = presentation.NewInvestigationProcessingDiscoveryOperations(operations, discovery); err != nil {
+			return nil, &fixedStepError{"processing-discovery", err}
+		}
 		services.Processing = publicProcessingChanges{root: root, installation: installation, profiles: profiles, policies: pc.processingPolicy, recovery: pc.recovery, decisions: decisions, artifactScopes: inventory, audit: normal, releaseAudit: release, mac: pc.mac, refused: eventLog(os.Stderr, "processing change refused")}
 	}
 	h, err := NewPublicContextHandler(PublicContextConfig{PublicOrigin: p.Origin, Issuer: id.settings.Issuer, Version: p.Version,

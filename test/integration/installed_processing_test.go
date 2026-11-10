@@ -11,10 +11,13 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"syscall"
 	"testing"
 	"time"
 
+	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/privacy"
 	"asservat.local/asservat/internal/transport/browser"
@@ -44,14 +47,20 @@ type installedProcessingReceipt struct {
 	Revision    int64  `json:"revision"`
 	Sequence    int64  `json:"sequence"`
 }
+type installedProcessingDiscovery struct {
+	RequestID     string                             `json:"requestID"`
+	Candidate     value.ProcessingDiscoveryCandidate `json:"candidate"`
+	ResponseBytes int64                              `json:"responseBytes"`
+}
 type installedProcessingEvent struct {
-	Kind    string                     `json:"kind"`
-	Receipt installedProcessingReceipt `json:"receipt"`
-	Input   json.RawMessage            `json:"input"`
-	Key     string                     `json:"key"`
-	Stage   string                     `json:"stage"`
-	Reason  string                     `json:"reason"`
-	Check   string                     `json:"check"`
+	Kind      string                       `json:"kind"`
+	Receipt   installedProcessingReceipt   `json:"receipt"`
+	Discovery installedProcessingDiscovery `json:"discovery"`
+	Input     json.RawMessage              `json:"input"`
+	Key       string                       `json:"key"`
+	Stage     string                       `json:"stage"`
+	Reason    string                       `json:"reason"`
+	Check     string                       `json:"check"`
 }
 
 // The real compiled React journey owns both mutations and obtains release
@@ -106,6 +115,10 @@ func qualifyInstalledProcessing(t *testing.T, parent context.Context, c installe
 			t.Fatal("restricted evidence accepted a new ordinary read", request.name, err)
 		}
 	}
+	driver.send(map[string]bool{"continue": true})
+	discovery := next("discovered")
+	c.checkDiscovery(t, ctx, restriction.Receipt, discovery.Discovery)
+	t.Logf("installed processing stage=discovered after %s", time.Since(started).Round(time.Millisecond))
 	driver.send(map[string]bool{"continue": true})
 	release := next("released")
 	if release.Receipt.State != "released" || release.Receipt.Revision != 2 || release.Receipt.RuleID != restriction.Receipt.RuleID || release.Receipt.Sequence <= restriction.Receipt.Sequence {
@@ -169,7 +182,52 @@ func qualifyInstalledProcessing(t *testing.T, parent context.Context, c installe
 		}
 		driver.cancel()
 	})
-	t.Logf("installed processing stage=complete after %s: real React restrict/reload/exact release, both original-key replays unchanged, ordinary reads refused under restriction and original native bytes restored without extending access", time.Since(started).Round(time.Millisecond))
+	t.Logf("installed processing complete after %s. React restricted the artifact, found its recorded lineage after ordinary reads were refused, selected it without a mutation, and released the exact restriction. Both replays preserved SQL state and native download restored the original bytes and deadline.", time.Since(started).Round(time.Millisecond))
+}
+
+func (c installedProcessingRun) checkDiscovery(t *testing.T, ctx context.Context, restriction installedProcessingReceipt, d installedProcessingDiscovery) {
+	t.Helper()
+	candidate := d.Candidate
+	if !authorization.UUID(d.RequestID) || d.RequestID == restriction.RequestID || !candidate.Valid() || candidate.ArtifactID != c.ArtifactID || candidate.CaseID != c.CaseID || !candidate.ExpiresAt.Equal(c.ExpiresAt) ||
+		d.ResponseBytes < 1 || d.ResponseBytes > audit.OperationOutputLimit {
+		t.Fatal("installed processing discovery returned different artifact identity, expiry or response bounds")
+	}
+	var stored value.ProcessingDiscoveryCandidate
+	var parentsJSON []byte
+	var unchanged, acknowledged bool
+	installedJourneyReadOnly(t, ctx, c.SQL, func(tx pgx.Tx) error {
+		return tx.QueryRow(ctx, `SELECT p.capture_id,p.cluster_id,p.namespace_uid,p.workload_uid,p.origin,p.parents,p.anchor_at,a.effective_expires_at,a.effective_delete_by,a.state,
+    r.state='restricted' AND r.revision=$6 AND pr.sequence=$7,
+    o.lane='normal' AND o.intent->>'Name'='search_processing_evidence' AND o.intent->>'InputFormat'='context-input/v1'
+    AND o.intent_receipt IS NOT NULL AND o.outcome_receipt IS NOT NULL AND l.intent_completion IS NOT NULL AND l.outcome_completion IS NOT NULL
+    AND o.outcome->>'Status'='success' AND o.outcome->>'Effect'='none' AND o.outcome->>'ClientReceipt'='unknown'
+    AND (o.outcome->>'OutputBytes')::bigint=$8
+    AND o.outcome->'ArtifactIDs'=jsonb_build_array(p.artifact_id)
+    AND o.outcome->'CaptureIDs'=jsonb_build_array(p.capture_id)
+    AND o.outcome->'CaseIDs'=jsonb_build_array(loc.case_id)
+  FROM context_processing p JOIN context_case_locator loc ON loc.root_id=p.root_id AND loc.artifact_id=p.artifact_id AND loc.capture_id=p.capture_id
+  JOIN custody_attempt a ON a.id=p.attempt_id AND a.cluster_id=p.cluster_id AND a.artifact_id=p.artifact_id
+  JOIN processing_root pr ON pr.root_id=p.root_id
+  JOIN processing_rule r ON r.root_id=p.root_id AND r.id=$5
+  JOIN operation_audit o ON o.root_id=p.root_id AND o.id=$4
+  JOIN operation_audit_lifecycle l ON l.root_id=p.root_id AND l.operation_id=o.id
+  WHERE p.root_id=$1 AND p.artifact_id=$2 AND loc.case_id=$3`,
+			c.RootID, c.ArtifactID, c.CaseID, d.RequestID, restriction.RuleID, restriction.Revision, restriction.Sequence, d.ResponseBytes).
+			Scan(&stored.CaptureID, &stored.ClusterID, &stored.NamespaceUID, &stored.WorkloadUID, &stored.Origin, &parentsJSON, &stored.AnchorAt, &stored.ExpiresAt, &stored.DeleteBy, &stored.CustodyState, &unchanged, &acknowledged)
+	})
+	var parents []artifact.Location
+	if json.Unmarshal(parentsJSON, &parents) != nil || parents == nil {
+		t.Fatal("installed processing lineage malformed")
+	}
+	parentIDs := make([]string, len(parents))
+	for i, parent := range parents {
+		parentIDs[i] = parent.ArtifactID
+	}
+	if candidate.CaptureID != stored.CaptureID || candidate.ClusterID != stored.ClusterID || candidate.NamespaceUID != stored.NamespaceUID || candidate.WorkloadUID != stored.WorkloadUID ||
+		candidate.Origin != stored.Origin || !slices.Equal(candidate.Parents, parentIDs) || !candidate.AnchorAt.Equal(stored.AnchorAt) || !candidate.ExpiresAt.Equal(stored.ExpiresAt) ||
+		!candidate.DeleteBy.Equal(stored.DeleteBy) || candidate.CustodyState != stored.CustodyState || !unchanged || !acknowledged {
+		t.Fatal("installed processing discovery differs from retained lineage, restriction or acknowledged normal audit")
+	}
 }
 
 func (c installedProcessingRun) checkReceipt(t *testing.T, ctx context.Context, event installedProcessingEvent, lane string) {

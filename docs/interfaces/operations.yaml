@@ -525,6 +525,13 @@ operations:
   - browser
   effect: read
   role: fleet-operator-or-delegation-previewer
+- operation: search_processing_evidence
+  path: /api/v1/operations/search_processing_evidence
+  transport:
+  - browser
+  effect: read
+  role: privacy-operator
+  contract: specs/contracts/mcp-tools.json
 - operation: get_live_capacity
   path: /api/v1/operations/get_live_capacity
   transport:

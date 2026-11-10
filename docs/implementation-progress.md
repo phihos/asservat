@@ -1,13 +1,31 @@
 # Sustained implementation progress
 
-## Active candidate: qualified processing inventory and release (2026-11-10)
+## Active candidate: privacy evidence discovery (2026-11-11)
+
+Outcome: a privacy operator finds restricted retained evidence by exact case
+or workload/acquisition interval, filters by accepted purpose, inspects recorded
+parent IDs, and selects an artifact for restriction. The search uses the
+existing normal audit lane and compiled hub SQL role. [ADR-319](decisions/319-privacy-evidence-discovery.md)
+records the bounds and qualification plan. Candidate `feature/privacy-rights-discovery`
+starts at authoritative `4f3c8d18`. Focused audited-presentation, application,
+privacy and audit Go race tests pass. The compiled-role SQL discovery fixture
+passed in 4.529 s. The schema-owner upgrade fixture passed in 6.977 s with floor
+149 and exact audit validator restoration on empty Down. Both report unchanged
+sources and empty cleanup failures. The shared controlled Chromium journey
+passed in 4.28 s after correcting the generated validator ES module import.
+Full repository, full packaged browser and fresh installed checks remain pending.
+
+## Merged processing inventory and release (2026-11-10)
 
 Outcome: a configured operator selects an existing artifact, restricts it,
 rediscovers its durable rule after reload, releases the exact revision and
 recovers ordinary reads and a new native download of the same original bytes.
-Candidate: `feature/processing-release-flow`, source `a1275b0f`, in the separate
-processing-release worktree based on qualified `dda2f708` (PR #216). Required CI
-and review state are tracked on the candidate PR. No merge or release is claimed.
+The installed source was `a1275b0f`. [PR #216](https://github.com/phihos/asservat/pull/216)
+merged at `9a31b555`, and [PR #217](https://github.com/phihos/asservat/pull/217)
+merged at `4f3c8d18` after rebasing onto that tree. GitHub's required
+[`pull_request` CI](https://github.com/phihos/asservat/actions/runs/42915115122)
+passed all 14 Go shards and `ci-ok` at rebased `f2101dd9`. Its complete tree
+matches merged `main`. All 4,750 installed source hashes remain applicable.
 [ADR-318](decisions/318-processing-operator-rule-inventory-and-release.md)
 records contracts, original authority bounds, the reserve and complexity review.
 
