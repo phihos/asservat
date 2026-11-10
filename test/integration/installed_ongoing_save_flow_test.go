@@ -594,13 +594,24 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 			}
 			second["source_handles"] = []string{overloadSelected.Handle}
 			second["idempotency_key"] = "live-incident-overload-" + overloadSelected.ID
-			reply, code, err := invoke(ctx, "open_live_watch", second)
+			var overloadWatch v.Watch
+			must("open_live_watch", second, &overloadWatch)
+			if overloadWatch.Cursor == nil {
+				t.Fatal("overload view lost its original cursor")
+			}
+			var originalBatch v.Batch
+			must("read_live_watch", map[string]any{"watch_id": liveWatch.ID, "cursor": *liveWatch.Cursor, "limit": 20, "wait_ms": 1000}, &originalBatch)
+			if originalBatch.WatchID != liveWatch.ID || originalBatch.State != "Active" {
+				t.Fatal("original cohort was not active before the overload read")
+			}
+			reply, code, err := invoke(ctx, "read_live_watch", map[string]any{"watch_id": overloadWatch.ID, "cursor": *overloadWatch.Cursor, "limit": 20, "wait_ms": 0})
 			var failure struct {
 				Retryable bool `json:"retryable"`
 			}
-			if err != nil || code != "CapacityUnavailable" || reply.Status != "error" || json.Unmarshal(reply.Data, &failure) != nil || failure.Retryable {
-				t.Fatal("second distinct-source view was not shed at the one-slot node budget", code, err)
+			if err != nil || code != "LiveUnavailable" || reply.Status != "error" || json.Unmarshal(reply.Data, &failure) != nil || !failure.Retryable {
+				t.Fatal("second distinct-source read was not shed at the one-slot node budget", code, err)
 			}
+			must("close_live_watch", map[string]any{"watch_id": overloadWatch.ID, "expected_revision": overloadWatch.Revision, "idempotency_key": "live-overload-close-" + overloadWatch.ID}, nil)
 			must("deactivate_policy", map[string]any{"policy_name": overloadName, "idempotency_key": "live-overload-stop-" + overloadActive.PolicyUID}, nil)
 			wait("distinct overload source stopped before incident", time.Minute, func(call context.Context) bool {
 				var ended *time.Time
