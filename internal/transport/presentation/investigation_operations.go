@@ -94,6 +94,15 @@ func NewInvestigationRetentionPreviewOperations(base *InvestigationOperations, p
 	return withOperations(base, preview)
 }
 
+// NewInvestigationLiveCapacityOperations adds the browser-only administrator
+// live-runtime capacity operation the same way.
+func NewInvestigationLiveCapacityOperations(base *InvestigationOperations, capacity *LiveCapacityOperations) (*InvestigationOperations, error) {
+	if capacity == nil {
+		return nil, ErrOperationsConfiguration
+	}
+	return withOperations(base, capacity)
+}
+
 // NewInvestigationGrantOperations adds the ADR-249 grant operations the same way.
 func NewInvestigationGrantOperations(base *InvestigationOperations, grants *GrantOperations) (*InvestigationOperations, error) {
 	if grants == nil {

@@ -3051,6 +3051,41 @@ paths:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
+  /api/v1/operations/get_live_capacity:
+    post:
+      operationId: get_live_capacity
+      summary: Fleet operators read one selected cluster's content-minimized live-view runtime totals and complete report-to-report rates (browser only).
+      tags:
+      - Human console
+      x-domain-contract: get_live_capacity
+      x-effect: read
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/McpInput_get_live_capacity'
+      parameters:
+      - name: X-CSRF-Token
+        in: header
+        required: true
+        description: Required on session-authenticated POST; validate origin and session-bound token.
+        schema:
+          type: string
+          maxLength: 256
+      responses:
+        '200':
+          description: Existing bounded MCP domain-result envelope; domain errors remain status=error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/McpOutput_get_live_capacity'
+        default:
+          description: Transport/session/validation failure; no evidence in error details.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
   /api/v1/operations/preview_retention_change:
     post:
       operationId: preview_retention_change
@@ -4055,6 +4090,67 @@ components:
               - message
               - assignments
               - assignments_total
+          required:
+          - status
+          - data
+        - type: object
+          properties:
+            status:
+              const: error
+            data:
+              type: object
+              additionalProperties: false
+              properties:
+                code:
+                  type: string
+                  minLength: 1
+                  maxLength: 64
+                message:
+                  type: string
+                  minLength: 1
+                  maxLength: 1024
+                retryable:
+                  type: boolean
+                navigation_uri:
+                  type: string
+                  format: uri
+                  maxLength: 2048
+                responsible_role:
+                  enum:
+                  - maintainer
+                  - approver
+                  - administrator
+                  - none
+                retry_after_seconds:
+                  type: integer
+                  minimum: 1
+                  maximum: 60
+              required:
+              - code
+              - message
+              - retryable
+          required:
+          - status
+          - data
+    McpInput_get_live_capacity:
+      type: object
+      additionalProperties: false
+      properties:
+        cluster_id:
+          type: string
+          format: uuid
+      required:
+      - cluster_id
+    McpOutput_get_live_capacity:
+      allOf:
+      - $ref: https://asservat.io/spec/v1/mcp-result.schema.json
+      - oneOf:
+        - type: object
+          properties:
+            status:
+              const: ok
+            data:
+              $ref: https://asservat.io/spec/v1/live-capacity.schema.json
           required:
           - status
           - data

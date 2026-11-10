@@ -46,6 +46,8 @@ Build approved projections close to the existing source using independently boun
 
 Slow readers are sampled/dropped/disconnected with visible loss, never allowed to hold the collector, freeze raw rings or backpressure the workload. Incident snapshots have scheduling priority. Overload sheds live projections first; base recording remains governed by its own safety limits. Reserve original recorder baseline separately from incremental live-view cost and show both. Expose active viewers, output/scan rates, lag, drops and denied admissions through content-minimized operator metrics and capacity views. Streaming needs no Kafka/Redis, per-row SQL write or object upload.
 
+The implemented administrator view uses the browser-only `get_live_capacity` operation for one explicitly selected cluster. It returns current active cohorts and cumulative scan/delivery/refusal counts plus per-second rates only when every current live-enabled node has a valid report predecessor; otherwise rates are explicitly unavailable. It exposes no node, workload, principal, source, filter, row or payload labels and performs no background polling or acquisition. Baseline recorder resources remain separately accounted in the existing node/source reports rather than being summed into live-view counters.
+
 ### SC-LIV-004
 
 Given a syscall storm and many viewers, when live budgets are exhausted, then views show sampled/missing data or stop while recording and protected incident saves retain their allocated resources. Opening another tab, retrying or changing filters cannot reset principal/workload counters.

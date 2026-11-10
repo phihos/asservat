@@ -148,6 +148,17 @@ func newPublicHandler(ctx context.Context, d *OwnerDeployment, a publicAuditStor
 			return nil, &fixedStepError{"access-preview", mounts.ErrUnavailable}
 		}
 	}
+	// The fleet operators' browser-only single-cluster live-runtime view.
+	capacity, err := composePublicLiveCapacity(PublicContextOperationsConfig{RootID: root, InstallationID: installation, PublicOrigin: p.Origin, CollectionEnabled: true, Now: time.Now, NewID: ownerRandomID},
+		PublicContextOperationServices{History: pc.history, Investigation: pc.investigation, Intents: pc.intents, Regional: pc.regional, Progress: pc.progress, Cases: pc.cases, Downloads: dl.coordinator, Native: dl.native, Projection: dl.projection}, pc)
+	if err != nil {
+		return nil, &fixedStepError{"live-capacity", mounts.ErrUnavailable}
+	}
+	if capacity != nil {
+		if operations, err = presentation.NewInvestigationLiveCapacityOperations(operations, capacity); err != nil {
+			return nil, &fixedStepError{"live-capacity", mounts.ErrUnavailable}
+		}
+	}
 	// ADR-240: the fleet operators' browser-only preview_retention_change.
 	retentionPreview, err := composePublicRetentionPreview(PublicContextOperationsConfig{RootID: root, InstallationID: installation, PublicOrigin: p.Origin, CollectionEnabled: true, Now: time.Now, NewID: ownerRandomID},
 		PublicContextOperationServices{History: pc.history, Investigation: pc.investigation, Intents: pc.intents, Regional: pc.regional, Progress: pc.progress, Cases: pc.cases, Downloads: dl.coordinator, Native: dl.native, Projection: dl.projection}, pc)

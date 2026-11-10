@@ -40,6 +40,8 @@ nothing yet; increment 4 adds the first recorder.
    the latest report-to-report rates in memory. `read-live-runtime` aggregates
    current totals/rates over the existing idle regional query with no node labels;
    incomplete predecessors suppress the whole rate set, not acquisition or reports.
+   Fleet operators read one selected cluster through the browser-only
+   `get_live_capacity` operation; it uses the same aggregate and current checks.
 5. Work: the collector long-polls (25 s hold) for work after its last sequence. Kinds are
    `armSource`, `stopSource`, `snapshot`, `peerGeneration` (no producer; refused with
    `RecorderNotImplemented`, `WorkExpired` or `WorkUnknown`) and `packetCapture`

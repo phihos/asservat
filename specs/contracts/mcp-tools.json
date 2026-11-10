@@ -17069,6 +17069,112 @@
       }
     },
     {
+      "name": "get_live_capacity",
+      "description": "Read one selected cluster's content-minimized live-view runtime capacity: current active cohorts and cumulative scan/delivery/refused-admission counters, plus report-to-report rates when every current live-enabled node has a valid predecessor. Incomplete rates are explicitly unavailable rather than partial. For fleet operators; no workload, principal, source, filter, row or payload labels are returned and no acquisition occurs.",
+      "enabledByDefault": true,
+      "transports": [
+        "browser"
+      ],
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "cluster_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "cluster_id"
+        ]
+      },
+      "outputSchema": {
+        "allOf": [
+          {
+            "$ref": "https://asservat.io/spec/v1/mcp-result.schema.json"
+          },
+          {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "const": "ok"
+                  },
+                  "data": {
+                    "$ref": "https://asservat.io/spec/v1/live-capacity.schema.json"
+                  }
+                },
+                "required": [
+                  "status",
+                  "data"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "const": "error"
+                  },
+                  "data": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "code": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      },
+                      "message": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 1024
+                      },
+                      "retryable": {
+                        "type": "boolean"
+                      },
+                      "navigation_uri": {
+                        "type": "string",
+                        "format": "uri",
+                        "maxLength": 2048
+                      },
+                      "responsible_role": {
+                        "enum": [
+                          "maintainer",
+                          "approver",
+                          "administrator",
+                          "none"
+                        ]
+                      },
+                      "retry_after_seconds": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 60
+                      }
+                    },
+                    "required": [
+                      "code",
+                      "message",
+                      "retryable"
+                    ]
+                  }
+                },
+                "required": [
+                  "status",
+                  "data"
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
       "name": "preview_retention_change",
       "description": "Preview how proposed EvidenceRetentionPolicy changes would shorten the retention of evidence already stored, before applying them through Kubernetes (ADR-240). Applies the proposal to the latest accepted policies of the hub (no source_cluster_id) or of one cluster's local source exactly as reconciliation will after acceptance, over at most 10,000 retained artifacts whose deletion is not yet due: affected artifacts per cluster and class, how many would become unreadable or due for deletion at once, and the earliest new access end and deletion dates. A longer limit never moves an already bound date. Artifacts for which a newly selected label selector would need historical labels are Unknown, never assumed; clusters whose policy source is not current are listed as incomplete. For fleet operators; it changes nothing: apply the change with kubectl or GitOps.",
       "enabledByDefault": true,

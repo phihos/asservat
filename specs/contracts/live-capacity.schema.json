@@ -1,0 +1,136 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/live-capacity.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "cluster_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "observed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "fresh_until": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "message": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024
+    },
+    "nodes": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 5000
+    },
+    "rates_unavailable": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 5000
+    },
+    "rates_complete": {
+      "type": "boolean"
+    },
+    "live": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cohorts": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 80000
+        },
+        "scan_events": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        },
+        "scan_bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        },
+        "scan_cpu_nanos": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        },
+        "delivered_rows": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        },
+        "delivered_bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        },
+        "refused_admissions": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        }
+      },
+      "required": [
+        "cohorts",
+        "scan_events",
+        "scan_bytes",
+        "scan_cpu_nanos",
+        "delivered_rows",
+        "delivered_bytes",
+        "refused_admissions"
+      ]
+    },
+    "rates": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "scan_events_per_second": {
+          "type": "number",
+          "minimum": 0
+        },
+        "scan_bytes_per_second": {
+          "type": "number",
+          "minimum": 0
+        },
+        "scan_cpu_nanos_per_second": {
+          "type": "number",
+          "minimum": 0
+        },
+        "delivered_rows_per_second": {
+          "type": "number",
+          "minimum": 0
+        },
+        "delivered_bytes_per_second": {
+          "type": "number",
+          "minimum": 0
+        },
+        "refused_admissions_per_second": {
+          "type": "number",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "scan_events_per_second",
+        "scan_bytes_per_second",
+        "scan_cpu_nanos_per_second",
+        "delivered_rows_per_second",
+        "delivered_bytes_per_second",
+        "refused_admissions_per_second"
+      ]
+    }
+  },
+  "required": [
+    "cluster_id",
+    "observed_at",
+    "fresh_until",
+    "message",
+    "nodes",
+    "rates_unavailable",
+    "rates_complete",
+    "rates"
+  ]
+}
