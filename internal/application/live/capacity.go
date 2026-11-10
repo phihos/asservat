@@ -63,8 +63,16 @@ func (s CapacityReader) Read(ctx context.Context, current CurrentIdentity, clust
 		return zero, time.Time{}, identity.ErrDenied
 	}
 	admin, err := s.Administration.FleetAdministration(ctx)
-	if err != nil || !admin.Valid(s.Now()) || admin.InstallationID != s.InstallationID {
-		s.note("administration")
+	if err != nil {
+		s.note("administration-read")
+		return zero, time.Time{}, identity.ErrUnavailable
+	}
+	if admin.InstallationID != s.InstallationID {
+		s.note("administration-scope")
+		return zero, time.Time{}, identity.ErrUnavailable
+	}
+	if !admin.Valid(s.Now()) {
+		s.note("administration-valid")
 		return zero, time.Time{}, identity.ErrUnavailable
 	}
 	if !admin.Operator(caller) {
