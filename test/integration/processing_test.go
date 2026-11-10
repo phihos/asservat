@@ -107,7 +107,7 @@ func qualifyProcessingRestrictions(t *testing.T, ctx context.Context, admin *pgx
 	if view, err := cases.GetContextCase(ctx, readActor, e.CaseID); err == nil || view.CaseID != "" || len(view.Artifacts) != 0 {
 		t.Fatal("ordinary case metadata bypassed restriction", view, err)
 	}
-	qualifyProcessingInventory(t, ctx, admin, s, e, f, restrict)
+	qualifyProcessingInventory(t, ctx, admin, poolFor, s, e, f, restrict)
 	release := privacyvalue.ProcessingChange{RequestID: custodyID(), RuleID: restrict.RuleID, Action: "release_processing", ExpectedRevision: 1, Scope: scope}
 	foreign := f.actor
 	foreign.value.Principal.Subject = "different-privacy-operator"

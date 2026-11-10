@@ -1,4 +1,12 @@
 -- +goose Up
+-- This is a contract migration: the prior binary's strict profile decoder
+-- rejects the additional processing lane. Never advertise an old image as
+-- compatible with this development baseline (ADR-227/318).
+-- +goose StatementBegin
+DO $$ BEGIN
+ EXECUTE 'COMMENT ON TABLE public.goose_db_version IS ''asservat:oldest-binary-schema=149''';
+END $$;
+-- +goose StatementEnd
 -- Expose only the already accepted, independently reserved processing release
 -- profile. No lane, account, pool, grant or initialization is created here.
 -- +goose StatementBegin
@@ -92,6 +100,12 @@ END $$;
 
 
 -- +goose Down
+
+-- +goose StatementBegin
+DO $$ BEGIN
+ EXECUTE 'COMMENT ON TABLE public.goose_db_version IS ''asservat:oldest-binary-schema=102''';
+END $$;
+-- +goose StatementEnd
 
 -- Restore the exact prior projection; retained processing decisions and audit
 -- reservations remain untouched.

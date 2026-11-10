@@ -56,10 +56,15 @@ Existing SQL source, recovery and backing checks remain. Processing changes do
 not alter ADR-312: a started native response continues its original decision;
 new responses still authorize current processing state.
 
-Migration 149 changes the existing audit-profile function only, without table or
-retained-row changes. The current binary requires schema 149. Unsupported older
-development profile layouts fail rather than being silently adopted. Rollback
-restores the exact prior function; this is not a permanent compatibility layer.
+Migration 149 changes the existing audit-profile function and declares the
+existing schema compatibility floor as 149, without table or retained-row changes.
+The prior binary's strict two-lane decoder cannot consume this response. This is
+a fresh supported development baseline: the existing release coordinator refuses
+`installer-upgrade` from 148 before migration, and image-only rollback to 148 is
+unavailable. No existing installation is adopted or erased. Supported additive
+upgrades starting at 149 retain the existing upgrade/rollback mechanism. A direct
+owned-fixture Down restores the exact prior function and floor 102; it is not a
+supported installed downgrade or a permanent development-layout compatibility layer.
 
 ## Complexity and cost review
 

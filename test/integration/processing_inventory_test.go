@@ -14,7 +14,7 @@ import (
 // Reuse the existing actual initialized/restricted SQL fixture. Only the
 // privacy-operator/source roots are synthetic; grants come from the compiled
 // shared hub role that owns the processing duty, without an extra table grant.
-func qualifyProcessingInventory(t *testing.T, ctx context.Context, admin *pgxpool.Pool, s captureAdmissionScenario, e artifact.ContextExpectation, f *processingTestFixture, change value.ProcessingChange) {
+func qualifyProcessingInventory(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, s captureAdmissionScenario, e artifact.ContextExpectation, f *processingTestFixture, change value.ProcessingChange) {
 	t.Helper()
 	const password = "synthetic-inventory"
 	role := narrowRole(t, ctx, admin, "processing_inventory_", password, func(name string) []string {
@@ -24,14 +24,7 @@ func qualifyProcessingInventory(t *testing.T, ctx context.Context, admin *pgxpoo
 		}
 		return grants
 	})
-	config := admin.Config()
-	config.ConnConfig.User = role
-	config.ConnConfig.Password = password
-	config.MaxConns = 2
-	pool, err := pgxpool.NewWithConfig(ctx, config)
-	if err != nil {
-		t.Fatal(err)
-	}
+	pool := poolFor(role, password)
 	defer pool.Close()
 	reader, err := postgres.NewProcessingInventory(ctx, pool, s.a.RootID, s.recovery.guard)
 	if err != nil {
@@ -126,5 +119,5 @@ func qualifyProcessingInventory(t *testing.T, ctx context.Context, admin *pgxpoo
 	if err = admin.QueryRow(ctx, `SELECT jsonb_build_object('root',to_jsonb(p),'rules',(SELECT jsonb_agg(to_jsonb(r) ORDER BY id) FROM processing_rule r WHERE r.root_id=p.root_id))::text FROM processing_root p WHERE p.root_id=$1`, s.a.RootID).Scan(&after); err != nil || after != before {
 		t.Fatal("inventory changed retained rules or authority", err)
 	}
-	t.Log("compiled processing-decision role: operator rule/scope read, cursor, current SQL fences and original lock-wait expiry; no state changes")
+	t.Log("compiled hub role with processing duty: operator rule/scope read, cursor, current SQL fences and original lock-wait expiry; no state changes")
 }
