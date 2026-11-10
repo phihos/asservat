@@ -25,12 +25,10 @@ error freshness and recursive content-label rejection. All 613 console tests,
 full `make pre-push`, and focused race tests for bootstrap, delivery, live
 buffers and node transport passed.
 
-This is real browser/TLS/component evidence with synthetic authority and runtime
-facts, not an installed multi-node or fleet-administrator measurement. The
-installed live fixture does not enable fleet administration, so it cannot
-qualify this operation. Guarded native suites passed the existing
-[policy](../live-lag-drop-policy-42803550038/README.md) and
-[manual](../live-lag-drop-manual-42800188004/README.md) live workflows; they do
-not establish that missing installed measurement. PR CI run 42800168119 and
-Gitar review passed. Earlier failed policy attempts and a passing `main` control
-are linked from the policy evidence rather than being presented as passes.
+This is built-browser/TLS/component evidence with synthetic authority and runtime
+facts. Later [installed run 42887449162](https://github.com/phihos/asservat/actions/runs/42887449162)
+qualified protected fleet capacity reads with two active viewers alongside the
+real policy live workflow. It does not establish multi-node sustained load or
+render the capacity page with installed runtime facts. The current candidate's
+complete checks and scope are recorded in
+[implementation progress](../../../docs/implementation-progress.md).

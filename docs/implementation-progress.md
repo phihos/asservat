@@ -22,8 +22,7 @@ fleet RBAC being installed even without fleet composition. The candidate adds
 real SQL rejection coverage and checks the disabled producer path. The enabled
 owner also needs an exact dry-run probe through both namespace guards so its
 fleet-source policy can be proved independently; real writes remain denied.
-The target
-mapping is a domain-separated SHA-256 digest, not a keyed digest. No role,
+The target mapping is a domain-separated SHA-256 digest, not a keyed digest. No role,
 connection, watch or background poll is added by the viewer aggregate. The
 optional installer selection adds zero API requests or background tasks and
 binds named RBAC/probe templates before resource claims. Retained resource
@@ -58,8 +57,19 @@ service and browser retry handling retains the original view. No read is
 authorized by expired facts, no deadline is renewed, and actual source, rights,
 policy, audience and hard-bound denials remain unchanged. Fixed diagnostic
 phases identify the batch, source-fact or final check without dependency text
-or identifiers. Focused authorization, service and bootstrap race tests pass;
-final integrated gates and fresh live qualification are required for this fix.
+or identifiers. Focused authorization, service and bootstrap race tests pass.
+At `7f4da307`, final `make pre-push` passed (affected Go tests 123 s), and the
+focused compiled-React live gate passed in 14.084 s.
+
+[Native run 42887449162](https://github.com/phihos/asservat/actions/runs/42887449162)
+passed at that exact source: package 445.219 s, live focus 166.70 s, harness
+630.5 s. The authenticated fleet operation returned two active viewers, two
+principals held three shared slots, the fourth view was refused, all three
+policy projections completed, and exact owner failover retained the original
+Deployment/ReplicaSet. All 4,552 recorded source hashes match locally; both
+Go/harness exits are zero, scratch was removed and cleanup failures are empty.
+This named run qualifies the corrected policy live workflow; long-duration
+load, multiple-node fleet measurements and the full specification remain open.
 
 Historical evidence has distinct scopes:
 
@@ -73,8 +83,9 @@ Historical evidence has distinct scopes:
   target-cluster mapping. It is not qualification of the final capacity gauge.
   Runs 42810631259 and 42813341849 failed and remain failures.
 - The original real PostgreSQL ledger/upgrade checks and built-browser tests
-  passed their named boundaries. Changes to migration 00148 require rerunning
-  the affected SQL/upgrade fixture on the integrated candidate.
+  passed their named boundaries. The reviewed SQL/upgrade run above covers
+  migration 00148; the follow-up changes only live authority/status refusal
+  handling, leaving that migration and fleet composition unchanged.
 
 Generated logs, environment dumps, screenshots and Pod logs introduced by these
 PRs are removed from the patch. Original bytes and pre-existing local results
@@ -84,9 +95,8 @@ reports outside these PRs are unchanged.
 
 Current qualification and required-CI event/head results are tracked on
 [PR #216](https://github.com/phihos/asservat/pull/216); #215 is superseded. The
-next acceptance boundary is the corrected live workflow through terminal
-cleanup. After it, complete the processing operator restriction/inventory/release
-workflow; the parked wiring alone cannot implement it. The complete first-release
+next product workflow is processing operator restriction, durable rule inventory
+and exact-revision release; the parked wiring alone cannot implement it. The complete first-release
 specification and wider operational qualification remain open.
 
 ## Live loss, reply-drop and pending-row capacity metrics (2026-11-10)
