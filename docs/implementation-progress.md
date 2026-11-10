@@ -10,8 +10,12 @@ document, caller-selected object reference or additional public route beyond
 ADR-193. `docs/architecture/bootstrap-issuance.md` records the boundary.
 
 Focused derivation and owner-reader tests pass valid exact pins, disabled
-composition and an invalid mount. Full bootstrap and provider packages and the
-native integration package compile with the real capacity assertion. Native
+composition and an invalid mount. The first installed attempt exposed a real
+composition defect: phase 3 built its provider artifact before attaching the
+fleet section, so it omitted the runtime `bootstrap-channel` role and every
+owner login for that purpose failed. The artifact and final runtime input now
+share one fleet-pinning function. A regression checks the artifact's exact role
+and issuance-audit scope; full bootstrap and provider packages pass. Native
 installed qualification is not claimed yet. PR #215's unrelated expired-fixture
 CI failure remains unchanged and is not modified here.
 

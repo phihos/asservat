@@ -876,6 +876,10 @@ func (k *InstallerContinuation) Owner(ctx context.Context, resources *kube.Initi
 	if promotion != nil {
 		transit, signing, pki := promotedKeyNames(input.InstallationID, k.record.Scope.IssuerEpoch, *promotion)
 		named.Public = &contracts.OwnerPublicDeployment{SessionTransit: transit, WorkSigning: signing, WorkerPKI: pki}
+		named, err = pinOwnerFleet(named, k.input.Public.Federation, contracts.OwnerPublicGuardedSource{Source: inventory.FleetSource, Guard: inventory.FleetGuard}, time.Now())
+		if err != nil {
+			return err
+		}
 	}
 	artifact, err := providerconfig.OwnerProviderSetupArtifact(named, profile, observed.Configuration.Pool, observed.Configuration.IssuerRoots, time.Now(), k.federation, k.publisherSetup(), k.downloadEvidenceSetup(), k.contextDeletionSetup())
 	if err != nil {

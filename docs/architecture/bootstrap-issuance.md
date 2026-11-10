@@ -18,10 +18,12 @@ Still required for production: protected trust/recovery production, current IdP 
 
 The promoted installer now derives `OwnerFleetIssuance` from the original fleet
 ConfigMap and guard when `federation.fleet` supplies the operator's KV mount and
-delivery profile. It pins the fleet provider recipe; no second fleet settings
-document or caller-selected object reference is introduced. Derivation and owner
-reader tests cover exact pins, invalid mounts and disabled composition. Native
-installed qualification remains a separate gate.
+delivery profile. The phase-3 provider artifact and final runtime input use the
+same pinned fleet recipe, so the artifact installs the `bootstrap-channel` role
+and issuance-audit scope before the owner first logs in. No second fleet settings
+document or caller-selected object reference is introduced. Derivation, artifact,
+and owner-reader tests cover exact pins, invalid mounts and disabled composition.
+Native installed qualification remains a separate gate.
 
 ## Retained issuance versions
 

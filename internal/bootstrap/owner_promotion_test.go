@@ -1,6 +1,7 @@
 package bootstrap
 
 import (
+	"bytes"
 	"context"
 	"encoding/pem"
 	"reflect"
@@ -9,8 +10,10 @@ import (
 	"time"
 
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
+	"asservat.local/asservat/internal/adapters/providerconfig"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
+	value "asservat.local/asservat/internal/domain/fleet"
 )
 
 // ADR-194 step 4: the derived promoted input passes the owner's own reader,
@@ -116,5 +119,26 @@ func TestDerivePromotedOwner(t *testing.T) {
 			}
 			got.closeHTTP()
 		})
+	}
+}
+
+func TestFleetProviderArtifactComposition(t *testing.T) {
+	_, _, c := ownerProviderInputFixture(t)
+	c.Public = &contracts.OwnerPublicDeployment{}
+	federation := &contracts.InstallerFederationSettings{Fleet: &contracts.InstallerFleetIssuance{ChannelMount: "fleet-kv", DeliveryProfile: "regional-installer"}}
+	settings := contracts.OwnerPublicGuardedSource{Source: contracts.WorkerObjectReference{Name: "fleet", UID: runtimeID}, Guard: contracts.OwnerDeploymentGuard{Name: "fleet-guard", PolicyUID: runtimeID, PolicyGeneration: 1, BindingUID: runtimeID, BindingResourceVersion: "1"}}
+	named, err := pinOwnerFleet(c, federation, settings, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	pool := value.OwnerPool{InstallationID: c.InstallationID, ClusterID: c.ClusterID, IssuerEpoch: runtimeID, Namespace: c.Namespace.Name, NamespaceUID: c.Namespace.UID,
+		Service: "hub", ServiceUID: runtimeID, Deployment: "hub", DeploymentUID: runtimeID, ServiceAccount: named.ProviderAuthentication.ServiceAccount.Name, AccountUID: named.ProviderAuthentication.ServiceAccount.UID, Port: 9443, NativePort: 9444, NativeBootstrap: value.OwnerBootstrapProfile}
+	raw, err := providerconfig.OwnerProviderSetupArtifact(named, *named.ProviderAuthentication, pool, c.Kubernetes.Roots, time.Now(), nil, nil, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	role, digest, err := providerconfig.OwnerFleetProviderRecipeFor(named, *named.ProviderAuthentication, time.Now())
+	if err != nil || digest != named.Public.Fleet.ProviderRecipeSHA256 || !bytes.Contains(raw, []byte("auth/"+named.ProviderAuthentication.AuthMount+"/role/"+role.Name)) || !bytes.Contains(raw, []byte("bootstrap-issue/v1/"+c.InstallationID+"/")) {
+		t.Fatal("phase-3 artifact omitted the runtime fleet role or audit scope", err)
 	}
 }

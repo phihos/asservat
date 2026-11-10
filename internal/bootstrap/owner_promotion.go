@@ -119,15 +119,31 @@ func derivePromotedOwner(in contracts.OwnerDeployment, x promotedOwnerParts, now
 	if _, out.Public.ProviderRecipeSHA256, err = providerconfig.OwnerPublicProviderRecipeFor(out, *in.ProviderAuthentication, now); err != nil {
 		return in, &fixedStepError{"recipe", err}
 	}
-	if x.Settings.Federation != nil && x.Settings.Federation.Fleet != nil {
-		f := x.Settings.Federation.Fleet
-		out.Public.Fleet = &contracts.OwnerFleetIssuance{Settings: x.FleetSettings.Source, SettingsGuard: x.FleetSettings.Guard, ChannelMount: f.ChannelMount, DeliveryProfile: f.DeliveryProfile}
-		if _, out.Public.Fleet.ProviderRecipeSHA256, err = providerconfig.OwnerFleetProviderRecipeFor(out, *in.ProviderAuthentication, now); err != nil {
-			return in, &fixedStepError{"fleet-recipe", err}
-		}
+	out, err = pinOwnerFleet(out, x.Settings.Federation, x.FleetSettings, now)
+	if err != nil {
+		return in, &fixedStepError{"fleet-recipe", err}
 	}
 	if err = validateUnprojectedOwnerDeployment(out); err != nil {
 		return in, &fixedStepError{"validate", err}
 	}
 	return out, nil
+}
+
+func pinOwnerFleet(in contracts.OwnerDeployment, federation *contracts.InstallerFederationSettings, settings contracts.OwnerPublicGuardedSource, now time.Time) (contracts.OwnerDeployment, error) {
+	if federation == nil || federation.Fleet == nil {
+		return in, nil
+	}
+	if in.Public == nil || in.ProviderAuthentication == nil {
+		return in, mounts.ErrUnavailable
+	}
+	f := federation.Fleet
+	public := *in.Public
+	public.Fleet = &contracts.OwnerFleetIssuance{Settings: settings.Source, SettingsGuard: settings.Guard, ChannelMount: f.ChannelMount, DeliveryProfile: f.DeliveryProfile}
+	in.Public = &public
+	_, digest, err := providerconfig.OwnerFleetProviderRecipeFor(in, *in.ProviderAuthentication, now)
+	if err != nil {
+		return in, err
+	}
+	public.Fleet.ProviderRecipeSHA256 = digest
+	return in, nil
 }
