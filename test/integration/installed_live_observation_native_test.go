@@ -51,6 +51,7 @@ type installedLiveRun struct {
 	Fanout                                                          bool
 	BeforeFailover                                                  func()
 	OtherCall                                                       installedLiveCall
+	Browser                                                         *installedBrowser
 	Identity                                                        *installedIdentity
 	PublicRoot                                                      []byte
 	Address, Origin, RegionalConfig, ClusterID, Namespace, Workload string
@@ -308,6 +309,7 @@ func qualifyInstalledLiveObservation(t *testing.T, ctx context.Context, c instal
 		return r.installedJourneyEnvelope, code, e
 	})
 	console := c.Identity.consoleSession(t, ctx, cert, c.Address, c.Origin)
+	c.Browser = console
 	browser := startInstalledLiveBrowser(t, ctx, console, c.Address, map[string]string{"cluster_id": c.ClusterID, "namespace": c.Namespace, "kind": "Deployment", "name": c.Workload})
 	defer browser.close()
 	episodes := 0
@@ -614,7 +616,10 @@ func installedLiveMCP(t *testing.T, ctx context.Context, db *pgxpool.Pool, root 
 			return errors.New("principal ceiling fixture did not retain React and MCP views")
 		}
 		mapped, direct, mappingErr, directErr := installedLiveViewerMapping(ctx, db, root, run.Installation, source)
-		capacity, _, e := call(ctx, "get_live_capacity", map[string]any{"cluster_id": source.ClusterID})
+		if run.Browser == nil {
+			return errors.New("installed browser capacity channel unavailable")
+		}
+		capacity, _, e := run.Browser.operation(ctx, "get_live_capacity", map[string]any{"cluster_id": source.ClusterID}, "")
 		var gauge struct {
 			ActiveViewers int `json:"active_viewers"`
 		}
