@@ -8,8 +8,12 @@ record and the source returns to Ready with the tighter dates. The existing
 authority audit lease, SQL role, versioned audit store and pinned Transit
 key carry the work. [ADR-320](decisions/320-installed-retention-lifecycle-publication.md)
 records the shared key decision, role and installation constraints. Focused
-Go race, schema, architecture and SQL generation checks pass. Real-service
-and installed checks remain pending. This supplies the signed lifecycle
+Go race, schema, architecture and SQL generation checks pass. The owned
+PostgreSQL/S3 fixture at `e3bb2442` passed in 2.886 s, verifying one
+acknowledged signed decision, empty queue on replay and immutable cutoffs.
+All 4,516 source hashes match and cleanup had no failures. It uses fixture
+signing material. The fresh installed check of the pinned Transit signer
+and source readiness remains pending. This supplies the signed lifecycle
 path needed by the separate early-erasure request and status workflow.
 
 ## Merged privacy evidence discovery (2026-11-11)

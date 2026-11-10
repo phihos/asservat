@@ -725,8 +725,17 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 			installedPolicyJourney(t, ctx, admin, p.RootID, identity, publicRoot, publicAddress, origin, diagnose)
 			return
 		}
+		var retentionCheck installedRetentionShorteningCheck
+		if installedJourneyFocus() == "retention-shortening" {
+			retention := installedRetentionShortening{admin: admin, hub: api, runner: runnerAPI, providers: providers,
+				installation: installation, root: p.RootID, hubCluster: original.Plan.ClusterID, namespace: desired.TargetNamespace, diagnose: diagnose}
+			retentionCheck = func(cluster, caseID, artifactID string, expires time.Time, read installedRetentionRead) {
+				retention.qualify(t, ctx, cluster, caseID, artifactID, expires, read)
+			}
+			deny, gone = nil, nil
+		}
 		run := installedJourney(t, ctx, admin, p.RootID, identity, publicRoot, publicAddress, origin, diagnose,
-			installedJourneyDeletion(t, ctx, admin, providers, evidenceBucket, p.RootID, diagnose), installedProjectionSQLCheck(t, ctx, admin, api, p.RootID))
+			installedJourneyDeletion(t, ctx, admin, providers, evidenceBucket, p.RootID, diagnose), installedProjectionSQLCheck(t, ctx, admin, api, p.RootID), retentionCheck)
 		// The PostgreSQL restart (ADR-226) runs only in the focused restart
 		// mode, so each run stays within the 20-minute limit and the full
 		// journey's capacity budget is unchanged.
@@ -776,7 +785,7 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 	}
 	hubKubeconfig := installedUnifiedRunnerKubeconfig(t, f.Clusters[0].Config, desired)
 	qualifyRegionalInstall(t, ctx, f, 1, admin, runnerAPI, api, hubKubeconfig, desired.TargetNamespace, issuer, journey, providers, offerMap.Data[contracts.RegionalOfferFile], installation)
-	if focus := installedJourneyFocus(); focus == "restart" || focus == "journey" || focus == "browser" || focus == "upgrade" || focus == "policy" || focus == "alert" || focus == "logresource" || focus == "chain" || focus == "share" || focus == "journey-store-failure" || focus == "journey-start-failure" || installedRecordingFocus() || installedLogsFocus() {
+	if focus := installedJourneyFocus(); focus == "restart" || focus == "journey" || focus == "browser" || focus == "upgrade" || focus == "policy" || focus == "alert" || focus == "logresource" || focus == "chain" || focus == "share" || focus == "journey-store-failure" || focus == "journey-start-failure" || focus == "retention-shortening" || installedRecordingFocus() || installedLogsFocus() {
 		t.Log("focused " + focus + " run complete: the second workload cluster and replay checks were not run")
 		return
 	}
@@ -1356,6 +1365,11 @@ func installerHubRetentionReady(t *testing.T, ctx context.Context, api kubernete
 // previous, when previous is set.
 func installerHubRetentionReadyEpoch(t *testing.T, ctx context.Context, api kubernetes.Interface, admin *pgxpool.Pool, namespace, installation, root, cluster string, least int64, previous string) (int64, string) {
 	t.Helper()
+	return installerHubRetentionReadyPolicyCount(t, ctx, api, admin, namespace, installation, root, cluster, least, previous, 1)
+}
+
+func installerHubRetentionReadyPolicyCount(t *testing.T, ctx context.Context, api kubernetes.Interface, admin *pgxpool.Pool, namespace, installation, root, cluster string, least int64, previous string, policies int) (int64, string) {
+	t.Helper()
 	projection, err := api.CoreV1().Secrets(namespace).Get(ctx, contracts.PublicRuntimeProjectionName(installation), meta.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
@@ -1390,12 +1404,12 @@ func installerHubRetentionReadyEpoch(t *testing.T, ctx context.Context, api kube
 		if e == nil && len(digest) == 32 && sequence >= least {
 			ref := privacy.PolicySourceRef{ClusterID: cluster, ControlNamespaceUID: namespaceUID, Hub: true}
 			copy(ref.ProtectionDigest[:], digest)
-			if a, e := sources.AcceptedRetentionSource(ctx, root, ref); e == nil && a.Ready && len(a.Snapshot.Policies) == 1 && a.Epoch != previous {
-				t.Logf("hub retention source Ready at sequence %d with the baseline policy", sequence)
+			if a, e := sources.AcceptedRetentionSource(ctx, root, ref); e == nil && a.Ready && a.Acceptance.Generation == sequence && len(a.Snapshot.Policies) == policies && a.Epoch != previous {
+				t.Logf("hub retention source Ready at sequence %d with %d policies", sequence, policies)
 				return sequence, a.Epoch
 			}
 		}
-		if time.Now().After(until) {
+		if ctx.Err() != nil || time.Now().After(until) {
 			t.Fatal("hub retention source not Ready", e, sequence)
 		}
 		time.Sleep(installedPoll)
