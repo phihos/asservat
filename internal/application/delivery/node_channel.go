@@ -396,6 +396,9 @@ func (c *NodeChannel) Report(p NodePeer, epoch string, r collector.Report) error
 		}
 		seenSources[source.SourceID] = true
 	}
+	if r.Live != nil && !r.Live.Valid(r.ObservedAt) {
+		return ErrNodeInvalid
+	}
 	c.mu.Lock()
 	e, err := c.current(p, epoch)
 	if err != nil {
@@ -442,6 +445,7 @@ func (c *NodeChannel) Report(p NodePeer, epoch string, r collector.Report) error
 	stored := r
 	stored.Sources = append([]collector.SourceStatus(nil), r.Sources...)
 	stored.Mechanisms = cloneNodeMechanisms(r.Mechanisms)
+	stored.Live = cloneLiveStatus(r.Live)
 	e.report, e.reportedAt = &stored, now
 	e.reports++
 	view := c.view(e, now)
@@ -531,6 +535,7 @@ func (c *NodeChannel) view(e *nodeEntry, now time.Time) NodeView {
 		r := *e.report
 		r.Sources = append([]collector.SourceStatus(nil), e.report.Sources...)
 		r.Mechanisms = cloneNodeMechanisms(e.report.Mechanisms)
+		r.Live = cloneLiveStatus(e.report.Live)
 		v.Report = &r
 		v.Current = now.Sub(e.reportedAt) <= collector.StatusStaleAfter
 	}
@@ -557,4 +562,12 @@ func cloneNodeMechanisms(in []collector.Availability) []collector.Availability {
 		out[n].LiveProjections = append([]string(nil), in[n].LiveProjections...)
 	}
 	return out
+}
+
+func cloneLiveStatus(in *collector.LiveStatus) *collector.LiveStatus {
+	if in == nil {
+		return nil
+	}
+	out := *in
+	return &out
 }

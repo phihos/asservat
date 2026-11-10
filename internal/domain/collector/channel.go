@@ -322,4 +322,29 @@ type Report struct {
 	Budget     Usage
 	Receipts   []Receipt
 	Sources    []SourceStatus
+	Live       *LiveStatus
+}
+
+// LiveStatus is bounded, content-free live-view runtime accounting. Activity
+// totals are process-lifetime; only rate limiting uses the window. No source,
+// principal, filter or row is retained.
+type LiveStatus struct {
+	WindowStartedAt   time.Time
+	Cohorts           int
+	ScanEvents        int64
+	ScanBytes         int64
+	ScanCPUNanos      int64
+	DeliveredRows     int64
+	DeliveredBytes    int64
+	RefusedAdmissions int64
+}
+
+func (s LiveStatus) Valid(observedAt time.Time) bool {
+	if s.Cohorts < 0 || s.Cohorts > 16 || s.ScanEvents < 0 || s.ScanBytes < 0 || s.ScanCPUNanos < 0 || s.DeliveredRows < 0 || s.DeliveredBytes < 0 || s.RefusedAdmissions < 0 {
+		return false
+	}
+	if s.WindowStartedAt.IsZero() {
+		return s.ScanEvents == 0 && s.ScanBytes == 0 && s.ScanCPUNanos == 0 && s.DeliveredRows == 0 && s.DeliveredBytes == 0
+	}
+	return !s.WindowStartedAt.After(observedAt)
 }

@@ -360,6 +360,18 @@ type NodeStatus struct {
 	Budget     NodeBudget         `json:"budget"`
 	Receipts   []NodeReceipt      `json:"receipts"`
 	Sources    []NodeSourceStatus `json:"sources,omitempty"`
+	Live       *NodeLiveStatus    `json:"live,omitempty"`
+}
+
+type NodeLiveStatus struct {
+	WindowStartedAt   time.Time `json:"windowStartedAt,omitzero"`
+	Cohorts           int       `json:"cohorts"`
+	ScanEvents        int64     `json:"scanEvents"`
+	ScanBytes         int64     `json:"scanBytes"`
+	ScanCPUNanos      int64     `json:"scanCPUNanos"`
+	DeliveredRows     int64     `json:"deliveredRows"`
+	DeliveredBytes    int64     `json:"deliveredBytes"`
+	RefusedAdmissions int64     `json:"refusedAdmissions"`
 }
 
 type NodeSourceStatus struct {

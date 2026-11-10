@@ -131,6 +131,11 @@ func TestLiveNodeProcessingCreditCountsFilteredEventsAndNeverWaits(t *testing.T)
 		t.Fatal("independent scan credit")
 	}
 	b.finish(time.Millisecond)
+	b.deliver(now, 2, 120)
+	status := b.status()
+	if status.Cohorts != 1 || status.ScanEvents != 1 || status.ScanBytes != 100 || status.ScanCPUNanos != int64(time.Millisecond) || status.DeliveredRows != 2 || status.DeliveredBytes != 120 || status.RefusedAdmissions != 1 {
+		t.Fatal("live status lost scan, delivery or refused-admission counters", status)
+	}
 	if b.take(now, 0) {
 		t.Fatal("CPU upper bound")
 	}
@@ -142,5 +147,11 @@ func TestLiveNodeProcessingCreditCountsFilteredEventsAndNeverWaits(t *testing.T)
 	if !b.take(now.Add(time.Second), 1) {
 		t.Fatal("finite refill")
 	}
+	if next := b.status(); next.ScanEvents != 2 || next.ScanBytes != 101 || next.DeliveredRows != 2 || next.DeliveredBytes != 120 || next.RefusedAdmissions != 1 {
+		t.Fatal("rate-limit refill reset cumulative live counters", next)
+	}
 	b.release()
+	if status := b.status(); status.Cohorts != 0 {
+		t.Fatal("live cohort did not release", status)
+	}
 }

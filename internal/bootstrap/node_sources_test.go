@@ -72,6 +72,24 @@ func TestNodeSourceReportPreservesSnapshotTimeAcrossBlockingMetadata(t *testing.
 	}
 }
 
+func TestNodeSourceReportDoesNotRejectNewerLiveWindow(t *testing.T) {
+	start := time.Now().UTC().Truncate(time.Microsecond)
+	clock := &packetRingClock{at: start}
+	permit := sourceOwnerPermit(start)
+	meter, err := collector.NewSourceMeter(permit, start)
+	if err != nil {
+		t.Fatal(err)
+	}
+	window := start.Add(time.Second)
+	n := &nodeSources{sources: map[string]*packetSource{permit.Binding.SourceID: {meter: meter}}, now: clock.now, liveBudget: &nodeLiveBudget{second: window, events: 1}}
+	budget, _ := collector.NewBudget(collector.Ceilings{}, start)
+	p := &nodeProcess{sources: n, budget: budget, now: clock.now}
+	report := p.report()
+	if !report.ObservedAt.Equal(window) || report.Live == nil || !report.Live.Valid(report.ObservedAt) {
+		t.Fatal("newer live window invalidated the node report", report)
+	}
+}
+
 func TestNodeSourceReportKeepsNaturalStopAfterSourceSetAsOf(t *testing.T) {
 	start := time.Now().UTC().Truncate(time.Microsecond)
 	clock := &packetRingClock{at: start}

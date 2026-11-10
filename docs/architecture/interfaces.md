@@ -54,8 +54,12 @@ ring across quiet renewals. The regional work uses a separate JWS purpose under
 the existing work key; enqueue is not attach acknowledgement or complete-history
 proof. Node status retains its original source-set snapshot time, cumulative
 accounting and distinct natural Stopped/Closed/unknown-input facts on the existing
-fifteen-second cadence. Public ongoing compilation, Save composition and installed
-source qualification remain gated as recorded in implementation progress.
+fifteen-second cadence. When live viewing is enabled, an optional content-minimized
+live snapshot adds active cohorts, the rate-limit window start and process-lifetime
+cumulative scan events/bytes/CPU, delivered rows/encoded bytes and refused cohort
+admissions, with no source/filter/payload labels.
+Public ongoing compilation, Save composition and installed source qualification
+remain gated as recorded in implementation progress.
 
 Sensors/sources may continue within existing leases when disconnected. Ordinary intrusive starts need the durable reservation and remaining permit. Natural-core acceptance is the prepared special path in I-03. Losing the local journal, boot identity or collector epoch makes past unproven starts unavailable/Indeterminate; a new leader cannot authorize replay by advancing only a delivery fence. Multi-node admission is conservative and may produce partial outcomes; it is not an atomic Kubernetes transaction.
 

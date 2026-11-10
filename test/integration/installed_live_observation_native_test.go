@@ -470,7 +470,10 @@ func installedLiveMCP(t *testing.T, ctx context.Context, db *pgxpool.Pool, root 
 		if selected != nil {
 			t.Logf("installed live source %s attempt %d state=%s blockers=%v; waiting", selected.ID, attempt, selected.State, selected.Blockers)
 		}
-		if e := installedJourneyPause(ctx, 2*time.Second); e != nil {
+		// The original unknown-start window is only five seconds. Poll promptly
+		// enough to observe its accepted receipt/report before maintenance can
+		// quarantine it; a later replacement is never the requested source.
+		if e := installedJourneyPause(ctx, 100*time.Millisecond); e != nil {
 			return e
 		}
 	}

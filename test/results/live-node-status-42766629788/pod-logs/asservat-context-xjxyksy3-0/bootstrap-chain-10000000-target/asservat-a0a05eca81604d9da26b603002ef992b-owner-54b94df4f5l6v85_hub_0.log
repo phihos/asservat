@@ -1,0 +1,23 @@
+2026-11-10T06:21:57.330641090Z owner port router: started (1)
+2026-11-10T06:21:57.330702626Z owner router: started (1)
+2026-11-10T06:21:57.330722052Z owner router: handoff observation (1)
+2026-11-10T06:21:59.133049133Z hub kube opening: guard checks: [current<reused]=4 [current<ReadClusterCatalog]=2 [current<ReadWorkerConfiguration]=2 [current<DownloadPolicy]=2 [ReadClusterCatalog<readPublicClusterCatalog]=1 [ReadWorkerConfiguration<newPublicDownloads]=1
+2026-11-10T06:21:59.294952475Z owner router: handoff observation (2)
+2026-11-10T06:22:02.125204614Z owner router: handoff observation (4)
+2026-11-10T06:22:07.074056738Z owner router: handoff observation (8)
+2026-11-10T06:22:15.835563521Z owner router: handoff native (1)
+2026-11-10T06:22:15.913063211Z context start ingress refused: admission (1)
+2026-11-10T06:22:15.913082257Z context start refused: authenticate (1)
+2026-11-10T06:22:15.995957206Z owner router: handoff native (2)
+2026-11-10T06:22:16.029209594Z context start ingress refused: admission (2)
+2026-11-10T06:22:16.029317264Z context start refused: authenticate (2)
+2026-11-10T06:22:17.949636510Z owner router: handoff native (4)
+2026-11-10T06:22:17.973571301Z context start ingress refused: admission (4)
+2026-11-10T06:22:17.973592561Z context start refused: authenticate (4)
+2026-11-10T06:22:19.113595906Z hub kube opening: guard checks: [current<CapacityNamespaceProtection]=2 [current<ReadClusterCatalog]=2 [current<reused]=2 [ReadClusterCatalog<clusterCatalogChanged]=1
+2026-11-10T06:22:20.781139172Z owner router: handoff observation (16)
+2026-11-10T06:22:21.936118525Z owner router: handoff native (8)
+2026-11-10T06:22:21.961806796Z context start ingress refused: admission (8)
+2026-11-10T06:22:21.962884818Z context start refused: authenticate (8)
+2026-11-10T06:22:24.707889211Z owner observer 643 calls 1.32s, operation 0 calls 0s, readiness 548 calls 1.1s, identity 3 calls 10ms, provider 12 calls 20ms, credentials 16 calls 50ms, context-start 0 calls 0s total
+2026-11-10T06:22:24.914947292Z owner startup failed: phase=full-runtime role=none reason=changed native=unspecified detail=unspecified sql=unknown sql-reason=unspecified step=unspecified
