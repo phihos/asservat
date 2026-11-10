@@ -33,6 +33,10 @@ type ProcessingChange struct {
 	Scope               ProcessingScope
 }
 
+func (c ProcessingChange) Equal(other ProcessingChange) bool {
+	return c.RequestID == other.RequestID && c.RuleID == other.RuleID && c.RequestedArtifactID == other.RequestedArtifactID && c.Action == other.Action && c.ExpectedRevision == other.ExpectedRevision && c.Scope.Equal(other.Scope)
+}
+
 func (c ProcessingChange) Valid() bool {
 	if !authorization.UUID(c.RequestID) || c.RequestedArtifactID != "" {
 		return false

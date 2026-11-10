@@ -196,7 +196,7 @@ func (s ProcessingChanges) Change(ctx context.Context, source ProcessingIdentity
 		return s.finalReceipt(call, source, authority, *prepared.Receipt)
 	}
 	decision := prepared.Decision
-	if !decision.Valid() || decision.Change != c || decision.Intent.Actor != authority.Identity.Principal || !s.Now().Before(decision.Intent.RequestUntil) {
+	if !decision.Valid() || !decision.Change.Equal(c) || decision.Intent.Actor != authority.Identity.Principal || !s.Now().Before(decision.Intent.RequestUntil) {
 		return zero, value.ErrUnavailable
 	}
 	original := identity.Earlier(until, decision.Intent.RequestUntil)

@@ -12,15 +12,15 @@ import (
 )
 
 // Reuse the existing actual initialized/restricted SQL fixture. Only the
-// privacy-operator/source roots are synthetic; grants come from the installed
-// processing-decision duty, without an extra table grant or administrative read.
+// privacy-operator/source roots are synthetic; grants come from the compiled
+// shared hub role that owns the processing duty, without an extra table grant.
 func qualifyProcessingInventory(t *testing.T, ctx context.Context, admin *pgxpool.Pool, s captureAdmissionScenario, e artifact.ContextExpectation, f *processingTestFixture, change value.ProcessingChange) {
 	t.Helper()
 	const password = "synthetic-inventory"
 	role := narrowRole(t, ctx, admin, "processing_inventory_", password, func(name string) []string {
-		grants, ok := postgres.PublicRuntimeRoleGrantSQL("processing-decision", name)
+		grants, ok := postgres.PublicRuntimeRoleGrantSQL("hub-runtime", name)
 		if !ok {
-			t.Fatal("compiled processing decision grants")
+			t.Fatal("compiled hub processing grants")
 		}
 		return grants
 	})

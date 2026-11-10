@@ -194,7 +194,7 @@ func (s *ProcessingDecisions) PrepareProcessing(ctx context.Context, a value.Pro
 					return app.ErrCapacity
 				}
 				var retained value.ProcessingScope
-				if json.Unmarshal(r.Scope, &retained) != nil || r.Revision != draft.Change.ExpectedRevision || retained != draft.Change.Scope || !bytes.Equal(r.ReleaseAccount, draft.ReleaseAccount[:]) {
+				if json.Unmarshal(r.Scope, &retained) != nil || r.Revision != draft.Change.ExpectedRevision || !retained.Equal(draft.Change.Scope) || !bytes.Equal(r.ReleaseAccount, draft.ReleaseAccount[:]) {
 					return value.ErrConflict
 				}
 			}

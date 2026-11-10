@@ -42,9 +42,14 @@ try {
   await expect(page.getByText('Starts the browser download from the beginning and stops the previous request. Both attempts count toward your download limit.', { exact: true })).toBeVisible();
   const failedState = await stats();
   assert.deepEqual(failedState.prepare_keys, first.prepare_keys);
-  // Chromium may retry its interrupted original attachment itself. Every such
-  // request remains counted on the old path; it is not a fresh session/refund.
-  assert(failedState.native_ids.length >= 1 && failedState.native_ids.length <= 3);
+  // Browser attachment retries vary. Bound accepted charges by the actual
+  // unchanged per-session quota, while separately counting received/refused
+  // requests. These retries cannot create or spend the fresh session's budget.
+  assert.equal(first.native_request_limit, 4, 'fixture must retain its original RequestLimit');
+  const charged = failedState.native_ids.length;
+  assert(charged >= 1 && charged <= first.native_request_limit, `old-path charges: ${JSON.stringify({charged, limit: first.native_request_limit, received: failedState.native_received, refused: failedState.native_refused, ranges: failedState.native_ranges})}`);
+  assert.equal(failedState.native_received, charged + failedState.native_refused, 'every received request is charged or refused');
+  assert.equal(failedState.accepted, 1, 'browser retries never prepare a new download session');
   assert(failedState.native_ids.every(id => id === '00000000-0000-4000-8000-000000000090'));
   // Native downloads belong to the browser download machinery and need not
   // emit page network events. The real download event and server counter are
@@ -52,7 +57,7 @@ try {
   assert((failedState.statuses ?? []).every(s => s === 'Ready'));
   await scan('failed-native-ready');
   await page.screenshot({ path: output + '/failed-native-ready.png', fullPage: true });
-  checks.push(`actual native anchor failure with ${failedState.native_ids.length} counted old-path browser request(s); Ready remains without an operation error and explicit full restart is available`);
+  checks.push(`actual native anchor failure with ${failedState.native_ids.length} charged old-path browser request(s), ${failedState.native_received} received and ${failedState.native_refused} refused; Ready remains without an operation error and explicit full restart is available`);
 
   // The service positively records Stop, then closes the actual HTTP connection
   // after one byte of the canonical JSON body. No new preparation is legal.
@@ -105,6 +110,8 @@ try {
   const final = await stats();
   assert.equal(final.native_ids.length, failedState.native_ids.length + 1);
   assert.equal(final.native_ids.at(-1), '00000000-0000-4000-8000-000000000091');
+  assert.equal(final.native_ranges.at(-1), '', 'the explicit fresh download starts at the beginning');
+  assert.equal(final.native_received, final.native_ids.length + final.native_refused);
   assert.equal(await page.evaluate(() => localStorage.length + sessionStorage.length), 0);
   checks.push('same new-prepare key reconciles lost reply; only a second explicit anchor click starts the new whole-file browser download; no web storage');
   assert.deepEqual(errors, []); assert.deepEqual(external, []); assert.deepEqual(violations, []);

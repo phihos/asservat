@@ -137,7 +137,7 @@ func TestProcessingReleaseProfilesWithRealPostgres(t *testing.T) {
 			return r
 		}
 		change(privacy.ProcessingChange{RequestID: custodyID(), Action: "initialize_processing"}, "initialized")
-		now := time.Now().UTC().Truncate(time.Microsecond)
+		now := time.Now().In(time.FixedZone("operator", 5*3600+30*60)).Truncate(time.Microsecond)
 		restrict := privacy.ProcessingChange{RequestID: custodyID(), RuleID: custodyID(), Action: "restrict_processing", Scope: privacy.ProcessingScope{Kind: "workloadInterval", ClusterID: scope.ClusterID, NamespaceUID: f.namespace.UID, WorkloadUID: f.workloads[0].UID, AcquiredFrom: now.Add(-time.Second), AcquiredUntil: now.Add(time.Second)}}
 		blocked := change(restrict, "restricted")
 		human, err := mac.Principal(actor.value.Principal)

@@ -36,6 +36,8 @@ supply only the selected public artifact ID. Resolve its immutable location
 under the same original operation authority before canonical hashing/audit;
 never ask the operator to find an internal attempt ID. Release uses the exact
 persisted scope returned by inventory and the expected restrictive revision.
+Go comparisons use interval instants, so a non-hour timezone survives the
+durable JSON round trip; serialized scope and request/audit digests are unchanged.
 Known conflicts return 409; uncertain effects remain unavailable and retry
 only the original request ID. Reload reads durable rules, not browser storage.
 

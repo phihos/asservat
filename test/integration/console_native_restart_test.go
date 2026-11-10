@@ -70,7 +70,7 @@ func TestConsoleNativeRestartWithBuiltPackage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	service := &consoleRestartDownloads{created: time.Now().UTC()}
+	service := &consoleRestartDownloads{created: time.Now().UTC(), stats: consoleRestartStats{NativeLimit: consoleRestartRequestLimit}}
 	downloadOps, err := presentation.NewContextDownloadOperations(presentation.ContextDownloadOperationsConfig{PublicOrigin: origin, Now: time.Now, NewID: newID}, service, service)
 	if err != nil {
 		t.Fatal(err)
@@ -201,15 +201,19 @@ type consoleRestartReply struct {
 func (w *consoleRestartReply) Unwrap() http.ResponseWriter { return w.wire }
 
 type consoleRestartStats struct {
-	PrepareKeys  []string `json:"prepare_keys"`
-	StopKeys     []string `json:"stop_keys"`
-	Events       []string `json:"events"`
-	NativeIDs    []string `json:"native_ids"`
-	Statuses     []string `json:"statuses"`
-	Accepted     int      `json:"accepted"`
-	StopPositive bool     `json:"stop_positive"`
-	LostStop     bool     `json:"lost_stop"`
-	LostPrepare  bool     `json:"lost_prepare"`
+	PrepareKeys    []string `json:"prepare_keys"`
+	StopKeys       []string `json:"stop_keys"`
+	Events         []string `json:"events"`
+	NativeIDs      []string `json:"native_ids"`
+	NativeRanges   []string `json:"native_ranges"`
+	NativeRefused  int      `json:"native_refused"`
+	NativeReceived int      `json:"native_received"`
+	NativeLimit    int      `json:"native_request_limit"`
+	Statuses       []string `json:"statuses"`
+	Accepted       int      `json:"accepted"`
+	StopPositive   bool     `json:"stop_positive"`
+	LostStop       bool     `json:"lost_stop"`
+	LostPrepare    bool     `json:"lost_prepare"`
 }
 type consoleRestartDownloads struct {
 	mu                                        sync.Mutex
@@ -219,6 +223,8 @@ type consoleRestartDownloads struct {
 	dropStop, dropPrepare                     bool
 	stats                                     consoleRestartStats
 }
+
+const consoleRestartRequestLimit = 4
 
 const consoleRestartBody = "synthetic browser restart fixture bytes only\n"
 
@@ -243,7 +249,7 @@ func (s *consoleRestartDownloads) view(i identity.Identity, id string) evidence.
 	if state.Terminal() {
 		m = nil
 	}
-	return evidence.ContextDownloadView{Session: artifact.DownloadSession{ID: id, AllocationID: consoleCaptureID(82), Scope: artifact.DownloadScope{RootID: consoleCaptureID(1), ArtifactID: consoleCaptureID(81), CaptureID: consoleCaptureID(8), ClusterID: consoleCaptureID(1), NamespaceUID: "synthetic-namespace-uid", WorkloadUID: "synthetic-workload-uid", PodUID: "synthetic-pod-uid", Version: artifact.Digest{9}, Principal: i.Principal}, RequestDigest: artifact.Digest{10}, State: state, CreatedAt: s.created, Deadline: deadline, OutputLimit: 8192, ReadLimit: 12 << 20, RequestLimit: 4}, Metadata: m, ValidUntil: identity.Earlier(now.Add(5*time.Second), identity.Earlier(i.ValidUntil, deadline)), AccessUntil: s.created.Add(time.Hour), DeleteBy: s.created.Add(2 * time.Hour)}
+	return evidence.ContextDownloadView{Session: artifact.DownloadSession{ID: id, AllocationID: consoleCaptureID(82), Scope: artifact.DownloadScope{RootID: consoleCaptureID(1), ArtifactID: consoleCaptureID(81), CaptureID: consoleCaptureID(8), ClusterID: consoleCaptureID(1), NamespaceUID: "synthetic-namespace-uid", WorkloadUID: "synthetic-workload-uid", PodUID: "synthetic-pod-uid", Version: artifact.Digest{9}, Principal: i.Principal}, RequestDigest: artifact.Digest{10}, State: state, CreatedAt: s.created, Deadline: deadline, OutputLimit: 8192, ReadLimit: 12 << 20, RequestLimit: consoleRestartRequestLimit}, Metadata: m, ValidUntil: identity.Earlier(now.Add(5*time.Second), identity.Earlier(i.ValidUntil, deadline)), AccessUntil: s.created.Add(time.Hour), DeleteBy: s.created.Add(2 * time.Hour)}
 }
 func (s *consoleRestartDownloads) PrepareContextDownload(ctx context.Context, c app.CurrentIdentity, artifactID, key string) (evidence.ContextDownloadView, error) {
 	i, e := s.current(ctx, c)
@@ -345,12 +351,23 @@ func (s *consoleRestartDownloads) content(w http.ResponseWriter, r *http.Request
 	id := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, browser.DownloadContentPrefix), "/content")
 	original := id == consoleCaptureID(90) && s.originalKey != "" && s.stopKey == ""
 	fresh := id == consoleCaptureID(91) && s.newKey != ""
-	if r.URL.Path != browser.DownloadContentPrefix+id+"/content" || (!original && !fresh) || len(s.stats.NativeIDs) >= 4 {
+	s.stats.NativeReceived++
+	charged := 0
+	for _, served := range s.stats.NativeIDs {
+		if served == id {
+			charged++
+		}
+	}
+	// Match the unchanged RequestLimit published for each accepted session.
+	// A new session never borrows from or refunds the old session's charges.
+	if r.URL.Path != browser.DownloadContentPrefix+id+"/content" || (!original && !fresh) || charged >= consoleRestartRequestLimit || !time.Now().Before(s.created.Add(time.Minute)) {
+		s.stats.NativeRefused++
 		s.mu.Unlock()
 		w.WriteHeader(404)
 		return
 	}
 	s.stats.NativeIDs = append(s.stats.NativeIDs, id)
+	s.stats.NativeRanges = append(s.stats.NativeRanges, r.Header.Get("Range"))
 	s.mu.Unlock()
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Header().Set("Content-Disposition", `attachment; filename="synthetic-pod-status.json"`)
@@ -362,4 +379,36 @@ func (s *consoleRestartDownloads) content(w http.ResponseWriter, r *http.Request
 		panic(http.ErrAbortHandler)
 	}
 	_, _ = io.WriteString(w, consoleRestartBody)
+}
+
+// The actual domain quota belongs to a download session. Browser retries can
+// exhaust the original session, but a positively stopped and explicitly prepared
+// second session must retain its independently accepted request budget.
+func TestConsoleRestartNativeQuotaBelongsToExactSession(t *testing.T) {
+	service := &consoleRestartDownloads{created: time.Now().UTC(), originalKey: "original"}
+	serve := func(id string) (response *httptest.ResponseRecorder) {
+		response = httptest.NewRecorder()
+		defer func() {
+			if v := recover(); v != nil && v != http.ErrAbortHandler {
+				panic(v)
+			}
+		}()
+		service.content(response, httptest.NewRequest(http.MethodGet, browser.DownloadContentPrefix+id+"/content", nil))
+		return response
+	}
+	for range consoleRestartRequestLimit {
+		if out := serve(consoleCaptureID(90)); out.Code != 200 || out.Body.Len() != 8 {
+			t.Fatal("original interrupted attempt", out.Code, out.Body.Len())
+		}
+	}
+	if out := serve(consoleCaptureID(90)); out.Code != 404 || len(service.stats.NativeIDs) != consoleRestartRequestLimit {
+		t.Fatal("original request quota was renewed")
+	}
+	service.stopKey, service.newKey = "stopped", "fresh"
+	if out := serve(consoleCaptureID(91)); out.Code != 200 || out.Body.String() != consoleRestartBody {
+		t.Fatal("original retries consumed another accepted session's budget", out.Code)
+	}
+	if service.stats.NativeReceived != 6 || service.stats.NativeRefused != 1 || len(service.stats.NativeIDs) != 5 {
+		t.Fatal("received/refused attempts were counted as accepted charges", service.stats.NativeReceived, service.stats.NativeRefused, len(service.stats.NativeIDs))
+	}
 }
