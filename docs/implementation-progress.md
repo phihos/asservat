@@ -1,5 +1,29 @@
 # Sustained implementation progress
 
+## Installation-wide live-view ceiling (2026-11-10)
+
+The real-PostgreSQL live-watch fixture now fills both installation-wide slots
+with two distinct principals and requires a third distinct principal to receive
+`live.ErrCapacity`, while each principal retains its existing single-slot
+ceiling. Closing the second principal's control releases its installation slot;
+the original expiry/debt checks remain at `n == 4` and `a == 2`. This is a
+test-only qualification with no production or permission change.
+
+- [Real-PostgreSQL evidence](../test/results/installation-live-ceiling/README.md):
+  `TestLiveWatchLedgerWithRealServices` passed in 10.53 seconds and the package
+  completed in 11.596 seconds. Sources were unchanged and cleanup had no
+  failures. Full `make pre-push` also passed on the same working tree, including
+  the affected integration suite and all 611 console tests.
+- The initially proposed separate installed suite was discarded because its
+  `PrincipalWatches=4` setting exceeded installation `Watches=2`; native run
+  42722762721 therefore failed before qualification and is not a pass. The SQL
+  fixture tests the intended distinct-principal boundary without introducing a
+  contradictory installed configuration.
+
+This does not qualify installed multi-principal React/MCP behavior, overload,
+incident priority or sustained throughput. The broader specification remains
+active.
+
 ## Shared React and MCP live-view principal ceiling (2026-11-10)
 
 The installed live-observation fixture now proves that React and MCP views share one principal's two watch slots. The browser emits an explicit `opened` event and remains open until Go sends `release`; the third concurrent open with a fresh idempotency key must return `CapacityUnavailable`. Both original controls remain active, and subsequent policy episodes complete. This is test-only qualification with no production or permission change.
