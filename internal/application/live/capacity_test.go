@@ -76,8 +76,10 @@ func TestCapacityReaderAuthorizesOneClusterAndRechecksCaller(t *testing.T) {
 	}
 	f, service = newCapacityFixture()
 	f.viewerErr = v.ErrUnavailable
-	if _, _, err = service.Read(context.Background(), f, capacityCluster); !errors.Is(err, identity.ErrUnavailable) || f.resolved != 1 {
-		t.Fatal("viewer outage returned data or skipped its bound", err, f.resolved)
+	stage := ""
+	service.Report = func(value string) { stage = value }
+	if _, _, err = service.Read(context.Background(), f, capacityCluster); !errors.Is(err, identity.ErrUnavailable) || f.resolved != 1 || stage != "viewers" {
+		t.Fatal("viewer outage returned data or skipped its bound", err, f.resolved, stage)
 	}
 	f, service = newCapacityFixture()
 	f.caller.Groups = nil

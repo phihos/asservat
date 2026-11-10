@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"context"
+	"os"
 	"slices"
 
 	"asservat.local/asservat/internal/adapters/postgres"
@@ -30,6 +31,6 @@ func composePublicLiveCapacity(ctx context.Context, c PublicContextOperationsCon
 	if err != nil {
 		return nil, presentation.ErrOperationsConfiguration
 	}
-	service := liveapp.CapacityReader{InstallationID: c.InstallationID, Administration: pc.fleet.Settings, Recovery: v.submission.Recovery, Targets: targets, Viewers: viewers, Clusters: slices.Clone(pc.clusterIDs), Now: c.Now}
+	service := liveapp.CapacityReader{InstallationID: c.InstallationID, Administration: pc.fleet.Settings, Recovery: v.submission.Recovery, Targets: targets, Viewers: viewers, Clusters: slices.Clone(pc.clusterIDs), Now: c.Now, Report: eventLog(os.Stderr, "live capacity refused")}
 	return presentation.NewLiveCapacityOperations(c.PublicOrigin, c.Now, c.NewID, service)
 }

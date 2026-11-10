@@ -42,6 +42,13 @@ type CapacityReader struct {
 	Viewers        CapacityViewers
 	Clusters       []string
 	Now            func() time.Time
+	Report         func(string)
+}
+
+func (s CapacityReader) note(stage string) {
+	if s.Report != nil {
+		s.Report(stage)
+	}
 }
 
 func (s CapacityReader) Read(ctx context.Context, current CurrentIdentity, cluster string) (collector.LiveRuntimeSnapshot, time.Time, error) {
@@ -72,19 +79,23 @@ func (s CapacityReader) Read(ctx context.Context, current CurrentIdentity, clust
 	}
 	recovery, err := s.Recovery.RecoveryState(ctx)
 	if err != nil || recovery.InstallationID != s.InstallationID || !recovery.Valid(s.Now()) {
+		s.note("recovery")
 		return zero, time.Time{}, identity.ErrUnavailable
 	}
 	until = identity.Earlier(until, recovery.FreshUntil)
 	out, err := s.Targets.ReadLiveRuntime(ctx, request)
 	if err != nil || out.ClusterID != cluster {
+		s.note("runtime")
 		return zero, time.Time{}, identity.ErrUnavailable
 	}
 	viewers, viewerFresh, err := s.Viewers.ReadLiveViewers(ctx, s.InstallationID, cluster)
 	if err != nil {
+		s.note("viewers")
 		return zero, time.Time{}, identity.ErrUnavailable
 	}
 	out.ActiveViewers = viewers
 	if !out.Valid(s.Now()) {
+		s.note("snapshot")
 		return zero, time.Time{}, identity.ErrUnavailable
 	}
 	until = identity.Earlier(identity.Earlier(until, out.FreshUntil), viewerFresh)
@@ -94,6 +105,7 @@ func (s CapacityReader) Read(ctx context.Context, current CurrentIdentity, clust
 	}
 	until = identity.Earlier(until, fresh.ValidUntil)
 	if ctx.Err() != nil || !s.Now().Before(until) {
+		s.note("deadline")
 		return zero, time.Time{}, identity.ErrUnavailable
 	}
 	return out, until, nil
