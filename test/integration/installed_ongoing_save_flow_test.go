@@ -174,19 +174,32 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 		t.Fatal("ongoing save MCP", err)
 	}
 	defer requester.Close()
-	invoke := func(call context.Context, name string, args any) (installedJourneyEnvelope, string, error) {
+	invoke := func(call context.Context, name string, args any) (installedLiveReply, string, error) {
 		raw, err := json.Marshal(args)
 		if err != nil {
-			return installedJourneyEnvelope{}, "", err
+			return installedLiveReply{}, "", err
 		}
 		if err = wire.ValidateInput(name, raw); err != nil {
-			return installedJourneyEnvelope{}, "", fmt.Errorf("native authored %s: %w", name, err)
+			return installedLiveReply{}, "", fmt.Errorf("native authored %s: %w", name, err)
 		}
 		out, err := requester.CallTool(call, &sdk.CallToolParams{Name: name, Arguments: args})
 		if err != nil {
-			return installedJourneyEnvelope{}, "", err
+			return installedLiveReply{}, "", err
 		}
-		return installedJourneyReplyCode(wire, name, out)
+		envelope, code, err := installedJourneyReplyCode(wire, name, out)
+		if err != nil {
+			return installedLiveReply{}, "", err
+		}
+		raw, err = json.Marshal(out.StructuredContent)
+		if err != nil {
+			return installedLiveReply{}, "", err
+		}
+		var decoded installedLiveReply
+		if err = json.Unmarshal(raw, &decoded); err != nil {
+			return installedLiveReply{}, "", err
+		}
+		decoded.installedJourneyEnvelope = envelope
+		return decoded, code, nil
 	}
 	wait := func(what string, limit time.Duration, done func(context.Context) bool) {
 		t.Helper()
@@ -599,11 +612,15 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 			if overloadWatch.Cursor == nil {
 				t.Fatal("overload view lost its original cursor")
 			}
+			originalReply, code, err := invoke(ctx, "read_live_watch", map[string]any{"watch_id": liveWatch.ID, "cursor": *liveWatch.Cursor, "limit": 20, "wait_ms": 1000})
 			var originalBatch v.Batch
-			must("read_live_watch", map[string]any{"watch_id": liveWatch.ID, "cursor": *liveWatch.Cursor, "limit": 20, "wait_ms": 1000}, &originalBatch)
-			if originalBatch.WatchID != liveWatch.ID || originalBatch.State != "Active" {
+			if err != nil || code != "" || originalReply.Status != "ok" || json.Unmarshal(originalReply.Data, &originalBatch) != nil {
+				t.Fatal("original cohort read failed before overload", code, err)
+			}
+			if originalBatch.WatchID != liveWatch.ID || originalBatch.State != "Active" || originalReply.NextCursor == nil {
 				t.Fatal("original cohort was not active before the overload read")
 			}
+			liveWatch.Cursor = originalReply.NextCursor
 			reply, code, err := invoke(ctx, "read_live_watch", map[string]any{"watch_id": overloadWatch.ID, "cursor": *overloadWatch.Cursor, "limit": 20, "wait_ms": 0})
 			var failure struct {
 				Retryable bool `json:"retryable"`
@@ -668,15 +685,23 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 		liveTerminal := ""
 		if installedJourneyFocus() == "ongoing-incident" {
 			wait("original live source terminal after incident", 30*time.Second, func(call context.Context) bool {
+				reply, code, err := invoke(call, "read_live_watch", map[string]any{"watch_id": liveWatch.ID, "cursor": *liveWatch.Cursor, "limit": 20, "wait_ms": 0})
 				var batch v.Batch
-				if !read(call, "read_live_watch", map[string]any{"watch_id": liveWatch.ID, "cursor": *liveWatch.Cursor, "limit": 20, "wait_ms": 0}, &batch) {
+				if err != nil || code != "" || reply.Status != "ok" || json.Unmarshal(reply.Data, &batch) != nil {
+					var state string
+					_ = admin.QueryRow(call, `SELECT state FROM live_watch_control WHERE root_id=$1 AND id=$2`, root, liveWatch.ID).Scan(&state)
+					t.Logf("incident terminal poll refused: code=%s sql=%s err=%v", code, state, err)
 					return false
 				}
 				if batch.WatchID != liveWatch.ID || batch.Revision != liveWatch.Revision || len(batch.Rows) != 0 {
 					t.Fatal("incident live terminal changed the original view or replayed rows")
 				}
+				if reply.NextCursor != nil {
+					liveWatch.Cursor = reply.NextCursor
+				}
 				liveTerminal = batch.State
 				if liveTerminal != "SourceEnded" {
+					t.Logf("incident terminal poll state=%s", liveTerminal)
 					return false
 				}
 				gap := false
