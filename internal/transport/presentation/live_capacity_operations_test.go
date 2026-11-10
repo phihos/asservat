@@ -8,6 +8,7 @@ import (
 	"time"
 
 	identities "asservat.local/asservat/internal/application/identity"
+	liveapp "asservat.local/asservat/internal/application/live"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/collector"
@@ -56,10 +57,19 @@ func TestLiveCapacityOperationReturnsCanonicalSingleClusterView(t *testing.T) {
 	if data["cluster_id"] != cluster || data["rates_complete"] != true || live["scan_events"] != 20.0 || live["scan_cpu_nanos"] != 3000.0 || rates["scan_events_per_second"] != 2.5 || data["fresh_until"] == nil {
 		t.Fatal(out)
 	}
-	encoded := string(reply.Body)
-	if strings.Contains(encoded, "scanEvents") || strings.Contains(encoded, "node") && strings.Contains(encoded, "node-uid") {
-		t.Fatal("wrong wire shape or node label", encoded)
+	forbidden := map[string]bool{"podUID": true, "nodeName": true, "node-uid": true, "sourceID": true, "principal": true, "filter": true, "payload": true, "scanEvents": true}
+	var checkKeys func(map[string]any)
+	checkKeys = func(object map[string]any) {
+		for key, value := range object {
+			if forbidden[key] {
+				t.Fatal("content label in capacity reply", key)
+			}
+			if nested, ok := value.(map[string]any); ok {
+				checkKeys(nested)
+			}
+		}
 	}
+	checkKeys(data)
 	tool, ok := ops.Tool("get_live_capacity")
 	if !ok || tool.MCP() {
 		t.Fatal("administrator operation exposed through MCP", tool)
@@ -73,7 +83,12 @@ func TestLiveCapacityOperationReturnsCanonicalSingleClusterView(t *testing.T) {
 	}
 	f.err = identity.ErrDenied
 	reply, err = ops.Call(context.Background(), f, "get_live_capacity", json.RawMessage(`{"cluster_id":"`+cluster+`"}`))
-	if err != nil || !strings.Contains(string(reply.Body), "AdministratorRequired") {
-		t.Fatal("authority failure not mapped", string(reply.Body), err)
+	if err != nil || !strings.Contains(string(reply.Body), "AdministratorRequired") || !reply.ValidUntil.Equal(f.now.Add(time.Second)) {
+		t.Fatal("authority failure or short error freshness not mapped", string(reply.Body), reply.ValidUntil, err)
+	}
+	f.err = liveapp.ErrClusterUnknown
+	reply, err = ops.Call(context.Background(), f, "get_live_capacity", json.RawMessage(`{"cluster_id":"`+cluster+`"}`))
+	if err != nil || !strings.Contains(string(reply.Body), "UnknownCluster") || !reply.ValidUntil.Equal(f.now.Add(time.Second)) {
+		t.Fatal("unknown cluster not distinguished", string(reply.Body), reply.ValidUntil, err)
 	}
 }

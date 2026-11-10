@@ -1,6 +1,8 @@
 package bootstrap
 
 import (
+	"slices"
+
 	liveapp "asservat.local/asservat/internal/application/live"
 	"asservat.local/asservat/internal/transport/presentation"
 )
@@ -21,6 +23,6 @@ func composePublicLiveCapacity(c PublicContextOperationsConfig, s PublicContextO
 	if !ok {
 		return nil, presentation.ErrOperationsConfiguration
 	}
-	service := liveapp.CapacityReader{InstallationID: c.InstallationID, Administration: pc.fleet.Settings, Recovery: v.submission.Recovery, Targets: targets, Now: c.Now}
+	service := liveapp.CapacityReader{InstallationID: c.InstallationID, Administration: pc.fleet.Settings, Recovery: v.submission.Recovery, Targets: targets, Clusters: slices.Clone(pc.clusterIDs), Now: c.Now}
 	return presentation.NewLiveCapacityOperations(c.PublicOrigin, c.Now, c.NewID, service)
 }

@@ -2,6 +2,8 @@ package live
 
 import (
 	"context"
+	"errors"
+	"slices"
 	"time"
 
 	"asservat.local/asservat/internal/domain/artifact"
@@ -24,6 +26,8 @@ type CapacityTargets interface {
 	ReadLiveRuntime(context.Context, collector.LiveRuntimeRequest) (collector.LiveRuntimeSnapshot, error)
 }
 
+var ErrClusterUnknown = errors.New("unknown live capacity cluster")
+
 // CapacityReader returns one selected cluster's content-free live runtime. It
 // authorizes before the regional read and rechecks the caller before replying.
 type CapacityReader struct {
@@ -31,6 +35,7 @@ type CapacityReader struct {
 	Administration CapacityAdministration
 	Recovery       CapacityRecovery
 	Targets        CapacityTargets
+	Clusters       []string
 	Now            func() time.Time
 }
 
@@ -56,6 +61,9 @@ func (s CapacityReader) Read(ctx context.Context, current CurrentIdentity, clust
 	request := collector.LiveRuntimeRequest{ClusterID: cluster}
 	if !request.Valid() {
 		return zero, time.Time{}, v.ErrInvalid
+	}
+	if !slices.Contains(s.Clusters, cluster) {
+		return zero, time.Time{}, ErrClusterUnknown
 	}
 	recovery, err := s.Recovery.RecoveryState(ctx)
 	if err != nil || recovery.InstallationID != s.InstallationID || !recovery.Valid(s.Now()) {

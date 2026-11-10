@@ -8,6 +8,7 @@ import (
 	"time"
 
 	identities "asservat.local/asservat/internal/application/identity"
+	liveapp "asservat.local/asservat/internal/application/live"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/collector"
 	"asservat.local/asservat/internal/domain/identity"
@@ -111,6 +112,9 @@ func liveCapacityFailure(err error) OperationFailure {
 	if errors.Is(err, v.ErrInvalid) {
 		return OperationFailure{"InvalidCluster", "Select one valid cluster ID.", false}
 	}
+	if errors.Is(err, liveapp.ErrClusterUnknown) {
+		return OperationFailure{"UnknownCluster", "That cluster is not enrolled in this installation.", false}
+	}
 	return OperationFailure{"NotAvailable", "Live-view capacity is unavailable right now. Retry shortly.", true}
 }
 
@@ -144,6 +148,8 @@ func (s *LiveCapacityOperations) CallWithContext(ctx context.Context, current id
 	snapshot, valid, operationErr := s.reader.Read(ctx, current, in.ClusterID)
 	if operationErr != nil {
 		out.Status, out.Data = "error", liveCapacityFailure(operationErr)
+		errorWindow := identity.Check(s.now(), identity.Recheck).Narrow(s.now().Add(time.Second))
+		until = identity.Earlier(until, errorWindow.Until())
 	} else {
 		until = identity.Earlier(until, valid)
 		out.Data = liveCapacityReply(snapshot)

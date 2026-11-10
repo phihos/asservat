@@ -57,7 +57,7 @@ func newCapacityFixture() (*capacityFixture, CapacityReader) {
 	f.admin = fleet.Administration{InstallationID: capacityInstallation, IssuerEpoch: capacityInstallation, Issuer: f.caller.Principal.Issuer, Revision: revision, ObservedAt: now, FreshUntil: now.Add(5 * time.Second), Clients: []string{"console"}, Groups: []string{"platform-admins"}, DeliveryProfiles: []string{"kv"}, MaxActiveBootstraps: 1, MaxBootstrapHistory: 1, MaxClusters: 1}
 	f.recovery = artifact.RecoveryProof{InstallationID: capacityInstallation, IssuerEpoch: capacityInstallation, Revision: revision, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
 	f.snapshot = collector.LiveRuntimeSnapshot{ClusterID: capacityCluster, ObservedAt: now, FreshUntil: now.Add(5 * time.Second), Nodes: 1, RatesComplete: true, Live: &collector.LiveActivity{Cohorts: 1, ScanEvents: 2}}
-	return f, CapacityReader{InstallationID: capacityInstallation, Administration: f, Recovery: f, Targets: f, Now: func() time.Time { return f.now }}
+	return f, CapacityReader{InstallationID: capacityInstallation, Administration: f, Recovery: f, Targets: f, Clusters: []string{capacityCluster}, Now: func() time.Time { return f.now }}
 }
 
 func TestCapacityReaderAuthorizesOneClusterAndRechecksCaller(t *testing.T) {
@@ -84,5 +84,9 @@ func TestCapacityReaderAuthorizesOneClusterAndRechecksCaller(t *testing.T) {
 	f, service = newCapacityFixture()
 	if _, _, err = service.Read(context.Background(), f, "not-a-cluster"); !errors.Is(err, v.ErrInvalid) || f.reads != 0 {
 		t.Fatal("invalid cluster reached regional read", err, f.reads)
+	}
+	f, service = newCapacityFixture()
+	if _, _, err = service.Read(context.Background(), f, capacityInstallation); !errors.Is(err, ErrClusterUnknown) || f.reads != 0 {
+		t.Fatal("unknown cluster reached regional read", err, f.reads)
 	}
 }
