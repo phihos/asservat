@@ -1,33 +1,69 @@
 # Sustained implementation progress
 
-## Active candidate: processing restriction inventory and release (2026-11-10)
+## Active candidate: qualified processing inventory and release (2026-11-10)
 
 Outcome: a configured operator selects an existing artifact, restricts it,
-rediscovers the durable rule after reload, releases its exact revision and
-recovers ordinary reads/download starts for the same original evidence.
-Candidate: `feature/processing-release-flow` in the separate processing-release
-worktree, based on qualified `dda2f708` (PR #216 remains open/green for review).
+rediscovers its durable rule after reload, releases the exact revision and
+recovers ordinary reads and a new native download of the same original bytes.
+Candidate: `feature/processing-release-flow`, source `a1275b0f`, in the separate
+processing-release worktree based on qualified `dda2f708` (PR #216). Required CI
+and review state are tracked on the candidate PR. No merge or release is claimed.
 [ADR-318](decisions/318-processing-operator-rule-inventory-and-release.md)
-records scope, wire changes, the shared reserve and numeric complexity review.
+records contracts, original authority bounds, the reserve and complexity review.
 
-The reserve projection, typed lane selection, canonical browser controls,
-operator inventory and artifact resolution are implemented as a candidate.
-Existing processing SQL grants/transactions are reused; two proposed duplicate
-SQL functions were removed. No roles, pools, background loops or consent step
-are added. Actual initialized/unknown/restricted state is never inferred from
-an empty browser view. Started responses retain ADR-312's existing bounds.
+Release uses the actual reserved processing policy/retention. Inventory and
+artifact resolution reuse existing compiled hub grants and SQL transactions;
+two proposed duplicate SQL functions were removed. No roles, pools, background
+loops or consent step were added. Complete policy/recovery observations fell
+from three to one per change; original SQL deadlines and current identity loss
+checks remain. Non-hour interval JSON round trips compare instants without
+changing stored/audited bytes. The console clears old identity scope correctly,
+retains uncertain request keys through same-user CSRF refresh and releases only
+the exact inventory scope/revision. Started responses retain ADR-312's bounds.
 
-Focused domain/application/adapter/browser race tests pass. The shared actual
-React driver passed the controlled Go TLS/session/CSRF restriction/reload/release
-journey in 3.30 s, including 320px reflow. Empty owned PostgreSQL migration149
-Up/Down/Up passes; the first preflight reached a socket-only initialization
-server before TCP was ready and failed before DDL, and is not a pass.
+Verification at the frozen candidate:
 
-Next: execute the actual profile/reserved release and inventory expressions
-under compiled SQL grants, check upgrade/history composition, integrate the same
-React driver into the installed journey, then run integrated gates once and
-fresh installed qualification. No installed outcome or complete REQ-PRV-006
-exit is claimed yet.
+- `make pre-push`: exit 0; 631 console tests and affected Go race tests (89 s),
+  schema bundle/history/release-floor checks, SQL generation and repository gates.
+- Full `make console-browser-check`: exit 0, 140.768 s; shared actual React
+  processing driver (3.31 s), existing journeys and accessibility checks.
+- Real compiled-role release/profile fixture: exit 0, 12.500 s; the normal human
+  account is full, private release succeeds, both audits are acknowledged, exact
+  replay spends nothing extra, and a `+05:30` interval survives durable SQL/JSON.
+- Real custody inventory fixture: exit 0, 4.786 s; operator rule/artifact reads
+  while ordinary access is restricted, cursor/current source/recovery fences,
+  original bounded lock refusal and unchanged retained state.
+- Actual schema-owner upgrade: exit 0, 5.724 s; floor 149 and unknown-history
+  refusal. Empty owned 148→149→148→149 also restores exact function definitions
+  and floor 102/149. All service runs report unchanged sources and clean cleanup.
+- Fresh `make installed-focus FOCUS=journey ARGS=--keep-on-failure`: Go exit 0
+  in 428.565 s; harness exit 0 in 495.4 s. The installed operator flow takes
+  12.494 s: real React restriction/reload/exact release, ordinary case/download
+  refusal, both original-key replays with unchanged rows/audit/account spend,
+  original artifact/access cutoff and identical native bytes after release.
+  Existing Stop/Deny/TargetGone/expiry, failed-cleanup accounting and independent
+  managed-copy deletion pass. All 4,750 source hashes match; cleanup is complete,
+  failures empty, build scratch and owned fixtures removed. Original reports are
+  in the external `kimi-review/processing-installed-qualified` archive.
+
+Earlier failed fixture invocations and the full browser failure are preserved
+externally. The new inventory fixture now uses the existing verified TLS helper
+and actual shared hub role. The browser regression exposed an existing mismatch:
+Chromium used four original-session requests within its advertised limit, while
+the test assumed three and shared the quota between sessions. The corrected
+fixture retains four per exact session, separates received/charged/refused
+requests and keeps all Stop/replay/fresh-key assertions. Final full gates pass.
+
+Schema 149 is a fresh development baseline: the prior strict two-lane decoder is
+incompatible. The existing release coordinator refuses `installer-upgrade` from
+148 before mutation, and image-only rollback to 148 is unavailable. Existing
+installations are neither adopted nor erased. This is distinct from the owned
+schema-owner/Down/Up tests, which do not qualify installed rolling 148→149.
+
+Remaining: complete REQ-PRV-006 candidate discovery by workload/time/purpose and
+controlled incident references, lineage, early erasure/exceptions and inventory
+reporting. This installed subset does not complete the whole privacy requirement,
+TASK-07 or the first release. PR review/merge is separate from qualification.
 
 
 ## Reviewed candidate: viewer capacity and optional fleet settings (2026-11-10)

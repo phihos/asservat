@@ -1,6 +1,6 @@
 # ADR-318 — Processing operator rule inventory and release
 
-Date: 2026-11-10. Status: implementation candidate; qualification pending.
+Date: 2026-11-10. Status: implemented and freshly installed-qualified for SC-PRV-010; PR review pending.
 Requirements: REQ-PRV-006, REQ-CAP-005, SC-PRV-010; TASK-07, TASK-11.
 
 ## Problem and authority
@@ -91,9 +91,12 @@ supported installed downgrade or a permanent development-layout compatibility la
 
 ## Verification boundary
 
-Focused unit/race and compiled-browser checks are component evidence. The fresh
-installed workflow must select an existing artifact, restrict it, observe new
-ordinary case/download refusal, reload inventory, release its exact revision,
-and recover the same original evidence without additional replay audit spend.
+Focused unit/race, compiled-browser and real SQL checks pass. The fresh installed
+journey at `a1275b0f` passes with Go/harness exit 0, 4,750 unchanged source hashes
+and complete cleanup. The actual React operator flow takes 12.494 s, including
+restriction, ordinary case/download refusal, durable inventory reload, exact
+release, unchanged replay spend and the original native bytes/access cutoff.
+Commands, terminal results and remaining uncertainty are in the current
+[implementation ledger](../implementation-progress.md).
 This is a bounded portion of REQ-PRV-006; erasure, complete rights-request search,
 reporting, backup lifetime and the full first release remain separate work.
