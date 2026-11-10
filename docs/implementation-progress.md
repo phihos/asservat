@@ -32,11 +32,28 @@ is complete, including both owned clusters, labelled Docker resources and
 build scratch. Original reports are in the external
 `rights-discovery/installed-415b5ce1` archive.
 
+Review found that a known non-operator's processing change received 503.
+At `08acfc6a` the browser receives 403 before recovery, decision or mutation
+audit work. Focused Go race, vet, architecture and contract checks passed.
+The fresh installed rerun passed at that commit (Go 463.822 s, harness 539.6 s,
+both exit 0). A signed-in non-operator received 403 and independent SQL
+readback found neither a decision nor a mutation audit. The 15.453 s
+processing flow still passed discovery, exact release, replay and original
+native bytes. Expiry and verified cleanup passed. All 4,767 source hashes
+match and the owned clusters, Docker resources and scratch were removed.
+Original reports are in `rights-discovery/installed-08acfc6a`.
+
+In a separate owned PostgreSQL smoke, schema-150 source `b6e7c2d8` upgraded
+schema 149 and acknowledged a search audit. The exact schema-149 source
+`4f3c8d18` used its compiled hub-runtime audit adapters against the same
+database, acknowledged a `get_case` audit and preserved the retained search
+record and lifecycle. Down refused that retained row. Both binaries and
+cleanup exited 0. The fixture used synthetic initial authority and object
+receipts. Exact prior-image rollout and HTTP behavior remain unverified.
+
 Next: exact early-erasure request and status through the existing deletion
 reconciler. Complete derivative/cache coverage and exceptions/reporting
-remain open under REQ-PRV-006. Schema 150 migration compatibility is tested
-in PostgreSQL. Exact prior-image rollback with retained search audits still
-needs installed evidence.
+remain open under REQ-PRV-006.
 
 ## Merged processing inventory and release (2026-11-10)
 

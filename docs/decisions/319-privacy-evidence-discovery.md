@@ -42,8 +42,13 @@ parents and escaped Unicode in each candidate. The operation is browser-only.
 
 Migration 150 expands the existing normal-lane operation and input-format lists
 and leaves the floor at 149. Down restores the prior functions after checking
-for retained search audit rows. An old-image smoke must verify the installed
-prior operations with new audit rows present before claiming image rollback.
+for retained search audit rows. The PostgreSQL smoke verified both compiled
+audit versions against retained search rows. Installed prior-image rollback
+remains unverified.
+
+Known non-operators receive a bounded 403 for an explicit processing change
+before mutation audit or decision work. Current authority that cannot be
+observed still receives an unavailable response.
 
 ## Complexity review
 
