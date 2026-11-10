@@ -2,6 +2,7 @@ package kubernetes
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	app "asservat.local/asservat/internal/application/fleet"
@@ -42,6 +43,14 @@ func (s *ProtectedFleetSettings) note(stage string) {
 	}
 }
 
+func fleetSettingsStep(err error) string {
+	var fixed interface{ FixedStep() string }
+	if errors.As(err, &fixed) {
+		return fixed.FixedStep()
+	}
+	return "other"
+}
+
 var _ app.AdministrationReader = (*ProtectedFleetSettings)(nil)
 
 func NewProtectedFleetSettings(c *PermissionClient, p *FleetConfigurationProtection, name, uid, installation string) (*ProtectedFleetSettings, error) {
@@ -65,7 +74,7 @@ func (s *ProtectedFleetSettings) FleetAdministration(ctx context.Context) (value
 	start := s.settings.client.now()
 	_, until, err := s.protection.current(ctx)
 	if err != nil {
-		s.note("protection")
+		s.note("protection/" + fleetSettingsStep(err))
 		return zero, err
 	}
 	first, err := s.settings.FleetAdministration(ctx)
