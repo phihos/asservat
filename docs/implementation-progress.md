@@ -1,5 +1,36 @@
 # Sustained implementation progress
 
+## Content-minimized live node runtime counters (2026-11-10)
+
+The existing I-02 node status now carries an optional live-runtime snapshot when
+live viewing is enabled. It reports active cohorts, the rate-limit window start
+and process-lifetime scan, delivery and refused-admission counters without
+source, principal, filter or payload labels. Policy and manual replies both
+account for retained rows and encoded bytes. Separate private per-window credit
+preserves the existing limits while public totals remain cumulative. Report
+ordering cannot reject a newer live window, and disabled live viewing leaves
+reports unchanged.
+
+- [Native evidence](../test/results/live-node-status-42766629788/README.md): run
+  42766629788 attempt 2 passed at `30bf1950` (Go test 439.47 s, package
+  439.506 s, focus 161.96 s), with all three policy projections and 33 bounded
+  live MCP operations. Sources were unchanged, build scratch was removed and
+  cleanup had no failures.
+- Full `make pre-push`, final-head PR CI (`ci-ok`) and Gitar review passed. The
+  review's report-ordering, manual-accounting and counter-reset findings are
+  resolved with regressions.
+- Earlier fixture failures are retained as qualifications, not passes: run
+  42761290164 hit transient open/browser readiness failures and had its stale
+  attempt cancelled; run 42764408892 exposed a slow fixture warming poll that
+  missed the original five-second start window before correctly refusing a
+  replacement; run 42766629788 attempt 1 timed out downloading tshark before
+  any product test. The prompt read-only poll now observes the original start
+  without weakening the no-replacement assertion.
+
+This adds node-runtime accounting, not an operator metrics/capacity UI, rate
+aggregation or long-duration load qualification. Those views and the broader
+specification remain active.
+
 ## Sustained installed live reads (2026-11-10)
 
 The installed live fixture now follows continuation through five bounded
