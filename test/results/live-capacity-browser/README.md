@@ -14,7 +14,7 @@ enrollment and an activated unexpired certificate; it is distinct from
 node-reported cohorts. Source-loss and reply-drop rates use report-to-report counter deltas
 and are withheld when any current live-enabled node lacks a valid predecessor.
 
-[Real PostgreSQL evidence](../live-viewer-capacity-fixed.log) covers
+[Real PostgreSQL evidence](../live-viewer-capacity-final.log) covers
 active/closed counts, retired-owner exclusion, cluster isolation and migration
 rollback under the compiled hub role, with unchanged sources and no cleanup
 failures.

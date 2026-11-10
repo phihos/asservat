@@ -23,11 +23,11 @@ caller validity before the final identity recheck.
   browser checks again. A later full gate reached unrelated accepted-policy
   fixtures whose fixed 2026-10-11 creation plus 30-day validity had just expired;
   those untouched fixtures fail on `main` too and were not changed here.
-- [Real SQL evidence](../test/results/live-viewer-capacity-fixed.log): both
-  intended tests passed in 26.948 s. The compiled hub role counted one active
+- [Real SQL evidence](../test/results/live-viewer-capacity-final.log): both
+  intended tests passed in 27.083 s. The compiled hub role counted one active
   then zero closed viewers, excluded a retired owner and isolated another
   cluster. Migration 00148 Up/Down/Up passed without changing retained records.
-  The [environment](../test/results/live-viewer-capacity-fixed-environment.json)
+  The [environment](../test/results/live-viewer-capacity-final-environment.json)
   records unchanged sources, exit 0 and no cleanup failures. An
   [earlier regression](../test/results/live-viewer-retired-red.log) failed with
   one viewer still counted after owner retirement; the liveness/distinct-ID fix

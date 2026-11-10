@@ -37,12 +37,11 @@ func (s *LiveViewerCapacity) ReadLiveViewers(ctx context.Context, installation, 
 	count := int64(-1)
 	fresh := time.Time{}
 	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		var err error
-		count, err = q.ReadLiveViewers(ctx, custodydb.ReadLiveViewersParams{InstallationID: id(installation), ClusterID: id(cluster)})
+		now, err := q.CurrentTime(ctx)
 		if err != nil {
 			return err
 		}
-		now, err := q.CurrentTime(ctx)
+		count, err = q.ReadLiveViewers(ctx, custodydb.ReadLiveViewersParams{InstallationID: id(installation), ClusterID: id(cluster)})
 		if err != nil {
 			return err
 		}
