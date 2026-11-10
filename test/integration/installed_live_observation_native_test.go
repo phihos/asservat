@@ -411,6 +411,14 @@ func installedLiveRestartOwner(t *testing.T, ctx context.Context, c installedLiv
 	}
 }
 
+func installedLiveViewerMapping(ctx context.Context, db *pgxpool.Pool, root, installation string, source installedLiveFixture) (int, int, error, error) {
+	expectedClusterKey := sha256.Sum256([]byte("asservat-live-cluster/v1\x00" + source.ClusterID))
+	var mapped, direct int
+	mappingErr := db.QueryRow(ctx, `SELECT count(*) FROM live_watch_control WHERE root_id=$1 AND cluster_key=$2 AND state IN ('Active','Paused','Disconnected')`, root, expectedClusterKey[:]).Scan(&mapped)
+	directErr := db.QueryRow(ctx, `SELECT live_watch_viewers($1,$2)`, installation, expectedClusterKey[:]).Scan(&direct)
+	return mapped, direct, mappingErr, directErr
+}
+
 func installedLiveMCP(t *testing.T, ctx context.Context, db *pgxpool.Pool, root string, source installedLiveFixture, call installedLiveCall, run installedLiveRun) error {
 	t.Helper()
 	mustOn := func(invoke installedLiveCall, name string, args any, out any) (installedLiveReply, error) {
@@ -431,6 +439,10 @@ func installedLiveMCP(t *testing.T, ctx context.Context, db *pgxpool.Pool, root 
 			r, code, e = invoke(ctx, name, args)
 		}
 		if e != nil || code != "" || r.Status != "ok" {
+			if name == "read_live_watch" {
+				mapped, direct, mappingErr, directErr := installedLiveViewerMapping(ctx, db, root, run.Installation, source)
+				return r, fmt.Errorf("installed live %s: %s mapped=%d direct=%d mappingErr=%v directErr=%v callErr=%w", name, code, mapped, direct, mappingErr, directErr, e)
+			}
 			return r, fmt.Errorf("installed live %s: %s %w", name, code, e)
 		}
 		if out != nil && json.Unmarshal(r.Data, out) != nil {
@@ -601,10 +613,7 @@ func installedLiveMCP(t *testing.T, ctx context.Context, db *pgxpool.Pool, root 
 		if e = db.QueryRow(ctx, activeQuery, root).Scan(&active, &principals); e != nil || active != 2 || principals != 1 {
 			return errors.New("principal ceiling fixture did not retain React and MCP views")
 		}
-		expectedClusterKey := sha256.Sum256([]byte("asservat-live-cluster/v1\x00" + source.ClusterID))
-		var mapped, direct int
-		mappingErr := db.QueryRow(ctx, `SELECT count(*) FROM live_watch_control WHERE root_id=$1 AND cluster_key=$2 AND state IN ('Active','Paused','Disconnected')`, root, expectedClusterKey[:]).Scan(&mapped)
-		directErr := db.QueryRow(ctx, `SELECT live_watch_viewers($1,$2)`, run.Installation, expectedClusterKey[:]).Scan(&direct)
+		mapped, direct, mappingErr, directErr := installedLiveViewerMapping(ctx, db, root, run.Installation, source)
 		capacity, _, e := call(ctx, "get_live_capacity", map[string]any{"cluster_id": source.ClusterID})
 		var gauge struct {
 			ActiveViewers int `json:"active_viewers"`
