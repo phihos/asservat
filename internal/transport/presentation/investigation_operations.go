@@ -247,6 +247,8 @@ func (s *InvestigationOperations) CallWithContext(ctx context.Context, current i
 		return p.CallWithContext(ctx, current, call, name, raw)
 	case *RetentionPreviewOperations:
 		return p.CallWithContext(ctx, current, call, name, raw)
+	case *LiveCapacityOperations:
+		return p.CallWithContext(ctx, current, call, name, raw)
 	case *GrantOperations:
 		return p.CallWithContext(ctx, current, call, name, raw)
 	default:

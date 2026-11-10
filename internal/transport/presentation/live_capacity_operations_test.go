@@ -40,7 +40,11 @@ func TestLiveCapacityOperationReturnsCanonicalSingleClusterView(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	reply, err := ops.Call(context.Background(), f, "get_live_capacity", json.RawMessage(`{"cluster_id":"`+cluster+`"}`))
+	routed, err := NewInvestigationLiveCapacityOperations(&InvestigationOperations{origin: "https://asservat.example.invalid"}, ops)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reply, err := routed.Call(context.Background(), f, "get_live_capacity", json.RawMessage(`{"cluster_id":"`+cluster+`"}`))
 	if err != nil {
 		t.Fatal(err)
 	}
