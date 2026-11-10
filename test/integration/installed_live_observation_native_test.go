@@ -624,7 +624,7 @@ func installedLiveMCP(t *testing.T, ctx context.Context, db *pgxpool.Pool, root 
 			ActiveViewers int `json:"active_viewers"`
 		}
 		if e != nil || capacity.Status != "ok" || json.Unmarshal(capacity.Data, &gauge) != nil || gauge.ActiveViewers != 2 {
-			return fmt.Errorf("installed live capacity returned the wrong active viewers: api=%d direct=%d mapped=%d status=%s mappingErr=%v directErr=%v callErr=%w", gauge.ActiveViewers, direct, mapped, capacity.Status, mappingErr, directErr, e)
+			return fmt.Errorf("installed live capacity returned the wrong active viewers: api=%d direct=%d mapped=%d status=%s data=%s mappingErr=%v directErr=%v callErr=%w", gauge.ActiveViewers, direct, mapped, capacity.Status, capacity.Data, mappingErr, directErr, e)
 		}
 		t.Log("installed live capacity: the real fleet operation returned exactly two active viewers")
 		refuse := func(invoke installedLiveCall, input map[string]any) error {
