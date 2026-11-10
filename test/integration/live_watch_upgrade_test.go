@@ -143,6 +143,11 @@ func TestLiveWatchUpgradeWithRealPostgres(t *testing.T) {
 	if _, err = provider.UpTo(ctx, 148); err != nil {
 		t.Fatal("148 viewer capacity second Up", err)
 	}
+	var capacityLane string
+	var contextInput, queryInput bool
+	if err = pool.QueryRow(ctx, `SELECT operation_audit_lane('get_live_capacity'),operation_audit_human_input_valid('get_live_capacity','context-input/v1'),operation_audit_human_input_valid('get_live_capacity','context-query-input/v1')`).Scan(&capacityLane, &contextInput, &queryInput); err != nil || capacityLane != "normal" || !contextInput || queryInput {
+		t.Fatal("browser live-capacity audit registration", capacityLane, contextInput, queryInput, err)
+	}
 	// Exercise the actual fixed SQL Open/Charge functions under the compiled
 	// hub duty. Trust, permission root and owner identity are synthetic here;
 	// this is retained-ledger rollback proof, not owner/C3 admission proof.
