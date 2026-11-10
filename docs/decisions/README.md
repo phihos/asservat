@@ -1180,3 +1180,5 @@ The brief's domain-registration and trademark work remains a maintainer-owned pu
 - [ADR-315 — Batched initial schema brackets](315-batched-initial-schema.md): one root lease, incarnation/inventory check and locked session per bracket of migrations instead of five root proofs per migration; per-migration transactions, exact prefix resume, original five-second deadline and final inventory unchanged.
 - [ADR-316 — Installer step brackets](316-installer-step-brackets.md): runtime resources and public roles run under one opening proof per bracket of items with a 2 s reserve and one closing proof, instead of three to five full proofs per item; per-item claims, CAS writes, lookups and original deadlines unchanged. The owner installation's 20 provider operations follow (the launch opens its own bracket). Amends ADR-186 decisions 3–4.
 - [ADR-319 — Privacy evidence discovery](319-privacy-evidence-discovery.md) specifies audited browser search over retained catalog and direct lineage metadata.
+
+- [ADR-320 — Installed retention lifecycle publication](320-installed-retention-lifecycle-publication.md) composes signed acknowledgement in the existing hub worker.

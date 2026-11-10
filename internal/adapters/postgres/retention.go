@@ -187,6 +187,21 @@ func (s *Retention) PendingLifecycleDecisions(ctx context.Context) ([]value.Life
 	}
 	return out, nil
 }
+
+func (s *Retention) PendingLifecycleDecision(ctx context.Context) (value.LifecycleDecision, bool, error) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	row, err := custodydb.New(s.ledger.pool).PendingRetentionDecision(ctx, id(s.root))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return value.LifecycleDecision{}, false, nil
+	}
+	if err != nil {
+		return value.LifecycleDecision{}, false, app.ErrUnavailable
+	}
+	d, err := decodeLifecycle(row)
+	return d, true, err
+}
+
 func (s *Retention) AcknowledgeLifecycleDecision(ctx context.Context, d value.LifecycleDecision, receipt audit.Receipt) error {
 	if !d.Valid() || d.RootID != s.root || !receipt.ValidLifecycle(s.root, d.ID) {
 		return artifact.ErrInvalid

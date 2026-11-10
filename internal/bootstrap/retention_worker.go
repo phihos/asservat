@@ -2,11 +2,13 @@ package bootstrap
 
 import (
 	"context"
+	"crypto/ed25519"
 	"errors"
 	"fmt"
 	"os"
 	"time"
 
+	"asservat.local/asservat/internal/adapters/jose"
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/adapters/mounts"
 	"asservat.local/asservat/internal/adapters/objectstore"
@@ -20,19 +22,18 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// retentionWorker is the ADR-195 hub retention source inside the permission
-// worker: the reconciler, the checkpoint acceptance publisher and the
-// catch-up pager, for the same stream root. The lifecycle decision publisher
-// needs its signing key and follows separately (ADR-195 step 5b); until then
-// a shortening of retained evidence leaves the source unavailable.
+// retentionWorker owns policy observation, catch-up and audit publication for
+// the same retention stream root.
 type retentionWorker struct {
-	reconciler app.RetentionReconciler
-	acceptance app.RetentionAcceptancePublisher
-	catchup    privacyapp.RetentionCatchup
-	source     privacy.PolicySourceRef
+	reconciler           app.RetentionReconciler
+	acceptance           app.RetentionAcceptancePublisher
+	lifecycle            *privacyapp.LifecyclePublisher
+	catchup              privacyapp.RetentionCatchup
+	source               privacy.PolicySourceRef
+	lastLifecycleOutcome string
 }
 
-func newRetentionWorker(ctx context.Context, c contracts.PermissionDeployment, pools map[string]*pgxpool.Pool, observer, probe *kube.PermissionClient, writer *installedConfigurationAudit) (*retentionWorker, error) {
+func newRetentionWorker(ctx context.Context, c contracts.PermissionDeployment, pools map[string]*pgxpool.Pool, observer, probe *kube.PermissionClient, writer *installedConfigurationAudit, deletionSection func() (contracts.ContextDeletionDeployment, string, bool)) (*retentionWorker, error) {
 	r := c.Retention
 	if r == nil || r.Guard.Name != contracts.RetentionGuardName(c.InstallationID) || writer == nil {
 		return nil, mounts.ErrUnavailable
@@ -59,14 +60,49 @@ func newRetentionWorker(ctx context.Context, c contracts.PermissionDeployment, p
 		return nil, mounts.ErrUnavailable
 	}
 	source := privacy.PolicySourceRef{ClusterID: c.Control.ClusterID, ControlNamespaceUID: c.Control.Namespace.UID, Hub: true, ProtectionDigest: guard.Digest()}
-	return &retentionWorker{source: source, catchup: catchup,
+	worker := &retentionWorker{source: source, catchup: catchup,
 		reconciler: app.RetentionReconciler{RootID: c.RootID, Source: source, Reader: stagedRetentionPolicies{policies}, Watcher: stagedRetentionPolicies{policies}, Protection: guard, Store: stagedRetentionStore{store}, Now: time.Now, NewID: uuid.NewString},
-		acceptance: app.RetentionAcceptancePublisher{Journal: journal, Writer: &installedRetentionAcceptance{root: c.RootID, audit: writer}}}, nil
+		acceptance: app.RetentionAcceptancePublisher{Journal: journal, Writer: &installedRetentionAcceptance{root: c.RootID, audit: writer}}}
+	// The installer enables deletion with every evidence publisher. Its
+	// verified capacity projection supplies the existing Transit signing pin.
+	if c.ContextDeletion {
+		if deletionSection == nil {
+			return nil, mounts.ErrUnavailable
+		}
+		lifecycle, err := postgres.NewRetention(ctx, pools["retention-lifecycle-audit"], c.RootID)
+		if err != nil {
+			return nil, err
+		}
+		worker.lifecycle = &privacyapp.LifecyclePublisher{Ledger: lifecycle,
+			Objects: &installedRetentionLifecycle{root: c.RootID, audit: writer, deletionSection: deletionSection}}
+	}
+	return worker, nil
+}
+
+// publish is called only by the permission worker's authority-audit loop.
+// Reserve at most one provider invocation per lease, and give acceptance
+// every retention turn when there is no pending lifecycle work.
+func (r *retentionWorker) publish(ctx context.Context, lifecycleTurn bool) {
+	if lifecycleTurn && r.lifecycle != nil {
+		attempted, err := r.lifecycle.PublishOne(ctx)
+		if ctx.Err() == nil {
+			outcome := regionalOutcome(err)
+			if outcome != r.lastLifecycleOutcome {
+				r.lastLifecycleOutcome = outcome
+				if err != nil {
+					retentionDiagnostic("lifecycle.publish", err)
+				}
+			}
+		}
+		if attempted || err != nil {
+			return
+		}
+	}
+	_ = r.acceptance.Publish(ctx, 1)
 }
 
 // run keeps the reconciler and the catch-up pager going until the Lease
-// ends; acceptance records are published by the permission worker's audit
-// loop, one per admitted lease.
+// ends. The permission worker publishes one audit record per admitted lease.
 func (r *retentionWorker) run(ctx context.Context) {
 	done := make(chan struct{})
 	go func() {
@@ -108,31 +144,78 @@ type installedRetentionAcceptance struct {
 }
 
 func (s *installedRetentionAcceptance) WriteRetentionAcceptance(ctx context.Context, r audit.RetentionAcceptance) (audit.Receipt, error) {
-	if s == nil || s.audit == nil || ctx == nil || ctx.Err() != nil || !r.Valid() || r.RootID != s.root {
+	if s == nil || ctx == nil || ctx.Err() != nil || !r.Valid() || r.RootID != s.root {
 		return audit.Receipt{}, mounts.ErrUnavailable
 	}
-	operation, err := s.audit.providers.BeginAuthorityAudit(ctx)
-	if err != nil {
+	return s.audit.writeRetentionAudit(ctx, func(call context.Context, store *objectstore.Store) (audit.Receipt, error) {
+		writer := &objectstore.RetentionAcceptanceObjects{Store: store, Seal: s.audit.providers.Sealer(), Open: s.audit.providers.Opener()}
+		return writer.WriteRetentionAcceptance(call, r)
+	})
+}
+
+// installedRetentionLifecycle signs the typed retention decision and verifies
+// the exact versioned ciphertext before the application acknowledges it.
+type installedRetentionLifecycle struct {
+	root            string
+	audit           *installedConfigurationAudit
+	deletionSection func() (contracts.ContextDeletionDeployment, string, bool)
+}
+
+func (s *installedRetentionLifecycle) WriteLifecycleDecision(ctx context.Context, r privacy.LifecycleDecision) (audit.Receipt, error) {
+	if s == nil || s.audit == nil || s.audit.providers == nil || s.deletionSection == nil || ctx == nil || ctx.Err() != nil || !r.Valid() || r.RootID != s.root {
 		return audit.Receipt{}, mounts.ErrUnavailable
+	}
+	section, _, ok := s.deletionSection()
+	if !ok {
+		return audit.Receipt{}, stagedRetention("signing.pin", mounts.ErrUnavailable)
+	}
+	pin := section.Signing
+	public := make(map[string]ed25519.PublicKey, len(pin.PublicKeys))
+	for id, key := range pin.PublicKeys {
+		public[id] = ed25519.PublicKey(key)
+	}
+	key, err := s.audit.providers.ContextDeletionSigningKey(pin.Mount, pin.Key, pin.Version, public[pin.KeyID])
+	if err != nil {
+		return audit.Receipt{}, stagedRetention("signing.key", err)
+	}
+	defer key.Close()
+	signatures, err := jose.NewRemoteLifecycleSignatures(s.root, pin.KeyID, public, key.ForContext)
+	if err != nil {
+		return audit.Receipt{}, stagedRetention("signing.type", err)
+	}
+	return s.audit.writeRetentionAudit(ctx, func(call context.Context, store *objectstore.Store) (audit.Receipt, error) {
+		writer := &objectstore.LifecycleObjects{Store: store, Seal: s.audit.providers.Sealer(), Open: s.audit.providers.Opener(), Signer: signatures, Verifier: signatures}
+		return writer.WriteLifecycleDecision(call, r)
+	})
+}
+
+// Both retention record types share the exact authority audit admission,
+// provider material, versioned storage and final provider proof.
+func (s *installedConfigurationAudit) writeRetentionAudit(ctx context.Context, write func(context.Context, *objectstore.Store) (audit.Receipt, error)) (audit.Receipt, error) {
+	if s == nil || s.providers == nil {
+		return audit.Receipt{}, mounts.ErrUnavailable
+	}
+	operation, err := s.providers.BeginAuthorityAudit(ctx)
+	if err != nil {
+		return audit.Receipt{}, stagedRetention("audit.begin", err)
 	}
 	defer operation.Close()
 	call := operation.Context()
 	material, err := operation.Credentials()
 	if err != nil {
-		return audit.Receipt{}, mounts.ErrUnavailable
+		return audit.Receipt{}, stagedRetention("audit.credentials", err)
 	}
-	store, err := s.audit.storage(material)
+	store, err := s.storage(material)
 	if err != nil {
-		return audit.Receipt{}, err
+		return audit.Receipt{}, stagedRetention("audit.storage", err)
 	}
 	defer store.Close()
-	writer := &objectstore.RetentionAcceptanceObjects{Store: store, Seal: s.audit.providers.Sealer(), Open: s.audit.providers.Opener()}
-	receipt, err := writer.WriteRetentionAcceptance(call, r)
+	receipt, err := write(call, store)
 	if err != nil || call.Err() != nil {
-		return audit.Receipt{}, mounts.ErrUnavailable
+		return audit.Receipt{}, stagedRetention("audit.write", mounts.ErrUnavailable)
 	}
 	if err = operation.Finish(); err != nil || call.Err() != nil {
-		return audit.Receipt{}, mounts.ErrUnavailable
+		return audit.Receipt{}, stagedRetention("audit.finish", mounts.ErrUnavailable)
 	}
 	return receipt, nil
 }

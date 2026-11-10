@@ -1,6 +1,24 @@
 # Sustained implementation progress
 
-## Installed-qualified candidate: privacy evidence discovery (2026-11-11)
+## Active candidate: installed retention lifecycle publication (2026-11-11)
+
+Outcome: after an administrator tightens retention on published evidence,
+the installed hub worker publishes and acknowledges the signed lifecycle
+record and the source returns to Ready with the tighter dates. The existing
+authority audit lease, SQL role, versioned audit store and pinned Transit
+key carry the work. [ADR-320](decisions/320-installed-retention-lifecycle-publication.md)
+records the shared key decision, role and installation constraints. Focused
+Go race, schema, architecture and SQL generation checks pass. Real-service
+and installed checks remain pending. This supplies the signed lifecycle
+path needed by the separate early-erasure request and status workflow.
+
+## Merged privacy evidence discovery (2026-11-11)
+
+[PR #218](https://github.com/phihos/asservat/pull/218) merged at `46065b06`.
+The authoritative tree matches `6cf2522b`, which passed all 14 Go shards
+and `ci-ok` in [required CI](https://github.com/phihos/asservat/actions/runs/42925379930).
+The installed-tested source is `08acfc6a` and the final changes were
+documentation only.
 
 Outcome: a privacy operator finds restricted retained evidence by exact case
 or workload/acquisition interval, filters by accepted purpose, inspects recorded

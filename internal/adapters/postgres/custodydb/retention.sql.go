@@ -93,6 +93,31 @@ func (q *Queries) LockRetentionDecision(ctx context.Context, arg LockRetentionDe
 	return i, err
 }
 
+const pendingRetentionDecision = `-- name: PendingRetentionDecision :one
+SELECT id, root_id, attempt_id, sequence, previous_expires_at, previous_delete_by, expires_at, delete_by, decision_digest, decision_json, recorded_at, audit_acknowledged_at, audit_receipt_json FROM retention_decision WHERE root_id=$1 AND audit_acknowledged_at IS NULL ORDER BY recorded_at,id LIMIT 1
+`
+
+func (q *Queries) PendingRetentionDecision(ctx context.Context, rootID pgtype.UUID) (RetentionDecision, error) {
+	row := q.db.QueryRow(ctx, pendingRetentionDecision, rootID)
+	var i RetentionDecision
+	err := row.Scan(
+		&i.ID,
+		&i.RootID,
+		&i.AttemptID,
+		&i.Sequence,
+		&i.PreviousExpiresAt,
+		&i.PreviousDeleteBy,
+		&i.ExpiresAt,
+		&i.DeleteBy,
+		&i.DecisionDigest,
+		&i.DecisionJson,
+		&i.RecordedAt,
+		&i.AuditAcknowledgedAt,
+		&i.AuditReceiptJson,
+	)
+	return i, err
+}
+
 const pendingRetentionDecisions = `-- name: PendingRetentionDecisions :many
 SELECT id, root_id, attempt_id, sequence, previous_expires_at, previous_delete_by, expires_at, delete_by, decision_digest, decision_json, recorded_at, audit_acknowledged_at, audit_receipt_json FROM retention_decision WHERE root_id=$1 AND audit_acknowledged_at IS NULL ORDER BY recorded_at,id LIMIT 64
 `
