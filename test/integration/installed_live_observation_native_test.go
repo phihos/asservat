@@ -601,6 +601,14 @@ func installedLiveMCP(t *testing.T, ctx context.Context, db *pgxpool.Pool, root 
 		if e = db.QueryRow(ctx, activeQuery, root).Scan(&active, &principals); e != nil || active != 2 || principals != 1 {
 			return errors.New("principal ceiling fixture did not retain React and MCP views")
 		}
+		capacity, _, e := call(ctx, "get_live_capacity", map[string]any{"cluster_id": source.ClusterID})
+		var gauge struct {
+			ActiveViewers int `json:"active_viewers"`
+		}
+		if e != nil || capacity.Status != "ok" || json.Unmarshal(capacity.Data, &gauge) != nil || gauge.ActiveViewers != 2 {
+			return fmt.Errorf("installed live capacity returned the wrong active viewers: %d %s %w", gauge.ActiveViewers, capacity.Status, e)
+		}
+		t.Log("installed live capacity: the real fleet operation returned exactly two active viewers")
 		refuse := func(invoke installedLiveCall, input map[string]any) error {
 			refusal, code, err := invoke(ctx, "open_live_watch", input)
 			var failure struct {

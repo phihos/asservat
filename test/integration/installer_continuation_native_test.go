@@ -96,6 +96,8 @@ func prepareInstallerContinuationNative(t *testing.T, ctx context.Context, api k
 	providers.admin(t, ctx, http.MethodPost, "sys/mounts/"+publicTransit, map[string]any{"type": "transit"}, http.StatusNoContent)
 	providers.admin(t, ctx, http.MethodPost, "sys/mounts/"+workerPKI, map[string]any{"type": "pki", "config": map[string]any{"max_lease_ttl": "2h"}}, http.StatusNoContent)
 	providers.admin(t, ctx, http.MethodPost, workerPKI+"/root/generate/internal", map[string]any{"common_name": "synthetic-worker-root", "ttl": "2h", "key_type": "ec", "key_bits": 256}, http.StatusOK)
+	fleetKV := "fleet-kv-" + namespace
+	providers.admin(t, ctx, http.MethodPost, "sys/mounts/"+fleetKV, map[string]any{"type": "kv", "options": map[string]string{"version": "2"}}, http.StatusNoContent)
 	// The installed journey's owned Keycloak replaces the synthetic issuer,
 	// which is never contacted, and adds the MCP client.
 	origin, consoleSecret := "https://asservat.synthetic.invalid", "synthetic-client-secret"
@@ -132,7 +134,8 @@ func prepareInstallerContinuationNative(t *testing.T, ctx context.Context, api k
 				KeyServiceEndpoint: "https://" + net.JoinHostPort(keyServiceHost, "31448"), KeyServiceNodePort: 31448,
 				EvidenceStore: &contracts.InstallerEvidenceStore{Endpoint: desired.AuditStore.Endpoint, RootsPEM: storeRoots.String(), Region: desired.AuditStore.Region, Bucket: evidenceBucket},
 				Connector: contracts.InstallerConnectorSettings{Accounts: 4, RecordsPerAccount: 256, RetainedSeconds: 15000, Profiles: 2, SourceTransitions: 64, PurgeLeases: 2, ValidSeconds: 7200,
-					Footprint: contracts.InstallerCapacityFootprint{RowBytes: 1 << 20, TransitionWALBytes: 1 << 20}}},
+					Footprint: contracts.InstallerCapacityFootprint{RowBytes: 1 << 20, TransitionWALBytes: 1 << 20}},
+				Fleet: &contracts.InstallerFleetIssuance{ChannelMount: fleetKV, DeliveryProfile: "regional-installer"}},
 			// ADR-195: the operator's synthetic baseline retention values.
 			RetentionBaseline: &contracts.InstallerRetentionBaseline{PurposeRef: "synthetic-baseline",
 				Defaults:              contracts.InstallerRetentionDurations{EvidenceSeconds: 86400, CaseMetadataSeconds: 86400, AuditMetadataSeconds: 86400},

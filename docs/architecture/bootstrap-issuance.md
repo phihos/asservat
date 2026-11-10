@@ -16,6 +16,13 @@ Race-enabled application/codec tests passed in `test/results/bootstrap-issuance-
 
 Still required for production: protected trust/recovery production, current IdP qualification, the actual authenticated browser/connector command, request/outcome audit and rate controls, credential destruction/metadata cleanup, and installation/provider backup-retention qualification. These components do not enable evidence collection or disclosure.
 
+The promoted installer now derives `OwnerFleetIssuance` from the original fleet
+ConfigMap and guard when `federation.fleet` supplies the operator's KV mount and
+delivery profile. It pins the fleet provider recipe; no second fleet settings
+document or caller-selected object reference is introduced. Derivation and owner
+reader tests cover exact pins, invalid mounts and disabled composition. Native
+installed qualification remains a separate gate.
+
 ## Retained issuance versions
 
 New acknowledgements and current activation require the full original issuance

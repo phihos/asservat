@@ -1,5 +1,20 @@
 # Sustained implementation progress
 
+## Production fleet-issuance input composition (2026-11-10)
+
+The promoted installer can now derive `OwnerFleetIssuance` from the original
+fleet ConfigMap and guard when the optional `federation.fleet` section supplies
+the operator's KV mount and delivery profile. The fleet provider recipe is pinned
+like the existing public recipe. This introduces no second fleet settings
+document, caller-selected object reference or additional public route beyond
+ADR-193. `docs/architecture/bootstrap-issuance.md` records the boundary.
+
+Focused derivation and owner-reader tests pass valid exact pins, disabled
+composition and an invalid mount. Full bootstrap and provider packages and the
+native integration package compile with the real capacity assertion. Native
+installed qualification is not claimed yet. PR #215's unrelated expired-fixture
+CI failure remains unchanged and is not modified here.
+
 ## Exact active-viewer capacity gauge (2026-11-10)
 
 The administrator capacity operation now reports exact active viewers for the
