@@ -205,6 +205,19 @@ func TestLiveWatchLedgerWithRealServices(t *testing.T) {
 	if r, s := snapshot(); r != rows || s != spent {
 		t.Fatal("failed debit changed ancestor accounts", r, s)
 	}
+	other := makeControl(2, 3)
+	other, _, err = ledger.Create(ctx, other, keyFor(4))
+	if err != nil {
+		t.Fatal("second distinct principal consumes installation slot", err)
+	}
+	if _, _, err = ledger.Create(ctx, makeControl(3, 4), keyFor(5)); !errors.Is(err, live.ErrCapacity) {
+		t.Fatal("third distinct principal bypassed installation ceiling", err)
+	}
+	other.State = "Closed"
+	other.Revision++
+	if other, err = ledger.Change(ctx, other, other.Revision-1, 0); err != nil {
+		t.Fatal("release installation slot", err)
+	}
 	c.State = "Closed"
 	c.Revision++
 	c, err = ledger.Change(ctx, c, c.Revision-1, 0)
@@ -295,7 +308,7 @@ func TestLiveWatchLedgerWithRealServices(t *testing.T) {
 		t.Fatal("expired retained key became absent/local-open eligible", found, err)
 	}
 	n, a, err := ledger.PruneExpired(ctx)
-	if err != nil || n != 3 || a != 0 {
+	if err != nil || n != 4 || a != 2 {
 		t.Fatal("bounded expiry retained shared debt", n, a, err)
 	}
 	if _, _, err = replacement.Create(ctx, makeControl(8, 8), keyFor(8)); err == nil {

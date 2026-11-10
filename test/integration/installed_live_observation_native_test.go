@@ -96,10 +96,6 @@ func installedLiveSettings(in contracts.DownloadEnvironmentSettings, root, clust
 	}
 	out.Revision++
 	out.LiveRead = &contracts.LiveReadSettings{Root: contracts.LiveRootSettings{Watches: 4, PrincipalWatches: 2, WorkloadWatches: 2, Rate: 1 << 20, Burst: 1 << 20}, Projections: []string{v.Packet, v.Syscall, v.HTTP}, Clients: clients, Ceilings: []contracts.LiveReadCeiling{{ClusterID: cluster, Duration: 120, Output: 1 << 20, Rate: 64 << 10, Rows: 20, Buffer: 128 << 10, RowAge: 30, Replay: 5}}}
-	if os.Getenv("ASSERVAT_LIVE_EPISODES") == "installation" {
-		out.LiveRead.Root.Watches = 2
-		out.LiveRead.Root.PrincipalWatches = 4
-	}
 	encoded, err := json.Marshal(out)
 	if err != nil || len(encoded) > contracts.DownloadEnvironmentMaxBytes {
 		return contracts.DownloadEnvironmentSettings{}, errors.New("delivery settings bound")
