@@ -16,6 +16,7 @@ import (
 	"time"
 
 	identities "asservat.local/asservat/internal/application/identity"
+	"asservat.local/asservat/internal/domain/identity"
 	value "asservat.local/asservat/internal/domain/privacy"
 )
 
@@ -48,7 +49,7 @@ func (s *processingService) Change(ctx context.Context, current identities.Curre
 
 // ADR-210: the route needs the session, CSRF and one UUID Idempotency-Key,
 // which becomes the change's request ID; it forwards only the change fields
-// and answers every service refusal with 503.
+// and distinguishes current authority denial from service unavailability.
 func TestProcessingChangeRoute(t *testing.T) {
 	var handler *ProcessingHandler
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { handler.ServeHTTP(w, r) }))
@@ -105,8 +106,12 @@ func TestProcessingChangeRoute(t *testing.T) {
 	if status, _ := send(body, nil); status != http.StatusServiceUnavailable {
 		t.Fatal("refusal not mapped to 503", status)
 	}
-	if len(service.changes) != 2 {
-		t.Fatal("refused requests reached the service", len(service.changes))
+	service.err = identity.ErrDenied
+	if status, _ := send(body, nil); status != http.StatusForbidden {
+		t.Fatal("known operator denial not mapped to 403", status)
+	}
+	if len(service.changes) != 3 {
+		t.Fatal("transport-refused requests reached the service", len(service.changes))
 	}
 }
 

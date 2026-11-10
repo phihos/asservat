@@ -7,6 +7,7 @@ import (
 	"asservat.local/asservat/internal/domain/identity"
 	value "asservat.local/asservat/internal/domain/privacy"
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -162,6 +163,11 @@ func TestProcessingNoReleaseFromOrdinaryApprovalAndNoAuthorityAfterWait(t *testi
 			}
 			if why != "post-SQL-revoke" && f.applies != 0 {
 				t.Fatal("CAS after lost authority")
+			}
+			if why == "ordinary-owner" || why == "client" {
+				if !errors.Is(e, identity.ErrDenied) || f.recoveryObservations != 0 || f.prepared != nil || f.begins != 0 || f.finishes != 0 {
+					t.Fatal("known operator denial reached recovery, decision or mutation audit", e)
+				}
 			}
 		})
 	}

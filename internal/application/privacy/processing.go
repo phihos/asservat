@@ -111,7 +111,7 @@ func (s ProcessingChanges) Change(ctx context.Context, source ProcessingIdentity
 	defer stop()
 	authority, e := s.authority(call, source, started, until)
 	if e != nil {
-		return zero, value.ErrUnavailable
+		return zero, e
 	}
 	until = authority.ValidUntil.UTC().Truncate(time.Microsecond)
 	call, stopOriginal := context.WithDeadline(call, until)

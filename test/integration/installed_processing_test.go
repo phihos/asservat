@@ -100,6 +100,7 @@ func qualifyInstalledProcessing(t *testing.T, parent context.Context, c installe
 	}
 	c.checkReceipt(t, ctx, restriction, "normal")
 	c.checkReplay(t, ctx, session, restriction)
+	c.checkOperatorDenial(t, ctx, restriction.Input)
 	t.Logf("installed processing stage=restricted after %s", time.Since(started).Round(time.Millisecond))
 	// These are new ordinary operations by the same signed-in user. Privacy
 	// operator membership does not bypass processing on ordinary evidence reads.
@@ -267,27 +268,54 @@ func (c installedProcessingRun) checkReplay(t *testing.T, ctx context.Context, b
 		return state
 	}
 	before := snapshot()
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, b.base+browser.ProcessingChangesPath, bytes.NewReader(event.Input))
-	if err != nil {
-		t.Fatal(err)
-	}
-	request.Header.Set("Content-Type", "application/json")
-	request.Header.Set("Origin", b.base)
-	request.Header.Set("X-CSRF-Token", b.csrf)
-	request.Header.Set("Idempotency-Key", event.Key)
-	response, err := b.client.Do(request)
-	if err != nil {
-		t.Fatal("installed processing original-key replay transport", err)
-	}
-	defer response.Body.Close()
-	raw, err := io.ReadAll(io.LimitReader(response.Body, 4097))
+	status, raw, err := b.postProcessingChange(ctx, event.Input, event.Key)
 	var again installedProcessingReceipt
-	if err != nil || response.StatusCode != 200 || len(raw) > 4096 || json.Unmarshal(raw, &again) != nil || again != event.Receipt {
-		t.Fatal("installed processing original-key replay changed effect", response.StatusCode, err)
+	if err != nil || status != http.StatusOK || len(raw) > 4096 || json.Unmarshal(raw, &again) != nil || again != event.Receipt {
+		t.Fatal("installed processing original-key replay changed effect", status, err)
 	}
 	if snapshot() != before {
 		t.Fatal("installed processing original-key replay changed retained rules, decisions, audit receipts or account spend")
 	}
+}
+
+func (c installedProcessingRun) checkOperatorDenial(t *testing.T, ctx context.Context, input json.RawMessage) {
+	t.Helper()
+	outsider := c.Identity.unrelated().consoleSession(t, ctx, c.PublicRoot, c.Address, c.Origin)
+	key := custodyID()
+	status, raw, err := outsider.postProcessingChange(ctx, input, key)
+	var problem struct {
+		Status int `json:"status"`
+	}
+	if err != nil || status != http.StatusForbidden || len(raw) > 4096 || json.Unmarshal(raw, &problem) != nil || problem.Status != status {
+		t.Fatal("installed processing non-operator did not receive the bounded refusal", status, err)
+	}
+	var untouched bool
+	installedJourneyReadOnly(t, ctx, c.SQL, func(tx pgx.Tx) error {
+		return tx.QueryRow(ctx, `SELECT NOT EXISTS(SELECT 1 FROM processing_decision WHERE root_id=$1 AND id=$2)
+ AND NOT EXISTS(SELECT 1 FROM operation_audit WHERE root_id=$1 AND id=$2)`, c.RootID, key).Scan(&untouched)
+	})
+	if !untouched {
+		t.Fatal("installed processing refusal left a decision or mutation audit")
+	}
+	t.Log("installed processing: eligible non-operator received 403 with no decision or mutation audit")
+}
+
+func (b *installedBrowser) postProcessingChange(ctx context.Context, input json.RawMessage, key string) (int, []byte, error) {
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, b.base+browser.ProcessingChangesPath, bytes.NewReader(input))
+	if err != nil {
+		return 0, nil, err
+	}
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Origin", b.base)
+	request.Header.Set("X-CSRF-Token", b.csrf)
+	request.Header.Set("Idempotency-Key", key)
+	response, err := b.client.Do(request)
+	if err != nil {
+		return 0, nil, err
+	}
+	defer response.Body.Close()
+	raw, err := io.ReadAll(io.LimitReader(response.Body, 4097))
+	return response.StatusCode, raw, err
 }
 
 func startInstalledProcessingBrowser(t *testing.T, ctx context.Context, b *installedBrowser, address, artifactID, caseID string) *installedLiveBrowser {

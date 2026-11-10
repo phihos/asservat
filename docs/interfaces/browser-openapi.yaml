@@ -55,6 +55,8 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/ProcessingReceipt'}
+        '403':
+          description: Current privacy-operator authority is denied or browser request protection refused the change.
         '409':
           description: Exact revision or idempotency conflict; refresh inventory before another change.
         default:
