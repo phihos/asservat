@@ -1,6 +1,6 @@
 # Sustained implementation progress
 
-## Active candidate: privacy evidence discovery (2026-11-11)
+## Installed-qualified candidate: privacy evidence discovery (2026-11-11)
 
 Outcome: a privacy operator finds restricted retained evidence by exact case
 or workload/acquisition interval, filters by accepted purpose, inspects recorded
@@ -13,7 +13,30 @@ passed in 4.529 s. The schema-owner upgrade fixture passed in 6.977 s with floor
 149 and exact audit validator restoration on empty Down. Both report unchanged
 sources and empty cleanup failures. The shared controlled Chromium journey
 passed in 4.28 s after correcting the generated validator ES module import.
-Full repository, full packaged browser and fresh installed checks remain pending.
+`make pre-push` exited 0, including 635 console tests and affected Go race
+tests in 407 s. Full `make console-browser-check` exited 0 in 146.626 s,
+including the shared processing driver in 3.41 s.
+
+Fresh `make installed-focus FOCUS=journey ARGS=--keep-on-failure` at
+`415b5ce1` passed in 433.888 s (Go) and 503.9 s (harness), both exit 0.
+The installed operator flow took 12.234 s. The browser found the restricted
+artifact while ordinary case and download starts were refused, returned its
+recorded lineage, and selected it without changing the restriction. An
+independent SQL read matched the browser request ID, candidate references,
+response size and acknowledged normal-lane audit. Exact release and replay
+restored a new transfer of the original bytes at the original deadline.
+Natural expiry, failed-inventory accounting and independent managed-copy
+deletion also passed. The focus used one regional capture path in a fresh
+two-cluster installation. All 4,767 source hashes match the commit. Cleanup
+is complete, including both owned clusters, labelled Docker resources and
+build scratch. Original reports are in the external
+`rights-discovery/installed-415b5ce1` archive.
+
+Next: exact early-erasure request and status through the existing deletion
+reconciler. Complete derivative/cache coverage and exceptions/reporting
+remain open under REQ-PRV-006. Schema 150 migration compatibility is tested
+in PostgreSQL. Exact prior-image rollback with retained search audits still
+needs installed evidence.
 
 ## Merged processing inventory and release (2026-11-10)
 

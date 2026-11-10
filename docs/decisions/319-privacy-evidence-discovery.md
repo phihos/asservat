@@ -1,6 +1,6 @@
 # ADR-319 — Privacy evidence discovery
 
-Date: 2026-11-11. Status: implementation and qualification in progress.
+Date: 2026-11-11. Status: implemented and qualified for SC-PRV-011.
 Requirements: REQ-PRV-006, REQ-AUT-005, SC-PRV-011.
 
 Privacy operators need to locate evidence before deciding how to handle a rights
