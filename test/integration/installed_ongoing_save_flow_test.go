@@ -684,7 +684,7 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 		})
 		liveTerminal := ""
 		if installedJourneyFocus() == "ongoing-incident" {
-			wait("original live source terminal after incident", 30*time.Second, func(call context.Context) bool {
+			wait("original live source state after incident", 30*time.Second, func(call context.Context) bool {
 				reply, code, err := invoke(call, "read_live_watch", map[string]any{"watch_id": liveWatch.ID, "cursor": *liveWatch.Cursor, "limit": 20, "wait_ms": 0})
 				var batch v.Batch
 				if err != nil || code != "" || reply.Status != "ok" || json.Unmarshal(reply.Data, &batch) != nil {
@@ -693,24 +693,39 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 					t.Logf("incident terminal poll refused: code=%s sql=%s err=%v", code, state, err)
 					return false
 				}
-				if batch.WatchID != liveWatch.ID || batch.Revision != liveWatch.Revision || len(batch.Rows) != 0 {
-					t.Fatal("incident live terminal changed the original view or replayed rows")
+				if batch.WatchID != liveWatch.ID || batch.Revision != liveWatch.Revision {
+					t.Fatal("incident live read changed the original view")
 				}
-				if reply.NextCursor != nil {
-					liveWatch.Cursor = reply.NextCursor
+				for _, row := range batch.Rows {
+					if row.SourceID != src.ID || row.PodUID != podUID || row.Projection != v.Packet {
+						t.Fatal("incident live read substituted a source or Pod")
+					}
 				}
 				liveTerminal = batch.State
-				if liveTerminal != "SourceEnded" {
+				switch liveTerminal {
+				case "Active":
+					if reply.NextCursor == nil {
+						t.Fatal("active incident live view lost continuation")
+					}
+					liveWatch.Cursor = reply.NextCursor
+					return true
+				case "SourceEnded":
+					if len(batch.Rows) != 0 {
+						t.Fatal("sourceEnded replayed rows after the incident")
+					}
+					for _, g := range batch.Gaps {
+						if g.Reason == "sourceEnded" {
+							return true
+						}
+					}
+					t.Fatal("sourceEnded omitted its explicit gap")
+					return false
+				default:
 					t.Logf("incident terminal poll state=%s", liveTerminal)
 					return false
 				}
-				gap := false
-				for _, g := range batch.Gaps {
-					gap = gap || g.Reason == "sourceEnded"
-				}
-				return gap
 			})
-			t.Logf("incident live view %s ended with sourceEnded after the protected occurrence was admitted", liveWatch.ID)
+			t.Logf("incident live view %s reached %s after the protected occurrence was admitted", liveWatch.ID, liveTerminal)
 		}
 		var incidentNative []byte
 		incidentMarkers := 0
