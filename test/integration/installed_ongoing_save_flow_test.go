@@ -21,6 +21,7 @@ import (
 
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
+	v "asservat.local/asservat/internal/domain/live"
 	"github.com/jackc/pgx/v5/pgxpool"
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 	core "k8s.io/api/core/v1"
@@ -131,7 +132,7 @@ type ongoingSaveSource struct {
 // qualifyInstalledOngoingSave is the one-active-source installed ordinary
 // packet + Save focus. It seeds no grant, acceptance, source or capture row:
 // every effect goes through the installed MCP/console/native paths.
-func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpool.Pool, root string, identity *installedIdentity, publicRoot []byte, address, origin string, diagnose func()) {
+func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpool.Pool, root string, identity *installedIdentity, publicRoot []byte, address, origin string, diagnose func(), liveRun installedLiveRun) {
 	t.Helper()
 	if st, err := os.Stat("/etc/asservat-disposable-host"); err != nil || !st.Mode().IsRegular() {
 		t.Fatal("ongoing save requires a fresh disposable runner")
@@ -139,6 +140,9 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 	f := installedPolicyTarget
 	if f == nil || identity == nil {
 		t.Fatal("ongoing save lacks installed target")
+	}
+	if installedJourneyFocus() == "ongoing-incident" {
+		installedLiveEnable(t, ctx, liveRun)
 	}
 	cert, err := x509.ParseCertificate(publicRoot)
 	if err != nil {
@@ -529,6 +533,45 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 		// one policy occurrence, whose snapshot the policy executor saves from the
 		// running source (no manual request, no finite recipe). The retained-port
 		// marker just before the restart must be in the saved window.
+		var liveWatch v.Watch
+		if installedJourneyFocus() == "ongoing-incident" {
+			var selected v.SourceRow
+			wait("live source before incident overload", time.Minute, func(call context.Context) bool {
+				var page v.SourcePage
+				if !read(call, "list_live_sources", target, &page) {
+					return false
+				}
+				selected = v.SourceRow{}
+				for _, candidate := range page.Sources {
+					if candidate.ID == src.ID && candidate.Eligible && candidate.PodUID == podUID {
+						selected = candidate
+					}
+				}
+				return selected.Handle != ""
+			})
+			request := map[string]any{"source_handles": []string{selected.Handle}, "projection": v.Packet, "idempotency_key": "live-incident-original-" + src.ID, "duration_seconds": 90, "max_output_bytes": 256 << 10}
+			must("open_live_watch", request, &liveWatch)
+			if len(liveWatch.SourceIDs) != 1 || liveWatch.SourceIDs[0] != src.ID || liveWatch.Cursor == nil || liveWatch.ExpiresAt.After(src.HardUntil) {
+				t.Fatal("incident live watch replaced or extended its source")
+			}
+			second := make(map[string]any, len(request))
+			for key, value := range request {
+				second[key] = value
+			}
+			second["idempotency_key"] = "live-incident-overload-" + src.ID
+			reply, code, err := invoke(ctx, "open_live_watch", second)
+			var failure struct {
+				Retryable bool `json:"retryable"`
+			}
+			if err != nil || code != "CapacityUnavailable" || reply.Status != "error" || json.Unmarshal(reply.Data, &failure) != nil || failure.Retryable {
+				t.Fatal("second hub-eligible view was not shed at the one-slot node budget", code, err)
+			}
+			var state string
+			if err = admin.QueryRow(ctx, `SELECT state FROM live_watch_control WHERE root_id=$1 AND id=$2`, root, liveWatch.ID).Scan(&state); err != nil || state != "Active" {
+				t.Fatal("overload refusal changed the original incident live view", state, err)
+			}
+			t.Log("incident live overload: second hub-eligible view refused at the one-slot node budget; original view retained")
+		}
 		incidentSent := marker(ongoingSaveRetainedPort)
 		if installedJourneyFocus() == "ongoing-syscall" || installedJourneyFocus() == "ongoing-mixed" {
 			// An idle Go workload parks without syscalls; serving a few
@@ -571,6 +614,28 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 		wait("automatic incident snapshot occurrence", 2*time.Minute, func(call context.Context) bool {
 			return admin.QueryRow(call, `SELECT coalesce(capture_id::text,'') FROM policy_occurrence WHERE root_id=$1 AND policy_uid=$2 AND pod_uid=$3 AND capture_id IS NOT NULL ORDER BY created_at DESC LIMIT 1`, root, active.PolicyUID, podUID).Scan(&incidentID) == nil && incidentID != ""
 		})
+		liveTerminal := ""
+		if installedJourneyFocus() == "ongoing-incident" {
+			wait("original live source terminal after incident", 30*time.Second, func(call context.Context) bool {
+				var batch v.Batch
+				if !read(call, "read_live_watch", map[string]any{"watch_id": liveWatch.ID, "cursor": *liveWatch.Cursor, "limit": 20, "wait_ms": 0}, &batch) {
+					return false
+				}
+				if batch.WatchID != liveWatch.ID || batch.Revision != liveWatch.Revision || len(batch.Rows) != 0 {
+					t.Fatal("incident live terminal changed the original view or replayed rows")
+				}
+				liveTerminal = batch.State
+				if liveTerminal != "SourceEnded" {
+					return false
+				}
+				gap := false
+				for _, g := range batch.Gaps {
+					gap = gap || g.Reason == "sourceEnded"
+				}
+				return gap
+			})
+			t.Logf("incident live view %s ended with sourceEnded after the protected occurrence was admitted", liveWatch.ID)
+		}
 		var incidentNative []byte
 		incidentMarkers := 0
 		if installedJourneyFocus() == "ongoing-syscall" {
@@ -612,6 +677,7 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 		report := map[string]any{
 			"policyUID": active.PolicyUID, "podUID": podUID, "sourceID": src.ID, "armLatencySeconds": armLatency.Seconds(), "rearmsBeforeIncident": rearms,
 			"incidentCaptureID": incidentID, "incidentChildCaptureID": childID, "incidentChildSyscallEvents": childEvents, "incidentMarkerSent": incidentSent, "incidentMarkerPackets": incidentMarkers, "incidentNativeBytes": len(incidentNative), "sourceAfterIncident": afterIncident.ID,
+			"liveWatchID": liveWatch.ID, "liveTerminal": liveTerminal,
 			"scope": "one automatic exit-detector incident snapshot from one active ordinary ongoing " + ongoingAction + " source on one installed Pod; no Save in the same trigger budget window",
 		}
 		raw, err := json.MarshalIndent(report, "", "  ")

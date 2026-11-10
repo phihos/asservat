@@ -579,7 +579,21 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 		}
 		if installedOngoingFocus() {
 			t.Run(installedJourneyFocus(), func(t *testing.T) {
-				qualifyInstalledOngoingSave(t, ctx, admin, p.RootID, identity, publicRoot, publicAddress, origin, diagnose)
+				var liveRun installedLiveRun
+				if installedJourneyFocus() == "ongoing-incident" {
+					administratorUser, administratorGroups, err := installedLiveAdministrator(ctx, api, prefix+"-workload-guard", prefix+"-download-environment-guard")
+					if err != nil {
+						t.Fatal(err)
+					}
+					runner := rest.CopyConfig(kc)
+					runner.Impersonate = rest.ImpersonationConfig{UserName: administratorUser, Groups: append(administratorGroups, "system:authenticated")}
+					administrator, err := kubernetes.NewForConfig(runner)
+					if err != nil {
+						t.Fatal(err)
+					}
+					liveRun = installedLiveRun{SQL: admin, API: api, Administrator: administrator, AdministratorUser: administratorUser, RootID: p.RootID, Installation: installation, HubNamespace: desired.TargetNamespace, OwnerDeployment: prefix + "-owner", Identity: identity, PublicRoot: publicRoot, Address: publicAddress, Origin: origin, ClusterID: cluster, Namespace: namespace, Workload: workload, Diagnose: diagnose}
+				}
+				qualifyInstalledOngoingSave(t, ctx, admin, p.RootID, identity, publicRoot, publicAddress, origin, diagnose, liveRun)
 			})
 			return
 		}

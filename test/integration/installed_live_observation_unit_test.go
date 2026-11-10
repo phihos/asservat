@@ -15,15 +15,23 @@ func TestInstalledLiveObservationUsesFastOriginalTopology(t *testing.T) {
 }
 
 func TestInstalledLiveSettingsKeepNestedCeilingsValid(t *testing.T) {
-	paths := []contracts.DownloadEnvironmentPath{{ID: "path", TargetClusterID: "cluster"}}
-	clients := []contracts.DownloadEnvironmentClient{{Issuer: "issuer", ID: "console", Kind: "human", PathIDs: []string{"path"}}, {Issuer: "issuer", ID: "mcp", Kind: "human", PathIDs: []string{"path"}}}
-	settings, err := installedLiveSettings(contracts.DownloadEnvironmentSettings{Format: contracts.DownloadEnvironmentFormat, RootID: "root", Revision: 1, Paths: paths, Clients: clients}, "root", "cluster", "issuer")
-	if err != nil {
-		t.Fatal(err)
-	}
-	root := settings.LiveRead.Root
-	if root.Watches != 3 || root.PrincipalWatches != 2 || root.WorkloadWatches != 3 || root.PrincipalWatches > root.Watches || root.WorkloadWatches > root.Watches {
-		t.Fatal("invalid nested installed live ceilings", root)
+	for _, tc := range []struct {
+		focus             string
+		watches, workload int
+	}{{"live-observation", 3, 3}, {"ongoing-incident", 2, 2}} {
+		t.Run(tc.focus, func(t *testing.T) {
+			t.Setenv("ASSERVAT_JOURNEY_FOCUS", tc.focus)
+			paths := []contracts.DownloadEnvironmentPath{{ID: "path", TargetClusterID: "cluster"}}
+			clients := []contracts.DownloadEnvironmentClient{{Issuer: "issuer", ID: "console", Kind: "human", PathIDs: []string{"path"}}, {Issuer: "issuer", ID: "mcp", Kind: "human", PathIDs: []string{"path"}}}
+			settings, err := installedLiveSettings(contracts.DownloadEnvironmentSettings{Format: contracts.DownloadEnvironmentFormat, RootID: "root", Revision: 1, Paths: paths, Clients: clients}, "root", "cluster", "issuer")
+			if err != nil {
+				t.Fatal(err)
+			}
+			root := settings.LiveRead.Root
+			if root.Watches != tc.watches || root.PrincipalWatches != 2 || root.WorkloadWatches != tc.workload || root.PrincipalWatches > root.Watches || root.WorkloadWatches > root.Watches {
+				t.Fatal("invalid nested installed live ceilings", root)
+			}
+		})
 	}
 }
 
