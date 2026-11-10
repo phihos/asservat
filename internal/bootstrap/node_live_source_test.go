@@ -44,9 +44,9 @@ func TestLiveExistingSourceTapDoesNotCollectPinOrBorrowRaw(t *testing.T) {
 	if _, e = s.activateLive(source, v.Packet, time.Now().Add(time.Second), nil, sample); e == nil {
 		t.Fatal("unqualified viewer budget accepted")
 	}
-	b := &nodeLiveBudget{limits: v.ProcessingLimits{Subscriptions: 1, MemoryBytes: 1 << 20, EventsPerSecond: 100, BytesPerSecond: 1 << 20, TimePerSecond: 100 * time.Millisecond}}
+	b := &nodeLiveBudget{limits: v.ProcessingLimits{Subscriptions: 1, MemoryBytes: 1 << 20, EventsPerSecond: 100000, BytesPerSecond: 1 << 20, TimePerSecond: 100 * time.Millisecond}}
 	sample, _ = sampleLiveClock("monotonic")
-	c, e := s.activateLive(source, v.Packet, time.Now().Add(time.Second), b, sample)
+	c, e := s.activateLive(source, v.Packet, time.Now().Add(5*time.Second), b, sample)
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -54,8 +54,7 @@ func TestLiveExistingSourceTapDoesNotCollectPinOrBorrowRaw(t *testing.T) {
 	raw := []byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 8, 0, 0x45, 0, 0, 60, 0, 0, 0, 0, 64, 6, 0, 0, 192, 0, 2, 1, 192, 0, 2, 2, 0x04, 0xd2, 0x1f, 0x90, 0, 0, 0, 0, 0, 0, 0, 0, 0x50, 2, 4, 0, 0, 0, 0, 0}
 	raw = append(raw, []byte("SYNTHETIC-LIVE-PAYLOAD")...)
 	stamp, _ := sampleLiveClock("monotonic")
-	at := time.Now()
-	f(gadget.Frame{Data: raw, Wire: uint32(len(raw)), At: at, RawTimestamp: uint64(stamp.Nanos), Clock: "monotonic", DirectionKnown: true})
+	f(gadget.Frame{Data: raw, Wire: uint32(len(raw)), At: time.Now(), RawTimestamp: uint64(stamp.Nanos), Clock: "monotonic", DirectionKnown: true})
 	call, cancel := context.WithTimeout(t.Context(), 10*time.Millisecond)
 	defer cancel()
 	rows, pos, e := c.Read(call, v.Position{}, 100, time.Now)
@@ -68,6 +67,43 @@ func TestLiveExistingSourceTapDoesNotCollectPinOrBorrowRaw(t *testing.T) {
 	}
 	if s.meter.ObservedBytes() != int64(len(raw)) || s.ring.State().FrozenBytes != 0 {
 		t.Fatal("viewer changed source accounting or pinned ring")
+	}
+	read := func(after v.Position) ([]v.StampedRow, v.Position, error) {
+		if err := c.activate(source, time.Now().Add(5*time.Second), sample, time.Now()); err != nil {
+			t.Logf("cohort activation denied: closed=%t until=%s now=%s lease=%s sample=%+v err=%v", c.closed, c.until, time.Now(), source.LeaseUntil, sample, err)
+			return nil, v.Position{}, err
+		}
+		bounded, stop := context.WithTimeout(t.Context(), time.Second)
+		defer stop()
+		return c.Read(bounded, after, 100, time.Now)
+	}
+	priorSequence, priorLoss, delivered := uint64(1), uint64(0), 0
+	for batch := 0; batch < 20; batch++ {
+		for range 100 {
+			f(gadget.Frame{Data: raw, Wire: uint32(len(raw)), At: time.Now(), RawTimestamp: uint64(stamp.Nanos), Clock: "monotonic", DirectionKnown: true})
+		}
+		rows, pos, e = read(pos)
+		if e != nil || pos.Sequence < priorSequence || pos.Lost < priorLoss {
+			t.Fatal("sustained live batch regressed cursor or loss", batch, len(rows), pos, e)
+		}
+		delivered += len(rows)
+		priorSequence, priorLoss = pos.Sequence, pos.Lost
+	}
+	if delivered == 0 {
+		t.Fatal("sustained live reads delivered no approved rows")
+	}
+	if got := s.meter.ObservedBytes(); got != int64(2001*len(raw)) {
+		t.Fatal("sustained live reads changed recorder accounting", got)
+	}
+	for range 1000 {
+		f(gadget.Frame{Data: raw, Wire: uint32(len(raw)), At: time.Now(), RawTimestamp: uint64(stamp.Nanos), Clock: "monotonic", DirectionKnown: true})
+	}
+	if got := s.meter.ObservedBytes(); got != int64(3001*len(raw)) {
+		t.Fatal("reader lag backpressured the recorder", got)
+	}
+	rows, pos, e = read(pos)
+	if e != nil || len(rows) == 0 || pos.Sequence < priorSequence || pos.Lost == 0 {
+		t.Fatal("reader lag did not retain bounded rows and explicit loss", len(rows), pos, e)
 	}
 	before := p
 	c.Close()
