@@ -262,7 +262,7 @@ func NewOwnerDeployment(ctx context.Context, files *os.Root, podUID string) (res
 		d.publicContext, err = newPublicContext(startup, in, d.publicFiles, d.providers, d.public, publicObserver, publicProbe, d.shared, catalog, parts.audit, &closers)
 		d.closers = append(d.closers, closers...)
 		if err != nil {
-			return nil, mounts.ErrUnavailable
+			return nil, &fixedStepError{"public-context", err}
 		}
 		nativeConfig.ContextStarts = d.publicContext.starts
 		if nativeConfig.ContextStarts.Authenticator, err = contextStartOwnerAuthenticator(in, c, guard, pool, configs, ledgers["registry"], &d.contextStartStats); err != nil {
