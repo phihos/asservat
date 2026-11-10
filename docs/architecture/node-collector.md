@@ -37,9 +37,12 @@ nothing yet; increment 4 adds the first recorder.
    receipts are pending. A report carries the facts, the per-mechanism assessment, the node budget
    and receipts. The connector keeps only the latest report per node, in memory; a node without a
    report for 45 s is not current. For optional live-runtime status, it also retains
-   the latest report-to-report rates in memory. `read-live-runtime` aggregates
-   current totals/rates over the existing idle regional query with no node labels;
-   incomplete predecessors suppress the whole rate set, not acquisition or reports.
+   the latest report-to-report rates in memory. Source-loss events and rows dropped
+   by bounded reply encoding are cumulative; pending rows are current shared-buffer
+   occupancy, not exact per-viewer lag or a viewer count. `read-live-runtime`
+   aggregates current totals/rates over the existing idle regional query with no
+   node labels; incomplete predecessors suppress the whole rate set, not acquisition
+   or reports.
    Fleet operators read one selected cluster through the browser-only
    `get_live_capacity` operation; it uses the same aggregate and current checks.
 5. Work: the collector long-polls (25 s hold) for work after its last sequence. Kinds are

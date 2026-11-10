@@ -1,0 +1,18 @@
+2026-11-10T10:55:28.752691648Z owner port router: started (1)
+2026-11-10T10:55:28.752721734Z owner router: started (1)
+2026-11-10T10:55:28.752851440Z owner router: unknown-name (1)
+2026-11-10T10:55:28.752989902Z owner router: handoff observation (1)
+2026-11-10T10:55:28.755638101Z owner router: handoff native (1)
+2026-11-10T10:55:28.921317568Z owner router: unknown-name (2)
+2026-11-10T10:55:29.017344403Z owner router: handoff observation (2)
+2026-11-10T10:55:29.049709182Z owner router: handoff native (2)
+2026-11-10T10:55:31.733651074Z hub kube opening: guard checks: [current<reused]=4 [boundaryLocal<beginLocal]=2 [current<ReadClusterCatalog]=2 [current<ReadWorkerConfiguration]=2 [current<DownloadPolicy]=2 [ReadClusterCatalog<readPublicClusterCatalog]=1
+2026-11-10T10:55:31.990059446Z owner router: handoff observation (4)
+2026-11-10T10:55:32.740641542Z owner local claim timing: claim (1), pending@<100ms registration@<100ms native-claim@<500ms select@<100ms observe@<2s final@<100ms
+2026-11-10T10:55:36.756643389Z owner local claim timing: claim (2), pending@<100ms registration@<100ms native-claim@<500ms select@<100ms observe@<2s final@<100ms
+2026-11-10T10:55:38.110895170Z owner router: handoff observation (8)
+2026-11-10T10:55:41.732700391Z hub kube opening: guard checks: [boundaryLocal<Final]=6 [boundaryLocal<beginLocal]=4 [current<ReadClusterCatalog]=2 [ReadClusterCatalog<clusterCatalogChanged]=1
+2026-11-10T10:55:45.221566832Z owner local claim timing: claim (4), pending@<100ms registration@<100ms native-claim@<500ms select@<100ms observe@<2s final@<100ms
+2026-11-10T10:55:51.110533907Z owner router: handoff native (4)
+2026-11-10T10:55:51.273840240Z owner router: handoff observation (16)
+2026-11-10T10:55:51.733715303Z hub kube opening: guard checks: [boundaryLocal<beginLocal]=4 [boundaryLocal<Final]=4 [current<CapacityNamespaceProtection]=4 [current<reused]=2

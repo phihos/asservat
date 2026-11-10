@@ -337,14 +337,17 @@ type LiveStatus struct {
 	DeliveredRows     int64
 	DeliveredBytes    int64
 	RefusedAdmissions int64
+	LostEvents        int64
+	DroppedRows       int64
+	PendingRows       int
 }
 
 func (s LiveStatus) Valid(observedAt time.Time) bool {
-	if s.Cohorts < 0 || s.Cohorts > 16 || s.ScanEvents < 0 || s.ScanBytes < 0 || s.ScanCPUNanos < 0 || s.DeliveredRows < 0 || s.DeliveredBytes < 0 || s.RefusedAdmissions < 0 {
+	if s.Cohorts < 0 || s.Cohorts > 16 || s.ScanEvents < 0 || s.ScanBytes < 0 || s.ScanCPUNanos < 0 || s.DeliveredRows < 0 || s.DeliveredBytes < 0 || s.RefusedAdmissions < 0 || s.LostEvents < 0 || s.DroppedRows < 0 || s.PendingRows < 0 {
 		return false
 	}
 	if s.WindowStartedAt.IsZero() {
-		return s.ScanEvents == 0 && s.ScanBytes == 0 && s.ScanCPUNanos == 0 && s.DeliveredRows == 0 && s.DeliveredBytes == 0
+		return s.ScanEvents == 0 && s.ScanBytes == 0 && s.ScanCPUNanos == 0 && s.DeliveredRows == 0 && s.DeliveredBytes == 0 && s.DroppedRows == 0 && s.PendingRows == 0
 	}
 	return !s.WindowStartedAt.After(observedAt)
 }

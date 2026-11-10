@@ -260,6 +260,7 @@ func (n *nodePackets) readManualLive(ctx context.Context, w collector.Work, budg
 		}
 		e = c.activate(source, until, sample, now)
 		if e == nil {
+			budget.attach(c)
 			h.active.Store(c)
 		}
 		h.mu.Unlock()
@@ -297,7 +298,7 @@ func (n *nodePackets) readManualLive(ctx context.Context, w collector.Work, budg
 	out.Examined = len(out.Rows)
 	bounded, encoded, e := boundManualLiveReply(id.Epoch, *r, out)
 	if e == nil {
-		budget.deliver(n.now(), len(bounded.Rows), encoded)
+		budget.deliver(n.now(), len(bounded.Rows), encoded, bounded.Dropped)
 	}
 	return bounded, e
 }

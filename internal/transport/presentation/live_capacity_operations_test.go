@@ -34,8 +34,8 @@ func TestLiveCapacityOperationReturnsCanonicalSingleClusterView(t *testing.T) {
 	f := &liveCapacityOpsFixture{now: time.Now().UTC().Truncate(time.Microsecond)}
 	const cluster = "22222222-3333-4444-8555-666666666666"
 	f.snapshot = collector.LiveRuntimeSnapshot{ClusterID: cluster, ObservedAt: f.now, FreshUntil: f.now.Add(5 * time.Second), Nodes: 2, RatesComplete: true,
-		Live:  &collector.LiveActivity{Cohorts: 3, ScanEvents: 20, ScanBytes: 200, ScanCPUNanos: 3000, DeliveredRows: 4, DeliveredBytes: 400, RefusedAdmissions: 2},
-		Rates: collector.LiveActivityRates{ScanEventsPerSecond: 2.5, ScanBytesPerSecond: 50, ScanCPUNanosPerSecond: 1000, DeliveredRowsPerSecond: 0.5, DeliveredBytesPerSecond: 20, RefusedAdmissionsPerSecond: 1}}
+		Live:  &collector.LiveActivity{Cohorts: 3, ScanEvents: 20, ScanBytes: 200, ScanCPUNanos: 3000, DeliveredRows: 4, DeliveredBytes: 400, RefusedAdmissions: 2, LostEvents: 6, DroppedRows: 3, PendingRows: 5},
+		Rates: collector.LiveActivityRates{ScanEventsPerSecond: 2.5, ScanBytesPerSecond: 50, ScanCPUNanosPerSecond: 1000, DeliveredRowsPerSecond: 0.5, DeliveredBytesPerSecond: 20, RefusedAdmissionsPerSecond: 1, LostEventsPerSecond: 2, DroppedRowsPerSecond: 0.5}}
 	ops, err := NewLiveCapacityOperations("https://asservat.example.invalid", func() time.Time { return f.now }, func() string { return "00000000-0000-4000-8000-000000000042" }, f)
 	if err != nil {
 		t.Fatal(err)
@@ -58,7 +58,7 @@ func TestLiveCapacityOperationReturnsCanonicalSingleClusterView(t *testing.T) {
 	data := out["data"].(map[string]any)
 	live := data["live"].(map[string]any)
 	rates := data["rates"].(map[string]any)
-	if data["cluster_id"] != cluster || data["rates_complete"] != true || live["scan_events"] != 20.0 || live["scan_cpu_nanos"] != 3000.0 || rates["scan_events_per_second"] != 2.5 || data["fresh_until"] == nil {
+	if data["cluster_id"] != cluster || data["rates_complete"] != true || live["scan_events"] != 20.0 || live["scan_cpu_nanos"] != 3000.0 || live["lost_events"] != 6.0 || live["dropped_rows"] != 3.0 || live["pending_rows"] != 5.0 || rates["scan_events_per_second"] != 2.5 || rates["lost_events_per_second"] != 2.0 || rates["dropped_rows_per_second"] != 0.5 || data["fresh_until"] == nil {
 		t.Fatal(out)
 	}
 	forbidden := map[string]bool{"podUID": true, "nodeName": true, "node-uid": true, "sourceID": true, "principal": true, "filter": true, "payload": true, "scanEvents": true}

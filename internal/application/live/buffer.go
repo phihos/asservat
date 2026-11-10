@@ -172,6 +172,12 @@ func (b *Buffer) Read(ctx context.Context, after uint64, limit int, now func() t
 		}
 	}
 }
+func (b *Buffer) Pending() int {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return len(b.rows)
+}
+
 func (b *Buffer) Close() {
 	b.mu.Lock()
 	defer b.mu.Unlock()

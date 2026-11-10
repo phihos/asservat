@@ -1,0 +1,835 @@
+     3.7 === RUN   TestInitialBootstrapChainWithRealServices
+     8.6     initial_bootstrap_chain_test.go:229: operator prerequisites prepared: providers, CRDs, PKI mounts, identity and runner inputs
+   120.6     initial_bootstrap_chain_test.go:276: unified runner phase produce ran 29s
+   120.6     initial_bootstrap_chain_test.go:276: unified runner phase schema ran 3s
+   120.6     initial_bootstrap_chain_test.go:276: unified runner phase prepare ran 39s
+   120.6     initial_bootstrap_chain_test.go:276: unified runner phase retire ran 40s
+   120.6     initial_bootstrap_chain_test.go:277: unified runner completed produce, schema, prepare and retire
+   121.2     initial_bootstrap_chain_test.go:302: original activation b5060a0f-2f93-4843-8e76-ffe196bc0662 image docker.io/library/asservat-context-worker@sha256:35f60c2ab84ba98b9db48fd65e772b5f0458bb871f3972920fd49dfc0c4f7b3a exit 0
+   122.2 === RUN   TestInitialBootstrapChainWithRealServices/installer-continuation
+   129.3     initial_bootstrap_chain_test.go:406: applied phase 1 worker-provider:
+   129.3         Kubernetes context "kind-asservat-context-1m07k-tx-0", namespace "bootstrap-chain-10000000", installation "5cd22b6a-a4ad-4438-838b-4e4264793489": applying phase 1 worker-provider recipe.
+   129.3         created: sys/policies/acl/asservat-configuration-e98b3d950f594ff4ee774a8b8a5fb4e89ab5c2d3c33447dae84e81d2ac3466aa-audit-wrap
+   129.3         created: auth/configuration-auth/role/asservat-configuration-e98b3d950f594ff4ee774a8b8a5fb4e89ab5c2d3c33447dae84e81d2ac3466aa-audit-wrap
+   129.3         created: sys/policies/acl/asservat-configuration-e98b3d950f594ff4ee774a8b8a5fb4e89ab5c2d3c33447dae84e81d2ac3466aa-audit-unwrap
+   129.3         created: auth/configuration-auth/role/asservat-configuration-e98b3d950f594ff4ee774a8b8a5fb4e89ab5c2d3c33447dae84e81d2ac3466aa-audit-unwrap
+   129.3         created: bootstrap-chain-transit/keys/asservat-5cd22b6aa4ad4438838b4e4264793489-worker-configuration-audit
+   129.3         created: bootstrap-chain-transit/keys/asservat-5cd22b6aa4ad4438838b4e4264793489-context-deletion
+   129.3         created: sys/policies/acl/asservat-5cd22b6aa4ad4438838b4e4264793489-worker-provider-inspection
+   129.3         Inbox written; the continuation verifies the provider before any use.
+   179.6     initial_bootstrap_chain_test.go:406: applied phase 3 owner-provider:
+   179.6         Kubernetes context "kind-asservat-context-1m07k-tx-0", namespace "bootstrap-chain-10000000", installation "5cd22b6a-a4ad-4438-838b-4e4264793489": applying phase 3 owner-provider recipe.
+   179.6         created: sys/policies/acl/asservat-owner-5f56dc2c58de4267bd92445ccaed287b5468ae9fab77e97af8ad8f30ddfa4004-audit-wrap
+   179.6         created: auth/owner-auth/role/asservat-owner-5f56dc2c58de4267bd92445ccaed287b5468ae9fab77e97af8ad8f30ddfa4004-audit-wrap
+   179.6         created: sys/policies/acl/asservat-owner-5f56dc2c58de4267bd92445ccaed287b5468ae9fab77e97af8ad8f30ddfa4004-audit-unwrap
+   179.6         created: auth/owner-auth/role/asservat-owner-5f56dc2c58de4267bd92445ccaed287b5468ae9fab77e97af8ad8f30ddfa4004-audit-unwrap
+   179.6         created: sys/policies/acl/asservat-owner-5f56dc2c58de4267bd92445ccaed287b5468ae9fab77e97af8ad8f30ddfa4004-server-sign
+   179.6         created: auth/owner-auth/role/asservat-owner-5f56dc2c58de4267bd92445ccaed287b5468ae9fab77e97af8ad8f30ddfa4004-server-sign
+   179.6         created: sys/policies/acl/asservat-owner-5f56dc2c58de4267bd92445ccaed287b5468ae9fab77e97af8ad8f30ddfa4004-client-sign
+   179.6         created: auth/owner-auth/role/asservat-owner-5f56dc2c58de4267bd92445ccaed287b5468ae9fab77e97af8ad8f30ddfa4004-client-sign
+   179.6         created: owner-pki/roles/asservat-owner-pki-e3f18bb1409d2716eae3d73128dff0f2f45efb7ef087aff2012d639189d938c8-server
+   179.6         created: owner-pki/roles/asservat-owner-pki-e3f18bb1409d2716eae3d73128dff0f2f45efb7ef087aff2012d639189d938c8-client
+   179.6         created: sys/policies/acl/asservat-owner-public-3486ea39baf31dc4-browser-seal
+   179.6         created: auth/owner-auth/role/asservat-owner-public-3486ea39baf31dc4-browser-seal
+   179.6         created: sys/policies/acl/asservat-owner-public-3486ea39baf31dc4-browser-open
+   179.6         created: auth/owner-auth/role/asservat-owner-public-3486ea39baf31dc4-browser-open
+   179.6         created: sys/policies/acl/asservat-owner-public-3486ea39baf31dc4-work-sign
+   179.6         created: auth/owner-auth/role/asservat-owner-public-3486ea39baf31dc4-work-sign
+   179.6         created: sys/policies/acl/asservat-owner-public-3486ea39baf31dc4-worker-issue
+   179.6         created: auth/owner-auth/role/asservat-owner-public-3486ea39baf31dc4-worker-issue
+   179.6         created: public-transit-bootstrap-chain-10000000/keys/asservat-5cd22b6aa4ad4438838b4e4264793489-browser-sessions
+   179.6         created: public-transit-bootstrap-chain-10000000/keys/asservat-5cd22b6aa4ad4438838b4e4264793489-work-signing
+   179.6         created: worker-pki-bootstrap-chain-10000000/roles/asservat-5cd22b6aa4ad4438838b4e4264793489-download-worker
+   179.6         created: sys/policies/acl/asservat-federation-2d3d4b246f8ad765331d0d5b5d31b5cec84e66b392487dd17ca0e09620b3158e-audit-wrap
+   179.6         created: auth/owner-auth/role/asservat-federation-2d3d4b246f8ad765331d0d5b5d31b5cec84e66b392487dd17ca0e09620b3158e-audit-wrap
+   179.6         created: sys/policies/acl/asservat-federation-2d3d4b246f8ad765331d0d5b5d31b5cec84e66b392487dd17ca0e09620b3158e-audit-unwrap
+   179.6         created: auth/owner-auth/role/asservat-federation-2d3d4b246f8ad765331d0d5b5d31b5cec84e66b392487dd17ca0e09620b3158e-audit-unwrap
+   179.6         created: sys/policies/acl/asservat-federation-2d3d4b246f8ad765331d0d5b5d31b5cec84e66b392487dd17ca0e09620b3158e-client-sign
+   179.6         created: auth/owner-auth/role/asservat-federation-2d3d4b246f8ad765331d0d5b5d31b5cec84e66b392487dd17ca0e09620b3158e-client-sign
+   179.6         created: sys/policies/acl/asservat-federation-2d3d4b246f8ad765331d0d5b5d31b5cec84e66b392487dd17ca0e09620b3158e-server-sign
+   179.6         created: auth/owner-auth/role/asservat-federation-2d3d4b246f8ad765331d0d5b5d31b5cec84e66b392487dd17ca0e09620b3158e-server-sign
+   179.6         created: connector-pki-bootstrap-chain-10000000/roles/asservat-5cd22b6aa4ad4438838b4e4264793489-connector-client
+   179.6         created: connector-pki-bootstrap-chain-10000000/roles/asservat-5cd22b6aa4ad4438838b4e4264793489-connector-server
+   179.6         created: bootstrap-chain-transit/keys/asservat-5cd22b6aa4ad4438838b4e4264793489-federation-audit
+   179.6         created: sys/policies/acl/asservat-publisher-cb238ff2e528715e4a6242dc4f4c9c0754f1ad3a5f85416c4ee2bde35314b561-audit-wrap
+   179.6         created: auth/owner-auth/role/asservat-publisher-cb238ff2e528715e4a6242dc4f4c9c0754f1ad3a5f85416c4ee2bde35314b561-audit-wrap
+   179.6         created: sys/policies/acl/asservat-publisher-cb238ff2e528715e4a6242dc4f4c9c0754f1ad3a5f85416c4ee2bde35314b561-audit-unwrap
+   179.6         created: auth/owner-auth/role/asservat-publisher-cb238ff2e528715e4a6242dc4f4c9c0754f1ad3a5f85416c4ee2bde35314b561-audit-unwrap
+   179.6         created: sys/policies/acl/asservat-publisher-cb238ff2e528715e4a6242dc4f4c9c0754f1ad3a5f85416c4ee2bde35314b561-verifier-sign
+   179.6         created: auth/owner-auth/role/asservat-publisher-cb238ff2e528715e4a6242dc4f4c9c0754f1ad3a5f85416c4ee2bde35314b561-verifier-sign
+   179.6         created: worker-pki-bootstrap-chain-10000000/roles/asservat-5cd22b6aa4ad4438838b4e4264793489-verifier
+   179.6         created: bootstrap-chain-transit/keys/asservat-5cd22b6aa4ad4438838b4e4264793489-publisher-audit
+   179.6         created: sys/policies/acl/asservat-5cd22b6aa4ad4438838b4e4264793489-owner-provider-inspection
+   179.6         Inbox written; the continuation verifies the provider before any use.
+   202.9     initial_bootstrap_chain_test.go:406: permission stream c2f02c0d-4d47-430a-a986-0fec62b7822c fresh with 2 acknowledged authority audits
+   202.9     initial_bootstrap_chain_test.go:406: capacity source initialized for the permission root
+   202.9     initial_bootstrap_chain_test.go:406: federation projection published for the permission root
+   203.0     initial_bootstrap_chain_test.go:406: federation provider roles applied and verified
+   203.2     initial_bootstrap_chain_test.go:406: federation available with zero peers; regional offer published
+   203.2     initial_bootstrap_chain_test.go:406: owner native port reachable from outside under its bootstrap name
+   203.2     initial_bootstrap_chain_test.go:406: key service available; its configuration accepted at revision 1
+   203.2     initial_bootstrap_chain_test.go:406: key service serves the offered roots and refuses an unknown client chain: remote error: tls: unknown certificate authority
+   203.4     initial_bootstrap_chain_test.go:406: no Pod mounts the root key; only the key service mounts its logins
+   203.6     initial_bootstrap_chain_test.go:406: publisher available without restarts
+   203.6     initial_bootstrap_chain_test.go:406: capacity root ReadyAt set for the permission root
+   205.1     initial_bootstrap_chain_test.go:406: hub retention source Ready at sequence 2 with the baseline policy
+   205.1     initial_bootstrap_chain_test.go:406: promoted owner Ready with download sources, operator public Secret and observation on 9444
+   205.4     initial_bootstrap_chain_test.go:406: operator installed canonical regional CapacityReservation CRD
+   205.5     initial_bootstrap_chain_test.go:406: operator added the regional workload, budget policy, pool slot and maintainer binding before the join
+   208.9     initial_bootstrap_chain_test.go:406: installed connector: exact listener Secret GET allowed; other Secret GET, list/watch/update and other-namespace GET denied
+   212.0     initial_bootstrap_chain_test.go:406: installer-cluster connector enrolled generation 1 and both leaves
+   212.0     initial_bootstrap_chain_test.go:406: join record printed and stored; its connector protection is the staged generation 1
+   213.0     initial_bootstrap_chain_test.go:406: regional executor composed from the settings it read by name
+   213.4     initial_bootstrap_chain_test.go:406: regional: connector lifecycle enroll took 440ms, observer 68 calls
+   213.4     initial_bootstrap_chain_test.go:406: regional: connector lifecycle client-sign took 340ms, observer 68 calls
+   213.4     initial_bootstrap_chain_test.go:406: regional: connector lifecycle server-sign took 1.35s, observer 68 calls
+   213.4     initial_bootstrap_chain_test.go:406: regional: connector lifecycle registration took 10ms, observer 0 calls
+   213.4     initial_bootstrap_chain_test.go:406: regional: connector lifecycle owner-observation-candidates took 50ms, observer 0 calls
+   213.4     initial_bootstrap_chain_test.go:406: regional: connector lifecycle owner-candidates took 10ms, observer 0 calls
+   213.4     initial_bootstrap_chain_test.go:406: regional: connector lifecycle owner-authentication took 50ms, observer 0 calls
+   213.5     initial_bootstrap_chain_test.go:406: installer-cluster-join wrote the slot's sources, topology and catalog entry; the rerun was exact
+   226.0     initial_bootstrap_chain_test.go:406: hub-api restarted its process on the catalog change and is Ready with the joined entry
+   227.3     initial_bootstrap_chain_test.go:406: hub-api recorded the join's write-once capacity qualification
+   227.3     initial_bootstrap_chain_test.go:406: regional capacity standby composed
+   244.1     initial_bootstrap_chain_test.go:406: regional workload enrolled through v2 to ready_at; demand lane sampled: false; the pool holds 1 extension revision(s)
+   260.8     installer_continuation_native_test.go:514: hub-api running 35s since its last start; the regional context standby had its reopening interval
+   260.8     installer_continuation_native_test.go:516: installed focus "live-observation" starts (fast fixture true)
+   260.8 === RUN   TestInitialBootstrapChainWithRealServices/installer-continuation/live-observation
+   260.8     installer_continuation_native_test.go:569: installed live administrator system:serviceaccount:bootstrap-chain-10000000:install-bootstrap-runner groups [] from the current guards
+   267.3     installer_continuation_native_test.go:576: guarded delivery revision3 accepted; exact oldPod19e6ba14-c6fc-4cc2-b6bf-a85adb3b55bf replacedby1fd968f9-a351-4e80-82c6-6e4b310480c3 with distinct currentactivated server epoch; original Deployment/ReplicaSet retained
+   268.6     installer_continuation_native_test.go:576: installed journey: the processing operator initialized processing through the console
+   276.2     installer_continuation_native_test.go:576: published namespace CaptureProfile apps-regional/http-capture.v1 uid=90a282fe-13f9-47cf-8fe6-8d56907708b0
+   298.5     installed_live_observation_native_test.go:344: installed live sustained reads: five bounded batches retained the original view, source and cumulative SQL spend
+   302.4     installer_continuation_native_test.go:576: installed LIVE original ongoing observation distinct principal did not receive its own original-source handle
+   302.4 === NAME  TestInitialBootstrapChainWithRealServices/installer-continuation
+   302.4     installed_capacity_current_test.go:73: diagnostics: capacity current snapshot_at=2026-11-10T10:43:06.68164Z (later read, not failed invocation state) accepted_revision=2
+   302.4     installed_capacity_current_test.go:74: diagnostics: capacity current trust_present=true permission_present=true source_present=true reader_pin_valid=true reader_role_matches=true installation_matches=true trust_current=true permission_current=true source_current=true root_configuration_valid=true root_ready=true root_unreconciled=true root_plan_present=true root_mutation_present=false root_digest_matches=true root_input_matches=true initial_audit_acknowledged=true epoch_audit_acknowledged=true
+   302.4     installed_capacity_current_test.go:77: diagnostics: capacity current trust_remaining_ms=29450
+   302.4     installed_capacity_current_test.go:77: diagnostics: capacity current permission_remaining_ms=29600
+   302.4     installed_capacity_current_test.go:77: diagnostics: capacity current permission_lease_remaining_ms=29600
+   302.4     installed_capacity_current_test.go:77: diagnostics: capacity current source_remaining_ms=29536
+   302.4     installed_capacity_current_test.go:77: diagnostics: capacity current root_planned_remaining_ms=86296758
+   302.4     installed_sql_activity_test.go:72: diagnostics: SQL activity role="as_5cd22b6aa4ad4438838b4e4264793489_cfg_00" state="idle" wait_type="Client" event="ClientRead" transaction_ms=-1 query_ms=560
+   302.4     installed_sql_activity_test.go:72: diagnostics: SQL activity role="as_5cd22b6aa4ad4438838b4e4264793489_cfg_01" state="idle" wait_type="Client" event="ClientRead" transaction_ms=-1 query_ms=972
+   302.4     installed_sql_activity_test.go:72: diagnostics: SQL activity role="as_5cd22b6aa4ad4438838b4e4264793489_own_06" state="idle" wait_type="Client" event="ClientRead" transaction_ms=-1 query_ms=15
+   302.4     installed_sql_activity_test.go:72: diagnostics: SQL activity role="as_5cd22b6aa4ad4438838b4e4264793489_own_06" state="idle" wait_type="Client" event="ClientRead" transaction_ms=-1 query_ms=292
+   302.4     installed_sql_activity_test.go:72: diagnostics: SQL activity role="as_5cd22b6aa4ad4438838b4e4264793489_own_06" state="idle" wait_type="Client" event="ClientRead" transaction_ms=-1 query_ms=654
+   302.4     installed_sql_activity_test.go:72: diagnostics: SQL activity role="as_5cd22b6aa4ad4438838b4e4264793489_own_06" state="idle" wait_type="Client" event="ClientRead" transaction_ms=-1 query_ms=4227
+   302.4     installed_sql_activity_test.go:72: diagnostics: SQL activity role="as_5cd22b6aa4ad4438838b4e4264793489_pub_01" state="idle" wait_type="Client" event="ClientRead" transaction_ms=-1 query_ms=41
+   302.4     installed_sql_activity_test.go:72: diagnostics: SQL activity role="as_5cd22b6aa4ad4438838b4e4264793489_pub_25" state="idle" wait_type="Client" event="ClientRead" transaction_ms=-1 query_ms=1990
+   302.4     installed_sql_activity_test.go:72: diagnostics: SQL activity role="as_5cd22b6aa4ad4438838b4e4264793489_pub_40" state="idle" wait_type="Client" event="ClientRead" transaction_ms=-1 query_ms=39691
+   302.4     installed_sql_activity_test.go:72: diagnostics: SQL activity role="as_5cd22b6aa4ad4438838b4e4264793489_pub_41" state="idle" wait_type="Client" event="ClientRead" transaction_ms=-1 query_ms=39656
+   302.4     installed_sql_activity_test.go:72: diagnostics: SQL activity role="as_5cd22b6aa4ad4438838b4e4264793489_pub_42" state="idle" wait_type="Client" event="ClientRead" transaction_ms=-1 query_ms=39654
+   302.4     installed_sql_activity_test.go:72: diagnostics: SQL activity role="as_5cd22b6aa4ad4438838b4e4264793489_pub_51" state="idle" wait_type="Client" event="ClientRead" transaction_ms=-1 query_ms=1
+   302.4     installed_sql_activity_test.go:72: diagnostics: SQL activity role="as_5cd22b6aa4ad4438838b4e4264793489_pub_52" state="idle" wait_type="Client" event="ClientRead" transaction_ms=-1 query_ms=4
+   302.4     installed_sql_activity_test.go:72: diagnostics: SQL activity role="as_5cd22b6aa4ad4438838b4e4264793489_pub_56" state="idle" wait_type="Client" event="ClientRead" transaction_ms=-1 query_ms=92
+   302.4     installed_sql_activity_test.go:72: diagnostics: SQL activity role="as_5cd22b6aa4ad4438838b4e4264793489_pub_70" state="idle" wait_type="Client" event="ClientRead" transaction_ms=-1 query_ms=189
+   302.4     installed_sql_activity_test.go:72: diagnostics: SQL activity role="as_5cd22b6aa4ad4438838b4e4264793489_pub_72" state="idle" wait_type="Client" event="ClientRead" transaction_ms=-1 query_ms=420
+   302.4     installed_sql_activity_test.go:72: diagnostics: SQL activity role="as_5cd22b6aa4ad4438838b4e4264793489_pub_73" state="idle" wait_type="Client" event="ClientRead" transaction_ms=-1 query_ms=2600
+   302.4     installed_sql_activity_test.go:72: diagnostics: SQL activity role="as_5cd22b6aa4ad4438838b4e4264793489_pub_78" state="idle" wait_type="Client" event="ClientRead" transaction_ms=-1 query_ms=108
+   302.4     installed_sql_activity_test.go:72: diagnostics: SQL activity role="as_5cd22b6aa4ad4438838b4e4264793489_pub_79" state="idle" wait_type="Client" event="ClientRead" transaction_ms=-1 query_ms=559
+   302.4     installed_sql_activity_test.go:72: diagnostics: SQL activity role="as_5cd22b6aa4ad4438838b4e4264793489_pub_80" state="idle" wait_type="Client" event="ClientRead" transaction_ms=-1 query_ms=940
+   302.4     installed_sql_activity_test.go:72: diagnostics: SQL activity role="as_5cd22b6aa4ad4438838b4e4264793489_pub_86" state="idle" wait_type="Client" event="ClientRead" transaction_ms=-1 query_ms=398
+   302.4     installed_sql_activity_test.go:72: diagnostics: SQL activity role="as_5cd22b6aa4ad4438838b4e4264793489_pub_89" state="idle" wait_type="Client" event="ClientRead" transaction_ms=-1 query_ms=13568
+   302.4     installed_sql_activity_test.go:72: diagnostics: SQL activity role="as_5cd22b6aa4ad4438838b4e4264793489_pub_95" state="idle" wait_type="Client" event="ClientRead" transaction_ms=-1 query_ms=58278
+   302.4     installed_sql_activity_test.go:72: diagnostics: SQL activity role="as_5cd22b6aa4ad4438838b4e4264793489_pub_95" state="idle" wait_type="Client" event="ClientRead" transaction_ms=-1 query_ms=103
+   302.4     installed_sql_activity_test.go:72: diagnostics: SQL activity role="as_5cd22b6aa4ad4438838b4e4264793489_pub_95" state="idle" wait_type="Client" event="ClientRead" transaction_ms=-1 query_ms=39172
+   302.4     installed_sql_activity_test.go:72: diagnostics: SQL activity role="as_5cd22b6aa4ad4438838b4e4264793489_pub_95" state="idle" wait_type="Client" event="ClientRead" transaction_ms=-1 query_ms=39128
+   302.4     installed_sql_activity_test.go:72: diagnostics: SQL activity role="as_5cd22b6aa4ad4438838b4e4264793489_pub_95" state="idle" wait_type="Client" event="ClientRead" transaction_ms=-1 query_ms=20
+   302.4     installed_sql_activity_test.go:79: diagnostics: SQL activity rows=27
+   302.4     installed_focus_rerun_native_test.go:111: diagnostics: asservat-5cd22b6aa4ad4438838b4e4264793489-owner pod asservat-5cd22b6aa4ad4438838b4e4264793489-owner-7578b6df4cdc2td phase Running
+   302.4     installed_focus_rerun_native_test.go:111: diagnostics: asservat-5cd22b6aa4ad4438838b4e4264793489-owner pod asservat-5cd22b6aa4ad4438838b4e4264793489-owner-7578b6df4cdc2td container hub ready true restarts 0 last "" exit 0 current termination unobserved
+   302.4     installed_focus_rerun_native_test.go:111: diagnostics: asservat-5cd22b6aa4ad4438838b4e4264793489-owner-7578b6df4cdc2td previous=false log:
+   302.4         2026-11-10T10:42:33.273416561Z owner port router: started (1)
+   302.4         2026-11-10T10:42:33.273561943Z owner router: started (1)
+   302.4         2026-11-10T10:42:33.273577662Z owner router: unknown-name (1)
+   302.4         2026-11-10T10:42:33.278958942Z owner router: handoff observation (1)
+   302.4         2026-11-10T10:42:33.279625478Z owner router: unknown-name (2)
+   302.4         2026-11-10T10:42:33.282234235Z owner router: handoff native (1)
+   302.4         2026-11-10T10:42:33.435431755Z owner router: unknown-name (4)
+   302.4         2026-11-10T10:42:33.732848490Z owner router: handoff native (2)
+   302.4         2026-11-10T10:42:33.791124835Z owner router: handoff observation (2)
+   302.4         2026-11-10T10:42:35.922023666Z hub kube opening: requests=51 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET namespaces]=15 [GET validatingadmissionpolicies]=9 [GET validatingadmissionpolicybindings]=9 [GET configmaps]=9 [POST selfsubjectreviews]=3 [POST selfsubjectaccessreviews]=3
+   302.4         2026-11-10T10:42:35.922047571Z hub kube opening: guard checks: [current<DownloadPolicy]=8 [current<reused]=4 [DownloadPolicy<authority]=3 [current<ReadClusterCatalog]=2 [boundaryLocal<beginLocal]=2 [current<ReadWorkerConfiguration]=2
+   302.4         2026-11-10T10:42:36.448505982Z 2026/11/10 10:42:36 http: TLS handshake error from 10.244.0.1:45522: remote error: tls: unknown certificate
+   302.4         2026-11-10T10:42:36.568046961Z owner router: handoff observation (4)
+   302.4         2026-11-10T10:42:37.298961233Z owner local claim timing: claim (1), pending@<100ms registration@<100ms native-claim@<500ms select@<100ms observe@<2s final@<100ms
+   302.4         2026-11-10T10:42:40.835297849Z policy activation refused: delegation/envelope (1)
+   302.4         2026-11-10T10:42:40.835664268Z mcp timing: normal/service-failed (1), pre@<100ms begin@<250ms call@<250ms total@<500ms [begin-reserve@<100ms begin-claim@<100ms credentials-configuration@<100ms credentials-mounted@<100ms credentials-verify@<100ms credentials@<100ms begin-object@<100ms begin-ack@<100ms]
+   302.4         2026-11-10T10:42:40.879593133Z mcp timing: normal (1), pre@<100ms begin@<250ms call@<250ms finish@<100ms total@<500ms [begin-reserve@<100ms begin-claim@<100ms credentials-configuration@<100ms credentials-mounted@<100ms credentials-verify@<100ms credentials@<100ms begin-object@<100ms begin-ack@<100ms finish-freeze@<100ms finish-claim@<100ms credentials-configuration@<100ms credentials-mounted@<100ms credentials-verify@<100ms credentials@<100ms finish-object@<100ms finish-ack@<100ms]
+   302.4         2026-11-10T10:42:41.341122916Z owner local claim timing: claim (2), pending@<100ms registration@<100ms native-claim@<500ms select@<100ms observe@<2s final@<100ms
+   302.4         2026-11-10T10:42:42.079903086Z policy activation refused: delegation/envelope (2)
+   302.4         2026-11-10T10:42:42.081324726Z mcp timing: normal/service-failed (2), pre@<100ms begin@<100ms call@<250ms total@<250ms [begin-reserve@<100ms begin-claim@<100ms credentials-configuration@<100ms credentials-mounted@<100ms credentials-verify@<100ms credentials@<100ms begin-object@<100ms begin-ack@<100ms]
+   302.4         2026-11-10T10:42:42.125511413Z mcp timing: normal (2), pre@<100ms begin@<100ms call@<250ms finish@<100ms total@<250ms [begin-reserve@<100ms begin-claim@<100ms credentials-configuration@<100ms credentials-mounted@<100ms credentials-verify@<100ms credentials@<100ms begin-object@<100ms begin-ack@<100ms finish-freeze@<100ms finish-claim@<100ms credentials-configuration@<100ms credentials-mounted@<100ms credentials-verify@<100ms credentials@<100ms finish-object@<100ms finish-ack@<100ms]
+   302.4         2026-11-10T10:42:42.712347280Z owner router: handoff observation (8)
+   302.4         2026-11-10T10:42:43.920313253Z mcp timing: normal (4), pre@<100ms begin@<250ms call@<100ms finish@<100ms total@<250ms [begin-reserve@<100ms begin-claim@<100ms credentials-configuration@<100ms credentials-mounted@<100ms credentials-verify@<100ms credentials@<100ms begin-object@<100ms begin-ack@<100ms finish-freeze@<100ms finish-claim@<100ms credentials-configuration@<100ms credentials-mounted@<100ms credentials-verify@<100ms credentials@<100ms finish-object@<100ms finish-ack@<100ms]
+   302.4         2026-11-10T10:42:45.042068498Z mcp timing: normal (8), pre@<100ms begin@<100ms call@<100ms finish@<100ms total@<250ms [begin-reserve@<100ms begin-claim@<100ms credentials-configuration@<100ms credentials-mounted@<100ms credentials-verify@<100ms credentials@<100ms begin-object@<100ms begin-ack@<100ms finish-freeze@<100ms finish-claim@<100ms credentials-configuration@<100ms credentials-mounted@<100ms credentials-verify@<100ms credentials@<100ms finish-object@<100ms finish-ack@<100ms]
+   302.4         2026-11-10T10:42:45.921613997Z hub kube opening: requests=12 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET namespaces]=6 [GET debugpolicies]=6
+   302.4         2026-11-10T10:42:45.921634466Z hub kube opening: guard checks: [boundaryLocal<Final]=6 [boundaryLocal<beginLocal]=4 [current<CapacityNamespaceProtection]=2 [current<ReadClusterCatalog]=2
+   302.4         2026-11-10T10:42:46.270263443Z policy trigger: tick/admit-check-late-binding-expired/unavailable (1)
+   302.4         2026-11-10T10:42:48.272573663Z owner local claim timing: claim (4), pending@<100ms registration@<100ms native-claim@<500ms select@<100ms observe@<2s final@<100ms
+   302.4         2026-11-10T10:42:51.916560296Z mcp timing: list_live_sources (1), pre@<100ms begin@<500ms call@<500ms finish@<100ms total@<1s [begin-reserve@<100ms begin-claim@<100ms credentials-configuration@<100ms credentials-mounted@<100ms credentials-verify@<100ms credentials@<250ms begin-object@<250ms begin-ack@<100ms finish-freeze@<100ms finish-claim@<100ms credentials-configuration@<100ms credentials-mounted@<100ms credentials-verify@<100ms credentials@<100ms finish-object@<100ms finish-ack@<100ms]
+   302.4         2026-11-10T10:42:52.612473679Z mcp timing: open_live_watch (1), pre@<100ms begin@<250ms call@<500ms finish@<100ms total@<1s [begin-reserve@<100ms begin-claim@<100ms credentials-configuration@<100ms credentials-mounted@<100ms credentials-verify@<100ms credentials@<100ms begin-object@<100ms begin-ack@<100ms finish-freeze@<100ms finish-claim@<100ms credentials-configuration@<100ms credentials-mounted@<100ms credentials-verify@<100ms credentials@<100ms finish-object@<100ms finish-ack@<100ms]
+   302.4         2026-11-10T10:42:53.391056458Z mcp timing: list_live_sources (2), pre@<100ms begin@<250ms call@<1s finish@<100ms total@<1s [begin-reserve@<100ms begin-claim@<100ms credentials-configuration@<100ms credentials-mounted@<100ms credentials-verify@<100ms credentials@<100ms begin-object@<100ms begin-ack@<100ms finish-freeze@<100ms finish-claim@<100ms credentials-configuration@<100ms credentials-mounted@<100ms credentials-verify@<100ms credentials@<100ms finish-object@<100ms finish-ack@<100ms]
+   302.4         2026-11-10T10:42:54.034138505Z mcp timing: open_live_watch (2), pre@<100ms begin@<100ms call@<500ms finish@<100ms total@<1s [begin-reserve@<100ms begin-claim@<100ms credentials-configuration@<100ms credentials-mounted@<100ms credentials-verify@<100ms credentials@<100ms begin-object@<100ms begin-ack@<100ms finish-freeze@<100ms finish-claim@<100ms credentials-configuration@<100ms credentials-mounted@<100ms credentials-verify@<100ms credentials@<100ms finish-object@<100ms finish-ack@<100ms]
+   302.4         2026-11-10T10:42:54.263060819Z owner router: handoff native (4)
+   302.4         2026-11-10T10:42:55.921924615Z hub kube opening: requests=42 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET namespaces]=15 [GET debugpolicies]=9 [GET validatingadmissionpolicies]=4 [GET validatingadmissionpolicybindings]=4 [GET configmaps]=4 [POST selfsubjectreviews]=2
+   302.4         2026-11-10T10:42:55.922128960Z hub kube opening: guard checks: [boundaryLocal<beginLocal]=8 [boundaryLocal<Final]=7 [current<readTrust]=4 [current<CapacityNamespaceProtection]=2 [current<reused]=2 [current<DownloadPolicy]=2
+   302.4         2026-11-10T10:42:55.986323807Z mcp timing: read_live_watch (1), pre@<100ms begin@<100ms call@<3s finish@<100ms total@<3s [begin-reserve@<100ms begin-claim@<100ms credentials-configuration@<100ms credentials-mounted@<100ms credentials-verify@<100ms credentials@<100ms begin-object@<100ms begin-ack@<100ms finish-freeze@<100ms finish-claim@<100ms credentials-configuration@<100ms credentials-mounted@<100ms credentials-verify@<100ms credentials@<100ms finish-object@<100ms finish-ack@<100ms]
+   302.4         2026-11-10T10:42:56.218057309Z mcp timing: read_live_watch (2), pre@<100ms begin@<250ms call@<2s finish@<100ms total@<3s [begin-reserve@<100ms begin-claim@<100ms credentials-configuration@<100ms credentials-mounted@<100ms credentials-verify@<100ms credentials@<100ms begin-object@<100ms begin-ack@<100ms finish-freeze@<100ms finish-claim@<100ms credentials-configuration@<100ms credentials-mounted@<100ms credentials-verify@<100ms credentials@<100ms finish-object@<100ms finish-ack@<100ms]
+   302.4         2026-11-10T10:42:56.483118112Z owner router: handoff observation (16)
+   302.4         2026-11-10T10:42:57.824522143Z mcp timing: read_live_watch (4), pre@<100ms begin@<250ms call@<2s finish@<100ms total@<2s [begin-reserve@<100ms begin-claim@<100ms credentials-configuration@<100ms credentials-mounted@<100ms credentials-verify@<100ms credentials@<100ms begin-object@<100ms begin-ack@<100ms finish-freeze@<100ms finish-claim@<100ms credentials-configuration@<100ms credentials-mounted@<100ms credentials-verify@<100ms credentials@<100ms finish-object@<100ms finish-ack@<100ms]
+   302.4         2026-11-10T10:42:59.529134170Z owner local claim timing: claim (8), pending@<100ms registration@<100ms native-claim@<500ms select@<100ms observe@<2s final@<100ms
+   302.4         2026-11-10T10:43:00.650648626Z owner observer 667 calls 1.38s, operation 474 calls 1.01s, readiness 548 calls 1.36s, identity 12 calls 20ms, provider 12 calls 20ms, credentials 71 calls 200ms, context-start 100 calls 220ms total
+   302.4         2026-11-10T10:43:00.988473361Z mcp timing: read_live_watch (8), pre@<100ms begin@<250ms call@<2s finish@<100ms total@<2s [begin-reserve@<100ms begin-claim@<100ms credentials-configuration@<100ms credentials-mounted@<100ms credentials-verify@<100ms credentials@<100ms begin-object@<100ms begin-ack@<100ms finish-freeze@<100ms finish-claim@<100ms credentials-configuration@<100ms credentials-mounted@<100ms credentials-verify@<100ms credentials@<100ms finish-object@<100ms finish-ack@<100ms]
+   302.4         2026-11-10T10:43:03.412283873Z live operation refused: open_live_watch capacity at live_watch:95 (1)
+   302.4         2026-11-10T10:43:03.412300945Z mcp timing: open_live_watch/service-failed (1), pre@<100ms begin@<250ms call@<500ms total@<1s [begin-reserve@<100ms begin-claim@<100ms credentials-configuration@<100ms credentials-mounted@<100ms credentials-verify@<100ms credentials@<100ms begin-object@<100ms begin-ack@<100ms]
+   302.4         2026-11-10T10:43:03.983883160Z owner router: handoff native (8)
+   302.4         2026-11-10T10:43:05.279374122Z owner router: unknown-name (8)
+   302.4         2026-11-10T10:43:05.921705881Z hub kube opening: requests=42 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET namespaces]=21 [GET debugpolicies]=21
+   302.4         2026-11-10T10:43:05.922008837Z hub kube opening: guard checks: [boundaryLocal<Final]=7 [boundaryLocal<beginLocal]=7 [current<CapacityNamespaceProtection]=2 [current<reused]=2 [current<ReadClusterCatalog]=2 [ReadClusterCatalog<clusterCatalogChanged]=1
+   302.4         2026-11-10T10:43:06.681138549Z live operation refused: read_live_watch transient at service:576 live_projection_reader:58 (1)
+   302.4         2026-11-10T10:43:06.681157755Z mcp timing: read_live_watch/service-failed (1), pre@<100ms begin@<250ms call@<3s total@<3s [begin-reserve@<100ms begin-claim@<100ms credentials-configuration@<100ms credentials-mounted@<100ms credentials-verify@<100ms credentials@<100ms begin-object@<100ms begin-ack@<100ms]
+   302.5     installed_focus_rerun_native_test.go:111: diagnostics: asservat-5cd22b6aa4ad4438838b4e4264793489-worker pod asservat-5cd22b6aa4ad4438838b4e4264793489-worker-6b57fb4d5lvzpk phase Running
+   302.5     installed_focus_rerun_native_test.go:111: diagnostics: asservat-5cd22b6aa4ad4438838b4e4264793489-worker pod asservat-5cd22b6aa4ad4438838b4e4264793489-worker-6b57fb4d5lvzpk container worker ready true restarts 0 last "" exit 0 current termination unobserved
+   302.5     installed_focus_rerun_native_test.go:111: diagnostics: asservat-5cd22b6aa4ad4438838b4e4264793489-worker-6b57fb4d5lvzpk previous=false log:
+   302.5         2026-11-10T10:40:25.150478198Z I1110 10:40:25.149962       1 leaderelection.go:258] "Attempting to acquire leader lease..." lock="asservat configuration reconciliation"
+   302.5         2026-11-10T10:40:25.160236682Z I1110 10:40:25.160117       1 leaderelection.go:272] "Successfully acquired lease" lock="asservat configuration reconciliation"
+   302.5         2026-11-10T10:40:25.165595473Z capacity waiting: projection hint pending
+   302.5         2026-11-10T10:40:53.117821911Z hub-worker context deadlines: deadline observation unavailable
+   302.5         2026-11-10T10:40:53.117842881Z hub-worker context deletion: waiting for the capacity projection
+   302.5         2026-11-10T10:40:53.131609101Z hub-worker policy grant settings: unavailable
+   302.5         2026-11-10T10:40:53.152969791Z hub-worker retention: reconciler/store.begin/client (unavailable)
+   302.5         2026-11-10T10:40:53.156590330Z hub-worker worker configuration: source (unavailable)
+   302.5         2026-11-10T10:41:03.125544292Z hub-worker policy grant settings: ok
+   302.5         2026-11-10T10:41:06.448578897Z hub-worker worker configuration: audit.admission (unavailable)
+   302.5         2026-11-10T10:41:09.482300789Z hub-worker worker configuration: ok
+   302.5         2026-11-10T10:41:16.890917764Z capacity waiting: projection mount pending
+   302.5         2026-11-10T10:41:22.407680292Z capacity started with 0 regional clusters
+   302.5         2026-11-10T10:41:23.123593923Z hub-worker context deadlines: ok
+   302.5         2026-11-10T10:41:23.455595615Z capacity local observation capacity-namespace-candidates: ok after 1.05s
+   302.5         2026-11-10T10:41:23.455617095Z capacity local discovery: steps=1 candidates=0 namespace-index=0 namespace-count=10 kind-index=0 workload-index=0 workload-count=0
+   302.5         2026-11-10T10:41:25.554674753Z capacity local observation capacity-workload-candidates: ok after 1.85s
+   302.5         2026-11-10T10:41:37.833239640Z capacity root: unavailable
+   302.5         2026-11-10T10:41:40.369081462Z capacity local observation capacity-namespace-guard: ok after 1.67s
+   302.5         2026-11-10T10:41:42.002176227Z capacity local observation capacity-workload: ok after 1.63s
+   302.5         2026-11-10T10:41:42.002227874Z capacity local workload: compose/permission-scope (not-allocated) after 3.32s
+   302.5         2026-11-10T10:41:43.413925975Z capacity local observation capacity-workload-candidates: ok after 910ms
+   302.5         2026-11-10T10:41:45.264467873Z capacity local observation capacity-namespace-guard: ok after 1.59s
+   302.5         2026-11-10T10:41:46.688114131Z capacity local observation capacity-workload: refused (unavailable) after 1.42s
+   302.5         2026-11-10T10:41:46.688141723Z capacity local workload: workload (unavailable) after 3.02s
+   302.5         2026-11-10T10:41:48.594448267Z capacity local observation capacity-namespace-guard: ok after 1.65s
+   302.5         2026-11-10T10:41:49.338701303Z capacity local observation capacity-workload: post (unavailable) after 740ms
+   302.5         2026-11-10T10:41:49.603130650Z capacity local observation capacity-namespace-guard: dial (unavailable) after 10ms
+   302.5         2026-11-10T10:41:49.603150517Z capacity local workload: guard-read (unavailable) after 10ms
+   302.5         2026-11-10T10:41:50.420400321Z capacity local observation capacity-workload-candidates: dial (unavailable) after 10ms
+   302.5         2026-11-10T10:41:52.413058879Z capacity clusters changed; capacity restarts with the new set
+   302.5         2026-11-10T10:41:53.876332607Z capacity started with 1 regional clusters
+   302.5         2026-11-10T10:41:53.906353140Z capacity local observation capacity-namespace-candidates: dial (unavailable) after 30ms
+   302.5         2026-11-10T10:41:53.906374029Z capacity local discovery: steps=1 candidates=0 namespace-index=0 namespace-count=0 kind-index=0 workload-index=0 workload-count=0
+   302.5         2026-11-10T10:41:53.911565449Z capacity regional e2b88ff0-7407-4a1f-8a48-9d30a8a92bbc observation capacity-namespace-candidates: locate/open (unavailable) after 30ms
+   302.5         2026-11-10T10:41:53.911584575Z capacity regional e2b88ff0-7407-4a1f-8a48-9d30a8a92bbc discovery: steps=1 candidates=0 namespace-index=0 namespace-count=0 kind-index=0 workload-index=0 workload-count=0
+   302.5         2026-11-10T10:41:57.683566420Z capacity local observation capacity-namespace-candidates: verify (denied) after 2.74s
+   302.5         2026-11-10T10:41:59.144220354Z capacity local observation capacity-namespace-candidates: ok after 1.21s
+   302.5         2026-11-10T10:41:59.842087131Z capacity regional e2b88ff0-7407-4a1f-8a48-9d30a8a92bbc observation capacity-namespace-candidates: ok after 3.92s
+   302.5         2026-11-10T10:42:00.624832613Z capacity local observation capacity-workload-candidates: ok after 1.23s
+   302.5         2026-11-10T10:42:03.885126831Z capacity regional e2b88ff0-7407-4a1f-8a48-9d30a8a92bbc observation capacity-workload-candidates: ok after 2.04s
+   302.5         2026-11-10T10:42:07.990069791Z capacity regional e2b88ff0-7407-4a1f-8a48-9d30a8a92bbc observation capacity-guarded-workload: ok after 2.1s
+   302.5         2026-11-10T10:42:08.486493748Z capacity regional e2b88ff0-7407-4a1f-8a48-9d30a8a92bbc workload: ok after 2.6s
+   302.5         2026-11-10T10:42:12.550912682Z capacity regional e2b88ff0-7407-4a1f-8a48-9d30a8a92bbc observation capacity-workload-candidates: ok after 2.06s
+   302.5         2026-11-10T10:42:15.007755348Z capacity local observation capacity-namespace-guard: ok after 1.64s
+   302.5         2026-11-10T10:42:16.988701848Z capacity local observation capacity-workload: ok after 1.98s
+   302.5         2026-11-10T10:42:16.988787738Z capacity local workload: compose/permission-scope (not-allocated) after 3.63s
+   302.5         2026-11-10T10:42:18.638976325Z capacity local observation capacity-workload-candidates: ok after 1.15s
+   302.5         2026-11-10T10:42:20.259649080Z capacity local observation capacity-namespace-guard: ok after 1.36s
+   302.5         2026-11-10T10:42:21.889938202Z capacity local observation capacity-workload: ok after 1.63s
+   302.5         2026-11-10T10:42:24.088570959Z capacity local observation capacity-namespace-guard: ok after 1.94s
+   302.5         2026-11-10T10:42:25.190671928Z capacity regional e2b88ff0-7407-4a1f-8a48-9d30a8a92bbc observation capacity-workload-candidates: claim/post (unavailable) until-authority/registry-current=2026-11-10T10:42:29.451328Z after 510ms
+   302.5         2026-11-10T10:42:25.190684301Z capacity regional e2b88ff0-7407-4a1f-8a48-9d30a8a92bbc discovery: steps=9 candidates=1 namespace-index=1 namespace-count=10 kind-index=1 workload-index=0 workload-count=0
+   302.5         2026-11-10T10:42:25.190876901Z capacity local observation capacity-workload: post (unavailable) after 1.1s
+   302.5         2026-11-10T10:42:25.190884916Z capacity local workload: workload (unavailable) after 3.05s
+   302.5         2026-11-10T10:42:25.446740290Z capacity local discovery: steps=23 candidates=4 namespace-index=3 namespace-count=10 kind-index=0 workload-index=3 workload-count=5
+   302.5         2026-11-10T10:42:25.526894952Z capacity local observation capacity-namespace-guard: dial (unavailable) after 50ms
+   302.5         2026-11-10T10:42:25.526907866Z capacity local workload: guard-read (unavailable) after 80ms
+   302.5         2026-11-10T10:42:26.325827326Z capacity local observation capacity-workload-candidates: dial (unavailable) after 0s
+   302.5         2026-11-10T10:42:27.236953362Z capacity regional e2b88ff0-7407-4a1f-8a48-9d30a8a92bbc observation capacity-workload-candidates: routes (unavailable) after 40ms
+   302.5         2026-11-10T10:42:33.282209379Z capacity local observation capacity-workload-candidates: verify (denied) after 2.56s
+   302.5         2026-11-10T10:42:34.749679611Z capacity local observation capacity-workload-candidates: ok after 970ms
+   302.5         2026-11-10T10:42:37.353521099Z capacity regional e2b88ff0-7407-4a1f-8a48-9d30a8a92bbc observation capacity-workload-candidates: ok after 2.05s
+   302.5         2026-11-10T10:42:41.016160257Z capacity local observation capacity-namespace-guard: ok after 1.67s
+   302.5         2026-11-10T10:42:41.386395555Z capacity regional e2b88ff0-7407-4a1f-8a48-9d30a8a92bbc observation capacity-guarded-workload: ok after 2.03s
+   302.5         2026-11-10T10:42:41.392666011Z capacity regional e2b88ff0-7407-4a1f-8a48-9d30a8a92bbc workload: compose/permission-scope (not-allocated) after 2.04s
+   302.5         2026-11-10T10:42:42.456561618Z capacity local observation capacity-workload: refused (unavailable) after 1.44s
+   302.5         2026-11-10T10:42:42.456582166Z capacity local workload: workload (unavailable) after 3.12s
+   302.5         2026-11-10T10:42:43.978962271Z capacity local observation capacity-workload-candidates: ok after 1.27s
+   302.5         2026-11-10T10:42:45.529777906Z capacity regional e2b88ff0-7407-4a1f-8a48-9d30a8a92bbc observation capacity-workload-candidates: ok after 2.13s
+   302.5         2026-11-10T10:42:48.327605454Z capacity regional e2b88ff0-7407-4a1f-8a48-9d30a8a92bbc observation capacity-guarded-workload: ok after 2.38s
+   302.5         2026-11-10T10:42:48.466985582Z capacity demand refresh: ok after 2.52s, read left 2.62s [guarded-read=2.38s guarded-reconcile=140ms o-candidates@<100ms o-routes@<100ms o-locate@<1s c-open@<100ms c-before@<100ms c-post@<2s c-after@<100ms c-final@<100ms c-current@<100ms o-claim@<2s]
+   302.5         2026-11-10T10:42:49.918266915Z capacity local observation capacity-namespace-guard: ok after 1.94s
+   302.5         2026-11-10T10:42:51.221903216Z capacity local observation capacity-workload: ok after 1.3s
+   302.5         2026-11-10T10:42:51.224226299Z capacity local workload: compose/permission-scope (not-allocated) after 3.25s
+   302.5         2026-11-10T10:42:51.485196742Z capacity demand refresh: ok after 2.77s, read left 2.47s [guarded-read=2.53s guarded-reconcile=240ms o-candidates@<100ms o-routes@<100ms o-locate@<1s c-open@<100ms c-before@<100ms c-post@<2s c-after@<100ms c-final@<250ms c-current@<100ms o-claim@<2s]
+   302.5         2026-11-10T10:42:53.349579639Z capacity local observation capacity-workload-candidates: ok after 1.87s
+   302.5         2026-11-10T10:42:54.250998865Z capacity demand refresh: ok after 2.51s, read left 2.73s [guarded-read=2.27s guarded-reconcile=240ms o-candidates@<100ms o-routes@<100ms o-locate@<500ms c-open@<100ms c-before@<100ms c-post@<2s c-after@<100ms c-final@<100ms c-current@<100ms o-claim@<2s]
+   302.5         2026-11-10T10:42:56.214362799Z capacity local discovery: steps=59 candidates=8 namespace-index=9 namespace-count=10 kind-index=0 workload-index=0 workload-count=1
+   302.5         2026-11-10T10:42:56.881614091Z capacity demand refresh: ok after 2.38s, read left 2.76s [guarded-read=2.24s guarded-reconcile=140ms o-candidates@<100ms o-routes@<100ms o-locate@<500ms c-open@<100ms c-before@<100ms c-post@<2s c-after@<100ms c-final@<100ms c-current@<100ms o-claim@<2s]
+   302.5         2026-11-10T10:42:58.283785097Z capacity local observation capacity-namespace-guard: ok after 1.81s
+   302.5         2026-11-10T10:42:59.709451292Z capacity demand refresh: ok after 2.58s, read left 2.55s [guarded-read=2.45s guarded-reconcile=130ms o-candidates@<100ms o-routes@<100ms o-locate@<1s c-open@<100ms c-before@<100ms c-post@<2s c-after@<100ms c-final@<100ms c-current@<100ms o-claim@<2s]
+   302.5         2026-11-10T10:42:59.934635431Z capacity local observation capacity-workload: ok after 1.65s
+   302.5         2026-11-10T10:43:01.648373950Z capacity local observation capacity-workload-candidates: ok after 1.46s
+   302.5         2026-11-10T10:43:02.590238749Z capacity demand refresh: ok after 2.63s, read left 2.49s [guarded-read=2.5s guarded-reconcile=130ms o-candidates@<100ms o-routes@<100ms o-locate@<500ms c-open@<100ms c-before@<100ms c-post@<2s c-after@<100ms c-final@<100ms c-current@<100ms o-claim@<2s]
+   302.5         2026-11-10T10:43:05.002061963Z capacity local observation capacity-namespace-candidates: ok after 1.14s
+   302.5         2026-11-10T10:43:05.255973184Z capacity demand refresh: ok after 2.41s, read left 2.74s [guarded-read=2.26s guarded-reconcile=160ms o-candidates@<100ms o-routes@<100ms o-locate@<500ms c-open@<100ms c-before@<100ms c-post@<2s c-after@<100ms c-final@<100ms c-current@<100ms o-claim@<2s]
+   302.5         2026-11-10T10:43:06.249002652Z capacity local observation capacity-workload-candidates: ok after 1s
+   302.5     installed_focus_rerun_native_test.go:111: diagnostics: asservat-5cd22b6aa4ad4438838b4e4264793489-publisher pod asservat-5cd22b6aa4ad4438838b4e4264793489-publisher-799c59gt2c2 phase Running
+   302.5     installed_focus_rerun_native_test.go:111: diagnostics: asservat-5cd22b6aa4ad4438838b4e4264793489-publisher pod asservat-5cd22b6aa4ad4438838b4e4264793489-publisher-799c59gt2c2 container publisher ready true restarts 1 last "Error" exit 1 current termination unobserved
+   302.5     installed_focus_rerun_native_test.go:111: diagnostics: asservat-5cd22b6aa4ad4438838b4e4264793489-publisher-799c59gt2c2 previous=true log:
+   302.5         2026-11-10T10:41:39.239799136Z service stopped at publisher/catalog-changed (changed): protected configuration, credentials or original deadline unavailable
+   302.5     regional_install_native_test.go:852: connector pod connector-c8d855446-cl9pn ready=true restarts=0 waiting=false
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:41:34.978033002Z connector lifecycle enroll took 440ms, observer 68 calls
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:41:35.215197304Z connector node asservat-context-1m07k-tx-1-control-plane (uid fc4c06d9-15d7-46bd-b47b-637d9886b774) pod asservat-node-brvf8 epoch b87d20e3-0db7-4eb9-91f1-269a38f14a3f runtime "containerd://2.3.4": enrolled, no report yet
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:41:35.229505317Z connector node asservat-context-1m07k-tx-1-control-plane (uid fc4c06d9-15d7-46bd-b47b-637d9886b774) pod asservat-node-brvf8 epoch b87d20e3-0db7-4eb9-91f1-269a38f14a3f runtime "containerd://2.3.4": report 1 kernel 7.0.0-1017-azure btf supported tcx supported cgroup2 supported; packetCapture Available []; syscallTrace Available []; goProfile Available []
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:41:35.317172820Z connector lifecycle client-sign took 340ms, observer 68 calls
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:41:36.672688393Z connector lifecycle server-sign took 1.35s, observer 68 calls
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:41:36.967438311Z connector lifecycle registration took 10ms, observer 0 calls
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:41:36.978000191Z connector process credentials active
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:41:37.042513968Z regional capacity standby active
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:41:37.092257208Z connector lifecycle owner-observation-candidates took 50ms, observer 0 calls
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:41:37.092414262Z regional capacity standby: open (unavailable)
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:41:37.096629894Z regional capacity standby: open (unavailable)
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:41:37.158799895Z regional context start active
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:41:37.169064585Z connector lifecycle owner-candidates took 10ms, observer 0 calls
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:41:37.259056421Z connector lifecycle owner-authentication took 50ms, observer 0 calls
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:41:37.262451030Z regional context standby refused: open/headers (denied) (1), elapsed=90ms remaining=4.26s
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:41:37.342835563Z regional context standby refused: open/headers (denied) (2), elapsed=70ms remaining=4.18s
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:41:39.404267139Z regional context standby refused: open/headers (denied) (4), elapsed=60ms remaining=4.16s
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:41:43.505745592Z regional context standby refused: open/headers (denied) (8), elapsed=110ms remaining=4.2s
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:41:43.850527715Z regional kube opening: requests=601 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET namespaces]=126 [GET validatingadmissionpolicybindings]=88 [GET validatingadmissionpolicies]=88 [GET configmaps]=71 [POST selfsubjectreviews]=38 [GET pods]=29
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:41:43.850550407Z regional kube opening: guard checks: [current<readConfiguration]=20 [recheckNative<recheckProof]=16 [sourceBoundary<boundary]=12 [boundary<Read]=12 [currentValues<Read]=12 [readConfiguration<ReadConnectorIdentityConfiguration]=10
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:41:49.351158069Z regional context standby refused: open/headers (unavailable) (1), elapsed=60ms remaining=2.96s
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:41:51.335790331Z regional context standby refused: open/dial (unavailable) (1), elapsed=150ms remaining=4.55s
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:41:51.399096034Z regional context standby refused: open/dial (unavailable) (2), elapsed=50ms remaining=4.49s
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:41:53.371112571Z regional context standby refused: open/dial (unavailable) (4), elapsed=80ms remaining=4.71s
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:41:53.851028865Z regional kube opening: requests=296 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET namespaces]=70 [GET validatingadmissionpolicybindings]=44 [GET configmaps]=44 [GET validatingadmissionpolicies]=44 [GET secrets]=20 [POST selfsubjectreviews]=18
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:41:53.851058420Z regional kube opening: guard checks: [recheckNative<recheckProof]=20 [current<readConfiguration]=16 [readConfiguration<ReadConnectorIdentityConfiguration]=8
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:41:57.682853806Z regional capacity standby: open (denied)
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:41:57.684140933Z regional context standby refused: open/tls (denied) (1), elapsed=2.51s remaining=510ms
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:41:57.690430795Z regional capacity standby: open (denied)
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:41:57.804514061Z regional context standby refused: open/tls (denied) (2), elapsed=80ms remaining=3.37s
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:41:58.517097710Z connector lifecycle owner-registration took 10ms, observer 0 calls
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:41:58.556133601Z regional capacity native open: ok after 40ms, 19 calls
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:41:58.561386372Z regional capacity native read 1: ok after 0s, 3 calls
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:41:58.609644057Z regional capacity native read 2: ok after 0s, 3 calls
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:41:58.644787739Z regional capacity metadata capacity-namespace-candidates: ok after 0s, 1 calls
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:41:58.702589896Z regional capacity native read 3: ok after 0s, 3 calls
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:41:59.716861013Z regional capacity native read 4: ok after 50ms, 22 calls
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:42:02.627579966Z regional capacity native open: ok after 40ms, 19 calls
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:42:02.633053098Z regional capacity native read 1: ok after 0s, 3 calls
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:42:02.673217672Z regional capacity native read 2: ok after 0s, 3 calls
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:42:02.706503767Z regional capacity metadata capacity-workload-candidates: ok after 0s, 1 calls
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:42:02.763197405Z regional capacity native read 3: ok after 10ms, 3 calls
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:42:03.780421373Z regional capacity native read 4: ok after 40ms, 22 calls
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:42:03.851289468Z regional kube opening: requests=256 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET namespaces]=57 [GET validatingadmissionpolicybindings]=34 [GET validatingadmissionpolicies]=34 [GET configmaps]=30 [POST selfsubjectreviews]=16 [GET pods]=14
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:42:03.851313273Z regional kube opening: guard checks: [current<nativeBoundary]=8 [recheckNative<recheckProof]=8 [recheckNative<finishSetup]=4 [nativeBoundary<Begin]=4 [nativeBoundary<Read]=4 [current<readConfiguration]=4
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:42:06.687504269Z regional capacity native open: ok after 50ms, 19 calls
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:42:06.692945814Z regional capacity native read 1: ok after 0s, 3 calls
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:42:06.734011671Z regional capacity native read 2: ok after 10ms, 3 calls
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:42:06.800493402Z regional capacity metadata capacity-guarded-workload: ok after 30ms, 14 calls
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:42:06.862896922Z regional capacity native read 3: ok after 0s, 3 calls
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:42:07.839783033Z regional capacity native read 4: ok after 50ms, 22 calls
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:42:11.299057364Z regional capacity native open: ok after 40ms, 19 calls
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:42:11.306196593Z regional capacity native read 1: ok after 10ms, 3 calls
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:42:11.348104619Z regional capacity native read 2: ok after 0s, 3 calls
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:42:11.382608628Z regional capacity metadata capacity-workload-candidates: ok after 0s, 1 calls
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:42:11.449656017Z regional capacity native read 3: ok after 10ms, 3 calls
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:42:12.458547038Z regional capacity native read 4: ok after 40ms, 22 calls
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:42:13.850916318Z regional kube opening: requests=139 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET namespaces]=33 [GET validatingadmissionpolicybindings]=18 [GET validatingadmissionpolicies]=18 [GET configmaps]=12 [POST tokenreviews]=8 [GET pods]=8
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:42:13.850962935Z regional kube opening: guard checks: [current<nativeBoundary]=8 [nativeBoundary<Begin]=4 [nativeBoundary<Read]=4 [current<CapacityNamespaceProtection]=2
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:42:15.338373302Z regional capacity native open: ok after 40ms, 19 calls
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:42:15.343768666Z regional capacity native read 1: ok after 0s, 3 calls
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:42:15.383290194Z regional capacity native read 2: ok after 10ms, 3 calls
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:42:15.424560857Z regional capacity metadata capacity-workload-candidates: ok after 0s, 1 calls
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:42:15.485528392Z regional capacity native read 3: ok after 10ms, 3 calls
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:42:16.512020082Z regional capacity native read 4: ok after 60ms, 22 calls
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:42:18.171131392Z regional context standby refused: exchange/read/http2-internal (unavailable) (1)
+   302.6     regional_install_native_test.go:852: regional: 2026-11-10T10:42:19.945393738Z regional context standby refused: exch
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:41:34.978033002Z connector lifecycle enroll took 440ms, observer 68 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:41:35.215197304Z connector node asservat-context-1m07k-tx-1-control-plane (uid fc4c06d9-15d7-46bd-b47b-637d9886b774) pod asservat-node-brvf8 epoch b87d20e3-0db7-4eb9-91f1-269a38f14a3f runtime "containerd://2.3.4": enrolled, no report yet
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:41:35.229505317Z connector node asservat-context-1m07k-tx-1-control-plane (uid fc4c06d9-15d7-46bd-b47b-637d9886b774) pod asservat-node-brvf8 epoch b87d20e3-0db7-4eb9-91f1-269a38f14a3f runtime "containerd://2.3.4": report 1 kernel 7.0.0-1017-azure btf supported tcx supported cgroup2 supported; packetCapture Available []; syscallTrace Available []; goProfile Available []
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:41:35.317172820Z connector lifecycle client-sign took 340ms, observer 68 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:41:36.672688393Z connector lifecycle server-sign took 1.35s, observer 68 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:41:36.967438311Z connector lifecycle registration took 10ms, observer 0 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:41:36.978000191Z connector process credentials active
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:41:37.042513968Z regional capacity standby active
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:41:37.092257208Z connector lifecycle owner-observation-candidates took 50ms, observer 0 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:41:37.092414262Z regional capacity standby: open (unavailable)
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:41:37.096629894Z regional capacity standby: open (unavailable)
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:41:37.158799895Z regional context start active
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:41:37.169064585Z connector lifecycle owner-candidates took 10ms, observer 0 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:41:37.259056421Z connector lifecycle owner-authentication took 50ms, observer 0 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:41:37.262451030Z regional context standby refused: open/headers (denied) (1), elapsed=90ms remaining=4.26s
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:41:37.342835563Z regional context standby refused: open/headers (denied) (2), elapsed=70ms remaining=4.18s
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:41:39.404267139Z regional context standby refused: open/headers (denied) (4), elapsed=60ms remaining=4.16s
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:41:43.505745592Z regional context standby refused: open/headers (denied) (8), elapsed=110ms remaining=4.2s
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:41:43.850527715Z regional kube opening: requests=601 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET namespaces]=126 [GET validatingadmissionpolicybindings]=88 [GET validatingadmissionpolicies]=88 [GET configmaps]=71 [POST selfsubjectreviews]=38 [GET pods]=29
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:41:43.850550407Z regional kube opening: guard checks: [current<readConfiguration]=20 [recheckNative<recheckProof]=16 [sourceBoundary<boundary]=12 [boundary<Read]=12 [currentValues<Read]=12 [readConfiguration<ReadConnectorIdentityConfiguration]=10
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:41:49.351158069Z regional context standby refused: open/headers (unavailable) (1), elapsed=60ms remaining=2.96s
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:41:51.335790331Z regional context standby refused: open/dial (unavailable) (1), elapsed=150ms remaining=4.55s
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:41:51.399096034Z regional context standby refused: open/dial (unavailable) (2), elapsed=50ms remaining=4.49s
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:41:53.371112571Z regional context standby refused: open/dial (unavailable) (4), elapsed=80ms remaining=4.71s
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:41:53.851028865Z regional kube opening: requests=296 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET namespaces]=70 [GET validatingadmissionpolicybindings]=44 [GET configmaps]=44 [GET validatingadmissionpolicies]=44 [GET secrets]=20 [POST selfsubjectreviews]=18
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:41:53.851058420Z regional kube opening: guard checks: [recheckNative<recheckProof]=20 [current<readConfiguration]=16 [readConfiguration<ReadConnectorIdentityConfiguration]=8
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:41:57.682853806Z regional capacity standby: open (denied)
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:41:57.684140933Z regional context standby refused: open/tls (denied) (1), elapsed=2.51s remaining=510ms
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:41:57.690430795Z regional capacity standby: open (denied)
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:41:57.804514061Z regional context standby refused: open/tls (denied) (2), elapsed=80ms remaining=3.37s
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:41:58.517097710Z connector lifecycle owner-registration took 10ms, observer 0 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:41:58.556133601Z regional capacity native open: ok after 40ms, 19 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:41:58.561386372Z regional capacity native read 1: ok after 0s, 3 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:41:58.609644057Z regional capacity native read 2: ok after 0s, 3 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:41:58.644787739Z regional capacity metadata capacity-namespace-candidates: ok after 0s, 1 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:41:58.702589896Z regional capacity native read 3: ok after 0s, 3 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:41:59.716861013Z regional capacity native read 4: ok after 50ms, 22 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:02.627579966Z regional capacity native open: ok after 40ms, 19 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:02.633053098Z regional capacity native read 1: ok after 0s, 3 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:02.673217672Z regional capacity native read 2: ok after 0s, 3 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:02.706503767Z regional capacity metadata capacity-workload-candidates: ok after 0s, 1 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:02.763197405Z regional capacity native read 3: ok after 10ms, 3 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:03.780421373Z regional capacity native read 4: ok after 40ms, 22 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:03.851289468Z regional kube opening: requests=256 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET namespaces]=57 [GET validatingadmissionpolicybindings]=34 [GET validatingadmissionpolicies]=34 [GET configmaps]=30 [POST selfsubjectreviews]=16 [GET pods]=14
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:03.851313273Z regional kube opening: guard checks: [current<nativeBoundary]=8 [recheckNative<recheckProof]=8 [recheckNative<finishSetup]=4 [nativeBoundary<Begin]=4 [nativeBoundary<Read]=4 [current<readConfiguration]=4
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:06.687504269Z regional capacity native open: ok after 50ms, 19 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:06.692945814Z regional capacity native read 1: ok after 0s, 3 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:06.734011671Z regional capacity native read 2: ok after 10ms, 3 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:06.800493402Z regional capacity metadata capacity-guarded-workload: ok after 30ms, 14 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:06.862896922Z regional capacity native read 3: ok after 0s, 3 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:07.839783033Z regional capacity native read 4: ok after 50ms, 22 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:11.299057364Z regional capacity native open: ok after 40ms, 19 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:11.306196593Z regional capacity native read 1: ok after 10ms, 3 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:11.348104619Z regional capacity native read 2: ok after 0s, 3 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:11.382608628Z regional capacity metadata capacity-workload-candidates: ok after 0s, 1 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:11.449656017Z regional capacity native read 3: ok after 10ms, 3 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:12.458547038Z regional capacity native read 4: ok after 40ms, 22 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:13.850916318Z regional kube opening: requests=139 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET namespaces]=33 [GET validatingadmissionpolicybindings]=18 [GET validatingadmissionpolicies]=18 [GET configmaps]=12 [POST tokenreviews]=8 [GET pods]=8
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:13.850962935Z regional kube opening: guard checks: [current<nativeBoundary]=8 [nativeBoundary<Begin]=4 [nativeBoundary<Read]=4 [current<CapacityNamespaceProtection]=2
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:15.338373302Z regional capacity native open: ok after 40ms, 19 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:15.343768666Z regional capacity native read 1: ok after 0s, 3 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:15.383290194Z regional capacity native read 2: ok after 10ms, 3 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:15.424560857Z regional capacity metadata capacity-workload-candidates: ok after 0s, 1 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:15.485528392Z regional capacity native read 3: ok after 10ms, 3 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:16.512020082Z regional capacity native read 4: ok after 60ms, 22 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:18.171131392Z regional context standby refused: exchange/read/http2-internal (unavailable) (1)
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:19.945393738Z regional context standby refused: exchange/read/http2-internal (unavailable) (2)
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:21.438057497Z regional capacity native open: ok after 60ms, 19 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:21.446891515Z regional capacity native read 1: ok after 10ms, 3 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:21.497542543Z regional capacity native read 2: ok after 10ms, 3 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:21.551507061Z regional capacity metadata capacity-workload-candidates: ok after 0s, 1 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:21.642692661Z regional capacity native read 3: ok after 10ms, 3 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:22.578446348Z regional capacity native read 4: ok after 50ms, 22 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:23.850994970Z regional kube opening: requests=261 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET namespaces]=57 [GET validatingadmissionpolicies]=34 [GET validatingadmissionpolicybindings]=34 [GET configmaps]=29 [POST selfsubjectreviews]=17 [GET pods]=15
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:23.851042339Z regional kube opening: guard checks: [current<nativeBoundary]=8 [current<produceProof]=4 [recheckNative<finishSetup]=4 [nativeBoundary<Begin]=4 [nativeBoundary<Read]=4 [current<readConfiguration]=4
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:25.183051591Z regional capacity standby: serve/receive (unavailable) after 2.56s
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:25.186106298Z regional capacity standby: serve/receive (unavailable) after 21.36s
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:25.186266988Z regional context standby refused: exchange/read/short-read (unavailable) (1)
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:25.186275113Z regional context standby refused: exchange/read/short-read (unavailable) (2)
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:25.235147066Z regional capacity standby: open (unavailable)
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:25.235182922Z regional capacity standby: open (unavailable)
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:27.320489829Z regional context standby refused: open/dial (unavailable) (8), elapsed=60ms remaining=2.96s
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:30.461111298Z regional context standby refused: open/dial (unavailable) (16), elapsed=30ms remaining=4.14s
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:33.280763400Z regional capacity standby: open (denied)
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:33.280790752Z regional capacity standby: open (denied)
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:33.280796282Z regional context standby refused: open/tls (denied) (4), elapsed=1.1s remaining=1.91s
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:33.850831947Z regional kube opening: requests=360 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET namespaces]=82 [GET validatingadmissionpolicies]=52 [GET validatingadmissionpolicybindings]=52 [GET configmaps]=52 [GET secrets]=28 [POST selfsubjectreviews]=22
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:33.850861472Z regional kube opening: guard checks: [recheckNative<recheckProof]=24 [current<readConfiguration]=16 [readConfiguration<ReadConnectorIdentityConfiguration]=8 [recheckNative<finishSetup]=4
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:36.080524659Z regional capacity native open: ok after 40ms, 19 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:36.087912419Z regional capacity native read 1: ok after 10ms, 3 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:36.180904502Z regional capacity native read 2: ok after 10ms, 3 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:36.247788239Z regional capacity metadata capacity-workload-candidates: ok after 0s, 1 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:36.352966708Z regional capacity native read 3: ok after 10ms, 3 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:37.243243154Z regional capacity native read 4: ok after 50ms, 22 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:40.140958111Z regional capacity native open: ok after 40ms, 19 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:40.145958190Z regional capacity native read 1: ok after 0s, 3 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:40.190654412Z regional capacity native read 2: ok after 10ms, 3 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:40.257802563Z regional capacity metadata capacity-guarded-workload: ok after 20ms, 13 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:40.323163207Z regional capacity native read 3: ok after 10ms, 3 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:40.824484754Z regional target answer: answer (1), r-local@<100ms r-owner@<100ms r-check@<250ms r-resolve@<100ms r-write@<100ms
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:41.295639452Z regional capacity native read 4: ok after 40ms, 22 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:42.072207427Z regional target answer: answer (2), r-local@<100ms r-owner@<100ms r-check@<100ms r-resolve@<100ms r-write@<100ms
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:43.850919392Z regional kube opening: requests=283 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET namespaces]=70 [GET validatingadmissionpolicies]=39 [GET validatingadmissionpolicybindings]=39 [GET configmaps]=33 [POST selfsubjectreviews]=16 [GET pods]=14
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:43.850977240Z regional kube opening: guard checks: [current<readConfiguration]=10 [current<nativeBoundary]=8 [recheckNative<recheckProof]=6 [readConfiguration<ReadConnectorIdentityConfiguration]=5 [nativeBoundary<Read]=4 [nativeBoundary<Begin]=4
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:44.341955677Z regional capacity native open: ok after 80ms, 19 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:44.350266056Z regional capacity native read 1: ok after 10ms, 3 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:44.438407018Z regional capacity native read 2: ok after 10ms, 3 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:44.485424379Z regional capacity metadata capacity-workload-candidates: ok after 0s, 1 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:44.617793640Z regional capacity native read 3: ok after 10ms, 3 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:45.421214692Z regional capacity native read 4: ok after 60ms, 22 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:45.810818026Z regional target answer: answer (4), r-local@<250ms r-owner@<100ms r-check@<250ms r-resolve@<100ms r-write@<100ms
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:47.058789976Z regional capacity native open: ok after 40ms, 19 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:47.065158695Z regional capacity native read 1: ok after 10ms, 3 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:47.107414877Z regional capacity native read 2: ok after 10ms, 3 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:47.180473306Z regional capacity metadata capacity-guarded-workload: ok after 40ms, 13 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:47.266232465Z regional capacity native read 3: ok after 10ms, 3 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:48.214009367Z regional capacity native read 4: ok after 50ms, 22 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:49.864871226Z regional capacity native open: ok after 40ms, 19 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:49.870776628Z regional capacity native read 1: ok after 10ms, 3 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:49.912187007Z regional capacity native read 2: ok after 10ms, 3 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:49.972806123Z regional capacity metadata capacity-guarded-workload: ok after 20ms, 13 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:50.034866147Z regional capacity native read 3: ok after 10ms, 3 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:51.032397883Z regional capacity native read 4: ok after 60ms, 22 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:51.284892656Z connector lifecycle recovery took 10ms, observer 0 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:51.343883703Z regional target answer: answer (8), r-local@<100ms r-owner@<100ms r-check@<250ms r-resolve@<100ms r-write@<100ms
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:52.680885580Z regional capacity native open: ok after 60ms, 19 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:52.687778466Z regional capacity native read 1: ok after 10ms, 3 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:52.751814372Z regional capacity native read 2: ok after 10ms, 3 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:52.831210557Z regional capacity metadata capacity-guarded-workload: ok after 40ms, 13 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:52.925147533Z regional capacity native read 3: ok after 10ms, 3 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:53.851830369Z regional kube opening: requests=713 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET namespaces]=166 [GET validatingadmissionpolicybindings]=94 [GET validatingadmissionpolicies]=94 [GET configmaps]=78 [POST selfsubjectreviews]=42 [GET deployments]=40
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:53.851858812Z regional kube opening: guard checks: [recheckNative<recheckProof]=26 [current<nativeBoundary]=16 [current<readConfiguration]=12 [nativeBoundary<Begin]=8 [nativeBoundary<Read]=8 [current<CapacityNamespaceProtection]=6
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:53.856074259Z regional capacity native read 4: ok after 80ms, 22 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:53.961958240Z regional target answer: answer (16), r-local@<500ms r-owner@<100ms r-check@<500ms r-resolve@<100ms r-write@<100ms
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:54.181181851Z regional context standby refused: exchange/read/http2-internal (unavailable) (4)
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:55.499795708Z regional capacity native open: ok after 80ms, 19 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:55.512563530Z regional capacity native read 1: ok after 10ms, 3 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:55.590780734Z regional capacity native read 2: ok after 10ms, 3 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:55.667630853Z regional capacity metadata capacity-guarded-workload: ok after 20ms, 13 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:55.750893508Z regional capacity native read 3: ok after 10ms, 3 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:56.625975380Z regional capacity native read 4: ok after 50ms, 22 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:58.297256547Z regional capacity native open: ok after 60ms, 19 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:58.304178378Z regional capacity native read 1: ok after 10ms, 3 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:58.360791388Z regional capacity native read 2: ok after 10ms, 3 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:58.453897405Z regional capacity metadata capacity-guarded-workload: ok after 30ms, 13 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:58.510646870Z regional capacity native read 3: ok after 10ms, 3 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:58.678525442Z regional target answer: answer (32), r-local@<250ms r-owner@<100ms r-check@<500ms r-resolve@<100ms r-write@<100ms
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:42:59.467541339Z regional capacity native read 4: ok after 100ms, 22 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:43:01.092208663Z regional capacity native open: ok after 70ms, 19 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:43:01.100797556Z regional capacity native read 1: ok after 10ms, 3 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:43:01.148012257Z regional capacity native read 2: ok after 0s, 3 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:43:01.221180883Z regional capacity metadata capacity-guarded-workload: ok after 30ms, 13 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:43:01.296036948Z regional capacity native read 3: ok after 10ms, 3 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:43:02.285405865Z regional capacity native read 4: ok after 90ms, 22 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:43:03.391400163Z regional context standby refused: exchange/read/http2-internal (unavailable) (8)
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:43:03.850840975Z regional kube opening: requests=823 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET namespaces]=185 [GET validatingadmissionpolicybindings]=114 [GET validatingadmissionpolicies]=114 [GET configmaps]=100 [GET secrets]=54 [POST selfsubjectreviews]=50
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:43:03.851012135Z regional kube opening: guard checks: [recheckNative<recheckProof]=46 [current<readConfiguration]=18 [current<nativeBoundary]=14 [readConfiguration<ReadConnectorIdentityConfiguration]=9 [recheckNative<finishSetup]=8 [nativeBoundary<Begin]=7
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:43:03.870788883Z regional capacity native open: ok after 40ms, 19 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:43:03.879664192Z regional capacity native read 1: ok after 10ms, 3 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:43:03.930689157Z regional capacity native read 2: ok after 0s, 3 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:43:03.979995311Z regional context standby refused: open/tls (denied) (8), elapsed=570ms remaining=3.1s
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:43:04.009361018Z regional capacity metadata capacity-guarded-workload: ok after 40ms, 13 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:43:04.028257809Z regional context standby refused: open/setup-begin (unavailable) (1), elapsed=20ms remaining=4.63s
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:43:04.050951702Z regional context standby refused: candidates (hub-channel) (1)
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:43:04.114158375Z regional context standby refused: open/source (unavailable) (1), elapsed=710ms remaining=2.96s
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:43:04.154321822Z regional capacity native read 3: ok after 10ms, 3 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:43:05.002942019Z regional capacity native read 4: ok after 40ms, 22 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:43:06.678636931Z regional capacity native open: ok after 60ms, 19 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:43:06.703982961Z regional capacity native read 1: ok after 30ms, 3 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:43:06.789611580Z regional capacity native read 2: ok after 10ms, 3 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:43:06.858277812Z regional capacity metadata capacity-guarded-workload: ok after 20ms, 13 calls
+   302.8     regional_install_native_test.go:852: regional: 2026-11-10T10:43:06.919243971Z regional capacity native read 3: ok after 0s, 3 calls
+   303.0     initial_bootstrap_chain_test.go:406: focused live-observation run complete: the second workload cluster and replay checks were not run
+   303.0     installer_continuation_native_test.go:1047: continuation 2cc7ecb0-99f5-4460-82c8-cbcf90b5ea4b produce 
+   303.0     installer_continuation_native_test.go:1047: continuation 2cc7ecb0-99f5-4460-82c8-cbcf90b5ea4b schema 
+   303.2     installer_continuation_native_test.go:1047: continuation 2cc7ecb0-99f5-4460-82c8-cbcf90b5ea4b prepare 
+   303.4     installer_continuation_native_test.go:1047: continuation 2cc7ecb0-99f5-4460-82c8-cbcf90b5ea4b retire 
+   303.6     installer_continuation_native_test.go:1047: continuation 2cc7ecb0-99f5-4460-82c8-cbcf90b5ea4b continue installer continuation: resources/audit-secrets done in 7ms
+   303.6         installer continuation: resources/audit-secrets kubernetes requests=139 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET configmaps]=30 [GET validatingadmissionpolicies]=25 [GET validatingadmissionpolicybindings]=22 [POST selfsubjectreviews]=16 [GET namespaces]=14 [GET serviceaccounts]=7
+   303.6         installer continuation: resources/audit-secrets guard checks: [current<currentHandoverWithFinal]=12 [stagingHandover<currentHandoverWithFinal]=6 [current<current]=2 [currentPublic<ReadToken]=2
+   303.6         installer continuation: resources/producer done in 44ms
+   303.6         installer continuation: resources/producer kubernetes requests=32 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET validatingadmissionpolicies]=7 [GET validatingadmissionpolicybindings]=6 [GET configmaps]=5 [POST selfsubjectreviews]=4 [GET namespaces]=3 [PUT configmaps]=2
+   303.6         installer continuation: resources/producer guard checks: [current<currentHandoverWithFinal]=4 [stagingHandover<currentHandoverWithFinal]=2
+   303.6         installer continuation: resources/journal done in 145ms
+   303.6         installer continuation: resources/journal kubernetes requests=98 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET validatingadmissionpolicies]=21 [GET validatingadmissionpolicybindings]=18 [GET configmaps]=15 [POST selfsubjectreviews]=12 [GET namespaces]=9 [GET secrets]=7
+   303.6         installer continuation: resources/journal guard checks: [current<currentHandoverWithFinal]=12 [stagingHandover<currentHandoverWithFinal]=6
+   303.6         installer continuation: resources/advance done in 1.435s
+   303.6         installer continuation: resources/advance kubernetes requests=160 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [PUT secrets]=38 [GET secrets]=24 [GET validatingadmissionpolicies]=16 [GET validatingadmissionpolicybindings]=14 [GET configmaps]=11 [POST selfsubjectreviews]=8
+   303.6         installer continuation: resources/advance guard checks: [current<currentHandoverWithFinal]=8 [stagingHandover<currentHandoverWithFinal]=4
+   303.6         installer continuation: resources/inventory done in 247ms
+   303.6         installer continuation: resources/inventory kubernetes requests=33 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET validatingadmissionpolicies]=7 [GET validatingadmissionpolicybindings]=6 [GET configmaps]=5 [POST selfsubjectreviews]=4 [GET namespaces]=3 [GET secrets]=3
+   303.6         installer continuation: resources/inventory guard checks: [current<currentHandoverWithFinal]=4 [stagingHandover<currentHandoverWithFinal]=2
+   303.6         installer continuation: resources/release-record done in 3ms
+   303.6         installer continuation: bridge/observer done in 30ms
+   303.6         installer continuation: bridge/protection done in 1ms
+   303.6         installer continuation: bridge/source done in 0s
+   303.6         installer continuation: bridge/journal done in 220ms
+   303.6         installer continuation: bridge/journal kubernetes requests=57 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET validatingadmissionpolicybindings]=13 [GET validatingadmissionpolicies]=13 [POST selfsubjectreviews]=8 [GET configmaps]=7 [GET namespaces]=5 [POST selfsubjectaccessreviews]=4
+   303.6         installer continuation: bridge/journal guard checks: [current<currentHandoverWithFinal]=4 [configurationRoleGuardVersions<func1]=3 [current<newInitialRuntimeBridge]=2 [current<readCurrent]=2 [stagingHandover<currentHandoverWithFinal]=2
+   303.6         installer continuation: bridge/probe done in 1.953s
+   303.6         installer continuation: bridge/probe kubernetes requests=296 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET validatingadmissionpolicies]=64 [GET validatingadmissionpolicybindings]=56 [POST selfsubjectreviews]=46 [GET namespaces]=31 [GET configmaps]=30 [GET serviceaccounts]=19
+   303.6         installer continuation: bridge/probe guard checks: [current<currentHandoverWithFinal]=20 [configurationRoleGuardVersions<readConfigurationRoleSource]=12 [stagingHandover<currentHandoverWithFinal]=10 [current<readCurrent]=8 [configurationRoleGuardVersions<current]=6
+   303.6         installer continuation: bridge/retained done in 660ms
+   303.6         installer continuation: bridge/retained kubernetes requests=252 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET validatingadmissionpolicies]=46 [POST selfsubjectreviews]=40 [GET validatingadmissionpolicybindings]=40 [GET namespaces]=33 [GET configmaps]=28 [GET serviceaccounts]=19
+   303.6         installer continuation: bridge/retained guard checks: [current<currentHandoverWithFinal]=12 [configurationRoleGuardVersions<recheckConfigurationRoleSource]=12 [stagingHandover<currentHandoverWithFinal]=6 [configurationRoleGuardVersions<readConfigurationRoleSource]=6 [current<readCurrent]=4
+   303.6         installer continuation: bridge/settle done in 3.021s
+   303.6         installer continuation: worker/configuration-documents done in 1ms
+   303.6         installer continuation: worker/outbox done in 5ms
+   303.6         installer continuation: worker/inbox done in 2.005s
+   303.6         installer continuation: worker/inspection done in 0s
+   303.6         installer continuation: worker/audit-secret done in 4ms
+   303.6         installer continuation: worker/roles-root done in 0s
+   303.6         installer continuation: worker/roles-sql done in 11ms
+   303.6         installer continuation: worker/roles-provision done in 3.38s
+   303.6         installer continuation: worker/roles-provision kubernetes requests=339 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET namespaces]=68 [GET validatingadmissionpolicies]=48 [GET validatingadmissionpolicybindings]=48 [GET configmaps]=42 [POST selfsubjectreviews]=32 [POST selfsubjectaccessreviews]=24
+   303.6         installer continuation: worker/roles-provision guard checks: [configurationRoleGuardVersions<readConfigurationRoleSource]=30 [configurationRoleGuardVersions<recheckConfigurationRoleSource]=18
+   303.6         installer continuation: worker/roles-projection done in 1.305s
+   303.6         installer continuation: worker/roles-projection kubernetes requests=85 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET namespaces]=16 [GET validatingadmissionpolicies]=12 [GET validatingadmissionpolicybindings]=12 [GET configmaps]=10 [POST selfsubjectreviews]=8 [POST selfsubjectaccessreviews]=6
+   303.6         installer continuation: worker/roles-projection guard checks: [configurationRoleGuardVersions<readConfigurationRoleSource]=6 [configurationRoleGuardVersions<recheckConfigurationRoleSource]=6
+   303.6         installer continuation: worker/inputs done in 4ms
+   303.6         installer continuation: worker/inputs-complete done in 3.061s
+   303.6         installer continuation: worker/inputs-complete kubernetes requests=323 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET validatingadmissionpolicies]=62 [GET validatingadmissionpolicybindings]=54 [GET configmaps]=40 [POST selfsubjectreviews]=36 [GET secrets]=32 [GET namespaces]=22
+   303.6         installer continuation: worker/inputs-complete guard checks: [configurationRoleGuardVersions<readConfigurationWorkerNative]=24 [current<currentHandoverWithFinal]=16 [stagingHandover<currentHandoverWithFinal]=8 [configurationRoleGuardVersions<readConfigurationWorkerCurrent]=6
+   303.6         installer continuation: worker/launch done in 3.1s
+   303.6         installer continuation: worker/launch kubernetes requests=325 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET validatingadmissionpolicies]=62 [GET validatingadmissionpolicybindings]=54 [GET configmaps]=42 [POST selfsubjectreviews]=36 [GET secrets]=32 [GET namespaces]=22
+   303.6         installer continuation: worker/launch guard checks: [configurationRoleGuardVersions<readConfigurationWorkerNative]=24 [current<currentHandoverWithFinal]=16 [stagingHandover<currentHandoverWithFinal]=8 [configurationRoleGuardVersions<readConfigurationWorkerCurrent]=6
+   303.6         installer continuation: public/sources done in 12ms
+   303.6         installer continuation: owner/accepted-source done in 6.051s
+   303.6         installer continuation: public/roles-binding done in 61ms
+   303.6         installer continuation: public/roles-binding kubernetes requests=32 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET validatingadmissionpolicies]=8 [GET validatingadmissionpolicybindings]=6 [POST selfsubjectreviews]=4 [GET configmaps]=4 [GET namespaces]=3 [POST selfsubjectaccessreviews]=2
+   303.6         installer continuation: public/roles-binding guard checks: [current<currentHandoverWithFinal]=4 [stagingHandover<currentHandoverWithFinal]=2
+   303.6         installer continuation: public/roles-root done in 0s
+   303.6         installer continuation: public/roles-sql done in 18ms
+   303.6         installer continuation: public/roles-provision done in 4.699s
+   303.6         installer continuation: public/roles-provision kubernetes requests=313 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET secrets]=152 [PUT secrets]=86 [GET deployments]=21 [POST selfsubjectreviews]=11 [GET configmaps]=10 [GET leases]=10
+   303.6         installer continuation: public/roles-provision guard checks: [current<reused]=2 [WithPublicRoleOperation<Provision]=2
+   303.6         installer continuation: public/roles-projection done in 948ms
+   303.6         installer continuation: public/roles-projection kubernetes requests=72 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET secrets]=16 [GET deployments]=12 [POST selfsubjectreviews]=6 [GET leases]=6 [GET configmaps]=6 [GET serviceaccounts]=6
+   303.6         installer continuation: public/roles-projection guard checks: [current<publishProjection]=5 [WithPublicRoleOperation<func2]=1
+   303.6         installer continuation: owner/roles done in 1.366s
+   303.6         installer continuation: owner/roles kubernetes requests=162 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET validatingadmissionpolicies]=33 [GET validatingadmissionpolicybindings]=27 [POST selfsubjectreviews]=25 [GET configmaps]=18 [GET namespaces]=12 [POST selfsubjectaccessreviews]=10
+   303.6         installer continuation: owner/roles guard checks: [configurationRoleGuardVersions<readConfigurationWorkerNative]=12 [current<currentHandoverWithFinal]=8 [stagingHandover<currentHandoverWithFinal]=4 [configurationRoleGuardVersions<readConfigurationWorkerCurrent]=3
+   303.6         installer continuation: owner/roles-sql done in 14ms
+   303.6         installer continuation: owner/selection done in 0s
+   303.6         installer continuation: owner/selection-complete done in 4.206s
+   303.6         installer continuation: owner/selection-complete kubernetes requests=493 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET validatingadmissionpolicies]=99 [GET validatingadmissionpolicybindings]=81 [POST selfsubjectreviews]=75 [GET configmaps]=57 [GET namespaces]=36 [GET serviceaccounts]=30
+   303.6         installer continuation: owner/selection-complete guard checks: [configurationRoleGuardVersions<readConfigurationWorkerNative]=36 [current<currentHandoverWithFinal]=24 [stagingHandover<currentHandoverWithFinal]=12 [configurationRoleGuardVersions<readConfigurationWorkerCurrent]=9
+   303.6         installer continuation: downloads/workers done in 635ms
+   303.6         installer continuation: permission/guard done in 11ms
+   303.6         installer continuation: retention/guard done in 5ms
+   303.6         installer continuation: permission/projection done in 644ms
+   303.6         installer continuation: permission/projection kubernetes requests=49 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET validatingadmissionpolicies]=10 [GET validatingadmissionpolicybindings]=7 [GET secrets]=7 [POST selfsubjectreviews]=5 [GET configmaps]=5 [GET namespaces]=3
+   303.6         installer continuation: permission/projection guard checks: [current<currentHandoverWithFinal]=4 [stagingHandover<currentHandoverWithFinal]=2 [WithPublicRoleOperation<func1]=1
+   303.6         installer continuation: capacity/sources done in 240ms
+   303.6         installer continuation: capacity/proofs done in 1.118s
+   303.6         installer continuation: capacity/proofs kubernetes requests=76 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET namespaces]=14 [GET validatingadmissionpolicies]=12 [GET validatingadmissionpolicybindings]=12 [GET serviceaccounts]=10 [POST selfsubjectaccessreviews]=10 [POST selfsubjectreviews]=7
+   303.6         installer continuation: capacity/proofs guard checks: [current<CapacityProtection]=6 [current<CapacityNamespaceProtection]=4 [current<ProveCapacitySources]=2
+   303.6         installer continuation: capacity/qualification done in 57ms
+   303.6         installer continuation: capacity/qualification kubernetes requests=30 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET secrets]=5 [GET deployments]=4 [GET serviceaccounts]=4 [POST selfsubjectreviews]=3 [GET configmaps]=2 [GET leases]=2
+   303.6         installer continuation: capacity/qualification guard checks: [current<CapacityProtection]=2
+   303.6         installer continuation: capacity/initialize done in 13.666s
+   303.6         installer continuation: capacity/initialize kubernetes requests=658 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET secrets]=83 [GET validatingadmissionpolicybindings]=81 [GET validatingadmissionpolicies]=81 [GET serviceaccounts]=81 [GET namespaces]=56 [GET deployments]=55
+   303.6         installer continuation: capacity/initialize guard checks: [current<CapacityProtection]=54 [WithPublicRoleOperation<func2]=25 [current<reused]=2
+   303.6         installer continuation: federation/projection done in 735ms
+   303.6         installer continuation: federation/projection kubernetes requests=72 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET secrets]=16 [GET deployments]=12 [POST selfsubjectreviews]=6 [GET serviceaccounts]=6 [GET leases]=6 [GET validatingadmissionpolicybindings]=6
+   303.6         installer continuation: federation/projection guard checks: [current<publishProjection]=5 [WithPublicRoleOperation<func1]=1
+   303.6         installer continuation: federation/identity done in 43ms
+   303.6         installer continuation: federation/identity kubernetes requests=17 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET secrets]=5 [GET deployments]=4 [POST selfsubjectreviews]=2 [GET configmaps]=2 [GET serviceaccounts]=2 [GET leases]=2
+   303.6         installer continuation: publisher/identity done in 7ms
+   303.6         installer continuation: public/download-sources done in 0s
+   303.6         installer continuation: public/sources done in 24ms
+   303.6         installer continuation: capacity/local-observation done in 1.141s
+   303.6         installer continuation: capacity/local-observation kubernetes requests=166 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET validatingadmissionpolicies]=33 [GET validatingadmissionpolicybindings]=27 [POST selfsubjectreviews]=25 [GET configmaps]=20 [GET namespaces]=12 [POST selfsubjectaccessreviews]=10
+   303.6         installer continuation: capacity/local-observation guard checks: [configurationRoleGuardVersions<readConfigurationWorkerNative]=12 [current<currentHandoverWithFinal]=8 [stagingHandover<currentHandoverWithFinal]=4 [configurationRoleGuardVersions<readConfigurationWorkerCurrent]=3
+   303.6         installer continuation: owner/outbox done in 16ms
+   303.6         installer continuation: owner/inbox done in 4.011s
+   303.6         installer continuation: owner/audit-secret done in 4ms
+   303.6         installer continuation: federation/audit-secret done in 4ms
+   303.6         installer continuation: federation/verify done in 42ms
+   303.6         installer continuation: public/readback done in 32ms
+   303.6         installer continuation: downloads/store done in 5ms
+   303.6         installer continuation: downloads/control done in 5ms
+   303.6         installer continuation: downloads/profile done in 4ms
+   303.6         installer continuation: public/derive done in 2ms
+   303.6         installer continuation: public/observation-projection done in 5ms
+   303.6         installer continuation: public/operator-secret done in 3ms
+   303.6         installer continuation: publisher/credentials done in 8ms
+   303.6         installer continuation: publisher/verify done in 28ms
+   303.6         installer continuation: deletion/credential done in 3ms
+   303.6         installer continuation: deletion/verify done in 2ms
+   303.6         installer continuation: downloads/accepted done in 4.012s
+   303.6         installer continuation: owner/projection done in 3ms
+   303.6         installer continuation: owner/installation done in 5.385s
+   303.6         installer continuation: owner/installation kubernetes requests=827 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET secrets]=212 [GET validatingadmissionpolicies]=178 [GET configmaps]=94 [POST selfsubjectreviews]=72 [GET validatingadmissionpolicybindings]=72 [GET deployments]=65
+   303.6         installer continuation: owner/installation guard checks: [configurationRoleGuardVersions<readConfigurationWorkerNative]=36 [current<currentHandoverWithFinal]=24 [stagingHandover<currentHandoverWithFinal]=12
+   303.6         installer continuation: public/exposure done in 16ms
+   303.6         installer continuation: capacity/projection done in 1.393s
+   303.6         installer continuation: capacity/projection kubernetes requests=106 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET validatingadmissionpolicies]=19 [GET configmaps]=17 [GET namespaces]=14 [GET validatingadmissionpolicybindings]=13 [GET secrets]=9 [POST selfsubjectreviews]=9
+   303.6         installer continuation: capacity/projection guard checks: [current<currentHandoverWithFinal]=8 [stagingHandover<currentHandoverWithFinal]=4 [WithPublicRoleOperation<func1]=1
+   303.6         installer continuation: federation/serving done in 3ms
+   303.6         installer continuation: federation/workload done in 327ms
+   303.6         installer continuation: federation/settle done in 2.035s
+   303.6         installer continuation: federation/offer done in 0s
+   303.6         installer continuation: federation/owner-exposure done in 18ms
+   303.6         installer continuation: key-service/projection done in 740ms
+   303.6         installer continuation: key-service/projection kubernetes requests=72 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET secrets]=16 [GET deployments]=12 [GET configmaps]=6 [GET serviceaccounts]=6 [GET leases]=6 [GET validatingadmissionpolicies]=6
+   303.6         installer continuation: key-service/projection guard checks: [current<publishProjection]=5 [WithPublicRoleOperation<func1]=1
+   303.6         installer continuation: back up Secret bootstrap-chain-10000000-target/asservat-5cd22b6aa4ad4438838b4e4264793489-key-service-root-v1; stored artifacts are unreadable without it
+   303.6         installer continuation: key-service/root done in 11ms
+   303.6         installer continuation: key-service/serving done in 2ms
+   303.6         installer continuation: key-service/workload done in 327ms
+   303.6         installer continuation: key-service/settle done in 2.009s
+   303.6         installer continuation: publisher/projection done in 757ms
+   303.6         installer continuation: publisher/projection kubernetes requests=72 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET secrets]=16 [GET deployments]=12 [POST selfsubjectreviews]=6 [GET serviceaccounts]=6 [GET validatingadmissionpolicybindings]=6 [GET configmaps]=6
+   303.6         installer continuation: publisher/projection guard checks: [current<publishProjection]=5 [WithPublicRoleOperation<func1]=1
+   303.6         installer continuation: publisher/workload done in 323ms
+   303.6         installer continuation: publisher/settle done in 2.013s
+   303.6         installer continuation: federation/executor-offer done in 4ms
+   303.6         installer continuation: retention/first-acceptance done in 8ms
+   303.6         
+   305.3     installed_approved_recording_native_test.go:259: collector diagnostics: [pod/asservat-node-brvf8/node] node collector probe: kernel 7.0.0-1017-azure; btf supported; cgroup2 supported; bpf supported; tcx supported; tc supported; tracefs supported; hostpid supported; runtime containerd; engine linked=true initialized=true v0.57.0; packetCapture Available prerequisites=true hook="tc" []; syscallTrace Available prerequisites=true hook="" []; goProfile Available prerequisites=true hook="" []
+   305.3         [pod/asservat-node-brvf8/node] node collector ring medium: encrypted disk available=false removedEarlier=0
+   305.3         [pod/asservat-node-brvf8/node] node collector enrolled: node asservat-context-1m07k-tx-1-control-plane, epoch b87d20e3-0db7-4eb9-91f1-269a38f14a3f, certificate until 2026-11-10T11:01:35Z
+   305.5 === RUN   TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation
+   309.2 === NAME  TestInitialBootstrapChainWithRealServices
+   309.2     initial_bootstrap_chain_test.go:444: actual fresh unified five-command runner, original activation/retirement and managed copy closure; original SQL/operator inputs retained for continuation; installed/resume results reported by installer-continuation
+   309.2     installer_continuation_native_test.go:1047: continuation 2cc7ecb0-99f5-4460-82c8-cbcf90b5ea4b produce 
+   309.2     installer_continuation_native_test.go:1047: continuation 2cc7ecb0-99f5-4460-82c8-cbcf90b5ea4b schema 
+   309.2     installer_continuation_native_test.go:1047: continuation 2cc7ecb0-99f5-4460-82c8-cbcf90b5ea4b prepare 
+   309.2     installer_continuation_native_test.go:1047: continuation 2cc7ecb0-99f5-4460-82c8-cbcf90b5ea4b retire 
+   309.2     installer_continuation_native_test.go:1047: continuation 2cc7ecb0-99f5-4460-82c8-cbcf90b5ea4b continue installer continuation: resources/audit-secrets done in 7ms
+   309.2         installer continuation: resources/audit-secrets kubernetes requests=139 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET configmaps]=30 [GET validatingadmissionpolicies]=25 [GET validatingadmissionpolicybindings]=22 [POST selfsubjectreviews]=16 [GET namespaces]=14 [GET serviceaccounts]=7
+   309.2         installer continuation: resources/audit-secrets guard checks: [current<currentHandoverWithFinal]=12 [stagingHandover<currentHandoverWithFinal]=6 [current<current]=2 [currentPublic<ReadToken]=2
+   309.2         installer continuation: resources/producer done in 44ms
+   309.2         installer continuation: resources/producer kubernetes requests=32 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET validatingadmissionpolicies]=7 [GET validatingadmissionpolicybindings]=6 [GET configmaps]=5 [POST selfsubjectreviews]=4 [GET namespaces]=3 [PUT configmaps]=2
+   309.2         installer continuation: resources/producer guard checks: [current<currentHandoverWithFinal]=4 [stagingHandover<currentHandoverWithFinal]=2
+   309.2         installer continuation: resources/journal done in 145ms
+   309.2         installer continuation: resources/journal kubernetes requests=98 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET validatingadmissionpolicies]=21 [GET validatingadmissionpolicybindings]=18 [GET configmaps]=15 [POST selfsubjectreviews]=12 [GET namespaces]=9 [GET secrets]=7
+   309.2         installer continuation: resources/journal guard checks: [current<currentHandoverWithFinal]=12 [stagingHandover<currentHandoverWithFinal]=6
+   309.2         installer continuation: resources/advance done in 1.435s
+   309.2         installer continuation: resources/advance kubernetes requests=160 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [PUT secrets]=38 [GET secrets]=24 [GET validatingadmissionpolicies]=16 [GET validatingadmissionpolicybindings]=14 [GET configmaps]=11 [POST selfsubjectreviews]=8
+   309.2         installer continuation: resources/advance guard checks: [current<currentHandoverWithFinal]=8 [stagingHandover<currentHandoverWithFinal]=4
+   309.2         installer continuation: resources/inventory done in 247ms
+   309.2         installer continuation: resources/inventory kubernetes requests=33 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET validatingadmissionpolicies]=7 [GET validatingadmissionpolicybindings]=6 [GET configmaps]=5 [POST selfsubjectreviews]=4 [GET namespaces]=3 [GET secrets]=3
+   309.2         installer continuation: resources/inventory guard checks: [current<currentHandoverWithFinal]=4 [stagingHandover<currentHandoverWithFinal]=2
+   309.2         installer continuation: resources/release-record done in 3ms
+   309.2         installer continuation: bridge/observer done in 30ms
+   309.2         installer continuation: bridge/protection done in 1ms
+   309.2         installer continuation: bridge/source done in 0s
+   309.2         installer continuation: bridge/journal done in 220ms
+   309.2         installer continuation: bridge/journal kubernetes requests=57 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET validatingadmissionpolicybindings]=13 [GET validatingadmissionpolicies]=13 [POST selfsubjectreviews]=8 [GET configmaps]=7 [GET namespaces]=5 [POST selfsubjectaccessreviews]=4
+   309.2         installer continuation: bridge/journal guard checks: [current<currentHandoverWithFinal]=4 [configurationRoleGuardVersions<func1]=3 [current<newInitialRuntimeBridge]=2 [current<readCurrent]=2 [stagingHandover<currentHandoverWithFinal]=2
+   309.2         installer continuation: bridge/probe done in 1.953s
+   309.2         installer continuation: bridge/probe kubernetes requests=296 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET validatingadmissionpolicies]=64 [GET validatingadmissionpolicybindings]=56 [POST selfsubjectreviews]=46 [GET namespaces]=31 [GET configmaps]=30 [GET serviceaccounts]=19
+   309.2         installer continuation: bridge/probe guard checks: [current<currentHandoverWithFinal]=20 [configurationRoleGuardVersions<readConfigurationRoleSource]=12 [stagingHandover<currentHandoverWithFinal]=10 [current<readCurrent]=8 [configurationRoleGuardVersions<current]=6
+   309.2         installer continuation: bridge/retained done in 660ms
+   309.2         installer continuation: bridge/retained kubernetes requests=252 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET validatingadmissionpolicies]=46 [POST selfsubjectreviews]=40 [GET validatingadmissionpolicybindings]=40 [GET namespaces]=33 [GET configmaps]=28 [GET serviceaccounts]=19
+   309.2         installer continuation: bridge/retained guard checks: [current<currentHandoverWithFinal]=12 [configurationRoleGuardVersions<recheckConfigurationRoleSource]=12 [stagingHandover<currentHandoverWithFinal]=6 [configurationRoleGuardVersions<readConfigurationRoleSource]=6 [current<readCurrent]=4
+   309.2         installer continuation: bridge/settle done in 3.021s
+   309.2         installer continuation: worker/configuration-documents done in 1ms
+   309.2         installer continuation: worker/outbox done in 5ms
+   309.2         installer continuation: worker/inbox done in 2.005s
+   309.2         installer continuation: worker/inspection done in 0s
+   309.2         installer continuation: worker/audit-secret done in 4ms
+   309.2         installer continuation: worker/roles-root done in 0s
+   309.2         installer continuation: worker/roles-sql done in 11ms
+   309.2         installer continuation: worker/roles-provision done in 3.38s
+   309.2         installer continuation: worker/roles-provision kubernetes requests=339 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET namespaces]=68 [GET validatingadmissionpolicies]=48 [GET validatingadmissionpolicybindings]=48 [GET configmaps]=42 [POST selfsubjectreviews]=32 [POST selfsubjectaccessreviews]=24
+   309.2         installer continuation: worker/roles-provision guard checks: [configurationRoleGuardVersions<readConfigurationRoleSource]=30 [configurationRoleGuardVersions<recheckConfigurationRoleSource]=18
+   309.2         installer continuation: worker/roles-projection done in 1.305s
+   309.2         installer continuation: worker/roles-projection kubernetes requests=85 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET namespaces]=16 [GET validatingadmissionpolicies]=12 [GET validatingadmissionpolicybindings]=12 [GET configmaps]=10 [POST selfsubjectreviews]=8 [POST selfsubjectaccessreviews]=6
+   309.2         installer continuation: worker/roles-projection guard checks: [configurationRoleGuardVersions<readConfigurationRoleSource]=6 [configurationRoleGuardVersions<recheckConfigurationRoleSource]=6
+   309.2         installer continuation: worker/inputs done in 4ms
+   309.2         installer continuation: worker/inputs-complete done in 3.061s
+   309.2         installer continuation: worker/inputs-complete kubernetes requests=323 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET validatingadmissionpolicies]=62 [GET validatingadmissionpolicybindings]=54 [GET configmaps]=40 [POST selfsubjectreviews]=36 [GET secrets]=32 [GET namespaces]=22
+   309.2         installer continuation: worker/inputs-complete guard checks: [configurationRoleGuardVersions<readConfigurationWorkerNative]=24 [current<currentHandoverWithFinal]=16 [stagingHandover<currentHandoverWithFinal]=8 [configurationRoleGuardVersions<readConfigurationWorkerCurrent]=6
+   309.2         installer continuation: worker/launch done in 3.1s
+   309.2         installer continuation: worker/launch kubernetes requests=325 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET validatingadmissionpolicies]=62 [GET validatingadmissionpolicybindings]=54 [GET configmaps]=42 [POST selfsubjectreviews]=36 [GET secrets]=32 [GET namespaces]=22
+   309.2         installer continuation: worker/launch guard checks: [configurationRoleGuardVersions<readConfigurationWorkerNative]=24 [current<currentHandoverWithFinal]=16 [stagingHandover<currentHandoverWithFinal]=8 [configurationRoleGuardVersions<readConfigurationWorkerCurrent]=6
+   309.2         installer continuation: public/sources done in 12ms
+   309.2         installer continuation: owner/accepted-source done in 6.051s
+   309.2         installer continuation: public/roles-binding done in 61ms
+   309.2         installer continuation: public/roles-binding kubernetes requests=32 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET validatingadmissionpolicies]=8 [GET validatingadmissionpolicybindings]=6 [POST selfsubjectreviews]=4 [GET configmaps]=4 [GET namespaces]=3 [POST selfsubjectaccessreviews]=2
+   309.2         installer continuation: public/roles-binding guard checks: [current<currentHandoverWithFinal]=4 [stagingHandover<currentHandoverWithFinal]=2
+   309.2         installer continuation: public/roles-root done in 0s
+   309.2         installer continuation: public/roles-sql done in 18ms
+   309.2         installer continuation: public/roles-provision done in 4.699s
+   309.2         installer continuation: public/roles-provision kubernetes requests=313 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET secrets]=152 [PUT secrets]=86 [GET deployments]=21 [POST selfsubjectreviews]=11 [GET configmaps]=10 [GET leases]=10
+   309.2         installer continuation: public/roles-provision guard checks: [current<reused]=2 [WithPublicRoleOperation<Provision]=2
+   309.2         installer continuation: public/roles-projection done in 948ms
+   309.2         installer continuation: public/roles-projection kubernetes requests=72 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET secrets]=16 [GET deployments]=12 [POST selfsubjectreviews]=6 [GET leases]=6 [GET configmaps]=6 [GET serviceaccounts]=6
+   309.2         installer continuation: public/roles-projection guard checks: [current<publishProjection]=5 [WithPublicRoleOperation<func2]=1
+   309.2         installer continuation: owner/roles done in 1.366s
+   309.2         installer continuation: owner/roles kubernetes requests=162 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET validatingadmissionpolicies]=33 [GET validatingadmissionpolicybindings]=27 [POST selfsubjectreviews]=25 [GET configmaps]=18 [GET namespaces]=12 [POST selfsubjectaccessreviews]=10
+   309.2         installer continuation: owner/roles guard checks: [configurationRoleGuardVersions<readConfigurationWorkerNative]=12 [current<currentHandoverWithFinal]=8 [stagingHandover<currentHandoverWithFinal]=4 [configurationRoleGuardVersions<readConfigurationWorkerCurrent]=3
+   309.2         installer continuation: owner/roles-sql done in 14ms
+   309.2         installer continuation: owner/selection done in 0s
+   309.2         installer continuation: owner/selection-complete done in 4.206s
+   309.2         installer continuation: owner/selection-complete kubernetes requests=493 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET validatingadmissionpolicies]=99 [GET validatingadmissionpolicybindings]=81 [POST selfsubjectreviews]=75 [GET configmaps]=57 [GET namespaces]=36 [GET serviceaccounts]=30
+   309.2         installer continuation: owner/selection-complete guard checks: [configurationRoleGuardVersions<readConfigurationWorkerNative]=36 [current<currentHandoverWithFinal]=24 [stagingHandover<currentHandoverWithFinal]=12 [configurationRoleGuardVersions<readConfigurationWorkerCurrent]=9
+   309.2         installer continuation: downloads/workers done in 635ms
+   309.2         installer continuation: permission/guard done in 11ms
+   309.2         installer continuation: retention/guard done in 5ms
+   309.2         installer continuation: permission/projection done in 644ms
+   309.2         installer continuation: permission/projection kubernetes requests=49 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET validatingadmissionpolicies]=10 [GET validatingadmissionpolicybindings]=7 [GET secrets]=7 [POST selfsubjectreviews]=5 [GET configmaps]=5 [GET namespaces]=3
+   309.2         installer continuation: permission/projection guard checks: [current<currentHandoverWithFinal]=4 [stagingHandover<currentHandoverWithFinal]=2 [WithPublicRoleOperation<func1]=1
+   309.2         installer continuation: capacity/sources done in 240ms
+   309.2         installer continuation: capacity/proofs done in 1.118s
+   309.2         installer continuation: capacity/proofs kubernetes requests=76 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET namespaces]=14 [GET validatingadmissionpolicies]=12 [GET validatingadmissionpolicybindings]=12 [GET serviceaccounts]=10 [POST selfsubjectaccessreviews]=10 [POST selfsubjectreviews]=7
+   309.2         installer continuation: capacity/proofs guard checks: [current<CapacityProtection]=6 [current<CapacityNamespaceProtection]=4 [current<ProveCapacitySources]=2
+   309.2         installer continuation: capacity/qualification done in 57ms
+   309.2         installer continuation: capacity/qualification kubernetes requests=30 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET secrets]=5 [GET deployments]=4 [GET serviceaccounts]=4 [POST selfsubjectreviews]=3 [GET configmaps]=2 [GET leases]=2
+   309.2         installer continuation: capacity/qualification guard checks: [current<CapacityProtection]=2
+   309.2         installer continuation: capacity/initialize done in 13.666s
+   309.2         installer continuation: capacity/initialize kubernetes requests=658 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET secrets]=83 [GET validatingadmissionpolicybindings]=81 [GET validatingadmissionpolicies]=81 [GET serviceaccounts]=81 [GET namespaces]=56 [GET deployments]=55
+   309.2         installer continuation: capacity/initialize guard checks: [current<CapacityProtection]=54 [WithPublicRoleOperation<func2]=25 [current<reused]=2
+   309.2         installer continuation: federation/projection done in 735ms
+   309.2         installer continuation: federation/projection kubernetes requests=72 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET secrets]=16 [GET deployments]=12 [POST selfsubjectreviews]=6 [GET serviceaccounts]=6 [GET leases]=6 [GET validatingadmissionpolicybindings]=6
+   309.2         installer continuation: federation/projection guard checks: [current<publishProjection]=5 [WithPublicRoleOperation<func1]=1
+   309.2         installer continuation: federation/identity done in 43ms
+   309.2         installer continuation: federation/identity kubernetes requests=17 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET secrets]=5 [GET deployments]=4 [POST selfsubjectreviews]=2 [GET configmaps]=2 [GET serviceaccounts]=2 [GET leases]=2
+   309.2         installer continuation: publisher/identity done in 7ms
+   309.2         installer continuation: public/download-sources done in 0s
+   309.2         installer continuation: public/sources done in 24ms
+   309.2         installer continuation: capacity/local-observation done in 1.141s
+   309.2         installer continuation: capacity/local-observation kubernetes requests=166 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET validatingadmissionpolicies]=33 [GET validatingadmissionpolicybindings]=27 [POST selfsubjectreviews]=25 [GET configmaps]=20 [GET namespaces]=12 [POST selfsubjectaccessreviews]=10
+   309.2         installer continuation: capacity/local-observation guard checks: [configurationRoleGuardVersions<readConfigurationWorkerNative]=12 [current<currentHandoverWithFinal]=8 [stagingHandover<currentHandoverWithFinal]=4 [configurationRoleGuardVersions<readConfigurationWorkerCurrent]=3
+   309.2         installer continuation: owner/outbox done in 16ms
+   309.2         installer continuation: owner/inbox done in 4.011s
+   309.2         installer continuation: owner/audit-secret done in 4ms
+   309.2         installer continuation: federation/audit-secret done in 4ms
+   309.2         installer continuation: federation/verify done in 42ms
+   309.2         installer continuation: public/readback done in 32ms
+   309.2         installer continuation: downloads/store done in 5ms
+   309.2         installer continuation: downloads/control done in 5ms
+   309.2         installer continuation: downloads/profile done in 4ms
+   309.2         installer continuation: public/derive done in 2ms
+   309.2         installer continuation: public/observation-projection done in 5ms
+   309.2         installer continuation: public/operator-secret done in 3ms
+   309.2         installer continuation: publisher/credentials done in 8ms
+   309.2         installer continuation: publisher/verify done in 28ms
+   309.2         installer continuation: deletion/credential done in 3ms
+   309.2         installer continuation: deletion/verify done in 2ms
+   309.2         installer continuation: downloads/accepted done in 4.012s
+   309.2         installer continuation: owner/projection done in 3ms
+   309.2         installer continuation: owner/installation done in 5.385s
+   309.2         installer continuation: owner/installation kubernetes requests=827 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET secrets]=212 [GET validatingadmissionpolicies]=178 [GET configmaps]=94 [POST selfsubjectreviews]=72 [GET validatingadmissionpolicybindings]=72 [GET deployments]=65
+   309.2         installer continuation: owner/installation guard checks: [configurationRoleGuardVersions<readConfigurationWorkerNative]=36 [current<currentHandoverWithFinal]=24 [stagingHandover<currentHandoverWithFinal]=12
+   309.2         installer continuation: public/exposure done in 16ms
+   309.2         installer continuation: capacity/projection done in 1.393s
+   309.2         installer continuation: capacity/projection kubernetes requests=106 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET validatingadmissionpolicies]=19 [GET configmaps]=17 [GET namespaces]=14 [GET validatingadmissionpolicybindings]=13 [GET secrets]=9 [POST selfsubjectreviews]=9
+   309.2         installer continuation: capacity/projection guard checks: [current<currentHandoverWithFinal]=8 [stagingHandover<currentHandoverWithFinal]=4 [WithPublicRoleOperation<func1]=1
+   309.2         installer continuation: federation/serving done in 3ms
+   309.2         installer continuation: federation/workload done in 327ms
+   309.2         installer continuation: federation/settle done in 2.035s
+   309.2         installer continuation: federation/offer done in 0s
+   309.2         installer continuation: federation/owner-exposure done in 18ms
+   309.2         installer continuation: key-service/projection done in 740ms
+   309.2         installer continuation: key-service/projection kubernetes requests=72 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET secrets]=16 [GET deployments]=12 [GET configmaps]=6 [GET serviceaccounts]=6 [GET leases]=6 [GET validatingadmissionpolicies]=6
+   309.2         installer continuation: key-service/projection guard checks: [current<publishProjection]=5 [WithPublicRoleOperation<func1]=1
+   309.2         installer continuation: back up Secret bootstrap-chain-10000000-target/asservat-5cd22b6aa4ad4438838b4e4264793489-key-service-root-v1; stored artifacts are unreadable without it
+   309.2         installer continuation: key-service/root done in 11ms
+   309.2         installer continuation: key-service/serving done in 2ms
+   309.2         installer continuation: key-service/workload done in 327ms
+   309.2         installer continuation: key-service/settle done in 2.009s
+   309.2         installer continuation: publisher/projection done in 757ms
+   309.2         installer continuation: publisher/projection kubernetes requests=72 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET secrets]=16 [GET deployments]=12 [POST selfsubjectreviews]=6 [GET serviceaccounts]=6 [GET validatingadmissionpolicybindings]=6 [GET configmaps]=6
+   309.2         installer continuation: publisher/projection guard checks: [current<publishProjection]=5 [WithPublicRoleOperation<func1]=1
+   309.2         installer continuation: publisher/workload done in 323ms
+   309.2         installer continuation: publisher/settle done in 2.013s
+   309.2         installer continuation: federation/executor-offer done in 4ms
+   309.2         installer continuation: retention/first-acceptance done in 8ms
+   309.2         
+   330.8 --- FAIL: TestInitialBootstrapChainWithRealServices (327.13s)
+   330.8     --- FAIL: TestInitialBootstrapChainWithRealServices/installer-continuation (183.24s)
+   330.8         --- FAIL: TestInitialBootstrapChainWithRealServices/installer-continuation/live-observation (41.65s)
+   330.8     --- PASS: TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation (3.74s)
+   330.8 FAIL
+   330.8 FAIL	asservat.local/asservat/test/integration	327.165s
+   330.8 FAIL

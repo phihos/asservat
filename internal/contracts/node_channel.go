@@ -372,6 +372,9 @@ type NodeLiveStatus struct {
 	DeliveredRows     int64     `json:"deliveredRows"`
 	DeliveredBytes    int64     `json:"deliveredBytes"`
 	RefusedAdmissions int64     `json:"refusedAdmissions"`
+	LostEvents        int64     `json:"lostEvents"`
+	DroppedRows       int64     `json:"droppedRows"`
+	PendingRows       int       `json:"pendingRows"`
 }
 
 type NodeSourceStatus struct {

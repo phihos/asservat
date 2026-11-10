@@ -51,6 +51,7 @@ type nodeLiveCohort struct {
 	sample            liveClockSample
 	until             time.Time
 	timer             *time.Timer
+	lossBase          uint64
 	closed            bool
 }
 
@@ -99,6 +100,7 @@ func (s *packetSource) activateLive(source v.Source, projection string, until ti
 		c.Close()
 		return nil, e
 	}
+	budget.attach(c)
 	s.live = c
 	if projection == v.HTTP {
 		s.httpObserved = func(record httpheaders.ObservedRecord) { c.appendHTTP(record, s.now()) }
@@ -181,6 +183,7 @@ func (c *nodeLiveCohort) closeLocked() {
 		if c.timer != nil {
 			c.timer.Stop()
 		}
+		c.budget.detach(c)
 		c.buffer.Close()
 		c.source = v.Source{}
 		c.filter = nil
@@ -316,7 +319,7 @@ func (n *nodeSources) readLive(ctx context.Context, w collector.Work) (v.NodeRep
 	for _, r := range out.Rows {
 		out.Bytes += int64(r.Row.Bytes())
 	}
-	budget.deliver(n.now(), kept, encoded)
+	budget.deliver(n.now(), kept, encoded, out.Dropped)
 	return out, nil
 }
 

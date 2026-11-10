@@ -12,7 +12,7 @@ func TestLiveRuntimeAggregatesCompleteRatesAndMarksThemUnavailable(t *testing.T)
 	peer, _ := enroll(t, ch, epochA)
 	const cluster = "00000000-0000-4000-8000-000000000001"
 	first := report(1, clock.now())
-	first.Live = &collector.LiveStatus{WindowStartedAt: first.ObservedAt, Cohorts: 2, ScanEvents: 10, ScanBytes: 100, ScanCPUNanos: 1000, DeliveredRows: 4, DeliveredBytes: 40}
+	first.Live = &collector.LiveStatus{WindowStartedAt: first.ObservedAt, Cohorts: 2, ScanEvents: 10, ScanBytes: 100, ScanCPUNanos: 1000, DeliveredRows: 4, DeliveredBytes: 40, LostEvents: 2, DroppedRows: 1, PendingRows: 2}
 	if err := ch.Report(peer, epochA, first); err != nil {
 		t.Fatal(err)
 	}
@@ -22,12 +22,12 @@ func TestLiveRuntimeAggregatesCompleteRatesAndMarksThemUnavailable(t *testing.T)
 	}
 	clock.add(2 * time.Second)
 	second := report(2, clock.now())
-	second.Live = &collector.LiveStatus{WindowStartedAt: second.ObservedAt, Cohorts: 2, ScanEvents: 15, ScanBytes: 200, ScanCPUNanos: 3000, DeliveredRows: 8, DeliveredBytes: 80, RefusedAdmissions: 2}
+	second.Live = &collector.LiveStatus{WindowStartedAt: second.ObservedAt, Cohorts: 2, ScanEvents: 15, ScanBytes: 200, ScanCPUNanos: 3000, DeliveredRows: 8, DeliveredBytes: 80, RefusedAdmissions: 2, LostEvents: 6, DroppedRows: 3, PendingRows: 1}
 	if err := ch.Report(peer, epochA, second); err != nil {
 		t.Fatal(err)
 	}
 	got := ch.LiveRuntime(cluster)
-	rates := collector.LiveActivityRates{ScanEventsPerSecond: 2.5, ScanBytesPerSecond: 50, ScanCPUNanosPerSecond: 1000, DeliveredRowsPerSecond: 2, DeliveredBytesPerSecond: 20, RefusedAdmissionsPerSecond: 1}
+	rates := collector.LiveActivityRates{ScanEventsPerSecond: 2.5, ScanBytesPerSecond: 50, ScanCPUNanosPerSecond: 1000, DeliveredRowsPerSecond: 2, DeliveredBytesPerSecond: 20, RefusedAdmissionsPerSecond: 1, LostEventsPerSecond: 2, DroppedRowsPerSecond: 1}
 	if !got.Valid(clock.now()) || got.Nodes != 1 || got.RatesUnavailable != 0 || !got.RatesComplete || *got.Live != second.Live.Activity() || got.Rates != rates {
 		t.Fatal("wrong live aggregate or report rates", got)
 	}

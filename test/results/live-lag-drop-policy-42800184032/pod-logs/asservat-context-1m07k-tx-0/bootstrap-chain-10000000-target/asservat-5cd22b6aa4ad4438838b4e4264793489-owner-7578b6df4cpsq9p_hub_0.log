@@ -1,0 +1,23 @@
+2026-11-10T10:41:21.537076764Z owner port router: started (1)
+2026-11-10T10:41:21.537121868Z owner router: started (1)
+2026-11-10T10:41:22.438341151Z owner router: handoff observation (1)
+2026-11-10T10:41:23.478060743Z hub kube opening: guard checks: [current<reused]=4 [current<ReadClusterCatalog]=2 [current<ReadWorkerConfiguration]=2 [current<DownloadPolicy]=2 [DownloadPolicy<newPublicLive]=1 [ReadClusterCatalog<readPublicClusterCatalog]=1
+2026-11-10T10:41:23.759879514Z owner router: handoff observation (2)
+2026-11-10T10:41:27.462332747Z owner router: handoff observation (4)
+2026-11-10T10:41:31.960110150Z owner router: handoff observation (8)
+2026-11-10T10:41:37.204553145Z owner router: handoff native (1)
+2026-11-10T10:41:37.261496553Z context start ingress refused: admission (1)
+2026-11-10T10:41:37.261517523Z context start refused: authenticate (1)
+2026-11-10T10:41:37.319507008Z owner router: handoff native (2)
+2026-11-10T10:41:37.342555900Z context start ingress refused: admission (2)
+2026-11-10T10:41:37.342588221Z context start refused: authenticate (2)
+2026-11-10T10:41:39.384302304Z owner router: handoff native (4)
+2026-11-10T10:41:39.403360494Z context start ingress refused: admission (4)
+2026-11-10T10:41:39.403869465Z context start refused: authenticate (4)
+2026-11-10T10:41:43.477943514Z hub kube opening: guard checks: [current<CapacityNamespaceProtection]=2 [current<ReadClusterCatalog]=2 [current<reused]=2 [ReadClusterCatalog<clusterCatalogChanged]=1
+2026-11-10T10:41:43.481077173Z owner router: handoff native (8)
+2026-11-10T10:41:43.505011816Z context start ingress refused: admission (8)
+2026-11-10T10:41:43.505220907Z context start refused: authenticate (8)
+2026-11-10T10:41:45.271441565Z owner router: handoff observation (16)
+2026-11-10T10:41:48.911695986Z owner observer 641 calls 1.14s, operation 0 calls 0s, readiness 548 calls 940ms, identity 3 calls 10ms, provider 12 calls 20ms, credentials 16 calls 30ms, context-start 0 calls 0s total
+2026-11-10T10:41:49.369914884Z owner startup failed: phase=full-runtime role=none reason=changed native=unspecified detail=unspecified sql=unknown sql-reason=unspecified step=unspecified

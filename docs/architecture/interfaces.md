@@ -55,9 +55,12 @@ the existing work key; enqueue is not attach acknowledgement or complete-history
 proof. Node status retains its original source-set snapshot time, cumulative
 accounting and distinct natural Stopped/Closed/unknown-input facts on the existing
 fifteen-second cadence. When live viewing is enabled, an optional content-minimized
-live snapshot adds active cohorts, the rate-limit window start and process-lifetime
-cumulative scan events/bytes/CPU, delivered rows/encoded bytes and refused cohort
-admissions, with no source/filter/payload labels. C-19 also aggregates current
+live snapshot adds active cohorts, buffered pending rows, the rate-limit window
+start and process-lifetime cumulative scan events/bytes/CPU, delivered
+rows/encoded bytes, refused cohort admissions, source-loss events and rows dropped
+by bounded reply encoding, with no source/filter/payload labels. Pending rows are
+a current shared-buffer occupancy gauge, not an exact per-viewer lag or viewer
+count; loss and reply-drop counts are cumulative. C-19 also aggregates current
 node totals and report-to-report rates per cluster. The existing idle regional
 query `read-live-runtime` returns that bounded aggregate without node labels;
 a first report, nonmonotonic counter or missing predecessor makes all rates

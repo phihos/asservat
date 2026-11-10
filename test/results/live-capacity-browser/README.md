@@ -1,23 +1,29 @@
 # Live runtime capacity browser evidence
 
-Commit: `f86f4eed2ce99108a514b9f67022c40aed7238b7`
-
 `make console-browser-check` passed with 29 journeys and 28 accessibility
 scans. The capacity journey used the actual built React page and Go HTTPS
-operation: entering one cluster, reading its cumulative counters and rates, and
-rendering them without content labels. [Screenshot](../console-browser/live-capacity.png).
+operation: entering one cluster, reading its counters, gauges and rates, and
+rendering cumulative source-loss events, transport-dropped rows and buffered
+pending-row occupancy without content labels.
+[Screenshot](../console-browser/live-capacity.png).
 
-The operation itself has application and presentation tests for current fleet
+Pending rows are shared-buffer occupancy, not exact per-viewer lag. Active
+cohorts are not an exact viewer count. Source-loss and reply-drop rates use
+report-to-report counter deltas and are withheld when any current live-enabled
+node lacks a valid predecessor.
+
+The operation has application and presentation tests for current fleet
 operator/administration/recovery checks, unknown clusters, incomplete rates,
-error freshness and recursive content-label rejection. The shared operation
-router, audit normalization, static route and packaged browser path are also
-covered. All 613 console tests and full `make pre-push` passed. PR CI run
-42792664049 and Gitar review passed.
+error freshness and recursive content-label rejection. All 613 console tests,
+full `make pre-push`, and focused race tests for bootstrap, delivery, live
+buffers and node transport passed.
 
 This is real browser/TLS/component evidence with synthetic authority and runtime
-facts, not an installed multi-node measurement. The installed live fixture does
-not enable fleet administration, so it cannot qualify this operation. Earlier
-attempts are not passes: browser-only MCP calls were correctly refused, and they
-also exposed missing audit input preservation, operation-router and static-route
-branches that are now covered. Richer lag/drop aggregation and a fleet-enabled
-installed run remain open.
+facts, not an installed multi-node or fleet-administrator measurement. The
+installed live fixture does not enable fleet administration, so it cannot
+qualify this operation. Guarded native suites passed the existing
+[policy](../live-lag-drop-policy-42803550038/README.md) and
+[manual](../live-lag-drop-manual-42800188004/README.md) live workflows; they do
+not establish that missing installed measurement. PR CI run 42800168119 and
+Gitar review passed. Earlier failed policy attempts and a passing `main` control
+are linked from the policy evidence rather than being presented as passes.

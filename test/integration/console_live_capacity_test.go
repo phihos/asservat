@@ -24,8 +24,8 @@ type consoleLiveCapacity struct{}
 func (c *consoleLiveCapacity) Read(_ context.Context, _ app.CurrentIdentity, cluster string) (collector.LiveRuntimeSnapshot, time.Time, error) {
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	return collector.LiveRuntimeSnapshot{ClusterID: cluster, ObservedAt: now, FreshUntil: now.Add(5 * time.Second), Nodes: 2, RatesComplete: true,
-		Live:  &collector.LiveActivity{Cohorts: 3, ScanEvents: 20, ScanBytes: 200, ScanCPUNanos: 3000, DeliveredRows: 4, DeliveredBytes: 400, RefusedAdmissions: 2},
-		Rates: collector.LiveActivityRates{ScanEventsPerSecond: 2.5, ScanBytesPerSecond: 50, ScanCPUNanosPerSecond: 1000, DeliveredRowsPerSecond: 0.5, DeliveredBytesPerSecond: 20, RefusedAdmissionsPerSecond: 1}}, now.Add(5 * time.Second), nil
+		Live:  &collector.LiveActivity{Cohorts: 3, ScanEvents: 20, ScanBytes: 200, ScanCPUNanos: 3000, DeliveredRows: 4, DeliveredBytes: 400, RefusedAdmissions: 2, LostEvents: 6, DroppedRows: 3, PendingRows: 5},
+		Rates: collector.LiveActivityRates{ScanEventsPerSecond: 2.5, ScanBytesPerSecond: 50, ScanCPUNanosPerSecond: 1000, DeliveredRowsPerSecond: 0.5, DeliveredBytesPerSecond: 20, RefusedAdmissionsPerSecond: 1, LostEventsPerSecond: 2, DroppedRowsPerSecond: 0.5}}, now.Add(5 * time.Second), nil
 }
 
 func newConsoleLiveCapacityOperations(t *testing.T, origin string) *presentation.LiveCapacityOperations {
