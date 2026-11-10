@@ -18,7 +18,7 @@ func sampleReport() collector.Report {
 	return collector.Report{Sequence: 4, ObservedAt: time.Date(2026, 10, 27, 12, 0, 0, 0, time.UTC), Facts: f, Mechanisms: collector.Assess(f),
 		Budget:   collector.Usage{Ceilings: collector.Ceilings{RingBytes: 256 << 20, FrozenBytes: 256 << 20, UploadBytesPerSecond: 32 << 20, UploadBurstBytes: 64 << 20}, UploadAvailable: 64 << 20},
 		Receipts: []collector.Receipt{{WorkID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", Sequence: 2, Outcome: collector.OutcomeRefused, Reason: collector.ReasonRecorderNotImplemented}},
-		Live:     &collector.LiveStatus{WindowStartedAt: time.Date(2026, 10, 27, 11, 59, 59, 0, time.UTC), Cohorts: 1, ScanEvents: 2, ScanBytes: 300, ScanCPUNanos: 400, DeliveredRows: 2, DeliveredBytes: 600, RefusedAdmissions: 1}}
+		Live:     &collector.LiveStatus{WindowStartedAt: time.Date(2026, 10, 27, 11, 59, 59, 0, time.UTC), Cohorts: 1, ScanEvents: 2, ScanBytes: 300, ScanCPUNanos: 400, DeliveredRows: 2, DeliveredBytes: 600, RefusedAdmissions: 1, LostEvents: 3, DroppedRows: 2, PendingRows: 1}}
 }
 
 func TestStatusRoundTripsThroughTheClosedWire(t *testing.T) {
@@ -41,6 +41,14 @@ func TestStatusRoundTripsThroughTheClosedWire(t *testing.T) {
 		t.Fatalf("kernel %q", w.Probe.Kernel)
 	} else if _, ok := DomainStatus(w); !ok {
 		t.Fatal("empty kernel refused")
+	}
+}
+
+func TestStatusRetainsLossBeforeTheFirstScanWindow(t *testing.T) {
+	r := sampleReport()
+	r.Live = &collector.LiveStatus{LostEvents: 1}
+	if back, ok := DomainStatus(WireStatus("epoch", r)); !ok || !reflect.DeepEqual(back, r) {
+		t.Fatal("source loss without an accepted scan was refused", ok, back.Live)
 	}
 }
 

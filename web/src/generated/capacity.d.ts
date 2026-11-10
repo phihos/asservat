@@ -48,6 +48,9 @@ export interface components {
                 delivered_rows: number;
                 delivered_bytes: number;
                 refused_admissions: number;
+                lost_events: number;
+                dropped_rows: number;
+                pending_rows: number;
             };
             rates: {
                 scan_events_per_second: number;
@@ -56,6 +59,8 @@ export interface components {
                 delivered_rows_per_second: number;
                 delivered_bytes_per_second: number;
                 refused_admissions_per_second: number;
+                lost_events_per_second: number;
+                dropped_rows_per_second: number;
             };
         };
         McpOutput_get_live_capacity: components["schemas"]["Contract_mcp_result"] & ({

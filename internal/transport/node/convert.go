@@ -41,7 +41,7 @@ func WireStatus(epoch string, r collector.Report) contracts.NodeStatus {
 		out.Sources = append(out.Sources, contracts.NodeSourceStatus{SourceStoppedAt: s.SourceStoppedAt.UTC(), SnapshotUntil: s.SnapshotUntil.UTC(), SourceID: s.SourceID, Fence: s.Fence, IssuedAt: s.IssuedAt.UTC(), LeafUntil: s.LeafUntil.UTC(), Credit: s.Credit, ObservedBytes: s.ObservedBytes, Closed: s.Closed, Stopped: s.Stopped, InputUnknown: s.InputUnknown})
 	}
 	if r.Live != nil {
-		out.Live = &contracts.NodeLiveStatus{WindowStartedAt: r.Live.WindowStartedAt.UTC(), Cohorts: r.Live.Cohorts, ScanEvents: r.Live.ScanEvents, ScanBytes: r.Live.ScanBytes, ScanCPUNanos: r.Live.ScanCPUNanos, DeliveredRows: r.Live.DeliveredRows, DeliveredBytes: r.Live.DeliveredBytes, RefusedAdmissions: r.Live.RefusedAdmissions}
+		out.Live = &contracts.NodeLiveStatus{WindowStartedAt: r.Live.WindowStartedAt.UTC(), Cohorts: r.Live.Cohorts, ScanEvents: r.Live.ScanEvents, ScanBytes: r.Live.ScanBytes, ScanCPUNanos: r.Live.ScanCPUNanos, DeliveredRows: r.Live.DeliveredRows, DeliveredBytes: r.Live.DeliveredBytes, RefusedAdmissions: r.Live.RefusedAdmissions, LostEvents: r.Live.LostEvents, DroppedRows: r.Live.DroppedRows, PendingRows: r.Live.PendingRows}
 	}
 	return out
 }
@@ -105,7 +105,7 @@ func DomainStatus(s contracts.NodeStatus) (collector.Report, bool) {
 		return collector.Report{}, false
 	}
 	if s.Live != nil {
-		r.Live = &collector.LiveStatus{WindowStartedAt: s.Live.WindowStartedAt.UTC(), Cohorts: s.Live.Cohorts, ScanEvents: s.Live.ScanEvents, ScanBytes: s.Live.ScanBytes, ScanCPUNanos: s.Live.ScanCPUNanos, DeliveredRows: s.Live.DeliveredRows, DeliveredBytes: s.Live.DeliveredBytes, RefusedAdmissions: s.Live.RefusedAdmissions}
+		r.Live = &collector.LiveStatus{WindowStartedAt: s.Live.WindowStartedAt.UTC(), Cohorts: s.Live.Cohorts, ScanEvents: s.Live.ScanEvents, ScanBytes: s.Live.ScanBytes, ScanCPUNanos: s.Live.ScanCPUNanos, DeliveredRows: s.Live.DeliveredRows, DeliveredBytes: s.Live.DeliveredBytes, RefusedAdmissions: s.Live.RefusedAdmissions, LostEvents: s.Live.LostEvents, DroppedRows: s.Live.DroppedRows, PendingRows: s.Live.PendingRows}
 		if !r.Live.Valid(r.ObservedAt) {
 			return collector.Report{}, false
 		}

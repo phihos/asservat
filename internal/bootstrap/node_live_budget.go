@@ -21,6 +21,8 @@ type nodeLiveBudget struct {
 	spent                         time.Duration
 	deliveredRows, deliveredBytes int64
 	refusedAdmissions             int64
+	cohorts                       map[*nodeLiveCohort]struct{}
+	lostEvents, droppedRows       int64
 }
 
 func (b *nodeLiveBudget) reserve() bool {
@@ -42,6 +44,27 @@ func (b *nodeLiveBudget) release() {
 	if b.held > 0 {
 		b.held--
 	}
+}
+func (b *nodeLiveBudget) attach(c *nodeLiveCohort) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.cohorts == nil {
+		b.cohorts = map[*nodeLiveCohort]struct{}{}
+	}
+	if _, ok := b.cohorts[c]; ok {
+		return
+	}
+	c.lossBase = c.buffer.LossPosition().Lost
+	b.cohorts[c] = struct{}{}
+}
+func (b *nodeLiveBudget) detach(c *nodeLiveCohort) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if _, ok := b.cohorts[c]; !ok {
+		return
+	}
+	b.lostEvents += int64(c.buffer.LossPosition().Lost - c.lossBase)
+	delete(b.cohorts, c)
 }
 func (b *nodeLiveBudget) reset(now time.Time) {
 	if b.second.IsZero() || now.Sub(b.second) >= time.Second {
@@ -77,8 +100,8 @@ func (b *nodeLiveBudget) finish(elapsed time.Duration) {
 		b.spent += elapsed
 	}
 }
-func (b *nodeLiveBudget) deliver(now time.Time, rows, bytes int) {
-	if b == nil || rows < 0 || bytes < 0 {
+func (b *nodeLiveBudget) deliver(now time.Time, rows, bytes, dropped int) {
+	if b == nil || rows < 0 || bytes < 0 || dropped < 0 {
 		return
 	}
 	b.mu.Lock()
@@ -89,9 +112,15 @@ func (b *nodeLiveBudget) deliver(now time.Time, rows, bytes int) {
 	b.reset(now)
 	b.deliveredRows += int64(rows)
 	b.deliveredBytes += int64(bytes)
+	b.droppedRows += int64(dropped)
 }
 func (b *nodeLiveBudget) status() collector.LiveStatus {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	return collector.LiveStatus{WindowStartedAt: b.second, Cohorts: b.held, ScanEvents: b.events, ScanBytes: b.bytes, ScanCPUNanos: b.spent.Nanoseconds(), DeliveredRows: b.deliveredRows, DeliveredBytes: b.deliveredBytes, RefusedAdmissions: b.refusedAdmissions}
+	lost, pending := b.lostEvents, 0
+	for c := range b.cohorts {
+		lost += int64(c.buffer.LossPosition().Lost - c.lossBase)
+		pending += c.buffer.Pending()
+	}
+	return collector.LiveStatus{WindowStartedAt: b.second, Cohorts: b.held, ScanEvents: b.events, ScanBytes: b.bytes, ScanCPUNanos: b.spent.Nanoseconds(), DeliveredRows: b.deliveredRows, DeliveredBytes: b.deliveredBytes, RefusedAdmissions: b.refusedAdmissions, LostEvents: lost, DroppedRows: b.droppedRows, PendingRows: pending}
 }

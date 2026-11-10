@@ -18,14 +18,14 @@ func nextLiveRates(previous *collector.Report, current collector.Report) *collec
 		return nil
 	}
 	before, after := previous.Live.Activity(), current.Live.Activity()
-	delta := [6]int64{after.ScanEvents - before.ScanEvents, after.ScanBytes - before.ScanBytes, after.ScanCPUNanos - before.ScanCPUNanos, after.DeliveredRows - before.DeliveredRows, after.DeliveredBytes - before.DeliveredBytes, after.RefusedAdmissions - before.RefusedAdmissions}
+	delta := [8]int64{after.ScanEvents - before.ScanEvents, after.ScanBytes - before.ScanBytes, after.ScanCPUNanos - before.ScanCPUNanos, after.DeliveredRows - before.DeliveredRows, after.DeliveredBytes - before.DeliveredBytes, after.RefusedAdmissions - before.RefusedAdmissions, after.LostEvents - before.LostEvents, after.DroppedRows - before.DroppedRows}
 	for _, value := range delta {
 		if value < 0 {
 			return nil
 		}
 	}
 	seconds := elapsed.Seconds()
-	return &collector.LiveActivityRates{ScanEventsPerSecond: float64(delta[0]) / seconds, ScanBytesPerSecond: float64(delta[1]) / seconds, ScanCPUNanosPerSecond: float64(delta[2]) / seconds, DeliveredRowsPerSecond: float64(delta[3]) / seconds, DeliveredBytesPerSecond: float64(delta[4]) / seconds, RefusedAdmissionsPerSecond: float64(delta[5]) / seconds}
+	return &collector.LiveActivityRates{ScanEventsPerSecond: float64(delta[0]) / seconds, ScanBytesPerSecond: float64(delta[1]) / seconds, ScanCPUNanosPerSecond: float64(delta[2]) / seconds, DeliveredRowsPerSecond: float64(delta[3]) / seconds, DeliveredBytesPerSecond: float64(delta[4]) / seconds, RefusedAdmissionsPerSecond: float64(delta[5]) / seconds, LostEventsPerSecond: float64(delta[6]) / seconds, DroppedRowsPerSecond: float64(delta[7]) / seconds}
 }
 
 // LiveRuntime aggregates current reports without node or workload labels. A
@@ -55,6 +55,9 @@ func (c *NodeChannel) LiveRuntime(cluster string) collector.LiveRuntimeSnapshot 
 		out.Live.DeliveredRows += activity.DeliveredRows
 		out.Live.DeliveredBytes += activity.DeliveredBytes
 		out.Live.RefusedAdmissions += activity.RefusedAdmissions
+		out.Live.LostEvents += activity.LostEvents
+		out.Live.DroppedRows += activity.DroppedRows
+		out.Live.PendingRows += activity.PendingRows
 		if entry.liveRates == nil {
 			out.RatesUnavailable++
 			continue
@@ -65,6 +68,8 @@ func (c *NodeChannel) LiveRuntime(cluster string) collector.LiveRuntimeSnapshot 
 		out.Rates.DeliveredRowsPerSecond += entry.liveRates.DeliveredRowsPerSecond
 		out.Rates.DeliveredBytesPerSecond += entry.liveRates.DeliveredBytesPerSecond
 		out.Rates.RefusedAdmissionsPerSecond += entry.liveRates.RefusedAdmissionsPerSecond
+		out.Rates.LostEventsPerSecond += entry.liveRates.LostEventsPerSecond
+		out.Rates.DroppedRowsPerSecond += entry.liveRates.DroppedRowsPerSecond
 	}
 	out.RatesComplete = out.RatesUnavailable == 0
 	if !out.RatesComplete {

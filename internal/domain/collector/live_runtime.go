@@ -23,14 +23,17 @@ type LiveActivity struct {
 	DeliveredRows     int64 `json:"deliveredRows"`
 	DeliveredBytes    int64 `json:"deliveredBytes"`
 	RefusedAdmissions int64 `json:"refusedAdmissions"`
+	LostEvents        int64 `json:"lostEvents"`
+	DroppedRows       int64 `json:"droppedRows"`
+	PendingRows       int   `json:"pendingRows"`
 }
 
 func (a LiveActivity) Valid() bool {
-	return a.Cohorts >= 0 && a.ScanEvents >= 0 && a.ScanBytes >= 0 && a.ScanCPUNanos >= 0 && a.DeliveredRows >= 0 && a.DeliveredBytes >= 0 && a.RefusedAdmissions >= 0
+	return a.Cohorts >= 0 && a.ScanEvents >= 0 && a.ScanBytes >= 0 && a.ScanCPUNanos >= 0 && a.DeliveredRows >= 0 && a.DeliveredBytes >= 0 && a.RefusedAdmissions >= 0 && a.LostEvents >= 0 && a.DroppedRows >= 0 && a.PendingRows >= 0
 }
 
 func (s LiveStatus) Activity() LiveActivity {
-	return LiveActivity{Cohorts: s.Cohorts, ScanEvents: s.ScanEvents, ScanBytes: s.ScanBytes, ScanCPUNanos: s.ScanCPUNanos, DeliveredRows: s.DeliveredRows, DeliveredBytes: s.DeliveredBytes, RefusedAdmissions: s.RefusedAdmissions}
+	return LiveActivity{Cohorts: s.Cohorts, ScanEvents: s.ScanEvents, ScanBytes: s.ScanBytes, ScanCPUNanos: s.ScanCPUNanos, DeliveredRows: s.DeliveredRows, DeliveredBytes: s.DeliveredBytes, RefusedAdmissions: s.RefusedAdmissions, LostEvents: s.LostEvents, DroppedRows: s.DroppedRows, PendingRows: s.PendingRows}
 }
 
 // LiveActivityRates is per-second activity across current collector processes.
@@ -41,10 +44,12 @@ type LiveActivityRates struct {
 	DeliveredRowsPerSecond     float64 `json:"deliveredRowsPerSecond"`
 	DeliveredBytesPerSecond    float64 `json:"deliveredBytesPerSecond"`
 	RefusedAdmissionsPerSecond float64 `json:"refusedAdmissionsPerSecond"`
+	LostEventsPerSecond        float64 `json:"lostEventsPerSecond"`
+	DroppedRowsPerSecond       float64 `json:"droppedRowsPerSecond"`
 }
 
 func (r LiveActivityRates) Valid() bool {
-	for _, value := range []float64{r.ScanEventsPerSecond, r.ScanBytesPerSecond, r.ScanCPUNanosPerSecond, r.DeliveredRowsPerSecond, r.DeliveredBytesPerSecond, r.RefusedAdmissionsPerSecond} {
+	for _, value := range []float64{r.ScanEventsPerSecond, r.ScanBytesPerSecond, r.ScanCPUNanosPerSecond, r.DeliveredRowsPerSecond, r.DeliveredBytesPerSecond, r.RefusedAdmissionsPerSecond, r.LostEventsPerSecond, r.DroppedRowsPerSecond} {
 		if value < 0 || math.IsNaN(value) || math.IsInf(value, 0) {
 			return false
 		}
@@ -53,7 +58,7 @@ func (r LiveActivityRates) Valid() bool {
 }
 
 func (r LiveActivityRates) Zero() bool {
-	return r.ScanEventsPerSecond == 0 && r.ScanBytesPerSecond == 0 && r.ScanCPUNanosPerSecond == 0 && r.DeliveredRowsPerSecond == 0 && r.DeliveredBytesPerSecond == 0 && r.RefusedAdmissionsPerSecond == 0
+	return r.ScanEventsPerSecond == 0 && r.ScanBytesPerSecond == 0 && r.ScanCPUNanosPerSecond == 0 && r.DeliveredRowsPerSecond == 0 && r.DeliveredBytesPerSecond == 0 && r.RefusedAdmissionsPerSecond == 0 && r.LostEventsPerSecond == 0 && r.DroppedRowsPerSecond == 0
 }
 
 // LiveRuntimeSnapshot is one region's aggregate at read time. Incomplete rates

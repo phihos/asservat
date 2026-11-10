@@ -65,6 +65,9 @@ type liveCapacityActivity struct {
 	DeliveredRows     int64 `json:"delivered_rows"`
 	DeliveredBytes    int64 `json:"delivered_bytes"`
 	RefusedAdmissions int64 `json:"refused_admissions"`
+	LostEvents        int64 `json:"lost_events"`
+	DroppedRows       int64 `json:"dropped_rows"`
+	PendingRows       int   `json:"pending_rows"`
 }
 type liveCapacityRates struct {
 	ScanEventsPerSecond        float64 `json:"scan_events_per_second"`
@@ -73,6 +76,8 @@ type liveCapacityRates struct {
 	DeliveredRowsPerSecond     float64 `json:"delivered_rows_per_second"`
 	DeliveredBytesPerSecond    float64 `json:"delivered_bytes_per_second"`
 	RefusedAdmissionsPerSecond float64 `json:"refused_admissions_per_second"`
+	LostEventsPerSecond        float64 `json:"lost_events_per_second"`
+	DroppedRowsPerSecond       float64 `json:"dropped_rows_per_second"`
 }
 type liveCapacityData struct {
 	ClusterID        string                `json:"cluster_id"`
@@ -98,9 +103,9 @@ func liveCapacityMessage(snapshot collector.LiveRuntimeSnapshot) string {
 
 func liveCapacityReply(snapshot collector.LiveRuntimeSnapshot) liveCapacityData {
 	out := liveCapacityData{ClusterID: snapshot.ClusterID, ObservedAt: snapshot.ObservedAt.UTC(), FreshUntil: snapshot.FreshUntil.UTC(), Message: liveCapacityMessage(snapshot), Nodes: snapshot.Nodes, RatesUnavailable: snapshot.RatesUnavailable, RatesComplete: snapshot.RatesComplete,
-		Rates: liveCapacityRates{ScanEventsPerSecond: snapshot.Rates.ScanEventsPerSecond, ScanBytesPerSecond: snapshot.Rates.ScanBytesPerSecond, ScanCPUNanosPerSecond: snapshot.Rates.ScanCPUNanosPerSecond, DeliveredRowsPerSecond: snapshot.Rates.DeliveredRowsPerSecond, DeliveredBytesPerSecond: snapshot.Rates.DeliveredBytesPerSecond, RefusedAdmissionsPerSecond: snapshot.Rates.RefusedAdmissionsPerSecond}}
+		Rates: liveCapacityRates{ScanEventsPerSecond: snapshot.Rates.ScanEventsPerSecond, ScanBytesPerSecond: snapshot.Rates.ScanBytesPerSecond, ScanCPUNanosPerSecond: snapshot.Rates.ScanCPUNanosPerSecond, DeliveredRowsPerSecond: snapshot.Rates.DeliveredRowsPerSecond, DeliveredBytesPerSecond: snapshot.Rates.DeliveredBytesPerSecond, RefusedAdmissionsPerSecond: snapshot.Rates.RefusedAdmissionsPerSecond, LostEventsPerSecond: snapshot.Rates.LostEventsPerSecond, DroppedRowsPerSecond: snapshot.Rates.DroppedRowsPerSecond}}
 	if snapshot.Live != nil {
-		out.Live = &liveCapacityActivity{Cohorts: snapshot.Live.Cohorts, ScanEvents: snapshot.Live.ScanEvents, ScanBytes: snapshot.Live.ScanBytes, ScanCPUNanos: snapshot.Live.ScanCPUNanos, DeliveredRows: snapshot.Live.DeliveredRows, DeliveredBytes: snapshot.Live.DeliveredBytes, RefusedAdmissions: snapshot.Live.RefusedAdmissions}
+		out.Live = &liveCapacityActivity{Cohorts: snapshot.Live.Cohorts, ScanEvents: snapshot.Live.ScanEvents, ScanBytes: snapshot.Live.ScanBytes, ScanCPUNanos: snapshot.Live.ScanCPUNanos, DeliveredRows: snapshot.Live.DeliveredRows, DeliveredBytes: snapshot.Live.DeliveredBytes, RefusedAdmissions: snapshot.Live.RefusedAdmissions, LostEvents: snapshot.Live.LostEvents, DroppedRows: snapshot.Live.DroppedRows, PendingRows: snapshot.Live.PendingRows}
 	}
 	return out
 }

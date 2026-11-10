@@ -291,8 +291,11 @@ try {
   await page.getByRole('button', { name: 'Read live capacity' }).click();
   const capacityHTTP = await capacityResponse;
   if (capacityHTTP.status() !== 200) console.log('live capacity HTTP', capacityHTTP.status());
-  await expect(page.getByLabel('Cumulative live runtime')).toBeVisible();
+  await expect(page.getByLabel('Live runtime totals and gauges')).toBeVisible();
   await expect(page.getByLabel('Live runtime rates')).toBeVisible();
+  await expect(page.getByText('Source-loss events', { exact: true })).toBeVisible();
+  await expect(page.getByText('Transport-dropped rows', { exact: true })).toBeVisible();
+  await expect(page.getByText('Buffered pending rows', { exact: true })).toBeVisible();
   await expect(page.getByText('Counters and per-second rates cover every current live-enabled node report.')).toBeVisible();
   await scan('live-capacity');
   await page.screenshot({ path: output + '/live-capacity.png', fullPage: true });

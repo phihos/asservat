@@ -72,6 +72,21 @@
           "type": "integer",
           "minimum": 0,
           "maximum": 9223372036854775807
+        },
+        "lost_events": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        },
+        "dropped_rows": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        },
+        "pending_rows": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 80000000
         }
       },
       "required": [
@@ -81,7 +96,10 @@
         "scan_cpu_nanos",
         "delivered_rows",
         "delivered_bytes",
-        "refused_admissions"
+        "refused_admissions",
+        "lost_events",
+        "dropped_rows",
+        "pending_rows"
       ]
     },
     "rates": {
@@ -111,6 +129,14 @@
         "refused_admissions_per_second": {
           "type": "number",
           "minimum": 0
+        },
+        "lost_events_per_second": {
+          "type": "number",
+          "minimum": 0
+        },
+        "dropped_rows_per_second": {
+          "type": "number",
+          "minimum": 0
         }
       },
       "required": [
@@ -119,7 +145,9 @@
         "scan_cpu_nanos_per_second",
         "delivered_rows_per_second",
         "delivered_bytes_per_second",
-        "refused_admissions_per_second"
+        "refused_admissions_per_second",
+        "lost_events_per_second",
+        "dropped_rows_per_second"
       ]
     }
   },

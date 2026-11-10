@@ -55,6 +55,9 @@ func TestLiveExistingSourceTapDoesNotCollectPinOrBorrowRaw(t *testing.T) {
 	raw = append(raw, []byte("SYNTHETIC-LIVE-PAYLOAD")...)
 	stamp, _ := sampleLiveClock("monotonic")
 	f(gadget.Frame{Data: raw, Wire: uint32(len(raw)), At: time.Now(), RawTimestamp: uint64(stamp.Nanos), Clock: "monotonic", DirectionKnown: true})
+	if status := b.status(); status.PendingRows != 1 {
+		t.Fatal("accepted live row is not pending", status)
+	}
 	call, cancel := context.WithTimeout(t.Context(), 10*time.Millisecond)
 	defer cancel()
 	rows, pos, e := c.Read(call, v.Position{}, 100, time.Now)
@@ -107,9 +110,23 @@ func TestLiveExistingSourceTapDoesNotCollectPinOrBorrowRaw(t *testing.T) {
 		t.Fatal("reader lag did not retain bounded rows and explicit loss", len(rows), pos, e)
 	}
 	before := p
+	b.attach(c)
+	if got := b.status().LostEvents; got != int64(pos.Lost) {
+		t.Fatal("repeated manual-style attach reset cohort loss", got, pos.Lost)
+	}
 	c.Close()
-	if b.held != 0 || s.closed || s.meter.Permit() != before {
-		t.Fatal("close viewer stopped or renewed collector")
+	retained := b.status()
+	if b.held != 0 || s.closed || s.meter.Permit() != before || retained.PendingRows != 0 || retained.LostEvents != int64(pos.Lost) {
+		t.Fatal("close viewer changed collection or lost its counters", retained, pos)
+	}
+	sample, _ = sampleLiveClock("monotonic")
+	next, e := s.activateLive(source, v.Packet, time.Now().Add(5*time.Second), b, sample)
+	if e != nil {
+		t.Fatal(e)
+	}
+	next.Close()
+	if got := b.status().LostEvents; got != retained.LostEvents {
+		t.Fatal("new cohort counted retained source loss again", got, retained.LostEvents)
 	}
 	// Changing a source epoch or projection cannot reuse its cohort.
 	changed := source
@@ -131,10 +148,10 @@ func TestLiveNodeProcessingCreditCountsFilteredEventsAndNeverWaits(t *testing.T)
 		t.Fatal("independent scan credit")
 	}
 	b.finish(time.Millisecond)
-	b.deliver(now, 2, 120)
+	b.deliver(now, 2, 120, 3)
 	status := b.status()
-	if status.Cohorts != 1 || status.ScanEvents != 1 || status.ScanBytes != 100 || status.ScanCPUNanos != int64(time.Millisecond) || status.DeliveredRows != 2 || status.DeliveredBytes != 120 || status.RefusedAdmissions != 1 {
-		t.Fatal("live status lost scan, delivery or refused-admission counters", status)
+	if status.Cohorts != 1 || status.ScanEvents != 1 || status.ScanBytes != 100 || status.ScanCPUNanos != int64(time.Millisecond) || status.DeliveredRows != 2 || status.DeliveredBytes != 120 || status.RefusedAdmissions != 1 || status.DroppedRows != 3 {
+		t.Fatal("live status lost scan, delivery, drop or refused-admission counters", status)
 	}
 	if b.take(now, 0) {
 		t.Fatal("CPU upper bound")

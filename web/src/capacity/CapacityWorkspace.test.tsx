@@ -9,8 +9,8 @@ const cluster = '22222222-3333-4444-8555-666666666666';
 const ok = (complete = true): LiveCapacityOutput => ({
   schema_version: 'mcp-result/v1', request_id: cluster, data_class: 'metadata', status: 'ok', warnings: [], provenance: [], truncated: false, next_cursor: null, narrowing_hint: null,
   data: { cluster_id: cluster, observed_at: '2026-11-10T08:00:00Z', fresh_until: '2026-11-10T08:00:05Z', message: complete ? 'Counters and rates cover every current live-enabled node report.' : 'At least one predecessor is missing; rates are unavailable.', nodes: 1, rates_unavailable: complete ? 0 : 1, rates_complete: complete,
-    live: { cohorts: 2, scan_events: 20, scan_bytes: 200, scan_cpu_nanos: 3000, delivered_rows: 4, delivered_bytes: 400, refused_admissions: 2 },
-    rates: { scan_events_per_second: 2.5, scan_bytes_per_second: 50, scan_cpu_nanos_per_second: 1000, delivered_rows_per_second: 0.5, delivered_bytes_per_second: 20, refused_admissions_per_second: 1 },
+    live: { cohorts: 2, scan_events: 20, scan_bytes: 200, scan_cpu_nanos: 3000, delivered_rows: 4, delivered_bytes: 400, refused_admissions: 2, lost_events: 6, dropped_rows: 3, pending_rows: 5 },
+    rates: { scan_events_per_second: 2.5, scan_bytes_per_second: 50, scan_cpu_nanos_per_second: 1000, delivered_rows_per_second: 0.5, delivered_bytes_per_second: 20, refused_admissions_per_second: 1, lost_events_per_second: 2, dropped_rows_per_second: 0.5 },
   },
 });
 
@@ -25,11 +25,16 @@ it('reads one cluster explicitly and hides partial rates and stale results', asy
   fireEvent.change(screen.getByLabelText('Cluster ID'), { target: { value: cluster } });
   fireEvent.click(screen.getByRole('button', { name: 'Read live capacity' }));
   await waitFor(() => expect(calls).toEqual([cluster]));
-  expect(screen.getByLabelText('Cumulative live runtime')).toBeTruthy();
+  expect(screen.getByLabelText('Live runtime totals and gauges')).toBeTruthy();
   expect(screen.getByLabelText('Live runtime rates')).toBeTruthy();
   expect(screen.getAllByText('20', { exact: true })).toHaveLength(2);
+  expect(screen.getByText('Source-loss events').nextElementSibling?.textContent).toBe('6');
+  expect(screen.getByText('Transport-dropped rows').nextElementSibling?.textContent).toBe('3');
+  expect(screen.getByText('Buffered pending rows').nextElementSibling?.textContent).toBe('5');
+  expect(screen.getByText('Source-loss events/second').nextElementSibling?.textContent).toBe('2');
+  expect(screen.getByText('Transport-dropped rows/second').nextElementSibling?.textContent).toBe((0.5).toLocaleString());
   fireEvent.change(screen.getByLabelText('Cluster ID'), { target: { value: cluster.slice(0, -1) + '7' } });
-  expect(screen.queryByLabelText('Cumulative live runtime')).toBeNull();
+  expect(screen.queryByLabelText('Live runtime totals and gauges')).toBeNull();
   expect(screen.queryByLabelText('Live runtime rates')).toBeNull();
   scope.abort();
 });

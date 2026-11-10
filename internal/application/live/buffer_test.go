@@ -23,14 +23,14 @@ func TestLiveBufferBoundedCopiesOverflowAndOriginalActivation(t *testing.T) {
 			t.Fatal("append", n)
 		}
 	}
-	if len(b.rows) != 500 || b.bytes > v.MaxBufferBytes || b.Lost() != 200 {
-		t.Fatal(len(b.rows), b.bytes, b.Lost())
+	if len(b.rows) != 500 || b.Pending() != 500 || b.bytes > v.MaxBufferBytes || b.Lost() != 200 {
+		t.Fatal(len(b.rows), b.Pending(), b.bytes, b.Lost())
 	}
 	call, cancel := context.WithTimeout(t.Context(), time.Millisecond)
 	defer cancel()
 	rows, pos, lost, e := b.Read(call, 0, 100, func() time.Time { return f.now })
-	if e != nil || len(rows) != 100 || rows[0].Row.Sequence != 201 || pos != 300 || lost != 200 {
-		t.Fatal(len(rows), pos, lost, e)
+	if e != nil || len(rows) != 100 || rows[0].Row.Sequence != 201 || pos != 300 || lost != 200 || b.Pending() != 500 {
+		t.Fatal(len(rows), pos, lost, b.Pending(), e)
 	}
 	rows[0].Row.Packet.RemoteIP = "203.0.113.1"
 	if b.rows[0].Row.Packet.RemoteIP == rows[0].Row.Packet.RemoteIP {
