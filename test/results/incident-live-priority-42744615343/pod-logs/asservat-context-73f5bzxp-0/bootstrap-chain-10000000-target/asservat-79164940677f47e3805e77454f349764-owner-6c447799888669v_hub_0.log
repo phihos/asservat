@@ -1,0 +1,23 @@
+2026-11-10T02:49:31.391165779Z owner port router: started (1)
+2026-11-10T02:49:31.391228128Z owner router: started (1)
+2026-11-10T02:49:31.391247918Z owner router: handoff observation (1)
+2026-11-10T02:49:33.151965362Z owner router: handoff observation (2)
+2026-11-10T02:49:33.701488023Z hub kube opening: guard checks: [current<reused]=4 [current<DownloadPolicy]=2 [current<ReadClusterCatalog]=2 [current<ReadWorkerConfiguration]=2 [ReadWorkerConfiguration<newPublicDownloads]=1 [DownloadPolicy<newPublicLive]=1
+2026-11-10T02:49:36.018752665Z owner router: handoff observation (4)
+2026-11-10T02:49:40.950093687Z owner router: handoff observation (8)
+2026-11-10T02:49:49.516865957Z owner router: handoff native (1)
+2026-11-10T02:49:49.573506850Z context start ingress refused: admission (1)
+2026-11-10T02:49:49.573665528Z context start refused: authenticate (1)
+2026-11-10T02:49:49.646318684Z owner router: handoff native (2)
+2026-11-10T02:49:49.665648761Z context start ingress refused: admission (2)
+2026-11-10T02:49:49.665665946Z context start refused: authenticate (2)
+2026-11-10T02:49:51.737839174Z owner router: handoff native (4)
+2026-11-10T02:49:51.757701054Z context start ingress refused: admission (4)
+2026-11-10T02:49:51.757727265Z context start refused: authenticate (4)
+2026-11-10T02:49:53.700841466Z hub kube opening: guard checks: [current<CapacityNamespaceProtection]=4 [current<ReadClusterCatalog]=2 [current<reused]=2 [ReadClusterCatalog<clusterCatalogChanged]=1
+2026-11-10T02:49:53.945254712Z owner router: handoff observation (16)
+2026-11-10T02:49:55.646540672Z owner router: handoff native (8)
+2026-11-10T02:49:55.666380996Z context start ingress refused: admission (8)
+2026-11-10T02:49:55.666406462Z context start refused: authenticate (8)
+2026-11-10T02:49:58.775169870Z owner observer 666 calls 1.38s, operation 0 calls 0s, readiness 548 calls 960ms, identity 3 calls 10ms, provider 12 calls 80ms, credentials 16 calls 30ms, context-start 0 calls 0s total
+2026-11-10T02:49:59.708850469Z owner startup failed: phase=full-runtime role=none reason=changed native=unspecified detail=unspecified sql=unknown sql-reason=unspecified step=unspecified

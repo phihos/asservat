@@ -1,5 +1,29 @@
 # Sustained implementation progress
 
+## Incident priority under live-node overload (2026-11-10)
+
+The existing installed incident fixture now holds an original live cohort while
+a short-lived distinct policy source attempts a second cohort. One node
+subscription is available while two views are hub-eligible. The second read is
+shed with retryable `LiveUnavailable`; its view closes and its source stops
+before a real container restart. The original control stays active. This is
+test-only qualification with no production or permission change and no load
+generator.
+
+- [Native evidence](../test/results/incident-live-priority-42744615343/README.md):
+  run 42744615343 passed at `d45b7838` (Go test 412.03 s, package 412.057 s,
+  focus 132.67 s). The original view remained `Active` with continuation after
+  incident admission. The 812-byte PCAPNG retained six pre-restart marker packets
+  (SHA-256 `2c2bcd17d6b3f344c5130c0e2371ffa4cf87353b997cdc7e21143570dc06208a`).
+  Sources were unchanged, build scratch was removed and cleanup had no failures.
+- Full `make pre-push` and Gitar review passed. Earlier attempts established that
+  same-source viewers share a cohort, open/Head is passive, continuation cursors
+  must be followed, and container restart can legitimately leave the source
+  active. They are not recorded as complete passes.
+
+This proves one bounded incident with live-node overload, not sustained load or
+cross-workload scheduling. The broader specification remains active.
+
 ## Installed multi-principal live-view ceiling (2026-11-10)
 
 The installed live fixture now uses the existing reviewer as a second separately
