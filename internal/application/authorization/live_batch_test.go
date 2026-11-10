@@ -5,6 +5,7 @@ import (
 	"asservat.local/asservat/internal/domain/live"
 	"asservat.local/asservat/internal/domain/privacy"
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -14,6 +15,7 @@ type livePhaseFixture struct {
 	*liveAuthorityFixture
 	records              []LiveSourceRecord
 	podReads, batchReads int
+	afterBatch           func()
 }
 
 func (f *livePhaseFixture) Permissions(ctx context.Context, target value.Target) (value.Projection, error) {
@@ -22,6 +24,9 @@ func (f *livePhaseFixture) Permissions(ctx context.Context, target value.Target)
 }
 func (f *livePhaseFixture) ReadLiveSourceRecords(context.Context, []live.SourceReference) ([]LiveSourceRecord, error) {
 	f.batchReads++
+	if f.afterBatch != nil {
+		f.afterBatch()
+	}
 	return append([]LiveSourceRecord(nil), f.records...), nil
 }
 
@@ -80,6 +85,40 @@ func TestLiveAuthorizationPhasesShareOnlyCommonObservationsAtOneAndSixteenSource
 				if err != nil || len(got) != count || !end.After(base.now) || f.podReads != count*phase || f.batchReads != phase || environment.policyReads != phase || environment.recoveryReads != phase {
 					t.Fatalf("sources=%d phase=%d result=%d error=%v pod=%d sourcebatch=%d policy=%d recovery=%d", count, phase, len(got), err, f.podReads, f.batchReads, environment.policyReads, environment.recoveryReads)
 				}
+			}
+			for _, observation := range []string{"record", "permission"} {
+				t.Run("elapsed-"+observation+"-freshness", func(t *testing.T) {
+					// A blocking catalog read spends the original observation. The
+					// caller, source and audience remain valid; no rights changed.
+					original := append([]LiveSourceRecord(nil), f.records...)
+					var events []string
+					s.Diagnose = func(event string) { events = append(events, event) }
+					f.afterBatch = func() {
+						base.now = now.Add(6 * time.Second)
+						environment.now = base.now
+						if observation == "permission" {
+							for n := range f.records {
+								f.records[n].ObservedAt = base.now
+								f.records[n].ValidUntil = base.now.Add(5 * time.Second)
+							}
+						}
+					}
+					got, _, err := s.CheckSources(t.Context(), f, expected, live.Packet)
+					if !errors.Is(err, live.ErrUnavailable) || errors.Is(err, live.ErrDenied) || len(got) != 0 {
+						t.Fatalf("elapsed observation became an access decision: sources=%d error=%v", len(got), err)
+					}
+					if len(events) != 2 || events[0] != "facts/"+observation+"-fresh unavailable" || events[1] != "batch/facts unavailable" {
+						t.Fatal("missing fixed inner refusal phase", events)
+					}
+					for n, record := range f.records {
+						if !record.Source.Same(original[n].Source) || !record.Source.LeaseUntil.Equal(original[n].Source.LeaseUntil) {
+							t.Fatal("elapsed observation replaced or extended the original source")
+						}
+					}
+					f.afterBatch, s.Diagnose = nil, nil
+					f.records = original
+					base.now, environment.now = now, now
+				})
 			}
 			// The post-node phase cannot reuse the previous phase's positive policy.
 			environment.policy.LiveRead.Clients = []privacy.LiveClient{}

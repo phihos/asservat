@@ -12,8 +12,10 @@ The Kimi-session review integrates PRs #215 and #216 on
 test clocks that had outlived a fixed 30-day fixture. The controlled fixture
 clocks now use the policy's original creation instant; authority durations and
 negative-expiry assertions remain unchanged. Focused and full PostgreSQL adapter
-race tests pass. Broad candidate checks and fresh installed qualification are
-pending until all review fixes are integrated.
+race tests pass. At `8e2b4ac1`, full pre-push passed (613 console tests; affected
+Go race tests 515 s), and the packaged-browser gate passed (146.302 s; 29
+journeys and 28 accessibility scans). The real PostgreSQL ledger and migration
+Up/Down/Up tests passed in 27.859 s with unchanged source and clean cleanup.
 
 Review found an unchecked NULL target digest in the new SQL writer and optional
 fleet RBAC being installed even without fleet composition. The candidate adds
@@ -32,6 +34,32 @@ release experiment: they referenced a profile absent from both the typed
 contract and SQL producer, so the local tree did not compile. Their exact patch
 is preserved outside the checkout; processing release remains unavailable under
 ADR-210 until its producer, consumer and installed workflow are completed.
+
+The fresh local installed chain at `8e2b4ac1` passed in 500.751 s (608.1 s
+including setup/cleanup), with 4,552 unchanged source hashes, removed scratch
+and no cleanup failures. It used the authenticated browser fleet issuance
+route, verified exact replay and the matching operator-channel credential,
+then completed regional enrollment, context capture/publication and native
+download. Issuance is checked in the existing chain/default continuation,
+without adding a focus or extra work to unrelated installed focuses.
+
+[Native run 42884104591](https://github.com/phihos/asservat/actions/runs/42884104591)
+failed after returning exactly two active viewers: React received four live
+batches, then a nonretryable source denial with over 100 seconds left on its
+watch. It is a failure, with unchanged source and complete cleanup, not capacity
+workflow qualification. The old diagnostics identify only outer `service:442`,
+so the precise inner refusal is unknown.
+
+Two local regressions expose concrete failures at that boundary: a missing
+regional status reply produced a source with empty projections and its initial
+lease, and a source/permission observation could expire during a blocking read.
+Those cases now refuse the operation as unavailable; existing same-cursor
+service and browser retry handling retains the original view. No read is
+authorized by expired facts, no deadline is renewed, and actual source, rights,
+policy, audience and hard-bound denials remain unchanged. Fixed diagnostic
+phases identify the batch, source-fact or final check without dependency text
+or identifiers. Focused authorization, service and bootstrap race tests pass;
+final integrated gates and fresh live qualification are required for this fix.
 
 Historical evidence has distinct scopes:
 
@@ -54,9 +82,12 @@ are preserved in the external review archive. CI artifacts own generated output;
 concise provenance summaries remain in source control. Existing historical
 reports outside these PRs are unchanged.
 
-Next: finish independent review, run the affected SQL and repository gates,
-then qualify the integrated installed workflow. The complete first-release
-specification, processing release and wider operational qualification remain open.
+Current qualification and required-CI event/head results are tracked on
+[PR #216](https://github.com/phihos/asservat/pull/216); #215 is superseded. The
+next acceptance boundary is the corrected live workflow through terminal
+cleanup. After it, complete the processing operator restriction/inventory/release
+workflow; the parked wiring alone cannot implement it. The complete first-release
+specification and wider operational qualification remain open.
 
 ## Live loss, reply-drop and pending-row capacity metrics (2026-11-10)
 
