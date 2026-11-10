@@ -10,7 +10,6 @@ import (
 	value "asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
 	admission "k8s.io/api/admissionregistration/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
 const fleetConfigurationDenial = "Asservat fleet configuration administrator is required."
@@ -49,12 +48,12 @@ func fleetSettingsStep(err error) string {
 	if errors.As(err, &fixed) {
 		step := fixed.FixedStep()
 		switch {
-		case apierrors.IsNotFound(err):
-			return step + "/not-found"
-		case apierrors.IsForbidden(err):
-			return step + "/forbidden"
-		case apierrors.IsUnauthorized(err):
-			return step + "/unauthorized"
+		case errors.Is(err, value.ErrDenied):
+			return step + "/denied"
+		case errors.Is(err, cfg.ErrChanged):
+			return step + "/changed"
+		case errors.Is(err, value.ErrUnavailable):
+			return step + "/unavailable"
 		default:
 			return step
 		}
