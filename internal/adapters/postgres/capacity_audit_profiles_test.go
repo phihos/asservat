@@ -15,10 +15,13 @@ func capacityAuditReadFixture() value.AcceptedCapacityAuditProfiles {
 	n := time.Date(2026, 10, 12, 12, 0, 0, 123456000, time.UTC)
 	lane := func(name string) value.CapacityAuditProfile {
 		q := value.OperationHistoryQualification{ID: id, Digest: artifact.Digest{1}, Layout: value.OperationVerificationHistoryLayout, MaximumRowFootprintBytes: 128 << 10, MaximumTransitionWALBytes: 128 << 10, BackupCopies: 1, WALCopies: 1}
+		if name == "processing" {
+			q.Layout = value.ProcessingReleaseHistoryLayout
+		}
 		b, w := q.SlotBacking(2)
 		return value.CapacityAuditProfile{Policy: value.OperationLifecyclePolicy{RootID: id, Lane: name, InstallationID: id, StoreID: id, PolicyID: id, BackupProfileID: id, PolicyDigest: artifact.Digest{2}, BackupProfileDigest: artifact.Digest{3}, BackingRevision: 1, MetadataSlots: 4, BackupReservedBytes: 4 * b, WALReservedBytes: 4 * w, BackupHorizonSeconds: 0, CleanupBudgetSeconds: 1, ProofWindowSeconds: 1, ValidUntil: n.Add(time.Hour), MaxPurgeLeases: 2, History: &q, OverdueTerminal: value.OperationOverdueTerminal}, RetainedSeconds: 60}
 	}
-	return value.AcceptedCapacityAuditProfiles{Format: value.CapacityAuditProfilesFormat, RootID: id, InstallationID: id, QualificationID: id, AccountVersion: "original", QualificationDigest: artifact.Digest{4}, PlanDigest: artifact.Digest{5}, ConfigurationRevision: 1, SourceRevision: 3, Normal: lane("normal"), Resolution: lane("resolution"), ObservedAt: n, FreshUntil: n.Add(5 * time.Second)}
+	return value.AcceptedCapacityAuditProfiles{Format: value.CapacityAuditProfilesFormat, RootID: id, InstallationID: id, QualificationID: id, AccountVersion: "original", QualificationDigest: artifact.Digest{4}, PlanDigest: artifact.Digest{5}, ConfigurationRevision: 1, SourceRevision: 3, Normal: lane("normal"), Processing: lane("processing"), Resolution: lane("resolution"), ObservedAt: n, FreshUntil: n.Add(5 * time.Second)}
 }
 
 func TestCapacityAuditProfilesDecodeClosedAndNoLegacyFallback(t *testing.T) {
@@ -27,7 +30,7 @@ func TestCapacityAuditProfilesDecodeClosedAndNoLegacyFallback(t *testing.T) {
 	if e != nil || !v.Valid(v.ObservedAt) {
 		t.Fatal("invalid fixture", e)
 	}
-	for _, mode := range []string{"valid", "sql-zone", "expired-after-read", "null-profile", "missing-zero", "null-zero", "case-alias", "duplicate", "unknown", "trailing", "oversized"} {
+	for _, mode := range []string{"valid", "sql-zone", "expired-after-read", "null-profile", "missing-zero", "null-zero", "case-alias", "duplicate", "unknown", "trailing", "oversized", "missing-processing", "null-processing", "processing-public-layout", "processing-wrong-revision"} {
 		t.Run(mode, func(t *testing.T) {
 			raw := bytes.Clone(original)
 			now := v.ObservedAt.Add(time.Second)
@@ -58,6 +61,14 @@ func TestCapacityAuditProfilesDecodeClosedAndNoLegacyFallback(t *testing.T) {
 					delete(x["Normal"].(map[string]any)["Policy"].(map[string]any), "BackupHorizonSeconds")
 				case "null-zero":
 					x["Normal"].(map[string]any)["Policy"].(map[string]any)["BackupHorizonSeconds"] = nil
+				case "missing-processing":
+					delete(x, "Processing")
+				case "null-processing":
+					x["Processing"] = nil
+				case "processing-public-layout":
+					x["Processing"].(map[string]any)["Policy"].(map[string]any)["History"].(map[string]any)["Layout"] = value.OperationVerificationHistoryLayout
+				case "processing-wrong-revision":
+					x["Processing"].(map[string]any)["Policy"].(map[string]any)["BackingRevision"] = 2
 				}
 				raw, e = json.Marshal(x)
 				if e != nil {

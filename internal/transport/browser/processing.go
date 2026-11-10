@@ -29,7 +29,8 @@ type ProcessingChangeService interface {
 // ProcessingHandler serves the processing route like the fleet route:
 // session, CSRF, exact JSON and an Idempotency-Key header that is the
 // change's request ID, one request per principal and two in total. Operator
-// membership is the service's check; every refusal is a bounded 503.
+// membership is the service's check; uncertain refusals are bounded 503s and
+// definite revision/request conflicts return 409.
 type ProcessingHandler struct {
 	sessions SessionHandler
 	service  ProcessingChangeService
@@ -46,10 +47,11 @@ func NewProcessingHandler(sessions SessionHandler, service ProcessingChangeServi
 }
 
 type processingChangeInput struct {
-	Action           string                 `json:"action"`
-	RuleID           string                 `json:"ruleID,omitempty"`
-	ExpectedRevision int64                  `json:"expectedRevision,omitempty"`
-	Scope            *value.ProcessingScope `json:"scope,omitempty"`
+	Action           string               `json:"action"`
+	RuleID           string               `json:"ruleID,omitempty"`
+	ExpectedRevision int64                `json:"expectedRevision,omitempty"`
+	Scope            *processingScopeWire `json:"scope,omitempty"`
+	ArtifactID       string               `json:"artifactID,omitempty"`
 }
 
 type processingChangeReply struct {
@@ -142,26 +144,30 @@ func (h *ProcessingHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var in processingChangeInput
 	d := json.NewDecoder(bytes.NewReader(body))
 	d.DisallowUnknownFields()
-	if err != nil || len(body) > 4096 || d.Decode(&in) != nil || d.More() {
+	if err != nil || len(body) > 4096 || d.Decode(&in) != nil || d.Decode(new(any)) != io.EOF || !processingChangeShape(body, in) {
 		sessionProblem(w, 400)
 		return
 	}
-	change := value.ProcessingChange{RequestID: key, RuleID: in.RuleID, Action: in.Action, ExpectedRevision: in.ExpectedRevision}
+	change := value.ProcessingChange{RequestID: key, RuleID: in.RuleID, Action: in.Action, ExpectedRevision: in.ExpectedRevision, RequestedArtifactID: in.ArtifactID}
 	if in.Scope != nil {
-		change.Scope = *in.Scope
+		change.Scope = in.Scope.domain()
 	}
-	if !change.Valid() {
+	if !change.ValidRequest() || in.Scope != nil && in.ArtifactID != "" {
 		sessionProblem(w, 400)
 		return
 	}
 	receipt, err := h.service.Change(ctx, current, change)
+	if errors.Is(err, value.ErrConflict) {
+		sessionProblem(w, http.StatusConflict)
+		return
+	}
 	until := identity.Earlier(deadline, identity.Earlier(view.Identity.ValidUntil, receipt.ValidUntil))
 	if err != nil || ctx.Err() != nil || !receipt.Valid(time.Now()) || !time.Now().Before(until) {
 		sessionProblem(w, 503)
 		return
 	}
-	// Change already performed its final current-authority read. Preserve
-	// that receipt's original bound through the socket flush without a new
+	// Change validated its original authority and current request identity.
+	// Preserve the receipt's original bound through the socket flush without a new
 	// observation. Cancellation cannot be overwritten by a later deadline.
 	socketMu.Lock()
 	if ctx.Err() != nil || !time.Now().Before(until) {

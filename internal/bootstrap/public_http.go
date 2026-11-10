@@ -11,6 +11,7 @@ import (
 	"asservat.local/asservat/internal/adapters/mounts"
 	"asservat.local/asservat/internal/adapters/postgres"
 	auditapp "asservat.local/asservat/internal/application/audit"
+	privacyapp "asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/transport/presentation"
@@ -40,11 +41,15 @@ func newPublicHandler(ctx context.Context, d *OwnerDeployment, a publicAuditStor
 		return nil, &fixedStepError{"profiles", mounts.ErrUnavailable}
 	}
 	auditor := func(lane string) (*auditapp.SelectedOperationAuditor, error) {
-		journalPool, err := d.public.open(ctx, "audit-"+lane+"-journal")
+		poolLane := lane
+		if lane == "processing" {
+			poolLane = "normal"
+		}
+		journalPool, err := d.public.open(ctx, "audit-"+poolLane+"-journal")
 		if err != nil {
 			return nil, err
 		}
-		ackPool, err := d.public.open(ctx, "audit-"+lane+"-ack")
+		ackPool, err := d.public.open(ctx, "audit-"+poolLane+"-ack")
 		if err != nil {
 			return nil, err
 		}
@@ -53,15 +58,27 @@ func newPublicHandler(ctx context.Context, d *OwnerDeployment, a publicAuditStor
 			if policy.Lane != lane || policy.RootID != root || policy.InstallationID != installation {
 				return nil, mounts.ErrUnavailable
 			}
-			journal, err := postgres.NewHealthyOperationJournal(call, journalPool, policy, recovery)
-			if err != nil {
-				return nil, mounts.ErrUnavailable
+			var journal *postgres.OperationJournal
+			var acks *postgres.OperationAcknowledgements
+			var lifecycle *postgres.OperationLifecycles
+			var err error
+			if lane == "processing" {
+				journal, err = postgres.NewProcessingReleaseJournal(call, journalPool, policy, recovery)
+				if err == nil {
+					acks, err = postgres.NewProcessingReleaseAcknowledgements(call, ackPool, policy, recovery)
+				}
+				if err == nil {
+					lifecycle, err = postgres.NewProcessingReleaseLifecycles(call, journalPool, policy, recovery)
+				}
+			} else {
+				journal, err = postgres.NewHealthyOperationJournal(call, journalPool, policy, recovery)
+				if err == nil {
+					acks, err = postgres.NewOperationAcknowledgements(call, ackPool, root, lane, recovery)
+				}
+				if err == nil {
+					lifecycle, err = postgres.NewOperationLifecycles(call, journalPool, root, lane, recovery)
+				}
 			}
-			acks, err := postgres.NewOperationAcknowledgements(call, ackPool, root, lane, recovery)
-			if err != nil {
-				return nil, mounts.ErrUnavailable
-			}
-			lifecycle, err := postgres.NewOperationLifecycles(call, journalPool, root, lane, recovery)
 			if err != nil {
 				return nil, mounts.ErrUnavailable
 			}
@@ -187,7 +204,8 @@ func newPublicHandler(ctx context.Context, d *OwnerDeployment, a publicAuditStor
 	if pc.fleet != nil {
 		services.Fleet = pc.fleet
 	}
-	// ADR-210: the privacy operator's processing changes on the normal lane.
+	// ADR-210: privacy changes use the normal lane and its separately reserved
+	// release lane; both audit facets pin their accepted policy through Finish.
 	if pc.processingPolicy != nil {
 		pool, err := d.public.open(ctx, "processing-decision")
 		if err != nil {
@@ -197,7 +215,16 @@ func newPublicHandler(ctx context.Context, d *OwnerDeployment, a publicAuditStor
 		if err != nil {
 			return nil, &fixedStepError{"processing-sql", mounts.ErrUnavailable}
 		}
-		services.Processing = publicProcessingChanges{root: root, installation: installation, profiles: profiles, policies: pc.processingPolicy, recovery: pc.recovery, decisions: decisions, audit: normal, mac: pc.mac, refused: eventLog(os.Stderr, "processing change refused")}
+		release, err := auditor("processing")
+		if err != nil {
+			return nil, &fixedStepError{"audit-processing", mounts.ErrUnavailable}
+		}
+		inventory, err := postgres.NewProcessingInventory(ctx, pool, root, d.shared.guards.Recovery)
+		if err != nil {
+			return nil, &fixedStepError{"processing-inventory", mounts.ErrUnavailable}
+		}
+		services.ProcessingRules = publicProcessingInventory{privacyapp.ProcessingRuleInventory{RootID: root, InstallationID: installation, Policies: pc.processingPolicy, Recovery: pc.recovery, Inventory: inventory, Now: time.Now}}
+		services.Processing = publicProcessingChanges{root: root, installation: installation, profiles: profiles, policies: pc.processingPolicy, recovery: pc.recovery, decisions: decisions, artifactScopes: inventory, audit: normal, releaseAudit: release, mac: pc.mac, refused: eventLog(os.Stderr, "processing change refused")}
 	}
 	h, err := NewPublicContextHandler(PublicContextConfig{PublicOrigin: p.Origin, Issuer: id.settings.Issuer, Version: p.Version,
 		OperationConcurrency: p.OperationConcurrency, MCPPerIdentity: p.MCPPerIdentity, DownloadConcurrency: p.DownloadConcurrency, DownloadsPerIdentity: p.DownloadsPerIdentity, DownloadMaxDuration: time.Duration(p.DownloadMaxSeconds) * time.Second,

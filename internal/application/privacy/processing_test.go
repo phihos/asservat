@@ -17,24 +17,27 @@ func processingID(n int) string { return fmt.Sprintf("00000000-0000-4000-8000-%0
 // Synthetic current source and durable journal fixture. No test value qualifies
 // deployment regions, identity groups, SQL completeness or backend capacity.
 type processingFixture struct {
-	now                       time.Time
-	i                         identity.Identity
-	p                         value.DownloadPolicy
-	recovery                  artifact.RecoveryProof
-	prepared                  *ProcessingDecision
-	receipt                   *value.ProcessingReceipt
-	begins, finishes, applies int
-	lost                      bool
-	afterFinish, afterApply   func()
+	now                                      time.Time
+	i                                        identity.Identity
+	p                                        value.DownloadPolicy
+	recovery                                 artifact.RecoveryProof
+	prepared                                 *ProcessingDecision
+	receipt                                  *value.ProcessingReceipt
+	begins, finishes, applies                int
+	policyObservations, recoveryObservations int
+	lost                                     bool
+	afterFinish, afterApply                  func()
 }
 
 func (f *processingFixture) ResolveIdentity(context.Context) (identity.Identity, error) {
 	return f.i, nil
 }
 func (f *processingFixture) DownloadPolicy(context.Context) (value.DownloadPolicy, error) {
+	f.policyObservations++
 	return f.p, nil
 }
 func (f *processingFixture) RecoveryState(context.Context) (artifact.RecoveryProof, error) {
+	f.recoveryObservations++
 	return f.recovery, nil
 }
 func (f *processingFixture) PrepareProcessing(_ context.Context, a value.ProcessingAuthority, d ProcessingDecision) (ProcessingPrepared, error) {
@@ -118,6 +121,9 @@ func TestProcessingDecisionAuditsPreparedUnknownBeforeCAS(t *testing.T) {
 	if e != nil || !out.Valid(f.now) || out.State != "initialized" || f.begins != 1 || f.finishes != 1 || f.applies != 1 || f.prepared.Outcome.Effect != "unknown" {
 		t.Fatal("prepared decision/CAS", out, e, f.begins, f.finishes, f.applies)
 	}
+	if f.policyObservations != 1 || f.recoveryObservations != 1 {
+		t.Fatal("change stacked complete authority observations", f.policyObservations, f.recoveryObservations)
+	}
 }
 func TestProcessingUnknownCASReplyRecoversOriginalWithoutAuditSpend(t *testing.T) {
 	f, s, c := newProcessingFixture(t)
@@ -129,6 +135,9 @@ func TestProcessingUnknownCASReplyRecoversOriginalWithoutAuditSpend(t *testing.T
 	out, e := s.Change(context.Background(), f, c)
 	if e != nil || out.OperationID != c.RequestID || f.begins != 1 || f.finishes != 1 || f.applies != 1 {
 		t.Fatal("replay allocated new work", out, e, f.begins, f.finishes, f.applies)
+	}
+	if f.policyObservations != 2 || f.recoveryObservations != 2 {
+		t.Fatal("retry must observe authority once per operation", f.policyObservations, f.recoveryObservations)
 	}
 }
 func TestProcessingNoReleaseFromOrdinaryApprovalAndNoAuthorityAfterWait(t *testing.T) {

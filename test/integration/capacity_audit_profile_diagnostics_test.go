@@ -60,6 +60,12 @@ func TestCapacityAuditProfileDiagnosticsWithRealPostgres(t *testing.T) {
 			return part[start : start+end+len("END $$;")]
 		}
 		before, after := definition(down), definition(up)
+		currentRaw, err := fs.ReadFile(migrations.Files(), "00149_processing_operator_workflow.sql")
+		if err != nil {
+			t.Fatal(err)
+		}
+		currentUp, currentDown, _ := strings.Cut(string(currentRaw), "-- +goose Down")
+		current, previous := definition(currentUp), definition(currentDown)
 		install := func(body string) {
 			t.Helper()
 			if _, err := admin.Exec(ctx, body); err != nil {
@@ -70,13 +76,32 @@ func TestCapacityAuditProfileDiagnosticsWithRealPostgres(t *testing.T) {
 		t.Cleanup(func() {
 			clean, stop := context.WithTimeout(context.Background(), 5*time.Second)
 			defer stop()
-			if _, err := admin.Exec(clean, after); err != nil {
-				t.Error("restore diagnostic function", err)
+			if _, err := admin.Exec(clean, current); err != nil {
+				t.Error("restore current profile function", err)
 			}
 		})
 		reader, err := postgres.NewCapacityAuditProfiles(ctx, f.roles["capacity-profile-read"], f.input.PermissionRootID, f.input.InstallationID, f.qualification.ID, f.qualification.Digest, f.input.AccountVersion)
 		if err != nil {
 			t.Fatal(err)
+		}
+		// Exercise the exact migration149 function pair against a retained,
+		// backed root. Full schema Up/Down qualification runs separately.
+		var retainedRoot string
+		if err := admin.QueryRow(ctx, `SELECT row_to_json(p)::text FROM processing_root p WHERE root_id=$1`, f.input.PermissionRootID).Scan(&retainedRoot); err != nil {
+			t.Fatal("retained processing root before function upgrade", err)
+		}
+		f.fresh(t)
+		f.readAuditProfiles(t)
+		install(previous)
+		if _, err := reader.ReadCapacityAuditProfiles(ctx); err != auditapp.ErrUnavailable {
+			t.Fatal("current adapter accepted historical two-lane projection", err)
+		}
+		install(current)
+		f.fresh(t)
+		f.readAuditProfiles(t)
+		var upgradedRoot string
+		if err := admin.QueryRow(ctx, `SELECT row_to_json(p)::text FROM processing_root p WHERE root_id=$1`, f.input.PermissionRootID).Scan(&upgradedRoot); err != nil || retainedRoot != upgradedRoot {
+			t.Fatal("function downgrade/upgrade changed retained processing state", err)
 		}
 		read := func() error {
 			n := time.Now().UTC().Truncate(time.Microsecond)
@@ -89,7 +114,9 @@ func TestCapacityAuditProfileDiagnosticsWithRealPostgres(t *testing.T) {
 			if err := read(); err != nil {
 				t.Fatal("fresh compiled-reader control", err)
 			}
-			f.readAuditProfiles(t)
+			if _, err := reader.ReadCapacityAuditProfiles(ctx); err != auditapp.ErrUnavailable {
+				t.Fatal("current adapter accepted historical two-lane projection", err)
+			}
 		}
 		for _, cut := range []string{"permission", "source", "trust"} {
 			if !t.Run(cut, func(t *testing.T) {
@@ -172,7 +199,7 @@ func TestCapacityAuditProfileDiagnosticsWithRealPostgres(t *testing.T) {
 				return
 			}
 		}
-		install(after)
+		install(current)
 		f.fresh(t)
 		f.readAuditProfiles(t)
 	})

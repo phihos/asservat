@@ -10,6 +10,55 @@ servers:
 security:
 - BrowserSession: []
 paths:
+  /api/v1/processing/rules:
+    get:
+      operationId: listProcessingRules
+      x-effect: read
+      summary: Read the privacy operator's bounded durable restriction inventory.
+      parameters:
+      - name: after
+        in: query
+        schema: {type: string, format: uuid}
+      - name: limit
+        in: query
+        schema: {type: integer, minimum: 1, maximum: 100, default: 50}
+      responses:
+        '200':
+          description: Current content-minimized processing rules; each page authorizes independently.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ProcessingInventory'}
+        default:
+          description: Session, authority, validation or availability refusal.
+  /api/v1/processing/changes:
+    post:
+      operationId: changeProcessing
+      x-effect: command
+      summary: Explicitly initialize, restrict or release processing under current privacy authority.
+      parameters:
+      - name: Idempotency-Key
+        in: header
+        required: true
+        schema: {type: string, format: uuid}
+      - name: X-CSRF-Token
+        in: header
+        required: true
+        schema: {type: string, minLength: 43, maxLength: 43}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ProcessingChange'}
+      responses:
+        '200':
+          description: Acknowledged exact processing change receipt.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ProcessingReceipt'}
+        '409':
+          description: Exact revision or idempotency conflict; refresh inventory before another change.
+        default:
+          description: Refusal or uncertain result; retry an uncertain change with the same key and input.
   /api/v1/operations/list_cases:
     post:
       operationId: list_cases
@@ -3296,6 +3345,12 @@ components:
       scheme: bearer
       bearerFormat: OAuth access token; audience/client and evidence:download checked
   schemas:
+    ProcessingInventory:
+      $ref: https://asservat.io/spec/v1/processing.schema.json#/$defs/Inventory
+    ProcessingChange:
+      $ref: https://asservat.io/spec/v1/processing.schema.json#/$defs/Change
+    ProcessingReceipt:
+      $ref: https://asservat.io/spec/v1/processing.schema.json#/$defs/Receipt
     McpInput_activate_policy:
       type: object
       additionalProperties: false

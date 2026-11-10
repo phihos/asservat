@@ -28,3 +28,13 @@ UPDATE processing_decision SET applied_at=clock_timestamp(),audit_digest=(SELECT
 WHERE processing_decision.root_id=$1 AND processing_decision.id=$2 AND processing_decision.applied_at IS NULL RETURNING processing_decision.*;
 -- name: ProcessingCatalogEmpty :one
 SELECT NOT EXISTS(SELECT 1 FROM context_catalog WHERE root_id=$1) AS empty;
+
+-- name: ListProcessingInventoryRules :many
+SELECT id,revision,state,scope,valid_until,retire_by FROM processing_rule
+WHERE root_id=sqlc.arg(root_id)::uuid AND (sqlc.narg(after_id)::uuid IS NULL OR id>sqlc.narg(after_id)::uuid)
+ORDER BY id LIMIT sqlc.arg(page_limit)::integer;
+
+-- name: ResolveProcessingArtifactScope :one
+SELECT p.cluster_id,p.artifact_id,p.attempt_id FROM context_processing p
+JOIN context_catalog c ON c.root_id=p.root_id AND c.artifact_id=p.artifact_id AND c.capture_id=p.capture_id
+WHERE p.root_id=sqlc.arg(root_id)::uuid AND p.artifact_id=sqlc.arg(artifact_id)::uuid;

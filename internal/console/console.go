@@ -43,7 +43,8 @@ var (
 	caseRoute         = regexp.MustCompile(`^/cases/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
 	captureRoute      = regexp.MustCompile(`^/captures/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
 	// ADR-249: one approval request page.
-	approvalRoute = regexp.MustCompile(`^/approvals/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
+	processingArtifactRoute = regexp.MustCompile(`^/processing/artifacts/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
+	approvalRoute           = regexp.MustCompile(`^/approvals/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
 )
 
 type asset struct {
@@ -353,7 +354,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func consoleRoute(path string) bool {
-	return path == "/" || path == "/captures/new" || path == "/live" || path == "/policies" || path == "/shares" || path == "/access-preview" || path == "/capacity" || path == "/retention-preview" || path == "/approvals" || captureRoute.MatchString(path) || caseRoute.MatchString(path) || approvalRoute.MatchString(path)
+	return path == "/processing" || processingArtifactRoute.MatchString(path) || path == "/" || path == "/captures/new" || path == "/live" || path == "/policies" || path == "/shares" || path == "/access-preview" || path == "/capacity" || path == "/retention-preview" || path == "/approvals" || captureRoute.MatchString(path) || caseRoute.MatchString(path) || approvalRoute.MatchString(path)
 }
 
 // ServeContent removes cache headers on conditional/range errors. Preserve the

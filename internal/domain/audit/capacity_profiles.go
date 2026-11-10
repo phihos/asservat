@@ -25,7 +25,7 @@ type AcceptedCapacityAuditProfiles struct {
 	Format, RootID, InstallationID, QualificationID, AccountVersion string
 	QualificationDigest, PlanDigest                                 artifact.Digest
 	ConfigurationRevision, SourceRevision                           int64
-	Normal, Resolution                                              CapacityAuditProfile
+	Normal, Processing, Resolution                                  CapacityAuditProfile
 	ObservedAt, FreshUntil                                          time.Time
 }
 
@@ -34,13 +34,13 @@ func (v AcceptedCapacityAuditProfiles) Valid(now time.Time) bool {
 		return false
 	}
 	for _, lane := range []struct {
-		name  string
-		value CapacityAuditProfile
-	}{{"normal", v.Normal}, {"resolution", v.Resolution}} {
+		name, layout string
+		value        CapacityAuditProfile
+	}{{"normal", OperationVerificationHistoryLayout, v.Normal}, {"processing", ProcessingReleaseHistoryLayout, v.Processing}, {"resolution", OperationVerificationHistoryLayout, v.Resolution}} {
 		p := lane.value.Policy
-		if !p.CertificateVerificationBacked() || p.History.Layout != OperationVerificationHistoryLayout || p.RootID != v.RootID || p.InstallationID != v.InstallationID || p.Lane != lane.name || p.BackingRevision != v.ConfigurationRevision || p.OverdueTerminal != OperationOverdueTerminal || v.FreshUntil.After(p.ValidUntil) || lane.value.RetainedSeconds < 60 || lane.value.RetainedSeconds > 316224000 || lane.value.RetainedSeconds <= 2*p.BackupHorizonSeconds+3*p.CleanupBudgetSeconds+p.ProofWindowSeconds+30 {
+		if !p.CertificateVerificationBacked() || p.History.Layout != lane.layout || p.RootID != v.RootID || p.InstallationID != v.InstallationID || p.Lane != lane.name || p.BackingRevision != v.ConfigurationRevision || p.OverdueTerminal != OperationOverdueTerminal || v.FreshUntil.After(p.ValidUntil) || lane.value.RetainedSeconds < 60 || lane.value.RetainedSeconds > 316224000 || lane.value.RetainedSeconds <= 2*p.BackupHorizonSeconds+3*p.CleanupBudgetSeconds+p.ProofWindowSeconds+30 {
 			return false
 		}
 	}
-	return v.Normal.Policy.StoreID == v.Resolution.Policy.StoreID
+	return v.Normal.Policy.StoreID == v.Resolution.Policy.StoreID && v.Normal.Policy.StoreID == v.Processing.Policy.StoreID
 }

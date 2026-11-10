@@ -14,7 +14,7 @@ import (
 func publicRoutesFixture(handler http.Handler) *publicContextRoutes {
 	return &publicContextRoutes{
 		host: "asservat.invalid", sessions: handler, investigations: handler,
-		mcp: handler, content: handler, console: handler,
+		mcp: handler, content: handler, console: handler, processing: handler, processingRules: handler,
 		mcpPath: "/mcp", mcpMetadata: "/.well-known/oauth-protected-resource/mcp",
 		contentPrefix: "/api/v1/downloads/", contentMetadata: "/.well-known/oauth-protected-resource/downloads",
 	}
@@ -30,6 +30,7 @@ func TestPublicContextRoutesKeepDistinctProtocolOwners(t *testing.T) {
 	h := publicRoutesFixture(owner("unused"))
 	h.sessions, h.investigations, h.mcp = owner("session"), owner("operation"), owner("mcp")
 	h.content, h.console = owner("content"), owner("console")
+	h.processing, h.processingRules = owner("processing-change"), owner("processing-inventory")
 	for _, tc := range []struct{ target, want string }{
 		{"/auth/login?return_to=%2Fcases%2Fx", "session"},
 		{"/auth/callback?state=opaque&code=opaque&iss=https%3A%2F%2Fidentity.invalid", "session"},
@@ -41,6 +42,10 @@ func TestPublicContextRoutesKeepDistinctProtocolOwners(t *testing.T) {
 		{"/api/v1/downloads/00000000-0000-4000-8000-000000000001/content", "content"},
 		{"/captures/new", "console"},
 		{"/live", "console"},
+		{"/processing", "console"},
+		{"/processing/artifacts/00000000-0000-4000-8000-000000000001", "console"},
+		{"/api/v1/processing/changes", "processing-change"},
+		{"/api/v1/processing/rules?limit=2&after=00000000-0000-4000-8000-000000000001", "processing-inventory"},
 		{"/policies", "console"},
 		{"/shares", "console"},
 		{"/cases/00000000-0000-4000-8000-000000000001", "console"},
@@ -69,6 +74,7 @@ func TestPublicContextRoutesPreserveOriginalAuthAndEvidenceRequests(t *testing.T
 		"/auth/callback?state=opaque&code=a%2Bb&iss=https%3A%2F%2Fidentity.invalid",
 		"/auth/backchannel-logout", "/auth/csrf", "/auth/refresh", "/auth/logout", "/api/v1/session",
 		"/mcp", "/.well-known/oauth-protected-resource/mcp", "/.well-known/oauth-protected-resource/downloads",
+		"/api/v1/processing/changes", "/api/v1/processing/rules?limit=2&after=00000000-0000-4000-8000-000000000001",
 		"/api/v1/operations/request_capture", "/api/v1/operations/cancel_artifact_download",
 		"/api/v1/downloads/00000000-0000-4000-8000-000000000001/content",
 		"/", "/assets/entry-12345678.js", "/captures/new", "/captures/00000000-0000-4000-8000-000000000001", "/cases/00000000-0000-4000-8000-000000000001",
@@ -94,7 +100,7 @@ func TestPublicContextRoutesNeverNormalizeOrUseAPIAsConsoleFallback(t *testing.T
 	var calls int
 	h := publicRoutesFixture(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { calls++ }))
 	for _, target := range []string{
-		"/api", "/api/v1/operations", "/api/v1/downloads", "/auth", "/auth/unknown", "/mcp/", "/private/owner", "/metrics", "/healthz",
+		"/processing/", "/processing?artifact=00000000-0000-4000-8000-000000000001", "/processing/artifacts/%30%30%30%30%30%30%30%30-0000-4000-8000-000000000001", "/api/v1/processing", "/api/v1/processing/changes/", "/api/v1/processing/rules/", "/api/v1/processing/changes?limit=2", "/api/v1/processing/rules?", "/api", "/api/v1/operations", "/api/v1/downloads", "/auth", "/auth/unknown", "/mcp/", "/private/owner", "/metrics", "/healthz",
 		"/.well-known/oauth-protected-resource", "/.well-known/oauth-protected-resource/downloads/",
 		"/api//v1/operations/request_capture", "/api/v1/../operations/request_capture", "/api/v1/./operations/request_capture",
 		"/%61pi/v1/operations/request_capture", "/api%2fv1/operations/request_capture", "/api/v1/downloads/x%252fy/content",
@@ -198,6 +204,23 @@ func TestPublicContextRoutesWithoutContentAnswerUnavailable(t *testing.T) {
 		h.ServeHTTP(w, r)
 		if w.Code != want {
 			t.Fatalf("%s answered %d, want %d", target, w.Code, want)
+		}
+	}
+}
+
+// Disabled processing services never fall through to the console shell. Query
+// ownership remains with the bounded inventory handler only when composed.
+func TestPublicContextRoutesWithoutProcessingNeverReachConsole(t *testing.T) {
+	var calls int
+	h := publicRoutesFixture(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { calls++ }))
+	h.processing, h.processingRules = nil, nil
+	for _, target := range []string{"/api/v1/processing/changes", "/api/v1/processing/rules", "/api/v1/processing/rules?limit=50"} {
+		r := httptest.NewRequest(http.MethodGet, target, nil)
+		r.Host, r.TLS = h.host, &tls.ConnectionState{}
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		if calls != 0 || w.Code < 400 || w.Header().Get("Location") != "" || w.Header().Get("Content-Type") != "application/problem+json" {
+			t.Fatalf("disabled processing route %s reached console or redirected: %d", target, w.Code)
 		}
 	}
 }

@@ -567,3 +567,17 @@ operations:
   - mcp
   effect: command
   contract: specs/contracts/mcp-tools.json
+- operation: listProcessingRules
+  path: /api/v1/processing/rules
+  transport:
+  - browser
+  effect: read
+  role: privacy-operator
+  contract: specs/contracts/processing.schema.json
+- operation: changeProcessing
+  path: /api/v1/processing/changes
+  transport:
+  - browser
+  effect: command
+  role: privacy-operator
+  contract: specs/contracts/processing.schema.json

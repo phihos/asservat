@@ -1,5 +1,9 @@
 # Decision records
 
+[ADR-318 — Processing operator rule inventory and release](318-processing-operator-rule-inventory-and-release.md)
+composes the existing reserved release lane with a bounded console inventory and
+exact-revision controls. Implementation candidate; installed qualification pending.
+
 [ADR-317 — Terminal recovery after live-owner loss](317-terminal-live-owner-recovery.md)
 ends the minimized view after full principal/client cursor verification instead
 of adopting private source/filter state into a replacement owner. Component,

@@ -1,6 +1,36 @@
 # Sustained implementation progress
 
-## Active candidate: viewer capacity and optional fleet settings (2026-11-10)
+## Active candidate: processing restriction inventory and release (2026-11-10)
+
+Outcome: a configured operator selects an existing artifact, restricts it,
+rediscovers the durable rule after reload, releases its exact revision and
+recovers ordinary reads/download starts for the same original evidence.
+Candidate: `feature/processing-release-flow` in the separate processing-release
+worktree, based on qualified `dda2f708` (PR #216 remains open/green for review).
+[ADR-318](decisions/318-processing-operator-rule-inventory-and-release.md)
+records scope, wire changes, the shared reserve and numeric complexity review.
+
+The reserve projection, typed lane selection, canonical browser controls,
+operator inventory and artifact resolution are implemented as a candidate.
+Existing processing SQL grants/transactions are reused; two proposed duplicate
+SQL functions were removed. No roles, pools, background loops or consent step
+are added. Actual initialized/unknown/restricted state is never inferred from
+an empty browser view. Started responses retain ADR-312's existing bounds.
+
+Focused domain/application/adapter/browser race tests pass. The shared actual
+React driver passed the controlled Go TLS/session/CSRF restriction/reload/release
+journey in 3.30 s, including 320px reflow. Empty owned PostgreSQL migration149
+Up/Down/Up passes; the first preflight reached a socket-only initialization
+server before TCP was ready and failed before DDL, and is not a pass.
+
+Next: execute the actual profile/reserved release and inventory expressions
+under compiled SQL grants, check upgrade/history composition, integrate the same
+React driver into the installed journey, then run integrated gates once and
+fresh installed qualification. No installed outcome or complete REQ-PRV-006
+exit is claimed yet.
+
+
+## Reviewed candidate: viewer capacity and optional fleet settings (2026-11-10)
 
 Outcome: the authenticated administrator capacity view reports active viewers
 for the selected workload cluster, using current owner liveness and the existing

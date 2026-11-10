@@ -12,14 +12,17 @@ func capacityAuditProfilesFixture() AcceptedCapacityAuditProfiles {
 	n := time.Date(2026, 10, 12, 12, 0, 0, 123456000, time.UTC)
 	lane := func(name string) CapacityAuditProfile {
 		q := OperationHistoryQualification{ID: id, Digest: artifact.Digest{1}, Layout: OperationVerificationHistoryLayout, MaximumRowFootprintBytes: 128 << 10, MaximumTransitionWALBytes: 128 << 10, BackupCopies: 1, WALCopies: 1}
+		if name == "processing" {
+			q.Layout = ProcessingReleaseHistoryLayout
+		}
 		b, w := q.SlotBacking(2)
 		return CapacityAuditProfile{Policy: OperationLifecyclePolicy{RootID: id, Lane: name, InstallationID: id, StoreID: id, PolicyID: id, BackupProfileID: id, PolicyDigest: artifact.Digest{2}, BackupProfileDigest: artifact.Digest{3}, BackingRevision: 2, MetadataSlots: 4, BackupReservedBytes: 4 * b, WALReservedBytes: 4 * w, BackupHorizonSeconds: 0, CleanupBudgetSeconds: 1, ProofWindowSeconds: 1, ValidUntil: n.Add(time.Hour), MaxPurgeLeases: 2, History: &q, OverdueTerminal: OperationOverdueTerminal}, RetainedSeconds: 60}
 	}
-	return AcceptedCapacityAuditProfiles{Format: CapacityAuditProfilesFormat, RootID: id, InstallationID: id, QualificationID: id, AccountVersion: "original-account-v1", QualificationDigest: artifact.Digest{4}, PlanDigest: artifact.Digest{5}, ConfigurationRevision: 2, SourceRevision: 8, Normal: lane("normal"), Resolution: lane("resolution"), ObservedAt: n, FreshUntil: n.Add(5 * time.Second)}
+	return AcceptedCapacityAuditProfiles{Format: CapacityAuditProfilesFormat, RootID: id, InstallationID: id, QualificationID: id, AccountVersion: "original-account-v1", QualificationDigest: artifact.Digest{4}, PlanDigest: artifact.Digest{5}, ConfigurationRevision: 2, SourceRevision: 8, Normal: lane("normal"), Processing: lane("processing"), Resolution: lane("resolution"), ObservedAt: n, FreshUntil: n.Add(5 * time.Second)}
 }
 
 func TestCapacityAuditProfilesPreserveExactLaneAndOriginalInterval(t *testing.T) {
-	for _, name := range []string{"valid", "normal-is-resolution", "legacy-layout", "other-root", "unbacked", "wrong-revision", "not-verifier-backed", "no-overdue", "invalid-retention", "earlier-policy", "future-observation", "expired", "renewed-interval", "submicro", "wrong-store", "no-plan", "no-account"} {
+	for _, name := range []string{"valid", "normal-is-resolution", "legacy-layout", "other-root", "unbacked", "wrong-revision", "not-verifier-backed", "no-overdue", "invalid-retention", "earlier-policy", "future-observation", "expired", "renewed-interval", "submicro", "wrong-store", "no-plan", "no-account", "missing-processing", "processing-normal-layout", "processing-unbacked", "processing-wrong-revision", "processing-wrong-store", "processing-short-retention", "processing-earlier-policy"} {
 		t.Run(name, func(t *testing.T) {
 			v := capacityAuditProfilesFixture()
 			now := v.ObservedAt.Add(time.Second)
@@ -56,6 +59,20 @@ func TestCapacityAuditProfilesPreserveExactLaneAndOriginalInterval(t *testing.T)
 				v.PlanDigest = artifact.Digest{}
 			case "no-account":
 				v.AccountVersion = ""
+			case "missing-processing":
+				v.Processing = CapacityAuditProfile{}
+			case "processing-normal-layout":
+				v.Processing.Policy.History.Layout = OperationVerificationHistoryLayout
+			case "processing-unbacked":
+				v.Processing.Policy.WALReservedBytes--
+			case "processing-wrong-revision":
+				v.Processing.Policy.BackingRevision++
+			case "processing-wrong-store":
+				v.Processing.Policy.StoreID = "40000000-0000-4000-8000-000000000002"
+			case "processing-short-retention":
+				v.Processing.RetainedSeconds = 34
+			case "processing-earlier-policy":
+				v.Processing.Policy.ValidUntil = now.Add(time.Second)
 			}
 			if v.Valid(now) != (name == "valid") {
 				t.Fatal("profile validity differs from original accepted lane/interval")
