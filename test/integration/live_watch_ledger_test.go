@@ -86,7 +86,11 @@ func TestLiveWatchLedgerWithRealServices(t *testing.T) {
 	}
 	t.Cleanup(pool.Close)
 	limits := postgres.LiveWatchLimits{InstallationSlots: 2, PrincipalSlots: 1, WorkloadSlots: 2, MemoryBytes: 2 << 20, InstallationRate: 1, InstallationBurst: 1 << 20, PrincipalRate: 1, PrincipalBurst: 48 << 10, WorkloadRate: 1, WorkloadBurst: 48 << 10, WatchBurst: 24 << 10, MaxOutputBytes: 1 << 20, MaxRate: 64 << 10, MaxDurationSeconds: 60, MaxAccounts: 16, MaxControlRecords: 128}
-	ledger, err := postgres.NewLiveWatches(ctx, pool, root, request.Binding.ProcessEpoch, owners.reader, current, limits)
+	workloadLimits := limits
+	workloadLimits.InstallationSlots = 3
+	workloadLimits.PrincipalSlots = 3
+	workloadLimits.MemoryBytes = 3 << 20
+	ledger, err := postgres.NewLiveWatches(ctx, pool, root, request.Binding.ProcessEpoch, owners.reader, current, workloadLimits)
 	if err != nil {
 		t.Fatal("compiled hub live constructor", err)
 	}
@@ -102,6 +106,52 @@ func TestLiveWatchLedgerWithRealServices(t *testing.T) {
 		return liveapp.Control{ID: custodyID(), OwnerID: request.Binding.ProcessEpoch, Fence: custodyID(), PrincipalKey: [32]byte{p}, WorkloadKey: [32]byte{w}, RequestDigest: [32]byte{3}, Revision: 1, State: "Active", AcceptedAt: now, ExpiresAt: now.Add(8 * time.Second), IdleUntil: now.Add(8 * time.Second), OutputLimit: 1 << 20, BytesPerSecond: 1}
 	}
 	keyFor := func(v byte) string { return hex.EncodeToString(bytes.Repeat([]byte{v}, 32)) }
+	firstWorkload := makeControl(4, 7)
+	if _, _, err = ledger.Create(ctx, firstWorkload, keyFor(10)); err != nil {
+		t.Fatal("first workload control", err)
+	}
+	secondWorkload := makeControl(5, 7)
+	if _, _, err = ledger.Create(ctx, secondWorkload, keyFor(11)); err != nil {
+		t.Fatal("second workload control", err)
+	}
+	if _, _, err = ledger.Create(ctx, makeControl(6, 7), keyFor(12)); !errors.Is(err, live.ErrCapacity) {
+		t.Fatal("third principal bypassed the workload ceiling below installation/principal limits", err)
+	}
+	outsideWorkload := makeControl(6, 8)
+	if _, _, err = ledger.Create(ctx, outsideWorkload, keyFor(13)); err != nil {
+		t.Fatal("workload refusal blocked an unrelated workload", err)
+	}
+	closeWorkload := func(control liveapp.Control) {
+		t.Helper()
+		control.State = "Closed"
+		control.Revision++
+		if _, err = ledger.Change(ctx, control, control.Revision-1, 0); err != nil {
+			t.Fatal("workload control close", err)
+		}
+	}
+	closeWorkload(firstWorkload)
+	releasedWorkload := makeControl(6, 7)
+	if _, _, err = ledger.Create(ctx, releasedWorkload, keyFor(14)); err != nil {
+		t.Fatal("workload close did not release its slot", err)
+	}
+	closeWorkload(secondWorkload)
+	closeWorkload(outsideWorkload)
+	closeWorkload(releasedWorkload)
+	workloadTimer := time.NewTimer(time.Until(releasedWorkload.ExpiresAt) + time.Millisecond)
+	defer workloadTimer.Stop()
+	select {
+	case <-workloadTimer.C:
+	case <-ctx.Done():
+		t.Fatal(ctx.Err())
+	}
+	workloadControls, workloadAccounts, err := ledger.PruneExpired(ctx)
+	if err != nil || workloadControls != 4 || workloadAccounts != 6 {
+		t.Fatal("closed unspent workload fixture did not prune", workloadControls, workloadAccounts, err)
+	}
+	ledger, err = postgres.NewLiveWatches(ctx, pool, root, request.Binding.ProcessEpoch, owners.reader, current, limits)
+	if err != nil {
+		t.Fatal("restore original live limits", err)
+	}
 	c := makeControl(1, 2)
 	got, reused, err := ledger.Create(ctx, c, keyFor(1))
 	if err != nil || reused || got != c {
@@ -331,5 +381,5 @@ func TestLiveWatchLedgerWithRealServices(t *testing.T) {
 		}
 	}
 
-	t.Log("real compiled hub control facets + independently audited current owner: original receipts, installation root uniqueness, one slot, per-watch/three-account charges, rollback, close/reopen debt, original expiry; no native/source/installed qualification")
+	t.Log("real compiled hub control facets + independently audited current owner: original receipts, installation root uniqueness, isolated workload ceiling/release, one slot, per-watch/three-account charges, rollback, close/reopen debt, original expiry; no native/source/installed qualification")
 }
