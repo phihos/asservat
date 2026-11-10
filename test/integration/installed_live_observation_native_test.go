@@ -303,7 +303,8 @@ func qualifyInstalledLiveObservation(t *testing.T, ctx context.Context, c instal
 	otherSession := connect(reviewer, "installed-live-second-principal")
 	defer otherSession.Close()
 	c.OtherCall = callOn(otherSession)
-	capacityReply, capacityCode, capacityErr := call(ctx, "get_live_capacity", map[string]any{"cluster_id": c.ClusterID})
+	console := c.Identity.consoleSession(t, ctx, cert, c.Address, c.Origin)
+	capacityReply, capacityHTTP, capacityErr := console.operation(ctx, "get_live_capacity", map[string]any{"cluster_id": c.ClusterID}, "")
 	var capacity struct {
 		ClusterID        string `json:"cluster_id"`
 		Nodes            int    `json:"nodes"`
@@ -313,24 +314,27 @@ func qualifyInstalledLiveObservation(t *testing.T, ctx context.Context, c instal
 			Cohorts int `json:"cohorts"`
 		} `json:"live"`
 	}
-	if capacityErr != nil || capacityCode != "" || capacityReply.Status != "ok" || json.Unmarshal(capacityReply.Data, &capacity) != nil || capacity.ClusterID != c.ClusterID || capacity.Nodes < 1 || capacity.Live == nil || capacity.Live.Cohorts < 0 || capacity.RatesComplete != (capacity.RatesUnavailable == 0) {
-		t.Fatal("installed fleet-operator live capacity", capacityCode, capacityErr, capacityReply.Status, string(capacityReply.Data))
+	if capacityErr != nil || capacityHTTP != http.StatusOK || capacityReply.Status != "ok" || json.Unmarshal(capacityReply.Data, &capacity) != nil || capacity.ClusterID != c.ClusterID || capacity.Nodes < 1 || capacity.Live == nil || capacity.Live.Cohorts < 0 || capacity.RatesComplete != (capacity.RatesUnavailable == 0) {
+		t.Fatal("installed fleet-operator live capacity", capacityHTTP, capacityErr, capacityReply.Status, string(capacityReply.Data))
 	}
 	for _, label := range []string{"podUID", "nodeName", "sourceID", "principal", "filter", "payload"} {
 		if strings.Contains(string(capacityReply.Data), `"`+label+`"`) {
 			t.Fatal("live capacity exposed a content label", label)
 		}
 	}
-	otherCapacity, otherCode, otherErr := c.OtherCall(ctx, "get_live_capacity", map[string]any{"cluster_id": c.ClusterID})
-	if otherErr != nil || otherCode != "AdministratorRequired" {
-		t.Fatal("non-operator read live capacity", otherCode, otherErr, otherCapacity.Status)
+	otherConsole := reviewer.consoleSession(t, ctx, cert, c.Address, c.Origin)
+	otherCapacity, otherHTTP, otherErr := otherConsole.operation(ctx, "get_live_capacity", map[string]any{"cluster_id": c.ClusterID}, "")
+	var capacityFailure struct {
+		Code string `json:"code"`
+	}
+	if otherErr != nil || otherHTTP != http.StatusOK || otherCapacity.Status != "error" || json.Unmarshal(otherCapacity.Data, &capacityFailure) != nil || capacityFailure.Code != "AdministratorRequired" {
+		t.Fatal("non-operator read live capacity", otherHTTP, otherErr, otherCapacity.Status, string(otherCapacity.Data))
 	}
 	t.Logf("installed live capacity: one original cluster, %d current live-enabled node reports, ratesComplete=%v; non-operator refused", capacity.Nodes, capacity.RatesComplete)
 	invoke := installedRecordingInvoke(func(callCtx context.Context, name string, input any) (installedJourneyEnvelope, string, error) {
 		r, code, e := call(callCtx, name, input)
 		return r.installedJourneyEnvelope, code, e
 	})
-	console := c.Identity.consoleSession(t, ctx, cert, c.Address, c.Origin)
 	browser := startInstalledLiveBrowser(t, ctx, console, c.Address, map[string]string{"cluster_id": c.ClusterID, "namespace": c.Namespace, "kind": "Deployment", "name": c.Workload})
 	defer browser.close()
 	episodes := 0
