@@ -1,0 +1,24 @@
+2026-11-10T12:29:40.001402774Z owner port router: started (1)
+2026-11-10T12:29:40.001431636Z owner router: started (1)
+2026-11-10T12:29:40.037485405Z owner router: handoff observation (1)
+2026-11-10T12:29:41.756575177Z owner router: handoff observation (2)
+2026-11-10T12:29:42.956874785Z hub kube opening: guard checks: [current<reused]=4 [current<ReadClusterCatalog]=2 [current<ReadWorkerConfiguration]=2 [current<DownloadPolicy]=2 [ReadClusterCatalog<readPublicClusterCatalog]=1 [ReadWorkerConfiguration<newPublicDownloads]=1
+2026-11-10T12:29:45.058664242Z owner router: handoff observation (4)
+2026-11-10T12:29:49.557674842Z owner router: handoff observation (8)
+2026-11-10T12:29:52.956787855Z hub kube opening: guard checks: [current<ReadClusterCatalog]=2
+2026-11-10T12:29:56.018281046Z owner router: handoff native (1)
+2026-11-10T12:29:56.061569906Z context start ingress refused: admission (1)
+2026-11-10T12:29:56.061589324Z context start refused: authenticate (1)
+2026-11-10T12:29:56.118156768Z owner router: handoff native (2)
+2026-11-10T12:29:56.135182083Z context start ingress refused: admission (2)
+2026-11-10T12:29:56.135204326Z context start refused: authenticate (2)
+2026-11-10T12:29:58.136623143Z owner router: handoff native (4)
+2026-11-10T12:29:58.319021275Z context start ingress refused: admission (4)
+2026-11-10T12:29:58.319072120Z context start refused: authenticate (4)
+2026-11-10T12:30:02.103408212Z owner router: handoff native (8)
+2026-11-10T12:30:02.122300534Z context start ingress refused: admission (8)
+2026-11-10T12:30:02.122603421Z context start refused: authenticate (8)
+2026-11-10T12:30:02.956136509Z hub kube opening: guard checks: [current<CapacityNamespaceProtection]=4 [current<reused]=2 [ReadClusterCatalog<clusterCatalogChanged]=1
+2026-11-10T12:30:03.120420889Z owner router: handoff observation (16)
+2026-11-10T12:30:07.388207772Z owner observer 637 calls 980ms, operation 0 calls 0s, readiness 548 calls 880ms, identity 3 calls 10ms, provider 12 calls 20ms, credentials 16 calls 20ms, context-start 0 calls 0s total
+2026-11-10T12:30:07.431196260Z owner startup failed: phase=full-runtime role=none reason=changed native=unspecified detail=unspecified sql=unknown sql-reason=unspecified step=unspecified

@@ -37,11 +37,20 @@ caller validity before the final identity recheck.
   The actual built React/Go HTTPS page renders exact active viewers separately
   from cohorts through the canonical operation and regenerated closed contract.
 
+- [Native evidence](../test/results/live-viewer-native-42814814795/README.md):
+  run 42814814795 passed at `4a699d9a` (package 449.626 s, focus 174.90 s),
+  covering all three policy projections, sustained reads, shared ceilings and
+  exact owner failover with 31 bounded live operations and no viewer acquisition.
+  Earlier attempts
+  [42810631259](../test/results/live-viewer-native-42810631259/README.md) and
+  [42813341849](../test/results/live-viewer-native-42813341849/README.md) failed
+  transient browser-source and principal-ceiling-open episodes and are not passes.
+
 This is exact component accounting, not a fleet-administrator installed
-multi-node measurement. [Native attempt 42810631259](../test/results/live-viewer-native-42810631259/README.md)
-failed an earlier browser `SourceUnavailable` episode and is not a pass; the
-corrected head needs its own installed run. Final-head CI and independent review
-are separate; the broader specification remains active.
+multi-node measurement. Final-head Gitar review approved with both findings
+closed. CI run 42814070024 passed every job except `test (1/14)`, which failed
+only the unrelated fixed-date accepted-policy fixtures described above, so the
+PR remains unmerged. The broader specification remains active.
 
 ## Live loss, reply-drop and pending-row capacity metrics (2026-11-10)
 

@@ -1,0 +1,142 @@
+2026-11-10T12:28:30.751309029Z installer continuation: resources/audit-secrets done in 6ms
+2026-11-10T12:28:30.751331822Z installer continuation: resources/audit-secrets kubernetes requests=139 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET configmaps]=30 [GET validatingadmissionpolicies]=25 [GET validatingadmissionpolicybindings]=22 [POST selfsubjectreviews]=16 [GET namespaces]=14 [GET serviceaccounts]=7
+2026-11-10T12:28:30.751344150Z installer continuation: resources/audit-secrets guard checks: [current<currentHandoverWithFinal]=12 [stagingHandover<currentHandoverWithFinal]=6 [currentPublic<ReadToken]=2 [current<current]=2
+2026-11-10T12:28:30.785644130Z installer continuation: resources/producer done in 34ms
+2026-11-10T12:28:30.785664420Z installer continuation: resources/producer kubernetes requests=32 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET validatingadmissionpolicies]=7 [GET validatingadmissionpolicybindings]=6 [GET configmaps]=5 [POST selfsubjectreviews]=4 [GET namespaces]=3 [POST selfsubjectaccessreviews]=2
+2026-11-10T12:28:30.785667114Z installer continuation: resources/producer guard checks: [current<currentHandoverWithFinal]=4 [stagingHandover<currentHandoverWithFinal]=2
+2026-11-10T12:28:30.930118723Z installer continuation: resources/journal done in 144ms
+2026-11-10T12:28:30.930135788Z installer continuation: resources/journal kubernetes requests=98 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET validatingadmissionpolicies]=21 [GET validatingadmissionpolicybindings]=18 [GET configmaps]=15 [POST selfsubjectreviews]=12 [GET namespaces]=9 [GET secrets]=7
+2026-11-10T12:28:30.930138522Z installer continuation: resources/journal guard checks: [current<currentHandoverWithFinal]=12 [stagingHandover<currentHandoverWithFinal]=6
+2026-11-10T12:28:32.405041826Z installer continuation: resources/advance done in 1.475s
+2026-11-10T12:28:32.405323753Z installer continuation: resources/advance kubernetes requests=160 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [PUT secrets]=38 [GET secrets]=24 [GET validatingadmissionpolicies]=16 [GET validatingadmissionpolicybindings]=14 [GET configmaps]=11 [POST selfsubjectreviews]=8
+2026-11-10T12:28:32.405333537Z installer continuation: resources/advance guard checks: [current<currentHandoverWithFinal]=8 [stagingHandover<currentHandoverWithFinal]=4
+2026-11-10T12:28:32.651049713Z installer continuation: resources/inventory done in 246ms
+2026-11-10T12:28:32.651072486Z installer continuation: resources/inventory kubernetes requests=33 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET validatingadmissionpolicies]=7 [GET validatingadmissionpolicybindings]=6 [GET configmaps]=5 [POST selfsubjectreviews]=4 [GET namespaces]=3 [GET secrets]=3
+2026-11-10T12:28:32.651077414Z installer continuation: resources/inventory guard checks: [current<currentHandoverWithFinal]=4 [stagingHandover<currentHandoverWithFinal]=2
+2026-11-10T12:28:32.654247487Z installer continuation: resources/release-record done in 3ms
+2026-11-10T12:28:32.673888678Z installer continuation: bridge/observer done in 20ms
+2026-11-10T12:28:32.674689872Z installer continuation: bridge/protection done in 0s
+2026-11-10T12:28:32.674822798Z installer continuation: bridge/source done in 0s
+2026-11-10T12:28:32.906227028Z installer continuation: bridge/journal done in 232ms
+2026-11-10T12:28:32.906245956Z installer continuation: bridge/journal kubernetes requests=57 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET validatingadmissionpolicies]=13 [GET validatingadmissionpolicybindings]=13 [POST selfsubjectreviews]=8 [GET configmaps]=7 [GET namespaces]=5 [PUT configmaps]=4
+2026-11-10T12:28:32.906267638Z installer continuation: bridge/journal guard checks: [current<currentHandoverWithFinal]=4 [configurationRoleGuardVersions<func1]=3 [current<newInitialRuntimeBridge]=2 [current<readCurrent]=2 [stagingHandover<currentHandoverWithFinal]=2
+2026-11-10T12:28:34.251594584Z installer continuation: bridge/probe done in 1.345s
+2026-11-10T12:28:34.251617278Z installer continuation: bridge/probe kubernetes requests=241 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET validatingadmissionpolicies]=52 [GET validatingadmissionpolicybindings]=45 [POST selfsubjectreviews]=36 [GET namespaces]=26 [GET configmaps]=26 [POST selfsubjectaccessreviews]=16
+2026-11-10T12:28:34.251622325Z installer continuation: bridge/probe guard checks: [current<currentHandoverWithFinal]=16 [configurationRoleGuardVersions<readConfigurationRoleSource]=9 [stagingHandover<currentHandoverWithFinal]=8 [current<readCurrent]=6 [configurationRoleGuardVersions<current]=6
+2026-11-10T12:28:34.923233929Z installer continuation: bridge/retained done in 672ms
+2026-11-10T12:28:34.923257624Z installer continuation: bridge/retained kubernetes requests=252 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET validatingadmissionpolicies]=46 [POST selfsubjectreviews]=40 [GET validatingadmissionpolicybindings]=40 [GET namespaces]=33 [GET configmaps]=28 [GET serviceaccounts]=19
+2026-11-10T12:28:34.923262211Z installer continuation: bridge/retained guard checks: [current<currentHandoverWithFinal]=12 [configurationRoleGuardVersions<recheckConfigurationRoleSource]=12 [stagingHandover<currentHandoverWithFinal]=6 [configurationRoleGuardVersions<readConfigurationRoleSource]=6 [current<readCurrent]=4
+2026-11-10T12:28:38.941812381Z installer continuation: bridge/settle done in 4.019s
+2026-11-10T12:28:38.942333421Z installer continuation: worker/configuration-documents done in 1ms
+2026-11-10T12:28:38.946224270Z installer continuation: worker/outbox done in 4ms
+2026-11-10T12:28:40.950343410Z installer continuation: worker/inbox done in 2.004s
+2026-11-10T12:28:40.950369458Z installer continuation: worker/inspection done in 0s
+2026-11-10T12:28:40.954505614Z installer continuation: worker/audit-secret done in 4ms
+2026-11-10T12:28:40.954520216Z installer continuation: worker/roles-root done in 0s
+2026-11-10T12:28:40.964436018Z installer continuation: worker/roles-sql done in 10ms
+2026-11-10T12:28:44.335797471Z installer continuation: worker/roles-provision done in 3.371s
+2026-11-10T12:28:44.335823920Z installer continuation: worker/roles-provision kubernetes requests=339 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET namespaces]=68 [GET validatingadmissionpolicies]=48 [GET validatingadmissionpolicybindings]=48 [GET configmaps]=42 [POST selfsubjectreviews]=32 [POST selfsubjectaccessreviews]=24
+2026-11-10T12:28:44.335829328Z installer continuation: worker/roles-provision guard checks: [configurationRoleGuardVersions<readConfigurationRoleSource]=30 [configurationRoleGuardVersions<recheckConfigurationRoleSource]=18
+2026-11-10T12:28:45.649884914Z installer continuation: worker/roles-projection done in 1.314s
+2026-11-10T12:28:45.649909921Z installer continuation: worker/roles-projection kubernetes requests=85 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET namespaces]=16 [GET validatingadmissionpolicies]=12 [GET validatingadmissionpolicybindings]=12 [GET configmaps]=10 [POST selfsubjectreviews]=8 [POST selfsubjectaccessreviews]=6
+2026-11-10T12:28:45.649914959Z installer continuation: worker/roles-projection guard checks: [configurationRoleGuardVersions<readConfigurationRoleSource]=6 [configurationRoleGuardVersions<recheckConfigurationRoleSource]=6
+2026-11-10T12:28:45.652733884Z installer continuation: worker/inputs done in 3ms
+2026-11-10T12:28:48.709903542Z installer continuation: worker/inputs-complete done in 3.057s
+2026-11-10T12:28:48.709927718Z installer continuation: worker/inputs-complete kubernetes requests=323 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET validatingadmissionpolicies]=62 [GET validatingadmissionpolicybindings]=54 [GET configmaps]=40 [POST selfsubjectreviews]=36 [GET secrets]=32 [GET namespaces]=22
+2026-11-10T12:28:48.709953366Z installer continuation: worker/inputs-complete guard checks: [configurationRoleGuardVersions<readConfigurationWorkerNative]=24 [current<currentHandoverWithFinal]=16 [stagingHandover<currentHandoverWithFinal]=8 [configurationRoleGuardVersions<readConfigurationWorkerCurrent]=6
+2026-11-10T12:28:51.813537510Z installer continuation: worker/launch done in 3.104s
+2026-11-10T12:28:51.813629045Z installer continuation: worker/launch kubernetes requests=325 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET validatingadmissionpolicies]=62 [GET validatingadmissionpolicybindings]=54 [GET configmaps]=42 [POST selfsubjectreviews]=36 [GET secrets]=32 [GET namespaces]=22
+2026-11-10T12:28:51.813639821Z installer continuation: worker/launch guard checks: [configurationRoleGuardVersions<readConfigurationWorkerNative]=24 [current<currentHandoverWithFinal]=16 [stagingHandover<currentHandoverWithFinal]=8 [configurationRoleGuardVersions<readConfigurationWorkerCurrent]=6
+2026-11-10T12:28:51.825172220Z installer continuation: public/sources done in 12ms
+2026-11-10T12:28:57.867528715Z installer continuation: owner/accepted-source done in 6.042s
+2026-11-10T12:28:57.913182598Z installer continuation: public/roles-binding done in 46ms
+2026-11-10T12:28:57.913482100Z installer continuation: public/roles-binding kubernetes requests=32 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET validatingadmissionpolicies]=8 [GET validatingadmissionpolicybindings]=6 [POST selfsubjectreviews]=4 [GET configmaps]=4 [GET namespaces]=3 [PUT configmaps]=2
+2026-11-10T12:28:57.913491694Z installer continuation: public/roles-binding guard checks: [current<currentHandoverWithFinal]=4 [stagingHandover<currentHandoverWithFinal]=2
+2026-11-10T12:28:57.913494999Z installer continuation: public/roles-root done in 0s
+2026-11-10T12:28:57.928407549Z installer continuation: public/roles-sql done in 15ms
+2026-11-10T12:29:02.547559083Z installer continuation: public/roles-provision done in 4.619s
+2026-11-10T12:29:02.547586293Z installer continuation: public/roles-provision kubernetes requests=313 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET secrets]=152 [PUT secrets]=86 [GET deployments]=21 [POST selfsubjectreviews]=11 [GET configmaps]=10 [GET leases]=10
+2026-11-10T12:29:02.547591010Z installer continuation: public/roles-provision guard checks: [current<reused]=2 [WithPublicRoleOperation<Provision]=2
+2026-11-10T12:29:03.574046898Z installer continuation: public/roles-projection done in 1.026s
+2026-11-10T12:29:03.574074409Z installer continuation: public/roles-projection kubernetes requests=72 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET secrets]=16 [GET deployments]=12 [GET configmaps]=6 [GET serviceaccounts]=6 [GET validatingadmissionpolicies]=6 [GET validatingadmissionpolicybindings]=6
+2026-11-10T12:29:03.574079266Z installer continuation: public/roles-projection guard checks: [current<publishProjection]=5 [WithPublicRoleOperation<func2]=1
+2026-11-10T12:29:04.939190409Z installer continuation: owner/roles done in 1.365s
+2026-11-10T12:29:04.939218089Z installer continuation: owner/roles kubernetes requests=162 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET validatingadmissionpolicies]=33 [GET validatingadmissionpolicybindings]=27 [POST selfsubjectreviews]=25 [GET configmaps]=18 [GET namespaces]=12 [POST selfsubjectaccessreviews]=10
+2026-11-10T12:29:04.939237188Z installer continuation: owner/roles guard checks: [configurationRoleGuardVersions<readConfigurationWorkerNative]=12 [current<currentHandoverWithFinal]=8 [stagingHandover<currentHandoverWithFinal]=4 [configurationRoleGuardVersions<readConfigurationWorkerCurrent]=3
+2026-11-10T12:29:04.949850074Z installer continuation: owner/roles-sql done in 11ms
+2026-11-10T12:29:04.950000862Z installer continuation: owner/selection done in 0s
+2026-11-10T12:29:09.160973612Z installer continuation: owner/selection-complete done in 4.211s
+2026-11-10T12:29:09.161260767Z installer continuation: owner/selection-complete kubernetes requests=493 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET validatingadmissionpolicies]=99 [GET validatingadmissionpolicybindings]=81 [POST selfsubjectreviews]=75 [GET configmaps]=57 [GET namespaces]=36 [POST selfsubjectaccessreviews]=30
+2026-11-10T12:29:09.161268588Z installer continuation: owner/selection-complete guard checks: [configurationRoleGuardVersions<readConfigurationWorkerNative]=36 [current<currentHandoverWithFinal]=24 [stagingHandover<currentHandoverWithFinal]=12 [configurationRoleGuardVersions<readConfigurationWorkerCurrent]=9
+2026-11-10T12:29:09.793009502Z installer continuation: downloads/workers done in 632ms
+2026-11-10T12:29:09.801015920Z installer continuation: permission/guard done in 8ms
+2026-11-10T12:29:09.805400438Z installer continuation: retention/guard done in 4ms
+2026-11-10T12:29:10.305591703Z installer continuation: permission/projection done in 500ms
+2026-11-10T12:29:10.305630079Z installer continuation: permission/projection kubernetes requests=49 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET validatingadmissionpolicies]=10 [GET secrets]=7 [GET validatingadmissionpolicybindings]=7 [POST selfsubjectreviews]=5 [GET configmaps]=5 [GET namespaces]=3
+2026-11-10T12:29:10.305633725Z installer continuation: permission/projection guard checks: [current<currentHandoverWithFinal]=4 [stagingHandover<currentHandoverWithFinal]=2 [WithPublicRoleOperation<func1]=1
+2026-11-10T12:29:10.544061494Z installer continuation: capacity/sources done in 238ms
+2026-11-10T12:29:11.110122733Z installer continuation: capacity/proofs done in 566ms
+2026-11-10T12:29:11.110363629Z installer continuation: capacity/proofs kubernetes requests=41 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET namespaces]=7 [GET validatingadmissionpolicies]=7 [GET validatingadmissionpolicybindings]=7 [GET serviceaccounts]=5 [POST selfsubjectaccessreviews]=5 [POST selfsubjectreviews]=4
+2026-11-10T12:29:11.110370720Z installer continuation: capacity/proofs guard checks: [current<CapacityProtection]=3 [current<CapacityNamespaceProtection]=2 [current<ProveCapacitySources]=2
+2026-11-10T12:29:11.162278808Z installer continuation: capacity/qualification done in 52ms
+2026-11-10T12:29:11.162305237Z installer continuation: capacity/qualification kubernetes requests=30 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET secrets]=5 [GET serviceaccounts]=4 [GET deployments]=4 [POST selfsubjectreviews]=3 [GET namespaces]=2 [GET validatingadmissionpolicies]=2
+2026-11-10T12:29:11.162310024Z installer continuation: capacity/qualification guard checks: [current<CapacityProtection]=2
+2026-11-10T12:29:19.119283302Z installer continuation: capacity/initialize done in 7.957s
+2026-11-10T12:29:19.119341558Z installer continuation: capacity/initialize kubernetes requests=408 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET secrets]=53 [GET serviceaccounts]=51 [GET validatingadmissionpolicies]=49 [GET validatingadmissionpolicybindings]=49 [GET deployments]=34 [POST selfsubjectaccessreviews]=34
+2026-11-10T12:29:19.119347477Z installer continuation: capacity/initialize guard checks: [current<CapacityProtection]=34 [WithPublicRoleOperation<func2]=15
+2026-11-10T12:29:19.602341656Z installer continuation: federation/projection done in 483ms
+2026-11-10T12:29:19.602379852Z installer continuation: federation/projection kubernetes requests=72 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET secrets]=16 [GET deployments]=12 [POST selfsubjectreviews]=6 [GET serviceaccounts]=6 [GET leases]=6 [GET validatingadmissionpolicybindings]=6
+2026-11-10T12:29:19.602384659Z installer continuation: federation/projection guard checks: [current<publishProjection]=5 [WithPublicRoleOperation<func1]=1
+2026-11-10T12:29:19.731990870Z installer continuation: federation/identity done in 129ms
+2026-11-10T12:29:19.732011771Z installer continuation: federation/identity kubernetes requests=17 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET secrets]=5 [GET deployments]=4 [GET configmaps]=2 [GET serviceaccounts]=2 [GET leases]=2 [POST selfsubjectreviews]=2
+2026-11-10T12:29:19.738179479Z installer continuation: publisher/identity done in 6ms
+2026-11-10T12:29:19.738197095Z installer continuation: public/download-sources done in 0s
+2026-11-10T12:29:19.758679710Z installer continuation: public/sources done in 21ms
+2026-11-10T12:29:21.175753498Z installer continuation: capacity/local-observation done in 1.417s
+2026-11-10T12:29:21.175782021Z installer continuation: capacity/local-observation kubernetes requests=166 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET validatingadmissionpolicies]=33 [GET validatingadmissionpolicybindings]=27 [POST selfsubjectreviews]=25 [GET configmaps]=20 [GET namespaces]=12 [GET serviceaccounts]=10
+2026-11-10T12:29:21.175786657Z installer continuation: capacity/local-observation guard checks: [configurationRoleGuardVersions<readConfigurationWorkerNative]=12 [current<currentHandoverWithFinal]=8 [stagingHandover<currentHandoverWithFinal]=4 [configurationRoleGuardVersions<readConfigurationWorkerCurrent]=3
+2026-11-10T12:29:21.189576861Z installer continuation: owner/outbox done in 14ms
+2026-11-10T12:29:25.195852001Z installer continuation: owner/inbox done in 4.006s
+2026-11-10T12:29:25.199410719Z installer continuation: owner/audit-secret done in 4ms
+2026-11-10T12:29:25.202559420Z installer continuation: federation/audit-secret done in 3ms
+2026-11-10T12:29:25.230989059Z installer continuation: federation/verify done in 28ms
+2026-11-10T12:29:25.256296384Z installer continuation: public/readback done in 25ms
+2026-11-10T12:29:25.260977530Z installer continuation: downloads/store done in 5ms
+2026-11-10T12:29:25.265402327Z installer continuation: downloads/control done in 5ms
+2026-11-10T12:29:25.268509913Z installer continuation: downloads/profile done in 3ms
+2026-11-10T12:29:25.269777645Z installer continuation: public/derive done in 1ms
+2026-11-10T12:29:25.272480263Z installer continuation: public/observation-projection done in 3ms
+2026-11-10T12:29:25.274421751Z installer continuation: public/operator-secret done in 2ms
+2026-11-10T12:29:25.280047772Z installer continuation: publisher/credentials done in 6ms
+2026-11-10T12:29:25.303264419Z installer continuation: publisher/verify done in 23ms
+2026-11-10T12:29:25.307041700Z installer continuation: deletion/credential done in 4ms
+2026-11-10T12:29:25.310149571Z installer continuation: deletion/verify done in 3ms
+2026-11-10T12:29:29.321761146Z installer continuation: downloads/accepted done in 4.012s
+2026-11-10T12:29:29.323692829Z installer continuation: owner/projection done in 2ms
+2026-11-10T12:29:34.706569608Z installer continuation: owner/installation done in 5.383s
+2026-11-10T12:29:34.706605581Z installer continuation: owner/installation kubernetes requests=827 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET secrets]=212 [GET validatingadmissionpolicies]=178 [GET configmaps]=94 [GET validatingadmissionpolicybindings]=72 [POST selfsubjectreviews]=72 [GET deployments]=65
+2026-11-10T12:29:34.706610689Z installer continuation: owner/installation guard checks: [configurationRoleGuardVersions<readConfigurationWorkerNative]=36 [current<currentHandoverWithFinal]=24 [stagingHandover<currentHandoverWithFinal]=12
+2026-11-10T12:29:34.715827480Z installer continuation: public/exposure done in 9ms
+2026-11-10T12:29:35.732758616Z installer continuation: capacity/projection done in 1.017s
+2026-11-10T12:29:35.732780088Z installer continuation: capacity/projection kubernetes requests=116 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET validatingadmissionpolicies]=21 [GET configmaps]=17 [GET namespaces]=16 [GET validatingadmissionpolicybindings]=15 [POST selfsubjectreviews]=10 [GET secrets]=9
+2026-11-10T12:29:35.732784945Z installer continuation: capacity/projection guard checks: [current<currentHandoverWithFinal]=8 [stagingHandover<currentHandoverWithFinal]=4 [current<reused]=2 [WithPublicRoleOperation<func1]=1
+2026-11-10T12:29:35.735436692Z installer continuation: federation/serving done in 3ms
+2026-11-10T12:29:36.108254530Z installer continuation: federation/workload done in 373ms
+2026-11-10T12:29:38.121329810Z installer continuation: federation/settle done in 2.013s
+2026-11-10T12:29:38.121355678Z installer continuation: federation/offer done in 0s
+2026-11-10T12:29:38.133619070Z installer continuation: federation/owner-exposure done in 12ms
+2026-11-10T12:29:38.716201567Z installer continuation: key-service/projection done in 583ms
+2026-11-10T12:29:38.716231030Z installer continuation: key-service/projection kubernetes requests=72 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET secrets]=16 [GET deployments]=12 [GET configmaps]=6 [GET serviceaccounts]=6 [GET validatingadmissionpolicybindings]=6 [POST selfsubjectreviews]=6
+2026-11-10T12:29:38.716236218Z installer continuation: key-service/projection guard checks: [current<publishProjection]=5 [WithPublicRoleOperation<func1]=1
+2026-11-10T12:29:38.729653410Z installer continuation: back up Secret bootstrap-chain-10000000-target/asservat-62b5aa12365445be973a7e8272c76e10-key-service-root-v1; stored artifacts are unreadable without it
+2026-11-10T12:29:38.729677455Z installer continuation: key-service/root done in 13ms
+2026-11-10T12:29:38.732030837Z installer continuation: key-service/serving done in 3ms
+2026-11-10T12:29:39.054594988Z installer continuation: key-service/workload done in 323ms
+2026-11-10T12:29:41.062831997Z installer continuation: key-service/settle done in 2.008s
+2026-11-10T12:29:41.711074367Z installer continuation: publisher/projection done in 648ms
+2026-11-10T12:29:41.711101568Z installer continuation: publisher/projection kubernetes requests=72 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET secrets]=16 [GET deployments]=12 [GET configmaps]=6 [GET validatingadmissionpolicies]=6 [POST selfsubjectreviews]=6 [GET serviceaccounts]=6
+2026-11-10T12:29:41.711106094Z installer continuation: publisher/projection guard checks: [current<publishProjection]=5 [WithPublicRoleOperation<func1]=1
+2026-11-10T12:29:42.024385653Z installer continuation: publisher/workload done in 313ms
+2026-11-10T12:29:44.032125263Z installer continuation: publisher/settle done in 2.008s
+2026-11-10T12:29:44.035677786Z installer continuation: federation/executor-offer done in 4ms
+2026-11-10T12:29:44.044166398Z installer continuation: retention/first-acceptance done in 8ms

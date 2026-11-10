@@ -1,0 +1,182 @@
+2026-11-10T12:16:54.767820705Z connector lifecycle enroll took 490ms, observer 68 calls
+2026-11-10T12:16:54.925664039Z connector node asservat-context-xhnm1orx-1-control-plane (uid 377d008f-a551-4a10-a7fd-f951eac232c6) pod asservat-node-dm54b epoch 0519bb1f-9c76-4dde-852d-09fede22c28d runtime "containerd://2.3.4": enrolled, no report yet
+2026-11-10T12:16:54.937830101Z connector node asservat-context-xhnm1orx-1-control-plane (uid 377d008f-a551-4a10-a7fd-f951eac232c6) pod asservat-node-dm54b epoch 0519bb1f-9c76-4dde-852d-09fede22c28d runtime "containerd://2.3.4": report 1 kernel 7.0.0-1017-azure btf supported tcx supported cgroup2 supported; packetCapture Available []; syscallTrace Available []; goProfile Available []
+2026-11-10T12:16:55.058834218Z connector lifecycle client-sign took 290ms, observer 68 calls
+2026-11-10T12:16:56.400124722Z connector lifecycle server-sign took 1.34s, observer 68 calls
+2026-11-10T12:16:56.705547967Z connector lifecycle registration took 20ms, observer 0 calls
+2026-11-10T12:16:56.722101791Z connector process credentials active
+2026-11-10T12:16:56.813877173Z regional capacity standby active
+2026-11-10T12:16:56.834984070Z connector lifecycle owner-observation-candidates took 10ms, observer 0 calls
+2026-11-10T12:16:56.835654726Z regional capacity standby: open (unavailable)
+2026-11-10T12:16:56.839945581Z regional capacity standby: open (unavailable)
+2026-11-10T12:16:56.912656476Z regional context start active
+2026-11-10T12:16:56.923386800Z connector lifecycle owner-candidates took 10ms, observer 0 calls
+2026-11-10T12:16:57.025449998Z connector lifecycle owner-authentication took 50ms, observer 0 calls
+2026-11-10T12:16:57.029768154Z regional context standby refused: open/headers (denied) (1), elapsed=110ms remaining=4.14s
+2026-11-10T12:16:57.107789979Z regional context standby refused: open/headers (denied) (2), elapsed=60ms remaining=4.06s
+2026-11-10T12:16:59.105118905Z regional context standby refused: open/headers (denied) (4), elapsed=50ms remaining=4.11s
+2026-11-10T12:17:03.159951365Z regional context standby refused: open/headers (denied) (8), elapsed=100ms remaining=4.13s
+2026-11-10T12:17:03.719012000Z regional kube opening: requests=601 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET namespaces]=126 [GET validatingadmissionpolicybindings]=88 [GET validatingadmissionpolicies]=88 [GET configmaps]=71 [POST selfsubjectreviews]=38 [GET pods]=29
+2026-11-10T12:17:03.719062105Z regional kube opening: guard checks: [current<readConfiguration]=20 [recheckNative<recheckProof]=16 [sourceBoundary<boundary]=12 [boundary<Read]=12 [currentValues<Read]=12 [readConfiguration<ReadConnectorIdentityConfiguration]=10
+2026-11-10T12:17:07.028222057Z regional context standby refused: open/dial (unavailable) (1), elapsed=100ms remaining=2.9s
+2026-11-10T12:17:07.105348205Z regional context standby refused: open/dial (unavailable) (2), elapsed=60ms remaining=4.39s
+2026-11-10T12:17:09.099670294Z regional context standby refused: open/dial (unavailable) (4), elapsed=130ms remaining=4.68s
+2026-11-10T12:17:13.391030797Z regional context standby refused: open/tls (denied) (1), elapsed=2.46s remaining=580ms
+2026-11-10T12:17:13.395099395Z regional capacity standby: open (denied)
+2026-11-10T12:17:13.397078093Z regional capacity standby: open (denied)
+2026-11-10T12:17:13.518543927Z regional context standby refused: open/tls (denied) (2), elapsed=90ms remaining=3.41s
+2026-11-10T12:17:13.719346129Z regional kube opening: requests=286 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET namespaces]=66 [GET validatingadmissionpolicybindings]=43 [GET validatingadmissionpolicies]=43 [GET configmaps]=41 [GET secrets]=20 [POST selfsubjectreviews]=18
+2026-11-10T12:17:13.719468202Z regional kube opening: guard checks: [recheckNative<recheckProof]=20 [current<readConfiguration]=14 [readConfiguration<ReadConnectorIdentityConfiguration]=7 [recheckNative<finishSetup]=2
+2026-11-10T12:17:16.135283584Z connector lifecycle owner-registration took 10ms, observer 0 calls
+2026-11-10T12:17:16.183985808Z regional capacity native open: ok after 50ms, 19 calls
+2026-11-10T12:17:16.190475281Z regional capacity native read 1: ok after 10ms, 3 calls
+2026-11-10T12:17:16.270299793Z regional capacity native read 2: ok after 10ms, 3 calls
+2026-11-10T12:17:16.349997405Z regional capacity metadata capacity-namespace-candidates: ok after 10ms, 1 calls
+2026-11-10T12:17:16.425162849Z regional capacity native read 3: ok after 0s, 3 calls
+2026-11-10T12:17:17.332445004Z regional capacity native read 4: ok after 50ms, 22 calls
+2026-11-10T12:17:20.193352842Z regional capacity native open: ok after 40ms, 19 calls
+2026-11-10T12:17:20.198274808Z regional capacity native read 1: ok after 0s, 3 calls
+2026-11-10T12:17:20.240822167Z regional capacity native read 2: ok after 0s, 3 calls
+2026-11-10T12:17:20.274298495Z regional capacity metadata capacity-workload-candidates: ok after 0s, 1 calls
+2026-11-10T12:17:20.355142857Z regional capacity native read 3: ok after 10ms, 3 calls
+2026-11-10T12:17:21.357273111Z regional capacity native read 4: ok after 50ms, 22 calls
+2026-11-10T12:17:23.718578838Z regional kube opening: requests=151 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET namespaces]=34 [GET validatingadmissionpolicybindings]=18 [GET validatingadmissionpolicies]=18 [GET configmaps]=16 [GET pods]=10 [POST selfsubjectreviews]=9
+2026-11-10T12:17:23.718813030Z regional kube opening: guard checks: [current<nativeBoundary]=8 [nativeBoundary<Begin]=4 [nativeBoundary<Read]=4 [recheckNative<finishSetup]=2
+2026-11-10T12:17:24.336636483Z regional capacity native open: ok after 40ms, 19 calls
+2026-11-10T12:17:24.341429983Z regional capacity native read 1: ok after 0s, 3 calls
+2026-11-10T12:17:24.380571772Z regional capacity native read 2: ok after 0s, 3 calls
+2026-11-10T12:17:24.441324316Z regional capacity metadata capacity-guarded-workload: ok after 30ms, 14 calls
+2026-11-10T12:17:24.519403358Z regional capacity native read 3: ok after 10ms, 3 calls
+2026-11-10T12:17:25.490975205Z regional capacity native read 4: ok after 50ms, 22 calls
+2026-11-10T12:17:28.805508233Z regional capacity native open: ok after 50ms, 19 calls
+2026-11-10T12:17:28.812018503Z regional capacity native read 1: ok after 0s, 3 calls
+2026-11-10T12:17:28.899965606Z regional capacity native read 2: ok after 10ms, 3 calls
+2026-11-10T12:17:28.953626388Z regional capacity metadata capacity-workload-candidates: ok after 0s, 1 calls
+2026-11-10T12:17:29.021365791Z regional capacity native read 3: ok after 10ms, 3 calls
+2026-11-10T12:17:29.960828482Z regional capacity native read 4: ok after 60ms, 22 calls
+2026-11-10T12:17:32.834103692Z regional capacity native open: ok after 40ms, 19 calls
+2026-11-10T12:17:32.839854987Z regional capacity native read 1: ok after 10ms, 3 calls
+2026-11-10T12:17:32.879303646Z regional capacity native read 2: ok after 0s, 3 calls
+2026-11-10T12:17:32.911251831Z regional capacity metadata capacity-workload-candidates: ok after 0s, 1 calls
+2026-11-10T12:17:32.980954180Z regional capacity native read 3: ok after 0s, 3 calls
+2026-11-10T12:17:33.719321238Z regional kube opening: requests=174 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET namespaces]=42 [GET validatingadmissionpolicybindings]=22 [GET validatingadmissionpolicies]=22 [GET configmaps]=16 [GET pods]=11 [POST tokenreviews]=10
+2026-11-10T12:17:33.719363441Z regional kube opening: guard checks: [current<nativeBoundary]=10 [nativeBoundary<Begin]=6 [nativeBoundary<Read]=4 [current<CapacityNamespaceProtection]=2
+2026-11-10T12:17:33.925716806Z regional context standby refused: exchange/read/http2-internal (unavailable) (1)
+2026-11-10T12:17:34.019130609Z regional capacity native read 4: ok after 70ms, 22 calls
+2026-11-10T12:17:35.685389368Z regional context standby refused: exchange/read/http2-internal (unavailable) (2)
+2026-11-10T12:17:38.942966575Z regional capacity native open: ok after 40ms, 19 calls
+2026-11-10T12:17:38.950662812Z regional capacity native read 1: ok after 10ms, 3 calls
+2026-11-10T12:17:38.992973267Z regional capacity native read 2: ok after 0s, 3 calls
+2026-11-10T12:17:39.032224164Z regional capacity metadata capacity-workload-candidates: ok after 0s, 1 calls
+2026-11-10T12:17:39.084816028Z regional capacity native read 3: ok after 0s, 3 calls
+2026-11-10T12:17:40.101160021Z regional capacity native read 4: ok after 50ms, 22 calls
+2026-11-10T12:17:41.249599231Z regional capacity standby: serve/receive (unavailable) after 1.11s
+2026-11-10T12:17:41.250112060Z regional capacity standby: serve/receive (unavailable) after 27.85s
+2026-11-10T12:17:41.250460553Z regional context standby refused: exchange/read/short-read (unavailable) (1)
+2026-11-10T12:17:41.332120265Z regional capacity standby: open (unavailable)
+2026-11-10T12:17:41.378209469Z regional capacity standby: open (unavailable)
+2026-11-10T12:17:43.013596240Z regional context standby refused: open/dial (unavailable) (8), elapsed=40ms remaining=3.34s
+2026-11-10T12:17:43.719323754Z regional kube opening: requests=324 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET namespaces]=70 [GET validatingadmissionpolicies]=44 [GET validatingadmissionpolicybindings]=44 [GET configmaps]=39 [POST selfsubjectreviews]=21 [GET secrets]=16
+2026-11-10T12:17:43.719365877Z regional kube opening: guard checks: [recheckNative<recheckProof]=10 [current<readConfiguration]=8 [current<nativeBoundary]=6 [readConfiguration<ReadConnectorIdentityConfiguration]=4 [current<produceProof]=4 [nativeBoundary<Read]=4
+2026-11-10T12:17:46.105888986Z regional context standby refused: open/dial (unavailable) (16), elapsed=40ms remaining=4.83s
+2026-11-10T12:17:49.230625082Z regional context standby refused: open/tls (denied) (4), elapsed=1.3s remaining=1.7s
+2026-11-10T12:17:49.243998826Z regional capacity standby: open (denied)
+2026-11-10T12:17:49.249614895Z regional capacity standby: open (denied)
+2026-11-10T12:17:49.308992445Z regional context standby refused: candidates (hub-channel) (1)
+2026-11-10T12:17:50.119785012Z regional capacity native open: ok after 50ms, 19 calls
+2026-11-10T12:17:50.131538887Z regional capacity native read 1: ok after 10ms, 3 calls
+2026-11-10T12:17:50.206865393Z regional capacity native read 2: ok after 10ms, 3 calls
+2026-11-10T12:17:50.253456535Z regional capacity metadata capacity-workload-candidates: ok after 0s, 1 calls
+2026-11-10T12:17:50.355193089Z regional capacity native read 3: ok after 10ms, 3 calls
+2026-11-10T12:17:51.236065783Z regional capacity native read 4: ok after 40ms, 22 calls
+2026-11-10T12:17:53.719348392Z regional kube opening: requests=341 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET namespaces]=77 [GET validatingadmissionpolicybindings]=48 [GET validatingadmissionpolicies]=48 [GET configmaps]=46 [GET secrets]=22 [POST selfsubjectreviews]=21
+2026-11-10T12:17:53.719414481Z regional kube opening: guard checks: [recheckNative<recheckProof]=18 [current<readConfiguration]=12 [readConfiguration<ReadConnectorIdentityConfiguration]=6 [recheckNative<finishSetup]=4 [current<nativeBoundary]=4 [nativeBoundary<Begin]=2
+2026-11-10T12:17:55.020677607Z regional target answer: answer (1), r-local@<100ms r-owner@<100ms r-check@<250ms r-resolve@<100ms r-write@<100ms
+2026-11-10T12:17:56.206424184Z regional capacity native open: ok after 90ms, 19 calls
+2026-11-10T12:17:56.220482090Z regional capacity native read 1: ok after 10ms, 3 calls
+2026-11-10T12:17:56.308017825Z regional capacity native read 2: ok after 10ms, 3 calls
+2026-11-10T12:17:56.390430585Z regional capacity metadata capacity-workload-candidates: ok after 0s, 1 calls
+2026-11-10T12:17:56.394232835Z regional target answer: answer (2), r-local@<100ms r-owner@<100ms r-check@<250ms r-resolve@<100ms r-write@<100ms
+2026-11-10T12:17:56.484612635Z regional capacity native read 3: ok after 10ms, 3 calls
+2026-11-10T12:17:57.297693417Z regional capacity native read 4: ok after 40ms, 22 calls
+2026-11-10T12:17:59.021805761Z regional target answer: answer (4), r-local@<100ms r-owner@<100ms r-check@<100ms r-resolve@<100ms r-write@<100ms
+2026-11-10T12:18:00.210239547Z regional capacity native open: ok after 50ms, 19 calls
+2026-11-10T12:18:00.217027178Z regional capacity native read 1: ok after 10ms, 3 calls
+2026-11-10T12:18:00.268954793Z regional capacity native read 2: ok after 10ms, 3 calls
+2026-11-10T12:18:00.366120639Z regional capacity metadata capacity-guarded-workload: ok after 40ms, 13 calls
+2026-11-10T12:18:00.443995287Z regional capacity native read 3: ok after 0s, 3 calls
+2026-11-10T12:18:01.376674082Z regional capacity native read 4: ok after 70ms, 22 calls
+2026-11-10T12:18:02.981169974Z regional capacity native open: ok after 50ms, 19 calls
+2026-11-10T12:18:02.986752583Z regional capacity native read 1: ok after 10ms, 3 calls
+2026-11-10T12:18:03.026913109Z regional capacity native read 2: ok after 10ms, 3 calls
+2026-11-10T12:18:03.106193334Z regional capacity metadata capacity-guarded-workload: ok after 30ms, 13 calls
+2026-11-10T12:18:03.195145932Z regional capacity native read 3: ok after 10ms, 3 calls
+2026-11-10T12:18:03.718433854Z regional kube opening: requests=468 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET namespaces]=113 [GET validatingadmissionpolicybindings]=60 [GET validatingadmissionpolicies]=60 [GET configmaps]=51 [GET deployments]=28 [GET pods]=27
+2026-11-10T12:18:03.718454515Z regional kube opening: guard checks: [recheckNative<recheckProof]=12 [current<readConfiguration]=12 [current<nativeBoundary]=10 [nativeBoundary<Begin]=6 [readConfiguration<ReadConnectorIdentityConfiguration]=6 [nativeBoundary<Read]=4
+2026-11-10T12:18:04.134063241Z regional capacity native read 4: ok after 40ms, 22 calls
+2026-11-10T12:18:05.769168704Z regional capacity native open: ok after 40ms, 19 calls
+2026-11-10T12:18:05.777569995Z regional capacity native read 1: ok after 10ms, 3 calls
+2026-11-10T12:18:05.821817989Z regional capacity native read 2: ok after 10ms, 3 calls
+2026-11-10T12:18:05.883903542Z regional capacity metadata capacity-guarded-workload: ok after 20ms, 13 calls
+2026-11-10T12:18:05.947552940Z regional capacity native read 3: ok after 0s, 3 calls
+2026-11-10T12:18:06.661568364Z regional target answer: answer (8), r-local@<100ms r-owner@<100ms r-check@<250ms r-resolve@<100ms r-write@<100ms
+2026-11-10T12:18:06.663325579Z regional context standby refused: exchange/read/http2-internal (unavailable) (4)
+2026-11-10T12:18:06.981552078Z regional capacity native read 4: ok after 80ms, 22 calls
+2026-11-10T12:18:07.184132539Z connector lifecycle recovery took 10ms, observer 0 calls
+2026-11-10T12:18:08.597963624Z regional capacity native open: ok after 50ms, 19 calls
+2026-11-10T12:18:08.604724945Z regional capacity native read 1: ok after 10ms, 3 calls
+2026-11-10T12:18:08.682764270Z regional capacity native read 2: ok after 10ms, 3 calls
+2026-11-10T12:18:08.758496696Z regional capacity metadata capacity-guarded-workload: ok after 30ms, 13 calls
+2026-11-10T12:18:08.900862710Z regional capacity native read 3: ok after 10ms, 3 calls
+2026-11-10T12:18:09.558595545Z regional target answer: answer (16), r-local@<100ms r-owner@<100ms r-check@<100ms r-resolve@<100ms r-write@<100ms
+2026-11-10T12:18:09.747333228Z regional capacity native read 4: ok after 60ms, 22 calls
+2026-11-10T12:18:11.410107317Z regional capacity native open: ok after 50ms, 19 calls
+2026-11-10T12:18:11.416799910Z regional capacity native read 1: ok after 10ms, 3 calls
+2026-11-10T12:18:11.468957366Z regional capacity native read 2: ok after 10ms, 3 calls
+2026-11-10T12:18:11.587554967Z regional capacity metadata capacity-guarded-workload: ok after 40ms, 13 calls
+2026-11-10T12:18:11.660276269Z regional capacity native read 3: ok after 10ms, 3 calls
+2026-11-10T12:18:12.549258312Z regional capacity native read 4: ok after 60ms, 22 calls
+2026-11-10T12:18:13.719582927Z regional kube opening: requests=780 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET namespaces]=177 [GET validatingadmissionpolicies]=105 [GET validatingadmissionpolicybindings]=105 [GET configmaps]=91 [GET secrets]=46 [POST selfsubjectreviews]=46
+2026-11-10T12:18:13.719608285Z regional kube opening: guard checks: [recheckNative<recheckProof]=40 [current<readConfiguration]=14 [current<nativeBoundary]=14 [nativeBoundary<Read]=8 [readConfiguration<ReadConnectorIdentityConfiguration]=7 [nativeBoundary<Begin]=6
+2026-11-10T12:18:14.193609739Z regional capacity native open: ok after 40ms, 19 calls
+2026-11-10T12:18:14.198671096Z regional capacity native read 1: ok after 0s, 3 calls
+2026-11-10T12:18:14.239653355Z regional capacity native read 2: ok after 0s, 3 calls
+2026-11-10T12:18:14.307173615Z regional capacity metadata capacity-guarded-workload: ok after 30ms, 13 calls
+2026-11-10T12:18:14.372417908Z regional target answer: answer (32), r-local@<250ms r-owner@<100ms r-check@<500ms r-resolve@<100ms r-write@<100ms
+2026-11-10T12:18:14.421475257Z regional capacity native read 3: ok after 10ms, 3 calls
+2026-11-10T12:18:15.379547655Z regional capacity native read 4: ok after 90ms, 22 calls
+2026-11-10T12:18:16.979277347Z regional capacity native open: ok after 40ms, 19 calls
+2026-11-10T12:18:16.984551829Z regional capacity native read 1: ok after 0s, 3 calls
+2026-11-10T12:18:17.022337215Z regional capacity native read 2: ok after 0s, 3 calls
+2026-11-10T12:18:17.084796499Z regional capacity metadata capacity-guarded-workload: ok after 30ms, 13 calls
+2026-11-10T12:18:17.157623784Z regional capacity native read 3: ok after 10ms, 3 calls
+2026-11-10T12:18:18.085333743Z regional context standby refused: exchange/read/http2-internal (unavailable) (8)
+2026-11-10T12:18:18.238472180Z regional capacity native read 4: ok after 110ms, 22 calls
+2026-11-10T12:18:19.774106246Z regional capacity native open: ok after 40ms, 19 calls
+2026-11-10T12:18:19.782761998Z regional capacity native read 1: ok after 10ms, 3 calls
+2026-11-10T12:18:19.836006394Z regional capacity native read 2: ok after 10ms, 3 calls
+2026-11-10T12:18:19.901512159Z regional capacity metadata capacity-guarded-workload: ok after 20ms, 13 calls
+2026-11-10T12:18:19.968451584Z regional capacity native read 3: ok after 0s, 3 calls
+2026-11-10T12:18:20.255771835Z regional context standby refused: open/tls (denied) (8), elapsed=330ms remaining=2.91s
+2026-11-10T12:18:20.997608608Z regional capacity native read 4: ok after 110ms, 22 calls
+2026-11-10T12:18:22.594745359Z regional capacity native open: ok after 60ms, 19 calls
+2026-11-10T12:18:22.600794536Z regional capacity native read 1: ok after 10ms, 3 calls
+2026-11-10T12:18:22.648488452Z regional capacity native read 2: ok after 0s, 3 calls
+2026-11-10T12:18:22.707369557Z regional capacity metadata capacity-guarded-workload: ok after 20ms, 13 calls
+2026-11-10T12:18:22.791489469Z regional capacity native read 3: ok after 10ms, 3 calls
+2026-11-10T12:18:23.718422507Z regional kube opening: requests=875 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET namespaces]=202 [GET validatingadmissionpolicies]=118 [GET validatingadmissionpolicybindings]=118 [GET configmaps]=103 [GET secrets]=54 [POST selfsubjectreviews]=51
+2026-11-10T12:18:23.719666673Z regional kube opening: guard checks: [recheckNative<recheckProof]=48 [current<readConfiguration]=18 [current<nativeBoundary]=15 [readConfiguration<ReadConnectorIdentityConfiguration]=9 [nativeBoundary<Begin]=8 [current<CapacityNamespaceProtection]=8
+2026-11-10T12:18:23.812097681Z regional capacity native read 4: ok after 100ms, 22 calls
+2026-11-10T12:18:25.388907385Z regional capacity standby: serve/receive (unavailable) after 1.5s
+2026-11-10T12:18:25.390156118Z regional context standby refused: exchange/read/short-read (unavailable) (2)
+2026-11-10T12:18:25.415614390Z regional capacity native open: ok after 70ms, 19 calls
+2026-11-10T12:18:25.420560648Z regional capacity native read 1: ok after 0s, 3 calls
+2026-11-10T12:18:25.422257087Z regional capacity standby: serve/answer/restrict (unavailable) after 21.25s
+2026-11-10T12:18:25.451167883Z regional capacity standby: open (unavailable)
+2026-11-10T12:18:25.457596479Z regional capacity standby: open (unavailable)
+2026-11-10T12:18:31.921736109Z regional context standby refused: candidates (hub-refused) (1)
+2026-11-10T12:18:32.923029715Z regional context standby refused: candidates (hub-refused) (2)
+2026-11-10T12:18:33.718836048Z regional kube opening: requests=206 failed=0 slow>=1s=0 slow>=2s=0 limiter-waits>=100ms=0 wait-total=0s wait-max=0s limiter-refused=0 top: [GET namespaces]=46 [GET validatingadmissionpolicybindings]=31 [GET validatingadmissionpolicies]=31 [GET configmaps]=28 [POST selfsubjectreviews]=13 [POST selfsubjectaccessreviews]=9
+2026-11-10T12:18:33.718919523Z regional kube opening: guard checks: [current<readConfiguration]=8 [recheckNative<recheckProof]=8 [readConfiguration<ReadConnectorIdentityConfiguration]=4 [current<readTrust]=3 [current<nativeBoundary]=3 [nativeBoundary<Begin]=2
+2026-11-10T12:18:34.922758741Z regional context standby refused: candidates (hub-refused) (4)
+2026-11-10T12:18:38.923327535Z regional context standby refused: candidates (hub-refused) (8)
