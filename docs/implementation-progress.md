@@ -1,5 +1,22 @@
 # Sustained implementation progress
 
+## Isolated live-workload ceiling (2026-11-10)
+
+The real-PostgreSQL live-watch fixture now isolates the workload ceiling from
+principal and installation limits. Distinct principals fill one workload's two
+slots; a third principal is refused, a different workload is admitted, and
+closing releases the original workload slot. Four unspent controls and six fully
+refilled accounts are pruned before restoring the original limits for all
+existing assertions. This is test-only qualification with no production change.
+
+- [Real-PostgreSQL evidence](../test/results/live-workload-ceiling/README.md):
+  the focused test passed in 18.74 seconds and the package in 19.812 seconds,
+  with unchanged sources and no cleanup failures. Full `make pre-push` also
+  passed, including the affected integration suite and all 611 console tests.
+
+This does not qualify installed workload scheduling, overload or sustained
+throughput. The broader specification remains active.
+
 ## Incident priority under live-node overload (2026-11-10)
 
 The existing installed incident fixture now holds an original live cohort while

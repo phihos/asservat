@@ -1,0 +1,5 @@
+=== RUN   TestLiveWatchLedgerWithRealServices
+    live_watch_ledger_test.go:384: real compiled hub control facets + independently audited current owner: original receipts, installation root uniqueness, isolated workload ceiling/release, one slot, per-watch/three-account charges, rollback, close/reopen debt, original expiry; no native/source/installed qualification
+--- PASS: TestLiveWatchLedgerWithRealServices (18.74s)
+PASS
+ok  	asservat.local/asservat/test/integration	19.812s
