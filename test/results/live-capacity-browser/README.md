@@ -21,5 +21,9 @@ buffers and node transport passed.
 This is real browser/TLS/component evidence with synthetic authority and runtime
 facts, not an installed multi-node or fleet-administrator measurement. The
 installed live fixture does not enable fleet administration, so it cannot
-qualify this operation. Guarded native suites exercise the existing policy and
-manual live workflows; they do not establish that missing installed measurement.
+qualify this operation. Guarded native suites passed the existing
+[policy](../live-lag-drop-policy-42803550038/README.md) and
+[manual](../live-lag-drop-manual-42800188004/README.md) live workflows; they do
+not establish that missing installed measurement. PR CI run 42800168119 and
+Gitar review passed. Earlier failed policy attempts and a passing `main` control
+are linked from the policy evidence rather than being presented as passes.

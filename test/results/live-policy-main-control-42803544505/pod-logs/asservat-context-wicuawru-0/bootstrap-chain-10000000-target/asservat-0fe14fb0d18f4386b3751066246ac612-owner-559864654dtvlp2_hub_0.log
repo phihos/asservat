@@ -1,0 +1,23 @@
+2026-11-10T11:04:28.184490129Z owner port router: started (1)
+2026-11-10T11:04:28.185256435Z owner router: started (1)
+2026-11-10T11:04:28.185290939Z owner router: handoff observation (1)
+2026-11-10T11:04:29.940559362Z owner router: handoff observation (2)
+2026-11-10T11:04:30.116619319Z hub kube opening: guard checks: [current<reused]=4 [current<DownloadPolicy]=2 [current<ReadClusterCatalog]=2 [current<ReadWorkerConfiguration]=2 [DownloadPolicy<newPublicLive]=1 [ReadClusterCatalog<readPublicClusterCatalog]=1
+2026-11-10T11:04:33.241082992Z owner router: handoff observation (4)
+2026-11-10T11:04:38.189538474Z owner router: handoff observation (8)
+2026-11-10T11:04:45.306053634Z owner router: handoff native (1)
+2026-11-10T11:04:45.354079061Z context start ingress refused: admission (1)
+2026-11-10T11:04:45.354099389Z context start refused: authenticate (1)
+2026-11-10T11:04:45.422584909Z owner router: handoff native (2)
+2026-11-10T11:04:45.451920109Z context start ingress refused: admission (2)
+2026-11-10T11:04:45.454656131Z context start refused: authenticate (2)
+2026-11-10T11:04:47.482417723Z owner router: handoff native (4)
+2026-11-10T11:04:47.502711615Z context start ingress refused: admission (4)
+2026-11-10T11:04:47.502731742Z context start refused: authenticate (4)
+2026-11-10T11:04:50.116431012Z hub kube opening: guard checks: [current<reused]=2 [current<CapacityNamespaceProtection]=2 [current<ReadClusterCatalog]=2 [ReadClusterCatalog<clusterCatalogChanged]=1
+2026-11-10T11:04:51.425879994Z owner router: handoff native (8)
+2026-11-10T11:04:51.444052597Z context start ingress refused: admission (8)
+2026-11-10T11:04:51.444070129Z context start refused: authenticate (8)
+2026-11-10T11:04:52.252480162Z owner router: handoff observation (16)
+2026-11-10T11:04:55.564704816Z owner observer 640 calls 1.21s, operation 0 calls 0s, readiness 548 calls 930ms, identity 3 calls 10ms, provider 12 calls 20ms, credentials 16 calls 40ms, context-start 0 calls 0s total
+2026-11-10T11:04:56.424312022Z owner startup failed: phase=full-runtime role=none reason=changed native=unspecified detail=unspecified sql=unknown sql-reason=unspecified step=unspecified

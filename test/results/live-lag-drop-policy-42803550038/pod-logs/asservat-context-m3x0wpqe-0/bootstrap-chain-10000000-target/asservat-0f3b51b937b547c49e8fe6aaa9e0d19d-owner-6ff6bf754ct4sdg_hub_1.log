@@ -1,0 +1,19 @@
+2026-11-10T11:05:34.626982513Z owner port router: started (1)
+2026-11-10T11:05:34.627110047Z owner router: started (1)
+2026-11-10T11:05:34.627325955Z owner router: handoff observation (1)
+2026-11-10T11:05:34.628025187Z owner router: unknown-name (1)
+2026-11-10T11:05:34.628032509Z owner router: handoff native (1)
+2026-11-10T11:05:34.682187202Z owner router: unknown-name (2)
+2026-11-10T11:05:34.834997223Z owner router: handoff native (2)
+2026-11-10T11:05:34.883114054Z owner router: handoff observation (2)
+2026-11-10T11:05:38.046258228Z owner router: handoff observation (4)
+2026-11-10T11:05:38.777046628Z hub kube opening: guard checks: [current<reused]=4 [current<ReadWorkerConfiguration]=2 [current<DownloadPolicy]=2 [current<ReadClusterCatalog]=2 [ReadWorkerConfiguration<newPublicDownloads]=1 [DownloadPolicy<newPublicLive]=1
+2026-11-10T11:05:43.685384294Z owner router: handoff observation (8)
+2026-11-10T11:05:45.613416700Z owner local claim timing: claim (1), pending@<100ms registration@<100ms native-claim@<500ms select@<100ms observe@<2s final@<100ms
+2026-11-10T11:05:48.776948147Z hub kube opening: guard checks: [boundaryLocal<beginLocal]=4 [boundaryLocal<Final]=3 [current<ReadClusterCatalog]=2 [ReadClusterCatalog<clusterCatalogChanged]=1
+2026-11-10T11:05:49.616191623Z owner local claim timing: claim (2), pending@<100ms registration@<100ms native-claim@<500ms select@<100ms observe@<2s final@<100ms
+2026-11-10T11:05:56.110683564Z owner router: handoff observation (16)
+2026-11-10T11:05:56.875270341Z owner router: handoff native (4)
+2026-11-10T11:05:57.779586576Z owner local claim timing: claim (4), pending@<100ms registration@<100ms native-claim@<500ms select@<100ms observe@<2s final@<100ms
+2026-11-10T11:05:58.777235720Z hub kube opening: guard checks: [boundaryLocal<Final]=5 [boundaryLocal<beginLocal]=4 [current<reused]=2
+2026-11-10T11:06:02.015887282Z owner observer 644 calls 780ms, operation 280 calls 300ms, readiness 560 calls 580ms, identity 3 calls 10ms, provider 12 calls 20ms, credentials 16 calls 30ms, context-start 27 calls 80ms total

@@ -20,11 +20,23 @@ Both policy and manual reply paths account for transport-dropped rows.
 - `make console-browser-check` passed 29 journeys and 28 accessibility scans.
   The actual built React/Go HTTPS journey renders loss, reply drops and pending
   occupancy through the canonical operation and regenerated closed contract.
+- [Policy native evidence](../test/results/live-lag-drop-policy-42803550038/README.md):
+  run 42803550038 passed at `d65ccbd0` (package 426.241 s, focus 152.71 s),
+  covering all three policy projections and 32 bounded live MCP operations.
+- [Manual native evidence](../test/results/live-lag-drop-manual-42800188004/README.md):
+  run 42800188004 passed at the same commit (package 379.554 s, focus 100.87 s),
+  covering all three finite manual projections and 34 bounded operations. Both
+  environments recorded unchanged sources, removed build scratch and no cleanup
+  failures. PR CI run 42800168119 (`ci-ok`) and Gitar review also passed.
 
-These are component and packaged-browser results with synthetic authority and
-runtime facts. Guarded native policy/manual suites remain separate from a
-fleet-administrator installed measurement, which is still not claimed. An exact
-active-viewer count and the broader specification remain open.
+Earlier policy attempts are not passes: run 42800184032 failed once at the
+second-principal handle check and once at an earlier transient `LiveUnavailable`.
+A [same-suite main control](../test/results/live-policy-main-control-42803544505/README.md)
+passed after its own retryable `LiveUnavailable`, confirming that this transient
+behavior exists independently of the increment. These native workflows exercise
+real policy/manual live sources but not the fleet-administrator operation or a
+long-duration load measurement. An exact active-viewer count and the broader
+specification remain open.
 
 ## Administrator live-runtime capacity view (2026-11-10)
 
