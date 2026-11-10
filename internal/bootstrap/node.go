@@ -364,8 +364,10 @@ func (p *nodeProcess) enroll(ctx context.Context) (time.Time, error) {
 func (p *nodeProcess) report() collector.Report {
 	var sources []collector.SourceStatus
 	var sourceAsOf time.Time
+	var live *collector.LiveStatus
 	if p.sources != nil {
 		sources, sourceAsOf = p.sources.Status()
+		live = p.sources.liveStatus()
 	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -378,7 +380,7 @@ func (p *nodeProcess) report() collector.Report {
 	if !sourceAsOf.IsZero() {
 		now = sourceAsOf
 	}
-	return collector.Report{Sequence: p.sequence, ObservedAt: now.UTC(), Facts: p.facts, Mechanisms: p.mechanisms, Budget: p.budget.Usage(now), Receipts: append([]collector.Receipt{}, p.receipts[:n]...), Sources: sources}
+	return collector.Report{Sequence: p.sequence, ObservedAt: now.UTC(), Facts: p.facts, Mechanisms: p.mechanisms, Budget: p.budget.Usage(now), Receipts: append([]collector.Receipt{}, p.receipts[:n]...), Sources: sources, Live: live}
 }
 
 // statusLoop sends the first report at once and then one every

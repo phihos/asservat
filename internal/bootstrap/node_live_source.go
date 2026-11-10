@@ -316,6 +316,7 @@ func (n *nodeSources) readLive(ctx context.Context, w collector.Work) (v.NodeRep
 	for _, r := range out.Rows {
 		out.Bytes += int64(r.Row.Bytes())
 	}
+	budget.deliver(n.now(), kept, encoded)
 	return out, nil
 }
 

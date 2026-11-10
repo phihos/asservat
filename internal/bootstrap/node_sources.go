@@ -240,6 +240,16 @@ func (n *nodeSources) Close() {
 	n.liveWG.Wait()
 }
 
+func (n *nodeSources) liveStatus() *collector.LiveStatus {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	if n.liveBudget == nil {
+		return nil
+	}
+	status := n.liveBudget.status()
+	return &status
+}
+
 func (n *nodeSources) Status() ([]collector.SourceStatus, time.Time) {
 	n.mu.Lock()
 	defer n.mu.Unlock()

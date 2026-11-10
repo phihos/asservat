@@ -17,7 +17,8 @@ func sampleReport() collector.Report {
 		Runtime: collector.RuntimeContainerd, Engine: collector.Engine{Linked: true, Initialized: true, Version: "v0.57.0"}}
 	return collector.Report{Sequence: 4, ObservedAt: time.Date(2026, 10, 27, 12, 0, 0, 0, time.UTC), Facts: f, Mechanisms: collector.Assess(f),
 		Budget:   collector.Usage{Ceilings: collector.Ceilings{RingBytes: 256 << 20, FrozenBytes: 256 << 20, UploadBytesPerSecond: 32 << 20, UploadBurstBytes: 64 << 20}, UploadAvailable: 64 << 20},
-		Receipts: []collector.Receipt{{WorkID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", Sequence: 2, Outcome: collector.OutcomeRefused, Reason: collector.ReasonRecorderNotImplemented}}}
+		Receipts: []collector.Receipt{{WorkID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", Sequence: 2, Outcome: collector.OutcomeRefused, Reason: collector.ReasonRecorderNotImplemented}},
+		Live:     &collector.LiveStatus{WindowStartedAt: time.Date(2026, 10, 27, 11, 59, 59, 0, time.UTC), Cohorts: 1, ScanEvents: 2, ScanBytes: 300, ScanCPUNanos: 400, DeliveredRows: 2, DeliveredBytes: 600, RefusedAdmissions: 1}}
 }
 
 func TestStatusRoundTripsThroughTheClosedWire(t *testing.T) {
@@ -134,6 +135,10 @@ func TestDomainStatusRefusesOpenValues(t *testing.T) {
 		"ring over":       func(s *contracts.NodeStatus) { s.Budget.RingReserved = s.Budget.Ceilings.RingBytes + 1 },
 		"negative":        func(s *contracts.NodeStatus) { s.Budget.FrozenReserved = -1 },
 		"bad ceilings":    func(s *contracts.NodeStatus) { s.Budget.Ceilings.UploadBurstBytes = 0 },
+		"live future":     func(s *contracts.NodeStatus) { s.Live.WindowStartedAt = s.ObservedAt.Add(time.Second) },
+		"live negative":   func(s *contracts.NodeStatus) { s.Live.ScanEvents = -1 },
+		"live cohorts":    func(s *contracts.NodeStatus) { s.Live.Cohorts = 17 },
+		"live no window":  func(s *contracts.NodeStatus) { s.Live.WindowStartedAt = time.Time{} },
 	} {
 		s := WireStatus("epoch", sampleReport())
 		edit(&s)
