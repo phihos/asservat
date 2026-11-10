@@ -5,13 +5,18 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"reflect"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"asservat.local/asservat/internal/contracts"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	admission "k8s.io/api/admissionregistration/v1"
 	core "k8s.io/api/core/v1"
+	rbac "k8s.io/api/rbac/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -52,9 +57,126 @@ func TestObservationCapabilityIsOriginalResourceBinding(t *testing.T) {
 	if selected.binding == old.binding || selected.observationFormat != contracts.OwnerObservationOperationFormat || old.observationFormat != "" {
 		t.Fatal("original capability not independently bound")
 	}
+	fleet, err := NewFleetProviderInstalledRuntimeResources(context.Background(), p, effects, roots, worker, owner)
+	if err != nil {
+		t.Fatal("fleet constructor", err)
+	}
+	t.Cleanup(fleet.Close)
+	if fleet.binding == old.binding || fleet.binding == selected.binding {
+		t.Fatal("fleet source rights not bound before resource claims")
+	}
+	for _, test := range []struct {
+		name     string
+		producer *InitialRuntimeResources
+		want     bool
+	}{{"disabled", old, false}, {"observation-only", selected, false}, {"fleet", fleet, true}} {
+		t.Run(test.name+"-fleet-rbac", func(t *testing.T) {
+			// Exercise the actual immutable resource producer, whose InitialInstaller
+			// always names the fleet source even when public fleet issuance is absent.
+			role, err := test.producer.object(contracts.InitialRuntimeResourceState{}, 2)
+			if err != nil {
+				t.Fatal(err)
+			}
+			guard, err := test.producer.object(contracts.InitialRuntimeResourceState{}, 4)
+			if err != nil {
+				t.Fatal(err)
+			}
+			sourceRead, guardRead := false, false
+			for _, rule := range role.object.(*rbac.Role).Rules {
+				sourceRead = sourceRead || slices.Contains(rule.ResourceNames, initial.FleetSource.Name)
+			}
+			for _, rule := range guard.object.(*rbac.ClusterRole).Rules {
+				guardRead = guardRead || slices.Contains(rule.ResourceNames, initial.FleetGuard.Name)
+			}
+			if sourceRead != test.want || guardRead != test.want {
+				t.Fatalf("fleet source/guard rights = %t/%t, want %t", sourceRead, guardRead, test.want)
+			}
+		})
+	}
 	// Refusal to adopt an existing v1 journal is checked through the same
 	// valid() predicate Read uses, in the mixed-state test below; here no
 	// journal exists, so a Read failure would not prove that property.
+}
+
+func TestProviderResourcesRejectLateFleetRoles(t *testing.T) {
+	s, state := providerResourceFixture(t)
+	if !s.valid(state) {
+		t.Fatal("original resource claims rejected")
+	}
+	s.ownerFleet = true
+	if s.valid(state) {
+		t.Fatal("disabled fleet journal adopted expanded Role templates")
+	}
+}
+
+func TestProviderFleetProbeComposition(t *testing.T) {
+	for _, enabled := range []bool{false, true} {
+		name := "disabled"
+		if enabled {
+			name = "enabled"
+		}
+		t.Run(name, func(t *testing.T) {
+			s, state := providerResourceFixture(t)
+			s.ownerFleet = enabled
+			for i := range state.Objects {
+				obj, err := s.object(state, i)
+				if err != nil {
+					t.Fatal(err)
+				}
+				state.Objects[i].TemplateDigest = preparationDigest(obj.object)
+			}
+			inv, err := s.inventory(state)
+			if err != nil {
+				t.Fatal(err)
+			}
+			pair := cfg.OwnerConfigurationProbe{ConfigMap: s.initial.FleetSource.Name, ServiceAccount: inv.OwnerAccount.Name}
+			plan := inv.BridgeAdministration.Owner
+			if slices.Contains(plan.ConfigurationProbes, pair) != enabled || len(inv.BridgeAdministration.SourceProbes) != 3 {
+				t.Fatal("fleet owner selection changed the worker's independent source probes")
+			}
+			built, err := s.object(state, 17)
+			if err != nil {
+				t.Fatal(err)
+			}
+			policy, _, err := OwnerWorkloadAdmission(plan)
+			if err != nil || !reflect.DeepEqual(policy.Spec, built.object.(*admission.ValidatingAdmissionPolicy).Spec) {
+				t.Fatal("inventory lost the originally selected owner namespace guard", err)
+			}
+			selected, err := s.preparer.originalOwnerFleet(s.initial, state)
+			if err != nil || selected != enabled {
+				t.Fatal("fresh preparer selected another fleet guard candidate", selected, err)
+			}
+			bad := state
+			bad.Objects = slices.Clone(state.Objects)
+			bad.Objects[2].TemplateDigest = strings.Repeat("0", 64)
+			if _, err := s.preparer.originalOwnerFleet(s.initial, bad); err == nil {
+				t.Fatal("unknown original Role interpreted as fleet capability")
+			}
+			retained, _, err := InitialRuntimeRetainedAdmission(inv.BridgeAdministration)
+			if err != nil {
+				t.Fatal(err)
+			}
+			ownerPair := "request.name == " + ownerCELString(pair.ConfigMap) + " && request.userInfo.username == " + ownerCELString("system:serviceaccount:"+inv.Namespace.Name+":"+pair.ServiceAccount) + " && request.userInfo.uid == " + ownerCELString(inv.OwnerAccount.UID)
+			if strings.Contains(retained.Spec.Validations[0].Expression, ownerPair) != enabled {
+				t.Fatal("retained initial guard does not preserve the exact selected owner/source/UID probe")
+			}
+			activation, err := BuildHubWorkerActivation(s.initial.InstallationID, contracts.InitialRuntimeResourceSnapshot{State: state, UID: ownerID(4490)}, inv)
+			if err != nil {
+				t.Fatal("worker activation rejected original optional fleet probe", err)
+			}
+			in := contracts.HubWorkerDeployment{InstallationID: s.initial.InstallationID, Namespace: inv.Namespace, FleetSource: inv.FleetSource, OwnerSource: inv.OwnerSource, OwnerGuard: inv.OwnerSourceGuard, LeaderLease: inv.LeaderLease, Activation: activation}
+			if !hubWorkerActivationShapeBound(in) || !reflect.DeepEqual(capacityActivationAdministration(in), plan) {
+				t.Fatal("worker activation lost original selected probe/guard")
+			}
+			if enabled {
+				last := len(activation.ConfigurationProbes) - 1
+				activation.ConfigurationProbes[last].ConfigMap = "unrelated"
+				if hubWorkerActivationShapeBound(in) {
+					t.Fatal("optional fleet probe accepted an unrelated source")
+				}
+			}
+		})
+	}
 }
 
 func TestObservationCapabilityRejectsMixedAndUnknownOriginalState(t *testing.T) {

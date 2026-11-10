@@ -64,6 +64,7 @@ func (r LiveActivityRates) Zero() bool {
 // LiveRuntimeSnapshot is one region's aggregate at read time. Incomplete rates
 // are zero rather than a partial value presented as installation-wide.
 type LiveRuntimeSnapshot struct {
+	ActiveViewers    int               `json:"activeViewers"`
 	ClusterID        string            `json:"clusterID"`
 	ObservedAt       time.Time         `json:"observedAt"`
 	FreshUntil       time.Time         `json:"freshUntil"`
@@ -75,7 +76,7 @@ type LiveRuntimeSnapshot struct {
 }
 
 func (s LiveRuntimeSnapshot) Valid(now time.Time) bool {
-	if !authorization.UUID(s.ClusterID) || !identity.Check(s.ObservedAt, identity.Recheck).Narrow(s.FreshUntil).Valid(now) || s.Nodes < 0 || s.Nodes > 5000 || s.RatesUnavailable < 0 || s.RatesUnavailable > s.Nodes || !s.Rates.Valid() {
+	if !authorization.UUID(s.ClusterID) || !identity.Check(s.ObservedAt, identity.Recheck).Narrow(s.FreshUntil).Valid(now) || s.ActiveViewers < 0 || s.ActiveViewers > 65536 || s.Nodes < 0 || s.Nodes > 5000 || s.RatesUnavailable < 0 || s.RatesUnavailable > s.Nodes || !s.Rates.Valid() {
 		return false
 	}
 	if s.Live == nil {

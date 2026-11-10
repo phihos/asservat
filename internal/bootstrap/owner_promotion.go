@@ -43,6 +43,7 @@ type promotedOwnerParts struct {
 	Signing        contracts.OwnerPublicSigning
 	WorkerRoots    [][]byte
 	Projection     contracts.WorkerObjectReference
+	FleetSettings  contracts.OwnerPublicGuardedSource
 	// Downloads are the configured hub-local download workers (ADR-204),
 	// or nil: the worker API, its profile source and the path template.
 	Downloads *promotedDownloads
@@ -118,8 +119,31 @@ func derivePromotedOwner(in contracts.OwnerDeployment, x promotedOwnerParts, now
 	if _, out.Public.ProviderRecipeSHA256, err = providerconfig.OwnerPublicProviderRecipeFor(out, *in.ProviderAuthentication, now); err != nil {
 		return in, &fixedStepError{"recipe", err}
 	}
+	out, err = pinOwnerFleet(out, x.Settings.Federation, x.FleetSettings, now)
+	if err != nil {
+		return in, &fixedStepError{"fleet-recipe", err}
+	}
 	if err = validateUnprojectedOwnerDeployment(out); err != nil {
 		return in, &fixedStepError{"validate", err}
 	}
 	return out, nil
+}
+
+func pinOwnerFleet(in contracts.OwnerDeployment, federation *contracts.InstallerFederationSettings, settings contracts.OwnerPublicGuardedSource, now time.Time) (contracts.OwnerDeployment, error) {
+	if federation == nil || federation.Fleet == nil {
+		return in, nil
+	}
+	if in.Public == nil || in.ProviderAuthentication == nil {
+		return in, mounts.ErrUnavailable
+	}
+	f := federation.Fleet
+	public := *in.Public
+	public.Fleet = &contracts.OwnerFleetIssuance{Settings: settings.Source, SettingsGuard: settings.Guard, ChannelMount: f.ChannelMount, DeliveryProfile: f.DeliveryProfile}
+	in.Public = &public
+	_, digest, err := providerconfig.OwnerFleetProviderRecipeFor(in, *in.ProviderAuthentication, now)
+	if err != nil {
+		return in, err
+	}
+	public.Fleet.ProviderRecipeSHA256 = digest
+	return in, nil
 }

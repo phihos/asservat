@@ -239,7 +239,11 @@ func (k *InstallerContinuation) Resources(ctx context.Context) (*kube.InitialRun
 		return nil, snapshot, inventory, err
 	}
 	k.at("resources/producer")
-	resources, err := kube.NewProviderInstalledRuntimeResources(ctx, k.preparer, k.sql, k.roots,
+	producer := kube.NewProviderInstalledRuntimeResources
+	if p := k.input.Public; p != nil && p.Promotion != nil && p.Federation != nil && p.Federation.Fleet != nil {
+		producer = kube.NewFleetProviderInstalledRuntimeResources
+	}
+	resources, err := producer(ctx, k.preparer, k.sql, k.roots,
 		contracts.ConfigurationProviderSelection{AuthMount: w.AuthMount, AuthMountAccessor: w.AuthMountAccessor, AuditCredentials: worker, WorkerConfigurationAudit: audit, ContextDeletionSigning: signing},
 		contracts.OwnerProviderSelection{AuthMount: o.AuthMount, AuthMountAccessor: o.AuthMountAccessor, AuditCredentials: owner})
 	if err != nil {
@@ -876,6 +880,10 @@ func (k *InstallerContinuation) Owner(ctx context.Context, resources *kube.Initi
 	if promotion != nil {
 		transit, signing, pki := promotedKeyNames(input.InstallationID, k.record.Scope.IssuerEpoch, *promotion)
 		named.Public = &contracts.OwnerPublicDeployment{SessionTransit: transit, WorkSigning: signing, WorkerPKI: pki}
+		named, err = pinOwnerFleet(named, k.input.Public.Federation, contracts.OwnerPublicGuardedSource{Source: inventory.FleetSource, Guard: inventory.FleetGuard}, time.Now())
+		if err != nil {
+			return err
+		}
 	}
 	artifact, err := providerconfig.OwnerProviderSetupArtifact(named, profile, observed.Configuration.Pool, observed.Configuration.IssuerRoots, time.Now(), k.federation, k.publisherSetup(), k.downloadEvidenceSetup(), k.contextDeletionSetup())
 	if err != nil {
@@ -1147,7 +1155,8 @@ func (k *InstallerContinuation) promote(ctx context.Context, inventory kube.Init
 	}
 	promoted, err := derivePromotedOwner(input, promotedOwnerParts{Settings: *k.input.Public, Sources: *k.sources, Qualification: k.capacity.qualification, ConnectorRoots: connectorRoots,
 		IssuerEpoch: k.record.Scope.IssuerEpoch, Signing: readback.Signing, WorkerRoots: readback.WorkerRoots, Projection: k.publicProjection, Downloads: downloads,
-		Processing: k.capacity.processingEnvironment()}, time.Now())
+		FleetSettings: contracts.OwnerPublicGuardedSource{Source: inventory.FleetSource, Guard: inventory.FleetGuard},
+		Processing:    k.capacity.processingEnvironment()}, time.Now())
 	if err != nil {
 		return input, err
 	}

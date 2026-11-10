@@ -1,6 +1,7 @@
 package bootstrap
 
 import (
+	"bytes"
 	"context"
 	"encoding/pem"
 	"reflect"
@@ -9,14 +10,16 @@ import (
 	"time"
 
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
+	"asservat.local/asservat/internal/adapters/providerconfig"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
+	value "asservat.local/asservat/internal/domain/fleet"
 )
 
 // ADR-194 step 4: the derived promoted input passes the owner's own reader,
 // pins the read-back key and projection, and refuses inconsistent parts.
 func TestDerivePromotedOwner(t *testing.T) {
-	for _, mode := range []string{"valid", "unprojected", "no-promotion", "already-native", "audit-mount", "other-signing-key", "no-worker-source", "foreign-capacity", "downloads", "downloads-other-source", "downloads-hub-namespace"} {
+	for _, mode := range []string{"valid", "unprojected", "no-promotion", "already-native", "audit-mount", "other-signing-key", "no-worker-source", "foreign-capacity", "downloads", "downloads-other-source", "downloads-hub-namespace", "fleet", "fleet-invalid"} {
 		t.Run(mode, func(t *testing.T) {
 			in, dir, c := ownerProviderInputFixture(t)
 			d := capacityDerivedFixture()
@@ -69,9 +72,16 @@ func TestDerivePromotedOwner(t *testing.T) {
 				if mode == "downloads-hub-namespace" {
 					x.Downloads.API.Namespace = c.Namespace
 				}
+			case "fleet", "fleet-invalid":
+				x.Settings.Federation = &contracts.InstallerFederationSettings{Fleet: &contracts.InstallerFleetIssuance{ChannelMount: "fleet-kv", DeliveryProfile: "regional-installer"}}
+				x.FleetSettings = guarded("fleet")
+				x.FleetSettings.Guard.Administrators = []contracts.OwnerDeploymentActor{{Kind: "User", Name: "operator"}}
+				if mode == "fleet-invalid" {
+					x.Settings.Federation.Fleet.ChannelMount = "not a mount"
+				}
 			}
 			out, err := derivePromotedOwner(c, x, time.Now())
-			if (err == nil) != (mode == "valid" || mode == "unprojected" || mode == "downloads") {
+			if (err == nil) != (mode == "valid" || mode == "unprojected" || mode == "downloads" || mode == "fleet") {
 				t.Fatal(mode, err)
 			}
 			if err != nil {
@@ -84,6 +94,13 @@ func TestDerivePromotedOwner(t *testing.T) {
 			if p.WorkSigning.KeyID != signing.Name+"-v1" || p.ProviderRecipeSHA256 == "" || p.AuditStoreID != q.RootBacking.Capture.Policy.StoreID || p.RuntimeProjection != x.Projection ||
 				out.Native.WorkerAPIs == nil || out.Native.RetentionTopologies == nil || p.WorkerConfiguration.Source != x.Sources.WorkerConfiguration.Source {
 				t.Fatal("derived input", p)
+			}
+			if mode == "fleet" {
+				if p.Fleet == nil || p.Fleet.Settings != x.FleetSettings.Source || !reflect.DeepEqual(p.Fleet.SettingsGuard, x.FleetSettings.Guard) || p.Fleet.ChannelMount != "fleet-kv" || p.Fleet.DeliveryProfile != "regional-installer" || p.Fleet.ProviderRecipeSHA256 == "" {
+					t.Fatal("fleet issuance input", p.Fleet)
+				}
+			} else if p.Fleet != nil {
+				t.Fatal("fleet enabled without its section", p.Fleet)
 			}
 			if d := x.Downloads; d == nil && (len(out.Native.WorkerAPIs) != 0 || p.DownloadEnvironment.PathTemplate != nil) ||
 				d != nil && (len(out.Native.WorkerAPIs) != 1 || !reflect.DeepEqual(out.Native.WorkerAPIs[0], d.API) || p.DownloadEnvironment.PathTemplate == nil || *p.DownloadEnvironment.PathTemplate != d.Template || len(p.DownloadEnvironment.Paths) != 0) {
@@ -102,5 +119,26 @@ func TestDerivePromotedOwner(t *testing.T) {
 			}
 			got.closeHTTP()
 		})
+	}
+}
+
+func TestFleetProviderArtifactComposition(t *testing.T) {
+	_, _, c := ownerProviderInputFixture(t)
+	c.Public = &contracts.OwnerPublicDeployment{}
+	federation := &contracts.InstallerFederationSettings{Fleet: &contracts.InstallerFleetIssuance{ChannelMount: "fleet-kv", DeliveryProfile: "regional-installer"}}
+	settings := contracts.OwnerPublicGuardedSource{Source: contracts.WorkerObjectReference{Name: "fleet", UID: runtimeID}, Guard: contracts.OwnerDeploymentGuard{Name: "fleet-guard", PolicyUID: runtimeID, PolicyGeneration: 1, BindingUID: runtimeID, BindingResourceVersion: "1"}}
+	named, err := pinOwnerFleet(c, federation, settings, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	pool := value.OwnerPool{InstallationID: c.InstallationID, ClusterID: c.ClusterID, IssuerEpoch: runtimeID, Namespace: c.Namespace.Name, NamespaceUID: c.Namespace.UID,
+		Service: "hub", ServiceUID: runtimeID, Deployment: "hub", DeploymentUID: runtimeID, ServiceAccount: named.ProviderAuthentication.ServiceAccount.Name, AccountUID: named.ProviderAuthentication.ServiceAccount.UID, Port: 9443, NativePort: 9444, NativeBootstrap: value.OwnerBootstrapProfile}
+	raw, err := providerconfig.OwnerProviderSetupArtifact(named, *named.ProviderAuthentication, pool, c.Kubernetes.Roots, time.Now(), nil, nil, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	role, digest, err := providerconfig.OwnerFleetProviderRecipeFor(named, *named.ProviderAuthentication, time.Now())
+	if err != nil || digest != named.Public.Fleet.ProviderRecipeSHA256 || !bytes.Contains(raw, []byte("auth/"+named.ProviderAuthentication.AuthMount+"/role/"+role.Name)) || !bytes.Contains(raw, []byte("bootstrap-issue/v1/"+c.InstallationID+"/")) {
+		t.Fatal("phase-3 artifact omitted the runtime fleet role or audit scope", err)
 	}
 }

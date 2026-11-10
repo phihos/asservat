@@ -293,6 +293,7 @@ try {
   if (capacityHTTP.status() !== 200) console.log('live capacity HTTP', capacityHTTP.status());
   await expect(page.getByLabel('Live runtime totals and gauges')).toBeVisible();
   await expect(page.getByLabel('Live runtime rates')).toBeVisible();
+  await expect(page.getByText('Active viewers', { exact: true })).toBeVisible();
   await expect(page.getByText('Source-loss events', { exact: true })).toBeVisible();
   await expect(page.getByText('Transport-dropped rows', { exact: true })).toBeVisible();
   await expect(page.getByText('Buffered pending rows', { exact: true })).toBeVisible();

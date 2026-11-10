@@ -39,6 +39,15 @@ func hubWorkerActivationShapeBound(in contracts.HubWorkerDeployment) bool {
 		probeCount = 3
 		if a.WorkerLayout == contracts.HubWorkerProviderInstalledLayout {
 			probeCount = 3 + len(ownerPublicSourceProbes(in.InstallationID, n.Owner))
+			// Fleet composition adds just the original source/owner pair. The
+			// copied projection selects a candidate; current native guard and
+			// original resource receipts independently prove that selection.
+			if len(a.ConfigurationProbes) == probeCount+1 {
+				if a.ConfigurationProbes[probeCount] != (contracts.OwnerConfigurationProbe{ConfigMap: in.FleetSource.Name, ServiceAccount: n.Owner}) {
+					return false
+				}
+				probeCount++
+			}
 		}
 		if a.CapacityProbe.ServiceAccount != a.ServiceAccount || len(a.ConfigurationProbes) != probeCount || a.ConfigurationProbes[2] != (contracts.OwnerConfigurationProbe{ConfigMap: installedProcessingSource(in.InstallationID), ServiceAccount: n.Worker}) {
 			return false

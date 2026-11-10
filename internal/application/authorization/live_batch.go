@@ -27,12 +27,19 @@ func (s LiveSourceAuthority) CheckSources(ctx context.Context, current identitie
 func (s LiveSourceAuthority) ResolveSources(ctx context.Context, current identities.CurrentIdentity, refs []live.SourceReference, projection string) ([]live.Source, time.Time, error) {
 	return s.sourcePhase(ctx, current, refs, nil, projection, true)
 }
-func (s LiveSourceAuthority) sourcePhase(ctx context.Context, current identities.CurrentIdentity, input []live.SourceReference, expected []live.Source, projection string, resolve bool) ([]live.Source, time.Time, error) {
+func (s LiveSourceAuthority) sourcePhase(ctx context.Context, current identities.CurrentIdentity, input []live.SourceReference, expected []live.Source, projection string, resolve bool) (out []live.Source, endAt time.Time, failure error) {
+	phase := "batch/input"
+	defer func() {
+		if failure != nil {
+			s.refuse(phase, failure)
+		}
+	}()
 	if !s.configured() || ctx == nil || ctx.Err() != nil || current == nil || len(input) < 1 || len(input) > live.MaxSources || !live.Projection(projection) {
 		return nil, time.Time{}, fmt.Errorf("%w: live_batch:30", live.ErrDenied)
 	}
 	call, stop := context.WithTimeout(ctx, identity.AuthorityRecheckInterval) // ADR-311: the request window bounds the call
 	defer stop()
+	phase = "batch/identity"
 	i, e := current.ResolveIdentity(call)
 	i = cloneProjectionIdentity(i)
 	if e != nil || !i.Valid(s.Now()) {
@@ -43,25 +50,30 @@ func (s LiveSourceAuthority) sourcePhase(ctx context.Context, current identities
 	permissions := make([]value.Projection, len(refs))
 	seen := map[string]bool{}
 	for n, ref := range refs {
+		phase = "batch/reference"
 		if !value.UUID(ref.ID) || seen[ref.ID] || ref.Kind != "policy" && ref.Kind != "manualSession" {
 			return nil, time.Time{}, fmt.Errorf("%w: live_batch:45", live.ErrDenied)
 		}
 		seen[ref.ID] = true
 		if resolve {
+			phase = "batch/target-read"
 			refs[n].Target, e = s.Catalog.LiveSourceTarget(call, ref.ID, ref.Kind)
 			if e != nil {
 				return nil, time.Time{}, liveBatchRefusal("live_batch:51", e)
 			}
 		}
 		target := refs[n].Target
+		phase = "batch/target"
 		if !target.Valid() || n > 0 && (target.ClusterID != refs[0].Target.ClusterID || target.NamespaceUID != refs[0].Target.NamespaceUID || target.WorkloadUID != refs[0].Target.WorkloadUID) {
 			return nil, time.Time{}, fmt.Errorf("%w: live_batch:56", live.ErrDenied)
 		}
+		phase = "batch/permission-read"
 		permissions[n], e = s.Permissions.Permissions(call, target)
 		if e != nil {
 			return nil, time.Time{}, liveBatchRefusal("live_batch:60", e)
 		}
 		ordinary := value.ScopeEligibility(i, permissions[n], value.ReadLiveSource, target, s.Now())
+		phase = "batch/permission-eligibility"
 		if !ordinary.Eligible {
 			return nil, time.Time{}, fmt.Errorf("%w: live_batch:64", live.ErrDenied)
 		}
@@ -69,6 +81,7 @@ func (s LiveSourceAuthority) sourcePhase(ctx context.Context, current identities
 	}
 	bounded, end := context.WithDeadline(call, until)
 	defer end()
+	phase = "batch/catalog-read"
 	var records []LiveSourceRecord
 	if batch, ok := s.Catalog.(liveCatalogBatch); ok {
 		records, e = batch.ReadLiveSourceRecords(bounded, refs)
@@ -91,9 +104,10 @@ func (s LiveSourceAuthority) sourcePhase(ctx context.Context, current identities
 		}
 		return nil, time.Time{}, fmt.Errorf("%w: live_batch:83: %v", live.ErrDenied, e)
 	}
-	out := make([]live.Source, len(records))
+	out = make([]live.Source, len(records))
 	for n, record := range records {
 		ref := refs[n]
+		phase = "batch/catalog-binding"
 		if record.Source.Root() != s.RootID || record.Source.ID() != ref.ID || record.Source.OwnerKind != ref.Kind || record.Source.Target != ref.Target {
 			return nil, time.Time{}, fmt.Errorf("%w: live_batch:89", live.ErrDenied)
 		}
@@ -102,12 +116,14 @@ func (s LiveSourceAuthority) sourcePhase(ctx context.Context, current identities
 			want = expected[n]
 		}
 		var sourceUntil time.Time
+		phase = "batch/facts"
 		out[n], sourceUntil, e = s.checkFacts(bounded, i, permissions[n], want, projection, record, until)
 		if e != nil {
 			return nil, time.Time{}, e
 		}
 		until = identity.Earlier(until, sourceUntil)
 	}
+	phase = "batch/finish"
 	return s.finishSources(bounded, current, i, out, projection, until)
 }
 

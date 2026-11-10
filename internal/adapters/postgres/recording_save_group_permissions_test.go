@@ -108,15 +108,18 @@ func (s *groupProjectionSQL) Query(_ context.Context, sql string, _ ...any) (pgx
 	}
 	return groupProjectionEmptyRows{}, nil
 }
-func groupProjectionFixture() (*groupProjectionSQL, *custodydb.Queries, custodydb.PermissionStream, authorization.Target) {
-	now := time.Now().UTC().Truncate(time.Microsecond)
+func groupProjectionFixture(t *testing.T) (*groupProjectionSQL, *custodydb.Queries, custodydb.PermissionStream, authorization.Target) {
+	t.Helper()
+	// The fake SQL clock and accepted-policy authority share one fixed instant.
+	// Tests advance this clock explicitly to exercise their original cutoffs.
+	now := previewTestValue(t).CreatedAt
 	db := &groupProjectionSQL{now: now}
 	q := custodydb.New(db)
 	stream := custodydb.PermissionStream{ID: id("11111111-1111-4111-8111-111111111111"), Epoch: id("22222222-2222-4222-8222-222222222222"), Sequence: 1, InitialAuditID: id("33333333-3333-4333-8333-333333333333"), ObservedAt: ts(now), FreshUntil: ts(now.Add(20 * time.Second)), LeaseUntil: ts(now.Add(30 * time.Second)), ProjectionDigest: append([]byte{1}, make([]byte, 31)...)}
 	return db, q, stream, authorization.Target{ClusterID: "44444444-4444-4444-8444-444444444444", NamespaceUID: "namespace", WorkloadUID: "workload", PodUID: "pod"}
 }
 func TestRecordingGroupPermissionProjectionsLoadOncePerExactPod(t *testing.T) {
-	db, q, stream, target := groupProjectionFixture()
+	db, q, stream, target := groupProjectionFixture(t)
 	cache := newRecordingGroupFacts(q, stream)
 	var scope authorization.PolicyGrantScope
 	if err := json.Unmarshal(policyGrantTestRow(t).PolicyScope, &scope); err != nil {
@@ -158,7 +161,7 @@ func TestRecordingGroupPermissionProjectionsLoadOncePerExactPod(t *testing.T) {
 	}
 }
 func TestRecordingGroupPermissionProjectionIdentityAndTransactionIsolation(t *testing.T) {
-	_, q, stream, target := groupProjectionFixture()
+	_, q, stream, target := groupProjectionFixture(t)
 	cache := newRecordingGroupFacts(q, stream)
 	if _, err := cache.read(t.Context(), q, stream, target); err != nil {
 		t.Fatal(err)
@@ -188,7 +191,7 @@ func TestRecordingGroupPermissionProjectionIdentityAndTransactionIsolation(t *te
 func TestRecordingGroupCachedProjectionReevaluatesEveryOriginalExpiry(t *testing.T) {
 	for _, which := range []string{"identity", "stream", "denySnapshot", "allow", "review", "deny"} {
 		t.Run(which, func(t *testing.T) {
-			db, q, stream, target := groupProjectionFixture()
+			db, q, stream, target := groupProjectionFixture(t)
 			cache := newRecordingGroupFacts(q, stream)
 			p, err := cache.read(t.Context(), q, stream, target)
 			if err != nil {
@@ -275,7 +278,7 @@ func (r *groupProjectionDataRows) Scan(dst ...any) error {
 
 func groupAuditedBasisFixture(t *testing.T) (*groupProjectionSQL, *custodydb.Queries, custodydb.PermissionStream, authorization.AcceptedPolicyAuthority, authorization.Target) {
 	t.Helper()
-	db, q, stream, target := groupProjectionFixture()
+	db, q, stream, target := groupProjectionFixture(t)
 	var scope authorization.PolicyGrantScope
 	if err := json.Unmarshal(policyGrantTestRow(t).PolicyScope, &scope); err != nil {
 		t.Fatal(err)
@@ -481,7 +484,7 @@ func TestRecordingGroupNilFactsPreserveOrdinaryReadsAndClocks(t *testing.T) {
 func TestRecordingGroupFactsOwnOriginalStreamDigestBytes(t *testing.T) {
 	for _, field := range []string{"projection", "trust"} {
 		t.Run(field, func(t *testing.T) {
-			db, q, stream, target := groupProjectionFixture()
+			db, q, stream, target := groupProjectionFixture(t)
 			stream.TrustDigest = append([]byte{2}, make([]byte, 31)...)
 			facts := newRecordingGroupFacts(q, stream)
 			if _, err := facts.read(t.Context(), q, stream, target); err != nil {

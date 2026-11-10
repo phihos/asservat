@@ -233,6 +233,12 @@ func (s liveSourceCatalog) ReadLiveSourceRecords(ctx context.Context, refs []liv
 		if !ok || record.Source.Target != ref.Target {
 			return nil, fmt.Errorf("%w: live_sources:233", live.ErrUnavailable)
 		}
+		// Inventory preserves an unavailable status for display. An exact read
+		// must fail this operation instead of passing its empty projections and
+		// initial lease to authorization as though current access were denied.
+		if record.Source.State == "Unavailable" && slices.Contains(record.Source.Blockers, "SourceUnavailable") {
+			return nil, fmt.Errorf("%w: live_sources:status", live.ErrUnavailable)
+		}
 		out[n] = record
 	}
 	return out, nil

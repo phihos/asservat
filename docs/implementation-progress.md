@@ -1,5 +1,104 @@
 # Sustained implementation progress
 
+## Active candidate: viewer capacity and optional fleet settings (2026-11-10)
+
+Outcome: the authenticated administrator capacity view reports active viewers
+for the selected workload cluster, using current owner liveness and the existing
+minimized watch ledger. Optional fleet settings reuse the original protected
+ConfigMap, provider artifact and named admission guard.
+
+The Kimi-session review integrates PRs #215 and #216 on
+`fix/kimi-session-review`. Both original heads have red CI from accepted-policy
+test clocks that had outlived a fixed 30-day fixture. The controlled fixture
+clocks now use the policy's original creation instant; authority durations and
+negative-expiry assertions remain unchanged. Focused and full PostgreSQL adapter
+race tests pass. At `8e2b4ac1`, full pre-push passed (613 console tests; affected
+Go race tests 515 s), and the packaged-browser gate passed (146.302 s; 29
+journeys and 28 accessibility scans). The real PostgreSQL ledger and migration
+Up/Down/Up tests passed in 27.859 s with unchanged source and clean cleanup.
+
+Review found an unchecked NULL target digest in the new SQL writer and optional
+fleet RBAC being installed even without fleet composition. The candidate adds
+real SQL rejection coverage and checks the disabled producer path. The enabled
+owner also needs an exact dry-run probe through both namespace guards so its
+fleet-source policy can be proved independently; real writes remain denied.
+The target mapping is a domain-separated SHA-256 digest, not a keyed digest. No role,
+connection, watch or background poll is added by the viewer aggregate. The
+optional installer selection adds zero API requests or background tasks and
+binds named RBAC/probe templates before resource claims. Retained resource
+digests and current native guards remain necessary after restart.
+
+The three original uncommitted production files were an unfinished processing
+release experiment: they referenced a profile absent from both the typed
+contract and SQL producer, so the local tree did not compile. Their exact patch
+is preserved outside the checkout; processing release remains unavailable under
+ADR-210 until its producer, consumer and installed workflow are completed.
+
+The fresh local installed chain at `8e2b4ac1` passed in 500.751 s (608.1 s
+including setup/cleanup), with 4,552 unchanged source hashes, removed scratch
+and no cleanup failures. It used the authenticated browser fleet issuance
+route, verified exact replay and the matching operator-channel credential,
+then completed regional enrollment, context capture/publication and native
+download. Issuance is checked in the existing chain/default continuation,
+without adding a focus or extra work to unrelated installed focuses.
+
+[Native run 42884104591](https://github.com/phihos/asservat/actions/runs/42884104591)
+failed after returning exactly two active viewers: React received four live
+batches, then a nonretryable source denial with over 100 seconds left on its
+watch. It is a failure, with unchanged source and complete cleanup, not capacity
+workflow qualification. The old diagnostics identify only outer `service:442`,
+so the precise inner refusal is unknown.
+
+Two local regressions expose concrete failures at that boundary: a missing
+regional status reply produced a source with empty projections and its initial
+lease, and a source/permission observation could expire during a blocking read.
+Those cases now refuse the operation as unavailable; existing same-cursor
+service and browser retry handling retains the original view. No read is
+authorized by expired facts, no deadline is renewed, and actual source, rights,
+policy, audience and hard-bound denials remain unchanged. Fixed diagnostic
+phases identify the batch, source-fact or final check without dependency text
+or identifiers. Focused authorization, service and bootstrap race tests pass.
+At `7f4da307`, final `make pre-push` passed (affected Go tests 123 s), and the
+focused compiled-React live gate passed in 14.084 s.
+
+[Native run 42887449162](https://github.com/phihos/asservat/actions/runs/42887449162)
+passed at that exact source: package 445.219 s, live focus 166.70 s, harness
+630.5 s. The authenticated fleet operation returned two active viewers, two
+principals held three shared slots, the fourth view was refused, all three
+policy projections completed, and exact owner failover retained the original
+Deployment/ReplicaSet. All 4,552 recorded source hashes match locally; both
+Go/harness exits are zero, scratch was removed and cleanup failures are empty.
+This named run qualifies the corrected policy live workflow; long-duration
+load, multiple-node fleet measurements and the full specification remain open.
+
+Historical evidence has distinct scopes:
+
+- [Run 42873289390](https://github.com/phihos/asservat/actions/runs/42873289390)
+  passed at `ca325e20`: the provider artifact started the fleet role, the owner
+  read protected settings, and the browser capacity operation returned two
+  viewers. This did not exercise bootstrap credential issuance and delivery,
+  multiple nodes, sustained operation or the final reviewed candidate.
+- [Run 42814814795](https://github.com/phihos/asservat/actions/runs/42814814795)
+  passed the existing policy live workflow at `4a699d9a`, before the corrected
+  target-cluster mapping. It is not qualification of the final capacity gauge.
+  Runs 42810631259 and 42813341849 failed and remain failures.
+- The original real PostgreSQL ledger/upgrade checks and built-browser tests
+  passed their named boundaries. The reviewed SQL/upgrade run above covers
+  migration 00148; the follow-up changes only live authority/status refusal
+  handling, leaving that migration and fleet composition unchanged.
+
+Generated logs, environment dumps, screenshots and Pod logs introduced by these
+PRs are removed from the patch. Original bytes and pre-existing local results
+are preserved in the external review archive. CI artifacts own generated output;
+concise provenance summaries remain in source control. Existing historical
+reports outside these PRs are unchanged.
+
+Current qualification and required-CI event/head results are tracked on
+[PR #216](https://github.com/phihos/asservat/pull/216); #215 is superseded. The
+next product workflow is processing operator restriction, durable rule inventory
+and exact-revision release; the parked wiring alone cannot implement it. The complete first-release
+specification and wider operational qualification remain open.
+
 ## Live loss, reply-drop and pending-row capacity metrics (2026-11-10)
 
 The existing optional live-runtime node report and administrator capacity view

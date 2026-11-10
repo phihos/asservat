@@ -1,6 +1,7 @@
 package kubernetes
 
 import (
+	"slices"
 	"strings"
 
 	cfg "asservat.local/asservat/internal/domain/configuration"
@@ -33,6 +34,13 @@ func InitialRuntimeProbeAdmission(p cfg.InitialRuntimeBridgeAdministration) (*ad
 			return nil, nil, cfg.ErrInvalid
 		}
 		probes = append(probes, "(variables.group == '' && request.resource.resource == 'configmaps' && request.name == "+ownerCELString(probe.ConfigMap)+" && "+account(probe.ServiceAccount, probe.ServiceAccountUID)+")")
+	}
+	// Fleet issuance reads the retained original fleet source as the owner.
+	// Its exact probe pair is selected before immutable resource claims; this
+	// additional namespace exception lets only that owner's denied dry-run
+	// reach the fleet source's independent administrator policy.
+	if slices.Contains(p.Owner.ConfigurationProbes, cfg.OwnerConfigurationProbe{ConfigMap: p.Initial.FleetSource, ServiceAccount: p.OwnerProbe.ServiceAccount}) {
+		probes = append(probes, "(variables.group == '' && request.resource.resource == 'configmaps' && request.name == "+ownerCELString(p.Initial.FleetSource)+" && "+account(p.OwnerProbe.ServiceAccount, p.OwnerProbe.ServiceAccountUID)+")")
 	}
 	policy.Spec.Validations[0].Expression = "(" + policy.Spec.Validations[0].Expression + ") || (has(request.dryRun) && request.dryRun && request.operation == 'UPDATE' && variables.sub == '' && (" + strings.Join(probes, " || ") + "))"
 	return policy, binding, nil

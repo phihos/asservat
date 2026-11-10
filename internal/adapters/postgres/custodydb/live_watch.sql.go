@@ -91,7 +91,7 @@ func (q *Queries) ConfigureLiveWatch(ctx context.Context, arg ConfigureLiveWatch
 }
 
 const createLiveWatch = `-- name: CreateLiveWatch :one
-SELECT live_watch_create($1::uuid,$2::uuid,$3::bytea,$4::jsonb,$5::bytea,$6::timestamptz)::jsonb
+SELECT live_watch_create_cluster($1::uuid,$2::uuid,$3::bytea,$4::jsonb,$5::bytea,$6::timestamptz,$7::bytea)::jsonb
 `
 
 type CreateLiveWatchParams struct {
@@ -101,6 +101,7 @@ type CreateLiveWatchParams struct {
 	Control       []byte
 	KeyHash       []byte
 	OriginalUntil pgtype.Timestamptz
+	ClusterKey    []byte
 }
 
 func (q *Queries) CreateLiveWatch(ctx context.Context, arg CreateLiveWatchParams) ([]byte, error) {
@@ -111,6 +112,7 @@ func (q *Queries) CreateLiveWatch(ctx context.Context, arg CreateLiveWatchParams
 		arg.Control,
 		arg.KeyHash,
 		arg.OriginalUntil,
+		arg.ClusterKey,
 	)
 	var column_1 []byte
 	err := row.Scan(&column_1)
@@ -205,4 +207,20 @@ func (q *Queries) ReadLiveControl(ctx context.Context, arg ReadLiveControlParams
 	var live_watch_read_control []byte
 	err := row.Scan(&live_watch_read_control)
 	return live_watch_read_control, err
+}
+
+const readLiveViewers = `-- name: ReadLiveViewers :one
+SELECT live_watch_viewers($1::uuid,$2::bytea)
+`
+
+type ReadLiveViewersParams struct {
+	InstallationID pgtype.UUID
+	ClusterKey     []byte
+}
+
+func (q *Queries) ReadLiveViewers(ctx context.Context, arg ReadLiveViewersParams) (int64, error) {
+	row := q.db.QueryRow(ctx, readLiveViewers, arg.InstallationID, arg.ClusterKey)
+	var live_watch_viewers int64
+	err := row.Scan(&live_watch_viewers)
+	return live_watch_viewers, err
 }

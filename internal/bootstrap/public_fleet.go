@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"context"
+	"os"
 	"time"
 
 	"asservat.local/asservat/internal/adapters/kms"
@@ -23,33 +24,34 @@ func newPublicFleet(ctx context.Context, c contracts.OwnerDeployment, providers 
 	}
 	f := c.Public.Fleet
 	if providers == nil || providers.BootstrapChannel() == nil || pools == nil || observer == nil || probe == nil || !a.storageConfigured() || a.seal == nil || a.open == nil {
-		return nil, mounts.ErrUnavailable
+		return nil, &fixedStepError{"fleet-inputs", mounts.ErrUnavailable}
 	}
 	admins, pin := capacityWorkerGuard(f.SettingsGuard)
 	protection, err := kube.NewFleetConfigurationProtection(observer, probe, cfg.ConfigMapAdministration{Name: f.SettingsGuard.Name, SourceName: f.Settings.Name, ControlNamespace: cfg.NamespaceRef{Name: c.Namespace.Name, UID: c.Namespace.UID}, Administrators: admins}, pin)
 	if err != nil {
-		return nil, mounts.ErrUnavailable
+		return nil, &fixedStepError{"fleet-protection", mounts.ErrUnavailable}
 	}
 	settings, err := kube.NewProtectedFleetSettings(observer, protection, f.Settings.Name, f.Settings.UID, c.InstallationID)
 	if err != nil {
-		return nil, mounts.ErrUnavailable
+		return nil, &fixedStepError{"fleet-settings", mounts.ErrUnavailable}
 	}
+	settings.Report = eventLog(os.Stderr, "fleet settings refused")
 	reservePool, err := pools.open(ctx, "fleet-bootstrap-reserve")
 	if err != nil {
-		return nil, err
+		return nil, &fixedStepError{"fleet-reserve-pool", mounts.ErrUnavailable}
 	}
 	reserve, err := postgres.NewBootstrapReservations(ctx, reservePool, c.InstallationID, ownerRandomID)
 	if err != nil {
-		return nil, mounts.ErrUnavailable
+		return nil, &fixedStepError{"fleet-reserve", mounts.ErrUnavailable}
 	}
 	var issues [3]*postgres.BootstrapIssues
 	for i, duty := range []string{"record", "audit", "activate"} {
 		pool, err := pools.open(ctx, "fleet-bootstrap-"+duty)
 		if err != nil {
-			return nil, err
+			return nil, &fixedStepError{"fleet-issue-pool", mounts.ErrUnavailable}
 		}
 		if issues[i], err = postgres.NewBootstrapIssues(ctx, pool, c.InstallationID); err != nil {
-			return nil, mounts.ErrUnavailable
+			return nil, &fixedStepError{"fleet-issues", mounts.ErrUnavailable}
 		}
 	}
 	return &fleetapp.FleetBootstrapIssuance{Settings: settings, Reservations: reserve, Credentials: providers.BootstrapChannel(), Records: issues[0], Audits: issues[1],

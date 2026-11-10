@@ -23,8 +23,8 @@ import (
 )
 
 // Pristine143 Up/Down/Up against the integrated142 baseline, plus147 recovery
-// Up/Down before the schema143 role checks; no installed role, source delivery
-// or live traffic claim follows from a schema round trip.
+// and148 viewer-capacity Up/Down before the schema143 role checks; no installed
+// role, source delivery or live traffic claim follows from a schema round trip.
 func TestLiveWatchUpgradeWithRealPostgres(t *testing.T) {
 	path := os.Getenv("ASSERVAT_CUSTODY_FIXTURES")
 	if path == "" {
@@ -127,11 +127,32 @@ func TestLiveWatchUpgradeWithRealPostgres(t *testing.T) {
 	if _, err = provider.UpTo(ctx, 147); err != nil {
 		t.Fatal("final147 Up", err)
 	}
+	if _, err = provider.UpTo(ctx, 148); err != nil {
+		t.Fatal("148 viewer capacity Up", err)
+	}
+	var viewerFunctions int
+	if err = pool.QueryRow(ctx, `SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public' AND p.proname='live_watch_viewers'`).Scan(&viewerFunctions); err != nil || viewerFunctions != 1 {
+		t.Fatal("148 viewer capacity function", viewerFunctions, err)
+	}
+	if _, err = provider.DownTo(ctx, 147); err != nil {
+		t.Fatal("148 viewer capacity Down", err)
+	}
+	if err = pool.QueryRow(ctx, `SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public' AND p.proname='live_watch_viewers'`).Scan(&viewerFunctions); err != nil || viewerFunctions != 0 {
+		t.Fatal("148 viewer capacity function retained at147", viewerFunctions, err)
+	}
+	if _, err = provider.UpTo(ctx, 148); err != nil {
+		t.Fatal("148 viewer capacity second Up", err)
+	}
+	var capacityLane string
+	var contextInput, queryInput bool
+	if err = pool.QueryRow(ctx, `SELECT operation_audit_lane('get_live_capacity'),operation_audit_human_input_valid('get_live_capacity','context-input/v1'),operation_audit_human_input_valid('get_live_capacity','context-query-input/v1')`).Scan(&capacityLane, &contextInput, &queryInput); err != nil || capacityLane != "normal" || !contextInput || queryInput {
+		t.Fatal("browser live-capacity audit registration", capacityLane, contextInput, queryInput, err)
+	}
 	// Exercise the actual fixed SQL Open/Charge functions under the compiled
 	// hub duty. Trust, permission root and owner identity are synthetic here;
 	// this is retained-ledger rollback proof, not owner/C3 admission proof.
 	installation, issuer, root, owner := custodyID(), custodyID(), custodyID(), custodyID()
-	if _, err = pool.Exec(ctx, `INSERT INTO fleet_trust(activated_postmaster_at,activated_database_oid,installation_id,issuer_epoch,source_uid,source_generation,source_digest,suspended,recovery_blocked,observed_at,fresh_until) VALUES(pg_catalog.pg_postmaster_start_time(),(SELECT oid FROM pg_catalog.pg_database WHERE datname=pg_catalog.current_database()),$1,$2,'synthetic-live-rollback',1,$3,false,false,clock_timestamp(),clock_timestamp()+interval '30 seconds')`, installation, issuer, bytes.Repeat([]byte{42}, 32)); err != nil {
+	if _, err = pool.Exec(ctx, `INSERT INTO fleet_trust(activated_postmaster_at,activated_database_oid,installation_id,issuer_epoch,source_uid,source_generation,source_digest,suspended,recovery_blocked,observed_at,fresh_until) VALUES(pg_catalog.pg_postmaster_start_time(),(SELECT oid FROM pg_catalog.pg_database WHERE datname=pg_catalog.current_database()),$1,$2,'synthetic-live-rollback',1,$3,false,false,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP+interval '30 seconds')`, installation, issuer, bytes.Repeat([]byte{42}, 32)); err != nil {
 		t.Fatal("synthetic rollback trust", err)
 	}
 	if _, err = seedSyntheticFleetObservation(ctx, pool, installation); err != nil {
@@ -190,6 +211,19 @@ func TestLiveWatchUpgradeWithRealPostgres(t *testing.T) {
 	var result []byte
 	if err = runtimePool.QueryRow(ctx, `SELECT live_watch_create($1,$2,$3,$4,$5,$6)`, root, owner, digest[:], encodedControl, bytes.Repeat([]byte{4}, 32), control.ExpiresAt).Scan(&result); err != nil || json.Unmarshal(result, &opened) != nil || opened.Reused || liveUTC(opened.Control) != control {
 		t.Fatalf("compiled original Open err=%v reused=%v\n got=%+v\nwant=%+v", err, opened.Reused, opened.Control, control)
+	}
+	if _, err = provider.UpTo(ctx, 148); err != nil {
+		t.Fatal("legacy viewer mapping upgrade", err)
+	}
+	clusterKey := sha256.Sum256([]byte("asservat-live-cluster/v1\x00" + installation))
+	var legacyViewers int
+	err = pool.QueryRow(ctx, `SELECT live_watch_viewers($1,$2)`, installation, clusterKey[:]).Scan(&legacyViewers)
+	var legacyUnavailable *pgconn.PgError
+	if !errors.As(err, &legacyUnavailable) || legacyUnavailable.Code != "55000" {
+		t.Fatal("unmapped legacy watch produced a false per-cluster aggregate", legacyViewers, err)
+	}
+	if _, err = provider.DownTo(ctx, 143); err != nil {
+		t.Fatal("legacy viewer mapping rollback", err)
 	}
 	control.Spent = 4 << 10
 	encodedControl, err = json.Marshal(control)
@@ -251,7 +285,7 @@ func TestLiveWatchUpgradeWithRealPostgres(t *testing.T) {
 		t.Fatal("account-only original debt", controls, accounts, debt, err)
 	}
 	assertRetainedDown("debt-only")
-	t.Log("pristine142→143→142 twice; 147 Up/Down removes only recovery functions before the schema143 compiled Open/Charge checks; retained control and account-only debt each refuse Down23514 with exact schema/functions/history/state unchanged; HTTP/source/audit retained guards not exercised")
+	t.Log("pristine142→143→142 twice; 147 recovery and148 viewer-capacity Up/Down before the schema143 compiled Open/Charge checks; retained control and account-only debt each refuse Down23514 with exact schema/functions/history/state unchanged; HTTP/source/audit retained guards not exercised")
 }
 
 // liveUTC matches the adapter's normalization: SQL JSON renders +00:00,

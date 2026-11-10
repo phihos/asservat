@@ -26,6 +26,10 @@ type CapacityTargets interface {
 	ReadLiveRuntime(context.Context, collector.LiveRuntimeRequest) (collector.LiveRuntimeSnapshot, error)
 }
 
+type CapacityViewers interface {
+	ReadLiveViewers(context.Context, string, string) (int, time.Time, error)
+}
+
 var ErrClusterUnknown = errors.New("unknown live capacity cluster")
 
 // CapacityReader returns one selected cluster's content-free live runtime. It
@@ -35,13 +39,21 @@ type CapacityReader struct {
 	Administration CapacityAdministration
 	Recovery       CapacityRecovery
 	Targets        CapacityTargets
+	Viewers        CapacityViewers
 	Clusters       []string
 	Now            func() time.Time
+	Report         func(string)
+}
+
+func (s CapacityReader) note(stage string) {
+	if s.Report != nil {
+		s.Report(stage)
+	}
 }
 
 func (s CapacityReader) Read(ctx context.Context, current CurrentIdentity, cluster string) (collector.LiveRuntimeSnapshot, time.Time, error) {
 	var zero collector.LiveRuntimeSnapshot
-	if ctx == nil || current == nil || s.Administration == nil || s.Recovery == nil || s.Targets == nil || s.Now == nil || !authorization.UUID(s.InstallationID) {
+	if ctx == nil || current == nil || s.Administration == nil || s.Recovery == nil || s.Targets == nil || s.Viewers == nil || s.Now == nil || !authorization.UUID(s.InstallationID) {
 		return zero, time.Time{}, identity.ErrUnavailable
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -51,7 +63,16 @@ func (s CapacityReader) Read(ctx context.Context, current CurrentIdentity, clust
 		return zero, time.Time{}, identity.ErrDenied
 	}
 	admin, err := s.Administration.FleetAdministration(ctx)
-	if err != nil || !admin.Valid(s.Now()) || admin.InstallationID != s.InstallationID {
+	if err != nil {
+		s.note("administration-read")
+		return zero, time.Time{}, identity.ErrUnavailable
+	}
+	if admin.InstallationID != s.InstallationID {
+		s.note("administration-scope")
+		return zero, time.Time{}, identity.ErrUnavailable
+	}
+	if !admin.Valid(s.Now()) {
+		s.note("administration-valid")
 		return zero, time.Time{}, identity.ErrUnavailable
 	}
 	if !admin.Operator(caller) {
@@ -67,20 +88,33 @@ func (s CapacityReader) Read(ctx context.Context, current CurrentIdentity, clust
 	}
 	recovery, err := s.Recovery.RecoveryState(ctx)
 	if err != nil || recovery.InstallationID != s.InstallationID || !recovery.Valid(s.Now()) {
+		s.note("recovery")
 		return zero, time.Time{}, identity.ErrUnavailable
 	}
 	until = identity.Earlier(until, recovery.FreshUntil)
 	out, err := s.Targets.ReadLiveRuntime(ctx, request)
-	if err != nil || out.ClusterID != cluster || !out.Valid(s.Now()) {
+	if err != nil || out.ClusterID != cluster {
+		s.note("runtime")
 		return zero, time.Time{}, identity.ErrUnavailable
 	}
-	until = identity.Earlier(until, out.FreshUntil)
+	viewers, viewerFresh, err := s.Viewers.ReadLiveViewers(ctx, s.InstallationID, cluster)
+	if err != nil {
+		s.note("viewers")
+		return zero, time.Time{}, identity.ErrUnavailable
+	}
+	out.ActiveViewers = viewers
+	if !out.Valid(s.Now()) {
+		s.note("snapshot")
+		return zero, time.Time{}, identity.ErrUnavailable
+	}
+	until = identity.Earlier(identity.Earlier(until, out.FreshUntil), viewerFresh)
 	fresh, err := current.ResolveIdentity(ctx)
 	if err != nil || fresh.Principal != caller.Principal || fresh.Policy != caller.Policy || !fresh.Valid(s.Now()) || !admin.Operator(fresh) {
 		return zero, time.Time{}, identity.ErrDenied
 	}
 	until = identity.Earlier(until, fresh.ValidUntil)
 	if ctx.Err() != nil || !s.Now().Before(until) {
+		s.note("deadline")
 		return zero, time.Time{}, identity.ErrUnavailable
 	}
 	return out, until, nil

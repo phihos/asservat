@@ -144,7 +144,7 @@ func (f *liveOwnerFacts) CurrentLive(_ context.Context, c liveapp.Control) error
 	}
 	return nil
 }
-func (f *liveOwnerFacts) Create(_ context.Context, c liveapp.Control, key string) (liveapp.Control, bool, error) {
+func (f *liveOwnerFacts) Create(_ context.Context, _ string, c liveapp.Control, key string) (liveapp.Control, bool, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if id, ok := f.keys[key]; ok {

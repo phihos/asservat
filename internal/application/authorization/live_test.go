@@ -9,6 +9,7 @@ import (
 	live "asservat.local/asservat/internal/domain/live"
 	"asservat.local/asservat/internal/domain/targets"
 	"context"
+	"errors"
 	"testing"
 	"time"
 )
@@ -96,8 +97,13 @@ func TestLiveAuthorityReadOnlyViewerNeedsMaintainerOriginalAudienceAndCurrentFin
 			case "late-catalog":
 				f.afterRead = func() { f.now = f.now.Add(6 * time.Second) }
 			}
-			if _, _, e := s.Check(t.Context(), f, expected, live.Packet); e == nil {
-				t.Fatal("unauthorized source read")
+			_, _, e := s.Check(t.Context(), f, expected, live.Packet)
+			if mode == "late-catalog" {
+				if !errors.Is(e, live.ErrUnavailable) || errors.Is(e, live.ErrDenied) {
+					t.Fatal("elapsed observation became an access decision", e)
+				}
+			} else if !errors.Is(e, live.ErrDenied) || errors.Is(e, live.ErrUnavailable) {
+				t.Fatal("actual access change treated as a transient observation", e)
 			}
 			if (mode == "reader" || mode == "owner" || mode == "denied") && f.catalogReads != 0 {
 				t.Fatal("protected lookup before ordinary maintainer rights")

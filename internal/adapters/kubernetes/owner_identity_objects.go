@@ -138,7 +138,11 @@ func (s *InstalledOwnerIdentityReader) deployment(ctx context.Context, state con
 		return cfg.ErrChanged
 	}
 	n := runtimeResourceNames(in.InstallationID)
-	plan := OwnerWorkloadPlan{InstallationID: in.InstallationID, Namespace: in.Namespace.Name, Name: n.Owner, ServiceAccount: n.Owner, Configuration: n.OwnerInputs, Credentials: n.OwnerProviders, WorkloadGuard: n.WorkloadGuard, Image: d.Spec.Template.Spec.Containers[0].Image}
+	var fleetGuard, fleetSource string
+	if s.input.Public != nil && s.input.Public.Fleet != nil {
+		fleetGuard, fleetSource = s.input.Public.Fleet.SettingsGuard.Name, s.input.Public.Fleet.Settings.Name
+	}
+	plan := OwnerWorkloadPlan{InstallationID: in.InstallationID, Namespace: in.Namespace.Name, Name: n.Owner, ServiceAccount: n.Owner, Configuration: n.OwnerInputs, Credentials: n.OwnerProviders, WorkloadGuard: n.WorkloadGuard, FleetGuard: fleetGuard, FleetSource: fleetSource, Image: d.Spec.Template.Spec.Containers[0].Image}
 	var want *OwnerWorkload
 	check = ownerReadDeploymentProviderBinding
 	if in.OwnerLayout == contracts.OwnerProviderInstalledLayout {

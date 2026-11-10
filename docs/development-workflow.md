@@ -57,6 +57,14 @@ candidate, checks, next blocker. Retain original reports and consequential ADRs;
 avoid new checkpoint essays for routine fixes. Reuse evidence only when its
 relevant sources and environment are unchanged, and state its scope.
 
+## Generated validation output
+
+Keep generated logs, environment inventories, screenshots and Pod logs in CI run
+artifacts or an external local archive, rather than adding them to a PR. Commit
+concise provenance summaries with exact source, command, exit, cleanup and known
+gaps. Existing tracked historical evidence remains available; do not treat a
+summary as proof of a run that was not performed.
+
 ## Required PR check events
 
 Before treating a green `ci-ok` as satisfying the PR rule, read back its event,

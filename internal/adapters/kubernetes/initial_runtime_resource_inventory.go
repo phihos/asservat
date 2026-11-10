@@ -43,7 +43,7 @@ func (s *InitialRuntimeResources) inventory(v contracts.InitialRuntimeResourceSt
 		return contracts.OwnerDeploymentGuard{Name: name, PolicyUID: p.UID, PolicyGeneration: p.Generation, BindingUID: b.UID, BindingResourceVersion: b.ResourceVersion, Administrators: append([]contracts.OwnerDeploymentActor(nil), s.preparer.plan.Administrators...)}
 	}
 	out := InitialRuntimeResourceInventory{Namespace: c.Namespace, FleetSource: c.FleetSource, OwnerSource: ref(14, n.OwnerSource), OwnerDeployment: ref(10, n.Owner), OwnerAccount: ref(0, n.Owner), OwnerService: ref(12, n.Owner), WorkerDeployment: ref(11, n.Worker), WorkerAccount: ref(1, n.Worker), LeaderLease: ref(13, n.Lease), OwnerInputs: n.OwnerInputs, WorkerInputs: n.WorkerInputs, OwnerProviders: n.OwnerProviders, WorkerProviders: n.WorkerProviders, FleetGuard: c.FleetGuard, OwnerSourceGuard: guard(15, n.OwnerSourceGuard), WorkloadGuard: guard(17, n.WorkloadGuard)}
-	a, e := s.preparer.runtimeBridgeAdministration(c, s.ownerLayout, out.OwnerDeployment, out.OwnerAccount, out.WorkerAccount)
+	a, e := s.preparer.runtimeBridgeAdministration(c, s.ownerLayout, out.OwnerDeployment, out.OwnerAccount, out.WorkerAccount, s.ownerFleet)
 	if e != nil {
 		return zero, e
 	}
@@ -54,7 +54,7 @@ func (s *InitialRuntimeResources) inventory(v contracts.InitialRuntimeResourceSt
 // runtimeBridgeAdministration derives the guard bridge's administration from
 // the original installer input, the layout and three journal receipts. A
 // fresh process after the bridge recomputes it the same way (ADR-187).
-func (p *InitialPreparer) runtimeBridgeAdministration(c contracts.InitialInstaller, ownerLayout string, ownerDeployment, ownerAccount, workerAccount contracts.WorkerObjectReference) (cfg.InitialRuntimeBridgeAdministration, error) {
+func (p *InitialPreparer) runtimeBridgeAdministration(c contracts.InitialInstaller, ownerLayout string, ownerDeployment, ownerAccount, workerAccount contracts.WorkerObjectReference, ownerFleet bool) (cfg.InitialRuntimeBridgeAdministration, error) {
 	var zero cfg.InitialRuntimeBridgeAdministration
 	n := runtimeResourceNames(c.InstallationID)
 	digest, e := initialPreparationDigest(c.PodSpecDigest)
@@ -74,6 +74,9 @@ func (p *InitialPreparer) runtimeBridgeAdministration(c contracts.InitialInstall
 	}
 	if ownerLayout == contracts.OwnerProviderInstalledLayout {
 		owner.ConfigurationProbes = append(owner.ConfigurationProbes, ownerPublicSourceProbes(c.InstallationID, n.Owner)...)
+		if ownerFleet {
+			owner.ConfigurationProbes = append(owner.ConfigurationProbes, cfg.OwnerConfigurationProbe{ConfigMap: c.FleetSource.Name, ServiceAccount: n.Owner})
+		}
 	}
 	out := cfg.InitialRuntimeBridgeAdministration{
 		Initial: cfg.InitialWorkloadAdministration{Handover: true, Name: c.WorkloadGuard.Name, Configuration: c.Configuration, Witness: c.Witness.Name, FleetSource: c.FleetSource.Name, ControlNamespace: control, PodName: c.Pod.Name, PodUID: c.Pod.UID, WriterAccount: c.WriterAccount.Name, WriterAccountUID: c.WriterAccount.UID, ProbeAccount: c.ProbeAccount.Name, ProbeAccountUID: c.ProbeAccount.UID, PodSpecDigest: digest, Administrators: append([]cfg.KubernetesActor(nil), admins...)},

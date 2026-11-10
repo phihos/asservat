@@ -80,6 +80,7 @@ type liveCapacityRates struct {
 	DroppedRowsPerSecond       float64 `json:"dropped_rows_per_second"`
 }
 type liveCapacityData struct {
+	ActiveViewers    int                   `json:"active_viewers"`
 	ClusterID        string                `json:"cluster_id"`
 	ObservedAt       time.Time             `json:"observed_at"`
 	FreshUntil       time.Time             `json:"fresh_until"`
@@ -102,7 +103,7 @@ func liveCapacityMessage(snapshot collector.LiveRuntimeSnapshot) string {
 }
 
 func liveCapacityReply(snapshot collector.LiveRuntimeSnapshot) liveCapacityData {
-	out := liveCapacityData{ClusterID: snapshot.ClusterID, ObservedAt: snapshot.ObservedAt.UTC(), FreshUntil: snapshot.FreshUntil.UTC(), Message: liveCapacityMessage(snapshot), Nodes: snapshot.Nodes, RatesUnavailable: snapshot.RatesUnavailable, RatesComplete: snapshot.RatesComplete,
+	out := liveCapacityData{ActiveViewers: snapshot.ActiveViewers, ClusterID: snapshot.ClusterID, ObservedAt: snapshot.ObservedAt.UTC(), FreshUntil: snapshot.FreshUntil.UTC(), Message: liveCapacityMessage(snapshot), Nodes: snapshot.Nodes, RatesUnavailable: snapshot.RatesUnavailable, RatesComplete: snapshot.RatesComplete,
 		Rates: liveCapacityRates{ScanEventsPerSecond: snapshot.Rates.ScanEventsPerSecond, ScanBytesPerSecond: snapshot.Rates.ScanBytesPerSecond, ScanCPUNanosPerSecond: snapshot.Rates.ScanCPUNanosPerSecond, DeliveredRowsPerSecond: snapshot.Rates.DeliveredRowsPerSecond, DeliveredBytesPerSecond: snapshot.Rates.DeliveredBytesPerSecond, RefusedAdmissionsPerSecond: snapshot.Rates.RefusedAdmissionsPerSecond, LostEventsPerSecond: snapshot.Rates.LostEventsPerSecond, DroppedRowsPerSecond: snapshot.Rates.DroppedRowsPerSecond}}
 	if snapshot.Live != nil {
 		out.Live = &liveCapacityActivity{Cohorts: snapshot.Live.Cohorts, ScanEvents: snapshot.Live.ScanEvents, ScanBytes: snapshot.Live.ScanBytes, ScanCPUNanos: snapshot.Live.ScanCPUNanos, DeliveredRows: snapshot.Live.DeliveredRows, DeliveredBytes: snapshot.Live.DeliveredBytes, RefusedAdmissions: snapshot.Live.RefusedAdmissions, LostEvents: snapshot.Live.LostEvents, DroppedRows: snapshot.Live.DroppedRows, PendingRows: snapshot.Live.PendingRows}

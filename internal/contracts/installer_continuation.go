@@ -168,6 +168,15 @@ type InstallerFederationSettings struct {
 	// Connector sizes the installation-wide connector root backing; its
 	// backup values come from the capacity profile, which is then required.
 	Connector InstallerConnectorSettings `json:"connector"`
+	// Fleet, when set, enables the specified fleet-operator bootstrap channel.
+	Fleet *InstallerFleetIssuance `json:"fleet,omitempty"`
+}
+
+// InstallerFleetIssuance selects the operator's KV-v2 mount and one delivery
+// profile from the protected fleet settings (ADR-193).
+type InstallerFleetIssuance struct {
+	ChannelMount    string `json:"channelMount"`
+	DeliveryProfile string `json:"deliveryProfile"`
 }
 
 // InstallerConnectorSettings are the operator-qualified connector identity

@@ -3,6 +3,7 @@ package integration
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -107,18 +108,18 @@ func TestLiveWatchLedgerWithRealServices(t *testing.T) {
 	}
 	keyFor := func(v byte) string { return hex.EncodeToString(bytes.Repeat([]byte{v}, 32)) }
 	firstWorkload := makeControl(4, 7)
-	if _, _, err = ledger.Create(ctx, firstWorkload, keyFor(10)); err != nil {
+	if _, _, err = ledger.Create(ctx, ownerPool.ClusterID, firstWorkload, keyFor(10)); err != nil {
 		t.Fatal("first workload control", err)
 	}
 	secondWorkload := makeControl(5, 7)
-	if _, _, err = ledger.Create(ctx, secondWorkload, keyFor(11)); err != nil {
+	if _, _, err = ledger.Create(ctx, ownerPool.ClusterID, secondWorkload, keyFor(11)); err != nil {
 		t.Fatal("second workload control", err)
 	}
-	if _, _, err = ledger.Create(ctx, makeControl(6, 7), keyFor(12)); !errors.Is(err, live.ErrCapacity) {
+	if _, _, err = ledger.Create(ctx, ownerPool.ClusterID, makeControl(6, 7), keyFor(12)); !errors.Is(err, live.ErrCapacity) {
 		t.Fatal("third principal bypassed the workload ceiling below installation/principal limits", err)
 	}
 	outsideWorkload := makeControl(6, 8)
-	if _, _, err = ledger.Create(ctx, outsideWorkload, keyFor(13)); err != nil {
+	if _, _, err = ledger.Create(ctx, ownerPool.ClusterID, outsideWorkload, keyFor(13)); err != nil {
 		t.Fatal("workload refusal blocked an unrelated workload", err)
 	}
 	closeWorkload := func(control liveapp.Control) {
@@ -131,7 +132,7 @@ func TestLiveWatchLedgerWithRealServices(t *testing.T) {
 	}
 	closeWorkload(firstWorkload)
 	releasedWorkload := makeControl(6, 7)
-	if _, _, err = ledger.Create(ctx, releasedWorkload, keyFor(14)); err != nil {
+	if _, _, err = ledger.Create(ctx, ownerPool.ClusterID, releasedWorkload, keyFor(14)); err != nil {
 		t.Fatal("workload close did not release its slot", err)
 	}
 	closeWorkload(secondWorkload)
@@ -153,10 +154,105 @@ func TestLiveWatchLedgerWithRealServices(t *testing.T) {
 		t.Fatal("restore original live limits", err)
 	}
 	c := makeControl(1, 2)
-	got, reused, err := ledger.Create(ctx, c, keyFor(1))
+	got, reused, err := ledger.Create(ctx, ownerPool.ClusterID, c, keyFor(1))
 	if err != nil || reused || got != c {
 		t.Fatal("original control", err, reused)
 	}
+	// Exercise the compiled SQL boundary directly: Go rejects an absent cluster
+	// before calling it, but a NULL digest must not become another legacy row
+	// that makes every cluster's exact gauge unavailable.
+	unmapped := makeControl(8, 8)
+	unmappedJSON, err := json.Marshal(unmapped)
+	if err != nil {
+		t.Fatal(err)
+	}
+	limitsJSON, err := json.Marshal(limits)
+	if err != nil {
+		t.Fatal(err)
+	}
+	limitsDigest := sha256.Sum256(limitsJSON)
+	var unmappedReply []byte
+	err = pool.QueryRow(ctx, `SELECT live_watch_create_cluster($1,$2,$3,$4,$5,$6,NULL)`, root, request.Binding.ProcessEpoch, limitsDigest[:], unmappedJSON, bytes.Repeat([]byte{15}, 32), unmapped.ExpiresAt).Scan(&unmappedReply)
+	var invalidCluster *pgconn.PgError
+	if !errors.As(err, &invalidCluster) || invalidCluster.Code != "23514" {
+		t.Fatal("compiled cluster writer accepted missing placement", err)
+	}
+	var unmappedControls int
+	if err = lab.admin.QueryRow(ctx, `SELECT count(*) FROM live_watch_control WHERE root_id=$1 AND id=$2`, root, unmapped.ID).Scan(&unmappedControls); err != nil || unmappedControls != 0 {
+		t.Fatal("missing placement changed retained controls", unmappedControls, err)
+	}
+	viewers, err := postgres.NewLiveViewerCapacity(ctx, pool, ownerPool.InstallationID)
+	if err != nil {
+		t.Fatal("compiled viewer capacity constructor", err)
+	}
+	clusterKey := sha256.Sum256([]byte("asservat-live-cluster/v1\x00" + ownerPool.ClusterID))
+	active, fresh, err := viewers.ReadLiveViewers(ctx, ownerPool.InstallationID, ownerPool.ClusterID)
+	if err != nil || active != 1 || !fresh.After(time.Now()) {
+		t.Fatal("active viewer aggregate", active, fresh, err)
+	}
+	otherCluster, _, err := viewers.ReadLiveViewers(ctx, ownerPool.InstallationID, custodyID())
+	if err != nil || otherCluster != 0 {
+		t.Fatal("viewer aggregate leaked across clusters", otherCluster, err)
+	}
+	for _, scenario := range []struct {
+		name, state        string
+		expired, idleEnded bool
+		want               int
+	}{
+		{"paused", "Paused", false, false, 1},
+		{"disconnected", "Disconnected", false, false, 1},
+		{"source-ended", "SourceEnded", false, false, 0},
+		{"expired", "Active", true, true, 0},
+		{"idle-ended", "Active", false, true, 0},
+	} {
+		t.Run("viewer-"+scenario.name, func(t *testing.T) {
+			// Fixture-only state changes are rolled back. The aggregate runs
+			// with production function grants and no live-table read access.
+			tx, err := lab.admin.Begin(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = tx.Rollback(context.Background()) }()
+			if _, err = tx.Exec(ctx, `UPDATE live_watch_control SET state=$3,
+ accepted_at=CASE WHEN $4 OR $5 THEN CURRENT_TIMESTAMP-interval '10 seconds' ELSE accepted_at END,
+ expires_at=CASE WHEN $4 THEN CURRENT_TIMESTAMP-interval '1 second' ELSE expires_at END,
+ idle_until=CASE WHEN $5 THEN CURRENT_TIMESTAMP-interval '1 second' ELSE idle_until END
+ WHERE root_id=$1 AND id=$2`, root, c.ID, scenario.state, scenario.expired, scenario.idleEnded); err != nil {
+				t.Fatal("viewer lifecycle fixture", err)
+			}
+			if _, err = tx.Exec(ctx, "SET LOCAL ROLE "+pgx.Identifier{role}.Sanitize()); err != nil {
+				t.Fatal("compiled viewer lifecycle role", err)
+			}
+			var count int
+			if err = tx.QueryRow(ctx, `SELECT live_watch_viewers($1,$2)`, ownerPool.InstallationID, clusterKey[:]).Scan(&count); err != nil || count != scenario.want {
+				t.Fatal("viewer lifecycle count", count, scenario.want, err)
+			}
+		})
+	}
+	t.Run("viewer-regional-target", func(t *testing.T) {
+		tx, err := pool.Begin(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = tx.Rollback(context.Background()) }()
+		regionalCluster := custodyID()
+		regionalKey := sha256.Sum256([]byte("asservat-live-cluster/v1\x00" + regionalCluster))
+		regional := makeControl(8, 8)
+		regionalJSON, err := json.Marshal(regional)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var reply []byte
+		if err = tx.QueryRow(ctx, `SELECT live_watch_create_cluster($1,$2,$3,$4,$5,$6,$7)`, root, request.Binding.ProcessEpoch, limitsDigest[:], regionalJSON, bytes.Repeat([]byte{16}, 32), regional.ExpiresAt, regionalKey[:]).Scan(&reply); err != nil {
+			t.Fatal("compiled regional-target writer", err)
+		}
+		for _, placement := range [][32]byte{regionalKey, clusterKey} {
+			var count int
+			if err = tx.QueryRow(ctx, `SELECT live_watch_viewers($1,$2)`, ownerPool.InstallationID, placement[:]).Scan(&count); err != nil || count != 1 {
+				t.Fatal("viewer placement followed owner cluster instead of target", count, err)
+			}
+		}
+	})
 	assertOwner := func(watch, key string) {
 		t.Helper()
 		before := certificateReads
@@ -180,6 +276,10 @@ func TestLiveWatchLedgerWithRealServices(t *testing.T) {
 	}
 	if _, err = tx.Exec(ctx, "SET LOCAL ROLE "+pgx.Identifier{role}.Sanitize()); err != nil {
 		t.Fatal("compiled role retirement control", err)
+	}
+	var retiredViewers int
+	if err = tx.QueryRow(ctx, `SELECT live_watch_viewers($1,$2)`, ownerPool.InstallationID, clusterKey[:]).Scan(&retiredViewers); err != nil || retiredViewers != 0 {
+		t.Fatal("retired owner remained an active viewer", retiredViewers, err)
 	}
 	var ignored string
 	err = tx.QueryRow(ctx, `SELECT installation_id::text FROM live_watch_owner($1,$2,$3,NULL)`, root, c.PrincipalKey[:], c.ID).Scan(&ignored)
@@ -206,20 +306,20 @@ func TestLiveWatchLedgerWithRealServices(t *testing.T) {
 	if err != nil {
 		t.Fatal("second-root adapter construction", err)
 	}
-	if _, _, err = secondRoot.Create(ctx, makeControl(9, 9), keyFor(9)); err == nil {
+	if _, _, err = secondRoot.Create(ctx, ownerPool.ClusterID, makeControl(9, 9), keyFor(9)); err == nil {
 		t.Fatal("second root minted installation aggregate pool")
 	}
 
 	retry := makeControl(1, 2)
-	got, reused, err = ledger.Create(ctx, retry, keyFor(1))
+	got, reused, err = ledger.Create(ctx, ownerPool.ClusterID, retry, keyFor(1))
 	if err != nil || !reused || got != c {
 		t.Fatal("key replay renewed control", err, reused)
 	}
 	retry.RequestDigest = [32]byte{9}
-	if _, _, err = ledger.Create(ctx, retry, keyFor(1)); !errors.Is(err, live.ErrConflict) {
+	if _, _, err = ledger.Create(ctx, ownerPool.ClusterID, retry, keyFor(1)); !errors.Is(err, live.ErrConflict) {
 		t.Fatal("changed selection replay", err)
 	}
-	if _, _, err = ledger.Create(ctx, makeControl(1, 2), keyFor(2)); !errors.Is(err, live.ErrCapacity) {
+	if _, _, err = ledger.Create(ctx, ownerPool.ClusterID, makeControl(1, 2), keyFor(2)); !errors.Is(err, live.ErrCapacity) {
 		t.Fatal("principal concurrent slot bypass", err)
 	}
 	if err = ledger.CurrentLive(ctx, c); err != nil {
@@ -256,11 +356,11 @@ func TestLiveWatchLedgerWithRealServices(t *testing.T) {
 		t.Fatal("failed debit changed ancestor accounts", r, s)
 	}
 	other := makeControl(2, 3)
-	other, _, err = ledger.Create(ctx, other, keyFor(4))
+	other, _, err = ledger.Create(ctx, ownerPool.ClusterID, other, keyFor(4))
 	if err != nil {
 		t.Fatal("second distinct principal consumes installation slot", err)
 	}
-	if _, _, err = ledger.Create(ctx, makeControl(3, 4), keyFor(5)); !errors.Is(err, live.ErrCapacity) {
+	if _, _, err = ledger.Create(ctx, ownerPool.ClusterID, makeControl(3, 4), keyFor(5)); !errors.Is(err, live.ErrCapacity) {
 		t.Fatal("third distinct principal bypassed installation ceiling", err)
 	}
 	other.State = "Closed"
@@ -277,6 +377,10 @@ func TestLiveWatchLedgerWithRealServices(t *testing.T) {
 	if err = ledger.CurrentLive(ctx, c); err != nil {
 		t.Fatal("exact closed receipt current", err)
 	}
+	active, _, err = viewers.ReadLiveViewers(ctx, ownerPool.InstallationID, ownerPool.ClusterID)
+	if err != nil || active != 0 {
+		t.Fatal("closed viewers remained active", active, err)
+	}
 	assertOwner(c.ID, "")
 	assertOwner("", keyFor(1))
 	terminalPaid := c
@@ -285,7 +389,7 @@ func TestLiveWatchLedgerWithRealServices(t *testing.T) {
 		t.Fatal("terminal positive cost")
 	}
 	second := makeControl(1, 2)
-	second, _, err = ledger.Create(ctx, second, keyFor(2))
+	second, _, err = ledger.Create(ctx, ownerPool.ClusterID, second, keyFor(2))
 	if err != nil {
 		t.Fatal("closed slot not released", err)
 	}
@@ -301,7 +405,7 @@ func TestLiveWatchLedgerWithRealServices(t *testing.T) {
 		t.Fatal(err)
 	}
 	third := makeControl(1, 2)
-	third, _, err = ledger.Create(ctx, third, keyFor(3))
+	third, _, err = ledger.Create(ctx, ownerPool.ClusterID, third, keyFor(3))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -336,7 +440,7 @@ func TestLiveWatchLedgerWithRealServices(t *testing.T) {
 	if err != nil {
 		t.Fatal("configuration-only constructor", err)
 	}
-	if _, _, err = replacement.Create(ctx, makeControl(8, 8), keyFor(8)); err == nil {
+	if _, _, err = replacement.Create(ctx, ownerPool.ClusterID, makeControl(8, 8), keyFor(8)); err == nil {
 		t.Fatal("live limits replacement reset debt")
 	}
 	if _, err = ledger.Change(ctx, liveapp.Control{}, 1, 0); err == nil {
@@ -361,7 +465,7 @@ func TestLiveWatchLedgerWithRealServices(t *testing.T) {
 	if err != nil || n != 4 || a != 2 {
 		t.Fatal("bounded expiry retained shared debt", n, a, err)
 	}
-	if _, _, err = replacement.Create(ctx, makeControl(8, 8), keyFor(8)); err == nil {
+	if _, _, err = replacement.Create(ctx, ownerPool.ClusterID, makeControl(8, 8), keyFor(8)); err == nil {
 		t.Fatal("expiry reset unrefilled debt")
 	}
 	// Maintenance-only adversarial backlog, never admission/owner authority:
@@ -372,7 +476,7 @@ func TestLiveWatchLedgerWithRealServices(t *testing.T) {
 		t.Fatal("expired receipt maintenance input", err)
 	}
 	for _, want := range []int64{1, 0} {
-		if _, _, err = replacement.Create(ctx, makeControl(8, 8), keyFor(8)); err == nil {
+		if _, _, err = replacement.Create(ctx, ownerPool.ClusterID, makeControl(8, 8), keyFor(8)); err == nil {
 			t.Fatal("prune progress reset unrefilled debt")
 		}
 		var remaining int64
@@ -381,5 +485,5 @@ func TestLiveWatchLedgerWithRealServices(t *testing.T) {
 		}
 	}
 
-	t.Log("real compiled hub control facets + independently audited current owner: original receipts, installation root uniqueness, isolated workload ceiling/release, one slot, per-watch/three-account charges, rollback, close/reopen debt, original expiry; no native/source/installed qualification")
+	t.Log("real compiled hub control facets + independently audited current owner: original receipts, exact active/closed/retired-owner viewer counts with cluster isolation, installation root uniqueness, isolated workload ceiling/release, one slot, per-watch/three-account charges, rollback, close/reopen debt, original expiry; no native/source/installed qualification")
 }

@@ -25,7 +25,10 @@ predicates in the owning process's bounded memory for the original watch
 lifetime. Clear them on joined close/expiry. No detailed scope, filters or
 projected rows enter SQL, URLs, logs or audit bodies. Existing authenticated
 encrypted transport carries those private details. SQL stores only minimized
-control identities, fences, original expiry and aggregate accounting. Existing
+control identities, fences, original expiry, aggregate accounting and a domain-separated
+target-cluster digest for the exact per-cluster viewer gauge; it stores no raw
+target, source, workload or principal scope. An active pre-mapping watch makes
+that gauge unavailable rather than assigning it to the hub owner's cluster. Existing
 persisted evidence/control references retain their encrypted-storage contracts.
 Do not add same-heap-key encryption to ephemeral scope/filter memory: it does
 not protect against a process that can already read both key and plaintext.

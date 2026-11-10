@@ -181,32 +181,69 @@ func (s LiveSourceAuthority) checkRecord(call context.Context, current identitie
 	}
 	return out[0], end, nil
 }
-func (s LiveSourceAuthority) checkFacts(call context.Context, i identity.Identity, p value.Projection, expected live.Source, projection string, record LiveSourceRecord, until time.Time) (live.Source, time.Time, error) {
+func (s LiveSourceAuthority) checkFacts(call context.Context, i identity.Identity, p value.Projection, expected live.Source, projection string, record LiveSourceRecord, until time.Time) (out live.Source, end time.Time, err error) {
 	var zero live.Source
+	phase := "facts/source-binding"
+	defer func() {
+		if err != nil {
+			s.refuse(phase, err)
+		}
+	}()
 
 	source := record.Source
-	if !source.Same(expected) || (!source.Valid(s.Now()) && (projection != "" || !source.ReferenceValid())) || !identity.Fresh(record.ObservedAt, record.ValidUntil, s.Now(), 5*time.Second) || projection != "" && !slices.Contains(source.Projections, projection) {
+	if !source.Same(expected) {
 		return zero, time.Time{}, live.ErrDenied
 	}
+	phase = "facts/source-current"
+	if !source.Valid(s.Now()) && (projection != "" || !source.ReferenceValid()) {
+		return zero, time.Time{}, live.ErrDenied
+	}
+	phase = "facts/record-fresh"
+	if !identity.Fresh(record.ObservedAt, record.ValidUntil, s.Now(), 5*time.Second) {
+		if liveObservationElapsed(record.ObservedAt, record.ValidUntil, s.Now(), 5*time.Second) {
+			return zero, time.Time{}, live.ErrUnavailable
+		}
+		return zero, time.Time{}, live.ErrDenied
+	}
+	phase = "facts/projection"
+	if projection != "" && !slices.Contains(source.Projections, projection) {
+		return zero, time.Time{}, live.ErrDenied
+	}
+	phase = "facts/audience"
 	rights := value.LiveSourceEligibility(i, p, source.Target, record.Audience, record.ValidUntil, s.Now())
 	if !rights.Eligible {
+		// The projection passed ordinary eligibility before the blocking
+		// catalog read. Spending its original observation is not a new access
+		// decision; a later read must obtain new facts without renewing this one.
+		if rights.Reason == "PermissionUnavailable" && (liveObservationElapsed(p.ObservedAt, p.FreshUntil, s.Now(), 60*time.Second) || liveObservationElapsed(p.DeniesObservedAt, p.DeniesFreshUntil, s.Now(), value.PermissionObservationInterval)) {
+			phase = "facts/permission-fresh"
+			return zero, time.Time{}, live.ErrUnavailable
+		}
 		return zero, time.Time{}, live.ErrDenied
 	}
 	until = identity.Earlier(until, rights.ValidUntil)
 	if source.Manual == nil {
+		phase = "facts/policy-inputs"
 		if s.Accepted == nil || s.Automation == nil {
 			return zero, time.Time{}, live.ErrDenied
 		}
+		phase = "facts/policy-read"
 		accepted, e := s.Accepted.AcceptedPolicyAuthority(call, source.Binding.PolicyUID)
-		a := accepted.Authority
-		if e != nil || !a.Valid(s.Now()) || a.Executor != record.Executor || a.PolicyUID != source.Binding.PolicyUID || [32]byte(a.ScopeDigest) != source.Binding.Scope || a.ClusterID != source.Target.ClusterID || a.NamespaceUID != source.Target.NamespaceUID || a.WorkloadUID != source.Target.WorkloadUID || !s.Now().Before(accepted.SourceUntil) {
+		if e != nil {
 			return zero, time.Time{}, live.ErrDenied
 		}
+		a := accepted.Authority
+		phase = "facts/policy-binding"
+		if !a.Valid(s.Now()) || a.Executor != record.Executor || a.PolicyUID != source.Binding.PolicyUID || [32]byte(a.ScopeDigest) != source.Binding.Scope || a.ClusterID != source.Target.ClusterID || a.NamespaceUID != source.Target.NamespaceUID || a.WorkloadUID != source.Target.WorkloadUID || !s.Now().Before(accepted.SourceUntil) {
+			return zero, time.Time{}, live.ErrDenied
+		}
+		phase = "facts/automation-read"
 		automation, e := s.Automation.PolicyAutomationAuthority(call, a, source.Target)
 		if e != nil {
 			return zero, time.Time{}, live.ErrDenied
 		}
 		executor := value.PolicyExecutorIdentity(a, accepted.ObservedAt, accepted.SourceUntil)
+		phase = "facts/automation-eligibility"
 		eligible := value.PolicyContextEligibility(executor, a, automation, source.Target, s.Now())
 		if !eligible.Eligible {
 			return zero, time.Time{}, live.ErrDenied
@@ -215,15 +252,18 @@ func (s LiveSourceAuthority) checkFacts(call context.Context, i identity.Identit
 	} else {
 		// The protected catalog joins the original accepted finite execution with
 		// the current exact regional/node holder. No old human identity is rebuilt.
+		phase = "facts/manual-binding"
 		if !record.Executor.Valid() || source.Manual == nil || !source.Manual.Valid() {
 			return zero, time.Time{}, live.ErrDenied
 		}
 		until = identity.Earlier(until, source.Manual.HardUntil)
 	}
 	if source.Binding.ObservationGrantID != "" {
+		phase = "facts/observation-inputs"
 		if s.ObservationGrants == nil {
 			return zero, time.Time{}, live.ErrDenied
 		}
+		phase = "facts/observation-read"
 		originalUntil, e := s.ObservationGrants.ReadLiveSourceObservation(call, source.ID(), source.Binding.ObservationGrantID)
 		if e != nil {
 			return zero, time.Time{}, live.ErrDenied
@@ -233,17 +273,30 @@ func (s LiveSourceAuthority) checkFacts(call context.Context, i identity.Identit
 	if projection != "" {
 		until = identity.Earlier(until, source.LeaseUntil)
 	}
+	phase = "facts/original-bound"
 	if call.Err() != nil || !s.Now().Before(until) {
 		return zero, time.Time{}, live.ErrDenied
 	}
 	return source.Clone(), until, nil
 }
 
+// Only a well-formed observation's elapsed original deadline is transient.
+// This does not extend it or change source, caller or access deadlines.
+func liveObservationElapsed(observed, until, now time.Time, maximum time.Duration) bool {
+	return identity.Fresh(observed, until, observed, maximum) && !now.Before(until)
+}
+
 type liveEnvironmentBatch interface {
 	LiveSourceReads(context.Context, []live.Source, string, identity.Principal) ([]LiveEnvironmentDecision, error)
 }
 
-func (s LiveSourceAuthority) finishSources(call context.Context, current identities.CurrentIdentity, i identity.Identity, sources []live.Source, projection string, until time.Time) ([]live.Source, time.Time, error) {
+func (s LiveSourceAuthority) finishSources(call context.Context, current identities.CurrentIdentity, i identity.Identity, sources []live.Source, projection string, until time.Time) (result []live.Source, end time.Time, failure error) {
+	phase := "finish/environment"
+	defer func() {
+		if failure != nil {
+			s.refuse(phase, failure)
+		}
+	}()
 	if len(sources) == 0 {
 		return []live.Source{}, until, nil
 	}
@@ -269,20 +322,31 @@ func (s LiveSourceAuthority) finishSources(call context.Context, current identit
 	out := make([]live.Source, len(sources))
 	for n, source := range sources {
 		feature := decisions[n]
+		phase = "finish/limits"
 		if !feature.Limits.Valid() {
 			return nil, time.Time{}, fmt.Errorf("%w: finish limits", live.ErrDenied)
 		}
 		source.ViewLimits = feature.Limits
 		source.Projections = slices.DeleteFunc(slices.Clone(source.Projections), func(p string) bool { return !slices.Contains(feature.Projections, p) })
+		phase = "finish/projection"
 		if projection != "" && !slices.Contains(source.Projections, projection) {
 			return nil, time.Time{}, fmt.Errorf("%w: finish projection", live.ErrDenied)
 		}
 		until = identity.Earlier(until, feature.ValidUntil)
 		out[n] = source.Clone()
 	}
+	phase = "finish/identity-read"
 	final, err := current.ResolveIdentity(call)
-	if err != nil || !final.Valid(s.Now()) || !sameProjectionIdentity(i, final, s.Now()) || call.Err() != nil || !s.Now().Before(until) {
+	if err != nil {
+		return nil, time.Time{}, live.ErrDenied
+	}
+	phase = "finish/identity"
+	if !final.Valid(s.Now()) || !sameProjectionIdentity(i, final, s.Now()) {
 		return nil, time.Time{}, fmt.Errorf("%w: finish final-identity", live.ErrDenied)
+	}
+	phase = "finish/original-bound"
+	if call.Err() != nil || !s.Now().Before(until) {
+		return nil, time.Time{}, live.ErrDenied
 	}
 	return out, identity.Earlier(until, final.ValidUntil), nil
 }

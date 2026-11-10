@@ -34,7 +34,7 @@ func (f *liveBoundary) Read(context.Context, []v.Source, string, []v.Position, i
 	f.reads++
 	return app.Projection{Rows: f.rows, Positions: []v.Position{{Sequence: 1}}, Sources: []v.SourceStatus{}, Gaps: []v.Gap{}, Examined: 1, Bytes: 100}, nil
 }
-func (f *liveBoundary) Create(_ context.Context, c app.Control, _ string) (app.Control, bool, error) {
+func (f *liveBoundary) Create(_ context.Context, _ string, c app.Control, _ string) (app.Control, bool, error) {
 	f.controls[c.ID] = c
 	return c, false, nil
 }

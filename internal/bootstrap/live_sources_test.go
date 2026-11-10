@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -111,5 +112,23 @@ func TestLiveCatalogNeedsActualCurrentCapabilityAndOriginalSourceWithoutSaveOptI
 				t.Fatal(row)
 			}
 		})
+	}
+}
+
+func TestLiveCatalogExactReadRetainsStatusMissAsUnavailable(t *testing.T) {
+	s, f, _ := newLiveCatalogFixture(t)
+	original := f.rows[0].Source
+	refs := []live.SourceReference{{ID: original.Binding.SourceID, Kind: "policy", Target: original.Target.Target()}}
+	f.statusError = true
+	rows, err := s.ReadLiveSourceRecords(t.Context(), refs)
+	if !errors.Is(err, live.ErrUnavailable) || errors.Is(err, live.ErrDenied) || len(rows) != 0 {
+		t.Fatal("status miss reached authorization as a source with no projection", len(rows), err)
+	}
+	// A new read may observe the same original source again. Neither the failed
+	// read nor recovery creates a recorder or renews its lease or hard deadline.
+	f.statusError = false
+	rows, err = s.ReadLiveSourceRecords(t.Context(), refs)
+	if err != nil || len(rows) != 1 || rows[0].Source.Binding != original.Binding || !rows[0].Source.LeaseUntil.Equal(f.replies[0].State.LeafUntil) || !rows[0].Source.HardUntil.Equal(original.HardUntil) || f.lookups != 2 || f.statusReads != 2 {
+		t.Fatal("fresh read changed the original source or bounds", len(rows), err)
 	}
 }

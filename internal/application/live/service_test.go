@@ -87,7 +87,7 @@ func (f *fixture) Read(_ context.Context, _ []v.Source, _ string, positions []v.
 	}
 	return Projection{Rows: rows, Positions: []v.Position{{Sequence: f.seq}}, Sources: []v.SourceStatus{{ID: uid, State: "Ready", Coverage: "observed"}}, Gaps: []v.Gap{}, Examined: len(f.rows), Bytes: 100}, nil
 }
-func (f *fixture) Create(_ context.Context, c Control, key string) (Control, bool, error) {
+func (f *fixture) Create(_ context.Context, _ string, c Control, key string) (Control, bool, error) {
 	f.created++
 	if old, ok := f.keys[key]; ok {
 		prior := f.controls[old]

@@ -69,7 +69,11 @@ func (s *InitialPreparer) bridgedFinal(ctx context.Context, allowProbe bool) (*c
 		return contracts.WorkerObjectReference{Name: name, UID: o[i].Receipt.UID}
 	}
 	n := runtimeResourceNames(c.InstallationID)
-	a, err := s.runtimeBridgeAdministration(c, state.OwnerLayout, ref(10, n.Owner), ref(0, n.Owner), ref(1, n.Worker))
+	ownerFleet, err := s.originalOwnerFleet(c, state)
+	if err != nil {
+		return nil, 0, err
+	}
+	a, err := s.runtimeBridgeAdministration(c, state.OwnerLayout, ref(10, n.Owner), ref(0, n.Owner), ref(1, n.Worker), ownerFleet)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -78,6 +82,33 @@ func (s *InitialPreparer) bridgedFinal(ctx context.Context, allowProbe bool) (*c
 		return nil, 0, err
 	}
 	return guards[phase], int(phase), nil
+}
+
+// The recorded original Role digest selects one of two compiled guard shapes.
+// It is not authority: the caller still verifies the current exact native
+// guard. Unknown templates cannot be adopted or interpreted as a capability.
+func (s *InitialPreparer) originalOwnerFleet(c contracts.InitialInstaller, state contracts.InitialRuntimeResourceState) (bool, error) {
+	if state.OwnerLayout != contracts.OwnerProviderInstalledLayout {
+		return false, nil
+	}
+	if state.OwnerProvider == nil || len(state.Objects) < 3 {
+		return false, cfg.ErrChanged
+	}
+	n := runtimeResourceNames(c.InstallationID)
+	p := OwnerWorkloadPlan{InstallationID: c.InstallationID, Namespace: c.Namespace.Name, Name: n.Owner, ServiceAccount: n.Owner, Configuration: n.OwnerInputs, Credentials: n.OwnerProviders, WorkloadGuard: n.WorkloadGuard, Image: s.plan.Workload.Image}
+	for _, enabled := range []bool{false, true} {
+		if enabled {
+			p.FleetGuard, p.FleetSource = c.FleetGuard.Name, c.FleetSource.Name
+		}
+		workload, err := BuildProviderOwnerWorkload(p, c.ClusterID, *state.OwnerProvider)
+		if err != nil {
+			return false, cfg.ErrChanged
+		}
+		if preparationDigest(workload.Role) == state.Objects[2].TemplateDigest {
+			return enabled, nil
+		}
+	}
+	return false, cfg.ErrChanged
 }
 
 // readResourceJournal reads the original resource journal with a plain GET.

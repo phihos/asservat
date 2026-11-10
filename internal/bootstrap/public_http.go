@@ -149,8 +149,12 @@ func newPublicHandler(ctx context.Context, d *OwnerDeployment, a publicAuditStor
 		}
 	}
 	// The fleet operators' browser-only single-cluster live-runtime view.
-	capacity, err := composePublicLiveCapacity(PublicContextOperationsConfig{RootID: root, InstallationID: installation, PublicOrigin: p.Origin, CollectionEnabled: true, Now: time.Now, NewID: ownerRandomID},
-		PublicContextOperationServices{History: pc.history, Investigation: pc.investigation, Intents: pc.intents, Regional: pc.regional, Progress: pc.progress, Cases: pc.cases, Downloads: dl.coordinator, Native: dl.native, Projection: dl.projection}, pc)
+	viewerPool, err := d.public.open(ctx, "live-watch")
+	if err != nil {
+		return nil, &fixedStepError{"live-capacity-pool", mounts.ErrUnavailable}
+	}
+	capacity, err := composePublicLiveCapacity(ctx, PublicContextOperationsConfig{RootID: root, InstallationID: installation, PublicOrigin: p.Origin, CollectionEnabled: true, Now: time.Now, NewID: ownerRandomID},
+		PublicContextOperationServices{History: pc.history, Investigation: pc.investigation, Intents: pc.intents, Regional: pc.regional, Progress: pc.progress, Cases: pc.cases, Downloads: dl.coordinator, Native: dl.native, Projection: dl.projection}, pc, viewerPool)
 	if err != nil {
 		return nil, &fixedStepError{"live-capacity", mounts.ErrUnavailable}
 	}

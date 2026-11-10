@@ -35,6 +35,16 @@ func TestOwnerStartupDiagnosticClosedRenderingRetainsCause(t *testing.T) {
 		t.Fatal("caller-controlled detail rendered")
 	}
 }
+func TestOwnerStartupDiagnosticRetainsCompositionStep(t *testing.T) {
+	err := ownerStartupError(startupPublicContext, "none", &fixedStepError{"public-context", &fixedStepError{"fleet-settings", mounts.ErrUnavailable}})
+	line := OwnerStartupDiagnostic(err)
+	if !strings.Contains(line, "phase=public-context role=none reason=unavailable ") || !strings.HasSuffix(line, " step=public-context/fleet-settings") || !errors.Is(err, mounts.ErrUnavailable) {
+		t.Fatal("lost closed public-context stage", line)
+	}
+	if got, ok := OwnerStartupDiagnosticLine(line); !ok || got != line {
+		t.Fatal("composition stage record rejected")
+	}
+}
 func TestOwnerStartupDiagnosticRejectsRawProcessOutput(t *testing.T) {
 	good := OwnerStartupDiagnostic(ownerStartupError(startupSqlCredential, "registry", mounts.ErrUnavailable))
 	for _, bad := range []string{"postgres://synthetic-private", "prefix " + good, good + "\npassword=synthetic", good + " extra", strings.Replace(good, "role=registry", "role=synthetic-private", 1), strings.Replace(good, "native=unspecified", "native=token-value", 1), strings.Replace(good, "reason=unavailable", "reason=synthetic-secret", 1), strings.Repeat("x", 513)} {

@@ -43,6 +43,7 @@ type InitialRuntimeResources struct {
 	binding, rootUID            string
 	workerLayout, ownerLayout   string
 	observationFormat           string
+	ownerFleet                  bool
 	workerProvider              *contracts.ConfigurationProviderSelection
 	ownerProvider               *contracts.OwnerProviderSelection
 	ctx                         context.Context
@@ -74,14 +75,14 @@ func newInitialRuntimeResources(ctx context.Context, preparer *InitialPreparer, 
 }
 
 func newProviderInitialRuntimeResources(ctx context.Context, preparer *InitialPreparer, effects app.InitialRuntimeBridgeEffects, ownerIssuerRoots [][]byte, workerLayout, ownerLayout string, workerProvider *contracts.ConfigurationProviderSelection, ownerProvider *contracts.OwnerProviderSelection) (*InitialRuntimeResources, error) {
-	return newObservationInitialRuntimeResources(ctx, preparer, effects, ownerIssuerRoots, workerLayout, ownerLayout, workerProvider, ownerProvider, "")
+	return newObservationInitialRuntimeResources(ctx, preparer, effects, ownerIssuerRoots, workerLayout, ownerLayout, workerProvider, ownerProvider, "", false)
 }
 
-func newObservationInitialRuntimeResources(ctx context.Context, preparer *InitialPreparer, effects app.InitialRuntimeBridgeEffects, ownerIssuerRoots [][]byte, workerLayout, ownerLayout string, workerProvider *contracts.ConfigurationProviderSelection, ownerProvider *contracts.OwnerProviderSelection, observationFormat string) (*InitialRuntimeResources, error) {
+func newObservationInitialRuntimeResources(ctx context.Context, preparer *InitialPreparer, effects app.InitialRuntimeBridgeEffects, ownerIssuerRoots [][]byte, workerLayout, ownerLayout string, workerProvider *contracts.ConfigurationProviderSelection, ownerProvider *contracts.OwnerProviderSelection, observationFormat string, ownerFleet bool) (*InitialRuntimeResources, error) {
 	if ctx == nil || ctx.Err() != nil || preparer == nil || !preparer.HandoverEnabled() || preparer.plan.HistoryProbe == nil || effects == nil {
 		return nil, cfg.ErrInvalid
 	}
-	if !initialRuntimeObservationSelectionValid(workerLayout, ownerLayout, observationFormat) || !initialRuntimeProviderSelectionValid(preparer.plan.InstallationID, workerLayout, ownerLayout, workerProvider, ownerProvider) {
+	if !initialRuntimeObservationSelectionValid(workerLayout, ownerLayout, observationFormat) || !initialRuntimeProviderSelectionValid(preparer.plan.InstallationID, workerLayout, ownerLayout, workerProvider, ownerProvider) || ownerFleet && ownerLayout != contracts.OwnerProviderInstalledLayout {
 		return nil, cfg.ErrInvalid
 	}
 	if workerProvider != nil {
@@ -142,13 +143,14 @@ func newObservationInitialRuntimeResources(ctx context.Context, preparer *Initia
 		WorkerProvider         *contracts.ConfigurationProviderSelection `json:",omitempty"`
 		OwnerProvider          *contracts.OwnerProviderSelection         `json:",omitempty"`
 		ObservationFormat      string                                    `json:",omitempty"`
-	}{contracts.InitialRuntimeResourcesFormat, root.RootUID, preparer.plan.Workload.Image, initial, record, receipt, roots, workerLayout, ownerLayout, workerProvider, ownerProvider, observationFormat})
+		OwnerFleet             bool                                      `json:",omitempty"`
+	}{contracts.InitialRuntimeResourcesFormat, root.RootUID, preparer.plan.Workload.Image, initial, record, receipt, roots, workerLayout, ownerLayout, workerProvider, ownerProvider, observationFormat, ownerFleet})
 	if e != nil || initialHandoverDeadline(call, preparer.protection.observer.now, until) != nil {
 		return nil, cfg.ErrUnavailable
 	}
 	d := sha256.Sum256(b)
 	life, cancel := context.WithCancel(ctx)
-	s := &InitialRuntimeResources{preparer: preparer, effects: effects, record: record, initial: initial, ownerRoots: roots, names: names, binding: hex.EncodeToString(d[:]), rootUID: root.RootUID, workerLayout: workerLayout, ownerLayout: ownerLayout, observationFormat: observationFormat, workerProvider: workerProvider, ownerProvider: ownerProvider, ctx: life, cancel: cancel}
+	s := &InitialRuntimeResources{preparer: preparer, effects: effects, record: record, initial: initial, ownerRoots: roots, names: names, binding: hex.EncodeToString(d[:]), rootUID: root.RootUID, workerLayout: workerLayout, ownerLayout: ownerLayout, observationFormat: observationFormat, ownerFleet: ownerFleet, workerProvider: workerProvider, ownerProvider: ownerProvider, ctx: life, cancel: cancel}
 	if e = s.providerSecretIdentities(call, until); e != nil {
 		s.Close()
 		return nil, e

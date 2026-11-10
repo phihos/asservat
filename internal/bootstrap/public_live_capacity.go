@@ -1,17 +1,21 @@
 package bootstrap
 
 import (
+	"context"
+	"os"
 	"slices"
 
+	"asservat.local/asservat/internal/adapters/postgres"
 	liveapp "asservat.local/asservat/internal/application/live"
 	"asservat.local/asservat/internal/transport/presentation"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // composePublicLiveCapacity composes the fleet operators' browser-only,
 // single-cluster live-runtime read. The private regional query supplies no
 // public authority by itself; current identity, fleet settings and recovery
 // remain mandatory for every call.
-func composePublicLiveCapacity(c PublicContextOperationsConfig, s PublicContextOperationServices, pc *publicContext) (*presentation.LiveCapacityOperations, error) {
+func composePublicLiveCapacity(ctx context.Context, c PublicContextOperationsConfig, s PublicContextOperationServices, pc *publicContext, pool *pgxpool.Pool) (*presentation.LiveCapacityOperations, error) {
 	if pc == nil || pc.fleet == nil {
 		return nil, nil
 	}
@@ -23,6 +27,10 @@ func composePublicLiveCapacity(c PublicContextOperationsConfig, s PublicContextO
 	if !ok {
 		return nil, presentation.ErrOperationsConfiguration
 	}
-	service := liveapp.CapacityReader{InstallationID: c.InstallationID, Administration: pc.fleet.Settings, Recovery: v.submission.Recovery, Targets: targets, Clusters: slices.Clone(pc.clusterIDs), Now: c.Now}
+	viewers, err := postgres.NewLiveViewerCapacity(ctx, pool, c.InstallationID)
+	if err != nil {
+		return nil, presentation.ErrOperationsConfiguration
+	}
+	service := liveapp.CapacityReader{InstallationID: c.InstallationID, Administration: pc.fleet.Settings, Recovery: v.submission.Recovery, Targets: targets, Viewers: viewers, Clusters: slices.Clone(pc.clusterIDs), Now: c.Now, Report: eventLog(os.Stderr, "live capacity refused")}
 	return presentation.NewLiveCapacityOperations(c.PublicOrigin, c.Now, c.NewID, service)
 }
