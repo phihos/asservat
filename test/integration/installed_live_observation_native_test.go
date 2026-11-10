@@ -601,12 +601,16 @@ func installedLiveMCP(t *testing.T, ctx context.Context, db *pgxpool.Pool, root 
 		if e = db.QueryRow(ctx, activeQuery, root).Scan(&active, &principals); e != nil || active != 2 || principals != 1 {
 			return errors.New("principal ceiling fixture did not retain React and MCP views")
 		}
+		expectedClusterKey := sha256.Sum256([]byte("asservat-live-cluster/v1\x00" + source.ClusterID))
+		var mapped, direct int
+		mappingErr := db.QueryRow(ctx, `SELECT count(*) FROM live_watch_control WHERE root_id=$1 AND cluster_key=$2 AND state IN ('Active','Paused','Disconnected')`, root, expectedClusterKey[:]).Scan(&mapped)
+		directErr := db.QueryRow(ctx, `SELECT live_watch_viewers($1,$2)`, run.Installation, expectedClusterKey[:]).Scan(&direct)
 		capacity, _, e := call(ctx, "get_live_capacity", map[string]any{"cluster_id": source.ClusterID})
 		var gauge struct {
 			ActiveViewers int `json:"active_viewers"`
 		}
 		if e != nil || capacity.Status != "ok" || json.Unmarshal(capacity.Data, &gauge) != nil || gauge.ActiveViewers != 2 {
-			return fmt.Errorf("installed live capacity returned the wrong active viewers: %d %s %w", gauge.ActiveViewers, capacity.Status, e)
+			return fmt.Errorf("installed live capacity returned the wrong active viewers: api=%d direct=%d mapped=%d status=%s mappingErr=%v directErr=%v callErr=%w", gauge.ActiveViewers, direct, mapped, capacity.Status, mappingErr, directErr, e)
 		}
 		t.Log("installed live capacity: the real fleet operation returned exactly two active viewers")
 		refuse := func(invoke installedLiveCall, input map[string]any) error {
