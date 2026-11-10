@@ -96,7 +96,7 @@ func installedLiveSettings(in contracts.DownloadEnvironmentSettings, root, clust
 		}
 	}
 	out.Revision++
-	out.LiveRead = &contracts.LiveReadSettings{Root: contracts.LiveRootSettings{Watches: 3, PrincipalWatches: 2, WorkloadWatches: 4, Rate: 1 << 20, Burst: 1 << 20}, Projections: []string{v.Packet, v.Syscall, v.HTTP}, Clients: clients, Ceilings: []contracts.LiveReadCeiling{{ClusterID: cluster, Duration: 120, Output: 1 << 20, Rate: 64 << 10, Rows: 20, Buffer: 128 << 10, RowAge: 30, Replay: 5}}}
+	out.LiveRead = &contracts.LiveReadSettings{Root: contracts.LiveRootSettings{Watches: 3, PrincipalWatches: 2, WorkloadWatches: 3, Rate: 1 << 20, Burst: 1 << 20}, Projections: []string{v.Packet, v.Syscall, v.HTTP}, Clients: clients, Ceilings: []contracts.LiveReadCeiling{{ClusterID: cluster, Duration: 120, Output: 1 << 20, Rate: 64 << 10, Rows: 20, Buffer: 128 << 10, RowAge: 30, Replay: 5}}}
 	encoded, err := json.Marshal(out)
 	if err != nil || len(encoded) > contracts.DownloadEnvironmentMaxBytes {
 		return contracts.DownloadEnvironmentSettings{}, errors.New("delivery settings bound")
@@ -618,10 +618,10 @@ func installedLiveMCP(t *testing.T, ctx context.Context, db *pgxpool.Pool, root 
 		}
 		otherRefusal["idempotency_key"] = "live-installation-ceiling-" + source.SourceID
 		if e := refuse(run.OtherCall, otherRefusal); e != nil {
-			return fmt.Errorf("fourth concurrent view was not refused by the installation ceiling below principal/workload limits: %w", e)
+			return fmt.Errorf("fourth concurrent view was not refused by the shared installation/workload ceiling below the principal limit: %w", e)
 		}
 		if e = db.QueryRow(ctx, activeQuery, root).Scan(&active, &principals); e != nil || active != 3 || principals != 2 {
-			return errors.New("installation ceiling refusal changed the original views")
+			return errors.New("shared ceiling refusal changed the original views")
 		}
 		otherBefore := otherWatch
 		if _, e = mustOn(run.OtherCall, "close_live_watch", map[string]any{"watch_id": otherWatch.ID, "expected_revision": otherWatch.Revision, "idempotency_key": "live-close-other-" + source.SourceID}, &otherWatch); e != nil {
@@ -636,7 +636,7 @@ func installedLiveMCP(t *testing.T, ctx context.Context, db *pgxpool.Pool, root 
 		if run.BeforeFailover != nil {
 			run.BeforeFailover()
 		}
-		t.Log("installed live installation ceiling: two principals held three slots; fourth view refused below principal/workload limits; other-principal close released its slot")
+		t.Log("installed live shared ceiling: two principals held three installation/workload slots; fourth view refused below the principal limit; other-principal close released its slot")
 	}
 	closeInput := map[string]any{"watch_id": watch.ID, "expected_revision": watch.Revision, "idempotency_key": "live-close-" + source.SourceID}
 	if run.Failover {
