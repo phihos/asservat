@@ -554,23 +554,63 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 			if len(liveWatch.SourceIDs) != 1 || liveWatch.SourceIDs[0] != src.ID || liveWatch.Cursor == nil || liveWatch.ExpiresAt.After(src.HardUntil) {
 				t.Fatal("incident live watch replaced or extended its source")
 			}
+			// Same-source viewers share a cohort by design. A second original
+			// policy source forces a distinct node cohort without inventing load.
+			overloadName := installedOngoingSaveName + "-live-overload"
+			overloadPolicy := map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "DebugPolicy", "metadata": map[string]any{"name": overloadName}, "spec": installedOngoingSaveSpec(f.cluster, f.namespace, f.workload)}
+			body, _ = json.Marshal(overloadPolicy)
+			if err = f.hub.Post().AbsPath(f.base + "debugpolicies").Body(body).Do(ctx).Error(); err != nil {
+				t.Fatal("operator live overload policy", err)
+			}
+			var overloadActive struct {
+				PolicyUID    string `json:"policy_uid"`
+				AcceptanceID string `json:"acceptance_id"`
+				State        string `json:"state"`
+			}
+			wait("live overload policy source", 2*time.Minute, func(call context.Context) bool {
+				if !read(call, "activate_policy", map[string]any{"policy_name": overloadName, "idempotency_key": "live-overload-activate-" + src.ID}, &overloadActive) || overloadActive.State != "active" || overloadActive.PolicyUID == "" || overloadActive.AcceptanceID == "" {
+					return false
+				}
+				var id string
+				return admin.QueryRow(call, `SELECT id::text FROM policy_recording_source WHERE root_id=$1 AND policy_uid=$2 AND acceptance_id=$3 AND pod_uid=$4 AND ended_at IS NULL`, root, overloadActive.PolicyUID, overloadActive.AcceptanceID, podUID).Scan(&id) == nil && id != ""
+			})
+			var overloadSelected v.SourceRow
+			wait("distinct live overload source", time.Minute, func(call context.Context) bool {
+				var page v.SourcePage
+				if !read(call, "list_live_sources", target, &page) {
+					return false
+				}
+				overloadSelected = v.SourceRow{}
+				for _, candidate := range page.Sources {
+					if candidate.OwnerID == overloadActive.PolicyUID && candidate.Eligible && candidate.PodUID == podUID && candidate.ID != src.ID {
+						overloadSelected = candidate
+					}
+				}
+				return overloadSelected.Handle != ""
+			})
 			second := make(map[string]any, len(request))
 			for key, value := range request {
 				second[key] = value
 			}
-			second["idempotency_key"] = "live-incident-overload-" + src.ID
+			second["source_handles"] = []string{overloadSelected.Handle}
+			second["idempotency_key"] = "live-incident-overload-" + overloadSelected.ID
 			reply, code, err := invoke(ctx, "open_live_watch", second)
 			var failure struct {
 				Retryable bool `json:"retryable"`
 			}
 			if err != nil || code != "CapacityUnavailable" || reply.Status != "error" || json.Unmarshal(reply.Data, &failure) != nil || failure.Retryable {
-				t.Fatal("second hub-eligible view was not shed at the one-slot node budget", code, err)
+				t.Fatal("second distinct-source view was not shed at the one-slot node budget", code, err)
 			}
+			must("deactivate_policy", map[string]any{"policy_name": overloadName, "idempotency_key": "live-overload-stop-" + overloadActive.PolicyUID}, nil)
+			wait("distinct overload source stopped before incident", time.Minute, func(call context.Context) bool {
+				var ended *time.Time
+				return admin.QueryRow(call, `SELECT ended_at FROM policy_recording_source WHERE root_id=$1 AND id=$2`, root, overloadSelected.ID).Scan(&ended) == nil && ended != nil
+			})
 			var state string
 			if err = admin.QueryRow(ctx, `SELECT state FROM live_watch_control WHERE root_id=$1 AND id=$2`, root, liveWatch.ID).Scan(&state); err != nil || state != "Active" {
 				t.Fatal("overload refusal changed the original incident live view", state, err)
 			}
-			t.Log("incident live overload: second hub-eligible view refused at the one-slot node budget; original view retained")
+			t.Logf("incident live overload: distinct source %s refused at the one-slot node budget; original view retained", overloadSelected.ID)
 		}
 		incidentSent := marker(ongoingSaveRetainedPort)
 		if installedJourneyFocus() == "ongoing-syscall" || installedJourneyFocus() == "ongoing-mixed" {
