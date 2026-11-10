@@ -16,7 +16,7 @@ import (
 // ADR-194 step 4: the derived promoted input passes the owner's own reader,
 // pins the read-back key and projection, and refuses inconsistent parts.
 func TestDerivePromotedOwner(t *testing.T) {
-	for _, mode := range []string{"valid", "unprojected", "no-promotion", "already-native", "audit-mount", "other-signing-key", "no-worker-source", "foreign-capacity", "downloads", "downloads-other-source", "downloads-hub-namespace"} {
+	for _, mode := range []string{"valid", "unprojected", "no-promotion", "already-native", "audit-mount", "other-signing-key", "no-worker-source", "foreign-capacity", "downloads", "downloads-other-source", "downloads-hub-namespace", "fleet", "fleet-invalid"} {
 		t.Run(mode, func(t *testing.T) {
 			in, dir, c := ownerProviderInputFixture(t)
 			d := capacityDerivedFixture()
@@ -69,9 +69,16 @@ func TestDerivePromotedOwner(t *testing.T) {
 				if mode == "downloads-hub-namespace" {
 					x.Downloads.API.Namespace = c.Namespace
 				}
+			case "fleet", "fleet-invalid":
+				x.Settings.Federation = &contracts.InstallerFederationSettings{Fleet: &contracts.InstallerFleetIssuance{ChannelMount: "fleet-kv", DeliveryProfile: "regional-installer"}}
+				x.FleetSettings = guarded("fleet")
+				x.FleetSettings.Guard.Administrators = []contracts.OwnerDeploymentActor{{Kind: "User", Name: "operator"}}
+				if mode == "fleet-invalid" {
+					x.Settings.Federation.Fleet.ChannelMount = "not a mount"
+				}
 			}
 			out, err := derivePromotedOwner(c, x, time.Now())
-			if (err == nil) != (mode == "valid" || mode == "unprojected" || mode == "downloads") {
+			if (err == nil) != (mode == "valid" || mode == "unprojected" || mode == "downloads" || mode == "fleet") {
 				t.Fatal(mode, err)
 			}
 			if err != nil {
@@ -84,6 +91,13 @@ func TestDerivePromotedOwner(t *testing.T) {
 			if p.WorkSigning.KeyID != signing.Name+"-v1" || p.ProviderRecipeSHA256 == "" || p.AuditStoreID != q.RootBacking.Capture.Policy.StoreID || p.RuntimeProjection != x.Projection ||
 				out.Native.WorkerAPIs == nil || out.Native.RetentionTopologies == nil || p.WorkerConfiguration.Source != x.Sources.WorkerConfiguration.Source {
 				t.Fatal("derived input", p)
+			}
+			if mode == "fleet" {
+				if p.Fleet == nil || p.Fleet.Settings != x.FleetSettings.Source || !reflect.DeepEqual(p.Fleet.SettingsGuard, x.FleetSettings.Guard) || p.Fleet.ChannelMount != "fleet-kv" || p.Fleet.DeliveryProfile != "regional-installer" || p.Fleet.ProviderRecipeSHA256 == "" {
+					t.Fatal("fleet issuance input", p.Fleet)
+				}
+			} else if p.Fleet != nil {
+				t.Fatal("fleet enabled without its section", p.Fleet)
 			}
 			if d := x.Downloads; d == nil && (len(out.Native.WorkerAPIs) != 0 || p.DownloadEnvironment.PathTemplate != nil) ||
 				d != nil && (len(out.Native.WorkerAPIs) != 1 || !reflect.DeepEqual(out.Native.WorkerAPIs[0], d.API) || p.DownloadEnvironment.PathTemplate == nil || *p.DownloadEnvironment.PathTemplate != d.Template || len(p.DownloadEnvironment.Paths) != 0) {

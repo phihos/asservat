@@ -1147,7 +1147,8 @@ func (k *InstallerContinuation) promote(ctx context.Context, inventory kube.Init
 	}
 	promoted, err := derivePromotedOwner(input, promotedOwnerParts{Settings: *k.input.Public, Sources: *k.sources, Qualification: k.capacity.qualification, ConnectorRoots: connectorRoots,
 		IssuerEpoch: k.record.Scope.IssuerEpoch, Signing: readback.Signing, WorkerRoots: readback.WorkerRoots, Projection: k.publicProjection, Downloads: downloads,
-		Processing: k.capacity.processingEnvironment()}, time.Now())
+		FleetSettings: contracts.OwnerPublicGuardedSource{Source: inventory.FleetSource, Guard: inventory.FleetGuard},
+		Processing:    k.capacity.processingEnvironment()}, time.Now())
 	if err != nil {
 		return input, err
 	}
