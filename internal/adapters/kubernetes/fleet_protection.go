@@ -48,11 +48,11 @@ func fleetSettingsStep(err error) string {
 	if errors.As(err, &fixed) {
 		step := fixed.FixedStep()
 		switch {
-		case errors.Is(err, value.ErrDenied):
+		case errors.Is(err, cfg.ErrDenied):
 			return step + "/denied"
 		case errors.Is(err, cfg.ErrChanged):
 			return step + "/changed"
-		case errors.Is(err, value.ErrUnavailable):
+		case errors.Is(err, cfg.ErrUnavailable):
 			return step + "/unavailable"
 		default:
 			return step
