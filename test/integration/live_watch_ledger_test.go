@@ -3,6 +3,7 @@ package integration
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -107,18 +108,18 @@ func TestLiveWatchLedgerWithRealServices(t *testing.T) {
 	}
 	keyFor := func(v byte) string { return hex.EncodeToString(bytes.Repeat([]byte{v}, 32)) }
 	firstWorkload := makeControl(4, 7)
-	if _, _, err = ledger.Create(ctx, firstWorkload, keyFor(10)); err != nil {
+	if _, _, err = ledger.Create(ctx, ownerPool.ClusterID, firstWorkload, keyFor(10)); err != nil {
 		t.Fatal("first workload control", err)
 	}
 	secondWorkload := makeControl(5, 7)
-	if _, _, err = ledger.Create(ctx, secondWorkload, keyFor(11)); err != nil {
+	if _, _, err = ledger.Create(ctx, ownerPool.ClusterID, secondWorkload, keyFor(11)); err != nil {
 		t.Fatal("second workload control", err)
 	}
-	if _, _, err = ledger.Create(ctx, makeControl(6, 7), keyFor(12)); !errors.Is(err, live.ErrCapacity) {
+	if _, _, err = ledger.Create(ctx, ownerPool.ClusterID, makeControl(6, 7), keyFor(12)); !errors.Is(err, live.ErrCapacity) {
 		t.Fatal("third principal bypassed the workload ceiling below installation/principal limits", err)
 	}
 	outsideWorkload := makeControl(6, 8)
-	if _, _, err = ledger.Create(ctx, outsideWorkload, keyFor(13)); err != nil {
+	if _, _, err = ledger.Create(ctx, ownerPool.ClusterID, outsideWorkload, keyFor(13)); err != nil {
 		t.Fatal("workload refusal blocked an unrelated workload", err)
 	}
 	closeWorkload := func(control liveapp.Control) {
@@ -131,7 +132,7 @@ func TestLiveWatchLedgerWithRealServices(t *testing.T) {
 	}
 	closeWorkload(firstWorkload)
 	releasedWorkload := makeControl(6, 7)
-	if _, _, err = ledger.Create(ctx, releasedWorkload, keyFor(14)); err != nil {
+	if _, _, err = ledger.Create(ctx, ownerPool.ClusterID, releasedWorkload, keyFor(14)); err != nil {
 		t.Fatal("workload close did not release its slot", err)
 	}
 	closeWorkload(secondWorkload)
@@ -153,7 +154,7 @@ func TestLiveWatchLedgerWithRealServices(t *testing.T) {
 		t.Fatal("restore original live limits", err)
 	}
 	c := makeControl(1, 2)
-	got, reused, err := ledger.Create(ctx, c, keyFor(1))
+	got, reused, err := ledger.Create(ctx, ownerPool.ClusterID, c, keyFor(1))
 	if err != nil || reused || got != c {
 		t.Fatal("original control", err, reused)
 	}
@@ -161,6 +162,7 @@ func TestLiveWatchLedgerWithRealServices(t *testing.T) {
 	if err != nil {
 		t.Fatal("compiled viewer capacity constructor", err)
 	}
+	clusterKey := sha256.Sum256([]byte("asservat-live-cluster/v1\x00" + ownerPool.ClusterID))
 	active, fresh, err := viewers.ReadLiveViewers(ctx, ownerPool.InstallationID, ownerPool.ClusterID)
 	if err != nil || active != 1 || !fresh.After(time.Now()) {
 		t.Fatal("active viewer aggregate", active, fresh, err)
@@ -194,7 +196,7 @@ func TestLiveWatchLedgerWithRealServices(t *testing.T) {
 		t.Fatal("compiled role retirement control", err)
 	}
 	var retiredViewers int
-	if err = tx.QueryRow(ctx, `SELECT live_watch_viewers($1,$2)`, ownerPool.InstallationID, ownerPool.ClusterID).Scan(&retiredViewers); err != nil || retiredViewers != 0 {
+	if err = tx.QueryRow(ctx, `SELECT live_watch_viewers($1,$2)`, ownerPool.InstallationID, clusterKey[:]).Scan(&retiredViewers); err != nil || retiredViewers != 0 {
 		t.Fatal("retired owner remained an active viewer", retiredViewers, err)
 	}
 	var ignored string
@@ -222,20 +224,20 @@ func TestLiveWatchLedgerWithRealServices(t *testing.T) {
 	if err != nil {
 		t.Fatal("second-root adapter construction", err)
 	}
-	if _, _, err = secondRoot.Create(ctx, makeControl(9, 9), keyFor(9)); err == nil {
+	if _, _, err = secondRoot.Create(ctx, ownerPool.ClusterID, makeControl(9, 9), keyFor(9)); err == nil {
 		t.Fatal("second root minted installation aggregate pool")
 	}
 
 	retry := makeControl(1, 2)
-	got, reused, err = ledger.Create(ctx, retry, keyFor(1))
+	got, reused, err = ledger.Create(ctx, ownerPool.ClusterID, retry, keyFor(1))
 	if err != nil || !reused || got != c {
 		t.Fatal("key replay renewed control", err, reused)
 	}
 	retry.RequestDigest = [32]byte{9}
-	if _, _, err = ledger.Create(ctx, retry, keyFor(1)); !errors.Is(err, live.ErrConflict) {
+	if _, _, err = ledger.Create(ctx, ownerPool.ClusterID, retry, keyFor(1)); !errors.Is(err, live.ErrConflict) {
 		t.Fatal("changed selection replay", err)
 	}
-	if _, _, err = ledger.Create(ctx, makeControl(1, 2), keyFor(2)); !errors.Is(err, live.ErrCapacity) {
+	if _, _, err = ledger.Create(ctx, ownerPool.ClusterID, makeControl(1, 2), keyFor(2)); !errors.Is(err, live.ErrCapacity) {
 		t.Fatal("principal concurrent slot bypass", err)
 	}
 	if err = ledger.CurrentLive(ctx, c); err != nil {
@@ -272,11 +274,11 @@ func TestLiveWatchLedgerWithRealServices(t *testing.T) {
 		t.Fatal("failed debit changed ancestor accounts", r, s)
 	}
 	other := makeControl(2, 3)
-	other, _, err = ledger.Create(ctx, other, keyFor(4))
+	other, _, err = ledger.Create(ctx, ownerPool.ClusterID, other, keyFor(4))
 	if err != nil {
 		t.Fatal("second distinct principal consumes installation slot", err)
 	}
-	if _, _, err = ledger.Create(ctx, makeControl(3, 4), keyFor(5)); !errors.Is(err, live.ErrCapacity) {
+	if _, _, err = ledger.Create(ctx, ownerPool.ClusterID, makeControl(3, 4), keyFor(5)); !errors.Is(err, live.ErrCapacity) {
 		t.Fatal("third distinct principal bypassed installation ceiling", err)
 	}
 	other.State = "Closed"
@@ -305,7 +307,7 @@ func TestLiveWatchLedgerWithRealServices(t *testing.T) {
 		t.Fatal("terminal positive cost")
 	}
 	second := makeControl(1, 2)
-	second, _, err = ledger.Create(ctx, second, keyFor(2))
+	second, _, err = ledger.Create(ctx, ownerPool.ClusterID, second, keyFor(2))
 	if err != nil {
 		t.Fatal("closed slot not released", err)
 	}
@@ -321,7 +323,7 @@ func TestLiveWatchLedgerWithRealServices(t *testing.T) {
 		t.Fatal(err)
 	}
 	third := makeControl(1, 2)
-	third, _, err = ledger.Create(ctx, third, keyFor(3))
+	third, _, err = ledger.Create(ctx, ownerPool.ClusterID, third, keyFor(3))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -356,7 +358,7 @@ func TestLiveWatchLedgerWithRealServices(t *testing.T) {
 	if err != nil {
 		t.Fatal("configuration-only constructor", err)
 	}
-	if _, _, err = replacement.Create(ctx, makeControl(8, 8), keyFor(8)); err == nil {
+	if _, _, err = replacement.Create(ctx, ownerPool.ClusterID, makeControl(8, 8), keyFor(8)); err == nil {
 		t.Fatal("live limits replacement reset debt")
 	}
 	if _, err = ledger.Change(ctx, liveapp.Control{}, 1, 0); err == nil {
@@ -381,7 +383,7 @@ func TestLiveWatchLedgerWithRealServices(t *testing.T) {
 	if err != nil || n != 4 || a != 2 {
 		t.Fatal("bounded expiry retained shared debt", n, a, err)
 	}
-	if _, _, err = replacement.Create(ctx, makeControl(8, 8), keyFor(8)); err == nil {
+	if _, _, err = replacement.Create(ctx, ownerPool.ClusterID, makeControl(8, 8), keyFor(8)); err == nil {
 		t.Fatal("expiry reset unrefilled debt")
 	}
 	// Maintenance-only adversarial backlog, never admission/owner authority:
@@ -392,7 +394,7 @@ func TestLiveWatchLedgerWithRealServices(t *testing.T) {
 		t.Fatal("expired receipt maintenance input", err)
 	}
 	for _, want := range []int64{1, 0} {
-		if _, _, err = replacement.Create(ctx, makeControl(8, 8), keyFor(8)); err == nil {
+		if _, _, err = replacement.Create(ctx, ownerPool.ClusterID, makeControl(8, 8), keyFor(8)); err == nil {
 			t.Fatal("prune progress reset unrefilled debt")
 		}
 		var remaining int64

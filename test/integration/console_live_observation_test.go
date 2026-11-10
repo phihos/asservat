@@ -142,7 +142,7 @@ func (f *consoleLiveFixture) CurrentLive(_ context.Context, c app.Control) error
 	}
 	return nil
 }
-func (f *consoleLiveFixture) Create(_ context.Context, c app.Control, key string) (app.Control, bool, error) {
+func (f *consoleLiveFixture) Create(_ context.Context, _ string, c app.Control, key string) (app.Control, bool, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if id, ok := f.keys[key]; ok {

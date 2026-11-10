@@ -1,7 +1,7 @@
 -- name: ConfigureLiveWatch :one
 SELECT live_watch_configure(sqlc.arg(root_id)::uuid,sqlc.arg(installation_id)::uuid,sqlc.arg(issuer_epoch)::uuid,sqlc.arg(limits_digest)::bytea,sqlc.arg(limits)::jsonb)::boolean;
 -- name: CreateLiveWatch :one
-SELECT live_watch_create(sqlc.arg(root_id)::uuid,sqlc.arg(owner_id)::uuid,sqlc.arg(limits_digest)::bytea,sqlc.arg(control)::jsonb,sqlc.arg(key_hash)::bytea,sqlc.arg(original_until)::timestamptz)::jsonb;
+SELECT live_watch_create_cluster(sqlc.arg(root_id)::uuid,sqlc.arg(owner_id)::uuid,sqlc.arg(limits_digest)::bytea,sqlc.arg(control)::jsonb,sqlc.arg(key_hash)::bytea,sqlc.arg(original_until)::timestamptz,sqlc.arg(cluster_key)::bytea)::jsonb;
 -- name: ChangeLiveWatch :one
 SELECT live_watch_change(sqlc.arg(root_id)::uuid,sqlc.arg(owner_id)::uuid,sqlc.arg(limits_digest)::bytea,sqlc.arg(control)::jsonb,sqlc.arg(expected_revision)::bigint,sqlc.arg(cost)::bigint,sqlc.arg(original_until)::timestamptz)::jsonb;
 -- name: CurrentLiveWatch :one
@@ -20,4 +20,4 @@ SELECT live_watch_read_control(sqlc.arg(root_id)::uuid,sqlc.arg(principal_key)::
 SELECT live_watch_close_control(sqlc.arg(root_id)::uuid,sqlc.arg(principal_key)::bytea,sqlc.arg(watch_id)::uuid,sqlc.arg(expected_revision)::bigint,sqlc.arg(fence)::uuid);
 
 -- name: ReadLiveViewers :one
-SELECT live_watch_viewers(sqlc.arg(installation_id)::uuid,sqlc.arg(cluster_id)::uuid);
+SELECT live_watch_viewers(sqlc.arg(installation_id)::uuid,sqlc.arg(cluster_key)::bytea);

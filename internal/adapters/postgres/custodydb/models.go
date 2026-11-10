@@ -1898,6 +1898,7 @@ type LiveWatchControl struct {
 	BytesPerSecond int64
 	TokensMicro    int64
 	RefilledAt     pgtype.Timestamptz
+	ClusterKey     []byte
 }
 
 type LiveWatchRoot struct {

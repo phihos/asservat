@@ -69,7 +69,8 @@ type Ledger interface {
 	CurrentLive(context.Context, Control) error
 	// Create applies installation/principal/workload slots and aggregate rolling
 	// output reservations atomically; retries return the original ID, never refill.
-	Create(context.Context, Control, string) (Control, bool, error)
+	// The validated target cluster is keyed separately from the minimized control.
+	Create(context.Context, string, Control, string) (Control, bool, error)
 	// Change compares original revision/fence, checks current DB time and charges
 	// every delivered/replayed byte before returning. Closed/expired stays spent.
 	Change(context.Context, Control, int64, int64) (Control, error)
@@ -390,7 +391,7 @@ func (s *Service) Open(ctx context.Context, current CurrentIdentity, r v.Open) (
 		return zero, fmt.Errorf("%w: service:362", v.ErrUnavailable)
 	}
 	c := Control{OwnerID: s.cfg.OwnerID, ID: s.cfg.NewID(), Fence: s.cfg.NewID(), PrincipalKey: principalKey, WorkloadKey: workloadKey, RequestDigest: requestDigest, Revision: 1, State: "Active", AcceptedAt: now, ExpiresAt: end, IdleUntil: minTime(now.Add(v.IdleAge), end), OutputLimit: limits.Output, BytesPerSecond: limits.Rate}
-	stored, reused, err := s.ledger.Create(ctx, c, hex.EncodeToString(keyDigest[:]))
+	stored, reused, err := s.ledger.Create(ctx, first.Target.ClusterID, c, hex.EncodeToString(keyDigest[:]))
 	if err != nil {
 		return zero, err
 	}

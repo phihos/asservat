@@ -34,6 +34,7 @@ func (s *LiveViewerCapacity) ReadLiveViewers(ctx context.Context, installation, 
 	if s == nil || s.ledger == nil || installation != s.installation || !authorization.UUID(cluster) {
 		return 0, time.Time{}, fmt.Errorf("%w: live_viewer_capacity:52", v.ErrInvalid)
 	}
+	clusterKey, _ := liveClusterKey(cluster)
 	count := int64(-1)
 	fresh := time.Time{}
 	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
@@ -41,7 +42,7 @@ func (s *LiveViewerCapacity) ReadLiveViewers(ctx context.Context, installation, 
 		if err != nil {
 			return err
 		}
-		count, err = q.ReadLiveViewers(ctx, custodydb.ReadLiveViewersParams{InstallationID: id(installation), ClusterID: id(cluster)})
+		count, err = q.ReadLiveViewers(ctx, custodydb.ReadLiveViewersParams{InstallationID: id(installation), ClusterKey: clusterKey[:]})
 		if err != nil {
 			return err
 		}

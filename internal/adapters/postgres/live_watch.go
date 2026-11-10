@@ -103,6 +103,12 @@ func normalizedLive(c liveapp.Control) liveapp.Control {
 	c.IdleUntil = ownerTime(c.IdleUntil)
 	return c
 }
+func liveClusterKey(cluster string) ([32]byte, bool) {
+	if !authorization.UUID(cluster) {
+		return [32]byte{}, false
+	}
+	return sha256.Sum256([]byte("asservat-live-cluster/v1\x00" + cluster)), true
+}
 func decodeLive(raw []byte) (liveapp.Control, error) {
 	var c liveapp.Control
 	if queryDecode(raw, 4096, &c) != nil || !liveControlValid(c) {
@@ -110,11 +116,12 @@ func decodeLive(raw []byte) (liveapp.Control, error) {
 	}
 	return normalizedLive(c), nil
 }
-func (s *LiveWatches) Create(ctx context.Context, c liveapp.Control, key string) (liveapp.Control, bool, error) {
+func (s *LiveWatches) Create(ctx context.Context, cluster string, c liveapp.Control, key string) (liveapp.Control, bool, error) {
 	var zero liveapp.Control
 	c = normalizedLive(c)
 	k, err := hex.DecodeString(key)
-	if s == nil || c.OwnerID != s.owner || !liveControlValid(c) || c.State != "Active" || c.Revision != 1 || c.Spent != 0 || err != nil || len(k) != 32 || hex.EncodeToString(k) != key {
+	clusterKey, clusterOK := liveClusterKey(cluster)
+	if s == nil || c.OwnerID != s.owner || !liveControlValid(c) || c.State != "Active" || c.Revision != 1 || c.Spent != 0 || !clusterOK || err != nil || len(k) != 32 || hex.EncodeToString(k) != key {
 		return zero, false, fmt.Errorf("%w: live_watch:117", v.ErrInvalid)
 	}
 	proof, err := s.ownerCurrent(ctx)
@@ -143,7 +150,7 @@ func (s *LiveWatches) Create(ctx context.Context, c liveapp.Control, key string)
 			configurationUnavailable = true
 			return liveBound(call, q, proof.FreshUntil)
 		}
-		raw, err := q.CreateLiveWatch(call, custodydb.CreateLiveWatchParams{RootID: id(s.root), OwnerID: id(s.owner), LimitsDigest: s.limitsDigest[:], Control: body, KeyHash: k, OriginalUntil: ts(proof.FreshUntil)})
+		raw, err := q.CreateLiveWatch(call, custodydb.CreateLiveWatchParams{RootID: id(s.root), OwnerID: id(s.owner), LimitsDigest: s.limitsDigest[:], Control: body, KeyHash: k, OriginalUntil: ts(proof.FreshUntil), ClusterKey: clusterKey[:]})
 		if err != nil {
 			return liveSQLError(err)
 		}

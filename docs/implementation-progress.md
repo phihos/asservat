@@ -25,15 +25,25 @@ The administrator capacity operation now reports exact active viewers for the
 selected cluster alongside the distinct node-reported source/projection cohorts.
 The count covers distinct unexpired Active, Paused and Disconnected watch
 control records only while current trust, their owner enrollment and an
-activated unexpired certificate still resolve that owner. It uses the existing
-owner-enrollment cluster mapping. No principal, source, workload or viewer
-identity is returned.
+activated unexpired certificate still resolve that owner. Creation stores only a
+keyed digest of the validated target cluster separately from the minimized
+control; no raw principal, source, workload, target or viewer identity is added.
+The first installed run exposed that owner-enrollment cluster matching returned
+zero for a regional target, so the aggregate now uses this explicit target key.
+Active legacy watches without it make the gauge unavailable instead of producing
+a false exact count.
 
-Migration 00148 adds one read-only SQL function and no table/column or retained
-record changes. The adapter reuses the existing hub credential and pool; it adds
-no role, connection, watch, background task or polling. Its freshness deadline
-bounds the reply alongside regional runtime, fleet administration, recovery and
-caller validity before the final identity recheck.
+Migration 00148 adds the keyed placement and one read-only SQL aggregate. The
+adapter reuses the existing hub credential and pool; it adds no role, connection,
+watch, background task or polling. Its freshness deadline bounds the reply
+alongside regional runtime, fleet administration, recovery and caller validity
+before the final identity recheck. Native run 42828155612 passed owner provider
+startup after the phase-3 artifact fix, then exposed the target-cluster mapping
+defect as two actual watches but zero reported viewers. The corrected real-SQL
+[ledger and upgrade run](../test/results/live-viewer-cluster-key-3.log) passed
+both tests in 26.759 s; its [environment](../test/results/live-viewer-cluster-key-3-environment.json)
+records unchanged sources and clean teardown. Native requalification of the
+corrected installed assertion is pending.
 
 - The initial full `make pre-push` passed, including 613 console tests and
   affected race shards. Presentation, application, bootstrap and React tests

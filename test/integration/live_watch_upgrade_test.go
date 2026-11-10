@@ -147,7 +147,7 @@ func TestLiveWatchUpgradeWithRealPostgres(t *testing.T) {
 	// hub duty. Trust, permission root and owner identity are synthetic here;
 	// this is retained-ledger rollback proof, not owner/C3 admission proof.
 	installation, issuer, root, owner := custodyID(), custodyID(), custodyID(), custodyID()
-	if _, err = pool.Exec(ctx, `INSERT INTO fleet_trust(activated_postmaster_at,activated_database_oid,installation_id,issuer_epoch,source_uid,source_generation,source_digest,suspended,recovery_blocked,observed_at,fresh_until) VALUES(pg_catalog.pg_postmaster_start_time(),(SELECT oid FROM pg_catalog.pg_database WHERE datname=pg_catalog.current_database()),$1,$2,'synthetic-live-rollback',1,$3,false,false,clock_timestamp(),clock_timestamp()+interval '30 seconds')`, installation, issuer, bytes.Repeat([]byte{42}, 32)); err != nil {
+	if _, err = pool.Exec(ctx, `INSERT INTO fleet_trust(activated_postmaster_at,activated_database_oid,installation_id,issuer_epoch,source_uid,source_generation,source_digest,suspended,recovery_blocked,observed_at,fresh_until) VALUES(pg_catalog.pg_postmaster_start_time(),(SELECT oid FROM pg_catalog.pg_database WHERE datname=pg_catalog.current_database()),$1,$2,'synthetic-live-rollback',1,$3,false,false,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP+interval '30 seconds')`, installation, issuer, bytes.Repeat([]byte{42}, 32)); err != nil {
 		t.Fatal("synthetic rollback trust", err)
 	}
 	if _, err = seedSyntheticFleetObservation(ctx, pool, installation); err != nil {
@@ -206,6 +206,19 @@ func TestLiveWatchUpgradeWithRealPostgres(t *testing.T) {
 	var result []byte
 	if err = runtimePool.QueryRow(ctx, `SELECT live_watch_create($1,$2,$3,$4,$5,$6)`, root, owner, digest[:], encodedControl, bytes.Repeat([]byte{4}, 32), control.ExpiresAt).Scan(&result); err != nil || json.Unmarshal(result, &opened) != nil || opened.Reused || liveUTC(opened.Control) != control {
 		t.Fatalf("compiled original Open err=%v reused=%v\n got=%+v\nwant=%+v", err, opened.Reused, opened.Control, control)
+	}
+	if _, err = provider.UpTo(ctx, 148); err != nil {
+		t.Fatal("legacy viewer mapping upgrade", err)
+	}
+	clusterKey := sha256.Sum256([]byte("asservat-live-cluster/v1\x00" + installation))
+	var legacyViewers int
+	err = pool.QueryRow(ctx, `SELECT live_watch_viewers($1,$2)`, installation, clusterKey[:]).Scan(&legacyViewers)
+	var legacyUnavailable *pgconn.PgError
+	if !errors.As(err, &legacyUnavailable) || legacyUnavailable.Code != "55000" {
+		t.Fatal("unmapped legacy watch produced a false per-cluster aggregate", legacyViewers, err)
+	}
+	if _, err = provider.DownTo(ctx, 143); err != nil {
+		t.Fatal("legacy viewer mapping rollback", err)
 	}
 	control.Spent = 4 << 10
 	encodedControl, err = json.Marshal(control)
