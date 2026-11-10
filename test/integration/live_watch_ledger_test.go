@@ -157,6 +157,18 @@ func TestLiveWatchLedgerWithRealServices(t *testing.T) {
 	if err != nil || reused || got != c {
 		t.Fatal("original control", err, reused)
 	}
+	viewers, err := postgres.NewLiveViewerCapacity(ctx, pool, ownerPool.InstallationID)
+	if err != nil {
+		t.Fatal("compiled viewer capacity constructor", err)
+	}
+	active, fresh, err := viewers.ReadLiveViewers(ctx, ownerPool.InstallationID, ownerPool.ClusterID)
+	if err != nil || active != 1 || !fresh.After(time.Now()) {
+		t.Fatal("active viewer aggregate", active, fresh, err)
+	}
+	otherCluster, _, err := viewers.ReadLiveViewers(ctx, ownerPool.InstallationID, custodyID())
+	if err != nil || otherCluster != 0 {
+		t.Fatal("viewer aggregate leaked across clusters", otherCluster, err)
+	}
 	assertOwner := func(watch, key string) {
 		t.Helper()
 		before := certificateReads
@@ -277,6 +289,10 @@ func TestLiveWatchLedgerWithRealServices(t *testing.T) {
 	if err = ledger.CurrentLive(ctx, c); err != nil {
 		t.Fatal("exact closed receipt current", err)
 	}
+	active, _, err = viewers.ReadLiveViewers(ctx, ownerPool.InstallationID, ownerPool.ClusterID)
+	if err != nil || active != 0 {
+		t.Fatal("closed viewers remained active", active, err)
+	}
 	assertOwner(c.ID, "")
 	assertOwner("", keyFor(1))
 	terminalPaid := c
@@ -381,5 +397,5 @@ func TestLiveWatchLedgerWithRealServices(t *testing.T) {
 		}
 	}
 
-	t.Log("real compiled hub control facets + independently audited current owner: original receipts, installation root uniqueness, isolated workload ceiling/release, one slot, per-watch/three-account charges, rollback, close/reopen debt, original expiry; no native/source/installed qualification")
+	t.Log("real compiled hub control facets + independently audited current owner: original receipts, exact active/closed viewer counts with cluster isolation, installation root uniqueness, isolated workload ceiling/release, one slot, per-watch/three-account charges, rollback, close/reopen debt, original expiry; no native/source/installed qualification")
 }

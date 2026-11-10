@@ -30,6 +30,7 @@ export interface components {
             digest: string;
         };
         Contract_live_capacity: {
+            active_viewers: number;
             /** Format: uuid */
             cluster_id: string;
             /** Format: date-time */

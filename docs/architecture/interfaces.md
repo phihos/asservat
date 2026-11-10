@@ -67,7 +67,11 @@ a first report, nonmonotonic counter or missing predecessor makes all rates
 explicitly incomplete instead of presenting a partial installation-wide rate.
 The browser-only `get_live_capacity` operation exposes one explicitly selected
 cluster to a current fleet operator after fresh identity/administration/recovery
-checks. It does not poll, enumerate sources or start acquisition.
+checks. An exact active-viewer gauge counts unexpired Active, Paused and
+Disconnected watch controls through their existing owner-enrollment cluster
+mapping and the existing hub SQL function credential/pool. No principal, source
+or workload identifier is returned. The operation does not poll, enumerate
+sources or start acquisition.
 Public ongoing compilation, Save composition and installed source qualification
 remain gated as recorded in implementation progress.
 

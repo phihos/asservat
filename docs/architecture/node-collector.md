@@ -45,6 +45,9 @@ nothing yet; increment 4 adds the first recorder.
    or reports.
    Fleet operators read one selected cluster through the browser-only
    `get_live_capacity` operation; it uses the same aggregate and current checks.
+   The separate exact active-viewer gauge comes from the minimized watch ledger's
+   existing owner-enrollment cluster mapping, not from cohort status or a new
+   node/viewer identity.
 5. Work: the collector long-polls (25 s hold) for work after its last sequence. Kinds are
    `armSource`, `stopSource`, `snapshot`, `peerGeneration` (no producer; refused with
    `RecorderNotImplemented`, `WorkExpired` or `WorkUnknown`) and `packetCapture`

@@ -3,14 +3,19 @@
 `make console-browser-check` passed with 29 journeys and 28 accessibility
 scans. The capacity journey used the actual built React page and Go HTTPS
 operation: entering one cluster, reading its counters, gauges and rates, and
-rendering cumulative source-loss events, transport-dropped rows and buffered
-pending-row occupancy without content labels.
+rendering exact active viewers, cumulative source-loss events, transport-dropped
+rows and buffered pending-row occupancy without content labels.
 [Screenshot](../console-browser/live-capacity.png).
 
 Pending rows are shared-buffer occupancy, not exact per-viewer lag. Active
-cohorts are not an exact viewer count. Source-loss and reply-drop rates use
-report-to-report counter deltas and are withheld when any current live-enabled
-node lacks a valid predecessor.
+viewers is the exact count of unexpired Active, Paused and Disconnected watch
+control records for the selected cluster; it is distinct from node-reported
+cohorts. Source-loss and reply-drop rates use report-to-report counter deltas
+and are withheld when any current live-enabled node lacks a valid predecessor.
+
+[Real PostgreSQL evidence](../live-viewer-capacity.log) covers active/closed
+counts, cluster isolation and migration rollback under the compiled hub role,
+with unchanged sources and no cleanup failures.
 
 The operation has application and presentation tests for current fleet
 operator/administration/recovery checks, unknown clusters, incomplete rates,

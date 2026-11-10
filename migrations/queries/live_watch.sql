@@ -18,3 +18,6 @@ SELECT live_watch_read_control(sqlc.arg(root_id)::uuid,sqlc.arg(principal_key)::
 
 -- name: CloseLiveControl :one
 SELECT live_watch_close_control(sqlc.arg(root_id)::uuid,sqlc.arg(principal_key)::bytea,sqlc.arg(watch_id)::uuid,sqlc.arg(expected_revision)::bigint,sqlc.arg(fence)::uuid);
+
+-- name: ReadLiveViewers :one
+SELECT live_watch_viewers(sqlc.arg(installation_id)::uuid,sqlc.arg(cluster_id)::uuid);

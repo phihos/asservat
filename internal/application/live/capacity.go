@@ -26,6 +26,10 @@ type CapacityTargets interface {
 	ReadLiveRuntime(context.Context, collector.LiveRuntimeRequest) (collector.LiveRuntimeSnapshot, error)
 }
 
+type CapacityViewers interface {
+	ReadLiveViewers(context.Context, string, string) (int, time.Time, error)
+}
+
 var ErrClusterUnknown = errors.New("unknown live capacity cluster")
 
 // CapacityReader returns one selected cluster's content-free live runtime. It
@@ -35,13 +39,14 @@ type CapacityReader struct {
 	Administration CapacityAdministration
 	Recovery       CapacityRecovery
 	Targets        CapacityTargets
+	Viewers        CapacityViewers
 	Clusters       []string
 	Now            func() time.Time
 }
 
 func (s CapacityReader) Read(ctx context.Context, current CurrentIdentity, cluster string) (collector.LiveRuntimeSnapshot, time.Time, error) {
 	var zero collector.LiveRuntimeSnapshot
-	if ctx == nil || current == nil || s.Administration == nil || s.Recovery == nil || s.Targets == nil || s.Now == nil || !authorization.UUID(s.InstallationID) {
+	if ctx == nil || current == nil || s.Administration == nil || s.Recovery == nil || s.Targets == nil || s.Viewers == nil || s.Now == nil || !authorization.UUID(s.InstallationID) {
 		return zero, time.Time{}, identity.ErrUnavailable
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -71,10 +76,18 @@ func (s CapacityReader) Read(ctx context.Context, current CurrentIdentity, clust
 	}
 	until = identity.Earlier(until, recovery.FreshUntil)
 	out, err := s.Targets.ReadLiveRuntime(ctx, request)
-	if err != nil || out.ClusterID != cluster || !out.Valid(s.Now()) {
+	if err != nil || out.ClusterID != cluster {
 		return zero, time.Time{}, identity.ErrUnavailable
 	}
-	until = identity.Earlier(until, out.FreshUntil)
+	viewers, viewerFresh, err := s.Viewers.ReadLiveViewers(ctx, s.InstallationID, cluster)
+	if err != nil {
+		return zero, time.Time{}, identity.ErrUnavailable
+	}
+	out.ActiveViewers = viewers
+	if !out.Valid(s.Now()) {
+		return zero, time.Time{}, identity.ErrUnavailable
+	}
+	until = identity.Earlier(identity.Earlier(until, out.FreshUntil), viewerFresh)
 	fresh, err := current.ResolveIdentity(ctx)
 	if err != nil || fresh.Principal != caller.Principal || fresh.Policy != caller.Policy || !fresh.Valid(s.Now()) || !admin.Operator(fresh) {
 		return zero, time.Time{}, identity.ErrDenied

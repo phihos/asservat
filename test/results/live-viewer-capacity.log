@@ -1,0 +1,8 @@
+=== RUN   TestLiveWatchLedgerWithRealServices
+    live_watch_ledger_test.go:400: real compiled hub control facets + independently audited current owner: original receipts, installation root uniqueness, isolated workload ceiling/release, one slot, per-watch/three-account charges, rollback, close/reopen debt, original expiry; no native/source/installed qualification
+--- PASS: TestLiveWatchLedgerWithRealServices (18.89s)
+=== RUN   TestLiveWatchUpgradeWithRealPostgres
+    live_watch_upgrade_test.go:270: pristine142→143→142 twice; 147 Up/Down removes only recovery functions before the schema143 compiled Open/Charge checks; retained control and account-only debt each refuse Down23514 with exact schema/functions/history/state unchanged; HTTP/source/audit retained guards not exercised
+--- PASS: TestLiveWatchUpgradeWithRealPostgres (7.58s)
+PASS
+ok  	asservat.local/asservat/test/integration	27.537s

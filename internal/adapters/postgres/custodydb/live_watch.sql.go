@@ -206,3 +206,19 @@ func (q *Queries) ReadLiveControl(ctx context.Context, arg ReadLiveControlParams
 	err := row.Scan(&live_watch_read_control)
 	return live_watch_read_control, err
 }
+
+const readLiveViewers = `-- name: ReadLiveViewers :one
+SELECT live_watch_viewers($1::uuid,$2::uuid)
+`
+
+type ReadLiveViewersParams struct {
+	InstallationID pgtype.UUID
+	ClusterID      pgtype.UUID
+}
+
+func (q *Queries) ReadLiveViewers(ctx context.Context, arg ReadLiveViewersParams) (int64, error) {
+	row := q.db.QueryRow(ctx, readLiveViewers, arg.InstallationID, arg.ClusterID)
+	var live_watch_viewers int64
+	err := row.Scan(&live_watch_viewers)
+	return live_watch_viewers, err
+}

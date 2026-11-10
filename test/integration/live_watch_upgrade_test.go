@@ -23,8 +23,8 @@ import (
 )
 
 // Pristine143 Up/Down/Up against the integrated142 baseline, plus147 recovery
-// Up/Down before the schema143 role checks; no installed role, source delivery
-// or live traffic claim follows from a schema round trip.
+// and148 viewer-capacity Up/Down before the schema143 role checks; no installed
+// role, source delivery or live traffic claim follows from a schema round trip.
 func TestLiveWatchUpgradeWithRealPostgres(t *testing.T) {
 	path := os.Getenv("ASSERVAT_CUSTODY_FIXTURES")
 	if path == "" {
@@ -126,6 +126,22 @@ func TestLiveWatchUpgradeWithRealPostgres(t *testing.T) {
 	}
 	if _, err = provider.UpTo(ctx, 147); err != nil {
 		t.Fatal("final147 Up", err)
+	}
+	if _, err = provider.UpTo(ctx, 148); err != nil {
+		t.Fatal("148 viewer capacity Up", err)
+	}
+	var viewerFunctions int
+	if err = pool.QueryRow(ctx, `SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public' AND p.proname='live_watch_viewers'`).Scan(&viewerFunctions); err != nil || viewerFunctions != 1 {
+		t.Fatal("148 viewer capacity function", viewerFunctions, err)
+	}
+	if _, err = provider.DownTo(ctx, 147); err != nil {
+		t.Fatal("148 viewer capacity Down", err)
+	}
+	if err = pool.QueryRow(ctx, `SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public' AND p.proname='live_watch_viewers'`).Scan(&viewerFunctions); err != nil || viewerFunctions != 0 {
+		t.Fatal("148 viewer capacity function retained at147", viewerFunctions, err)
+	}
+	if _, err = provider.UpTo(ctx, 148); err != nil {
+		t.Fatal("148 viewer capacity second Up", err)
 	}
 	// Exercise the actual fixed SQL Open/Charge functions under the compiled
 	// hub duty. Trust, permission root and owner identity are synthetic here;
@@ -251,7 +267,7 @@ func TestLiveWatchUpgradeWithRealPostgres(t *testing.T) {
 		t.Fatal("account-only original debt", controls, accounts, debt, err)
 	}
 	assertRetainedDown("debt-only")
-	t.Log("pristine142→143→142 twice; 147 Up/Down removes only recovery functions before the schema143 compiled Open/Charge checks; retained control and account-only debt each refuse Down23514 with exact schema/functions/history/state unchanged; HTTP/source/audit retained guards not exercised")
+	t.Log("pristine142→143→142 twice; 147 recovery and148 viewer-capacity Up/Down before the schema143 compiled Open/Charge checks; retained control and account-only debt each refuse Down23514 with exact schema/functions/history/state unchanged; HTTP/source/audit retained guards not exercised")
 }
 
 // liveUTC matches the adapter's normalization: SQL JSON renders +00:00,
