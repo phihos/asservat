@@ -1,5 +1,27 @@
 # Sustained implementation progress
 
+## Sustained installed live reads (2026-11-10)
+
+The installed live fixture now follows continuation through five bounded
+one-second batches on its first policy and manual episodes. Every batch retains
+the original watch revision, source, projection and row expiry, with no canary in
+approved content. Cumulative delivery spend matches the minimized SQL ledger.
+This is test-only qualification with no production change or additional load
+generator.
+
+- [Policy native evidence](../test/results/live-sustained-policy-42755991162/README.md):
+  run 42755991162 passed at `f36aed40` (Go test 437.40 s, package 437.430 s,
+  focus 163.58 s), with all three policy projections and 31 bounded live MCP
+  operations.
+- [Manual native evidence](../test/results/live-sustained-manual-42757257065/README.md):
+  run 42757257065 passed at the same commit (Go test 382.20 s, package 382.228 s,
+  focus 105.34 s), with all three finite sessions and 35 operations. Both runs
+  had unchanged sources, removed build scratch and no cleanup failures.
+- Full `make pre-push`, PR CI run 42755991635 (`ci-ok`) and Gitar review passed.
+
+This is a short installed sustained-read proof, not long-duration load or
+operator-metrics qualification. The broader specification remains active.
+
 ## Sustained live cohort delivery without recorder backpressure (2026-11-10)
 
 The actual existing-source cohort test now drives 2,000 timestamped frames

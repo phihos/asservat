@@ -1,0 +1,10 @@
+2026-11-10T04:46:04.040540175Z node collector probe: kernel 7.0.0-1017-azure; btf supported; cgroup2 supported; bpf supported; tcx supported; tc supported; tracefs supported; hostpid supported; runtime containerd; engine linked=true initialized=true v0.57.0; packetCapture Available prerequisites=true hook="tc" []; syscallTrace Available prerequisites=true hook="" []; goProfile Available prerequisites=true hook="" []
+2026-11-10T04:46:04.041140373Z node collector ring medium: encrypted disk available=false removedEarlier=0
+2026-11-10T04:46:04.150495141Z node collector enrolled: node asservat-context-pdvt5vl8-1-control-plane, epoch 578e6ad8-b94a-429e-a677-41ece647e5f9, certificate until 2026-11-10T05:06:04Z
+2026-11-10T04:47:36.944531865Z node collector: capture 884a7d6a-fe3b-453c-b27c-f91c996c1bac uploaded: 1379 of 1379 frames retained, 176 bytes, 0 lost samples, failure "CaptureFailed"
+2026-11-10T04:47:44.882474470Z packet engine: no operator found for media type "application/vnd.gadget.wasm.program.v1+binary", skipping layer
+2026-11-10T04:47:44.916176609Z syscall engine: tracing mount namespace 4026533479 (late false)
+2026-11-10T04:47:44.916864744Z syscall engine: tracing mount namespace 4026533483 (late false)
+2026-11-10T04:47:58.938039384Z node collector: syscall capture 0cdf0d6c-2920-4065-b500-899277c6ae12 uploaded: 0 of 0 calls retained, 176 bytes, 0 lost samples, failure "CaptureFailed"
+2026-11-10T04:48:21.038633392Z node collector: capture 6060fd45-e679-4e13-8530-f702932fc590 stopped: context canceled
+2026-11-10T04:48:21.039183296Z node collector: capture 6060fd45-e679-4e13-8530-f702932fc590 uploaded: 632 of 633 frames retained, 176 bytes, 0 lost samples, failure "CaptureFailed"
