@@ -33,6 +33,13 @@ func NewFleetConfigurationProtection(observer, probe *PermissionClient, plan cfg
 type ProtectedFleetSettings struct {
 	settings   *FleetSettingsClient
 	protection *FleetConfigurationProtection
+	Report     func(string)
+}
+
+func (s *ProtectedFleetSettings) note(stage string) {
+	if s.Report != nil {
+		s.Report(stage)
+	}
 }
 
 var _ app.AdministrationReader = (*ProtectedFleetSettings)(nil)
@@ -45,7 +52,7 @@ func NewProtectedFleetSettings(c *PermissionClient, p *FleetConfigurationProtect
 	if err != nil {
 		return nil, err
 	}
-	return &ProtectedFleetSettings{s, p}, nil
+	return &ProtectedFleetSettings{settings: s, protection: p}, nil
 }
 
 func (s *ProtectedFleetSettings) FleetAdministration(ctx context.Context) (value.Administration, error) {
@@ -58,23 +65,32 @@ func (s *ProtectedFleetSettings) FleetAdministration(ctx context.Context) (value
 	start := s.settings.client.now()
 	_, until, err := s.protection.current(ctx)
 	if err != nil {
+		s.note("protection")
 		return zero, err
 	}
 	first, err := s.settings.FleetAdministration(ctx)
 	if err != nil {
+		s.note("first-source")
 		return zero, err
 	}
 	last, err := s.settings.FleetAdministration(ctx)
-	if err != nil || first.Revision != last.Revision || first.InstallationID != last.InstallationID || first.IssuerEpoch != last.IssuerEpoch {
+	if err != nil {
+		s.note("second-source")
+		return zero, value.ErrUnavailable
+	}
+	if first.Revision != last.Revision || first.InstallationID != last.InstallationID || first.IssuerEpoch != last.IssuerEpoch {
+		s.note("revision")
 		return zero, value.ErrUnavailable
 	}
 	g := s.protection.configMapProtection
 	if _, err = checkAdmissionGuard(ctx, g.observer, g.plan.Name, g.pin, g.policy, g.binding); err != nil {
+		s.note("admission")
 		return zero, err
 	}
 	first.ObservedAt = start
 	first.FreshUntil = identity.Earlier(start.Add(5*time.Second), identity.Earlier(until, identity.Earlier(first.FreshUntil, last.FreshUntil)))
 	if ctx.Err() != nil || !first.Valid(s.settings.client.now()) {
+		s.note("valid")
 		return zero, value.ErrUnavailable
 	}
 	return first, nil

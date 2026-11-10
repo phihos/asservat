@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"context"
+	"os"
 	"time"
 
 	"asservat.local/asservat/internal/adapters/kms"
@@ -34,6 +35,7 @@ func newPublicFleet(ctx context.Context, c contracts.OwnerDeployment, providers 
 	if err != nil {
 		return nil, &fixedStepError{"fleet-settings", mounts.ErrUnavailable}
 	}
+	settings.Report = eventLog(os.Stderr, "fleet settings refused")
 	reservePool, err := pools.open(ctx, "fleet-bootstrap-reserve")
 	if err != nil {
 		return nil, &fixedStepError{"fleet-reserve-pool", mounts.ErrUnavailable}
