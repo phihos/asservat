@@ -129,7 +129,7 @@ func installedAnyFocusMatch(match func() bool) bool {
 // automation binding grants it anyway), the CPU profile workload and its
 // endpoints (policy-profile; packet focuses mark closed ports, not the
 // application), and the collector's ring disk (ongoing-save-disk) and live
-// processing values (live-observation).
+// processing values (live-observation and ongoing-incident).
 type installedFocusBootstrap struct {
 	FastFixture, RegionalInstallerChecks bool
 	Clusters                             int

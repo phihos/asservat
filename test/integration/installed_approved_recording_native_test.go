@@ -217,10 +217,15 @@ func installApprovedRecordingCollector(t *testing.T, ctx context.Context, api ku
 		// ADR-278: the administrator's opt-in encrypted-disk ring volume.
 		collector["ringDisk"] = map[string]any{"enabled": true, "bytes": ongoingSaveDiskBytes}
 	}
-	if installedAnyFocus("live-observation") {
+	if installedAnyFocus("live-observation") || installedAnyFocus("ongoing-incident") {
 		// The administrator's node-side live processing opt-in; hub
-		// delivery.liveRead separately authorizes viewers.
-		collector["live"] = map[string]any{"subscriptions": 4, "memoryBytes": 4 << 20, "eventsPerSecond": 2000, "bytesPerSecond": 1 << 20, "processingNanosPerSecond": 50_000_000}
+		// delivery.liveRead separately authorizes viewers. The incident fixture
+		// leaves one node slot so a second hub-eligible view must be shed.
+		subscriptions := 4
+		if installedAnyFocus("ongoing-incident") {
+			subscriptions = 1
+		}
+		collector["live"] = map[string]any{"subscriptions": subscriptions, "memoryBytes": 4 << 20, "eventsPerSecond": 2000, "bytesPerSecond": 1 << 20, "processingNanosPerSecond": 50_000_000}
 	}
 	values := map[string]any{"mode": "cluster", "collector": collector}
 	raw, _ := json.Marshal(values)
