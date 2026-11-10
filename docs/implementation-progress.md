@@ -1,5 +1,35 @@
 # Sustained implementation progress
 
+## Installed multi-principal live-view ceiling (2026-11-10)
+
+The installed live fixture now uses the existing reviewer as a second separately
+authenticated maintainer principal. React and the developer's MCP session hold
+the first principal's two slots; the reviewer fills a third installation/workload
+slot. The reviewer's next open is refused below its principal ceiling, and its
+original close releases the slot without extending the deadline. SQL verifies
+three controls across two principal keys, then two across one. This is test-only
+qualification with no production or permission change and no additional suite.
+
+- [Policy native evidence](../test/results/live-principals-policy-42730471915-pass/README.md):
+  run 42730471915 attempt 2 passed at `55cd5861` (Go test 419.34 s, package
+  419.365 s, focus 145.46 s). All three policy projections completed, including
+  packet owner failover and the 2,810-byte HTTP native Save.
+- [Manual native evidence](../test/results/live-principals-manual-42733127220/README.md):
+  run 42733127220 passed at the same commit (Go test 362.90 s, package 362.930 s,
+  focus 89.47 s). All three finite sessions attached before publication and
+  cancelled without replacement. Both runs had unchanged sources, removed build
+  scratch and no cleanup failures.
+- Full `make pre-push`, PR CI run 42730477266 (`ci-ok`) and Gitar review passed.
+  Run 42728495709 rejected an invalid workload-greater-than-installation fixture
+  before qualification. Policy attempt 1 passed the new assertions but later hit
+  a transient HTTP Save `NotAvailable`; the unchanged attempt 2 is the complete
+  pass. Neither failed attempt is recorded as one.
+
+The native scenario does not distinguish its equal installation/workload limits;
+PR #205's SQL fixture isolates installation-only accounting. Overload, incident
+priority and sustained-throughput qualification remain open. The broader
+specification remains active.
+
 ## Installation-wide live-view ceiling (2026-11-10)
 
 The real-PostgreSQL live-watch fixture now fills both installation-wide slots
