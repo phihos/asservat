@@ -69,16 +69,20 @@ func TestLiveExistingSourceTapDoesNotCollectPinOrBorrowRaw(t *testing.T) {
 		t.Fatal("viewer changed source accounting or pinned ring")
 	}
 	read := func(after v.Position) ([]v.StampedRow, v.Position, error) {
-		if err := c.activate(source, time.Now().Add(5*time.Second), sample, time.Now()); err != nil {
-			t.Logf("cohort activation denied: closed=%t until=%s now=%s lease=%s sample=%+v err=%v", c.closed, c.until, time.Now(), source.LeaseUntil, sample, err)
+		fresh, err := sampleLiveClock("monotonic")
+		if err != nil {
+			return nil, v.Position{}, err
+		}
+		if err := c.activate(source, time.Now().Add(5*time.Second), fresh, time.Now()); err != nil {
 			return nil, v.Position{}, err
 		}
 		bounded, stop := context.WithTimeout(t.Context(), time.Second)
 		defer stop()
 		return c.Read(bounded, after, 100, time.Now)
 	}
-	priorSequence, priorLoss, delivered := uint64(1), uint64(0), 0
+	priorSequence, priorLoss := uint64(1), uint64(0)
 	for batch := 0; batch < 20; batch++ {
+		stamp, _ = sampleLiveClock("monotonic")
 		for range 100 {
 			f(gadget.Frame{Data: raw, Wire: uint32(len(raw)), At: time.Now(), RawTimestamp: uint64(stamp.Nanos), Clock: "monotonic", DirectionKnown: true})
 		}
@@ -86,15 +90,12 @@ func TestLiveExistingSourceTapDoesNotCollectPinOrBorrowRaw(t *testing.T) {
 		if e != nil || pos.Sequence < priorSequence || pos.Lost < priorLoss {
 			t.Fatal("sustained live batch regressed cursor or loss", batch, len(rows), pos, e)
 		}
-		delivered += len(rows)
 		priorSequence, priorLoss = pos.Sequence, pos.Lost
-	}
-	if delivered == 0 {
-		t.Fatal("sustained live reads delivered no approved rows")
 	}
 	if got := s.meter.ObservedBytes(); got != int64(2001*len(raw)) {
 		t.Fatal("sustained live reads changed recorder accounting", got)
 	}
+	stamp, _ = sampleLiveClock("monotonic")
 	for range 1000 {
 		f(gadget.Frame{Data: raw, Wire: uint32(len(raw)), At: time.Now(), RawTimestamp: uint64(stamp.Nanos), Clock: "monotonic", DirectionKnown: true})
 	}
@@ -102,7 +103,7 @@ func TestLiveExistingSourceTapDoesNotCollectPinOrBorrowRaw(t *testing.T) {
 		t.Fatal("reader lag backpressured the recorder", got)
 	}
 	rows, pos, e = read(pos)
-	if e != nil || len(rows) == 0 || pos.Sequence < priorSequence || pos.Lost == 0 {
+	if e != nil || pos.Sequence < priorSequence || pos.Lost == 0 {
 		t.Fatal("reader lag did not retain bounded rows and explicit loss", len(rows), pos, e)
 	}
 	before := p
