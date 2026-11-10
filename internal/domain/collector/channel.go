@@ -325,8 +325,9 @@ type Report struct {
 	Live       *LiveStatus
 }
 
-// LiveStatus is bounded, content-free live-view runtime accounting. The window
-// is local to the collector; no source, principal, filter or row is retained.
+// LiveStatus is bounded, content-free live-view runtime accounting. Activity
+// totals are process-lifetime; only rate limiting uses the window. No source,
+// principal, filter or row is retained.
 type LiveStatus struct {
 	WindowStartedAt   time.Time
 	Cohorts           int

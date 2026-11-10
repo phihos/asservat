@@ -15,6 +15,8 @@ type nodeLiveBudget struct {
 	limits                        v.ProcessingLimits
 	held                          int
 	second                        time.Time
+	windowEvents, windowBytes     int64
+	windowSpent                   time.Duration
 	events, bytes                 int64
 	spent                         time.Duration
 	deliveredRows, deliveredBytes int64
@@ -44,11 +46,9 @@ func (b *nodeLiveBudget) release() {
 func (b *nodeLiveBudget) reset(now time.Time) {
 	if b.second.IsZero() || now.Sub(b.second) >= time.Second {
 		b.second = now
-		b.events = 0
-		b.bytes = 0
-		b.spent = 0
-		b.deliveredRows = 0
-		b.deliveredBytes = 0
+		b.windowEvents = 0
+		b.windowBytes = 0
+		b.windowSpent = 0
 	}
 }
 func (b *nodeLiveBudget) take(now time.Time, bytes int) bool {
@@ -60,9 +60,11 @@ func (b *nodeLiveBudget) take(now time.Time, bytes int) bool {
 		return false
 	}
 	b.reset(now)
-	if b.events >= b.limits.EventsPerSecond || int64(bytes) > b.limits.BytesPerSecond-b.bytes || b.spent >= b.limits.TimePerSecond {
+	if b.windowEvents >= b.limits.EventsPerSecond || int64(bytes) > b.limits.BytesPerSecond-b.windowBytes || b.windowSpent >= b.limits.TimePerSecond {
 		return false
 	}
+	b.windowEvents++
+	b.windowBytes += int64(bytes)
 	b.events++
 	b.bytes += int64(bytes)
 	return true
@@ -71,6 +73,7 @@ func (b *nodeLiveBudget) finish(elapsed time.Duration) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if elapsed > 0 {
+		b.windowSpent += elapsed
 		b.spent += elapsed
 	}
 }

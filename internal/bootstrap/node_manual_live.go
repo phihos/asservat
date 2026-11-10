@@ -295,18 +295,22 @@ func (n *nodePackets) readManualLive(ctx context.Context, w collector.Work, budg
 	}
 	out.Sample = sample.Nanos
 	out.Examined = len(out.Rows)
-	return boundManualLiveReply(id.Epoch, *r, out)
+	bounded, encoded, e := boundManualLiveReply(id.Epoch, *r, out)
+	if e == nil {
+		budget.deliver(n.now(), len(bounded.Rows), encoded)
+	}
+	return bounded, e
 }
-func boundManualLiveReply(epoch string, r collector.LiveRead, out v.NodeReply) (v.NodeReply, error) {
+func boundManualLiveReply(epoch string, r collector.LiveRead, out v.NodeReply) (v.NodeReply, int, error) {
 	rows := out.Rows
 	out.Rows = []v.StampedRow{}
 	base, e := node.WireLiveReply(epoch, out)
 	if e != nil {
-		return v.NodeReply{}, e
+		return v.NodeReply{}, 0, e
 	}
 	raw, e := json.Marshal(base)
 	if e != nil {
-		return v.NodeReply{}, e
+		return v.NodeReply{}, 0, e
 	}
 	encoded := len(raw) + 64
 	clear(raw)
@@ -315,18 +319,18 @@ func boundManualLiveReply(epoch string, r collector.LiveRead, out v.NodeReply) (
 		maximum = 24 << 10
 	}
 	if encoded > maximum {
-		return v.NodeReply{}, v.ErrCapacity
+		return v.NodeReply{}, 0, v.ErrCapacity
 	}
 	kept := 0
 	for _, pending := range rows {
 		row, e := json.Marshal(pending.Row)
 		if e != nil {
-			return v.NodeReply{}, e
+			return v.NodeReply{}, 0, e
 		}
 		raw, e := json.Marshal(contracts.NodeLiveRow{Row: row, Nanos: pending.Nanos, Clock: pending.Clock})
 		clear(row)
 		if e != nil {
-			return v.NodeReply{}, e
+			return v.NodeReply{}, 0, e
 		}
 		cost := len(raw) + 1
 		clear(raw)
@@ -342,7 +346,7 @@ func boundManualLiveReply(epoch string, r collector.LiveRead, out v.NodeReply) (
 	for _, row := range out.Rows {
 		out.Bytes += int64(row.Row.Bytes())
 	}
-	return out, nil
+	return out, encoded, nil
 }
 
 func (h *manualLiveHolder) httpLoss(before, after httpheaders.Counters) {

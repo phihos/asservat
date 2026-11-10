@@ -366,8 +366,8 @@ func (p *nodeProcess) report() collector.Report {
 	var sourceAsOf time.Time
 	var live *collector.LiveStatus
 	if p.sources != nil {
-		sources, sourceAsOf = p.sources.Status()
 		live = p.sources.liveStatus()
+		sources, sourceAsOf = p.sources.Status()
 	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -379,6 +379,9 @@ func (p *nodeProcess) report() collector.Report {
 	now := p.now()
 	if !sourceAsOf.IsZero() {
 		now = sourceAsOf
+	}
+	if live != nil && live.WindowStartedAt.After(now) {
+		now = live.WindowStartedAt
 	}
 	return collector.Report{Sequence: p.sequence, ObservedAt: now.UTC(), Facts: p.facts, Mechanisms: p.mechanisms, Budget: p.budget.Usage(now), Receipts: append([]collector.Receipt{}, p.receipts[:n]...), Sources: sources, Live: live}
 }

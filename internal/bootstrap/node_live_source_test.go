@@ -147,8 +147,8 @@ func TestLiveNodeProcessingCreditCountsFilteredEventsAndNeverWaits(t *testing.T)
 	if !b.take(now.Add(time.Second), 1) {
 		t.Fatal("finite refill")
 	}
-	if next := b.status(); next.ScanEvents != 1 || next.DeliveredRows != 0 || next.DeliveredBytes != 0 || next.RefusedAdmissions != 1 {
-		t.Fatal("live window did not reset only delivery counters", next)
+	if next := b.status(); next.ScanEvents != 2 || next.ScanBytes != 101 || next.DeliveredRows != 2 || next.DeliveredBytes != 120 || next.RefusedAdmissions != 1 {
+		t.Fatal("rate-limit refill reset cumulative live counters", next)
 	}
 	b.release()
 	if status := b.status(); status.Cohorts != 0 {

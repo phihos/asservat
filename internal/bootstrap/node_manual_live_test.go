@@ -113,6 +113,9 @@ func TestManualLiveActualFinitePacketHolderIsPassiveAndDoesNotRenew(t *testing.T
 	if e != nil || len(got.Rows) != 1 || got.Rows[0].Row.Packet == nil || got.Rows[0].Row.Packet.RemotePort != 8080 {
 		t.Fatal("original finite callback", got, e)
 	}
+	if status := processing.status(); status.DeliveredRows != 1 || status.DeliveredBytes <= 0 {
+		t.Fatal("manual delivery missing from live status", status)
+	}
 	encoded, _ := json.Marshal(got)
 	if strings.Contains(string(encoded), "CANARY") {
 		t.Fatal("raw user data entered approved live cohort")
@@ -365,7 +368,7 @@ func TestManualLiveSixteenSourcesCanRetainOneWholeRowWithinPrivateBudget(t *test
 	request := collector.LiveRead{Manual: &m, Limit: 2, ReplyBytes: (28 << 10) / 16}
 	wire, _ := node.WireLiveReply(id.Epoch, out)
 	raw, _ := json.Marshal(wire)
-	got, e := boundManualLiveReply(id.Epoch, request, out)
+	got, _, e := boundManualLiveReply(id.Epoch, request, out)
 	if e != nil || len(got.Rows) != 1 {
 		t.Fatal("sixteen-source private header consumed every whole row", len(raw), request.ReplyBytes, e, len(got.Rows))
 	}

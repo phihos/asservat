@@ -55,8 +55,9 @@ the existing work key; enqueue is not attach acknowledgement or complete-history
 proof. Node status retains its original source-set snapshot time, cumulative
 accounting and distinct natural Stopped/Closed/unknown-input facts on the existing
 fifteen-second cadence. When live viewing is enabled, an optional content-minimized
-live snapshot adds active cohorts, scan events/bytes/CPU, delivered rows/encoded
-bytes and cumulative refused cohort admissions, with no source/filter/payload labels.
+live snapshot adds active cohorts, the rate-limit window start and process-lifetime
+cumulative scan events/bytes/CPU, delivered rows/encoded bytes and refused cohort
+admissions, with no source/filter/payload labels.
 Public ongoing compilation, Save composition and installed source qualification
 remain gated as recorded in implementation progress.
 
