@@ -95,6 +95,42 @@ func TestProviderInstalledOwnerSeparatesSQLStorageAndNativeAuthentication(t *tes
 	}
 }
 
+func TestProviderOwnerFleetReadScope(t *testing.T) {
+	p := installedOwnerPlan()
+	p.FleetGuard = "fleet-settings-guard"
+	p.FleetSource = "fleet-settings"
+	w, err := BuildProviderOwnerWorkload(p, ownerID(2), ownerProviderInstalledSelection())
+	if err != nil {
+		t.Fatal(err)
+	}
+	configMaps, guards := 0, 0
+	for _, rule := range w.Role.Rules {
+		if slices.Contains(rule.ResourceNames, p.FleetSource) {
+			configMaps++
+			if !reflect.DeepEqual(rule.APIGroups, []string{""}) || !reflect.DeepEqual(rule.Resources, []string{"configmaps"}) || !reflect.DeepEqual(rule.Verbs, []string{"get", "update"}) {
+				t.Fatal("fleet source received unrelated Role authority", rule)
+			}
+		}
+		if slices.Contains(rule.ResourceNames, p.FleetGuard) {
+			t.Fatal("fleet guard is readable in the wrong scope", rule)
+		}
+	}
+	for _, rule := range w.ClusterRole.Rules {
+		if slices.Contains(rule.ResourceNames, p.FleetSource) {
+			t.Fatal("fleet source received cluster-wide authority", rule)
+		}
+		if slices.Contains(rule.ResourceNames, p.FleetGuard) {
+			guards++
+			if !reflect.DeepEqual(rule.APIGroups, []string{"admissionregistration.k8s.io"}) || !reflect.DeepEqual(rule.Resources, []string{"validatingadmissionpolicies", "validatingadmissionpolicybindings"}) || !reflect.DeepEqual(rule.Verbs, []string{"get"}) {
+				t.Fatal("fleet guard received unrelated ClusterRole authority", rule)
+			}
+		}
+	}
+	if configMaps != 1 || guards != 1 {
+		t.Fatalf("fleet read scope counts = (%d, %d), want (1, 1)", configMaps, guards)
+	}
+}
+
 func TestProviderInstalledOwnerRejectsCredentialScopeSubstitution(t *testing.T) {
 	for _, name := range []string{"secret-name", "missing-uid", "auth-path", "token-mount", "accessor", "cluster"} {
 		t.Run(name, func(t *testing.T) {

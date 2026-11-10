@@ -21,8 +21,8 @@ import (
 // plan. It exposes no Pod template, credential contents, RBAC rules or route.
 // Public/native projections are separate additions, never inferred from ports.
 type OwnerWorkloadPlan struct {
-	InstallationID, Namespace, Name, ServiceAccount  string
-	Configuration, Credentials, WorkloadGuard, Image string
+	InstallationID, Namespace, Name, ServiceAccount                           string
+	Configuration, Credentials, WorkloadGuard, FleetGuard, FleetSource, Image string
 }
 
 type OwnerWorkload struct {
@@ -45,6 +45,11 @@ func BuildOwnerWorkload(p OwnerWorkloadPlan) (*OwnerWorkload, error) {
 	}
 	for _, name := range []string{p.ServiceAccount, p.Configuration, p.Credentials, p.WorkloadGuard} {
 		if len(validation.IsDNS1123Subdomain(name)) != 0 {
+			return nil, cfg.ErrInvalid
+		}
+	}
+	for _, name := range []string{p.FleetGuard, p.FleetSource} {
+		if name != "" && len(validation.IsDNS1123Subdomain(name)) != 0 {
 			return nil, cfg.ErrInvalid
 		}
 	}

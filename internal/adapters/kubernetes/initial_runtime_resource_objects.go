@@ -45,7 +45,7 @@ func (s *InitialRuntimeResources) object(state contracts.InitialRuntimeResourceS
 	}
 	p := s.names
 	namespace := s.initial.Namespace.Name
-	ownerPlan := OwnerWorkloadPlan{InstallationID: s.initial.InstallationID, Namespace: namespace, Name: p.Owner, ServiceAccount: p.Owner, Configuration: p.OwnerInputs, Credentials: p.OwnerProviders, WorkloadGuard: p.WorkloadGuard, Image: s.preparer.plan.Workload.Image}
+	ownerPlan := OwnerWorkloadPlan{InstallationID: s.initial.InstallationID, Namespace: namespace, Name: p.Owner, ServiceAccount: p.Owner, Configuration: p.OwnerInputs, Credentials: p.OwnerProviders, WorkloadGuard: p.WorkloadGuard, FleetGuard: s.initial.FleetGuard.Name, FleetSource: s.initial.FleetSource.Name, Image: s.preparer.plan.Workload.Image}
 	workerPlan := HubWorkerWorkloadPlan{Namespace: namespace, Name: p.Worker, ServiceAccount: p.Worker, Configuration: p.WorkerInputs, Credentials: p.WorkerProviders, Image: s.preparer.plan.Workload.Image, FleetSource: s.initial.FleetSource.Name, OwnerSource: p.OwnerSource, FleetGuard: s.initial.FleetGuard.Name, OwnerGuard: p.OwnerSourceGuard, LeaderLease: p.Lease}
 	if !initialRuntimeProviderSelectionValid(s.initial.InstallationID, s.workerLayout, s.ownerLayout, s.workerProvider, s.ownerProvider) {
 		return initialRuntimeObject{}, cfg.ErrInvalid
