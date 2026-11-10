@@ -1,0 +1,20 @@
+2026-11-10T01:00:39.105608662Z owner port router: started (1)
+2026-11-10T01:00:39.105647277Z owner router: started (1)
+2026-11-10T01:00:39.105805470Z owner router: handoff observation (1)
+2026-11-10T01:00:39.106932534Z owner router: handoff native (1)
+2026-11-10T01:00:39.106941337Z owner router: unknown-name (1)
+2026-11-10T01:00:39.164400904Z owner router: unknown-name (2)
+2026-11-10T01:00:39.274780856Z owner router: handoff native (2)
+2026-11-10T01:00:39.362941818Z owner router: handoff observation (2)
+2026-11-10T01:00:42.561114253Z owner router: handoff observation (4)
+2026-11-10T01:00:42.772808382Z hub kube opening: guard checks: [current<reused]=4 [current<ReadWorkerConfiguration]=2 [current<DownloadPolicy]=2 [current<ReadClusterCatalog]=2 [ReadClusterCatalog<readPublicClusterCatalog]=1 [ReadWorkerConfiguration<newPublicDownloads]=1
+2026-11-10T01:00:48.465123219Z owner router: handoff observation (8)
+2026-11-10T01:00:51.273314650Z owner local claim timing: claim (1), pending@<100ms registration@<100ms native-claim@<500ms select@<100ms observe@<2s final@<100ms
+2026-11-10T01:00:52.773791103Z hub kube opening: guard checks: [boundaryLocal<beginLocal]=2 [boundaryLocal<Final]=2 [current<ReadClusterCatalog]=2 [ReadClusterCatalog<clusterCatalogChanged]=1
+2026-11-10T01:00:55.293237677Z owner local claim timing: claim (2), pending@<100ms registration@<100ms native-claim@<500ms select@<100ms observe@<2s final@<100ms
+2026-11-10T01:01:01.173237952Z owner router: handoff observation (16)
+2026-11-10T01:01:01.317300269Z owner router: handoff native (4)
+2026-11-10T01:01:02.773144873Z hub kube opening: guard checks: [boundaryLocal<beginLocal]=6 [boundaryLocal<Final]=5 [current<reused]=2
+2026-11-10T01:01:03.558901976Z owner local claim timing: claim (4), pending@<100ms registration@<100ms native-claim@<500ms select@<100ms observe@<2s final@<100ms
+2026-11-10T01:01:06.495037224Z owner observer 631 calls 810ms, operation 260 calls 430ms, readiness 548 calls 680ms, identity 3 calls 10ms, provider 12 calls 30ms, credentials 16 calls 20ms, context-start 27 calls 40ms total
+2026-11-10T01:01:07.279813578Z owner local claim refused: observe/conversation/registration-3/last-read/exchange/owner-read/final-native (changed)

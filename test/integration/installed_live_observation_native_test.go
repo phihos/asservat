@@ -50,6 +50,7 @@ type installedLiveRun struct {
 	Failover                                                        bool
 	Fanout                                                          bool
 	BeforeFailover                                                  func()
+	OtherCall                                                       installedLiveCall
 	Identity                                                        *installedIdentity
 	PublicRoot                                                      []byte
 	Address, Origin, RegionalConfig, ClusterID, Namespace, Workload string
@@ -95,7 +96,7 @@ func installedLiveSettings(in contracts.DownloadEnvironmentSettings, root, clust
 		}
 	}
 	out.Revision++
-	out.LiveRead = &contracts.LiveReadSettings{Root: contracts.LiveRootSettings{Watches: 4, PrincipalWatches: 2, WorkloadWatches: 2, Rate: 1 << 20, Burst: 1 << 20}, Projections: []string{v.Packet, v.Syscall, v.HTTP}, Clients: clients, Ceilings: []contracts.LiveReadCeiling{{ClusterID: cluster, Duration: 120, Output: 1 << 20, Rate: 64 << 10, Rows: 20, Buffer: 128 << 10, RowAge: 30, Replay: 5}}}
+	out.LiveRead = &contracts.LiveReadSettings{Root: contracts.LiveRootSettings{Watches: 3, PrincipalWatches: 2, WorkloadWatches: 3, Rate: 1 << 20, Burst: 1 << 20}, Projections: []string{v.Packet, v.Syscall, v.HTTP}, Clients: clients, Ceilings: []contracts.LiveReadCeiling{{ClusterID: cluster, Duration: 120, Output: 1 << 20, Rate: 64 << 10, Rows: 20, Buffer: 128 << 10, RowAge: 30, Replay: 5}}}
 	encoded, err := json.Marshal(out)
 	if err != nil || len(encoded) > contracts.DownloadEnvironmentMaxBytes {
 		return contracts.DownloadEnvironmentSettings{}, errors.New("delivery settings bound")
@@ -241,47 +242,63 @@ func qualifyInstalledLiveObservation(t *testing.T, ctx context.Context, c instal
 		return dial.DialContext(call, network, c.Address)
 	}}
 	defer transport.CloseIdleConnections()
-	client := sdk.NewClient(&sdk.Implementation{Name: "installed-live-observation", Version: "1"}, nil)
-	session, err := client.Connect(ctx, &sdk.StreamableClientTransport{Endpoint: strings.TrimSuffix(c.Origin, "/") + "/mcp", HTTPClient: &http.Client{Transport: installedJourneyBearer{transport, c.Identity.mcpTokenSource(c.Origin).Token}, Timeout: 45 * time.Second}, MaxRetries: -1, DisableStandaloneSSE: true}, nil)
-	if err != nil {
-		t.Fatal(err)
+	connect := func(identity *installedIdentity, name string) *sdk.ClientSession {
+		client := sdk.NewClient(&sdk.Implementation{Name: name, Version: "1"}, nil)
+		session, e := client.Connect(ctx, &sdk.StreamableClientTransport{Endpoint: strings.TrimSuffix(c.Origin, "/") + "/mcp", HTTPClient: &http.Client{Transport: installedJourneyBearer{transport, identity.mcpTokenSource(c.Origin).Token}, Timeout: 45 * time.Second}, MaxRetries: -1, DisableStandaloneSSE: true}, nil)
+		if e != nil {
+			t.Fatal(e)
+		}
+		return session
 	}
+	session := connect(c.Identity, "installed-live-observation")
 	defer session.Close()
 	wire, err := contracts.NewInvestigationContracts()
 	if err != nil {
 		t.Fatal(err)
 	}
 	liveCalls := 0
-	call := func(parent context.Context, name string, input any) (installedLiveReply, string, error) {
-		var zero installedLiveReply
-		raw, e := json.Marshal(input)
-		if e != nil || wire.ValidateInput(name, raw) != nil {
-			return zero, "", errors.New("invalid authored installed input")
-		}
-		// The service bounds each phase at five seconds itself.
-		bounded, stop := context.WithTimeout(parent, 25*time.Second)
-		defer stop()
-		reply, e := session.CallTool(bounded, &sdk.CallToolParams{Name: name, Arguments: input})
-		if e != nil {
-			return zero, "", e
-		}
-		envelope, code, e := installedJourneyReplyCode(wire, name, reply)
-		if e != nil {
-			return zero, "", e
-		}
-		raw, e = json.Marshal(reply.StructuredContent)
-		if e != nil || json.Unmarshal(raw, &zero) != nil {
-			return zero, "", errors.New("installed live result shape")
-		}
-		zero.installedJourneyEnvelope = envelope
-		if strings.HasSuffix(name, "live_watch") || name == "list_live_sources" {
-			liveCalls++
-			if liveCalls > 100 {
-				return zero, "", errors.New("bounded live operation count exceeded")
+	callOn := func(session *sdk.ClientSession) installedLiveCall {
+		return func(parent context.Context, name string, input any) (installedLiveReply, string, error) {
+			var zero installedLiveReply
+			raw, e := json.Marshal(input)
+			if e != nil || wire.ValidateInput(name, raw) != nil {
+				return zero, "", errors.New("invalid authored installed input")
 			}
+			// The service bounds each phase at five seconds itself.
+			bounded, stop := context.WithTimeout(parent, 25*time.Second)
+			defer stop()
+			reply, e := session.CallTool(bounded, &sdk.CallToolParams{Name: name, Arguments: input})
+			if e != nil {
+				return zero, "", e
+			}
+			envelope, code, e := installedJourneyReplyCode(wire, name, reply)
+			if e != nil {
+				return zero, "", e
+			}
+			raw, e = json.Marshal(reply.StructuredContent)
+			if e != nil || json.Unmarshal(raw, &zero) != nil {
+				return zero, "", errors.New("installed live result shape")
+			}
+			zero.installedJourneyEnvelope = envelope
+			if strings.HasSuffix(name, "live_watch") || name == "list_live_sources" {
+				liveCalls++
+				if liveCalls > 100 {
+					return zero, "", errors.New("bounded live operation count exceeded")
+				}
+			}
+			return zero, code, nil
 		}
-		return zero, code, nil
 	}
+	call := callOn(session)
+	if c.Identity.ReviewerSubject == "" {
+		t.Fatal("distinct installed live reviewer required")
+	}
+	reviewerKC := *c.Identity.kc
+	reviewerKC.username = "reviewer"
+	reviewer := &installedIdentity{kc: &reviewerKC, Issuer: c.Identity.Issuer, RootPEM: c.Identity.RootPEM, ReviewerSubject: c.Identity.ReviewerSubject}
+	otherSession := connect(reviewer, "installed-live-second-principal")
+	defer otherSession.Close()
+	c.OtherCall = callOn(otherSession)
 	invoke := installedRecordingInvoke(func(callCtx context.Context, name string, input any) (installedJourneyEnvelope, string, error) {
 		r, code, e := call(callCtx, name, input)
 		return r.installedJourneyEnvelope, code, e
@@ -392,8 +409,8 @@ func installedLiveRestartOwner(t *testing.T, ctx context.Context, c installedLiv
 
 func installedLiveMCP(t *testing.T, ctx context.Context, db *pgxpool.Pool, root string, source installedLiveFixture, call installedLiveCall, run installedLiveRun) error {
 	t.Helper()
-	must := func(name string, args any, out any) (installedLiveReply, error) {
-		r, code, e := call(ctx, name, args)
+	mustOn := func(invoke installedLiveCall, name string, args any, out any) (installedLiveReply, error) {
+		r, code, e := invoke(ctx, name, args)
 		// A retryable refusal (for example a source lease renewing) failed only
 		// that call; retry it a bounded number of times and record each one.
 		for attempt := 1; e == nil && code == "LiveUnavailable" && attempt <= 5; attempt++ {
@@ -407,7 +424,7 @@ func installedLiveMCP(t *testing.T, ctx context.Context, db *pgxpool.Pool, root 
 			if e = installedJourneyPause(ctx, time.Second); e != nil {
 				return r, e
 			}
-			r, code, e = call(ctx, name, args)
+			r, code, e = invoke(ctx, name, args)
 		}
 		if e != nil || code != "" || r.Status != "ok" {
 			return r, fmt.Errorf("installed live %s: %s %w", name, code, e)
@@ -416,6 +433,9 @@ func installedLiveMCP(t *testing.T, ctx context.Context, db *pgxpool.Pool, root 
 			return r, errors.New("installed live typed result")
 		}
 		return r, nil
+	}
+	must := func(name string, args any, out any) (installedLiveReply, error) {
+		return mustOn(call, name, args, out)
 	}
 	// A just-armed source may still be warming; wait a bounded time for the
 	// same original source to become eligible, never for a replacement.
@@ -539,29 +559,84 @@ func installedLiveMCP(t *testing.T, ctx context.Context, db *pgxpool.Pool, root 
 		return errors.New("public accounting differs from actual minimized ledger")
 	}
 	if run.Fanout {
-		var active int
-		if e = db.QueryRow(ctx, `SELECT count(*) FROM live_watch_control WHERE root_id=$1 AND state IN ('Active','Paused','Disconnected')`, root).Scan(&active); e != nil || active != 2 {
+		var active, principals int
+		activeQuery := `SELECT count(*),count(DISTINCT principal_key) FROM live_watch_control WHERE root_id=$1 AND state IN ('Active','Paused','Disconnected')`
+		if e = db.QueryRow(ctx, activeQuery, root).Scan(&active, &principals); e != nil || active != 2 || principals != 1 {
 			return errors.New("principal ceiling fixture did not retain React and MCP views")
+		}
+		refuse := func(invoke installedLiveCall, input map[string]any) error {
+			refusal, code, err := invoke(ctx, "open_live_watch", input)
+			var failure struct {
+				Retryable bool `json:"retryable"`
+			}
+			if err != nil || code != "CapacityUnavailable" || refusal.Status != "error" || json.Unmarshal(refusal.Data, &failure) != nil || failure.Retryable {
+				return fmt.Errorf("open returned %s: %w", code, err)
+			}
+			return nil
 		}
 		thirdInput := make(map[string]any, len(request))
 		for key, value := range request {
 			thirdInput[key] = value
 		}
 		thirdInput["idempotency_key"] = "live-ceiling-third-" + source.SourceID
-		refusal, code, e := call(ctx, "open_live_watch", thirdInput)
-		var failure struct {
-			Retryable bool `json:"retryable"`
+		if e := refuse(call, thirdInput); e != nil {
+			return fmt.Errorf("third concurrent view was not refused by the principal ceiling: %w", e)
 		}
-		if e != nil || code != "CapacityUnavailable" || refusal.Status != "error" || json.Unmarshal(refusal.Data, &failure) != nil || failure.Retryable {
-			return fmt.Errorf("third concurrent view was not refused by the principal ceiling: %s %w", code, e)
-		}
-		if e = db.QueryRow(ctx, `SELECT count(*) FROM live_watch_control WHERE root_id=$1 AND state IN ('Active','Paused','Disconnected')`, root).Scan(&active); e != nil || active != 2 {
+		if e = db.QueryRow(ctx, activeQuery, root).Scan(&active, &principals); e != nil || active != 2 || principals != 1 {
 			return errors.New("principal ceiling refusal changed the original views")
+		}
+		if run.OtherCall == nil {
+			return errors.New("distinct principal session missing")
+		}
+		var otherPage v.SourcePage
+		if _, e = mustOn(run.OtherCall, "list_live_sources", map[string]any{"target_ref": source.Target, "limit": 20}, &otherPage); e != nil {
+			return e
+		}
+		otherHandle := ""
+		for _, candidate := range otherPage.Sources {
+			if candidate.ID == source.SourceID && candidate.Eligible && candidate.PodUID == source.PodUID && candidate.ActionID == source.ActionID {
+				otherHandle = candidate.Handle
+			}
+		}
+		if otherHandle == "" || otherHandle == selected.Handle {
+			return errors.New("distinct principal did not receive its own original-source handle")
+		}
+		otherRequest := map[string]any{"source_handles": []string{otherHandle}, "projection": source.Projection, "idempotency_key": "live-installed-other-" + source.SourceID, "duration_seconds": 90, "max_output_bytes": 256 << 10}
+		var otherWatch v.Watch
+		if _, e = mustOn(run.OtherCall, "open_live_watch", otherRequest, &otherWatch); e != nil {
+			return e
+		}
+		if !slices.Equal(otherWatch.SourceIDs, []string{source.SourceID}) || otherWatch.Cursor == nil || !source.HardUntil.IsZero() && otherWatch.ExpiresAt.After(source.HardUntil) {
+			return errors.New("distinct principal watch extended or replaced original source")
+		}
+		if e = db.QueryRow(ctx, activeQuery, root).Scan(&active, &principals); e != nil || active != 3 || principals != 2 {
+			return errors.New("distinct principal did not fill the third installation slot")
+		}
+		otherRefusal := make(map[string]any, len(otherRequest))
+		for key, value := range otherRequest {
+			otherRefusal[key] = value
+		}
+		otherRefusal["idempotency_key"] = "live-installation-ceiling-" + source.SourceID
+		if e := refuse(run.OtherCall, otherRefusal); e != nil {
+			return fmt.Errorf("fourth concurrent view was not refused by the shared installation/workload ceiling below the principal limit: %w", e)
+		}
+		if e = db.QueryRow(ctx, activeQuery, root).Scan(&active, &principals); e != nil || active != 3 || principals != 2 {
+			return errors.New("shared ceiling refusal changed the original views")
+		}
+		otherBefore := otherWatch
+		if _, e = mustOn(run.OtherCall, "close_live_watch", map[string]any{"watch_id": otherWatch.ID, "expected_revision": otherWatch.Revision, "idempotency_key": "live-close-other-" + source.SourceID}, &otherWatch); e != nil {
+			return e
+		}
+		if otherWatch.ID != otherBefore.ID || otherWatch.State != "Closed" || !otherWatch.ExpiresAt.Equal(otherBefore.ExpiresAt) {
+			return errors.New("distinct principal close changed the original watch")
+		}
+		if e = db.QueryRow(ctx, activeQuery, root).Scan(&active, &principals); e != nil || active != 2 || principals != 1 {
+			return errors.New("distinct principal close did not release the installation slot")
 		}
 		if run.BeforeFailover != nil {
 			run.BeforeFailover()
 		}
-		t.Log("installed live principal ceiling: third concurrent view refused CapacityUnavailable; React and MCP views retained")
+		t.Log("installed live shared ceiling: two principals held three installation/workload slots; fourth view refused below the principal limit; other-principal close released its slot")
 	}
 	closeInput := map[string]any{"watch_id": watch.ID, "expected_revision": watch.Revision, "idempotency_key": "live-close-" + source.SourceID}
 	if run.Failover {
