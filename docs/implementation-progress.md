@@ -1,5 +1,24 @@
 # Sustained implementation progress
 
+## Sustained live cohort delivery without recorder backpressure (2026-11-10)
+
+The actual existing-source cohort test now drives 2,000 timestamped frames
+through bounded live reads, then 1,000 frames under reader lag. Cursor/loss
+counters remain monotonic, approved batches may be sampled or empty under the
+100 ms live CPU ceiling, and all 3,001 frames remain charged to the original
+recorder. Replay and payload remain bounded, and closing leaves the source's
+original permit active. This is test-only qualification with no production
+change.
+
+- [Component evidence](../test/results/live-cohort-throughput/README.md): the
+  race-enabled libpcap test passed all 20 runs in 73.412 seconds. Full
+  `make pre-push` also passed, including affected libpcap/integration tests and
+  all 611 console tests. Earlier exact-batch/zero-loss and stale-timestamp fixture
+  assumptions were rejected rather than weakening the lifecycle assertions.
+
+This is not installed/native or operator-metrics qualification. The broader
+specification remains active.
+
 ## Isolated live-workload ceiling (2026-11-10)
 
 The real-PostgreSQL live-watch fixture now isolates the workload ceiling from
