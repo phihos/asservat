@@ -8,14 +8,16 @@ rows and buffered pending-row occupancy without content labels.
 [Screenshot](../console-browser/live-capacity.png).
 
 Pending rows are shared-buffer occupancy, not exact per-viewer lag. Active
-viewers is the exact count of unexpired Active, Paused and Disconnected watch
-control records for the selected cluster; it is distinct from node-reported
-cohorts. Source-loss and reply-drop rates use report-to-report counter deltas
+viewers is the exact count of distinct unexpired Active, Paused and
+Disconnected watch control records with current trust, an active owner
+enrollment and an activated unexpired certificate; it is distinct from
+node-reported cohorts. Source-loss and reply-drop rates use report-to-report counter deltas
 and are withheld when any current live-enabled node lacks a valid predecessor.
 
-[Real PostgreSQL evidence](../live-viewer-capacity.log) covers active/closed
-counts, cluster isolation and migration rollback under the compiled hub role,
-with unchanged sources and no cleanup failures.
+[Real PostgreSQL evidence](../live-viewer-capacity-fixed.log) covers
+active/closed counts, retired-owner exclusion, cluster isolation and migration
+rollback under the compiled hub role, with unchanged sources and no cleanup
+failures.
 
 The operation has application and presentation tests for current fleet
 operator/administration/recovery checks, unknown clusters, incomplete rates,

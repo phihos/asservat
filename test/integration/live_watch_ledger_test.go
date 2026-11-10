@@ -193,6 +193,10 @@ func TestLiveWatchLedgerWithRealServices(t *testing.T) {
 	if _, err = tx.Exec(ctx, "SET LOCAL ROLE "+pgx.Identifier{role}.Sanitize()); err != nil {
 		t.Fatal("compiled role retirement control", err)
 	}
+	var retiredViewers int
+	if err = tx.QueryRow(ctx, `SELECT live_watch_viewers($1,$2)`, ownerPool.InstallationID, ownerPool.ClusterID).Scan(&retiredViewers); err != nil || retiredViewers != 0 {
+		t.Fatal("retired owner remained an active viewer", retiredViewers, err)
+	}
 	var ignored string
 	err = tx.QueryRow(ctx, `SELECT installation_id::text FROM live_watch_owner($1,$2,$3,NULL)`, root, c.PrincipalKey[:], c.ID).Scan(&ignored)
 	var unavailable *pgconn.PgError
@@ -397,5 +401,5 @@ func TestLiveWatchLedgerWithRealServices(t *testing.T) {
 		}
 	}
 
-	t.Log("real compiled hub control facets + independently audited current owner: original receipts, exact active/closed viewer counts with cluster isolation, installation root uniqueness, isolated workload ceiling/release, one slot, per-watch/three-account charges, rollback, close/reopen debt, original expiry; no native/source/installed qualification")
+	t.Log("real compiled hub control facets + independently audited current owner: original receipts, exact active/closed/retired-owner viewer counts with cluster isolation, installation root uniqueness, isolated workload ceiling/release, one slot, per-watch/three-account charges, rollback, close/reopen debt, original expiry; no native/source/installed qualification")
 }

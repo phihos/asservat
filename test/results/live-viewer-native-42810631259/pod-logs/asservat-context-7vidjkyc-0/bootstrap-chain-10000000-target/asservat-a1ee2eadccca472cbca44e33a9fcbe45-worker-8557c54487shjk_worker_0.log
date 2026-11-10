@@ -1,0 +1,69 @@
+2026-11-10T11:56:45.735932753Z I1110 11:56:45.735777       1 leaderelection.go:258] "Attempting to acquire leader lease..." lock="asservat configuration reconciliation"
+2026-11-10T11:56:45.746777433Z I1110 11:56:45.746595       1 leaderelection.go:272] "Successfully acquired lease" lock="asservat configuration reconciliation"
+2026-11-10T11:56:45.752004817Z capacity waiting: projection hint pending
+2026-11-10T11:57:13.822273234Z hub-worker context deadlines: deadline observation unavailable
+2026-11-10T11:57:13.822297459Z hub-worker context deletion: waiting for the capacity projection
+2026-11-10T11:57:13.832780151Z hub-worker policy grant settings: unavailable
+2026-11-10T11:57:13.880740242Z hub-worker retention: reconciler/store.begin/client (unavailable)
+2026-11-10T11:57:13.887055096Z hub-worker worker configuration: source (unavailable)
+2026-11-10T11:57:23.825933551Z hub-worker policy grant settings: ok
+2026-11-10T11:57:29.082400598Z hub-worker worker configuration: ok
+2026-11-10T11:57:37.913401290Z capacity waiting: projection mount pending
+2026-11-10T11:57:41.475414745Z capacity started with 0 regional clusters
+2026-11-10T11:57:43.829593033Z hub-worker context deadlines: ok
+2026-11-10T11:57:43.833834064Z capacity local observation capacity-namespace-candidates: ok after 2.36s
+2026-11-10T11:57:43.833853360Z capacity local discovery: steps=1 candidates=0 namespace-index=0 namespace-count=10 kind-index=0 workload-index=0 workload-count=0
+2026-11-10T11:57:45.222387076Z capacity local observation capacity-workload-candidates: ok after 1.14s
+2026-11-10T11:57:59.204517044Z capacity root: unavailable
+2026-11-10T11:57:59.574102766Z capacity local observation capacity-namespace-guard: ok after 1.55s
+2026-11-10T11:58:01.213402786Z capacity local observation capacity-workload: refused (unavailable) after 1.64s
+2026-11-10T11:58:01.213424467Z capacity local workload: workload (unavailable) after 3.2s
+2026-11-10T11:58:02.705543712Z capacity local observation capacity-workload-candidates: ok after 990ms
+2026-11-10T11:58:04.574705109Z capacity local observation capacity-namespace-guard: ok after 1.61s
+2026-11-10T11:58:05.463862857Z capacity local observation capacity-workload: refused (unavailable) after 890ms
+2026-11-10T11:58:07.373643645Z capacity local observation capacity-namespace-guard: ok after 1.65s
+2026-11-10T11:58:08.991929313Z capacity local observation capacity-workload: ok after 1.62s
+2026-11-10T11:58:08.991954082Z capacity local workload: compose/permission-scope (not-allocated) after 3.28s
+2026-11-10T11:58:11.064506810Z capacity local observation capacity-namespace-guard: post (unavailable) after 1.81s
+2026-11-10T11:58:11.064754833Z capacity local workload: guard-read (unavailable) after 1.82s
+2026-11-10T11:58:11.338908950Z capacity local observation capacity-namespace-guard: dial (unavailable) after 10ms
+2026-11-10T11:58:11.858569224Z capacity local observation capacity-workload-candidates: dial (unavailable) after 10ms
+2026-11-10T11:58:13.927059797Z capacity local discovery: steps=29 candidates=6 namespace-index=4 namespace-count=10 kind-index=1 workload-index=0 workload-count=0
+2026-11-10T11:58:18.579879713Z capacity local observation capacity-workload-candidates: verify (denied) after 2.58s
+2026-11-10T11:58:20.084528755Z capacity local observation capacity-workload-candidates: ok after 1.25s
+2026-11-10T11:58:26.476832040Z capacity local observation capacity-namespace-guard: selected (unavailable) after 370ms
+2026-11-10T11:58:26.478903736Z capacity clusters changed; capacity restarts with the new set
+2026-11-10T11:58:27.689090990Z capacity started with 1 regional clusters
+2026-11-10T11:58:28.738015655Z capacity local observation capacity-namespace-candidates: ok after 1.05s
+2026-11-10T11:58:28.738264621Z capacity local discovery: steps=1 candidates=0 namespace-index=0 namespace-count=10 kind-index=0 workload-index=0 workload-count=0
+2026-11-10T11:58:29.879761764Z capacity regional cfbdc064-7f4e-4d07-9ec4-ee4f48ce83de observation capacity-namespace-candidates: ok after 2.19s
+2026-11-10T11:58:29.879787822Z capacity regional cfbdc064-7f4e-4d07-9ec4-ee4f48ce83de discovery: steps=1 candidates=0 namespace-index=0 namespace-count=10 kind-index=0 workload-index=0 workload-count=0
+2026-11-10T11:58:30.386411817Z capacity local observation capacity-workload-candidates: ok after 1.4s
+2026-11-10T11:58:33.960131482Z capacity regional cfbdc064-7f4e-4d07-9ec4-ee4f48ce83de observation capacity-workload-candidates: ok after 2.08s
+2026-11-10T11:58:38.094720101Z capacity regional cfbdc064-7f4e-4d07-9ec4-ee4f48ce83de observation capacity-guarded-workload: ok after 2.13s
+2026-11-10T11:58:38.602913142Z capacity regional cfbdc064-7f4e-4d07-9ec4-ee4f48ce83de workload: ok after 2.64s
+2026-11-10T11:58:42.660079386Z capacity regional cfbdc064-7f4e-4d07-9ec4-ee4f48ce83de observation capacity-workload-candidates: ok after 2.05s
+2026-11-10T11:58:44.663440729Z capacity local observation capacity-namespace-guard: ok after 1.49s
+2026-11-10T11:58:46.098914878Z capacity local observation capacity-workload: post (unavailable) after 1.44s
+2026-11-10T11:58:46.098941228Z capacity local workload: workload (unavailable) after 2.94s
+2026-11-10T11:58:46.304818758Z capacity regional cfbdc064-7f4e-4d07-9ec4-ee4f48ce83de observation capacity-workload-candidates: claim/post (unavailable) until-authority/registry-current=2026-11-10T11:58:49.114751Z after 1.63s
+2026-11-10T11:58:46.668817094Z capacity local observation capacity-workload-candidates: dial (unavailable) after 70ms
+2026-11-10T11:58:48.330150483Z capacity regional cfbdc064-7f4e-4d07-9ec4-ee4f48ce83de observation capacity-workload-candidates: routes (unavailable) after 20ms
+2026-11-10T11:58:54.677079737Z capacity local observation capacity-workload-candidates: verify (denied) after 2.54s
+2026-11-10T11:58:56.470141826Z capacity local observation capacity-workload-candidates: ok after 1.54s
+2026-11-10T11:58:57.199535215Z capacity regional cfbdc064-7f4e-4d07-9ec4-ee4f48ce83de observation capacity-workload-candidates: ok after 2.84s
+2026-11-10T11:58:59.315880289Z capacity local discovery: steps=39 candidates=1 namespace-index=6 namespace-count=10 kind-index=2 workload-index=0 workload-count=0
+2026-11-10T11:59:01.267024856Z capacity regional cfbdc064-7f4e-4d07-9ec4-ee4f48ce83de discovery: steps=10 candidates=1 namespace-index=1 namespace-count=10 kind-index=1 workload-index=0 workload-count=0
+2026-11-10T11:59:03.993992820Z capacity regional cfbdc064-7f4e-4d07-9ec4-ee4f48ce83de observation capacity-workload-candidates: claim/post (unavailable) until-authority/registry-current=2026-11-10T11:59:07.381609Z after 720ms
+2026-11-10T11:59:06.189707434Z capacity local observation capacity-namespace-guard: ok after 2.68s
+2026-11-10T11:59:06.235831054Z capacity local observation capacity-workload: selected (unavailable) after 50ms
+2026-11-10T11:59:08.405674776Z capacity local observation capacity-workload-candidates: ok after 1.92s
+2026-11-10T11:59:08.505460041Z capacity regional cfbdc064-7f4e-4d07-9ec4-ee4f48ce83de observation capacity-workload-candidates: ok after 2.51s
+2026-11-10T11:59:10.707438749Z capacity regional cfbdc064-7f4e-4d07-9ec4-ee4f48ce83de observation capacity-guarded-workload: claim/post (unavailable) until-authority/caller=2026-11-10T11:59:12.519486388Z after 3.19s
+2026-11-10T11:59:10.707460219Z capacity demand refresh: guarded-read (unavailable) after 3.19s, read left 0s [guarded-read=3.19s o-candidates@<100ms o-routes@<100ms o-locate@<2s c-open@<100ms c-before@<100ms o-claim@<2s]
+2026-11-10T11:59:10.928580863Z capacity source: protection/source.probe-object-shape (changed)
+2026-11-10T11:59:11.013306689Z capacity regional cfbdc064-7f4e-4d07-9ec4-ee4f48ce83de observation capacity-guarded-workload: routes (unavailable) after 40ms
+2026-11-10T11:59:11.013324402Z capacity demand refresh: guarded-read (unavailable) after 40ms, read left 0s [guarded-read=40ms o-candidates@<100ms o-routes@<100ms]
+2026-11-10T11:59:11.155412175Z capacity local observation capacity-workload-candidates: dial (unavailable) after 20ms
+2026-11-10T11:59:11.272575164Z capacity demand refresh: guarded-read (unavailable) after 10ms, read left 0s [guarded-read=10ms o-candidates@<100ms o-routes@<100ms]
+2026-11-10T11:59:11.531311849Z capacity demand refresh: guarded-read (unavailable) after 10ms, read left 0s [guarded-read=10ms o-candidates@<100ms o-routes@<100ms]

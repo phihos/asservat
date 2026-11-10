@@ -4,9 +4,11 @@
 
 The administrator capacity operation now reports exact active viewers for the
 selected cluster alongside the distinct node-reported source/projection cohorts.
-The count covers unexpired Active, Paused and Disconnected watch control records
-and uses their existing owner-enrollment cluster mapping. No principal, source,
-workload or viewer identity is returned.
+The count covers distinct unexpired Active, Paused and Disconnected watch
+control records only while current trust, their owner enrollment and an
+activated unexpired certificate still resolve that owner. It uses the existing
+owner-enrollment cluster mapping. No principal, source, workload or viewer
+identity is returned.
 
 Migration 00148 adds one read-only SQL function and no table/column or retained
 record changes. The adapter reuses the existing hub credential and pool; it adds
@@ -14,23 +16,32 @@ no role, connection, watch, background task or polling. Its freshness deadline
 bounds the reply alongside regional runtime, fleet administration, recovery and
 caller validity before the final identity recheck.
 
-- Full `make pre-push` passed, including 613 console tests and affected race
-  shards. Presentation, application, bootstrap and React tests cover the gauge,
-  viewer outage, freshness and regenerated closed contract.
-- [Real SQL evidence](../test/results/live-viewer-capacity.log): both intended
-  tests passed in 27.537 s. The compiled hub role counted one active then zero
-  closed viewers and isolated another cluster. Migration 00148 Up/Down/Up passed
-  without changing retained records. The
-  [environment](../test/results/live-viewer-capacity-environment.json) records
-  unchanged sources, exit 0 and no cleanup failures.
+- The initial full `make pre-push` passed, including 613 console tests and
+  affected race shards. Presentation, application, bootstrap and React tests
+  cover the gauge, viewer outage, freshness and regenerated closed contract.
+  The owner-liveness correction then passed its focused real-SQL and packaged
+  browser checks again. A later full gate reached unrelated accepted-policy
+  fixtures whose fixed 2026-10-11 creation plus 30-day validity had just expired;
+  those untouched fixtures fail on `main` too and were not changed here.
+- [Real SQL evidence](../test/results/live-viewer-capacity-fixed.log): both
+  intended tests passed in 26.948 s. The compiled hub role counted one active
+  then zero closed viewers, excluded a retired owner and isolated another
+  cluster. Migration 00148 Up/Down/Up passed without changing retained records.
+  The [environment](../test/results/live-viewer-capacity-fixed-environment.json)
+  records unchanged sources, exit 0 and no cleanup failures. An
+  [earlier regression](../test/results/live-viewer-retired-red.log) failed with
+  one viewer still counted after owner retirement; the liveness/distinct-ID fix
+  resolved that review finding.
 
 - `make console-browser-check` passed 29 journeys and 28 accessibility scans.
   The actual built React/Go HTTPS page renders exact active viewers separately
   from cohorts through the canonical operation and regenerated closed contract.
 
 This is exact component accounting, not a fleet-administrator installed
-multi-node measurement. Final-head CI and independent review are separate;
-the broader specification remains active.
+multi-node measurement. [Native attempt 42810631259](../test/results/live-viewer-native-42810631259/README.md)
+failed an earlier browser `SourceUnavailable` episode and is not a pass; the
+corrected head needs its own installed run. Final-head CI and independent review
+are separate; the broader specification remains active.
 
 ## Live loss, reply-drop and pending-row capacity metrics (2026-11-10)
 
