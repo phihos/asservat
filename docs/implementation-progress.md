@@ -1,5 +1,31 @@
 # Sustained implementation progress
 
+## Private live-runtime aggregate query (2026-11-10)
+
+C-19 now aggregates current per-node live totals and report-to-report rates for
+one cluster. The existing idle regional query `read-live-runtime` returns the
+content-free aggregate with its original five-second receiver bound, without
+node, workload, principal, source, filter or payload labels. Current totals come
+only from fresh reports. Rates require a valid predecessor for every current
+live-enabled node; a first report, rollback or missing predecessor suppresses
+the complete rate set rather than returning a partial installation-wide value.
+
+The implementation retains one six-value rate struct per enrolled node and adds
+no storage, goroutine, timer, credential or background API call. An explicit
+query uses the existing framed regional path. Multi-node aggregation, disabled
+and stale reports, incomplete rates, wrong-cluster/expired answers and actual
+framed queries have regressions.
+
+- Full `make pre-push` passed, including affected Go/integration tests and all
+  611 console tests. `go test -race ./internal/application/delivery
+  ./internal/transport/contextstart` also passed. The first gate run rejected
+  two hand-built validity windows; typed `identity.Window` checks replaced them
+  and the final authority-window gate passed.
+
+This is a private component read path, not a public administrator operation,
+browser capacity view or installed multi-node measurement. Those remain next;
+the broader specification remains active.
+
 ## Content-minimized live node runtime counters (2026-11-10)
 
 The existing I-02 node status now carries an optional live-runtime snapshot when

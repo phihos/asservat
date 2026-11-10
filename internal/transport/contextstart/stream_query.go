@@ -8,6 +8,7 @@ import (
 
 	auditapp "asservat.local/asservat/internal/application/audit"
 	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/collector"
 	"asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
 	livevalue "asservat.local/asservat/internal/domain/live"
@@ -556,6 +557,16 @@ func (s *frameStream) answerQuery(ctx context.Context, f contracts.APIContextFra
 		}
 		if recorders, ok := s.targets.(RecorderTargets); ok && r.Valid() {
 			out, e = recorders.PacketRecorder(bounded, r)
+		} else {
+			e = targets.ErrUnsupported
+		}
+	case queryReadLiveRuntime:
+		var r collector.LiveRuntimeRequest
+		if decodeOperationBody(q.Body, &r) != nil || !r.Valid() {
+			return contracts.ErrAPIContextProtocol
+		}
+		if resolver, ok := s.targets.(LiveRuntimeTargetResolver); ok {
+			out, e = resolver.ResolveLiveRuntime(bounded, r)
 		} else {
 			e = targets.ErrUnsupported
 		}

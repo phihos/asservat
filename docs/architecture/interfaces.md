@@ -57,7 +57,12 @@ accounting and distinct natural Stopped/Closed/unknown-input facts on the existi
 fifteen-second cadence. When live viewing is enabled, an optional content-minimized
 live snapshot adds active cohorts, the rate-limit window start and process-lifetime
 cumulative scan events/bytes/CPU, delivered rows/encoded bytes and refused cohort
-admissions, with no source/filter/payload labels.
+admissions, with no source/filter/payload labels. C-19 also aggregates current
+node totals and report-to-report rates per cluster. The existing idle regional
+query `read-live-runtime` returns that bounded aggregate without node labels;
+a first report, nonmonotonic counter or missing predecessor makes all rates
+explicitly incomplete instead of presenting a partial installation-wide rate.
+The public administrator capacity view remains pending.
 Public ongoing compilation, Save composition and installed source qualification
 remain gated as recorded in implementation progress.
 

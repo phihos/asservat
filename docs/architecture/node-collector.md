@@ -36,7 +36,10 @@ nothing yet; increment 4 adds the first recorder.
 4. Status: one report immediately, then every 15 s (S9), sooner but at least 1 s apart when work
    receipts are pending. A report carries the facts, the per-mechanism assessment, the node budget
    and receipts. The connector keeps only the latest report per node, in memory; a node without a
-   report for 45 s is not current.
+   report for 45 s is not current. For optional live-runtime status, it also retains
+   the latest report-to-report rates in memory. `read-live-runtime` aggregates
+   current totals/rates over the existing idle regional query with no node labels;
+   incomplete predecessors suppress the whole rate set, not acquisition or reports.
 5. Work: the collector long-polls (25 s hold) for work after its last sequence. Kinds are
    `armSource`, `stopSource`, `snapshot`, `peerGeneration` (no producer; refused with
    `RecorderNotImplemented`, `WorkExpired` or `WorkUnknown`) and `packetCapture`
