@@ -339,6 +339,29 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 	}
 	var originalRawGrantShape, originalRawGrantGuard, originalRawAuditFunctions string
 	const rawAuditFunctions = `SELECT pg_get_functiondef('public.operation_audit_lane(text)'::regprocedure)||pg_get_functiondef('public.operation_audit_human_input_valid(text,text)'::regprocedure)`
+	var originalSearchAuditFunctions string
+	checkSearchAudit := func(wantLane string) {
+		t.Helper()
+		var lane string
+		var contextValid, otherInputsRefused, previousValid bool
+		if err := conn.QueryRow(ctx, `SELECT
+ COALESCE(public.operation_audit_lane('search_processing_evidence'),''),
+ public.operation_audit_human_input_valid('search_processing_evidence','context-input/v1'),
+ public.operation_audit_human_input_valid('search_processing_evidence','invalid-input/v1') IS FALSE
+ AND public.operation_audit_human_input_valid('search_processing_evidence','processing-input/v1') IS FALSE
+ AND public.operation_audit_human_input_valid('search_processing_evidence',NULL) IS FALSE,
+ public.operation_audit_lane('get_live_capacity')='normal'
+ AND public.operation_audit_human_input_valid('get_live_capacity','context-input/v1')
+ AND public.operation_audit_human_input_valid('get_live_capacity','invalid-input/v1')`).Scan(&lane, &contextValid, &otherInputsRefused, &previousValid); err != nil || lane != wantLane || contextValid != (wantLane == "normal") || !otherInputsRefused || !previousValid {
+			t.Fatal("processing evidence search audit admission", lane, contextValid, otherInputsRefused, previousValid, err)
+		}
+	}
+	if head == 150 {
+		if e = conn.QueryRow(ctx, rawAuditFunctions).Scan(&originalSearchAuditFunctions); e != nil {
+			t.Fatal("previous processing evidence search audit definitions", e)
+		}
+		checkSearchAudit("")
+	}
 	const rawGrantShape = `SELECT jsonb_build_object('constraints',(SELECT jsonb_agg(x ORDER BY x) FROM (SELECT pg_get_constraintdef(oid) x FROM pg_constraint WHERE conrelid IN ('access_grant'::regclass,'access_grant_child'::regclass)) q),'columns',(SELECT jsonb_agg(to_jsonb(c) ORDER BY c.table_name,c.ordinal_position) FROM (SELECT table_name,column_name,ordinal_position,is_nullable,data_type FROM information_schema.columns WHERE table_schema='public' AND table_name IN ('access_grant','access_grant_child')) c))::text`
 	if head == 131 {
 		if e = conn.QueryRow(ctx, rawAuditFunctions).Scan(&originalRawAuditFunctions); e != nil {
@@ -412,6 +435,25 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 	}
 	if from, to, e = upgrade.Run(ctx); e != nil || from != head || to != head {
 		t.Fatal("repeated upgrade was not a no-op", from, to, e)
+	}
+	if head == 150 {
+		if state.Floor != 149 || !state.Compatible(149) {
+			t.Fatal("processing evidence search raised the compatibility floor", state)
+		}
+		checkSearchAudit("normal")
+		if _, e = p.DownTo(ctx, head-1); e != nil {
+			t.Fatal("empty processing evidence search Down", e)
+		}
+		var restored string
+		if e = conn.QueryRow(ctx, rawAuditFunctions).Scan(&restored); e != nil || restored != originalSearchAuditFunctions {
+			t.Fatal("processing evidence search Down changed previous audit definitions", e)
+		}
+		checkSearchAudit("")
+		if from, to, e = upgrade.Run(ctx); e != nil || from != head-1 || to != head {
+			t.Fatal("processing evidence search Up after Down", from, to, e)
+		}
+		checkSearchAudit("normal")
+		t.Log("SQL150 kept floor149 and restored the exact previous audit validators on empty Down")
 	}
 	// Migration 103 changes this function only. Down restores its exact old
 	// definition; it neither rewrites projections nor changes activation state.

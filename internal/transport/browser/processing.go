@@ -157,6 +157,10 @@ func (h *ProcessingHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	receipt, err := h.service.Change(ctx, current, change)
+	if errors.Is(err, identity.ErrDenied) {
+		sessionProblem(w, http.StatusForbidden)
+		return
+	}
 	if errors.Is(err, value.ErrConflict) {
 		sessionProblem(w, http.StatusConflict)
 		return

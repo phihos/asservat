@@ -5,6 +5,7 @@ import (
 	"asservat.local/asservat/internal/adapters/postgres"
 	auditapp "asservat.local/asservat/internal/application/audit"
 	"asservat.local/asservat/internal/application/evidence"
+	"asservat.local/asservat/internal/application/planning"
 	"asservat.local/asservat/internal/domain/analysis"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/capture"
@@ -392,6 +393,44 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 			}
 			qualifyProcessingDownloadEffects(t, ctx, poolFor, store, keys, f.scenario, artifact.PublishedContext{Expectation: f.e, Copies: f.copies}, f.reader, processing)
 		})
+	})
+
+	t.Run("processing-discovery-compiled-role-and-bounded-pagination", func(t *testing.T) {
+		s := create(t, 3)
+		first, err := s.s.AdmitContext(ctx, s.a)
+		if err != nil {
+			t.Fatal("admit first discovery artifact", err)
+		}
+		next := s.a
+		input := next.Plan.Input
+		input.CaptureID = custodyID()
+		next.Plan, err = planning.CompileContext(input, time.Now())
+		if err != nil {
+			t.Fatal("compile second discovery capture", err)
+		}
+		next.IdempotencyKey, next.OccurrenceID = custodyID(), custodyID()
+		next.Registration.Location.ArtifactID, next.Registration.Location.AttemptID = custodyID(), custodyID()
+		second, err := s.s.AdmitContext(ctx, next)
+		if err != nil {
+			t.Fatal("admit second discovery artifact", err)
+		}
+		prepareAdmitted(t, ctx, s, first, keys, keys, func(one fixture, processing *processingTestFixture) {
+			two := prepareAdmitted(t, ctx, s, second, keys, keys, nil, false)
+			publish := func(f fixture) {
+				batch := s.batch
+				batch.Initial = nil
+				batch.ObservedAt = time.Now().UTC().Truncate(time.Microsecond)
+				batch.FreshUntil = batch.ObservedAt.Add(5 * time.Second)
+				if err := s.p.RefreshPermissions(ctx, batch); err != nil {
+					t.Fatal("refresh discovery publication permissions", err)
+				}
+				if _, err := f.publisher.Publish(ctx, f.e.CaptureUID, f.copies); err != nil {
+					t.Fatal("publish discovery fixture", err)
+				}
+			}
+			publish(one)
+			qualifyProcessingDiscovery(t, ctx, admin, poolFor, s, processing, one.e, two.e, func() { publish(two) })
+		}, true)
 	})
 
 	t.Run("ordinary-case-metadata-navigation-and-private-routing", func(t *testing.T) {

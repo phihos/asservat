@@ -1,0 +1,479 @@
+{
+  "name": "search_processing_evidence",
+  "description": "Privacy operators search retained published evidence by an exact case ID or immutable workload identity and acquisition interval, optionally with an exact accepted purpose. Each page includes effective custody dates and recorded direct parents. An empty filtered page may have a continuation. The search grants no evidence access and does not discover user content.",
+  "transports": [
+    "browser"
+  ],
+  "annotations": {
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "openWorldHint": false
+  },
+  "inputSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "case_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "purpose_ref": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128
+      },
+      "limit": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 12,
+        "default": 12
+      },
+      "after": {
+        "oneOf": [
+          {
+            "$ref": "#/$defs/d0"
+          },
+          {
+            "$ref": "#/$defs/d1"
+          }
+        ]
+      },
+      "cluster_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "namespace_uid": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 64
+      },
+      "workload_uid": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 64
+      },
+      "acquired_from": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "acquired_until": {
+        "type": "string",
+        "format": "date-time"
+      }
+    },
+    "oneOf": [
+      {
+        "$ref": "#/$defs/d2"
+      },
+      {
+        "$ref": "#/$defs/d3"
+      }
+    ],
+    "$defs": {
+      "d0": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "artifact_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "artifact_id"
+        ]
+      },
+      "d1": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "artifact_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "anchor_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "artifact_id",
+          "anchor_at"
+        ]
+      },
+      "d2": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "purpose_ref": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 12,
+            "default": 12
+          },
+          "after": {
+            "$ref": "#/$defs/d0"
+          }
+        },
+        "required": [
+          "case_id"
+        ]
+      },
+      "d3": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "cluster_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "namespace_uid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "workload_uid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "acquired_from": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "acquired_until": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "purpose_ref": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 12,
+            "default": 12
+          },
+          "after": {
+            "$ref": "#/$defs/d1"
+          }
+        },
+        "required": [
+          "cluster_id",
+          "namespace_uid",
+          "workload_uid",
+          "acquired_from",
+          "acquired_until"
+        ]
+      }
+    }
+  },
+  "outputSchema": {
+    "title": "Asservat mcp-result v1",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "schema_version": {
+        "const": "mcp-result/v1"
+      },
+      "request_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "data_class": {
+        "const": "metadata"
+      },
+      "status": {
+        "type": "string",
+        "enum": [
+          "ok",
+          "pending",
+          "error"
+        ]
+      },
+      "data": {
+        "type": "object"
+      },
+      "truncated": {
+        "const": false
+      },
+      "next_cursor": {
+        "type": "null"
+      },
+      "narrowing_hint": {
+        "type": "null"
+      },
+      "warnings": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "maxItems": 32,
+        "minItems": 0,
+        "uniqueItems": true
+      },
+      "provenance": {
+        "type": "array",
+        "maxItems": 0
+      }
+    },
+    "required": [
+      "schema_version",
+      "request_id",
+      "data_class",
+      "status",
+      "data",
+      "truncated",
+      "next_cursor",
+      "narrowing_hint",
+      "warnings",
+      "provenance"
+    ],
+    "allOf": [
+      {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": "ok"
+              },
+              "data": {
+                "$ref": "#/$defs/d0"
+              }
+            },
+            "required": [
+              "status",
+              "data"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": "error"
+              },
+              "data": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "message": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1024
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "navigation_uri": {
+                    "type": "string",
+                    "format": "uri",
+                    "maxLength": 2048
+                  },
+                  "responsible_role": {
+                    "enum": [
+                      "maintainer",
+                      "approver",
+                      "administrator",
+                      "none"
+                    ]
+                  },
+                  "retry_after_seconds": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 60
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ]
+              }
+            },
+            "required": [
+              "status",
+              "data"
+            ]
+          }
+        ]
+      }
+    ],
+    "$defs": {
+      "d1": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "artifact_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "capture_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "case_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "cluster_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "namespace_uid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "workload_uid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "purpose_ref": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "native_type": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "data_class": {
+            "enum": [
+              "metadata",
+              "raw",
+              "extract"
+            ]
+          },
+          "origin": {
+            "enum": [
+              "capture",
+              "derived"
+            ]
+          },
+          "anchor_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "delete_by": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "custody_state": {
+            "enum": [
+              "stored_unpublished",
+              "deleting"
+            ]
+          },
+          "parents": {
+            "type": "array",
+            "maxItems": 16,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        },
+        "required": [
+          "artifact_id",
+          "capture_id",
+          "case_id",
+          "cluster_id",
+          "namespace_uid",
+          "workload_uid",
+          "purpose_ref",
+          "native_type",
+          "data_class",
+          "origin",
+          "anchor_at",
+          "expires_at",
+          "delete_by",
+          "custody_state",
+          "parents"
+        ]
+      },
+      "d2": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "artifact_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "artifact_id"
+        ]
+      },
+      "d3": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "artifact_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "anchor_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "artifact_id",
+          "anchor_at"
+        ]
+      },
+      "d0": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "candidates": {
+            "type": "array",
+            "maxItems": 12,
+            "items": {
+              "$ref": "#/$defs/d1"
+            }
+          },
+          "next": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/d2"
+              },
+              {
+                "$ref": "#/$defs/d3"
+              }
+            ]
+          }
+        },
+        "required": [
+          "candidates"
+        ]
+      }
+    }
+  }
+}

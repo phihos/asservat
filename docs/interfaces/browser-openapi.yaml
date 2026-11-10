@@ -55,6 +55,8 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/ProcessingReceipt'}
+        '403':
+          description: Current privacy-operator authority is denied or browser request protection refused the change.
         '409':
           description: Exact revision or idempotency conflict; refresh inventory before another change.
         default:
@@ -3100,6 +3102,41 @@ paths:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
+  /api/v1/operations/search_processing_evidence:
+    post:
+      operationId: search_processing_evidence
+      summary: Search retained evidence and inspect recorded lineage as a privacy operator (browser only).
+      tags:
+      - Human console
+      x-domain-contract: search_processing_evidence
+      x-effect: read
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/McpInput_search_processing_evidence'
+      parameters:
+      - name: X-CSRF-Token
+        in: header
+        required: true
+        description: Required on session-authenticated POST; validate origin and session-bound token.
+        schema:
+          type: string
+          maxLength: 256
+      responses:
+        '200':
+          description: Existing bounded MCP domain-result envelope; domain errors remain status=error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/McpOutput_search_processing_evidence'
+        default:
+          description: Transport/session/validation failure; no evidence in error details.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
   /api/v1/operations/get_live_capacity:
     post:
       operationId: get_live_capacity
@@ -4145,6 +4182,98 @@ components:
               - message
               - assignments
               - assignments_total
+          required:
+          - status
+          - data
+        - type: object
+          properties:
+            status:
+              const: error
+            data:
+              type: object
+              additionalProperties: false
+              properties:
+                code:
+                  type: string
+                  minLength: 1
+                  maxLength: 64
+                message:
+                  type: string
+                  minLength: 1
+                  maxLength: 1024
+                retryable:
+                  type: boolean
+                navigation_uri:
+                  type: string
+                  format: uri
+                  maxLength: 2048
+                responsible_role:
+                  enum:
+                  - maintainer
+                  - approver
+                  - administrator
+                  - none
+                retry_after_seconds:
+                  type: integer
+                  minimum: 1
+                  maximum: 60
+              required:
+              - code
+              - message
+              - retryable
+          required:
+          - status
+          - data
+    McpInput_search_processing_evidence:
+      type: object
+      additionalProperties: false
+      properties:
+        case_id:
+          type: string
+          format: uuid
+        purpose_ref:
+          type: string
+          minLength: 1
+          maxLength: 128
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 12
+          default: 12
+        after:
+          oneOf:
+          - $ref: https://asservat.io/spec/v1/processing-discovery.schema.json#/$defs/CaseCursor
+          - $ref: https://asservat.io/spec/v1/processing-discovery.schema.json#/$defs/WorkloadCursor
+        cluster_id:
+          type: string
+          format: uuid
+        namespace_uid:
+          type: string
+          minLength: 1
+          maxLength: 64
+        workload_uid:
+          type: string
+          minLength: 1
+          maxLength: 64
+        acquired_from:
+          type: string
+          format: date-time
+        acquired_until:
+          type: string
+          format: date-time
+      oneOf:
+      - $ref: https://asservat.io/spec/v1/processing-discovery.schema.json#/$defs/CaseSearch
+      - $ref: https://asservat.io/spec/v1/processing-discovery.schema.json#/$defs/WorkloadSearch
+    McpOutput_search_processing_evidence:
+      allOf:
+      - $ref: https://asservat.io/spec/v1/mcp-result.schema.json
+      - oneOf:
+        - type: object
+          properties:
+            status:
+              const: ok
+            data:
+              $ref: https://asservat.io/spec/v1/processing-discovery.schema.json#/$defs/Page
           required:
           - status
           - data

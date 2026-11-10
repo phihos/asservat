@@ -1,13 +1,71 @@
 # Sustained implementation progress
 
-## Active candidate: qualified processing inventory and release (2026-11-10)
+## Installed-qualified candidate: privacy evidence discovery (2026-11-11)
+
+Outcome: a privacy operator finds restricted retained evidence by exact case
+or workload/acquisition interval, filters by accepted purpose, inspects recorded
+parent IDs, and selects an artifact for restriction. The search uses the
+existing normal audit lane and compiled hub SQL role. [ADR-319](decisions/319-privacy-evidence-discovery.md)
+records the bounds and qualification plan. Candidate `feature/privacy-rights-discovery`
+starts at authoritative `4f3c8d18`. Focused audited-presentation, application,
+privacy and audit Go race tests pass. The compiled-role SQL discovery fixture
+passed in 4.529 s. The schema-owner upgrade fixture passed in 6.977 s with floor
+149 and exact audit validator restoration on empty Down. Both report unchanged
+sources and empty cleanup failures. The shared controlled Chromium journey
+passed in 4.28 s after correcting the generated validator ES module import.
+`make pre-push` exited 0, including 635 console tests and affected Go race
+tests in 407 s. Full `make console-browser-check` exited 0 in 146.626 s,
+including the shared processing driver in 3.41 s.
+
+Fresh `make installed-focus FOCUS=journey ARGS=--keep-on-failure` at
+`415b5ce1` passed in 433.888 s (Go) and 503.9 s (harness), both exit 0.
+The installed operator flow took 12.234 s. The browser found the restricted
+artifact while ordinary case and download starts were refused, returned its
+recorded lineage, and selected it without changing the restriction. An
+independent SQL read matched the browser request ID, candidate references,
+response size and acknowledged normal-lane audit. Exact release and replay
+restored a new transfer of the original bytes at the original deadline.
+Natural expiry, failed-inventory accounting and independent managed-copy
+deletion also passed. The focus used one regional capture path in a fresh
+two-cluster installation. All 4,767 source hashes match the commit. Cleanup
+is complete, including both owned clusters, labelled Docker resources and
+build scratch. Original reports are in the external
+`rights-discovery/installed-415b5ce1` archive.
+
+Review found that a known non-operator's processing change received 503.
+At `08acfc6a` the browser receives 403 before recovery, decision or mutation
+audit work. Focused Go race, vet, architecture and contract checks passed.
+The fresh installed rerun passed at that commit (Go 463.822 s, harness 539.6 s,
+both exit 0). A signed-in non-operator received 403 and independent SQL
+readback found neither a decision nor a mutation audit. The 15.453 s
+processing flow still passed discovery, exact release, replay and original
+native bytes. Expiry and verified cleanup passed. All 4,767 source hashes
+match and the owned clusters, Docker resources and scratch were removed.
+Original reports are in `rights-discovery/installed-08acfc6a`.
+
+In a separate owned PostgreSQL smoke, schema-150 source `b6e7c2d8` upgraded
+schema 149 and acknowledged a search audit. The exact schema-149 source
+`4f3c8d18` used its compiled hub-runtime audit adapters against the same
+database, acknowledged a `get_case` audit and preserved the retained search
+record and lifecycle. Down refused that retained row. Both binaries and
+cleanup exited 0. The fixture used synthetic initial authority and object
+receipts. Exact prior-image rollout and HTTP behavior remain unverified.
+
+Next: exact early-erasure request and status through the existing deletion
+reconciler. Complete derivative/cache coverage and exceptions/reporting
+remain open under REQ-PRV-006.
+
+## Merged processing inventory and release (2026-11-10)
 
 Outcome: a configured operator selects an existing artifact, restricts it,
 rediscovers its durable rule after reload, releases the exact revision and
 recovers ordinary reads and a new native download of the same original bytes.
-Candidate: `feature/processing-release-flow`, source `a1275b0f`, in the separate
-processing-release worktree based on qualified `dda2f708` (PR #216). Required CI
-and review state are tracked on the candidate PR. No merge or release is claimed.
+The installed source was `a1275b0f`. [PR #216](https://github.com/phihos/asservat/pull/216)
+merged at `9a31b555`, and [PR #217](https://github.com/phihos/asservat/pull/217)
+merged at `4f3c8d18` after rebasing onto that tree. GitHub's required
+[`pull_request` CI](https://github.com/phihos/asservat/actions/runs/42915115122)
+passed all 14 Go shards and `ci-ok` at rebased `f2101dd9`. Its complete tree
+matches merged `main`. All 4,750 installed source hashes remain applicable.
 [ADR-318](decisions/318-processing-operator-rule-inventory-and-release.md)
 records contracts, original authority bounds, the reserve and complexity review.
 

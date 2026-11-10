@@ -2,6 +2,8 @@ import { useLayoutEffect, useRef, useState } from 'react';
 import { Button } from 'react-aria-components';
 import type { Session } from '../auth/session';
 import { processingArtifactIDFromPath } from '../routes';
+import { ProcessingDiscovery } from './ProcessingDiscovery';
+import type { ProcessingDiscoveryClient } from './discovery-http';
 import { processingClient, ProcessingFailure, uuid, type ProcessingClient, type Inventory, type Change, type Receipt, type Rule } from './http';
 
 const when = (value: string) => new Date(value).toLocaleString();
@@ -9,10 +11,11 @@ function describe(rule: Rule) {
   const scope = rule.scope;
   return scope.kind === 'artifact' ? `Artifact ${scope.location.artifactID}` : `Workload ${scope.workloadUID} in namespace ${scope.namespaceUID}, cluster ${scope.clusterID}, acquired from ${when(scope.acquiredFrom)} until ${when(scope.acquiredUntil)}`;
 }
-export function ProcessingWorkspace({ session, scope, client = processingClient, newID = () => crypto.randomUUID(), artifactID = processingArtifactIDFromPath(window.location.pathname) ?? '' }: {
-  session: Session; scope: AbortSignal; client?: ProcessingClient; newID?: () => string; artifactID?: string;
+export function ProcessingWorkspace({ session, scope, client = processingClient, discoveryClient, newID = () => crypto.randomUUID(), artifactID = processingArtifactIDFromPath(window.location.pathname) ?? '' }: {
+  session: Session; scope: AbortSignal; client?: ProcessingClient; discoveryClient?: ProcessingDiscoveryClient; newID?: () => string; artifactID?: string;
 }) {
   const heading = useRef<HTMLHeadingElement>(null);
+  const artifactField = useRef<HTMLInputElement>(null);
   const inFlight = useRef(false);
   const activeScope = useRef(scope);
   const current = () => activeScope.current === scope && !scope.aborted;
@@ -65,11 +68,18 @@ export function ProcessingWorkspace({ session, scope, client = processingClient,
     } finally { if (current()) { inFlight.current = false; setBusy(false); } }
   };
   const start = (input: Change) => { if (!pending && !busy) void change({ input, key: newID() }); };
+  const selectArtifact = (id: string) => {
+    if (!current() || busy || pending || !uuid.test(id)) return;
+    setArtifact(id);
+    setReceipt(undefined);
+    artifactField.current?.focus();
+  };
   return <div className="capture-workspace">
     <div className="page-intro"><h1 ref={heading} tabIndex={-1}>Processing restrictions</h1>
       <p>For configured privacy operators. Restrict processing of saved evidence or explicitly release an existing restriction. Ordinary evidence access does not grant these actions.</p>
       <p>Restrictions persist until an explicit release. An administrative deadline does not release a restriction. External downloaded copies remain outside Asservat's control.</p>
     </div>
+    <ProcessingDiscovery session={session} scope={scope} client={discoveryClient} disabled={busy || !!pending} onSelect={selectArtifact}/>
     <section className="review-section" aria-labelledby="processing-inventory"><h2 id="processing-inventory">Restriction inventory</h2>
       <p>Load existing restrictions, including when ordinary evidence access is blocked. Each page contains at most 50 rules.</p>
       <Button className="button secondary" isDisabled={busy || !!pending} onPress={() => void load()}>Refresh processing rules</Button>
@@ -87,7 +97,7 @@ export function ProcessingWorkspace({ session, scope, client = processingClient,
     </section>
     <section className="review-section" aria-labelledby="processing-selected"><h2 id="processing-selected">Selected evidence</h2>
       <label htmlFor="processing-artifact">Artifact ID</label>
-      <input id="processing-artifact" value={artifact} maxLength={36} disabled={busy || !!pending} onChange={event => { setArtifact(event.target.value); setReceipt(undefined); }}/>
+      <input ref={artifactField} id="processing-artifact" value={artifact} maxLength={36} disabled={busy || !!pending} onChange={event => { setArtifact(event.target.value); setReceipt(undefined); }}/>
       <p>A restriction covers this artifact and evidence derived from it.</p>
       <Button className="button" isDisabled={busy || !!pending || !uuid.test(artifact)} onPress={() => start({ action: 'restrict_processing', artifactID: artifact, ruleID: newID(), expectedRevision: 0 })}>Restrict processing</Button>
     </section>

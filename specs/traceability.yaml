@@ -488,6 +488,7 @@ requirements:
   scenarios:
   - SC-PRV-006
   - SC-PRV-010
+  - SC-PRV-011
   tasks:
   - TASK-07
   - TASK-11

@@ -14,6 +14,7 @@ const config = await command();
 assert.equal(new URL(config.origin).protocol, 'https:');
 if (config.proxy) assert.equal(new URL(config.proxy).hostname, '127.0.0.1');
 assert.match(config.artifactID, /^[0-9a-f-]{36}$/);
+assert.match(config.casePath, /^\/cases\/[0-9a-f-]{36}$/);
 const browser = await chromium.launch({ headless: true, ...(config.proxy ? { proxy: { server: config.proxy, bypass: '<-loopback>' } } : {}), ...(process.env.ASSERVAT_CHROMIUM ? { executablePath: process.env.ASSERVAT_CHROMIUM } : {}) });
 let stage = 'session';
 try {
@@ -27,7 +28,7 @@ try {
     process.stdout.write(line + '\n'); assert.deepEqual(await command(), { continue: true });
   };
   stage = 'processing';
-  await processingJourney({ page, origin: config.origin, artifactID: config.artifactID, casePath: config.casePath, restricted: observe('restricted'), released: observe('released'), stage: value => { stage = value; } });
+  await processingJourney({ page, origin: config.origin, artifactID: config.artifactID, casePath: config.casePath, parents: config.parents, restricted: observe('restricted'), discovered: observe('discovered'), released: observe('released'), stage: value => { stage = value; } });
   assert.deepEqual(errors, []);
   process.stdout.write(JSON.stringify({ kind: 'complete' }) + '\n');
 } catch (error) {

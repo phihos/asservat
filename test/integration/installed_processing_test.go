@@ -11,10 +11,13 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"syscall"
 	"testing"
 	"time"
 
+	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/privacy"
 	"asservat.local/asservat/internal/transport/browser"
@@ -44,14 +47,20 @@ type installedProcessingReceipt struct {
 	Revision    int64  `json:"revision"`
 	Sequence    int64  `json:"sequence"`
 }
+type installedProcessingDiscovery struct {
+	RequestID     string                             `json:"requestID"`
+	Candidate     value.ProcessingDiscoveryCandidate `json:"candidate"`
+	ResponseBytes int64                              `json:"responseBytes"`
+}
 type installedProcessingEvent struct {
-	Kind    string                     `json:"kind"`
-	Receipt installedProcessingReceipt `json:"receipt"`
-	Input   json.RawMessage            `json:"input"`
-	Key     string                     `json:"key"`
-	Stage   string                     `json:"stage"`
-	Reason  string                     `json:"reason"`
-	Check   string                     `json:"check"`
+	Kind      string                       `json:"kind"`
+	Receipt   installedProcessingReceipt   `json:"receipt"`
+	Discovery installedProcessingDiscovery `json:"discovery"`
+	Input     json.RawMessage              `json:"input"`
+	Key       string                       `json:"key"`
+	Stage     string                       `json:"stage"`
+	Reason    string                       `json:"reason"`
+	Check     string                       `json:"check"`
 }
 
 // The real compiled React journey owns both mutations and obtains release
@@ -91,6 +100,7 @@ func qualifyInstalledProcessing(t *testing.T, parent context.Context, c installe
 	}
 	c.checkReceipt(t, ctx, restriction, "normal")
 	c.checkReplay(t, ctx, session, restriction)
+	c.checkOperatorDenial(t, ctx, restriction.Input)
 	t.Logf("installed processing stage=restricted after %s", time.Since(started).Round(time.Millisecond))
 	// These are new ordinary operations by the same signed-in user. Privacy
 	// operator membership does not bypass processing on ordinary evidence reads.
@@ -106,6 +116,10 @@ func qualifyInstalledProcessing(t *testing.T, parent context.Context, c installe
 			t.Fatal("restricted evidence accepted a new ordinary read", request.name, err)
 		}
 	}
+	driver.send(map[string]bool{"continue": true})
+	discovery := next("discovered")
+	c.checkDiscovery(t, ctx, restriction.Receipt, discovery.Discovery)
+	t.Logf("installed processing stage=discovered after %s", time.Since(started).Round(time.Millisecond))
 	driver.send(map[string]bool{"continue": true})
 	release := next("released")
 	if release.Receipt.State != "released" || release.Receipt.Revision != 2 || release.Receipt.RuleID != restriction.Receipt.RuleID || release.Receipt.Sequence <= restriction.Receipt.Sequence {
@@ -169,7 +183,52 @@ func qualifyInstalledProcessing(t *testing.T, parent context.Context, c installe
 		}
 		driver.cancel()
 	})
-	t.Logf("installed processing stage=complete after %s: real React restrict/reload/exact release, both original-key replays unchanged, ordinary reads refused under restriction and original native bytes restored without extending access", time.Since(started).Round(time.Millisecond))
+	t.Logf("installed processing complete after %s. React restricted the artifact, found its recorded lineage after ordinary reads were refused, selected it without a mutation, and released the exact restriction. Both replays preserved SQL state and native download restored the original bytes and deadline.", time.Since(started).Round(time.Millisecond))
+}
+
+func (c installedProcessingRun) checkDiscovery(t *testing.T, ctx context.Context, restriction installedProcessingReceipt, d installedProcessingDiscovery) {
+	t.Helper()
+	candidate := d.Candidate
+	if !authorization.UUID(d.RequestID) || d.RequestID == restriction.RequestID || !candidate.Valid() || candidate.ArtifactID != c.ArtifactID || candidate.CaseID != c.CaseID || !candidate.ExpiresAt.Equal(c.ExpiresAt) ||
+		d.ResponseBytes < 1 || d.ResponseBytes > audit.OperationOutputLimit {
+		t.Fatal("installed processing discovery returned different artifact identity, expiry or response bounds")
+	}
+	var stored value.ProcessingDiscoveryCandidate
+	var parentsJSON []byte
+	var unchanged, acknowledged bool
+	installedJourneyReadOnly(t, ctx, c.SQL, func(tx pgx.Tx) error {
+		return tx.QueryRow(ctx, `SELECT p.capture_id,p.cluster_id,p.namespace_uid,p.workload_uid,p.origin,p.parents,p.anchor_at,a.effective_expires_at,a.effective_delete_by,a.state,
+    r.state='restricted' AND r.revision=$6 AND pr.sequence=$7,
+    o.lane='normal' AND o.intent->>'Name'='search_processing_evidence' AND o.intent->>'InputFormat'='context-input/v1'
+    AND o.intent_receipt IS NOT NULL AND o.outcome_receipt IS NOT NULL AND l.intent_completion IS NOT NULL AND l.outcome_completion IS NOT NULL
+    AND o.outcome->>'Status'='success' AND o.outcome->>'Effect'='none' AND o.outcome->>'ClientReceipt'='unknown'
+    AND (o.outcome->>'OutputBytes')::bigint=$8
+    AND o.outcome->'ArtifactIDs'=jsonb_build_array(p.artifact_id)
+    AND o.outcome->'CaptureIDs'=jsonb_build_array(p.capture_id)
+    AND o.outcome->'CaseIDs'=jsonb_build_array(loc.case_id)
+  FROM context_processing p JOIN context_case_locator loc ON loc.root_id=p.root_id AND loc.artifact_id=p.artifact_id AND loc.capture_id=p.capture_id
+  JOIN custody_attempt a ON a.id=p.attempt_id AND a.cluster_id=p.cluster_id AND a.artifact_id=p.artifact_id
+  JOIN processing_root pr ON pr.root_id=p.root_id
+  JOIN processing_rule r ON r.root_id=p.root_id AND r.id=$5
+  JOIN operation_audit o ON o.root_id=p.root_id AND o.id=$4
+  JOIN operation_audit_lifecycle l ON l.root_id=p.root_id AND l.operation_id=o.id
+  WHERE p.root_id=$1 AND p.artifact_id=$2 AND loc.case_id=$3`,
+			c.RootID, c.ArtifactID, c.CaseID, d.RequestID, restriction.RuleID, restriction.Revision, restriction.Sequence, d.ResponseBytes).
+			Scan(&stored.CaptureID, &stored.ClusterID, &stored.NamespaceUID, &stored.WorkloadUID, &stored.Origin, &parentsJSON, &stored.AnchorAt, &stored.ExpiresAt, &stored.DeleteBy, &stored.CustodyState, &unchanged, &acknowledged)
+	})
+	var parents []artifact.Location
+	if json.Unmarshal(parentsJSON, &parents) != nil || parents == nil {
+		t.Fatal("installed processing lineage malformed")
+	}
+	parentIDs := make([]string, len(parents))
+	for i, parent := range parents {
+		parentIDs[i] = parent.ArtifactID
+	}
+	if candidate.CaptureID != stored.CaptureID || candidate.ClusterID != stored.ClusterID || candidate.NamespaceUID != stored.NamespaceUID || candidate.WorkloadUID != stored.WorkloadUID ||
+		candidate.Origin != stored.Origin || !slices.Equal(candidate.Parents, parentIDs) || !candidate.AnchorAt.Equal(stored.AnchorAt) || !candidate.ExpiresAt.Equal(stored.ExpiresAt) ||
+		!candidate.DeleteBy.Equal(stored.DeleteBy) || candidate.CustodyState != stored.CustodyState || !unchanged || !acknowledged {
+		t.Fatal("installed processing discovery differs from retained lineage, restriction or acknowledged normal audit")
+	}
 }
 
 func (c installedProcessingRun) checkReceipt(t *testing.T, ctx context.Context, event installedProcessingEvent, lane string) {
@@ -209,27 +268,54 @@ func (c installedProcessingRun) checkReplay(t *testing.T, ctx context.Context, b
 		return state
 	}
 	before := snapshot()
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, b.base+browser.ProcessingChangesPath, bytes.NewReader(event.Input))
-	if err != nil {
-		t.Fatal(err)
-	}
-	request.Header.Set("Content-Type", "application/json")
-	request.Header.Set("Origin", b.base)
-	request.Header.Set("X-CSRF-Token", b.csrf)
-	request.Header.Set("Idempotency-Key", event.Key)
-	response, err := b.client.Do(request)
-	if err != nil {
-		t.Fatal("installed processing original-key replay transport", err)
-	}
-	defer response.Body.Close()
-	raw, err := io.ReadAll(io.LimitReader(response.Body, 4097))
+	status, raw, err := b.postProcessingChange(ctx, event.Input, event.Key)
 	var again installedProcessingReceipt
-	if err != nil || response.StatusCode != 200 || len(raw) > 4096 || json.Unmarshal(raw, &again) != nil || again != event.Receipt {
-		t.Fatal("installed processing original-key replay changed effect", response.StatusCode, err)
+	if err != nil || status != http.StatusOK || len(raw) > 4096 || json.Unmarshal(raw, &again) != nil || again != event.Receipt {
+		t.Fatal("installed processing original-key replay changed effect", status, err)
 	}
 	if snapshot() != before {
 		t.Fatal("installed processing original-key replay changed retained rules, decisions, audit receipts or account spend")
 	}
+}
+
+func (c installedProcessingRun) checkOperatorDenial(t *testing.T, ctx context.Context, input json.RawMessage) {
+	t.Helper()
+	outsider := c.Identity.unrelated().consoleSession(t, ctx, c.PublicRoot, c.Address, c.Origin)
+	key := custodyID()
+	status, raw, err := outsider.postProcessingChange(ctx, input, key)
+	var problem struct {
+		Status int `json:"status"`
+	}
+	if err != nil || status != http.StatusForbidden || len(raw) > 4096 || json.Unmarshal(raw, &problem) != nil || problem.Status != status {
+		t.Fatal("installed processing non-operator did not receive the bounded refusal", status, err)
+	}
+	var untouched bool
+	installedJourneyReadOnly(t, ctx, c.SQL, func(tx pgx.Tx) error {
+		return tx.QueryRow(ctx, `SELECT NOT EXISTS(SELECT 1 FROM processing_decision WHERE root_id=$1 AND id=$2)
+ AND NOT EXISTS(SELECT 1 FROM operation_audit WHERE root_id=$1 AND id=$2)`, c.RootID, key).Scan(&untouched)
+	})
+	if !untouched {
+		t.Fatal("installed processing refusal left a decision or mutation audit")
+	}
+	t.Log("installed processing: eligible non-operator received 403 with no decision or mutation audit")
+}
+
+func (b *installedBrowser) postProcessingChange(ctx context.Context, input json.RawMessage, key string) (int, []byte, error) {
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, b.base+browser.ProcessingChangesPath, bytes.NewReader(input))
+	if err != nil {
+		return 0, nil, err
+	}
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Origin", b.base)
+	request.Header.Set("X-CSRF-Token", b.csrf)
+	request.Header.Set("Idempotency-Key", key)
+	response, err := b.client.Do(request)
+	if err != nil {
+		return 0, nil, err
+	}
+	defer response.Body.Close()
+	raw, err := io.ReadAll(io.LimitReader(response.Body, 4097))
+	return response.StatusCode, raw, err
 }
 
 func startInstalledProcessingBrowser(t *testing.T, ctx context.Context, b *installedBrowser, address, artifactID, caseID string) *installedLiveBrowser {
