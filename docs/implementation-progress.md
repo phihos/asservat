@@ -1,5 +1,32 @@
 # Sustained implementation progress
 
+## Administrator live-runtime capacity view (2026-11-10)
+
+The browser-only `get_live_capacity` operation now returns one explicitly
+selected cluster's current live totals and complete report-to-report rates.
+Current identity, fleet administration and recovery are checked before and after
+the regional read. Unknown enrolled IDs fail before any regional request; other
+unavailability stays retryable with a one-second error bound. Rates are withheld
+when any current live-enabled node lacks a valid predecessor. The UI-053 React
+page uses explicit refresh only, with no background polling, source enumeration
+or acquisition.
+
+- [Browser evidence](../test/results/live-capacity-browser/README.md): the
+  packaged journey passed with 29 journeys and 28 accessibility scans, using the
+  actual Go HTTPS operation and built React result. Full `make pre-push`, all
+  613 console tests, final-head PR CI run 42792664049 and Gitar review passed.
+- Review findings for error freshness, unknown clusters and label assertions are
+  resolved. Subsequent installed/component failures also exposed and fixed audit
+  input normalization, the shared operation router and the static route.
+- Earlier native attempts are not passes. Browser-only MCP calls were correctly
+  refused, and the installed live fixture has no fleet-administration service,
+  so its 404 is not a valid qualification of this operation.
+
+This is real browser/component evidence with synthetic authority and runtime
+facts, not a fleet-enabled installed multi-node measurement. That installed run,
+lag/drop aggregation and an exact active-viewer count remain open; this view
+reports cohorts instead. The broader specification remains active.
+
 ## Private live-runtime aggregate query (2026-11-10)
 
 C-19 now aggregates current per-node live totals and report-to-report rates for

@@ -89,6 +89,9 @@ func TestConsoleBrowserWithBuiltPackage(t *testing.T) {
 	if composed, err = presentation.NewInvestigationPolicyOperations(composed, newConsolePolicyStatus(t, origin, managerGrants)); err != nil {
 		t.Fatal(err)
 	}
+	if composed, err = presentation.NewInvestigationLiveCapacityOperations(composed, newConsoleLiveCapacityOperations(t, origin)); err != nil {
+		t.Fatal(err)
+	}
 	investigations, err := browser.NewInvestigationHandler(sessionHandler, composed, 4)
 	if err != nil {
 		t.Fatal(err)

@@ -285,6 +285,19 @@ try {
   checks.push('shared policy budgets and explicit refresh; finite policy approval request through real C03/HTTPS, existing review detail and no self-approval/personal continuation');
   await page.screenshot({ path: output + '/policy-budgets.png', fullPage: true });
 
+  await page.goto(origin + '/capacity');
+  await page.getByLabel('Cluster ID').fill('00000000-0000-4000-8000-000000000001');
+  const capacityResponse = page.waitForResponse(response => new URL(response.url()).pathname === '/api/v1/operations/get_live_capacity');
+  await page.getByRole('button', { name: 'Read live capacity' }).click();
+  const capacityHTTP = await capacityResponse;
+  if (capacityHTTP.status() !== 200) console.log('live capacity HTTP', capacityHTTP.status());
+  await expect(page.getByLabel('Cumulative live runtime')).toBeVisible();
+  await expect(page.getByLabel('Live runtime rates')).toBeVisible();
+  await expect(page.getByText('Counters and per-second rates cover every current live-enabled node report.')).toBeVisible();
+  await scan('live-capacity');
+  await page.screenshot({ path: output + '/live-capacity.png', fullPage: true });
+  checks.push('fleet-operator live capacity uses canonical browser/CSRF transport and built React without polling or content labels');
+
   await page.goto(origin + '/');
 
   await control('unavailable');
