@@ -200,9 +200,6 @@ func TestInitialBootstrapChainWithRealServices(t *testing.T) {
 	clear(claims)
 	desired.ProbeAudience = aud.Audience[0]
 	var publicInput contracts.InitialBootstrapInput
-	if installedMode {
-		publicInput, desired = installedUnifiedPublicInput(t, desired)
-	}
 	rootCert, err := x509.ParseCertificate(f.NativeProviders.Root)
 	if err != nil {
 		t.Fatal(err)
@@ -225,6 +222,11 @@ func TestInitialBootstrapChainWithRealServices(t *testing.T) {
 	var unified *installedUnifiedRunner
 	if installedMode {
 		setup := prepareInstallerContinuationNative(t, ctx, api, f, desired)
+		desired.Fleet.Issuer = setup.issuer
+		desired.Fleet.Clients = []string{"console"}
+		desired.Fleet.Groups = []string{installedIdentityGroup}
+		desired.Fleet.DeliveryProfiles = []string{"regional-installer"}
+		publicInput, desired = installedUnifiedPublicInput(t, desired)
 		unified = newInstalledUnifiedRunner(t, ctx, api, publicInput, setup, f.Clusters[0].Pod.NodeName)
 		t.Log("operator prerequisites prepared: providers, CRDs, PKI mounts, identity and runner inputs")
 	} else {
