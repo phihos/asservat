@@ -1,3 +1,0 @@
-2026-11-10T11:57:55.871469678Z node collector probe: kernel 7.0.0-1017-azure; btf supported; cgroup2 supported; bpf supported; tcx supported; tc supported; tracefs supported; hostpid supported; runtime containerd; engine linked=true initialized=true v0.57.0; packetCapture Available prerequisites=true hook="tc" []; syscallTrace Available prerequisites=true hook="" []; goProfile Available prerequisites=true hook="" []
-2026-11-10T11:57:55.871743730Z node collector ring medium: encrypted disk available=false removedEarlier=0
-2026-11-10T11:57:55.913007771Z node collector enrolled: node asservat-context-7vidjkyc-1-control-plane, epoch fa181002-27ad-4fa6-9811-87ccc6be9604, certificate until 2026-11-10T12:17:55Z

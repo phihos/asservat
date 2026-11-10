@@ -1,6 +1,6 @@
 # Active-viewer native attempt on initial head
 
-GitHub native run: 42810631259, attempt 1
+GitHub native run: [42810631259](https://github.com/phihos/asservat/actions/runs/42810631259), attempt 1
 Commit: `548ea02cf4c8d3c431b4277278c459d809c0f156`
 Suite: `continuation-ongoing-live`
 

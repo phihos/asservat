@@ -23,8 +23,9 @@ same pinned fleet recipe, so the artifact installs the `bootstrap-channel` role
 and issuance-audit scope before the owner first logs in. No second fleet settings
 document or caller-selected object reference is introduced. Derivation, artifact,
 and owner-reader tests cover exact pins, invalid mounts and disabled composition.
-Native installed run 42873289390 passed at `ca325e20`, including actual provider
-issuance and the authenticated browser fleet-capacity operation. The installed
+Native installed run 42873289390 passed at `ca325e20`, including provider-role
+startup, protected settings reads and the authenticated browser fleet-capacity
+operation. It did not issue or deliver a bootstrap credential. The installed
 owner's RBAC contains only the original fleet ConfigMap and guard names; the
 non-fleet template does not gain those reads. Component and installed evidence
 remain distinct from the remaining public ingress, lifecycle and recovery work.

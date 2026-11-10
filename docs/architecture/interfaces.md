@@ -70,7 +70,8 @@ cluster to a current fleet operator after fresh identity/administration/recovery
 checks. An exact active-viewer gauge counts distinct unexpired Active, Paused
 and Disconnected watch controls only while current trust, their owner enrollment
 and an activated unexpired certificate still resolve that owner. It uses the
-existing owner-enrollment cluster mapping and hub SQL function credential/pool.
+validated target cluster's domain-separated SHA-256 digest and the existing hub
+SQL function credential/pool; the owner's cluster is not the target placement.
 No principal, source or workload identifier is returned. The operation does not poll, enumerate
 sources or start acquisition.
 Public ongoing compilation, Save composition and installed source qualification

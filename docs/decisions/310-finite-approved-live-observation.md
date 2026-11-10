@@ -25,7 +25,7 @@ predicates in the owning process's bounded memory for the original watch
 lifetime. Clear them on joined close/expiry. No detailed scope, filters or
 projected rows enter SQL, URLs, logs or audit bodies. Existing authenticated
 encrypted transport carries those private details. SQL stores only minimized
-control identities, fences, original expiry, aggregate accounting and a keyed
+control identities, fences, original expiry, aggregate accounting and a domain-separated
 target-cluster digest for the exact per-cluster viewer gauge; it stores no raw
 target, source, workload or principal scope. An active pre-mapping watch makes
 that gauge unavailable rather than assigning it to the hub owner's cluster. Existing

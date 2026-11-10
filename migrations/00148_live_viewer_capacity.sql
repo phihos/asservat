@@ -29,7 +29,7 @@ DECLARE p public.live_watch_root; w public.live_watch_control; n timestamptz; co
 BEGIN
  SELECT * INTO STRICT p FROM public.live_watch_root WHERE root_id=r FOR UPDATE;
  n:=clock_timestamp();
- IF o IS NULL OR d IS NULL OR key IS NULL OR bound IS NULL OR NOT isfinite(bound) OR n>=bound OR p.limits_digest<>d OR octet_length(key)<>32 OR octet_length(k)<>32 OR NOT EXISTS(SELECT 1 FROM public.fleet_current_trust WHERE installation_id=p.installation_id AND issuer_epoch=p.issuer_epoch AND NOT suspended AND NOT recovery_blocked AND observed_at<=n AND n<fresh_until) THEN RAISE EXCEPTION 'live owner or limits unavailable' USING ERRCODE='23514'; END IF;
+ IF o IS NULL OR d IS NULL OR key IS NULL OR bound IS NULL OR k IS NULL OR NOT isfinite(bound) OR n>=bound OR p.limits_digest<>d OR octet_length(key)<>32 OR octet_length(k)<>32 OR NOT EXISTS(SELECT 1 FROM public.fleet_current_trust WHERE installation_id=p.installation_id AND issuer_epoch=p.issuer_epoch AND NOT suspended AND NOT recovery_blocked AND observed_at<=n AND n<fresh_until) THEN RAISE EXCEPTION 'live owner or limits unavailable' USING ERRCODE='23514'; END IF;
  SELECT * INTO w FROM public.live_watch_control WHERE root_id=r AND key_hash=key;
  IF FOUND THEN
   IF w.principal_key<>public.live_watch_digest(c->'PrincipalKey') OR w.request_digest<>public.live_watch_digest(c->'RequestDigest') THEN RAISE EXCEPTION 'live request conflict' USING ERRCODE='23505'; END IF;

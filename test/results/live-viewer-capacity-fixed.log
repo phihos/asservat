@@ -1,8 +1,0 @@
-=== RUN   TestLiveWatchLedgerWithRealServices
-    live_watch_ledger_test.go:404: real compiled hub control facets + independently audited current owner: original receipts, exact active/closed viewer counts with cluster isolation, installation root uniqueness, isolated workload ceiling/release, one slot, per-watch/three-account charges, rollback, close/reopen debt, original expiry; no native/source/installed qualification
---- PASS: TestLiveWatchLedgerWithRealServices (18.66s)
-=== RUN   TestLiveWatchUpgradeWithRealPostgres
-    live_watch_upgrade_test.go:270: pristine142→143→142 twice; 147 recovery and148 viewer-capacity Up/Down before the schema143 compiled Open/Charge checks; retained control and account-only debt each refuse Down23514 with exact schema/functions/history/state unchanged; HTTP/source/audit retained guards not exercised
---- PASS: TestLiveWatchUpgradeWithRealPostgres (7.21s)
-PASS
-ok  	asservat.local/asservat/test/integration	26.948s

@@ -158,6 +158,29 @@ func TestLiveWatchLedgerWithRealServices(t *testing.T) {
 	if err != nil || reused || got != c {
 		t.Fatal("original control", err, reused)
 	}
+	// Exercise the compiled SQL boundary directly: Go rejects an absent cluster
+	// before calling it, but a NULL digest must not become another legacy row
+	// that makes every cluster's exact gauge unavailable.
+	unmapped := makeControl(8, 8)
+	unmappedJSON, err := json.Marshal(unmapped)
+	if err != nil {
+		t.Fatal(err)
+	}
+	limitsJSON, err := json.Marshal(limits)
+	if err != nil {
+		t.Fatal(err)
+	}
+	limitsDigest := sha256.Sum256(limitsJSON)
+	var unmappedReply []byte
+	err = pool.QueryRow(ctx, `SELECT live_watch_create_cluster($1,$2,$3,$4,$5,$6,NULL)`, root, request.Binding.ProcessEpoch, limitsDigest[:], unmappedJSON, bytes.Repeat([]byte{15}, 32), unmapped.ExpiresAt).Scan(&unmappedReply)
+	var invalidCluster *pgconn.PgError
+	if !errors.As(err, &invalidCluster) || invalidCluster.Code != "23514" {
+		t.Fatal("compiled cluster writer accepted missing placement", err)
+	}
+	var unmappedControls int
+	if err = lab.admin.QueryRow(ctx, `SELECT count(*) FROM live_watch_control WHERE root_id=$1 AND id=$2`, root, unmapped.ID).Scan(&unmappedControls); err != nil || unmappedControls != 0 {
+		t.Fatal("missing placement changed retained controls", unmappedControls, err)
+	}
 	viewers, err := postgres.NewLiveViewerCapacity(ctx, pool, ownerPool.InstallationID)
 	if err != nil {
 		t.Fatal("compiled viewer capacity constructor", err)
@@ -171,6 +194,65 @@ func TestLiveWatchLedgerWithRealServices(t *testing.T) {
 	if err != nil || otherCluster != 0 {
 		t.Fatal("viewer aggregate leaked across clusters", otherCluster, err)
 	}
+	for _, scenario := range []struct {
+		name, state        string
+		expired, idleEnded bool
+		want               int
+	}{
+		{"paused", "Paused", false, false, 1},
+		{"disconnected", "Disconnected", false, false, 1},
+		{"source-ended", "SourceEnded", false, false, 0},
+		{"expired", "Active", true, true, 0},
+		{"idle-ended", "Active", false, true, 0},
+	} {
+		t.Run("viewer-"+scenario.name, func(t *testing.T) {
+			// Fixture-only state changes are rolled back. The aggregate runs
+			// with production function grants and no live-table read access.
+			tx, err := lab.admin.Begin(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = tx.Rollback(context.Background()) }()
+			if _, err = tx.Exec(ctx, `UPDATE live_watch_control SET state=$3,
+ accepted_at=CASE WHEN $4 OR $5 THEN CURRENT_TIMESTAMP-interval '10 seconds' ELSE accepted_at END,
+ expires_at=CASE WHEN $4 THEN CURRENT_TIMESTAMP-interval '1 second' ELSE expires_at END,
+ idle_until=CASE WHEN $5 THEN CURRENT_TIMESTAMP-interval '1 second' ELSE idle_until END
+ WHERE root_id=$1 AND id=$2`, root, c.ID, scenario.state, scenario.expired, scenario.idleEnded); err != nil {
+				t.Fatal("viewer lifecycle fixture", err)
+			}
+			if _, err = tx.Exec(ctx, "SET LOCAL ROLE "+pgx.Identifier{role}.Sanitize()); err != nil {
+				t.Fatal("compiled viewer lifecycle role", err)
+			}
+			var count int
+			if err = tx.QueryRow(ctx, `SELECT live_watch_viewers($1,$2)`, ownerPool.InstallationID, clusterKey[:]).Scan(&count); err != nil || count != scenario.want {
+				t.Fatal("viewer lifecycle count", count, scenario.want, err)
+			}
+		})
+	}
+	t.Run("viewer-regional-target", func(t *testing.T) {
+		tx, err := pool.Begin(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = tx.Rollback(context.Background()) }()
+		regionalCluster := custodyID()
+		regionalKey := sha256.Sum256([]byte("asservat-live-cluster/v1\x00" + regionalCluster))
+		regional := makeControl(8, 8)
+		regionalJSON, err := json.Marshal(regional)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var reply []byte
+		if err = tx.QueryRow(ctx, `SELECT live_watch_create_cluster($1,$2,$3,$4,$5,$6,$7)`, root, request.Binding.ProcessEpoch, limitsDigest[:], regionalJSON, bytes.Repeat([]byte{16}, 32), regional.ExpiresAt, regionalKey[:]).Scan(&reply); err != nil {
+			t.Fatal("compiled regional-target writer", err)
+		}
+		for _, placement := range [][32]byte{regionalKey, clusterKey} {
+			var count int
+			if err = tx.QueryRow(ctx, `SELECT live_watch_viewers($1,$2)`, ownerPool.InstallationID, placement[:]).Scan(&count); err != nil || count != 1 {
+				t.Fatal("viewer placement followed owner cluster instead of target", count, err)
+			}
+		}
+	})
 	assertOwner := func(watch, key string) {
 		t.Helper()
 		before := certificateReads

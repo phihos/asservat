@@ -20,12 +20,20 @@ func NewProviderInstalledRuntimeResources(ctx context.Context, preparer *Initial
 	return newProviderInitialRuntimeResources(ctx, preparer, effects, ownerIssuerRoots, contracts.HubWorkerProviderInstalledLayout, contracts.OwnerProviderInstalledLayout, &worker, &owner)
 }
 
+// NewFleetProviderInstalledRuntimeResources additionally binds the owner's
+// named fleet settings/probe rights before the first immutable resource claim.
+// Omitting fleet composition uses NewProviderInstalledRuntimeResources and
+// grants neither access to that ConfigMap nor reads of its admission guard.
+func NewFleetProviderInstalledRuntimeResources(ctx context.Context, preparer *InitialPreparer, effects app.InitialRuntimeBridgeEffects, ownerIssuerRoots [][]byte, worker contracts.ConfigurationProviderSelection, owner contracts.OwnerProviderSelection) (*InitialRuntimeResources, error) {
+	return newObservationInitialRuntimeResources(ctx, preparer, effects, ownerIssuerRoots, contracts.HubWorkerProviderInstalledLayout, contracts.OwnerProviderInstalledLayout, &worker, &owner, "", true)
+}
+
 // NewObservationProviderInstalledRuntimeResources selects ADR150's original
 // observation-v2 capability before the first resource claim. It creates no
 // backend projection, regional identity or runtime route. The existing provider
 // constructor preserves its omitted v1 selection and cannot adopt this journal.
 func NewObservationProviderInstalledRuntimeResources(ctx context.Context, preparer *InitialPreparer, effects app.InitialRuntimeBridgeEffects, ownerIssuerRoots [][]byte, worker contracts.ConfigurationProviderSelection, owner contracts.OwnerProviderSelection) (*InitialRuntimeResources, error) {
-	return newObservationInitialRuntimeResources(ctx, preparer, effects, ownerIssuerRoots, contracts.HubWorkerProviderInstalledLayout, contracts.OwnerProviderInstalledLayout, &worker, &owner, contracts.OwnerObservationOperationFormat)
+	return newObservationInitialRuntimeResources(ctx, preparer, effects, ownerIssuerRoots, contracts.HubWorkerProviderInstalledLayout, contracts.OwnerProviderInstalledLayout, &worker, &owner, contracts.OwnerObservationOperationFormat, false)
 }
 
 func initialRuntimeObservationSelectionValid(worker, owner, format string) bool {

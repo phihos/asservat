@@ -1,96 +1,62 @@
 # Sustained implementation progress
 
-## Production fleet-issuance input composition (2026-11-10)
+## Active candidate: viewer capacity and optional fleet settings (2026-11-10)
 
-The promoted installer can now derive `OwnerFleetIssuance` from the original
-fleet ConfigMap and guard when the optional `federation.fleet` section supplies
-the operator's KV mount and delivery profile. The fleet provider recipe is pinned
-like the existing public recipe. This introduces no second fleet settings
-document, caller-selected object reference or additional public route beyond
-ADR-193. `docs/architecture/bootstrap-issuance.md` records the boundary.
+Outcome: the authenticated administrator capacity view reports active viewers
+for the selected workload cluster, using current owner liveness and the existing
+minimized watch ledger. Optional fleet settings reuse the original protected
+ConfigMap, provider artifact and named admission guard.
 
-Focused derivation and owner-reader tests pass valid exact pins, disabled
-composition and an invalid mount. The first installed attempt exposed a real
-composition defect: phase 3 built its provider artifact before attaching the
-fleet section, so it omitted the runtime `bootstrap-channel` role and every
-owner login for that purpose failed. The artifact and final runtime input now
-share one fleet-pinning function. A regression checks the artifact's exact role
-and issuance-audit scope; full bootstrap and provider packages pass. The next
-installed attempts exposed two missing named RBAC reads. The installed owner now
-adds only the original fleet ConfigMap and guard names when fleet composition is
-enabled; non-fleet RBAC remains unchanged, with a focused privilege regression.
+The Kimi-session review integrates PRs #215 and #216 on
+`fix/kimi-session-review`. Both original heads have red CI from accepted-policy
+test clocks that had outlived a fixed 30-day fixture. The controlled fixture
+clocks now use the policy's original creation instant; authority durations and
+negative-expiry assertions remain unchanged. Focused and full PostgreSQL adapter
+race tests pass. Broad candidate checks and fresh installed qualification are
+pending until all review fixes are integrated.
 
-[Native run 42873289390](../test/results/fleet-issuance-native-42873289390/native-continuation-ongoing-live-1/context-storage-timing.log)
-passed at `ca325e20`: the actual phase-3 artifact created the fleet bootstrap
-role, the promoted owner read the protected fleet source and guard, and the
-authenticated browser fleet operation returned exactly two active viewers. The
-Go test passed in 445.370 s and the focused live-observation section in 163.17 s;
-the environment records unchanged sources, removed build scratch and no cleanup
-failures. PR #215's unrelated expired-fixture CI failure remains unchanged and
-is not modified here, so final-head `ci-ok` remains red despite every other CI
-job passing.
+Review found an unchecked NULL target digest in the new SQL writer and optional
+fleet RBAC being installed even without fleet composition. The candidate adds
+real SQL rejection coverage and checks the disabled producer path. The enabled
+owner also needs an exact dry-run probe through both namespace guards so its
+fleet-source policy can be proved independently; real writes remain denied.
+The target
+mapping is a domain-separated SHA-256 digest, not a keyed digest. No role,
+connection, watch or background poll is added by the viewer aggregate. The
+optional installer selection adds zero API requests or background tasks and
+binds named RBAC/probe templates before resource claims. Retained resource
+digests and current native guards remain necessary after restart.
 
-## Exact active-viewer capacity gauge (2026-11-10)
+The three original uncommitted production files were an unfinished processing
+release experiment: they referenced a profile absent from both the typed
+contract and SQL producer, so the local tree did not compile. Their exact patch
+is preserved outside the checkout; processing release remains unavailable under
+ADR-210 until its producer, consumer and installed workflow are completed.
 
-The administrator capacity operation now reports exact active viewers for the
-selected cluster alongside the distinct node-reported source/projection cohorts.
-The count covers distinct unexpired Active, Paused and Disconnected watch
-control records only while current trust, their owner enrollment and an
-activated unexpired certificate still resolve that owner. Creation stores only a
-keyed digest of the validated target cluster separately from the minimized
-control; no raw principal, source, workload, target or viewer identity is added.
-The first installed run exposed that owner-enrollment cluster matching returned
-zero for a regional target, so the aggregate now uses this explicit target key.
-Active legacy watches without it make the gauge unavailable instead of producing
-a false exact count.
+Historical evidence has distinct scopes:
 
-Migration 00148 adds the keyed placement and one read-only SQL aggregate. The
-adapter reuses the existing hub credential and pool; it adds no role, connection,
-watch, background task or polling. Its freshness deadline bounds the reply
-alongside regional runtime, fleet administration, recovery and caller validity
-before the final identity recheck. Native run 42828155612 passed owner provider
-startup after the phase-3 artifact fix, then exposed the target-cluster mapping
-defect as two actual watches but zero reported viewers. The corrected real-SQL
-[ledger and upgrade run](../test/results/live-viewer-cluster-key-3.log) passed
-both tests in 26.759 s; its [environment](../test/results/live-viewer-cluster-key-3-environment.json)
-records unchanged sources and clean teardown. Native requalification of the
-corrected installed assertion is pending.
+- [Run 42873289390](https://github.com/phihos/asservat/actions/runs/42873289390)
+  passed at `ca325e20`: the provider artifact started the fleet role, the owner
+  read protected settings, and the browser capacity operation returned two
+  viewers. This did not exercise bootstrap credential issuance and delivery,
+  multiple nodes, sustained operation or the final reviewed candidate.
+- [Run 42814814795](https://github.com/phihos/asservat/actions/runs/42814814795)
+  passed the existing policy live workflow at `4a699d9a`, before the corrected
+  target-cluster mapping. It is not qualification of the final capacity gauge.
+  Runs 42810631259 and 42813341849 failed and remain failures.
+- The original real PostgreSQL ledger/upgrade checks and built-browser tests
+  passed their named boundaries. Changes to migration 00148 require rerunning
+  the affected SQL/upgrade fixture on the integrated candidate.
 
-- The initial full `make pre-push` passed, including 613 console tests and
-  affected race shards. Presentation, application, bootstrap and React tests
-  cover the gauge, viewer outage, freshness and regenerated closed contract.
-  The owner-liveness correction then passed its focused real-SQL and packaged
-  browser checks again. A later full gate reached unrelated accepted-policy
-  fixtures whose fixed 2026-10-11 creation plus 30-day validity had just expired;
-  those untouched fixtures fail on `main` too and were not changed here.
-- [Real SQL evidence](../test/results/live-viewer-capacity-final.log): both
-  intended tests passed in 27.083 s. The compiled hub role counted one active
-  then zero closed viewers, excluded a retired owner and isolated another
-  cluster. Migration 00148 Up/Down/Up passed without changing retained records.
-  The [environment](../test/results/live-viewer-capacity-final-environment.json)
-  records unchanged sources, exit 0 and no cleanup failures. An
-  [earlier regression](../test/results/live-viewer-retired-red.log) failed with
-  one viewer still counted after owner retirement; the liveness/distinct-ID fix
-  resolved that review finding.
+Generated logs, environment dumps, screenshots and Pod logs introduced by these
+PRs are removed from the patch. Original bytes and pre-existing local results
+are preserved in the external review archive. CI artifacts own generated output;
+concise provenance summaries remain in source control. Existing historical
+reports outside these PRs are unchanged.
 
-- `make console-browser-check` passed 29 journeys and 28 accessibility scans.
-  The actual built React/Go HTTPS page renders exact active viewers separately
-  from cohorts through the canonical operation and regenerated closed contract.
-
-- [Native evidence](../test/results/live-viewer-native-42814814795/README.md):
-  run 42814814795 passed at `4a699d9a` (package 449.626 s, focus 174.90 s),
-  covering all three policy projections, sustained reads, shared ceilings and
-  exact owner failover with 31 bounded live operations and no viewer acquisition.
-  Earlier attempts
-  [42810631259](../test/results/live-viewer-native-42810631259/README.md) and
-  [42813341849](../test/results/live-viewer-native-42813341849/README.md) failed
-  transient browser-source and principal-ceiling-open episodes and are not passes.
-
-This is exact component accounting, not a fleet-administrator installed
-multi-node measurement. Final-head Gitar review approved with both findings
-closed. CI run 42814070024 passed every job except `test (1/14)`, which failed
-only the unrelated fixed-date accepted-policy fixtures described above, so the
-PR remains unmerged. The broader specification remains active.
+Next: finish independent review, run the affected SQL and repository gates,
+then qualify the integrated installed workflow. The complete first-release
+specification, processing release and wider operational qualification remain open.
 
 ## Live loss, reply-drop and pending-row capacity metrics (2026-11-10)
 

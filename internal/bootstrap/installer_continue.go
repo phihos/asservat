@@ -239,7 +239,11 @@ func (k *InstallerContinuation) Resources(ctx context.Context) (*kube.InitialRun
 		return nil, snapshot, inventory, err
 	}
 	k.at("resources/producer")
-	resources, err := kube.NewProviderInstalledRuntimeResources(ctx, k.preparer, k.sql, k.roots,
+	producer := kube.NewProviderInstalledRuntimeResources
+	if p := k.input.Public; p != nil && p.Promotion != nil && p.Federation != nil && p.Federation.Fleet != nil {
+		producer = kube.NewFleetProviderInstalledRuntimeResources
+	}
+	resources, err := producer(ctx, k.preparer, k.sql, k.roots,
 		contracts.ConfigurationProviderSelection{AuthMount: w.AuthMount, AuthMountAccessor: w.AuthMountAccessor, AuditCredentials: worker, WorkerConfigurationAudit: audit, ContextDeletionSigning: signing},
 		contracts.OwnerProviderSelection{AuthMount: o.AuthMount, AuthMountAccessor: o.AuthMountAccessor, AuditCredentials: owner})
 	if err != nil {

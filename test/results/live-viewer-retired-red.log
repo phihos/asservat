@@ -1,6 +1,0 @@
-=== RUN   TestLiveWatchLedgerWithRealServices
-    live_watch_ledger_test.go:198: retired owner remained an active viewer 1 <nil>
---- FAIL: TestLiveWatchLedgerWithRealServices (10.24s)
-FAIL
-FAIL	asservat.local/asservat/test/integration	10.312s
-FAIL

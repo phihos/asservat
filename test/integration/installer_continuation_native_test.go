@@ -510,6 +510,9 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 	// The first installed S-02 slice runs once the regional workload holds a
 	// fresh binding; it reads the public root generated during provider apply.
 	publicAddress := net.JoinHostPort(nodeInternalIP(t, ctx, api, f.Clusters[0].NodeUID), "31450")
+	if installedJourneyFocus() == "chain" || installedJourneyFocus() == "" {
+		qualifyInstalledFleetIssuance(t, ctx, admin, identity, publicRoot, publicAddress, origin, installation, "fleet-kv-"+desired.BootstrapNamespace, providers)
+	}
 	// runFocus runs the current focus; journey runs every listed focus, each
 	// as its own subtest when there are several (installedRunFoci).
 	runFocus := func(t *testing.T, cluster, namespace, workload string, deny func(bool), gone func(string)) {

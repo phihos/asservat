@@ -20,8 +20,10 @@ import (
 // compilation and retention arithmetic establish requested vs effective age.
 func sourceRetentionCheckFixture(t *testing.T, maximum, deletion int64) (captureapp.PolicySourceCheck, time.Time) {
 	t.Helper()
-	now := time.Now().UTC().Truncate(time.Microsecond)
 	preview := previewTestValue(t)
+	// Match the accepted authority's synthetic clock instead of letting this
+	// current-time check outlive the fixed fixture's original expiry.
+	now := preview.CreatedAt
 	var scope authorization.PolicyGrantScope
 	if err := json.Unmarshal(policyGrantTestRow(t).PolicyScope, &scope); err != nil {
 		t.Fatal(err)

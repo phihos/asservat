@@ -1,6 +1,6 @@
 # Active-viewer native qualification on final head
 
-GitHub native run: 42814814795, attempt 1
+GitHub native run: [42814814795](https://github.com/phihos/asservat/actions/runs/42814814795), attempt 1
 Commit: `4a699d9a06218b1778e2ecabc1d8985f31e2aeb0`
 Suite: `continuation-ongoing-live`
 
