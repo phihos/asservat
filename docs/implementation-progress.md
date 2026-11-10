@@ -15,9 +15,20 @@ composition defect: phase 3 built its provider artifact before attaching the
 fleet section, so it omitted the runtime `bootstrap-channel` role and every
 owner login for that purpose failed. The artifact and final runtime input now
 share one fleet-pinning function. A regression checks the artifact's exact role
-and issuance-audit scope; full bootstrap and provider packages pass. Native
-installed qualification is not claimed yet. PR #215's unrelated expired-fixture
-CI failure remains unchanged and is not modified here.
+and issuance-audit scope; full bootstrap and provider packages pass. The next
+installed attempts exposed two missing named RBAC reads. The installed owner now
+adds only the original fleet ConfigMap and guard names when fleet composition is
+enabled; non-fleet RBAC remains unchanged, with a focused privilege regression.
+
+[Native run 42873289390](../test/results/fleet-issuance-native-42873289390/native-continuation-ongoing-live-1/context-storage-timing.log)
+passed at `ca325e20`: the actual phase-3 artifact created the fleet bootstrap
+role, the promoted owner read the protected fleet source and guard, and the
+authenticated browser fleet operation returned exactly two active viewers. The
+Go test passed in 445.370 s and the focused live-observation section in 163.17 s;
+the environment records unchanged sources, removed build scratch and no cleanup
+failures. PR #215's unrelated expired-fixture CI failure remains unchanged and
+is not modified here, so final-head `ci-ok` remains red despite every other CI
+job passing.
 
 ## Exact active-viewer capacity gauge (2026-11-10)
 
