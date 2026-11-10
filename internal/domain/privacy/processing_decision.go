@@ -25,13 +25,20 @@ func (a ProcessingAuthority) Valid(now time.Time) bool {
 // release names the previous restrictive revision; normal grants are unrelated.
 type ProcessingChange struct {
 	RequestID, RuleID string
-	Action            string
-	ExpectedRevision  int64
-	Scope             ProcessingScope
+	// RequestedArtifactID is a transient public selector, resolved under the
+	// request's privacy-operator authority before canonical audit/SQL bytes.
+	RequestedArtifactID string `json:"-"`
+	Action              string
+	ExpectedRevision    int64
+	Scope               ProcessingScope
+}
+
+func (c ProcessingChange) Equal(other ProcessingChange) bool {
+	return c.RequestID == other.RequestID && c.RuleID == other.RuleID && c.RequestedArtifactID == other.RequestedArtifactID && c.Action == other.Action && c.ExpectedRevision == other.ExpectedRevision && c.Scope.Equal(other.Scope)
 }
 
 func (c ProcessingChange) Valid() bool {
-	if !authorization.UUID(c.RequestID) {
+	if !authorization.UUID(c.RequestID) || c.RequestedArtifactID != "" {
 		return false
 	}
 	switch c.Action {
@@ -43,6 +50,10 @@ func (c ProcessingChange) Valid() bool {
 		return authorization.UUID(c.RuleID) && c.ExpectedRevision > 0 && c.ExpectedRevision < MaxProcessingChanges && c.ExpectedRevision%2 == 1 && c.Scope.Valid()
 	}
 	return false
+}
+
+func (c ProcessingChange) ValidRequest() bool {
+	return c.Valid() || authorization.UUID(c.RequestID) && authorization.UUID(c.RuleID) && authorization.UUID(c.RequestedArtifactID) && c.Action == "restrict_processing" && c.ExpectedRevision == 0 && c.Scope == (ProcessingScope{})
 }
 
 type ProcessingReceipt struct {

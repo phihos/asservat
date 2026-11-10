@@ -194,7 +194,7 @@ func (s *ProcessingDecisions) PrepareProcessing(ctx context.Context, a value.Pro
 					return app.ErrCapacity
 				}
 				var retained value.ProcessingScope
-				if json.Unmarshal(r.Scope, &retained) != nil || r.Revision != draft.Change.ExpectedRevision || retained != draft.Change.Scope || !bytes.Equal(r.ReleaseAccount, draft.ReleaseAccount[:]) {
+				if json.Unmarshal(r.Scope, &retained) != nil || r.Revision != draft.Change.ExpectedRevision || !retained.Equal(draft.Change.Scope) || !bytes.Equal(r.ReleaseAccount, draft.ReleaseAccount[:]) {
 					return value.ErrConflict
 				}
 			}
@@ -216,6 +216,9 @@ func (s *ProcessingDecisions) PrepareProcessing(ctx context.Context, a value.Pro
 	})
 	if errors.Is(e, app.ErrCapacity) {
 		return app.ProcessingPrepared{}, app.ErrCapacity
+	}
+	if errors.Is(e, value.ErrConflict) {
+		return app.ProcessingPrepared{}, value.ErrConflict
 	}
 	if e != nil {
 		return app.ProcessingPrepared{}, value.ErrUnavailable
@@ -254,6 +257,9 @@ func (s *ProcessingDecisions) ApplyProcessing(ctx context.Context, a value.Proce
 		out, e = processingReceipt(row, p, a, current.Time)
 		return e
 	})
+	if errors.Is(e, value.ErrConflict) {
+		return value.ProcessingReceipt{}, value.ErrConflict
+	}
 	if e != nil {
 		return value.ProcessingReceipt{}, value.ErrUnavailable
 	}

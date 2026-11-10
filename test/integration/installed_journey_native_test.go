@@ -454,6 +454,10 @@ func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, ro
 			}
 		}
 		t.Logf("installed journey: the Keycloak user downloaded the native pod-status file (%d bytes) of cluster %s through the hub-local worker", size, cluster)
+		if !short && installedJourneyFocus() == "journey" {
+			qualifyInstalledProcessing(t, ctx, installedProcessingRun{SQL: admin, RootID: root, Identity: identity, PublicRoot: cert, Address: address, Origin: origin,
+				CaseID: progress.CaseID, ArtifactID: investigation.Artifacts[0].ArtifactID, ExpiresAt: expires, Native: native, Transport: transport, Call: readReply, Diagnose: diagnose})
+		}
 		if short {
 			if installedJourneyFocus() == "share" {
 				// ADR-232: share the published artifact with the unrelated principal.

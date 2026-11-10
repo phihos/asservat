@@ -12,16 +12,18 @@ import (
 )
 
 // publicProcessingChanges composes the ADR-210 privacy-operator change. The
-// normal lane's policy and retained seconds are read from the current accepted
-// capacity profile for each call, like the selected auditor that begins the
-// audit: a renewal between the two fails closed and the change is retried.
+// normal and reserved release policies are read from the current accepted
+// capacity profile for each call, like their selected auditors: a renewal
+// between those reads fails closed and the change is retried.
 type publicProcessingChanges struct {
 	root, installation string
 	profiles           auditapp.CapacityAuditProfiles
 	policies           privacy.ProcessingPolicyReader
 	recovery           privacy.ProcessingRecoveryReader
 	decisions          privacy.ProcessingDecisions
+	artifactScopes     privacy.ProcessingArtifactScopes
 	audit              privacy.ProcessingAudit
+	releaseAudit       privacy.ProcessingAudit
 	mac                *auditapp.OperationMAC
 	// refused receives a fixed step name per refusal; diagnostics only.
 	refused func(string)
@@ -29,17 +31,17 @@ type publicProcessingChanges struct {
 
 func (s publicProcessingChanges) Change(ctx context.Context, current identities.CurrentIdentity, c value.ProcessingChange) (value.ProcessingReceipt, error) {
 	var zero value.ProcessingReceipt
-	// ADR-210 decision 3: the release lane is not composed.
-	if c.Action == "release_processing" {
-		return zero, value.ErrUnavailable
-	}
 	accepted, err := s.profiles.ReadCapacityAuditProfiles(ctx)
 	if err != nil {
 		s.refuse("profiles")
 		return zero, value.ErrUnavailable
 	}
-	receipt, err := privacy.ProcessingChanges{RootID: s.root, InstallationID: s.installation, Policies: s.policies, Recovery: s.recovery, Decisions: s.decisions,
-		Audit: s.audit, MAC: s.mac, AuditPolicy: accepted.Normal.Policy, RetainedSeconds: accepted.Normal.RetainedSeconds, Now: time.Now}.Change(ctx, current, c)
+	retainedSeconds := accepted.Normal.RetainedSeconds
+	if c.Action == "release_processing" {
+		retainedSeconds = accepted.Processing.RetainedSeconds
+	}
+	receipt, err := privacy.ProcessingChanges{RootID: s.root, InstallationID: s.installation, Policies: s.policies, Recovery: s.recovery, Decisions: s.decisions, ArtifactScopes: s.artifactScopes,
+		Audit: s.audit, ReleaseAudit: s.releaseAudit, MAC: s.mac, AuditPolicy: accepted.Normal.Policy, ReleaseAuditPolicy: accepted.Processing.Policy, RetainedSeconds: retainedSeconds, Now: time.Now}.Change(ctx, current, c)
 	if err != nil {
 		s.refuse(s.refusedStep(ctx, current))
 	}

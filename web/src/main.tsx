@@ -1,6 +1,6 @@
 import { lazy, Suspense } from 'react';
 import { EvidenceBoundary } from './evidence-boundary';
-import { approvalIDFromPath, caseIDFromPath } from './routes';
+import { approvalIDFromPath, caseIDFromPath, processingArtifactIDFromPath } from './routes';
 import { createRoot } from 'react-dom/client';
 import { SessionGate } from './auth/SessionGate';
 import { BrowserSession } from './auth/session';
@@ -16,6 +16,7 @@ import { ApprovalsWorkspace } from './approvals/ApprovalsWorkspace';
 import { Shares } from './sharing/shares';
 import './styles.css';
 
+const ProcessingWorkspace = lazy(() => import('./processing/ProcessingWorkspace').then(module => ({ default: module.ProcessingWorkspace })));
 const LiveWorkspace = lazy(() => import('./live/LiveWorkspace').then(module => ({default:module.LiveWorkspace})));
 const livePage = window.location.pathname === '/live';
 const caseID = caseIDFromPath(window.location.pathname);
@@ -29,6 +30,7 @@ const shares = new Shares();
 const policyPage = window.location.pathname === '/policies';
 const sharesPage = window.location.pathname === '/shares';
 const accessPreviewPage = window.location.pathname === '/access-preview';
+const processingPage = window.location.pathname === '/processing' || processingArtifactIDFromPath(window.location.pathname) !== undefined;
 const capacityPage = window.location.pathname === '/capacity';
 const retentionPreviewPage = window.location.pathname === '/retention-preview';
 const approvalID = approvalIDFromPath(window.location.pathname);
@@ -41,5 +43,5 @@ const root = document.getElementById('root');
 if (!root) throw new Error('Missing console root');
 createRoot(root).render(<>
   <a className="skip-link" href="#main">Skip to content</a>
-  <SessionGate controller={controller}>{(session, scope) => <Suspense fallback={<p role="status">Loading evidence view…</p>}>{caseID ? <EvidenceBoundary path={"/cases/" + caseID}><EvidenceWorkspace session={session} scope={scope} caseID={caseID}/></EvidenceBoundary> : livePage ? <LiveWorkspace session={session} scope={scope}/> : policyPage ? <PolicyWorkspace session={session} scope={scope} controller={policies}/> : sharesPage ? <SharesWorkspace session={session} scope={scope} controller={shares}/> : accessPreviewPage ? <AccessPreviewWorkspace session={session} scope={scope}/> : capacityPage ? <CapacityWorkspace session={session} scope={scope}/> : retentionPreviewPage ? <RetentionPreviewWorkspace session={session} scope={scope}/> : approvalsPage ? <ApprovalsWorkspace session={session} scope={scope} grantID={approvalID}/> : <CaptureWorkspace session={session} scope={scope} controller={investigation}/>}</Suspense>}</SessionGate>
+  <SessionGate controller={controller}>{(session, scope) => <Suspense fallback={<p role="status">Loading evidence view…</p>}>{caseID ? <EvidenceBoundary path={"/cases/" + caseID}><EvidenceWorkspace session={session} scope={scope} caseID={caseID}/></EvidenceBoundary> : livePage ? <LiveWorkspace session={session} scope={scope}/> : policyPage ? <PolicyWorkspace session={session} scope={scope} controller={policies}/> : sharesPage ? <SharesWorkspace session={session} scope={scope} controller={shares}/> : accessPreviewPage ? <AccessPreviewWorkspace session={session} scope={scope}/> : processingPage ? <ProcessingWorkspace session={session} scope={scope}/> : capacityPage ? <CapacityWorkspace session={session} scope={scope}/> : retentionPreviewPage ? <RetentionPreviewWorkspace session={session} scope={scope}/> : approvalsPage ? <ApprovalsWorkspace session={session} scope={scope} grantID={approvalID}/> : <CaptureWorkspace session={session} scope={scope} controller={investigation}/>}</Suspense>}</SessionGate>
 </>);

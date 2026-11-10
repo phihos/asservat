@@ -43,7 +43,7 @@ for (const file of (await readdir(resolve(root, 'specs/contracts'))).filter(file
   const schema = JSON.parse(await readFile(resolve(root, 'specs/contracts', file), 'utf8'));
   registry.set(schema.$id, { name: 'Contract_' + file.replace('.schema.json', '').replaceAll('-', '_'), schema });
 }
-async function operationBundle(names, bundle) {
+async function operationBundle(names, bundle, direct = []) {
   const capture = { openapi: browser.openapi, info: browser.info, paths: {}, components: { schemas: {} } };
   function localSchema(value, base) {
     if (Array.isArray(value)) return value.map(child => localSchema(child, base));
@@ -84,12 +84,19 @@ async function operationBundle(names, bundle) {
       exports['valid' + direction + '_' + name] = key;
     }
   }
+  for (const name of direct) {
+    const schema = browser.components.schemas[name];
+    capture.components.schemas[name] = localSchema(schema);
+    validators.addSchema(schema, name);
+    exports['valid' + name] = name;
+  }
   outputs[bundle + '.d.ts'] = astToString(await openapiTS(capture, { emptyObjectsUnknown: true }));
   outputs['validate-' + bundle + '.js'] = standalone(validators, exports);
   outputs['validate-' + bundle + '.d.ts'] = `import type { components } from './${bundle}';\n` + Object.entries(exports).map(([name, key]) =>
     `export declare function ${name}(value: unknown): value is components['schemas']['${key}'];\n`).join('');
 
 }
+await operationBundle([], 'processing', ['ProcessingInventory', 'ProcessingChange', 'ProcessingReceipt']);
 await operationBundle(['list_diagnostics', 'preview_capture', 'request_capture', 'resolve_capture_request', 'get_capture', 'cancel_capture', 'list_capture_history', 'get_capture_settings', 'list_capture_profiles', 'get_capture_profile'], 'capture');
 await operationBundle(['get_case', 'prepare_artifact_download', 'get_artifact_download', 'cancel_artifact_download'], 'evidence');
 await operationBundle(['get_file_excerpt', 'get_profile_summary', 'get_pcap_summary', 'pcap_query', 'compare_profiles', 'get_syscall_summary', 'get_syscall_events', 'syscall_query', 'get_logs', 'get_query_result'], 'projection');
@@ -123,6 +130,7 @@ function browserModules(source) {
     return `import * as ${name}Module from '${path}.js';\nconst ${name} = { default: typeof ${name}Module.default === 'function' ? ${name}Module.default : ${name}Module.default.default };\n`;
   }).join('') + result;
 }
+outputs['validate-processing.js'] = browserModules(outputs['validate-processing.js']);
 outputs['validate-live.js'] = browserModules(outputs['validate-live.js']);
 outputs['validate-auth.js'] = browserModules(outputs['validate-auth.js']);
 outputs['validate-capture.js'] = browserModules(outputs['validate-capture.js']);

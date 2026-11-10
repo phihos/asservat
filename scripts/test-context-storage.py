@@ -142,6 +142,11 @@ def source_hashes():
     files += [ROOT/"scripts/package-argument-gadget.py"]
     files += [ROOT/"experiments/syscall-argument-budget"/name for name in ("prepare.py", "pins.json", "program.patch", "budget.h")]
     files += [ROOT/"web/package.json", ROOT/"web/package-lock.json", ROOT/"web/scripts/installed-history-browser.mjs", ROOT/"web/scripts/installed-history-response.mjs", ROOT/"web/scripts/installed-profile-comparison-browser.mjs", ROOT/"web/scripts/installed-packet-summary-browser.mjs", ROOT/"web/scripts/installed-packet-query-browser.mjs", ROOT/"web/scripts/installed-syscall-query-browser.mjs", ROOT/"web/scripts/installed-profile-case-proof.mjs", ROOT/"web/src/generated/validate-auth.js", ROOT/"web/src/generated/validate-evidence.js"]
+    # Freeze both the image-owned React inputs and the real browser drivers,
+    # including new journeys without extending a hand-maintained file list.
+    files += list((ROOT/"web/src").rglob("*"))
+    files += list((ROOT/"web/scripts").glob("*.mjs")) + list((ROOT/"web/tests").glob("*.mjs"))
+    files += [ROOT/"web/index.html", ROOT/"web/vite.config.ts", ROOT/"web/tsconfig.json"]
     files += list((ROOT/"cmd").rglob("*.go")) + list((ROOT/"internal").rglob("*.go")) + list((ROOT/"test/integration").rglob("*.go"))
     files += [ROOT/"scripts/helm_registry.py", ROOT/"scripts/native_kube_audit.py", ROOT/"scripts/pod_log_stream.py"] + list((ROOT/"charts/asservat").rglob("*"))
     files = [p for p in files if p.is_file()]

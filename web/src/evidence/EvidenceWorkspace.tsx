@@ -144,6 +144,7 @@ export default function EvidenceWorkspace({ session, scope, caseID, controller =
         <h2 id={`artifact-${index}`}>{kindName(artifact.kind, artifact.data_class)}</h2>
         <p className="field-help">{classLine(artifact)}</p>
         <Handling artifact={artifact}/>
+        <p><a href={"/processing/artifacts/" + encodeURIComponent(artifact.artifact_id)}>Manage processing restriction</a></p>
         {Date.parse(artifact.expires_at) <= Date.now() ? <p>Evidence access has expired.</p> : <>
           {artifact.data_class === 'metadata' && ['context', 'pod-status'].includes(artifact.kind) && <SavedPodStatus session={session} scope={scope} caseID={caseID} artifactID={artifact.artifact_id}/>}
           {artifact.kind === 'packetCapture' && (artifact.native_format === 'pcapng' && artifact.data_class === 'metadata' || artifact.native_format === 'pcapng-raw' && artifact.data_class === 'raw' && state.details?.case.access !== 'shared') && <><SavedPacketSummary session={session} scope={scope} caseID={caseID} artifact={artifact}/><SavedPacketQuery session={session} scope={scope} caseID={caseID} artifact={artifact}/></>}

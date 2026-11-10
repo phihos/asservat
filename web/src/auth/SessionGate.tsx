@@ -24,7 +24,7 @@ export function SessionGate({ controller, children }: {
   }, [controller]);
 
   if (state.phase === 'active') return <>
-    <header className="app-header"><a className="brand" href="/">Asservat</a><a href="/live">Watch live</a><Button className="button secondary" onPress={() => { void controller.logout(); }}>Sign out</Button></header>
+    <header className="app-header"><a className="brand" href="/">Asservat</a><a href="/live">Watch live</a><a href="/processing">Processing restrictions</a><Button className="button secondary" onPress={() => { void controller.logout(); }}>Sign out</Button></header>
     <main id="main" className="workspace">{children(state.session, state.scope)}</main>
   </>;
 

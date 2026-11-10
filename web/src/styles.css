@@ -13,7 +13,7 @@ p { margin: 0 0 24px; color: #5e6772; max-width: 65ch; }
 .button.secondary:hover, .button.secondary[data-hovered] { background: #f8f9fa; }
 :focus-visible, .button[data-focus-visible] { outline: 3px solid #126b54; outline-offset: 3px; }
 .actions { display: flex; flex-wrap: wrap; gap: 12px; }
-.app-header { min-height: 80px; padding: 16px 32px; border-bottom: 1px solid #e3e6e9; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.app-header { min-height: 80px; padding: 16px 32px; border-bottom: 1px solid #e3e6e9; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 20px; }
 .workspace { max-width: 1440px; padding: 40px 32px; margin: auto; }
 .capture-workspace { max-width: 760px; margin: 0 auto; }
 .page-intro { margin-bottom: 32px; }

@@ -22,6 +22,12 @@ type ProcessingScope struct {
 	AcquiredFrom, AcquiredUntil          time.Time
 }
 
+// Equal compares interval instants independently of JSON-decoded timezone
+// locations. It does not normalize the scope or change its canonical bytes.
+func (s ProcessingScope) Equal(other ProcessingScope) bool {
+	return s.Kind == other.Kind && s.Location == other.Location && s.ClusterID == other.ClusterID && s.NamespaceUID == other.NamespaceUID && s.WorkloadUID == other.WorkloadUID && s.AcquiredFrom.Equal(other.AcquiredFrom) && s.AcquiredUntil.Equal(other.AcquiredUntil)
+}
+
 func (s ProcessingScope) Valid() bool {
 	switch s.Kind {
 	case "artifact":

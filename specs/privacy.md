@@ -131,6 +131,20 @@ Automated content discovery cannot prove complete coverage in arbitrary cores. R
 
 Given a validated erasure request covering an incident, when a privacy operator deletes its candidate artifacts, then derived summaries, versions and query caches enter the same deletion plan. A legally preserved item is separately restricted and explained; lack of a user tag is not reported as proof of absence.
 
+### SC-PRV-010
+
+Given an initialized installation and a current configured privacy operator,
+when they select a published artifact from its case, restrict its processing,
+reload the durable restriction inventory and explicitly release the exact
+current revision, then new ordinary case reads and native-response starts are
+refused while restricted and recover for the same original artifact after
+release. Inventory remains operator-only; ordinary read permission alone cannot
+manage rules. Replaying the original change adds no audit spend or deadline.
+Unknown changes retain their original request ID; an acknowledged revision
+conflict requires refreshed state and another explicit decision. Existing
+started responses retain ADR-312's original bounds. The console never treats an
+administrative deadline or missing browser state as release.
+
 ## REQ-PRV-007 — External agents, transfers and operational privacy
 
 Apply locality policy to raw storage, decryption, derived results, hub indexes, backups, support bundles and configured event destinations. The hub region and authorized remote client disclosures are part of the data-flow inventory. Local raw storage alone does not establish that all personal data remains in that region. The administrator approves clients/data classes for external AI disclosure and supplies the relevant organizational handling policy. Authentication/client allowlisting constrains recipients, but cannot establish or enforce their eventual model provider, geography, logging or retention.

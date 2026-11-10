@@ -175,6 +175,54 @@ func (q *Queries) InsertProcessingRule(ctx context.Context, arg InsertProcessing
 	return err
 }
 
+const listProcessingInventoryRules = `-- name: ListProcessingInventoryRules :many
+SELECT id,revision,state,scope,valid_until,retire_by FROM processing_rule
+WHERE root_id=$1::uuid AND ($2::uuid IS NULL OR id>$2::uuid)
+ORDER BY id LIMIT $3::integer
+`
+
+type ListProcessingInventoryRulesParams struct {
+	RootID    pgtype.UUID
+	AfterID   pgtype.UUID
+	PageLimit int32
+}
+
+type ListProcessingInventoryRulesRow struct {
+	ID         pgtype.UUID
+	Revision   int64
+	State      string
+	Scope      []byte
+	ValidUntil pgtype.Timestamptz
+	RetireBy   pgtype.Timestamptz
+}
+
+func (q *Queries) ListProcessingInventoryRules(ctx context.Context, arg ListProcessingInventoryRulesParams) ([]ListProcessingInventoryRulesRow, error) {
+	rows, err := q.db.Query(ctx, listProcessingInventoryRules, arg.RootID, arg.AfterID, arg.PageLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListProcessingInventoryRulesRow{}
+	for rows.Next() {
+		var i ListProcessingInventoryRulesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Revision,
+			&i.State,
+			&i.Scope,
+			&i.ValidUntil,
+			&i.RetireBy,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const lockProcessingDecision = `-- name: LockProcessingDecision :one
 SELECT id, root_id, rule_id, expected_revision, release_account, actor_digest, request_digest, scope, action, intent_seed, decision_digest, created_at, request_until, valid_until, retire_by, outcome_json, applied_at, audit_digest, result_revision, result_sequence FROM processing_decision WHERE root_id=$1 AND id=$2 AND actor_digest=sha256(convert_to($3::jsonb::text,'UTF8')) FOR UPDATE
 `
@@ -416,6 +464,30 @@ func (q *Queries) ReadProcessingRules(ctx context.Context, rootID pgtype.UUID) (
 		return nil, err
 	}
 	return items, nil
+}
+
+const resolveProcessingArtifactScope = `-- name: ResolveProcessingArtifactScope :one
+SELECT p.cluster_id,p.artifact_id,p.attempt_id FROM context_processing p
+JOIN context_catalog c ON c.root_id=p.root_id AND c.artifact_id=p.artifact_id AND c.capture_id=p.capture_id
+WHERE p.root_id=$1::uuid AND p.artifact_id=$2::uuid
+`
+
+type ResolveProcessingArtifactScopeParams struct {
+	RootID     pgtype.UUID
+	ArtifactID pgtype.UUID
+}
+
+type ResolveProcessingArtifactScopeRow struct {
+	ClusterID  pgtype.UUID
+	ArtifactID pgtype.UUID
+	AttemptID  pgtype.UUID
+}
+
+func (q *Queries) ResolveProcessingArtifactScope(ctx context.Context, arg ResolveProcessingArtifactScopeParams) (ResolveProcessingArtifactScopeRow, error) {
+	row := q.db.QueryRow(ctx, resolveProcessingArtifactScope, arg.RootID, arg.ArtifactID)
+	var i ResolveProcessingArtifactScopeRow
+	err := row.Scan(&i.ClusterID, &i.ArtifactID, &i.AttemptID)
+	return i, err
 }
 
 const updateProcessingBacking = `-- name: UpdateProcessingBacking :execrows

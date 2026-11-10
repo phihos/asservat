@@ -11,7 +11,8 @@ import (
 // SelectedOperationAuditor reads the lane's current accepted capacity profile
 // before each new Begin (ADR-190) and finishes each operation with the policy
 // its intent was bound to, so a renewal never rebinds work in flight. It keeps
-// one healthy auditor per policy, built on first use; at most four.
+// one healthy auditor per policy, built on first use; at most four. The
+// processing lane uses its independently reserved release profile (ADR-210).
 type SelectedOperationAuditor struct {
 	lane     string
 	profiles CapacityAuditProfiles
@@ -30,7 +31,7 @@ type selectedAuditor struct {
 }
 
 func NewSelectedOperationAuditor(lane string, profiles CapacityAuditProfiles, build func(context.Context, value.OperationLifecyclePolicy) (*HealthyOperationAuditor, error)) (*SelectedOperationAuditor, error) {
-	if lane != "normal" && lane != "resolution" || profiles == nil || build == nil {
+	if lane != "normal" && lane != "resolution" && lane != "processing" || profiles == nil || build == nil {
 		return nil, ErrUnavailable
 	}
 	return &SelectedOperationAuditor{lane: lane, profiles: profiles, build: build}, nil
@@ -51,6 +52,8 @@ func (s *SelectedOperationAuditor) Begin(ctx context.Context, in value.Operation
 	profile := accepted.Normal
 	if s.lane == "resolution" {
 		profile = accepted.Resolution
+	} else if s.lane == "processing" {
+		profile = accepted.Processing
 	}
 	a, err := s.auditor(ctx, profile.Policy)
 	if err != nil {

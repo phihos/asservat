@@ -33,6 +33,9 @@ type ProcessingDecisions interface {
 	PrepareProcessing(context.Context, value.ProcessingAuthority, ProcessingDecision) (ProcessingPrepared, error)
 	ApplyProcessing(context.Context, value.ProcessingAuthority, ProcessingDecision) (value.ProcessingReceipt, error)
 }
+type ProcessingArtifactScopes interface {
+	ResolveProcessingArtifactScope(context.Context, value.ProcessingAuthority, string) (value.ProcessingScope, error)
+}
 type ProcessingAudit interface {
 	Begin(context.Context, auditvalue.OperationIntent) error
 	Finish(context.Context, auditvalue.OperationOutcome) error
@@ -42,6 +45,7 @@ type ProcessingChanges struct {
 	Policies               ProcessingPolicyReader
 	Recovery               ProcessingRecoveryReader
 	Decisions              ProcessingDecisions
+	ArtifactScopes         ProcessingArtifactScopes
 	Audit                  ProcessingAudit
 	ReleaseAudit           ProcessingAudit
 	MAC                    *auditapp.OperationMAC
@@ -91,7 +95,7 @@ func sameProcessingIdentity(a, b identity.Identity) bool {
 }
 func (s ProcessingChanges) Change(ctx context.Context, source ProcessingIdentity, c value.ProcessingChange) (value.ProcessingReceipt, error) {
 	var zero value.ProcessingReceipt
-	if ctx == nil || ctx.Err() != nil || source == nil || s.Policies == nil || s.Recovery == nil || s.Decisions == nil || s.Audit == nil || s.MAC == nil || s.Now == nil || !c.Valid() || !s.AuditPolicy.CertificateVerificationBacked() || s.RetainedSeconds < 60 || s.RetainedSeconds > 316224000 {
+	if ctx == nil || ctx.Err() != nil || source == nil || s.Policies == nil || s.Recovery == nil || s.Decisions == nil || s.Audit == nil || s.MAC == nil || s.Now == nil || !c.ValidRequest() || !s.AuditPolicy.CertificateVerificationBacked() || s.RetainedSeconds < 60 || s.RetainedSeconds > 316224000 {
 		return zero, value.ErrUnavailable
 	}
 	started := s.Now().UTC().Truncate(time.Microsecond)
@@ -108,6 +112,16 @@ func (s ProcessingChanges) Change(ctx context.Context, source ProcessingIdentity
 	until = authority.ValidUntil.UTC().Truncate(time.Microsecond)
 	call, stopOriginal := context.WithDeadline(call, until)
 	defer stopOriginal()
+	if c.RequestedArtifactID != "" {
+		if s.ArtifactScopes == nil {
+			return zero, value.ErrUnavailable
+		}
+		scope, err := s.ArtifactScopes.ResolveProcessingArtifactScope(call, authority, c.RequestedArtifactID)
+		if err != nil || !authority.Valid(s.Now()) || call.Err() != nil || scope.Kind != "artifact" || scope.Location.ArtifactID != c.RequestedArtifactID || !scope.Valid() {
+			return zero, value.ErrUnavailable
+		}
+		c.Scope, c.RequestedArtifactID = scope, ""
+	}
 	// The initiating private operation retains RequestID. Replays cannot give
 	// the same decision a new audit ID or acquire another provider attempt.
 	input, e := json.Marshal(struct {
@@ -166,6 +180,9 @@ func (s ProcessingChanges) Change(ctx context.Context, source ProcessingIdentity
 		return zero, value.ErrUnavailable
 	}
 	prepared, e := s.Decisions.PrepareProcessing(call, authority, draft)
+	if errors.Is(e, value.ErrConflict) {
+		return zero, value.ErrConflict
+	}
 	if errors.Is(e, ErrCapacity) {
 		return zero, ErrCapacity
 	}
@@ -179,7 +196,7 @@ func (s ProcessingChanges) Change(ctx context.Context, source ProcessingIdentity
 		return s.finalReceipt(call, source, authority, *prepared.Receipt)
 	}
 	decision := prepared.Decision
-	if !decision.Valid() || decision.Change != c || decision.Intent.Actor != authority.Identity.Principal || !s.Now().Before(decision.Intent.RequestUntil) {
+	if !decision.Valid() || !decision.Change.Equal(c) || decision.Intent.Actor != authority.Identity.Principal || !s.Now().Before(decision.Intent.RequestUntil) {
 		return zero, value.ErrUnavailable
 	}
 	original := identity.Earlier(until, decision.Intent.RequestUntil)
@@ -191,13 +208,17 @@ func (s ProcessingChanges) Change(ctx context.Context, source ProcessingIdentity
 	if e = auditService.Finish(call, decision.Outcome); e != nil {
 		return zero, value.ErrUnavailable
 	}
-	// Audit says prepared/effect-unknown. Current authority is still required
-	// after provider waits; only the SQL result can prove the bounded CAS.
-	final, e := s.authority(call, source, started, identity.Earlier(authority.ValidUntil, original))
-	if e != nil || !authority.Valid(s.Now()) || !sameProcessingIdentity(authority.Identity, final.Identity) || authority.Policy.Revision != final.Policy.Revision || authority.Policy.ProtectionDigest != final.Policy.ProtectionDigest || authority.Recovery.Revision != final.Recovery.Revision || authority.Recovery.IssuerEpoch != final.Recovery.IssuerEpoch {
+	// Keep the original completed authority through provider waits (ADR-311).
+	// Current request identity and SQL effect fences still precede the CAS.
+	authority.ValidUntil = identity.Earlier(authority.ValidUntil, original)
+	final, e := s.continueAuthority(call, source, authority)
+	if e != nil {
 		return zero, value.ErrUnavailable
 	}
 	result, e := s.Decisions.ApplyProcessing(call, final, decision)
+	if errors.Is(e, value.ErrConflict) {
+		return zero, value.ErrConflict
+	}
 	if e != nil || !result.Valid(s.Now()) || result.RequestID != c.RequestID || call.Err() != nil {
 		return zero, value.ErrUnavailable
 	}
@@ -220,8 +241,8 @@ func ProcessingRequestDigest(c value.ProcessingChange) artifact.Digest {
 }
 
 func (s ProcessingChanges) finalReceipt(ctx context.Context, source ProcessingIdentity, original value.ProcessingAuthority, r value.ProcessingReceipt) (value.ProcessingReceipt, error) {
-	now, e := s.authority(ctx, source, original.ObservedAt, identity.Earlier(original.ValidUntil, r.ValidUntil))
-	if e != nil || !original.Valid(s.Now()) || !sameProcessingIdentity(original.Identity, now.Identity) || now.Policy.Revision != original.Policy.Revision || now.Policy.ProtectionDigest != original.Policy.ProtectionDigest || now.Recovery.Revision != original.Recovery.Revision || now.Recovery.IssuerEpoch != original.Recovery.IssuerEpoch {
+	now, e := s.continueAuthority(ctx, source, original)
+	if e != nil {
 		return value.ProcessingReceipt{}, value.ErrUnavailable
 	}
 	r.ValidUntil = identity.Earlier(r.ValidUntil, now.ValidUntil)
@@ -229,4 +250,19 @@ func (s ProcessingChanges) finalReceipt(ctx context.Context, source ProcessingId
 		return value.ProcessingReceipt{}, value.ErrUnavailable
 	}
 	return r, nil
+}
+
+// Reuse one complete operation observation, preserving every original bound.
+// ResolveIdentity checks the existing request identity; policy/recovery are not
+// observed again and SQL retains its independent current effect checks.
+func (s ProcessingChanges) continueAuthority(ctx context.Context, source ProcessingIdentity, original value.ProcessingAuthority) (value.ProcessingAuthority, error) {
+	current, err := source.ResolveIdentity(ctx)
+	if err != nil || ctx.Err() != nil || !original.Valid(s.Now()) || !current.Valid(s.Now()) || !sameProcessingIdentity(original.Identity, current) {
+		return value.ProcessingAuthority{}, value.ErrUnavailable
+	}
+	original.ValidUntil = identity.Earlier(original.ValidUntil, current.ValidUntil)
+	if !original.Valid(s.Now()) {
+		return value.ProcessingAuthority{}, value.ErrUnavailable
+	}
+	return original, nil
 }

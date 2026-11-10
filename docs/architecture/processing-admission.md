@@ -66,3 +66,14 @@ installation boundary. Constructor sites are inventoried in the handoff.
 The source and native tests for this follow-up remain unrun until recorded by
 the owned qualification harness. The existing SQL54 matrix passed before this
 change; it is not evidence for these added checks.
+
+## Operator inventory and release
+
+[ADR-318](../decisions/318-processing-operator-rule-inventory-and-release.md)
+composes current operator authority, the existing processing transaction and
+reserved release lane with same-origin console controls. Inventory uses bounded
+queries under the existing processing duty; it does not grant ordinary evidence
+inspection. Artifact selection resolves one immutable location before audit;
+release uses the persisted scope and exact revision. No new credential, pool,
+watch, background task or authority-renewal mechanism is introduced. Current
+qualification and remaining gaps are in implementation progress.
