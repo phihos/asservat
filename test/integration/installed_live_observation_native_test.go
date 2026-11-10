@@ -563,6 +563,36 @@ func installedLiveMCP(t *testing.T, ctx context.Context, db *pgxpool.Pool, root 
 		return errors.New("public accounting differs from actual minimized ledger")
 	}
 	if run.Fanout {
+		if replay.NextCursor == nil {
+			return errors.New("sustained live reads lost continuation")
+		}
+		readInput["cursor"] = *replay.NextCursor
+		for n := 0; n < 5; n++ {
+			r, e := must("read_live_watch", readInput, nil)
+			if e != nil {
+				return e
+			}
+			wrapped, _ := json.Marshal(map[string]any{"batch": r.Data})
+			decoded, e := liveapp.DecodeOwnerResult(wrapped, time.Now())
+			if e != nil || decoded.Batch == nil || decoded.Batch.WatchID != watch.ID || decoded.Batch.Revision != watch.Revision || decoded.Batch.State != "Active" || r.NextCursor == nil {
+				return errors.New("sustained live batch changed the original view")
+			}
+			for _, row := range decoded.Batch.Rows {
+				raw, _ := json.Marshal(row)
+				if row.SourceID != source.SourceID || row.PodUID != source.PodUID || row.Projection != source.Projection || !source.HardUntil.IsZero() && row.ExpiresAt.After(source.HardUntil) || !row.Valid(time.Now()) || bytesHaveLiveCanary(raw) {
+					return errors.New("sustained live row changed source/time/projection or disclosed a canary")
+				}
+			}
+			if decoded.Batch.Spent <= lastSpend {
+				return errors.New("sustained live delivery did not retain cumulative spend")
+			}
+			lastSpend = decoded.Batch.Spent
+			readInput["cursor"] = *r.NextCursor
+		}
+		if e = db.QueryRow(ctx, `SELECT spent,state FROM live_watch_control WHERE root_id=$1 AND id=$2`, root, watch.ID).Scan(&sqlSpent, &state); e != nil || sqlSpent != lastSpend || state != "Active" {
+			return errors.New("sustained live accounting differs from the minimized ledger")
+		}
+		t.Log("installed live sustained reads: five bounded batches retained the original view, source and cumulative SQL spend")
 		var active, principals int
 		activeQuery := `SELECT count(*),count(DISTINCT principal_key) FROM live_watch_control WHERE root_id=$1 AND state IN ('Active','Paused','Disconnected')`
 		if e = db.QueryRow(ctx, activeQuery, root).Scan(&active, &principals); e != nil || active != 2 || principals != 1 {
