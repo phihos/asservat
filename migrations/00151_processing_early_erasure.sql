@@ -1,6 +1,24 @@
 -- +goose Up
 -- Erasure uses the already compiled processing decision duty. Only this fixed
 -- trigger branch can stage and apply the exact audited retention shortening.
+-- The processing decision uses a restricted search path for its nested
+-- custody update. Resolve the retention ledger by its exact schema.
+-- +goose StatementBegin
+CREATE OR REPLACE FUNCTION public.protect_custody_retention() RETURNS trigger LANGUAGE plpgsql SET search_path=pg_catalog,pg_temp AS $$
+BEGIN
+ IF TG_OP='INSERT' THEN
+  IF NEW.retention_sequence<>0 OR (NEW.effective_expires_at IS NOT NULL AND NEW.effective_expires_at<>NEW.expires_at) OR (NEW.effective_delete_by IS NOT NULL AND NEW.effective_delete_by<>NEW.delete_by) THEN RAISE EXCEPTION 'initial retention must match registration'; END IF;
+  NEW.effective_expires_at:=NEW.expires_at;NEW.effective_delete_by:=NEW.delete_by;RETURN NEW;
+ END IF;
+ IF (NEW.id,NEW.cluster_id,NEW.artifact_id,NEW.allocation_id,NEW.request_digest,NEW.pool_revision,NEW.allocation_revision,NEW.native_limit,NEW.reserved_bytes,NEW.anchor_at,NEW.write_until,NEW.expires_at,NEW.delete_by) IS DISTINCT FROM
+ (OLD.id,OLD.cluster_id,OLD.artifact_id,OLD.allocation_id,OLD.request_digest,OLD.pool_revision,OLD.allocation_revision,OLD.native_limit,OLD.reserved_bytes,OLD.anchor_at,OLD.write_until,OLD.expires_at,OLD.delete_by) THEN RAISE EXCEPTION 'immutable custody registration'; END IF;
+ IF (NEW.retention_sequence,NEW.effective_expires_at,NEW.effective_delete_by) IS DISTINCT FROM (OLD.retention_sequence,OLD.effective_expires_at,OLD.effective_delete_by) THEN
+  IF NEW.retention_sequence<>OLD.retention_sequence+1 OR NEW.effective_expires_at>OLD.effective_expires_at OR NEW.effective_delete_by>OLD.effective_delete_by OR NOT EXISTS(SELECT 1 FROM public.retention_decision d WHERE d.attempt_id=OLD.id AND d.sequence=NEW.retention_sequence AND d.previous_expires_at=OLD.effective_expires_at AND d.previous_delete_by=OLD.effective_delete_by AND d.expires_at=NEW.effective_expires_at AND d.delete_by=NEW.effective_delete_by) THEN RAISE EXCEPTION 'retention decision mismatch'; END IF;
+ END IF;
+ RETURN NEW;
+END $$;
+-- +goose StatementEnd
+
 ALTER TABLE public.processing_decision ADD COLUMN erasure_decision bytea;
 ALTER TABLE public.processing_decision DROP CONSTRAINT processing_decision_action_check;
 ALTER TABLE public.processing_decision ADD CONSTRAINT processing_decision_action_check
@@ -334,4 +352,20 @@ LANGUAGE sql IMMUTABLE SET search_path=pg_catalog,pg_temp AS $$
  WHEN operation_name IN ('initialize_processing','restrict_processing','release_processing') THEN input_format='processing-input/v1'
  WHEN operation_name IN ('list_live_sources','open_live_watch','read_live_watch','update_live_watch','close_live_watch','get_live_capacity','list_diagnostics','list_recordings','preview_recording_save','cancel_capture','preview_capture','request_capture','resolve_capture_request','get_capture','get_case','prepare_artifact_download','get_artifact_download','invalid_operation','activate_policy','get_policy_status','deactivate_policy','create_share','list_shares','revoke_share','explain_access','preview_access_change','list_capture_history','get_capture_settings','transfer_share','stop_future_sharing','preview_retention_change','get_grant','list_reviews','decide_review','revoke_grant','request_policy_grant','request_raw_access','list_capture_profiles','get_capture_profile') THEN input_format IN ('context-input/v1','invalid-input/v1') ELSE false END
 $$;
+-- +goose StatementEnd
+
+-- +goose StatementBegin
+CREATE OR REPLACE FUNCTION public.protect_custody_retention() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+ IF TG_OP='INSERT' THEN
+  IF NEW.retention_sequence<>0 OR (NEW.effective_expires_at IS NOT NULL AND NEW.effective_expires_at<>NEW.expires_at) OR (NEW.effective_delete_by IS NOT NULL AND NEW.effective_delete_by<>NEW.delete_by) THEN RAISE EXCEPTION 'initial retention must match registration'; END IF;
+  NEW.effective_expires_at:=NEW.expires_at;NEW.effective_delete_by:=NEW.delete_by;RETURN NEW;
+ END IF;
+ IF (NEW.id,NEW.cluster_id,NEW.artifact_id,NEW.allocation_id,NEW.request_digest,NEW.pool_revision,NEW.allocation_revision,NEW.native_limit,NEW.reserved_bytes,NEW.anchor_at,NEW.write_until,NEW.expires_at,NEW.delete_by) IS DISTINCT FROM
+ (OLD.id,OLD.cluster_id,OLD.artifact_id,OLD.allocation_id,OLD.request_digest,OLD.pool_revision,OLD.allocation_revision,OLD.native_limit,OLD.reserved_bytes,OLD.anchor_at,OLD.write_until,OLD.expires_at,OLD.delete_by) THEN RAISE EXCEPTION 'immutable custody registration'; END IF;
+ IF (NEW.retention_sequence,NEW.effective_expires_at,NEW.effective_delete_by) IS DISTINCT FROM (OLD.retention_sequence,OLD.effective_expires_at,OLD.effective_delete_by) THEN
+  IF NEW.retention_sequence<>OLD.retention_sequence+1 OR NEW.effective_expires_at>OLD.effective_expires_at OR NEW.effective_delete_by>OLD.effective_delete_by OR NOT EXISTS(SELECT 1 FROM retention_decision d WHERE d.attempt_id=OLD.id AND d.sequence=NEW.retention_sequence AND d.previous_expires_at=OLD.effective_expires_at AND d.previous_delete_by=OLD.effective_delete_by AND d.expires_at=NEW.effective_expires_at AND d.delete_by=NEW.effective_delete_by) THEN RAISE EXCEPTION 'retention decision mismatch'; END IF;
+ END IF;
+ RETURN NEW;
+END $$;
 -- +goose StatementEnd
