@@ -64,6 +64,16 @@ accepted history. Affected audit/capacity/PostgreSQL/bootstrap unit suites pass
 failures are empty and all three owned containers are absent. The paid-share
 retry remains pending; evidence is external in `share-retirement/slots-d7a2fd1a`.
 
+At `eca00f46`, genuine paid creation and fresh-operation replay passed. The
+incompatible-expiry assertion exposed transaction error sanitization: the new
+typed backing refusal was collapsed to unavailable (Go 6.451 s, harness exit1).
+The correction preserves that one closed sentinel and translates only P1530
+before the transaction boundary. PostgreSQL/sharing/presentation suites pass
+(1.311/0.003/93.262 s). All 4,561 failed-run hashes match; source stayed frozen
+and all three owned containers are absent. Independent review of shared cleanup
+and installer composition found no actionable remaining issue. Physical
+retirement qualification is still pending; no failed run is counted as a pass.
+
 The first owned fixture at `1dc7c616` failed before measurement (Go 4.946 s):
 the query-publication helper requested 60-second evidence retention under the
 baseline's original 60-second root, leaving no deletion margin. The correction

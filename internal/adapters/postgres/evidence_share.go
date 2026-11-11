@@ -111,7 +111,14 @@ func shareFromRow(r custodydb.EvidenceShare) (authorization.Share, error) {
 // business replay may return its original row even when this operation's marker
 // was already spent; a new effect must require EffectAvailable.
 func (s *EvidenceShares) beginEffect(ctx context.Context, q *custodydb.Queries, operation, action string, actor identity.Principal, target string) (custodydb.BeginShareEffectRow, error) {
-	return q.BeginShareEffect(ctx, custodydb.BeginShareEffectParams{RootID: id(s.root), OperationID: id(operation), Action: action, Issuer: actor.Issuer, Subject: actor.Subject, Client: actor.ClientID, Target: id(target)})
+	row, err := q.BeginShareEffect(ctx, custodydb.BeginShareEffectParams{RootID: id(s.root), OperationID: id(operation), Action: action, Issuer: actor.Issuer, Subject: actor.Subject, Client: actor.ClientID, Target: id(target)})
+	// Translate the one closed backing refusal before the common transaction
+	// boundary sanitizes provider errors. Other SQL errors keep that boundary.
+	var sqlError *pgconn.PgError
+	if errors.As(err, &sqlError) && sqlError.Code == "P1530" {
+		return row, sharing.ErrRetentionCapacity
+	}
+	return row, err
 }
 
 func (s *EvidenceShares) RecipientShares(ctx context.Context, artifactID string, caller identity.Identity) ([]authorization.Share, error) {
@@ -499,10 +506,6 @@ func pinsAll(management []byte, ids []string) bool {
 }
 
 func shareError(err error) error {
-	var sqlError *pgconn.PgError
-	if errors.As(err, &sqlError) && sqlError.Code == "P1530" {
-		return sharing.ErrRetentionCapacity
-	}
 	for _, sentinel := range []error{sharing.ErrRetentionCapacity, value.ErrConflict, value.ErrCapacity, value.ErrDenied, value.ErrInvalid} {
 		if errors.Is(err, sentinel) {
 			return sentinel

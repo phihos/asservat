@@ -119,8 +119,8 @@ func newProcessingTestFixture(t *testing.T, ctx context.Context, poolFor func(st
 		}
 		p.History = &audit.OperationHistoryQualification{ID: custodyID(), Digest: artifact.Digest{5}, Layout: layout, MaximumRowFootprintBytes: 128 << 10, MaximumTransitionWALBytes: 128 << 10, BackupCopies: 2, WALCopies: 2}
 		if lane == "normal" && shares {
-			// Explicit synthetic per-scenario input, measured by the bounded
-			// policy100 test. It is not production maximum-width qualification.
+			// Explicit synthetic per-scenario input. The bounded policy100
+			// measurement and production maximum-width qualification are pending.
 			p.History.MaximumTransitionWALBytes = 2 << 20
 		}
 		bb, ww := p.History.SlotBacking(p.MaxPurgeLeases)
