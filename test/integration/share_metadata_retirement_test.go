@@ -387,10 +387,33 @@ func qualifyPaidShareRetirement(t *testing.T, f *capacitySQLFixture, s captureAd
 	}
 	cleaner := auditapp.OperationCleanup{Journal: ledgers[0], Acknowledgements: ledgers[1], Finalizer: ledgers[2], Objects: objects, Verifier: checks}
 	t.Logf("share_retirement_stage=await_original_purge remaining_ms=%d; original source bound unchanged; synthetic local signing/storage credentials do not qualify installed IAM", time.Until(in.Lifecycle.OriginalPurgeAt).Milliseconds())
+	// Exercise the installed selector with its compiled cleanup credential,
+	// including the normal lane; direct Advance alone cannot prove this path.
+	f.refreshFleet(t)
+	due, err := ledgers[0].DueWorkerOperations(ctx, "")
+	if err != nil || time.Now().Before(in.Lifecycle.OriginalPurgeAt) && slices.Contains(due, in.ID) {
+		t.Fatal("worker selected a normal operation before its original purge", err)
+	}
 	deadline := in.Lifecycle.LiveRetireBy.Add(5 * time.Second)
-	removed := false
+	removed, selected := false, false
 	for time.Now().Before(deadline) {
 		f.refreshFleet(t)
+		if !selected && !time.Now().Before(in.Lifecycle.OriginalPurgeAt) {
+			due, err = ledgers[0].DueWorkerOperations(ctx, "")
+			if err != nil || !slices.Contains(due, in.ID) {
+				t.Fatal("compiled worker selector omitted the due normal operation", err, due)
+			}
+			after, e := ledgers[0].DueWorkerOperations(ctx, in.ID)
+			if e != nil {
+				t.Fatal("compiled worker cursor query", e)
+			}
+			for _, id := range after {
+				if id <= in.ID {
+					t.Fatal("worker cursor repeated an earlier operation")
+				}
+			}
+			selected = true
+		}
 		err = cleaner.Advance(ctx, in.ID)
 		var count int
 		if e := f.admin.QueryRow(ctx, `SELECT count(*) FROM operation_audit WHERE id=$1`, in.ID).Scan(&count); e != nil {
@@ -406,8 +429,8 @@ func qualifyPaidShareRetirement(t *testing.T, f *capacitySQLFixture, s captureAd
 		case <-time.After(200 * time.Millisecond):
 		}
 	}
-	if !removed {
-		t.Fatal("original provider/finalization did not retire share", err)
+	if !removed || !selected {
+		t.Fatal("original provider/finalization did not select and retire share", err)
 	}
 	var shareCount, historyCount, charged int64
 	var eligible time.Time
