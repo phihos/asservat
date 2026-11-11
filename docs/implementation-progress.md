@@ -1,6 +1,110 @@
 # Sustained implementation progress
 
-## Active candidate: installable context trial (2026-11-11)
+## Installed-qualified finite share metadata retirement (2026-11-11)
+
+The manual/capture-time sharing workflow now passes through healthy certificate
+verification, identifying-row retirement within original live bounds, independent
+managed-object absence and actual residual-charge release. Fresh source
+`bc444f36` passes Go567.863s/harness635.5s with4,855 independently matching
+source hashes, frozen source and complete owned cleanup. Delivery requires full
+exact-head PR CI, review and authoritative merge readback; those receipts belong
+with the implementation PR. The full specification goal remains active.
+
+Candidate `feature/finite-share-history`, owned worktree
+`asservat-share-retirement`, integrates authoritative main `b389b7c9` (PR223).
+ADR323 records the contracts, simplifications and measured costs. SQL153/154
+require head/floor154. Each concrete share has an immutable original prepaid
+creating-operation link; management pays its own effect, replay cannot renew
+bounds, and finalization deletes the child before its parent. Unknown unlinked
+development rows are refused without adoption/deletion. New sharing uses
+normal-v4/capture-v2; resolution remains v3. Broader policy/control metadata is
+outside this concrete-share obligation.
+
+The existing worker handles capture/normal/resolution using one total16-row UUID
+cursor and the same three private facet pools (Min0/Max1). Three existing SQL
+identities, two independent supplied S3 credentials and four native provider
+purposes activate; the three connections per worker were already counted in
+the114-connection installation requirement, API32 unchanged. The installer
+provisions the protected cleanup projection; the trial guide documents its two
+credential inputs. No deployment, role, watch, tuning knob or per-lane goroutine
+is added.
+
+Reports are external under
+`/home/phil/.cache/asservat-build/share-retirement/`. All rows below have frozen
+sources, independently matching source hashes, empty cleanup failures and
+independently absent owned resources. Failures remain failures.
+
+| Source / archive | Actual evidence and scope |
+| --- | --- |
+| `52ce1797` / `policy-cost-52ce1797` | Go78.912s pass,4578 hashes:100 recurring concrete shares, paid revoke-all/replay and schema154/153 roundtrip2.95s. Paid/aborted WAL1,957,168/2,969,504 bytes fit the separately prepaid8MiB business allowance after smaller trigger/index corrections. This is a bounded sample, not universal footprint proof. |
+| `732d6fb7` / `slots-guard-732d6fb7` | Go65.671s pass,4582 hashes: actual compiled cleanup/verifier/finalizer roles, exact nested counter/replay and wrong-mutation guards, acknowledged selector waiting/cutoff/finalization-ready/overdue, shared nullable certificate snapshot, atomic retirement, futureH cooling and exact charge release; schema roundtrip3.48s. |
+| `4192e6bd` / `installed-4192e6bd` | Go192.448s/harness261.8s fail,4851 hashes: owner-provider outbox refuses before public startup. Complete representative production recipe reproduces65,845 bytes over unchanged64KiB cap. |
+| `1d1451f8` / `installed-1d1451f8` | Go619.155s/harness691.5s fail,4852 hashes: install/MCP sharing work; cold cleanup purpose is refused before provider login. |
+| `8ab7b9ae` / `installed-8ab7b9ae` | Go240.583s/harness305.1s fail,4854 hashes: original worker stops after valid sibling cleanup journal publication during capacity completion. Restart does not satisfy original-process proof. |
+| `d851782f` / `installed-d851782f` | Go513.952s fail,4854 hashes: worker and MCP producers work, but SQL23514 rejects the nested proof-window counter and normal rows miss their live cutoff. |
+| `7e07616a` / `installed-7e07616a` | Go583.844s/harness654.9s fail,4855 hashes: both shares delete atomically within original bounds and retain cooling charges; neither proves healthy certification under B10. Unrelated row verification-claim refusals cannot identify these shares' exact path. |
+| `653ccc2d` / `installed-653ccc2d` | Go496.141s/harness564.5s fail,4855 hashes: B30 normal certificate acknowledged at407.6s with22.2s original write time left; rows remain at469.9s,48ms beyond live cutoff. Charge18 equals4 live+14 history records. |
+| `ba0128c4` / `installed-ba0128c4` | Go499.455s/harness568.2s fail,4855 hashes: normal acknowledgment429.0s, one attempt and4.3s original write time left. At473.4s its rows miss the live cutoff by81ms; charge11 equals3 live+8 history records. Nine history keys complete in1.549s, but a16-ID lifecycle page takes19.827s. |
+| `bc444f36` / `installed-bc444f36` | Go567.863s/harness635.5s pass,4855 hashes. Normal healthy acknowledgment414.0s, atomic deletion442.7s and29.306s future cooling; capture acknowledgment471.8s, atomic deletion526.0s and15.223s future cooling. Final proof542.7s verifies both original charges released only after eligibility, no managed versions/delete markers/multipart, and exact live+history account totals. A paired16-ID page takes11.849s. |
+
+Current broad evidence: default `make pre-push` at `ad4662b7` passes490s affected
+race tests. At `ba0128c4`, all static gates and the supported incremental
+`ASSERVAT_AFFECTED_BASE=ad4662b7 make pre-push` pass387s. At `bc444f36`, the next supported incremental
+`ASSERVAT_AFFECTED_BASE=ba0128c4 make pre-push` passes55s and all static gates.
+Earlier system-Python
+validator-import failure was corrected using the existing full specification
+virtual environment. Built-browser checks at `52ce1797` pass158.964s
+(30 journeys/31 accessibility scans); installed sharing here uses MCP, so this
+is not installed React-sharing qualification. Required full PR CI and merge status are tracked
+by the implementation PR; local checks do not substitute for them.
+
+Focused corrections preserve the64KiB artifact cap by removing only duplicated
+federation descriptions (representative output57,899 bytes), admit the existing
+cleanup purpose, separate capacity completion from valid sibling cleanup
+publication, and permit only the nested saturated proof-counter increment. A
+stronger negative probe caught an earlier fixture guard; it now proves the exact
+intended guard and call stack. Closed diagnostics avoid private text/IDs.
+
+The selector skips acknowledged certificates until their original next cutoff.
+The history page now shares one original native proof for at most16 SQL-only
+keys (26 vs416 native requests), retaining each SQL fence, first-error pending
+state, later-key progress and original expired DeleteBy. Work stops one second
+before the earliest original proof/parent end; Finish retains the original
+five-second context. The latest change applies the same bounded ownership to
+pairs of lifecycle IDs, with cursor advancement only for actually attempted IDs.
+It adds no grant, authority cache or renewed deadline. Component page/native contract race tests pass. The fresh installed result
+above proves the selected cohort: its16-ID page takes11.849s versus19.827s
+in the earlier run, while the earlier history-page correction handles9 keys
+in1.549s. These are named reference observations, not throughput maxima. Persistent backend stalls are not qualified by these happy-path samples.
+
+The observer still requires both original certificate acknowledgments before
+atomic disappearance, original live cutoffs, charge equal to all live plus
+history records, future cooling and independent version/multipart absence.
+Failed B10 results are not qualified. The B30/H2/P10 cohort retains240s normal/
+resolution and300s capture retention: selecting B30 before installation moves
+original purge60s and live removal20s earlier. No running timestamp is rewritten.
+
+Scope: a fresh actual five-command installer/private provider CLI, one hub API
+and one regional workload API, public MCP manual/capture-time sharing and the
+actual cleanup worker. This focused collector-free run does not run the second
+workload/replay extras, interruption/resume matrix, exact canonical Helm profile
+or installed React sharing. The separate built-browser/Helm qualifications keep
+their named sources. SQL/audit/domain/object-store service sources from732d6fb7
+are independently byte-identical atbc444f36; only cleanup runtime and two tests
+differ in its4,582-file inventory (external `service-source-reuse-bc444f36.json`).
+
+The accepted specification still requires broader control/policy/browser metadata
+retirement, maximum throughput/sustained operation, backup-chain lifetime closure,
+remaining collectors and operational qualification; this source is no whole
+S-02/S-04/S-05 or specification exit, release or homelab deployment. Continue the
+next complete user workflow after delivery; retain unrelated parked work.
+
+## Merged installable context trial (2026-11-11)
+
+[PR223](https://github.com/phihos/asservat/pull/223) merged at `b389b7c9`;
+its complete tree matches reviewed `2613aa4f`. Required pull-request
+CI43018930876, automated review and post-merge push CI43020311620 pass.
+All4,834 installed runtime source hashes independently match authoritative main.
 
 Outcome: let the maintainer install and try the existing collector-free
 pod-status workflow. `feature/homelab-context-trial` starts at merged main
@@ -53,7 +157,7 @@ cleans up; source hashes remain unchanged. Evidence is external in
 `capacity-guard-first-denial` and `capacity-guard-isolated`. Closed nested
 `guard/enforcement` diagnostics reach existing runtime logs. Fresh integrated same-API qualification at `f10c064d` passes as above.
 `make pre-push` also passes at that source, including384s affected Go race
-tests. Required PR CI and merge are next. Its packaged chart SHA256 is
+tests. Required PR CI passed and the candidate is merged. Its packaged chart SHA256 is
 `cbcfdd2e5b778bf5d2fbfea41c5929b6401a670595e5b060fe14d83854dce4c3`.
 
 Earlier broad gates: `make pre-push` at76d/31e passes (affected Go race503s/382s).
@@ -69,14 +173,16 @@ Limits: preloaded reference images, no registry-pull or one-hour renewal proof,
 no second workload cluster/replay campaign in these focused trials, no active
 stream-interruption claim, no sustained history recycling, supported release,
 restore or production qualification. External services and provider-specific
-S3 capabilities remain operator tasks. The sharing-retirement work is parked
-cleanly at `e5e77be7`, with local/stress/schema passes but no installed
-qualification or merge; it is not delivered by this trial.
+S3 capabilities remain operator tasks. The sharing-retirement work resumes separately from its clean `e5e77be7`
+checkpoint; it is not delivered by this trial.
 
-## Active candidate: processing inventory export (2026-11-11)
+## Merged processing inventory export (2026-11-11)
 
-[PR222](https://github.com/phihos/asservat/pull/222) starts from authoritative
-`fec1e03e`. The console exports seven ordered sections of retained artifacts
+[PR222](https://github.com/phihos/asservat/pull/222) merged at `cef71802`.
+Its complete tree matches reviewed `382a5071`; required PR CI42962003612
+passed all 14 Go shards, the browser job and `ci-ok`. Post-merge push CI42963062617
+also passed on authoritative `cef71802`. The branch started from
+authoritative `fec1e03e`. The console exports seven ordered sections of retained artifacts
 including deletions, recipients, native sessions, operation responses, rules,
 technical paths and declared processors. Finite JSON parts preserve the original
 selection and continue before completion. ADR-322 and SC-PRV-014 define the
@@ -98,8 +204,8 @@ frozen, cleanup failures are empty, both owned clusters and labelled Docker
 resources are gone, and build scratch was removed. The focus uses one regional
 target; broader replay and second-workload matrices were not run. Original
 reports are external in `privacy-inventory-report/installed-8fe07f0a`. Required
-final PR CI and merge remain pending. The end-to-end specification goal stays
-active.
+PR CI passed and authoritative main readback matched all 4,813 qualification
+source hashes. The end-to-end specification goal stays active.
 
 Local validation passed: 683 console tests, 41 focused UI/HTTP cases, TypeScript,
 59 report contract cases, Helm and specification/architecture/design checks.

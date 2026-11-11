@@ -113,7 +113,7 @@ func TestWorkerProjectionOperationTokenRotationFailsClosed(t *testing.T) {
 }
 
 func TestWorkerProjectionOperationFinalRejectsChangedOriginalFacts(t *testing.T) {
-	for _, kind := range []string{"journal", "worker", "metadata"} {
+	for _, kind := range []string{"journal", "core", "invalid-cleanup", "worker", "metadata"} {
 		t.Run(kind, func(t *testing.T) {
 			f := newWorkerProjectionOperationFixture(t)
 			op, claim, err := f.reader.worker.BeginCapacityProjectionOperation(t.Context())
@@ -123,14 +123,21 @@ func TestWorkerProjectionOperationFinalRejectsChangedOriginalFacts(t *testing.T)
 			defer op.Close()
 			f.mu.Lock()
 			switch kind {
-			case "journal":
+			case "journal", "core", "invalid-cleanup":
 				j := f.objects["/api/v1/namespaces/"+f.input.Namespace.Name+"/secrets/"+f.input.Activation.Resources.Name].(*core.Secret)
 				var state contracts.InitialRuntimeResourceState
 				if json.Unmarshal(j.Data["state.json"], &state) != nil {
 					f.mu.Unlock()
 					t.Fatal("journal decode")
 				}
-				state.CapacityProjection.PublicDigest = strings.Repeat("d", 64)
+				switch kind {
+				case "journal":
+					state.CapacityProjection.PublicDigest = strings.Repeat("d", 64)
+				case "core":
+					state.SetupID = ownerID(19100)
+				case "invalid-cleanup":
+					state.CleanupProjection.Setup.DatabaseOID = 0
+				}
 				j.Data["state.json"], _ = json.Marshal(state)
 			case "worker":
 				f.objects["/apis/apps/v1/namespaces/"+f.input.Namespace.Name+"/deployments/"+f.input.Activation.Deployment.Name].(*apps.Deployment).Spec.Template.Spec.Containers[0].Image = "foreign"
@@ -143,6 +150,158 @@ func TestWorkerProjectionOperationFinalRejectsChangedOriginalFacts(t *testing.T)
 			}
 			if op.Context().Err() == nil || !op.FreshUntil().IsZero() {
 				t.Fatal("known changed final left native operation usable")
+			}
+		})
+	}
+}
+
+// A cleanup publication changes the shared journal while capacity is opening.
+// Both current passes still validate the whole journal; that valid sibling
+// progress must not replace the selected capacity claim or its original bound.
+func TestWorkerCapacityProjectionFinishAllowsValidCleanupPublication(t *testing.T) {
+	for _, phase := range []string{"claim", "receipt"} {
+		t.Run(phase, func(t *testing.T) {
+			f := newWorkerProjectionOperationFixture(t)
+			path := "/api/v1/namespaces/" + f.input.Namespace.Name + "/secrets/" + f.input.Activation.Resources.Name
+			f.mu.Lock()
+			journal := f.objects[path].(*core.Secret)
+			var state contracts.InitialRuntimeResourceState
+			if err := json.Unmarshal(journal.Data["state.json"], &state); err != nil {
+				f.mu.Unlock()
+				t.Fatal(err)
+			}
+			cleanup := *state.CleanupProjection
+			receipt := *cleanup.Receipt
+			cleanup.Receipt = nil
+			if phase == "claim" {
+				state.CleanupProjection = nil
+			} else {
+				state.CleanupProjection = &cleanup
+			}
+			journal.Data["state.json"], _ = json.Marshal(state)
+			f.mu.Unlock()
+			op, selected, err := f.reader.worker.BeginCapacityProjectionOperation(t.Context())
+			if err != nil {
+				t.Fatal("begin original capacity", err)
+			}
+			defer op.Close()
+			originalUntil := op.FreshUntil()
+			originalState, _ := json.Marshal(op.initial.state)
+			if phase == "receipt" {
+				cleanup.Receipt = &receipt
+			}
+			state.CleanupProjection = &cleanup
+			if !workerProjectionStateValid(f.input.InstallationID, state, time.Now()) {
+				t.Fatal("fixture sibling publication invalid")
+			}
+			f.mu.Lock()
+			journal.Data["state.json"], _ = json.Marshal(state)
+			f.mu.Unlock()
+			if err := op.Finish(op.Context()); err != nil {
+				t.Fatal("valid cleanup publication stopped unchanged capacity startup", err)
+			}
+			afterState, _ := json.Marshal(op.initial.state)
+			if string(originalState) != string(afterState) || !op.FreshUntil().Equal(originalUntil) || !equalJSON(selected, state.CapacityProjection) {
+				t.Fatal("sibling publication changed original capacity or deadline")
+			}
+		})
+	}
+}
+
+// The native bracket binds the cleanup compartment, not a history row ID.
+// These inert callbacks qualify shared context/call counts only; compiled SQL
+// per-key fences are exercised separately by the service fixture.
+func TestWorkerCleanupProjectionOperationCoversBoundedSequentialHistoryPage(t *testing.T) {
+	f := newWorkerProjectionOperationFixture(t)
+	beforeS, beforeP := f.observer.Load(), f.probe.Load()
+	op, claim, err := f.reader.worker.BeginCleanupProjectionOperation(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer op.Close()
+	original := op.Context()
+	originalUntil := op.FreshUntil()
+	work, stop := context.WithDeadline(original, originalUntil.Add(-time.Second))
+	defer stop()
+	calls := 0
+	for range 16 {
+		effect := func(call context.Context) error {
+			if call != work {
+				t.Fatal("history key received a replacement context")
+			}
+			until, ok := call.Deadline()
+			if !ok || !until.Equal(originalUntil.Add(-time.Second)) || call.Err() != nil {
+				t.Fatal("history key escaped original work cutoff")
+			}
+			calls++
+			return nil
+		}
+		if err := effect(work); err != nil {
+			t.Fatal(err)
+		}
+	}
+	stop() // The work slice ends before Finish uses the original native context.
+	if original.Err() != nil || !op.FreshUntil().Equal(originalUntil) {
+		t.Fatal("child work shortened or renewed original proof")
+	}
+	if err := op.Finish(original); err != nil {
+		t.Fatal(err)
+	}
+	if calls != 16 || !op.FreshUntil().Equal(originalUntil) || !equalJSON(claim, op.initial.state.CleanupProjection) {
+		t.Fatal("page changed original cleanup claim or deadline")
+	}
+	if reads, posts := f.observer.Load()-beforeS, f.probe.Load()-beforeP; reads != 23 || posts != 3 {
+		t.Fatalf("history page repeated native proof: reads=%d posts=%d want23/3", reads, posts)
+	}
+	if op.Finish(original) == nil {
+		t.Fatal("page repeated its one final proof")
+	}
+}
+
+func TestWorkerCleanupProjectionPageCannotFinishAfterCancellationChangeOrExpiry(t *testing.T) {
+	for _, mode := range []string{"cancel", "metadata", "expired-work"} {
+		t.Run(mode, func(t *testing.T) {
+			f := newWorkerProjectionOperationFixture(t)
+			parent, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			op, claim, err := f.reader.worker.BeginCleanupProjectionOperation(parent)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer op.Close()
+			originalUntil := op.FreshUntil()
+			work, stop := context.WithDeadline(op.Context(), originalUntil.Add(-time.Second))
+			defer stop()
+			// Several completed callbacks do not turn the unfinished native bracket
+			// into a reusable permit or let a later context renew its original end.
+			for range 3 {
+				if work.Err() != nil {
+					t.Fatal(work.Err())
+				}
+			}
+			finish := op.Context()
+			switch mode {
+			case "cancel":
+				cancel()
+				if work.Err() == nil {
+					t.Fatal("page work survived caller cancellation")
+				}
+			case "metadata":
+				f.mu.Lock()
+				f.objects["/api/v1/namespaces/"+f.input.Namespace.Name+"/secrets/"+claim.Receipt.Secret.Name].(*meta.PartialObjectMetadata).UID = types.UID(ownerID(19101))
+				f.mu.Unlock()
+			case "expired-work":
+				expired, end := context.WithDeadline(op.Context(), time.Now().Add(-time.Second))
+				defer end()
+				finish = expired
+			}
+			if err := op.Finish(finish); err == nil {
+				t.Fatal("page finished after ended or changed original proof")
+			}
+			later, end := context.WithDeadline(t.Context(), originalUntil.Add(time.Hour))
+			defer end()
+			if op.Finish(later) == nil || !op.FreshUntil().IsZero() {
+				t.Fatal("later caller revived ended page proof")
 			}
 		})
 	}

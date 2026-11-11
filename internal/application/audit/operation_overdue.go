@@ -28,26 +28,38 @@ type OperationOverdueCleanup struct {
 	Verifier         OperationAbsenceVerifier
 }
 
-func (s OperationOverdueCleanup) Advance(ctx context.Context, id string) error {
+func (s OperationOverdueCleanup) Advance(ctx context.Context, id string) (err error) {
+	step := "input"
+	defer func() {
+		if err != nil {
+			err = &operationCleanupFailure{step: step, cause: err}
+		}
+	}()
 	if ctx == nil || ctx.Err() != nil || s.Journal == nil || s.Acknowledgements == nil || s.Finalizer == nil || s.Objects == nil || s.Verifier == nil {
 		return ErrUnavailable
 	}
+	step = "overdue-lease"
 	lease, e := s.Journal.BeginOperationPurge(ctx, id, "overdueOriginal")
 	if e != nil {
 		return ErrUnavailable
 	}
+	step = "overdue-purge"
 	if e = s.Objects.PurgeOperationObjects(ctx, lease); e != nil {
 		return ErrUnavailable
 	}
+	step = "overdue-record"
 	result, e := s.Journal.RecordOverdueOperationPurge(ctx, lease)
 	if e != nil {
 		return ErrUnavailable
 	}
+	step = "overdue-verify"
 	if e = s.Verifier.VerifyOperationAbsence(ctx, lease); e != nil {
 		return ErrUnavailable
 	}
+	step = "overdue-ack"
 	if e = s.Acknowledgements.AcknowledgeOverdueOperationPurge(ctx, lease, result); e != nil {
 		return ErrUnavailable
 	}
+	step = "retire"
 	return s.Finalizer.RetireOperationAudit(ctx, id)
 }

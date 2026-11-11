@@ -34,6 +34,16 @@ func attachOrdinaryPolicyAccountingGrant(t *testing.T, ctx context.Context, admi
 }
 
 func attachPolicyAccountingGrantMode(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, s captureAdmissionScenario, a authorization.AcceptedPolicyAuthority, scope []byte, key string, observation bool, recorder ...planvalue.PolicyRecorderConfiguration) string {
+	return attachPolicyAccountingGrantModeWithLimits(t, ctx, admin, poolFor, s, a, scope, key, observation, authorization.AutomationLimits{}, recorder...)
+}
+
+// This explicit original review is used by the bounded policy100 qualifier;
+// existing scenarios retain their original four-execution grant.
+func attachPolicyAccountingGrantWithLimits(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, s captureAdmissionScenario, a authorization.AcceptedPolicyAuthority, scope []byte, key string, limits authorization.AutomationLimits) string {
+	return attachPolicyAccountingGrantModeWithLimits(t, ctx, admin, poolFor, s, a, scope, key, false, limits)
+}
+
+func attachPolicyAccountingGrantModeWithLimits(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, s captureAdmissionScenario, a authorization.AcceptedPolicyAuthority, scope []byte, key string, observation bool, originalLimits authorization.AutomationLimits, recorder ...planvalue.PolicyRecorderConfiguration) string {
 	t.Helper()
 	// Role labels may repeat, but reviewed operations for distinct policies must
 	// use distinct original request keys under the same root and human actor.
@@ -80,6 +90,9 @@ func attachPolicyAccountingGrantMode(t *testing.T, ctx context.Context, admin *p
 		t.Fatal("protected settings acceptance", err)
 	}
 	limits := authorization.AutomationLimits{MaxExecutions: 4, MaxBytes: 4 * artifact.MaxContextBytes}
+	if originalLimits.MaxExecutions > 0 {
+		limits = originalLimits
+	}
 	g := authorization.Grant{ID: custodyID(), RootID: s.a.RootID, Kind: authorization.GrantPolicy, Requester: a.Creator, ExecutionDigest: a.ScopeDigest, DataClass: "extract", Reasons: []authorization.SensitiveReason{{ActionID: "pod-status", Code: "synthetic-component-review"}}, Scope: scope, Review: []byte(`{}`), Lifetime: time.Hour, Revision: 1, Policy: &authorization.PolicyGrantScope{Authority: a, RecipeDigest: planning.RecipeDigest(), Limits: limits, ApprovalPolicyRef: settings.Revision, ApprovalMaxAge: time.Hour}}
 	if len(recorder) == 1 {
 		g.Policy.RecipeDigest = recorder[0].RecipeDigest
@@ -149,7 +162,7 @@ func attachPolicyAccountingGrantMode(t *testing.T, ctx context.Context, admin *p
 	if !observation && (g.Policy == nil || g.Policy.Observation != nil || g.Policy.Authority.ScopeDigest != a.ScopeDigest || g.Policy.Authority.Limits != a.Limits) {
 		t.Fatal("ordinary grant changed actual authority or acquired raw observation credit")
 	}
-	actor := identity.Identity{Principal: a.Creator, Scopes: []string{"evidence:read", "evidence:capture"}, Groups: []string{"maintainers"}, Policy: s.a.Eligibility.VerifiedIdentity.Policy, VerifiedAt: now, ValidUntil: now.Add(30 * time.Second)}
+	actor := identity.Identity{Principal: a.Creator, Scopes: []string{"evidence:read", "evidence:capture"}, Groups: append([]string(nil), s.a.Eligibility.VerifiedIdentity.Groups...), Policy: s.a.Eligibility.VerifiedIdentity.Policy, VerifiedAt: now, ValidUntil: now.Add(30 * time.Second)}
 	if _, _, err = policies.AttachPolicyGrant(ctx, app.PolicyGrantAttachmentInput{ID: custodyID(), PolicyUID: a.PolicyUID, GrantID: g.ID, IdempotencyKey: requestKey + "-attachment", Actor: actor, Recovery: recovery}); err != nil {
 		t.Fatal("current manager attachment", err)
 	}
@@ -196,7 +209,12 @@ func qualifyOriginalPolicyGrantAcquisition(t *testing.T, ctx context.Context, ad
 		return err
 	}
 	if err = read(); err != nil {
-		t.Fatal("original spent grant did not cover its prepaid API work", err)
+		step := "unclassified"
+		var fixed interface{ FixedStep() string }
+		if errors.As(err, &fixed) {
+			step = fixed.FixedStep()
+		}
+		t.Fatal("original spent grant did not cover its prepaid API work", step, err)
 	}
 	replacement := replace()
 	if replacement == oldGrant {

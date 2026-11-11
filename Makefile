@@ -77,7 +77,7 @@ context-integration:
 # owned kind clusters, e.g. make installed-focus FOCUS=manual-logs. The harness
 # refuses collector focuses without the disposable-host guard; this target
 # additionally accepts only the collector-free focuses below.
-LOCAL_FOCUSES = chain journey browser restart clusters upgrade policy alert logresource share manual-logs journey-store-failure journey-start-failure retention-shortening early-erasure processing-workload privacy-inventory
+LOCAL_FOCUSES = chain journey browser restart clusters upgrade policy alert logresource share manual-logs journey-store-failure journey-start-failure retention-shortening early-erasure processing-workload privacy-inventory share-retirement
 .PHONY: installed-focus
 installed-focus:
 	$(if $(and $(filter 1,$(words $(FOCUS))),$(filter $(FOCUS),$(LOCAL_FOCUSES))),,$(error FOCUS must be one collector-free focus: $(LOCAL_FOCUSES)))

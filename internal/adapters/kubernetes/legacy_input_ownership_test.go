@@ -74,6 +74,16 @@ func TestLegacyInputOwnershipCleanupConstructor(t *testing.T) {
 		Postgres: contracts.OwnerPostgresEndpoint{Roots: [][]byte{{1, 2, 3}}},
 		Signing:  contracts.CaptureCleanupSigning{PublicKeys: map[string][]byte{"original": make([]byte, 32)}},
 	}
+	resources.workerLayout, resources.ownerLayout = contracts.HubWorkerProviderInstalledLayout, contracts.OwnerProviderInstalledLayout
+	names := runtimeResourceNames(resources.initial.InstallationID)
+	resources.workerProvider = &contracts.ConfigurationProviderSelection{AuthMount: "configuration", AuthMountAccessor: "auth_configuration", AuditCredentials: contracts.WorkerObjectReference{Name: names.WorkerProviders, UID: ownerID(14931)}}
+	resources.ownerProvider = &contracts.OwnerProviderSelection{AuthMount: "owner", AuthMountAccessor: "auth_owner", AuditCredentials: contracts.WorkerObjectReference{Name: contracts.OwnerProviderAuditSecretName(resources.initial.InstallationID), UID: ownerID(14932)}}
+	resources.initial.KeyService = contracts.ConfigurationKeyService{AuditMount: "audit", AuditKey: "original", Roots: [][]byte{{1, 2, 3}}}
+	bridge.initial = resources.initial
+	deployment.AuditStore, deployment.KeyService = resources.initial.AuditStore, resources.initial.KeyService
+	resources.workerProvider.CleanupAudit = contracts.OwnerPublicTransit{Mount: deployment.KeyService.AuditMount, Key: deployment.KeyService.AuditKey}
+	resources.workerProvider.ContextDeletionSigning = contracts.OwnerPublicTransit{Mount: deployment.KeyService.AuditMount, Key: contracts.ContextDeletionSigningKeyName(resources.initial.InstallationID)}
+	deployment.Signing.Mount, deployment.Signing.Name = deployment.KeyService.AuditMount, contracts.ContextDeletionSigningKeyName(resources.initial.InstallationID)
 	s, err := NewCaptureCleanupProjection(bridge, resources, roles, deployment, CaptureCleanupProviderMaterial{})
 	if err != nil {
 		t.Fatal(err)

@@ -115,6 +115,20 @@ projected API token has one audience; set it explicitly for ambiguous profiles.
 After the references and public values exist, the fresh operation is one Helm
 invocation (apply/upgrade the CRDs separately as documented):
 
+Public continuation with capacity also prepares operation-audit cleanup in the
+existing hub worker (ADR-323). Its phase-3 provider recipe includes
+`operationCleanupStorage`: provision the two distinct storage principals for
+that exact audit bucket and permission-root prefix, preserving existing writer
+denials. Supply their credential JSON files to `installer-provider-apply` with
+`--cleanup-audit-credential` and `--cleanup-verify-credential`. The cleaner needs
+version/multipart inventory and deletion plus conditional creation of retirement
+certificates; the independent verifier cannot write or delete. Neither gets
+evidence-bucket or storage-administration rights. The recipe does not provision
+S3 IAM. Provider authentication uses the worker's existing native identity and
+bounded renewable provider lifetimes; no static provider token is supplied in
+these files. Current candidate installed qualification is recorded in
+`docs/implementation-progress.md`.
+
 Public continuation optionally accepts `bootstrap.continuation.public.captureHistory`
 with both `perSelector` (1–1,000) and `perInstallation` (1–100,000). Omission uses
 1,000 and 100,000 respectively. These are retained history-entry ceilings, in

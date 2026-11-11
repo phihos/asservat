@@ -1,8 +1,13 @@
 # Decision records
 
 [ADR-324 — Installable context trial](324-installable-context-trial.md)
-closes missing Helm/installer producers for the existing context workflow.
-Implementation and fresh actual-chart qualification are in progress.
+closes missing Helm/installer producers; the named shared/separate API context
+journeys pass and PR223 is merged.
+
+[ADR-323 — Finite share metadata and public audit retirement](323-finite-share-metadata-retirement.md)
+implements creating-slot dependency, finite replay and cleanup composition.
+The bounded cost sampler and fresh manual/capture-time installed retirement
+qualification pass; broader control metadata remains separate.
 
 [ADR-322 — Processing inventory export](322-processing-inventory-export.md)
 adds bounded audited JSON export of retained artifacts, recipient history,

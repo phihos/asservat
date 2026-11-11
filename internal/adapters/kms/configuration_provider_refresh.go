@@ -12,7 +12,7 @@ import (
 )
 
 // This private operation is made only for one of the enclosing concrete
-// worker's two fixed credential slots. It is never selected by a callback or
+// worker's closed credential slots. It is never selected by a callback or
 // exposed as a current-reader implementation. Native and SQL are both real;
 // no SQL transaction is held over native/provider I/O.
 type configurationProviderRefreshOperation struct {
@@ -27,13 +27,13 @@ type configurationProviderRefreshOperation struct {
 }
 
 func (s *InstalledConfigurationProviderEffects) beginRefresh(ctx context.Context, slot *ownerProviderLifetime) (*configurationProviderRefreshOperation, time.Time, error) {
-	if s == nil || s.effects == nil || (slot != s.effects.wrap && slot != s.effects.unwrap) {
+	if s == nil || s.effects == nil || (slot != s.effects.wrap && slot != s.effects.unwrap && !s.effects.cleanupSlot(slot)) {
 		return nil, time.Time{}, ErrKeyService
 	}
 	return s.beginConfigurationNative(ctx)
 }
 
-// Shared private mechanics for only the two fixed refresh purposes and owner
+// Shared private mechanics for fixed configuration/cleanup purposes and owner
 // configuration audit. Public callers cannot supply phases or proof callbacks.
 func (s *InstalledConfigurationProviderEffects) beginConfigurationNative(ctx context.Context) (*configurationProviderRefreshOperation, time.Time, error) {
 	if s == nil || ctx == nil || ctx.Err() != nil || s.root.Err() != nil || s.effects == nil ||

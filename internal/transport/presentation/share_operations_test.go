@@ -21,6 +21,7 @@ type shareOperationsFixture struct {
 	input     sharing.CreateInput
 	createErr error
 	transfer  sharing.TransferInput
+	revoke    sharing.RevokeInput
 }
 
 func (f *shareOperationsFixture) ResolveIdentity(context.Context) (identity.Identity, error) {
@@ -41,9 +42,9 @@ func (f *shareOperationsFixture) List(_ context.Context, _ identities.CurrentIde
 		Creator: identity.Principal{Issuer: issuer, Subject: "creator", ClientID: "mcp", Kind: identity.Human}, Management: []artifact.AudienceAssignment{team, again}}
 	return []sharing.View{{Share: s, Phase: authorization.ShareSuspended}}, time.Now().Add(5 * time.Second), nil
 }
-func (f *shareOperationsFixture) Revoke(_ context.Context, _ identities.CurrentIdentity, id string, expected int64, key string) (authorization.Share, bool, error) {
-	f.calls = append(f.calls, "revoke")
-	return authorization.Share{ID: id, Revision: 2}, false, nil
+func (f *shareOperationsFixture) Revoke(_ context.Context, _ identities.CurrentIdentity, in sharing.RevokeInput) (authorization.Share, bool, error) {
+	f.calls, f.revoke = append(f.calls, "revoke"), in
+	return authorization.Share{ID: in.ShareID, Revision: 2}, false, nil
 }
 
 func (f *shareOperationsFixture) Transfer(_ context.Context, _ identities.CurrentIdentity, in sharing.TransferInput) (authorization.Share, bool, error) {
@@ -186,5 +187,56 @@ func TestShareOperationsContract(t *testing.T) {
 	f.scopes, f.createErr = []string{"evidence:read", "evidence:share"}, value.ErrCapacity
 	if out := shareCall(t, s, f, "create_share", create); out["data"].(map[string]any)["code"] != "ShareLimit" {
 		t.Fatal("capacity code", out)
+	}
+	f.createErr = sharing.ErrRetentionCapacity
+	if out := shareCall(t, s, f, "create_share", create); out["status"] != "error" {
+		t.Fatal("retention backing refusal reported success", out)
+	} else if failure := out["data"].(map[string]any); failure["code"] != "NotAvailable" || failure["retryable"] != false || !strings.Contains(failure["message"].(string), "earlier expiry") {
+		t.Fatal("retention backing refusal lost its explicit remedy", out)
+	}
+}
+
+func TestShareMutationsCarryServerOperationID(t *testing.T) {
+	const target = "11111111-1111-4111-8111-111111111111"
+	for _, mutation := range []struct{ name, body, kind string }{
+		{"create_share", `{"case_id":"22222222-2222-4222-8222-222222222222","artifacts":[{"artifactID":"33333333-3333-4333-8333-333333333333","digest":"` + strings.Repeat("0a", 32) + `"}],"recipients":[{"kind":"User","issuer":"https://id.example.invalid","id":"outsider"}],"data_classes":["metadata"],"operations":["get_case"],"expires_at":"2026-11-12T12:00:00Z","reason":"synthetic incident","idempotency_key":"stable"}`, "create"},
+		{"transfer_share", `{"share_id":"` + target + `","expected_revision":1,"idempotency_key":"stable","management":{"mode":"teams","teams":[{"kind":"Group","issuer":"https://id.example.invalid","id":"owners"}]}}`, "transfer"},
+		{"revoke_share", `{"share_id":"` + target + `","expected_revision":1,"idempotency_key":"stable"}`, "revoke"},
+		{"revoke_share", `{"sharing_intent_id":"` + target + `","expected_revision":1,"idempotency_key":"stable"}`, "policy-revoke"},
+		{"stop_future_sharing", `{"sharing_intent_id":"` + target + `","expected_revision":1,"idempotency_key":"stable"}`, "policy-stop"},
+	} {
+		t.Run(mutation.kind, func(t *testing.T) {
+			f := &policyRevokeFixture{shareOperationsFixture: shareOperationsFixture{scopes: []string{"evidence:read", "evidence:share"}}}
+			s, err := NewShareOperations("https://asservat.example.invalid", time.Now, func() string { return target }, f)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, operationID := range []string{"88888888-8888-4888-8888-888888888888", "77777777-7777-4777-8777-777777777777"} {
+				reply, err := s.CallWithContext(t.Context(), f, OperationCall{requestID: operationID}, mutation.name, json.RawMessage(mutation.body))
+				var envelope OperationEnvelope
+				if err != nil || json.Unmarshal(reply.Body, &envelope) != nil || envelope.Status != "ok" || envelope.RequestID != operationID {
+					t.Fatal("sharing mutation failed", err)
+				}
+				var got string
+				switch mutation.kind {
+				case "create":
+					got = f.shareOperationsFixture.input.OperationID
+				case "transfer":
+					got = f.transfer.OperationID
+				case "revoke":
+					got = f.revoke.OperationID
+				default:
+					got = f.input.OperationID
+				}
+				if got != operationID {
+					t.Fatal("server operation ID was dropped or replaced", got, operationID)
+				}
+			}
+			// A public body cannot supply or replace the paid server identity.
+			injected := strings.TrimSuffix(mutation.body, "}") + `,"operation_id":"` + target + `"}`
+			if _, err := s.CallWithContext(t.Context(), f, OperationCall{requestID: target}, mutation.name, json.RawMessage(injected)); err == nil {
+				t.Fatal("public operation ID accepted")
+			}
+		})
 	}
 }

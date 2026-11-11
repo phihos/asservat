@@ -28,6 +28,7 @@ import (
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/adapters/mtls"
 	"asservat.local/asservat/internal/adapters/postgres"
+	"asservat.local/asservat/internal/adapters/providerconfig"
 	"asservat.local/asservat/internal/bootstrap"
 	"asservat.local/asservat/internal/contracts"
 	query "asservat.local/asservat/internal/domain/analysis"
@@ -262,8 +263,9 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 					Bucket   string   `json:"bucket"`
 					Prefixes []string `json:"prefixes"`
 				} `json:"evidenceDeleteStorage"`
-				Public     bool                              `json:"public"`
-				ServingTLS contracts.InstallerServingTLSPlan `json:"servingTLS"`
+				OperationCleanupStorage *providerconfig.OperationCleanupStorageRequirements `json:"operationCleanupStorage"`
+				Public                  bool                                                `json:"public"`
+				ServingTLS              contracts.InstallerServingTLSPlan                   `json:"servingTLS"`
 			}
 			if json.Unmarshal(outbox.Recipe, &artifact) != nil {
 				t.Fatal("outbox artifact unreadable")
@@ -330,6 +332,17 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 						t.Fatal(e)
 					}
 					args = append(args, c.flag, file)
+				}
+			}
+			if a := artifact.OperationCleanupStorage; a != nil {
+				users = append(users, "operation-cleanup", "operation-verify")
+				material := installerOperationCleanupCredentials(t, limit, providers, *a, users)
+				for key, flag := range map[string]string{contracts.InstallerInboxCleanupAuditCredential: "--cleanup-audit-credential", contracts.InstallerInboxCleanupVerifyCredential: "--cleanup-verify-credential"} {
+					file := filepath.Join(work, key)
+					if e = os.WriteFile(file, material[key], 0600); e != nil {
+						t.Fatal(e)
+					}
+					args = append(args, flag, file)
 				}
 			}
 			if artifact.Public {
@@ -767,6 +780,11 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 		}
 		var postDownload func(cluster string, run installedProcessingRun)
 		switch installedJourneyFocus() {
+		case "share-retirement":
+			postDownload = func(cluster string, run installedProcessingRun) {
+				qualifyInstalledShareRetirement(t, ctx, cluster, namespace, workload, run, providers)
+			}
+			deny, gone = nil, nil
 		case "privacy-inventory":
 			erasure := installedEarlyErasure{hub: api, providers: providers, installation: installation, namespace: desired.TargetNamespace, evidenceBucket: evidenceBucket}
 			postDownload = func(cluster string, run installedProcessingRun) {
@@ -851,7 +869,7 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 		regionalRecord = issuedRecord
 	}
 	qualifyRegionalInstall(t, ctx, f, 1, regionalPhysicalIndex, admin, runnerAPI, api, hubKubeconfig, desired.TargetNamespace, issuer, journey, providers, offerMap.Data[contracts.RegionalOfferFile], installation, regionalRecord)
-	if focus := installedJourneyFocus(); focus == "restart" || focus == "journey" || focus == "browser" || focus == "upgrade" || focus == "policy" || focus == "alert" || focus == "logresource" || focus == "chain" || focus == "share" || focus == "journey-store-failure" || focus == "journey-start-failure" || focus == "retention-shortening" || focus == "early-erasure" || focus == "processing-workload" || focus == "privacy-inventory" || installedRecordingFocus() || installedLogsFocus() {
+	if focus := installedJourneyFocus(); focus == "restart" || focus == "journey" || focus == "browser" || focus == "upgrade" || focus == "policy" || focus == "alert" || focus == "logresource" || focus == "chain" || focus == "share" || focus == "journey-store-failure" || focus == "journey-start-failure" || focus == "retention-shortening" || focus == "early-erasure" || focus == "processing-workload" || focus == "privacy-inventory" || focus == "share-retirement" || installedRecordingFocus() || installedLogsFocus() {
 		t.Log("focused " + focus + " run complete: the second workload cluster and replay checks were not run")
 		return
 	}
@@ -998,33 +1016,7 @@ func installerOperatorStorage(t *testing.T, ctx context.Context, p *initialRunti
 		t.Fatal("owned S3 container identity missing", err)
 	}
 	clear(raw)
-	runID := strings.TrimSuffix(strings.TrimPrefix(native.Container, "asservat-"), "-s3")
-	label, err := installedOutput(ctx, installedDockerTimeout, "docker", "inspect", "--format", "{{ index .Config.Labels \"asservat.test\" }}", native.Container)
-	if err != nil || strings.TrimSpace(string(label)) != runID || len(actions) == 0 {
-		t.Fatal("refuse non-owned S3 administration", err)
-	}
-	bucket := p.desired.AuditStore.Bucket
-	key, secret := user+"-continuation", user+"-continuation-secret"
-	shell := "s3.configure -user=administrator -access_key=synthetic-only -secret_key=synthetic-only-secret -actions=Admin,Read,Write,List -apply\n" +
-		"s3.configure -user=" + user + " -access_key=" + key + " -secret_key=" + secret + " -actions=" + strings.Join(actions, ",") + " -apply\n"
-	command, commandDone := installedBoundedCommand(ctx, installedDockerTimeout, "docker", "exec", "-i", native.Container, "/usr/bin/weed", "shell", "-master=localhost:9333", "-filer=localhost:8888")
-	defer commandDone()
-	command.Stdin = strings.NewReader(shell)
-	if output, e := command.CombinedOutput(); e != nil {
-		clear(output)
-		t.Fatal("owned exact IAM provisioning command unavailable", e)
-	}
-	var principals []string
-	for _, u := range users {
-		principals = append(principals, "arn:aws:iam::000000000000:user/"+u)
-	}
-	policy, _ := json.Marshal(map[string]any{"Version": "2012-10-17", "Statement": []any{map[string]any{"Sid": "DenyRuntimeDeletion", "Effect": "Deny", "Principal": map[string]any{"AWS": principals}, "Action": []string{"s3:DeleteObject", "s3:DeleteObjectVersion"}, "Resource": "arn:aws:s3:::" + bucket + "/*"}}})
-	store := s3.New(s3.Options{Region: p.desired.AuditStore.Region, BaseEndpoint: aws.String(p.desired.AuditStore.Endpoint), UsePathStyle: true, Credentials: credentials.NewStaticCredentialsProvider("synthetic-only", "synthetic-only-secret", ""), HTTPClient: p.client, RetryMaxAttempts: 1})
-	if _, err = store.PutBucketPolicy(ctx, &s3.PutBucketPolicyInput{Bucket: &bucket, Policy: aws.String(string(policy))}); err != nil {
-		t.Fatal("runtime deletion denial", err)
-	}
-	out, _ := json.Marshal(contracts.OwnerStorageCredential{AccessKeyID: key, SecretAccessKey: secret})
-	return out
+	return installerOwnedOperatorStorage(t, ctx, p, native.Container, user, actions, users)
 }
 
 func installerContinuationRunning(t *testing.T, ctx context.Context, api kubernetes.Interface, d *apps.Deployment, image string) {
@@ -1226,7 +1218,7 @@ func nativeCapacityProfile() *contracts.InstallerCapacitySettings {
 		records, normal = records+r, normal+n
 	})
 	poolSpec, policySpec := installerDeclaredCapacitySpecs()
-	return &contracts.InstallerCapacitySettings{Pool: "capacity", Policy: "applications", PoolSpec: poolSpec, PolicySpec: policySpec, NamespaceKeys: []string{"team"}, Accounts: 16, Records: records, AdmissionSeconds: 86400,
+	profile := &contracts.InstallerCapacitySettings{Pool: "capacity", Policy: "applications", PoolSpec: poolSpec, PolicySpec: policySpec, NamespaceKeys: []string{"team"}, Accounts: 16, Records: records, AdmissionSeconds: 86400,
 		Lanes:               contracts.InstallerCapacityLanes{CaptureRetainedSeconds: 10000, Normal: lane(4, normal*installedKeptRuns()), Resolution: lane(4, 8*installedFundedRuns()), Processing: lane(2, 16)},
 		StopRetainedSeconds: 10000,
 		Backup:              contracts.InstallerCapacityBackup{HorizonSeconds: 3600, CleanupBudgetSeconds: 60, ProofWindowSeconds: 60, BackupCopies: 2, WALCopies: 3},
@@ -1236,6 +1228,20 @@ func nativeCapacityProfile() *contracts.InstallerCapacitySettings {
 		Metadata:            contracts.InstallerCapacityMetadata{FixedRowBytes: 1 << 20, AccountRowBytes: 256 << 10, RecordRowBytes: 128 << 10, RecordWALBytes: 8 << 20, RecordKeyAttempts: 16, TransitionWALBytes: 1 << 20, ConfigurationTransitions: 4096},
 		Envelope:            contracts.InstallerCapacityEnvelope{SystemObjects: contracts.InstallerCapacityAmount{Bytes: 1 << 50, Objects: 1 << 50}, SQLBytes: 1 << 50, BackupBytes: 1 << 50, WALBytes: 1 << 50, KeyAttempts: 1 << 50},
 		Backends:            []contracts.InstallerCapacityBackend{{StorageProfile: "dedicated", Usable: contracts.InstallerCapacityAmount{Bytes: 1 << 50, Objects: 1000000000}}}}
+	if installedJourneyFocus() == "share-retirement" {
+		// Selected before installation/admission: exercise original finite
+		// bounds, never rewrite a running operation to make cleanup due.
+		profile.Backup.HorizonSeconds = 2
+		// The ten-second cohort did not qualify healthy native retirement.
+		// Select thirty seconds before installation for serial native checks
+		// and cold provider work; retention and proof requirements stay fixed.
+		// This moves original purge 60s earlier and live removal 20s earlier.
+		profile.Backup.CleanupBudgetSeconds, profile.Backup.ProofWindowSeconds = 30, 10
+		profile.Lanes.Normal.RetainedSeconds = 240
+		profile.Lanes.Resolution.RetainedSeconds = 240
+		profile.Lanes.CaptureRetainedSeconds = 300
+	}
+	return profile
 }
 
 // installedFocusCapacityRecords is the current focus' records per account

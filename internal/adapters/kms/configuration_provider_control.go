@@ -14,12 +14,12 @@ import (
 // Reuse the fixed login/self-control wire and lease accounting, while deriving
 // only a worker recipe. No fabricated owner deployment or PKI role is involved.
 func newConfigurationProviderControl(in contracts.HubWorkerDeployment, profile contracts.ConfigurationProviderAuthentication, purpose string, client *http.Client, now func() time.Time) (*ownerProviderControl, error) {
-	if now == nil || client == nil || client.Jar != nil || (purpose != "audit-wrap" && purpose != "audit-unwrap") ||
+	if now == nil || client == nil || client.Jar != nil ||
 		contracts.ConfigurationProviderTokenTTLSeconds != contracts.OwnerProviderTokenTTLSeconds || contracts.ConfigurationProviderTokenMaxTTLSeconds != contracts.OwnerProviderTokenMaxTTLSeconds ||
 		providerconfig.ValidateConfigurationProviderAuthentication(in, profile, now()) != nil {
 		return nil, ErrKeyService
 	}
-	recipe, err := providerconfig.ConfigurationProviderRecipeFor(in, contracts.ConfigurationProviderSelection{AuthMount: profile.AuthMount, AuthMountAccessor: profile.AuthMountAccessor, AuditCredentials: profile.AuditCredentials, WorkerConfigurationAudit: profile.WorkerConfigurationAudit, ContextDeletionSigning: profile.ContextDeletionSigning}, profile.ServiceAccount, now())
+	recipe, err := providerconfig.ConfigurationProviderRecipeFor(in, contracts.ConfigurationProviderSelection{AuthMount: profile.AuthMount, AuthMountAccessor: profile.AuthMountAccessor, AuditCredentials: profile.AuditCredentials, WorkerConfigurationAudit: profile.WorkerConfigurationAudit, ContextDeletionSigning: profile.ContextDeletionSigning, CleanupAudit: profile.CleanupAudit}, profile.ServiceAccount, now())
 	if err != nil {
 		return nil, ErrKeyService
 	}

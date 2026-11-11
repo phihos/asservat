@@ -264,7 +264,8 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		read("fleet_current_trust", "context_case_locator", "evidence_share")
 		add("fleet_current_trust", "UPDATE", "installation_id")
 		add("evidence_share", "INSERT")
-		add("evidence_share", "UPDATE", "revoked_at", "revoke_key", "revision", "management", "transfer_key", "transfer_digest")
+		add("evidence_share", "UPDATE", "revoked_at", "revoke_key", "revision", "management", "transfer_key", "transfer_digest", "last_operation_id")
+		out = append(out, publicRuntimeGrant{"function", "begin_share_effect(uuid,uuid,text,text,text,text,uuid)", "", "EXECUTE"})
 		// ADR-239: revoke-all of a policy acceptance's recurring sharing reads
 		// its instruction and marks it stopped or revoked once (a trigger keeps it so).
 		read("policy_acceptance")

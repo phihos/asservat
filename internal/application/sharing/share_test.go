@@ -238,7 +238,7 @@ func newFixture() (*fixture, Service) {
 }
 
 func (f *fixture) input(key string) CreateInput {
-	return CreateInput{CaseID: f.caseID, ArtifactID: f.route.ArtifactID, Version: f.record.Version, Recipients: []value.ShareRecipient{{Kind: "Group", Issuer: f.i.Principal.Issuer, ID: "outsiders"}}, ExpiresAt: f.now.Add(48 * time.Hour), Reason: "incident review", IdempotencyKey: key}
+	return CreateInput{OperationID: testID(900), CaseID: f.caseID, ArtifactID: f.route.ArtifactID, Version: f.record.Version, Recipients: []value.ShareRecipient{{Kind: "Group", Issuer: f.i.Principal.Issuer, ID: "outsiders"}}, ExpiresAt: f.now.Add(48 * time.Hour), Reason: "incident review", IdempotencyKey: key}
 }
 
 func TestShareCreateListRevoke(t *testing.T) {
@@ -263,10 +263,10 @@ func TestShareCreateListRevoke(t *testing.T) {
 	if err != nil || len(owned) != 1 || owned[0].Phase != value.ShareActive {
 		t.Fatal("owned list", err, owned)
 	}
-	if _, _, err := s.Revoke(context.Background(), f, created.ID, 1, "r1"); err != nil {
+	if _, _, err := s.Revoke(context.Background(), f, RevokeInput{OperationID: testID(900), ShareID: created.ID, ExpectedRevision: 1, IdempotencyKey: "r1"}); err != nil {
 		t.Fatal("revoke", err)
 	}
-	if _, replay, err := s.Revoke(context.Background(), f, created.ID, 1, "r1"); err != nil || !replay {
+	if _, replay, err := s.Revoke(context.Background(), f, RevokeInput{OperationID: testID(900), ShareID: created.ID, ExpectedRevision: 1, IdempotencyKey: "r1"}); err != nil || !replay {
 		t.Fatal("revoke replay", err, replay)
 	}
 	owned, _, _ = s.List(context.Background(), f, "owned", 20)
@@ -362,7 +362,7 @@ func TestShareOwnedListSurvivesUnavailableProjection(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := s.Revoke(context.Background(), f, revoked.ID, 1, "r1"); err != nil {
+	if _, _, err := s.Revoke(context.Background(), f, RevokeInput{OperationID: testID(900), ShareID: revoked.ID, ExpectedRevision: 1, IdempotencyKey: "r1"}); err != nil {
 		t.Fatal(err)
 	}
 	active, _, err := s.Create(context.Background(), f, f.input("k2"))
@@ -450,7 +450,7 @@ func TestShareTeamManagement(t *testing.T) {
 		t.Fatal("creator departure changed the share", owned)
 	}
 	f.i = mate
-	if revoked, _, err := s.Revoke(ctx, f, share.ID, 1, "r-mate"); err != nil || revoked.Revision != 2 {
+	if revoked, _, err := s.Revoke(ctx, f, RevokeInput{OperationID: testID(900), ShareID: share.ID, ExpectedRevision: 1, IdempotencyKey: "r-mate"}); err != nil || revoked.Revision != 2 {
 		t.Fatal("team member could not revoke", err)
 	}
 	// A revoked team share leaves the member's (not the creator's) view.
@@ -468,7 +468,7 @@ func TestShareTeamManagement(t *testing.T) {
 	owners := f.p.Allows[1].Audience
 	f.dropAllow(owners.AssignmentID)
 	f.i = mate
-	if _, _, err := s.Revoke(ctx, f, second.ID, 1, "r-lost"); !errors.Is(err, capture.ErrDenied) {
+	if _, _, err := s.Revoke(ctx, f, RevokeInput{OperationID: testID(900), ShareID: second.ID, ExpectedRevision: 1, IdempotencyKey: "r-lost"}); !errors.Is(err, capture.ErrDenied) {
 		t.Fatal("member of a team without a current assignment revoked", err)
 	}
 	if owned, _, _ := s.List(ctx, f, "owned", 20); len(owned) != 0 {
@@ -492,7 +492,7 @@ func TestShareTeamManagement(t *testing.T) {
 		t.Fatal("re-granted owner binding restored a suspended share", owned)
 	}
 	f.i = mate
-	if _, _, err := s.Revoke(ctx, f, second.ID, 1, "r-new"); !errors.Is(err, capture.ErrDenied) {
+	if _, _, err := s.Revoke(ctx, f, RevokeInput{OperationID: testID(900), ShareID: second.ID, ExpectedRevision: 1, IdempotencyKey: "r-new"}); !errors.Is(err, capture.ErrDenied) {
 		t.Fatal("newly added owner managed an old share", err)
 	}
 	if owned, _, _ := s.List(ctx, f, "owned", 20); len(owned) != 0 {
@@ -500,7 +500,7 @@ func TestShareTeamManagement(t *testing.T) {
 	}
 	// The creator can still revoke the suspended share.
 	f.i = creator
-	if _, _, err := s.Revoke(ctx, f, second.ID, 1, "r-creator"); err != nil {
+	if _, _, err := s.Revoke(ctx, f, RevokeInput{OperationID: testID(900), ShareID: second.ID, ExpectedRevision: 1, IdempotencyKey: "r-creator"}); err != nil {
 		t.Fatal("creator could not revoke a suspended share", err)
 	}
 }
@@ -520,7 +520,7 @@ func TestShareManagementPersonalTeamsAndDeny(t *testing.T) {
 	other := f.i
 	other.Principal.Subject = "someone-else"
 	f.i = other
-	if _, _, err := s.Revoke(ctx, f, share.ID, 1, "r"); !errors.Is(err, capture.ErrDenied) {
+	if _, _, err := s.Revoke(ctx, f, RevokeInput{OperationID: testID(900), ShareID: share.ID, ExpectedRevision: 1, IdempotencyKey: "r"}); !errors.Is(err, capture.ErrDenied) {
 		t.Fatal("another user managed a personal share", err)
 	}
 
@@ -540,11 +540,11 @@ func TestShareManagementPersonalTeamsAndDeny(t *testing.T) {
 	d.Audience.Kind, d.Audience.SubjectID, d.Audience.AssignmentID = "User", "mate", testID(63)
 	f.p.Denies = []value.CurrentAssignment{d}
 	f.i = mate
-	if _, _, err := s.Revoke(ctx, f, share.ID, 1, "r"); !errors.Is(err, capture.ErrDenied) {
+	if _, _, err := s.Revoke(ctx, f, RevokeInput{OperationID: testID(900), ShareID: share.ID, ExpectedRevision: 1, IdempotencyKey: "r"}); !errors.Is(err, capture.ErrDenied) {
 		t.Fatal("denied member revoked", err)
 	}
 	f.p.Denies = nil
-	if _, _, err := s.Revoke(ctx, f, share.ID, 1, "r"); err != nil {
+	if _, _, err := s.Revoke(ctx, f, RevokeInput{OperationID: testID(900), ShareID: share.ID, ExpectedRevision: 1, IdempotencyKey: "r"}); err != nil {
 		t.Fatal("member revoke", err)
 	}
 

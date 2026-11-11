@@ -5,6 +5,8 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
+	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -19,6 +21,7 @@ import (
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/capture"
+	cfg "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/identity"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -33,9 +36,25 @@ import (
 // acceptance never backfills, a capture published after notAfter is unshared,
 // and revoke-all revokes exactly its acceptance's shares and stops its
 // pending captures from being shared.
-func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, create func(*testing.T, int64) captureAdmissionScenario, prepare func(*testing.T, captureAdmissionScenario, capture.Accepted, bool) captureShareFixture) {
+func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, create func(*testing.T, int64) captureAdmissionScenario, prepare func(*testing.T, captureAdmissionScenario, capture.Accepted, bool) captureShareFixture, configureCapture func(*testing.T, *captureAdmissionScenario) shareCaptureAudit, wideCost ...bool) {
 	t.Helper()
-	s := create(t, 12)
+	wide := len(wideCost) > 0 && wideCost[0]
+	slots := int64(12)
+	if wide {
+		slots = 112
+	}
+	s := create(t, slots)
+	authorGroups := []string{"maintainers"}
+	var widthRecipients []authorization.ShareRecipient
+	if wide {
+		creator, groups, recipients := widePolicyShareActors(t, policyWideSampleIssuerBytes)
+		t.Logf("policy_cost_stage=fixed_wide_sample_selection issuer_bytes=%d groups=8 recipients=8 id_bytes=256; chosen before authority/audience acceptance; all-individual-maxima is a separate structural rejection", len(creator.Issuer))
+		s.a.Eligibility.VerifiedIdentity.Principal = creator
+		s.a.Eligibility.VerifiedIdentity.Groups = groups
+		authorGroups, widthRecipients = groups, recipients
+	}
+
+	qualifiedCapture := configureCapture(t, &s)
 	root, installation := s.a.RootID, s.recovery.installation
 	pod := s.a.Plan.Input.Target.Target()
 	workload := authorization.WorkloadScope(pod.ClusterID, pod.NamespaceUID, pod.WorkloadUID)
@@ -50,6 +69,13 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 	}
 	refresh := func() {
 		t.Helper()
+		// The 100-publication measurement outlives one synthetic source
+		// observation. Model its existing producer under the exact original
+		// installation/epoch/source/incarnation pins before each new operation;
+		// this renews neither a capture's authority nor its writer deadline.
+		if err := renewSyntheticFleetObservation(ctx, admin, s.recovery.observation, 30*time.Second, true); err != nil {
+			t.Fatal("policy share current original fleet source", err)
+		}
 		b := s.batch
 		b.Initial = nil
 		b.ObservedAt = clock()
@@ -63,6 +89,12 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 	// holds evidence-owner too: the policy's owner team (ADR-239).
 	b := &s.batch.Bases[0]
 	b.Roles = []string{"workload-maintainer", "evidence-owner"}
+	if wide {
+		b.Subjects = nil
+		for _, group := range authorGroups {
+			b.Subjects = append(b.Subjects, cfg.Subject{Kind: "Group", Issuer: s.a.Eligibility.VerifiedIdentity.Principal.Issuer, ID: group})
+		}
+	}
 	b.Automation = &authorization.AutomationEnvelope{AllowedActions: []string{authorization.PolicyContextAction}, MaxLifetimeSeconds: 3600, MaxExecutions: 100, MaxBytes: 1 << 30}
 	b.Resource.Generation++
 	b.Resource.SpecDigest[0]++
@@ -83,17 +115,25 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 		t.Fatal(err)
 	}
 	var sponsor, owner artifact.AudienceAssignment
+	var sponsors, managers []artifact.AudienceAssignment
 	for _, a := range projection.Allows {
 		if a.Audience.BasisUID == b.Resource.UID && a.Audience.Role == "workload-maintainer" {
 			sponsor = a.Audience
+			sponsors = append(sponsors, a.Audience)
 		}
 		if a.Audience.BasisUID == b.Resource.UID && a.Audience.Role == "evidence-owner" {
 			owner = a.Audience
+			managers = append(managers, a.Audience)
 		}
 	}
 	if sponsor.AssignmentID == "" || owner.AssignmentID == "" {
 		t.Fatal("automation binding assignments", projection.Allows)
 	}
+	if wide && (len(sponsors) != 8 || len(managers) != 8) {
+		t.Fatal("wide-sample original owner projection", len(sponsors), len(managers))
+	}
+	slices.SortFunc(sponsors, func(a, b artifact.AudienceAssignment) int { return strings.Compare(a.AssignmentID, b.AssignmentID) })
+	slices.SortFunc(managers, func(a, b artifact.AudienceAssignment) int { return strings.Compare(a.AssignmentID, b.AssignmentID) })
 
 	factory := func(role, password string) *postgres.Policies {
 		pool := poolFor(role, password)
@@ -114,6 +154,14 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 	policyUID := custodyID()
 	creator := s.a.Eligibility.VerifiedIdentity.Principal
 	recipient := authorization.ShareRecipient{Kind: "User", Issuer: creator.Issuer, ID: "synthetic-policy-recipient"}
+	shareRecipients := []authorization.ShareRecipient{recipient}
+	shareManagers := []artifact.AudienceAssignment{owner}
+	authorityOwners := []artifact.AudienceAssignment{sponsor}
+	maxExecutions := int64(50)
+	if wide {
+		shareRecipients, shareManagers, authorityOwners, maxExecutions = widthRecipients, managers, sponsors, 100
+	}
+
 	source := capture.PolicySource{InstallationID: installation, ClusterID: custodyID(), NamespaceUID: "control", Name: "restarts", Revision: identity.Revision{UID: policyUID, Generation: 1, Digest: artifact.Digest{51}}, ResourceVersion: "policy-1", CollectionDigest: artifact.Digest{52}}
 	observe := func() {
 		t.Helper()
@@ -148,12 +196,29 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 			t.Fatal(err)
 		}
 		authority = authorization.AcceptedPolicyAuthority{InstallationID: installation, PolicyUID: policyUID, Creator: creator, Executor: authorization.PolicyPrincipal(installation, policyUID), ScopeDigest: sha256.Sum256(authorityScope), ClusterID: pod.ClusterID, NamespaceUID: pod.NamespaceUID, WorkloadUID: pod.WorkloadUID,
-			Delegation: identity.Revision{UID: b.Resource.UID, Generation: b.Resource.Generation, Digest: b.Resource.SpecDigest}, Owners: []artifact.AudienceAssignment{sponsor}, Actions: []string{authorization.PolicyContextAction}, Limits: authorization.AutomationLimits{MaxExecutions: 50, MaxBytes: 1 << 20}, IssuedAt: now, NotAfter: now.Add(time.Hour)}
-		author := identity.Identity{Principal: creator, Scopes: []string{"evidence:read", "evidence:capture", authorization.ShareScope}, Groups: []string{"maintainers"}, Policy: s.a.Eligibility.VerifiedIdentity.Policy, VerifiedAt: now, ValidUntil: now.Add(30 * time.Second)}
+			Delegation: identity.Revision{UID: b.Resource.UID, Generation: b.Resource.Generation, Digest: b.Resource.SpecDigest}, Owners: authorityOwners, Actions: []string{authorization.PolicyContextAction}, Limits: authorization.AutomationLimits{MaxExecutions: maxExecutions, MaxBytes: 1 << 20}, IssuedAt: now, NotAfter: now.Add(time.Hour)}
+		author := identity.Identity{Principal: creator, Scopes: []string{"evidence:read", "evidence:capture", authorization.ShareScope}, Groups: authorGroups, Policy: s.a.Eligibility.VerifiedIdentity.Policy, VerifiedAt: now, ValidUntil: now.Add(30 * time.Second)}
 		in := capture.PolicyAdmission{RootID: root, Recovery: recovery, Target: workload, Authority: authority, Author: author,
 			Submission: capture.VerifiedPolicySubmission{ReplacesID: active, Nonce: custodyID(), Actor: creator, Source: source.Revision, ClusterID: source.ClusterID, NamespaceUID: source.NamespaceUID, Name: source.Name, ScopeDigest: authority.ScopeDigest, EnvelopeDigest: artifact.Digest{53}, IssuedAt: now, ExpiresAt: now.Add(30 * time.Second)},
-			Sharing:    &capture.PolicyShareInstruction{Creator: creator, Management: []artifact.AudienceAssignment{owner}, Recipients: []authorization.ShareRecipient{recipient}, MaxCaptures: maxCaptures, NotAfter: notAfter.UTC().Truncate(time.Second)}}
+			Sharing:    &capture.PolicyShareInstruction{Creator: creator, Management: shareManagers, Recipients: shareRecipients, MaxCaptures: maxCaptures, NotAfter: notAfter.UTC().Truncate(time.Second)}}
 		in.Verification = syntheticSubmissionCheck(in, now)
+		if wide {
+			// The recovery read began after the request's original timestamps.
+			// Validate at delivery time, as AcceptPolicy does, without renewing
+			// any original input observation or authority deadline.
+			var version int64
+			if err := readPool.QueryRow(ctx, `SELECT intent_version FROM policy_source WHERE root_id=$1 AND policy_uid=$2`, root, policyUID).Scan(&version); err != nil {
+				t.Fatal("wide-sample acceptance source revision", err)
+			}
+			checkedAt := clock()
+			candidate := capture.PolicyAcceptance{ID: custodyID(), RootID: root, Source: source, Submission: in.Submission, Authority: in.Authority, Submitter: in.Author.Principal, IdentityRevision: in.Author.Policy, PermissionRevision: projection.Revision, Recovery: in.Recovery, AcceptedAt: checkedAt, IntentVersion: version, Sharing: in.Sharing}
+			body, encodeErr := json.Marshal(candidate)
+			t.Logf("policy_cost_stage=original_wide_acceptance_shape issuer_bytes=%d source_candidate_valid=%t input_valid=%t encode_ok=%t encoded_bytes=%d closed_adapter_limit=%d", len(creator.Issuer), candidate.Valid(), in.Valid(checkedAt), encodeErr == nil, len(body), 64<<10)
+			t.Logf("policy_acceptance_predicates source=%t submission=%t verification=%t author=%t authority=%t target=%t sharing=%t recovery=%t original_request_precedes_recovery=%t", source.Valid(checkedAt), in.Submission.Valid(checkedAt), in.Verification.Valid(checkedAt), in.Author.Valid(checkedAt), in.Authority.Valid(checkedAt), in.Target.Valid(), in.Sharing.Valid(), in.Recovery.Valid(checkedAt), now.Before(in.Recovery.ObservedAt))
+			if !candidate.Valid() || !in.Valid(checkedAt) || encodeErr != nil || len(body) > 64<<10 {
+				t.Fatal("fixed wide sample violates original acceptance predicates")
+			}
+		}
 		r, err := acceptor.AcceptPolicy(ctx, in)
 		if err != nil {
 			t.Fatal("accept policy with sharing", err)
@@ -242,6 +307,12 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 			e := (authapp.AutomationEvaluator{Accepted: reader, Current: automation, Now: time.Now}).Eligibility(ctx, use)
 			t.Fatalf("policy capture admission: %v (evaluator %s, eligible until %s, now %s)", err, e.Reason, a.Eligibility.ValidUntil, time.Now())
 		}
+		// Runtime acknowledges this selected capture immediately. Later test
+		// waits may exhaust its original writer window and cannot authorize a
+		// new pair write or renew that window.
+		if _, err := qualifiedCapture.publication.AcknowledgedCaptureIntent(ctx, got.CaptureID); err != nil {
+			t.Fatal("policy capture original intent pair", shareFixtureFailureStage(err), err)
+		}
 		// A replayed admission (a lost reply) returns the same capture and
 		// claims no second slot.
 		if again, err := admissions.AdmitContext(ctx, a); err != nil || again.CaptureID != got.CaptureID {
@@ -314,22 +385,29 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 	// narrowRole names one role per prefix and database.
 	captureAdmissions := func(prefix string) *postgres.ContextAdmissions {
 		t.Helper()
-		role := narrowRole(t, ctx, admin, prefix, "synthetic-policy-share-admit", func(role string) []string {
-			grants, ok := postgres.PublicRuntimeRoleGrantSQL("capture-admit", role)
-			if !ok {
-				t.Fatal("missing compiled capture-admit grants")
-			}
-			return grants
-		})
-		pool := poolFor(role, "synthetic-policy-share-admit")
+		// A fresh pool/adapter uses the same original pinned capture role;
+		// a process restart cannot invent a replacement admission identity.
+		pool := poolFor(qualifiedCapture.admissionRole, "synthetic-share-capture-admit")
 		t.Cleanup(pool.Close)
-		a, err := postgres.NewContextAdmissions(ctx, pool, root, postgres.EffectTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard})
+		a, err := postgres.NewAuditedContextAdmissions(ctx, pool, root, qualifiedCapture.mac, postgres.EffectTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard})
 		if err != nil {
 			t.Fatal(err)
 		}
 		return a
 	}
 
+	if wide {
+		qualifyWidePolicyShareCost(t, ctx, admin, poolFor, store, keys, policyShareCostFixture{
+			Scenario: s, Creator: creator, Groups: authorGroups, Accept: func() string { return accept(99, 100, clock().Add(time.Hour)) },
+			Grant: func() {
+				attachPolicyAccountingGrantWithLimits(t, ctx, admin, poolFor, s, authority, authorityScope, "wide-sample-accounting", authorization.AutomationLimits{MaxExecutions: 100, MaxBytes: 100 * artifact.MaxContextBytes})
+			},
+			Admit: func() capture.Accepted { return admit(qualifiedCapture.admissions) }, Prepare: func(accepted capture.Accepted, initialize bool) captureShareFixture {
+				return prepare(t, s, accepted, initialize)
+			}, Publish: publish, Refresh: refresh,
+		})
+		return
+	}
 	// Acceptance A of generation 1 shares at most three captures.
 	first := accept(61, 3, time.Now().Add(time.Hour))
 	firstGrant := attachPolicyAccountingGrant(t, ctx, admin, poolFor, s, authority, authorityScope, "accounting-review")
@@ -371,9 +449,9 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 	f1, f2 := prepare(t, s, c1, true), prepare(t, s, c2, false)
 	publish(f1)
 	publish(f2)
-	// Existing intent publishers have now acknowledged all four original
-	// captures. Only c4 uses API execution, so this is the actual acquisition
-	// reader/gate without altering the existing Node publication fixtures.
+	// Each selected capture already persisted its own genuine pair immediately
+	// after admission; c4's prepaid API work consumes that acknowledgement.
+	assertPolicyAPIWorkSource(t, ctx, admin, c4, true)
 	qualifyOriginalPolicyGrantAcquisition(t, ctx, admin, poolFor, s, authority, c4, firstGrant, func() string {
 		return attachPolicyAccountingGrant(t, ctx, admin, poolFor, s, authority, authorityScope, "replacement-review")
 	}, func() { refresh(); observe() })
@@ -429,24 +507,7 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 	}
 
 	// Revoke-all of A revokes exactly A's shares, through the hub's own grants.
-	hubRole := narrowRole(t, ctx, admin, "policy_share_hub_", "synthetic-policy-share-hub", func(role string) []string {
-		grants, ok := postgres.PublicRuntimeRoleGrantSQL("hub-runtime", role)
-		if !ok {
-			t.Fatal("missing compiled hub grants")
-		}
-		return grants
-	})
-	hubPool := poolFor(hubRole, "synthetic-policy-share-hub")
-	t.Cleanup(hubPool.Close)
-	ledger, err := postgres.NewEvidenceShares(ctx, hubPool, root, s.recovery.guard)
-	if err != nil {
-		t.Fatal(err)
-	}
-	routes, err := postgres.NewContextCaseReads(ctx, hubPool, root, s.recovery.guard)
-	if err != nil {
-		t.Fatal(err)
-	}
-	service := sharing.Service{RootID: root, InstallationID: installation, Routes: routes, Permissions: s.p, Catalog: f1.reader, Store: ledger, Policies: ledger, Recovery: s.recovery.reader, NewID: custodyID, Now: time.Now}
+	service, _ := newPolicyPaidShareService(t, ctx, admin, poolFor, store, keys, s, f1.reader)
 	as := func(subject string, groups []string) identities.CurrentIdentity {
 		t.Helper()
 		refresh()
@@ -459,23 +520,23 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 		}
 		return current
 	}
-	if _, err := service.RevokePolicySharing(ctx, as("synthetic-policy-recipient", nil), first, 1, "revoke-all"); !errors.Is(err, capture.ErrDenied) {
+	if _, err := service.RevokePolicySharing(ctx, as("synthetic-policy-recipient", nil), sharing.PolicyRevokeInput{AcceptanceID: first, ExpectedRevision: 1, IdempotencyKey: "revoke-all"}); !errors.Is(err, capture.ErrDenied) {
 		t.Fatal("a recipient revoked the policy's sharing", err)
 	}
 	// A current owner-team member (not the creator) manages the sharing.
-	r, err := service.RevokePolicySharing(ctx, as("synthetic-team-mate", []string{"maintainers"}), first, 1, "revoke-all")
+	r, err := service.RevokePolicySharing(ctx, as("synthetic-team-mate", []string{"maintainers"}), sharing.PolicyRevokeInput{AcceptanceID: first, ExpectedRevision: 1, IdempotencyKey: "revoke-all"})
 	if err != nil || r.Revoked != 2 || r.Replay {
 		t.Fatal("revoke-all", r, err)
 	}
-	if again, err := service.RevokePolicySharing(ctx, as(creator.Subject, []string{"maintainers"}), first, 1, "revoke-all"); err != nil || !again.Replay || again.Revoked != 2 {
+	if again, err := service.RevokePolicySharing(ctx, as(creator.Subject, []string{"maintainers"}), sharing.PolicyRevokeInput{AcceptanceID: first, ExpectedRevision: 1, IdempotencyKey: "revoke-all"}); err != nil || !again.Replay || again.Revoked != 2 {
 		t.Fatal("revoke-all replay", again, err)
 	}
 	// A replay with a stale expected revision cannot report a revision the
 	// store never produced.
-	if _, err := service.RevokePolicySharing(ctx, as(creator.Subject, []string{"maintainers"}), first, 2, "revoke-all"); !errors.Is(err, capture.ErrConflict) {
+	if _, err := service.RevokePolicySharing(ctx, as(creator.Subject, []string{"maintainers"}), sharing.PolicyRevokeInput{AcceptanceID: first, ExpectedRevision: 2, IdempotencyKey: "revoke-all"}); !errors.Is(err, capture.ErrConflict) {
 		t.Fatal("replay with another expected revision", err)
 	}
-	if _, err := service.RevokePolicySharing(ctx, as(creator.Subject, []string{"maintainers"}), first, 1, "another-key"); !errors.Is(err, capture.ErrConflict) {
+	if _, err := service.RevokePolicySharing(ctx, as(creator.Subject, []string{"maintainers"}), sharing.PolicyRevokeInput{AcceptanceID: first, ExpectedRevision: 1, IdempotencyKey: "another-key"}); !errors.Is(err, capture.ErrConflict) {
 		t.Fatal("second revoke-all under another key", err)
 	}
 	got = shares()
@@ -495,16 +556,16 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 	if w := stored(c8); w == nil || w.Acceptance != third {
 		t.Fatal("acceptance C does not share", w)
 	}
-	if _, err := service.StopPolicySharing(ctx, as("synthetic-policy-recipient", nil), third, 1, "stop"); !errors.Is(err, capture.ErrDenied) {
+	if _, err := service.StopPolicySharing(ctx, as("synthetic-policy-recipient", nil), sharing.PolicyRevokeInput{AcceptanceID: third, ExpectedRevision: 1, IdempotencyKey: "stop"}); !errors.Is(err, capture.ErrDenied) {
 		t.Fatal("a recipient stopped the policy's sharing", err)
 	}
-	if r, err := service.StopPolicySharing(ctx, as("synthetic-team-mate", []string{"maintainers"}), third, 1, "stop"); err != nil || r.Replay {
+	if r, err := service.StopPolicySharing(ctx, as("synthetic-team-mate", []string{"maintainers"}), sharing.PolicyRevokeInput{AcceptanceID: third, ExpectedRevision: 1, IdempotencyKey: "stop"}); err != nil || r.Replay {
 		t.Fatal("stop future sharing", r, err)
 	}
-	if r, err := service.StopPolicySharing(ctx, as(creator.Subject, []string{"maintainers"}), third, 1, "stop"); err != nil || !r.Replay {
+	if r, err := service.StopPolicySharing(ctx, as(creator.Subject, []string{"maintainers"}), sharing.PolicyRevokeInput{AcceptanceID: third, ExpectedRevision: 1, IdempotencyKey: "stop"}); err != nil || !r.Replay {
 		t.Fatal("stop replay", r, err)
 	}
-	if _, err := service.StopPolicySharing(ctx, as(creator.Subject, []string{"maintainers"}), third, 1, "stop-again"); !errors.Is(err, capture.ErrConflict) {
+	if _, err := service.StopPolicySharing(ctx, as(creator.Subject, []string{"maintainers"}), sharing.PolicyRevokeInput{AcceptanceID: third, ExpectedRevision: 1, IdempotencyKey: "stop-again"}); !errors.Is(err, capture.ErrConflict) {
 		t.Fatal("second stop under another key", err)
 	}
 	if c9 := admit(hub); stored(c9) != nil || spent(third) != 1 {
@@ -515,10 +576,10 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 	if r := shares()["capture:"+c8.CaptureID]; r.Acceptance != third || r.Revoked {
 		t.Fatal("a capture claimed before the Stop did not publish its share", r)
 	}
-	if _, err := service.RevokePolicySharing(ctx, as(creator.Subject, []string{"maintainers"}), third, 1, "revoke-third"); !errors.Is(err, capture.ErrConflict) {
+	if _, err := service.RevokePolicySharing(ctx, as(creator.Subject, []string{"maintainers"}), sharing.PolicyRevokeInput{AcceptanceID: third, ExpectedRevision: 1, IdempotencyKey: "revoke-third"}); !errors.Is(err, capture.ErrConflict) {
 		t.Fatal("revoke-all at a stale revision", err)
 	}
-	if r, err := service.RevokePolicySharing(ctx, as(creator.Subject, []string{"maintainers"}), third, 2, "revoke-third"); err != nil || r.Revoked != 1 {
+	if r, err := service.RevokePolicySharing(ctx, as(creator.Subject, []string{"maintainers"}), sharing.PolicyRevokeInput{AcceptanceID: third, ExpectedRevision: 2, IdempotencyKey: "revoke-third"}); err != nil || r.Revoked != 1 {
 		t.Fatal("revoke-all after stop", r, err)
 	}
 	if !shares()["capture:"+c8.CaptureID].Revoked || shares()["capture:"+c5.CaptureID].Revoked {

@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
 	authapp "asservat.local/asservat/internal/application/authorization"
 	catalogapp "asservat.local/asservat/internal/application/catalog"
@@ -32,7 +33,7 @@ import (
 // its share, revocation concurrent with reads stops every later read,
 // expiry ends a share, and a current Deny (or the loss of the pinned owner
 // assignment) wins over every share.
-func qualifyEvidenceShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, s captureAdmissionScenario, e artifact.ContextExpectation, reader *postgres.ContextPublications, publishAuthority func() error) {
+func qualifyEvidenceShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, s captureAdmissionScenario, e artifact.ContextExpectation, reader *postgres.ContextPublications, publishAuthority func() error, objects *objectstore.Store, keys authorityTestKeys) {
 	t.Helper()
 	role := narrowRole(t, ctx, admin, "share_hub_", "synthetic-share-hub", func(role string) []string {
 		grants, ok := postgres.PublicRuntimeRoleGrantSQL("hub-runtime", role)
@@ -56,7 +57,7 @@ func qualifyEvidenceShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool
 		t.Fatal(err)
 	}
 	cases := catalogapp.ContextCaseService{RootID: s.a.RootID, InstallationID: s.recovery.installation, Routes: routes, Permissions: s.p, Catalog: reader, Retention: privacyapp.RetentionResolver{RetainedPolicies: s.retention, Now: time.Now}, Recovery: s.recovery.reader, Processing: processing, Shares: store, Now: time.Now}
-	shares := sharing.Service{RootID: s.a.RootID, InstallationID: s.recovery.installation, Routes: routes, Permissions: s.p, Catalog: reader, Store: store, Recovery: s.recovery.reader, NewID: custodyID, Now: time.Now}
+	shares := paidShareService{Service: sharing.Service{RootID: s.a.RootID, InstallationID: s.recovery.installation, Routes: routes, Permissions: s.p, Catalog: reader, Store: store, Recovery: s.recovery.reader, NewID: custodyID, Now: time.Now}, audit: newShareBusinessAudit(t, ctx, pool, objects, keys, s)}
 	issuer := s.a.Eligibility.VerifiedIdentity.Principal.Issuer
 	batch := s.batch
 	refresh := func() {
@@ -223,7 +224,7 @@ func qualifyEvidenceShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool
 		}()
 	}
 	time.Sleep(200 * time.Millisecond)
-	revoked, replay, err := shares.Revoke(ctx, owner(), first.ID, 1, "revoke-1")
+	revoked, replay, err := shares.Revoke(ctx, owner(), sharing.RevokeInput{ShareID: first.ID, ExpectedRevision: 1, IdempotencyKey: "revoke-1"})
 	mu.Lock()
 	revokedAt = time.Now()
 	mu.Unlock()
@@ -236,18 +237,18 @@ func qualifyEvidenceShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool
 	if reads(recipient()) || downloads("synthetic-recipient", nil, "evidence:read", "evidence:download") {
 		t.Fatal("revoked share still readable or downloadable")
 	}
-	if again, replay, err := shares.Revoke(ctx, owner(), first.ID, 1, "revoke-1"); err != nil || !replay || again.Revision != 2 {
+	if again, replay, err := shares.Revoke(ctx, owner(), sharing.RevokeInput{ShareID: first.ID, ExpectedRevision: 1, IdempotencyKey: "revoke-1"}); err != nil || !replay || again.Revision != 2 {
 		t.Fatal("revocation replay", err, replay)
 	}
-	if _, _, err := shares.Revoke(ctx, owner(), first.ID, 1, "revoke-other"); !errors.Is(err, capture.ErrConflict) {
+	if _, _, err := shares.Revoke(ctx, owner(), sharing.RevokeInput{ShareID: first.ID, ExpectedRevision: 1, IdempotencyKey: "revoke-other"}); !errors.Is(err, capture.ErrConflict) {
 		t.Fatal("second revocation under another key", err)
 	}
 	// A current team member manages the share (ADR-232 increment 4), so a
 	// second revocation is a conflict for them; a stranger is refused.
-	if _, _, err := shares.Revoke(ctx, as("synthetic-other-owner", []string{"other-owners"}, "evidence:read", authorization.ShareScope), first.ID, 2, "foreign"); !errors.Is(err, capture.ErrConflict) {
+	if _, _, err := shares.Revoke(ctx, as("synthetic-other-owner", []string{"other-owners"}, "evidence:read", authorization.ShareScope), sharing.RevokeInput{ShareID: first.ID, ExpectedRevision: 2, IdempotencyKey: "foreign"}); !errors.Is(err, capture.ErrConflict) {
 		t.Fatal("team member's second revocation", err)
 	}
-	if _, _, err := shares.Revoke(ctx, as("synthetic-stranger", []string{"maintainers"}, "evidence:read", authorization.ShareScope), first.ID, 2, "foreign"); !errors.Is(err, capture.ErrDenied) {
+	if _, _, err := shares.Revoke(ctx, as("synthetic-stranger", []string{"maintainers"}, "evidence:read", authorization.ShareScope), sharing.RevokeInput{ShareID: first.ID, ExpectedRevision: 2, IdempotencyKey: "foreign"}); !errors.Is(err, capture.ErrDenied) {
 		t.Fatal("non-manager revoked", err)
 	}
 
@@ -281,10 +282,10 @@ func qualifyEvidenceShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool
 	if owned, _, err := shares.List(ctx, mate(), "owned", 20); err != nil || len(owned) != 1 || owned[0].Share.ID != team.ID || owned[0].Phase != authorization.ShareActive || owned[0].Share.Creator.Subject != "synthetic-share-owner" {
 		t.Fatal("team member's managed view", err, owned)
 	}
-	if _, _, err := shares.Revoke(ctx, as("synthetic-stranger", []string{"maintainers"}, "evidence:read", authorization.ShareScope), team.ID, 1, "stranger"); !errors.Is(err, capture.ErrDenied) {
+	if _, _, err := shares.Revoke(ctx, as("synthetic-stranger", []string{"maintainers"}, "evidence:read", authorization.ShareScope), sharing.RevokeInput{ShareID: team.ID, ExpectedRevision: 1, IdempotencyKey: "stranger"}); !errors.Is(err, capture.ErrDenied) {
 		t.Fatal("non-member revoked a team share", err)
 	}
-	if revoked, _, err := shares.Revoke(ctx, mate(), team.ID, 1, "team-revoke"); err != nil || revoked.Revision != 2 {
+	if revoked, _, err := shares.Revoke(ctx, mate(), sharing.RevokeInput{ShareID: team.ID, ExpectedRevision: 1, IdempotencyKey: "team-revoke"}); err != nil || revoked.Revision != 2 {
 		t.Fatal("team member could not revoke", err)
 	}
 	if reads(recipient()) {
@@ -339,7 +340,7 @@ func qualifyEvidenceShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool
 	}
 	administrators := shares
 	administrators.Administration = shareAdministration{installation: s.recovery.installation, issuer: issuer, client: s.a.Eligibility.VerifiedIdentity.Principal.ClientID}
-	if _, _, err := administrators.Revoke(ctx, as("synthetic-stranger", []string{"maintainers"}, "evidence:read", authorization.ShareScope), pinned.ID, 2, "stranger-revoke"); !errors.Is(err, capture.ErrDenied) {
+	if _, _, err := administrators.Revoke(ctx, as("synthetic-stranger", []string{"maintainers"}, "evidence:read", authorization.ShareScope), sharing.RevokeInput{ShareID: pinned.ID, ExpectedRevision: 2, IdempotencyKey: "stranger-revoke"}); !errors.Is(err, capture.ErrDenied) {
 		t.Fatal("non-admin non-manager revoked", err)
 	}
 	// The administrator holds no evidence right on this workload.
@@ -390,7 +391,7 @@ func qualifyEvidenceShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool
 	if !found || len(listed) != 4 {
 		t.Fatal("administrator listing misses shares", len(listed), found)
 	}
-	if revoked, _, err := administrators.Revoke(ctx, operator, pinned.ID, 3, "admin-revoke"); err != nil || revoked.Revision != 4 || revoked.RevokedAt.IsZero() {
+	if revoked, _, err := administrators.Revoke(ctx, operator, sharing.RevokeInput{ShareID: pinned.ID, ExpectedRevision: 3, IdempotencyKey: "admin-revoke"}); err != nil || revoked.Revision != 4 || revoked.RevokedAt.IsZero() {
 		t.Fatal("administrator revocation", err, revoked.Revision)
 	}
 	if reads(recipient()) {
@@ -472,7 +473,7 @@ func qualifyEvidenceShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool
 		if managed, _, err := shares.List(ctx, sharer("synthetic-team-mate", []string{"other-owners"}), "owned", 20); err != nil || len(managed) != 0 {
 			t.Fatal(when, "team member still manages", err, managed)
 		}
-		if _, _, err := shares.Revoke(ctx, sharer("synthetic-team-mate", []string{"other-owners"}), group.ID, 1, "lost-team"); !errors.Is(err, capture.ErrDenied) {
+		if _, _, err := shares.Revoke(ctx, sharer("synthetic-team-mate", []string{"other-owners"}), sharing.RevokeInput{ShareID: group.ID, ExpectedRevision: 1, IdempotencyKey: "lost-team"}); !errors.Is(err, capture.ErrDenied) {
 			t.Fatal(when, "team member revoked without a current pinned assignment", err)
 		}
 		// ADR-238: nobody manages a suspended share, so nobody can move it

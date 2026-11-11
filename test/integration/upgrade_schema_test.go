@@ -543,6 +543,9 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 		checkReportSchema(true)
 		t.Log("SQL152 preserved floor149, admitted only the report context format and restored prior validators and indexes on empty Down")
 	}
+	if head == 154 {
+		qualifyShareLayoutUpgrade(t, ctx, conn, p)
+	}
 	// Migration 103 changes this function only. Down restores its exact old
 	// definition; it neither rewrites projections nor changes activation state.
 	if head == 103 {

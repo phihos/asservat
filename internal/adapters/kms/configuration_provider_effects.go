@@ -12,6 +12,7 @@ import (
 // or PKI effect. Effect calls cannot trigger login or renew their borrowed token.
 type configurationProviderEffects struct {
 	wrap, unwrap *ownerProviderLifetime
+	cleanup      [4]*ownerProviderLifetime
 	seal         *Sealer
 	open         *Opener
 	cancel       context.CancelFunc
@@ -46,6 +47,20 @@ func newConfigurationProviderEffects(ctx context.Context, in contracts.HubWorker
 		}
 		*fixed.target = slot
 	}
+	if profile.CleanupAudit != (contracts.OwnerPublicTransit{}) {
+		for i, purpose := range []string{"cleanup-wrap", "cleanup-open", "cleanup-verify", "cleanup-sign"} {
+			control, err := newConfigurationProviderControl(in, profile, purpose, client, now)
+			if err != nil {
+				return nil, err
+			}
+			slot, err := newOwnerProviderLifetime(root, control, jwt, proof, 1)
+			if err != nil {
+				control.close()
+				return nil, err
+			}
+			out.cleanup[i] = slot
+		}
+	}
 	wrap, err := newOwnerProviderEffectClient(out.wrap, in.KeyService.AuditMount+"/encrypt/"+in.KeyService.AuditKey)
 	if err != nil {
 		return nil, err
@@ -68,7 +83,7 @@ func (s *configurationProviderEffects) close(ctx context.Context) error {
 	call, end := context.WithTimeout(ctx, 10*time.Second)
 	defer end()
 	var result error
-	for _, slot := range []*ownerProviderLifetime{s.wrap, s.unwrap} {
+	for _, slot := range s.slots() {
 		if slot != nil {
 			if err := slot.close(call); err != nil {
 				result = ErrKeyService
@@ -94,7 +109,7 @@ func (s *configurationProviderEffects) joinClosed() {
 		return
 	}
 	s.cancel()
-	for _, slot := range []*ownerProviderLifetime{s.wrap, s.unwrap} {
+	for _, slot := range s.slots() {
 		if slot != nil {
 			slot.joinClosed()
 		}
@@ -105,4 +120,19 @@ func (s *configurationProviderEffects) joinClosed() {
 	if s.open != nil {
 		s.open.Close()
 	}
+}
+
+func (s *configurationProviderEffects) slots() []*ownerProviderLifetime {
+	return append([]*ownerProviderLifetime{s.wrap, s.unwrap}, s.cleanup[:]...)
+}
+func (s *configurationProviderEffects) cleanupSlot(slot *ownerProviderLifetime) bool {
+	if slot == nil {
+		return false
+	}
+	for _, candidate := range s.cleanup {
+		if candidate == slot {
+			return true
+		}
+	}
+	return false
 }

@@ -21,6 +21,25 @@ func capacityAuditProfilesFixture() AcceptedCapacityAuditProfiles {
 	return AcceptedCapacityAuditProfiles{Format: CapacityAuditProfilesFormat, RootID: id, InstallationID: id, QualificationID: id, AccountVersion: "original-account-v1", QualificationDigest: artifact.Digest{4}, PlanDigest: artifact.Digest{5}, ConfigurationRevision: 2, SourceRevision: 8, Normal: lane("normal"), Processing: lane("processing"), Resolution: lane("resolution"), ObservedAt: n, FreshUntil: n.Add(5 * time.Second)}
 }
 
+func TestCapacityAuditProfilesKeepFundedShareLayoutWithoutPromotion(t *testing.T) {
+	v := capacityAuditProfilesFixture()
+	q := *v.Normal.Policy.History
+	q.Layout = ShareOperationHistoryLayout
+	v.Normal.Policy.History = &q
+	b, w := q.SlotBacking(v.Normal.Policy.MaxPurgeLeases)
+	v.Normal.Policy.BackupReservedBytes, v.Normal.Policy.WALReservedBytes = b*v.Normal.Policy.MetadataSlots, w*v.Normal.Policy.MetadataSlots
+	if !v.Normal.Policy.SharingBacked() || !v.Valid(v.ObservedAt) {
+		t.Fatal("accepted funded share policy rejected by the profile consumer")
+	}
+	if v.Resolution.Policy.History.Layout != OperationVerificationHistoryLayout {
+		t.Fatal("selecting normal share backing promoted another original cohort")
+	}
+	v.Normal.Policy.WALReservedBytes--
+	if v.Valid(v.ObservedAt) {
+		t.Fatal("profile reader accepted an underfunded share policy")
+	}
+}
+
 func TestCapacityAuditProfilesPreserveExactLaneAndOriginalInterval(t *testing.T) {
 	for _, name := range []string{"valid", "normal-is-resolution", "legacy-layout", "other-root", "unbacked", "wrong-revision", "not-verifier-backed", "no-overdue", "invalid-retention", "earlier-policy", "future-observation", "expired", "renewed-interval", "submicro", "wrong-store", "no-plan", "no-account", "missing-processing", "processing-normal-layout", "processing-unbacked", "processing-wrong-revision", "processing-wrong-store", "processing-short-retention", "processing-earlier-policy"} {
 		t.Run(name, func(t *testing.T) {

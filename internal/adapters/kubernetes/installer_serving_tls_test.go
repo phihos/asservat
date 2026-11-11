@@ -211,7 +211,7 @@ func TestInstallerInboxServingTLSIsCompleteAndPhaseThreeOnly(t *testing.T) {
 	cert, key, ca := installerServingTLSFixture(t, "federation.example.test", time.Now())
 	files := map[string][]byte{contracts.InstallerInboxFederationTLSCertificate: cert, contracts.InstallerInboxFederationTLSKey: key, contracts.InstallerInboxFederationTLSCA: ca}
 	write := func(phase int, material map[string][]byte) error {
-		return WriteInstallerInbox(context.Background(), config, "release", installation, phase, []byte("inspection"), []byte("audit"), nil, nil, nil, nil, nil, material)
+		return WriteInstallerInbox(context.Background(), config, "release", installation, phase, []byte("inspection"), []byte("audit"), nil, nil, nil, nil, nil, InstallerInboxMaterial{ServingTLS: material})
 	}
 	if err := write(3, files); err != nil {
 		t.Fatal(err)

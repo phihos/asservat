@@ -2,6 +2,7 @@ package audit
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -114,7 +115,7 @@ func TestOperationVerificationUnknownClaimAndProviderFailureRemainSpent(t *testi
 			f.claimError = mode == "unknown-claim"
 			f.verifyError = mode == "provider-failure"
 			for i := 0; i < 8; i++ {
-				if e := s.Advance(context.Background(), id); e != ErrUnavailable {
+				if e := s.Advance(context.Background(), id); !errors.Is(e, ErrUnavailable) {
 					t.Fatal(e)
 				}
 			}
@@ -144,7 +145,7 @@ func TestOperationVerificationPreservesDeadlineAndCancellationThroughProvider(t 
 			case "provider-cancel":
 				f.verifyHook = func(context.Context) { cancel() }
 			}
-			if e := s.Advance(ctx, id); e != ErrUnavailable {
+			if e := s.Advance(ctx, id); !errors.Is(e, ErrUnavailable) {
 				t.Fatal("expired/canceled verification succeeded", e)
 			}
 			if f.claims != 1 || f.acknowledgements != 0 {
@@ -190,7 +191,7 @@ func TestHistoricalUnacknowledgedCleanupCannotStartDoomedProviderWork(t *testing
 				r := f.snapshot.CertificateWriter.Receipt
 				f.snapshot.CertificateReceipt = &r
 			}
-			if e = s.Advance(context.Background(), id); e != ErrUnavailable {
+			if e = s.Advance(context.Background(), id); !errors.Is(e, ErrUnavailable) {
 				t.Fatal(e)
 			}
 			if f.certificateClaims != 0 || f.verifications != 0 || f.claims != 0 {
@@ -204,5 +205,99 @@ func TestHistoricalUnacknowledgedCleanupCannotStartDoomedProviderWork(t *testing
 				t.Fatal("unsupported unacknowledged history purged originals", f.purges)
 			}
 		})
+	}
+}
+
+// A normal wait for the fixed terminal deadline must be distinguishable from
+// spending the independent verifier allowance and failing before acknowledgement.
+func TestOperationCleanupDiagnosticsDistinguishVerificationFromTerminalWait(t *testing.T) {
+	for _, stage := range []string{"certificate-backing", "original-lease", "certificate-claim", "verification-claim", "certificate-verify", "certificate-ack", "terminal-lease"} {
+		t.Run(stage, func(t *testing.T) {
+			f, s, id := verificationFixture(t)
+			switch stage {
+			case "certificate-backing":
+				f.snapshot.Intent.Lifecycle = nil
+			case "original-lease":
+				f.snapshot.Retirement = nil
+			case "certificate-claim":
+				f.snapshot.CertificateWriter = nil
+			case "verification-claim":
+				f.claimError = true
+			case "certificate-verify":
+				f.verifyError = true
+			case "terminal-lease":
+				r := f.snapshot.CertificateWriter.Receipt
+				f.snapshot.CertificateReceipt = &r
+			}
+			err := s.Advance(t.Context(), id)
+			if !errors.Is(err, ErrUnavailable) || OperationCleanupFailureStep(err) != stage {
+				t.Fatalf("lost exact unavailable boundary: stage=%s got=%s", stage, OperationCleanupFailureStep(err))
+			}
+			expectedClaims, expectedVerifications, expectedAcknowledgements := 0, 0, 0
+			switch stage {
+			case "verification-claim":
+				expectedClaims = 1
+			case "certificate-verify":
+				expectedClaims, expectedVerifications = 1, 1
+			case "certificate-ack":
+				expectedClaims, expectedVerifications, expectedAcknowledgements = 1, 1, 1
+			}
+			if f.claims != expectedClaims || f.verifications != expectedVerifications || f.acknowledgements != expectedAcknowledgements {
+				t.Fatal("refused stage changed prepaid effect sequence", f.claims, f.verifications, f.acknowledgements)
+			}
+			if stage == "terminal-lease" && (len(f.purges) != 1 || f.purges[0] != "terminal") {
+				t.Fatal("terminal wait changed", f.purges)
+			}
+		})
+	}
+}
+
+// Finalizer errors historically passed through unchanged. A stage annotation
+// must preserve cancellation and other caller-observable error identities.
+type cleanupDiagnosticFinalizer struct{ cause error }
+
+func (f cleanupDiagnosticFinalizer) RetireOperationAudit(context.Context, string) error {
+	return f.cause
+}
+
+type cleanupTerminalDiagnosticFixture struct{ *verificationBudgetFixture }
+
+func (f *cleanupTerminalDiagnosticFixture) BeginOperationPurge(_ context.Context, _ string, phase string) (value.OperationPurgeLease, error) {
+	f.purges = append(f.purges, phase)
+	return value.OperationPurgeLease{}, nil
+}
+func (*cleanupTerminalDiagnosticFixture) PurgeOperationObjects(context.Context, value.OperationPurgeLease) error {
+	return nil
+}
+func (*cleanupTerminalDiagnosticFixture) RecordTerminalOperationPurge(context.Context, value.OperationPurgeLease) (value.OperationTerminalPurge, error) {
+	return value.OperationTerminalPurge{}, nil
+}
+func (*cleanupTerminalDiagnosticFixture) VerifyOperationAbsence(context.Context, value.OperationPurgeLease) error {
+	return nil
+}
+func (*cleanupTerminalDiagnosticFixture) AcknowledgeTerminalOperationPurge(context.Context, value.OperationPurgeLease, value.OperationTerminalPurge) error {
+	return nil
+}
+
+func TestOperationCleanupFinalizerDiagnosticPreservesOriginalErrorIdentity(t *testing.T) {
+	for _, cause := range []error{context.Canceled, context.DeadlineExceeded, errors.New("synthetic finalizer refusal")} {
+		f, s, id := verificationFixture(t)
+		receipt := f.snapshot.CertificateWriter.Receipt
+		f.snapshot.CertificateReceipt = &receipt
+		terminal := &cleanupTerminalDiagnosticFixture{f}
+		s.Journal, s.Objects, s.Verifier, s.Acknowledgements = terminal, terminal, terminal, terminal
+		s.Finalizer = cleanupDiagnosticFinalizer{cause}
+		err := s.Advance(t.Context(), id)
+		if !errors.Is(err, cause) || OperationCleanupFailureStep(err) != "retire" {
+			t.Fatal("healthy finalizer error identity lost")
+		}
+		if f.claims != 0 || f.verifications != 0 || len(f.purges) != 1 || f.purges[0] != "terminal" {
+			t.Fatal("finalizer path changed existing effects")
+		}
+		overdue := &overdueOrder{}
+		err = (OperationOverdueCleanup{overdue, overdue, cleanupDiagnosticFinalizer{cause}, overdue, overdue}).Advance(t.Context(), id)
+		if !errors.Is(err, cause) || OperationCleanupFailureStep(err) != "retire" {
+			t.Fatal("overdue finalizer error identity lost")
+		}
 	}
 }

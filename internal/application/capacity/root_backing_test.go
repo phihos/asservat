@@ -73,6 +73,47 @@ func TestCapacityRootBackingPaysSharedLanesAndFullAccountCeilingOnce(t *testing.
 	}
 }
 
+func TestCapacityRootBackingShareLayoutsIncreaseTheOriginalEnvelope(t *testing.T) {
+	in, pool := capacityRootBackingFixture()
+	old, err := CompileRootBacking(in, pool)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, lane := range []*RootAuditBacking{&in.Capture, &in.Normal, &in.Resolution} {
+		q := *lane.Policy.History
+		q.Layout = audit.ShareOperationHistoryLayout
+		if lane.Policy.Lane == "capture" {
+			q.Layout = audit.ShareCaptureOperationHistoryLayout
+			in.ContextHistory.Capture = q
+		}
+		lane.Policy.History = &q
+		b, w := q.SlotBacking(lane.Policy.MaxPurgeLeases)
+		lane.Policy.BackupReservedBytes, lane.Policy.WALReservedBytes = b*lane.Policy.MetadataSlots, w*lane.Policy.MetadataSlots
+	}
+	next, err := CompileRootBacking(in, pool)
+	if err != nil {
+		t.Fatal("fully funded share layouts rejected", err)
+	}
+	// Capture v2 adds two protocol transitions; normal/resolution v4 each
+	// add three, plus the one fixed business effect per generation/copy.
+	wantDelta := int64(0)
+	for _, lane := range []RootAuditBacking{in.Capture, in.Normal, in.Resolution} {
+		q := lane.Policy.History
+		extra := int64(3)*q.MaximumTransitionWALBytes + 8<<20
+		if lane.Policy.Lane == "capture" {
+			extra = 2 * q.MaximumTransitionWALBytes
+		}
+		wantDelta += lane.Policy.MetadataSlots * 2 * q.WALCopies * extra
+	}
+	if got := next.Totals().WALBytes - old.Totals().WALBytes; got != wantDelta {
+		t.Fatalf("aggregate share WAL delta=%d want %d", got, wantDelta)
+	}
+	in.Envelope.WALBytes = old.Totals().WALBytes
+	if _, err := CompileRootBacking(in, pool); err != ErrBudgetFull {
+		t.Fatal("old aggregate WAL envelope accepted for the new layouts", err)
+	}
+}
+
 func TestCapacityRootBackingEveryDimensionMustBeIndependentlyFunded(t *testing.T) {
 	in, pool := capacityRootBackingFixture()
 	p, e := CompileRootBacking(in, pool)

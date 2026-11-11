@@ -91,6 +91,7 @@ declare -A suites=(
   [continuation-logresource]="env ASSERVAT_JOURNEY_FOCUS=logresource $context --initial-bootstrap-chain --runtime-provider-pair --installer-continuation"
   # ADR-232: a short journey, then share the artifact with the unrelated
   # principal over MCP (get_case works, download refused, revoke refuses).
+  [continuation-share-retirement]="env ASSERVAT_JOURNEY_FOCUS=share-retirement $context --initial-bootstrap-chain --runtime-provider-pair --installer-continuation"
   [continuation-share]="env ASSERVAT_JOURNEY_FOCUS=share $context --initial-bootstrap-chain --runtime-provider-pair --installer-continuation"
   [direct-observation]="$context --run ^TestDirectHolderObservationWithRealKubernetes\$"
   # The single-cluster owned node→Pod traffic probe: the harness installs its

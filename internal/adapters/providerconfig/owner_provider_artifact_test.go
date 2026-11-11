@@ -97,7 +97,7 @@ func TestOwnerProviderArtifactCarriesFederationSetup(t *testing.T) {
 		t.Fatal(err)
 	}
 	var out struct {
-		Federation             *FederationProviderSetup    `json:"federation"`
+		Federation             bool                        `json:"federation"`
 		Apply                  []ownerProviderSetupRequest `json:"apply"`
 		Inspect                []string                    `json:"inspect"`
 		FederationAuditStorage struct {
@@ -105,7 +105,7 @@ func TestOwnerProviderArtifactCarriesFederationSetup(t *testing.T) {
 			Prefixes  [3]string `json:"prefixes"`
 		} `json:"federationAuditStorage"`
 	}
-	if json.Unmarshal(b, &out) != nil || out.Federation == nil || len(out.Apply) != 21 || f.requests.Load() != 0 {
+	if json.Unmarshal(b, &out) != nil || !out.Federation || len(out.Apply) != 21 || f.requests.Load() != 0 {
 		t.Fatal("federation setup missing or provider work performed", len(out.Apply))
 	}
 	for _, r := range out.Apply {

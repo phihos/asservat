@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"os"
+	"reflect"
 	"time"
 
 	"asservat.local/asservat/internal/adapters/mounts"
@@ -32,7 +33,10 @@ func readCaptureCleanupInputs(ctx context.Context, files *os.Root, worker contra
 	c, err = contracts.DecodeCaptureCleanupDeployment(bytes.NewReader(b))
 	clear(b)
 	if err != nil || c.Format != contracts.CaptureCleanupDeploymentFormat || c.InstallationID != worker.InstallationID || !authorization.UUID(c.RootID) || !authorization.UUID(c.StoreID) ||
-		c.RoleRootUID != claim.Setup.RoleRootUID || c.RoleSetupID != claim.Setup.RoleSetupID || c.RootID != claim.Setup.PermissionRootID || c.Postgres.MaxConnections != 1 ||
+		c.RoleRootUID != claim.Setup.RoleRootUID || c.RoleSetupID != claim.Setup.RoleSetupID || c.RootID != claim.Setup.PermissionRootID || c.Postgres.MaxConnections != 1 || worker.ProviderAuthentication == nil ||
+		worker.ProviderAuthentication.CleanupAudit != (contracts.OwnerPublicTransit{Mount: c.KeyService.AuditMount, Key: c.KeyService.AuditKey}) ||
+		worker.ProviderAuthentication.ContextDeletionSigning != (contracts.OwnerPublicTransit{Mount: c.Signing.Mount, Key: c.Signing.Name}) ||
+		!reflect.DeepEqual(c.KeyService, worker.KeyService) || !reflect.DeepEqual(c.AuditStore, worker.AuditStore) ||
 		providerconfig.Validate(worker.Kubernetes, c.Postgres, c.AuditStore, c.KeyService, time.Now()) != nil {
 		return fail()
 	}

@@ -172,7 +172,7 @@ func installedFocusGroupError() error {
 			failure = fmt.Errorf("focus %q and %q both add an automation binding for the workload", automation, focus)
 		case seen[focus]:
 			failure = fmt.Errorf("focus %q listed twice", focus)
-		case focus == "chain" || focus == "clusters" || focus == "":
+		case focus == "chain" || focus == "clusters" || focus == "share-retirement" || focus == "":
 			failure = fmt.Errorf("focus %q needs its own installation", focus)
 		case slices.Contains(installedLastFoci, focus) && index != len(foci)-1:
 			failure = fmt.Errorf("focus %q must run last", focus)

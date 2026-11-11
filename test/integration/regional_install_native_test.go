@@ -1154,7 +1154,7 @@ func installedRegionalBindingRoles() []any {
 	if installedRecordingFocus() || installedLogsFocus() {
 		roles = append(roles, "action-approver")
 	}
-	if installedAnyFocus("share") || installedAnyFocus("browser") || installedAnyFocus("privacy-inventory") {
+	if installedAnyFocus("share") || installedAnyFocus("browser") || installedAnyFocus("privacy-inventory") || installedAnyFocus("share-retirement") {
 		// ADR-232: the developer group also owns the workload's evidence, so
 		// its captures' retained audience includes the evidence-owner role.
 		// Browser and inventory focuses also create actual artifact shares.

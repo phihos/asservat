@@ -66,10 +66,11 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 		publisher                      evidence.ContextPublisher
 		gate                           contextPublicationTestGate
 	}
-	var prepareAdmitted func(t *testing.T, ctx context.Context, s captureAdmissionScenario, accepted capture.Accepted, seal evidence.KeySealer, open evidence.KeyOpener, processingCheck func(fixture, *processingTestFixture), initialize bool) fixture
+	var prepareAdmitted func(t *testing.T, ctx context.Context, s captureAdmissionScenario, accepted capture.Accepted, seal evidence.KeySealer, open evidence.KeyOpener, processingCheck func(fixture, *processingTestFixture), initialize bool, shareCohort ...bool) fixture
+	shareCaptures := map[string]shareCaptureAudit{}
 	// admit, when set, replaces the direct admission (ADR-235 admits a
 	// reviewed preview carrying a sharing instruction).
-	setupAdmitted := func(t *testing.T, provider func(string) (evidence.KeySealer, evidence.KeyOpener), processingCheck func(fixture, *processingTestFixture), admit func(*testing.T, *captureAdmissionScenario) capture.Accepted) fixture {
+	setupAdmitted := func(t *testing.T, provider func(string) (evidence.KeySealer, evidence.KeyOpener), processingCheck func(fixture, *processingTestFixture), admit func(*testing.T, *captureAdmissionScenario) capture.Accepted, shareCohort ...bool) fixture {
 		t.Helper()
 		ctx := ctx
 		s := create(t, 1)
@@ -84,6 +85,11 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 		if provider != nil {
 			seal, open = provider(s.recovery.installation)
 		}
+		if admit != nil && len(shareCohort) > 0 && shareCohort[0] {
+			qualified := newShareCaptureAudit(t, ctx, admin, poolFor, store, keys, s)
+			s.s = qualified.admissions
+			shareCaptures[s.a.RootID] = qualified
+		}
 		var accepted capture.Accepted
 		var err error
 		if admit != nil {
@@ -91,13 +97,13 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 		} else if accepted, err = s.s.AdmitContext(ctx, s.a); err != nil {
 			t.Fatal(err)
 		}
-		return prepareAdmitted(t, ctx, s, accepted, seal, open, processingCheck, true)
+		return prepareAdmitted(t, ctx, s, accepted, seal, open, processingCheck, true, shareCohort...)
 	}
 	// prepareAdmitted stores, verifies and audits one admitted capture of s so
 	// that it is ready to publish. A scenario's processing root is accepted and
 	// initialized once (initialize), by its first prepared capture; later
 	// captures of the same root are covered by it.
-	prepareAdmitted = func(t *testing.T, ctx context.Context, s captureAdmissionScenario, accepted capture.Accepted, seal evidence.KeySealer, open evidence.KeyOpener, processingCheck func(fixture, *processingTestFixture), initialize bool) fixture {
+	prepareAdmitted = func(t *testing.T, ctx context.Context, s captureAdmissionScenario, accepted capture.Accepted, seal evidence.KeySealer, open evidence.KeyOpener, processingCheck func(fixture, *processingTestFixture), initialize bool, shareCohort ...bool) fixture {
 		t.Helper()
 		var err error
 		var f fixture
@@ -105,7 +111,7 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 		f.e = accepted.Expectation
 		var processing *processingTestFixture
 		if initialize {
-			processing = newProcessingTestFixture(t, ctx, poolFor, store, keys, s, f.e)
+			processing = newProcessingTestFixture(t, ctx, poolFor, store, keys, s, f.e, shareCohort...)
 			defer processing.Close()
 			initializeProcessingTestFixtureWith(t, ctx, processing)
 		}
@@ -118,9 +124,10 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 				t.Fatal(err)
 			}
 		}
-		// A later capture of the root may already be audited: the first
-		// preparation's publisher writes every pending capture intent.
-		if _, err = f.verify.AcceptedContextForPublication(ctx, accepted.CaptureID); err == nil && initialize {
+		// Sharing admissions acknowledge their own pair immediately. Other
+		// fixtures still exercise the initial unaudited publication refusal.
+		_, shareQualified := shareCaptures[s.a.RootID]
+		if _, err = f.verify.AcceptedContextForPublication(ctx, accepted.CaptureID); err == nil && initialize && !shareQualified {
 			t.Fatal("unaudited capture accepted for publication")
 		}
 		if _, err = f.reader.RetainedAudience(ctx, f.e.Registration.Location.ArtifactID); err == nil {
@@ -130,7 +137,11 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err = (auditapp.CaptureIntentPublisher{Ledger: intents, Objects: &objectstore.CaptureIntentObjects{Store: store, Seal: keys, Open: keys}}).PublishCaptureIntents(ctx); err != nil {
+		if qualified, ok := shareCaptures[s.a.RootID]; ok {
+			if _, err = qualified.publication.AcknowledgedCaptureIntent(ctx, accepted.CaptureID); err != nil {
+				t.Fatal("actual share-qualified capture pair", shareFixtureFailureStage(err), err)
+			}
+		} else if err = (auditapp.CaptureIntentPublisher{Ledger: intents, Objects: &objectstore.CaptureIntentObjects{Store: store, Seal: keys, Open: keys}}).PublishCaptureIntents(ctx); err != nil {
 			t.Fatal(err)
 		}
 		bound, err := store.ForCustody(f.e.Registration.StoreID)
@@ -442,14 +453,14 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 	})
 
 	t.Run("evidence-share-recipient-read-revocation-expiry-and-deny", func(t *testing.T) {
-		f := setup(t)
+		f := setupAdmitted(t, nil, nil, nil, true)
 		if _, err := f.publisher.Publish(ctx, f.e.CaptureUID, f.copies); err != nil {
 			t.Fatal(err)
 		}
 		publishAuthority := func() error {
 			return (auditapp.AuthorityPublisher{Ledger: f.scenario.p, Objects: &objectstore.AuthorityObjects{Store: store, Seal: keys, Open: keys}}).PublishAuthority(ctx)
 		}
-		qualifyEvidenceShare(t, ctx, admin, poolFor, f.scenario, f.e, f.reader, publishAuthority)
+		qualifyEvidenceShare(t, ctx, admin, poolFor, f.scenario, f.e, f.reader, publishAuthority, store, keys)
 	})
 
 	t.Run("access-grant-approval-children-pool-revocation-and-expiry", func(t *testing.T) {
@@ -465,7 +476,7 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 
 	t.Run("capture-time-share-once-at-publication-and-owner-checked-at-admission", func(t *testing.T) {
 		qualifyCaptureShare(t, ctx, admin, poolFor, create, func(t *testing.T, admit func(*testing.T, *captureAdmissionScenario) capture.Accepted) captureShareFixture {
-			f := setupAdmitted(t, nil, nil, admit)
+			f := setupAdmitted(t, nil, nil, admit, true)
 			return captureShareFixture{scenario: f.scenario, e: f.e, reader: f.reader, publish: func() (artifact.PublishedContext, error) { return f.publisher.Publish(ctx, f.e.CaptureUID, f.copies) },
 				replay: func() error {
 					a, err := f.gate.CheckContextPublication(ctx, f.e)
@@ -479,9 +490,26 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 
 	t.Run("policy-share-counter-limit-end-stop-and-revoke-all", func(t *testing.T) {
 		qualifyPolicyShare(t, ctx, admin, poolFor, store, keys, create, func(t *testing.T, s captureAdmissionScenario, accepted capture.Accepted, initialize bool) captureShareFixture {
-			f := prepareAdmitted(t, ctx, s, accepted, keys, keys, nil, initialize)
+			f := prepareAdmitted(t, ctx, s, accepted, keys, keys, nil, initialize, true)
 			return captureShareFixture{scenario: f.scenario, e: f.e, reader: f.reader, publish: func() (artifact.PublishedContext, error) { return f.publisher.Publish(ctx, f.e.CaptureUID, f.copies) }}
+		}, func(t *testing.T, s *captureAdmissionScenario) shareCaptureAudit {
+			qualified := newShareCaptureAudit(t, ctx, admin, poolFor, store, keys, *s)
+			s.s = qualified.admissions
+			shareCaptures[s.a.RootID] = qualified
+			return qualified
 		})
+	})
+
+	t.Run("policy-share-admitted-wide-sample-and-100-batch-cost", func(t *testing.T) {
+		qualifyPolicyShare(t, ctx, admin, poolFor, store, keys, create, func(t *testing.T, s captureAdmissionScenario, accepted capture.Accepted, initialize bool) captureShareFixture {
+			f := prepareAdmitted(t, ctx, s, accepted, keys, keys, nil, initialize, true)
+			return captureShareFixture{scenario: f.scenario, e: f.e, reader: f.reader, publish: func() (artifact.PublishedContext, error) { return f.publisher.Publish(ctx, f.e.CaptureUID, f.copies) }}
+		}, func(t *testing.T, s *captureAdmissionScenario) shareCaptureAudit {
+			qualified := newShareCaptureAudit(t, ctx, admin, poolFor, store, keys, *s)
+			s.s = qualified.admissions
+			shareCaptures[s.a.RootID] = qualified
+			return qualified
+		}, true)
 	})
 
 	t.Run("progress-revisions-follow-durable-verification-audit-and-publication", func(t *testing.T) {

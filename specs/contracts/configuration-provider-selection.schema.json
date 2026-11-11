@@ -42,6 +42,50 @@
           "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
         }
       }
+    },
+    "cleanupAudit": {
+      "$ref": "https://asservat.io/spec/v1/configuration-provider-selection.schema.json#/$defs/transit"
+    },
+    "workerConfigurationAudit": {
+      "$ref": "https://asservat.io/spec/v1/configuration-provider-selection.schema.json#/$defs/transit"
+    },
+    "contextDeletionSigning": {
+      "$ref": "https://asservat.io/spec/v1/configuration-provider-selection.schema.json#/$defs/transit"
     }
+  },
+  "$defs": {
+    "transit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mount",
+        "key"
+      ],
+      "properties": {
+        "mount": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_-]+(?![\\s\\S])",
+          "not": {
+            "enum": [
+              "sys",
+              "auth"
+            ]
+          }
+        },
+        "key": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_-]+(?![\\s\\S])"
+        }
+      }
+    }
+  },
+  "dependentRequired": {
+    "cleanupAudit": [
+      "contextDeletionSigning"
+    ]
   }
 }

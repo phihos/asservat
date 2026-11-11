@@ -37,6 +37,7 @@ type CaptureCleanupWorkerDeployment struct {
 	closers                      []func()
 	reader                       *kube.InstalledWorkerProjectionReader
 	admission                    *fleetapp.WorkerRuntimeAdmission
+	providers                    *kms.InstalledConfigurationProviderEffects
 	claim                        contracts.CaptureCleanupProjectionClaim
 	journal, verifier, finalizer *postgres.OperationLifecycles
 	healthy                      app.OperationCleanup
@@ -82,6 +83,7 @@ func newCaptureCleanupWorkerDeployment(ctx context.Context, base, files *os.Root
 	d := &CaptureCleanupWorkerDeployment{root: root, cancel: cancel, reader: reader, lastSweepPending: true}
 	if selected != nil {
 		d.admission = selected.admission
+		d.providers = selected.providers
 	}
 	encoded, err := json.Marshal(got)
 	if err != nil || json.Unmarshal(encoded, &d.claim) != nil {
@@ -122,42 +124,25 @@ func newCaptureCleanupWorkerDeployment(ctx context.Context, base, files *os.Root
 		if postgres.VerifyCaptureCleanupCredential(startup, pool, m, purpose) != nil {
 			return nil, mounts.ErrUnavailable
 		}
-		ledger, e := postgres.NewScopedCaptureOperationLifecycles(startup, pool, c.RootID, c.InstallationID, c.StoreID, recovery)
+		ledger, e := postgres.NewScopedWorkerOperationLifecycles(startup, pool, c.RootID, c.InstallationID, c.StoreID, recovery)
 		if e != nil {
 			return nil, mounts.ErrUnavailable
 		}
 		ledgers = append(ledgers, ledger)
 	}
 	d.journal, d.verifier, d.finalizer = ledgers[0], ledgers[1], ledgers[2]
-	provider, err := ownerHTTP(c.KeyService.Endpoint, c.KeyService.Roots)
-	if err != nil {
-		return nil, err
-	}
-	d.closers = append(d.closers, provider.CloseIdleConnections)
-	seal, err := kms.NewSealerWithTokenSource(c.KeyService.Endpoint, c.KeyService.AuditMount, c.KeyService.AuditKey, in.token("certificate-wrap.token"), provider)
-	if err != nil {
+	if selected == nil || selected.providers == nil {
 		return nil, mounts.ErrUnavailable
 	}
-	d.closers = append(d.closers, seal.Close)
-	open, err := kms.NewOpenerWithTokenSource(c.KeyService.Endpoint, c.KeyService.AuditMount, c.KeyService.AuditKey, in.token("certificate-open.token"), provider)
-	if err != nil {
-		return nil, mounts.ErrUnavailable
-	}
-	d.closers = append(d.closers, open.Close)
-	verifyOpen, err := kms.NewOpenerWithTokenSource(c.KeyService.Endpoint, c.KeyService.AuditMount, c.KeyService.AuditKey, in.token("certificate-verify.token"), provider)
-	if err != nil {
-		return nil, mounts.ErrUnavailable
-	}
-	d.closers = append(d.closers, verifyOpen.Close)
 	public := map[string]ed25519.PublicKey{}
 	for id, key := range c.Signing.PublicKeys {
 		public[id] = ed25519.PublicKey(key)
 	}
-	sign, err := kms.NewSigningKeyWithTokenSource(c.KeyService.Endpoint, c.Signing.Mount, c.Signing.Name, c.Signing.Version, public[c.Signing.KeyID], in.token("certificate-sign.token"), provider)
+	seal, open, verifyOpen, sign, err := selected.providers.CleanupKeys(c.KeyService.AuditMount, c.KeyService.AuditKey, c.Signing.Mount, c.Signing.Name, c.Signing.Version, public[c.Signing.KeyID])
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	d.closers = append(d.closers, sign.Close)
+	d.closers = append(d.closers, seal.Close, open.Close, verifyOpen.Close, sign.Close)
 	signer, err := jose.NewRemoteOperationRetirementSignatures(c.RootID, c.Signing.KeyID, public, sign.ForContext)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
@@ -249,7 +234,7 @@ func (d *CaptureCleanupWorkerDeployment) Run(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		ids, err := d.journal.DueCaptureOperations(call, cursor)
+		ids, err := d.journal.DueWorkerOperations(call, cursor)
 		end()
 		if err != nil {
 			return err

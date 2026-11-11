@@ -36,6 +36,8 @@ const (
 	// evidence list-and-delete principal in the phase-3 inbox (ADR-205
 	// decision 4); it is copied only into EvidenceDeleteCredentialName.
 	InstallerInboxEvidenceDeleteCredential = "evidence-delete.json"
+	InstallerInboxCleanupAuditCredential   = "cleanup-audit.json"
+	InstallerInboxCleanupVerifyCredential  = "cleanup-verify.json"
 	InstallerInboxFederationTLSCertificate = "federation-tls.crt"
 	InstallerInboxFederationTLSKey         = "federation-tls.key"
 	InstallerInboxFederationTLSCA          = "federation-ca.crt"

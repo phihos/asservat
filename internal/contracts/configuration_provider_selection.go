@@ -23,4 +23,6 @@ type ConfigurationProviderSelection struct {
 	AuditCredentials         WorkerObjectReference `json:"auditCredentials"`
 	WorkerConfigurationAudit OwnerPublicTransit    `json:"workerConfigurationAudit,omitzero"`
 	ContextDeletionSigning   OwnerPublicTransit    `json:"contextDeletionSigning,omitzero"`
+	// CleanupAudit selects four independent finite cleanup purposes for this exact audit key.
+	CleanupAudit OwnerPublicTransit `json:"cleanupAudit,omitzero"`
 }

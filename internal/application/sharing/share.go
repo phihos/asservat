@@ -54,6 +54,9 @@ type Service struct {
 // CreateInput is the validated create_share input. A zero ExpiresAt
 // selects value.ShareDefaultLifetime.
 type CreateInput struct {
+	// OperationID is the current server-owned paid audit operation. It is
+	// private plumbing, never part of the stable business request digest.
+	OperationID        string `json:"-"`
 	CaseID, ArtifactID string
 	Version            artifact.Digest
 	Recipients         []value.ShareRecipient
@@ -68,9 +71,24 @@ type CreateInput struct {
 // TransferInput is the validated transfer_share input: the complete new
 // management selection (mode creator or teams).
 type TransferInput struct {
+	OperationID      string `json:"-"`
 	ShareID          string
 	ExpectedRevision int64
 	Management       value.ManagementRequest
+	IdempotencyKey   string
+}
+
+type RevokeInput struct {
+	OperationID      string `json:"-"`
+	ShareID          string
+	ExpectedRevision int64
+	IdempotencyKey   string
+}
+
+type PolicyRevokeInput struct {
+	OperationID      string `json:"-"`
+	AcceptanceID     string
+	ExpectedRevision int64
 	IdempotencyKey   string
 }
 
@@ -109,6 +127,9 @@ func (s Service) Create(ctx context.Context, current identities.CurrentIdentity,
 	var zero value.Share
 	if ctx == nil || ctx.Err() != nil || current == nil || !s.ready() {
 		return zero, false, capture.ErrUnavailable
+	}
+	if !value.UUID(in.OperationID) {
+		return zero, false, capture.ErrInvalid
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
@@ -217,7 +238,7 @@ func (s Service) Create(ctx context.Context, current identities.CurrentIdentity,
 	}
 	share := value.Share{ID: s.NewID(), RootID: s.RootID, ArtifactID: route.ArtifactID, CaseID: in.CaseID, Target: route.Target, Version: record.Version,
 		Creator: i.Principal, Management: owners, Recipients: recipients, ExpiresAt: expires, Revision: 1}
-	out, replay, err := s.Store.CreateShare(ctx, Request{Share: share, IdempotencyKey: in.IdempotencyKey, RequestDigest: sha256.Sum256(digest)}, recovery)
+	out, replay, err := s.Store.CreateShare(ctx, Request{OperationID: in.OperationID, Share: share, IdempotencyKey: in.IdempotencyKey, RequestDigest: sha256.Sum256(digest)}, recovery)
 	if err != nil {
 		return zero, false, err
 	}
@@ -334,12 +355,13 @@ func (s Service) List(ctx context.Context, current identities.CurrentIdentity, v
 // creator needs no current owner assignment and the administrator no evidence
 // right; the operation audit records the acting principal. A share the
 // caller may not revoke is NotAvailable without saying why.
-func (s Service) Revoke(ctx context.Context, current identities.CurrentIdentity, shareID string, expected int64, key string) (value.Share, bool, error) {
+func (s Service) Revoke(ctx context.Context, current identities.CurrentIdentity, in RevokeInput) (value.Share, bool, error) {
+	shareID, expected, key := in.ShareID, in.ExpectedRevision, in.IdempotencyKey
 	var zero value.Share
 	if ctx == nil || ctx.Err() != nil || current == nil || !s.ready() {
 		return zero, false, capture.ErrUnavailable
 	}
-	if !value.UUID(shareID) || expected < 1 || !identity.Text(key, 128) {
+	if !value.UUID(in.OperationID) || !value.UUID(shareID) || expected < 1 || !identity.Text(key, 128) {
 		return zero, false, capture.ErrInvalid
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -359,7 +381,7 @@ func (s Service) Revoke(ctx context.Context, current identities.CurrentIdentity,
 	if err != nil || share.ID != shareID || share.RootID != s.RootID {
 		return zero, false, capture.ErrUnavailable
 	}
-	revocation := Revocation{ShareID: shareID, Actor: i.Principal, ExpectedRevision: expected, IdempotencyKey: key}
+	revocation := Revocation{OperationID: in.OperationID, ShareID: shareID, Actor: i.Principal, ExpectedRevision: expected, IdempotencyKey: key}
 	if !createdBy(share, i.Principal) {
 		var held []artifact.AudienceAssignment
 		if p, err := s.Permissions.Permissions(ctx, share.Target); err == nil {
@@ -499,7 +521,7 @@ func (s Service) Transfer(ctx context.Context, current identities.CurrentIdentit
 	if ctx == nil || ctx.Err() != nil || current == nil || !s.ready() {
 		return zero, false, capture.ErrUnavailable
 	}
-	if !value.UUID(in.ShareID) || in.ExpectedRevision < 1 || !identity.Text(in.IdempotencyKey, 128) || in.Management.Mode == "" || !in.Management.Valid() {
+	if !value.UUID(in.OperationID) || !value.UUID(in.ShareID) || in.ExpectedRevision < 1 || !identity.Text(in.IdempotencyKey, 128) || in.Management.Mode == "" || !in.Management.Valid() {
 		return zero, false, capture.ErrInvalid
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -574,7 +596,7 @@ func (s Service) Transfer(ctx context.Context, current identities.CurrentIdentit
 	if err != nil {
 		return zero, false, capture.ErrUnavailable
 	}
-	t := Transfer{ShareID: in.ShareID, Actor: i.Principal, Administrator: administered, Management: owners, ExpectedRevision: in.ExpectedRevision, IdempotencyKey: in.IdempotencyKey, RequestDigest: sha256.Sum256(digest)}
+	t := Transfer{OperationID: in.OperationID, ShareID: in.ShareID, Actor: i.Principal, Administrator: administered, Management: owners, ExpectedRevision: in.ExpectedRevision, IdempotencyKey: in.IdempotencyKey, RequestDigest: sha256.Sum256(digest)}
 	for _, a := range held {
 		t.Managers = append(t.Managers, a.AssignmentID)
 	}
@@ -618,6 +640,10 @@ var ErrManagementTooBroad = errors.New("share management exceeds eight owner ass
 // artifact (ADR-238): management is never assigned to others.
 var ErrManagementNotHeld = errors.New("share management names an assignment the caller does not hold")
 
+// ErrRetentionCapacity refuses a new share whose expiry cannot fit its
+// original paid operation's backing. It never shortens an accepted expiry.
+var ErrRetentionCapacity = errors.New("share expiry exceeds original retained metadata backing")
+
 func createdBy(s value.Share, p identity.Principal) bool {
 	return s.Creator.Issuer == p.Issuer && s.Creator.Subject == p.Subject
 }
@@ -640,11 +666,11 @@ type PolicyRevokeResult struct {
 // recurring sharing and stops its future sharing (ADR-239, REQ-SHR-007).
 // Expected is the sharing's revision (1, or 2 after a Stop); the same key
 // after success is a replay.
-func (s Service) RevokePolicySharing(ctx context.Context, current identities.CurrentIdentity, acceptanceID string, expected int64, key string) (PolicyRevokeResult, error) {
+func (s Service) RevokePolicySharing(ctx context.Context, current identities.CurrentIdentity, in PolicyRevokeInput) (PolicyRevokeResult, error) {
 	var out PolicyRevokeResult
-	err := s.changePolicySharing(ctx, current, acceptanceID, expected, key, func(ctx context.Context, r PolicyRevocation, recovery artifact.RecoveryProof) error {
+	err := s.changePolicySharing(ctx, current, in, func(ctx context.Context, r PolicyRevocation, recovery artifact.RecoveryProof) error {
 		revoked, replay, err := s.Policies.RevokePolicySharing(ctx, r, recovery)
-		out = PolicyRevokeResult{AcceptanceID: acceptanceID, Revoked: revoked, Replay: replay}
+		out = PolicyRevokeResult{AcceptanceID: in.AcceptanceID, Revoked: revoked, Replay: replay}
 		return err
 	})
 	if err != nil {
@@ -657,11 +683,11 @@ func (s Service) RevokePolicySharing(ctx context.Context, current identities.Cur
 // (REQ-SHR-007): no further capture claims a slot; captures that already
 // claimed one still publish their shares before notAfter; existing shares
 // stay until they expire or are revoked. Expected must be revision 1.
-func (s Service) StopPolicySharing(ctx context.Context, current identities.CurrentIdentity, acceptanceID string, expected int64, key string) (PolicyRevokeResult, error) {
+func (s Service) StopPolicySharing(ctx context.Context, current identities.CurrentIdentity, in PolicyRevokeInput) (PolicyRevokeResult, error) {
 	var out PolicyRevokeResult
-	err := s.changePolicySharing(ctx, current, acceptanceID, expected, key, func(ctx context.Context, r PolicyRevocation, recovery artifact.RecoveryProof) error {
+	err := s.changePolicySharing(ctx, current, in, func(ctx context.Context, r PolicyRevocation, recovery artifact.RecoveryProof) error {
 		replay, err := s.Policies.StopPolicySharing(ctx, r, recovery)
-		out = PolicyRevokeResult{AcceptanceID: acceptanceID, Replay: replay}
+		out = PolicyRevokeResult{AcceptanceID: in.AcceptanceID, Replay: replay}
 		return err
 	})
 	if err != nil {
@@ -675,11 +701,12 @@ func (s Service) StopPolicySharing(ctx context.Context, current identities.Curre
 // owner-team assignments now on the policy's workload) or an installation
 // administrator (ADR-238). Both only restrict access. An acceptance without
 // sharing, or one the caller may not change, is NotAvailable.
-func (s Service) changePolicySharing(ctx context.Context, current identities.CurrentIdentity, acceptanceID string, expected int64, key string, apply func(context.Context, PolicyRevocation, artifact.RecoveryProof) error) error {
+func (s Service) changePolicySharing(ctx context.Context, current identities.CurrentIdentity, in PolicyRevokeInput, apply func(context.Context, PolicyRevocation, artifact.RecoveryProof) error) error {
+	acceptanceID, expected, key := in.AcceptanceID, in.ExpectedRevision, in.IdempotencyKey
 	if ctx == nil || ctx.Err() != nil || current == nil || !s.ready() || s.Policies == nil {
 		return capture.ErrUnavailable
 	}
-	if !value.UUID(acceptanceID) || expected < 1 || !identity.Text(key, 128) {
+	if !value.UUID(in.OperationID) || !value.UUID(acceptanceID) || expected < 1 || !identity.Text(key, 128) {
 		return capture.ErrInvalid
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -699,12 +726,12 @@ func (s Service) changePolicySharing(ctx context.Context, current identities.Cur
 	if err != nil || sharing.AcceptanceID != acceptanceID {
 		return capture.ErrUnavailable
 	}
-	r := PolicyRevocation{AcceptanceID: acceptanceID, Actor: i.Principal, ExpectedRevision: expected, IdempotencyKey: key}
-	in := sharing.Instruction
-	if in.Creator.Issuer != i.Principal.Issuer || in.Creator.Subject != i.Principal.Subject {
+	r := PolicyRevocation{OperationID: in.OperationID, AcceptanceID: acceptanceID, Actor: i.Principal, ExpectedRevision: expected, IdempotencyKey: key}
+	instruction := sharing.Instruction
+	if instruction.Creator.Issuer != i.Principal.Issuer || instruction.Creator.Subject != i.Principal.Subject {
 		var held []artifact.AudienceAssignment
 		if p, err := s.Permissions.Permissions(ctx, sharing.Target); err == nil {
-			held, _ = value.PolicySharingManagedBy(in.Creator, in.Management, sharing.Target, i, p, s.Now())
+			held, _ = value.PolicySharingManagedBy(instruction.Creator, instruction.Management, sharing.Target, i, p, s.Now())
 		}
 		if len(held) == 0 && !s.administrator(ctx, i) {
 			return capture.ErrDenied

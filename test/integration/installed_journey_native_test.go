@@ -65,7 +65,7 @@ const installedJourneyRetention = 240
 // 25 s after acceptance locally, so 80 s keeps a margin of about a minute
 // and the run stays well under 15 minutes.
 func installedJourneyRetentionSeconds() int64 {
-	if installedJourneyFocus() == "journey" {
+	if installedJourneyFocus() == "journey" || installedJourneyFocus() == "share-retirement" {
 		return 80
 	}
 	return installedJourneyRetention
@@ -1182,7 +1182,7 @@ func installedJourneyFocus() string {
 // 20-minute limit; docs/implementation-progress.md records the split.
 func installedFastFixture() bool {
 	switch installedJourneyFocus() {
-	case "live-observation", "policy", "alert", "logresource", "browser", "restart", "upgrade", "journey", "clusters", "share", "approved-recording", "manual-logs", "manual-syscall", "manual-arguments", "manual-mixed", "manual-raw", "manual-http", "manual-peers", "manual-profile", "profile-comparison", "native-paced", "policy-recording", "policy-arguments", "policy-profile", "ongoing-save", "ongoing-save-disk", "ongoing-incident", "ongoing-syscall", "ongoing-mixed", "journey-store-failure", "journey-start-failure", "retention-shortening", "early-erasure", "processing-workload", "privacy-inventory":
+	case "live-observation", "policy", "alert", "logresource", "browser", "restart", "upgrade", "journey", "clusters", "share", "approved-recording", "manual-logs", "manual-syscall", "manual-arguments", "manual-mixed", "manual-raw", "manual-http", "manual-peers", "manual-profile", "profile-comparison", "native-paced", "policy-recording", "policy-arguments", "policy-profile", "ongoing-save", "ongoing-save-disk", "ongoing-incident", "ongoing-syscall", "ongoing-mixed", "journey-store-failure", "journey-start-failure", "retention-shortening", "early-erasure", "processing-workload", "privacy-inventory", "share-retirement":
 		return true
 	}
 	return false

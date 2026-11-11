@@ -44,7 +44,6 @@ func BuildInstalledHubWorkerWorkload(p HubWorkerWorkloadPlan, installationID str
 		contracts.HubWorkerCleanupDeploymentFile, contracts.HubWorkerCleanupManifestFile,
 		"sql-capture-cleanup.json", "sql-capture-verifier.json", "sql-capture-finalizer.json",
 		"cleanup-storage.json", "verify-storage.json",
-		"certificate-wrap.token", "certificate-open.token", "certificate-verify.token", "certificate-sign.token",
 	})
 	add(contracts.PermissionRuntimeProjectionName(installationID), contracts.PermissionWorkerProjectionDirectory, []string{
 		contracts.PermissionDeploymentFile, contracts.PermissionCredentialManifestFile,

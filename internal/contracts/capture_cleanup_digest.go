@@ -14,7 +14,7 @@ func CaptureCleanupProjectionDigest(deployment CaptureCleanupDeployment, manifes
 		Format     string
 		Deployment CaptureCleanupDeployment
 		Manifest   CaptureCleanupCredentialManifest
-	}{"asservat-capture-cleanup-projection/v1", deployment, manifest}
+	}{"asservat-capture-cleanup-projection/v2", deployment, manifest}
 	raw, err := json.Marshal(public)
 	if err != nil {
 		return "", err

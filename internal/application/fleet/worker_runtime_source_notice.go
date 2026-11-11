@@ -93,7 +93,7 @@ func (s *WorkerRuntimeAdmission) InvalidateFleetNotice() {
 
 type workerRuntimeLeaseKey struct{}
 
-// AwaitFleetObservation is solely for wrap/unwrap maintenance and owner audit,
+// AwaitFleetObservation is solely for provider maintenance and audited work,
 // before selecting any recovery proof, provider permit or audit candidate. It
 // waits for one independent source read begun after FIFO admission. The total
 // scheduling wait (queue plus this wait) has a fixed original five-second end.
@@ -106,7 +106,7 @@ func (p *WorkerRuntimeAdmissionLease) AwaitFleetObservation() error {
 	s := p.owner
 	s.mu.Lock()
 	t := p.ticket
-	if t.purpose != workerWrapRefresh && t.purpose != workerUnwrapRefresh && t.purpose != workerOwnerAuditPurpose && t.purpose != workerAuthorityAudit {
+	if t.purpose != workerWrapRefresh && t.purpose != workerUnwrapRefresh && t.purpose != workerOwnerAuditPurpose && t.purpose != workerAuthorityAudit && t.purpose != workerCleanup {
 		s.mu.Unlock()
 		return value.ErrUnavailable
 	}

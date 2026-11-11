@@ -140,7 +140,8 @@ func (s *consoleSyntheticShares) List(ctx context.Context, current app.CurrentId
 	return out, i.ValidUntil, nil
 }
 
-func (s *consoleSyntheticShares) Revoke(_ context.Context, _ app.CurrentIdentity, id string, expected int64, _ string) (authorization.Share, bool, error) {
+func (s *consoleSyntheticShares) Revoke(_ context.Context, _ app.CurrentIdentity, in sharing.RevokeInput) (authorization.Share, bool, error) {
+	id, expected := in.ShareID, in.ExpectedRevision
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for n := range s.shares {

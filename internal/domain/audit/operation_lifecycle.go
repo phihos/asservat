@@ -10,6 +10,15 @@ const OperationWriterProtocol = "closed-operation-audit/v1"
 const OperationHistoryLayout = "operation-audit-history/v1"
 const OperationVerificationHistoryLayout = "operation-audit-history/v3"
 
+// ShareOperationHistoryLayout additionally funds one share effect and its
+// dependent row retirement. Earlier qualifications do not imply this coverage.
+const ShareOperationHistoryLayout = "operation-audit-history/v4"
+
+// ShareOperationBusinessWALBytes prepays one complete business effect, including
+// the bounded 100-share mutation or its rollback, separately from audit phases.
+// Every residual generation and WAL copy retains this allowance until release.
+const ShareOperationBusinessWALBytes int64 = 8 << 20
+
 // This distinct private qualification includes retained connector source/process/
 // certificate dependencies; a public v3 result is never automatically sufficient.
 const ConnectorOperationHistoryLayout = "connector-operation-history/v1"
@@ -21,6 +30,15 @@ const ConnectorRetirementHistoryLayout = "connector-operation-history/v2"
 
 func connectorHistoryLayout(layout string) bool {
 	return layout == ConnectorOperationHistoryLayout || layout == ConnectorRetirementHistoryLayout
+}
+
+func captureHistoryLayout(layout string) bool {
+	return layout == CaptureOperationHistoryLayout || layout == ShareCaptureOperationHistoryLayout
+}
+
+func verificationHistoryLayout(layout string) bool {
+	return layout == OperationVerificationHistoryLayout || layout == ShareOperationHistoryLayout ||
+		connectorHistoryLayout(layout) || layout == ProcessingReleaseHistoryLayout || captureHistoryLayout(layout)
 }
 
 const ProcessingReleaseHistoryLayout = "processing-release-history/v1"
@@ -40,7 +58,7 @@ type OperationHistoryQualification struct {
 }
 
 func (q OperationHistoryQualification) Valid() bool {
-	return authorization.UUID(q.ID) && q.Digest != (artifact.Digest{}) && (q.Layout == OperationHistoryLayout || q.Layout == OperationOverdueHistoryLayout || q.Layout == OperationVerificationHistoryLayout || connectorHistoryLayout(q.Layout) || q.Layout == ProcessingReleaseHistoryLayout || q.Layout == CaptureOperationHistoryLayout) && (!connectorHistoryLayout(q.Layout) || q.MaximumRowFootprintBytes >= 1<<20) && q.MaximumRowFootprintBytes >= 128<<10 && q.MaximumRowFootprintBytes <= 16<<20 && q.MaximumTransitionWALBytes >= 128<<10 && q.MaximumTransitionWALBytes <= 64<<20 && q.BackupCopies >= 1 && q.BackupCopies <= 64 && q.WALCopies >= 1 && q.WALCopies <= 64
+	return authorization.UUID(q.ID) && q.Digest != (artifact.Digest{}) && (q.Layout == OperationHistoryLayout || q.Layout == OperationOverdueHistoryLayout || verificationHistoryLayout(q.Layout)) && (!connectorHistoryLayout(q.Layout) || q.MaximumRowFootprintBytes >= 1<<20) && q.MaximumRowFootprintBytes >= 128<<10 && q.MaximumRowFootprintBytes <= 16<<20 && q.MaximumTransitionWALBytes >= 128<<10 && q.MaximumTransitionWALBytes <= 64<<20 && q.BackupCopies >= 1 && q.BackupCopies <= 64 && q.WALCopies >= 1 && q.WALCopies <= 64
 }
 func (q OperationHistoryQualification) SlotBacking(leases int64) (backup, wal int64) {
 	// At most two residual generations overlap; every reuse waits through H.
@@ -51,6 +69,15 @@ func (q OperationHistoryQualification) SlotBacking(leases int64) (backup, wal in
 	} else if q.Layout == OperationVerificationHistoryLayout {
 		// Includes the optional overdue branch and two irreversible verifier claims.
 		transitions += 5
+	} else if q.Layout == ShareOperationHistoryLayout {
+		// Existing verifier lifecycle plus paid effect consumption, business
+		// mutation and dependent share retirement. Full transaction bounds
+		// must include the closed 100-share revoke-all case.
+		transitions = 24
+	} else if q.Layout == ShareCaptureOperationHistoryLayout {
+		// Capture admission/publication plus the immutable share dependency
+		// and its removal during the creating operation's finalization.
+		transitions = 34
 	} else if q.Layout == CaptureOperationHistoryLayout {
 		// Pair/lifecycle plus immutable admission, binding, two reads per phase,
 		// acknowledgement and bounded dependent row retirement.
@@ -69,7 +96,11 @@ func (q OperationHistoryQualification) SlotBacking(leases int64) (backup, wal in
 		// SQL49 enforces that graph; actual transaction cost needs its own test.
 		transitions = 32
 	}
-	return 2 * q.MaximumRowFootprintBytes * q.BackupCopies, 2 * q.MaximumTransitionWALBytes * q.WALCopies * (transitions + 3*leases)
+	business := int64(0)
+	if q.Layout == ShareOperationHistoryLayout {
+		business = ShareOperationBusinessWALBytes
+	}
+	return 2 * q.MaximumRowFootprintBytes * q.BackupCopies, 2 * q.WALCopies * (q.MaximumTransitionWALBytes*(transitions+3*leases) + business)
 }
 
 // These facts come only from accepted protected installation composition. They
@@ -92,8 +123,8 @@ func (p OperationLifecyclePolicy) Valid() bool {
 	if p.MaxPurgeLeases < 2 || p.MaxPurgeLeases > 32 {
 		return false
 	}
-	if p.BackupHorizonSeconds > 0 || p.History != nil && (p.History.Layout == OperationVerificationHistoryLayout || connectorHistoryLayout(p.History.Layout) || p.History.Layout == ProcessingReleaseHistoryLayout || p.History.Layout == CaptureOperationHistoryLayout) {
-		if p.History == nil || !p.History.Valid() || (p.History.Layout != OperationVerificationHistoryLayout && !connectorHistoryLayout(p.History.Layout) && p.History.Layout != ProcessingReleaseHistoryLayout && p.History.Layout != CaptureOperationHistoryLayout && ((p.OverdueTerminal == "" && p.History.Layout != OperationHistoryLayout) || (p.OverdueTerminal != "" && p.History.Layout != OperationOverdueHistoryLayout))) {
+	if p.BackupHorizonSeconds > 0 || p.History != nil && verificationHistoryLayout(p.History.Layout) {
+		if p.History == nil || !p.History.Valid() || (!verificationHistoryLayout(p.History.Layout) && ((p.OverdueTerminal == "" && p.History.Layout != OperationHistoryLayout) || (p.OverdueTerminal != "" && p.History.Layout != OperationOverdueHistoryLayout))) {
 			return false
 		}
 		b, w := p.History.SlotBacking(p.MaxPurgeLeases)
@@ -104,13 +135,33 @@ func (p OperationLifecyclePolicy) Valid() bool {
 	} else if p.History != nil {
 		return false
 	}
-	return authorization.UUID(p.RootID) && ((p.Lane == "normal" || p.Lane == "resolution") && (p.History == nil || !connectorHistoryLayout(p.History.Layout) && p.History.Layout != ProcessingReleaseHistoryLayout && p.History.Layout != CaptureOperationHistoryLayout) || p.Lane == "capture" && p.History != nil && p.History.Layout == CaptureOperationHistoryLayout || p.Lane == "processing" && p.History != nil && p.History.Layout == ProcessingReleaseHistoryLayout || p.Lane == "identity" && p.History != nil && connectorHistoryLayout(p.History.Layout)) && authorization.UUID(p.InstallationID) && authorization.UUID(p.StoreID) && authorization.UUID(p.PolicyID) && authorization.UUID(p.BackupProfileID) && p.PolicyDigest != (artifact.Digest{}) && p.BackupProfileDigest != (artifact.Digest{}) && p.BackingRevision > 0 && p.BackingRevision <= 1<<60 && p.MetadataSlots > 0 && p.MetadataSlots <= 1000000000000 && p.BackupHorizonSeconds >= 0 && p.BackupHorizonSeconds <= 316224000 && p.CleanupBudgetSeconds > 0 && p.CleanupBudgetSeconds <= 86400 && p.ProofWindowSeconds > 0 && p.ProofWindowSeconds <= 316224000 && p.BackupReservedBytes >= 0 && p.WALReservedBytes >= 0 && (p.BackupHorizonSeconds == 0 || p.BackupReservedBytes > 0 && p.WALReservedBytes > 0) && microTime(p.ValidUntil)
+	return authorization.UUID(p.RootID) && p.historyLaneValid() && authorization.UUID(p.InstallationID) && authorization.UUID(p.StoreID) && authorization.UUID(p.PolicyID) && authorization.UUID(p.BackupProfileID) && p.PolicyDigest != (artifact.Digest{}) && p.BackupProfileDigest != (artifact.Digest{}) && p.BackingRevision > 0 && p.BackingRevision <= 1<<60 && p.MetadataSlots > 0 && p.MetadataSlots <= 1000000000000 && p.BackupHorizonSeconds >= 0 && p.BackupHorizonSeconds <= 316224000 && p.CleanupBudgetSeconds > 0 && p.CleanupBudgetSeconds <= 86400 && p.ProofWindowSeconds > 0 && p.ProofWindowSeconds <= 316224000 && p.BackupReservedBytes >= 0 && p.WALReservedBytes >= 0 && (p.BackupHorizonSeconds == 0 || p.BackupReservedBytes > 0 && p.WALReservedBytes > 0) && microTime(p.ValidUntil)
+}
+
+func (p OperationLifecyclePolicy) historyLaneValid() bool {
+	switch p.Lane {
+	case "normal", "resolution":
+		return p.History == nil || p.History.Layout == OperationHistoryLayout || p.History.Layout == OperationOverdueHistoryLayout || p.History.Layout == OperationVerificationHistoryLayout || p.History.Layout == ShareOperationHistoryLayout
+	case "capture":
+		return p.History != nil && captureHistoryLayout(p.History.Layout)
+	case "processing":
+		return p.History != nil && p.History.Layout == ProcessingReleaseHistoryLayout
+	case "identity":
+		return p.History != nil && connectorHistoryLayout(p.History.Layout)
+	}
+	return false
 }
 
 // CertificateVerificationBacked selects new admission, including H=0. Valid
 // intentionally still reads historical bindings; it never upgrades them.
 func (p OperationLifecyclePolicy) CertificateVerificationBacked() bool {
-	return p.Valid() && p.History != nil && (p.History.Layout == OperationVerificationHistoryLayout || connectorHistoryLayout(p.History.Layout) || p.History.Layout == ProcessingReleaseHistoryLayout || p.History.Layout == CaptureOperationHistoryLayout)
+	return p.Valid() && p.History != nil && verificationHistoryLayout(p.History.Layout)
+}
+
+// SharingBacked identifies a separately qualified share-business graph, not
+// permission to share or a promotion of a historical audit record.
+func (p OperationLifecyclePolicy) SharingBacked() bool {
+	return p.Valid() && p.History != nil && (p.History.Layout == ShareOperationHistoryLayout || p.History.Layout == ShareCaptureOperationHistoryLayout)
 }
 
 type OperationLifecycleBinding struct {

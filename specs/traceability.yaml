@@ -660,6 +660,7 @@ requirements:
   spec: specs/privacy.md
   scenarios:
   - SC-PRV-008
+  - SC-PRV-015
   tasks:
   - TASK-03
   - TASK-11

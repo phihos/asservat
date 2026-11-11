@@ -168,7 +168,13 @@ Inspect `current-recipe.json` for `phase: 1`, `purpose: worker-provider`. Re-rea
 
 The helper applies missing recipe keys/roles/ACL configuration, obtains a ten-minute read-only inspection token, and writes the private inbox through the actual administrative identity. The continuation validates and consumes it. It does not issue S3 IAM credentials.
 
-Repeat the outbox read command after phase 1, wait for `phase: 3`, `purpose: owner-provider`, and provision the separate capabilities named by `.recipe.auditStorage`, `.recipe.federationAuditStorage`, `.recipe.publisher.auditStorage`, `.recipe.publisher.evidenceReadStorage`, `.recipe.downloadEvidenceReadStorage` and `.recipe.evidenceDeleteStorage`. Use their exact emitted prefixes/actions; no generated UUID, SQL OID or digest is an operator input. Then run:
+Repeat the outbox read command after phase 1, wait for `phase: 3`, `purpose: owner-provider`, and provision the separate capabilities named by `.recipe.auditStorage`, `.recipe.federationAuditStorage`, `.recipe.publisher.auditStorage`, `.recipe.publisher.evidenceReadStorage`, `.recipe.downloadEvidenceReadStorage`, `.recipe.evidenceDeleteStorage` and
+`.recipe.operationCleanupStorage.cleanup`/`.verify`. Use their exact emitted prefixes/actions; no generated UUID, SQL OID or digest is an operator input.
+The cleanup principal may create only immutable deletion certificates and delete
+the selected audit objects; the separate verifier cannot write or delete. Save
+their distinct credentials as `private/cleanup-audit.json` and
+`private/cleanup-verify.json`. Neither receives evidence-bucket or storage-admin
+rights. Then run:
 
 ```sh
 "$ASSERVAT" installer-provider-apply --context "$HUB_CONTEXT" \
@@ -179,6 +185,8 @@ Repeat the outbox read command after phase 1, wait for `phase: 3`, `purpose: own
   --publisher-audit-credential private/publisher-audit.json \
   --download-evidence-credential private/download-evidence-read.json \
   --evidence-delete-credential private/evidence-delete.json \
+  --cleanup-audit-credential private/cleanup-audit.json \
+  --cleanup-verify-credential private/cleanup-verify.json \
   --oidc-client-secret private/oidc-client-secret \
   --public-tls-certificate private/public.crt --public-tls-key private/public.key \
   --federation-tls-certificate private/federation.crt \

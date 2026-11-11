@@ -24,14 +24,16 @@ type ownerProviderSetupRequest struct {
 //
 // A federation deployment with provider authentication adds its own roles,
 // connector PKI roles and audit transit key to the same artifact (ADR-193),
-// so the operator applies both compartments in one step. A publisher
+// so the operator applies both compartments in one step. The federation flag
+// marks those requests; their bodies appear only in apply, not a second setup
+// copy. A publisher
 // deployment adds its roles, verifier PKI role and audit transit key and
 // describes its two operator storage credentials (ADR-203). A download
 // evidence store describes the download workers' own read-only evidence
 // credential (ADR-204 decision 5); it adds no provider request. A deletion
 // evidence store likewise describes the context deletion child's own
 // list-and-delete evidence credential (ADR-205 decision 4).
-func OwnerProviderSetupArtifact(in contracts.OwnerDeployment, profile contracts.OwnerProviderAuthentication, pool fleet.OwnerPool, roots [][]byte, now time.Time, federation *contracts.FederationDeployment, publisher *contracts.PublisherDeployment, downloads, deletion *contracts.InstallerEvidenceStore) ([]byte, error) {
+func OwnerProviderSetupArtifact(in contracts.OwnerDeployment, profile contracts.OwnerProviderAuthentication, pool fleet.OwnerPool, roots [][]byte, now time.Time, federation *contracts.FederationDeployment, publisher *contracts.PublisherDeployment, downloads, deletion *contracts.InstallerEvidenceStore, cleanup ...bool) ([]byte, error) {
 	if !authorization.UUID(in.ConfigurationUID) {
 		return nil, ErrSetupUnavailable
 	}
@@ -95,7 +97,6 @@ func OwnerProviderSetupArtifact(in contracts.OwnerDeployment, profile contracts.
 		inspect = append(inspect, "sys/policies/acl/"+role.Name, "auth/"+profile.AuthMount+"/role/"+role.Name)
 		storage.Prefixes = append(storage.Prefixes, "bootstrap-issue/v1/"+in.InstallationID+"/")
 	}
-	var federationSetup *FederationProviderSetup
 	var federationStorage any
 	if federation != nil {
 		f, err := FederationProviderSetupFor(*federation)
@@ -106,7 +107,7 @@ func OwnerProviderSetupArtifact(in contracts.OwnerDeployment, profile contracts.
 		if err != nil {
 			return nil, err
 		}
-		requests, inspect, federationSetup = append(requests, more...), append(inspect, federationSetupPaths(*federation, f)...), &f
+		requests, inspect = append(requests, more...), append(inspect, federationSetupPaths(*federation, f)...)
 		// The federation writes connector operation audits for the permission
 		// root and, for ADR-193 bootstraps, the claim and generation-1 audits;
 		// its principal is a separate operator credential.
@@ -152,21 +153,36 @@ func OwnerProviderSetupArtifact(in contracts.OwnerDeployment, profile contracts.
 		// phase's inspection token (ADR-205 decision 6).
 		inspect = append(inspect, in.KeyService.AuditMount+"/keys/"+contracts.ContextDeletionSigningKeyName(in.InstallationID))
 	}
+	var cleanupStorage *OperationCleanupStorageRequirements
+	if len(cleanup) > 1 {
+		return nil, ErrSetupUnavailable
+	}
+	if len(cleanup) == 1 && cleanup[0] {
+		if !authorization.UUID(in.PermissionRootID) {
+			return nil, ErrSetupUnavailable
+		}
+		cleanupStorage = OperationCleanupStorageRequirementsFor(in.AuditStore, in.PermissionRootID)
+		path := in.KeyService.AuditMount + "/keys/" + contracts.ContextDeletionSigningKeyName(in.InstallationID)
+		if !slices.Contains(inspect, path) {
+			inspect = append(inspect, path)
+		}
+	}
 	return ownerProviderCanonical(struct {
-		Format                      string                      `json:"format"`
-		ConfigurationUID            string                      `json:"configurationUID"`
-		Setup                       OwnerSetupRecipe            `json:"setup"`
-		Federation                  *FederationProviderSetup    `json:"federation,omitempty"`
-		Publisher                   *publisherArtifact          `json:"publisher,omitempty"`
-		Public                      bool                        `json:"public,omitempty"`
-		Apply                       []ownerProviderSetupRequest `json:"apply"`
-		Inspect                     []string                    `json:"inspect"`
-		AuditStorage                any                         `json:"auditStorage"`
-		FederationAuditStorage      any                         `json:"federationAuditStorage,omitempty"`
-		DownloadEvidenceReadStorage *publisherStorage           `json:"downloadEvidenceReadStorage,omitempty"`
-		EvidenceDeleteStorage       *evidenceDeleteStorage      `json:"evidenceDeleteStorage,omitempty"`
-		ExternalAdministration      bool                        `json:"externalAdministration"`
-	}{"asservat-owner-provider-setup/v1", in.ConfigurationUID, setup, federationSetup, publisherSection, public, requests, inspect, storage, federationStorage, downloadStorage, deletionStorage, true})
+		Format                      string                               `json:"format"`
+		ConfigurationUID            string                               `json:"configurationUID"`
+		Setup                       OwnerSetupRecipe                     `json:"setup"`
+		Federation                  bool                                 `json:"federation,omitempty"`
+		Publisher                   *publisherArtifact                   `json:"publisher,omitempty"`
+		Public                      bool                                 `json:"public,omitempty"`
+		Apply                       []ownerProviderSetupRequest          `json:"apply"`
+		Inspect                     []string                             `json:"inspect"`
+		AuditStorage                any                                  `json:"auditStorage"`
+		FederationAuditStorage      any                                  `json:"federationAuditStorage,omitempty"`
+		DownloadEvidenceReadStorage *publisherStorage                    `json:"downloadEvidenceReadStorage,omitempty"`
+		EvidenceDeleteStorage       *evidenceDeleteStorage               `json:"evidenceDeleteStorage,omitempty"`
+		OperationCleanupStorage     *OperationCleanupStorageRequirements `json:"operationCleanupStorage,omitempty"`
+		ExternalAdministration      bool                                 `json:"externalAdministration"`
+	}{"asservat-owner-provider-setup/v1", in.ConfigurationUID, setup, federation != nil, publisherSection, public, requests, inspect, storage, federationStorage, downloadStorage, deletionStorage, cleanupStorage, true})
 }
 
 // evidenceDeleteStorage is the context deletion child's evidence credential

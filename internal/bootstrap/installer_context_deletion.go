@@ -24,7 +24,7 @@ func (k *InstallerContinuation) contextDeletionEnabled() bool {
 // through the provider selection, so the mount comes from the original
 // preparation services.
 func (k *InstallerContinuation) contextDeletionSigning() (contracts.OwnerPublicTransit, error) {
-	if !k.contextDeletionEnabled() {
+	if !k.contextDeletionEnabled() && !k.operationCleanupEnabled() {
 		return contracts.OwnerPublicTransit{}, nil
 	}
 	s := k.plan.Services

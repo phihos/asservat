@@ -86,10 +86,12 @@ func RunInstallerProviderApply(ctx context.Context, args []string, out io.Writer
 	publisherAuditFile := flags.String("publisher-audit-credential", "", "the publisher's scoped audit storage credential JSON file (phase 3 with a publisher)")
 	downloadEvidenceFile := flags.String("download-evidence-credential", "", "the download workers' read-only evidence storage credential JSON file (phase 3 with downloads)")
 	evidenceDeleteFile := flags.String("evidence-delete-credential", "", "the context deletion's list-and-delete evidence storage credential JSON file (phase 3 with deletion)")
+	cleanupFile := flags.String("cleanup-audit-credential", "", "operation audit cleanup storage credential JSON file (phase 3 with cleanup)")
+	cleanupVerifyFile := flags.String("cleanup-verify-credential", "", "independent operation audit verification storage credential JSON file (phase 3 with cleanup)")
 	if flags.Parse(args) != nil || flags.NArg() != 0 || *installation == "" || *credentialFile == "" {
 		return mounts.ErrUnavailable
 	}
-	serving := map[string][]byte{}
+	var serving map[string][]byte
 	defer func() {
 		for _, data := range serving {
 			clear(data)
@@ -108,6 +110,9 @@ func RunInstallerProviderApply(ctx context.Context, args []string, out io.Writer
 		if readErr != nil || closeErr != nil || len(data) == 0 || len(data) > 64<<10 {
 			clear(data)
 			return mounts.ErrUnavailable
+		}
+		if serving == nil {
+			serving = map[string][]byte{}
 		}
 		serving[key] = data
 	}
@@ -157,6 +162,27 @@ func RunInstallerProviderApply(ctx context.Context, args []string, out io.Writer
 		return err
 	}
 	defer clear(deletion)
+	var cleanup map[string][]byte
+	if *cleanupFile != "" || *cleanupVerifyFile != "" {
+		cleanup = map[string][]byte{}
+		for key, file := range map[string]string{contracts.InstallerInboxCleanupAuditCredential: *cleanupFile, contracts.InstallerInboxCleanupVerifyCredential: *cleanupVerifyFile} {
+			b, e := os.ReadFile(file)
+			if e != nil || len(b) > 32<<10 {
+				return mounts.ErrUnavailable
+			}
+			defer clear(b)
+			c, e := contracts.DecodeOwnerStorageCredential(bytes.NewReader(b))
+			if e != nil || c.AccessKeyID == "" || c.SecretAccessKey == "" || c.SessionToken != "" {
+				return mounts.ErrUnavailable
+			}
+			cleanup[key] = b
+		}
+		a, _ := contracts.DecodeOwnerStorageCredential(bytes.NewReader(cleanup[contracts.InstallerInboxCleanupAuditCredential]))
+		v, _ := contracts.DecodeOwnerStorageCredential(bytes.NewReader(cleanup[contracts.InstallerInboxCleanupVerifyCredential]))
+		if a.AccessKeyID == v.AccessKeyID {
+			return mounts.ErrUnavailable
+		}
+	}
 	// ADR-194: a promoted owner's public material, all three or none.
 	var public map[string][]byte
 	if *clientSecretFile != "" || *certificateFile != "" || *keyFile != "" {
@@ -190,6 +216,7 @@ func RunInstallerProviderApply(ctx context.Context, args []string, out io.Writer
 		Publisher  json.RawMessage                   `json:"publisher"`
 		Public     bool                              `json:"public"`
 		Downloads  json.RawMessage                   `json:"downloadEvidenceReadStorage"`
+		Cleanup    json.RawMessage                   `json:"operationCleanupStorage"`
 		Deletion   json.RawMessage                   `json:"evidenceDeleteStorage"`
 		ServingTLS contracts.InstallerServingTLSPlan `json:"servingTLS"`
 	}
@@ -207,6 +234,10 @@ func RunInstallerProviderApply(ctx context.Context, args []string, out io.Writer
 	}
 	if hasDeletion := len(plan.Deletion) != 0 && string(plan.Deletion) != "null"; hasDeletion != (deletion != nil) {
 		_, _ = fmt.Fprintln(out, "Pass --evidence-delete-credential exactly when this recipe names the context deletion's evidence delete credential.")
+		return mounts.ErrUnavailable
+	}
+	if hasCleanup := len(plan.Cleanup) != 0 && string(plan.Cleanup) != "null"; hasCleanup != (cleanup != nil) {
+		_, _ = fmt.Fprintln(out, "Pass --cleanup-audit-credential and --cleanup-verify-credential exactly when this recipe names operation audit cleanup.")
 		return mounts.ErrUnavailable
 	}
 	if plan.Public != (public != nil) {
@@ -230,7 +261,7 @@ func RunInstallerProviderApply(ctx context.Context, args []string, out io.Writer
 		return err
 	}
 	defer clear(token)
-	if err = kube.WriteInstallerInbox(ctx, configuration, resolved, *installation, outbox.Phase, token, credential, federation, public, publisher, downloads, deletion, serving); err != nil {
+	if err = kube.WriteInstallerInbox(ctx, configuration, resolved, *installation, outbox.Phase, token, credential, federation, public, publisher, downloads, deletion, kube.InstallerInboxMaterial{Cleanup: cleanup, ServingTLS: serving}); err != nil {
 		return err
 	}
 	_, err = fmt.Fprintln(out, "Inbox written; the continuation verifies the provider before any use.")

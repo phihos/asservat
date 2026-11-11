@@ -1,6 +1,8 @@
 package postgres
 
-// The three A-HWORK capture lifecycle credentials use private filtered views.
+// The same three A-HWORK lifecycle credentials use private views filtered to
+// capture/normal/resolution. Historical capture names remain fixed; identity
+// and processing lanes are outside this worker's SQL authority.
 // This list is derived from captureLifecycleQueries and its recovery-first
 // transaction, not broad grants on the human audit tables. It does not make a
 // purpose creatable before the separate protected worker projection is bound.

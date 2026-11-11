@@ -327,3 +327,53 @@ func TestWorkerRuntimeAuthorityAuditClaimIsPurposeBound(t *testing.T) {
 		t.Fatal("authority invocation was not exactly once and purpose-bound")
 	}
 }
+
+func TestWorkerRuntimeCleanupColdMaintenanceRetainsOriginalFleetNotice(t *testing.T) {
+	gate, err := NewWorkerRuntimeAdmission(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer gate.Close()
+	// This is the cold cleanup maintenance path, before any credential exists.
+	lease, err := gate.WaitCleanup(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer lease.Release()
+	notice := workerSchedulingAdministration()
+	gate.NoteFleetObservation(notice)
+	gate.NoteFleetCommitted(t.Context(), notice)
+	if err := lease.AwaitFleetObservation(); err != nil {
+		t.Fatal("cold cleanup maintenance refused current committed fleet notice", err)
+	}
+	until, ok := lease.Context().Deadline()
+	if !ok || !until.Equal(notice.FreshUntil) {
+		t.Fatal("cleanup did not retain original fleet observation end")
+	}
+	later := workerSchedulingAdministration()
+	gate.NoteFleetObservation(later)
+	gate.NoteFleetCommitted(t.Context(), later)
+	retained, _ := lease.Context().Deadline()
+	if !retained.Equal(until) || lease.AwaitFleetObservation() == nil {
+		t.Fatal("cleanup renewed its consumed scheduling notice")
+	}
+	if gate.ClaimOwnerAudit(lease.Context()) || gate.ClaimAuthorityAudit(lease.Context()) {
+		t.Fatal("cleanup scheduling granted another purpose")
+	}
+	gate.InvalidateFleetNotice()
+	if lease.Context().Err() == nil {
+		t.Fatal("cleanup survived fleet invalidation")
+	}
+	lease.Release()
+	capacity, err := gate.WaitCapacity(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer capacity.Release()
+	notice = workerSchedulingAdministration()
+	gate.NoteFleetObservation(notice)
+	gate.NoteFleetCommitted(t.Context(), notice)
+	if capacity.AwaitFleetObservation() == nil {
+		t.Fatal("unselected capacity purpose accepted maintenance notice")
+	}
+}

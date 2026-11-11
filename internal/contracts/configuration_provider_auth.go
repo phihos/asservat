@@ -31,6 +31,7 @@ type ConfigurationProviderAuthentication struct {
 	AuditCredentials         WorkerObjectReference `json:"auditCredentials"`
 	WorkerConfigurationAudit OwnerPublicTransit    `json:"workerConfigurationAudit,omitzero"`
 	ContextDeletionSigning   OwnerPublicTransit    `json:"contextDeletionSigning,omitzero"`
+	CleanupAudit             OwnerPublicTransit    `json:"cleanupAudit,omitzero"`
 	RecipeSHA256             string                `json:"recipeSHA256"`
 }
 

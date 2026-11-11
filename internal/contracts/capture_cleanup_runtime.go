@@ -5,11 +5,13 @@ import (
 	"time"
 )
 
-const CaptureCleanupDeploymentFormat = "asservat-capture-cleanup-deployment/v1"
+const CaptureCleanupDeploymentFormat = "asservat-capture-cleanup-deployment/v2"
 const CaptureCleanupManifestFormat = "asservat-capture-cleanup-credentials/v1"
 const CaptureCleanupDeploymentMaxBytes = 64 << 10
 
-// Generated public scope for the fixed A-HWORK cleanup compartment. It carries
+// Generated public scope for the fixed capture/normal/resolution A-HWORK
+// cleanup compartment. Its single provider scope is independently pinned; an
+// unmatched historical store or key cannot select another provider. It carries
 // no current policy or replacement lifetime: each selected row retains its own
 // original independently acknowledged lifecycle and current recovery checks.
 type CaptureCleanupDeployment struct {
@@ -25,7 +27,7 @@ type CaptureCleanupDeployment struct {
 	Signing        CaptureCleanupSigning   `json:"signing"`
 }
 
-// Dedicated provider key/version and independently protected public keys. Old
+// Selected nonexportable provider key/version and independently protected public keys. Old
 // verification keys remain available for their original retained certificates;
 // no key discovery, startup generation or automatic identity rotation occurs.
 type CaptureCleanupSigning struct {

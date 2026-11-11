@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://asservat.io/spec/v1/capture-cleanup-deployment.schema.json",
-  "title": "Generated worker capture cleanup inputs",
-  "description": "Fixed A-HWORK cleanup compartment with independently provisioned provider scope. Original per-record audit policy and writer bounds remain authoritative; this input cannot replace them or authorize deletion by expiry alone.",
+  "title": "Generated worker closed-lane audit cleanup inputs",
+  "description": "Fixed capture/normal/resolution A-HWORK cleanup compartment with one independently pinned provider scope. Unknown historical key or store scope remains unavailable; no alternate provider is selected. Original per-record audit policy and writer bounds remain authoritative; this input cannot replace them or authorize deletion by expiry alone.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -19,7 +19,7 @@
   ],
   "properties": {
     "format": {
-      "const": "asservat-capture-cleanup-deployment/v1"
+      "const": "asservat-capture-cleanup-deployment/v2"
     },
     "installationID": {
       "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"

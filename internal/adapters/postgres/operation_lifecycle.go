@@ -18,6 +18,7 @@ type OperationLifecycles struct {
 	journal      *OperationJournal
 	connector    bool
 	capture      bool
+	worker       bool
 	captureScope captureLifecycleScope
 }
 
@@ -160,13 +161,13 @@ func (s *OperationLifecycles) transaction(ctx context.Context, operation string,
 		scoped := s.queries(q)
 		// Immutable projection only; no locks or authority are obtained from this read.
 		initial, e := scoped.ReadOperationForLifecycle(ctx, custodydb.ReadOperationForLifecycleParams{RootID: id(j.root), ID: id(operation)})
-		if e != nil || initial.Lane != j.lane {
+		if e != nil || !s.acceptsLane(initial.Lane) {
 			return app.ErrUnavailable
 		}
-		if _, e = scoped.LockOperationAuditPool(ctx, custodydb.LockOperationAuditPoolParams{RootID: id(j.root), Lane: j.lane}); e != nil {
+		if _, e = scoped.LockOperationAuditPool(ctx, custodydb.LockOperationAuditPoolParams{RootID: id(j.root), Lane: initial.Lane}); e != nil {
 			return e
 		}
-		if _, e = scoped.LockOperationLifecycleAccount(ctx, custodydb.LockOperationLifecycleAccountParams{RootID: id(j.root), Lane: j.lane, PrincipalDigest: initial.PrincipalDigest}); e != nil {
+		if _, e = scoped.LockOperationLifecycleAccount(ctx, custodydb.LockOperationLifecycleAccountParams{RootID: id(j.root), Lane: initial.Lane, PrincipalDigest: initial.PrincipalDigest}); e != nil {
 			return e
 		}
 		a, e := scoped.LockOperationAudit(ctx, custodydb.LockOperationAuditParams{ID: id(operation), RootID: id(j.root)})
@@ -181,7 +182,7 @@ func (s *OperationLifecycles) transaction(ctx context.Context, operation string,
 		if e != nil {
 			return e
 		}
-		if s.capture && !s.captureScope.matches(state.Intent) {
+		if s.capture && !s.captureScope.matches(state.Intent) || s.worker && !s.captureScope.matchesWorker(state.Intent) {
 			return app.ErrUnavailable
 		}
 		if s.connector && !sameAuditJSON(state.Intent.Lifecycle.Policy, *j.lifecycle) {
@@ -562,7 +563,7 @@ func (s *OperationLifecycles) DueOperationHistory(ctx context.Context) ([]value.
 				return app.ErrUnavailable
 			}
 			copy(k.PrincipalDigest[:], r.PrincipalDigest)
-			if !k.Valid() || k.RootID != j.root || k.Lane != j.lane {
+			if !k.Valid() || k.RootID != j.root || !s.acceptsLane(k.Lane) {
 				return app.ErrUnavailable
 			}
 			out = append(out, k)
@@ -576,7 +577,7 @@ func (s *OperationLifecycles) DueOperationHistory(ctx context.Context) ([]value.
 }
 func (s *OperationLifecycles) ReleaseOperationHistory(ctx context.Context, k value.OperationHistoryKey) (value.OperationHistoryRelease, error) {
 	var out value.OperationHistoryRelease
-	if s == nil || s.journal == nil || ctx == nil || ctx.Err() != nil || !k.Valid() || k.RootID != s.journal.root || k.Lane != s.journal.lane {
+	if s == nil || s.journal == nil || ctx == nil || ctx.Err() != nil || !k.Valid() || k.RootID != s.journal.root || !s.acceptsLane(k.Lane) {
 		return out, app.ErrUnavailable
 	}
 	j := s.journal

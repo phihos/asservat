@@ -124,6 +124,7 @@ Docker and kind, in about 13 minutes instead of a hosted round trip:
 ```sh
 cd web && npm ci --prefer-offline && cd ..   # once per fresh worktree
 make installed-focus FOCUS=manual-logs       # ARGS=--keep-on-failure to retain a failure
+make installed-focus FOCUS=share-retirement  # manual/capture shares through original audit retirement
 ```
 
 This is the `continuation-<focus>` command from `scripts/ci-native.sh` with
@@ -132,7 +133,7 @@ scratch; `/tmp` is a small zram disk). It owns two fresh kind clusters
 (three for `clusters`) and needs about 10 GiB of free memory.
 
 Local-capable focuses: `chain`, `journey`, `browser`, `restart`, `clusters`,
-`upgrade`, `policy`, `alert`, `logresource`, `share`, `manual-logs`
+`upgrade`, `policy`, `alert`, `logresource`, `share`, `share-retirement`, `manual-logs`
 (`LOCAL_FOCUSES` in the Makefile; the target rejects every other value). All
 other focuses load eBPF collectors; the harness also refuses them without
 `/etc/asservat-disposable-host`. Never create that file on a workstation.
