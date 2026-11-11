@@ -133,7 +133,8 @@ seconds before to 10 seconds after the trigger.
 - [Implementation status](docs/implementation-status.md): what works, how it is tested and what is missing
 - [Product definition](docs/product.md): users, workflows and first-release scope
 - [MCP workflows](docs/interfaces/mcp-workflows.md): what an AI agent can do, tool by tool
-- [Helm installation](docs/installation/helm.md): what the chart installs today
+- [Try pod-status capture](docs/installation/context-trial.md): source-built Helm trial with your PostgreSQL, S3, OpenBao and Keycloak
+- [Helm installation](docs/installation/helm.md): chart scope and configuration reference
 - [Decision records](docs/decisions/README.md): every accepted design decision and why
 - [Project guide](docs/project-guide.md): reading map, specifications and checks for contributors
 

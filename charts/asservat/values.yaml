@@ -17,6 +17,13 @@ bootstrap:
   image: ""
   registrySecret: ""
   probeAudience: ""
+  # Optional explicit Kubernetes User/Group identities that may administer the
+  # existing protected configuration after install. The exact runner is always
+  # derived and added by the product. Omit for runner-only; this grants no
+  # browser/evidence permissions. An explicit list must contain 1..31 actors.
+  # administrators:
+  #   - kind: User
+  #     name: operator@example.org
   secrets:
     producer: ""
     schema: ""
@@ -85,6 +92,12 @@ bootstrap:
       #     name: Example organization
       #     activities: ["Evidence storage"]
       #     regions: []
+      # Public context execution also needs explicit capacity, processingOperators,
+      # federation, promotion and retentionBaseline objects. They use the existing
+      # installer DTO fields unchanged; omitted objects enable no additional role.
+      # Capacity footprints and backend envelopes must describe the actual trial
+      # services, not the synthetic installed-test profile. No credentials belong
+      # in any of these public objects; private inputs use the operator inbox.
       # Optional protected manual-collection policy; without stepUp no
       # independent approval can be decided. ACR values are provider-specific.
       # approvals:

@@ -74,6 +74,14 @@ func RunInstallerProviderApply(ctx context.Context, args []string, out io.Writer
 	clientSecretFile := flags.String("oidc-client-secret", "", "the hub-api's OIDC client secret file (phase 3 of a promoted owner)")
 	certificateFile := flags.String("public-tls-certificate", "", "the hub-api's public TLS certificate chain PEM file (phase 3 of a promoted owner)")
 	keyFile := flags.String("public-tls-key", "", "the hub-api's public TLS private key PEM file (phase 3 of a promoted owner)")
+	servingPaths := map[string]*string{
+		contracts.InstallerInboxFederationTLSCertificate: flags.String("federation-tls-certificate", "", "federation serving certificate chain PEM file (phase 3)"),
+		contracts.InstallerInboxFederationTLSKey:         flags.String("federation-tls-key", "", "federation serving private key PEM file (phase 3)"),
+		contracts.InstallerInboxFederationTLSCA:          flags.String("federation-tls-ca", "", "federation serving CA roots PEM file (phase 3)"),
+		contracts.InstallerInboxKeyServiceTLSCertificate: flags.String("key-service-tls-certificate", "", "key-service serving certificate chain PEM file (phase 3)"),
+		contracts.InstallerInboxKeyServiceTLSKey:         flags.String("key-service-tls-key", "", "key-service serving private key PEM file (phase 3)"),
+		contracts.InstallerInboxKeyServiceTLSCA:          flags.String("key-service-tls-ca", "", "key-service serving CA roots PEM file (phase 3)"),
+	}
 	evidenceFile := flags.String("evidence-read-credential", "", "the publisher's read-only evidence storage credential JSON file (phase 3 with a publisher)")
 	publisherAuditFile := flags.String("publisher-audit-credential", "", "the publisher's scoped audit storage credential JSON file (phase 3 with a publisher)")
 	downloadEvidenceFile := flags.String("download-evidence-credential", "", "the download workers' read-only evidence storage credential JSON file (phase 3 with downloads)")
@@ -82,6 +90,31 @@ func RunInstallerProviderApply(ctx context.Context, args []string, out io.Writer
 	cleanupVerifyFile := flags.String("cleanup-verify-credential", "", "independent operation audit verification storage credential JSON file (phase 3 with cleanup)")
 	if flags.Parse(args) != nil || flags.NArg() != 0 || *installation == "" || *credentialFile == "" {
 		return mounts.ErrUnavailable
+	}
+	var serving map[string][]byte
+	defer func() {
+		for _, data := range serving {
+			clear(data)
+		}
+	}()
+	for key, path := range servingPaths {
+		if *path == "" {
+			continue
+		}
+		file, err := os.Open(*path)
+		if err != nil {
+			return mounts.ErrUnavailable
+		}
+		data, readErr := io.ReadAll(io.LimitReader(file, (64<<10)+1))
+		closeErr := file.Close()
+		if readErr != nil || closeErr != nil || len(data) == 0 || len(data) > 64<<10 {
+			clear(data)
+			return mounts.ErrUnavailable
+		}
+		if serving == nil {
+			serving = map[string][]byte{}
+		}
+		serving[key] = data
 	}
 	credential, err := os.ReadFile(*credentialFile)
 	if err != nil {
@@ -179,12 +212,13 @@ func RunInstallerProviderApply(ctx context.Context, args []string, out io.Writer
 	// An artifact with a federation section needs its separate credential,
 	// checked before any provider write.
 	var plan struct {
-		Federation json.RawMessage `json:"federation"`
-		Publisher  json.RawMessage `json:"publisher"`
-		Public     bool            `json:"public"`
-		Downloads  json.RawMessage `json:"downloadEvidenceReadStorage"`
-		Cleanup    json.RawMessage `json:"operationCleanupStorage"`
-		Deletion   json.RawMessage `json:"evidenceDeleteStorage"`
+		Federation json.RawMessage                   `json:"federation"`
+		Publisher  json.RawMessage                   `json:"publisher"`
+		Public     bool                              `json:"public"`
+		Downloads  json.RawMessage                   `json:"downloadEvidenceReadStorage"`
+		Cleanup    json.RawMessage                   `json:"operationCleanupStorage"`
+		Deletion   json.RawMessage                   `json:"evidenceDeleteStorage"`
+		ServingTLS contracts.InstallerServingTLSPlan `json:"servingTLS"`
 	}
 	if json.Unmarshal(outbox.Recipe, &plan) == nil && len(plan.Federation) != 0 && string(plan.Federation) != "null" && federation == nil {
 		_, _ = fmt.Fprintln(out, "This recipe provisions the federation: pass --federation-audit-credential with its separately scoped audit credential.")
@@ -210,6 +244,10 @@ func RunInstallerProviderApply(ctx context.Context, args []string, out io.Writer
 		_, _ = fmt.Fprintln(out, "Pass --oidc-client-secret, --public-tls-certificate and --public-tls-key exactly when this recipe promotes the hub-api.")
 		return mounts.ErrUnavailable
 	}
+	if err := kube.ValidateInstallerServingTLSMaterial(plan.ServingTLS, serving, time.Now()); err != nil {
+		_, _ = fmt.Fprintln(out, "Pass the complete --federation-tls-certificate/--federation-tls-key/--federation-tls-ca and --key-service-tls-certificate/--key-service-tls-key/--key-service-tls-ca bundles exactly when their servingTLS hostnames appear in this phase-3 recipe.")
+		return mounts.ErrUnavailable
+	}
 	if _, err = fmt.Fprintf(out, "Kubernetes context %q, namespace %q, installation %q: applying phase %d %s recipe.\n", current, resolved, *installation, outbox.Phase, outbox.Purpose); err != nil {
 		return mounts.ErrUnavailable
 	}
@@ -223,13 +261,29 @@ func RunInstallerProviderApply(ctx context.Context, args []string, out io.Writer
 		return err
 	}
 	defer clear(token)
-	var cleanupInput []map[string][]byte
-	if cleanup != nil {
-		cleanupInput = append(cleanupInput, cleanup)
-	}
-	if err = kube.WriteInstallerInbox(ctx, configuration, resolved, *installation, outbox.Phase, token, credential, federation, public, publisher, downloads, deletion, cleanupInput...); err != nil {
+	if err = kube.WriteInstallerInbox(ctx, configuration, resolved, *installation, outbox.Phase, token, credential, federation, public, publisher, downloads, deletion, kube.InstallerInboxMaterial{Cleanup: cleanup, ServingTLS: serving}); err != nil {
 		return err
 	}
 	_, err = fmt.Fprintln(out, "Inbox written; the continuation verifies the provider before any use.")
 	return err
+}
+
+// withInstallerServingTLSRecipe adds only expected hostnames to the public
+// recipe. Private files never enter the outbox or desired Helm configuration.
+func withInstallerServingTLSRecipe(artifact []byte, plan contracts.InstallerServingTLSPlan) ([]byte, error) {
+	var out map[string]json.RawMessage
+	if json.Unmarshal(artifact, &out) != nil || len(out) == 0 {
+		return nil, mounts.ErrUnavailable
+	}
+	if _, exists := out["servingTLS"]; exists {
+		return nil, mounts.ErrUnavailable
+	}
+	if plan.FederationServerName != "" || plan.KeyServiceServerName != "" {
+		raw, err := json.Marshal(plan)
+		if err != nil {
+			return nil, mounts.ErrUnavailable
+		}
+		out["servingTLS"] = raw
+	}
+	return json.Marshal(out)
 }

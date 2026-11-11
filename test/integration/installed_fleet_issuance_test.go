@@ -21,7 +21,7 @@ import (
 // including the installer's provider role, protected settings and compiled SQL
 // grants. Fixture administration only reads the resulting SQL and operator KV
 // channel; it does not supply authority, issue a token or activate a slot.
-func qualifyInstalledFleetIssuance(t *testing.T, ctx context.Context, sql *pgxpool.Pool, identity *installedIdentity, publicRoot []byte, address, origin, installation, mount string, providers *initialRuntimeNativeProviders) {
+func qualifyInstalledFleetIssuance(t *testing.T, ctx context.Context, sql *pgxpool.Pool, identity *installedIdentity, publicRoot []byte, address, origin, installation, mount string, providers *initialRuntimeNativeProviders) []byte {
 	t.Helper()
 	root, err := x509.ParseCertificate(publicRoot)
 	if err != nil || identity == nil {
@@ -144,4 +144,8 @@ func qualifyInstalledFleetIssuance(t *testing.T, ctx context.Context, sql *pgxpo
 		t.Fatal("installed fleet channel credential did not match the issued SQL binding", err)
 	}
 	t.Log("installed fleet issuance: authenticated browser returned one audited slot; replay kept all receipts and bounds; operator KV held the matching version-1 credential")
+	// The exact operator-read record can fund the subsequent actual enrollment.
+	// Returning a copy preserves the strict decoded original while clearing the
+	// response buffers here; the caller owns and clears this one private copy.
+	return bytes.Clone(stored.Data.Data)
 }

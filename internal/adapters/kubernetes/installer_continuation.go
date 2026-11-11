@@ -138,6 +138,8 @@ type InstallerInbox struct {
 	// Public holds exactly the InstallerInboxPublicFiles when the phase-3
 	// artifact carried a promoted owner (ADR-194); otherwise it is nil.
 	Public map[string][]byte
+	// ServingTLS holds the optional closed federation/key-service TLS bundles.
+	ServingTLS map[string][]byte
 }
 
 // ReadInstallerInbox returns the inbox only when it answers phase; any other
@@ -169,6 +171,17 @@ func ReadInstallerInbox(ctx context.Context, config *rest.Config, namespace, ins
 			}
 			out.Public[key] = v
 		}
+	}
+	for _, key := range contracts.InstallerInboxServingTLSFiles() {
+		if v, exists := s.Data[key]; exists {
+			if out.ServingTLS == nil {
+				out.ServingTLS = map[string][]byte{}
+			}
+			out.ServingTLS[key] = v
+		}
+	}
+	if !installerServingTLSFilesValid(out.ServingTLS) || phase != 3 && len(out.ServingTLS) != 0 {
+		return zero, cfg.ErrUnavailable
 	}
 	return out, nil
 }
@@ -275,6 +288,13 @@ func ReadInstallerOutbox(ctx context.Context, config *rest.Config, namespace, in
 	return out, nil
 }
 
+// InstallerInboxMaterial keeps the two optional private phase-3 groups
+// distinct. Each supplied group is complete and closed; nil means absent.
+type InstallerInboxMaterial struct {
+	Cleanup    map[string][]byte
+	ServingTLS map[string][]byte
+}
+
 // WriteInstallerInbox writes the operator's answer for phase, replacing an
 // older answer in the operator-owned release namespace.
 // federation is the optional federation audit credential (ADR-193), public
@@ -283,15 +303,29 @@ func ReadInstallerOutbox(ctx context.Context, config *rest.Config, namespace, in
 // (ADR-203), downloads the optional download workers' evidence read
 // credential (ADR-204) and deletion the optional context deletion child's
 // evidence delete credential (ADR-205).
-func WriteInstallerInbox(ctx context.Context, config *rest.Config, namespace, installation string, phase int, token, credential, federation []byte, public, publisher map[string][]byte, downloads, deletion []byte, cleanup ...map[string][]byte) error {
+func WriteInstallerInbox(ctx context.Context, config *rest.Config, namespace, installation string, phase int, token, credential, federation []byte, public, publisher map[string][]byte, downloads, deletion []byte, material ...InstallerInboxMaterial) error {
 	api, err := installerAPI(config)
 	if err != nil || namespace == "" || !authorization.UUID(installation) || len(token) == 0 || len(credential) == 0 {
+		return cfg.ErrInvalid
+	}
+	if len(material) > 1 {
+		return cfg.ErrInvalid
+	}
+	var selected InstallerInboxMaterial
+	if len(material) == 1 {
+		selected = material[0]
+	}
+	servingTLS, cleanup := selected.ServingTLS, selected.Cleanup
+	if servingTLS != nil && (len(servingTLS) == 0 || !installerServingTLSFilesValid(servingTLS) || phase != 3) {
 		return cfg.ErrInvalid
 	}
 	call, end := context.WithTimeout(ctx, 5*time.Second)
 	defer end()
 	s := &core.Secret{ObjectMeta: meta.ObjectMeta{Name: contracts.InstallerInboxName(installation)}, Type: core.SecretTypeOpaque, Data: map[string][]byte{
 		contracts.InstallerInboxPhase: []byte(strconv.Itoa(phase)), contracts.InstallerInboxInspectionToken: token, contracts.InstallerInboxAuditCredential: credential}}
+	for key, data := range servingTLS {
+		s.Data[key] = data
+	}
 	if len(federation) != 0 {
 		s.Data[contracts.InstallerInboxFederationAuditCredential] = federation
 	}
@@ -301,23 +335,20 @@ func WriteInstallerInbox(ctx context.Context, config *rest.Config, namespace, in
 	if len(deletion) != 0 {
 		s.Data[contracts.InstallerInboxEvidenceDeleteCredential] = deletion
 	}
-	if len(cleanup) > 1 {
-		return cfg.ErrInvalid
-	}
-	if len(cleanup) == 1 {
-		if phase != 3 || len(cleanup[0]) != 2 {
+	if cleanup != nil {
+		if phase != 3 || len(cleanup) != 2 {
 			return cfg.ErrInvalid
 		}
 		for _, key := range []string{contracts.InstallerInboxCleanupAuditCredential, contracts.InstallerInboxCleanupVerifyCredential} {
-			b := cleanup[0][key]
+			b := cleanup[key]
 			c, e := contracts.DecodeOwnerStorageCredential(bytes.NewReader(b))
 			if e != nil || !identity.Text(c.AccessKeyID, 256) || !identity.Text(c.SecretAccessKey, 8192) || c.SessionToken != "" {
 				return cfg.ErrInvalid
 			}
 			s.Data[key] = b
 		}
-		a, _ := contracts.DecodeOwnerStorageCredential(bytes.NewReader(cleanup[0][contracts.InstallerInboxCleanupAuditCredential]))
-		v, _ := contracts.DecodeOwnerStorageCredential(bytes.NewReader(cleanup[0][contracts.InstallerInboxCleanupVerifyCredential]))
+		a, _ := contracts.DecodeOwnerStorageCredential(bytes.NewReader(cleanup[contracts.InstallerInboxCleanupAuditCredential]))
+		v, _ := contracts.DecodeOwnerStorageCredential(bytes.NewReader(cleanup[contracts.InstallerInboxCleanupVerifyCredential]))
 		if a.AccessKeyID == v.AccessKeyID {
 			return cfg.ErrInvalid
 		}

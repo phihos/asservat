@@ -176,6 +176,13 @@ func buildConnectorBacking(c contracts.InstallerConnectorSettings, b contracts.I
 	if !out.Valid() || !out.SupportsProcessLimits(contracts.RegionalServingSlots, contracts.RegionalRetainedProcesses) {
 		return zero, mounts.ErrUnavailable
 	}
+	// The first process acceptance must prepay its original retirement ticket
+	// through the entire promised admission period. The ticket's ordinary end
+	// must precede its original purge by one minute (Go and SQL), using this
+	// original compiler start rather than a later enrollment observation.
+	if out.Policy.ValidUntil.After(now.Add(time.Duration(out.ProcessRunSeconds()) * time.Second)) {
+		return zero, mounts.ErrUnavailable
+	}
 	return out, nil
 }
 

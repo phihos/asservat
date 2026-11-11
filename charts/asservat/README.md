@@ -2,7 +2,9 @@
 
 Helm is Asservat's officially supported installation method. The release layout is one hub and one cluster release per workload cluster; `combined` is for single-cluster evaluation. PostgreSQL, S3-compatible storage, KMS and Keycloak are operated separately. No dependency chart, external download hook or operator-managed credentials are bundled.
 
-**Current version: configuration foundation with optional installer.** By default this development chart installs the seven implemented CRDs and a small release inventory ConfigMap. The optional `bootstrap.enabled` hook performs initial schema and activation; `bootstrap.continuation.enabled` adds runtime continuation as its fifth sequential command. The consolidated single-Pod layout awaits its own qualification; earlier installed evidence is recorded in [implementation status](../../docs/implementation-status.md). Rendering the chart alone does not activate permissions, qualify an identity provider or collect evidence. `runtime.enabled: true` is rejected. The inventory ConfigMap records intent and is never an authority/readiness source.
+**Current version: configuration foundation with optional installer.** By default this development chart installs eight implemented CRDs, including CaptureProfile and a small release inventory ConfigMap. The optional `bootstrap.enabled` hook performs initial schema and activation; `bootstrap.continuation.enabled` adds runtime continuation as its fifth sequential command. The consolidated single-Pod runner passed the [external-services context trial](../../docs/installation/context-trial.md) with one hub and one separate workload cluster using preloaded images. Same-cluster qualification and registry distribution remain outside that result; [implementation status](../../docs/implementation-status.md) records the measured scope. Rendering the chart alone does not activate permissions, qualify an identity provider or collect evidence. `runtime.enabled: true` is rejected. The inventory ConfigMap records intent and is never an authority/readiness source.
+
+For an installed pod-status capture and native download, use the [source-built context trial](../../docs/installation/context-trial.md). The commands below install the default configuration foundation only.
 
 ## Install the current foundation
 
@@ -31,7 +33,7 @@ For GitOps, use the same chart and checked-in nonsecret values. Give one adminis
 | `bootstrap.continuation.enabled` | `false` | Add runtime continuation after retirement in the same fixed installer Pod |
 | `bootstrap.name`, `targetNamespace`, `image` | `asservat`, `asservat-system`, empty | Stable original installation choices and verified image digest |
 | `bootstrap.secrets.*` | empty | Existing producer, schema and retirement private input references |
-| `bootstrap.registrySecret` | empty | Optional explicit image-registry Docker auth Secret |
+| `bootstrap.registrySecret` | empty | Optional bootstrap-runner Docker auth Secret; not propagated to runtime workloads |
 | `bootstrap.kubernetes`, `postgres`, `auditStore`, `keyService` | See values.yaml | Public endpoints, PEM roots and external provider choices |
 | `bootstrap.fleet`, `providers`, `probeAudience` | See values.yaml | Explicit initial fleet scope/ceilings, fixed provider names and optional API audience |
 | `bootstrap.continuation.public.permissionDelegations` | `[]` | Trusted initial AccessBinding writer envelopes and browser previewers; [configuration and scope](../../docs/installation/helm.md#delegate-permission-management) |

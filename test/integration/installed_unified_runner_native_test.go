@@ -34,6 +34,9 @@ func installedUnifiedPublicInput(t *testing.T, desired contracts.InitialBootstra
 	t.Helper()
 	input := helmBootstrapPublicInput(desired)
 	input.RegistryAuthentication = "" // the existing owned fixture preloads its exact image
+	if os.Getenv("ASSERVAT_HELM_CONTEXT_NATIVE") == "1" {
+		input.Administrators = append([]contracts.OwnerDeploymentActor{}, desired.Administrators...)
+	}
 	input.ProbeAudience = desired.ProbeAudience
 	var ca bytes.Buffer
 	for _, root := range desired.Kubernetes.Roots {
@@ -46,8 +49,9 @@ func installedUnifiedPublicInput(t *testing.T, desired contracts.InitialBootstra
 	if err != nil {
 		t.Fatal("actual public bootstrap compiler", err)
 	}
-	if len(compiled.Administrators) != 1 || compiled.Administrators[0].Name != "system:serviceaccount:"+input.BootstrapNamespace+":"+input.RunnerAccount {
-		t.Fatal("public compiler changed the single original runner administrator")
+	wantAdmins := 1 + len(input.Administrators)
+	if len(compiled.Administrators) != wantAdmins || compiled.Administrators[0].Name != "system:serviceaccount:"+input.BootstrapNamespace+":"+input.RunnerAccount {
+		t.Fatal("public compiler changed declared original administrators")
 	}
 	return input, compiled
 }
@@ -86,6 +90,7 @@ func installedUnifiedRunnerKubeconfig(t *testing.T, original string, desired con
 }
 
 type installedUnifiedRunner struct {
+	helm         *helmContextRunner
 	template     *core.Pod
 	pod          *core.Pod
 	continuation *installerContinuationFixture
@@ -124,6 +129,15 @@ func newInstalledUnifiedRunner(t *testing.T, ctx context.Context, api kubernetes
 
 func (u *installedUnifiedRunner) start(t *testing.T, ctx context.Context, api kubernetes.Interface) *core.Pod {
 	t.Helper()
+	if u.helm != nil {
+		pod := u.helm.start(t, ctx, api)
+		if u.pod != nil && u.pod.UID == pod.UID {
+			t.Fatal("actual chart reused a previous runner result")
+		}
+		u.template, u.pod = pod.DeepCopy(), pod
+		t.Cleanup(func() { installerContinuationLogs(t, api, pod) })
+		return pod
+	}
 	pod, err := api.CoreV1().Pods(u.template.Namespace).Create(ctx, u.template.DeepCopy(), meta.CreateOptions{})
 	if err != nil {
 		t.Fatal("actual unified Restricted runner admission", err)
@@ -138,6 +152,9 @@ func (u *installedUnifiedRunner) start(t *testing.T, ctx context.Context, api ku
 
 func (u *installedUnifiedRunner) current(t *testing.T, ctx context.Context, api kubernetes.Interface) *core.Pod {
 	t.Helper()
+	if u.helm != nil {
+		return u.helm.current(t, ctx, api, u.pod.UID)
+	}
 	pod, err := api.CoreV1().Pods(u.pod.Namespace).Get(ctx, u.pod.Name, meta.GetOptions{})
 	if err != nil || pod.UID != u.pod.UID || pod.DeletionTimestamp != nil {
 		t.Fatal("original unified runner lost/replaced/deleting", err)
@@ -358,6 +375,13 @@ func (u *installedUnifiedRunner) replay(t *testing.T, ctx context.Context, api k
 	t.Helper()
 	completed := u.current(t, ctx, api)
 	u.checkPhases(t, completed, true)
+	if u.helm != nil {
+		u.completeHelm(t, ctx, api)
+		u.start(t, ctx, api)
+		u.completeHelm(t, ctx, api)
+		u.verifyReplay(t)
+		return
+	}
 	var output bytes.Buffer
 	if err := bootstrap.RunInstallerResume(ctx, []string{"--kubeconfig", kubeconfig, "--namespace", desired.BootstrapNamespace, "--name", desired.Name}, &output); err != nil {
 		t.Fatal("completed unified runner resume", err)
@@ -379,5 +403,13 @@ func (u *installedUnifiedRunner) replay(t *testing.T, ctx context.Context, api k
 			return
 		}
 		installedUnifiedPoll(t, wait)
+	}
+}
+
+func (u *installedUnifiedRunner) completeHelm(t *testing.T, ctx context.Context, api kubernetes.Interface) {
+	t.Helper()
+	if u.helm != nil {
+		u.pod = u.helm.complete(t, ctx, api, u.pod.UID)
+		u.checkPhases(t, u.pod, true)
 	}
 }

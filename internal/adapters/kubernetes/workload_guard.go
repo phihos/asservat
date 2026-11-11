@@ -63,7 +63,8 @@ func WorkloadAdmission(p cfg.WorkloadAdministration) (*admission.ValidatingAdmis
 		}
 		return "(" + out + ")"
 	}
-	expression := capacityActors(p.Administrators) + " || (request.operation == 'CREATE' ? " + join(create) + " : " + join(unchanged) + ")"
+	foreignProbe := "(has(request.dryRun) && request.dryRun == true && request.operation == 'CREATE' && request.namespace != " + capacityLiteral(p.ProbeNamespace.Name) + ")"
+	expression := capacityActors(p.Administrators) + " || " + foreignProbe + " || (request.operation == 'CREATE' ? " + join(create) + " : " + join(unchanged) + ")"
 	fail, equivalent := admission.Fail, admission.Equivalent
 	policy := &admission.ValidatingAdmissionPolicy{TypeMeta: meta.TypeMeta{APIVersion: "admissionregistration.k8s.io/v1", Kind: "ValidatingAdmissionPolicy"}, ObjectMeta: meta.ObjectMeta{Name: p.Name}, Spec: admission.ValidatingAdmissionPolicySpec{FailurePolicy: &fail,
 		MatchConstraints: &admission.MatchResources{MatchPolicy: &equivalent, ResourceRules: []admission.NamedRuleWithOperations{{RuleWithOperations: admission.RuleWithOperations{Operations: []admission.OperationType{admission.Create, admission.Update}, Rule: admission.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1"}, Resources: []string{"deployments", "statefulsets"}}}}}},

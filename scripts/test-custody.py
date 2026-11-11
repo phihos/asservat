@@ -86,6 +86,7 @@ def run(args, **kw):
 
 def hashes():
     files = [ROOT/"go.mod", ROOT/"go.sum", ROOT/"sqlc.yaml", Path(__file__)]
+    files += list((ROOT/"examples/helm").glob("*.yaml"))
     for folder, pattern in [("cmd", "*.go"), ("internal", "*.go"), ("internal", "*.json"), ("migrations", "*.sql"), ("migrations", "*.go"), ("test/fixtures", "*.sql"), ("test/integration", "*.go")]:
         files += list((ROOT/folder).rglob(pattern))
     return {str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(files)}

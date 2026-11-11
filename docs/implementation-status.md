@@ -63,10 +63,12 @@ A source-built, context-only developer experiment can use an ordinary owned
 homelab Kubernetes cluster without a node collector or disposable-node marker.
 It requires external PostgreSQL, S3-compatible storage, OpenBao and Keycloak;
 matching source-built, digest-pinned images accessible to the cluster; and the
-[documented installer setup](installation/helm.md#optional-initial-bootstrap-checkpoint),
+[context-trial procedure](installation/context-trial.md),
 including separate credentials, identity and permission configuration, delegation
-where needed and regional enrollment. Private-registry credentials are needed
-only when used.
+where needed and regional enrollment. The actual Helm/profile journey passed
+with separate hub/workload APIs and a shared API, using preloaded images.
+The shared path uses hub Helm followed by the regional CLI. Runtime image pulls require anonymous or node-configured
+access, or exact preloads; the bootstrap pull Secret covers only its runner.
 
 The default Helm install starts no services. The documented
 `bootstrap.enabled: true` with `bootstrap.continuation.enabled: true` runs the

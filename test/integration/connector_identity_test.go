@@ -95,6 +95,8 @@ func newConnectorSQLFixture(t *testing.T, ctx context.Context, admin *pgxpool.Po
 type connectorRetirementFixtureOptions struct {
 	Enabled   bool
 	Admission time.Duration
+	// TrialProfile takes all finite budget parameters from the shipped example.
+	TrialProfile bool
 	// ClusterID and PodUID, when set, place the connector process in an
 	// existing scenario's cluster and executor Pod (ADR-176 wrap tests).
 	ClusterID, PodUID string
@@ -225,6 +227,24 @@ func newConnectorSQLFixtureWithOptions(t *testing.T, ctx context.Context, admin 
 		b.SourceBackupReservedBytes = rows * 2 * q.MaximumRowFootprintBytes * q.BackupCopies
 		b.SourceWALReservedBytes = (2*b.SourceTransitionLimit + app.ConnectorRetirementTicketTransitions*b.ProfileLimit*(b.SourceTransitionLimit+1)) * q.MaximumTransitionWALBytes * q.WALCopies
 	}
+	if retirement.TrialProfile {
+		p := helmContextTrialProfile(t).Public
+		c, h := p.Federation.Connector, p.Capacity.Backup
+		b := &f.configuration.Backing
+		b.AccountLimit, b.RecordsPerAccount, b.RetainedSeconds = c.Accounts, c.RecordsPerAccount, c.RetainedSeconds
+		b.ProfileLimit, b.SourceTransitionLimit = c.Profiles, c.SourceTransitions
+		q.MaximumRowFootprintBytes, q.MaximumTransitionWALBytes = c.Footprint.RowBytes, c.Footprint.TransitionWALBytes
+		q.BackupCopies, q.WALCopies = h.BackupCopies, h.WALCopies
+		policy.History, policy.MetadataSlots, policy.MaxPurgeLeases = &q, c.Accounts*c.RecordsPerAccount, c.PurgeLeases
+		policy.BackupHorizonSeconds, policy.CleanupBudgetSeconds, policy.ProofWindowSeconds = h.HorizonSeconds, h.CleanupBudgetSeconds, h.ProofWindowSeconds
+		policy.ValidUntil = n.Add(time.Duration(c.ValidSeconds) * time.Second)
+		backup, wal := q.SlotBacking(c.PurgeLeases)
+		policy.BackupReservedBytes, policy.WALReservedBytes = backup*policy.MetadataSlots, wal*policy.MetadataSlots
+		b.Policy = policy
+		rows := 1 + c.Profiles + c.Profiles*(c.SourceTransitions+1)
+		b.SourceBackupReservedBytes = rows * 2 * q.MaximumRowFootprintBytes * q.BackupCopies
+		b.SourceWALReservedBytes = (2*c.SourceTransitions + app.ConnectorRetirementTicketTransitions*c.Profiles*(c.SourceTransitions+1)) * q.MaximumTransitionWALBytes * q.WALCopies
+	}
 	if !f.configuration.Valid(n) {
 		t.Fatal("synthetic connector configuration invalid")
 	}
@@ -291,6 +311,17 @@ func newConnectorSQLFixtureWithOptions(t *testing.T, ctx context.Context, admin 
 	}
 	f.request = value.ConnectorProcessRequest{Process: value.ConnectorProcessIdentity{Binding: binding, PodUID: pod, ProcessEpoch: custodyID()}, ClientCSRDER: connectorSQLCSR(t), ServerCSRDER: connectorSQLCSR(t)}
 	f.processID = custodyID()
+	if retirement.TrialProfile {
+		// Generation-1 bootstrap stages this same source before the ordinary
+		// process enrollment stages it again. A full one-profile budget must
+		// admit unchanged observations without adding profiles or transitions.
+		f.refresh(t)
+		c, _ := f.ReadConnectorIdentityConfiguration(ctx)
+		if err := f.source.StageConnectorIdentity(ctx, c); err != nil {
+			t.Fatal("restage original connector source", err)
+		}
+		regionalEnrollmentDiagnostics(t, ctx, admin, binding.InstallationID, custodyID(), s.a.RootID, binding.PeerID)
+	}
 	f.process, e = f.enrollment.Enroll(ctx, f.processID, f.request)
 	if e != nil {
 		t.Fatal("enroll connector", e)
@@ -424,6 +455,19 @@ func (f *connectorSQLFixture) renewBacking(t *testing.T, promote ...bool) string
 	return id
 }
 func qualifyConnectorIdentity(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, create func(*testing.T, int64) captureAdmissionScenario) {
+	t.Run("connector-trial-profile", func(t *testing.T) {
+		f := newConnectorSQLFixtureWithOptions(t, ctx, admin, poolFor, store, keys, create(t, 1), 3600, connectorRetirementFixtureOptions{Enabled: true, Admission: time.Minute, TrialProfile: true})
+		f.issue(t, "client")
+		f.issue(t, "server")
+		regionalEnrollmentDiagnostics(t, ctx, admin, f.request.Process.Binding.InstallationID, custodyID(), f.scenario.a.RootID, f.request.Process.Binding.PeerID)
+		var profiles, transitions, processes int64
+		if err := admin.QueryRow(ctx, `SELECT r.profiles,r.source_transitions,(SELECT count(*) FROM connector_identity_process p WHERE p.root_id=r.root_id) FROM connector_identity_root r WHERE root_id=$1`, f.scenario.a.RootID).Scan(&profiles, &transitions, &processes); err != nil {
+			t.Fatal(err)
+		}
+		if profiles != 1 || transitions != 1 || processes != 1 {
+			t.Fatalf("original profile/transition/process charges changed: %d/%d/%d", profiles, transitions, processes)
+		}
+	})
 	t.Run("connector-identity-fast", func(t *testing.T) {
 		f := newConnectorSQLFixture(t, ctx, admin, poolFor, store, keys, create(t, 1), 10800)
 		client, server := f.issue(t, "client"), f.issue(t, "server")

@@ -48,6 +48,16 @@ func TestInitialBootstrapPublicCompilerNormalizesOnlyNonAuthorizingInput(t *test
 	if d.Format != contracts.InitialBootstrapVersionedAuditFormat || len(d.Kubernetes.Roots) != 1 || bytes.Contains(d.Kubernetes.Roots[0], []byte("BEGIN")) {
 		t.Fatal("normalizer retained PEM or changed selected fresh profile")
 	}
+	v.Administrators = []contracts.OwnerDeploymentActor{{Kind: "User", Name: "installation-operator"}, {Kind: "Group", Name: "installation-maintainers"}}
+	withAdmins, e := CompileInitialBootstrapInput(v, ca, bootstrapInputHint(now, []string{"api-audience"}), now)
+	if e != nil || len(withAdmins.Administrators) != 3 || withAdmins.Administrators[0] != d.Administrators[0] || withAdmins.Administrators[1] != v.Administrators[0] || withAdmins.Administrators[2] != v.Administrators[1] {
+		t.Fatal("explicit Kubernetes administrators lost before guarded installation", e)
+	}
+	v.Administrators[0].Name = "changed-after-compilation"
+	if withAdmins.Administrators[1].Name != "installation-operator" {
+		t.Fatal("compiled original administrators alias caller input")
+	}
+	v.Administrators = nil
 	for _, aud := range []any{[]string{}, []string{"a", "b"}, 123, nil} {
 		if _, e := CompileInitialBootstrapInput(v, ca, bootstrapInputHint(now, aud), now); e == nil {
 			t.Fatal("ambiguous audience selected automatically")
@@ -77,6 +87,34 @@ func TestInitialBootstrapPublicCompilerNormalizesOnlyNonAuthorizingInput(t *test
 		if _, e := CompileInitialBootstrapInput(v, nil, nil, now); e == nil {
 			t.Fatal("noncertificate, duplicate or ignored PEM text accepted")
 		}
+	}
+}
+
+func TestInitialBootstrapAdministratorsAreExplicitAndBounded(t *testing.T) {
+	v := contracts.InitialBootstrapInput{BootstrapNamespace: "installer", RunnerAccount: "runner"}
+	for _, bad := range [][]contracts.OwnerDeploymentActor{
+		{},
+		{{Kind: "ServiceAccount", Name: "runner"}},
+		{{Kind: "User", Name: ""}},
+		{{Kind: "User", Name: "operator\n"}},
+		{{Kind: "User", Name: "operator"}, {Kind: "User", Name: "operator"}},
+		{{Kind: "User", Name: "system:serviceaccount:installer:runner"}},
+	} {
+		v.Administrators = bad
+		if _, err := initialBootstrapAdministrators(v); err == nil {
+			t.Fatal("invalid or duplicate administrator accepted", bad)
+		}
+	}
+	v.Administrators = nil
+	for n := 0; n < 31; n++ {
+		v.Administrators = append(v.Administrators, contracts.OwnerDeploymentActor{Kind: "User", Name: strings.Repeat("a", n+1)})
+	}
+	if admins, err := initialBootstrapAdministrators(v); err != nil || len(admins) != 32 {
+		t.Fatal("existing 32-actor guard bound not available", err)
+	}
+	v.Administrators = append(v.Administrators, contracts.OwnerDeploymentActor{Kind: "User", Name: "extra"})
+	if _, err := initialBootstrapAdministrators(v); err == nil {
+		t.Fatal("original guard actor bound exceeded")
 	}
 }
 

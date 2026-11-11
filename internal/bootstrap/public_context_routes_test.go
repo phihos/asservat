@@ -42,6 +42,7 @@ func TestPublicContextRoutesKeepDistinctProtocolOwners(t *testing.T) {
 		{"/api/v1/downloads/00000000-0000-4000-8000-000000000001/content", "content"},
 		{"/captures/new", "console"},
 		{"/live", "console"},
+		{"/fleet", "console"},
 		{"/processing", "console"},
 		{"/processing/artifacts/00000000-0000-4000-8000-000000000001", "console"},
 		{"/api/v1/processing/changes", "processing-change"},

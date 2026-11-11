@@ -354,7 +354,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func consoleRoute(path string) bool {
-	return path == "/processing" || processingArtifactRoute.MatchString(path) || path == "/" || path == "/captures/new" || path == "/live" || path == "/policies" || path == "/shares" || path == "/access-preview" || path == "/capacity" || path == "/retention-preview" || path == "/approvals" || captureRoute.MatchString(path) || caseRoute.MatchString(path) || approvalRoute.MatchString(path)
+	return path == "/fleet" || path == "/processing" || processingArtifactRoute.MatchString(path) || path == "/" || path == "/captures/new" || path == "/live" || path == "/policies" || path == "/shares" || path == "/access-preview" || path == "/capacity" || path == "/retention-preview" || path == "/approvals" || captureRoute.MatchString(path) || caseRoute.MatchString(path) || approvalRoute.MatchString(path)
 }
 
 // ServeContent removes cache headers on conditional/range errors. Preserve the

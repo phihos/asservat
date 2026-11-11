@@ -23,6 +23,13 @@ console-check:
 console-build:
 	cd web && npm run build
 
+# Local, source-built application image with compiled React assets. This does
+# not publish an image, install dependencies in Kubernetes or enable a collector.
+IMAGE ?= asservat:dev
+.PHONY: image
+image: console-install
+	ASSERVAT_BUILD_TMP="$(ASSERVAT_BUILD_TMP)" $(PYTHON) scripts/build-product-image.py --tag "$(IMAGE)"
+
 console-browser-check: console-build
 	ASSERVAT_CONSOLE_BROWSER_TEST=1 TMPDIR="$(ASSERVAT_BUILD_TMP)" go test -count=1 -run '^TestConsole(Browser|NativeRestart|ProfileComparison|HeapProfile|PacketSummary|PacketQuery|SyscallQuery|SyscallCaptureAuthoring|LogsQuery|LiveObservation|Processing|WorkloadProcessing|ProcessingReport|Erasure)WithBuiltPackage$$' -v ./test/integration
 

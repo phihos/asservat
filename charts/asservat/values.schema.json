@@ -848,10 +848,66 @@
                       "maximum": 100000
                     }
                   }
+                },
+                "capacity": {
+                  "$ref": "#/definitions/installerCapacity"
+                },
+                "processingOperators": {
+                  "$ref": "#/definitions/installerProcessingOperators"
+                },
+                "federation": {
+                  "$ref": "#/definitions/installerFederation"
+                },
+                "promotion": {
+                  "$ref": "#/definitions/installerPromotion"
+                },
+                "retentionBaseline": {
+                  "$ref": "#/definitions/installerRetentionBaseline"
                 }
+              },
+              "dependencies": {
+                "capacity": [
+                  "processingOperators"
+                ],
+                "promotion": [
+                  "capacity",
+                  "federation",
+                  "processingOperators"
+                ],
+                "federation": [
+                  "capacity"
+                ]
               }
             }
           }
+        },
+        "administrators": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 31,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "name"
+            ],
+            "properties": {
+              "kind": {
+                "enum": [
+                  "User",
+                  "Group"
+                ]
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              }
+            }
+          },
+          "description": "Explicit existing guard administrators in addition to the installer-derived runner; names are Kubernetes authenticated identities, not browser permission grants."
         }
       },
       "allOf": [
@@ -1128,16 +1184,38 @@
               "tls": {
                 "type": "object",
                 "additionalProperties": false,
-                "required": ["serverName", "rootsPEM"],
+                "required": [
+                  "serverName",
+                  "rootsPEM"
+                ],
                 "description": "ADR-299: explicit public certificate roots, never credentials. The installer checks canonical certificate syntax and the 8 KiB byte cap. Connector-first rollout; TLS-capable collectors required.",
                 "properties": {
-                  "serverName": {"type": "string", "minLength": 1, "maxLength": 253},
-                  "rootsPEM": {"type": "string", "minLength": 1, "maxLength": 8192}
+                  "serverName": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 253
+                  },
+                  "rootsPEM": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 8192
+                  }
                 }
               }
             },
             "allOf": [
-              {"if": {"required": ["credential"]}, "then": {"required": ["tls"]}},
+              {
+                "if": {
+                  "required": [
+                    "credential"
+                  ]
+                },
+                "then": {
+                  "required": [
+                    "tls"
+                  ]
+                }
+              },
               {
                 "if": {
                   "properties": {
@@ -1405,6 +1483,1319 @@
           }
         }
       }
+    }
+  },
+  "definitions": {
+    "installerFootprint": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "rowBytes": {
+          "type": "integer",
+          "minimum": 16384,
+          "maximum": 16777216
+        },
+        "transitionWALBytes": {
+          "type": "integer",
+          "minimum": 65536,
+          "maximum": 67108864
+        }
+      },
+      "required": [
+        "rowBytes",
+        "transitionWALBytes"
+      ]
+    },
+    "installerAmount": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "objects": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "bytes",
+        "objects"
+      ]
+    },
+    "installerLane": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "accounts": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000
+        },
+        "recordsPerAccount": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000
+        },
+        "retainedSeconds": {
+          "type": "integer",
+          "minimum": 60,
+          "maximum": 316224000
+        }
+      },
+      "required": [
+        "accounts",
+        "recordsPerAccount",
+        "retainedSeconds"
+      ]
+    },
+    "installerCapacity": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "pool": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 63,
+          "pattern": "^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$"
+        },
+        "policy": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 63,
+          "pattern": "^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$"
+        },
+        "namespaceKeys": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 253
+          },
+          "minItems": 1,
+          "maxItems": 256,
+          "uniqueItems": true
+        },
+        "workloadKeys": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "labels": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 317
+              },
+              "minItems": 0,
+              "maxItems": 32,
+              "uniqueItems": true
+            },
+            "annotations": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 317
+              },
+              "minItems": 0,
+              "maxItems": 32,
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "labels",
+            "annotations"
+          ]
+        },
+        "accounts": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16
+        },
+        "recordsPerAccount": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 512
+        },
+        "admissionSeconds": {
+          "type": "integer",
+          "minimum": 60,
+          "maximum": 86400
+        },
+        "lanes": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "captureRetainedSeconds": {
+              "type": "integer",
+              "minimum": 60,
+              "maximum": 316224000
+            },
+            "normal": {
+              "$ref": "#/definitions/installerLane"
+            },
+            "resolution": {
+              "$ref": "#/definitions/installerLane"
+            },
+            "processing": {
+              "$ref": "#/definitions/installerLane"
+            }
+          },
+          "required": [
+            "captureRetainedSeconds",
+            "normal",
+            "resolution",
+            "processing"
+          ]
+        },
+        "stopRetainedSeconds": {
+          "type": "integer",
+          "minimum": 60,
+          "maximum": 316224000
+        },
+        "backup": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "horizonSeconds": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 316224000
+            },
+            "cleanupBudgetSeconds": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 86400
+            },
+            "proofWindowSeconds": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 316224000
+            },
+            "backupCopies": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 64
+            },
+            "walCopies": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 64
+            }
+          },
+          "required": [
+            "horizonSeconds",
+            "cleanupBudgetSeconds",
+            "proofWindowSeconds",
+            "backupCopies",
+            "walCopies"
+          ]
+        },
+        "footprints": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "capture": {
+              "$ref": "#/definitions/installerFootprint"
+            },
+            "operation": {
+              "$ref": "#/definitions/installerFootprint"
+            },
+            "processing": {
+              "$ref": "#/definitions/installerFootprint"
+            },
+            "native": {
+              "$ref": "#/definitions/installerFootprint"
+            },
+            "stop": {
+              "$ref": "#/definitions/installerFootprint"
+            },
+            "processingState": {
+              "$ref": "#/definitions/installerFootprint"
+            }
+          },
+          "required": [
+            "capture",
+            "operation",
+            "processing",
+            "native",
+            "stop",
+            "processingState"
+          ]
+        },
+        "purgeLeases": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 32
+        },
+        "processing": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "maxRules": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1024
+            },
+            "maxRootTransitions": {
+              "type": "integer",
+              "minimum": 8,
+              "maximum": 65536
+            }
+          },
+          "required": [
+            "maxRules",
+            "maxRootTransitions"
+          ]
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "fixedRowBytes": {
+              "type": "integer",
+              "minimum": 1048576,
+              "maximum": 67108864
+            },
+            "accountRowBytes": {
+              "type": "integer",
+              "minimum": 262144,
+              "maximum": 16777216
+            },
+            "recordRowBytes": {
+              "type": "integer",
+              "minimum": 131072,
+              "maximum": 16777216
+            },
+            "recordWALBytes": {
+              "type": "integer",
+              "minimum": 1048576,
+              "maximum": 268435456
+            },
+            "recordKeyAttempts": {
+              "type": "integer",
+              "minimum": 16,
+              "maximum": 256
+            },
+            "transitionWALBytes": {
+              "type": "integer",
+              "minimum": 1048576,
+              "maximum": 268435456
+            },
+            "configurationTransitions": {
+              "type": "integer",
+              "minimum": 3,
+              "maximum": 1000000
+            }
+          },
+          "required": [
+            "fixedRowBytes",
+            "accountRowBytes",
+            "recordRowBytes",
+            "recordWALBytes",
+            "recordKeyAttempts",
+            "transitionWALBytes",
+            "configurationTransitions"
+          ]
+        },
+        "envelope": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "systemObjects": {
+              "$ref": "#/definitions/installerAmount"
+            },
+            "sqlBytes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "backupBytes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "walBytes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "keyAttempts": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "systemObjects",
+            "sqlBytes",
+            "backupBytes",
+            "walBytes",
+            "keyAttempts"
+          ]
+        },
+        "backends": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "storageProfile": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 63,
+                "pattern": "^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$"
+              },
+              "usable": {
+                "$ref": "#/definitions/installerAmount"
+              }
+            },
+            "required": [
+              "storageProfile",
+              "usable"
+            ]
+          },
+          "minItems": 1,
+          "maxItems": 1,
+          "uniqueItems": true
+        },
+        "poolSpec": {
+          "$ref": "#/definitions/installerPoolSpec"
+        },
+        "policySpec": {
+          "$ref": "#/definitions/installerPolicySpec"
+        }
+      },
+      "required": [
+        "pool",
+        "policy",
+        "namespaceKeys",
+        "accounts",
+        "recordsPerAccount",
+        "admissionSeconds",
+        "lanes",
+        "stopRetainedSeconds",
+        "backup",
+        "footprints",
+        "purgeLeases",
+        "processing",
+        "metadata",
+        "envelope",
+        "backends"
+      ],
+      "dependencies": {
+        "poolSpec": [
+          "policySpec"
+        ],
+        "policySpec": [
+          "poolSpec"
+        ]
+      }
+    },
+    "installerProcessingOperators": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "issuer",
+          "clientID",
+          "kind",
+          "id"
+        ],
+        "properties": {
+          "issuer": {
+            "type": "string",
+            "format": "uri",
+            "pattern": "^https://",
+            "maxLength": 2048
+          },
+          "clientID": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "kind": {
+            "enum": [
+              "User",
+              "Group"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        }
+      },
+      "minItems": 1,
+      "maxItems": 32,
+      "uniqueItems": true
+    },
+    "installerEvidenceStore": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "endpoint": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048,
+          "pattern": "^https://[^/?#@]+/?$"
+        },
+        "rootsPEM": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32768
+        },
+        "region": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "bucket": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 63
+        }
+      },
+      "required": [
+        "endpoint",
+        "rootsPEM",
+        "region",
+        "bucket"
+      ]
+    },
+    "installerConnector": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "accounts": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4096
+        },
+        "recordsPerAccount": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 1000000
+        },
+        "retainedSeconds": {
+          "type": "integer",
+          "minimum": 60,
+          "maximum": 316224000
+        },
+        "profiles": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 256
+        },
+        "sourceTransitions": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4096
+        },
+        "purgeLeases": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 32
+        },
+        "validSeconds": {
+          "type": "integer",
+          "minimum": 3600,
+          "maximum": 31622400
+        },
+        "footprint": {
+          "$ref": "#/definitions/installerFootprint"
+        }
+      },
+      "required": [
+        "accounts",
+        "recordsPerAccount",
+        "retainedSeconds",
+        "profiles",
+        "sourceTransitions",
+        "purgeLeases",
+        "validSeconds",
+        "footprint"
+      ]
+    },
+    "installerFederation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "connectorPKIMount": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "connectorIssuerRootsPEM": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32768
+        },
+        "endpoint": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048,
+          "pattern": "^https://[^/?#@]+/?$"
+        },
+        "serverName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 253
+        },
+        "serviceType": {
+          "enum": [
+            "NodePort",
+            "LoadBalancer"
+          ]
+        },
+        "nodePort": {
+          "type": "integer",
+          "minimum": 30000,
+          "maximum": 32767
+        },
+        "ownerAddress": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 253
+        },
+        "ownerNodePort": {
+          "type": "integer",
+          "minimum": 30000,
+          "maximum": 32767
+        },
+        "ownerOperationAddress": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 253
+        },
+        "ownerOperationNodePort": {
+          "type": "integer",
+          "minimum": 30000,
+          "maximum": 32767
+        },
+        "keyServiceEndpoint": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048,
+          "pattern": "^https://[^/?#@]+/?$"
+        },
+        "keyServiceNodePort": {
+          "type": "integer",
+          "minimum": 30000,
+          "maximum": 32767
+        },
+        "evidenceStore": {
+          "$ref": "#/definitions/installerEvidenceStore"
+        },
+        "connector": {
+          "$ref": "#/definitions/installerConnector"
+        },
+        "fleet": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "channelMount": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]+$"
+            },
+            "deliveryProfile": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          },
+          "required": [
+            "channelMount",
+            "deliveryProfile"
+          ]
+        }
+      },
+      "required": [
+        "connectorPKIMount",
+        "connectorIssuerRootsPEM",
+        "endpoint",
+        "serverName",
+        "serviceType",
+        "connector"
+      ]
+    },
+    "installerPromotion": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "browserAudience": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "providerRootsPEM": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32768
+        },
+        "transitMount": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "workerPKIMount": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "exposure": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "serviceType": {
+              "enum": [
+                "NodePort",
+                "LoadBalancer"
+              ]
+            },
+            "nodePort": {
+              "type": "integer",
+              "minimum": 30000,
+              "maximum": 32767
+            }
+          },
+          "required": [
+            "serviceType"
+          ]
+        }
+      },
+      "required": [
+        "browserAudience",
+        "providerRootsPEM",
+        "transitMount",
+        "workerPKIMount",
+        "version"
+      ]
+    },
+    "installerRetentionDurations": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "evidenceSeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 316224000
+        },
+        "caseMetadataSeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 316224000
+        },
+        "auditMetadataSeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 316224000
+        }
+      },
+      "required": [
+        "evidenceSeconds",
+        "caseMetadataSeconds",
+        "auditMetadataSeconds"
+      ]
+    },
+    "installerRetentionBaseline": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "purposeRef": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "defaults": {
+          "$ref": "#/definitions/installerRetentionDurations"
+        },
+        "maxima": {
+          "$ref": "#/definitions/installerRetentionDurations"
+        },
+        "deletionBudgetSeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 316224000
+        }
+      },
+      "required": [
+        "purposeRef",
+        "defaults",
+        "maxima",
+        "deletionBudgetSeconds"
+      ]
+    },
+    "installerPoolSpec": {
+      "type": "object",
+      "properties": {
+        "storageProfileRef": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 63
+        },
+        "capacity": {
+          "type": "object",
+          "properties": {
+            "bytes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1125899906842624
+            },
+            "objects": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000000000
+            }
+          },
+          "required": [
+            "bytes",
+            "objects"
+          ],
+          "additionalProperties": false
+        },
+        "safetyHeadroom": {
+          "type": "object",
+          "properties": {
+            "bytes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1125899906842624
+            },
+            "objects": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000000000
+            }
+          },
+          "required": [
+            "bytes",
+            "objects"
+          ],
+          "additionalProperties": false
+        },
+        "systemReserve": {
+          "type": "object",
+          "properties": {
+            "bytes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1125899906842624
+            },
+            "objects": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000000000
+            }
+          },
+          "required": [
+            "bytes",
+            "objects"
+          ],
+          "additionalProperties": false
+        },
+        "sharedBurst": {
+          "type": "object",
+          "properties": {
+            "bytes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1125899906842624
+            },
+            "objects": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000000000
+            }
+          },
+          "required": [
+            "bytes",
+            "objects"
+          ],
+          "additionalProperties": false
+        },
+        "protectedAllocations": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "items": {
+            "type": "object",
+            "properties": {
+              "budgetPolicyRef": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 63
+              },
+              "workloadSlots": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 10000
+              },
+              "protectedPerWorkload": {
+                "type": "object",
+                "properties": {
+                  "bytes": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1125899906842624
+                  },
+                  "objects": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1000000000
+                  }
+                },
+                "required": [
+                  "bytes",
+                  "objects"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "budgetPolicyRef",
+              "workloadSlots",
+              "protectedPerWorkload"
+            ],
+            "additionalProperties": false
+          },
+          "x-kubernetes-list-type": "map",
+          "x-kubernetes-list-map-keys": [
+            "budgetPolicyRef"
+          ]
+        },
+        "upload": {
+          "type": "object",
+          "properties": {
+            "bytesPerSecond": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1125899906842624
+            },
+            "burstBytes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1125899906842624
+            }
+          },
+          "required": [
+            "bytesPerSecond",
+            "burstBytes"
+          ],
+          "additionalProperties": false
+        },
+        "maxUploadRequestsPerSecond": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100000
+        },
+        "capacityAssurance": {
+          "enum": [
+            "qualifiedReservedBackend",
+            "bestEffort"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "storageProfileRef",
+        "capacity",
+        "safetyHeadroom",
+        "systemReserve",
+        "sharedBurst",
+        "protectedAllocations",
+        "upload",
+        "maxUploadRequestsPerSecond",
+        "capacityAssurance"
+      ],
+      "additionalProperties": false
+    },
+    "installerPolicySpec": {
+      "type": "object",
+      "properties": {
+        "poolRef": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 63
+        },
+        "scope": {
+          "type": "object",
+          "properties": {
+            "clusterID": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "const": ""
+                }
+              ],
+              "description": "Omit or leave empty for the installer-derived hub cluster ID; a supplied value must equal the actual ID."
+            },
+            "namespaceSelector": {
+              "type": "object",
+              "properties": {
+                "matchLabels": {
+                  "type": "object",
+                  "minProperties": 1,
+                  "maxProperties": 16,
+                  "additionalProperties": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 63
+                  },
+                  "x-kubernetes-validations": [
+                    {
+                      "rule": "self.all(k, size(k) <= 253)",
+                      "message": "Label keys are at most 253 characters."
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "matchLabels"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "namespaceSelector"
+          ],
+          "additionalProperties": false
+        },
+        "namespaceEnvelope": {
+          "type": "object",
+          "properties": {
+            "maxWorkloadAccounts": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10000
+            },
+            "maxStoredBytes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1125899906842624
+            },
+            "maxObjects": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000000000
+            }
+          },
+          "required": [
+            "maxWorkloadAccounts",
+            "maxStoredBytes",
+            "maxObjects"
+          ],
+          "additionalProperties": false
+        },
+        "workload": {
+          "type": "object",
+          "properties": {
+            "protected": {
+              "type": "object",
+              "properties": {
+                "bytes": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1125899906842624
+                },
+                "objects": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1000000000
+                }
+              },
+              "required": [
+                "bytes",
+                "objects"
+              ],
+              "additionalProperties": false
+            },
+            "hardLimit": {
+              "type": "object",
+              "properties": {
+                "bytes": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1125899906842624
+                },
+                "objects": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1000000000
+                }
+              },
+              "required": [
+                "bytes",
+                "objects"
+              ],
+              "additionalProperties": false
+            },
+            "contextReserve": {
+              "type": "object",
+              "properties": {
+                "bytes": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1125899906842624
+                },
+                "objects": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1000000000
+                }
+              },
+              "required": [
+                "bytes",
+                "objects"
+              ],
+              "additionalProperties": false
+            },
+            "dump": {
+              "type": "object",
+              "properties": {
+                "burst": {
+                  "enum": [
+                    1
+                  ],
+                  "type": "integer"
+                },
+                "minimumIntervalSeconds": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 86400
+                },
+                "maxStartsPerRollingHour": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1000
+                },
+                "maxInputBytesPerRollingHour": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1125899906842624
+                },
+                "maxProcessesPerEpisode": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 64,
+                  "default": 1
+                }
+              },
+              "required": [
+                "burst",
+                "minimumIntervalSeconds",
+                "maxStartsPerRollingHour",
+                "maxInputBytesPerRollingHour"
+              ],
+              "additionalProperties": false
+            },
+            "maxConcurrentExpensive": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "maxQueuedExpensive": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "maxQueueAgeSeconds": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 300
+            },
+            "upload": {
+              "type": "object",
+              "properties": {
+                "bytesPerSecond": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1125899906842624
+                },
+                "burstBytes": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1125899906842624
+                }
+              },
+              "required": [
+                "bytesPerSecond",
+                "burstBytes"
+              ],
+              "additionalProperties": false
+            },
+            "maxUploadRequestsPerSecond": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000
+            },
+            "maxSpoolBytes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1125899906842624
+            },
+            "onFull": {
+              "enum": [
+                "RejectNewExpensive",
+                "DeleteOldestEligibleInAccount"
+              ],
+              "type": "string"
+            },
+            "maxActiveSources": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1024
+            },
+            "inputBytesPerSecond": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10737418240
+            },
+            "inputBurstBytes": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10737418240
+            }
+          },
+          "required": [
+            "protected",
+            "hardLimit",
+            "contextReserve",
+            "dump",
+            "maxConcurrentExpensive",
+            "maxQueuedExpensive",
+            "maxQueueAgeSeconds",
+            "upload",
+            "maxUploadRequestsPerSecond",
+            "maxSpoolBytes",
+            "onFull"
+          ],
+          "additionalProperties": false
+        },
+        "node": {
+          "type": "object",
+          "properties": {
+            "maxConcurrentExpensive": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "maxQueuedExpensive": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000
+            },
+            "upload": {
+              "type": "object",
+              "properties": {
+                "bytesPerSecond": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1125899906842624
+                },
+                "burstBytes": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1125899906842624
+                }
+              },
+              "required": [
+                "bytesPerSecond",
+                "burstBytes"
+              ],
+              "additionalProperties": false
+            },
+            "maxSpoolBytes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1125899906842624
+            },
+            "maxRingBytes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 4294967296
+            },
+            "maxFrozenBytes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 4294967296
+            },
+            "impactProfileRef": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 63
+            },
+            "unhealthySamples": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 60
+            },
+            "sampleIntervalSeconds": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 60
+            },
+            "recoveryHealthySeconds": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 3600
+            },
+            "maxActiveSources": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1024
+            },
+            "inputBytesPerSecond": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10737418240
+            },
+            "inputBurstBytes": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10737418240
+            }
+          },
+          "required": [
+            "maxConcurrentExpensive",
+            "maxQueuedExpensive",
+            "upload",
+            "maxSpoolBytes",
+            "impactProfileRef",
+            "unhealthySamples",
+            "sampleIntervalSeconds",
+            "recoveryHealthySeconds"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "poolRef",
+        "scope",
+        "namespaceEnvelope",
+        "workload",
+        "node"
+      ],
+      "additionalProperties": false
     }
   }
 }

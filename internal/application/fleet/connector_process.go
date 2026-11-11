@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"time"
 )
 
@@ -89,7 +90,13 @@ func (s ConnectorProcessEnrollment) Enroll(ctx context.Context, id string, r val
 	return s.enrollUsing(ctx, id, r, connectorLegacyProcessChecks{s: s, request: r})
 }
 
-func (s ConnectorProcessEnrollment) enrollUsing(ctx context.Context, id string, r value.ConnectorProcessRequest, checks connectorProcessChecks) (value.ConnectorCredentialProcess, error) {
+func (s ConnectorProcessEnrollment) enrollUsing(ctx context.Context, id string, r value.ConnectorProcessRequest, checks connectorProcessChecks) (_ value.ConnectorCredentialProcess, err error) {
+	step := "inputs"
+	defer func() {
+		if err != nil {
+			err = connectorEnrollmentError{step, err}
+		}
+	}()
 	var zero value.ConnectorCredentialProcess
 	if ctx == nil || checks == nil || s.Recovery == nil || s.Journal == nil || s.Audit == nil || s.MAC == nil || s.Now == nil || !authorization.UUID(id) || !r.Valid() {
 		return zero, value.ErrUnavailable
@@ -101,6 +108,7 @@ func (s ConnectorProcessEnrollment) enrollUsing(ctx context.Context, id string, 
 	until := start.Add(5 * time.Second)
 	live, end := context.WithDeadline(ctx, until)
 	defer end()
+	step = "initial-proof"
 	c, e := checks.Current(live, value.ConnectorLifecycleInitial, start, until)
 	if e != nil {
 		return zero, e
@@ -108,6 +116,7 @@ func (s ConnectorProcessEnrollment) enrollUsing(ctx context.Context, id string, 
 	until = c.Until
 	live, firstEnd := context.WithDeadline(live, until)
 	defer firstEnd()
+	step = "prepare"
 	a, e := s.Journal.PrepareConnectorProcess(live, id, c)
 	if e != nil {
 		return zero, e
@@ -119,9 +128,11 @@ func (s ConnectorProcessEnrollment) enrollUsing(ctx context.Context, id string, 
 		if !s.Now().Before(a.Intent.RequestUntil) {
 			return zero, value.ErrUnavailable
 		}
+		step = "intent-audit"
 		if e = s.Audit.Begin(live, a.Intent); e != nil {
 			return zero, e
 		}
+		step = "effect-proof"
 		next, e := checks.Current(live, value.ConnectorLifecycleBeforeEffect, start, until)
 		if e != nil {
 			return zero, e
@@ -148,6 +159,7 @@ func (s ConnectorProcessEnrollment) enrollUsing(ctx context.Context, id string, 
 		if !out.Valid() || !next.Valid(s.Now()) || live.Err() != nil {
 			return zero, value.ErrUnavailable
 		}
+		step = "store-outcome"
 		if e = s.Journal.StoreConnectorProcessOutcome(live, a, out); e != nil {
 			return zero, e
 		}
@@ -155,11 +167,13 @@ func (s ConnectorProcessEnrollment) enrollUsing(ctx context.Context, id string, 
 	}
 	// Activated is a durable exact-receipt fact, not fresh authority. Re-enter
 	// the current SQL activation check below; never reopen its old audit window.
+	step = "outcome-audit"
 	if !a.Activated {
 		if e = s.Audit.Finish(live, *a.Outcome); e != nil {
 			return zero, e
 		}
 	}
+	step = "activation-proof"
 	next, e := checks.Current(live, value.ConnectorLifecycleBeforeActivation, start, until)
 	if e != nil {
 		return zero, e
@@ -169,6 +183,7 @@ func (s ConnectorProcessEnrollment) enrollUsing(ctx context.Context, id string, 
 	}
 	active, close := context.WithDeadline(live, next.Until)
 	defer close()
+	step = "activate"
 	p, e := s.Journal.AcceptConnectorProcess(active, a, next)
 	if e != nil {
 		return zero, e
@@ -178,10 +193,31 @@ func (s ConnectorProcessEnrollment) enrollUsing(ctx context.Context, id string, 
 	if e != nil || f != nil || !bytes.Equal(x, y) || !next.Valid(s.Now()) || active.Err() != nil {
 		return zero, value.ErrUnavailable
 	}
+	step = "final-proof"
 	final, e := checks.Current(active, value.ConnectorLifecycleFinal, start, next.Until)
 	if e != nil || !final.Proof.Configuration.SameSource(c.Proof.Configuration) || final.Proof.WorkloadDigest != c.Proof.WorkloadDigest || final.Proof.ProtectionDigest != c.Proof.ProtectionDigest {
 		return zero, value.ErrUnavailable
 	}
 	// This is an acknowledged process admission, never a serving identity.
 	return p, nil
+}
+
+// connectorEnrollmentError carries only a fixed local stage. Provider error
+// text and identities never enter operator diagnostics; Unwrap retains class.
+type connectorEnrollmentError struct {
+	step string
+	err  error
+}
+
+func (e connectorEnrollmentError) Error() string     { return "connector enrollment " + e.step }
+func (e connectorEnrollmentError) Unwrap() error     { return e.err }
+func (e connectorEnrollmentError) FixedStep() string { return e.step }
+
+// ConnectorEnrollmentStep reads only the enrollment runner's closed stage.
+func ConnectorEnrollmentStep(err error) string {
+	var failure connectorEnrollmentError
+	if errors.As(err, &failure) {
+		return failure.step
+	}
+	return "unavailable"
 }

@@ -25,7 +25,7 @@ func TestSessionCleanupReportsFailureAndStops(t *testing.T) {
 }
 
 func TestLocalReturnPath(t *testing.T) {
-	for _, s := range []string{"/", "/cases/abc", "/investigations?tab=packets", "/investigations?q=pod%20name"} {
+	for _, s := range []string{"/", "/fleet", "/cases/abc", "/investigations?tab=packets", "/investigations?q=pod%20name"} {
 		if !LocalReturnPath(s) {
 			t.Errorf("valid return %q rejected", s)
 		}
