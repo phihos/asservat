@@ -9,9 +9,20 @@ audited cutoff, signed source, status and role compatibility. Focused Go
 race, browser unit, TypeScript, schema, OpenAPI and design checks pass.
 The owned PostgreSQL schema-owner upgrade at `c84d796f` applied 150→151,
 preserved floor 149, verified idempotence and refused unknown history
-(4.097 s, exit 0, all 4,527 hashes match and cleanup passed). The exact SQL
-erasure and managed-copy verification fixture and the fresh installed
-journey remain pending.
+(4.097 s, exit 0, all 4,527 hashes match and cleanup passed).
+
+The first PostgreSQL/S3 erasure run found an unqualified ledger reference
+inside the custody retention trigger. The correction preserves the narrow
+definer search path and qualifies the ledger table. The next fixture reached
+the applied cutoff and failed on its expected error class. It now asserts
+the custody adapter's exact unavailable result. The final owned fixture at
+`39c49084` passed in 6.138 s. It verifies refusal before independent normal
+audit, the exact acknowledged cutoff, immutable replay, signed lifecycle
+acknowledgement, distinct pending and verified deletion status and empty
+versioned S3 inventory after positive cleanup. All 4,528 source hashes match
+and cleanup completed. The original runs are in the external
+`privacy-early-erasure` archive. Fresh installed browser and previous-version
+publication checks remain pending.
 
 ## Merged retention lifecycle publication (2026-11-11)
 

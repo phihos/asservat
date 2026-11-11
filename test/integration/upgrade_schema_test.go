@@ -362,6 +362,30 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 		}
 		checkSearchAudit("")
 	}
+	var originalErasureDefinitions string
+	const erasureDefinitions = `SELECT pg_get_functiondef('public.guard_processing_decision()'::regprocedure)||
+ pg_get_functiondef('public.protect_custody_retention()'::regprocedure)||pg_get_functiondef('public.operation_audit_lane(text)'::regprocedure)||
+ pg_get_functiondef('public.operation_audit_human_input_valid(text,text)'::regprocedure)`
+	checkErasureSchema := func(installed bool) {
+		t.Helper()
+		var column, routed, exactFormats bool
+		if err := conn.QueryRow(ctx, `SELECT
+ EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='processing_decision' AND column_name='erasure_decision'),
+ coalesce(public.operation_audit_lane('request_early_erasure')='normal' AND public.operation_audit_lane('get_processing_erasure')='normal',false),
+ public.operation_audit_human_input_valid('request_early_erasure','processing-input/v1') IS TRUE
+ AND public.operation_audit_human_input_valid('request_early_erasure','context-input/v1') IS FALSE
+ AND public.operation_audit_human_input_valid('get_processing_erasure','context-input/v1') IS TRUE
+ AND public.operation_audit_human_input_valid('get_processing_erasure','processing-input/v1') IS FALSE`).Scan(&column, &routed, &exactFormats); err != nil || column != installed || routed != installed || exactFormats != installed {
+			t.Fatal("exact erasure schema and audit admission", installed, column, routed, exactFormats, err)
+		}
+		checkSearchAudit("normal")
+	}
+	if head == 151 {
+		if e = conn.QueryRow(ctx, erasureDefinitions).Scan(&originalErasureDefinitions); e != nil {
+			t.Fatal("previous erasure migration function definitions", e)
+		}
+		checkErasureSchema(false)
+	}
 	const rawGrantShape = `SELECT jsonb_build_object('constraints',(SELECT jsonb_agg(x ORDER BY x) FROM (SELECT pg_get_constraintdef(oid) x FROM pg_constraint WHERE conrelid IN ('access_grant'::regclass,'access_grant_child'::regclass)) q),'columns',(SELECT jsonb_agg(to_jsonb(c) ORDER BY c.table_name,c.ordinal_position) FROM (SELECT table_name,column_name,ordinal_position,is_nullable,data_type FROM information_schema.columns WHERE table_schema='public' AND table_name IN ('access_grant','access_grant_child')) c))::text`
 	if head == 131 {
 		if e = conn.QueryRow(ctx, rawAuditFunctions).Scan(&originalRawAuditFunctions); e != nil {
@@ -454,6 +478,25 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 		}
 		checkSearchAudit("normal")
 		t.Log("SQL150 kept floor149 and restored the exact previous audit validators on empty Down")
+	}
+	if head == 151 {
+		if state.Floor != 149 || !state.Compatible(150) {
+			t.Fatal("early erasure raised the compatibility floor", state)
+		}
+		checkErasureSchema(true)
+		if _, e = p.DownTo(ctx, head-1); e != nil {
+			t.Fatal("empty early erasure Down", e)
+		}
+		var restored string
+		if e = conn.QueryRow(ctx, erasureDefinitions).Scan(&restored); e != nil || restored != originalErasureDefinitions {
+			t.Fatal("early erasure Down changed previous function definitions", e)
+		}
+		checkErasureSchema(false)
+		if from, to, e = upgrade.Run(ctx); e != nil || from != head-1 || to != head {
+			t.Fatal("early erasure Up after Down", from, to, e)
+		}
+		checkErasureSchema(true)
+		t.Log("SQL151 kept floor149 and restored exact previous guards and audit validators on empty Down")
 	}
 	// Migration 103 changes this function only. Down restores its exact old
 	// definition; it neither rewrites projections nor changes activation state.
