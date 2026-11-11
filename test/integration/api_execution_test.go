@@ -20,6 +20,7 @@ import (
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/execution"
 	"asservat.local/asservat/internal/domain/privacy"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -28,7 +29,7 @@ import (
 // completed-result publication gate. Native workload/process proof and local
 // start receipts remain explicit synthetic fixtures here; separate Kubernetes
 // qualification is mandatory before this runner can be deployed.
-func qualifyAPIExecutionTransactions(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, create func(*testing.T, int64) captureAdmissionScenario) {
+func qualifyAPIExecutionTransactions(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, s3admin *s3.Client, bucket string, create func(*testing.T, int64) captureAdmissionScenario) {
 	t.Helper()
 	qualifyAPIExecutionPreparationBoundaries(t, ctx, admin, poolFor, store, keys, create)
 	qualifyAPIExecutionRetainedObservation(t, ctx, admin, poolFor, store, keys, create)
@@ -39,6 +40,7 @@ func qualifyAPIExecutionTransactions(t *testing.T, ctx context.Context, admin *p
 		for _, roleCase := range []struct{ name, purpose string }{
 			{"compiled-verifier", "context-verify"},
 			{"compiled-publisher", "context-publish"},
+			{"early-erasure", "context-publish"},
 		} {
 			t.Run(roleCase.name, func(t *testing.T) {
 				s := create(t, 1)
@@ -58,11 +60,20 @@ func qualifyAPIExecutionTransactions(t *testing.T, ctx context.Context, admin *p
 				if err != nil {
 					t.Fatal(err)
 				}
-				initializeProcessingTestFixture(t, ctx, poolFor, store, keys, s, accepted.Expectation)
+				var erasure *processingTestFixture
+				if roleCase.name == "early-erasure" {
+					erasure = newProcessingTestFixture(t, ctx, poolFor, store, keys, s, accepted.Expectation)
+					defer erasure.Close()
+					initializeProcessingTestFixtureWith(t, ctx, erasure)
+				} else {
+					initializeProcessingTestFixture(t, ctx, poolFor, store, keys, s, accepted.Expectation)
+				}
 				pool := func(user, password string) *pgxpool.Pool { p := poolFor(user, password); t.Cleanup(p.Close); return p }
 				sharedPools, _ := compiledOrdinaryHubPools(t, ctx, admin, poolFor)
 				sharedPool := sharedPools.ordinary
-				qualifyOrdinaryHubPoolBound(t, ctx, sharedPools)
+				if erasure == nil {
+					qualifyOrdinaryHubPoolBound(t, ctx, sharedPools)
+				}
 				for _, query := range []string{
 					"DELETE FROM context_execution WHERE false",
 					"UPDATE context_execution SET binding_json=binding_json WHERE false",
@@ -371,6 +382,10 @@ func qualifyAPIExecutionTransactions(t *testing.T, ctx context.Context, admin *p
 				var records int
 				if err = admin.QueryRow(ctx, "SELECT count(*) FROM context_execution WHERE root_id=$1", s.a.RootID).Scan(&records); err != nil || records != 1 {
 					t.Fatal("execution identity duplicated", records, err)
+				}
+				if erasure != nil {
+					qualifyProcessingEarlyErasure(t, ctx, admin, sharedPool, poolFor, store, bound, keys, s3admin, bucket, s, erasure, published)
+					return
 				}
 				// The completed execution qualifier no longer uses its deliberately
 				// saturated 18+2 hub pools. Join their closure before starting the
