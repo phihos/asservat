@@ -260,6 +260,27 @@ func qualifyWidePolicyShareCost(t *testing.T, ctx context.Context, admin *pgxpoo
 	}
 	firstSample := samplePolicyShareCost(t, ctx, admin, root)
 	logPolicyShareCost(t, ctx, admin, "first-wide-capture-through-published-share", baseline, firstSample)
+	service, hub := newPolicyPaidShareService(t, ctx, admin, poolFor, objects, keys, f.Scenario, first.reader)
+	current := func() identities.CurrentIdentity {
+		t.Helper()
+		f.Refresh()
+		now := time.Now().UTC().Truncate(time.Microsecond)
+		i := f.Scenario.a.Eligibility.VerifiedIdentity
+		i.Principal = f.Creator
+		i.Groups = f.Groups
+		i.Scopes = []string{"evidence:read", authorization.ShareScope}
+		i.VerifiedAt, i.ValidUntil = now, now.Add(5*time.Second)
+		source, _, err := identities.NewBearerRequest(ctx, downloadTestIdentity{i}, "synthetic-reference", time.Now)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return source
+	}
+	// Check the actual request/resolver contract before paying for 99 more
+	// captures. This reads identity only and consumes no operation slot.
+	if _, err := current().ResolveIdentity(ctx); err != nil {
+		t.Fatal("wide-sample caller preflight", err)
+	}
 	t.Log("policy_cost_stage=first_wide_succeeded_continue_to_100")
 	for n := 1; n < 100; n++ {
 		accepted := f.Admit()
@@ -278,22 +299,6 @@ func qualifyWidePolicyShareCost(t *testing.T, ctx context.Context, admin *pgxpoo
 		t.Fatal("100 original paid capture associations", err, spent, executions, captured)
 	}
 	logPolicyShareCost(t, ctx, admin, "100-genuine-wide-capture-shares", baseline, complete)
-	service, hub := newPolicyPaidShareService(t, ctx, admin, poolFor, objects, keys, f.Scenario, first.reader)
-	current := func() identities.CurrentIdentity {
-		t.Helper()
-		f.Refresh()
-		now := time.Now().UTC().Truncate(time.Microsecond)
-		i := f.Scenario.a.Eligibility.VerifiedIdentity
-		i.Principal = f.Creator
-		i.Groups = f.Groups
-		i.Scopes = []string{"evidence:read", authorization.ShareScope}
-		i.VerifiedAt, i.ValidUntil = now, now.Add(5*time.Second)
-		source, _, err := identities.NewBearerRequest(ctx, downloadTestIdentity{i}, "synthetic-wide-sample", time.Now)
-		if err != nil {
-			t.Fatal(err)
-		}
-		return source
-	}
 	// Exercise rollback of the same current generated SQL business transaction.
 	// This deliberately does not claim the outer service authority path ran for
 	// the aborted effect; its acknowledged normal operation stays charged.
