@@ -1,6 +1,6 @@
 # ADR-323 — Finite share metadata and public audit retirement
 
-Date: 2026-11-11. Status: candidate implemented; bounded wide100 cost sampler passes, installed qualification pending.
+Date: 2026-11-11. Status: implemented; bounded wide100 service and fresh installed manual/capture-time qualification pass at bc444f36; delivery tracked by the implementation PR.
 Requirements REQ-PRV-008, REQ-PRV-004 and REQ-SHR-001 through REQ-SHR-008.
 Scenario SC-PRV-015 binds the finite share and audit-retirement workflow.
 
@@ -357,3 +357,30 @@ Variable S3/crypto work remains bounded by the unchanged original child; unknown
 outcomes remain charged. The B30 cohort and all success/deletion assertions stay
 unchanged. Test paired exact IDs, cancellation, partial progress, first-error
 continuation and original-tail bounds, then measure the fresh installed outcome.
+
+
+## Installed qualification
+
+Fresh `bc444f36` passes the collector-free actual installer/MCP/worker focus:
+Go567.863s, harness635.5s, both exits0. All4,855 committed runtime/contract source
+hashes independently match; sources stay frozen, cleanup failures are empty and
+owned clusters, containers, networks, volumes, images and scratch are absent.
+Normal certificate acknowledgment is observed414.0s, atomic child/parent/lifecycle
+removal442.7s and29.306s future original cooling. Capture-time acknowledgment is
+observed471.8s, atomic removal526.0s and15.223s future cooling. Final proof542.7s
+requires real account charge equal to all live+history records, no early charge
+release and independent absence of all object versions/delete markers/uploads.
+
+The paired16-ID page takes11.849s versus the earlier run's19.827s; the earlier
+history-page correction takes1.549s for9 keys. These named-run measurements do
+not prove universal throughput or cold-provider cost. This B30/H2/P10 success
+does not qualify the failed B10 cohort. No deadline or assertion was changed
+after installation. Full exact-head PR CI/review and authoritative merge readback
+remain delivery requirements.
+
+The focus covers one hub and one regional API, actual public MCP sharing and
+private cleanup. It omits the second-workload/replay extras and interruption
+matrix, and is not exact canonical Helm or installed React-sharing qualification.
+Existing separately named evidence remains separately scoped. Policy instructions,
+other identifying control/browser state, backup-chain erasure and operational
+maximums still need their own complete workflows.

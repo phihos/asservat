@@ -1,13 +1,14 @@
 # Sustained implementation progress
 
-## Active candidate: finite share metadata retirement (2026-11-11)
+## Installed-qualified finite share metadata retirement (2026-11-11)
 
-Complete the manual/capture-time sharing workflow through original identifying-row
-retirement, independent managed-object absence and actual residual-charge release.
-Installed qualification has **not passed**. The latest tested source is
-`ba0128c4`; its bounded history page works, but serial lifecycle checks still
-miss the original live deadline. Two lifecycle IDs per original proof are being
-implemented and require qualification. The full specification goal remains active.
+The manual/capture-time sharing workflow now passes through healthy certificate
+verification, identifying-row retirement within original live bounds, independent
+managed-object absence and actual residual-charge release. Fresh source
+`bc444f36` passes Go567.863s/harness635.5s with4,855 independently matching
+source hashes, frozen source and complete owned cleanup. Delivery requires full
+exact-head PR CI, review and authoritative merge readback; those receipts belong
+with the implementation PR. The full specification goal remains active.
 
 Candidate `feature/finite-share-history`, owned worktree
 `asservat-share-retirement`, integrates authoritative main `b389b7c9` (PR223).
@@ -44,14 +45,18 @@ independently absent owned resources. Failures remain failures.
 | `7e07616a` / `installed-7e07616a` | Go583.844s/harness654.9s fail,4855 hashes: both shares delete atomically within original bounds and retain cooling charges; neither proves healthy certification under B10. Unrelated row verification-claim refusals cannot identify these shares' exact path. |
 | `653ccc2d` / `installed-653ccc2d` | Go496.141s/harness564.5s fail,4855 hashes: B30 normal certificate acknowledged at407.6s with22.2s original write time left; rows remain at469.9s,48ms beyond live cutoff. Charge18 equals4 live+14 history records. |
 | `ba0128c4` / `installed-ba0128c4` | Go499.455s/harness568.2s fail,4855 hashes: normal acknowledgment429.0s, one attempt and4.3s original write time left. At473.4s its rows miss the live cutoff by81ms; charge11 equals3 live+8 history records. Nine history keys complete in1.549s, but a16-ID lifecycle page takes19.827s. |
+| `bc444f36` / `installed-bc444f36` | Go567.863s/harness635.5s pass,4855 hashes. Normal healthy acknowledgment414.0s, atomic deletion442.7s and29.306s future cooling; capture acknowledgment471.8s, atomic deletion526.0s and15.223s future cooling. Final proof542.7s verifies both original charges released only after eligibility, no managed versions/delete markers/multipart, and exact live+history account totals. A paired16-ID page takes11.849s. |
 
 Current broad evidence: default `make pre-push` at `ad4662b7` passes490s affected
 race tests. At `ba0128c4`, all static gates and the supported incremental
-`ASSERVAT_AFFECTED_BASE=ad4662b7 make pre-push` pass387s. Earlier system-Python
+`ASSERVAT_AFFECTED_BASE=ad4662b7 make pre-push` pass387s. At `bc444f36`, the next supported incremental
+`ASSERVAT_AFFECTED_BASE=ba0128c4 make pre-push` passes55s and all static gates.
+Earlier system-Python
 validator-import failure was corrected using the existing full specification
 virtual environment. Built-browser checks at `52ce1797` pass158.964s
 (30 journeys/31 accessibility scans); installed sharing here uses MCP, so this
-is not installed React-sharing qualification. No retirement PR/hosted CI yet.
+is not installed React-sharing qualification. Required full PR CI and merge status are tracked
+by the implementation PR; local checks do not substitute for them.
 
 Focused corrections preserve the64KiB artifact cap by removing only duplicated
 federation descriptions (representative output57,899 bytes), admit the existing
@@ -67,9 +72,10 @@ state, later-key progress and original expired DeleteBy. Work stops one second
 before the earliest original proof/parent end; Finish retains the original
 five-second context. The latest change applies the same bounded ownership to
 pairs of lifecycle IDs, with cursor advancement only for actually attempted IDs.
-It adds no grant, authority cache or renewed deadline. Component page/native
-contract race tests pass; fresh aggregate latency and timely erasure remain
-pending. Persistent backend stalls are not qualified by these happy-path samples.
+It adds no grant, authority cache or renewed deadline. Component page/native contract race tests pass. The fresh installed result
+above proves the selected cohort: its16-ID page takes11.849s versus19.827s
+in the earlier run, while the earlier history-page correction handles9 keys
+in1.549s. These are named reference observations, not throughput maxima. Persistent backend stalls are not qualified by these happy-path samples.
 
 The observer still requires both original certificate acknowledgments before
 atomic disappearance, original live cutoffs, charge equal to all live plus
@@ -78,13 +84,20 @@ Failed B10 results are not qualified. The B30/H2/P10 cohort retains240s normal/
 resolution and300s capture retention: selecting B30 before installation moves
 original purge60s and live removal20s earlier. No running timestamp is rewritten.
 
-Next: finish focused pair-control checks and repository gates, then fresh
-collector-free installed qualification with frozen source. After an actual pass,
-record exact evidence, run required full exact-head PR CI/review, merge and read
-back authoritative main and push CI. Retain unrelated parked work. This does not
-qualify max throughput, sustained operation, backup-chain erasure, all other
-identifying metadata, a release or a homelab deployment. The canonical Helm
-context trial below retains its separate named-source qualification.
+Scope: a fresh actual five-command installer/private provider CLI, one hub API
+and one regional workload API, public MCP manual/capture-time sharing and the
+actual cleanup worker. This focused collector-free run does not run the second
+workload/replay extras, interruption/resume matrix, exact canonical Helm profile
+or installed React sharing. The separate built-browser/Helm qualifications keep
+their named sources. SQL/audit/domain/object-store service sources from732d6fb7
+are independently byte-identical atbc444f36; only cleanup runtime and two tests
+differ in its4,582-file inventory (external `service-source-reuse-bc444f36.json`).
+
+The accepted specification still requires broader control/policy/browser metadata
+retirement, maximum throughput/sustained operation, backup-chain lifetime closure,
+remaining collectors and operational qualification; this source is no whole
+S-02/S-04/S-05 or specification exit, release or homelab deployment. Continue the
+next complete user workflow after delivery; retain unrelated parked work.
 
 ## Merged installable context trial (2026-11-11)
 
