@@ -30,6 +30,15 @@
 {{- range $n := list $b.secrets.producer $b.secrets.schema $b.secrets.retirement -}}
 {{- if or (eq $n "") (gt (len $n) 253) (not (regexMatch "^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$" $n)) }}{{ fail "bootstrap requires the existing producer, schema and retirement Secret references" }}{{ end -}}
 {{- end -}}
+{{- if and $b.continuation.enabled $b.continuation.public.capacity $b.continuation.public.federation -}}
+{{- $p := $b.continuation.public -}}
+{{- if $p.federation.connector -}}
+{{- $c := $p.federation.connector -}}
+{{- $backup := $p.capacity.backup -}}
+{{- $minimumRetained := add (int64 $c.validSeconds) (mul 2 (int64 $backup.horizonSeconds)) (mul 3 (int64 $backup.cleanupBudgetSeconds)) (int64 $backup.proofWindowSeconds) 60 -}}
+{{- if lt (int64 $c.retainedSeconds) $minimumRetained }}{{ fail "bootstrap.continuation.public.federation.connector.retainedSeconds must cover validSeconds + 2*capacity.backup.horizonSeconds + 3*capacity.backup.cleanupBudgetSeconds + capacity.backup.proofWindowSeconds + 60 for original retirement backing" }}{{ end -}}
+{{- end -}}
+{{- end -}}
 {{- if gt (len (include "asservat.bootstrap.input" .)) 49152 }}{{ fail "complete bootstrap public input exceeds 48 KiB" }}{{ end -}}
 {{- if and $b.continuation.enabled (gt (len (include "asservat.bootstrap.continuation" .)) 65536) }}{{ fail "complete continuation public input exceeds 64 KiB" }}{{ end -}}
 {{- end -}}

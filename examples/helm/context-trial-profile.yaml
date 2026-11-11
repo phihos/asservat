@@ -139,11 +139,11 @@ bootstrap:
         connector:
           accounts: 1
           recordsPerAccount: 96
-          retainedSeconds: 3600
+          retainedSeconds: 4000
           profiles: 1
           sourceTransitions: 8
           purgeLeases: 2
-          validSeconds: 7200
+          validSeconds: 3600
           footprint: { rowBytes: 1048576, transitionWALBytes: 1048576 }
         fleet: { channelMount: fleet-bootstrap, deliveryProfile: regional-installer }
       promotion:

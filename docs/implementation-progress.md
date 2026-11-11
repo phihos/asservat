@@ -83,6 +83,20 @@ SHA and packaged chart SHA are retained in
 `homelab-context-trial/installed-830eca51`. This is a successful Helm bootstrap
 boundary, not a qualified end-to-end trial or completed specification.
 
+The focused exact-profile PG/S3 case at `36613b83` reproduces enrollment refusal
+in0.91s (Go1.349s). Its diagnostic SQL executes successfully and identifies
+process preparation;4,557 inventory hashes match and owned resources are gone.
+The canonical profile input is separately bound to the original installed
+profile SHA; subsequent custody inventories include the example YAML directly.
+The profile promised7,200s admission while its original3,600s retirement backing
+allowed only3,298s. Existing Go and SQL ticket predicates both refused it.
+
+The installer compiler and Helm preflight now reject that relation, including
+one-second-short backing and one-second-long admission, without clamping or
+relaxing ticket predicates. The trial uses3,600s validity/4,000s retention;
+96 records and all footprints remain unchanged. Focused boundary/race and
+actual Helm render checks pass (Go1.306s); the exact real-service rerun is next.
+
 ## Active candidate: processing inventory export (2026-11-11)
 
 [PR222](https://github.com/phihos/asservat/pull/222) starts from authoritative

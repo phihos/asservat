@@ -55,6 +55,19 @@ def check_context_public(public, render):
         bad = copy.deepcopy(configured)
         bad["bootstrap"]["continuation"]["public"][field] = value
         render(bad, ok=False)
+    # The ticket's original purge must still back its entire promised ordinary
+    # admission period. This is checked during Helm rendering, before mutation.
+    boundary = copy.deepcopy(configured)
+    trial_public = boundary["bootstrap"]["continuation"]["public"]
+    connector, backup = trial_public["federation"]["connector"], trial_public["capacity"]["backup"]
+    connector["retainedSeconds"] = (connector["validSeconds"] + 2 * backup["horizonSeconds"]
+                                    + 3 * backup["cleanupBudgetSeconds"] + backup["proofWindowSeconds"] + 60)
+    render(boundary)
+    connector["retainedSeconds"] -= 1
+    assert "federation.connector.retainedSeconds must cover" in render(boundary, ok=False)
+    connector["retainedSeconds"] += 1
+    connector["validSeconds"] += 1
+    assert "federation.connector.retainedSeconds must cover" in render(boundary, ok=False)
     preprovided = copy.deepcopy(configured)
     preprovided_capacity = preprovided["bootstrap"]["continuation"]["public"]["capacity"]
     preprovided_capacity.pop("poolSpec", None)
