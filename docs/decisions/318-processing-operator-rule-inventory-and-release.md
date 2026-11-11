@@ -66,6 +66,29 @@ upgrades starting at 149 retain the existing upgrade/rollback mechanism. A direc
 owned-fixture Down restores the exact prior function and floor 102; it is not a
 supported installed downgrade or a permanent development-layout compatibility layer.
 
+## Workload scope review
+
+The console also offers the existing `workloadInterval` scope after a
+successful workload/acquisition search. Confirmation shows exact cluster,
+namespace and workload identities plus the inclusive start and exclusive end
+in UTC. The selected query is immutable during review. Editing search fields
+clears the previous result. Cancellation submits no change.
+
+The rule covers every purpose and every result page, including matching
+evidence published later with an acquisition anchor in that interval. Search
+purpose filtering does not narrow this scope. An empty successful page can
+still supply the reviewed workload interval. The operator can widen the
+interval when acquisition anchors do not cover the incident's full time range.
+
+Submission, uncertain same-key retry, durable inventory and exact-revision
+release reuse the existing change pipeline. This adds zero routes, SQL grants,
+migrations, retained state types, background tasks or configuration. It sends
+one existing audited change per confirmed restriction, followed by explicit
+inventory reads and the existing reserved release change. SC-PRV-013 records
+the workflow and its bounds. Fresh installed workload-interval restriction,
+reload, original-key replay and exact release passed at `75b7606b`.
+Implementation progress records the complete evidence and remaining scope.
+
 ## Complexity and cost review
 
 1. Frequency/harm: every public release currently fails; restrictions cannot be

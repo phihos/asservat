@@ -1,6 +1,57 @@
 # Sustained implementation progress
 
-## Active candidate: exact early erasure (2026-11-11)
+## Active candidate: workload-interval processing restriction (2026-11-11)
+
+Outcome: a privacy operator searches by workload and acquisition time,
+reviews the complete immutable scope, restricts it, then reloads and releases
+that exact rule. The existing canonical workload scope, audited change,
+durable inventory and compiled SQL grants already support the behavior.
+The console currently offers only exact-artifact restriction. SC-PRV-013
+records the full review, all-purpose/all-page coverage and replay semantics.
+
+One candidate starts from authoritative `d94ab63f`. The missing review
+action was reproduced in a failing UI test before implementation. All 29
+focused processing tests and TypeScript pass. Domain race checks verify
+half-open boundaries, identity isolation and later-publication/lineage
+restriction semantics. The actual compiled console passes the shared
+workload, artifact and erasure browser journeys. The workload reload assertion
+compares timestamp instants across Go's whole-second JSON normalization.
+Python focus selection and specification/architecture/design gates pass.
+
+The installed fixture independently derives exact target and interval from
+retained SQL before checking browser mutations, both audit lanes and replay
+charges. Independent review found no concrete mismatch. At `75b7606b`,
+`make pre-push` passed, including 642 console tests and affected Go race
+tests (405 s). Full `make console-browser-check` passed in 155.228 s,
+including all three shared processing journeys, 29 standard journeys and
+28 accessibility scans.
+
+Fresh `make installed-focus FOCUS=processing-workload ARGS=--keep-on-failure`
+at `75b7606b` passed (Go 303.606 s, harness 366.6 s, both exits 0).
+After collecting and downloading the original regional pod-status file, the
+signed-in Keycloak operator searched the exact workload interval, confirmed
+one workload rule and reloaded its durable scope and revision. New ordinary
+case reads and download preparation were refused. Exact release restored the
+same original native bytes and deadline. Both original-key replays preserved
+SQL state, audit receipts and account spend. The operator workflow took
+12.912 s. All 4,787 source hashes match, cleanup failures are empty, and both
+owned clusters, labelled Docker resources and build scratch are removed.
+Original reports are archived externally under
+`privacy-workload-restriction/installed-75b7606b`.
+
+Required PR CI and merge remain pending.
+Added routes, roles, SQL state, schema migrations, background jobs and polls
+are zero. Confirmation itself performs no request. One existing audited
+change records the workload rule and the existing reserve funds release.
+
+## Merged exact early erasure (2026-11-11)
+
+[PR #220](https://github.com/phihos/asservat/pull/220) merged at `d94ab63f`.
+Its complete tree matches reviewed `20a6c16b`, whose 4,787 qualification
+source hashes match installed-tested `2fd6b5ee`.
+[Required PR CI](https://github.com/phihos/asservat/actions/runs/42937218020)
+passed all 14 Go shards and `ci-ok`. Independent review found no actionable
+regression and the posted Gitar review reported no issues.
 
 Outcome: a current privacy operator confirms a discovered artifact for early
 erasure, reloads its exact request and observes the independently verified
@@ -55,7 +106,7 @@ and both owned clusters, labelled Docker resources and build scratch are
 removed. Reports are archived externally under
 `privacy-early-erasure/installed-2fd6b5ee`.
 
-Required PR CI and merge remain pending. The exact-artifact path leaves
+The exact-artifact path leaves
 incident/workload batches, derivative/cache propagation, access/correction,
 preservation and inventory reporting under REQ-PRV-006.
 

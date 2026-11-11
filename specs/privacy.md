@@ -158,6 +158,24 @@ not establish that any user appears in the evidence or that all derivatives
 are known. The operator can select an exact result for the existing explicit
 restriction action.
 
+### SC-PRV-013
+
+Given a current privacy operator has searched by exact workload and a half-open
+UTC acquisition interval, the console can review and confirm one restriction
+for that entire immutable scope. Review states that every purpose and every
+result page is covered, including matching evidence published later. An optional
+purpose filter narrows discovery only. A successful empty page does not prevent
+the operator from reviewing the workload scope. Edited search fields invalidate
+the old selection. Cancellation submits no change.
+
+The confirmed change uses one stable request key and the existing audited
+workload-interval rule. New ordinary reads and response starts for matching
+evidence are refused. Another workload and an acquisition anchor at the exclusive
+end remain outside this scope. Reloading inventory preserves the exact scope
+and revision for explicit release. A same-key retry adds no audit spend or new
+deadline. Release restores ordinary access to eligible original evidence under
+its original bounds.
+
 ### SC-PRV-012
 
 Given a retained published artifact with a qualified closed writer, a current

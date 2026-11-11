@@ -6,7 +6,7 @@ import { ProcessingDiscovery } from './ProcessingDiscovery';
 import type { ProcessingDiscoveryClient } from './discovery-http';
 import { ProcessingErasureStatus } from './ProcessingErasureStatus';
 import type { ProcessingErasureClient } from './erasure-http';
-import { processingClient, ProcessingFailure, uuid, type ProcessingClient, type Inventory, type Change, type Receipt, type Rule } from './http';
+import { processingClient, ProcessingFailure, uuid, type ProcessingClient, type Inventory, type Change, type Receipt, type Rule, type WorkloadScope } from './http';
 
 const when = (value: string) => new Date(value).toLocaleString();
 function describe(rule: Rule) {
@@ -28,25 +28,26 @@ export function ProcessingWorkspace({ session, scope, client = processingClient,
   const [message, setMessage] = useState<string>();
   const [receipt, setReceipt] = useState<Receipt>();
   const [confirmation, setConfirmation] = useState<string>();
+  const [workloadConfirmation, setWorkloadConfirmation] = useState<WorkloadScope>();
   const [pending, setPending] = useState<{ input: Change; key: string }>();
   useLayoutEffect(() => {
     // Clear the previous principal's view before paint. Same-user session/CSRF
     // refreshes retain this scope and therefore retain an uncertain request.
     activeScope.current = scope;
     inFlight.current = false; setBusy(false);
-    setInventory(undefined); setReceipt(undefined); setPending(undefined); setConfirmation(undefined); setMessage(undefined); setArtifact(artifactID);
+    setInventory(undefined); setReceipt(undefined); setPending(undefined); setConfirmation(undefined); setWorkloadConfirmation(undefined); setMessage(undefined); setArtifact(artifactID);
     heading.current?.focus();
     const clear = () => {
       if (activeScope.current !== scope) return;
       inFlight.current = false; setBusy(false);
-      setInventory(undefined); setReceipt(undefined); setPending(undefined); setConfirmation(undefined); setMessage(undefined); setArtifact('');
+      setInventory(undefined); setReceipt(undefined); setPending(undefined); setConfirmation(undefined); setWorkloadConfirmation(undefined); setMessage(undefined); setArtifact('');
     };
     if (scope.aborted) clear();
     else scope.addEventListener('abort', clear, { once: true });
     return () => scope.removeEventListener('abort', clear);
   }, [scope]);
-  useLayoutEffect(() => { if (confirmation) confirmationHeading.current?.focus(); }, [confirmation]);
-  const locked = busy || !!pending || !!confirmation;
+  useLayoutEffect(() => { if (confirmation || workloadConfirmation) confirmationHeading.current?.focus(); }, [confirmation, workloadConfirmation]);
+  const locked = busy || !!pending || !!confirmation || !!workloadConfirmation;
   const load = async (after?: string) => {
     if (inFlight.current || !current()) return;
     inFlight.current = true; setBusy(true); setMessage(undefined); setInventory(undefined);
@@ -86,12 +87,16 @@ export function ProcessingWorkspace({ session, scope, client = processingClient,
     if (!current() || locked || !uuid.test(id)) return;
     setConfirmation(id);
   };
+  const reviewWorkload = (selected: WorkloadScope) => {
+    if (!current() || locked) return;
+    setWorkloadConfirmation(selected);
+  };
   return <div className="capture-workspace">
     <div className="page-intro"><h1 ref={heading} tabIndex={-1}>Processing restrictions</h1>
       <p>For configured privacy operators. Restrict processing, release an existing restriction, or request early erasure of saved evidence. Ordinary evidence access does not grant these actions.</p>
       <p>Restrictions persist until an explicit release. An administrative deadline does not release a restriction. External downloaded copies remain outside Asservat's control.</p>
     </div>
-    <ProcessingDiscovery session={session} scope={scope} client={discoveryClient} disabled={locked} onSelect={selectArtifact} onReviewErasure={reviewErasure}/>
+    <ProcessingDiscovery session={session} scope={scope} client={discoveryClient} disabled={locked} onSelect={selectArtifact} onReviewErasure={reviewErasure} onReviewWorkload={reviewWorkload}/>
     {confirmation && <section className="review-section" aria-labelledby="processing-erasure-confirmation">
       <h2 id="processing-erasure-confirmation" ref={confirmationHeading} tabIndex={-1}>Confirm early erasure</h2>
       <p>Artifact <span className="identifier">{confirmation}</span></p>
@@ -101,6 +106,22 @@ export function ProcessingWorkspace({ session, scope, client = processingClient,
         start({ action: 'request_early_erasure', artifactID: confirmation });
       }}>Confirm early erasure</Button>
       <Button className="button secondary" onPress={() => { setConfirmation(undefined); heading.current?.focus(); }}>Cancel early erasure</Button>
+    </section>}
+    {workloadConfirmation && <section className="review-section" aria-labelledby="processing-workload-confirmation">
+      <h2 id="processing-workload-confirmation" ref={confirmationHeading} tabIndex={-1}>Confirm workload restriction</h2>
+      <dl className="facts">
+        <dt>Cluster ID</dt><dd className="identifier">{workloadConfirmation.clusterID}</dd>
+        <dt>Namespace UID</dt><dd className="identifier">{workloadConfirmation.namespaceUID}</dd>
+        <dt>Workload UID</dt><dd className="identifier">{workloadConfirmation.workloadUID}</dd>
+        <dt>Acquired from (inclusive, UTC)</dt><dd>{workloadConfirmation.acquiredFrom}</dd>
+        <dt>Acquired until (exclusive, UTC)</dt><dd>{workloadConfirmation.acquiredUntil}</dd>
+      </dl>
+      <p>The restriction covers all purposes, every page, and matching artifacts published later that were acquired within this interval. The purpose filter applies only to discovery.</p>
+      <Button className="button" onPress={() => {
+        setWorkloadConfirmation(undefined);
+        start({ action: 'restrict_processing', ruleID: newID(), expectedRevision: 0, scope: workloadConfirmation });
+      }}>Confirm workload restriction</Button>
+      <Button className="button secondary" onPress={() => { setWorkloadConfirmation(undefined); heading.current?.focus(); }}>Cancel workload restriction</Button>
     </section>}
     <section className="review-section" aria-labelledby="processing-inventory"><h2 id="processing-inventory">Restriction inventory</h2>
       <p>Load existing restrictions, including when ordinary evidence access is blocked. Each page contains at most 50 rules.</p>

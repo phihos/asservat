@@ -80,6 +80,46 @@ func TestProcessingFutureWorkloadMatchesAndChildrenInherit(t *testing.T) {
 	}
 }
 
+func TestProcessingWorkloadIntervalBoundsAndIdentity(t *testing.T) {
+	snapshot, _ := processingSnapshotFixture()
+	node := snapshot.Nodes[0]
+	scope := ProcessingScope{
+		Kind: "workloadInterval", ClusterID: node.Target.ClusterID,
+		NamespaceUID: node.Target.NamespaceUID, WorkloadUID: node.Target.WorkloadUID,
+		AcquiredFrom: node.AnchorAt, AcquiredUntil: node.AnchorAt.Add(time.Second),
+	}
+	for _, test := range []struct {
+		name   string
+		anchor time.Time
+		want   bool
+	}{
+		{"before start", scope.AcquiredFrom.Add(-time.Microsecond), false},
+		{"inclusive start", scope.AcquiredFrom, true},
+		{"before end", scope.AcquiredUntil.Add(-time.Microsecond), true},
+		{"exclusive end", scope.AcquiredUntil, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			candidate := node
+			candidate.AnchorAt = test.anchor
+			if scope.Matches(candidate) != test.want {
+				t.Fatal("workload restriction changed its acquisition bounds")
+			}
+		})
+	}
+	for _, field := range []*string{&node.Target.NamespaceUID, &node.Target.WorkloadUID} {
+		original := *field
+		*field = "another-identity"
+		if scope.Matches(node) {
+			t.Fatal("workload restriction matched a different namespace or workload")
+		}
+		*field = original
+	}
+	node.Target.ClusterID, node.Location.ClusterID = processingID(99), processingID(99)
+	if scope.Matches(node) {
+		t.Fatal("workload restriction matched a different cluster")
+	}
+}
+
 func TestProcessingExpiredAdministrativeCoverageDoesNotRelease(t *testing.T) {
 	s, n := processingSnapshotFixture()
 	rule := ProcessingRule{ID: processingID(20), Revision: 1, State: "restricted", Scope: ProcessingScope{Kind: "artifact", Location: s.Subject}, AdministrationUntil: n.Add(-time.Hour), RetireBy: n.Add(-time.Minute)}

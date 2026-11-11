@@ -1182,7 +1182,7 @@ func installedJourneyFocus() string {
 // 20-minute limit; docs/implementation-progress.md records the split.
 func installedFastFixture() bool {
 	switch installedJourneyFocus() {
-	case "live-observation", "policy", "alert", "logresource", "browser", "restart", "upgrade", "journey", "clusters", "share", "approved-recording", "manual-logs", "manual-syscall", "manual-arguments", "manual-mixed", "manual-raw", "manual-http", "manual-peers", "manual-profile", "profile-comparison", "native-paced", "policy-recording", "policy-arguments", "policy-profile", "ongoing-save", "ongoing-save-disk", "ongoing-incident", "ongoing-syscall", "ongoing-mixed", "journey-store-failure", "journey-start-failure", "retention-shortening", "early-erasure":
+	case "live-observation", "policy", "alert", "logresource", "browser", "restart", "upgrade", "journey", "clusters", "share", "approved-recording", "manual-logs", "manual-syscall", "manual-arguments", "manual-mixed", "manual-raw", "manual-http", "manual-peers", "manual-profile", "profile-comparison", "native-paced", "policy-recording", "policy-arguments", "policy-profile", "ongoing-save", "ongoing-save-disk", "ongoing-incident", "ongoing-syscall", "ongoing-mixed", "journey-store-failure", "journey-start-failure", "retention-shortening", "early-erasure", "processing-workload":
 		return true
 	}
 	return false
