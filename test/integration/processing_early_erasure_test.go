@@ -123,7 +123,7 @@ WHERE p.root_id=$1 AND p.id=$2 AND p.applied_at IS NOT NULL AND a.id=$3`, root, 
 	if json.Unmarshal(raw, &lifecycle) != nil || !lifecycle.Valid() || lifecycle.ID != request.RequestID || lifecycle.Location != loc {
 		t.Fatal("exact erasure lifecycle decision did not validate")
 	}
-	if _, err := catalog.RetainedAudience(ctx, loc.ArtifactID); !errors.Is(err, value.ErrUnavailable) || !time.Now().Before(reg.ExpiresAt) {
+	if _, err := catalog.RetainedAudience(ctx, loc.ArtifactID); !errors.Is(err, privacyapp.ErrUnavailable) || !time.Now().Before(reg.ExpiresAt) {
 		t.Fatal("new reads did not stop at erasure before original expiry", err)
 	}
 	readStatus := func(auditState value.ProcessingErasureAuditState, deletionState value.ProcessingErasureDeletionState) value.ProcessingErasureStatus {
