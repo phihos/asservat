@@ -1,5 +1,8 @@
 # Decision records
 
+[ADR-326 — Individually selectable small services](326-individually-selectable-small-services.md)
+records the active self-contained installation candidate and its remaining qualification.
+
 [ADR-324 — Installable context trial](324-installable-context-trial.md)
 closes missing Helm/installer producers; the named shared/separate API context
 journeys pass and PR223 is merged.

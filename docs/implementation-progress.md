@@ -1,5 +1,80 @@
 # Sustained implementation progress
 
+## Active small-installation workflow (2026-11-11)
+
+The active candidate is `feature/small-installation-profile` in
+`asservat-small-installation`, based on authoritative main `62b80beb`.
+The maintainer has no external PostgreSQL, S3 or OpenBao and explicitly requests
+bundled Keycloak even though an existing Keycloak is available. Every bundled
+service must be independently selectable. The external-services context trial
+cannot satisfy this installation. The complete specification goal remains active;
+manual command work is parked separately at `c0b58cb0` and is not integrated here.
+
+[ADR-326](decisions/326-individually-selectable-small-services.md) records this
+candidate. Provider packaging and component checks are implementation evidence,
+not an installed small-profile result. There is no homelab deployment, supported
+release, image publication or completed REQ-DEP-001–005 qualification.
+
+| Boundary | Current evidence | Remaining work |
+| --- | --- | --- |
+| Selection | Closed Helm values independently select PostgreSQL, SeaweedFS and Keycloak; external defaults remain selectable | Key-provider preference is pending: bundled OpenBao versus the accepted isolated static-key service |
+| PostgreSQL | Create-once TLS/SCRAM state, retained PVCs, server budget117/122 and client pool2; actual image/TLS/separate logins/encrypted full backup/restart and Helm/native Pod parity pass | Restore and installed profile qualification |
+| Keycloak | Actual26.8.2 import, HTTPS readiness, console/MCP PKCE, group refresh and restart pass; generated identity, optional email and literal external-password handling verified | Installed Asservat identity/approval composition and broader lifecycle qualification |
+| SeaweedFS | Actual4.53 TLS, scoped policies, immutable versions, delayed projection/reload with new ordinary credential consumption and pinned exact-byte reads after restart pass | Provider phase composition, multipart and installed authority/lifecycle qualification |
+| Installation | Finite preparation command and actual rendered-role integration pass; generated CA and public Keycloak identity resolve before canonical compilation; full Helm/native Pod parity passes | Complete all provider inputs and continuation, then fresh Helm→login→capture→exact native download→expiry/deletion→restart journey |
+
+The first PostgreSQL image failed because `/etc/asservat` was nontraversable
+(mode0444). Creating that directory as0755 fixed the actual nonroot startup.
+The fresh component then passed with PostgreSQL18.6/pgBackRest2.60.0, exact TLS
+hostname checks, separate DDL/Keycloak logins, encrypted full backup and data/TLS
+persistence across restart; exit0, unchanged source and independent empty cleanup
+receipts are in `postgres-image-smoke/asv-small-pg-96152fac56/result.json` below.
+Restore was not tested. A retained-workload/missing-data-PVC regression failed
+before its fix and passes afterward; complete loss of both PVCs and all workloads
+still cannot be distinguished from an unfinished initial preparation by surviving
+credential state alone.
+
+The combined focused race selection passes across bootstrap2.691s,
+Kubernetes2.883s, PostgreSQL1.093s, provider configuration1.059s and
+object storage1.262s. It exercises actual Helm public inputs and named RBAC,
+KC→PG→S3 state→IAM preparation, byte-preserving/no-create replay, changed database
+target refusal and full native runner parity. `spec-check`, `helm-check`,
+`go-architecture-check` and `architecture-check` returned0; these are static and
+component checks, not installed qualification. The generated architecture report
+was archived outside the repository and restored in the worktree.
+
+The final Keycloak component returned0 in48.135s at
+`keycloak-component/asv-small-kc-1b02d0f955/result.json`, including real SQL empty/
+retained-state checks, exact literal `${...}`/`$$` external password through
+`KCRAW_DB_PASSWORD`, OAuth and persistence. All26 recorded relevant hashes,
+including the shared database-coordinate contract, match current files; root
+independently rehashed them and confirmed no owned Docker resources remain.
+Earlier failures retain their exact scopes: fixture readiness, rejected missing
+built-in email definition (fixed while keeping email optional), then fixture
+session reuse after deliberately replayed code. Component tokens and fixture
+administration are not evidence of installed Asservat approval authority.
+
+The final Seaweed component returned Go0/37.033s and harness0/41.468s at
+`seaweed-component-pinned-reader-453/receipt.json`. All4,648 before/after source
+hashes independently matched at terminal readback, and exact owned containers/
+network are absent. One trailing blank line in the PVC template was subsequently
+removed for `git diff --check`; its unchanged non-whitespace bytes are recorded
+separately. No Seaweed Go implementation, image or configuration changed. It verifies12KiB of bounded synthetic successful writes: TLS/plain HTTP
+refusal, internal loopback listeners, owned tags/versioning/policy, immutable
+versioned bytes, actual delayed projection plus fixed SIGHUP, new ordinary
+credential use, exact403 role/prefix/administration refusals, delete-only effects
+and restart reads through production `Store.Pin.ReadRange`. There is no SQL
+funding, multipart, public grant or installed workflow claim. The two failures
+remain preserved: strict policy readback exposed upstream singleton-array
+canonicalization (compiler fixed without weakening equality), then the fixture's
+short raw-SDK read was replaced with the actual production pinned consumer.
+
+All generated test reports remain outside the repository under
+`/home/phil/.cache/asservat-build/small-installation/`. No report is committed.
+The component candidate was frozen during each named service run. Provider setup
+and key-service integration remain the next implementation work; the full goal
+is active. No PR or merge is claimed for this local checkpoint.
+
 ## Installed-qualified finite share metadata retirement (2026-11-11)
 
 The manual/capture-time sharing workflow now passes through healthy certificate

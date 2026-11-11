@@ -1,0 +1,120 @@
+{{- $services := default dict .Values.services }}
+{{- $identity := dig "identity" (dict) $services }}
+{{- if eq (default "external" $identity.provider) "keycloak" }}
+{{- $kc := $identity.keycloak }}
+{{- if not (regexMatch "^[a-z0-9][a-z0-9./:_-]{0,383}@sha256:[a-f0-9]{64}$" $kc.image) }}
+{{- fail "services.identity.keycloak.image requires the verified Keycloak repository@sha256 digest" }}
+{{- end }}
+{{- $name := printf "%s-keycloak" .Values.bootstrap.name }}
+{{- $db := $kc.database }}
+{{- $bundledPG := eq (dig "postgres" "provider" "external" $services) "bundled" }}
+{{- $host := default (printf "%s-postgres.%s.svc" .Values.bootstrap.name .Release.Namespace) $db.host }}
+{{- $credentials := default (printf "%s-postgres-state" .Values.bootstrap.name) $db.credentialsSecretName }}
+{{- $roots := default (printf "%s-postgres-state" .Values.bootstrap.name) $db.rootsSecretName }}
+{{- if or (not $kc.hostname) (not (hasPrefix "https://" $kc.hostname)) (not $kc.tlsSecretName) }}
+{{- fail "services.identity.keycloak requires an explicit HTTPS hostname and tlsSecretName" }}
+{{- end }}
+{{- if and (or (not $bundledPG) (not (empty $db.host))) (or (not $db.host) (not $db.credentialsSecretName) (not $db.rootsSecretName)) }}
+{{- fail "bundled Keycloak with external PostgreSQL requires database.host, credentialsSecretName and rootsSecretName" }}
+{{- end }}
+{{- if ne (int $db.maxConnections) 5 }}
+{{- fail "services.identity.keycloak.database.maxConnections must be 5 for the small profile" }}
+{{- end }}
+{{- if and $bundledPG (not $db.host) (or (ne (int $db.port) 5432) (ne $db.name "keycloak") (ne $db.user "keycloak")) }}
+{{- fail "Keycloak on bundled PostgreSQL requires the fixed keycloak database/user and port5432" }}
+{{- end }}
+{{- if or (not (regexMatch "^[a-zA-Z0-9]([a-zA-Z0-9.-]{0,251}[a-zA-Z0-9])?$" $host)) (not (regexMatch "^[a-zA-Z_][a-zA-Z0-9_-]{0,62}$" $db.name)) (not (regexMatch "^[a-zA-Z_][a-zA-Z0-9_-]{0,62}$" $db.user)) }}
+{{- fail "Keycloak database host/name/user must be plain database identifiers without JDBC URL metacharacters" }}
+{{- end }}
+{{- if and $bundledPG (not $db.host) (or (and $db.credentialsSecretName (ne $db.credentialsSecretName (printf "%s-postgres-state" .Values.bootstrap.name))) (and $db.rootsSecretName (ne $db.rootsSecretName (printf "%s-postgres-state" .Values.bootstrap.name)))) }}
+{{- fail "Keycloak on bundled PostgreSQL uses its generated PostgreSQL credential and roots source; select an explicit database.host for an external database" }}
+{{- end }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+  labels: &labels
+    app.kubernetes.io/name: asservat-keycloak
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector:
+    matchLabels: *labels
+  template:
+    metadata:
+      labels: *labels
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: keycloak
+          image: {{ $kc.image | quote }}
+          imagePullPolicy: IfNotPresent
+          args: [start, --import-realm, --db=postgres, --cache=local, --http-enabled=false, --https-port=8443, --health-enabled=true]
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+          ports:
+            - {name: https, containerPort: 8443}
+            - {name: management, containerPort: 9000}
+          env:
+            - {name: KC_HOSTNAME, value: {{ $kc.hostname | quote }}}
+            - {name: KC_HOSTNAME_STRICT, value: "true"}
+            - {name: KC_HTTPS_CERTIFICATE_FILE, value: /opt/keycloak/tls/tls.crt}
+            - {name: KC_HTTPS_CERTIFICATE_KEY_FILE, value: /opt/keycloak/tls/tls.key}
+            - name: KC_DB_URL
+              value: {{ printf "jdbc:postgresql://%s:%d/%s?sslmode=verify-full&sslrootcert=/opt/keycloak/db/ca.crt" $host (int $db.port) $db.name | quote }}
+            - {name: KC_DB_USERNAME, value: {{ $db.user | quote }}}
+            - name: KCRAW_DB_PASSWORD
+              valueFrom: {secretKeyRef: {name: {{ $credentials }}, key: keycloak-password}}
+            - {name: KC_DB_POOL_INITIAL_SIZE, value: "1"}
+            - {name: KC_DB_POOL_MIN_SIZE, value: "1"}
+            - {name: KC_DB_POOL_MAX_SIZE, value: "5"}
+            - name: KC_BOOTSTRAP_ADMIN_USERNAME
+              valueFrom: {secretKeyRef: {name: {{ printf "%s-state" $name }}, key: bootstrap-admin-username}}
+            - name: KC_BOOTSTRAP_ADMIN_PASSWORD
+              valueFrom: {secretKeyRef: {name: {{ printf "%s-state" $name }}, key: bootstrap-admin-password}}
+            - name: KC_ASSERVAT_CONSOLE_SECRET
+              valueFrom: {secretKeyRef: {name: {{ printf "%s-state" $name }}, key: console-client-secret}}
+          resources:
+            {{- toYaml $kc.resources | nindent 12 }}
+          startupProbe:
+            httpGet: {path: /health/started, port: management, scheme: HTTPS}
+            periodSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            httpGet: {path: /health/ready, port: management, scheme: HTTPS}
+            periodSeconds: 10
+          volumeMounts:
+            - {name: tls, mountPath: /opt/keycloak/tls, readOnly: true}
+            - {name: db-roots, mountPath: /opt/keycloak/db, readOnly: true}
+            - {name: realm, mountPath: /opt/keycloak/data/import, readOnly: true}
+            - {name: data, mountPath: /opt/keycloak/data}
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        - name: tls
+          secret:
+            secretName: {{ $kc.tlsSecretName }}
+            defaultMode: 0440
+            items: [{key: tls.crt, path: tls.crt}, {key: tls.key, path: tls.key}]
+        - name: db-roots
+          secret:
+            secretName: {{ $roots }}
+            defaultMode: 0440
+            items: [{key: ca.crt, path: ca.crt}]
+        - name: realm
+          secret:
+            secretName: {{ printf "%s-state" $name }}
+            defaultMode: 0440
+            items: [{key: {{ printf "%s-realm.json" $kc.realm }}, path: {{ printf "%s-realm.json" $kc.realm }}}]
+        - {name: data, emptyDir: {sizeLimit: 256Mi}}
+        - {name: tmp, emptyDir: {sizeLimit: 64Mi}}
+{{- end }}

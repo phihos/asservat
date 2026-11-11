@@ -66,7 +66,8 @@ func InstallerInboxPublicFiles() []string {
 }
 
 type InstallerContinuation struct {
-	Format string `json:"format"`
+	Format         string `json:"format"`
+	IdentitySource string `json:"identitySource,omitempty"`
 	// Namespace is the chart's release namespace holding the outbox and inbox;
 	// operators cannot write the guarded installation namespace.
 	Namespace      string                     `json:"namespace"`

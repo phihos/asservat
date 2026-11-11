@@ -22,7 +22,7 @@ import (
 // The optional token audience is a hint only; no other claim is returned.
 func CompileInitialBootstrapInput(v contracts.InitialBootstrapInput, kubernetesCA, token []byte, now time.Time) (contracts.InitialBootstrap, error) {
 	var zero contracts.InitialBootstrap
-	if v.Format != contracts.InitialBootstrapInputFormat || v.RegistryAuthentication != "" && v.RegistryAuthentication != contracts.InitialRegistryAuthentication || now.IsZero() || len(validation.IsDNS1123Label(v.RunnerAccount)) != 0 || len(validation.IsDNS1123Label(v.BootstrapNamespace)) != 0 {
+	if v.Format != contracts.InitialBootstrapInputFormat || v.IdentitySource != "" || v.Postgres.RootsSource != "" || v.RegistryAuthentication != "" && v.RegistryAuthentication != contracts.InitialRegistryAuthentication || now.IsZero() || len(validation.IsDNS1123Label(v.RunnerAccount)) != 0 || len(validation.IsDNS1123Label(v.BootstrapNamespace)) != 0 {
 		return zero, cfg.ErrInvalid
 	}
 	admins, err := initialBootstrapAdministrators(v)

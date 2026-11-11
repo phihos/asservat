@@ -115,6 +115,7 @@ require (
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/go-containerregistry v0.21.3 // indirect
 	github.com/google/jsonschema-go v0.4.3 // indirect
+	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
@@ -141,6 +142,7 @@ require (
 	github.com/moby/locker v1.0.1 // indirect
 	github.com/moby/moby/api v1.56.1 // indirect
 	github.com/moby/moby/client v0.6.1 // indirect
+	github.com/moby/spdystream v0.5.1 // indirect
 	github.com/moby/sys/mountinfo v0.7.2 // indirect
 	github.com/moby/sys/sequential v0.6.0 // indirect
 	github.com/moby/sys/signal v0.7.0 // indirect
@@ -221,6 +223,7 @@ require (
 	k8s.io/klog/v2 v2.140.0 // indirect
 	k8s.io/kube-openapi v0.0.0-20260721132016-d427ff9ee9ad // indirect
 	k8s.io/kubelet v0.37.1 // indirect
+	k8s.io/streaming v0.37.1 // indirect
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 // indirect
 	sigs.k8s.io/kustomize/api v0.21.1 // indirect
 	sigs.k8s.io/kustomize/kyaml v0.21.1 // indirect

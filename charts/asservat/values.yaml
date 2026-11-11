@@ -232,3 +232,52 @@ collector:
   ringDisk:
     enabled: false
     bytes: 1073741824
+
+# Independently selectable dependencies. External choices use the existing
+# bootstrap provider inputs and are never provisioned or adopted by this chart.
+services:
+  postgres:
+    provider: external
+    bundled:
+      image: ""
+      storageClass: ""
+      dataSize: 64Gi
+      backupSize: 64Gi
+      resources:
+        requests: {cpu: 100m, memory: 256Mi}
+        limits: {cpu: "2", memory: 1Gi}
+      backupResources:
+        requests: {cpu: 20m, memory: 64Mi}
+        limits: {cpu: "1", memory: 256Mi}
+  objectStore:
+    provider: external
+    seaweedfs:
+      image: chrislusf/seaweedfs@sha256:ccad23e18639c8b98cee17e7100b95830a06077b56d8e5b006d6dcf8ec5e94a0
+      persistence:
+        storageClass: ""
+        size: 32Gi
+      resources:
+        requests: {cpu: 100m, memory: 128Mi}
+        limits: {cpu: "2", memory: 1Gi}
+  identity:
+    provider: external
+    keycloak:
+      image: quay.io/keycloak/keycloak@sha256:723b1d6e254c0fc96d5cffec860c7e0744d6a3277822b865bb538cf891575e41
+      hostname: ""
+      realm: asservat
+      tlsSecretName: ""
+      mcpRedirectURIs: []
+      database:
+        host: ""
+        port: 5432
+        name: keycloak
+        user: keycloak
+        credentialsSecretName: ""
+        rootsSecretName: ""
+        maxConnections: 5
+      service:
+        type: ClusterIP
+        nodePort: 31451
+      resources:
+        requests: {cpu: 100m, memory: 256Mi}
+        limits: {cpu: "2", memory: 1Gi}

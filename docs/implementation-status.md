@@ -4,6 +4,13 @@ Evidence updated on **2026-11-11**. The context-trial main baseline is [PR223](h
 
 **There is no supported homelab release yet.** Several packaged operator/developer workflows have installed evidence. That evidence applies to the named environments and inputs; it does not complete the accepted first-release scope or qualify sustained production operation. Component, built-browser and installed evidence remain distinct.
 
+The active next workflow is the self-contained small installation, following the
+maintainer's correction that the external-services trial is unusable without
+external PostgreSQL and S3. Bundled PostgreSQL/pgBackRest, SeaweedFS and Keycloak
+are being integrated with independent provider choices. PostgreSQL has component
+startup/backup/restart evidence; the complete small-profile install remains
+unqualified. See the [current ledger](implementation-progress.md).
+
 No overall completion percentage or calendar ETA is established. Earlier estimates lacked a consistent scope/effort baseline and are withdrawn.
 
 ## Evidence levels

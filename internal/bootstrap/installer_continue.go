@@ -119,6 +119,9 @@ func OpenInstallerContinuation(ctx context.Context, files, preparer *os.Root, st
 	if err != nil || k.input.Format != contracts.InstallerContinuationFormat {
 		return nil, mounts.ErrUnavailable
 	}
+	if err := resolveInstallerContinuationIdentity(ctx, files, &k.input); err != nil {
+		return nil, err
+	}
 	// ADR-194 decision 1: promotion needs the capacity and federation steps.
 	if p := k.input.Public; p != nil {
 		if !privacy.ProcessingOrganizationsValid(installerProcessingOrganizations(p.Processors)) {

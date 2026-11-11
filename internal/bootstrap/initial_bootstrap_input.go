@@ -39,6 +39,12 @@ func readInitialBootstrapDesired(ctx context.Context, input *os.Root) (contracts
 	if err != nil {
 		return zero, mounts.ErrUnavailable
 	}
+	if err := resolveInitialBootstrapPostgresRoots(ctx, input, &v); err != nil {
+		return zero, err
+	}
+	if err := resolveInitialBootstrapIdentity(ctx, input, &v); err != nil {
+		return zero, err
+	}
 	var ca, token []byte
 	if v.Kubernetes.RootsPEM == "" {
 		ca, err = mounts.Read(ctx, input, "kube-ca.crt", 32<<10)
@@ -58,4 +64,26 @@ func readInitialBootstrapDesired(ctx context.Context, input *os.Root) (contracts
 		return zero, mounts.ErrUnavailable
 	}
 	return d, nil
+}
+
+func resolveInitialBootstrapPostgresRoots(ctx context.Context, input *os.Root, v *contracts.InitialBootstrapInput) error {
+	if v == nil || ctx == nil || input == nil {
+		return mounts.ErrUnavailable
+	}
+	if v.Postgres.RootsSource == "" {
+		return nil
+	}
+	if v.Postgres.RootsSource != contracts.InitialBootstrapBundledPostgresRoots || v.Postgres.RootsPEM != "" {
+		return mounts.ErrUnavailable
+	}
+	ca, err := mounts.Read(ctx, input, contracts.InitialBootstrapPostgresCAFile, 32<<10)
+	if err != nil || ctx.Err() != nil {
+		return mounts.ErrUnavailable
+	}
+	// Trust parsing/expiry/duplication and canonical ordering remain the same
+	// full compiler path as explicit operator PEM. Do not return a precompiled
+	// endpoint or invent a trust observation here.
+	v.Postgres.RootsPEM = string(ca)
+	v.Postgres.RootsSource = ""
+	return nil
 }

@@ -4,6 +4,12 @@ import "io"
 
 const InitialBootstrapInputFormat = "asservat-bootstrap-input/v1"
 
+// The selected bundled provider projects this fixed public certificate file.
+// It is resolved before canonical installation input is compiled; it never
+// excludes the actual trust bytes from the immutable installation identity.
+const InitialBootstrapBundledPostgresRoots = "bundledPostgres"
+const InitialBootstrapPostgresCAFile = "postgres-ca.crt"
+
 // Public installer input for the official chart. Only static operator choices
 // occur here; the product obtains all UIDs, SQL OIDs and original effect IDs.
 // PEM roots are normalized before private files or effects are touched.
@@ -17,6 +23,7 @@ type InitialBootstrapInput struct {
 	Image                  string                          `json:"image"`
 	RegistryAuthentication string                          `json:"registryAuthentication,omitempty"`
 	ProbeAudience          string                          `json:"probeAudience,omitempty"`
+	IdentitySource         string                          `json:"identitySource,omitempty"`
 	Kubernetes             InitialBootstrapEndpointInput   `json:"kubernetes"`
 	Postgres               InitialBootstrapPostgresInput   `json:"postgres"`
 	AuditStore             InitialBootstrapAuditStoreInput `json:"auditStore"`
@@ -34,6 +41,7 @@ type InitialBootstrapPostgresInput struct {
 	Database       string `json:"database"`
 	MaxConnections int32  `json:"maxConnections"`
 	RootsPEM       string `json:"rootsPEM"`
+	RootsSource    string `json:"rootsSource,omitempty"`
 }
 type InitialBootstrapAuditStoreInput struct {
 	Endpoint string `json:"endpoint"`

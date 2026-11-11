@@ -1,6 +1,6 @@
 # Deployment profiles and internal dependency alternatives
 
-The maintainer requires a small-deployment path that does not require separately operated SSO, KMS, S3 or PostgreSQL and has accepted the recommendations in [ADR-063](../docs/decisions/063-small-deployment-alternatives.md). The [research report](../docs/research/small-deployments.md) distinguishes selected choices from measured qualification. These requirements are planned behavior, not available chart settings.
+The maintainer requires a small-deployment path that does not require separately operated SSO, KMS, S3 or PostgreSQL and has accepted the recommendations in [ADR-063](../docs/decisions/063-small-deployment-alternatives.md). The [research report](../docs/research/small-deployments.md) distinguishes selected choices from measured qualification. Qualification remains incomplete; the implementation ledger distinguishes component settings from an installable profile.
 
 ## REQ-DEP-001 — Independently selectable infrastructure
 
@@ -33,6 +33,14 @@ permanently fail that call; no reacquisition or cross-call cache is allowed.
 An unavailable read MUST NOT be reported as evidence of changed identity.
 Unknown writes retain original claims and lookup-only recovery. This exception
 provides bounded freshness, not instantaneous revocation or runtime enablement.
+
+The maintainer's 2026-11-11 refinement requires bundled Keycloak as an explicit
+identity choice, independently of the PostgreSQL, object-store and key-service
+selections. An existing external Keycloak remains selectable. Bundled Keycloak
+MUST retain its original realm/client/group identities and selected database
+target across retries, restart and upgrade; changing the target requires an
+explicit supported migration. Generated credentials MUST remain outside Helm
+values and release data. See [ADR-326](../docs/decisions/326-individually-selectable-small-services.md).
 
 Official Helm installation MUST offer explicit bundled and external choices for identity, key services, PostgreSQL and evidence storage. A small profile selects compatible internal/bundled defaults; administrators can override each provider independently. Deployment size is separate from hub/cluster topology and never introduces tenants. Workload-cluster enrollment MUST NOT install duplicate hub databases or identity services. Reuse existing configured infrastructure without taking ownership of it.
 

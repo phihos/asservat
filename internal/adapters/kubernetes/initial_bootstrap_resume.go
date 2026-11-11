@@ -73,11 +73,25 @@ func ResumeInitialBootstrapRunner(ctx context.Context, c *rest.Config, namespace
 	if err != nil || refs.Format != contracts.InitialBootstrapRunnerInputFormat || (refs.RegistrySecret != "") != (input.RegistryAuthentication == contracts.InitialRegistryAuthentication) || input.RegistryAuthentication != "" && input.RegistryAuthentication != contracts.InitialRegistryAuthentication {
 		return zero, cfg.ErrChanged
 	}
+	if input.Postgres.RootsSource == contracts.InitialBootstrapBundledPostgresRoots {
+		if input.Postgres.RootsPEM != "" || refs.PostgresSecret != name+"-postgres-state" || input.Postgres.Host != name+"-postgres."+namespace+".svc" || input.Postgres.Port != 5432 || input.Postgres.Database != "asservat" || input.Postgres.MaxConnections != 2 {
+			return zero, cfg.ErrChanged
+		}
+	} else if input.Postgres.RootsSource != "" || refs.PostgresSecret != "" {
+		return zero, cfg.ErrChanged
+	}
+	if input.IdentitySource == "bundledKeycloak" {
+		if refs.KeycloakSecret != name+"-keycloak-state" {
+			return zero, cfg.ErrChanged
+		}
+	} else if input.IdentitySource != "" || refs.KeycloakSecret != "" {
+		return zero, cfg.ErrChanged
+	}
 	sum := sha256.Sum256([]byte(cm.Data["bootstrap.json"] + "\n" + cm.Data["runner.json"]))
 	if hex.EncodeToString(sum[:]) != originalDigest {
 		return zero, cfg.ErrChanged
 	}
-	plan := InitialBootstrapRunnerPlan{Namespace: namespace, Name: name, Image: input.Image, InputDigest: hex.EncodeToString(sum[:]), ProducerSecret: refs.ProducerSecret, SchemaSecret: refs.SchemaSecret, RetirementSecret: refs.RetirementSecret, RegistrySecret: refs.RegistrySecret, ProbeAudience: input.ProbeAudience, ContinuationDigest: refs.ContinuationDigest}
+	plan := InitialBootstrapRunnerPlan{Namespace: namespace, Name: name, Image: input.Image, InputDigest: hex.EncodeToString(sum[:]), ProducerSecret: refs.ProducerSecret, SchemaSecret: refs.SchemaSecret, RetirementSecret: refs.RetirementSecret, RegistrySecret: refs.RegistrySecret, ProbeAudience: input.ProbeAudience, ContinuationDigest: refs.ContinuationDigest, PostgresSecret: refs.PostgresSecret, KeycloakSecret: refs.KeycloakSecret}
 	want, err := BuildInitialBootstrapRunner(plan)
 	if err != nil {
 		return zero, err

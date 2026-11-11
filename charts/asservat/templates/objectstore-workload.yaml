@@ -1,0 +1,137 @@
+{{- $services := default dict .Values.services }}
+{{- if eq (dig "objectStore" "provider" "external" $services) "seaweedfs" }}
+{{- $p := .Values.services.objectStore.seaweedfs }}
+{{- $name := printf "%s-objectstore" .Values.bootstrap.name }}
+{{- if not (regexMatch "^[a-z0-9][a-z0-9./:_-]{0,383}@sha256:[a-f0-9]{64}$" .Values.services.objectStore.seaweedfs.image) }}
+{{- fail "services.objectStore.seaweedfs.image requires the verified SeaweedFS repository@sha256 digest" }}
+{{- end }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $name }}-config
+  namespace: {{ .Release.Namespace }}
+data:
+  filer.toml: |
+    [leveldb2]
+    enabled = true
+    dir = "/data/filerldb2"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  selector:
+    asservat.io/objectstore: {{ $name }}
+  ports:
+    - name: s3-tls
+      port: 8333
+      targetPort: s3-tls
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  serviceName: {{ $name }}
+  replicas: 1
+  revisionHistoryLimit: 1
+  selector:
+    matchLabels:
+      asservat.io/objectstore: {{ $name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: asservat-objectstore
+        asservat.io/objectstore: {{ $name }}
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      terminationGracePeriodSeconds: 60
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: seaweed
+          image: {{ $p.image | quote }}
+          imagePullPolicy: IfNotPresent
+          command: [/usr/bin/weed]
+          args:
+            - server
+            - -dir=/data
+            - -ip=127.0.0.1
+            - -ip.bind=127.0.0.1
+            - -master=true
+            - -volume=true
+            - -filer=true
+            - -s3=true
+            - -master.telemetry=false
+            - -s3.ip.bind=0.0.0.0
+            - -s3.port=8333
+            - -s3.port.https=0
+            - -s3.cert.file=/run/asservat/objectstore-tls/tls.crt
+            - -s3.key.file=/run/asservat/objectstore-tls/tls.key
+            - -s3.config=/run/asservat/objectstore-iam/s3.json
+            - -s3.iam=false
+            - -s3.autoCreateBucket=false
+            - -s3.port.iceberg=0
+            - -s3.port.lance=0
+            - -iam=false
+            - -webdav=false
+            - -sftp=false
+            - -mq.broker=false
+            - -mq.agent=false
+            - -metricsPort=0
+            - -debug=false
+          ports:
+            - name: s3-tls
+              containerPort: 8333
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          resources: {{ toYaml $p.resources | nindent 12 }}
+          # TCP readiness is startup only. The installer independently checks
+          # authenticated versioned S3 and scoped policy before activation.
+          readinessProbe:
+            tcpSocket: {port: s3-tls}
+            periodSeconds: 5
+            timeoutSeconds: 2
+          startupProbe:
+            tcpSocket: {port: s3-tls}
+            periodSeconds: 2
+            timeoutSeconds: 2
+            failureThreshold: 90
+          volumeMounts:
+            - {name: data, mountPath: /data}
+            - {name: filer-config, mountPath: /etc/seaweedfs, readOnly: true}
+            - {name: iam, mountPath: /run/asservat/objectstore-iam, readOnly: true}
+            - {name: tls, mountPath: /run/asservat/objectstore-tls, readOnly: true}
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ printf "%s-data" $name }}
+        - name: filer-config
+          configMap: {name: {{ $name }}-config}
+        - name: iam
+          secret:
+            secretName: {{ $name }}-iam
+            defaultMode: 0440
+            items: [{key: s3.json, path: s3.json}]
+        - name: tls
+          secret:
+            secretName: {{ $name }}-state
+            defaultMode: 0440
+            items:
+              - {key: tls.crt, path: tls.crt}
+              - {key: tls.key, path: tls.key}
+        - name: tmp
+          emptyDir: {medium: Memory, sizeLimit: 32Mi}
+{{- end }}

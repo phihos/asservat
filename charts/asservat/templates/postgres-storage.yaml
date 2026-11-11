@@ -1,0 +1,24 @@
+{{- $services := default dict .Values.services }}
+{{- if eq (dig "postgres" "provider" "external" $services) "bundled" }}
+{{- $p := .Values.services.postgres.bundled }}
+{{- range $kind, $size := dict "data" $p.dataSize "backup" $p.backupSize }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ printf "%s-postgres-%s" $.Values.bootstrap.name $kind }}
+  namespace: {{ $.Release.Namespace }}
+  annotations:
+    helm.sh/resource-policy: keep
+  labels:
+    app.kubernetes.io/name: asservat-postgres
+spec:
+  accessModes: [ReadWriteOnce]
+  {{- if $p.storageClass }}
+  storageClassName: {{ $p.storageClass | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ $size | quote }}
+{{- end }}
+{{- end }}

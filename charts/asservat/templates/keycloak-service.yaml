@@ -1,0 +1,25 @@
+{{- $services := default dict .Values.services }}
+{{- $identity := dig "identity" (dict) $services }}
+{{- if eq (default "external" $identity.provider) "keycloak" }}
+{{- $kc := $identity.keycloak }}
+{{- if not (has $kc.service.type (list "ClusterIP" "NodePort")) }}
+{{- fail "services.identity.keycloak.service.type must be ClusterIP or NodePort" }}
+{{- end }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ printf "%s-keycloak" .Values.bootstrap.name }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  type: {{ $kc.service.type }}
+  selector:
+    app.kubernetes.io/name: asservat-keycloak
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+  ports:
+    - name: https
+      port: 8443
+      targetPort: https
+      {{- if and (eq $kc.service.type "NodePort") $kc.service.nodePort }}
+      nodePort: {{ $kc.service.nodePort }}
+      {{- end }}
+{{- end }}

@@ -27,10 +27,19 @@
     "registrySecret": {
       "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/name"
     },
+    "postgresSecret": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/name",
+      "description": "Optional fixed <bootstrap-name>-postgres-state source for bundled PostgreSQL. Projects only the public CA and phase-specific SQL credential files."
+    },
     "continuationDigest": {
       "type": "string",
       "pattern": "^[a-f0-9]{64}$",
       "description": "Full SHA-256 of the immutable continuation.json bytes. Its ConfigMap name is derived from the original bootstrap name and the first 32 digest characters; the full digest binds the runner input."
+    },
+    "keycloakSecret": {
+      "type": "string",
+      "pattern": "^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$",
+      "maxLength": 253
     }
   }
 }

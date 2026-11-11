@@ -87,8 +87,27 @@
         "rootsPEM": {
           "type": "string",
           "maxLength": 32768
+        },
+        "rootsSource": {
+          "const": "bundledPostgres"
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "rootsSource"
+            ]
+          },
+          "then": {
+            "properties": {
+              "rootsPEM": {
+                "const": ""
+              }
+            }
+          }
+        }
+      ]
     },
     "auditStore": {
       "type": "object",
@@ -173,6 +192,9 @@
       "items": {
         "$ref": "https://asservat.io/spec/v1/owner-deployment.schema.json#/properties/workloadGuard/properties/administrators/items"
       }
+    },
+    "identitySource": {
+      "const": "bundledKeycloak"
     }
   }
 }
