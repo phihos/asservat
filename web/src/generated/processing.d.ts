@@ -73,9 +73,15 @@ export interface components {
             ruleID: string;
             expectedRevision: number;
             scope: components["schemas"]["Contract_processing_30a5a965212655cf"];
+        } | {
+            /** @constant */
+            action: "request_early_erasure";
+            /** Format: uuid */
+            artifactID: string;
         };
         ProcessingChange: components["schemas"]["Contract_processing_5c4c1b2613c810e5"];
-        Contract_processing_777db293a5ce3458: {
+        Contract_processing_777db293a5ce3458: components["schemas"]["Contract_processing_6183fe4b7f727c89"] | components["schemas"]["Contract_processing_1360c24949605ce7"];
+        Contract_processing_6183fe4b7f727c89: {
             /** Format: uuid */
             rootID: string;
             /** Format: uuid */
@@ -89,6 +95,23 @@ export interface components {
             /** @enum {unknown} */
             state: "initialized" | "restricted" | "released";
             revision: number;
+            sequence: number;
+            /** Format: date-time */
+            observedAt: string;
+            /** Format: date-time */
+            validUntil: string;
+        };
+        Contract_processing_1360c24949605ce7: {
+            /** Format: uuid */
+            rootID: string;
+            /** Format: uuid */
+            epoch: string;
+            /** Format: uuid */
+            requestID: string;
+            /** Format: uuid */
+            operationID: string;
+            /** @constant */
+            state: "erasureRequested";
             sequence: number;
             /** Format: date-time */
             observedAt: string;

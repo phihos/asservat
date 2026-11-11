@@ -34,3 +34,23 @@ it('cancels the actual metadata request on scope loss without replay', async () 
   vi.stubGlobal('fetch', fetcher); const scope = new AbortController(); const result = processingClient.read(scope.signal); scope.abort();
   await expect(result).rejects.toMatchObject({ name: 'AbortError' }); expect(downstream.aborted).toBe(true); expect(fetcher).toHaveBeenCalledTimes(1);
 });
+
+it('requires the exact artifact and request ID for an erasure acknowledgement without rule fields', async () => {
+  const now = page(), input = { action: 'request_early_erasure' as const, artifactID: id(5) };
+  const accepted = { rootID: now.rootID, epoch: now.epoch, sequence: 2, requestID: id(8), operationID: id(9),
+    state: 'erasureRequested', observedAt: now.observedAt, validUntil: now.validUntil };
+  const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(json(accepted));
+  vi.stubGlobal('fetch', fetcher);
+  const scope = new AbortController();
+  expect(validProcessingChange({ ...input, ruleID: id(3) })).toBe(false);
+  expect(validProcessingChange({ ...input, expectedRevision: 0 })).toBe(false);
+  expect(validProcessingChange({ ...input, reason: 'free text' })).toBe(false);
+  await expect(processingClient.change(input, id(8), 'C'.repeat(43), scope.signal)).resolves.toEqual(accepted);
+  expect(fetcher.mock.calls[0][0]).toBe('/api/v1/processing/changes');
+  expect(fetcher.mock.calls[0][1]).toMatchObject({ method: 'POST', headers: { 'Idempotency-Key': id(8), 'X-CSRF-Token': 'C'.repeat(43) } });
+  expect(JSON.parse(fetcher.mock.calls[0][1]!.body as string)).toEqual(input);
+  for (const mismatch of [{ requestID: id(10) }, { revision: 0 }, { ruleID: id(3) }, { state: 'initialized', revision: 0 }]) {
+    fetcher.mockResolvedValueOnce(json({ ...accepted, ...mismatch }));
+    await expect(processingClient.change(input, id(8), 'C'.repeat(43), scope.signal)).rejects.toMatchObject({ status: 502 });
+  }
+});

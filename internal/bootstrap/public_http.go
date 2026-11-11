@@ -225,7 +225,8 @@ func newPublicHandler(ctx context.Context, d *OwnerDeployment, a publicAuditStor
 		}
 		services.ProcessingRules = publicProcessingInventory{privacyapp.ProcessingRuleInventory{RootID: root, InstallationID: installation, Policies: pc.processingPolicy, Recovery: pc.recovery, Inventory: inventory, Now: time.Now}}
 		discovery, err := presentation.NewProcessingDiscoveryOperations(p.Origin, time.Now, ownerRandomID,
-			privacyapp.ProcessingEvidenceDiscovery{RootID: root, InstallationID: installation, Policies: pc.processingPolicy, Recovery: pc.recovery, Discovery: inventory, Now: time.Now})
+			privacyapp.ProcessingEvidenceDiscovery{RootID: root, InstallationID: installation, Policies: pc.processingPolicy, Recovery: pc.recovery, Discovery: inventory, Now: time.Now},
+			&privacyapp.ProcessingErasureStatus{RootID: root, InstallationID: installation, Policies: pc.processingPolicy, Recovery: pc.recovery, Status: decisions, Now: time.Now})
 		if err != nil {
 			return nil, &fixedStepError{"processing-discovery", err}
 		}

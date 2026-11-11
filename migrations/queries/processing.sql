@@ -21,8 +21,8 @@ SELECT * FROM processing_decision WHERE root_id=$1 AND id=$2 AND actor_digest=sh
 -- name: LockProcessingDecision :one
 SELECT * FROM processing_decision WHERE root_id=$1 AND id=$2 AND actor_digest=sha256(convert_to(sqlc.arg(actor)::jsonb::text,'UTF8')) FOR UPDATE;
 -- name: InsertProcessingDecision :one
-INSERT INTO processing_decision(id,root_id,rule_id,expected_revision,release_account,actor_digest,request_digest,scope,action,intent_seed,decision_digest,created_at,request_until,outcome_json)
-VALUES($1,$2,$3,$4,sqlc.narg(release_account),sha256(convert_to(sqlc.arg(actor)::jsonb::text,'UTF8')),$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *;
+INSERT INTO processing_decision(id,root_id,rule_id,expected_revision,release_account,actor_digest,request_digest,scope,action,intent_seed,decision_digest,created_at,request_until,outcome_json,erasure_decision)
+VALUES($1,$2,$3,$4,sqlc.narg(release_account),sha256(convert_to(sqlc.arg(actor)::jsonb::text,'UTF8')),$5,$6,$7,$8,$9,$10,$11,$12,sqlc.narg(erasure_decision)) RETURNING *;
 -- name: ApplyProcessingDecision :one
 UPDATE processing_decision SET applied_at=clock_timestamp(),audit_digest=(SELECT sha256(convert_to(a.outcome_receipt::text,'UTF8')) FROM operation_audit a WHERE a.root_id=processing_decision.root_id AND a.id=processing_decision.id)
 WHERE processing_decision.root_id=$1 AND processing_decision.id=$2 AND processing_decision.applied_at IS NULL RETURNING processing_decision.*;

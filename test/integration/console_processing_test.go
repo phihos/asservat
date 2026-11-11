@@ -68,7 +68,7 @@ func TestConsoleProcessingWithBuiltPackage(t *testing.T) {
 	rootID := consoleCaptureID(41)
 	discovery, err := presentation.NewProcessingDiscoveryOperations(origin, time.Now, custodyID, privacyapp.ProcessingEvidenceDiscovery{
 		RootID: rootID, InstallationID: rootID, Policies: facts, Recovery: facts, Discovery: facts, Now: time.Now,
-	})
+	}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

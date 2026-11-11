@@ -2334,6 +2334,7 @@ type ProcessingDecision struct {
 	AuditDigest      []byte
 	ResultRevision   pgtype.Int8
 	ResultSequence   pgtype.Int8
+	ErasureDecision  []byte
 }
 
 type ProcessingRoot struct {

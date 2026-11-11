@@ -5,6 +5,7 @@ import (
 	value "asservat.local/asservat/internal/domain/privacy"
 	"bytes"
 	"encoding/json"
+	"encoding/json/jsontext"
 	"time"
 )
 
@@ -67,8 +68,11 @@ func processingExactFields(raw []byte, names ...string) bool {
 	return true
 }
 func processingChangeShape(raw []byte, in processingChangeInput) bool {
-	if in.Action == "initialize_processing" {
+	switch in.Action {
+	case "initialize_processing":
 		return processingExactFields(raw, "action")
+	case value.RequestEarlyErasure:
+		return jsontext.Value(raw).IsValid() && processingExactFields(raw, "action", "artifactID")
 	}
 	var object map[string]json.RawMessage
 	if json.Unmarshal(raw, &object) != nil {

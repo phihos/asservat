@@ -241,10 +241,37 @@
             "expectedRevision",
             "scope"
           ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "action": {
+              "const": "request_early_erasure"
+            },
+            "artifactID": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "required": [
+            "action",
+            "artifactID"
+          ]
         }
       ]
     },
     "Receipt": {
+      "oneOf": [
+        {
+          "$ref": "https://asservat.io/spec/v1/processing.schema.json#/$defs/StateReceipt"
+        },
+        {
+          "$ref": "https://asservat.io/spec/v1/processing.schema.json#/$defs/ErasureReceipt"
+        }
+      ]
+    },
+    "StateReceipt": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
@@ -301,6 +328,54 @@
         "operationID",
         "state",
         "revision",
+        "sequence",
+        "observedAt",
+        "validUntil"
+      ]
+    },
+    "ErasureReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "rootID": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "epoch": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "requestID": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "operationID": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "state": {
+          "const": "erasureRequested"
+        },
+        "sequence": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1152921504606846976
+        },
+        "observedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "validUntil": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "rootID",
+        "epoch",
+        "requestID",
+        "operationID",
+        "state",
         "sequence",
         "observedAt",
         "validUntil"

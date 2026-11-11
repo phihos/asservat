@@ -69,7 +69,7 @@ func TestAuditedProcessingDiscoveryGuardsMetadataAndFitsOutputBound(t *testing.T
 				return page
 			}
 			base := s.inner.(*InvestigationOperations)
-			ops, err := NewProcessingDiscoveryOperations(base.origin, s.config.Now, s.config.NewID, privacyapp.ProcessingEvidenceDiscovery{RootID: root, InstallationID: root, Policies: fixture, Recovery: fixture, Discovery: fixture, Now: s.config.Now})
+			ops, err := NewProcessingDiscoveryOperations(base.origin, s.config.Now, s.config.NewID, privacyapp.ProcessingEvidenceDiscovery{RootID: root, InstallationID: root, Policies: fixture, Recovery: fixture, Discovery: fixture, Now: s.config.Now}, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -96,6 +96,69 @@ func TestAuditedProcessingDiscoveryGuardsMetadataAndFitsOutputBound(t *testing.T
 			}
 			if mode == "audit-intent-unavailable" && reads != 0 || mode == "audit-result-unavailable" && reads != 1 {
 				t.Fatal("wrong audit boundary", reads)
+			}
+		})
+	}
+}
+
+type erasureStatusReaderFunc func(value.ProcessingAuthority, string) value.ProcessingErasureStatus
+
+func (f erasureStatusReaderFunc) ReadProcessingErasureStatus(_ context.Context, a value.ProcessingAuthority, id string) (value.ProcessingErasureStatus, error) {
+	return f(a, id), nil
+}
+
+func TestAuditedProcessingErasureStatusUsesExactRequestAndPrivacyAuthority(t *testing.T) {
+	for _, operator := range []bool{true, false} {
+		name := "ordinary-reader"
+		if operator {
+			name = "privacy-operator"
+		}
+		t.Run(name, func(t *testing.T) {
+			s, caller, journal := auditedFixture(t)
+			now, root, epoch := s.config.Now(), s.config.RootID, discoveryID(7)
+			caller.i.Scopes = []string{"evidence:read"}
+			if operator {
+				caller.i.Groups, caller.i.Scopes = []string{"privacy"}, []string{}
+			}
+			policy := value.DownloadPolicy{RootID: root, InstallationID: root, RecoveryEpoch: epoch, Revision: caller.i.Policy,
+				ProtectionDigest: artifact.Digest{1}, PermittedRegions: []string{}, Paths: []artifact.DownloadPath{}, Clients: []value.DownloadClient{},
+				Operators:  []value.ProcessingOperator{{Issuer: caller.i.Principal.Issuer, ClientID: caller.i.Principal.ClientID, Kind: "Group", ID: "privacy"}},
+				ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
+			fixture := processingDiscoveryFixture{policy: policy, recovery: artifact.RecoveryProof{InstallationID: root, IssuerEpoch: epoch,
+				Revision: caller.i.Policy, ObservedAt: now, FreshUntil: policy.FreshUntil}}
+			requestID, artifactID := discoveryID(15), discoveryID(16)
+			reads := 0
+			reader := erasureStatusReaderFunc(func(a value.ProcessingAuthority, id string) value.ProcessingErasureStatus {
+				reads++
+				if id != requestID || !a.Valid(now) || len(journal.intents) != 1 {
+					t.Fatal("status reached storage before the exact authorized audit intent")
+				}
+				return value.ProcessingErasureStatus{RequestID: id, ArtifactID: artifactID, AcceptedAt: now.Add(-time.Minute),
+					AccessUntil: now.Add(-time.Hour), DeleteBy: now.Add(time.Hour), EffectiveDeleteBy: now.Add(time.Hour),
+					AuditState: value.ProcessingErasureAuditPending, DeletionState: value.ProcessingErasureDeletionPending,
+					ObservedAt: a.ObservedAt, ValidUntil: a.ValidUntil}
+			})
+			base := s.inner.(*InvestigationOperations)
+			ops, err := NewProcessingDiscoveryOperations(base.origin, s.config.Now, s.config.NewID,
+				privacyapp.ProcessingEvidenceDiscovery{RootID: root, InstallationID: root, Policies: fixture, Recovery: fixture, Discovery: fixture, Now: s.config.Now},
+				&privacyapp.ProcessingErasureStatus{RootID: root, InstallationID: root, Policies: fixture, Recovery: fixture, Status: reader, Now: s.config.Now})
+			if err != nil {
+				t.Fatal(err)
+			}
+			s.inner, err = NewInvestigationProcessingDiscoveryOperations(base, ops)
+			if err != nil {
+				t.Fatal(err)
+			}
+			reply, err := s.Call(t.Context(), caller, processingErasureStatusOperation, json.RawMessage(`{"request_id":"`+requestID+`"}`))
+			if !operator {
+				if !errors.Is(err, identity.ErrDenied) || len(reply.Body) != 0 || reads != 0 || len(journal.outcomes) != 1 || journal.outcomes[0].Status != "denied" {
+					t.Fatal("ordinary reader obtained erasure status", reads, err)
+				}
+				return
+			}
+			if err != nil || reads != 1 || len(reply.Body) == 0 || len(journal.outcomes) != 1 ||
+				journal.outcomes[0].Effect != "none" || len(journal.outcomes[0].ArtifactIDs) != 1 || journal.outcomes[0].ArtifactIDs[0] != artifactID {
+				t.Fatal("audited operator status lost exact artifact reference", reads, err)
 			}
 		})
 	}

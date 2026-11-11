@@ -3,7 +3,8 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { session } from '../evidence/test-fixtures';
 import { ProcessingWorkspace } from './ProcessingWorkspace';
 import type { DiscoveryPage, DiscoveryReply, ProcessingDiscoveryClient } from './discovery-http';
-import type { ProcessingClient } from './http';
+import type { ErasureStatusReply, ProcessingErasureClient } from './erasure-http';
+import { ProcessingFailure, type ProcessingClient } from './http';
 
 const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const candidate = (artifact = 3): DiscoveryPage['candidates'][number] => ({
@@ -93,4 +94,89 @@ it('refuses to present a successful reply from another case', async () => {
   await screen.findByRole('alert');
   expect(screen.queryByRole('article')).toBeNull();
   expect(screen.queryByRole('button', { name: 'Select artifact for restriction' })).toBeNull();
+});
+
+const erasureStatus = (requestID: string, deletionState: 'pending' | 'deleted'): ErasureStatusReply => ({
+  schema_version: 'mcp-result/v1', request_id: id(99), data_class: 'metadata', status: 'ok', warnings: [], provenance: [], truncated: false,
+  next_cursor: null, narrowing_hint: null,
+  data: {
+    request_id: requestID, artifact_id: id(3), accepted_at: '2026-11-10T17:23:00Z', access_until: '2026-11-10T17:23:00Z',
+    delete_by: '2026-11-11T18:22:00Z', effective_delete_by: '2026-11-11T18:10:00Z',
+    audit_state: 'acknowledged', deletion_state: deletionState,
+    ...(deletionState === 'deleted' ? { deleted_at: '2026-11-10T17:26:00Z' } : {}),
+  },
+});
+const checkErasureStatus = () => fireEvent.submit(screen.getByRole('button', { name: 'Check erasure status' }).closest('form')!);
+
+it('confirms a discovered artifact, retries its same erasure request, and reads deletion status only on demand', async () => {
+  const discoveryClient = { search: vi.fn<ProcessingDiscoveryClient['search']>().mockResolvedValue(reply([{ ...candidate(), origin: 'capture', parents: [] }])) };
+  const change = vi.fn<ProcessingClient['change']>().mockRejectedValueOnce(new ProcessingFailure(503)).mockImplementationOnce(async (_input, key) => ({
+    rootID: id(1), epoch: id(2), requestID: key, operationID: id(8), state: 'erasureRequested', sequence: 2,
+    observedAt: new Date().toISOString(), validUntil: new Date(Date.now()+5000).toISOString(),
+  }));
+  const newID = vi.fn(() => id(20));
+  const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(new Response(JSON.stringify(erasureStatus(id(20), 'pending')), { headers: { 'Content-Type': 'application/json' } }))
+    .mockResolvedValueOnce(new Response(JSON.stringify(erasureStatus(id(20), 'deleted')), { headers: { 'Content-Type': 'application/json' } }));
+  vi.stubGlobal('fetch', fetcher);
+  const scope = new AbortController();
+  const view = render(<ProcessingWorkspace session={session} scope={scope.signal} discoveryClient={discoveryClient} client={{ read: vi.fn(), change }} newID={newID} artifactID={id(9)}/>);
+  expect(screen.queryByRole('button', { name: 'Request early erasure' })).toBeNull();
+  fill('Case ID', id(5)); search();
+  const row = await screen.findByRole('article', { name: 'Evidence candidate '+id(3) });
+  const review = () => fireEvent.click(within(row).getByRole('button', { name: 'Request early erasure' }));
+  review();
+  expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Confirm early erasure' }));
+  const confirmation = screen.getByRole('region', { name: 'Confirm early erasure' });
+  expect(within(confirmation).getByText(id(3))).toBeTruthy();
+  expect(within(confirmation).getByText(/existing hard deletion deadline still applies/)).toBeTruthy();
+  fireEvent.click(within(confirmation).getByRole('button', { name: 'Cancel early erasure' }));
+  expect(change).not.toHaveBeenCalled();
+  expect(newID).not.toHaveBeenCalled();
+
+  review();
+  fireEvent.click(screen.getByRole('button', { name: 'Confirm early erasure' }));
+  const retry = await screen.findByRole('button', { name: 'Retry same erasure request' });
+  expect(change).toHaveBeenCalledTimes(1);
+  fireEvent.click(retry);
+  await screen.findByText(/Early erasure request accepted/);
+  expect(change.mock.calls[0]).toEqual([{ action: 'request_early_erasure', artifactID: id(3) }, id(20), session.csrf_token, scope.signal]);
+  expect(change.mock.calls[1]).toEqual(change.mock.calls[0]);
+  expect(newID).toHaveBeenCalledTimes(1);
+  expect(fetcher).not.toHaveBeenCalled();
+  expect((screen.getByLabelText('Erasure request ID') as HTMLInputElement).value).toBe(id(20));
+
+  checkErasureStatus();
+  await screen.findByText('Deletion pending.');
+  expect(screen.getByText('Current hard deletion deadline')).toBeTruthy();
+  expect(screen.queryByText('Managed deletion verified.')).toBeNull();
+  expect(fetcher.mock.calls[0][0]).toBe('/api/v1/operations/get_processing_erasure');
+  expect(fetcher.mock.calls[0][1]).toMatchObject({ method: 'POST', credentials: 'same-origin', redirect: 'error', headers: { 'X-CSRF-Token': session.csrf_token } });
+  expect(JSON.parse(fetcher.mock.calls[0][1]!.body as string)).toEqual({ request_id: id(20) });
+
+  view.unmount();
+  render(<ProcessingWorkspace session={session} scope={new AbortController().signal}/>);
+  expect((screen.getByLabelText('Erasure request ID') as HTMLInputElement).value).toBe('');
+  expect(fetcher).toHaveBeenCalledTimes(1);
+  fill('Erasure request ID', id(20)); checkErasureStatus();
+  await screen.findByText('Managed deletion verified.');
+  expect(screen.getByText('Verified deletion time')).toBeTruthy();
+  expect(fetcher).toHaveBeenCalledTimes(2);
+});
+
+it('discards erasure status across session scope loss and refuses a mismatched request ID', async () => {
+  const oldScope = new AbortController(), nextScope = new AbortController();
+  let finish!: (reply: ErasureStatusReply) => void;
+  const read = vi.fn<ProcessingErasureClient['read']>().mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }))
+    .mockResolvedValueOnce(erasureStatus(id(21), 'deleted'));
+  const client = { read };
+  const view = render(<ProcessingWorkspace session={session} scope={oldScope.signal} erasureClient={client}/>);
+  fill('Erasure request ID', id(20)); checkErasureStatus();
+  act(() => oldScope.abort());
+  view.rerender(<ProcessingWorkspace session={session} scope={nextScope.signal} erasureClient={client}/>);
+  expect((screen.getByLabelText('Erasure request ID') as HTMLInputElement).value).toBe('');
+  await act(async () => finish(erasureStatus(id(20), 'deleted')));
+  expect(screen.queryByText('Managed deletion verified.')).toBeNull();
+  fill('Erasure request ID', id(20)); checkErasureStatus();
+  await screen.findByText('Erasure status is unavailable for this request ID.');
+  expect(screen.queryByText('Managed deletion verified.')).toBeNull();
 });

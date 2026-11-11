@@ -5,6 +5,7 @@ import (
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/identity"
 	"slices"
+	"strings"
 	"time"
 )
 
@@ -25,8 +26,9 @@ func (r RetainedArtifact) Valid() bool {
 	return (r.Input.ControlKind == "" || r.Input.ControlKind == "case-metadata") && authorization.UUID(r.RootID) && o.Validate() == nil && r.Sequence >= 0 && ValidPolicyOrigins(r.OriginPolicies) && r.Input.Target.Valid() && r.Input.Target.ClusterID == o.Location.ClusterID && r.Input.AnchorAt.Equal(o.AnchorAt) && r.Input.RequestedSeconds > 0 && class(r.Input.PrivacyClass) && evidenceType(r.Input.EvidenceType) && d.ValidRetained() && d.AnchorAt.Equal(o.AnchorAt) && !d.ExpiresAt.After(o.ExpiresAt) && !d.DeleteBy.After(o.DeleteBy)
 }
 
-// LifecycleDecision records only monotonic policy shortening. It cannot grant
-// access, extend a hold, revive a deleted artifact or rewrite its manifest.
+// LifecycleDecision records a monotonic tightening of retained access. The
+// signed source reference identifies an accepted policy or an exact audited
+// erasure decision. Policies and Origins describe actual retained policies.
 type LifecycleDecision struct {
 	ID, RootID             string
 	Location               artifact.Location
@@ -40,8 +42,25 @@ type LifecycleDecision struct {
 	ObservedAt, ValidUntil time.Time
 }
 
+const erasureLifecyclePrefix = "erasure:"
+
+// ErasureLifecycleSource binds the signed cutoff to the exact prepared and
+// audited processing decision without changing the canonical record format.
+func ErasureLifecycleSource(requestID string, decisionDigest artifact.Digest) identity.Revision {
+	if !authorization.UUID(requestID) || decisionDigest == (artifact.Digest{}) {
+		return identity.Revision{}
+	}
+	return identity.Revision{UID: erasureLifecyclePrefix + requestID, Generation: 1, Digest: decisionDigest}
+}
+
 func (r LifecycleDecision) Valid() bool {
 	if !authorization.UUID(r.ID) || !authorization.UUID(r.RootID) || r.Location.Validate() != nil || !r.Target.Valid() || r.Target.ClusterID != r.Location.ClusterID || r.Sequence < 1 || r.RegistrationDigest == (artifact.Digest{}) || !r.PolicyRevision.Valid() || len(r.Policies) < 1 || len(r.Policies) > 64 || !ValidPolicyOrigins(r.Origins) || !r.Previous.ValidRetained() || !r.Effective.ValidRetained() || !r.Effective.AnchorAt.Equal(r.Previous.AnchorAt) || r.Effective.ExpiresAt.After(r.Previous.ExpiresAt) || r.Effective.DeleteBy.After(r.Previous.DeleteBy) || (r.Effective.ExpiresAt.Equal(r.Previous.ExpiresAt) && r.Effective.DeleteBy.Equal(r.Previous.DeleteBy)) || !identity.Fresh(r.ObservedAt, r.ValidUntil, r.ObservedAt, 60*time.Second) {
+		return false
+	}
+	if _, erasure := strings.CutPrefix(r.PolicyRevision.UID, erasureLifecyclePrefix); erasure &&
+		(r.PolicyRevision != ErasureLifecycleSource(r.ID, r.PolicyRevision.Digest) ||
+			!r.Effective.ExpiresAt.Equal(r.Effective.AnchorAt) || !r.Effective.DeleteBy.Equal(r.Previous.DeleteBy) ||
+			!slices.Equal(r.Policies, r.Origins)) {
 		return false
 	}
 	last := ""

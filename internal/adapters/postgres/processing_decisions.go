@@ -82,12 +82,17 @@ func decodeProcessingDecision(row custodydb.ProcessingDecision, actor identity.P
 	if !row.ValidUntil.Valid || !row.RetireBy.Valid || !row.RetireBy.Time.After(row.ValidUntil.Time) || row.RequestUntil.Time.After(row.ValidUntil.Time) || !d.Valid() || d.Intent.ID != uid(row.ID) || d.Intent.RootID != uid(row.RootID) || app.ProcessingDecisionDigest(d) != d.DecisionDigest || !d.Intent.CreatedAt.Equal(row.CreatedAt.Time) || !d.Intent.RequestUntil.Equal(row.RequestUntil.Time) || !bytes.Equal(row.RequestDigest, digest(d.Change)) {
 		return app.ProcessingDecision{}, value.ErrUnavailable
 	}
+	if d.Change.Action == value.RequestEarlyErasure && len(row.ErasureDecision) == 0 {
+		return app.ProcessingDecision{}, value.ErrUnavailable
+	}
 	return d, nil
 }
 func processingReceipt(row custodydb.ProcessingDecision, p custodydb.ProcessingRoot, a value.ProcessingAuthority, now time.Time) (value.ProcessingReceipt, error) {
 	state := "initialized"
 	rule := ""
-	if row.RuleID.Valid {
+	if row.Action == value.RequestEarlyErasure {
+		state = "erasureRequested"
+	} else if row.RuleID.Valid {
 		rule = uid(row.RuleID)
 		state = "restricted"
 		if row.Action == "release_processing" {
@@ -150,6 +155,11 @@ func (s *ProcessingDecisions) PrepareProcessing(ctx context.Context, a value.Pro
 				return value.ErrConflict
 			}
 			if row.AppliedAt.Valid {
+				if row.Action == value.RequestEarlyErasure {
+					if e = verifyProcessingErasure(ctx, q, row); e != nil {
+						return e
+					}
+				}
 				receipt, e := processingReceipt(row, p, a, now)
 				if e != nil {
 					return e
@@ -171,13 +181,23 @@ func (s *ProcessingDecisions) PrepareProcessing(ctx context.Context, a value.Pro
 			return value.ErrUnavailable
 		}
 		var rule pgtype.UUID
+		var erasure []byte
 		scope, _ := json.Marshal(draft.Change.Scope)
-		if draft.Change.Action == "initialize_processing" {
+		switch draft.Change.Action {
+		case "initialize_processing":
 			empty, e := q.ProcessingCatalogEmpty(ctx, id(s.root))
 			if e != nil || !empty || p.InitializedAt.Valid {
 				return value.ErrUnavailable
 			}
-		} else {
+		case value.RequestEarlyErasure:
+			if p.RootTransitions+2 >= p.MaxRootTransitions {
+				return app.ErrCapacity
+			}
+			erasure, e = prepareProcessingErasure(ctx, q, draft)
+			if e != nil {
+				return e
+			}
+		default:
 			rule = id(draft.Change.RuleID)
 			r, e := q.LockProcessingRule(ctx, custodydb.LockProcessingRuleParams{RootID: id(s.root), ID: rule})
 			if errors.Is(e, pgx.ErrNoRows) && draft.Change.Action == "restrict_processing" && draft.Change.ExpectedRevision == 0 {
@@ -207,7 +227,7 @@ func (s *ProcessingDecisions) PrepareProcessing(ctx context.Context, a value.Pro
 		if draft.Change.RuleID != "" {
 			releaseAccount = draft.ReleaseAccount[:]
 		}
-		row, e = q.InsertProcessingDecision(ctx, custodydb.InsertProcessingDecisionParams{ID: id(draft.Change.RequestID), RootID: id(s.root), RuleID: rule, ExpectedRevision: draft.Change.ExpectedRevision, ReleaseAccount: releaseAccount, Actor: actor, RequestDigest: digest(draft.Change), Scope: scope, Action: draft.Change.Action, IntentSeed: seed, DecisionDigest: draft.DecisionDigest[:], CreatedAt: ts(draft.Intent.CreatedAt), RequestUntil: ts(draft.Intent.RequestUntil), OutcomeJson: output})
+		row, e = q.InsertProcessingDecision(ctx, custodydb.InsertProcessingDecisionParams{ID: id(draft.Change.RequestID), RootID: id(s.root), RuleID: rule, ExpectedRevision: draft.Change.ExpectedRevision, ReleaseAccount: releaseAccount, Actor: actor, RequestDigest: digest(draft.Change), Scope: scope, Action: draft.Change.Action, IntentSeed: seed, DecisionDigest: draft.DecisionDigest[:], CreatedAt: ts(draft.Intent.CreatedAt), RequestUntil: ts(draft.Intent.RequestUntil), OutcomeJson: output, ErasureDecision: erasure})
 		if e != nil {
 			return e
 		}
@@ -247,6 +267,10 @@ func (s *ProcessingDecisions) ApplyProcessing(ctx context.Context, a value.Proce
 			}
 			row, e = q.ApplyProcessingDecision(ctx, custodydb.ApplyProcessingDecisionParams{RootID: id(s.root), ID: row.ID})
 			if e != nil {
+				return e
+			}
+		} else if row.Action == value.RequestEarlyErasure {
+			if e = verifyProcessingErasure(ctx, q, row); e != nil {
 				return e
 			}
 		}

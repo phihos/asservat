@@ -26,8 +26,8 @@ function buildQuery(criteria: typeof initial): unknown {
   };
 }
 
-export function ProcessingDiscovery({ session, scope, onSelect, disabled, client = processingDiscoveryClient }: {
-  session: Session; scope: AbortSignal; onSelect: (artifactID: string) => void; disabled: boolean; client?: ProcessingDiscoveryClient;
+export function ProcessingDiscovery({ session, scope, onSelect, onReviewErasure, disabled, client = processingDiscoveryClient }: {
+  session: Session; scope: AbortSignal; onSelect: (artifactID: string) => void; onReviewErasure: (artifactID: string) => void; disabled: boolean; client?: ProcessingDiscoveryClient;
 }) {
   const inFlight = useRef<object | undefined>(undefined);
   const [criteria, setCriteria] = useState(initial);
@@ -142,6 +142,7 @@ export function ProcessingDiscovery({ session, scope, onSelect, disabled, client
           <ul>{candidate.parents.map(id => <li className="identifier" key={id}>{id}</li>)}</ul>
         </> : <p>Original capture</p>}
         <Button className="button secondary" isDisabled={disabled} onPress={() => onSelect(candidate.artifact_id)}>Select artifact for restriction</Button>
+        <Button className="button secondary" isDisabled={disabled} onPress={() => onReviewErasure(candidate.artifact_id)}>Request early erasure</Button>
       </article>)}
       {result.page.next && <Button className="button secondary" isDisabled={disabled} onPress={nextPage}>Next evidence page</Button>}
     </section>}

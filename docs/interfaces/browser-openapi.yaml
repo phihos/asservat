@@ -34,7 +34,7 @@ paths:
     post:
       operationId: changeProcessing
       x-effect: command
-      summary: Explicitly initialize, restrict or release processing under current privacy authority.
+      summary: Initialize, restrict or release processing, or request early erasure under current privacy authority.
       parameters:
       - name: Idempotency-Key
         in: header
@@ -51,14 +51,14 @@ paths:
             schema: {$ref: '#/components/schemas/ProcessingChange'}
       responses:
         '200':
-          description: Acknowledged exact processing change receipt.
+          description: Acknowledged processing change. An early-erasure receipt records cutoff acceptance; deletion has separate status.
           content:
             application/json:
               schema: {$ref: '#/components/schemas/ProcessingReceipt'}
         '403':
           description: Current privacy-operator authority is denied or browser request protection refused the change.
         '409':
-          description: Exact revision or idempotency conflict; refresh inventory before another change.
+          description: Exact revision or idempotency conflict. Refresh inventory before another rule change.
         default:
           description: Refusal or uncertain result; retry an uncertain change with the same key and input.
   /api/v1/operations/list_cases:
@@ -3102,6 +3102,41 @@ paths:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
+  /api/v1/operations/get_processing_erasure:
+    post:
+      operationId: get_processing_erasure
+      summary: Read an exact accepted erasure request and its deletion status as a privacy operator (browser only).
+      tags:
+      - Human console
+      x-domain-contract: get_processing_erasure
+      x-effect: read
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/McpInput_get_processing_erasure'
+      parameters:
+      - name: X-CSRF-Token
+        in: header
+        required: true
+        description: Required on session-authenticated POST; validate origin and session-bound token.
+        schema:
+          type: string
+          maxLength: 256
+      responses:
+        '200':
+          description: Existing bounded MCP domain-result envelope; domain errors remain status=error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/McpOutput_get_processing_erasure'
+        default:
+          description: Transport/session/validation failure; no evidence in error details.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
   /api/v1/operations/search_processing_evidence:
     post:
       operationId: search_processing_evidence
@@ -4182,6 +4217,67 @@ components:
               - message
               - assignments
               - assignments_total
+          required:
+          - status
+          - data
+        - type: object
+          properties:
+            status:
+              const: error
+            data:
+              type: object
+              additionalProperties: false
+              properties:
+                code:
+                  type: string
+                  minLength: 1
+                  maxLength: 64
+                message:
+                  type: string
+                  minLength: 1
+                  maxLength: 1024
+                retryable:
+                  type: boolean
+                navigation_uri:
+                  type: string
+                  format: uri
+                  maxLength: 2048
+                responsible_role:
+                  enum:
+                  - maintainer
+                  - approver
+                  - administrator
+                  - none
+                retry_after_seconds:
+                  type: integer
+                  minimum: 1
+                  maximum: 60
+              required:
+              - code
+              - message
+              - retryable
+          required:
+          - status
+          - data
+    McpInput_get_processing_erasure:
+      type: object
+      additionalProperties: false
+      properties:
+        request_id:
+          type: string
+          format: uuid
+      required:
+      - request_id
+    McpOutput_get_processing_erasure:
+      allOf:
+      - $ref: https://asservat.io/spec/v1/mcp-result.schema.json
+      - oneOf:
+        - type: object
+          properties:
+            status:
+              const: ok
+            data:
+              $ref: https://asservat.io/spec/v1/processing-erasure.schema.json
           required:
           - status
           - data

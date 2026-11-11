@@ -13,7 +13,7 @@ import (
 
 const applyProcessingDecision = `-- name: ApplyProcessingDecision :one
 UPDATE processing_decision SET applied_at=clock_timestamp(),audit_digest=(SELECT sha256(convert_to(a.outcome_receipt::text,'UTF8')) FROM operation_audit a WHERE a.root_id=processing_decision.root_id AND a.id=processing_decision.id)
-WHERE processing_decision.root_id=$1 AND processing_decision.id=$2 AND processing_decision.applied_at IS NULL RETURNING processing_decision.id, processing_decision.root_id, processing_decision.rule_id, processing_decision.expected_revision, processing_decision.release_account, processing_decision.actor_digest, processing_decision.request_digest, processing_decision.scope, processing_decision.action, processing_decision.intent_seed, processing_decision.decision_digest, processing_decision.created_at, processing_decision.request_until, processing_decision.valid_until, processing_decision.retire_by, processing_decision.outcome_json, processing_decision.applied_at, processing_decision.audit_digest, processing_decision.result_revision, processing_decision.result_sequence
+WHERE processing_decision.root_id=$1 AND processing_decision.id=$2 AND processing_decision.applied_at IS NULL RETURNING processing_decision.id, processing_decision.root_id, processing_decision.rule_id, processing_decision.expected_revision, processing_decision.release_account, processing_decision.actor_digest, processing_decision.request_digest, processing_decision.scope, processing_decision.action, processing_decision.intent_seed, processing_decision.decision_digest, processing_decision.created_at, processing_decision.request_until, processing_decision.valid_until, processing_decision.retire_by, processing_decision.outcome_json, processing_decision.applied_at, processing_decision.audit_digest, processing_decision.result_revision, processing_decision.result_sequence, processing_decision.erasure_decision
 `
 
 type ApplyProcessingDecisionParams struct {
@@ -45,13 +45,14 @@ func (q *Queries) ApplyProcessingDecision(ctx context.Context, arg ApplyProcessi
 		&i.AuditDigest,
 		&i.ResultRevision,
 		&i.ResultSequence,
+		&i.ErasureDecision,
 	)
 	return i, err
 }
 
 const insertProcessingDecision = `-- name: InsertProcessingDecision :one
-INSERT INTO processing_decision(id,root_id,rule_id,expected_revision,release_account,actor_digest,request_digest,scope,action,intent_seed,decision_digest,created_at,request_until,outcome_json)
-VALUES($1,$2,$3,$4,$13,sha256(convert_to($14::jsonb::text,'UTF8')),$5,$6,$7,$8,$9,$10,$11,$12) RETURNING id, root_id, rule_id, expected_revision, release_account, actor_digest, request_digest, scope, action, intent_seed, decision_digest, created_at, request_until, valid_until, retire_by, outcome_json, applied_at, audit_digest, result_revision, result_sequence
+INSERT INTO processing_decision(id,root_id,rule_id,expected_revision,release_account,actor_digest,request_digest,scope,action,intent_seed,decision_digest,created_at,request_until,outcome_json,erasure_decision)
+VALUES($1,$2,$3,$4,$13,sha256(convert_to($14::jsonb::text,'UTF8')),$5,$6,$7,$8,$9,$10,$11,$12,$15) RETURNING id, root_id, rule_id, expected_revision, release_account, actor_digest, request_digest, scope, action, intent_seed, decision_digest, created_at, request_until, valid_until, retire_by, outcome_json, applied_at, audit_digest, result_revision, result_sequence, erasure_decision
 `
 
 type InsertProcessingDecisionParams struct {
@@ -69,6 +70,7 @@ type InsertProcessingDecisionParams struct {
 	OutcomeJson      []byte
 	ReleaseAccount   []byte
 	Actor            []byte
+	ErasureDecision  []byte
 }
 
 func (q *Queries) InsertProcessingDecision(ctx context.Context, arg InsertProcessingDecisionParams) (ProcessingDecision, error) {
@@ -87,6 +89,7 @@ func (q *Queries) InsertProcessingDecision(ctx context.Context, arg InsertProces
 		arg.OutcomeJson,
 		arg.ReleaseAccount,
 		arg.Actor,
+		arg.ErasureDecision,
 	)
 	var i ProcessingDecision
 	err := row.Scan(
@@ -110,6 +113,7 @@ func (q *Queries) InsertProcessingDecision(ctx context.Context, arg InsertProces
 		&i.AuditDigest,
 		&i.ResultRevision,
 		&i.ResultSequence,
+		&i.ErasureDecision,
 	)
 	return i, err
 }
@@ -224,7 +228,7 @@ func (q *Queries) ListProcessingInventoryRules(ctx context.Context, arg ListProc
 }
 
 const lockProcessingDecision = `-- name: LockProcessingDecision :one
-SELECT id, root_id, rule_id, expected_revision, release_account, actor_digest, request_digest, scope, action, intent_seed, decision_digest, created_at, request_until, valid_until, retire_by, outcome_json, applied_at, audit_digest, result_revision, result_sequence FROM processing_decision WHERE root_id=$1 AND id=$2 AND actor_digest=sha256(convert_to($3::jsonb::text,'UTF8')) FOR UPDATE
+SELECT id, root_id, rule_id, expected_revision, release_account, actor_digest, request_digest, scope, action, intent_seed, decision_digest, created_at, request_until, valid_until, retire_by, outcome_json, applied_at, audit_digest, result_revision, result_sequence, erasure_decision FROM processing_decision WHERE root_id=$1 AND id=$2 AND actor_digest=sha256(convert_to($3::jsonb::text,'UTF8')) FOR UPDATE
 `
 
 type LockProcessingDecisionParams struct {
@@ -257,6 +261,7 @@ func (q *Queries) LockProcessingDecision(ctx context.Context, arg LockProcessing
 		&i.AuditDigest,
 		&i.ResultRevision,
 		&i.ResultSequence,
+		&i.ErasureDecision,
 	)
 	return i, err
 }
@@ -332,7 +337,7 @@ func (q *Queries) ProcessingCatalogEmpty(ctx context.Context, rootID pgtype.UUID
 }
 
 const readProcessingDecision = `-- name: ReadProcessingDecision :one
-SELECT id, root_id, rule_id, expected_revision, release_account, actor_digest, request_digest, scope, action, intent_seed, decision_digest, created_at, request_until, valid_until, retire_by, outcome_json, applied_at, audit_digest, result_revision, result_sequence FROM processing_decision WHERE root_id=$1 AND id=$2 AND actor_digest=sha256(convert_to($3::jsonb::text,'UTF8'))
+SELECT id, root_id, rule_id, expected_revision, release_account, actor_digest, request_digest, scope, action, intent_seed, decision_digest, created_at, request_until, valid_until, retire_by, outcome_json, applied_at, audit_digest, result_revision, result_sequence, erasure_decision FROM processing_decision WHERE root_id=$1 AND id=$2 AND actor_digest=sha256(convert_to($3::jsonb::text,'UTF8'))
 `
 
 type ReadProcessingDecisionParams struct {
@@ -365,6 +370,7 @@ func (q *Queries) ReadProcessingDecision(ctx context.Context, arg ReadProcessing
 		&i.AuditDigest,
 		&i.ResultRevision,
 		&i.ResultSequence,
+		&i.ErasureDecision,
 	)
 	return i, err
 }

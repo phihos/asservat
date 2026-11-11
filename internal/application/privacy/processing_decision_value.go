@@ -22,9 +22,13 @@ type ProcessingDecision struct {
 func (d ProcessingDecision) Valid() bool {
 	left, le := json.Marshal(d.Intent)
 	right, re := json.Marshal(d.Outcome.Intent)
-	capacityValid := d.Change.Action == "initialize_processing" && d.ReleaseAccount == (artifact.Digest{}) || d.Change.Action != "initialize_processing" && d.ReleaseAccount != (artifact.Digest{})
+	capacityValid := (d.Change.RuleID == "") == (d.ReleaseAccount == (artifact.Digest{}))
 	if d.Change.Action == "release_processing" {
 		capacityValid = capacityValid && d.Intent.PrincipalDigest == d.ReleaseAccount
 	}
-	return capacityValid && le == nil && re == nil && bytes.Equal(left, right) && d.Change.Valid() && d.Intent.ID == d.Change.RequestID && d.Intent.Valid() && d.Intent.Name == d.Change.Action && d.Intent.InputFormat == "processing-input/v1" && d.Outcome.Valid() && d.Outcome.Intent.ID == d.Intent.ID && d.Outcome.Intent.RootID == d.Intent.RootID && d.Outcome.Status == "success" && d.Outcome.Reason == "prepared" && d.Outcome.Effect == "unknown" && d.Outcome.ClientReceipt == "unknown" && len(d.Outcome.CaseIDs) == 0 && len(d.Outcome.ArtifactIDs) == 0 && len(d.Outcome.CaptureIDs) == 0 && d.DecisionDigest != (artifact.Digest{})
+	artifactRefsValid := len(d.Outcome.ArtifactIDs) == 0
+	if d.Change.Action == value.RequestEarlyErasure {
+		artifactRefsValid = len(d.Outcome.ArtifactIDs) == 1 && d.Outcome.ArtifactIDs[0] == d.Change.Scope.Location.ArtifactID
+	}
+	return capacityValid && artifactRefsValid && le == nil && re == nil && bytes.Equal(left, right) && d.Change.Valid() && d.Intent.ID == d.Change.RequestID && d.Intent.Valid() && d.Intent.Name == d.Change.Action && d.Intent.InputFormat == "processing-input/v1" && d.Outcome.Valid() && d.Outcome.Intent.ID == d.Intent.ID && d.Outcome.Intent.RootID == d.Intent.RootID && d.Outcome.Status == "success" && d.Outcome.Reason == "prepared" && d.Outcome.Effect == "unknown" && d.Outcome.ClientReceipt == "unknown" && len(d.Outcome.CaseIDs) == 0 && len(d.Outcome.CaptureIDs) == 0 && d.DecisionDigest != (artifact.Digest{})
 }

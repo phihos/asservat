@@ -1,6 +1,20 @@
 # Sustained implementation progress
 
-## Installed-qualified candidate: retention lifecycle publication (2026-11-11)
+## Active candidate: exact early erasure (2026-11-11)
+
+Outcome: a current privacy operator confirms a discovered artifact for early
+erasure, reloads its exact request and observes the independently verified
+deletion outcome. [ADR-321](decisions/321-exact-early-erasure.md) records the
+audited cutoff, signed source, status and role compatibility. Application
+authority, exact audit and replay race tests pass. SQL and browser integration
+and fresh installed qualification are in progress.
+
+## Merged retention lifecycle publication (2026-11-11)
+
+[PR #219](https://github.com/phihos/asservat/pull/219) merged at `ae515fa3`.
+Its complete authoritative tree matches `f54ec3c8`, which passed all 14 Go
+shards and `ci-ok` in [required CI](https://github.com/phihos/asservat/actions/runs/42930280603).
+The installed-tested source is `b99c4ff9`.
 
 Outcome: after an administrator tightens retention on published evidence,
 the installed hub worker publishes and acknowledges the signed lifecycle

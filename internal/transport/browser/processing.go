@@ -61,7 +61,7 @@ type processingChangeReply struct {
 	RuleID      string    `json:"ruleID,omitempty"`
 	OperationID string    `json:"operationID"`
 	State       string    `json:"state"`
-	Revision    int64     `json:"revision"`
+	Revision    *int64    `json:"revision,omitempty"`
 	Sequence    int64     `json:"sequence"`
 	ObservedAt  time.Time `json:"observedAt"`
 	ValidUntil  time.Time `json:"validUntil"`
@@ -166,7 +166,9 @@ func (h *ProcessingHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	until := identity.Earlier(deadline, identity.Earlier(view.Identity.ValidUntil, receipt.ValidUntil))
-	if err != nil || ctx.Err() != nil || !receipt.Valid(time.Now()) || !time.Now().Before(until) {
+	erasure := change.Action == value.RequestEarlyErasure
+	if err != nil || ctx.Err() != nil || !receipt.Valid(time.Now()) || receipt.RequestID != key ||
+		erasure != (receipt.State == "erasureRequested") || !time.Now().Before(until) {
 		sessionProblem(w, 503)
 		return
 	}
@@ -186,8 +188,12 @@ func (h *ProcessingHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	err = json.NewEncoder(w).Encode(processingChangeReply{RootID: receipt.RootID, Epoch: receipt.Epoch, RequestID: receipt.RequestID, RuleID: receipt.RuleID, OperationID: receipt.OperationID,
-		State: receipt.State, Revision: receipt.Revision, Sequence: receipt.Sequence, ObservedAt: receipt.ObservedAt, ValidUntil: receipt.ValidUntil})
+	reply := processingChangeReply{RootID: receipt.RootID, Epoch: receipt.Epoch, RequestID: receipt.RequestID, RuleID: receipt.RuleID, OperationID: receipt.OperationID,
+		State: receipt.State, Sequence: receipt.Sequence, ObservedAt: receipt.ObservedAt, ValidUntil: receipt.ValidUntil}
+	if !erasure {
+		reply.Revision = &receipt.Revision
+	}
+	err = json.NewEncoder(w).Encode(reply)
 	if err != nil || controller.Flush() != nil || ctx.Err() != nil || !time.Now().Before(until) {
 		panic(http.ErrAbortHandler)
 	}
