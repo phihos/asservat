@@ -892,7 +892,7 @@ func (k *InstallerContinuation) Owner(ctx context.Context, resources *kube.Initi
 		return errors.Join(mounts.ErrUnavailable, err)
 	}
 	k.ownerConfiguration = &observed.Configuration
-	k.at("owner/outbox")
+	k.at("owner/recipe")
 	// ADR-194: a promoted artifact also creates the derived public keys and
 	// roles; only their names are known before the readback.
 	var promotion *contracts.InstallerOwnerPromotion
@@ -912,14 +912,17 @@ func (k *InstallerContinuation) Owner(ctx context.Context, resources *kube.Initi
 	if err != nil {
 		return err
 	}
+	k.at("owner/serving-plan")
 	serving, err := k.servingTLSPlan()
 	if err != nil {
 		return err
 	}
+	k.at("owner/recipe-serving")
 	artifact, err = withInstallerServingTLSRecipe(artifact, serving)
 	if err != nil {
 		return err
 	}
+	k.at("owner/outbox")
 	admin := k.in.kubernetes("administrator-token")
 	if err = kube.PublishInstallerRecipe(ctx, admin, k.input.Namespace, k.record.Scope.InstallationID, contracts.InstallerRecipeOutbox{Format: contracts.InstallerRecipeOutboxFormat, Phase: 3, Purpose: "owner-provider", Recipe: artifact}); err != nil {
 		return err

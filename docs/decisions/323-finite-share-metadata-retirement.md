@@ -193,3 +193,23 @@ actual source hashes, exits, cleanup and throughput; no generated result files.
 References checked 2026-11-11: [PostgreSQL row locks](https://www.postgresql.org/docs/current/explicit-locking.html#LOCKING-ROWS)
 and [Argo completed-resource retention](https://argo-workflows.readthedocs.io/en/latest/cost-optimisation/#limit-the-total-number-of-workflows-and-pods).
 These references support mechanism/precedent, not Asservat qualification.
+
+## Combined provider recipe envelope
+
+The fresh integrated installer at `4192e6bd` refuses its owner-provider outbox
+before public startup. A complete pure production reproduction with genuine
+installation-derived names encodes65,845 bytes, beyond the existing64KiB bound.
+The7,950-byte `federation` description repeats role/ACL/PKI/transit bodies
+already present in the exact flat `apply` requests. The operator CLI consumes
+that description only as a presence indication; current provider verification
+recomputes expected recipes from protected deployment inputs.
+
+Replace that duplicate description with `federation: true` when selected and
+omit it otherwise. Preserve every flat action/body, inspection path, separate
+`federationAuditStorage` requirement and unique owner authentication/reviewer
+prerequisite. Keep the64KiB bound. This changes one public setup-artifact field,
+not evidence, credentials, current provider authority or SQL protocols. It adds
+no role, API call, process, fallback, state or configuration. Existing protected
+input/image pins and unsupported-development-state refusal remain in force;
+no permanent compatibility mechanism is introduced. Focused tests and fresh
+installed qualification must establish the correction before it is delivered.

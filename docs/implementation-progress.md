@@ -62,11 +62,36 @@ qualification, required PR CI and authoritative merge readback. Its original
 short bounds are selected before installation; timestamps are never rewritten
 to make cleanup due. No new installed outcome or completed spec is claimed.
 
+Integration at `52ce1797` combines the qualified main installer with retirement
+using one typed private inbox material for TLS and cleanup credentials. Focused
+producer/consumer and canonical Helm/profile checks pass. `make pre-push`
+passes with498s affected Go race tests; the full built-browser gate passes
+158.964s (30 journeys/31 accessibility scans). The real-service wide100/schema
+run passes78.912s with4,578 matching hashes: paid WAL1,957,168 bytes,
+aborted WAL2,969,504, schema upgrade/rollback2.95s. At `4192e6bd`, the actual
+compiled worker selector is also exercised before/at the original purge cutoff
+and after its cursor. The selector/share-retirement and storage-scope fixture
+passes62.895s; all4,578 hashes match and owned services/network are absent.
+
+Fresh installed `4192e6bd` fails before public startup at `owner/outbox`:
+Go192.448s/harness261.8s. Bootstrap, capacity and source provisioning pass.
+All4,851 source hashes match, source stays frozen, cleanup failures are empty
+and owned clusters/containers/networks/volumes/images are absent. The full
+owner-provider recipe reproduces locally at65,845 bytes, exceeding its unchanged
+65,536-byte cap. Its7,950-byte federation description duplicates the actual
+flat `apply` requests. The correction keeps all actions, inspection paths, unique setup prerequisites
+and storage scopes while replacing that unused description with an explicit
+presence marker. The complete fixture now passes at57,899 bytes (7,946 fewer)
+under the same cap; full provider tests pass1.448s and focused bootstrap
+tests0.014s. Fresh installed qualification is pending;
+no installed share retirement is claimed. Evidence is external in
+`share-retirement/{policy-cost-52ce1797,slots-selector-4192e6bd,installed-4192e6bd}`.
+
 ## Merged installable context trial (2026-11-11)
 
 [PR223](https://github.com/phihos/asservat/pull/223) merged at `b389b7c9`;
 its complete tree matches reviewed `2613aa4f`. Required pull-request
-CI43018930876 and automated review pass; post-merge CI43020311620 is pending.
+CI43018930876, automated review and post-merge push CI43020311620 pass.
 All4,834 installed runtime source hashes independently match authoritative main.
 
 Outcome: let the maintainer install and try the existing collector-free
