@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -554,8 +555,9 @@ func qualifyCompiledCleanupOverdueCounter(t *testing.T, f *capacitySQLFixture, s
 		}
 		_ = tx.Rollback(ctx)
 		var pgerr *pgconn.PgError
-		if !errors.As(err, &pgerr) || pgerr.Code != "23514" {
-			t.Fatal("compiled cleanup gained arbitrary same-depth pool write", mutation, err)
+		if !errors.As(err, &pgerr) || pgerr.Code != "23514" || pgerr.Message != "capture audit backing role unavailable" ||
+			!strings.Contains(pgerr.Where, "guard_capture_audit_access") || !strings.Contains(pgerr.Where, "share_retirement_pool_probe") {
+			t.Fatal("compiled cleanup nested pool probe did not reach the intended rejecting guard", mutation, err)
 		}
 	}
 	if err = f.admin.QueryRow(ctx, `SELECT proof_window_missed FROM operation_audit_pool WHERE root_id=$1 AND lane='normal'`, s.a.RootID).Scan(&after); err != nil || after != before+1 {

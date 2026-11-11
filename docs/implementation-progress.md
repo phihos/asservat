@@ -45,8 +45,10 @@ failures and independently absent owned resources. Failed runs remain failures.
 | `8ab7b9ae` / `installed-8ab7b9ae` | Go240.583s/harness305.1s fail,4854 hashes: original worker exits at capacity/open/finish after valid sibling cleanup journal progress. Restart does not satisfy original-process assertion. |
 | `d851782f` / `installed-d851782f` | Go513.952s fail,4854 hashes: original worker stays running and both MCP share producers work; identifying normal rows outlive original live_retire_by. PostgreSQL23514 refuses nested proof-window-missed pool update under compiled cleanup role. Fix and fresh qualification pending. |
 
-Current broad checks: `make pre-push` passes at `d851782f` (312s affected
-race phase), after earlier integrated498s and354s passes. Full built-browser
+Current broad checks: `make pre-push` passes at `ad4662b7` (490s affected
+race phase), using the existing full specification virtual environment. The first
+invocation used system Python and failed missing validator imports before the
+race phase; it is not a source failure. Earlier `d851782f` passed312s. Full built-browser
 check at `52ce1797` passes158.964s (30 journeys/31 accessibility scans).
 Installed sharing uses MCP; that separate browser evidence is not installed
 React-sharing qualification. No share-retirement PR or hosted CI has run yet.
@@ -63,8 +65,13 @@ identify scheduling/provider/projection/effect stages without private content.
 The shared observer rejects non-atomic disappearance, late live rows, premature
 history/charge release and changed original deadlines. Short H2/B10/P10 and
 normal/resolution240s/capture300s fixture bounds are selected before installation;
-timestamps are never rewritten. Current work reproduces the SQL-role refusal
-and resolves concrete cleanup failures before another fresh installed run.
+timestamps are never rewritten. At `ad4662b7`, the compiled-role service regression passes Go62.173s with
+4,582 exact hashes, frozen source and complete owned cleanup. The original
+healthy retirement/refund still passes; overdue selection increments its
+original counter once and replay preserves it. Negative mutation assertions
+are being strengthened to require the exact nested guard context, since an
+earlier recovery guard can also return23514. Fresh installed work remains
+pending, with all original bounds unchanged.
 
 Earlier failed boundary reports remain in `baseline-1dc7c616`,
 `boundaries-63da31e8`, `schema-retry`, `slots-d7a2fd1a`, `slots-eca00f46`,
