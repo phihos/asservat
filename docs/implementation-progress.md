@@ -2,104 +2,89 @@
 
 ## Active candidate: finite share metadata retirement (2026-11-11)
 
-Outcome sought: create and use manual/capture-time shares, end access, delete
-identifying share and audit rows within their original bounds, independently
-verify managed-object absence and release charges only after actual SQL
-retirement plus the original residual-history interval. Installed qualification
-has not passed. The full specification goal remains active.
+Complete the manual/capture-time sharing workflow through original identifying-row
+retirement, independent managed-object absence and actual residual-charge release.
+Installed qualification has **not passed**. The latest tested source is
+`ba0128c4`; its bounded history page works, but serial lifecycle checks still
+miss the original live deadline. Two lifecycle IDs per original proof are being
+implemented and require qualification. The full specification goal remains active.
 
-Candidate `feature/finite-share-history` is in the owned
-`asservat-share-retirement` worktree, integrating authoritative main `b389b7c9`
-(PR223). Latest tested source: `d851782f`. ADR323 records the contracts and
-measured simplifications. SQL153/154 require compiled head/floor154. Each share
-has an immutable original creating-operation link; later management pays its own
-effect, replay cannot renew deadlines, and finalization deletes the child before
-the parent. Unknown unlinked development rows are refused without adoption or
-deletion. New shares require normal-v4/capture-v2; resolution remains v3.
+Candidate `feature/finite-share-history`, owned worktree
+`asservat-share-retirement`, integrates authoritative main `b389b7c9` (PR223).
+ADR323 records the contracts, simplifications and measured costs. SQL153/154
+require head/floor154. Each concrete share has an immutable original prepaid
+creating-operation link; management pays its own effect, replay cannot renew
+bounds, and finalization deletes the child before its parent. Unknown unlinked
+development rows are refused without adoption/deletion. New sharing uses
+normal-v4/capture-v2; resolution remains v3. Broader policy/control metadata is
+outside this concrete-share obligation.
 
-The existing worker handles capture/normal/resolution using one total16-row
-UUID cursor and the same three cold facet pools (Min0/Max1). Nine bindings
-activate: three existing SQL identities, two supplied independent S3 credentials
-and four native provider purposes. At most three connections per worker were
-already counted in the114-connection installation requirement; API32 is
-unchanged. No new deployment, watch, tuning knob or per-lane goroutine is added.
-The installer provisions the protected projection; the trial guide documents
-its two distinct cleanup credential inputs. Combined throughput remains unproved.
+The existing worker handles capture/normal/resolution using one total16-row UUID
+cursor and the same three private facet pools (Min0/Max1). Three existing SQL
+identities, two independent supplied S3 credentials and four native provider
+purposes activate; the three connections per worker were already counted in
+the114-connection installation requirement, API32 unchanged. The installer
+provisions the protected cleanup projection; the trial guide documents its two
+credential inputs. No deployment, role, watch, tuning knob or per-lane goroutine
+is added.
 
-Verification reports are external under
-`/home/phil/.cache/asservat-build/share-retirement/`. Service and installed rows
-below had frozen sources, matching independent source hashes, empty cleanup
-failures and independently absent owned resources. Failed runs remain failures.
+Reports are external under
+`/home/phil/.cache/asservat-build/share-retirement/`. All rows below have frozen
+sources, independently matching source hashes, empty cleanup failures and
+independently absent owned resources. Failures remain failures.
 
-| Source / archive | Actual result and scope |
+| Source / archive | Actual evidence and scope |
 | --- | --- |
-| `2a2bc0f1` / `baseline-2a2bc0f1` | Go8.170s pass,4546 hashes:65 retained/32 active shares, relation growth1,114,112 bytes, whole-instance WAL1,085,704 bytes. Count-maximal sample, not universal footprint proof. |
-| `4d17772d` / `slots-4d17772d` | Go62.181s pass,4561 hashes: paid create/replay, once-only effect, expiry, transfer/revoke, atomic child/parent deletion, object verification and originalH cooling/release. |
-| `a3ca495f` / `policy-cost-a3ca495f` | Go69.301s fail: all100 semantic cases pass; smaller exact tuple trigger and partial recipient GIN reduce paid/rollback WAL to1,949,488/2,957,808 bytes, but rollback exceeds original2MiB funding. |
-| `d4a63a8e` / `policy-cost-d4a63a8e` | Go72.578s pass,4562 hashes: same100-share case with separately prepaid8MiB business-WAL allowance, paid/rollback1,999,848/2,939,816 bytes; schema roundtrip2.54s. |
-| `52ce1797` / `policy-cost-52ce1797` | Go78.912s pass,4578 hashes:100 paid recurring shares, revoke-all/replay, WAL1,957,168/2,969,504 bytes, schema154/153 upgrade/rollback2.95s. |
-| `4192e6bd` / `slots-selector-4192e6bd` | Go62.895s pass,4578 hashes: compiled worker role selects before/at original purge cutoff and respects cursor; independent storage scope. |
-| `8ab7b9ae` / `slots-proof-8ab7b9ae` | Go62.792s pass,4581 hashes: exact installed snapshot query checks nullable account/history, real charge equal to all live+history, futureH cooling, original cursor/cutoffs and actual refund. |
-| `4192e6bd` / `installed-4192e6bd` | Go192.448s/harness261.8s fail,4851 hashes: owner/outbox refuses before public startup. Representative complete production recipe reproduces65,845 bytes over unchanged64KiB cap. |
-| `1d1451f8` / `installed-1d1451f8` | Go619.155s/harness691.5s fail,4852 hashes: installation and public MCP manual/capture sharing work, healthy retirement not observed. Cold scheduling predicate rejects cleanup purpose before provider login. |
-| `8ab7b9ae` / `installed-8ab7b9ae` | Go240.583s/harness305.1s fail,4854 hashes: original worker exits at capacity/open/finish after valid sibling cleanup journal progress. Restart does not satisfy original-process assertion. |
-| `d851782f` / `installed-d851782f` | Go513.952s fail,4854 hashes: original worker stays running and both MCP share producers work; identifying normal rows outlive original live_retire_by. PostgreSQL23514 refuses nested proof-window-missed pool update under compiled cleanup role. Fix and fresh qualification pending. |
+| `52ce1797` / `policy-cost-52ce1797` | Go78.912s pass,4578 hashes:100 recurring concrete shares, paid revoke-all/replay and schema154/153 roundtrip2.95s. Paid/aborted WAL1,957,168/2,969,504 bytes fit the separately prepaid8MiB business allowance after smaller trigger/index corrections. This is a bounded sample, not universal footprint proof. |
+| `732d6fb7` / `slots-guard-732d6fb7` | Go65.671s pass,4582 hashes: actual compiled cleanup/verifier/finalizer roles, exact nested counter/replay and wrong-mutation guards, acknowledged selector waiting/cutoff/finalization-ready/overdue, shared nullable certificate snapshot, atomic retirement, futureH cooling and exact charge release; schema roundtrip3.48s. |
+| `4192e6bd` / `installed-4192e6bd` | Go192.448s/harness261.8s fail,4851 hashes: owner-provider outbox refuses before public startup. Complete representative production recipe reproduces65,845 bytes over unchanged64KiB cap. |
+| `1d1451f8` / `installed-1d1451f8` | Go619.155s/harness691.5s fail,4852 hashes: install/MCP sharing work; cold cleanup purpose is refused before provider login. |
+| `8ab7b9ae` / `installed-8ab7b9ae` | Go240.583s/harness305.1s fail,4854 hashes: original worker stops after valid sibling cleanup journal publication during capacity completion. Restart does not satisfy original-process proof. |
+| `d851782f` / `installed-d851782f` | Go513.952s fail,4854 hashes: worker and MCP producers work, but SQL23514 rejects the nested proof-window counter and normal rows miss their live cutoff. |
+| `7e07616a` / `installed-7e07616a` | Go583.844s/harness654.9s fail,4855 hashes: both shares delete atomically within original bounds and retain cooling charges; neither proves healthy certification under B10. Unrelated row verification-claim refusals cannot identify these shares' exact path. |
+| `653ccc2d` / `installed-653ccc2d` | Go496.141s/harness564.5s fail,4855 hashes: B30 normal certificate acknowledged at407.6s with22.2s original write time left; rows remain at469.9s,48ms beyond live cutoff. Charge18 equals4 live+14 history records. |
+| `ba0128c4` / `installed-ba0128c4` | Go499.455s/harness568.2s fail,4855 hashes: normal acknowledgment429.0s, one attempt and4.3s original write time left. At473.4s its rows miss the live cutoff by81ms; charge11 equals3 live+8 history records. Nine history keys complete in1.549s, but a16-ID lifecycle page takes19.827s. |
 
-| `7e07616a` / `installed-7e07616a` | Go583.844s/harness654.9s fail,4855 hashes: normal/capture rows delete atomically before original live bounds and retain future cooling charges; final healthy-certificate assertion fails. Verification-claim refusals are logged for some rows, but their identities cannot be correlated to these shares. |
+Current broad evidence: default `make pre-push` at `ad4662b7` passes490s affected
+race tests. At `ba0128c4`, all static gates and the supported incremental
+`ASSERVAT_AFFECTED_BASE=ad4662b7 make pre-push` pass387s. Earlier system-Python
+validator-import failure was corrected using the existing full specification
+virtual environment. Built-browser checks at `52ce1797` pass158.964s
+(30 journeys/31 accessibility scans); installed sharing here uses MCP, so this
+is not installed React-sharing qualification. No retirement PR/hosted CI yet.
 
-| `732d6fb7` / `slots-guard-732d6fb7` | Go65.671s pass,4582 hashes: actual selector skips acknowledged rows until original terminal cutoff, includes finalization-ready and overdue rows; exact shared snapshot scans unstarted/completed/deleted lifecycle states; nested counter/negative probes, atomic retirement/cooling and schema roundtrip3.48s pass. |
+Focused corrections preserve the64KiB artifact cap by removing only duplicated
+federation descriptions (representative output57,899 bytes), admit the existing
+cleanup purpose, separate capacity completion from valid sibling cleanup
+publication, and permit only the nested saturated proof-counter increment. A
+stronger negative probe caught an earlier fixture guard; it now proves the exact
+intended guard and call stack. Closed diagnostics avoid private text/IDs.
 
-| `653ccc2d` / `installed-653ccc2d` | Go496.141s/harness564.5s fail,4855 hashes: normal share certificate acknowledged at407.6s with22.2s original write time left; it remains live at469.9s,48ms after original live cutoff. Account charge18 equals4 live+14 history records. No SQL cleanup refusal is logged; aggregate lifecycle/history cost needs qualification. |
+The selector skips acknowledged certificates until their original next cutoff.
+The history page now shares one original native proof for at most16 SQL-only
+keys (26 vs416 native requests), retaining each SQL fence, first-error pending
+state, later-key progress and original expired DeleteBy. Work stops one second
+before the earliest original proof/parent end; Finish retains the original
+five-second context. The latest change applies the same bounded ownership to
+pairs of lifecycle IDs, with cursor advancement only for actually attempted IDs.
+It adds no grant, authority cache or renewed deadline. Component page/native
+contract race tests pass; fresh aggregate latency and timely erasure remain
+pending. Persistent backend stalls are not qualified by these happy-path samples.
 
-Current broad checks: `make pre-push` passes at `ad4662b7` (490s affected
-race phase), using the existing full specification virtual environment. The first
-invocation used system Python and failed missing validator imports before the
-race phase; it is not a source failure. Earlier `d851782f` passed312s. Full built-browser
-check at `52ce1797` passes158.964s (30 journeys/31 accessibility scans).
-Installed sharing uses MCP; that separate browser evidence is not installed
-React-sharing qualification. No share-retirement PR or hosted CI has run yet.
+The observer still requires both original certificate acknowledgments before
+atomic disappearance, original live cutoffs, charge equal to all live plus
+history records, future cooling and independent version/multipart absence.
+Failed B10 results are not qualified. The B30/H2/P10 cohort retains240s normal/
+resolution and300s capture retention: selecting B30 before installation moves
+original purge60s and live removal20s earlier. No running timestamp is rewritten.
 
-Focused corrections already integrated: replace the duplicated descriptive
-federation setup body with a presence marker, retaining all flat provider
-actions/inspection paths and the64KiB cap (representative output57,899 bytes);
-allow the existing cleanup ticket to consume its original fleet notice; and
-ignore only valid sibling CleanupProjection progress when completing capacity
-startup. Reproductions fail before and pass after each correction. No extra
-request/retry/deadline or authority is added. Closed runtime diagnostics now
-identify scheduling/provider/projection/effect stages without private content.
-
-The shared observer rejects non-atomic disappearance, late live rows, premature
-history/charge release and changed original deadlines. The failed installed cohort used H2/B10/P10 with
-normal/resolution240s/capture300s. The next fresh cohort selects B30 before
-installation, retains the same H/P/retention and moves original purge60s and
-live removal20s earlier; this does not qualify B10. All profile bounds are
-selected before installation;
-timestamps are never rewritten. At `ad4662b7`, the compiled-role service regression passes Go62.173s with
-4,582 exact hashes, frozen source and complete owned cleanup. The original
-healthy retirement/refund still passes; overdue selection increments its
-original counter once and replay preserves it. Negative mutation assertions
-are being strengthened to require the exact nested guard context, since an
-earlier recovery guard can also return23514. At `f107d8e4`, schema upgrade/rollback passes3.32s; the stronger service
-assertion correctly rejects the fixture's backing-mutation probe because the
-earlier capacity configuration guard handles revision writes. The probe now
-targets history backing, which that guard permits to reach the intended audit
-guard, rather than accepting an arbitrary23514. This is fixture correction,
-not a runtime-permission expansion. Fresh installed work remains pending, with
-all original bounds unchanged.
-
-Earlier failed boundary reports remain in `baseline-1dc7c616`,
-`boundaries-63da31e8`, `schema-retry`, `slots-d7a2fd1a`, `slots-eca00f46`,
-`sharing-producers-4d17772d`, and `policy-cost-{08dcf93d,f4527824,ef8e019a,
-bef1348e,dac2d40d}`. They exposed incompatible fixture retention, stale schema,
-closed-layout/sentinel handling, fixture role/receipt mismatches and temporal
-observation errors; none count as passed qualification.
-
-Remaining: fresh installed healthy/terminal absence, original live-row cutoff
-and charge cooling/release; required PR CI/review, merge and authoritative
-readback. This focus does not qualify sustained/max-throughput behavior,
-backup-chain erasure, all control/identity/policy metadata, a supported release
-or a homelab deployment. The canonical Helm context trial below is separately
-qualified on its named source, not freshly requalified by this installer focus.
+Next: finish focused pair-control checks and repository gates, then fresh
+collector-free installed qualification with frozen source. After an actual pass,
+record exact evidence, run required full exact-head PR CI/review, merge and read
+back authoritative main and push CI. Retain unrelated parked work. This does not
+qualify max throughput, sustained operation, backup-chain erasure, all other
+identifying metadata, a release or a homelab deployment. The canonical Helm
+context trial below retains its separate named-source qualification.
 
 ## Merged installable context trial (2026-11-11)
 

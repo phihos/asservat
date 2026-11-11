@@ -18,8 +18,8 @@ import (
 // success. Refused refresh stays pending and retains the provider error class.
 func TestProviderCleanupRefusedRefreshReportsStageWithoutStoppingActor(t *testing.T) {
 	d := &CaptureCleanupWorkerDeployment{providers: &kms.InstalledConfigurationProviderEffects{}}
-	err, current := d.advanceProviderCleanup(t.Context(), "never-selected-row")
-	if !current || !errors.Is(err, kms.ErrKeyService) || cleanupRuntimeEvent(err) != "provider-refresh/unavailable" {
+	attempted, err, current := d.advanceProviderCleanupGroup(t.Context(), []string{"10000000-0000-4000-8000-000000000001"}, nil)
+	if attempted != 0 || !current || !errors.Is(err, kms.ErrKeyService) || cleanupRuntimeEvent(err) != "provider-refresh/unavailable" {
 		t.Fatalf("pending refresh stage/class/current changed: %s/%t", cleanupRuntimeEvent(err), current)
 	}
 }
@@ -171,6 +171,119 @@ func TestCleanupHistoryPageRejectsWholeInvalidPageBeforeAdmission(t *testing.T) 
 		}
 		if attempted, err := releaseCleanupHistoryPage(t.Context(), time.Now().Add(5*time.Second), page, finalizer); err == nil || calls != 0 || attempted != 0 {
 			t.Fatal("invalid history page released a prefix")
+		}
+	}
+}
+
+func cleanupLifecycleGroupIDs() []string {
+	return []string{"10000000-0000-4000-8000-000000000001", "10000000-0000-4000-8000-000000000002"}
+}
+
+func TestCleanupLifecycleGroupKeepsTwoExactIDsAndContinuesAfterFailure(t *testing.T) {
+	ids := cleanupLifecycleGroupIDs()
+	originalEnd := time.Now().Add(5 * time.Second)
+	ctx, cancel := context.WithDeadline(t.Context(), originalEnd)
+	defer cancel()
+	first, later := errors.New("synthetic first effect unknown"), errors.New("synthetic second effect unknown")
+	var observed []string
+	var work context.Context
+	attempted, err := advanceCleanupLifecycleGroup(ctx, originalEnd.Add(time.Hour), ids, func(call context.Context, id string) error {
+		if work == nil {
+			work = call
+		} else if work != call {
+			t.Fatal("lifecycle group replaced its original work context")
+		}
+		until, ok := call.Deadline()
+		if !ok || !until.Equal(originalEnd.Add(-time.Second)) {
+			t.Fatal("lifecycle work renewed its parent deadline")
+		}
+		observed = append(observed, id)
+		if len(observed) == 1 {
+			return first
+		}
+		return later
+	})
+	if attempted != 2 || !errors.Is(err, first) || !reflect.DeepEqual(observed, ids) || ctx.Err() != nil || work.Err() == nil {
+		t.Fatal("group lost exact IDs, later-ID fairness or first pending result", attempted, len(observed))
+	}
+}
+
+func TestCleanupLifecycleGroupCancellationStopsBeforeNextID(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	until, _ := ctx.Deadline()
+	ids := cleanupLifecycleGroupIDs()
+	var observed []string
+	attempted, err := advanceCleanupLifecycleGroup(ctx, until, ids, func(_ context.Context, id string) error {
+		observed = append(observed, id)
+		cancel()
+		return nil
+	})
+	if attempted != 1 || !errors.Is(err, context.Canceled) || !reflect.DeepEqual(observed, ids[:1]) {
+		t.Fatal("canceled lifecycle group started another ID", attempted, len(observed))
+	}
+}
+
+func TestCleanupLifecycleGroupPartialAndZeroWorkKeepOriginalTailAndCursor(t *testing.T) {
+	ids := cleanupLifecycleGroupIDs()
+	for _, remaining := range []time.Duration{1040 * time.Millisecond, 500 * time.Millisecond} {
+		t.Run(remaining.String(), func(t *testing.T) {
+			originalEnd := time.Now().Add(remaining)
+			ctx, cancel := context.WithDeadline(t.Context(), originalEnd)
+			defer cancel()
+			var observed []string
+			attempted, err := advanceCleanupLifecycleGroup(ctx, originalEnd, ids, func(call context.Context, id string) error {
+				observed = append(observed, id)
+				until, _ := call.Deadline()
+				if !until.Equal(originalEnd.Add(-time.Second)) {
+					t.Fatal("work discarded original native-check tail")
+				}
+				<-call.Done()
+				return call.Err()
+			})
+			want := 1
+			cursor := "10000000-0000-4000-8000-000000000000"
+			wantCursor := ids[0]
+			if remaining < time.Second {
+				want, wantCursor = 0, cursor
+			}
+			end, _ := ctx.Deadline()
+			if attempted != want || len(observed) != want || !errors.Is(err, context.DeadlineExceeded) || ctx.Err() != nil || !end.Equal(originalEnd) {
+				t.Fatal("lifecycle group consumed or renewed final native tail", attempted, len(observed))
+			}
+			if got := cleanupLifecycleCursor(cursor, ids, attempted); got != wantCursor {
+				t.Fatal("partial lifecycle page skipped unattempted selected IDs", got, wantCursor)
+			}
+		})
+	}
+}
+
+func TestCleanupLifecycleCursorWrapsOnlyAfterCompleteShortPage(t *testing.T) {
+	ids := cleanupLifecycleGroupIDs()
+	if got := cleanupLifecycleCursor(ids[0], ids, len(ids)); got != "" {
+		t.Fatal("complete short lifecycle page did not wrap")
+	}
+	full := make([]string, 16)
+	for i := range full {
+		full[i] = ids[i%2]
+	}
+	// The transition depends only on page size/attempted prefix. SQL separately
+	// validates strictly increasing real IDs before any native admission.
+	if got := cleanupLifecycleCursor(ids[0], full, len(full)); got != full[15] {
+		t.Fatal("full lifecycle page wrapped before reading its later IDs")
+	}
+	if got := cleanupLifecycleCursor(ids[0], nil, 0); got != "" {
+		t.Fatal("exhausted lifecycle cursor did not wrap")
+	}
+}
+
+func TestCleanupLifecycleGroupRejectsInvalidOrOversizedInputBeforeAdmission(t *testing.T) {
+	ids := cleanupLifecycleGroupIDs()
+	for _, input := range [][]string{nil, {ids[0], "invalid"}, {ids[0], ids[1], ids[0]}} {
+		d := &CaptureCleanupWorkerDeployment{}
+		attempted, err, current := d.advanceProviderCleanupGroup(t.Context(), input, nil)
+		if attempted != 0 || current || cleanupRuntimeEvent(err) != "lifecycle-group-input/unavailable" {
+			t.Fatal("invalid lifecycle group entered credential/native work")
 		}
 	}
 }

@@ -13,6 +13,7 @@ import (
 	auditapp "asservat.local/asservat/internal/application/audit"
 	fleetapp "asservat.local/asservat/internal/application/fleet"
 	value "asservat.local/asservat/internal/domain/audit"
+	"asservat.local/asservat/internal/domain/authorization"
 )
 
 // Scheduling queries carry no native/effect authority and do not acquire a
@@ -39,18 +40,24 @@ func (d *CaptureCleanupWorkerDeployment) runProviderCleanup(ctx context.Context)
 			report("due-lifecycles/empty")
 		}
 		pending := false
-		for _, id := range ids {
-			effectErr, current := d.advanceProviderCleanup(ctx, id)
-			report(cleanupRuntimeEvent(effectErr))
+		operationsAttempted := 0
+		for operationsAttempted < len(ids) {
+			groupEnd := min(operationsAttempted+2, len(ids))
+			group := ids[operationsAttempted:groupEnd]
+			attempted, effectErr, current := d.advanceProviderCleanupGroup(ctx, group, report)
+			operationsAttempted += attempted
+			if !current || attempted < len(group) {
+				report(cleanupRuntimeEvent(effectErr))
+			}
 			if !current {
 				return effectErr
 			}
 			pending = pending || effectErr != nil
-			cursor = id
+			if attempted < len(group) {
+				break
+			}
 		}
-		if len(ids) < 16 {
-			cursor = ""
-		}
+		cursor = cleanupLifecycleCursor(cursor, ids, operationsAttempted)
 		operationsElapsed := time.Since(operationsStarted)
 		historyStarted := time.Now()
 		schedule, end = context.WithTimeout(ctx, 5*time.Second)
@@ -79,7 +86,7 @@ func (d *CaptureCleanupWorkerDeployment) runProviderCleanup(ctx context.Context)
 		// query and all serial processing, excluding the fixed idle sleep. IDs,
 		// error text and provider inputs never enter these diagnostics.
 		if len(ids)+len(keys) > 0 {
-			fmt.Fprintf(os.Stderr, "operation cleanup: sweep operations=%d operations_ms=%d history_selected=%d history_attempted=%d history_ms=%d\n", len(ids), operationsElapsed.Milliseconds(), len(keys), historyAttempted, time.Since(historyStarted).Milliseconds())
+			fmt.Fprintf(os.Stderr, "operation cleanup: sweep operations_selected=%d operations_attempted=%d operations_ms=%d history_selected=%d history_attempted=%d history_ms=%d\n", len(ids), operationsAttempted, operationsElapsed.Milliseconds(), len(keys), historyAttempted, time.Since(historyStarted).Milliseconds())
 		}
 		d.mu.Lock()
 		d.lastSweepPending = pending
@@ -113,8 +120,11 @@ func (d *CaptureCleanupWorkerDeployment) beginProviderCleanup(ctx context.Contex
 	return op, lease, nil
 }
 
-func (d *CaptureCleanupWorkerDeployment) advanceProviderCleanup(ctx context.Context, id string) (err error, current bool) {
-	step := "provider-refresh"
+// The native cleanup claim is installation/credential scoped, not operation-ID
+// scoped. Two exact lifecycle IDs share only that original native bracket;
+// their SQL/application effects and remote provider borrows remain independent.
+func (d *CaptureCleanupWorkerDeployment) advanceProviderCleanupGroup(ctx context.Context, ids []string, report func(string)) (attempted int, err error, current bool) {
+	step := "lifecycle-group-input"
 	defer func() {
 		if err != nil {
 			var stopped *cleanupRuntimeError
@@ -123,42 +133,115 @@ func (d *CaptureCleanupWorkerDeployment) advanceProviderCleanup(ctx context.Cont
 			}
 		}
 	}()
-	if d.providers == nil {
-		return mounts.ErrUnavailable, false
+	if !validCleanupLifecycleGroup(ids) {
+		return 0, mounts.ErrUnavailable, false
 	}
+	step = "provider-refresh"
+	if d.providers == nil {
+		return 0, mounts.ErrUnavailable, false
+	}
+	// Credential maintenance precedes this group's native admission, and never
+	// extends its context or caches S3/crypto effect authority.
 	if err := d.providers.RefreshCleanup(ctx); err != nil {
-		return err, ctx.Err() == nil
+		return 0, err, ctx.Err() == nil
 	}
 	step = "projection-begin"
 	op, lease, err := d.beginProviderCleanup(ctx)
 	if err != nil {
-		return err, false
+		return 0, err, false
 	}
 	defer lease.Release()
 	defer op.Close()
-	call := op.Context()
-	step = "lifecycle-read"
-	state, err := d.journal.ReadOperationLifecycle(call, id)
+	step = "lifecycle-group-work"
+	attempted, err = advanceCleanupLifecycleGroup(op.Context(), op.FreshUntil(), ids, func(call context.Context, id string) error {
+		effectErr := d.advanceProviderCleanupOperation(call, id)
+		if report != nil {
+			report(cleanupRuntimeEvent(effectErr))
+		}
+		return effectErr
+	})
+	if final := op.Finish(op.Context()); final != nil {
+		return attempted, &cleanupRuntimeError{"projection-finish", final}, false
+	}
+	// Unknown/failed row effects stay pending and charged. The next independent
+	// SQL invocation alone decides what an original row can still complete.
+	return attempted, err, true
+}
+
+func (d *CaptureCleanupWorkerDeployment) advanceProviderCleanupOperation(ctx context.Context, id string) (err error) {
+	step := "lifecycle-read"
+	defer func() {
+		if err != nil {
+			err = &cleanupRuntimeError{step, err}
+		}
+	}()
+	state, err := d.journal.ReadOperationLifecycle(ctx, id)
 	if err == nil {
 		b := state.Intent.Lifecycle
 		switch {
 		case state.TerminalAcknowledged:
 			step = "finalize"
-			err = d.finalizer.RetireOperationAudit(call, id)
+			err = d.finalizer.RetireOperationAudit(ctx, id)
 		case b != nil && b.Policy.OverdueTerminal == value.OperationOverdueTerminal && !state.CertificateStarted && state.CertificateWriter == nil && state.CertificateReceipt == nil && !time.Now().Before(b.CertificatePurgeAt.Add(-time.Duration(b.Policy.ProofWindowSeconds)*time.Second)):
 			step = "overdue"
-			err = d.overdue.Advance(call, id)
+			err = d.overdue.Advance(ctx, id)
 		default:
 			step = "healthy"
-			err = d.healthy.Advance(call, id)
+			err = d.healthy.Advance(ctx, id)
 		}
 	}
-	if final := op.Finish(call); final != nil {
-		return &cleanupRuntimeError{"projection-finish", final}, false
+	return err
+}
+
+func validCleanupLifecycleGroup(ids []string) bool {
+	if len(ids) == 0 || len(ids) > 2 {
+		return false
 	}
-	// A failed/unknown effect remains pending and charged. Only the existing SQL
-	// lifecycle decides what a later independently admitted invocation may do.
-	return err, true
+	for _, id := range ids {
+		if !authorization.UUID(id) {
+			return false
+		}
+	}
+	return true
+}
+
+// A partial page must retain its unattempted suffix, including a zero-work
+// group. Only a fully processed short page proves the cursor may wrap.
+func cleanupLifecycleCursor(cursor string, ids []string, attempted int) string {
+	if attempted > 0 {
+		cursor = ids[attempted-1]
+	}
+	if attempted == len(ids) && len(ids) < 16 {
+		return ""
+	}
+	return cursor
+}
+
+// The group uses no fresh end. Reserve the final second of the earliest
+// original parent/native deadline, then stop before attempting another ID.
+func advanceCleanupLifecycleGroup(ctx context.Context, until time.Time, ids []string, advance func(context.Context, string) error) (attempted int, err error) {
+	if ctx == nil || until.IsZero() || advance == nil || !validCleanupLifecycleGroup(ids) {
+		return 0, mounts.ErrUnavailable
+	}
+	if outer, ok := ctx.Deadline(); ok && outer.Before(until) {
+		until = outer
+	}
+	work, stop := context.WithDeadline(ctx, until.Add(-time.Second))
+	defer stop()
+	var first error
+	for _, id := range ids {
+		if work.Err() != nil {
+			break
+		}
+		attempted++
+		if err := advance(work, id); err != nil && first == nil {
+			first = err
+		}
+	}
+	if first == nil {
+		first = work.Err()
+	}
+	return attempted, first
 }
 
 func (d *CaptureCleanupWorkerDeployment) releaseProviderHistoryPage(ctx context.Context, keys []value.OperationHistoryKey) (attempted int, err error, current bool) {

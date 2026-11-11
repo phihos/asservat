@@ -330,3 +330,30 @@ must preserve cancellation, the original parent deadline, the final-check tail,
 per-key error continuation and exact native request counts. Real compiled-role
 SQL and fresh installed qualification remain required; the timing inference and
 passing certificate alone do not establish timely erasure.
+
+
+## Pair lifecycle IDs under the same original request
+
+At `ba0128c4`, nine history releases take1.549s, proving the bounded history-page
+composition runs. The workflow still fails its normal original live cutoff:
+a sixteen-ID lifecycle page takes19.827s. Its certificate is acknowledged with
+4.3s left before the original write cutoff, so neither dropping verification nor
+another retention/budget increase addresses the observed serial native cost.
+
+Group at most two lifecycle IDs under one original cleanup proof. Keep provider
+refresh before native admission, each ID's current SQL/store/key checks and
+complete existing lifecycle protocol, one original five-second context, the
+same one-second final-check reserve and one Finish. Continue a second ID after
+an isolated error only while that original child remains live. Report each
+closed per-ID error. A partial group advances the UUID cursor only through its
+attempted prefix; zero progress ends the page rather than spinning, and only a
+fully attempted short page resets the cursor. Unattempted IDs stay in SQL.
+
+A full16-ID page needs eight proofs rather than sixteen (208 vs416 native
+requests); with one16-key history page,32 effects need234 rather than832 native
+requests, a71.875% arithmetic reduction. This is not a latency guarantee. It adds
+no state, configuration, role, grant, provider scope, goroutine or background task.
+Variable S3/crypto work remains bounded by the unchanged original child; unknown
+outcomes remain charged. The B30 cohort and all success/deletion assertions stay
+unchanged. Test paired exact IDs, cancellation, partial progress, first-error
+continuation and original-tail bounds, then measure the fresh installed outcome.
