@@ -47,6 +47,8 @@ failures and independently absent owned resources. Failed runs remain failures.
 
 | `7e07616a` / `installed-7e07616a` | Go583.844s/harness654.9s fail,4855 hashes: normal/capture rows delete atomically before original live bounds and retain future cooling charges; final healthy-certificate assertion fails. Verification-claim refusals are logged for some rows, but their identities cannot be correlated to these shares. |
 
+| `732d6fb7` / `slots-guard-732d6fb7` | Go65.671s pass,4582 hashes: actual selector skips acknowledged rows until original terminal cutoff, includes finalization-ready and overdue rows; exact shared snapshot scans unstarted/completed/deleted lifecycle states; nested counter/negative probes, atomic retirement/cooling and schema roundtrip3.48s pass. |
+
 Current broad checks: `make pre-push` passes at `ad4662b7` (490s affected
 race phase), using the existing full specification virtual environment. The first
 invocation used system Python and failed missing validator imports before the
