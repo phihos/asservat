@@ -2,145 +2,82 @@
 
 ## Active candidate: processing inventory export (2026-11-11)
 
-Outcome is a complete sequence of bounded audited inventory pages covering
-retained artifacts and deletions, recipients, native sessions, operation
-responses, rules, technical placement and processor declarations. The console
-exports finite JSON parts and continues through every section before reporting
-completion. ADR-322 and SC-PRV-014 record the source and lifetime contracts.
+[PR222](https://github.com/phihos/asservat/pull/222) starts from authoritative
+`fec1e03e`. The console exports seven ordered sections of retained artifacts
+including deletions, recipients, native sessions, operation responses, rules,
+technical paths and declared processors. Finite JSON parts preserve the original
+selection and continue before completion. ADR-322 and SC-PRV-014 define the
+per-page observations and original visibility horizons. Missing declarations
+and an explicit empty list remain distinct; regions do not imply organizations.
 
-Fresh installed qualification at `72a459be` passed (Go 312.453 s, harness
-371.0 s, both exits 0). The Keycloak user captured, published and downloaded
-the original regional pod-status file, created a share with four existing
-recipients and completed verified early erasure. The real console exported
-every report section with exact acknowledged page bytes, the same recipients
-across 3+1 pages, the completed native session, retained deletion and declared
-processors. Ordinary readership could not export and produced the exact denied
-audit. The actual SQL152 Down guard refused retained report history with 23514;
+Fresh installed qualification at `8fe07f0a` passed (Go 312.047 s, harness
+368.7 s, both exits 0). The Keycloak user captured, published and downloaded
+the regional pod-status file, created a share with four existing recipients and
+completed verified early erasure. The real console exported every section with
+exact acknowledged page bytes, recipients across 3+1 pages, a completed native
+session, retained verified deletion and the declared processors. Ordinary
+readership could not export and produced the exact acknowledged denial audit.
+The actual SQL152 Down guard refused retained report history with 23514;
 rollback preserved schema 152 and all three index definitions.
 
-All 4,812 qualification source hashes independently match. Source stayed frozen,
-cleanup failures are empty, both owned clusters and labelled Docker resources
-are gone, and build scratch was removed. Final focused race/browser, vet and
-formatting checks passed at that head; full pre-push at `021142f4` and the full
-browser gate at `a657fca4` remain applicable to identical production/browser
-sources. The final native focus used one regional target; the second-workload
-and broader replay matrix were not run. Reports are archived externally in
-`privacy-inventory-report/installed-72a459be`. Required PR CI and merge remain
-pending. The specification goal stays active.
+All 4,813 qualification source hashes independently match. Source stayed
+frozen, cleanup failures are empty, both owned clusters and labelled Docker
+resources are gone, and build scratch was removed. The focus uses one regional
+target; broader replay and second-workload matrices were not run. Original
+reports are external in `privacy-inventory-report/installed-8fe07f0a`. Required
+final PR CI and merge remain pending. The end-to-end specification goal stays
+active.
 
-[PR222](https://github.com/phihos/asservat/pull/222) opened at `b74d49d5`.
-Its first required `pull_request` CI, run 42957758840, completed with all
-14 Go shards, the Go gate, contract checks and console tests passing. The
-browser job alone failed: the report driver requested a Chromium response
-body after Blob download navigation had discarded it, and its pending capture
-rejected before being joined. A focused local loop reproduced the exact
-failure in 4 of 20 runs (29.074 s, exit 1). The observer needs to retain the
-actual upstream bytes before delivery, preserve the original session/CSRF and
-proxy transport, propagate capture failures and perform no retries. The fixed
-driver requires focused, full browser and fresh installed qualification before
-another CI push. Original CI logs and timing are archived externally in
-`privacy-inventory-report/ci-42957758840`.
-The corrected report-only observer captures the actual upstream bytes before
-fulfilling the browser response. It preserves all intercepted headers, including
-the original cookie, uses zero retries/redirects, joins pending handlers and
-disposes responses. A closed CONNECT-proxy probe changes the cookie jar after
-interception, compares exact UTF-8/whitespace bytes through Blob download and
-navigation, and verifies truncated-response failure without replay. It runs
-inside the existing CI-selected report browser test. Twenty repeated exports
-with that probe pass (47.823 s, exit 0); the final focused source check passes
-in 2.388 s. Probe process-group cancellation follows the existing bounded
-Chromium cleanup pattern. HTTP and part assertions enforce the product's
-24 KiB and 1 MiB bounds. Application and UI sources remain unchanged. Logs are
-external in `browser-response-capture`; new browser/native qualification is
-still pending for this driver correction.
+Local validation passed: 683 console tests, 41 focused UI/HTTP cases, TypeScript,
+59 report contract cases, Helm and specification/architecture/design checks.
+`make pre-push` passed at `021142f4`; its affected Go race phase took 103 s with
+unchanged packages cached, following the changed-source 517 s pass at `a657fca4`.
+All 14 Go shards and the Go gate passed in required PR CI42957758840 at
+`b74d49d5`. Production, UI, SQL and canonical contracts are unchanged afterward.
+The corrected driver's full browser gate passed at `8fe07f0a` (149.514 s),
+including 29 standard journeys and 28 accessibility scans. Exact-head focused
+race/browser checks passed (6.042 s), alongside vet, formatting and design gates.
 
-The candidate starts from authoritative `fec1e03e`. Declaration preservation,
-domain and application authority checks, 41 focused UI/HTTP tests, TypeScript,
-59 generated contract cases, Helm and specification checks pass. The focused
-compiled-browser test passed (Go 1.520 s), exporting 40 pages across two actual
-JSON files and comparing their complete pages with acknowledged HTTP responses.
-Review corrected a draft query that used renewed shared backing as a native
-session's metadata horizon. The reader uses its original per-session snapshot.
-
-Owned service checks at `25e9a774` passed sequentially with all 4,544 source
-hashes independently matched and empty cleanup failures. Containers and networks
-were independently confirmed absent.
+Owned service checks at `25e9a774` passed sequentially. All 4,544 source hashes
+match and owned containers/networks were independently confirmed absent:
 
 - Schema-owner upgrade 151→152 and empty Down/Up passed in 3.680 s, preserving
   floor 149, exact prior validators/indexes and unknown-history refusal.
-- PostgreSQL/S3 erasure and report reads passed in 6.669 s, including every
-  section before and after positive cleanup, a released rule, declarations,
-  current-operator refusal and an actual unknown audit outcome.
-- The owned PostgreSQL/OpenBao/S3 capacity matrix passed in 82.064 s. After
-  actual capacity renewal it verifies the original session disappears at its
-  immutable cutoff while shared backing and artifact metadata remain valid.
+- PostgreSQL/S3 report and erasure checks passed in 6.669 s, including every
+  section before/after purge, a released rule and an actual unknown audit outcome.
+- The PostgreSQL/OpenBao/S3 renewal matrix passed in 82.064 s. After actual
+  renewal the original session disappears at its immutable cutoff while shared
+  backing and artifact metadata remain valid.
 
-Reports are archived externally under
-`privacy-inventory-report/services-25e9a774`. The later installed-only assertion
-will exercise the exact migration Down guard against real retained report audit
-rows and verify the schema/indexes remain unchanged after refusal. These checks
-were pending at that earlier checkpoint; the final installed result is above.
+The earlier failures remain recorded in their commits and external archives.
+At `b871dd60`, architecture/authority gates rejected a domain hex decoder and a
+literal observation interval; both were corrected without weakening the gates.
+Static pre-push checks now precede the longer race phase. Installed `a657fca4`
+failed prerequisite sharing because its focus omitted ownership before capture.
+The regression reproduced the missing role. Installed `021142f4` passed sharing
+and erasure but its report assertion read the owner download source instead of
+the separately pinned processing source. The two-source regression reproduced
+that distinct-UID mismatch. All sources matched each failed head; official
+retained-environment cleanup completed with no leftovers. Installed `72a459be`
+then passed (Go 312.453 s, harness 371.0 s; 4,812 matching source hashes).
 
-The first `make pre-push` at `b871dd60` returned 2. All 683 console tests and
-the affected Go race suite passed (522 s), while Go architecture and authority
-window gates rejected two new value checks. The source now validates the closed
-hex alphabet using allowed text utilities and uses the existing SQL-fenced
-interval. Both static gates and focused report race checks pass. `pre-push`
-now completes its parallel static phase before starting the longer race phase.
-The full packaged-browser gate at `b871dd60` passed in 158.579 s, including
-the report export, existing journeys and accessibility scans. Its generated
-output is archived externally. A final installed-only correction uses a valid
-nonoperator query and requires the actual 401 plus an acknowledged denied audit.
+CI42957758840 failed only the report browser observer: Chromium discarded a
+response body after Blob download navigation. The exact failure reproduced in
+4/20 local runs (29.074 s). The report-only observer now captures real upstream
+bytes before fulfillment, preserves full intercepted headers including Cookie,
+uses zero retries/redirects and joins/disposes its handlers. The closed CONNECT
+probe verifies original cookies despite jar mutation, exact UTF-8/whitespace
+bytes through download/navigation and truncated-response failure without replay.
+Twenty repeated runs with the probe passed (47.823 s); final source check passed
+in 2.388 s. Bounded process-group cancellation follows the existing Chromium
+pattern. HTTP and part checks enforce 24 KiB and 1 MiB. Logs remain external in
+`browser-response-capture`, `ci-42957758840` and the named installed archives;
+no generated result files are committed.
 
-At `a657fca4`, final `make pre-push` passed, including all 683 console tests
-and the affected Go race suite (517 s). Full `make console-browser-check`
-passed in 159.513 s. Fresh installed `privacy-inventory` qualification then
-failed before the export, while creating its prerequisite share (Go 262.205 s,
-harness 337.0 s, test exit 1 and make exit 2). The actual persisted operation
-records a denied `create_share`, reason `not_available`, with both audit
-receipts acknowledged. All 4,811 source hashes independently match the frozen
-commit and source remained unchanged. The owned collector-free environment
-was retained for diagnosis. Its current permission projection and original
-capture audience contained only `workload-maintainer`; the focus selector
-omitted the `evidence-owner` setup used by sharing fixtures. A focused selector
-regression reproduced the omission. The failure occurred almost four minutes
-before evidence expiry and created no share. After diagnosis, official kept
-cleanup returned 0 and verified no owned cluster or labelled Docker resources
-remained. Original outputs remain outside the repository in
-`installed-a657fca4`. Fresh qualification of the corrected fixture is pending.
-The corrected focus grants ownership before acquisition, preserving the real
-retained audience. The selector regression and compiled-browser report test
-pass (2.085 s, exit 0). Installed assertions now require four existing fixture
-recipients across exact 3+1 pages, unique recipient ordinals and acknowledged
-page output bytes. Production code, console assets and browser drivers are
-unchanged from the successful broad/browser checkpoint.
-
-Final `make pre-push` at `021142f4` passed, including the integration race
-package (102 s; affected suite 103 s with unchanged packages cached). The next
-fresh installed run passed capture, native download, the four-recipient share
-and verified early erasure, then failed its first exported page's provenance
-assertion (Go 349.432 s, harness 398.2 s, test exit 1 and make exit 2). All 4,811
-source hashes match and source remained frozen. The assertion read the owner
-download ConfigMap, while the public processing service deliberately uses the
-separate capacity processing source. Their distinct UIDs invalidate that test
-expectation even when their documents match. The full source revision check
-must use the actual processing source. Original outputs are archived in
-`installed-021142f4`. The accepted owner input confirmed separate processing
-and download source UIDs, both at revision 2 with the two declarations.
-Official retained-fixture cleanup returned 0 with all resource lists empty.
-The helper now follows the actual Deployment projection to its pinned
-processing source, retains every strict header comparison and names any
-mismatched field. A focused two-source regression failed before the fix and
-passes with UID-replacement refusal and the compiled report browser (1.393 s,
-exit 0). Failed synthetic export parts are preserved under the private external
-fixture directory before temporary-directory cleanup. The production protected
-reader's focused race checks also pass (2.203 s). Production and browser sources
-remain unchanged, so the successful broad gates are reusable while final
-fixture checks, fresh qualification and full required PR CI remain mandatory.
-
-The report uses original visibility horizons. Physical retirement of all share
-metadata, complete retained-derivative production/propagation, reviewed personal
-extracts and preservation remain open under the wider specification.
+This report bounds visibility by original metadata lifetimes. Physical retirement
+of all sharing/control metadata, complete retained-derivative production and
+erasure propagation, reviewed extracts, preservation and wider qualification
+remain open under the accepted specification.
 
 ## Merged workload-interval processing restriction (2026-11-11)
 
