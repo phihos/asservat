@@ -1182,3 +1182,5 @@ The brief's domain-registration and trademark work remains a maintainer-owned pu
 - [ADR-319 — Privacy evidence discovery](319-privacy-evidence-discovery.md) specifies audited browser search over retained catalog and direct lineage metadata.
 
 - [ADR-320 — Installed retention lifecycle publication](320-installed-retention-lifecycle-publication.md) composes signed acknowledgement in the existing hub worker.
+
+- [ADR-321 — Exact early erasure](321-exact-early-erasure.md) binds an audited operator request to the existing signed retention and deletion lifecycle.

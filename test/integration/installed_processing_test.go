@@ -81,7 +81,7 @@ func qualifyInstalledProcessing(t *testing.T, parent context.Context, c installe
 	}()
 	t.Logf("installed processing stage=start, original artifact access remaining=%s", time.Until(c.ExpiresAt).Round(time.Second))
 	session := c.Identity.consoleSession(t, ctx, c.PublicRoot, c.Address, c.Origin)
-	driver := startInstalledProcessingBrowser(t, ctx, session, c.Address, c.ArtifactID, c.CaseID)
+	driver := startInstalledProcessingBrowser(t, ctx, session, c.Address, c.ArtifactID, c.CaseID, "installed-processing-browser.mjs")
 	next := func(want string) installedProcessingEvent {
 		t.Helper()
 		var event installedProcessingEvent
@@ -171,6 +171,12 @@ func qualifyInstalledProcessing(t *testing.T, parent context.Context, c installe
 	}
 	driver.send(map[string]bool{"continue": true})
 	next("complete")
+	awaitInstalledProcessingBrowser(t, driver)
+	t.Logf("installed processing complete after %s. React restricted the artifact, found its recorded lineage after ordinary reads were refused, selected it without a mutation, and released the exact restriction. Both replays preserved SQL state and native download restored the original bytes and deadline.", time.Since(started).Round(time.Millisecond))
+}
+
+func awaitInstalledProcessingBrowser(t *testing.T, driver *installedLiveBrowser) {
+	t.Helper()
 	driver.once.Do(func() {
 		_ = driver.in.Close()
 		err, ok := installedAwait(t, "installed processing browser", driver.done, 15*time.Second)
@@ -183,7 +189,6 @@ func qualifyInstalledProcessing(t *testing.T, parent context.Context, c installe
 		}
 		driver.cancel()
 	})
-	t.Logf("installed processing complete after %s. React restricted the artifact, found its recorded lineage after ordinary reads were refused, selected it without a mutation, and released the exact restriction. Both replays preserved SQL state and native download restored the original bytes and deadline.", time.Since(started).Round(time.Millisecond))
 }
 
 func (c installedProcessingRun) checkDiscovery(t *testing.T, ctx context.Context, restriction installedProcessingReceipt, d installedProcessingDiscovery) {
@@ -318,7 +323,7 @@ func (b *installedBrowser) postProcessingChange(ctx context.Context, input json.
 	return response.StatusCode, raw, err
 }
 
-func startInstalledProcessingBrowser(t *testing.T, ctx context.Context, b *installedBrowser, address, artifactID, caseID string) *installedLiveBrowser {
+func startInstalledProcessingBrowser(t *testing.T, ctx context.Context, b *installedBrowser, address, artifactID, caseID, script string) *installedLiveBrowser {
 	t.Helper()
 	origin, err := url.Parse(b.base)
 	if err != nil || b.client.Jar == nil {
@@ -331,7 +336,7 @@ func startInstalledProcessingBrowser(t *testing.T, ctx context.Context, b *insta
 	if len(cookies) == 0 {
 		t.Fatal("installed processing browser cookie absent")
 	}
-	command, cancel := installedBoundedCommand(ctx, 3*time.Minute, "node", filepath.Join("..", "..", "web", "scripts", "installed-processing-browser.mjs"))
+	command, cancel := installedBoundedCommand(ctx, 3*time.Minute, "node", filepath.Join("..", "..", "web", "scripts", script))
 	command.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	command.Cancel = func() error {
 		if command.Process == nil {

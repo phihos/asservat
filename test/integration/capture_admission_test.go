@@ -397,7 +397,7 @@ func TestContextAdmissionWithRealServices(t *testing.T) {
 	qualifyOperationAuditOverdue(t, ctx, admin, poolFor, store, keys, create)
 	qualifyContextPreviews(t, ctx, admin, poolFor, create)
 	qualifyContextProgress(t, ctx, admin, poolFor, create)
-	qualifyAPIExecutionTransactions(t, ctx, admin, poolFor, store, keys, create)
+	qualifyAPIExecutionTransactions(t, ctx, admin, poolFor, store, keys, s3admin, bucket, create)
 	qualifyRecordingTransactions(t, ctx, admin, poolFor, store, keys, func(t *testing.T) scenario {
 		scenarioNativeLimit = artifact.RecordingNativeLimit
 		defer func() { scenarioNativeLimit = 4096 }()

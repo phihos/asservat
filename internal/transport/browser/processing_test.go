@@ -43,8 +43,12 @@ func (s *processingService) Change(ctx context.Context, current identities.Curre
 	if s.after != nil {
 		s.after()
 	}
+	state := "initialized"
+	if c.Action == value.RequestEarlyErasure {
+		state = "erasureRequested"
+	}
 	return value.ProcessingReceipt{RootID: "00000000-0000-4000-8000-000000000041", Epoch: "00000000-0000-4000-8000-000000000042", RequestID: c.RequestID,
-		OperationID: "00000000-0000-4000-8000-000000000043", State: "initialized", Sequence: 2, ObservedAt: now, ValidUntil: until}, nil
+		OperationID: "00000000-0000-4000-8000-000000000043", State: state, Sequence: 2, ObservedAt: now, ValidUntil: until}, nil
 }
 
 // ADR-210: the route needs the session, CSRF and one UUID Idempotency-Key,
@@ -82,7 +86,7 @@ func TestProcessingChangeRoute(t *testing.T) {
 	body := `{"action":"initialize_processing"}`
 	status, reply := send(body, nil)
 	var out map[string]any
-	if status != http.StatusOK || json.Unmarshal([]byte(reply), &out) != nil || out["state"] != "initialized" || out["requestID"] != key || len(service.changes) != 1 || service.changes[0].RequestID != key || service.changes[0].Action != "initialize_processing" {
+	if status != http.StatusOK || json.Unmarshal([]byte(reply), &out) != nil || out["state"] != "initialized" || out["revision"] != float64(0) || out["requestID"] != key || len(service.changes) != 1 || service.changes[0].RequestID != key || service.changes[0].Action != "initialize_processing" {
 		t.Fatal("initialization reply", status, reply)
 	}
 	for name, mutate := range map[string]func(*http.Request){
@@ -102,6 +106,37 @@ func TestProcessingChangeRoute(t *testing.T) {
 			t.Fatal("invalid change accepted", bad, status)
 		}
 	}
+	const eraseKey = "00000000-0000-4000-8000-000000000045"
+	const artifactID = "00000000-0000-4000-8000-000000000046"
+	eraseHeader := func(r *http.Request) { r.Header.Set("Idempotency-Key", eraseKey) }
+	eraseBody := `{"action":"request_early_erasure","artifactID":"` + artifactID + `"}`
+	status, reply = send(eraseBody, eraseHeader)
+	var erasure map[string]any
+	if status != http.StatusOK || json.Unmarshal([]byte(reply), &erasure) != nil || erasure["state"] != "erasureRequested" || erasure["requestID"] != eraseKey ||
+		len(service.changes) != 2 || service.changes[1] != (value.ProcessingChange{RequestID: eraseKey, Action: value.RequestEarlyErasure, RequestedArtifactID: artifactID}) {
+		t.Fatal("erasure request or acknowledgement", status, reply)
+	}
+	if _, ok := erasure["revision"]; ok {
+		t.Fatal("erasure receipt included a revision", reply)
+	}
+	if _, ok := erasure["ruleID"]; ok {
+		t.Fatal("erasure receipt included a rule ID", reply)
+	}
+	for _, bad := range []string{
+		`{"action":"request_early_erasure"}`,
+		`{"action":"request_early_erasure","artifactID":"not-an-artifact"}`,
+		`{"action":"request_early_erasure","artifactID":null}`,
+		`{"action":"request_early_erasure","ArtifactID":"` + artifactID + `"}`,
+		`{"action":"request_early_erasure","artifactID":"` + artifactID + `","artifactID":"` + artifactID + `"}`,
+		`{"action":"request_early_erasure","artifactID":"` + artifactID + `","reason":"free text"}`,
+		`{"action":"request_early_erasure","artifactID":"` + artifactID + `","ruleID":""}`,
+		`{"action":"request_early_erasure","artifactID":"` + artifactID + `","expectedRevision":0}`,
+		`{"action":"request_early_erasure","artifactID":"` + artifactID + `","scope":null}`,
+	} {
+		if status, _ := send(bad, eraseHeader); status != http.StatusBadRequest {
+			t.Fatal("invalid erasure accepted", bad, status)
+		}
+	}
 	service.err = value.ErrUnavailable
 	if status, _ := send(body, nil); status != http.StatusServiceUnavailable {
 		t.Fatal("refusal not mapped to 503", status)
@@ -110,7 +145,7 @@ func TestProcessingChangeRoute(t *testing.T) {
 	if status, _ := send(body, nil); status != http.StatusForbidden {
 		t.Fatal("known operator denial not mapped to 403", status)
 	}
-	if len(service.changes) != 3 {
+	if len(service.changes) != 4 {
 		t.Fatal("transport-refused requests reached the service", len(service.changes))
 	}
 }

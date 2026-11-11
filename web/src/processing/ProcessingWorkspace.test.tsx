@@ -6,7 +6,12 @@ import { processingArtifactIDFromPath } from '../routes';
 import { session } from '../live/test-fixtures';
 const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const page = (revision = 1): Inventory => ({ rootID: id(1), epoch: id(2), initialized: true, sequence: 2, observedAt: new Date().toISOString(), validUntil: new Date(Date.now()+5000).toISOString(), rules: [{ id: id(3), revision, state: revision % 2 ? 'restricted' : 'released', scope: { kind: 'artifact', location: { clusterID: id(4), artifactID: id(5), attemptID: id(6) } }, administrationUntil: '2020-01-01T00:00:00Z', retireBy: '2030-01-01T00:00:00Z' }] });
-const receipt = (input: Change, key: string): Receipt => ({ rootID: id(1), epoch: id(2), requestID: key, operationID: id(7), state: input.action === 'initialize_processing' ? 'initialized' : input.action === 'release_processing' ? 'released' : 'restricted', revision: input.action === 'initialize_processing' ? 0 : input.expectedRevision+1, sequence: 3, ...(input.action === 'initialize_processing' ? {} : { ruleID: input.ruleID }), observedAt: new Date().toISOString(), validUntil: new Date(Date.now()+5000).toISOString() });
+const receipt = (input: Change, key: string): Receipt => {
+  const common = { rootID: id(1), epoch: id(2), requestID: key, operationID: id(7), sequence: 3, observedAt: new Date().toISOString(), validUntil: new Date(Date.now()+5000).toISOString() };
+  if (input.action === 'request_early_erasure') return { ...common, state: 'erasureRequested' };
+  if (input.action === 'initialize_processing') return { ...common, state: 'initialized', revision: 0 };
+  return { ...common, state: input.action === 'release_processing' ? 'released' : 'restricted', revision: input.expectedRevision+1, ruleID: input.ruleID };
+};
 afterEach(cleanup);
 it('loads explicitly and releases the exact persisted scope/revision after the administrative deadline', async () => {
   const read = vi.fn(async () => page()), change = vi.fn(async (input: Change, key: string) => receipt(input, key));

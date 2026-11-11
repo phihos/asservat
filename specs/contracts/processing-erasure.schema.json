@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/processing-erasure.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "request_id",
+    "artifact_id",
+    "accepted_at",
+    "access_until",
+    "delete_by",
+    "effective_delete_by",
+    "audit_state",
+    "deletion_state"
+  ],
+  "properties": {
+    "request_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "artifact_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "accepted_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "access_until": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "delete_by": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "effective_delete_by": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "audit_state": {
+      "enum": [
+        "pending",
+        "acknowledged"
+      ]
+    },
+    "deletion_state": {
+      "enum": [
+        "pending",
+        "overdue",
+        "deleted"
+      ]
+    },
+    "deleted_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "if": {
+    "properties": {
+      "deletion_state": {
+        "const": "deleted"
+      }
+    },
+    "required": [
+      "deletion_state"
+    ]
+  },
+  "then": {
+    "required": [
+      "deleted_at"
+    ]
+  },
+  "else": {
+    "not": {
+      "required": [
+        "deleted_at"
+      ]
+    }
+  }
+}

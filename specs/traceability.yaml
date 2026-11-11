@@ -489,6 +489,7 @@ requirements:
   - SC-PRV-006
   - SC-PRV-010
   - SC-PRV-011
+  - SC-PRV-012
   tasks:
   - TASK-07
   - TASK-11

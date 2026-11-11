@@ -4,6 +4,7 @@ import (
 	auditapp "asservat.local/asservat/internal/application/audit"
 	"asservat.local/asservat/internal/domain/artifact"
 	auditvalue "asservat.local/asservat/internal/domain/audit"
+	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/identity"
 	value "asservat.local/asservat/internal/domain/privacy"
 	"context"
@@ -77,7 +78,9 @@ func (f *processingFixture) ApplyProcessing(_ context.Context, a value.Processin
 	}
 	f.applies++
 	f.receipt = &value.ProcessingReceipt{RootID: d.Intent.RootID, Epoch: processingID(7), RequestID: d.Change.RequestID, OperationID: d.Intent.ID, State: "initialized", Sequence: 2, ObservedAt: a.ObservedAt, ValidUntil: a.ValidUntil}
-	if d.Change.Action != "initialize_processing" {
+	if d.Change.Action == value.RequestEarlyErasure {
+		f.receipt.State = "erasureRequested"
+	} else if d.Change.Action != "initialize_processing" {
 		f.receipt.RuleID = d.Change.RuleID
 		f.receipt.Revision = d.Change.ExpectedRevision + 1
 		f.receipt.State = "restricted"
@@ -126,6 +129,42 @@ func TestProcessingDecisionAuditsPreparedUnknownBeforeCAS(t *testing.T) {
 		t.Fatal("change stacked complete authority observations", f.policyObservations, f.recoveryObservations)
 	}
 }
+
+type erasureArtifactScope struct{ location artifact.Location }
+
+func (s erasureArtifactScope) ResolveProcessingArtifactScope(_ context.Context, _ value.ProcessingAuthority, artifactID string) (value.ProcessingScope, error) {
+	if !authorization.UUID(artifactID) || artifactID != s.location.ArtifactID {
+		return value.ProcessingScope{}, value.ErrUnavailable
+	}
+	return value.ProcessingScope{Kind: "artifact", Location: s.location}, nil
+}
+
+func TestProcessingErasureAuditsExactArtifactBeforeApplyAndReplay(t *testing.T) {
+	f, service, change := newProcessingFixture(t)
+	location := artifact.Location{ClusterID: processingID(10), ArtifactID: processingID(11), AttemptID: processingID(12)}
+	service.ArtifactScopes = erasureArtifactScope{location: location}
+	change.Action, change.RequestedArtifactID = value.RequestEarlyErasure, location.ArtifactID
+	receipt, err := service.Change(t.Context(), f, change)
+	if err != nil || !receipt.Valid(f.now) || receipt.State != "erasureRequested" || receipt.RuleID != "" || receipt.Revision != 0 ||
+		f.begins != 1 || f.finishes != 1 || f.applies != 1 || f.prepared == nil {
+		t.Fatal("erasure was not an exact acknowledged decision", receipt, err)
+	}
+	draft := f.prepared
+	if draft.Change.Scope.Location != location || draft.Intent.Name != value.RequestEarlyErasure ||
+		auditvalue.OperationLane(draft.Intent.Name) != "normal" || draft.ReleaseAccount != (artifact.Digest{}) ||
+		len(draft.Outcome.ArtifactIDs) != 1 || draft.Outcome.ArtifactIDs[0] != location.ArtifactID || draft.Outcome.Effect != "unknown" {
+		t.Fatal("prepared erasure audit lost exact artifact, purpose or uncertainty")
+	}
+	again, err := service.Change(t.Context(), f, change)
+	if err != nil || again != receipt || f.begins != 1 || f.finishes != 1 || f.applies != 1 {
+		t.Fatal("erasure replay changed its original decision or audit spend", again, err)
+	}
+	change.RuleID = processingID(13)
+	if _, err := service.Change(t.Context(), f, change); err == nil || f.applies != 1 {
+		t.Fatal("erasure accepted an unrelated reversible rule")
+	}
+}
+
 func TestProcessingUnknownCASReplyRecoversOriginalWithoutAuditSpend(t *testing.T) {
 	f, s, c := newProcessingFixture(t)
 	f.lost = true

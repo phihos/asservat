@@ -158,6 +158,21 @@ not establish that any user appears in the evidence or that all derivatives
 are known. The operator can select an exact result for the existing explicit
 restriction action.
 
+### SC-PRV-012
+
+Given a retained published artifact with a qualified closed writer, a current
+privacy operator selects it in the Processing console and confirms an exact
+early-erasure request. Its acknowledged intent names the artifact and the
+same request key replays the original decision. The application closes
+ordinary access and makes the existing attempt due for deletion before its
+previous expiry. It preserves the original registration and hard deletion
+deadline. The signed lifecycle decision identifies the exact audited request.
+The operator can reload that request's pending, overdue or verified deletion
+status through its original control retirement. An acknowledgement or elapsed
+deadline cannot establish physical deletion. The existing reconciler verifies
+all managed copies for this attempt before finalization. See
+[ADR-321](../docs/decisions/321-exact-early-erasure.md).
+
 ## REQ-PRV-007 — External agents, transfers and operational privacy
 
 Apply locality policy to raw storage, decryption, derived results, hub indexes, backups, support bundles and configured event destinations. The hub region and authorized remote client disclosures are part of the data-flow inventory. Local raw storage alone does not establish that all personal data remains in that region. The administrator approves clients/data classes for external AI disclosure and supplies the relevant organizational handling policy. Authentication/client allowlisting constrains recipients, but cannot establish or enforce their eventual model provider, geography, logging or retention.

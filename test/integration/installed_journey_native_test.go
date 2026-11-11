@@ -89,7 +89,7 @@ type installedJourneyDownload struct {
 // download with its SHA-256 check, after the full journey has initialized
 // processing. Its idempotency keys carry the cluster so they never collide
 // with the full journey's keys.
-func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, root string, identity *installedIdentity, publicRoot []byte, address, origin string, diagnose func(), deletionCheck func(artifactID string) func(), projectionCheck installedProjectionCheck, retentionCheck installedRetentionShorteningCheck) func(cluster, namespace, workload string, deny func(bool), gone func(podUID string)) {
+func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, root string, identity *installedIdentity, publicRoot []byte, address, origin string, diagnose func(), deletionCheck func(artifactID string) func(), projectionCheck installedProjectionCheck, postDownload func(cluster string, run installedProcessingRun)) func(cluster, namespace, workload string, deny func(bool), gone func(podUID string)) {
 	// Each further run in the same installation gets its own idempotency keys;
 	// the count spans every cluster's journey in this test process.
 	return func(cluster, namespace, workload string, deny func(bool), gone func(podUID string)) {
@@ -108,7 +108,7 @@ func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, ro
 		}
 		// The focused restart run (ASSERVAT_JOURNEY_FOCUS=restart) starts with a
 		// short journey, which must initialize processing itself.
-		initialize := !short || (installedJourneyFocus() == "restart" || installedJourneyFocus() == "clusters" || installedJourneyFocus() == "upgrade" || installedJourneyFocus() == "chain" || installedJourneyFocus() == "share" || retentionCheck != nil) && runs == 1
+		initialize := !short || (installedJourneyFocus() == "restart" || installedJourneyFocus() == "clusters" || installedJourneyFocus() == "upgrade" || installedJourneyFocus() == "chain" || installedJourneyFocus() == "share" || postDownload != nil) && runs == 1
 		cert, err := x509.ParseCertificate(publicRoot)
 		if err != nil {
 			t.Fatal("public listener root", err)
@@ -454,12 +454,13 @@ func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, ro
 			}
 		}
 		t.Logf("installed journey: the Keycloak user downloaded the native pod-status file (%d bytes) of cluster %s through the hub-local worker", size, cluster)
-		if retentionCheck != nil {
-			retentionCheck(cluster, progress.CaseID, investigation.Artifacts[0].ArtifactID, expires, readReply)
+		processing := installedProcessingRun{SQL: admin, RootID: root, Identity: identity, PublicRoot: cert, Address: address, Origin: origin,
+			CaseID: progress.CaseID, ArtifactID: investigation.Artifacts[0].ArtifactID, ExpiresAt: expires, Native: native, Transport: transport, Call: readReply, Diagnose: diagnose}
+		if postDownload != nil {
+			postDownload(cluster, processing)
 		}
 		if !short && installedJourneyFocus() == "journey" {
-			qualifyInstalledProcessing(t, ctx, installedProcessingRun{SQL: admin, RootID: root, Identity: identity, PublicRoot: cert, Address: address, Origin: origin,
-				CaseID: progress.CaseID, ArtifactID: investigation.Artifacts[0].ArtifactID, ExpiresAt: expires, Native: native, Transport: transport, Call: readReply, Diagnose: diagnose})
+			qualifyInstalledProcessing(t, ctx, processing)
 		}
 		if short {
 			if installedJourneyFocus() == "share" {
@@ -1181,7 +1182,7 @@ func installedJourneyFocus() string {
 // 20-minute limit; docs/implementation-progress.md records the split.
 func installedFastFixture() bool {
 	switch installedJourneyFocus() {
-	case "live-observation", "policy", "alert", "logresource", "browser", "restart", "upgrade", "journey", "clusters", "share", "approved-recording", "manual-logs", "manual-syscall", "manual-arguments", "manual-mixed", "manual-raw", "manual-http", "manual-peers", "manual-profile", "profile-comparison", "native-paced", "policy-recording", "policy-arguments", "policy-profile", "ongoing-save", "ongoing-save-disk", "ongoing-incident", "ongoing-syscall", "ongoing-mixed", "journey-store-failure", "journey-start-failure", "retention-shortening":
+	case "live-observation", "policy", "alert", "logresource", "browser", "restart", "upgrade", "journey", "clusters", "share", "approved-recording", "manual-logs", "manual-syscall", "manual-arguments", "manual-mixed", "manual-raw", "manual-http", "manual-peers", "manual-profile", "profile-comparison", "native-paced", "policy-recording", "policy-arguments", "policy-profile", "ongoing-save", "ongoing-save-disk", "ongoing-incident", "ongoing-syscall", "ongoing-mixed", "journey-store-failure", "journey-start-failure", "retention-shortening", "early-erasure":
 		return true
 	}
 	return false

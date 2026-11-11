@@ -70,9 +70,14 @@ export const processingClient: ProcessingClient = {
   async change(input, key, csrf, signal) {
     if (!uuid.test(key) || !validProcessingChange(input)) throw new ProcessingFailure(400);
     const out = await request('/api/v1/processing/changes', signal, input, key, csrf);
+    if (!validProcessingReceipt(out) || !current(out) || out.requestID !== key) throw new ProcessingFailure(502);
+    if (input.action === 'request_early_erasure') {
+      if (out.state !== 'erasureRequested') throw new ProcessingFailure(502);
+      return out;
+    }
     const state = input.action === 'initialize_processing' ? 'initialized' : input.action === 'restrict_processing' ? 'restricted' : 'released';
-    if (!validProcessingReceipt(out) || !current(out) || out.requestID !== key || out.state !== state ||
-      (input.action === 'initialize_processing' ? !!out.ruleID || out.revision !== 0 : out.ruleID !== input.ruleID || out.revision !== input.expectedRevision + 1)) throw new ProcessingFailure(502);
+    if (out.state !== state || (input.action === 'initialize_processing' ? !!out.ruleID || out.revision !== 0 :
+      out.ruleID !== input.ruleID || out.revision !== input.expectedRevision + 1)) throw new ProcessingFailure(502);
     return out;
   },
 };

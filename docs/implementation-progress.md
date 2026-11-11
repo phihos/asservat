@@ -1,6 +1,70 @@
 # Sustained implementation progress
 
-## Installed-qualified candidate: retention lifecycle publication (2026-11-11)
+## Active candidate: exact early erasure (2026-11-11)
+
+Outcome: a current privacy operator confirms a discovered artifact for early
+erasure, reloads its exact request and observes the independently verified
+deletion outcome. [ADR-321](decisions/321-exact-early-erasure.md) records the
+audited cutoff, signed source, status and role compatibility. Focused Go
+race, browser unit, TypeScript, schema, OpenAPI and design checks pass.
+The owned PostgreSQL schema-owner upgrade at `3c318d50` applied 150→151,
+preserved floor 149, verified idempotence and refused unknown history. An
+empty Down restored the exact prior SQL guards and audit validators before
+reapplying 151 (3.569 s, exit 0, all 4,528 hashes match and cleanup passed).
+
+The first PostgreSQL/S3 erasure run found an unqualified ledger reference
+inside the custody retention trigger. The correction preserves the narrow
+definer search path and qualifies the ledger table. The next fixture reached
+the applied cutoff and failed on its expected error class. It now asserts
+the custody adapter's exact unavailable result. The final owned fixture at
+`39c49084` passed in 6.138 s. It verifies refusal before independent normal
+audit, the exact acknowledged cutoff, immutable replay, signed lifecycle
+acknowledgement, distinct pending and verified deletion status and empty
+versioned S3 inventory after positive cleanup. All 4,528 source hashes match
+and cleanup completed. The original runs are in the external
+`privacy-early-erasure` archive.
+
+The exact preceding `ae515fa3` hub adapters and lifecycle publisher also
+passed against schema 151 and its canonical erasure row. The owned real
+PostgreSQL/versioned-S3 probe denied ordinary reads before original expiry,
+selected the exact due attempt and signed and acknowledged the decision once
+through the compiled lifecycle-audit role (7.131 s, both processes exit 0).
+Current code independently verified the version-pinned ciphertext and JWS,
+status and managed purge. All 4,528 current source hashes match and owned
+cleanup completed. This uses fixture keys and credentials. Previous-image
+installation, previous-image physical purge and populated Down remain
+unqualified.
+
+At `2fd6b5ee`, full `make pre-push` passed, including 638 console tests
+and affected Go race tests (406 s). Full `make console-browser-check`
+passed in 149.691 s, including the shared erasure driver, 29 standard
+journeys and 28 accessibility scans.
+
+Fresh `make installed-focus FOCUS=early-erasure ARGS=--keep-on-failure`
+at `2fd6b5ee` passed (Go 336.452 s, harness 425.5 s, both exits 0).
+The Keycloak user collected, published and downloaded the original regional
+pod-status file. The real console discovered and explicitly confirmed that
+artifact. Ordinary reads stopped before its original expiry. A scoped
+fixture fault held cleaner inventory so pending status retained the exact
+original copies and charges. After restoring inventory, the installed
+publisher acknowledged the signed lifecycle record and the cleaner
+independently finalized the exact purge. Reloaded browser status reported
+verified deletion. Independent version-pinned audit reads and empty managed
+S3 inventory passed. All 4,787 source hashes match, cleanup failures are empty,
+and both owned clusters, labelled Docker resources and build scratch are
+removed. Reports are archived externally under
+`privacy-early-erasure/installed-2fd6b5ee`.
+
+Required PR CI and merge remain pending. The exact-artifact path leaves
+incident/workload batches, derivative/cache propagation, access/correction,
+preservation and inventory reporting under REQ-PRV-006.
+
+## Merged retention lifecycle publication (2026-11-11)
+
+[PR #219](https://github.com/phihos/asservat/pull/219) merged at `ae515fa3`.
+Its complete authoritative tree matches `f54ec3c8`, which passed all 14 Go
+shards and `ci-ok` in [required CI](https://github.com/phihos/asservat/actions/runs/42930280603).
+The installed-tested source is `b99c4ff9`.
 
 Outcome: after an administrator tightens retention on published evidence,
 the installed hub worker publishes and acknowledges the signed lifecycle

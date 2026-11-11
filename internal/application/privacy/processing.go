@@ -178,6 +178,9 @@ func (s ProcessingChanges) Change(ctx context.Context, source ProcessingIdentity
 		return zero, value.ErrUnavailable
 	}
 	outcome := auditvalue.OperationOutcome{Intent: in, Status: "success", Reason: "prepared", Effect: "unknown", ClientReceipt: "unknown", OutputDigest: outputMAC, OutputBytes: int64(len(projection)), MetadataUntil: until, RecordedAt: started}
+	if c.Action == value.RequestEarlyErasure {
+		outcome.ArtifactIDs = []string{c.Scope.Location.ArtifactID}
+	}
 	draft := ProcessingDecision{Change: c, Intent: in, Outcome: outcome, ReleaseAccount: releaseAccount}
 	draft.DecisionDigest = ProcessingDecisionDigest(draft)
 	if !draft.Valid() {
