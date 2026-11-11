@@ -5,8 +5,8 @@ natively qualified ([continuation run 8](../../test/results/adr195-continuation-
 The hub retention source becomes Ready with the baseline policy, read
 through the hub's `retention-read` login. An administrator's baseline edit
 is accepted (sequence 3), and after a hub-worker crash the source returns
-to Ready under a new epoch. Step 5b (the lifecycle signer) is deferred to
-the capture composition.
+to Ready under a new epoch. [ADR-320](320-installed-retention-lifecycle-publication.md)
+composes step 5b, the lifecycle signer and publisher.
 Requirements: REQ-PRV-002/004, REQ-DEP-001/003/005, S-02; TASK-11.
 Productizes the retention components of ADR-055–057 for the installed hub,
 following the permission stream of

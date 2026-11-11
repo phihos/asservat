@@ -19,6 +19,11 @@ type LifecycleJournal interface {
 	PendingLifecycleDecisions(context.Context) ([]value.LifecycleDecision, error)
 	AcknowledgeLifecycleDecision(context.Context, value.LifecycleDecision, audit.Receipt) error
 }
+
+type singleLifecycleJournal interface {
+	PendingLifecycleDecision(context.Context) (value.LifecycleDecision, bool, error)
+}
+
 type LifecycleWriter interface {
 	WriteLifecycleDecision(context.Context, value.LifecycleDecision) (audit.Receipt, error)
 }
@@ -91,7 +96,7 @@ type LifecyclePublisher struct {
 }
 
 func (p LifecyclePublisher) Publish(ctx context.Context) error {
-	if p.Ledger == nil || p.Objects == nil {
+	if ctx == nil || p.Ledger == nil || p.Objects == nil {
 		return ErrUnavailable
 	}
 	rows, err := p.Ledger.PendingLifecycleDecisions(ctx)
@@ -102,16 +107,34 @@ func (p LifecyclePublisher) Publish(ctx context.Context) error {
 		return ErrUnavailable
 	}
 	for _, r := range rows {
-		if !r.Valid() || ctx.Err() != nil {
-			return ErrUnavailable
-		}
-		receipt, err := p.Objects.WriteLifecycleDecision(ctx, r)
-		if err != nil {
-			return err
-		}
-		if err = p.Ledger.AcknowledgeLifecycleDecision(ctx, r, receipt); err != nil {
+		if err := p.publishDecision(ctx, r); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// PublishOne selects and publishes at most one retained decision. attempted
+// is true once a row was selected, including when publication cannot finish.
+func (p LifecyclePublisher) PublishOne(ctx context.Context) (attempted bool, err error) {
+	journal, ok := p.Ledger.(singleLifecycleJournal)
+	if ctx == nil || ctx.Err() != nil || !ok || p.Objects == nil {
+		return false, ErrUnavailable
+	}
+	r, found, err := journal.PendingLifecycleDecision(ctx)
+	if err != nil || !found {
+		return found, err
+	}
+	return true, p.publishDecision(ctx, r)
+}
+
+func (p LifecyclePublisher) publishDecision(ctx context.Context, r value.LifecycleDecision) error {
+	if !r.Valid() || ctx.Err() != nil {
+		return ErrUnavailable
+	}
+	receipt, err := p.Objects.WriteLifecycleDecision(ctx, r)
+	if err != nil {
+		return err
+	}
+	return p.Ledger.AcknowledgeLifecycleDecision(ctx, r, receipt)
 }

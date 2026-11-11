@@ -83,7 +83,8 @@ and its storage charge is never released.
    setup readback records the key's public keys, and the section pins the key,
    its version and those public keys. `jose` gains a remote constructor for
    context deletion signatures, like the operation retirement one. The key
-   signs only `asservat-context-deletion+jws` records.
+   signs `asservat-context-deletion+jws` records. [ADR-320](320-installed-retention-lifecycle-publication.md)
+   extends this worker's pinned key to the distinct retention lifecycle type.
 7. **Optional runtime composition in a fresh-install layout.** Without the
    section there is no deletion child, no cleanup login in its permission
    projection, no signing key or signing policy path and no evidence-delete

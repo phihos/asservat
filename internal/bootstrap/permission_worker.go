@@ -252,7 +252,7 @@ func (d *InstalledHubWorkerDeployment) openPermission(ctx context.Context) (*per
 		if e != nil {
 			return nil, &fixedStepError{"retention/clients", e}
 		}
-		if w.retention, err = newRetentionWorker(startup, c, pools, retentionObserver, retentionProbe, writer); err != nil {
+		if w.retention, err = newRetentionWorker(startup, c, pools, retentionObserver, retentionProbe, writer, b.ContextDeletion); err != nil {
 			return nil, &fixedStepError{"retention/open", err}
 		}
 	}
@@ -381,7 +381,7 @@ func (p *permissionWorker) run(ctx context.Context) error {
 // admits exactly one provider audit invocation.
 func (p *permissionWorker) publish(ctx context.Context) {
 	// A lease admits one provider audit invocation. With retention the
-	// leases alternate between authority and checkpoint acceptance records.
+	// leases alternate between authority and retention records.
 	turn := 0
 	// One line per change of the authority publisher's outcome: an
 	// unacknowledged activation audit hides its scope from capacity.
@@ -390,7 +390,7 @@ func (p *permissionWorker) publish(ctx context.Context) {
 		if lease, err := p.admission.WaitAuthorityAudit(ctx); err == nil {
 			if lease.AwaitFleetObservation() == nil {
 				if p.retention != nil && turn%2 == 1 {
-					_ = p.retention.acceptance.Publish(lease.Context(), 1)
+					p.retention.publish(lease.Context(), turn%4 == 3)
 				} else if outcome := regionalOutcome(p.publisher.PublishAuthority(lease.Context())); outcome != last && ctx.Err() == nil {
 					last = outcome
 					fmt.Fprintln(os.Stderr, "authority audit publish: "+outcome)

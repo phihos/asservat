@@ -6,11 +6,13 @@ import (
 	"asservat.local/asservat/internal/adapters/postgres"
 	app "asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/identity"
 	value "asservat.local/asservat/internal/domain/privacy"
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
+	"encoding/json"
 	"errors"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"reflect"
@@ -114,12 +116,18 @@ func qualifyRetentionLifecycle(t *testing.T, ctx context.Context, admin *pgxpool
 			t.Fatal(err)
 		}
 		objects := &objectstore.LifecycleObjects{Store: store, Seal: keys, Open: keys, Signer: signer, Verifier: signer}
-		receipt, err := objects.WriteLifecycleDecision(ctx, d)
-		if err != nil {
-			t.Fatal(err)
+		publisher := app.LifecyclePublisher{Ledger: a, Objects: objects}
+		if attempted, publishErr := publisher.PublishOne(ctx); !attempted || publishErr != nil {
+			t.Fatal("publish one exact decision", attempted, publishErr)
 		}
-		if err = a.AcknowledgeLifecycleDecision(ctx, d, receipt); err != nil {
-			t.Fatal(err)
+		var receipt audit.Receipt
+		var rawReceipt []byte
+		if err = admin.QueryRow(ctx, `SELECT audit_receipt_json FROM retention_decision WHERE root_id=$1 AND id=$2 AND audit_acknowledged_at IS NOT NULL`, s.a.RootID, d.ID).Scan(&rawReceipt); err != nil ||
+			json.Unmarshal(rawReceipt, &receipt) != nil || !receipt.ValidLifecycle(s.a.RootID, d.ID) {
+			t.Fatal("persisted lifecycle audit receipt unavailable", err)
+		}
+		if attempted, publishErr := publisher.PublishOne(ctx); attempted || publishErr != nil {
+			t.Fatal("acknowledged decision stayed pending", attempted, publishErr)
 		}
 		// Key rotation verifies the existing immutable object's historical signature.
 		pub2, priv2, _ := ed25519.GenerateKey(rand.Reader)
