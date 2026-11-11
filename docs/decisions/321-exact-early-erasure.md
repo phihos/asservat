@@ -1,6 +1,6 @@
 # ADR-321 — Exact early erasure
 
-Date: 2026-11-11. Status: implementation and qualification in progress.
+Date: 2026-11-11. Status: exact-artifact installed qualification passed.
 Requirements: REQ-PRV-006, SC-PRV-012.
 
 A current privacy operator selects an exact published artifact from the
@@ -43,7 +43,8 @@ pending or overdue with original charges held.
 2. Existing operator authority, immutable lineage and deletion proof still apply.
 3. The first path supports exact published attempts with qualified closed writers.
 4. It reuses the processing decision, retention journal and deletion reconciler.
-5. New SQL credentials, grants, endpoints and privileged workers are zero.
+5. New SQL credentials, grants, service listeners and privileged workers are
+   zero. The browser adds one audited metadata status operation.
 6. Request acceptance, pending signature and deletion progress use existing
    acknowledgement and custody states.
 7. New administrator settings are zero.

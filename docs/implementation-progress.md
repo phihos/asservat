@@ -22,8 +22,42 @@ audit, the exact acknowledged cutoff, immutable replay, signed lifecycle
 acknowledgement, distinct pending and verified deletion status and empty
 versioned S3 inventory after positive cleanup. All 4,528 source hashes match
 and cleanup completed. The original runs are in the external
-`privacy-early-erasure` archive. Fresh installed browser and previous-version
-publication checks remain pending.
+`privacy-early-erasure` archive.
+
+The exact preceding `ae515fa3` hub adapters and lifecycle publisher also
+passed against schema 151 and its canonical erasure row. The owned real
+PostgreSQL/versioned-S3 probe denied ordinary reads before original expiry,
+selected the exact due attempt and signed and acknowledged the decision once
+through the compiled lifecycle-audit role (7.131 s, both processes exit 0).
+Current code independently verified the version-pinned ciphertext and JWS,
+status and managed purge. All 4,528 current source hashes match and owned
+cleanup completed. This uses fixture keys and credentials. Previous-image
+installation, previous-image physical purge and populated Down remain
+unqualified.
+
+At `2fd6b5ee`, full `make pre-push` passed, including 638 console tests
+and affected Go race tests (406 s). Full `make console-browser-check`
+passed in 149.691 s, including the shared erasure driver, 29 standard
+journeys and 28 accessibility scans.
+
+Fresh `make installed-focus FOCUS=early-erasure ARGS=--keep-on-failure`
+at `2fd6b5ee` passed (Go 336.452 s, harness 425.5 s, both exits 0).
+The Keycloak user collected, published and downloaded the original regional
+pod-status file. The real console discovered and explicitly confirmed that
+artifact. Ordinary reads stopped before its original expiry. A scoped
+fixture fault held cleaner inventory so pending status retained the exact
+original copies and charges. After restoring inventory, the installed
+publisher acknowledged the signed lifecycle record and the cleaner
+independently finalized the exact purge. Reloaded browser status reported
+verified deletion. Independent version-pinned audit reads and empty managed
+S3 inventory passed. All 4,787 source hashes match, cleanup failures are empty,
+and both owned clusters, labelled Docker resources and build scratch are
+removed. Reports are archived externally under
+`privacy-early-erasure/installed-2fd6b5ee`.
+
+Required PR CI and merge remain pending. The exact-artifact path leaves
+incident/workload batches, derivative/cache propagation, access/correction,
+preservation and inventory reporting under REQ-PRV-006.
 
 ## Merged retention lifecycle publication (2026-11-11)
 
