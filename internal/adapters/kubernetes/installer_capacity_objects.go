@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"reflect"
+	"sort"
 	"time"
 
 	capacityapp "asservat.local/asservat/internal/application/capacity"
@@ -39,6 +41,13 @@ func EnsureInstallerCapacityObjects(ctx context.Context, config *rest.Config, co
 		return cfg.ErrInvalid
 	}
 	policy := *settings.PolicySpec
+	// The served EvidenceBudgetPolicy CRD defaults this omitted field to 1.
+	// Normalize the copied desired spec before exact comparison; original
+	// installer input/digests and explicitly selected limits remain unchanged.
+	if policy.Workload.Dump.MaxProcessesPerEpisode == nil {
+		one := int64(1)
+		policy.Workload.Dump.MaxProcessesPerEpisode = &one
+	}
 	if policy.PoolRef != settings.Pool || policy.Scope.ClusterID != "" && policy.Scope.ClusterID != cluster {
 		return cfg.ErrInvalid
 	}
@@ -89,8 +98,11 @@ func EnsureInstallerCapacityObjects(ctx context.Context, config *rest.Config, co
 		if e != nil || json.Unmarshal(raw, &ns) != nil {
 			return cfg.ErrUnavailable
 		}
-		if string(ns.UID) != control.UID || ns.DeletionTimestamp != nil {
-			return cfg.ErrChanged
+		if string(ns.UID) != control.UID {
+			return &installerCapacityMismatch{"Namespace", control.Name, "metadata.uid"}
+		}
+		if ns.DeletionTimestamp != nil {
+			return &installerCapacityMismatch{"Namespace", control.Name, "metadata.deletionTimestamp"}
 		}
 		return nil
 	}
@@ -127,11 +139,27 @@ func EnsureInstallerCapacityObjects(ctx context.Context, config *rest.Config, co
 		}
 		var got object
 		var actual, want any
-		if json.Unmarshal(raw, &got) != nil || exactCapacitySpec(got.Spec, &actual) != nil || exactCapacitySpec(source.spec, &want) != nil || !reflect.DeepEqual(actual, want) ||
-			got.APIVersion != "asservat.io/v1alpha1" || got.Kind != source.kind || got.Metadata.Name != source.name || got.Metadata.Namespace != control.Name ||
-			!authorization.UUID(string(got.Metadata.UID)) || got.Metadata.ResourceVersion == "" || got.Metadata.Generation < 1 || got.Metadata.DeletionTimestamp != nil ||
-			len(got.Metadata.OwnerReferences) != 0 || len(got.Metadata.Finalizers) != 0 || len(got.Metadata.Labels) != 0 || !reflect.DeepEqual(got.Metadata.Annotations, markers) {
-			return cfg.ErrChanged
+		changed := func(field string) error { return &installerCapacityMismatch{source.kind, source.name, field} }
+		if json.Unmarshal(raw, &got) != nil {
+			return changed("object")
+		}
+		if exactCapacitySpec(got.Spec, &actual) != nil || exactCapacitySpec(source.spec, &want) != nil {
+			return changed("spec")
+		}
+		if field := capacitySpecDifference(actual, want, "spec"); field != "" {
+			return changed(field)
+		}
+		for _, field := range []struct {
+			name  string
+			valid bool
+		}{
+			{"apiVersion", got.APIVersion == "asservat.io/v1alpha1"}, {"kind", got.Kind == source.kind}, {"metadata.name", got.Metadata.Name == source.name}, {"metadata.namespace", got.Metadata.Namespace == control.Name},
+			{"metadata.uid", authorization.UUID(string(got.Metadata.UID))}, {"metadata.resourceVersion", got.Metadata.ResourceVersion != ""}, {"metadata.generation", got.Metadata.Generation >= 1}, {"metadata.deletionTimestamp", got.Metadata.DeletionTimestamp == nil},
+			{"metadata.ownerReferences", len(got.Metadata.OwnerReferences) == 0}, {"metadata.finalizers", len(got.Metadata.Finalizers) == 0}, {"metadata.labels", len(got.Metadata.Labels) == 0}, {"metadata.annotations", reflect.DeepEqual(got.Metadata.Annotations, markers)},
+		} {
+			if !field.valid {
+				return changed(field.name)
+			}
 		}
 	}
 	if err = currentNamespace(); err != nil {
@@ -145,4 +173,62 @@ func exactCapacitySpec(raw []byte, out *any) error {
 	d := json.NewDecoder(bytes.NewReader(raw))
 	d.UseNumber()
 	return d.Decode(out)
+}
+
+// Only public object identity and a bounded field path enter fixed installer
+// diagnostics. Values, credentials and arbitrary response keys are excluded.
+type installerCapacityMismatch struct{ kind, name, field string }
+
+func (e *installerCapacityMismatch) Error() string {
+	return fmt.Sprintf("installer capacity %s %s differs at %s", e.kind, e.name, e.field)
+}
+func (e *installerCapacityMismatch) Unwrap() error { return cfg.ErrChanged }
+func (e *installerCapacityMismatch) FixedStep() string {
+	field := e.field
+	if len(field) > 160 {
+		field = field[:160]
+	}
+	return e.kind + "/" + e.name + "/" + field
+}
+
+func capacitySpecDifference(actual, want any, path string) string {
+	switch expected := want.(type) {
+	case map[string]any:
+		observed, ok := actual.(map[string]any)
+		if !ok {
+			return path
+		}
+		keys := make([]string, 0, len(expected))
+		for key := range expected {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		for _, key := range keys {
+			value, ok := observed[key]
+			if !ok {
+				return path + "." + key
+			}
+			if field := capacitySpecDifference(value, expected[key], path+"."+key); field != "" {
+				return field
+			}
+		}
+		if len(observed) != len(expected) {
+			return path + ".fields"
+		}
+	case []any:
+		observed, ok := actual.([]any)
+		if !ok || len(observed) != len(expected) {
+			return path
+		}
+		for i := range expected {
+			if field := capacitySpecDifference(observed[i], expected[i], fmt.Sprintf("%s[%d]", path, i)); field != "" {
+				return field
+			}
+		}
+	default:
+		if !reflect.DeepEqual(actual, want) {
+			return path
+		}
+	}
+	return ""
 }

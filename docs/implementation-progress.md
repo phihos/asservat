@@ -27,7 +27,33 @@ route;9 focused UI/HTTP tests and TypeScript pass. Exact `/fleet` console and
 safe login return checks pass. Actual-chart fixture render/race checks pass
 1.132s and integration compilation passes; no final objects are seeded on that
 path and no installer impersonation is used for operator management.
-Broad gates and fresh actual Helm qualification are next. No complete Helm installation or
+At `76d641f9`, `make pre-push` passes, including503s affected Go race tests;
+the full built-browser gate passes157.279s (29 journeys/28 scans). The fresh
+product image builds and its nonroot, read-only, network-disabled CLI smoke
+passes;16 file hashes are archived. No registry publication occurred.
+
+The first actual Helm context run at `76d641f9` fails at `capacity/objects`:
+Go178.511s, harness227.7s. Bootstrap/activation and the first provider handoff
+pass. Kubernetes inserts the declared CRD default
+`workload.dump.maxProcessesPerEpisode: 1`, which was absent from the desired
+wire. The focused fresh-Kind reproduction fails in0.046s before correction;
+normalize the copied desired value to that existing default and keep exact
+comparison. The focused before/after native test fails0.046s and passes1.169s
+with race detection after correction, proving actual defaulting, exact replay,
+unchanged original nil input and preserved explicit2. Both3,711-source
+inventories remain unchanged; the owned cluster/containers are independently
+absent and the private kubeconfig is removed. Focused unit race checks pass
+1.424s. Evidence is external in `capacity-crd-roundtrip`.
+All4,827 installed-source hashes match, source stayed frozen,
+cleanup failures are empty, owned clusters/labelled resources/networks are
+independently absent and build scratch is removed. Reports remain external in
+`homelab-context-trial/installed-76d641f9`.
+
+Added actual built-browser Fleet coverage passes30 journeys/31 scans in31.426s,
+including same-key503→201 retry, exact receipt bounds and403 refusal through the
+real handler/session/CSRF; three synthetic service calls reserve exactly one
+slot. These tests add no product change. Broad/native checks for the integrated
+default correction are next. No complete Helm installation or
 homelab outcome is claimed. Target context/dependency choices await the
 maintainer; owned collector-free qualification can proceed independently.
 

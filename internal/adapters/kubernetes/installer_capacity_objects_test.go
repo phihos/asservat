@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -16,8 +18,11 @@ import (
 	capacityapp "asservat.local/asservat/internal/application/capacity"
 	"asservat.local/asservat/internal/contracts"
 	cfg "asservat.local/asservat/internal/domain/configuration"
+	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 func installerCapacityObjectSettings(t *testing.T) contracts.InstallerCapacitySettings {
@@ -198,8 +203,15 @@ func TestInstallerCapacityObjectsRefuseUnknownOrChangedRetainedObjects(t *testin
 				f.control.UID = ownerID(5)
 			}
 			control := cfg.NamespaceRef{Name: "hub", UID: ownerID(2)}
-			if err := EnsureInstallerCapacityObjects(context.Background(), config, control, ownerID(1), permissionCluster, s); !errors.Is(err, cfg.ErrChanged) || f.writes != 2 {
+			err := EnsureInstallerCapacityObjects(context.Background(), config, control, ownerID(1), permissionCluster, s)
+			if !errors.Is(err, cfg.ErrChanged) || f.writes != 2 {
 				t.Fatal("adopted/updated retained or replaced source", name, err, f.writes)
+			}
+			if name == "changed-spec" {
+				var stage interface{ FixedStep() string }
+				if !errors.As(err, &stage) || stage.FixedStep() != "EvidenceStoragePool/pool/spec.capacity.bytes" {
+					t.Fatal("changed actual quantity lacks bounded object/field diagnostic", err)
+				}
 			}
 		})
 	}
@@ -215,4 +227,69 @@ func TestInstallerCapacityObjectsUnknownCreateDoesNotReplayPOST(t *testing.T) {
 	if err := EnsureInstallerCapacityObjects(context.Background(), config, f.control, ownerID(1), permissionCluster, settings); err != nil || f.writes != 2 {
 		t.Fatal("exact later reopen duplicated the first create", err, f.writes)
 	}
+}
+
+// A real shipped-CRD roundtrip, deliberately without SQL/provider/capture
+// authority. The caller owns the fresh cluster; this test owns its namespace.
+func TestInstallerCapacityObjectsWithRealKubernetes(t *testing.T) {
+	path := os.Getenv("ASSERVAT_INSTALLER_CAPACITY_KUBECONFIG")
+	if path == "" {
+		t.Skip("requires fresh owned Kind with shipped capacity CRDs")
+	}
+	config, err := clientcmd.BuildConfigFromFlags("", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	api, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 90*time.Second)
+	defer cancel()
+	namespace, err := api.CoreV1().Namespaces().Create(ctx, &core.Namespace{ObjectMeta: meta.ObjectMeta{Name: "capacity-objects-" + ownerID(1)[24:] + fmt.Sprint(time.Now().UnixNano()%1000000), Labels: map[string]string{"pod-security.kubernetes.io/enforce": "restricted"}}}, meta.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		cleanup, end := context.WithTimeout(context.Background(), 30*time.Second)
+		defer end()
+		if err := api.CoreV1().Namespaces().Delete(cleanup, namespace.Name, meta.DeleteOptions{Preconditions: &meta.Preconditions{UID: &namespace.UID}}); err != nil {
+			t.Error("owned capacity namespace cleanup", err)
+		}
+	}()
+	settings := installerCapacityObjectSettings(t)
+	control := cfg.NamespaceRef{Name: namespace.Name, UID: string(namespace.UID)}
+	if err := EnsureInstallerCapacityObjects(ctx, config, control, ownerID(1), permissionCluster, settings); err != nil {
+		raw, _ := api.CoreV1().RESTClient().Get().AbsPath("/apis/asservat.io/v1alpha1/namespaces/" + namespace.Name + "/evidencebudgetpolicies/" + settings.Policy).DoRaw(ctx)
+		var observed struct {
+			Spec json.RawMessage `json:"spec"`
+		}
+		_ = json.Unmarshal(raw, &observed)
+		t.Fatalf("actual shipped-CRD producer roundtrip: %v; public policy spec=%s", err, observed.Spec)
+	}
+	if settings.PolicySpec.Workload.Dump.MaxProcessesPerEpisode != nil {
+		t.Fatal("producer changed original declared input")
+	}
+	if err := EnsureInstallerCapacityObjects(ctx, config, control, ownerID(1), permissionCluster, settings); err != nil {
+		t.Fatal("actual API exact replay", err)
+	}
+	limit := int64(2)
+	settings.PolicySpec.Workload.Dump.MaxProcessesPerEpisode = &limit
+	if err := EnsureInstallerCapacityObjects(ctx, config, control, ownerID(1), permissionCluster, settings); !errors.Is(err, cfg.ErrChanged) {
+		t.Fatal("actual explicit nondefault adopted existing default", err)
+	}
+	settings.Pool, settings.Policy = "explicit-pool", "explicit-policy"
+	settings.PoolSpec.ProtectedAllocations[0].BudgetPolicyRef = settings.Policy
+	settings.PolicySpec.PoolRef = settings.Pool
+	if err := EnsureInstallerCapacityObjects(ctx, config, control, ownerID(1), permissionCluster, settings); err != nil {
+		t.Fatal("explicit nondefault process limit was not preserved", err)
+	}
+	raw, err := api.CoreV1().RESTClient().Get().AbsPath("/apis/asservat.io/v1alpha1/namespaces/" + namespace.Name + "/evidencebudgetpolicies/" + settings.Policy).DoRaw(ctx)
+	var explicit struct {
+		Spec wire.EvidenceBudgetPolicySpec `json:"spec"`
+	}
+	if err != nil || json.Unmarshal(raw, &explicit) != nil || explicit.Spec.Workload.Dump.MaxProcessesPerEpisode == nil || *explicit.Spec.Workload.Dump.MaxProcessesPerEpisode != 2 {
+		t.Fatal("actual explicit process limit changed", err)
+	}
+	t.Log("actual shipped capacity CRDs: omitted process limit defaults1, exact replay preserves originalnilinput, explicit2 refuses changed retained spec and survives fresh creation")
 }
