@@ -9,12 +9,35 @@ exports finite JSON parts and continues through every section before reporting
 completion. ADR-322 and SC-PRV-014 record the source and lifetime contracts.
 
 The candidate starts from authoritative `fec1e03e`. Declaration preservation,
-domain and application authority checks, generated contracts and focused schema
-tests pass. The browser and real SQL fixtures are being connected. Review found
-and corrected a draft query that used renewed shared backing as a native
-session's metadata horizon. The reader now uses the original session snapshot
-as an additional immutable bound. Real renewal and upgrade regressions, broad
-gates and fresh installed qualification remain pending.
+domain and application authority checks, 41 focused UI/HTTP tests, TypeScript,
+59 generated contract cases, Helm and specification checks pass. The focused
+compiled-browser test passed (Go 1.520 s), exporting 40 pages across two actual
+JSON files and comparing their complete pages with acknowledged HTTP responses.
+Review corrected a draft query that used renewed shared backing as a native
+session's metadata horizon. The reader uses its original per-session snapshot.
+
+Owned service checks at `25e9a774` passed sequentially with all 4,544 source
+hashes independently matched and empty cleanup failures. Containers and networks
+were independently confirmed absent.
+
+- Schema-owner upgrade 151→152 and empty Down/Up passed in 3.680 s, preserving
+  floor 149, exact prior validators/indexes and unknown-history refusal.
+- PostgreSQL/S3 erasure and report reads passed in 6.669 s, including every
+  section before and after positive cleanup, a released rule, declarations,
+  current-operator refusal and an actual unknown audit outcome.
+- The owned PostgreSQL/OpenBao/S3 capacity matrix passed in 82.064 s. After
+  actual capacity renewal it verifies the original session disappears at its
+  immutable cutoff while shared backing and artifact metadata remain valid.
+
+Reports are archived externally under
+`privacy-inventory-report/services-25e9a774`. The later installed-only assertion
+will exercise the exact migration Down guard against real retained report audit
+rows and verify the schema/indexes remain unchanged after refusal. Broad gates,
+fresh installed qualification, required PR CI and merge remain pending.
+
+The report uses original visibility horizons. Physical retirement of all share
+metadata, complete retained-derivative production/propagation, reviewed personal
+extracts and preservation remain open under the wider specification.
 
 ## Merged workload-interval processing restriction (2026-11-11)
 

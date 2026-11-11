@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"encoding/json/jsontext"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -21,6 +22,8 @@ import (
 	"asservat.local/asservat/internal/contracts"
 	value "asservat.local/asservat/internal/domain/privacy"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -257,7 +260,64 @@ WHERE o.root_id=$1 AND o.id=$2`, run.RootID, summary.RequestID, summary.Response
 	if refused, status, err := outsider.operation(ctx, "get_processing_report", map[string]any{}, ""); err != nil || status != http.StatusOK || refused.Status != "error" {
 		t.Fatal("installed report nonoperator refusal", status, err)
 	}
+	qualifyInstalledReportRollbackGuard(t, ctx, run.SQL)
 	t.Log("installed privacy inventory exported every section with exact page audit bytes, recorded recipient and completed session, retained verified deletion and operator declarations")
+}
+
+func qualifyInstalledReportRollbackGuard(t *testing.T, parent context.Context, admin *pgxpool.Pool) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(parent, 5*time.Second)
+	defer cancel()
+	raw, err := os.ReadFile(filepath.Join("..", "..", "migrations", "00152_processing_report.sql"))
+	if err != nil {
+		t.Fatal("read exact processing report migration", err)
+	}
+	_, down, found := strings.Cut(string(raw), "-- +goose Down\n")
+	lock, statement, begin := strings.Cut(down, "-- +goose StatementBegin\n")
+	guard, _, end := strings.Cut(statement, "\n-- +goose StatementEnd")
+	if !found || !begin || !end || strings.TrimSpace(lock) != "LOCK TABLE public.operation_audit IN SHARE MODE;" ||
+		!strings.HasPrefix(guard, "DO $$ BEGIN\n") || !strings.HasSuffix(guard, "END $$;") {
+		t.Fatal("processing report Down guard source shape changed")
+	}
+	readLayout := func() string {
+		t.Helper()
+		var head, indexes int64
+		var applied bool
+		var definitions string
+		if err := admin.QueryRow(ctx, `
+SELECT v.version_id,v.is_applied,
+ (SELECT count(*) FROM pg_indexes WHERE schemaname='public' AND indexname IN ('processing_report_downloads','processing_report_operations','processing_report_rule_created')),
+ (SELECT jsonb_object_agg(indexname,indexdef ORDER BY indexname)::text FROM pg_indexes WHERE schemaname='public' AND indexname IN ('processing_report_downloads','processing_report_operations','processing_report_rule_created'))
+FROM goose_db_version v ORDER BY v.id DESC LIMIT 1`).Scan(&head, &applied, &indexes, &definitions); err != nil || head != 152 || !applied || indexes != 3 {
+			t.Fatal("processing report retained layout", head, applied, indexes, err)
+		}
+		return definitions
+	}
+	before := readLayout()
+	tx, err := admin.Begin(ctx)
+	if err != nil {
+		t.Fatal("begin rollback guard qualification", err)
+	}
+	defer func() {
+		cleanup, stop := context.WithTimeout(context.Background(), 3*time.Second)
+		defer stop()
+		_ = tx.Rollback(cleanup)
+	}()
+	if _, err = tx.Exec(ctx, lock); err != nil {
+		t.Fatal("acquire exact Down audit lock", err)
+	}
+	_, err = tx.Exec(ctx, guard)
+	var refusal *pgconn.PgError
+	if !errors.As(err, &refusal) || refusal.Code != "23514" || refusal.Message != "retained processing report audit prevents rollback" {
+		t.Fatal("actual retained report audit did not refuse exact Down guard", err)
+	}
+	if err := tx.Rollback(ctx); err != nil {
+		t.Fatal("rollback refused report guard transaction", err)
+	}
+	if after := readLayout(); after != before {
+		t.Fatal("refused report guard changed report index definitions")
+	}
+	t.Log("exact SQL152 Down guard refused retained report audit with 23514; rolled back, schema152 and all three index definitions unchanged")
 }
 
 func createInstalledReportShare(t *testing.T, ctx context.Context, run installedProcessingRun) (string, string) {
