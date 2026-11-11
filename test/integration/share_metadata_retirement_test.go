@@ -23,6 +23,7 @@ import (
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/capture"
+	"asservat.local/asservat/internal/domain/execution"
 	"asservat.local/asservat/internal/domain/fleet"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -97,7 +98,12 @@ func TestShareMetadataRetirementBaselineWithRealServices(t *testing.T) {
 		for _, pool := range processingPools {
 			pool.Close()
 		}
-		s, published := publishQueryLedgerContext(t, f, root, enrolled, false)
+		// The query helper selects 60s retention and requires its own 120s
+		// processing profile. This baseline uses the original managed-context
+		// 20s retention under the unchanged 60s root instead.
+		s, accepted := f.admitManagedContext(t, root, enrolled)
+		s, published := publishPreparedQueryLedgerContext(t, f, s, accepted, nil, execution.APIExecution{}, nil, false)
+		t.Logf("share_baseline_original_access_remaining_ms=%d", time.Until(published.Expectation.Registration.ExpiresAt).Milliseconds())
 		qualifyShareMetadataBaseline(t, f, s, published)
 	})
 }

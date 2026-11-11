@@ -23,6 +23,15 @@ No product behavior or new credential has changed. Next: freeze/commit the
 measurement source, run the owned fixture, establish compatible original
 provider/funding bounds and implement the complete installed retirement path.
 
+The first owned fixture at `1dc7c616` failed before measurement (Go 4.946 s):
+the query-publication helper requested 60-second evidence retention under the
+baseline's original 60-second root, leaving no deletion margin. The correction
+uses its existing 20-second managed capture and publishes that exact admission;
+no root backing, quota or original deadline is increased. All 4,546 failed-run
+source hashes match and source was unchanged. Cleanup failures are empty and
+owned containers were independently confirmed absent. The corrected fixture
+has compiled with an explicit service skip; actual service execution is pending.
+
 ## Merged processing inventory export (2026-11-11)
 
 [PR222](https://github.com/phihos/asservat/pull/222) merged at `cef71802`.
