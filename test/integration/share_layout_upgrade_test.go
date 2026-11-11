@@ -16,6 +16,16 @@ import (
 // Temporary NOLOGIN roles qualify real view ownership and table/column grants.
 func qualifyShareLayoutUpgrade(t *testing.T, ctx context.Context, conn *pgx.Conn, provider *goose.Provider) {
 	t.Helper()
+	checkRecipientIndex := func(partial bool) {
+		t.Helper()
+		var method, column string
+		var predicate *string
+		if err := conn.QueryRow(ctx, `SELECT a.amname,pg_get_indexdef(i.indexrelid,1,true),pg_get_expr(i.indpred,i.indrelid)
+ FROM pg_index i JOIN pg_class c ON c.oid=i.indexrelid JOIN pg_am a ON a.oid=c.relam
+ WHERE i.indexrelid='public.evidence_share_recipient'::regclass AND i.indrelid='public.evidence_share'::regclass`).Scan(&method, &column, &predicate); err != nil || method != "gin" || column != "recipient_keys" || partial && (predicate == nil || *predicate != "(revoked_at IS NULL)") || !partial && predicate != nil {
+			t.Fatal("share recipient index shape after migration", method, column, predicate, partial, err)
+		}
+	}
 	checkLayouts := func(current bool) {
 		t.Helper()
 		for _, row := range []struct {
@@ -126,6 +136,7 @@ func qualifyShareLayoutUpgrade(t *testing.T, ctx context.Context, conn *pgx.Conn
 	}
 	checkLayouts(true)
 	columns(true)
+	checkRecipientIndex(true)
 	before := snapshot()
 	// An actual grant on a new-only column cannot be silently discarded by Down.
 	if _, err := conn.Exec(ctx, "GRANT UPDATE (share_effect_target) ON public.capture_operation_lifecycle TO "+pgx.Identifier{column}.Sanitize()); err != nil {
@@ -153,6 +164,7 @@ func qualifyShareLayoutUpgrade(t *testing.T, ctx context.Context, conn *pgx.Conn
 	}
 	checkLayouts(false)
 	columns(false)
+	checkRecipientIndex(true) // SQL154 does not own this SQL153 index.
 	if snapshot() != before {
 		t.Fatal("SQL154 Down changed lifecycle owners/table/column grants")
 	}
@@ -160,11 +172,13 @@ func qualifyShareLayoutUpgrade(t *testing.T, ctx context.Context, conn *pgx.Conn
 	if _, err := provider.DownTo(ctx, 152); err != nil {
 		t.Fatal("standalone SQL153 Down after SQL154", err)
 	}
+	checkRecipientIndex(false)
 	if _, err := provider.Up(ctx); err != nil {
 		t.Fatal("SQL153/154 Up after empty roundtrip", err)
 	}
 	checkLayouts(true)
 	columns(true)
+	checkRecipientIndex(true)
 	if snapshot() != before {
 		t.Fatal("SQL153/154 roundtrip changed lifecycle owners/table/column grants")
 	}

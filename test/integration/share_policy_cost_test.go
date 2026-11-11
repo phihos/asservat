@@ -20,6 +20,7 @@ import (
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/identity"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -322,6 +323,27 @@ func qualifyWidePolicyShareCost(t *testing.T, ctx context.Context, admin *pgxpoo
 	if err != nil || !effect.EffectAvailable {
 		t.Fatal("rollback paid effect", err)
 	}
+	// The real hub can update both management and revocation. A structurally
+	// valid management change must still fail in a paid revocation branch,
+	// rather than merely fail its SQL privileges or an array-size constraint.
+	if _, err = tx.Exec(ctx, `SAVEPOINT share_revocation_immutable`); err != nil {
+		t.Fatal(err)
+	}
+	_, err = tx.Exec(ctx, `UPDATE evidence_share SET revoked_at=clock_timestamp(),revoke_key='branch-probe',revision=revision+1,
+ last_operation_id=$3,management=jsonb_build_array(management->0)
+ WHERE root_id=$1 AND id=(SELECT id FROM evidence_share WHERE root_id=$1 AND policy_acceptance_id=$2
+ AND revoked_at IS NULL AND jsonb_array_length(management)=8 ORDER BY id LIMIT 1)`, root, acceptance, rollbackOp.ID)
+	var refusal *pgconn.PgError
+	if !errors.As(err, &refusal) || refusal.Code != "23514" || refusal.Message != "share revocation changes only the revocation" {
+		t.Fatal("paid revocation changed management or failed outside its branch guard", err)
+	}
+	if _, err = tx.Exec(ctx, `ROLLBACK TO SAVEPOINT share_revocation_immutable`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = tx.Exec(ctx, `RELEASE SAVEPOINT share_revocation_immutable`); err != nil {
+		t.Fatal(err)
+	}
+	t.Log("policy_cost_stage=paid_revocation_immutable_branch_refused; rollback WAL conservatively includes one rejected paid probe and its savepoint rollback")
 	if _, err = q.LockPolicySharingAcceptance(ctx, custodydb.LockPolicySharingAcceptanceParams{RootID: rootID, ID: target}); err != nil {
 		t.Fatal(err)
 	}

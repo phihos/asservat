@@ -9,6 +9,10 @@ DO $$ BEGIN
  END IF;
 END $$;
 -- +goose StatementEnd
+-- Recipient lookups only expose unrevoked rows. Do not add wide recipient
+-- keys for a new revoked row version during the bounded revoke-all update.
+DROP INDEX public.evidence_share_recipient;
+CREATE INDEX evidence_share_recipient ON public.evidence_share USING gin(recipient_keys) WHERE revoked_at IS NULL;
 -- +goose StatementBegin
 DO $$ BEGIN
  EXECUTE 'COMMENT ON TABLE public.goose_db_version IS ''asservat:oldest-binary-schema=153''';
@@ -132,13 +136,24 @@ BEGIN
  IF d.share_effect_target IS DISTINCT FROM expected OR d.share_effect_xid IS DISTINCT FROM pg_current_xact_id() OR a.lane<>'normal' OR n>=a.request_until THEN
   RAISE EXCEPTION 'share mutation lacks exact paid effect' USING ERRCODE='23514';
  END IF;
+ -- Compare the exact stored columns without serializing/detoasting the whole
+ -- NEW composite into JSON. All source, recipient and original-bound fields
+ -- are immutable for both supported mutations.
+ IF ROW(NEW.id,NEW.root_id,NEW.artifact_id,NEW.case_id,NEW.cluster_id,NEW.namespace_uid,NEW.workload_uid,NEW.pod_uid,
+   NEW.version,NEW.creator_issuer,NEW.creator_subject,NEW.creator_client,NEW.recipients,NEW.recipient_keys,NEW.idempotency_key,
+   NEW.request_digest,NEW.created_at,NEW.expires_at,NEW.policy_acceptance_id,NEW.creating_operation_id,NEW.retire_by)
+  IS DISTINCT FROM ROW(OLD.id,OLD.root_id,OLD.artifact_id,OLD.case_id,OLD.cluster_id,OLD.namespace_uid,OLD.workload_uid,OLD.pod_uid,
+   OLD.version,OLD.creator_issuer,OLD.creator_subject,OLD.creator_client,OLD.recipients,OLD.recipient_keys,OLD.idempotency_key,
+   OLD.request_digest,OLD.created_at,OLD.expires_at,OLD.policy_acceptance_id,OLD.creating_operation_id,OLD.retire_by) THEN
+  RAISE EXCEPTION 'share mutation changes immutable source or original bounds' USING ERRCODE='23514';
+ END IF;
  IF NEW.revoked_at IS NOT NULL THEN
   IF a.intent->>'Name' IS DISTINCT FROM 'revoke_share' OR
-   (to_jsonb(NEW)-ARRAY['revoked_at','revoke_key','revision','last_operation_id']) IS DISTINCT FROM (to_jsonb(OLD)-ARRAY['revoked_at','revoke_key','revision','last_operation_id']) THEN
+   ROW(NEW.management,NEW.transfer_key,NEW.transfer_digest) IS DISTINCT FROM ROW(OLD.management,OLD.transfer_key,OLD.transfer_digest) THEN
    RAISE EXCEPTION 'share revocation changes only the revocation' USING ERRCODE='23514';
   END IF;
  ELSIF a.intent->>'Name' IS DISTINCT FROM 'transfer_share' OR NEW.transfer_key IS NULL OR OLD.expires_at<=n OR
-  (to_jsonb(NEW)-ARRAY['management','transfer_key','transfer_digest','revision','last_operation_id']) IS DISTINCT FROM (to_jsonb(OLD)-ARRAY['management','transfer_key','transfer_digest','revision','last_operation_id']) THEN
+  ROW(NEW.revoked_at,NEW.revoke_key) IS DISTINCT FROM ROW(OLD.revoked_at,OLD.revoke_key) THEN
   RAISE EXCEPTION 'share transfer changes only live management' USING ERRCODE='23514';
  END IF;
  RETURN NEW;
@@ -258,6 +273,8 @@ DO $$ BEGIN
  END IF;
 END $$;
 -- +goose StatementEnd
+DROP INDEX public.evidence_share_recipient;
+CREATE INDEX evidence_share_recipient ON public.evidence_share USING gin(recipient_keys);
 DROP TRIGGER policy_acceptance_share_effect ON public.policy_acceptance;
 DROP FUNCTION public.guard_policy_share_effect();
 DROP TRIGGER operation_audit_share_dependency ON public.operation_audit;

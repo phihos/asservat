@@ -132,6 +132,32 @@ Actual admission/publication and 100-share costs still require service results.
 Neither the narrower sample nor the structural rejection is universal maximum
 footprint qualification.
 
+### Measured mutation cost and smaller correction
+
+At `dac2d40d`, all 100 wide captures/shares, explicit rollback, paid revoke-all
+and fresh-operation replay completed their semantic assertions. The final
+funding assertion refused the result: paid revoke-all produced 6,731,960 bytes
+of whole-instance WAL and rollback 7,703,136 bytes, beyond the original synthetic
+2 MiB transition bound (and the 256 KiB installer example). Each mutation also
+grew indexes by about 1.7 MB and TOAST storage by about 1.66 MB. These include
+page images/background effects, not universal per-statement maxima.
+
+First remove whole-row JSON serialization from the immutable-field trigger and
+keep recipient GIN entries only for unrevoked shares. The proposed exact tuple
+comparison preserves all 21 immutable columns and branch-specific restrictions;
+both recipient-key queries already require `revoked_at IS NULL`. This adds
+zero rows, role identities, permissions, background tasks, configuration or
+lifecycle states; it replaces one index predicate and its empty rollback.
+Ordinary revocation benefits too, while avoiding a blanket increase in every
+normal-read reservation. The existing artifact-index predicate still changes,
+so this does not promise HOT updates or TOAST reuse. Rerun the same sampler
+before accepting a smaller cost bound. A separate narrow mutable-state row is
+deferred unless these measured simplifications are insufficient.
+
+Mechanism references checked 2026-11-11: [PostgreSQL HOT](https://www.postgresql.org/docs/current/storage-hot.html)
+and [partial indexes](https://www.postgresql.org/docs/current/indexes-partial.html).
+They explain update/index behavior; they do not qualify this candidate.
+
 Then qualify actual upgrade/rollback, all three producers, original cutoffs,
 replay, late publication, mutation/finalization concurrency, recovery refusal,
 unknown effects, direct-DELETE denial, provider scope rejection, managed-object
