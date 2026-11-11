@@ -186,6 +186,10 @@ WHERE root_id=$1::uuid
   AND lane='capture'
   AND operation_id>$2::uuid
   AND original_purge_at<=clock_timestamp()
+  -- Acknowledged certificates cannot acquire their terminal lease before this
+  -- original cutoff. Do not repeatedly admit native work while they wait.
+  AND (certificate_receipt IS NULL OR certificate_purge_at<=clock_timestamp()
+       OR terminal_acknowledged_at IS NOT NULL)
 ORDER BY operation_id LIMIT 16
 `
 
@@ -576,6 +580,10 @@ WHERE root_id=$1::uuid
   AND lane IN ('capture','normal','resolution')
   AND operation_id>$2::uuid
   AND original_purge_at<=clock_timestamp()
+  -- Acknowledged certificates cannot acquire their terminal lease before this
+  -- original cutoff. Do not repeatedly admit native work while they wait.
+  AND (certificate_receipt IS NULL OR certificate_purge_at<=clock_timestamp()
+       OR terminal_acknowledged_at IS NOT NULL)
 ORDER BY operation_id LIMIT 16
 `
 

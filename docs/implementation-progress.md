@@ -45,6 +45,8 @@ failures and independently absent owned resources. Failed runs remain failures.
 | `8ab7b9ae` / `installed-8ab7b9ae` | Go240.583s/harness305.1s fail,4854 hashes: original worker exits at capacity/open/finish after valid sibling cleanup journal progress. Restart does not satisfy original-process assertion. |
 | `d851782f` / `installed-d851782f` | Go513.952s fail,4854 hashes: original worker stays running and both MCP share producers work; identifying normal rows outlive original live_retire_by. PostgreSQL23514 refuses nested proof-window-missed pool update under compiled cleanup role. Fix and fresh qualification pending. |
 
+| `7e07616a` / `installed-7e07616a` | Go583.844s/harness654.9s fail,4855 hashes: normal/capture rows delete atomically before original live bounds and retain future cooling charges; final healthy-certificate assertion fails. Verification-claim refusals are logged for some rows, but their identities cannot be correlated to these shares. |
+
 Current broad checks: `make pre-push` passes at `ad4662b7` (490s affected
 race phase), using the existing full specification virtual environment. The first
 invocation used system Python and failed missing validator imports before the
@@ -63,8 +65,11 @@ request/retry/deadline or authority is added. Closed runtime diagnostics now
 identify scheduling/provider/projection/effect stages without private content.
 
 The shared observer rejects non-atomic disappearance, late live rows, premature
-history/charge release and changed original deadlines. Short H2/B10/P10 and
-normal/resolution240s/capture300s fixture bounds are selected before installation;
+history/charge release and changed original deadlines. The failed installed cohort used H2/B10/P10 with
+normal/resolution240s/capture300s. The next fresh cohort selects B30 before
+installation, retains the same H/P/retention and moves original purge60s and
+live removal20s earlier; this does not qualify B10. All profile bounds are
+selected before installation;
 timestamps are never rewritten. At `ad4662b7`, the compiled-role service regression passes Go62.173s with
 4,582 exact hashes, frozen source and complete owned cleanup. The original
 healthy retirement/refund still passes; overdue selection increments its

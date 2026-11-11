@@ -1232,7 +1232,11 @@ func nativeCapacityProfile() *contracts.InstallerCapacitySettings {
 		// Selected before installation/admission: exercise original finite
 		// bounds, never rewrite a running operation to make cleanup due.
 		profile.Backup.HorizonSeconds = 2
-		profile.Backup.CleanupBudgetSeconds, profile.Backup.ProofWindowSeconds = 10, 10
+		// The ten-second cohort did not qualify healthy native retirement.
+		// Select thirty seconds before installation for serial native checks
+		// and cold provider work; retention and proof requirements stay fixed.
+		// This moves original purge 60s earlier and live removal 20s earlier.
+		profile.Backup.CleanupBudgetSeconds, profile.Backup.ProofWindowSeconds = 30, 10
 		profile.Lanes.Normal.RetainedSeconds = 240
 		profile.Lanes.Resolution.RetainedSeconds = 240
 		profile.Lanes.CaptureRetainedSeconds = 300

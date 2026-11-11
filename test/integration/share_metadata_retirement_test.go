@@ -362,12 +362,21 @@ func qualifyShareMetadataSlots(t *testing.T, f *capacitySQLFixture, s captureAdm
 	qualifyCompiledCleanupOverdueCounter(t, f, s, overdue, policy)
 }
 
+type shareRetirementFinalizerFunc func(context.Context, string) error
+
+func (f shareRetirementFinalizerFunc) RetireOperationAudit(ctx context.Context, id string) error {
+	return f(ctx, id)
+}
+
 func qualifyPaidShareRetirement(t *testing.T, f *capacitySQLFixture, s captureAdmissionScenario, in auditvalue.OperationIntent, shareID string, policy auditvalue.OperationLifecyclePolicy) {
 	t.Helper()
 	ctx := f.ctx
 	live, err := readShareRetirementSnapshot(ctx, f.admin, s.a.RootID, "normal", in.PrincipalDigest[:], shareID, in.ID, in.Lifecycle.HistoryReleaseAt, in.Lifecycle.HistoryDeleteBy)
 	if err != nil || !live.Share || !live.Operation || !live.Lifecycle || live.AccountCharge == nil || *live.AccountCharge != live.LiveRecords+live.HistoryRecords {
 		t.Fatal("paid share original snapshot or charge invariant", err)
+	}
+	if live.CertificateStarted || live.CertificateWriter || live.CertificateVerifyAttempts != 0 || live.CertificateWriteUntil != nil {
+		t.Fatal("paid share initial certificate snapshot did not preserve unstarted NULL state")
 	}
 	ledgers := make([]*postgres.OperationLifecycles, 0, 3)
 	for _, purpose := range []string{"capture-cleanup", "capture-verifier", "capture-finalizer"} {
@@ -397,7 +406,22 @@ func qualifyPaidShareRetirement(t *testing.T, f *capacitySQLFixture, s captureAd
 	if err != nil {
 		t.Fatal(err)
 	}
-	cleaner := auditapp.OperationCleanup{Journal: ledgers[0], Acknowledgements: ledgers[1], Finalizer: ledgers[2], Objects: objects, Verifier: checks}
+	terminalReadySelected := false
+	acknowledgedWaitSkipped, terminalDueSelected := false, false
+	finalizer := shareRetirementFinalizerFunc(func(call context.Context, id string) error {
+		// This callback occurs only after the real independent terminal-absence
+		// acknowledgement. Selection still grants no retirement authority.
+		due, err := ledgers[0].DueWorkerOperations(call, "")
+		if err != nil || !slices.Contains(due, id) {
+			t.Fatal("worker omitted independently acknowledged finalization-ready operation", err)
+		}
+		if time.Now().Before(in.Lifecycle.CertificatePurgeAt) {
+			t.Fatal("terminal finalization preceded original certificate purge cutoff")
+		}
+		terminalReadySelected, terminalDueSelected = true, true
+		return ledgers[2].RetireOperationAudit(call, id)
+	})
+	cleaner := auditapp.OperationCleanup{Journal: ledgers[0], Acknowledgements: ledgers[1], Finalizer: finalizer, Objects: objects, Verifier: checks}
 	t.Logf("share_retirement_stage=await_original_purge remaining_ms=%d; original source bound unchanged; synthetic local signing/storage credentials do not qualify installed IAM", time.Until(in.Lifecycle.OriginalPurgeAt).Milliseconds())
 	// Exercise the installed selector with its compiled cleanup credential,
 	// including the normal lane; direct Advance alone cannot prove this path.
@@ -407,7 +431,7 @@ func qualifyPaidShareRetirement(t *testing.T, f *capacitySQLFixture, s captureAd
 		t.Fatal("worker selected a normal operation before its original purge", err)
 	}
 	deadline := in.Lifecycle.LiveRetireBy.Add(5 * time.Second)
-	removed, selected := false, false
+	removed, selected, certificateDecoded := false, false, false
 	for time.Now().Before(deadline) {
 		f.refreshFleet(t)
 		if !selected && !time.Now().Before(in.Lifecycle.OriginalPurgeAt) {
@@ -426,6 +450,13 @@ func qualifyPaidShareRetirement(t *testing.T, f *capacitySQLFixture, s captureAd
 			}
 			selected = true
 		}
+		if certificateDecoded && !terminalDueSelected && !time.Now().Before(in.Lifecycle.CertificatePurgeAt) {
+			due, err = ledgers[0].DueWorkerOperations(ctx, "")
+			if err != nil || !slices.Contains(due, in.ID) {
+				t.Fatal("worker omitted acknowledged operation at original terminal cutoff", err)
+			}
+			terminalDueSelected = true
+		}
 		err = cleaner.Advance(ctx, in.ID)
 		state, e := readShareRetirementSnapshot(ctx, f.admin, s.a.RootID, "normal", in.PrincipalDigest[:], shareID, in.ID, in.Lifecycle.HistoryReleaseAt, in.Lifecycle.HistoryDeleteBy)
 		if e != nil || state.Share != state.Operation || state.Lifecycle != state.Operation || state.AccountCharge == nil || *state.AccountCharge != state.LiveRecords+state.HistoryRecords {
@@ -433,6 +464,27 @@ func qualifyPaidShareRetirement(t *testing.T, f *capacitySQLFixture, s captureAd
 		}
 		if state.Operation && !state.SnapshotAt.Before(in.Lifecycle.LiveRetireBy) {
 			t.Fatal("paid share exceeded original live retirement bound")
+		}
+		if state.Healthy {
+			if !state.CertificateStarted || !state.CertificateWriter || state.CertificateVerifyAttempts != 1 || state.CertificateWriteUntil == nil ||
+				!state.CertificateWriteUntil.After(in.Lifecycle.OriginalPurgeAt) || state.CertificateWriteUntil.After(in.Lifecycle.CertificatePurgeAt.Add(-time.Duration(policy.ProofWindowSeconds)*time.Second)) {
+				t.Fatal("paid share acknowledged certificate snapshot lost its persisted completion or original write bound")
+			}
+			certificateDecoded = true
+			if !acknowledgedWaitSkipped && time.Now().Before(in.Lifecycle.CertificatePurgeAt) {
+				due, err = ledgers[0].DueWorkerOperations(ctx, "")
+				if err != nil {
+					t.Fatal("worker selection during original certificate wait", err)
+				}
+				// The selector's SQL clock may cross the cutoff during this read. Assert
+				// exclusion only when both sides of the read precede the original end.
+				if time.Now().Before(in.Lifecycle.CertificatePurgeAt) {
+					if slices.Contains(due, in.ID) {
+						t.Fatal("worker repeatedly selected an acknowledged certificate before original terminal cutoff")
+					}
+					acknowledgedWaitSkipped = true
+				}
+			}
 		}
 		if !state.Operation {
 			removed = true
@@ -444,12 +496,15 @@ func qualifyPaidShareRetirement(t *testing.T, f *capacitySQLFixture, s captureAd
 		case <-time.After(200 * time.Millisecond):
 		}
 	}
-	if !removed || !selected {
-		t.Fatal("original provider/finalization did not select and retire share", err)
+	if !removed || !selected || !certificateDecoded || !acknowledgedWaitSkipped || !terminalDueSelected || !terminalReadySelected {
+		t.Fatal("original provider/finalization selection missed healthy wait or original terminal readiness", err, removed, selected, certificateDecoded, acknowledgedWaitSkipped, terminalDueSelected, terminalReadySelected)
 	}
 	cooling, err := readShareRetirementSnapshot(ctx, f.admin, s.a.RootID, "normal", in.PrincipalDigest[:], shareID, in.ID, in.Lifecycle.HistoryReleaseAt, in.Lifecycle.HistoryDeleteBy)
 	if err != nil || cooling.Share || cooling.Operation || cooling.Lifecycle || cooling.OriginalRecords != 1 || cooling.Eligible == nil || cooling.AccountCharge == nil || !cooling.ObservedAt.Before(*cooling.Eligible) || *cooling.AccountCharge != cooling.LiveRecords+cooling.HistoryRecords {
 		t.Fatal("share deletion did not retain original H charge", err)
+	}
+	if cooling.CertificateStarted || cooling.CertificateWriter || cooling.CertificateVerifyAttempts != 0 || cooling.CertificateWriteUntil != nil {
+		t.Fatal("deleted paid share certificate snapshot did not preserve absent lifecycle NULL state")
 	}
 	eligible, charged := *cooling.Eligible, *cooling.AccountCharge
 	t.Logf("share_retirement_stage=child_and_parent_deleted original_H=%d remaining_cooling_ms=%d charged=%d", policy.BackupHorizonSeconds, time.Until(eligible).Milliseconds(), charged)
@@ -505,6 +560,10 @@ func qualifyCompiledCleanupOverdueCounter(t *testing.T, f *capacitySQLFixture, s
 	if err != nil {
 		t.Fatal(err)
 	}
+	due, err := ledger.DueWorkerOperations(ctx, "")
+	if err != nil || !slices.Contains(due, in.ID) {
+		t.Fatal("worker omitted due unstarted overdue source", err)
+	}
 	var before, after int64
 	if err = f.admin.QueryRow(ctx, `SELECT proof_window_missed FROM operation_audit_pool WHERE root_id=$1 AND lane='normal'`, s.a.RootID).Scan(&before); err != nil {
 		t.Fatal(err)
@@ -515,6 +574,10 @@ func qualifyCompiledCleanupOverdueCounter(t *testing.T, f *capacitySQLFixture, s
 	}
 	if err = f.admin.QueryRow(ctx, `SELECT proof_window_missed FROM operation_audit_pool WHERE root_id=$1 AND lane='normal'`, s.a.RootID).Scan(&after); err != nil || after != before+1 {
 		t.Fatal("overdue counter did not increment exactly once", before, after, err)
+	}
+	due, err = ledger.DueWorkerOperations(ctx, "")
+	if err != nil || !slices.Contains(due, in.ID) {
+		t.Fatal("worker omitted pending original overdue lease", err)
 	}
 	replay, err := ledger.BeginOperationPurge(ctx, in.ID, "overdueOriginal")
 	if err != nil || !lease.Until.Equal(replay.Until) || lease.Fence != replay.Fence {

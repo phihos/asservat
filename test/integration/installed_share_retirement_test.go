@@ -33,6 +33,8 @@ func qualifyInstalledShareRetirement(t *testing.T, parent context.Context, clust
 		eligible                       time.Time
 		horizon                        int64
 		healthy, cooling, gone         bool
+		certificateLogged              bool
+		certificateState               shareRetirementCertificateState
 	}
 	rows, err := run.SQL.Query(parent, `SELECT s.id::text,s.creating_operation_id::text,a.lane,a.principal_digest,l.original_purge_at,l.live_retire_by,
  (l.binding->>'HistoryReleaseAt')::timestamptz,(l.binding->>'HistoryDeleteBy')::timestamptz,(l.binding#>>'{Policy,BackupHorizonSeconds}')::bigint
@@ -88,6 +90,16 @@ func qualifyInstalledShareRetirement(t *testing.T, parent context.Context, clust
 			if err != nil {
 				run.Diagnose()
 				t.Fatal("installed share retirement/account snapshot", err)
+			}
+			certificateState := sample.certificateState()
+			if !o.certificateLogged || certificateState != o.certificateState {
+				var writeRemainingMS int64
+				if sample.CertificateWriteUntil != nil {
+					writeRemainingMS = sample.CertificateWriteUntil.Sub(observedAt).Milliseconds()
+				}
+				t.Logf("installed_share_retirement lane=%s stage=certificate_state lifecycle=%t started=%t writer_completed=%t verification_attempts=%d healthy=%t original_write_bound_present=%t original_write_remaining_ms=%d original_write_open=%t",
+					o.lane, lifecycle, sample.CertificateStarted, sample.CertificateWriter, sample.CertificateVerifyAttempts, healthy, sample.CertificateWriteUntil != nil, writeRemainingMS, certificateState.WriteOpen)
+				o.certificateLogged, o.certificateState = true, certificateState
 			}
 			if share != operation || lifecycle != operation {
 				t.Fatal("installed retirement did not remove share, operation and lifecycle atomically", o.lane)
@@ -172,9 +184,28 @@ func qualifyInstalledShareRetirement(t *testing.T, parent context.Context, clust
 type shareRetirementSnapshot struct {
 	SnapshotAt, ObservedAt                       time.Time
 	Share, Operation, Lifecycle, Healthy         bool
+	CertificateStarted, CertificateWriter        bool
+	CertificateVerifyAttempts                    int64
+	CertificateWriteUntil                        *time.Time
 	Eligible                                     *time.Time
 	OriginalRecords, LiveRecords, HistoryRecords int64
 	AccountCharge                                *int64
+}
+
+type shareRetirementCertificateState struct {
+	Lifecycle, Started, Writer, Healthy, WriteOpen bool
+	VerifyAttempts                                 int64
+	WriteUntil                                     time.Time
+}
+
+func (s shareRetirementSnapshot) certificateState() shareRetirementCertificateState {
+	state := shareRetirementCertificateState{Lifecycle: s.Lifecycle, Started: s.CertificateStarted, Writer: s.CertificateWriter,
+		Healthy: s.Healthy, VerifyAttempts: s.CertificateVerifyAttempts}
+	if s.CertificateWriteUntil != nil {
+		state.WriteUntil = *s.CertificateWriteUntil
+		state.WriteOpen = s.ObservedAt.Before(*s.CertificateWriteUntil)
+	}
+	return state
 }
 
 func readShareRetirementSnapshot(ctx context.Context, pool *pgxpool.Pool, root, lane string, principal []byte, share, operation string, release, deleteBy time.Time) (sample shareRetirementSnapshot, err error) {
@@ -183,15 +214,21 @@ func readShareRetirementSnapshot(ctx context.Context, pool *pgxpool.Pool, root, 
  live AS (SELECT count(*) AS records FROM operation_audit WHERE root_id=$1 AND lane=$2 AND principal_digest=$3),
  history AS (SELECT COALESCE(sum(records),0)::bigint AS records FROM operation_audit_history WHERE root_id=$1 AND lane=$2 AND principal_digest=$3),
  original_history AS (SELECT eligible_at,records FROM operation_audit_history WHERE root_id=$1 AND lane=$2 AND principal_digest=$3 AND release_at=$6 AND delete_by=$7),
+ lifecycle AS (SELECT certificate_started,certificate_completion,certificate_acknowledged_at,certificate_verify_attempts,retirement FROM operation_audit_lifecycle WHERE root_id=$1 AND operation_id=$5),
  snapshot AS MATERIALIZED (SELECT
  EXISTS(SELECT 1 FROM evidence_share WHERE root_id=$1 AND id=$4) AS share_present,
  EXISTS(SELECT 1 FROM operation_audit WHERE root_id=$1 AND id=$5) AS operation_present,
- EXISTS(SELECT 1 FROM operation_audit_lifecycle WHERE root_id=$1 AND operation_id=$5) AS lifecycle_present,
- EXISTS(SELECT 1 FROM operation_audit_lifecycle WHERE root_id=$1 AND operation_id=$5 AND certificate_acknowledged_at IS NOT NULL) AS healthy,
+ EXISTS(SELECT 1 FROM lifecycle) AS lifecycle_present,
+ EXISTS(SELECT 1 FROM lifecycle WHERE certificate_acknowledged_at IS NOT NULL) AS healthy,
+ COALESCE((SELECT certificate_started FROM lifecycle),false) AS certificate_started,
+ EXISTS(SELECT 1 FROM lifecycle WHERE certificate_completion IS NOT NULL) AS certificate_writer,
+ COALESCE((SELECT certificate_verify_attempts FROM lifecycle),0) AS certificate_verify_attempts,
+ (SELECT (retirement->>'CertificateWriteUntil')::timestamptz FROM lifecycle) AS certificate_write_until,
  (SELECT eligible_at FROM original_history) AS eligible_at,COALESCE((SELECT records FROM original_history),0) AS original_records,
  (SELECT charged FROM account) AS charged,(SELECT records FROM live) AS live_records,(SELECT records FROM history) AS history_records)
- SELECT statement_timestamp(),clock_timestamp(),share_present,operation_present,lifecycle_present,healthy,eligible_at,original_records,charged,live_records,history_records FROM snapshot`, root, lane, principal, share, operation, release, deleteBy).Scan(
+ SELECT statement_timestamp(),clock_timestamp(),share_present,operation_present,lifecycle_present,healthy,certificate_started,certificate_writer,certificate_verify_attempts,certificate_write_until,eligible_at,original_records,charged,live_records,history_records FROM snapshot`, root, lane, principal, share, operation, release, deleteBy).Scan(
 		&sample.SnapshotAt, &sample.ObservedAt, &sample.Share, &sample.Operation, &sample.Lifecycle, &sample.Healthy,
+		&sample.CertificateStarted, &sample.CertificateWriter, &sample.CertificateVerifyAttempts, &sample.CertificateWriteUntil,
 		&sample.Eligible, &sample.OriginalRecords, &sample.AccountCharge, &sample.LiveRecords, &sample.HistoryRecords)
 	return
 }

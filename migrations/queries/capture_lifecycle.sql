@@ -68,6 +68,10 @@ WHERE root_id=sqlc.arg(root_id)::uuid
   AND lane='capture'
   AND operation_id>sqlc.arg(after_id)::uuid
   AND original_purge_at<=clock_timestamp()
+  -- Acknowledged certificates cannot acquire their terminal lease before this
+  -- original cutoff. Do not repeatedly admit native work while they wait.
+  AND (certificate_receipt IS NULL OR certificate_purge_at<=clock_timestamp()
+       OR terminal_acknowledged_at IS NOT NULL)
 ORDER BY operation_id LIMIT 16;
 
 -- name: WorkerDueOperationLifecycles :many
@@ -78,6 +82,10 @@ WHERE root_id=sqlc.arg(root_id)::uuid
   AND lane IN ('capture','normal','resolution')
   AND operation_id>sqlc.arg(after_id)::uuid
   AND original_purge_at<=clock_timestamp()
+  -- Acknowledged certificates cannot acquire their terminal lease before this
+  -- original cutoff. Do not repeatedly admit native work while they wait.
+  AND (certificate_receipt IS NULL OR certificate_purge_at<=clock_timestamp()
+       OR terminal_acknowledged_at IS NOT NULL)
 ORDER BY operation_id LIMIT 16;
 
 -- name: WorkerDueOperationAuditHistory :many

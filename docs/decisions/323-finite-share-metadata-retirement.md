@@ -261,3 +261,34 @@ failure without changing its strict live-row, atomicity or charge assertions.
 Cold sequential credential acquisition and the original short proof windows
 still require measured installed qualification; the available sparse logs do
 not establish cold-start duration or a successful certificate acknowledgement.
+
+
+## Schedule only the next due effect
+
+The worker's original-purge-only selector repeatedly admits already acknowledged
+certificates while they wait for their original terminal cutoff. Each selected
+waiting row pays the full existing native Begin/Finish (23 reads and three probes
+in the focused contract), two lifecycle reads and a refused terminal-lease
+transaction, about44 SQL statements including transaction control. The installed
+log shows two serial waiting-row refusals1.358s apart. Multiplying that observed
+rate by16 suggests21.7s per full page; it is an inference, not a measured full-page
+maximum. Both concrete shares in the B10 run retired with cooling, but neither
+proved healthy certification. The row timing diagnostics were insufficient to
+attribute that outcome solely to scheduling or cold provider acquisition.
+
+Skip an acknowledged certificate until its existing certificate-purge cutoff;
+keep terminal-acknowledged rows eligible for finalization. Apply this scheduling
+predicate to the existing worker and capture selectors. No new state, grant,
+query, watch, task, fallback or effect authority is added. Existing transactions
+continue to reject early effects. Test acknowledged absence before the original
+cutoff, eligibility at the cutoff and finalization readiness with real SQL.
+
+The next fresh installed cohort uses an original30-second cleanup budget rather
+than the unqualified10-second fixture value. The trial's public profile already
+uses60 seconds. Keep H2/P10 and the same240/300s retention. Existing arithmetic
+moves original purge60s earlier and the identifying-row live cutoff20s earlier,
+reserving time for actual serial native/provider work without extending evidence
+retention or changing an in-flight deadline. This is qualification of B30 only;
+it does not declare the failed B10 healthy path fixed. Cold-refresh cost remains unmeasured; exact original certificate states are
+recorded on the next run, with every success,
+original deadline and charge assertion retained.
