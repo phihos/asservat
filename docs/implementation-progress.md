@@ -69,6 +69,29 @@ recipients across exact 3+1 pages, unique recipient ordinals and acknowledged
 page output bytes. Production code, console assets and browser drivers are
 unchanged from the successful broad/browser checkpoint.
 
+Final `make pre-push` at `021142f4` passed, including the integration race
+package (102 s; affected suite 103 s with unchanged packages cached). The next
+fresh installed run passed capture, native download, the four-recipient share
+and verified early erasure, then failed its first exported page's provenance
+assertion (Go 349.432 s, harness 398.2 s, test exit 1 and make exit 2). All 4,811
+source hashes match and source remained frozen. The assertion read the owner
+download ConfigMap, while the public processing service deliberately uses the
+separate capacity processing source. Their distinct UIDs invalidate that test
+expectation even when their documents match. The full source revision check
+must use the actual processing source. Original outputs are archived in
+`installed-021142f4`. The accepted owner input confirmed separate processing
+and download source UIDs, both at revision 2 with the two declarations.
+Official retained-fixture cleanup returned 0 with all resource lists empty.
+The helper now follows the actual Deployment projection to its pinned
+processing source, retains every strict header comparison and names any
+mismatched field. A focused two-source regression failed before the fix and
+passes with UID-replacement refusal and the compiled report browser (1.393 s,
+exit 0). Failed synthetic export parts are preserved under the private external
+fixture directory before temporary-directory cleanup. The production protected
+reader's focused race checks also pass (2.203 s). Production and browser sources
+remain unchanged, so the successful broad gates are reusable while final
+fixture checks, fresh qualification and full required PR CI remain mandatory.
+
 The report uses original visibility horizons. Physical retirement of all share
 metadata, complete retained-derivative production/propagation, reviewed personal
 extracts and preservation remain open under the wider specification.

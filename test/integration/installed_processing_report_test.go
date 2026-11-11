@@ -27,7 +27,9 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
+	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 )
 
 type reportPageSummary struct {
@@ -79,6 +81,40 @@ func TestInstalledReportSharingAuthority(t *testing.T) {
 func startProcessingReportBrowser(t *testing.T, ctx context.Context, config map[string]any) (*installedLiveBrowser, string) {
 	t.Helper()
 	output := t.TempDir()
+	// Registered before process cleanup: join the browser first, preserve
+	// failed synthetic downloads next, then let TempDir remove its copies.
+	t.Cleanup(func() {
+		fixtures := os.Getenv("ASSERVAT_CONTEXT_FIXTURES")
+		if !t.Failed() || fixtures == "" {
+			return
+		}
+		archive, err := os.MkdirTemp(filepath.Dir(fixtures), "processing-report-failure-")
+		if err != nil {
+			t.Log("preserve failed processing report", err)
+			return
+		}
+		for part := 1; part <= 8; part++ {
+			name := fmt.Sprintf("processing-report-%d.json", part)
+			path := filepath.Join(output, name)
+			info, err := os.Stat(path)
+			if os.IsNotExist(err) {
+				break
+			}
+			if err != nil || !info.Mode().IsRegular() || info.Size() > 4<<20 {
+				t.Log("preserve failed processing report: invalid bounded part", part, err)
+				break
+			}
+			raw, err := os.ReadFile(path)
+			if err == nil {
+				err = os.WriteFile(filepath.Join(archive, name), raw, 0600)
+			}
+			if err != nil {
+				t.Log("preserve failed processing report part", part, err)
+				break
+			}
+		}
+		t.Log("failed synthetic processing report downloads preserved", archive)
+	})
 	config["outputDirectory"] = output
 	command, cancel := installedBoundedCommand(ctx, 3*time.Minute, "node", filepath.Join("..", "..", "web", "scripts", "installed-processing-report-browser.mjs"))
 	command.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
@@ -223,7 +259,7 @@ func qualifyInstalledProcessingReport(t *testing.T, parent context.Context, clus
 	}
 	driver, output := startProcessingReportBrowser(t, ctx, map[string]any{"origin": session.base, "proxy": installedHistoryBrowserTunnel(t, ctx, session.base, run.Address), "cookies": cookies})
 	clear(cookies)
-	source, err := erasure.hub.CoreV1().ConfigMaps(erasure.namespace).Get(ctx, contracts.OwnerDownloadEnvironmentName(erasure.installation), meta.GetOptions{})
+	source, err := installedProcessingReportSource(ctx, erasure.hub, erasure.namespace, erasure.installation)
 	if err != nil {
 		t.Fatal("installed report declared source", err)
 	}
@@ -236,12 +272,13 @@ func qualifyInstalledProcessingReport(t *testing.T, parent context.Context, clus
 		t.Fatal(err)
 	}
 	policy := sha256.Sum256(canonical)
+	expected := value.ProcessingReportPage{RootID: run.RootID, InstallationID: erasure.installation,
+		PolicyRevision: value.ProcessingReportRevision{UID: string(source.UID), Generation: settings.Revision, Digest: hex.EncodeToString(policy[:])}, ProcessorDeclarations: "supplied"}
 	sharePages := 0
 	var shareAfter value.ProcessingReportCursor
 	records := readProcessingReportExports(t, driver, output, func(summary reportPageSummary, page value.ProcessingReportPage) {
-		if page.RootID != run.RootID || page.InstallationID != erasure.installation || page.PolicyRevision.UID != string(source.UID) ||
-			page.PolicyRevision.Generation != settings.Revision || page.PolicyRevision.Digest != hex.EncodeToString(policy[:]) || page.ProcessorDeclarations != "supplied" {
-			t.Fatal("installed report changed the actual accepted policy or declaration provenance")
+		if mismatch := installedReportProvenanceMismatch(page, expected); mismatch != "" {
+			t.Fatal("installed report provenance", "section", page.Section, "source", source.Name, "request", summary.RequestID, mismatch)
 		}
 		if page.Section == "shares" {
 			sharePages++
@@ -335,6 +372,75 @@ WHERE o.root_id=$1 AND o.intent->>'Name'='get_processing_report'
 	}
 	qualifyInstalledReportRollbackGuard(t, ctx, run.SQL)
 	t.Log("installed privacy inventory exported every section with exact page audit bytes, recorded recipient and completed session, retained verified deletion and operator declarations")
+}
+
+func installedProcessingReportSource(ctx context.Context, client kubernetes.Interface, namespace, installation string) (*core.ConfigMap, error) {
+	deployments, err := client.AppsV1().Deployments(namespace).List(ctx, meta.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("report owner deployment: %w", err)
+	}
+	configuration := ""
+	owners := 0
+	for _, deployment := range deployments.Items {
+		if deployment.Spec.Template.Labels["asservat.io/private-role"] != "hub-api" {
+			continue
+		}
+		owners++
+		for _, volume := range deployment.Spec.Template.Spec.Volumes {
+			if volume.Projected == nil {
+				continue
+			}
+			for _, projection := range volume.Projected.Sources {
+				if projection.ConfigMap == nil {
+					continue
+				}
+				for _, item := range projection.ConfigMap.Items {
+					if item.Key == "deployment.json" && item.Path == "deployment.json" {
+						if configuration != "" {
+							return nil, errors.New("report owner deployment has ambiguous input projection")
+						}
+						configuration = projection.ConfigMap.Name
+					}
+				}
+			}
+		}
+	}
+	if owners != 1 || configuration == "" {
+		return nil, fmt.Errorf("report owner deployment input unavailable: owners=%d", owners)
+	}
+	input, err := client.CoreV1().ConfigMaps(namespace).Get(ctx, configuration, meta.GetOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("report owner input: %w", err)
+	}
+	deployment, err := contracts.DecodeOwnerDeployment(strings.NewReader(input.Data["deployment.json"]))
+	if err != nil || deployment.Format != contracts.OwnerDeploymentFormat || deployment.InstallationID != installation || deployment.Public == nil || deployment.Public.Processing == nil {
+		return nil, errors.New("report owner processing source input invalid")
+	}
+	pin := deployment.Public.Processing.Source
+	source, err := client.CoreV1().ConfigMaps(namespace).Get(ctx, pin.Name, meta.GetOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("report selected processing source: %w", err)
+	}
+	if pin.Name == "" || pin.UID == "" || string(source.UID) != pin.UID {
+		return nil, errors.New("report selected processing source UID changed")
+	}
+	return source, nil
+}
+
+func installedReportProvenanceMismatch(got, want value.ProcessingReportPage) string {
+	var mismatches []string
+	for _, field := range []struct{ name, got, want string }{
+		{"root_id", got.RootID, want.RootID}, {"installation_id", got.InstallationID, want.InstallationID},
+		{"policy_revision.uid", got.PolicyRevision.UID, want.PolicyRevision.UID},
+		{"policy_revision.generation", fmt.Sprint(got.PolicyRevision.Generation), fmt.Sprint(want.PolicyRevision.Generation)},
+		{"policy_revision.digest", got.PolicyRevision.Digest, want.PolicyRevision.Digest},
+		{"processor_declarations", got.ProcessorDeclarations, want.ProcessorDeclarations},
+	} {
+		if field.got != field.want {
+			mismatches = append(mismatches, fmt.Sprintf("%s: got=%q want=%q", field.name, field.got, field.want))
+		}
+	}
+	return strings.Join(mismatches, "; ")
 }
 
 func qualifyInstalledReportRollbackGuard(t *testing.T, parent context.Context, admin *pgxpool.Pool) {
