@@ -3,6 +3,7 @@ package bootstrap
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"reflect"
 	"time"
@@ -22,6 +23,7 @@ func (d *CaptureCleanupWorkerDeployment) runProviderCleanup(ctx context.Context)
 	report := eventLog(os.Stderr, "operation cleanup")
 	report("started")
 	for ctx.Err() == nil {
+		operationsStarted := time.Now()
 		schedule, end := context.WithTimeout(ctx, 5*time.Second)
 		ids, err := d.journal.DueWorkerOperations(schedule, cursor)
 		end()
@@ -49,6 +51,8 @@ func (d *CaptureCleanupWorkerDeployment) runProviderCleanup(ctx context.Context)
 		if len(ids) < 16 {
 			cursor = ""
 		}
+		operationsElapsed := time.Since(operationsStarted)
+		historyStarted := time.Now()
 		schedule, end = context.WithTimeout(ctx, 5*time.Second)
 		keys, err := d.journal.DueOperationHistory(schedule)
 		end()
@@ -60,13 +64,22 @@ func (d *CaptureCleanupWorkerDeployment) runProviderCleanup(ctx context.Context)
 			report(cleanupRuntimeEvent(err))
 			return err
 		}
-		for _, key := range keys {
-			effectErr, current := d.releaseProviderHistory(ctx, key)
+		historyAttempted := 0
+		if len(keys) > 0 {
+			var effectErr error
+			var current bool
+			historyAttempted, effectErr, current = d.releaseProviderHistoryPage(ctx, keys)
 			report(cleanupRuntimeEvent(effectErr))
 			if !current {
 				return effectErr
 			}
 			pending = pending || effectErr != nil
+		}
+		// One numeric aggregate per completed nonempty sweep. Include each due
+		// query and all serial processing, excluding the fixed idle sleep. IDs,
+		// error text and provider inputs never enter these diagnostics.
+		if len(ids)+len(keys) > 0 {
+			fmt.Fprintf(os.Stderr, "operation cleanup: sweep operations=%d operations_ms=%d history_selected=%d history_attempted=%d history_ms=%d\n", len(ids), operationsElapsed.Milliseconds(), len(keys), historyAttempted, time.Since(historyStarted).Milliseconds())
 		}
 		d.mu.Lock()
 		d.lastSweepPending = pending
@@ -148,7 +161,7 @@ func (d *CaptureCleanupWorkerDeployment) advanceProviderCleanup(ctx context.Cont
 	return err, true
 }
 
-func (d *CaptureCleanupWorkerDeployment) releaseProviderHistory(ctx context.Context, key value.OperationHistoryKey) (err error, current bool) {
+func (d *CaptureCleanupWorkerDeployment) releaseProviderHistoryPage(ctx context.Context, keys []value.OperationHistoryKey) (attempted int, err error, current bool) {
 	step := "history-input"
 	defer func() {
 		if err != nil {
@@ -162,22 +175,68 @@ func (d *CaptureCleanupWorkerDeployment) releaseProviderHistory(ctx context.Cont
 	// Keep all original fields, including DeleteBy, unchanged through the queue.
 	// SQL must still be able to report and drain overdue history under a newly
 	// acquired current native/recovery operation; expiry never refunds spend.
-	if !key.Valid() {
-		return mounts.ErrUnavailable, false
+	if !validCleanupHistoryPage(keys) || d.history.Finalizer == nil {
+		return 0, mounts.ErrUnavailable, false
+	}
+	if len(keys) == 0 {
+		return 0, nil, true
 	}
 	step = "history-projection-begin"
 	op, lease, err := d.beginProviderCleanup(ctx)
 	if err != nil {
-		return err, false
+		return 0, err, false
 	}
 	defer lease.Release()
 	defer op.Close()
 	step = "history-release"
-	_, err = d.finalizer.ReleaseOperationHistory(op.Context(), key)
+	attempted, err = releaseCleanupHistoryPage(op.Context(), op.FreshUntil(), keys, d.history.Finalizer)
 	if final := op.Finish(op.Context()); final != nil {
-		return &cleanupRuntimeError{"history-projection-finish", final}, false
+		return attempted, &cleanupRuntimeError{"history-projection-finish", final}, false
 	}
-	return err, true
+	return attempted, err, true
+}
+
+// All keys are checked before entering native admission. An expired historical
+// DeleteBy remains a valid drain input; SQL independently keeps overdue spend.
+func validCleanupHistoryPage(keys []value.OperationHistoryKey) bool {
+	if len(keys) > 16 {
+		return false
+	}
+	for _, key := range keys {
+		if !key.Valid() {
+			return false
+		}
+	}
+	return true
+}
+
+// The existing page shares one original native bracket, not SQL effect authority.
+// Each exact key keeps its independent recovery/lock/incarnation transaction.
+// Reserve the original final second for Finish; never replace an original end.
+func releaseCleanupHistoryPage(ctx context.Context, until time.Time, keys []value.OperationHistoryKey, finalizer auditapp.OperationHistoryFinalizer) (attempted int, err error) {
+	if ctx == nil || finalizer == nil || until.IsZero() || !validCleanupHistoryPage(keys) {
+		return 0, mounts.ErrUnavailable
+	}
+	if outer, ok := ctx.Deadline(); ok && outer.Before(until) {
+		until = outer
+	}
+	work, stop := context.WithDeadline(ctx, until.Add(-time.Second))
+	defer stop()
+	var first error
+	for _, key := range keys {
+		if work.Err() != nil {
+			break
+		}
+		attempted++
+		_, err := finalizer.ReleaseOperationHistory(work, key)
+		if first == nil && err != nil {
+			first = err
+		}
+	}
+	if first == nil {
+		first = work.Err()
+	}
+	return attempted, first
 }
 
 // Cleanup failures remain pending and charged. Diagnostics carry only local

@@ -292,3 +292,41 @@ retention or changing an in-flight deadline. This is qualification of B30 only;
 it does not declare the failed B10 healthy path fixed. Cold-refresh cost remains unmeasured; exact original certificate states are
 recorded on the next run, with every success,
 original deadline and charge assertion retained.
+
+
+## One original native proof for the bounded history page
+
+The B30 run verifies the normal share's certificate with22.2s left in its
+original write window, but fails its original live-row cutoff. Normal live
+rows are4 while history retains14 records; these are record counts, not proof
+of14 simultaneously due keys. The effect log has roughly1.26s per successful
+serial operation. Due-history selection already requires eligibility no earlier
+than original release, so repeated successful pre-release no-ops are not the
+cause. The existing worker pays a complete native bracket for every history key
+before it returns to lifecycle selection. Up to16 keys cost416 native API calls;
+at the observed effect rate this suggests20.2s, not a measured full-page bound.
+
+Use one request-owned native cleanup bracket for the existing page of at most16
+SQL-only history keys. Its claim binds the worker/installation/purpose and
+credential projection rather than an individual key. Each key retains the same
+SQL recovery, incarnation, account, original eligibility and exact-history fences.
+Do not batch lifecycle effects with variable S3/crypto work in this change.
+Preserve progress after an isolated release failure and conservative unknown
+accounting. Do not advance or replace the original keys or deadlines.
+
+Bound SQL work by a child deadline at the original proof end minus one second,
+then finish under the unchanged original five-second context. Unattempted keys
+remain in SQL for the next independently admitted sweep; this is not a renewed
+permit. A slow or changed final proof still refuses. One second is a fixed
+engineering reserve for the existing final native pass, not a guarantee against
+API latency. This reduces a full history page from416 to26 native requests
+(93.75%) and its native-operation time envelope from up to16 original brackets
+to one. It adds no role, grant, credential, process, watch, background task,
+configuration or effect authority. The only added child context shortens work.
+
+Numeric completed-sweep diagnostics separate selected lifecycle/history counts
+and durations without IDs, provider inputs or dependency text. Component tests
+must preserve cancellation, the original parent deadline, the final-check tail,
+per-key error continuation and exact native request counts. Real compiled-role
+SQL and fresh installed qualification remain required; the timing inference and
+passing certificate alone do not establish timely erasure.

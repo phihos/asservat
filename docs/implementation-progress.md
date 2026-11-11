@@ -49,6 +49,8 @@ failures and independently absent owned resources. Failed runs remain failures.
 
 | `732d6fb7` / `slots-guard-732d6fb7` | Go65.671s pass,4582 hashes: actual selector skips acknowledged rows until original terminal cutoff, includes finalization-ready and overdue rows; exact shared snapshot scans unstarted/completed/deleted lifecycle states; nested counter/negative probes, atomic retirement/cooling and schema roundtrip3.48s pass. |
 
+| `653ccc2d` / `installed-653ccc2d` | Go496.141s/harness564.5s fail,4855 hashes: normal share certificate acknowledged at407.6s with22.2s original write time left; it remains live at469.9s,48ms after original live cutoff. Account charge18 equals4 live+14 history records. No SQL cleanup refusal is logged; aggregate lifecycle/history cost needs qualification. |
+
 Current broad checks: `make pre-push` passes at `ad4662b7` (490s affected
 race phase), using the existing full specification virtual environment. The first
 invocation used system Python and failed missing validator imports before the
