@@ -7,6 +7,17 @@ audit/copy spend. A-HWORK supervises the source, root and candidate loops under
 its existing protected scheduling Lease. See [ADR-141](../decisions/141-protected-capacity-production.md)
 and [REQ-CAP-004 through REQ-CAP-006](../../specs/capacity.md).
 
+## Shared-API probe composition
+
+[ADR-324](../decisions/324-installable-context-trial.md) isolates the two global
+metadata guards' no-effect probes. A namespace-label guard permits explicitly
+true dry-run UPDATE outside its own probe namespace; a workload guard permits
+explicitly true dry-run CREATE outside its own probe namespace. Its own probe
+remains denied by exactly that pinned guard. All persistent effects and current
+identity/source/proof checks remain protected. Removing the target guard must
+make its proof fail despite the other guard. This adds no role, loop, request,
+shared owner or runtime state; private namespace/source guards are unchanged.
+
 ## Packet evidence funding
 
 [ADR-257](../decisions/257-approved-recording-funding.md) corrects the physical

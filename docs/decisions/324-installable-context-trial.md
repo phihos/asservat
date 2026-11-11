@@ -44,6 +44,40 @@ console. It builds locally, includes no fixture helpers and neither pushes nor
 deploys. A registry reference must use the actual published digest when an
 operator separately chooses to distribute that image.
 
+## Same-API independent probes
+
+The fresh actual Helm same-API run at `9a55d5de` installs and enrolls but
+cannot ready its workload: the hub and regional global namespace-label guards
+mask each other's denial. A fresh owned Kind reproduction with two genuine
+policies and unprivileged probe accounts fails in6.591s. Kubernetes returns
+only the first policy's denial, so the second guard's exact proof is unavailable.
+This affects every such co-installation, not a hypothetical permission change.
+
+For the two global metadata guards, isolate only their no-effect probes:
+namespace UPDATE is exempt from the other guards only when `request.dryRun`
+is explicitly true and the object name differs from that guard's own pinned
+probe namespace name. Workload CREATE has the same explicit dry-run condition
+and must target a namespace other than that guard's own probe namespace.
+Each guard still denies its own unprivileged probe. The exact policy/binding,
+current identities, original proof interval and real object reads remain
+mandatory. A missing or ineffective own guard must make the proof fail even
+when another global guard remains installed.
+
+All persistent CREATE/UPDATE protection and RBAC remain unchanged. Dry-run
+responses supply neither persisted metadata nor evidence or execution authority.
+This is a limited refinement of ADR-092's prohibition on broad dry-run
+exceptions, confined to these two global metadata policies; private namespace,
+source, credential and workload protection policies retain their existing
+exceptions. No probe list, shared-guard owner, role, watch, process or additional
+API request is introduced. Admission adds one constant-size CEL condition per
+existing global guard, independent of workload/node count. The source contract
+requires persistent metadata protection (REQ-CAP-004–006, REQ-PER-003/005), not
+that an unrelated global guard mask an independent no-effect probe.
+
+Existing pre-release guards with a different generated specification are not
+adopted or silently rewritten. Fresh installation and exact-guard qualification
+are required; this change makes no supported upgrade or rollback claim.
+
 ## Cost and verification
 
 The observed defects block every operator attempting this Helm context path.

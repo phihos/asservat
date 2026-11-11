@@ -2,154 +2,73 @@
 
 ## Active candidate: installable context trial (2026-11-11)
 
-The maintainer's immediate priority is trying the existing context vertical
-slice on a homelab. Candidate `feature/homelab-context-trial` starts at
-authoritative merged `cef71802`; ADR324 records the packaging defects and
-bounded remedies. The sharing-retirement candidate is preserved separately
-at `e5e77be7`, with broad local and stress/schema passes but no fresh installed
-qualification or merge. It is parked while this installation workflow proceeds.
+Outcome: let the maintainer install and try the existing collector-free
+pod-status workflow. `feature/homelab-context-trial` starts at merged main
+`cef71802`; [ADR324](decisions/324-installable-context-trial.md) records the
+observed packaging defects, finite remedies and shared-API probe refinement.
+Use the [source-built trial guide](installation/context-trial.md) and exact
+[profile](../examples/helm/context-trial-profile.yaml). No image was pushed,
+release published or homelab changed; target context/dependency choices await
+the maintainer. The full specification goal remains active.
 
-Observed main gaps: Helm cannot pass five required public context settings;
-native setup supplies the storage pool/budget and serving TLS Secrets; the
-public bootstrap input hides existing explicit installation administrators.
-The candidate adds those producers using current contracts and guard branches.
-It does not copy synthetic grants or weaken browser evidence authorization.
+Implemented on the candidate: Helm forwards its five omitted public settings;
+the installer creates exact marked capacity objects and two validated serving
+TLS Secrets through existing authority; explicit Kubernetes administrators
+remain distinct from browser evidence rights. `make image` builds the actual
+static binary and console without fixture helpers. The authenticated Fleet
+form issues/replays one bootstrap through the existing API and KV contract.
+There are no new runtime processes, roles, watches or background loops.
 
-Local image packaging succeeds (linux/amd64) with actual static CLI and compiled
-React; a nonroot, read-only, network-disabled recipe invocation returns valid
-JSON and the exported image has no fixture helper binaries. Nothing was pushed.
-Original administrator normalization tests pass0.007s. Full Helm render/schema
-checks pass; rendered public inputs decode through actual installer DTOs and
-capacity compilers. Capacity producer race checks pass1.429s; serving TLS
-producer/consumer checks pass0.068s/0.021s. Independent composition review found
-no blocker. The operator Fleet form uses the existing authenticated issuance
-route;9 focused UI/HTTP tests and TypeScript pass. Exact `/fleet` console and
-safe login return checks pass. Actual-chart fixture render/race checks pass
-1.132s and integration compilation passes; no final objects are seeded on that
-path and no installer impersonation is used for operator management.
-At `76d641f9`, `make pre-push` passes, including503s affected Go race tests;
-the full built-browser gate passes157.279s (29 journeys/28 scans). The fresh
-product image builds and its nonroot, read-only, network-disabled CLI smoke
-passes;16 file hashes are archived. No registry publication occurred.
+The reference profile retains full shared-query support, original footprints
+and normal4×128 headroom. Connector validity3600s fits its original retirement
+bound4000s, with96 finite history records; no ticket deadline is clamped.
+Profile SHA256:
+`e38b68011e79ff0e35ec4c5632e56e5a9bd42b5850399781eb86b9931251061c`.
 
-The first actual Helm context run at `76d641f9` fails at `capacity/objects`:
-Go178.511s, harness227.7s. Bootstrap/activation and the first provider handoff
-pass. Kubernetes inserts the declared CRD default
-`workload.dump.maxProcessesPerEpisode: 1`, which was absent from the desired
-wire. The focused fresh-Kind reproduction fails in0.046s before correction;
-normalize the copied desired value to that existing default and keep exact
-comparison. The focused before/after native test fails0.046s and passes1.169s
-with race detection after correction, proving actual defaulting, exact replay,
-unchanged original nil input and preserved explicit2. Both3,711-source
-inventories remain unchanged; the owned cluster/containers are independently
-absent and the private kubeconfig is removed. Focused unit race checks pass
-1.424s. Evidence is external in `capacity-crd-roundtrip`.
-All4,827 installed-source hashes match, source stayed frozen,
-cleanup failures are empty, owned clusters/labelled resources/networks are
-independently absent and build scratch is removed. Reports remain external in
-`homelab-context-trial/installed-76d641f9`.
+| Fresh installed source | Actual result and scope |
+| --- | --- |
+| `76d641f9` | Fails at actual CRD defaulting, Go178.511s/harness227.7s. Focused native reproduction fails0.046s; copying the existing default without changing original input passes race1.169s and preserves explicit2. |
+| `830eca51` | Hook's five original commands and Helm completion pass; regional enrollment fails, Go408.504s/harness481.5s. |
+| `36613b83` / `8948a800` | Focused real-service connector reproduction fails1.349s at ticket preparation; correcting the authored profile's admission/retirement relationship passes2.779s, with both ordinary leaves activated. |
+| `2413fa78` | Separate hub/workload APIs pass: Go432.678s/harness491.7s, exits0. Actual chart/profile hook, joined Helm/hook deletion, browser-issued bootstrap/KV replay, enrollment/join/capacity, browser/MCP capture/publication,706-byte native/Range/If-Range parity, processing restriction/release, unrelated-user opacity, Stop after Deny with exact replay, TargetGone and original80s expiry refusal. Failed cleanup retains evidence/receipts/charges; later independent inventory removes all objects/versions/markers/multipart, refunds storage and retains control charges. |
+| `9a55d5de` | Same API fails at regional readiness after successful hook/enrollment/join/standby: Go540.263s/harness598.4s, test1/make2. Two global metadata guards mask the second guard's exact admission denial. No same-API capture is claimed. |
 
-Added actual built-browser Fleet coverage passes30 journeys/31 scans in31.426s,
-including same-key503→201 retry, exact receipt bounds and403 refusal through the
-real handler/session/CSRF; three synthetic service calls reserve exactly one
-slot. These tests add no product change. Broad/native checks for the integrated
-default correction are next. No complete Helm installation or
-homelab outcome is claimed. Target context/dependency choices await the
-maintainer; owned collector-free qualification can proceed independently.
-
-At `31e7b7ab`, full `make pre-push` passes (affected Go race382s). The proposed
-reference profile's zero history horizon fails promoted shared-query admission;
-changing only that configured allowance to1s passes actual Helm decoding,
-complete root/backend/pool conservation and connector compilation. No footprint
-or required query capability is reduced. Root configured totals are97,828,864
-SQL bytes,195,657,728 backup bytes,16,005,726,208 WAL bytes and1,392 system objects.
-The profile is shipped at `examples/helm/context-trial-profile.yaml`.
-
-Actual Helm qualification at `830eca51` uses that exact profile (including
-one bootstrap/cluster, normal4×128 headroom and pre-reserved regional capacity).
-All five hook commands exit0; Helm joins successfully and the original hook
-is deleted. Public services, protected capacity and retention become ready.
-The actual browser API issues one audited bootstrap, and the operator reads
-and reuses that same KV record for regional enrollment. The connector starts
-without restarts, but enrollment is refused and both ordinary leaves never
-activate: overall Go408.504s/harness481.5s, exits1/nonzero. No successful capture
-is claimed. Federation logs classify the ordinary enrollment error as
-unavailable; focused reproduction and bounded stage diagnostics are next.
-
-All4,830 source hashes independently match `830eca51`, source stays frozen,
-cleanup failures are empty and all owned clusters, labelled resources and
-networks are independently absent; build scratch is removed. The actual profile
-SHA and packaged chart SHA are retained in
-`homelab-context-trial/installed-830eca51`. This is a successful Helm bootstrap
-boundary, not a qualified end-to-end trial or completed specification.
-
-The focused exact-profile PG/S3 case at `36613b83` reproduces enrollment refusal
-in0.91s (Go1.349s). Its diagnostic SQL executes successfully and identifies
-process preparation;4,557 inventory hashes match and owned resources are gone.
-The canonical profile input is separately bound to the original installed
-profile SHA; subsequent custody inventories include the example YAML directly.
-The profile promised7,200s admission while its original3,600s retirement backing
-allowed only3,298s. Existing Go and SQL ticket predicates both refused it.
-
-The installer compiler and Helm preflight now reject that relation, including
-one-second-short backing and one-second-long admission, without clamping or
-relaxing ticket predicates. The trial uses3,600s validity/4,000s retention;
-96 records and all footprints remain unchanged. Focused boundary/race and
-actual Helm render checks pass (Go1.306s); the exact real-service rerun is next.
-
-The corrected exact-profile real PG/S3 case at `8948a800` passes (Go2.779s):
-one admitted process, acknowledged audits and both active leaves. All4,558
-source hashes match, source stays frozen, cleanup failures are empty and owned
-containers/network are independently absent. The affected Go race phase passes
-353s at the same production source; archive `gates-8948a800`.
-
-Source-build instructions exposed a separate packaging defect under their
-private `umask077`: root-owned binary0700 and console assets0600 prevented the
-image's UID65532 from executing/reading them. The builder now normalizes only
-public artifacts to binary/directories0755 and asset files0644. Actual before
-CLI exit126/read-denied becomes successful nonroot execution and exact reads of
-all10 console files under the same mask, read-only root and disabled network.
-Dedicated smoke containers/image tags are removed; evidence is external in
-`homelab-image-umask`. The draft trial guide and public site example keep their
-end-to-end-pending status until the next fresh actual Helm journey succeeds.
-
-Fresh actual Helm qualification at `2413fa78` passes: Go432.678s,
-harness491.7s, both exits0. The exact reference profile completes the five
-positive original hook commands, successful joined Helm completion/hook
-deletion, real browser-issued bootstrap/KV replay, regional enrollment with
-both ordinary leaves, join and capacity acceptance. Browser/MCP capture and
-publication pass; the706-byte native file matches Range/If-Range resume.
-Processing restriction/release, unrelated-user opacity, Stop after Deny with
-exact replay, TargetGone and original80s expiry refusal pass. A failed cleanup
-keeps evidence/receipts/charges; later independent inventory proves all evidence
-objects, versions, markers and multipart uploads absent and releases evidence
-storage while retaining control charges. No active-stream interruption is claimed.
-
-All4,832 source hashes independently match, source stays frozen, cleanup
-failures are empty and owned clusters/containers/networks/volumes/images are
-independently absent; scratch is removed. Reference profile SHA256 is
-`e38b68011e79ff0e35ec4c5632e56e5a9bd42b5850399781eb86b9931251061c`;
-packaged chart SHA256 is
+All installed source inventories independently match their frozen inputs;
+cleanup failures are empty and owned clusters/containers/networks/volumes/images
+are independently absent. The two latest inventories contain4,832/4,833 hashes.
+The2413 packaged chart SHA256 is
 `ce6e7e72a6d34c81439833249291f8a62f8da423f55468d06c71c7d3d3563b7b`.
-Reports are external in `homelab-context-trial/installed-2413fa78`.
-All pre-push static targets pass at the same source; the353s Go race pass is
-reused after independently checking unchanged Go/fixture/chart/web/profile
-inputs from `8948a800`. Registry pulls, a second workload cluster, replay,
-same-API installation, long renewal and sustained operation remain outside
-this installed result. Same-API qualification is next; required PR CI and merge
-remain pending. The full specification goal stays active.
+Actual reports remain external under
+`/home/phil/.cache/asservat-build/homelab-context-trial/installed-<source>`.
 
-Same-API qualification at `9a55d5de` fails at regional workload readiness
-(Go540.263s, harness598.4s, test1/make2):
-the actual Helm hook, ordinary connector leaves, join and capacity standby
-complete, but the regional guarded-workload observation repeatedly refuses its
-namespace guard proof. No same-cluster capture is claimed. All4,833 source
-hashes independently match, source remains unchanged, cleanup failures are
-empty and all owned clusters/containers/networks/volumes/images are absent.
-Evidence is external in `homelab-context-trial/installed-9a55d5de`.
-A focused native admission reproduction must identify the refusal before
-another full installed run. The two-API `2413fa78` result remains applicable
-to its named topology and unchanged production inputs.
+The shared-API defect now has a fast real-API regression: two genuine guards
+fail6.591s before correction. Explicitly true dry-run namespace UPDATE and
+workload CREATE outside each guard's own probe namespace isolate the probes;
+all persistent protection and RBAC stay unchanged. Fresh native checks pass
+5.961s, including both policy families, exact other-guard persistent denial
+after own-binding removal, own-proof refusal, false/null rejection and no
+persisted probe state. Component race checks pass1.163s. Each owned Kind run
+cleans up; source hashes remain unchanged. Evidence is external in
+`capacity-guard-first-denial` and `capacity-guard-isolated`. Closed nested
+`guard/enforcement` diagnostics reach existing runtime logs. Fresh integrated
+same-API qualification and final gates/required PR CI/merge are next.
+
+Earlier broad gates: `make pre-push` at76d/31e passes (affected Go race503s/382s).
+All static pre-push targets pass at2413;353s Go race evidence is reused only
+after independently checking unchanged relevant894 inputs. Full built-browser
+gate passes157.279s; added Fleet coverage passes30 journeys/31 accessibility
+scans in31.426s, including same-key503→201 retry and403 through real session/CSRF.
+The image's private-umask regression fails before mode normalization and passes
+afterwards: nonroot read-only CLI and exact reads of all10 console files.
+Dedicated smoke images/containers are removed; evidence is external.
+
+Limits: preloaded reference images, no registry-pull or one-hour renewal proof,
+no second workload cluster/replay campaign in these focused trials, no active
+stream-interruption claim, no sustained history recycling, supported release,
+restore or production qualification. External services and provider-specific
+S3 capabilities remain operator tasks. The sharing-retirement work is parked
+cleanly at `e5e77be7`, with local/stress/schema passes but no installed
+qualification or merge; it is not delivered by this trial.
 
 ## Active candidate: processing inventory export (2026-11-11)
 

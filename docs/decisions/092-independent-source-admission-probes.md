@@ -18,6 +18,16 @@ Real updates, creates, deletes, other actors, other ConfigMaps, Secrets, workloa
 
 Include the exact probe list in the workload protection digest, expected policy specification and mounted deployment validation. Copy caller-owned lists before retaining the plan. Changes require policy requalification and owner process replacement, like other protected deployment input. The private pre-release v1 contract gains a required field; there is no existing production installation or public API migration to preserve.
 
+## Later global metadata guards
+
+[ADR-324](324-installable-context-trial.md) refines the no-broad-dry-run rule
+only for the two global namespace/workload metadata guards. Their probes must
+not mask one another on a shared API: explicitly true dry-run namespace UPDATE
+or workload CREATE outside a guard's own probe namespace is exempt there.
+Its own probe must still obtain its exact denial, and missing own protection
+must fail proof. Persistent effects and this ADR's private namespace/source
+policy exceptions are unchanged.
+
 ## Evidence and remaining work
 
 Unit tests cover closed input, finite/unique exact scopes and caller-memory isolation. The native combined test repeatedly verifies the source denial with both policies active. After stopping the nested owner runtime it deliberately removes source protection, proves only the named dry-run can succeed without changing resourceVersion, and verifies the namespace policy still denies persistent updates, other actors/objects, Secrets and create/delete. The fixture then recreates an unaccepted binding for the enclosing missing-protection test; it never substitutes that new UID for the original accepted pin.

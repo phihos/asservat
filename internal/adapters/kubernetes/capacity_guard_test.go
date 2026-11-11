@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -208,6 +209,15 @@ func TestCapacityGuardsRequireExactIndependentCurrentDenial(t *testing.T) {
 					}
 				} else if err == nil {
 					t.Fatal("invalid guard accepted")
+				}
+				if want := map[string]string{"probe-admin": "probe-identity", "wrong-probe": "probe-identity", "wrong-account": "probe-identity", "rbac-denied": "enforcement", "wrong-cause": "enforcement", "guard-change": "guard-last", "account-change": "account-last", "namespace-change": "namespace-last"}[mode]; want != "" {
+					var step interface{ FixedStep() string }
+					if !errors.As(err, &step) || step.FixedStep() != want {
+						t.Fatal("guard failed without its fixed substage", err)
+					}
+					if mode == "wrong-cause" && !errors.Is(err, cfg.ErrUnavailable) {
+						t.Fatal("guard diagnostic changed the original error class", err)
+					}
 				}
 				if strings.HasPrefix(mode, "probe-") || mode == "wrong-probe" || mode == "wrong-account" || mode == "rbac-denied" {
 					if probes.Load() != 0 {

@@ -39,6 +39,15 @@ type CapacityNamespaceGuard struct {
 	keys  []string
 }
 
+type capacityGuardDiagnostic struct {
+	step  string
+	cause error
+}
+
+func (e *capacityGuardDiagnostic) Error() string     { return "capacity guard: " + e.step }
+func (e *capacityGuardDiagnostic) Unwrap() error     { return e.cause }
+func (e *capacityGuardDiagnostic) FixedStep() string { return e.step }
+
 var _ port.CapacitySourceProtectionReader = (*CapacityGuard)(nil)
 var _ port.CapacityNamespaceProtectionReader = (*CapacityNamespaceGuard)(nil)
 
@@ -133,8 +142,11 @@ func capacityExactDenial(err error, policy, group, resource, message string) err
 	return cfg.ErrUnavailable
 }
 func (g *capacityGuard) current(ctx context.Context, prove func(context.Context) error) (time.Time, time.Time, error) {
+	fail := func(step string, err error) (time.Time, time.Time, error) {
+		return time.Time{}, time.Time{}, &capacityGuardDiagnostic{step: step, cause: err}
+	}
 	if g == nil || ctx == nil || ctx.Err() != nil {
-		return time.Time{}, time.Time{}, cfg.ErrUnavailable
+		return fail("request", cfg.ErrUnavailable)
 	}
 	start := g.observer.now()
 	until := start.Add(port.CapacitySourceInterval)
@@ -145,31 +157,31 @@ func (g *capacityGuard) current(ctx context.Context, prove func(context.Context)
 	defer cancel()
 	ns, err := g.observer.namespace(call, g.namespace)
 	if err != nil || ns.Deleting {
-		return time.Time{}, time.Time{}, cfg.ErrChanged
+		return fail("namespace-first", cfg.ErrChanged)
 	}
 	before, err := checkAdmissionGuard(call, g.observer, g.name, g.pin, g.policy, g.binding)
 	if err != nil {
-		return time.Time{}, time.Time{}, err
+		return fail("guard-first", err)
 	}
 	if err = g.probeIdentity(call); err != nil {
-		return time.Time{}, time.Time{}, err
+		return fail("probe-identity", err)
 	}
 	if err = prove(call); err != nil {
-		return time.Time{}, time.Time{}, err
+		return fail("enforcement", err)
 	}
 	after, err := checkAdmissionGuard(call, g.observer, g.name, g.pin, g.policy, g.binding)
 	if err != nil || after != before {
-		return time.Time{}, time.Time{}, cfg.ErrChanged
+		return fail("guard-last", cfg.ErrChanged)
 	}
 	if err = g.accountCurrent(call); err != nil {
-		return time.Time{}, time.Time{}, err
+		return fail("account-last", err)
 	}
 	ns, err = g.observer.namespace(call, g.namespace)
 	if err != nil || ns.Deleting {
-		return time.Time{}, time.Time{}, cfg.ErrChanged
+		return fail("namespace-last", cfg.ErrChanged)
 	}
 	if call.Err() != nil || !identity.Fresh(start, until, g.observer.now(), port.CapacitySourceInterval) {
-		return time.Time{}, time.Time{}, cfg.ErrUnavailable
+		return fail("freshness", cfg.ErrUnavailable)
 	}
 	return start, until, nil
 }
