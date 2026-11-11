@@ -35,6 +35,17 @@ will exercise the exact migration Down guard against real retained report audit
 rows and verify the schema/indexes remain unchanged after refusal. Broad gates,
 fresh installed qualification, required PR CI and merge remain pending.
 
+The first `make pre-push` at `b871dd60` returned 2. All 683 console tests and
+the affected Go race suite passed (522 s), while Go architecture and authority
+window gates rejected two new value checks. The source now validates the closed
+hex alphabet using allowed text utilities and uses the existing SQL-fenced
+interval. Both static gates and focused report race checks pass. `pre-push`
+now completes its parallel static phase before starting the longer race phase.
+The full packaged-browser gate at `b871dd60` passed in 158.579 s, including
+the report export, existing journeys and accessibility scans. Its generated
+output is archived externally. A final installed-only correction uses a valid
+nonoperator query and requires the actual 401 plus an acknowledged denied audit.
+
 The report uses original visibility horizons. Physical retirement of all share
 metadata, complete retained-derivative production/propagation, reviewed personal
 extracts and preservation remain open under the wider specification.

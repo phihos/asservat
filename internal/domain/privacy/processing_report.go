@@ -1,8 +1,8 @@
 package privacy
 
 import (
-	"encoding/hex"
 	"slices"
+	"strings"
 	"time"
 
 	"asservat.local/asservat/internal/domain/artifact"
@@ -42,8 +42,15 @@ func (q ProcessingReportQuery) Normalized() ProcessingReportQuery {
 }
 
 func reportDigest(s string) bool {
-	b, err := hex.DecodeString(s)
-	return err == nil && len(b) == 32 && hex.EncodeToString(b) == s
+	if len(s) != 64 {
+		return false
+	}
+	for _, digit := range s {
+		if !strings.ContainsRune("0123456789abcdef", digit) {
+			return false
+		}
+	}
+	return true
 }
 
 func (q ProcessingReportQuery) Valid() bool {
@@ -245,7 +252,7 @@ func (p ProcessingReportPage) Valid(q ProcessingReportQuery, now time.Time) bool
 		p.SelectionCreatedBefore.Nanosecond()%1000 != 0 || q.PolicyDigest != "" && q.PolicyDigest != p.PolicyRevision.Digest ||
 		!q.CreatedBefore.IsZero() && !q.CreatedBefore.Equal(p.SelectionCreatedBefore) ||
 		!identity.Text(p.PolicyRevision.UID, 64) || p.PolicyRevision.Generation < 1 || !reportDigest(p.PolicyRevision.Digest) ||
-		!identity.Fresh(p.ObservedAt, p.ValidUntil, now, 5*time.Second) || p.Records == nil || len(p.Records) > q.Limit ||
+		!identity.Fresh(p.ObservedAt, p.ValidUntil, now, identity.SQLFenced.Interval()) || p.Records == nil || len(p.Records) > q.Limit ||
 		!slices.Contains([]string{"supplied", "unsupplied"}, p.ProcessorDeclarations) || !slices.Equal(p.Coverage, ProcessingReportCoverage()) {
 		return false
 	}

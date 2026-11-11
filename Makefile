@@ -250,7 +250,8 @@ PRE_PUSH_GATES := spec-check architecture-check design-check openapi-check live-
 	gate-self-tests sql-check console-check gofmt-check go-vet go-affected-test authority-window-check
 .PHONY: pre-push gate-self-tests gofmt-check go-vet go-affected-test
 pre-push:
-	$(MAKE) -k -j4 -O $(PRE_PUSH_GATES)
+	$(MAKE) -k -j4 -O $(filter-out go-affected-test,$(PRE_PUSH_GATES))
+	$(MAKE) go-affected-test
 
 gate-self-tests:
 	for f in scripts/test-ci-changes.py scripts/test-go-shards.py scripts/test-kept-cleanup.py scripts/test-*-selection.py scripts/test-direct-helper-regression.py scripts/test-collector-provenance.py scripts/test-pod-log-stream.py; do $(PYTHON) "$$f" || exit 1; done

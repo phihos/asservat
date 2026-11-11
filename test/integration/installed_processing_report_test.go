@@ -257,8 +257,28 @@ WHERE o.root_id=$1 AND o.id=$2`, run.RootID, summary.RequestID, summary.Response
 		t.Fatal("installed export omitted source artifact, recipient, completed session or declarations", artifactFound, shareFound, downloadFound)
 	}
 	outsider := run.Identity.unrelated().consoleSession(t, ctx, run.PublicRoot, run.Address, run.Origin)
-	if refused, status, err := outsider.operation(ctx, "get_processing_report", map[string]any{}, ""); err != nil || status != http.StatusOK || refused.Status != "error" {
+	denialCounts := func() (total, acknowledged int64) {
+		t.Helper()
+		installedJourneyReadOnly(t, ctx, run.SQL, func(tx pgx.Tx) error {
+			return tx.QueryRow(ctx, `
+SELECT count(*),count(*) FILTER(WHERE o.lane='normal' AND o.intent->>'InputFormat'='context-input/v1'
+ AND o.outcome->>'Status'='denied' AND o.outcome->>'Effect'='none'
+ AND o.intent_receipt IS NOT NULL AND o.outcome_receipt IS NOT NULL
+ AND l.binding=o.intent->'Lifecycle' AND l.intent_completion->'Receipt'=o.intent_receipt
+ AND l.outcome_completion->'Receipt'=o.outcome_receipt)
+FROM operation_audit o LEFT JOIN operation_audit_lifecycle l
+ ON l.root_id=o.root_id AND l.operation_id=o.id AND l.lane=o.lane
+WHERE o.root_id=$1 AND o.intent->>'Name'='get_processing_report'
+ AND o.intent#>>'{Actor,Issuer}'=$2 AND o.intent#>>'{Actor,Subject}'=$3`, run.RootID, run.Identity.Issuer, recipient).Scan(&total, &acknowledged)
+		})
+		return total, acknowledged
+	}
+	beforeTotal, beforeAcknowledged := denialCounts()
+	if _, status, err := outsider.operation(ctx, "get_processing_report", map[string]any{"section": "artifacts", "limit": 1}, ""); err == nil || status != http.StatusUnauthorized {
 		t.Fatal("installed report nonoperator refusal", status, err)
+	}
+	if total, acknowledged := denialCounts(); total != beforeTotal+1 || acknowledged != beforeAcknowledged+1 {
+		t.Fatal("nonoperator report refusal lacks one new independently acknowledged denial audit", total-beforeTotal, acknowledged-beforeAcknowledged)
 	}
 	qualifyInstalledReportRollbackGuard(t, ctx, run.SQL)
 	t.Log("installed privacy inventory exported every section with exact page audit bytes, recorded recipient and completed session, retained verified deletion and operator declarations")

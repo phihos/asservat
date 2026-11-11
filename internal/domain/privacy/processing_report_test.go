@@ -20,6 +20,8 @@ func TestProcessingReportCursorShape(t *testing.T) {
 	for _, change := range []func(*ProcessingReportQuery){
 		func(q *ProcessingReportQuery) { q.CreatedBefore = time.Time{} },
 		func(q *ProcessingReportQuery) { q.PolicyDigest = strings.Repeat("AB", 32) },
+		func(q *ProcessingReportQuery) { q.PolicyDigest = "g" + strings.Repeat("0", 63) },
+		func(q *ProcessingReportQuery) { q.PolicyDigest = strings.Repeat("0", 63) },
 		func(q *ProcessingReportQuery) { q.After.Ordinal = 101 },
 		func(q *ProcessingReportQuery) { q.After.CreatedAt = now },
 		func(q *ProcessingReportQuery) { q.Section = "downloads" },
