@@ -69,6 +69,13 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 	}
 	refresh := func() {
 		t.Helper()
+		// The 100-publication measurement outlives one synthetic source
+		// observation. Model its existing producer under the exact original
+		// installation/epoch/source/incarnation pins before each new operation;
+		// this renews neither a capture's authority nor its writer deadline.
+		if err := renewSyntheticFleetObservation(ctx, admin, s.recovery.observation, 30*time.Second, true); err != nil {
+			t.Fatal("policy share current original fleet source", err)
+		}
 		b := s.batch
 		b.Initial = nil
 		b.ObservedAt = clock()
