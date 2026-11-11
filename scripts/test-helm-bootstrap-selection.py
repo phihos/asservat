@@ -32,6 +32,19 @@ class HelmSelection(unittest.TestCase):
                 fixture.main(initial_bootstrap_chain=True, runtime_provider_pair=True, installer_continuation=True)
             external.assert_not_called()
 
+    def test_same_api_topology_is_explicit_and_refused_before_external_setup(self):
+        flag = "ASSERVAT_HELM_CONTEXT_TOPOLOGY"
+        base = {"ASSERVAT_HELM_CONTEXT_NATIVE": "1", flag: "same-api"}
+        ordinary = fixture.qualification_environment(base, Path("fixture"), Path("work"), False, False)
+        self.assertNotIn(flag, ordinary)
+        selected = fixture.qualification_environment(base, Path("fixture"), Path("work"), False, False, initial_bootstrap_chain=True, runtime_provider_pair=True, installer_continuation=True)
+        self.assertEqual(selected[flag], "same-api")
+        for invalid in ({flag: "same-api"}, {"ASSERVAT_HELM_CONTEXT_NATIVE": "1", flag: "typo"}):
+            with patch.dict("os.environ", invalid, clear=True), patch.object(fixture, "run", side_effect=AssertionError("external setup")) as external:
+                with self.assertRaisesRegex(ValueError, "Helm context topology"):
+                    fixture.main()
+                external.assert_not_called()
+
     def test_exported_layer_retains_exact_bytes_and_original_rootfs(self):
         plain = b"synthetic tar payload"
         digest = "sha256:"+hashlib.sha256(plain).hexdigest()

@@ -178,7 +178,7 @@ func prepareInstallerContinuationNative(t *testing.T, ctx context.Context, api k
 
 // Complete the actual five-command runner through both operator provider waits,
 // then keep all installed process, SQL, regional and public journey assertions.
-func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *rest.Config, kubeconfig string, api kubernetes.Interface, admin *pgxpool.Pool, f fixture, desired contracts.InitialBootstrap, original contracts.InitialPreparer, unified *installedUnifiedRunner) {
+func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *rest.Config, kubeconfig string, api kubernetes.Interface, admin *pgxpool.Pool, f fixture, desired contracts.InitialBootstrap, original contracts.InitialPreparer, unified *installedUnifiedRunner, regionalPhysicalIndex int) {
 	t.Helper()
 	installation, namespace := original.Plan.InstallationID, desired.BootstrapNamespace
 	setup := unified.continuation
@@ -584,25 +584,25 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 		}
 		if installedLogsFocus() {
 			t.Run("manual-logs", func(t *testing.T) {
-				qualifyInstalledManualLogs(t, ctx, admin, api, p.RootID, identity, publicRoot, publicAddress, origin, f.Clusters[1].Config, cluster, namespace, workload, diagnose)
+				qualifyInstalledManualLogs(t, ctx, admin, api, p.RootID, identity, publicRoot, publicAddress, origin, f.Clusters[regionalPhysicalIndex].Config, cluster, namespace, workload, diagnose)
 			})
 			return
 		}
 		if installedJourneyFocus() == "policy-profile" {
 			t.Run("policy-profile", func(t *testing.T) {
-				qualifyInstalledPolicyProfile(t, ctx, admin, p.RootID, identity, publicRoot, publicAddress, origin, f.Clusters[1].Config, diagnose)
+				qualifyInstalledPolicyProfile(t, ctx, admin, p.RootID, identity, publicRoot, publicAddress, origin, f.Clusters[regionalPhysicalIndex].Config, diagnose)
 			})
 			return
 		}
 		if installedJourneyFocus() == "policy-arguments" {
 			t.Run("policy-arguments", func(t *testing.T) {
-				qualifyInstalledPolicyArguments(t, ctx, admin, p.RootID, identity, publicRoot, publicAddress, origin, f.Clusters[1].Config, diagnose)
+				qualifyInstalledPolicyArguments(t, ctx, admin, p.RootID, identity, publicRoot, publicAddress, origin, f.Clusters[regionalPhysicalIndex].Config, diagnose)
 			})
 			return
 		}
 		if installedJourneyFocus() == "policy-recording" {
 			t.Run("policy-recording", func(t *testing.T) {
-				qualifyInstalledPolicyRecording(t, ctx, admin, p.RootID, identity, publicRoot, publicAddress, origin, f.Clusters[1].Config, diagnose)
+				qualifyInstalledPolicyRecording(t, ctx, admin, p.RootID, identity, publicRoot, publicAddress, origin, f.Clusters[regionalPhysicalIndex].Config, diagnose)
 			})
 			return
 		}
@@ -619,7 +619,7 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 				if err != nil {
 					t.Fatal(err)
 				}
-				qualifyInstalledLiveObservation(t, ctx, installedLiveRun{SQL: admin, API: api, Administrator: administrator, AdministratorUser: administratorUser, RootID: p.RootID, Installation: installation, HubNamespace: desired.TargetNamespace, OwnerDeployment: prefix + "-owner", Identity: identity, PublicRoot: publicRoot, Address: publicAddress, Origin: origin, RegionalConfig: f.Clusters[1].Config, ClusterID: cluster, Namespace: namespace, Workload: workload, Diagnose: diagnose})
+				qualifyInstalledLiveObservation(t, ctx, installedLiveRun{SQL: admin, API: api, Administrator: administrator, AdministratorUser: administratorUser, RootID: p.RootID, Installation: installation, HubNamespace: desired.TargetNamespace, OwnerDeployment: prefix + "-owner", Identity: identity, PublicRoot: publicRoot, Address: publicAddress, Origin: origin, RegionalConfig: f.Clusters[regionalPhysicalIndex].Config, ClusterID: cluster, Namespace: namespace, Workload: workload, Diagnose: diagnose})
 			})
 			return
 		}
@@ -676,7 +676,7 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 					}()
 					var sources []installedProfileComparisonSource
 					for index := 0; index < 2; index++ {
-						qualifyInstalledApprovedRecording(t, ctx, identity, publicRoot, publicAddress, origin, cluster, namespace, workload, f.Clusters[1].Config, diagnose, nil, func(captureID string) { installedHistoryStorageDiagnostics(t, ctx, admin, p.RootID, captureID) }, func(previewID string) { installedInitialStorageDiagnostics(t, ctx, admin, p.RootID, previewID) }, nil, nil, nil, nil, installedStoppedDownloadSQLCheck(t, ctx, admin, kc, p.RootID, original.Plan.ClusterID), installedProfileCaptureContinuation{InitializeProcessing: index == 0, Captured: func(transport http.RoundTripper, source installedProfileComparisonSource) {
+						qualifyInstalledApprovedRecording(t, ctx, identity, publicRoot, publicAddress, origin, cluster, namespace, workload, f.Clusters[regionalPhysicalIndex].Config, diagnose, nil, func(captureID string) { installedHistoryStorageDiagnostics(t, ctx, admin, p.RootID, captureID) }, func(previewID string) { installedInitialStorageDiagnostics(t, ctx, admin, p.RootID, previewID) }, nil, nil, nil, nil, installedStoppedDownloadSQLCheck(t, ctx, admin, kc, p.RootID, original.Plan.ClusterID), installedProfileCaptureContinuation{InitializeProcessing: index == 0, Captured: func(transport http.RoundTripper, source installedProfileComparisonSource) {
 							if installedAcceptedHeavyComparison() {
 								if err := acceptedHeavySourceMatches(f.ProfileContainment, index, source.Native); err != nil {
 									t.Fatal("accepted-heavy original downloaded source", err)
@@ -737,7 +737,7 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 							return check(artifactID)
 						}
 					}
-					qualifyInstalledApprovedRecording(t, ctx, identity, publicRoot, publicAddress, origin, cluster, namespace, workload, f.Clusters[1].Config, diagnose, measurement, func(captureID string) { installedHistoryStorageDiagnostics(t, ctx, admin, p.RootID, captureID) }, func(previewID string) { installedInitialStorageDiagnostics(t, ctx, admin, p.RootID, previewID) }, summaryCheck, packetQueryCheck, packetDrain, installedArgumentsSQLSource(t, ctx, admin, p.RootID), installedStoppedDownloadSQLCheck(t, ctx, admin, kc, p.RootID, original.Plan.ClusterID), profileChecks...)
+					qualifyInstalledApprovedRecording(t, ctx, identity, publicRoot, publicAddress, origin, cluster, namespace, workload, f.Clusters[regionalPhysicalIndex].Config, diagnose, measurement, func(captureID string) { installedHistoryStorageDiagnostics(t, ctx, admin, p.RootID, captureID) }, func(previewID string) { installedInitialStorageDiagnostics(t, ctx, admin, p.RootID, previewID) }, summaryCheck, packetQueryCheck, packetDrain, installedArgumentsSQLSource(t, ctx, admin, p.RootID), installedStoppedDownloadSQLCheck(t, ctx, admin, kc, p.RootID, original.Plan.ClusterID), profileChecks...)
 					for _, retired := range packetQueryRetirements {
 						retired()
 					}
@@ -850,7 +850,7 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 	if os.Getenv("ASSERVAT_HELM_CONTEXT_NATIVE") == "1" {
 		regionalRecord = issuedRecord
 	}
-	qualifyRegionalInstall(t, ctx, f, 1, admin, runnerAPI, api, hubKubeconfig, desired.TargetNamespace, issuer, journey, providers, offerMap.Data[contracts.RegionalOfferFile], installation, regionalRecord)
+	qualifyRegionalInstall(t, ctx, f, 1, regionalPhysicalIndex, admin, runnerAPI, api, hubKubeconfig, desired.TargetNamespace, issuer, journey, providers, offerMap.Data[contracts.RegionalOfferFile], installation, regionalRecord)
 	if focus := installedJourneyFocus(); focus == "restart" || focus == "journey" || focus == "browser" || focus == "upgrade" || focus == "policy" || focus == "alert" || focus == "logresource" || focus == "chain" || focus == "share" || focus == "journey-store-failure" || focus == "journey-start-failure" || focus == "retention-shortening" || focus == "early-erasure" || focus == "processing-workload" || focus == "privacy-inventory" || installedRecordingFocus() || installedLogsFocus() {
 		t.Log("focused " + focus + " run complete: the second workload cluster and replay checks were not run")
 		return
@@ -862,7 +862,7 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 	short := func(cluster, namespace, workload string, _ func(bool), _ func(string)) {
 		journey(cluster, namespace, workload, nil, nil)
 	}
-	qualifyRegionalInstall(t, ctx, f, 2, admin, runnerAPI, api, hubKubeconfig, desired.TargetNamespace, issuer, short, providers, offerMap.Data[contracts.RegionalOfferFile], installation, nil)
+	qualifyRegionalInstall(t, ctx, f, 2, 2, admin, runnerAPI, api, hubKubeconfig, desired.TargetNamespace, issuer, short, providers, offerMap.Data[contracts.RegionalOfferFile], installation, nil)
 	// After the guard bridge, the same five-command profile replays (as on
 	// upgrade), finds the installation complete and preserves guard/journal state.
 	guard, err := api.AdmissionregistrationV1().ValidatingAdmissionPolicies().Get(ctx, original.Plan.Workload.WorkloadGuard, meta.GetOptions{})
@@ -1130,13 +1130,28 @@ func installerContinuationLogs(t *testing.T, api kubernetes.Interface, pod *core
 	}
 }
 
-// installShippedPermissionCRDs installs the chart's own AccessBinding and
-// PermissionSource CRDs, as Helm does from crds/ (ADR-189), and waits until
-// both are established.
+// Install the legacy permission subset, or the entire canonical chart CRD
+// bundle for the actual Helm operator flow, and wait for every entry to be
+// established before the runner starts with --skip-crds.
 func installShippedPermissionCRDs(t *testing.T, ctx context.Context, api kubernetes.Interface) {
 	t.Helper()
 	client := api.CoreV1().RESTClient()
-	for _, file := range []string{"accessbindings.yaml", "permissionsources.yaml", "evidencestoragepools.yaml", "evidencebudgetpolicies.yaml", "evidenceretentionpolicies.yaml", "debugpolicies.yaml"} {
+	files := []string{"accessbindings.yaml", "permissionsources.yaml", "evidencestoragepools.yaml", "evidencebudgetpolicies.yaml", "evidenceretentionpolicies.yaml", "debugpolicies.yaml"}
+	if os.Getenv("ASSERVAT_HELM_CONTEXT_NATIVE") == "1" {
+		// Match the guide's full canonical operator prerequisite, once, before
+		// Helm runs with --skip-crds. The inventory remains on this real API.
+		entries, err := os.ReadDir("../../charts/asservat/crds")
+		if err != nil {
+			t.Fatal("shipped chart CRD bundle", err)
+		}
+		files = nil
+		for _, entry := range entries {
+			if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".yaml") {
+				files = append(files, entry.Name())
+			}
+		}
+	}
+	for _, file := range files {
 		data, err := os.ReadFile("../../charts/asservat/crds/" + file)
 		if err != nil {
 			t.Fatal(err)

@@ -2,13 +2,15 @@
 
 Install one hub, enroll a workload-cluster connector, and capture and download pod status through the browser. This source-built trial uses your PostgreSQL, S3-compatible storage, OpenBao and Keycloak. It installs no node collector; workloads remain under Pod Security `restricted`.
 
-**Candidate procedure: end-to-end qualification is pending.** Component, accounting and browser checks do not establish that this exact Helm/profile/registry combination completes installation and capture. See [implementation progress](../implementation-progress.md) for the current result. There is no supported release or production/restore claim for this procedure.
+**Source-built developer trial.** The actual Helm/profile workflow passed with one hub and one workload cluster in an owned reference environment: installation, enrollment, browser/MCP capture, native download, expiry refusal and verified evidence deletion. The images were preloaded; registry distribution and a same-cluster topology have separate qualification scope. See [implementation progress](../implementation-progress.md) for exact source and results. There is no supported release or production/restore claim for this procedure.
 
 Use the checked-in [trial profile](../../examples/helm/context-trial-profile.yaml) together with your edited [site example](../../examples/helm/context-trial-site.example.yaml). The profile supplies finite budgets; the site file supplies public endpoints, identities and the image digest. Keep private inputs outside the checkout and Helm release history.
 
 ## Trial bounds
 
 The profile admits two workload accounts with eight capture records each. Default evidence access is 300 seconds, with a further 300-second deletion budget; case and audit defaults are one hour. Complete inspection and download before expiry. Native copies on your workstation remain yours to manage.
+
+The verified journey explicitly requested 80 seconds and checked its original expiry. It does not measure every duration or maximum supported by the configuration.
 
 The connector admits work for 3,600 seconds and retains its history for 4,000 seconds. Operation/source transition counts are finite. Sustained operation and automatic normal/resolution history recycling are not qualified by this trial; avoid unattended polling.
 
@@ -289,4 +291,4 @@ Then repeat the **same** Helm command and original inputs. Never use Helm rollba
 
 ## Current limits
 
-This candidate still needs a successful fresh Helm installation and browser capture/download with the exact checked-in trial profile. Its one-hour connector margin, registry-pull path and managed expiry/cleanup must be observed in that run. The same-context hub/regional path is source-reviewed only. Provider-specific S3 IAM issuance remains an operator task, including the time-sensitive post-bootstrap step. This procedure does not qualify sustained service, general upgrades/rollback, disaster recovery, automatic dependency installation or a supported release.
+The reference run covers the named short context journey, not one-hour renewal, sustained operation, a second workload cluster, general upgrades/rollback or disaster recovery. The same-context hub/regional path is source-reviewed only. Registry pulls and provider-specific S3 IAM issuance remain operator tasks; the latter includes a time-sensitive post-bootstrap step. Dependencies are operated separately. This procedure is not a supported release.

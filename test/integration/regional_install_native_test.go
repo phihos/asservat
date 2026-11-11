@@ -50,14 +50,14 @@ import (
 
 // qualifyRegionalInstall is ADR-193 step 5 on top of the installed hub: a
 // product BootstrapIssuer slot, the operator's read of the KV record, then
-// `installer-cluster` against owned workload cluster f.Clusters[index]
-// (index 1 or 2; Clusters[0] is the hub). Both leaves must
+// `installer-cluster` against its preselected original physical API. Logical
+// index 1 may share the hub API; the descriptor is never aliased. Both leaves must
 // activate, a Pod restart is readmitted, a rerun is idempotent and a
 // non-administrator source write is denied. The issuance logins are the
 // product fleet-bootstrap purposes the continuation provisioned; only the
 // fleet operator authority is fixture setup. Hub operations use the accepted
 // runner; the original observer retains diagnostic log access only.
-func qualifyRegionalInstall(t *testing.T, ctx context.Context, f fixture, index int, admin *pgxpool.Pool, hub, hubObserver kubernetes.Interface, hubKubeconfig, namespace, issuer string, journey func(cluster, namespace, workload string, deny func(bool), gone func(string)), providers *initialRuntimeNativeProviders, offerJSON string, installation string, issuedRecord []byte) {
+func qualifyRegionalInstall(t *testing.T, ctx context.Context, f fixture, index, physicalIndex int, admin *pgxpool.Pool, hub, hubObserver kubernetes.Interface, hubKubeconfig, namespace, issuer string, journey func(cluster, namespace, workload string, deny func(bool), gone func(string)), providers *initialRuntimeNativeProviders, offerJSON string, installation string, issuedRecord []byte) {
 	t.Helper()
 	var offer contracts.RegionalOffer
 	if json.Unmarshal([]byte(offerJSON), &offer) != nil {
@@ -67,7 +67,11 @@ func qualifyRegionalInstall(t *testing.T, ctx context.Context, f fixture, index 
 	if err != nil {
 		t.Fatal("partial executor offer", err)
 	}
-	config, err := clientcmd.BuildConfigFromFlags("", f.Clusters[index].Config)
+	if physicalIndex < 0 || physicalIndex >= len(f.Clusters) {
+		t.Fatal("original regional physical API unavailable")
+	}
+	regionalKubeconfig := f.Clusters[physicalIndex].Config
+	config, err := clientcmd.BuildConfigFromFlags("", regionalKubeconfig)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,7 +79,7 @@ func qualifyRegionalInstall(t *testing.T, ctx context.Context, f fixture, index 
 	if err != nil {
 		t.Fatal(err)
 	}
-	if executor {
+	if executor && physicalIndex != 0 {
 		// Match the chart/operator prerequisite in each workload cluster,
 		// before issuing the short-lived bootstrap. The product installer
 		// reads discovery only and never installs or adopts a shared CRD.
@@ -96,7 +100,7 @@ func qualifyRegionalInstall(t *testing.T, ctx context.Context, f fixture, index 
 		t.Fatal("operator files")
 	}
 	clear(record)
-	args := []string{"--kubeconfig", f.Clusters[index].Config, "--offer", offerFile, "--bootstrap", recordFile, "--namespace", "asservat-connector"}
+	args := []string{"--kubeconfig", regionalKubeconfig, "--offer", offerFile, "--bootstrap", recordFile, "--namespace", "asservat-connector"}
 	envelope, err := kms.DecodeBootstrapRecord(mustRead(t, recordFile))
 	if err != nil {
 		t.Fatal(err)
@@ -176,7 +180,7 @@ func qualifyRegionalInstall(t *testing.T, ctx context.Context, f fixture, index 
 		t.Fatal("installer-cluster result")
 	}
 	if executor && installedRecordingFocus() && index == 1 {
-		installApprovedRecordingCollector(t, ctx, region, f.Clusters[index].Config, f.CollectorImage, installation, envelope.Binding.ClusterID, installed.Namespace.Name)
+		installApprovedRecordingCollector(t, ctx, region, regionalKubeconfig, f.CollectorImage, installation, envelope.Binding.ClusterID, installed.Namespace.Name)
 	}
 	peer := envelope.Binding.PeerID
 	waitActive := func(except string) string {
@@ -206,8 +210,14 @@ func qualifyRegionalInstall(t *testing.T, ctx context.Context, f fixture, index 
 		qualifyRegionalExecutor(t, ctx, admin, region, offer, installed, peer)
 		qualifyRegionalJoin(t, ctx, hub, hubObserver, hubKubeconfig, namespace, installation, *installed.Join, index)
 		if offer.Capacity != nil {
-			qualifyRegionalCapacity(t, ctx, admin, hub, hubObserver, region, namespace, issuer, journey, installation, offer, installed, index, existing, f.ProfileTLSDirectory)
+			qualifyRegionalCapacity(t, ctx, admin, hub, hubObserver, region, namespace, issuer, journey, installation, offer, installed, index, existing, f.ProfileTLSDirectory, physicalIndex == 0)
 		}
+	}
+	if physicalIndex == 0 {
+		if existing == nil {
+			t.Fatal("same-api trial did not retain its originally created workload")
+		}
+		assertUnusedRegionalAPI(t, ctx, f, installed.Namespace.Name, existing.workload.ns.Name)
 	}
 	if !installedRegionalInstallerChecks(index) {
 		// The rerun, restarted-connector readmission and source-write denial
@@ -760,7 +770,7 @@ func nodeInternalIP(t *testing.T, ctx context.Context, api kubernetes.Interface,
 // hub-worker enrolls that workload through v2 to ready_at with a fresh binding.
 // Workload cluster index n adds its own policy, binding and pool slot; the
 // pool then holds n revisions.
-func qualifyRegionalCapacity(t *testing.T, ctx context.Context, admin *pgxpool.Pool, hub, hubObserver, region kubernetes.Interface, namespace, issuer string, journey func(cluster, namespace, workload string, deny func(bool), gone func(string)), installation string, offer contracts.RegionalOffer, installed kube.RegionalInstallation, index int, existing *regionalPrepared, tlsDirectory string) {
+func qualifyRegionalCapacity(t *testing.T, ctx context.Context, admin *pgxpool.Pool, hub, hubObserver, region kubernetes.Interface, namespace, issuer string, journey func(cluster, namespace, workload string, deny func(bool), gone func(string)), installation string, offer contracts.RegionalOffer, installed kube.RegionalInstallation, index int, existing *regionalPrepared, tlsDirectory string, sameAPI bool) {
 	t.Helper()
 	j := installed.Join
 	if j == nil || j.Capacity == nil || !slices.Equal(j.Capacity.Keys, slices.Sorted(slices.Values(offer.Capacity.Keys))) {
@@ -878,6 +888,9 @@ func qualifyRegionalCapacity(t *testing.T, ctx context.Context, admin *pgxpool.P
 			t.Fatal("installed regional Pod observation", err)
 		}
 		target := authorization.Target{ClusterID: cluster, NamespaceUID: string(ns.UID), WorkloadUID: string(app.UID), PodUID: string(pods.Items[0].UID)}
+		if sameAPI {
+			assertSameAPIRegionalTarget(t, ctx, hubObserver, installed, w, pods.Items[0].Name, target)
+		}
 		denyUID := ""
 		observeDeny := func(on bool) {
 			t.Helper()

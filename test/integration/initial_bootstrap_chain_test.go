@@ -61,6 +61,20 @@ func TestInitialBootstrapChainWithRealServices(t *testing.T) {
 	if helmContext && (!installedMode || installedJourneyFocus() != "journey") {
 		t.Fatal("actual chart context requires the collector-free installed journey")
 	}
+	regionalPhysicalIndex := 1
+	if installedMode || os.Getenv("ASSERVAT_HELM_CONTEXT_TOPOLOGY") != "" {
+		regionalPhysicalIndex, err = installerContextRegionalIndex(helmContext, installedJourneyFocus(), os.Getenv("ASSERVAT_HELM_CONTEXT_TOPOLOGY"), len(f.Clusters))
+		if err != nil {
+			t.Fatal("original installed topology selection", err)
+		}
+		if helmContext {
+			used := 2
+			if regionalPhysicalIndex == 0 {
+				used = 1
+			}
+			t.Logf("original Helm context topology: hub physical0, logical region1 physical%d; %d unused physical API(s)", regionalPhysicalIndex, len(f.Clusters)-used)
+		}
+	}
 	if err := installedFocusGroupError(); installedMode && err != nil {
 		t.Fatal("focuses cannot share one installation:", err)
 	}
@@ -438,7 +452,7 @@ func TestInitialBootstrapChainWithRealServices(t *testing.T) {
 			}
 			t.Run("installer-continuation", func(t *testing.T) {
 				installedHangWatchdog(t)
-				qualifyInstallerContinuationNative(t, ctx, direct, f.Clusters[0].Config, api, admin, f, desired, configuration, unified)
+				qualifyInstallerContinuationNative(t, ctx, direct, f.Clusters[0].Config, api, admin, f, desired, configuration, unified, regionalPhysicalIndex)
 			})
 		} else if os.Getenv("ASSERVAT_INITIAL_RUNTIME_PROVIDER_WORKER") == "1" {
 			if os.Getenv("ASSERVAT_INITIAL_RUNTIME_PROVIDER_PAIR") != "1" {

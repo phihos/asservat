@@ -113,6 +113,32 @@ Dedicated smoke containers/image tags are removed; evidence is external in
 `homelab-image-umask`. The draft trial guide and public site example keep their
 end-to-end-pending status until the next fresh actual Helm journey succeeds.
 
+Fresh actual Helm qualification at `2413fa78` passes: Go432.678s,
+harness491.7s, both exits0. The exact reference profile completes the five
+positive original hook commands, successful joined Helm completion/hook
+deletion, real browser-issued bootstrap/KV replay, regional enrollment with
+both ordinary leaves, join and capacity acceptance. Browser/MCP capture and
+publication pass; the706-byte native file matches Range/If-Range resume.
+Processing restriction/release, unrelated-user opacity, Stop after Deny with
+exact replay, TargetGone and original80s expiry refusal pass. A failed cleanup
+keeps evidence/receipts/charges; later independent inventory proves all evidence
+objects, versions, markers and multipart uploads absent and releases evidence
+storage while retaining control charges. No active-stream interruption is claimed.
+
+All4,832 source hashes independently match, source stays frozen, cleanup
+failures are empty and owned clusters/containers/networks/volumes/images are
+independently absent; scratch is removed. Reference profile SHA256 is
+`e38b68011e79ff0e35ec4c5632e56e5a9bd42b5850399781eb86b9931251061c`;
+packaged chart SHA256 is
+`ce6e7e72a6d34c81439833249291f8a62f8da423f55468d06c71c7d3d3563b7b`.
+Reports are external in `homelab-context-trial/installed-2413fa78`.
+All pre-push static targets pass at the same source; the353s Go race pass is
+reused after independently checking unchanged Go/fixture/chart/web/profile
+inputs from `8948a800`. Registry pulls, a second workload cluster, replay,
+same-API installation, long renewal and sustained operation remain outside
+this installed result. Same-API qualification is next; required PR CI and merge
+remain pending. The full specification goal stays active.
+
 ## Active candidate: processing inventory export (2026-11-11)
 
 [PR222](https://github.com/phihos/asservat/pull/222) starts from authoritative

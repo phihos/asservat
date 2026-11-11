@@ -244,8 +244,10 @@ def qualification_environment(base, fixture_path, work, initial_handover, initia
     env = base.copy()
     env["ASSERVAT_CONTEXT_FIXTURES"] = str(fixture_path)
     env.pop("ASSERVAT_HELM_CONTEXT_NATIVE", None)
+    env.pop("ASSERVAT_HELM_CONTEXT_TOPOLOGY", None)
     if installer_continuation and base.get("ASSERVAT_HELM_CONTEXT_NATIVE") == "1":
         env["ASSERVAT_HELM_CONTEXT_NATIVE"] = "1"
+        env["ASSERVAT_HELM_CONTEXT_TOPOLOGY"] = base.get("ASSERVAT_HELM_CONTEXT_TOPOLOGY", "separate-api")
     # Development-only keep/rerun switches never leak from the caller's shell.
     for key in DEVELOPMENT_ENVIRONMENT:
         env.pop(key, None)
@@ -668,6 +670,9 @@ def collect_profile_containment_artifacts(work, results):
 
 def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=False, initial_bootstrap_chain=False, helm_bootstrap=False, regional_context_start=None, runtime_object_roundtrip=False, owner_provider_auth=False, runtime_provider_pair=False, runtime_provider_worker=False, runtime_provider_owner=False, installer_continuation=False, helm_cluster=False, keep_on_failure=False, keep_installed=False):
     helm_context = os.environ.get("ASSERVAT_HELM_CONTEXT_NATIVE") == "1"
+    helm_context_topology = os.environ.get("ASSERVAT_HELM_CONTEXT_TOPOLOGY", "separate-api")
+    if helm_context_topology not in ("separate-api", "same-api") or ("ASSERVAT_HELM_CONTEXT_TOPOLOGY" in os.environ and not helm_context):
+        raise ValueError("Helm context topology requires its explicit installed workflow and separate-api or same-api")
     if helm_context and (not installer_continuation or not initial_bootstrap_chain or helm_bootstrap or helm_cluster):
         raise ValueError("Helm context qualification requires the installed bootstrap continuation and its exact workflow")
     focus = os.environ.get("ASSERVAT_JOURNEY_FOCUS")
@@ -742,6 +747,9 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
         if helm_context:
             profile = ROOT/"examples/helm/context-trial-profile.yaml"
             report["helmContextReferenceProfileSHA256"] = hashlib.sha256(profile.read_bytes()).hexdigest()
+            report["helmContextTopology"] = helm_context_topology
+            report["helmContextPhysicalMap"] = {"hub": 0, "region": 0 if helm_context_topology == "same-api" else 1}
+            report["unusedPhysicalClusterIndices"] = [1] if helm_context_topology == "same-api" else []
         if keep_installed:
             report["qualification"] = False
             report["developmentMode"] = "keep-installed: the installation is left running for --rerun-installed; never a qualification"
