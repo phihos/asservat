@@ -31,6 +31,7 @@ cleanup failures empty and owned containers independently absent):
 | `eca00f46` | Share Go 6.451 s, exit1; 4,561 hashes | Paid create/replay passed; transaction sanitization lost the new typed backing refusal. Preserve that closed sentinel and translate only P1530 before the transaction boundary. `slots-eca00f46`. |
 | `4d17772d` | Share Go 62.181 s, exit0; 4,561 hashes | Actual prepaid creation/fresh-op replay, once-only effects, expiry refusal, transfer/revoke, atomic child/parent deletion, managed-object verification and originalH cooling followed by exactly one charge release. `slots-4d17772d`. |
 | `4d17772d` | Producer Go 18.154 s, exit1; 4,561 hashes | Manual matrix passed8.93 s and capture-time matrix passed6.14 s, including all three child cases. Recurring admission refused because the new fixture used the old manual-only SQL role without policy reads. Production's compiled capture-admit role already has them; fixture correction is pending. `sharing-producers-4d17772d`. |
+| `08dcf93d` | Policy Go 7.142 s, exit1; 4,562 hashes | Recurring admission passed with the compiled role. The API-work fixture had not acknowledged c4's actual private pair; add that genuine producer call. All-individual-max activation was refused before capture; local structural reproduction is 73,469 bytes beyond the unchanged65,536-byte acceptance cap. `policy-cost-08dcf93d`. |
 
 The original baseline failure at `1dc7c616` requested incompatible 60-second
 retention. The corrected fixture used its original 20-second managed capture,
@@ -40,12 +41,16 @@ were verified; failed-run evidence remains `baseline-1dc7c616`.
 Affected audit/capacity/PostgreSQL/bootstrap unit suites pass
 (0.006/0.135/8.146/1.302/67.019 s); error-boundary PostgreSQL/sharing/presentation
 suites pass (1.311/0.003/93.262 s). Provider/KMS/Kubernetes and canonical-schema
-focused regressions pass. Independent review of the shared cleanup adapter and
+focused regressions pass. Architecture/design passed (1,359 checks/420 references).
+After correcting six self-references to the repository's registered absolute
+schema IDs, full specification validation passed (13,970 assertions). Independent review of the shared cleanup adapter and
 installer composition found no actionable issue. These are component results,
 not installed provider/IAM, backup-chain or universal footprint qualification.
 
-Next: measure maximum-width policy100 through genuine audited capture and paid
-revoke-all, establish justified row/WAL bounds, run final broad gates, then
+Next: measure the admitted wide policy100 sample through genuine audited capture
+and paid revoke-all (1,536-byte issuer, eight groups/recipients, 256-byte IDs;
+pure record59,133 bytes). Keep the all-field-max rejection explicit, establish
+justified row/WAL bounds, run final broad gates, then
 fresh collector-free `share-retirement` installed qualification. Its original
 short bounds are selected before installation; timestamps are never rewritten
 to make cleanup due. No new installed outcome or completed spec is claimed.

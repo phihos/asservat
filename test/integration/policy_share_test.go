@@ -36,18 +36,19 @@ import (
 // acceptance never backfills, a capture published after notAfter is unshared,
 // and revoke-all revokes exactly its acceptance's shares and stops its
 // pending captures from being shared.
-func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, create func(*testing.T, int64) captureAdmissionScenario, prepare func(*testing.T, captureAdmissionScenario, capture.Accepted, bool) captureShareFixture, configureCapture func(*testing.T, *captureAdmissionScenario) shareCaptureAudit, maximumCost ...bool) {
+func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, create func(*testing.T, int64) captureAdmissionScenario, prepare func(*testing.T, captureAdmissionScenario, capture.Accepted, bool) captureShareFixture, configureCapture func(*testing.T, *captureAdmissionScenario) shareCaptureAudit, wideCost ...bool) {
 	t.Helper()
-	maximum := len(maximumCost) > 0 && maximumCost[0]
+	wide := len(wideCost) > 0 && wideCost[0]
 	slots := int64(12)
-	if maximum {
+	if wide {
 		slots = 112
 	}
 	s := create(t, slots)
 	authorGroups := []string{"maintainers"}
 	var widthRecipients []authorization.ShareRecipient
-	if maximum {
-		creator, groups, recipients := maximumPolicyShareActors(t)
+	if wide {
+		creator, groups, recipients := widePolicyShareActors(t, policyWideSampleIssuerBytes)
+		t.Logf("policy_cost_stage=fixed_wide_sample_selection issuer_bytes=%d groups=8 recipients=8 id_bytes=256; chosen before authority/audience acceptance; all-individual-maxima is a separate structural rejection", len(creator.Issuer))
 		s.a.Eligibility.VerifiedIdentity.Principal = creator
 		s.a.Eligibility.VerifiedIdentity.Groups = groups
 		authorGroups, widthRecipients = groups, recipients
@@ -81,7 +82,7 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 	// holds evidence-owner too: the policy's owner team (ADR-239).
 	b := &s.batch.Bases[0]
 	b.Roles = []string{"workload-maintainer", "evidence-owner"}
-	if maximum {
+	if wide {
 		b.Subjects = nil
 		for _, group := range authorGroups {
 			b.Subjects = append(b.Subjects, cfg.Subject{Kind: "Group", Issuer: s.a.Eligibility.VerifiedIdentity.Principal.Issuer, ID: group})
@@ -121,8 +122,8 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 	if sponsor.AssignmentID == "" || owner.AssignmentID == "" {
 		t.Fatal("automation binding assignments", projection.Allows)
 	}
-	if maximum && (len(sponsors) != 8 || len(managers) != 8) {
-		t.Fatal("maximum-width original owner projection", len(sponsors), len(managers))
+	if wide && (len(sponsors) != 8 || len(managers) != 8) {
+		t.Fatal("wide-sample original owner projection", len(sponsors), len(managers))
 	}
 	slices.SortFunc(sponsors, func(a, b artifact.AudienceAssignment) int { return strings.Compare(a.AssignmentID, b.AssignmentID) })
 	slices.SortFunc(managers, func(a, b artifact.AudienceAssignment) int { return strings.Compare(a.AssignmentID, b.AssignmentID) })
@@ -150,7 +151,7 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 	shareManagers := []artifact.AudienceAssignment{owner}
 	authorityOwners := []artifact.AudienceAssignment{sponsor}
 	maxExecutions := int64(50)
-	if maximum {
+	if wide {
 		shareRecipients, shareManagers, authorityOwners, maxExecutions = widthRecipients, managers, sponsors, 100
 	}
 
@@ -194,6 +195,18 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 			Submission: capture.VerifiedPolicySubmission{ReplacesID: active, Nonce: custodyID(), Actor: creator, Source: source.Revision, ClusterID: source.ClusterID, NamespaceUID: source.NamespaceUID, Name: source.Name, ScopeDigest: authority.ScopeDigest, EnvelopeDigest: artifact.Digest{53}, IssuedAt: now, ExpiresAt: now.Add(30 * time.Second)},
 			Sharing:    &capture.PolicyShareInstruction{Creator: creator, Management: shareManagers, Recipients: shareRecipients, MaxCaptures: maxCaptures, NotAfter: notAfter.UTC().Truncate(time.Second)}}
 		in.Verification = syntheticSubmissionCheck(in, now)
+		if wide {
+			var version int64
+			if err := readPool.QueryRow(ctx, `SELECT intent_version FROM policy_source WHERE root_id=$1 AND policy_uid=$2`, root, policyUID).Scan(&version); err != nil {
+				t.Fatal("wide-sample acceptance source revision", err)
+			}
+			candidate := capture.PolicyAcceptance{ID: custodyID(), RootID: root, Source: source, Submission: in.Submission, Authority: in.Authority, Submitter: in.Author.Principal, IdentityRevision: in.Author.Policy, PermissionRevision: projection.Revision, Recovery: in.Recovery, AcceptedAt: now, IntentVersion: version, Sharing: in.Sharing}
+			body, encodeErr := json.Marshal(candidate)
+			t.Logf("policy_cost_stage=original_wide_acceptance_shape issuer_bytes=%d source_candidate_valid=%t input_valid=%t encode_ok=%t encoded_bytes=%d closed_adapter_limit=%d", len(creator.Issuer), candidate.Valid(), in.Valid(now), encodeErr == nil, len(body), 64<<10)
+			if !candidate.Valid() || !in.Valid(now) || encodeErr != nil || len(body) > 64<<10 {
+				t.Fatal("fixed wide sample violates original acceptance predicates")
+			}
+		}
 		r, err := acceptor.AcceptPolicy(ctx, in)
 		if err != nil {
 			t.Fatal("accept policy with sharing", err)
@@ -365,11 +378,11 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 		return a
 	}
 
-	if maximum {
-		qualifyMaximumPolicyShareCost(t, ctx, admin, poolFor, store, keys, policyShareCostFixture{
+	if wide {
+		qualifyWidePolicyShareCost(t, ctx, admin, poolFor, store, keys, policyShareCostFixture{
 			Scenario: s, Creator: creator, Groups: authorGroups, Accept: func() string { return accept(99, 100, clock().Add(time.Hour)) },
 			Grant: func() {
-				attachPolicyAccountingGrantWithLimits(t, ctx, admin, poolFor, s, authority, authorityScope, "maximum-width-accounting", authorization.AutomationLimits{MaxExecutions: 100, MaxBytes: 100 * artifact.MaxContextBytes})
+				attachPolicyAccountingGrantWithLimits(t, ctx, admin, poolFor, s, authority, authorityScope, "wide-sample-accounting", authorization.AutomationLimits{MaxExecutions: 100, MaxBytes: 100 * artifact.MaxContextBytes})
 			},
 			Admit: func() capture.Accepted { return admit(qualifiedCapture.admissions) }, Prepare: func(accepted capture.Accepted, initialize bool) captureShareFixture {
 				return prepare(t, s, accepted, initialize)
@@ -418,9 +431,14 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 	f1, f2 := prepare(t, s, c1, true), prepare(t, s, c2, false)
 	publish(f1)
 	publish(f2)
-	// Existing intent publishers have now acknowledged all four original
-	// captures. Only c4 uses API execution, so this is the actual acquisition
-	// reader/gate without altering the existing Node publication fixtures.
+	// The private publisher persists the selected capture, rather than the
+	// old batch publisher's unrelated pending captures. Persist c4's own genuine
+	// pair before its prepaid API work is consumed.
+	assertPolicyAPIWorkSource(t, ctx, admin, c4, false)
+	if _, err := qualifiedCapture.publication.AcknowledgedCaptureIntent(ctx, c4.CaptureID); err != nil {
+		t.Fatal("prepaid API original intent pair", err)
+	}
+	assertPolicyAPIWorkSource(t, ctx, admin, c4, true)
 	qualifyOriginalPolicyGrantAcquisition(t, ctx, admin, poolFor, s, authority, c4, firstGrant, func() string {
 		return attachPolicyAccountingGrant(t, ctx, admin, poolFor, s, authority, authorityScope, "replacement-review")
 	}, func() { refresh(); observe() })

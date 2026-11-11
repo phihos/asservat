@@ -499,7 +499,7 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 		})
 	})
 
-	t.Run("policy-share-maximum-width-and-100-batch-cost", func(t *testing.T) {
+	t.Run("policy-share-admitted-wide-sample-and-100-batch-cost", func(t *testing.T) {
 		qualifyPolicyShare(t, ctx, admin, poolFor, store, keys, create, func(t *testing.T, s captureAdmissionScenario, accepted capture.Accepted, initialize bool) captureShareFixture {
 			f := prepareAdmitted(t, ctx, s, accepted, keys, keys, nil, initialize, true)
 			return captureShareFixture{scenario: f.scenario, e: f.e, reader: f.reader, publish: func() (artifact.PublishedContext, error) { return f.publisher.Publish(ctx, f.e.CaptureUID, f.copies) }}

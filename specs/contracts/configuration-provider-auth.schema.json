@@ -76,13 +76,13 @@
       }
     },
     "cleanupAudit": {
-      "$ref": "#/$defs/transit"
+      "$ref": "https://asservat.io/spec/v1/configuration-provider-auth.schema.json#/$defs/transit"
     },
     "workerConfigurationAudit": {
-      "$ref": "#/$defs/transit"
+      "$ref": "https://asservat.io/spec/v1/configuration-provider-auth.schema.json#/$defs/transit"
     },
     "contextDeletionSigning": {
-      "$ref": "#/$defs/transit"
+      "$ref": "https://asservat.io/spec/v1/configuration-provider-auth.schema.json#/$defs/transit"
     }
   },
   "$defs": {

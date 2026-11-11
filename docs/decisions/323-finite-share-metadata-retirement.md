@@ -122,6 +122,16 @@ WAL deltas and real tuple/index growth are observations, not universal maxima.
 The 100-share transaction and the integrated additional layout still need their
 own measurement. Do not label a fixture-gated compile run as service execution.
 
+The first width experiment found that simultaneous individual field maxima
+(2,048-byte issuer, eight sponsors/managers/recipients and 256-byte identifiers)
+produce a domain-valid 73,469-byte immutable acceptance, beyond the existing
+65,536-byte encoded-record cap. Preserve that cap and its refusal before
+collection. A separately labelled wide sample uses a 1,536-byte issuer with
+the same counts/identifier widths; its pure fixture record is 59,133 bytes.
+Actual admission/publication and 100-share costs still require service results.
+Neither the narrower sample nor the structural rejection is universal maximum
+footprint qualification.
+
 Then qualify actual upgrade/rollback, all three producers, original cutoffs,
 replay, late publication, mutation/finalization concurrency, recovery refusal,
 unknown effects, direct-DELETE denial, provider scope rejection, managed-object

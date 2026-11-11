@@ -5,7 +5,7 @@ LOCK TABLE public.evidence_share IN ACCESS EXCLUSIVE MODE;
 -- +goose StatementBegin
 DO $$ BEGIN
  IF EXISTS(SELECT 1 FROM public.evidence_share) THEN
-  RAISE EXCEPTION 'unsupported retained unlinked share history; retire with the original runtime before upgrading' USING ERRCODE='23514';
+  RAISE EXCEPTION 'unsupported retained unlinked share history; this development layout cannot be upgraded in place' USING ERRCODE='23514';
  END IF;
 END $$;
 -- +goose StatementEnd

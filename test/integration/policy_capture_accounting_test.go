@@ -209,7 +209,12 @@ func qualifyOriginalPolicyGrantAcquisition(t *testing.T, ctx context.Context, ad
 		return err
 	}
 	if err = read(); err != nil {
-		t.Fatal("original spent grant did not cover its prepaid API work", err)
+		step := "unclassified"
+		var fixed interface{ FixedStep() string }
+		if errors.As(err, &fixed) {
+			step = fixed.FixedStep()
+		}
+		t.Fatal("original spent grant did not cover its prepaid API work", step, err)
 	}
 	replacement := replace()
 	if replacement == oldGrant {
