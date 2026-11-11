@@ -33,7 +33,6 @@ import (
 )
 
 type installedRetentionRead func(context.Context, string, any) (installedJourneyEnvelope, error)
-type installedRetentionShorteningCheck func(cluster, caseID, artifactID string, expires time.Time, read installedRetentionRead)
 
 type installedRetentionShortening struct {
 	admin                                     *pgxpool.Pool
@@ -84,7 +83,7 @@ WHERE l.root_id=$1 AND l.case_id=$2 AND l.artifact_id=$3 AND l.cluster_id=$4 AND
 	if checkpoint != checkpointBefore+1 {
 		t.Fatal("installed shortening: expected the next hub checkpoint", checkpointBefore, checkpoint)
 	}
-	s.verifyReceipt(t, ctx, decision, receipt)
+	verifyInstalledRetentionLifecycle(t, ctx, s.hub, s.providers, s.namespace, s.installation, s.root, decision, receipt)
 	ready, _ := installerHubRetentionReadyPolicyCount(t, ctx, s.hub, s.admin, s.namespace, s.installation, s.root, s.hubCluster, checkpoint, "", 2)
 	if ready != checkpoint {
 		t.Fatal("installed shortening: Ready projected a different checkpoint", ready, checkpoint)
@@ -196,35 +195,25 @@ func sameRetentionDeadlines(a, b value.Deadlines) bool {
 	return a.AnchorAt.Equal(b.AnchorAt) && a.ExpiresAt.Equal(b.ExpiresAt) && a.DeleteBy.Equal(b.DeleteBy)
 }
 
-func (s installedRetentionShortening) verifyReceipt(t *testing.T, ctx context.Context, decision value.LifecycleDecision, receipt audit.Receipt) {
+func verifyInstalledRetentionLifecycle(t *testing.T, ctx context.Context, hub kubernetes.Interface, p *initialRuntimeNativeProviders, namespace, installation, root string, decision value.LifecycleDecision, receipt audit.Receipt) {
 	t.Helper()
-	projection, err := s.hub.CoreV1().Secrets(s.namespace).Get(ctx, contracts.CapacityRuntimeProjectionName(s.installation), meta.GetOptions{})
+	projection, err := hub.CoreV1().Secrets(namespace).Get(ctx, contracts.CapacityRuntimeProjectionName(installation), meta.GetOptions{})
 	if err != nil {
-		t.Fatal("installed shortening: protected signing pins unavailable", err)
+		t.Fatal("installed retention lifecycle: protected signing pins unavailable", err)
 	}
 	deployment, err := contracts.DecodeCapacityDeployment(bytes.NewReader(projection.Data[contracts.CapacityDeploymentFile]))
-	if err != nil || deployment.InstallationID != s.installation || deployment.PermissionRootID != s.root || deployment.ContextDeletion == nil {
-		t.Fatal("installed shortening: protected signer does not bind the installation", err)
+	if err != nil || deployment.InstallationID != installation || deployment.PermissionRootID != root || deployment.ContextDeletion == nil {
+		t.Fatal("installed retention lifecycle: protected signer does not bind the installation", err)
 	}
 	pin := deployment.ContextDeletion.Signing
 	public := map[string]ed25519.PublicKey{pin.KeyID: pin.PublicKeys[pin.KeyID]}
-	verifier, err := jose.NewLifecycleSignatures(s.root, "", nil, public)
+	verifier, err := jose.NewLifecycleSignatures(root, "", nil, public)
 	if err != nil {
-		t.Fatal("installed shortening: pinned public signature verifier", err)
+		t.Fatal("installed retention lifecycle: pinned public signature verifier", err)
 	}
-	p := s.providers
 	store := s3.New(s3.Options{Region: p.desired.AuditStore.Region, BaseEndpoint: aws.String(p.desired.AuditStore.Endpoint), UsePathStyle: true,
 		Credentials: credentials.NewStaticCredentialsProvider("synthetic-only", "synthetic-only-secret", ""), HTTPClient: p.client, RetryMaxAttempts: 1})
-	object, err := store.GetObject(ctx, &s3.GetObjectInput{Bucket: aws.String(p.desired.AuditStore.Bucket), Key: &receipt.Key, VersionId: &receipt.Version, IfMatch: &receipt.ETag})
-	if err != nil {
-		t.Fatal("installed shortening: acknowledged lifecycle version unavailable", err)
-	}
-	defer object.Body.Close()
-	ciphertext, err := io.ReadAll(io.LimitReader(object.Body, receipt.Bytes+1))
-	if err != nil || int64(len(ciphertext)) != receipt.Bytes || aws.ToString(object.VersionId) != receipt.Version ||
-		aws.ToString(object.ETag) != receipt.ETag || sha256.Sum256(ciphertext) != receipt.SHA256 {
-		t.Fatal("installed shortening: lifecycle ciphertext differs from its acknowledged version", err)
-	}
+	ciphertext := readInstalledAuditObject(t, ctx, store, p.desired.AuditStore.Bucket, receipt)
 	key := p.desired.KeyService
 	const policyName = "fixture-retention-lifecycle-decrypt"
 	acl := fmt.Sprintf("path %q { capabilities = [\"update\"] }", key.AuditMount+"/decrypt/"+key.AuditKey)
@@ -237,14 +226,29 @@ func (s installedRetentionShortening) verifyReceipt(t *testing.T, ctx context.Co
 		} `json:"auth"`
 	}
 	if json.Unmarshal(raw, &token) != nil || token.Auth.Value == "" {
-		t.Fatal("installed shortening: independent decrypt-only fixture credential unavailable")
+		t.Fatal("installed retention lifecycle: independent decrypt-only fixture credential unavailable")
 	}
 	opener, err := kms.NewOpener(p.endpoint, token.Auth.Value, key.AuditMount, key.AuditKey, p.client)
 	if err != nil {
-		t.Fatal("installed shortening: independent decrypt-only audit client", err)
+		t.Fatal("installed retention lifecycle: independent decrypt-only audit client", err)
 	}
 	defer opener.Close()
 	if err := framed.VerifyLifecycle(ctx, opener, verifier, decision, ciphertext); err != nil {
-		t.Fatal("installed shortening: acknowledged lifecycle record does not verify with the protected signing pin", err)
+		t.Fatal("installed retention lifecycle: acknowledged lifecycle record does not verify with the protected signing pin", err)
 	}
+}
+
+func readInstalledAuditObject(t *testing.T, ctx context.Context, store *s3.Client, bucket string, receipt audit.Receipt) []byte {
+	t.Helper()
+	object, err := store.GetObject(ctx, &s3.GetObjectInput{Bucket: &bucket, Key: &receipt.Key, VersionId: &receipt.Version, IfMatch: &receipt.ETag})
+	if err != nil {
+		t.Fatal("installed audit: acknowledged version unavailable", err)
+	}
+	defer object.Body.Close()
+	ciphertext, err := io.ReadAll(io.LimitReader(object.Body, receipt.Bytes+1))
+	if err != nil || int64(len(ciphertext)) != receipt.Bytes || aws.ToString(object.VersionId) != receipt.Version ||
+		aws.ToString(object.ETag) != receipt.ETag || sha256.Sum256(ciphertext) != receipt.SHA256 {
+		t.Fatal("installed audit: ciphertext differs from its acknowledged version", err)
+	}
+	return ciphertext
 }

@@ -725,17 +725,24 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 			installedPolicyJourney(t, ctx, admin, p.RootID, identity, publicRoot, publicAddress, origin, diagnose)
 			return
 		}
-		var retentionCheck installedRetentionShorteningCheck
-		if installedJourneyFocus() == "retention-shortening" {
+		var postDownload func(cluster string, run installedProcessingRun)
+		switch installedJourneyFocus() {
+		case "retention-shortening":
 			retention := installedRetentionShortening{admin: admin, hub: api, runner: runnerAPI, providers: providers,
 				installation: installation, root: p.RootID, hubCluster: original.Plan.ClusterID, namespace: desired.TargetNamespace, diagnose: diagnose}
-			retentionCheck = func(cluster, caseID, artifactID string, expires time.Time, read installedRetentionRead) {
-				retention.qualify(t, ctx, cluster, caseID, artifactID, expires, read)
+			postDownload = func(cluster string, run installedProcessingRun) {
+				retention.qualify(t, ctx, cluster, run.CaseID, run.ArtifactID, run.ExpiresAt, run.Call)
+			}
+			deny, gone = nil, nil
+		case "early-erasure":
+			erasure := installedEarlyErasure{hub: api, providers: providers, installation: installation, namespace: desired.TargetNamespace, evidenceBucket: evidenceBucket}
+			postDownload = func(cluster string, run installedProcessingRun) {
+				erasure.qualify(t, ctx, cluster, run)
 			}
 			deny, gone = nil, nil
 		}
 		run := installedJourney(t, ctx, admin, p.RootID, identity, publicRoot, publicAddress, origin, diagnose,
-			installedJourneyDeletion(t, ctx, admin, providers, evidenceBucket, p.RootID, diagnose), installedProjectionSQLCheck(t, ctx, admin, api, p.RootID), retentionCheck)
+			installedJourneyDeletion(t, ctx, admin, providers, evidenceBucket, p.RootID, diagnose), installedProjectionSQLCheck(t, ctx, admin, api, p.RootID), postDownload)
 		// The PostgreSQL restart (ADR-226) runs only in the focused restart
 		// mode, so each run stays within the 20-minute limit and the full
 		// journey's capacity budget is unchanged.
@@ -785,7 +792,7 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 	}
 	hubKubeconfig := installedUnifiedRunnerKubeconfig(t, f.Clusters[0].Config, desired)
 	qualifyRegionalInstall(t, ctx, f, 1, admin, runnerAPI, api, hubKubeconfig, desired.TargetNamespace, issuer, journey, providers, offerMap.Data[contracts.RegionalOfferFile], installation)
-	if focus := installedJourneyFocus(); focus == "restart" || focus == "journey" || focus == "browser" || focus == "upgrade" || focus == "policy" || focus == "alert" || focus == "logresource" || focus == "chain" || focus == "share" || focus == "journey-store-failure" || focus == "journey-start-failure" || focus == "retention-shortening" || installedRecordingFocus() || installedLogsFocus() {
+	if focus := installedJourneyFocus(); focus == "restart" || focus == "journey" || focus == "browser" || focus == "upgrade" || focus == "policy" || focus == "alert" || focus == "logresource" || focus == "chain" || focus == "share" || focus == "journey-store-failure" || focus == "journey-start-failure" || focus == "retention-shortening" || focus == "early-erasure" || installedRecordingFocus() || installedLogsFocus() {
 		t.Log("focused " + focus + " run complete: the second workload cluster and replay checks were not run")
 		return
 	}

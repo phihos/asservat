@@ -7,9 +7,10 @@ erasure, reloads its exact request and observes the independently verified
 deletion outcome. [ADR-321](decisions/321-exact-early-erasure.md) records the
 audited cutoff, signed source, status and role compatibility. Focused Go
 race, browser unit, TypeScript, schema, OpenAPI and design checks pass.
-The owned PostgreSQL schema-owner upgrade at `c84d796f` applied 150→151,
-preserved floor 149, verified idempotence and refused unknown history
-(4.097 s, exit 0, all 4,527 hashes match and cleanup passed).
+The owned PostgreSQL schema-owner upgrade at `3c318d50` applied 150→151,
+preserved floor 149, verified idempotence and refused unknown history. An
+empty Down restored the exact prior SQL guards and audit validators before
+reapplying 151 (3.569 s, exit 0, all 4,528 hashes match and cleanup passed).
 
 The first PostgreSQL/S3 erasure run found an unqualified ledger reference
 inside the custody retention trigger. The correction preserves the narrow
