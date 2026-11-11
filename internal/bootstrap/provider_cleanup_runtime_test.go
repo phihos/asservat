@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"asservat.local/asservat/internal/adapters/kms"
+	auditapp "asservat.local/asservat/internal/application/audit"
 )
 
 // Exercise the actual pending-return branch rather than fabricating a worker
@@ -32,5 +33,15 @@ func TestProviderCleanupDiagnosticsKeepOnlyLocalStageAndClass(t *testing.T) {
 	}
 	if !errors.Is(err, private) || out.String() != "operation cleanup: healthy/unavailable (1)\noperation cleanup: healthy/unavailable (2)\noperation cleanup: healthy/unavailable (4)\n" {
 		t.Fatal("private diagnostics or repeated pending failure escaped bounded log")
+	}
+}
+
+func TestProviderCleanupReportsOnlyApplicationOwnedInnerStage(t *testing.T) {
+	err := (auditapp.OperationCleanup{}).Advance(t.Context(), "never-selected-row")
+	if !errors.Is(err, auditapp.ErrUnavailable) || cleanupRuntimeEvent(&cleanupRuntimeError{"healthy", err}) != "healthy/input/unavailable" {
+		t.Fatal("application refusal stage lost")
+	}
+	if auditapp.OperationCleanupFailureStep(privateCleanupError{}) != "" {
+		t.Fatal("foreign stage accepted")
 	}
 }

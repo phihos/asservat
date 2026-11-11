@@ -27,6 +27,7 @@ import (
 	"asservat.local/asservat/internal/domain/execution"
 	"asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -47,6 +48,7 @@ func TestShareMetadataSlotsWithRealServices(t *testing.T) {
 			normal := &f.qualification.RootBacking.Normal
 			normal.RetainedSeconds = 60
 			normal.Policy.History.Layout = auditvalue.ShareOperationHistoryLayout
+			normal.Policy.OverdueTerminal = auditvalue.OperationOverdueTerminal
 			normal.Policy.BackupHorizonSeconds = 2
 			normal.Policy.CleanupBudgetSeconds = 3
 			normal.Policy.ProofWindowSeconds = 2
@@ -351,7 +353,12 @@ func qualifyShareMetadataSlots(t *testing.T, f *capacitySQLFixture, s captureAdm
 	if err != nil || len(rows) != 0 {
 		t.Fatal("report renewed share visibility from parent", err, len(rows))
 	}
+	// Keep one genuinely paid/acknowledged source untouched while the healthy
+	// sibling follows its original timeline. No timestamps are rewritten.
+	overdue := begin("create_share", "overdue-counter-regression")
+	finish(overdue)
 	qualifyPaidShareRetirement(t, f, s, reserved, first.ID, policy)
+	qualifyCompiledCleanupOverdueCounter(t, f, s, overdue, policy)
 }
 
 func qualifyPaidShareRetirement(t *testing.T, f *capacitySQLFixture, s captureAdmissionScenario, in auditvalue.OperationIntent, shareID string, policy auditvalue.OperationLifecyclePolicy) {
@@ -477,4 +484,82 @@ func qualifyPaidShareRetirement(t *testing.T, f *capacitySQLFixture, s captureAd
 		t.Fatal("absent paid-share account snapshot decoding", err)
 	}
 	t.Log("share_retirement_stage=original_H_elapsed_exact_one_charge_released")
+}
+
+// Exercise the real compiled cleanup login and the nested proof-window trigger.
+// The extra paid source is already overdue after the sibling's healthy/cooling
+// timeline; its original dates and outstanding charge remain unchanged.
+func qualifyCompiledCleanupOverdueCounter(t *testing.T, f *capacitySQLFixture, s captureAdmissionScenario, in auditvalue.OperationIntent, policy auditvalue.OperationLifecyclePolicy) {
+	t.Helper()
+	ctx := f.ctx
+	threshold := in.Lifecycle.CertificatePurgeAt.Add(-time.Duration(policy.ProofWindowSeconds) * time.Second)
+	for time.Now().Before(threshold) {
+		if installedJourneyPause(ctx, 20*time.Millisecond) != nil {
+			t.Fatal(ctx.Err())
+		}
+	}
+	f.refreshFleet(t)
+	cleanup := f.roles["capture-cleanup"]
+	ledger, err := postgres.NewScopedWorkerOperationLifecycles(ctx, cleanup, s.a.RootID, s.recovery.installation, policy.StoreID, s.recovery.guard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var before, after int64
+	if err = f.admin.QueryRow(ctx, `SELECT proof_window_missed FROM operation_audit_pool WHERE root_id=$1 AND lane='normal'`, s.a.RootID).Scan(&before); err != nil {
+		t.Fatal(err)
+	}
+	lease, err := ledger.BeginOperationPurge(ctx, in.ID, "overdueOriginal")
+	if err != nil {
+		t.Fatal("compiled cleanup failed nested overdue proof counter", err)
+	}
+	if err = f.admin.QueryRow(ctx, `SELECT proof_window_missed FROM operation_audit_pool WHERE root_id=$1 AND lane='normal'`, s.a.RootID).Scan(&after); err != nil || after != before+1 {
+		t.Fatal("overdue counter did not increment exactly once", before, after, err)
+	}
+	replay, err := ledger.BeginOperationPurge(ctx, in.ID, "overdueOriginal")
+	if err != nil || !lease.Until.Equal(replay.Until) || lease.Fence != replay.Fence {
+		t.Fatal("overdue replay changed original lease", err)
+	}
+	if err = f.admin.QueryRow(ctx, `SELECT proof_window_missed FROM operation_audit_pool WHERE root_id=$1 AND lane='normal'`, s.a.RootID).Scan(&after); err != nil || after != before+1 {
+		t.Fatal("overdue replay incremented counter", after, err)
+	}
+	// A fixture-only SECURITY DEFINER trigger lets the same original cleanup
+	// session attempt arbitrary nested pool writes. No runtime SQL grant changes.
+	const probe = `CREATE FUNCTION public.share_retirement_pool_probe() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
+ BEGIN
+  CASE current_setting('asservat.test_pool_mutation',true)
+   WHEN 'reset' THEN UPDATE public.operation_audit_pool SET proof_window_missed=0 WHERE root_id=NEW.root_id AND lane=NEW.lane;
+   WHEN 'jump' THEN UPDATE public.operation_audit_pool SET proof_window_missed=proof_window_missed+2 WHERE root_id=NEW.root_id AND lane=NEW.lane;
+   WHEN 'backing' THEN UPDATE public.operation_audit_pool SET proof_window_missed=proof_window_missed+1,revision=revision+1 WHERE root_id=NEW.root_id AND lane=NEW.lane;
+   ELSE RAISE EXCEPTION 'unknown fixture mutation';
+  END CASE;
+  RETURN NULL;
+ END $$;
+ CREATE TRIGGER share_retirement_pool_probe AFTER UPDATE OF lease_fence ON public.operation_audit_lifecycle FOR EACH ROW EXECUTE FUNCTION public.share_retirement_pool_probe();`
+	if _, err = f.admin.Exec(ctx, probe); err != nil {
+		t.Fatal("install negative nested-write probe", err)
+	}
+	defer func() {
+		if _, err := f.admin.Exec(ctx, `DROP TRIGGER share_retirement_pool_probe ON public.operation_audit_lifecycle;DROP FUNCTION public.share_retirement_pool_probe()`); err != nil {
+			t.Error("remove nested-write probe", err)
+		}
+	}()
+	for _, mutation := range []string{"reset", "jump", "backing"} {
+		tx, err := cleanup.Begin(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = tx.Exec(ctx, `SELECT set_config('asservat.test_pool_mutation',$1,true)`, mutation)
+		if err == nil {
+			_, err = tx.Exec(ctx, `UPDATE capture_operation_lifecycle SET lease_fence=lease_fence WHERE operation_id=$1`, in.ID)
+		}
+		_ = tx.Rollback(ctx)
+		var pgerr *pgconn.PgError
+		if !errors.As(err, &pgerr) || pgerr.Code != "23514" {
+			t.Fatal("compiled cleanup gained arbitrary same-depth pool write", mutation, err)
+		}
+	}
+	if err = f.admin.QueryRow(ctx, `SELECT proof_window_missed FROM operation_audit_pool WHERE root_id=$1 AND lane='normal'`, s.a.RootID).Scan(&after); err != nil || after != before+1 {
+		t.Fatal("rejected nested writes changed counter", after, err)
+	}
+	t.Log("share_retirement_stage=compiled_cleanup_overdue_counter_once_arbitrary_nested_pool_writes_refused; original overdue source remains charged")
 }

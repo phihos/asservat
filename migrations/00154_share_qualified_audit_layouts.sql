@@ -72,7 +72,13 @@ BEGIN
  END IF;
  source_role:=public.capture_audit_role_ok(r,'source');admit_role:=public.capture_audit_role_ok(r,'admission');journal_role:=public.capture_audit_role_ok(r,'journal');ack_role:=public.capture_audit_role_ok(r,'acknowledge');cleanup_role:=public.capture_audit_role_ok(r,'cleanup');verifier_role:=public.capture_audit_role_ok(r,'verifier');finalizer_role:=public.capture_audit_role_ok(r,'finalizer');
  IF TG_TABLE_NAME='operation_audit_pool' THEN
-  IF NOT source_role AND NOT(pg_trigger_depth()>1 AND (admit_role OR finalizer_role)) THEN RAISE EXCEPTION 'capture audit backing role unavailable' USING ERRCODE='23514';END IF;
+  -- The existing overdue-selection AFTER trigger charges this one counter
+  -- through the cleanup login. It grants no backing/profile mutation.
+  IF NOT source_role AND NOT(pg_trigger_depth()>1 AND (admit_role OR finalizer_role OR
+   (cleanup_role AND TG_OP='UPDATE' AND
+    (to_jsonb(NEW)-'proof_window_missed') IS NOT DISTINCT FROM (to_jsonb(OLD)-'proof_window_missed') AND
+    NEW.proof_window_missed=LEAST(OLD.proof_window_missed+1,1152921504606846976)))) THEN
+   RAISE EXCEPTION 'capture audit backing role unavailable' USING ERRCODE='23514';END IF;
  ELSIF TG_TABLE_NAME='operation_audit_account' THEN
   IF pg_trigger_depth()<2 OR NOT(admit_role OR finalizer_role) THEN RAISE EXCEPTION 'capture audit account role unavailable' USING ERRCODE='23514';END IF;
  ELSIF TG_TABLE_NAME='operation_audit_history' THEN

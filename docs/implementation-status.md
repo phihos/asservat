@@ -1,6 +1,6 @@
 # Product implementation status
 
-Status checked on **2026-11-11** against merged main through [PR222](https://github.com/phihos/asservat/pull/222), merge `cef71802`. Required PR CI and [post-merge main CI](https://github.com/phihos/asservat/actions/runs/42963062617) passed. The latest installed processing-inventory workflow passed with Go/harness exits0 and all4,813 source hashes matching main. Other rows retain their separately named evidence scopes; [implementation progress](implementation-progress.md) preserves actual results, failures and remaining gaps.
+Status checked on **2026-11-11** against merged main through [PR223](https://github.com/phihos/asservat/pull/223), merge `b389b7c9`. Required PR CI and [post-merge main CI](https://github.com/phihos/asservat/actions/runs/43020311620) passed. The source-built collector-free context trial has actual Helm qualification with two APIs and a shared API; all 4,834 shared-API runtime hashes match main. PR222's processing-inventory evidence has its separately qualified 4,813-hash source scope. Other rows retain their named evidence scopes; [implementation progress](implementation-progress.md) preserves actual results, failures and remaining gaps.
 
 **There is no supported homelab release yet.** Several packaged operator/developer workflows have installed evidence. That evidence applies to the named environments and inputs; it does not complete the accepted first-release scope or qualify sustained production operation. Component, built-browser and installed evidence remain distinct.
 

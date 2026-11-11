@@ -208,10 +208,17 @@ type OperationCleanup struct {
 	Verifier         OperationCleanupVerifier
 }
 
-func (s OperationCleanup) Advance(ctx context.Context, id string) error {
+func (s OperationCleanup) Advance(ctx context.Context, id string) (err error) {
+	step := "input"
+	defer func() {
+		if err != nil {
+			err = &operationCleanupFailure{step: step, cause: err}
+		}
+	}()
 	if ctx == nil || ctx.Err() != nil || s.Journal == nil || s.Acknowledgements == nil || s.Finalizer == nil || s.Objects == nil || s.Verifier == nil {
 		return ErrUnavailable
 	}
+	step = "read"
 	state, e := s.Journal.ReadOperationLifecycle(ctx, id)
 	if e != nil {
 		return ErrUnavailable
@@ -220,17 +227,21 @@ func (s OperationCleanup) Advance(ctx context.Context, id string) error {
 	// Do not destroy their originals or create a certificate that cannot be
 	// acknowledged. Already acknowledged history can still finish terminal
 	// cleanup; explicit overdue-original reconciliation is a separate path.
+	step = "certificate-backing"
 	if state.CertificateReceipt == nil && (state.Intent.Lifecycle == nil || !state.Intent.Lifecycle.Policy.CertificateVerificationBacked()) {
 		return ErrUnavailable
 	}
 	if state.Retirement == nil {
+		step = "original-lease"
 		lease, e := s.Journal.BeginOperationPurge(ctx, id, "original")
 		if e != nil {
 			return ErrUnavailable
 		}
+		step = "original-purge"
 		if e = s.Objects.PurgeOperationObjects(ctx, lease); e != nil {
 			return ErrUnavailable
 		}
+		step = "original-record"
 		r, e := s.Journal.RecordOriginalOperationPurge(ctx, lease)
 		if e != nil {
 			return ErrUnavailable
@@ -240,14 +251,17 @@ func (s OperationCleanup) Advance(ctx context.Context, id string) error {
 	r := *state.Retirement
 	if state.CertificateReceipt == nil {
 		if state.CertificateWriter == nil {
+			step = "certificate-claim"
 			fresh, e := s.Journal.ClaimOperationCertificate(ctx, r)
 			if e != nil || !fresh {
 				return ErrUnavailable
 			}
+			step = "certificate-create"
 			c, e := s.Objects.CreateOperationCertificate(ctx, r)
 			if e != nil {
 				return ErrUnavailable
 			}
+			step = "certificate-record"
 			if e = s.Journal.RecordCertificateCompletion(ctx, r, c); e != nil {
 				return ErrUnavailable
 			}
@@ -259,38 +273,47 @@ func (s OperationCleanup) Advance(ctx context.Context, id string) error {
 		deadline := identity.Earlier(time.Now().Add(5*time.Second), r.CertificateWriteUntil)
 		verification, stop := context.WithDeadline(ctx, deadline)
 		defer stop()
+		step = "verification-claim"
 		until, e := s.Acknowledgements.ClaimOperationCertificateVerification(verification, r, receipt)
 		if e != nil || verification.Err() != nil || !time.Now().Before(until) || until.After(deadline) {
 			return ErrUnavailable
 		}
 		verification, stopVerification := context.WithDeadline(verification, until)
 		defer stopVerification()
+		step = "certificate-verify"
 		if e = s.Verifier.VerifyOperationCertificate(verification, r, receipt); e != nil || verification.Err() != nil {
 			return ErrUnavailable
 		}
+		step = "certificate-ack"
 		if e = s.Acknowledgements.AcknowledgeOperationCertificate(verification, r, receipt); e != nil || verification.Err() != nil {
 			return ErrUnavailable
 		}
 	}
 	// The second lease is available only after the ORIGINAL certificate proof
 	// deadline. Early calls return unavailable without changing that schedule.
+	step = "terminal-lease"
 	lease, e := s.Journal.BeginOperationPurge(ctx, id, "terminal")
 	if e != nil {
 		return ErrUnavailable
 	}
+	step = "terminal-purge"
 	if e = s.Objects.PurgeOperationObjects(ctx, lease); e != nil {
 		return ErrUnavailable
 	}
+	step = "terminal-record"
 	terminal, e := s.Journal.RecordTerminalOperationPurge(ctx, lease)
 	if e != nil {
 		return ErrUnavailable
 	}
+	step = "terminal-verify"
 	if e = s.Verifier.VerifyOperationAbsence(ctx, lease); e != nil {
 		return ErrUnavailable
 	}
+	step = "terminal-ack"
 	if e = s.Acknowledgements.AcknowledgeTerminalOperationPurge(ctx, lease, terminal); e != nil {
 		return ErrUnavailable
 	}
+	step = "retire"
 	return s.Finalizer.RetireOperationAudit(ctx, id)
 }
 

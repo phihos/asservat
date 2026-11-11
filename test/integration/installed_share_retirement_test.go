@@ -104,6 +104,9 @@ func qualifyInstalledShareRetirement(t *testing.T, parent context.Context, clust
 				t.Fatal("installed audit account charge differs from live and residual records", o.lane, charged, liveRecords, historyRecords)
 			}
 			if operation && !snapshotAt.Before(o.live) {
+				t.Logf("installed_share_retirement lane=%s stage=original_live_bound_missed since_purge_ms=%d live_overdue_ms=%d until_history_release_ms=%d until_history_delete_ms=%d snapshot_read_ms=%d share=%t operation=%t lifecycle=%t healthy=%t healthy_previously_observed=%t account_charge=%d live_records=%d history_records=%d original_history_present=%t original_history_records=%d",
+					o.lane, snapshotAt.Sub(o.purge).Milliseconds(), snapshotAt.Sub(o.live).Milliseconds(), o.release.Sub(snapshotAt).Milliseconds(), o.deleteBy.Sub(snapshotAt).Milliseconds(), observedAt.Sub(snapshotAt).Milliseconds(),
+					share, operation, lifecycle, healthy, o.healthy, charged, liveRecords, historyRecords, eligible != nil, originalRecords)
 				t.Fatal("installed identifying share/audit rows outlived original live_retire_by", o.lane)
 			}
 			if healthy && !o.healthy {

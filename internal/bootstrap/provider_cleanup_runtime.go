@@ -9,6 +9,7 @@ import (
 
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/adapters/mounts"
+	auditapp "asservat.local/asservat/internal/application/audit"
 	fleetapp "asservat.local/asservat/internal/application/fleet"
 	value "asservat.local/asservat/internal/domain/audit"
 )
@@ -195,7 +196,11 @@ func cleanupRuntimeEvent(err error) string {
 	}
 	var stopped *cleanupRuntimeError
 	if errors.As(err, &stopped) {
-		return stopped.step + "/" + errorClass(err)
+		step := stopped.step
+		if inner := auditapp.OperationCleanupFailureStep(stopped.cause); inner != "" {
+			step += "/" + inner
+		}
+		return step + "/" + errorClass(err)
 	}
 	return "effect/" + errorClass(err)
 }

@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"reflect"
 	"testing"
 )
@@ -91,6 +92,7 @@ func (f *overdueOrder) AcknowledgeOverdueOperationPurge(context.Context, value.O
 func (f *overdueOrder) RetireOperationAudit(context.Context, string) error { return f.step("retire") }
 func TestOverduePurgeDoesNotWaitForVerifierOrRefundUnknown(t *testing.T) {
 	steps := []string{"fence", "purge", "persist", "independent", "ack", "retire"}
+	stages := []string{"overdue-lease", "overdue-purge", "overdue-record", "overdue-verify", "overdue-ack", "retire"}
 	for i, stop := range append(append([]string{}, steps...), "") {
 		t.Run(stop, func(t *testing.T) {
 			f := &overdueOrder{fail: stop}
@@ -99,6 +101,9 @@ func TestOverduePurgeDoesNotWaitForVerifierOrRefundUnknown(t *testing.T) {
 			count := i + 1
 			if stop == "" {
 				count = len(steps)
+			}
+			if stop != "" && (!errors.Is(e, ErrUnavailable) || OperationCleanupFailureStep(e) != stages[i]) {
+				t.Fatal("lost exact unavailable overdue boundary", OperationCleanupFailureStep(e))
 			}
 			if !reflect.DeepEqual(f.events, steps[:count]) || (stop == "") != (e == nil) {
 				t.Fatal("wrong effects after failure", e, f.events)

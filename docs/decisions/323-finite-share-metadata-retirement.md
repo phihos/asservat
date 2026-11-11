@@ -240,3 +240,24 @@ capacity field, Secret, worker identity, guard, token and original time bound
 remains required. Cleanup and every other purpose retain their existing
 comparison. This removes an unrelated-entity coupling, with no new request,
 retry, state, deadline or fallback and no weakened process-identity test.
+
+
+## Installed proof-window counter refusal
+
+At `d851782f`, public MCP manual and capture-time sharing pass and the original
+worker stays running, but normal identifying rows remain at their original
+`live_retire_by`. PostgreSQL reports SQLSTATE23514: the cleanup role's nested
+`record_operation_proof_window_missed` update is rejected by the backing guard.
+Permit only its exact bounded counter increment under that existing compiled
+cleanup identity and nested trigger context; every other pool field must remain
+identical. Do not grant direct pool writes, move a deadline or turn a missed
+healthy proof into a healthy result. Exercise the actual compiled role and
+reject nested counter reset/jump and unrelated pool mutations.
+
+Cleanup diagnostics retain only application-selected fixed stages and existing
+error identities. They add no provider request, retry, state or authority. The
+installed observer also reports safe DB-relative timing and boolean state on
+failure without changing its strict live-row, atomicity or charge assertions.
+Cold sequential credential acquisition and the original short proof windows
+still require measured installed qualification; the available sparse logs do
+not establish cold-start duration or a successful certificate acknowledgement.
