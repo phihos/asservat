@@ -85,8 +85,9 @@ release reuse the existing change pipeline. This adds zero routes, SQL grants,
 migrations, retained state types, background tasks or configuration. It sends
 one existing audited change per confirmed restriction, followed by explicit
 inventory reads and the existing reserved release change. SC-PRV-013 records
-the workflow and its bounds. Actual installed qualification is tracked in
-implementation progress.
+the workflow and its bounds. Fresh installed workload-interval restriction,
+reload, original-key replay and exact release passed at `75b7606b`.
+Implementation progress records the complete evidence and remaining scope.
 
 ## Complexity and cost review
 

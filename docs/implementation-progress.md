@@ -20,8 +20,26 @@ Python focus selection and specification/architecture/design gates pass.
 
 The installed fixture independently derives exact target and interval from
 retained SQL before checking browser mutations, both audit lanes and replay
-charges. Broad repository/browser gates, independent review and fresh
-`processing-workload` installed qualification remain pending.
+charges. Independent review found no concrete mismatch. At `75b7606b`,
+`make pre-push` passed, including 642 console tests and affected Go race
+tests (405 s). Full `make console-browser-check` passed in 155.228 s,
+including all three shared processing journeys, 29 standard journeys and
+28 accessibility scans.
+
+Fresh `make installed-focus FOCUS=processing-workload ARGS=--keep-on-failure`
+at `75b7606b` passed (Go 303.606 s, harness 366.6 s, both exits 0).
+After collecting and downloading the original regional pod-status file, the
+signed-in Keycloak operator searched the exact workload interval, confirmed
+one workload rule and reloaded its durable scope and revision. New ordinary
+case reads and download preparation were refused. Exact release restored the
+same original native bytes and deadline. Both original-key replays preserved
+SQL state, audit receipts and account spend. The operator workflow took
+12.912 s. All 4,787 source hashes match, cleanup failures are empty, and both
+owned clusters, labelled Docker resources and build scratch are removed.
+Original reports are archived externally under
+`privacy-workload-restriction/installed-75b7606b`.
+
+Required PR CI and merge remain pending.
 Added routes, roles, SQL state, schema migrations, background jobs and polls
 are zero. Confirmation itself performs no request. One existing audited
 change records the workload rule and the existing reserve funds release.
