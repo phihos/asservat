@@ -727,6 +727,12 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 		}
 		var postDownload func(cluster string, run installedProcessingRun)
 		switch installedJourneyFocus() {
+		case "processing-workload":
+			postDownload = func(_ string, run installedProcessingRun) {
+				run.WorkloadRestriction = true
+				qualifyInstalledProcessing(t, ctx, run)
+			}
+			deny, gone = nil, nil
 		case "retention-shortening":
 			retention := installedRetentionShortening{admin: admin, hub: api, runner: runnerAPI, providers: providers,
 				installation: installation, root: p.RootID, hubCluster: original.Plan.ClusterID, namespace: desired.TargetNamespace, diagnose: diagnose}
@@ -792,7 +798,7 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 	}
 	hubKubeconfig := installedUnifiedRunnerKubeconfig(t, f.Clusters[0].Config, desired)
 	qualifyRegionalInstall(t, ctx, f, 1, admin, runnerAPI, api, hubKubeconfig, desired.TargetNamespace, issuer, journey, providers, offerMap.Data[contracts.RegionalOfferFile], installation)
-	if focus := installedJourneyFocus(); focus == "restart" || focus == "journey" || focus == "browser" || focus == "upgrade" || focus == "policy" || focus == "alert" || focus == "logresource" || focus == "chain" || focus == "share" || focus == "journey-store-failure" || focus == "journey-start-failure" || focus == "retention-shortening" || focus == "early-erasure" || installedRecordingFocus() || installedLogsFocus() {
+	if focus := installedJourneyFocus(); focus == "restart" || focus == "journey" || focus == "browser" || focus == "upgrade" || focus == "policy" || focus == "alert" || focus == "logresource" || focus == "chain" || focus == "share" || focus == "journey-store-failure" || focus == "journey-start-failure" || focus == "retention-shortening" || focus == "early-erasure" || focus == "processing-workload" || installedRecordingFocus() || installedLogsFocus() {
 		t.Log("focused " + focus + " run complete: the second workload cluster and replay checks were not run")
 		return
 	}

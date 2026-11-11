@@ -3,6 +3,7 @@ import { validProcessingChange, validProcessingInventory, validProcessingReceipt
 
 export type Inventory = components['schemas']['ProcessingInventory'];
 export type Rule = Inventory['rules'][number];
+export type WorkloadScope = Extract<Rule['scope'], { kind: 'workloadInterval' }>;
 export type Change = components['schemas']['ProcessingChange'];
 export type Receipt = components['schemas']['ProcessingReceipt'];
 export class ProcessingFailure extends Error {

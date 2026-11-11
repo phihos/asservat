@@ -46,6 +46,40 @@ func TestConsoleProcessingWithBuiltPackage(t *testing.T) {
 	t.Log("compiled React and Go TLS/session/CSRF covered restriction, audited case search with direct lineage, selection, and exact release using synthetic privacy state")
 }
 
+func TestConsoleWorkloadProcessingWithBuiltPackage(t *testing.T) {
+	root, origin, facts := newConsoleProcessing(t, false)
+	facts.workloadRestriction = true
+	runConsoleProcessingBrowser(t, root, origin, "installed-processing-browser.mjs", 3, true)
+	facts.mu.Lock()
+	defer facts.mu.Unlock()
+	scope := facts.workloadScope()
+	if len(facts.changes) != 2 || !facts.changes[0].Scope.Equal(scope) || facts.changes[0].RequestedArtifactID != "" ||
+		facts.changes[0].ExpectedRevision != 0 || !facts.changes[1].Scope.Equal(scope) || facts.changes[1].ExpectedRevision != 1 ||
+		facts.changes[0].RequestID == facts.changes[1].RequestID || facts.rule.State != "released" || facts.rule.Revision != 2 {
+		t.Fatal("workload browser changed the original scope, revision or request identity")
+	}
+	if len(facts.searchQueries) != 3 || facts.searchReads != 3 || len(facts.searchOutcomes) != 3 {
+		t.Fatal("workload restriction requires source case, workload and restricted-case discovery")
+	}
+	first, workload, last := facts.searchQueries[0], facts.searchQueries[1], facts.searchQueries[2]
+	if first.CaseID != consoleCaptureID(80) || last.CaseID != first.CaseID || workload.CaseID != "" ||
+		workload.ClusterID != scope.ClusterID || workload.NamespaceUID != scope.NamespaceUID || workload.WorkloadUID != scope.WorkloadUID ||
+		!workload.AcquiredFrom.Equal(scope.AcquiredFrom) || !workload.AcquiredUntil.Equal(scope.AcquiredUntil) ||
+		workload.PurposeRef != "synthetic-rights-discovery" || workload.Limit != 12 {
+		t.Fatal("workload review did not derive the exact interval from accepted candidate metadata")
+	}
+	seen := map[string]bool{}
+	for _, out := range facts.searchOutcomes {
+		if seen[out.Intent.ID] || audit.OperationLane(out.Intent.Name) != "normal" || out.Status != "success" || out.Effect != "none" ||
+			!slices.Equal(out.CaseIDs, []string{consoleCaptureID(80)}) || !slices.Equal(out.ArtifactIDs, []string{consoleCaptureID(81)}) ||
+			!slices.Equal(out.CaptureIDs, []string{consoleCaptureID(8)}) {
+			t.Fatal("workload discovery did not independently audit the selected metadata")
+		}
+		seen[out.Intent.ID] = true
+	}
+	t.Log("compiled React reviewed the exact all-purpose workload interval, reloaded its original scope and released the exact revision using synthetic privacy state")
+}
+
 func TestConsoleErasureWithBuiltPackage(t *testing.T) {
 	root, origin, facts := newConsoleProcessing(t, true)
 	runConsoleProcessingBrowser(t, root, origin, "installed-erasure-browser.mjs", 2)
@@ -157,9 +191,12 @@ func newConsoleProcessing(t *testing.T, erasure bool) (string, string, *consoleP
 	return root, origin, facts
 }
 
-func runConsoleProcessingBrowser(t *testing.T, root, origin, script string, acknowledgements int) {
+func runConsoleProcessingBrowser(t *testing.T, root, origin, script string, acknowledgements int, workloadRestriction ...bool) {
 	t.Helper()
 	config := map[string]any{"origin": origin, "artifactID": consoleCaptureID(81), "casePath": "/cases/" + consoleCaptureID(80), "parents": []string{consoleCaptureID(83)}, "cookies": []map[string]any{{"name": browser.SessionCookie, "value": strings.Repeat("A", 43), "url": origin, "secure": true, "httpOnly": true, "sameSite": "Strict"}}}
+	if len(workloadRestriction) > 0 && workloadRestriction[0] {
+		config["workloadRestriction"] = true
+	}
 	private, err := json.Marshal(config)
 	if err != nil {
 		t.Fatal(err)
@@ -197,18 +234,21 @@ func runConsoleProcessingBrowser(t *testing.T, root, origin, script string, ackn
 }
 
 type consoleProcessingFacts struct {
-	mu              sync.Mutex
-	rule            value.ProcessingInventoryRule
-	changes         []value.ProcessingChange
-	expires         time.Time
-	searchIntent    audit.OperationIntent
-	searchOutcome   audit.OperationOutcome
-	searchReads     int
-	erasure         bool
-	erasureAccepted time.Time
-	statusIntents   []audit.OperationIntent
-	statusOutcomes  []audit.OperationOutcome
-	statusReads     int
+	mu                  sync.Mutex
+	rule                value.ProcessingInventoryRule
+	changes             []value.ProcessingChange
+	expires             time.Time
+	searchIntent        audit.OperationIntent
+	searchOutcome       audit.OperationOutcome
+	searchReads         int
+	workloadRestriction bool
+	searchQueries       []value.ProcessingDiscoveryQuery
+	searchOutcomes      []audit.OperationOutcome
+	erasure             bool
+	erasureAccepted     time.Time
+	statusIntents       []audit.OperationIntent
+	statusOutcomes      []audit.OperationOutcome
+	statusReads         int
 }
 
 func (s *consoleProcessingFacts) Configured() bool { return s != nil }
@@ -221,7 +261,7 @@ func (s *consoleProcessingFacts) Begin(ctx context.Context, intent audit.Operati
 	defer s.mu.Unlock()
 	switch intent.Name {
 	case "search_processing_evidence":
-		if s.searchIntent.ID != "" || !s.erasure && s.rule.State != "restricted" {
+		if s.searchIntent.ID != "" && s.searchOutcome.Intent.ID != s.searchIntent.ID || !s.erasure && !s.workloadRestriction && s.rule.State != "restricted" {
 			return auditapp.ErrUnavailable
 		}
 		s.searchIntent = intent
@@ -242,10 +282,11 @@ func (s *consoleProcessingFacts) Finish(ctx context.Context, outcome audit.Opera
 	defer s.mu.Unlock()
 	switch outcome.Intent.Name {
 	case "search_processing_evidence":
-		if outcome.Intent.ID != s.searchIntent.ID || s.searchReads != 1 {
+		if outcome.Intent.ID != s.searchIntent.ID || s.searchReads != len(s.searchOutcomes)+1 {
 			return auditapp.ErrUnavailable
 		}
 		s.searchOutcome = outcome
+		s.searchOutcomes = append(s.searchOutcomes, outcome)
 	case "get_processing_erasure":
 		i := len(s.statusOutcomes)
 		if i+1 != s.statusReads || i+1 != len(s.statusIntents) || outcome.Intent.ID != s.statusIntents[i].ID {
@@ -274,9 +315,19 @@ func (s *consoleProcessingFacts) ReadProcessingDiscovery(ctx context.Context, au
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	now := time.Now()
-	if ctx.Err() != nil || !authority.Valid(now) || !s.erasure && s.rule.State != "restricted" || s.searchIntent.ID == "" || s.searchOutcome.Intent.ID != "" || query.CaseID != consoleCaptureID(80) {
+	if ctx.Err() != nil || !authority.Valid(now) || !s.erasure && !s.workloadRestriction && s.rule.State != "restricted" || s.searchIntent.ID == "" || s.searchOutcome.Intent.ID == s.searchIntent.ID {
 		return value.ProcessingDiscoveryPage{}, value.ErrUnavailable
 	}
+	if query.CaseID != consoleCaptureID(80) {
+		scope := s.workloadScope()
+		if !s.workloadRestriction || query.CaseID != "" || query.ClusterID != scope.ClusterID ||
+			query.NamespaceUID != scope.NamespaceUID || query.WorkloadUID != scope.WorkloadUID ||
+			!query.AcquiredFrom.Equal(scope.AcquiredFrom) || !query.AcquiredUntil.Equal(scope.AcquiredUntil) ||
+			query.PurposeRef != "synthetic-rights-discovery" {
+			return value.ProcessingDiscoveryPage{}, value.ErrUnavailable
+		}
+	}
+	s.searchQueries = append(s.searchQueries, query)
 	s.searchReads++
 	origin, parents := "derived", []string{consoleCaptureID(83)}
 	if s.erasure {
@@ -284,7 +335,7 @@ func (s *consoleProcessingFacts) ReadProcessingDiscovery(ctx context.Context, au
 	}
 	return value.ProcessingDiscoveryPage{RootID: consoleCaptureID(41), Epoch: consoleCaptureID(42), Sequence: 2,
 		ObservedAt: authority.ObservedAt, ValidUntil: authority.ValidUntil, Candidates: []value.ProcessingDiscoveryCandidate{{
-			ArtifactID: consoleCaptureID(81), CaptureID: consoleCaptureID(8), CaseID: query.CaseID, ClusterID: consoleCaptureID(1),
+			ArtifactID: consoleCaptureID(81), CaptureID: consoleCaptureID(8), CaseID: consoleCaptureID(80), ClusterID: consoleCaptureID(1),
 			NamespaceUID: "synthetic-namespace-uid", WorkloadUID: "synthetic-workload-uid", PurposeRef: "synthetic-rights-discovery",
 			NativeType: "podStatus", DataClass: "metadata", Origin: origin, AnchorAt: s.expires.Add(-time.Hour),
 			ExpiresAt: s.expires, DeleteBy: s.expires.Add(5 * time.Minute), CustodyState: artifact.StoredUnpublished, Parents: parents,
@@ -343,10 +394,19 @@ func (s *consoleProcessingFacts) Change(ctx context.Context, current app.Current
 		return value.ProcessingReceipt{RootID: consoleCaptureID(41), Epoch: consoleCaptureID(42), RequestID: c.RequestID,
 			OperationID: consoleCaptureID(601), State: "erasureRequested", Sequence: 2, ObservedAt: now, ValidUntil: now.Add(5 * time.Second)}, nil
 	case "restrict_processing":
-		if s.rule.ID != "" || c.ExpectedRevision != 0 || c.RequestedArtifactID != consoleCaptureID(81) {
+		if s.rule.ID != "" || c.ExpectedRevision != 0 {
 			return value.ProcessingReceipt{}, value.ErrConflict
 		}
-		s.rule = value.ProcessingInventoryRule{ID: c.RuleID, State: "restricted", Revision: 1, Scope: value.ProcessingScope{Kind: "artifact", Location: artifact.Location{ClusterID: consoleCaptureID(1), ArtifactID: c.RequestedArtifactID, AttemptID: consoleCaptureID(82)}}, AdministrationUntil: now.Add(time.Hour), RetireBy: now.Add(2 * time.Hour)}
+		scope := value.ProcessingScope{Kind: "artifact", Location: artifact.Location{ClusterID: consoleCaptureID(1), ArtifactID: c.RequestedArtifactID, AttemptID: consoleCaptureID(82)}}
+		if s.workloadRestriction {
+			if c.RequestedArtifactID != "" || !c.Scope.Equal(s.workloadScope()) || s.searchReads != 2 {
+				return value.ProcessingReceipt{}, value.ErrConflict
+			}
+			scope = c.Scope
+		} else if c.RequestedArtifactID != consoleCaptureID(81) {
+			return value.ProcessingReceipt{}, value.ErrConflict
+		}
+		s.rule = value.ProcessingInventoryRule{ID: c.RuleID, State: "restricted", Revision: 1, Scope: scope, AdministrationUntil: now.Add(time.Hour), RetireBy: now.Add(2 * time.Hour)}
 	case "release_processing":
 		if c.RuleID != s.rule.ID || c.ExpectedRevision != s.rule.Revision || c.Scope != s.rule.Scope {
 			return value.ProcessingReceipt{}, value.ErrConflict
@@ -358,4 +418,12 @@ func (s *consoleProcessingFacts) Change(ctx context.Context, current app.Current
 	}
 	s.changes = append(s.changes, c)
 	return value.ProcessingReceipt{RootID: consoleCaptureID(41), Epoch: consoleCaptureID(42), RequestID: c.RequestID, RuleID: s.rule.ID, OperationID: consoleCaptureID(600 + len(s.changes)), State: s.rule.State, Revision: s.rule.Revision, Sequence: int64(len(s.changes) + 1), ObservedAt: now, ValidUntil: now.Add(5 * time.Second)}, nil
+}
+
+// workloadScope independently derives the reviewed interval from fixture facts.
+func (s *consoleProcessingFacts) workloadScope() value.ProcessingScope {
+	second := s.expires.Add(-time.Hour).UTC().Truncate(time.Second)
+	return value.ProcessingScope{Kind: "workloadInterval", ClusterID: consoleCaptureID(1),
+		NamespaceUID: "synthetic-namespace-uid", WorkloadUID: "synthetic-workload-uid",
+		AcquiredFrom: second.Add(-time.Second), AcquiredUntil: second.Add(time.Second)}
 }

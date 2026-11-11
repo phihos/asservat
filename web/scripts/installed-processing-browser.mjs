@@ -28,7 +28,7 @@ try {
     process.stdout.write(line + '\n'); assert.deepEqual(await command(), { continue: true });
   };
   stage = 'processing';
-  await processingJourney({ page, origin: config.origin, artifactID: config.artifactID, casePath: config.casePath, parents: config.parents, restricted: observe('restricted'), discovered: observe('discovered'), released: observe('released'), stage: value => { stage = value; } });
+  await processingJourney({ page, origin: config.origin, artifactID: config.artifactID, casePath: config.casePath, parents: config.parents, workloadRestriction: config.workloadRestriction === true, restricted: observe('restricted'), discovered: observe('discovered'), released: observe('released'), stage: value => { stage = value; } });
   assert.deepEqual(errors, []);
   process.stdout.write(JSON.stringify({ kind: 'complete' }) + '\n');
 } catch (error) {

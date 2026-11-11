@@ -16,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	privacyapp "asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/authorization"
@@ -36,6 +37,7 @@ type installedProcessingRun struct {
 	Transport                           http.RoundTripper
 	Call                                func(context.Context, string, any) (installedJourneyEnvelope, error)
 	Diagnose                            func()
+	WorkloadRestriction                 bool
 }
 type installedProcessingReceipt struct {
 	RootID      string `json:"rootID"`
@@ -53,14 +55,15 @@ type installedProcessingDiscovery struct {
 	ResponseBytes int64                              `json:"responseBytes"`
 }
 type installedProcessingEvent struct {
-	Kind      string                       `json:"kind"`
-	Receipt   installedProcessingReceipt   `json:"receipt"`
-	Discovery installedProcessingDiscovery `json:"discovery"`
-	Input     json.RawMessage              `json:"input"`
-	Key       string                       `json:"key"`
-	Stage     string                       `json:"stage"`
-	Reason    string                       `json:"reason"`
-	Check     string                       `json:"check"`
+	Kind              string                       `json:"kind"`
+	Receipt           installedProcessingReceipt   `json:"receipt"`
+	Discovery         installedProcessingDiscovery `json:"discovery"`
+	WorkloadDiscovery installedProcessingDiscovery `json:"workloadDiscovery"`
+	Input             json.RawMessage              `json:"input"`
+	Key               string                       `json:"key"`
+	Stage             string                       `json:"stage"`
+	Reason            string                       `json:"reason"`
+	Check             string                       `json:"check"`
 }
 
 // The real compiled React journey owns both mutations and obtains release
@@ -79,9 +82,10 @@ func qualifyInstalledProcessing(t *testing.T, parent context.Context, c installe
 			c.Diagnose()
 		}
 	}()
+	scope := c.expectedScope(t, ctx)
 	t.Logf("installed processing stage=start, original artifact access remaining=%s", time.Until(c.ExpiresAt).Round(time.Second))
 	session := c.Identity.consoleSession(t, ctx, c.PublicRoot, c.Address, c.Origin)
-	driver := startInstalledProcessingBrowser(t, ctx, session, c.Address, c.ArtifactID, c.CaseID, "installed-processing-browser.mjs")
+	driver := startInstalledProcessingBrowser(t, ctx, session, c.Address, c.ArtifactID, c.CaseID, "installed-processing-browser.mjs", c.WorkloadRestriction)
 	next := func(want string) installedProcessingEvent {
 		t.Helper()
 		var event installedProcessingEvent
@@ -98,7 +102,14 @@ func qualifyInstalledProcessing(t *testing.T, parent context.Context, c installe
 	if restriction.Receipt.State != "restricted" || restriction.Receipt.Revision != 1 {
 		t.Fatal("installed processing restriction receipt")
 	}
-	c.checkReceipt(t, ctx, restriction, "normal")
+	c.checkReceipt(t, ctx, restriction, "normal", scope)
+	if c.WorkloadRestriction {
+		c.checkDiscovery(t, ctx, restriction.Receipt, restriction.Discovery)
+		c.checkDiscovery(t, ctx, restriction.Receipt, restriction.WorkloadDiscovery)
+		if restriction.Discovery.RequestID == restriction.WorkloadDiscovery.RequestID {
+			t.Fatal("workload search reused the exact-case discovery audit")
+		}
+	}
 	c.checkReplay(t, ctx, session, restriction)
 	c.checkOperatorDenial(t, ctx, restriction.Input)
 	t.Logf("installed processing stage=restricted after %s", time.Since(started).Round(time.Millisecond))
@@ -119,13 +130,16 @@ func qualifyInstalledProcessing(t *testing.T, parent context.Context, c installe
 	driver.send(map[string]bool{"continue": true})
 	discovery := next("discovered")
 	c.checkDiscovery(t, ctx, restriction.Receipt, discovery.Discovery)
+	if c.WorkloadRestriction && slices.Contains([]string{restriction.Discovery.RequestID, restriction.WorkloadDiscovery.RequestID}, discovery.Discovery.RequestID) {
+		t.Fatal("post-restriction discovery reused an earlier audit operation")
+	}
 	t.Logf("installed processing stage=discovered after %s", time.Since(started).Round(time.Millisecond))
 	driver.send(map[string]bool{"continue": true})
 	release := next("released")
 	if release.Receipt.State != "released" || release.Receipt.Revision != 2 || release.Receipt.RuleID != restriction.Receipt.RuleID || release.Receipt.Sequence <= restriction.Receipt.Sequence {
 		t.Fatal("installed processing exact release receipt")
 	}
-	c.checkReceipt(t, ctx, release, "processing")
+	c.checkReceipt(t, ctx, release, "processing", scope)
 	c.checkReplay(t, ctx, session, release)
 	t.Logf("installed processing stage=released after %s", time.Since(started).Round(time.Millisecond))
 	invoke := func(name string, input any) (installedJourneyEnvelope, string) {
@@ -172,7 +186,38 @@ func qualifyInstalledProcessing(t *testing.T, parent context.Context, c installe
 	driver.send(map[string]bool{"continue": true})
 	next("complete")
 	awaitInstalledProcessingBrowser(t, driver)
-	t.Logf("installed processing complete after %s. React restricted the artifact, found its recorded lineage after ordinary reads were refused, selected it without a mutation, and released the exact restriction. Both replays preserved SQL state and native download restored the original bytes and deadline.", time.Since(started).Round(time.Millisecond))
+	t.Logf("installed processing complete after %s for %s scope. React applied and released the same restriction after reload. Both replays preserved SQL state and native download restored the original bytes and deadline.", time.Since(started).Round(time.Millisecond), scope.Kind)
+}
+
+func (c installedProcessingRun) expectedScope(t *testing.T, ctx context.Context) value.ProcessingScope {
+	t.Helper()
+	var location artifact.Location
+	var target authorization.Target
+	var anchor, expires time.Time
+	installedJourneyReadOnly(t, ctx, c.SQL, func(tx pgx.Tx) error {
+		return tx.QueryRow(ctx, `SELECT p.cluster_id,p.artifact_id,p.attempt_id,p.namespace_uid,p.workload_uid,p.pod_uid,p.anchor_at,a.effective_expires_at
+FROM context_processing p
+JOIN context_case_locator l ON l.root_id=p.root_id AND l.capture_id=p.capture_id AND l.artifact_id=p.artifact_id
+JOIN custody_attempt a ON a.id=p.attempt_id AND a.cluster_id=p.cluster_id AND a.artifact_id=p.artifact_id
+JOIN context_writer_completion w ON w.root_id=p.root_id AND w.capture_id=p.capture_id AND w.attempt_id=p.attempt_id
+WHERE p.root_id=$1 AND p.artifact_id=$2 AND l.case_id=$3 AND a.state='stored_unpublished'`,
+			c.RootID, c.ArtifactID, c.CaseID).
+			Scan(&location.ClusterID, &location.ArtifactID, &location.AttemptID, &target.NamespaceUID, &target.WorkloadUID, &target.PodUID, &anchor, &expires)
+	})
+	target.ClusterID = location.ClusterID
+	if location.Validate() != nil || !target.Valid() || anchor.IsZero() || !expires.Equal(c.ExpiresAt) || !time.Now().Before(expires) {
+		t.Fatal("installed processing exact retained target and anchor unavailable")
+	}
+	if !c.WorkloadRestriction {
+		return value.ProcessingScope{Kind: "artifact", Location: location}
+	}
+	second := anchor.UTC().Truncate(time.Second)
+	scope := value.ProcessingScope{Kind: "workloadInterval", ClusterID: target.ClusterID, NamespaceUID: target.NamespaceUID, WorkloadUID: target.WorkloadUID,
+		AcquiredFrom: second.Add(-time.Second), AcquiredUntil: second.Add(time.Second)}
+	if !scope.Valid() || anchor.Before(scope.AcquiredFrom) || !anchor.Before(scope.AcquiredUntil) {
+		t.Fatal("installed processing workload scope does not contain the retained anchor")
+	}
+	return scope
 }
 
 func awaitInstalledProcessingBrowser(t *testing.T, driver *installedLiveBrowser) {
@@ -236,25 +281,52 @@ func (c installedProcessingRun) checkDiscovery(t *testing.T, ctx context.Context
 	}
 }
 
-func (c installedProcessingRun) checkReceipt(t *testing.T, ctx context.Context, event installedProcessingEvent, lane string) {
+func (c installedProcessingRun) checkReceipt(t *testing.T, ctx context.Context, event installedProcessingEvent, lane string, expected value.ProcessingScope) {
 	t.Helper()
 	r := event.Receipt
 	if !authorization.UUID(event.Key) || r.RequestID != event.Key || r.OperationID != event.Key || r.RootID != c.RootID || !authorization.UUID(r.Epoch) || !authorization.UUID(r.RuleID) {
 		t.Fatal("installed processing receipt identity")
 	}
+	action := map[string]string{"restricted": "restrict_processing", "released": "release_processing"}[r.State]
+	var input struct {
+		Action           string
+		ArtifactID       string
+		RuleID           string
+		ExpectedRevision int64
+		Scope            *value.ProcessingScope
+	}
+	if json.Unmarshal(event.Input, &input) != nil || input.Action != action || input.RuleID != r.RuleID || input.ExpectedRevision != r.Revision-1 {
+		t.Fatal("installed processing mutation input differs from receipt")
+	}
+	if c.WorkloadRestriction || action == "release_processing" {
+		if input.ArtifactID != "" || input.Scope == nil || !input.Scope.Equal(expected) {
+			t.Fatal("installed processing mutation changed the canonical scope or used an artifact selector")
+		}
+	} else if input.ArtifactID != c.ArtifactID || input.Scope != nil {
+		t.Fatal("installed processing artifact restriction changed its selector")
+	}
+	canonical := value.ProcessingChange{RequestID: r.RequestID, RuleID: r.RuleID, Action: action, ExpectedRevision: r.Revision - 1, Scope: expected}
 	var scope value.ProcessingScope
 	var raw []byte
+	var requestDigest []byte
 	var revision, sequence int64
-	var state, action, actualLane string
+	var state, storedAction, actualLane string
 	var audited bool
 	installedJourneyReadOnly(t, ctx, c.SQL, func(tx pgx.Tx) error {
-		return tx.QueryRow(ctx, `SELECT r.scope,r.revision,r.state,d.action,d.result_sequence,a.lane,a.intent_receipt IS NOT NULL AND a.outcome_receipt IS NOT NULL
+		return tx.QueryRow(ctx, `SELECT r.scope,r.revision,r.state,d.action,d.result_sequence,a.lane,d.request_digest,
+    d.scope=r.scope AND d.intent_seed=(a.intent-ARRAY['Actor','Peer','Process']) AND d.outcome_json=(a.outcome-'Intent')
+    AND d.audit_digest=sha256(convert_to(a.outcome_receipt::text,'UTF8'))
+    AND a.intent_receipt IS NOT NULL AND a.outcome_receipt IS NOT NULL
+    AND l.binding=a.intent->'Lifecycle' AND l.intent_completion->'Receipt'=a.intent_receipt AND l.outcome_completion->'Receipt'=a.outcome_receipt
   FROM processing_rule r JOIN processing_root p ON p.root_id=r.root_id
   JOIN processing_decision d ON d.root_id=r.root_id AND d.rule_id=r.id AND d.id=$3 AND d.applied_at IS NOT NULL AND d.result_revision=r.revision
   JOIN operation_audit a ON a.root_id=r.root_id AND a.id=d.id
-  WHERE r.root_id=$1 AND r.id=$2 AND p.epoch=$4`, c.RootID, r.RuleID, r.OperationID, r.Epoch).Scan(&raw, &revision, &state, &action, &sequence, &actualLane, &audited)
+  JOIN operation_audit_lifecycle l ON l.root_id=a.root_id AND l.operation_id=a.id AND l.lane=a.lane
+  WHERE r.root_id=$1 AND r.id=$2 AND p.epoch=$4`, c.RootID, r.RuleID, r.OperationID, r.Epoch).Scan(&raw, &revision, &state, &storedAction, &sequence, &actualLane, &requestDigest, &audited)
 	})
-	if json.Unmarshal(raw, &scope) != nil || !scope.Valid() || scope.Kind != "artifact" || scope.Location.ArtifactID != c.ArtifactID || revision != r.Revision || state != r.State || sequence != r.Sequence || actualLane != lane || !audited || action != map[string]string{"restricted": "restrict_processing", "released": "release_processing"}[r.State] {
+	digest := privacyapp.ProcessingRequestDigest(canonical)
+	if json.Unmarshal(raw, &scope) != nil || !scope.Valid() || !scope.Equal(expected) || !bytes.Equal(requestDigest, digest[:]) ||
+		revision != r.Revision || state != r.State || sequence != r.Sequence || actualLane != lane || !audited || storedAction != action {
 		t.Fatal("installed processing actual SQL effect/audit differs from public receipt")
 	}
 }
@@ -323,7 +395,7 @@ func (b *installedBrowser) postProcessingChange(ctx context.Context, input json.
 	return response.StatusCode, raw, err
 }
 
-func startInstalledProcessingBrowser(t *testing.T, ctx context.Context, b *installedBrowser, address, artifactID, caseID, script string) *installedLiveBrowser {
+func startInstalledProcessingBrowser(t *testing.T, ctx context.Context, b *installedBrowser, address, artifactID, caseID, script string, workloadRestriction ...bool) *installedLiveBrowser {
 	t.Helper()
 	origin, err := url.Parse(b.base)
 	if err != nil || b.client.Jar == nil {
@@ -387,7 +459,8 @@ func startInstalledProcessingBrowser(t *testing.T, ctx context.Context, b *insta
 			installedAwait(t, "installed processing browser", p.done, 30*time.Second)
 		})
 	})
-	p.send(map[string]any{"origin": b.base, "proxy": installedHistoryBrowserTunnel(t, ctx, b.base, address), "cookies": cookies, "artifactID": artifactID, "casePath": "/cases/" + caseID})
+	p.send(map[string]any{"origin": b.base, "proxy": installedHistoryBrowserTunnel(t, ctx, b.base, address), "cookies": cookies, "artifactID": artifactID, "casePath": "/cases/" + caseID,
+		"workloadRestriction": len(workloadRestriction) == 1 && workloadRestriction[0]})
 	clear(cookies)
 	return p
 }

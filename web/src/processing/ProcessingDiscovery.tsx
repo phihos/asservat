@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef, useState } from 'react';
 import { Button } from 'react-aria-components';
 import type { Session } from '../auth/session';
 import { OperationFailure } from '../capture/http';
+import type { WorkloadScope } from './http';
 import { processingDiscoveryClient, validDiscoveryQuery, type DiscoveryPage, type DiscoveryQuery, type ProcessingDiscoveryClient } from './discovery-http';
 
 const initial = {
@@ -26,8 +27,8 @@ function buildQuery(criteria: typeof initial): unknown {
   };
 }
 
-export function ProcessingDiscovery({ session, scope, onSelect, onReviewErasure, disabled, client = processingDiscoveryClient }: {
-  session: Session; scope: AbortSignal; onSelect: (artifactID: string) => void; onReviewErasure: (artifactID: string) => void; disabled: boolean; client?: ProcessingDiscoveryClient;
+export function ProcessingDiscovery({ session, scope, onSelect, onReviewErasure, onReviewWorkload, disabled, client = processingDiscoveryClient }: {
+  session: Session; scope: AbortSignal; onSelect: (artifactID: string) => void; onReviewErasure: (artifactID: string) => void; onReviewWorkload: (scope: WorkloadScope) => void; disabled: boolean; client?: ProcessingDiscoveryClient;
 }) {
   const inFlight = useRef<object | undefined>(undefined);
   const [criteria, setCriteria] = useState(initial);
@@ -87,6 +88,11 @@ export function ProcessingDiscovery({ session, scope, onSelect, onReviewErasure,
     void search({ ...result.query, after: result.page.next });
   };
 
+  const workloadScope: WorkloadScope | undefined = result && !('case_id' in result.query) ? {
+    kind: 'workloadInterval', clusterID: result.query.cluster_id, namespaceUID: result.query.namespace_uid, workloadUID: result.query.workload_uid,
+    acquiredFrom: result.query.acquired_from, acquiredUntil: result.query.acquired_until,
+  } : undefined;
+
   return <section className="review-section" aria-labelledby="processing-discovery">
     <h2 id="processing-discovery">Find evidence</h2>
     <p>Search uses retained catalog metadata. Results show the lineage recorded at publication.</p>
@@ -122,6 +128,7 @@ export function ProcessingDiscovery({ session, scope, onSelect, onReviewErasure,
     {message && <p role="alert" className="notice">{message}</p>}
     {result && <section className="review-section" aria-labelledby="processing-candidates">
       <h3 id="processing-candidates">Evidence candidates</h3>
+      {workloadScope && <Button className="button secondary" isDisabled={disabled || busy} onPress={() => onReviewWorkload(workloadScope)}>Review workload restriction</Button>}
       {result.page.candidates.length === 0 && <p>No matching candidates on this page.</p>}
       {result.page.candidates.map(candidate => <article className="diagnostic" key={candidate.artifact_id} aria-label={`Evidence candidate ${candidate.artifact_id}`}>
         <h4 className="identifier">Artifact {candidate.artifact_id}</h4>

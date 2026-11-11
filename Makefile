@@ -24,7 +24,7 @@ console-build:
 	cd web && npm run build
 
 console-browser-check: console-build
-	ASSERVAT_CONSOLE_BROWSER_TEST=1 TMPDIR="$(ASSERVAT_BUILD_TMP)" go test -count=1 -run '^TestConsole(Browser|NativeRestart|ProfileComparison|HeapProfile|PacketSummary|PacketQuery|SyscallQuery|SyscallCaptureAuthoring|LogsQuery|LiveObservation|Processing|Erasure)WithBuiltPackage$$' -v ./test/integration
+	ASSERVAT_CONSOLE_BROWSER_TEST=1 TMPDIR="$(ASSERVAT_BUILD_TMP)" go test -count=1 -run '^TestConsole(Browser|NativeRestart|ProfileComparison|HeapProfile|PacketSummary|PacketQuery|SyscallQuery|SyscallCaptureAuthoring|LogsQuery|LiveObservation|Processing|WorkloadProcessing|Erasure)WithBuiltPackage$$' -v ./test/integration
 
 .PHONY: openapi-check
 openapi-check:
@@ -70,7 +70,7 @@ context-integration:
 # owned kind clusters, e.g. make installed-focus FOCUS=manual-logs. The harness
 # refuses collector focuses without the disposable-host guard; this target
 # additionally accepts only the collector-free focuses below.
-LOCAL_FOCUSES = chain journey browser restart clusters upgrade policy alert logresource share manual-logs journey-store-failure journey-start-failure retention-shortening early-erasure
+LOCAL_FOCUSES = chain journey browser restart clusters upgrade policy alert logresource share manual-logs journey-store-failure journey-start-failure retention-shortening early-erasure processing-workload
 .PHONY: installed-focus
 installed-focus:
 	$(if $(and $(filter 1,$(words $(FOCUS))),$(filter $(FOCUS),$(LOCAL_FOCUSES))),,$(error FOCUS must be one collector-free focus: $(LOCAL_FOCUSES)))

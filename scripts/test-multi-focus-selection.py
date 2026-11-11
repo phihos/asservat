@@ -25,6 +25,10 @@ class MultiFocusSelection(unittest.TestCase):
     def test_focus_list(self):
         self.assertEqual(fixture.journey_foci({}), [])
         self.assertEqual(fixture.journey_foci({"ASSERVAT_JOURNEY_FOCUS": "manual-logs"}), ["manual-logs"])
+        self.assertEqual(fixture.journey_foci({"ASSERVAT_JOURNEY_FOCUS": "processing-workload"}), ["processing-workload"])
+        with patch.dict(os.environ, {"ASSERVAT_JOURNEY_FOCUS": "processing-workload"}):
+            self.assertEqual(fixture.qualification_cluster_count(3, installer_continuation=True), 2)
+        self.assertFalse(fixture.qualification_collector(["processing-workload"]))
         self.assertEqual(fixture.journey_foci({"ASSERVAT_JOURNEY_FOCUS": "journey,policy"}), ["journey", "policy"])
         for bad in ("journey,journey", "journey,chain", "clusters,journey", "journey,", "journey,typo"):
             with self.subTest(bad=bad), self.assertRaises(ValueError):
