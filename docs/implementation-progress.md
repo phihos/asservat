@@ -1,9 +1,34 @@
 # Sustained implementation progress
 
-## Active candidate: processing inventory export (2026-11-11)
+## Active candidate: finite share metadata retirement (2026-11-11)
 
-[PR222](https://github.com/phihos/asservat/pull/222) starts from authoritative
-`fec1e03e`. The console exports seven ordered sections of retained artifacts
+Candidate `feature/finite-share-history` starts from authoritative `cef71802`
+in the owned `asservat-share-retirement` worktree. Outcome is a complete share
+workflow through live metadata deletion, managed audit-object retirement and
+original residual-history accounting. ADR-323 records the proposed creating-slot
+binding, finite business-key replay and shared cleanup composition.
+
+Source review found that active-share limits do not bound retained history and
+share DELETE is unconditionally refused. The existing capture cleanup component
+has no production installer projection caller; activating it is real new runtime
+work, not already installed qualification. Exact pool/credential activation cost
+is being checked before wiring. Reuse the existing audit slots and finalization;
+add no lifetime-share quota, permanent key tombstone or share-specific cleaner.
+
+The bounded baseline fixture accepts eight owners before actual publication,
+uses compiled hub grants, records share/replay/transfer/revoke/rollback costs and
+checks 65 retained rows despite the 32-active limit. Only fixture-gated compilation
+has run; real-service measurement and the 100-share revoke-all cost are pending.
+No product behavior or new credential has changed. Next: freeze/commit the
+measurement source, run the owned fixture, establish compatible original
+provider/funding bounds and implement the complete installed retirement path.
+
+## Merged processing inventory export (2026-11-11)
+
+[PR222](https://github.com/phihos/asservat/pull/222) merged at `cef71802`.
+Its complete tree matches reviewed `382a5071`; required PR CI42962003612
+passed all 14 Go shards, the browser job and `ci-ok`. The branch started from
+authoritative `fec1e03e`. The console exports seven ordered sections of retained artifacts
 including deletions, recipients, native sessions, operation responses, rules,
 technical paths and declared processors. Finite JSON parts preserve the original
 selection and continue before completion. ADR-322 and SC-PRV-014 define the
@@ -25,8 +50,8 @@ frozen, cleanup failures are empty, both owned clusters and labelled Docker
 resources are gone, and build scratch was removed. The focus uses one regional
 target; broader replay and second-workload matrices were not run. Original
 reports are external in `privacy-inventory-report/installed-8fe07f0a`. Required
-final PR CI and merge remain pending. The end-to-end specification goal stays
-active.
+PR CI passed and authoritative main readback matched all 4,813 qualification
+source hashes. The end-to-end specification goal stays active.
 
 Local validation passed: 683 console tests, 41 focused UI/HTTP cases, TypeScript,
 59 report contract cases, Helm and specification/architecture/design checks.

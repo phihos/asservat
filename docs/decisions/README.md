@@ -1,5 +1,9 @@
 # Decision records
 
+[ADR-323 — Finite share metadata and public audit retirement](323-finite-share-metadata-retirement.md)
+plans creating-slot dependency, finite replay and actual cleanup composition.
+Measurements and implementation qualification remain pending.
+
 [ADR-322 — Processing inventory export](322-processing-inventory-export.md)
 adds bounded audited JSON export of retained artifacts, recipient history,
 processing rules, placement and explicit processor declarations. The named
