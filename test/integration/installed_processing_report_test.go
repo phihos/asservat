@@ -14,12 +14,14 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"syscall"
 	"testing"
 	"time"
 
 	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/privacy"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -51,6 +53,27 @@ type processingReportExport struct {
 	Pages    []installedJourneyEnvelope   `json:"pages"`
 	Next     *value.ProcessingReportQuery `json:"next,omitempty"`
 	Complete bool                         `json:"complete"`
+}
+
+func TestInstalledReportSharingAuthority(t *testing.T) {
+	for _, fixture := range []struct {
+		foci  string
+		owner bool
+	}{
+		{"privacy-inventory", true}, {"share", true}, {"browser", true},
+		{"early-erasure", false}, {"early-erasure,privacy-inventory", true},
+	} {
+		t.Run(fixture.foci, func(t *testing.T) {
+			t.Setenv("ASSERVAT_JOURNEY_FOCUS", fixture.foci)
+			owner := false
+			for _, role := range installedRegionalBindingRoles() {
+				owner = owner || role == "evidence-owner"
+			}
+			if owner != fixture.owner {
+				t.Fatal("installed sharing fixture must bind evidence-owner before capture so it joins the retained audience", owner, fixture.owner)
+			}
+		})
+	}
 }
 
 func startProcessingReportBrowser(t *testing.T, ctx context.Context, config map[string]any) (*installedLiveBrowser, string) {
@@ -187,7 +210,7 @@ func qualifyInstalledProcessingReport(t *testing.T, parent context.Context, clus
 			run.Diagnose()
 		}
 	}()
-	shareID, recipient := createInstalledReportShare(t, ctx, run)
+	shared := createInstalledReportShare(t, ctx, run)
 	erasure.qualify(t, ctx, cluster, run)
 	session := run.Identity.consoleSession(t, ctx, run.PublicRoot, run.Address, run.Origin)
 	origin, err := url.Parse(session.base)
@@ -213,10 +236,34 @@ func qualifyInstalledProcessingReport(t *testing.T, parent context.Context, clus
 		t.Fatal(err)
 	}
 	policy := sha256.Sum256(canonical)
+	sharePages := 0
+	var shareAfter value.ProcessingReportCursor
 	records := readProcessingReportExports(t, driver, output, func(summary reportPageSummary, page value.ProcessingReportPage) {
 		if page.RootID != run.RootID || page.InstallationID != erasure.installation || page.PolicyRevision.UID != string(source.UID) ||
 			page.PolicyRevision.Generation != settings.Revision || page.PolicyRevision.Digest != hex.EncodeToString(policy[:]) || page.ProcessorDeclarations != "supplied" {
 			t.Fatal("installed report changed the actual accepted policy or declaration provenance")
+		}
+		if page.Section == "shares" {
+			sharePages++
+			if summary.Query.Limit != 3 || sharePages > 2 {
+				t.Fatal("installed report did not paginate the four real recipients at three records per page")
+			}
+			for _, record := range page.Records {
+				if record.Share == nil || record.Share.ShareID != shared.ID {
+					t.Fatal("installed report recipient page changed the actual share")
+				}
+			}
+			if sharePages == 1 {
+				if len(page.Records) != 3 || page.Next == nil || page.Next.Section != "shares" {
+					t.Fatal("installed report failed to continue inside a share's recipient list")
+				}
+				shareAfter = page.Records[2].Cursor()
+				if shareAfter.Ordinal != 3 || !reflect.DeepEqual(page.Next.After, shareAfter) {
+					t.Fatal("installed report lost the third recipient continuation")
+				}
+			} else if len(page.Records) != 1 || !reflect.DeepEqual(summary.Query.After, shareAfter) || page.Next == nil || page.Next.Section != "downloads" {
+				t.Fatal("installed report did not finish the same share with its fourth recipient")
+			}
 		}
 		installedJourneyReadOnly(t, ctx, run.SQL, func(tx pgx.Tx) error {
 			var exact bool
@@ -233,7 +280,8 @@ WHERE o.root_id=$1 AND o.id=$2`, run.RootID, summary.RequestID, summary.Response
 			return nil
 		})
 	})
-	artifactFound, shareFound, downloadFound := false, false, false
+	artifactFound, downloadFound := false, false
+	recipients := map[string]bool{}
 	var processors []value.ProcessingOrganization
 	for _, record := range records {
 		if a := record.Artifact; a != nil && a.ArtifactID == run.ArtifactID {
@@ -243,8 +291,13 @@ WHERE o.root_id=$1 AND o.id=$2`, run.RootID, summary.RequestID, summary.Response
 				t.Fatal("installed report lost retained erasure and original provenance")
 			}
 		}
-		if share := record.Share; share != nil && share.ShareID == shareID {
-			shareFound = share.ArtifactID == run.ArtifactID && share.RecipientID == recipient && share.RecipientIssuer == run.Identity.Issuer
+		if share := record.Share; share != nil && share.ShareID == shared.ID {
+			recipient := authorization.ShareRecipient{Kind: share.RecipientKind, Issuer: share.RecipientIssuer, ID: share.RecipientID}
+			ordinal := slices.Index(shared.Recipients, recipient) + 1
+			if share.ArtifactID != run.ArtifactID || ordinal == 0 || share.Ordinal != int64(ordinal) || recipients[recipient.Key()] {
+				t.Fatal("installed export changed, repeated or invented an actual share recipient")
+			}
+			recipients[recipient.Key()] = true
 		}
 		if download := record.Download; download != nil && download.ArtifactID == run.ArtifactID && download.State == "Completed" && download.EmittedBytes > 0 && download.ClientReceipt == "unknown" {
 			downloadFound = true
@@ -253,8 +306,8 @@ WHERE o.root_id=$1 AND o.id=$2`, run.RootID, summary.RequestID, summary.Response
 			processors = append(processors, *record.Processor)
 		}
 	}
-	if !artifactFound || !shareFound || !downloadFound || !reflect.DeepEqual(processors, reportFixtureProcessors()) {
-		t.Fatal("installed export omitted source artifact, recipient, completed session or declarations", artifactFound, shareFound, downloadFound)
+	if !artifactFound || len(recipients) != 4 || sharePages != 2 || !downloadFound || !reflect.DeepEqual(processors, reportFixtureProcessors()) {
+		t.Fatal("installed export omitted source artifact, four paginated recipients, completed session or declarations", artifactFound, len(recipients), sharePages, downloadFound)
 	}
 	outsider := run.Identity.unrelated().consoleSession(t, ctx, run.PublicRoot, run.Address, run.Origin)
 	denialCounts := func() (total, acknowledged int64) {
@@ -269,7 +322,7 @@ SELECT count(*),count(*) FILTER(WHERE o.lane='normal' AND o.intent->>'InputForma
 FROM operation_audit o LEFT JOIN operation_audit_lifecycle l
  ON l.root_id=o.root_id AND l.operation_id=o.id AND l.lane=o.lane
 WHERE o.root_id=$1 AND o.intent->>'Name'='get_processing_report'
- AND o.intent#>>'{Actor,Issuer}'=$2 AND o.intent#>>'{Actor,Subject}'=$3`, run.RootID, run.Identity.Issuer, recipient).Scan(&total, &acknowledged)
+ AND o.intent#>>'{Actor,Issuer}'=$2 AND o.intent#>>'{Actor,Subject}'=$3`, run.RootID, run.Identity.Issuer, shared.OutsiderID).Scan(&total, &acknowledged)
 		})
 		return total, acknowledged
 	}
@@ -340,7 +393,12 @@ FROM goose_db_version v ORDER BY v.id DESC LIMIT 1`).Scan(&head, &applied, &inde
 	t.Log("exact SQL152 Down guard refused retained report audit with 23514; rolled back, schema152 and all three index definitions unchanged")
 }
 
-func createInstalledReportShare(t *testing.T, ctx context.Context, run installedProcessingRun) (string, string) {
+type installedReportShare struct {
+	ID, OutsiderID string
+	Recipients     []authorization.ShareRecipient
+}
+
+func createInstalledReportShare(t *testing.T, ctx context.Context, run installedProcessingRun) installedReportShare {
 	t.Helper()
 	reply, err := run.Call(ctx, "get_case", map[string]string{"case_id": run.CaseID})
 	// Public case metadata supplies the exact version; SQL supplies no input.
@@ -350,8 +408,9 @@ func createInstalledReportShare(t *testing.T, ctx context.Context, run installed
 			Digest string `json:"digest"`
 		} `json:"artifacts"`
 	}
-	if err != nil || reply.Status != "ok" || json.Unmarshal(reply.Data, &data) != nil || len(data.Artifacts) != 1 || data.Artifacts[0].ID != run.ArtifactID {
-		t.Fatal("installed report share source case", err)
+	decodeErr := json.Unmarshal(reply.Data, &data)
+	if err != nil || reply.Status != "ok" || decodeErr != nil || len(data.Artifacts) != 1 || data.Artifacts[0].ID != run.ArtifactID {
+		t.Fatal("installed report share source case", "status", reply.Status, "request", reply.RequestID, "call", err, "decode", decodeErr, "artifacts", len(data.Artifacts))
 	}
 	recipient := run.Identity.unrelated().mcpTokenSource(run.Origin)
 	if _, err := recipient.Token(ctx); err != nil || recipient.subject == "" {
@@ -359,6 +418,22 @@ func createInstalledReportShare(t *testing.T, ctx context.Context, run installed
 	}
 	client := sdk.NewClient(&sdk.Implementation{Name: "installed-report-share", Version: "1"}, &sdk.ClientOptions{Capabilities: &sdk.ClientCapabilities{}})
 	owner := run.Identity.shareTokenSource(run.Origin)
+	if _, err := owner.Token(ctx); err != nil || owner.subject == "" {
+		t.Fatal("installed report owner", err)
+	}
+	// These two users and stable groups are created by the actual fixture
+	// realm. Four recipients exercise a continuation within one share at limit 3.
+	recipients := []authorization.ShareRecipient{
+		{Kind: "User", Issuer: run.Identity.Issuer, ID: recipient.subject},
+		{Kind: "User", Issuer: run.Identity.Issuer, ID: owner.subject},
+		{Kind: "Group", Issuer: run.Identity.Issuer, ID: installedIdentityGroup},
+		{Kind: "Group", Issuer: run.Identity.Issuer, ID: installedUnrelatedGroup},
+	}
+	slices.SortFunc(recipients, func(a, b authorization.ShareRecipient) int { return strings.Compare(a.Key(), b.Key()) })
+	wires := make([]map[string]string, 0, len(recipients))
+	for _, recipient := range recipients {
+		wires = append(wires, map[string]string{"kind": recipient.Kind, "issuer": recipient.Issuer, "id": recipient.ID})
+	}
 	session, err := client.Connect(ctx, &sdk.StreamableClientTransport{Endpoint: strings.TrimSuffix(run.Origin, "/") + "/mcp",
 		HTTPClient: &http.Client{Transport: installedJourneyBearer{run.Transport, owner.Token}, Timeout: 30 * time.Second}, MaxRetries: -1, DisableStandaloneSSE: true}, nil)
 	if err != nil {
@@ -367,7 +442,7 @@ func createInstalledReportShare(t *testing.T, ctx context.Context, run installed
 	defer session.Close()
 	result, err := session.CallTool(ctx, &sdk.CallToolParams{Name: "create_share", Arguments: map[string]any{
 		"case_id": run.CaseID, "artifacts": []map[string]string{{"artifactID": run.ArtifactID, "digest": data.Artifacts[0].Digest}},
-		"recipients":   []map[string]string{{"kind": "User", "issuer": run.Identity.Issuer, "id": recipient.subject}},
+		"recipients":   wires,
 		"data_classes": []string{"metadata"}, "operations": []string{"get_case"}, "expires_at": run.ExpiresAt.UTC().Format(time.RFC3339Nano),
 		"reason": "synthetic inventory report qualification", "idempotency_key": "installed-inventory-share",
 	}})
@@ -375,14 +450,17 @@ func createInstalledReportShare(t *testing.T, ctx context.Context, run installed
 	if err != nil || wireErr != nil {
 		t.Fatal("installed report share", err, wireErr)
 	}
-	envelope, err := installedJourneyReply(wire, "create_share", result)
+	envelope, code, err := installedJourneyReplyCode(wire, "create_share", result)
 	var created struct {
-		ID string `json:"share_id"`
+		ID    string `json:"share_id"`
+		Phase string `json:"phase"`
 	}
-	if err != nil || envelope.Status != "ok" || json.Unmarshal(envelope.Data, &created) != nil || created.ID == "" {
-		t.Fatal("installed report share receipt", err)
+	decodeErr = json.Unmarshal(envelope.Data, &created)
+	if err != nil || envelope.Status != "ok" || decodeErr != nil || created.ID == "" || created.Phase != "Active" {
+		t.Fatal("installed report share receipt", "status", envelope.Status, "code", code, "request", envelope.RequestID, "contract", err, "decode", decodeErr, "phase", created.Phase)
 	}
-	return created.ID, recipient.subject
+	t.Logf("installed report create_share -> %s %s request %s with %d existing fixture recipients", envelope.Status, created.Phase, envelope.RequestID, len(recipients))
+	return installedReportShare{ID: created.ID, OutsiderID: recipient.subject, Recipients: recipients}
 }
 
 func canonicalReportSource(raw string) ([]byte, error) {

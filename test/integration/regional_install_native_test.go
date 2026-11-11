@@ -987,17 +987,17 @@ func (b *regionalBudget) addPolicy() {
 	}
 }
 
-// installedRegionalBindingRoles are the maintainer binding's roles. A share
-// or browser focus adds evidence-owner for every focus of its installation.
+// installedRegionalBindingRoles are the maintainer binding's roles. Share,
+// browser and privacy inventory focuses add evidence-owner before capture.
 func installedRegionalBindingRoles() []any {
 	roles := []any{"workload-maintainer"}
 	if installedRecordingFocus() || installedLogsFocus() {
 		roles = append(roles, "action-approver")
 	}
-	if installedAnyFocus("share") || installedAnyFocus("browser") {
+	if installedAnyFocus("share") || installedAnyFocus("browser") || installedAnyFocus("privacy-inventory") {
 		// ADR-232: the developer group also owns the workload's evidence, so
 		// its captures' retained audience includes the evidence-owner role.
-		// The browser focus shares from the console session.
+		// Browser and inventory focuses also create actual artifact shares.
 		roles = append(roles, "evidence-owner")
 	}
 	return roles

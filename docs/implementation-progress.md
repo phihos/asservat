@@ -46,6 +46,29 @@ the report export, existing journeys and accessibility scans. Its generated
 output is archived externally. A final installed-only correction uses a valid
 nonoperator query and requires the actual 401 plus an acknowledged denied audit.
 
+At `a657fca4`, final `make pre-push` passed, including all 683 console tests
+and the affected Go race suite (517 s). Full `make console-browser-check`
+passed in 159.513 s. Fresh installed `privacy-inventory` qualification then
+failed before the export, while creating its prerequisite share (Go 262.205 s,
+harness 337.0 s, test exit 1 and make exit 2). The actual persisted operation
+records a denied `create_share`, reason `not_available`, with both audit
+receipts acknowledged. All 4,811 source hashes independently match the frozen
+commit and source remained unchanged. The owned collector-free environment
+was retained for diagnosis. Its current permission projection and original
+capture audience contained only `workload-maintainer`; the focus selector
+omitted the `evidence-owner` setup used by sharing fixtures. A focused selector
+regression reproduced the omission. The failure occurred almost four minutes
+before evidence expiry and created no share. After diagnosis, official kept
+cleanup returned 0 and verified no owned cluster or labelled Docker resources
+remained. Original outputs remain outside the repository in
+`installed-a657fca4`. Fresh qualification of the corrected fixture is pending.
+The corrected focus grants ownership before acquisition, preserving the real
+retained audience. The selector regression and compiled-browser report test
+pass (2.085 s, exit 0). Installed assertions now require four existing fixture
+recipients across exact 3+1 pages, unique recipient ordinals and acknowledged
+page output bytes. Production code, console assets and browser drivers are
+unchanged from the successful broad/browser checkpoint.
+
 The report uses original visibility horizons. Physical retirement of all share
 metadata, complete retained-derivative production/propagation, reviewed personal
 extracts and preservation remain open under the wider specification.
