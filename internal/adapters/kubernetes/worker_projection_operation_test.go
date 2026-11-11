@@ -113,7 +113,7 @@ func TestWorkerProjectionOperationTokenRotationFailsClosed(t *testing.T) {
 }
 
 func TestWorkerProjectionOperationFinalRejectsChangedOriginalFacts(t *testing.T) {
-	for _, kind := range []string{"journal", "worker", "metadata"} {
+	for _, kind := range []string{"journal", "core", "invalid-cleanup", "worker", "metadata"} {
 		t.Run(kind, func(t *testing.T) {
 			f := newWorkerProjectionOperationFixture(t)
 			op, claim, err := f.reader.worker.BeginCapacityProjectionOperation(t.Context())
@@ -123,14 +123,21 @@ func TestWorkerProjectionOperationFinalRejectsChangedOriginalFacts(t *testing.T)
 			defer op.Close()
 			f.mu.Lock()
 			switch kind {
-			case "journal":
+			case "journal", "core", "invalid-cleanup":
 				j := f.objects["/api/v1/namespaces/"+f.input.Namespace.Name+"/secrets/"+f.input.Activation.Resources.Name].(*core.Secret)
 				var state contracts.InitialRuntimeResourceState
 				if json.Unmarshal(j.Data["state.json"], &state) != nil {
 					f.mu.Unlock()
 					t.Fatal("journal decode")
 				}
-				state.CapacityProjection.PublicDigest = strings.Repeat("d", 64)
+				switch kind {
+				case "journal":
+					state.CapacityProjection.PublicDigest = strings.Repeat("d", 64)
+				case "core":
+					state.SetupID = ownerID(19100)
+				case "invalid-cleanup":
+					state.CleanupProjection.Setup.DatabaseOID = 0
+				}
 				j.Data["state.json"], _ = json.Marshal(state)
 			case "worker":
 				f.objects["/apis/apps/v1/namespaces/"+f.input.Namespace.Name+"/deployments/"+f.input.Activation.Deployment.Name].(*apps.Deployment).Spec.Template.Spec.Containers[0].Image = "foreign"
@@ -143,6 +150,59 @@ func TestWorkerProjectionOperationFinalRejectsChangedOriginalFacts(t *testing.T)
 			}
 			if op.Context().Err() == nil || !op.FreshUntil().IsZero() {
 				t.Fatal("known changed final left native operation usable")
+			}
+		})
+	}
+}
+
+// A cleanup publication changes the shared journal while capacity is opening.
+// Both current passes still validate the whole journal; that valid sibling
+// progress must not replace the selected capacity claim or its original bound.
+func TestWorkerCapacityProjectionFinishAllowsValidCleanupPublication(t *testing.T) {
+	for _, phase := range []string{"claim", "receipt"} {
+		t.Run(phase, func(t *testing.T) {
+			f := newWorkerProjectionOperationFixture(t)
+			path := "/api/v1/namespaces/" + f.input.Namespace.Name + "/secrets/" + f.input.Activation.Resources.Name
+			f.mu.Lock()
+			journal := f.objects[path].(*core.Secret)
+			var state contracts.InitialRuntimeResourceState
+			if err := json.Unmarshal(journal.Data["state.json"], &state); err != nil {
+				f.mu.Unlock()
+				t.Fatal(err)
+			}
+			cleanup := *state.CleanupProjection
+			receipt := *cleanup.Receipt
+			cleanup.Receipt = nil
+			if phase == "claim" {
+				state.CleanupProjection = nil
+			} else {
+				state.CleanupProjection = &cleanup
+			}
+			journal.Data["state.json"], _ = json.Marshal(state)
+			f.mu.Unlock()
+			op, selected, err := f.reader.worker.BeginCapacityProjectionOperation(t.Context())
+			if err != nil {
+				t.Fatal("begin original capacity", err)
+			}
+			defer op.Close()
+			originalUntil := op.FreshUntil()
+			originalState, _ := json.Marshal(op.initial.state)
+			if phase == "receipt" {
+				cleanup.Receipt = &receipt
+			}
+			state.CleanupProjection = &cleanup
+			if !workerProjectionStateValid(f.input.InstallationID, state, time.Now()) {
+				t.Fatal("fixture sibling publication invalid")
+			}
+			f.mu.Lock()
+			journal.Data["state.json"], _ = json.Marshal(state)
+			f.mu.Unlock()
+			if err := op.Finish(op.Context()); err != nil {
+				t.Fatal("valid cleanup publication stopped unchanged capacity startup", err)
+			}
+			afterState, _ := json.Marshal(op.initial.state)
+			if string(originalState) != string(afterState) || !op.FreshUntil().Equal(originalUntil) || !equalJSON(selected, state.CapacityProjection) {
+				t.Fatal("sibling publication changed original capacity or deadline")
 			}
 		})
 	}

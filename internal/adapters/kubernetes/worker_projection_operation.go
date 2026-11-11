@@ -189,7 +189,14 @@ func (p *WorkerProjectionOperation) Finish(ctx context.Context) error {
 	if err == nil {
 		err = p.tokens.mountedCurrent(call)
 	}
-	if err == nil && (last.guard != p.initial.guard || !equalJSON(last.state, p.initial.state) || !configurationProviderDeploymentEqual(last.owner, p.initial.owner)) {
+	initialState, lastState := p.initial.state, last.state
+	if p.purpose == workerCapacityProjection {
+		// Cleanup publishes independently after capacity. Both complete journals
+		// were validated above; valid cleanup progress is not capacity authority.
+		// Compare copies so the original operation and selected claim stay intact.
+		initialState.CleanupProjection, lastState.CleanupProjection = nil, nil
+	}
+	if err == nil && (last.guard != p.initial.guard || !equalJSON(lastState, initialState) || !configurationProviderDeploymentEqual(last.owner, p.initial.owner)) {
 		err = cfg.ErrChanged
 	}
 	p.mu.Lock()

@@ -114,6 +114,26 @@ must be exercised there before another installed run. This focus covers public
 MCP sharing; the separate built-browser evidence remains separately scoped.
 No installed retirement or full specification completion is claimed.
 
+At `8ab7b9ae`, the exact shared observer query passes the paid-share service
+fixture (Go62.792s,4,581 hashes), including positive future cooling, actual
+refund, aggregated charges and nullable fields. Pre-push passes with354s race
+tests. Fresh installed qualification fails earlier at worker startup:
+Go240.583s/harness305.1s, all4,854 source hashes matching and complete owned
+cleanup. The original worker exits at `capacity/open/finish (changed)`;
+Kubernetes restarts it and the replacement begins cleanup, but that does not
+satisfy the original-process qualification check.
+
+A deterministic two-pass reproduction fails0.220s: capacity publishes first,
+then cleanup adds its valid sibling claim/receipt to the same resource journal.
+Capacity compared the whole journal and rejected that unrelated progress.
+The correction compares copies that omit only `CleanupProjection` for the
+capacity purpose. Complete journal validation, all other core fields, selected
+capacity/Secret data, workload identity, guard, token and original deadlines
+remain checked. It adds no request, retry, loop, state or timeout and changes
+no other purpose. Both sibling interleavings pass; genuine authority changes
+still refuse. Focused race checks pass3.364s. Fresh integrated qualification
+remains pending; no installed retirement claim is made.
+
 ## Merged installable context trial (2026-11-11)
 
 [PR223](https://github.com/phihos/asservat/pull/223) merged at `b389b7c9`;

@@ -227,3 +227,16 @@ not effect or owner/authority-audit authority. This is a correction of the
 component composition, with no new role, cache, timeout, API call or task.
 Cold regressions must cover the actual cleanup ticket and unseeded credential
 slots; healthy cached-token tests alone cannot establish cold startup.
+
+## Independent projection completion during startup
+
+The installed `8ab7b9ae` worker rejects capacity startup when cleanup publishes
+a valid sibling claim/receipt between capacity's two native reads. The cleanup
+producer guarantees all other journal fields stay unchanged. A focused
+reproduction fails for both legitimate sibling updates. Capacity completion
+therefore compares journal copies without only the sibling `CleanupProjection`
+field. Both complete states are still validated, and every core/selected
+capacity field, Secret, worker identity, guard, token and original time bound
+remains required. Cleanup and every other purpose retain their existing
+comparison. This removes an unrelated-entity coupling, with no new request,
+retry, state, deadline or fallback and no weakened process-identity test.
