@@ -3,12 +3,14 @@ package integration
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 	"time"
 
@@ -16,8 +18,39 @@ import (
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/contracts"
 	cfg "asservat.local/asservat/internal/domain/configuration"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"sigs.k8s.io/yaml"
 )
+
+// Read the operator example itself on each use. This intentionally supplies no
+// native endpoint, identity, credential or generated installation identifier.
+type helmContextTrialSettings struct {
+	Fleet  contracts.InitialBootstrapFleet
+	Public *contracts.InstallerPublicSettings
+}
+
+func helmContextTrialProfile(t *testing.T) helmContextTrialSettings {
+	t.Helper()
+	raw, err := os.ReadFile("../../examples/helm/context-trial-profile.yaml")
+	if err != nil {
+		t.Fatal("canonical context trial profile", err)
+	}
+	var document struct {
+		Bootstrap struct {
+			Fleet        contracts.InitialBootstrapFleet `json:"fleet"`
+			Continuation contracts.InstallerContinuation `json:"continuation"`
+		} `json:"bootstrap"`
+	}
+	if err := yaml.Unmarshal(raw, &document); err != nil {
+		t.Fatal("decode canonical context trial profile", err)
+	}
+	p := document.Bootstrap.Continuation.Public
+	if p == nil || p.Capacity == nil || p.Capacity.PoolSpec == nil || p.Capacity.PolicySpec == nil || p.Federation == nil || p.RetentionBaseline == nil {
+		t.Fatal("canonical context trial lacks its complete declared profile")
+	}
+	return helmContextTrialSettings{Fleet: document.Bootstrap.Fleet, Public: p}
+}
 
 // The old fixture's exact budget choices, supplied before generated identities
 // exist. The product fills the original hub cluster ID and creates the sources.
@@ -132,5 +165,59 @@ func TestInstallerDeclaredCapacityPassesProductPreflight(t *testing.T) {
 	err := kube.EnsureInstallerCapacityObjects(context.Background(), config, cfg.NamespaceRef{Name: "hub", UID: custodyID()}, custodyID(), custodyID(), *profile)
 	if !errors.Is(err, cfg.ErrUnavailable) || calls != 1 || profile.PolicySpec.Scope.ClusterID != "" {
 		t.Fatal("declared native profile failed before its actual current-source check", err, calls)
+	}
+}
+
+func TestInstallerHelmRegionalPolicyUsesDeclaredCapacity(t *testing.T) {
+	t.Setenv("ASSERVAT_HELM_CONTEXT_NATIVE", "1")
+	profile := helmContextTrialProfile(t).Public.Capacity
+	cluster := custodyID()
+	expected := *profile.PolicySpec
+	expected.Scope.ClusterID = cluster
+	expected.NamespaceEnvelope = wire.CapacityNamespaceEnvelope{MaxWorkloadAccounts: 1, MaxStoredBytes: expected.Workload.HardLimit.Bytes, MaxObjects: expected.Workload.HardLimit.Objects}
+	expectedPool := *profile.PoolSpec
+	expectedPool.ProtectedAllocations = append(append([]wire.CapacityProtectedAllocation{}, expectedPool.ProtectedAllocations...), wire.CapacityProtectedAllocation{BudgetPolicyRef: "trial-region", WorkloadSlots: 1, ProtectedPerWorkload: expected.Workload.Protected})
+	base := "/apis/asservat.io/v1alpha1/namespaces/hub/"
+	calls := 0
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == base+"evidencebudgetpolicies":
+			var got struct {
+				Metadata struct{ Name string }         `json:"metadata"`
+				Spec     wire.EvidenceBudgetPolicySpec `json:"spec"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&got); err != nil || got.Metadata.Name != "trial-region" || !reflect.DeepEqual(got.Spec, expected) {
+				t.Error("operator regional policy replaced declared scope, reserve or limits", err)
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusCreated)
+			_, _ = w.Write([]byte(`{}`))
+		case r.Method == http.MethodGet && r.URL.Path == base+"evidencestoragepools/"+profile.Pool:
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "EvidenceStoragePool", "metadata": map[string]string{"name": profile.Pool, "resourceVersion": "7"}, "spec": profile.PoolSpec})
+		case r.Method == http.MethodPut && r.URL.Path == base+"evidencestoragepools/"+profile.Pool:
+			var got struct {
+				Metadata struct{ ResourceVersion string } `json:"metadata"`
+				Spec     wire.EvidenceStoragePoolSpec     `json:"spec"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&got); err != nil || got.Metadata.ResourceVersion != "7" || !reflect.DeepEqual(got.Spec, expectedPool) {
+				t.Error("regional slot changed declared backing or lost original CAS", err)
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{}`))
+		default:
+			t.Error("unexpected regional operator request", r.Method, r.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+	api, err := kubernetes.NewForConfig(&rest.Config{Host: server.URL, TLSClientConfig: rest.TLSClientConfig{CAData: pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: server.Certificate().Raw})}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	newRegionalBudget(t, context.Background(), api, "hub", "https://issuer.example.test", cluster, 1).addPolicy()
+	if calls != 3 {
+		t.Fatal("regional declared policy/slot did not use its three bounded operator calls", calls)
 	}
 }

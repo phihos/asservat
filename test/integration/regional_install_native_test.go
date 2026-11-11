@@ -18,6 +18,7 @@ import (
 	"testing"
 	"time"
 
+	wire "asservat.local/asservat/api/v1alpha1"
 	"asservat.local/asservat/internal/adapters/kms"
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/adapters/objectstore"
@@ -54,7 +55,7 @@ import (
 // product fleet-bootstrap purposes the continuation provisioned; only the
 // fleet operator authority is fixture setup. Hub operations use the accepted
 // runner; the original observer retains diagnostic log access only.
-func qualifyRegionalInstall(t *testing.T, ctx context.Context, f fixture, index int, admin *pgxpool.Pool, hub, hubObserver kubernetes.Interface, hubKubeconfig, namespace, issuer string, journey func(cluster, namespace, workload string, deny func(bool), gone func(string)), providers *initialRuntimeNativeProviders, offerJSON string, installation string) {
+func qualifyRegionalInstall(t *testing.T, ctx context.Context, f fixture, index int, admin *pgxpool.Pool, hub, hubObserver kubernetes.Interface, hubKubeconfig, namespace, issuer string, journey func(cluster, namespace, workload string, deny func(bool), gone func(string)), providers *initialRuntimeNativeProviders, offerJSON string, installation string, issuedRecord []byte) {
 	t.Helper()
 	var offer contracts.RegionalOffer
 	if json.Unmarshal([]byte(offerJSON), &offer) != nil {
@@ -78,7 +79,15 @@ func qualifyRegionalInstall(t *testing.T, ctx context.Context, f fixture, index 
 		// reads discovery only and never installs or adopts a shared CRD.
 		installRegionalStartCRD(t, ctx, region)
 	}
-	record := issueInstalledBootstrap(t, ctx, admin, hub, namespace, providers, installation, index)
+	var record []byte
+	if os.Getenv("ASSERVAT_HELM_CONTEXT_NATIVE") == "1" {
+		if index != 1 || len(issuedRecord) == 0 {
+			t.Fatal("Helm context trial requires its one original browser-issued bootstrap")
+		}
+		record = bytes.Clone(issuedRecord)
+	} else {
+		record = issueInstalledBootstrap(t, ctx, admin, hub, namespace, providers, installation, index)
+	}
 	dir := t.TempDir()
 	offerFile, recordFile := filepath.Join(dir, "regional-offer.json"), filepath.Join(dir, "bootstrap.json")
 	if os.WriteFile(offerFile, []byte(offerJSON), 0o600) != nil || os.WriteFile(recordFile, record, 0o600) != nil {
@@ -904,8 +913,15 @@ func newRegionalBudget(t *testing.T, ctx context.Context, hub kubernetes.Interfa
 	if index > 1 {
 		suffix = "-" + strconv.Itoa(index)
 	}
-	return &regionalBudget{t: t, ctx: ctx, client: hub.CoreV1().RESTClient(), base: "/apis/asservat.io/v1alpha1/namespaces/" + namespace + "/", issuer: issuer, cluster: cluster,
+	b := &regionalBudget{t: t, ctx: ctx, client: hub.CoreV1().RESTClient(), base: "/apis/asservat.io/v1alpha1/namespaces/" + namespace + "/", issuer: issuer, cluster: cluster,
 		policyName: "regional" + suffix, bindingName: "regional-maintainers" + suffix, index: index}
+	if os.Getenv("ASSERVAT_HELM_CONTEXT_NATIVE") == "1" {
+		if index != 1 {
+			t.Fatal("the declared context trial covers one regional cluster")
+		}
+		b.policyName = "trial-region"
+	}
+	return b
 }
 
 func (b *regionalBudget) amount(bytes, objects int64) map[string]int64 {
@@ -950,6 +966,10 @@ func installedFocusContextReserve() (bytes, objects int64) {
 
 func (b *regionalBudget) addPolicy() {
 	b.t.Helper()
+	if os.Getenv("ASSERVAT_HELM_CONTEXT_NATIVE") == "1" {
+		b.addDeclaredPolicy()
+		return
+	}
 	// The operator's regional budget: a policy for the joined cluster and its
 	// slot in the existing pool, with the pool's capacity raised to fit.
 	// Ongoing sources, re-arms, Saves and incident snapshots share the default
@@ -984,6 +1004,47 @@ func (b *regionalBudget) addPolicy() {
 	body, _ = json.Marshal(pool)
 	if err = b.client.Put().AbsPath(b.base + "evidencestoragepools/capacity").Body(body).Do(b.ctx).Error(); err != nil {
 		b.t.Fatal("operator pool extension", err)
+	}
+}
+
+// The guide's operator step derives a regional policy from the original public
+// policy and spends one pre-reserved pool slot. It never raises backend/pool
+// capacity to make the test fit or changes the root's accepted record ceiling.
+func (b *regionalBudget) addDeclaredPolicy() {
+	b.t.Helper()
+	profile := helmContextTrialProfile(b.t).Public.Capacity
+	spec := *profile.PolicySpec
+	spec.Scope.ClusterID = b.cluster
+	spec.NamespaceEnvelope = wire.CapacityNamespaceEnvelope{MaxWorkloadAccounts: 1, MaxStoredBytes: spec.Workload.HardLimit.Bytes, MaxObjects: spec.Workload.HardLimit.Objects}
+	policy := map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "EvidenceBudgetPolicy", "metadata": map[string]any{"name": b.policyName}, "spec": spec}
+	body, err := json.Marshal(policy)
+	if err != nil {
+		b.t.Fatal("declared regional policy", err)
+	}
+	if err = b.client.Post().AbsPath(b.base + "evidencebudgetpolicies").Body(body).Do(b.ctx).Error(); err != nil {
+		b.t.Fatal("operator declared regional policy", err)
+	}
+	path := b.base + "evidencestoragepools/" + profile.Pool
+	raw, err := b.client.Get().AbsPath(path).DoRaw(b.ctx)
+	var pool map[string]any
+	if err != nil || json.Unmarshal(raw, &pool) != nil {
+		b.t.Fatal("operator declared pool read", err)
+	}
+	poolSpec, ok := pool["spec"].(map[string]any)
+	if !ok {
+		b.t.Fatal("operator declared pool spec")
+	}
+	allocations, ok := poolSpec["protectedAllocations"].([]any)
+	if !ok {
+		b.t.Fatal("operator declared pool allocations")
+	}
+	poolSpec["protectedAllocations"] = append(allocations, wire.CapacityProtectedAllocation{BudgetPolicyRef: b.policyName, WorkloadSlots: 1, ProtectedPerWorkload: spec.Workload.Protected})
+	body, err = json.Marshal(pool)
+	if err != nil {
+		b.t.Fatal("operator declared pool update", err)
+	}
+	if err = b.client.Put().AbsPath(path).Body(body).Do(b.ctx).Error(); err != nil {
+		b.t.Fatal("operator declared pool slot", err)
 	}
 }
 
@@ -1046,6 +1107,13 @@ func createRegionalWorkload(t *testing.T, ctx context.Context, region kubernetes
 	// The regional workload: a labeled namespace (the selector guard admits
 	// the administrator) and a Deployment with no replicas.
 	labels := map[string]string{"team": "regional"}
+	if os.Getenv("ASSERVAT_HELM_CONTEXT_NATIVE") == "1" {
+		selector := helmContextTrialProfile(t).Public.Capacity.PolicySpec.Scope.NamespaceSelector
+		if len(selector.MatchLabels) == 0 {
+			t.Fatal("context trial requires its exact declared namespace labels")
+		}
+		labels = selector.MatchLabels
+	}
 	if installedRecordingFocus() || installedLogsFocus() {
 		labels["pod-security.kubernetes.io/enforce"] = "restricted"
 	}

@@ -140,6 +140,7 @@ def build_console(image_dir, build_env):
 def source_hashes():
     files = [ROOT/"go.mod", ROOT/"go.sum", Path(__file__), ROOT/"scripts/fetch-gadget.sh", ROOT/"scripts/ci-native.sh", ROOT/".github/workflows/native.yml"]
     files += [ROOT/"scripts/package-argument-gadget.py"]
+    files += list((ROOT/"examples/helm").glob("*.yaml"))
     files += [ROOT/"experiments/syscall-argument-budget"/name for name in ("prepare.py", "pins.json", "program.patch", "budget.h")]
     files += [ROOT/"web/package.json", ROOT/"web/package-lock.json", ROOT/"web/scripts/installed-history-browser.mjs", ROOT/"web/scripts/installed-history-response.mjs", ROOT/"web/scripts/installed-profile-comparison-browser.mjs", ROOT/"web/scripts/installed-packet-summary-browser.mjs", ROOT/"web/scripts/installed-packet-query-browser.mjs", ROOT/"web/scripts/installed-syscall-query-browser.mjs", ROOT/"web/scripts/installed-profile-case-proof.mjs", ROOT/"web/src/generated/validate-auth.js", ROOT/"web/src/generated/validate-evidence.js"]
     # Freeze both the image-owned React inputs and the real browser drivers,
@@ -738,6 +739,9 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
         audit_nodes = []
         report = {"scope": "component integration, not S-02 release acceptance", "runtimeProviderPairQualification": runtime_provider_pair, "runtimeProviderWorkerQualification": runtime_provider_worker, "runtimeProviderOwnerQualification": runtime_provider_owner, "installerContinuationQualification": installer_continuation, "aggregateGoTimeout": qualification_go_timeout(helm_bootstrap, runtime_provider_owner, installer_continuation, native_traffic_probe), "bootstrapFixtureSeconds": (2700 if installer_continuation else 720 if runtime_provider_owner else 480) if initial_bootstrap_chain else None, "images": {"s3": SEAWEED, "kms": BAO, "kubernetes": NODE, "postgres": POSTGRES}, "clusters": [], "testPattern": test_pattern, "testPackage": test_package, "runtimeObjectRoundTripQualification": runtime_object_roundtrip, "ownerProviderAuthenticationQualification": owner_provider_auth, "initialHandoverQualification": initial_handover, "initialSchemaHandoverQualification": initial_schema_handover, "initialBootstrapChainQualification": initial_bootstrap_chain, "helmBootstrapQualification": helm_bootstrap and not helm_cluster, "helmClusterQualification": helm_cluster, "regionalContextStartQualification": regional_context_start, "fixtureMigratesDatabase": not (initial_schema_handover or initial_bootstrap_chain or helm_bootstrap)}
         report["helmContextQualification"] = helm_context
+        if helm_context:
+            profile = ROOT/"examples/helm/context-trial-profile.yaml"
+            report["helmContextReferenceProfileSHA256"] = hashlib.sha256(profile.read_bytes()).hexdigest()
         if keep_installed:
             report["qualification"] = False
             report["developmentMode"] = "keep-installed: the installation is left running for --rerun-installed; never a qualification"

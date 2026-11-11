@@ -245,6 +245,13 @@ func TestInitialBootstrapChainWithRealServices(t *testing.T) {
 		desired.Fleet.Clients = []string{"console"}
 		desired.Fleet.Groups = []string{installedIdentityGroup}
 		desired.Fleet.DeliveryProfiles = []string{"regional-installer"}
+		if helmContext {
+			profile := helmContextTrialProfile(t).Fleet
+			desired.Fleet.DeliveryProfiles = append([]string(nil), profile.DeliveryProfiles...)
+			desired.Fleet.MaxActiveBootstraps = profile.MaxActiveBootstraps
+			desired.Fleet.MaxBootstrapHistory = profile.MaxBootstrapHistory
+			desired.Fleet.MaxClusters = profile.MaxClusters
+		}
 		publicInput, desired = installedUnifiedPublicInput(t, desired)
 		if helmContext {
 			if f.HelmContext == nil || f.HelmContext.ChartArchive == "" {

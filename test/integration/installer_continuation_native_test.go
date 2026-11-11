@@ -124,17 +124,32 @@ func prepareInstallerContinuationNative(t *testing.T, ctx context.Context, api k
 			processors = append(processors, contracts.ProcessingOrganization{ID: organization.ID, Name: organization.Name, Activities: organization.Activities, Regions: organization.Regions})
 		}
 	}
+	capacity := nativeCapacityProfile()
+	connector := contracts.InstallerConnectorSettings{Accounts: 4, RecordsPerAccount: 256, RetainedSeconds: 15000, Profiles: 2, SourceTransitions: 64, PurgeLeases: 2, ValidSeconds: 7200,
+		Footprint: contracts.InstallerCapacityFootprint{RowBytes: 1 << 20, TransitionWALBytes: 1 << 20}}
+	baseline := &contracts.InstallerRetentionBaseline{PurposeRef: "synthetic-baseline",
+		Defaults:              contracts.InstallerRetentionDurations{EvidenceSeconds: 86400, CaseMetadataSeconds: 86400, AuditMetadataSeconds: 86400},
+		Maxima:                contracts.InstallerRetentionDurations{EvidenceSeconds: 604800, CaseMetadataSeconds: 604800, AuditMetadataSeconds: 604800},
+		DeletionBudgetSeconds: 3600}
+	maxLifetime, maxLogins, maxSessions, maxLogout := 3600, 8*int(installedFundedRuns()), 8*int(installedFundedRuns()), 8*int(installedFundedRuns())
+	var captureHistory *contracts.CaptureHistoryLimits
+	if os.Getenv("ASSERVAT_HELM_CONTEXT_NATIVE") == "1" {
+		trial := helmContextTrialProfile(t).Public
+		capacity, connector, baseline = trial.Capacity, trial.Federation.Connector, trial.RetentionBaseline
+		maxLifetime, maxLogins, maxSessions, maxLogout = trial.MaxLifetimeSeconds, trial.MaxLogins, trial.MaxSessions, trial.MaxLogoutEvents
+		captureHistory, processors = trial.CaptureHistory, trial.Processors
+	}
 	document, _ := json.Marshal(contracts.InstallerContinuation{Format: contracts.InstallerContinuationFormat, Namespace: namespace,
 		WorkerProvider:      contracts.InstallerProviderSelection{AuthMount: providers.worker.AuthMount, AuthMountAccessor: providers.worker.AuthMountAccessor},
 		OwnerProvider:       contracts.InstallerProviderSelection{AuthMount: providers.owner.AuthMount, AuthMountAccessor: providers.owner.AuthMountAccessor},
 		OwnerIssuerRootsPEM: roots.String(), OwnerPKIMount: "owner-pki", OwnerConnections: 4, OwnerConcurrency: 2,
 		// ADR-185: synthetic browser identity settings exercise the public sources step.
 		Public: &contracts.InstallerPublicSettings{Origin: origin, Issuer: issuer, ClientID: "console",
-			MaxLifetimeSeconds: 3600, MaxLogins: 8 * int(installedFundedRuns()), MaxSessions: 8 * int(installedFundedRuns()), MaxLogoutEvents: 8 * int(installedFundedRuns()), Clients: clients,
+			MaxLifetimeSeconds: maxLifetime, MaxLogins: maxLogins, MaxSessions: maxSessions, MaxLogoutEvents: maxLogout, Clients: clients,
 			EligibleSubjects: eligibleSubjects,
 			EligibleGroups:   []string{"synthetic-group", installedUnrelatedGroup}, GroupMaxAgeSeconds: 300, Approvals: approvals,
 			// ADR-190: the operator's synthetic capacity profile and release operator.
-			Capacity: nativeCapacityProfile(),
+			Capacity: capacity, CaptureHistory: captureHistory,
 			// ADR-210: the synthetic group's console users are the processing
 			// operators, so the journey's one user initializes processing.
 			ProcessingOperators: []contracts.ProcessingOperator{{ClientID: "console", Issuer: issuer, Kind: "Group", ID: installedIdentityGroup}},
@@ -149,14 +164,10 @@ func prepareInstallerContinuationNative(t *testing.T, ctx context.Context, api k
 				// ADR-198: the key service on the same node, named by its IP.
 				KeyServiceEndpoint: "https://" + net.JoinHostPort(keyServiceHost, "31448"), KeyServiceNodePort: 31448,
 				EvidenceStore: &contracts.InstallerEvidenceStore{Endpoint: desired.AuditStore.Endpoint, RootsPEM: storeRoots.String(), Region: desired.AuditStore.Region, Bucket: evidenceBucket},
-				Connector: contracts.InstallerConnectorSettings{Accounts: 4, RecordsPerAccount: 256, RetainedSeconds: 15000, Profiles: 2, SourceTransitions: 64, PurgeLeases: 2, ValidSeconds: 7200,
-					Footprint: contracts.InstallerCapacityFootprint{RowBytes: 1 << 20, TransitionWALBytes: 1 << 20}},
-				Fleet: &contracts.InstallerFleetIssuance{ChannelMount: fleetKV, DeliveryProfile: "regional-installer"}},
+				Connector:     connector,
+				Fleet:         &contracts.InstallerFleetIssuance{ChannelMount: fleetKV, DeliveryProfile: "regional-installer"}},
 			// ADR-195: the operator's synthetic baseline retention values.
-			RetentionBaseline: &contracts.InstallerRetentionBaseline{PurposeRef: "synthetic-baseline",
-				Defaults:              contracts.InstallerRetentionDurations{EvidenceSeconds: 86400, CaseMetadataSeconds: 86400, AuditMetadataSeconds: 86400},
-				Maxima:                contracts.InstallerRetentionDurations{EvidenceSeconds: 604800, CaseMetadataSeconds: 604800, AuditMetadataSeconds: 604800},
-				DeletionBudgetSeconds: 3600},
+			RetentionBaseline: baseline,
 			// ADR-194: the promoted launch.
 			Promotion: &contracts.InstallerOwnerPromotion{BrowserAudience: "asservat-api", ProviderRootsPEM: providerRoots,
 				// ADR-202: the public API's NodePort for the installed journey.
@@ -537,8 +548,10 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 	// The first installed S-02 slice runs once the regional workload holds a
 	// fresh binding; it reads the public root generated during provider apply.
 	publicAddress := net.JoinHostPort(nodeInternalIP(t, ctx, api, f.Clusters[0].NodeUID), "31450")
-	if installedJourneyFocus() == "chain" || installedJourneyFocus() == "" {
-		qualifyInstalledFleetIssuance(t, ctx, admin, identity, publicRoot, publicAddress, origin, installation, "fleet-kv-"+desired.BootstrapNamespace, providers)
+	var issuedRecord []byte
+	if installedJourneyFocus() == "chain" || installedJourneyFocus() == "" || os.Getenv("ASSERVAT_HELM_CONTEXT_NATIVE") == "1" {
+		issuedRecord = qualifyInstalledFleetIssuance(t, ctx, admin, identity, publicRoot, publicAddress, origin, installation, "fleet-kv-"+desired.BootstrapNamespace, providers)
+		defer clear(issuedRecord)
 	}
 	// runFocus runs the current focus; journey runs every listed focus, each
 	// as its own subtest when there are several (installedRunFoci).
@@ -833,7 +846,11 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 	if os.Getenv("ASSERVAT_HELM_CONTEXT_NATIVE") != "1" {
 		hubKubeconfig = installedUnifiedRunnerKubeconfig(t, hubKubeconfig, desired)
 	}
-	qualifyRegionalInstall(t, ctx, f, 1, admin, runnerAPI, api, hubKubeconfig, desired.TargetNamespace, issuer, journey, providers, offerMap.Data[contracts.RegionalOfferFile], installation)
+	var regionalRecord []byte
+	if os.Getenv("ASSERVAT_HELM_CONTEXT_NATIVE") == "1" {
+		regionalRecord = issuedRecord
+	}
+	qualifyRegionalInstall(t, ctx, f, 1, admin, runnerAPI, api, hubKubeconfig, desired.TargetNamespace, issuer, journey, providers, offerMap.Data[contracts.RegionalOfferFile], installation, regionalRecord)
 	if focus := installedJourneyFocus(); focus == "restart" || focus == "journey" || focus == "browser" || focus == "upgrade" || focus == "policy" || focus == "alert" || focus == "logresource" || focus == "chain" || focus == "share" || focus == "journey-store-failure" || focus == "journey-start-failure" || focus == "retention-shortening" || focus == "early-erasure" || focus == "processing-workload" || focus == "privacy-inventory" || installedRecordingFocus() || installedLogsFocus() {
 		t.Log("focused " + focus + " run complete: the second workload cluster and replay checks were not run")
 		return
@@ -845,7 +862,7 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 	short := func(cluster, namespace, workload string, _ func(bool), _ func(string)) {
 		journey(cluster, namespace, workload, nil, nil)
 	}
-	qualifyRegionalInstall(t, ctx, f, 2, admin, runnerAPI, api, hubKubeconfig, desired.TargetNamespace, issuer, short, providers, offerMap.Data[contracts.RegionalOfferFile], installation)
+	qualifyRegionalInstall(t, ctx, f, 2, admin, runnerAPI, api, hubKubeconfig, desired.TargetNamespace, issuer, short, providers, offerMap.Data[contracts.RegionalOfferFile], installation, nil)
 	// After the guard bridge, the same five-command profile replays (as on
 	// upgrade), finds the installation complete and preserves guard/journal state.
 	guard, err := api.AdmissionregistrationV1().ValidatingAdmissionPolicies().Get(ctx, original.Plan.Workload.WorkloadGuard, meta.GetOptions{})
