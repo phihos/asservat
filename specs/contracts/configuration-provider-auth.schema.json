@@ -74,6 +74,50 @@
       "not": {
         "const": "0000000000000000000000000000000000000000000000000000000000000000"
       }
+    },
+    "cleanupAudit": {
+      "$ref": "#/$defs/transit"
+    },
+    "workerConfigurationAudit": {
+      "$ref": "#/$defs/transit"
+    },
+    "contextDeletionSigning": {
+      "$ref": "#/$defs/transit"
     }
+  },
+  "$defs": {
+    "transit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mount",
+        "key"
+      ],
+      "properties": {
+        "mount": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_-]+(?![\\s\\S])",
+          "not": {
+            "enum": [
+              "sys",
+              "auth"
+            ]
+          }
+        },
+        "key": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_-]+(?![\\s\\S])"
+        }
+      }
+    }
+  },
+  "dependentRequired": {
+    "cleanupAudit": [
+      "contextDeletionSigning"
+    ]
   }
 }

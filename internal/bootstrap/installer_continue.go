@@ -242,13 +242,17 @@ func (k *InstallerContinuation) Resources(ctx context.Context) (*kube.InitialRun
 	if err != nil {
 		return nil, snapshot, inventory, err
 	}
+	cleanup := contracts.OwnerPublicTransit{}
+	if signing != (contracts.OwnerPublicTransit{}) {
+		cleanup = contracts.OwnerPublicTransit{Mount: k.plan.Services.KeyService.AuditMount, Key: k.plan.Services.KeyService.AuditKey}
+	}
 	k.at("resources/producer")
 	producer := kube.NewProviderInstalledRuntimeResources
 	if p := k.input.Public; p != nil && p.Promotion != nil && p.Federation != nil && p.Federation.Fleet != nil {
 		producer = kube.NewFleetProviderInstalledRuntimeResources
 	}
 	resources, err := producer(ctx, k.preparer, k.sql, k.roots,
-		contracts.ConfigurationProviderSelection{AuthMount: w.AuthMount, AuthMountAccessor: w.AuthMountAccessor, AuditCredentials: worker, WorkerConfigurationAudit: audit, ContextDeletionSigning: signing},
+		contracts.ConfigurationProviderSelection{AuthMount: w.AuthMount, AuthMountAccessor: w.AuthMountAccessor, AuditCredentials: worker, WorkerConfigurationAudit: audit, ContextDeletionSigning: signing, CleanupAudit: cleanup},
 		contracts.OwnerProviderSelection{AuthMount: o.AuthMount, AuthMountAccessor: o.AuthMountAccessor, AuditCredentials: owner})
 	if err != nil {
 		return nil, snapshot, inventory, err
@@ -518,8 +522,12 @@ func (k *InstallerContinuation) WorkerRecipe(ctx context.Context, resources *kub
 	if err != nil || signing != (contracts.OwnerPublicTransit{}) && signing.Mount != original.KeyService.AuditMount {
 		return docs, errors.Join(mounts.ErrUnavailable, err)
 	}
+	cleanup := contracts.OwnerPublicTransit{}
+	if signing != (contracts.OwnerPublicTransit{}) {
+		cleanup = contracts.OwnerPublicTransit{Mount: original.KeyService.AuditMount, Key: original.KeyService.AuditKey}
+	}
 	k.at("worker/outbox")
-	artifact, err := providerconfig.ConfigurationProviderPairSetupArtifact(deployment, contracts.ConfigurationProviderSelection{AuthMount: w.AuthMount, AuthMountAccessor: w.AuthMountAccessor, AuditCredentials: worker, WorkerConfigurationAudit: audit, ContextDeletionSigning: signing}, inventory.WorkerAccount, snapshot.State.WorkerLayout, time.Now())
+	artifact, err := providerconfig.ConfigurationProviderPairSetupArtifact(deployment, contracts.ConfigurationProviderSelection{AuthMount: w.AuthMount, AuthMountAccessor: w.AuthMountAccessor, AuditCredentials: worker, WorkerConfigurationAudit: audit, ContextDeletionSigning: signing, CleanupAudit: cleanup}, inventory.WorkerAccount, snapshot.State.WorkerLayout, time.Now())
 	if err != nil {
 		return docs, err
 	}
@@ -900,7 +908,7 @@ func (k *InstallerContinuation) Owner(ctx context.Context, resources *kube.Initi
 			return err
 		}
 	}
-	artifact, err := providerconfig.OwnerProviderSetupArtifact(named, profile, observed.Configuration.Pool, observed.Configuration.IssuerRoots, time.Now(), k.federation, k.publisherSetup(), k.downloadEvidenceSetup(), k.contextDeletionSetup())
+	artifact, err := providerconfig.OwnerProviderSetupArtifact(named, profile, observed.Configuration.Pool, observed.Configuration.IssuerRoots, time.Now(), k.federation, k.publisherSetup(), k.downloadEvidenceSetup(), k.contextDeletionSetup(), k.operationCleanupEnabled())
 	if err != nil {
 		return err
 	}
@@ -927,6 +935,8 @@ func (k *InstallerContinuation) Owner(ctx context.Context, resources *kube.Initi
 	// ADR-205 decision 4: the deletion child's own evidence delete principal,
 	// exactly when this installation deletes context evidence.
 	defer clear(inbox.EvidenceDeleteCredential)
+	defer clear(inbox.CleanupAuditCredential)
+	defer clear(inbox.CleanupVerifyCredential)
 	if (k.contextDeletionSetup() != nil) != (len(inbox.EvidenceDeleteCredential) != 0) {
 		return mounts.ErrUnavailable
 	}
@@ -1009,6 +1019,9 @@ func (k *InstallerContinuation) Owner(ctx context.Context, resources *kube.Initi
 		}
 	}
 	if err = k.CapacityProjection(ctx, resources, bridge, inventory, input); err != nil {
+		return err
+	}
+	if err = k.OperationCleanupProjection(ctx, resources, bridge, inbox, inspector, input); err != nil {
 		return err
 	}
 	if err = k.FederationWorkload(ctx, inventory, input); err != nil {

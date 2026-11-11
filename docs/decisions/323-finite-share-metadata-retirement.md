@@ -35,7 +35,8 @@ shares. Preserve the existing 32-active and recurring-100 limits.
 
 The share inherits original accepted live-removal and hard-retirement bounds;
 neither publication, mutation, backing renewal nor replay moves them. Its access
-must fit before identifying metadata can retire. Refuse incompatible backing
+must fit no later than `original_purge_at`, the earliest original cleanup path,
+rather than the later certificate cutoff. Refuse incompatible backing
 before creation with an explicit remedy; do not silently extend an audit or
 shorten an acknowledged share. Do not invent creating-operation links for old
 unqualified rows. Retained-state upgrade and rollback must either preserve the
@@ -74,8 +75,8 @@ introduced. Capture publication retains its stricter original-instruction rule.
 
 Extend the existing cleanup component to the closed capture/normal/resolution
 lane set. Share its three existing facet pools and provider clients across
-lane-specific adapters, with one total page of at most 16 operations and bounded
-round-robin progress. Do not add concurrent per-lane loops or a separate share
+one scoped adapter, with one total page of at most 16 operations and a global
+UUID cursor that wraps after its final page. Do not add concurrent per-lane loops or a separate share
 cleaner. The installer must actually provision the protected projection and
 credential material and the supervisor must own and join its task.
 
@@ -86,24 +87,36 @@ from today's configuration. Preserve cleanup/verifier storage separation and
 the exact SQL facet grant union. Keep identity/processing lanes, source
 acceptance and evidence-key authority outside this expansion.
 
+The four closed provider purposes reuse the native worker login/lifetime
+machinery. First use needs four login/lookup-self pairs (eight HTTP requests);
+healthy reuse adds no provider refresh request. Renewal needs two requests for
+each due slot, only during later cleanup work. This operation count is covered
+by component regressions; combined installed latency is pending. The existing
+audit-wrap role also retains its exact selected signing-key path when that
+optional key is selected. This is the same worker/key scope as cleanup-sign,
+with no additional role, token, key or separate signer-selection flag.
+
 ## Complexity and qualification
 
 | Question | Answer before implementation |
 | --- | --- |
-| Observed benefit | Source rejects all share deletion; the retained-count/cost reproduction is pending. |
+| Observed benefit | At `2a2bc0f1`, 65 shares remained while only 32 were active. The sequence grew relations by 1,114,112 bytes and whole-instance WAL by 1,085,704 bytes in 1,160 ms. These observations are not maximum-footprint qualification. |
 | Accepted risk | No maintainer acceptance of indefinite identifying share history. |
 | Typical deployments | All three concrete sharing producers and normal public audit apply. |
 | Precedent | Reuse C-08 retirement. Argo uses finite completed-control retention; PostgreSQL supplies the row-lock conflict used for the proposed transaction. Neither proves backup erasure. |
-| Added exposure | Activate the existing cleanup component's three SQL facets and scoped provider/storage credentials. Exact installed connection/credential delta must be recorded before wiring. No collectors or evidence keys. |
+| Added exposure | Activate 3 already-provisioned SQL logins, 2 operator-supplied S3 credentials and 4 closed provider purposes (wrap, open, independent verify-open, sign): 9 active bindings, 0 new SQL role identities. The provider roles reuse native proof-bound login/lifetimes. No collectors or evidence keys. |
 | States | Zero new lifecycle/fallback states; existing healthy, overdue and unavailable behavior remains. |
 | Configuration | Zero new lifetime quotas or cleanup-tuning knobs. Existing qualified retention/backing must cover the effects. |
 | Dependencies | Existing PostgreSQL, audit storage/provider and qualified residual-history inputs. |
-| Aggregate cost | One existing component loop with a total 16-operation page. Measure provider work, sustained normal-read retirement and capture progress; three cold pools bound connections, not throughput. |
+| Aggregate cost | Three cold pools (MinConns 0, MaxConns 1) activate at most +3 connections per worker, +6 across two retained workers. These are already included in the separate 20-pool worker compartment and compiled 114-connection installation requirement. API hub 32 is unchanged. Existing supervisor task; 0 new deployments, watches or child goroutines. Measure provider work, sustained normal-read retirement and capture progress; pool bounds do not prove throughput. |
 | Upgrade/disable | Qualify original layouts and empty rollback; unknown retained links or provider scopes cannot be adopted. Disabling work cannot certify timely erasure. |
 | Smaller fix | Raw scheduled DELETE omits paid history, late publication and residual reuse. Coupled existing finalization avoids another cleanup protocol. |
 
-First measure current count-maximal eight-manager/eight-recipient share effects
-using compiled hub grants and an actually published artifact. Whole-instance
+The current count-maximal eight-manager/eight-recipient baseline used compiled
+hub grants and an actually published artifact. At `2a2bc0f1` its owned service
+run passed in 8.170 s. All 4,546 source hashes matched; source stayed frozen,
+cleanup failures were empty and owned PostgreSQL/S3/KMS containers were absent.
+Whole-instance
 WAL deltas and real tuple/index growth are observations, not universal maxima.
 The 100-share transaction and the integrated additional layout still need their
 own measurement. Do not label a fixture-gated compile run as service execution.

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"asservat.local/asservat/internal/adapters/postgres"
+	"asservat.local/asservat/internal/adapters/providerconfig"
 	"asservat.local/asservat/internal/contracts"
 )
 
@@ -40,16 +41,13 @@ func captureCleanupInputFixture(t *testing.T) (*providerInputs, string, contract
 	}
 	a := &contracts.HubWorkerRuntimeActivation{
 		Resources: contracts.WorkerObjectReference{Name: "asservat-runtime-resources-" + strings.ReplaceAll(owner.InstallationID, "-", ""), UID: id(8)},
-		SetupID:   id(9), BindingDigest: strings.Repeat("d", 64), WorkerLayout: contracts.HubWorkerInstalledLayout, CreatedAt: at, Until: at.Add(30 * time.Minute),
+		SetupID:   id(9), BindingDigest: strings.Repeat("d", 64), WorkerLayout: contracts.HubWorkerProviderInstalledLayout, CreatedAt: at, Until: at.Add(30 * time.Minute),
 		Deployment: ref("-worker", 10), ServiceAccount: ref("-worker", 11), OwnerDeployment: ref("-owner", 12), WorkloadGuard: guard("-workload-guard", 13),
 		ConfigurationProbes: []contracts.OwnerConfigurationProbe{{ConfigMap: worker.FleetSource.Name, ServiceAccount: prefix + "-worker"}, {ConfigMap: worker.OwnerSource.Name, ServiceAccount: prefix + "-worker"}},
 		SchedulingLeases:    []contracts.OwnerSchedulingLease{{Lease: worker.LeaderLease.Name, ServiceAccount: prefix + "-worker"}},
 		InitialHistoryProbe: &contracts.OwnerInitialHistoryProbe{Namespace: contracts.WorkerObjectReference{Name: "original-bootstrap", UID: id(15)}, ServiceAccount: contracts.WorkerObjectReference{Name: "original-bootstrap", UID: id(16)}, Configuration: "original-plan"},
 	}
 	worker.Activation = a
-	if err := validateHubWorkerInputs(worker); err != nil {
-		t.Fatal("synthetic worker input invalid", err)
-	}
 	m := contracts.CaptureCleanupCredentialManifest{Format: contracts.CaptureCleanupManifestFormat, RootUID: id(20), SetupID: id(21), Input: contracts.PublicRuntimeRoles{
 		Format: contracts.PublicRuntimeRolesFormat, InstallationID: worker.InstallationID, InitialClaimID: id(22), ClusterID: worker.ClusterID, Namespace: worker.Namespace, OwnerConfigurationUID: worker.OwnerSource.UID, LayoutDigest: postgres.PublicRuntimeRoleLayoutDigest(),
 		Worker: contracts.PublicRuntimeWorkerBinding{Resources: a.Resources, ResourceSetupID: a.SetupID, ResourceBinding: a.BindingDigest, WorkerLayout: a.WorkerLayout, Deployment: contracts.PublicRuntimeWorkerObject{Reference: a.Deployment}, Account: contracts.PublicRuntimeWorkerObject{Reference: a.ServiceAccount}, Lease: contracts.PublicRuntimeWorkerObject{Reference: worker.LeaderLease}},
@@ -66,6 +64,18 @@ func captureCleanupInputFixture(t *testing.T) (*providerInputs, string, contract
 		Signing: contracts.CaptureCleanupSigning{Mount: "transit", Name: "retirement", Version: 1, KeyID: "original-retirement", PublicKeys: map[string][]byte{"original-retirement": make([]byte, ed25519.PublicKeySize)}},
 	}
 	c.Postgres.MaxConnections = 1
+	c.Signing.Mount, c.Signing.Name = worker.KeyService.AuditMount, contracts.ContextDeletionSigningKeyName(worker.InstallationID)
+	selection := contracts.ConfigurationProviderSelection{AuthMount: "cleanup-auth", AuthMountAccessor: "auth_cleanup", AuditCredentials: contracts.WorkerObjectReference{Name: prefix + "-worker-providers", UID: id(70)}, CleanupAudit: contracts.OwnerPublicTransit{Mount: c.KeyService.AuditMount, Key: c.KeyService.AuditKey}, ContextDeletionSigning: contracts.OwnerPublicTransit{Mount: c.Signing.Mount, Key: c.Signing.Name}}
+	recipe, err := providerconfig.ConfigurationProviderRecipeFor(worker, selection, a.ServiceAccount, time.Now())
+	if err != nil {
+		t.Fatal("cleanup recipe", err)
+	}
+	worker.ProviderAuthentication = &recipe.Profile
+	worker.Postgres.MaxConnections = 1
+	worker.ProviderInputs = &contracts.ConfigurationWorkerInputProvenance{OperationID: id(71), ConfigurationSetupID: id(72), ConfigurationRoot: contracts.WorkerObjectReference{Name: "asservat-configuration-roles-" + strings.ReplaceAll(worker.InstallationID, "-", ""), UID: id(73)}, SQLProjection: contracts.WorkerObjectReference{Name: "asservat-configuration-runtime-" + strings.ReplaceAll(worker.InstallationID, "-", ""), UID: id(74)}}
+	if err := validateHubWorkerInputs(worker); err != nil {
+		t.Fatal("synthetic worker input invalid", err)
+	}
 	digest, err := contracts.CaptureCleanupProjectionDigest(c, m)
 	if err != nil {
 		t.Fatal(err)
@@ -75,7 +85,7 @@ func captureCleanupInputFixture(t *testing.T) (*providerInputs, string, contract
 }
 
 func TestCaptureCleanupInputsRequireMatchingOriginalWorkerAndPositiveReceipt(t *testing.T) {
-	for _, mode := range []string{"historical-positive", "unknown-receipt", "no-activation", "other-worker", "other-account", "other-lease", "other-resource-journal", "other-owner-source", "other-setup", "changed-store-without-receipt", "expanded-pool", "wrong-key-size", "canceled", "expired"} {
+	for _, mode := range []string{"historical-positive", "unknown-receipt", "no-activation", "other-worker", "other-account", "other-lease", "other-resource-journal", "other-owner-source", "other-setup", "changed-store-without-receipt", "changed-provider-endpoint", "changed-provider-key", "changed-storage-bucket", "changed-storage-endpoint", "expanded-pool", "wrong-key-size", "canceled", "expired"} {
 		t.Run(mode, func(t *testing.T) {
 			in, dir, worker, c, m, claim := captureCleanupInputFixture(t)
 			ctx, cancel := context.WithCancel(context.Background())
@@ -99,6 +109,14 @@ func TestCaptureCleanupInputsRequireMatchingOriginalWorkerAndPositiveReceipt(t *
 				m.CaptureSetup.RoleSetupID = m.RootUID
 			case "changed-store-without-receipt":
 				c.StoreID = m.RootUID
+			case "changed-provider-endpoint":
+				c.KeyService.Endpoint = "https://other.example"
+			case "changed-provider-key":
+				c.KeyService.AuditKey = "historical"
+			case "changed-storage-bucket":
+				c.AuditStore.Bucket = "historical"
+			case "changed-storage-endpoint":
+				c.AuditStore.Endpoint = "https://other.example"
 			case "expanded-pool":
 				c.Postgres.MaxConnections = 2
 			case "wrong-key-size":

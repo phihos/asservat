@@ -22,7 +22,7 @@ import (
 type ShareUseCase interface {
 	Create(context.Context, identities.CurrentIdentity, sharing.CreateInput) (authorization.Share, bool, error)
 	List(context.Context, identities.CurrentIdentity, string, int) ([]sharing.View, time.Time, error)
-	Revoke(context.Context, identities.CurrentIdentity, string, int64, string) (authorization.Share, bool, error)
+	Revoke(context.Context, identities.CurrentIdentity, sharing.RevokeInput) (authorization.Share, bool, error)
 	Transfer(context.Context, identities.CurrentIdentity, sharing.TransferInput) (authorization.Share, bool, error)
 	ListAdministered(context.Context, identities.CurrentIdentity, string, int) ([]sharing.View, string, time.Time, error)
 }
@@ -32,8 +32,8 @@ type ShareUseCase interface {
 // sharing_intent_id). A share service without it refuses both as
 // unavailable.
 type PolicySharingRevoker interface {
-	RevokePolicySharing(context.Context, identities.CurrentIdentity, string, int64, string) (sharing.PolicyRevokeResult, error)
-	StopPolicySharing(context.Context, identities.CurrentIdentity, string, int64, string) (sharing.PolicyRevokeResult, error)
+	RevokePolicySharing(context.Context, identities.CurrentIdentity, sharing.PolicyRevokeInput) (sharing.PolicyRevokeResult, error)
+	StopPolicySharing(context.Context, identities.CurrentIdentity, sharing.PolicyRevokeInput) (sharing.PolicyRevokeResult, error)
 }
 
 // policySharingStopData is the stop_future_sharing reply.
@@ -181,6 +181,8 @@ func managedBy(s authorization.Share) []shareRecipientInput {
 
 func publicShareFailure(err error) OperationFailure {
 	switch {
+	case errors.Is(err, sharing.ErrRetentionCapacity):
+		return OperationFailure{"NotAvailable", "The requested share expiry exceeds its original metadata backing. Choose an earlier expiry, or ask an operator to review backing capacity before submitting a new sharing decision.", false}
 	case errors.Is(err, sharing.ErrManagementTooBroad):
 		return OperationFailure{"ManagementTooBroad", "You hold evidence-owner on this workload through more than eight team assignments, and sharing never picks a subset. Name at most eight of your owner teams in management, or ask an administrator to combine the owner bindings.", false}
 	case errors.Is(err, sharing.ErrManagementNotHeld):
@@ -241,7 +243,7 @@ func (s *ShareOperations) CallWithContext(ctx context.Context, current identitie
 				return OperationReply{}, contracts.ErrInvestigationWire
 			}
 			copy(version[:], b)
-			input := sharing.CreateInput{CaseID: in.CaseID, ArtifactID: in.Artifacts[0].ArtifactID, Version: version, Reason: in.Reason, IdempotencyKey: in.IdempotencyKey}
+			input := sharing.CreateInput{OperationID: call.requestID, CaseID: in.CaseID, ArtifactID: in.Artifacts[0].ArtifactID, Version: version, Reason: in.Reason, IdempotencyKey: in.IdempotencyKey}
 			if in.ExpiresAt != nil {
 				input.ExpiresAt = in.ExpiresAt.UTC()
 			}
@@ -299,14 +301,14 @@ func (s *ShareOperations) CallWithContext(ctx context.Context, current identitie
 					break
 				}
 				var r sharing.PolicyRevokeResult
-				r, operationErr = revoker.RevokePolicySharing(ctx, current, in.SharingIntentID, in.ExpectedRevision, in.IdempotencyKey)
+				r, operationErr = revoker.RevokePolicySharing(ctx, current, sharing.PolicyRevokeInput{OperationID: call.requestID, AcceptanceID: in.SharingIntentID, ExpectedRevision: in.ExpectedRevision, IdempotencyKey: in.IdempotencyKey})
 				if operationErr == nil {
 					out.Data = shareRevokeData{SharingIntentID: r.AcceptanceID, Phase: string(authorization.ShareRevoked), Revision: in.ExpectedRevision + 1}
 				}
 				break
 			}
 			var share authorization.Share
-			share, _, operationErr = s.shares.Revoke(ctx, current, in.ShareID, in.ExpectedRevision, in.IdempotencyKey)
+			share, _, operationErr = s.shares.Revoke(ctx, current, sharing.RevokeInput{OperationID: call.requestID, ShareID: in.ShareID, ExpectedRevision: in.ExpectedRevision, IdempotencyKey: in.IdempotencyKey})
 			if operationErr == nil {
 				out.Data = shareRevokeData{ShareID: share.ID, Phase: string(authorization.ShareRevoked), Revision: share.Revision}
 			}
@@ -317,12 +319,12 @@ func (s *ShareOperations) CallWithContext(ctx context.Context, current identitie
 				break
 			}
 			var r sharing.PolicyRevokeResult
-			r, operationErr = revoker.StopPolicySharing(ctx, current, in.SharingIntentID, in.ExpectedRevision, in.IdempotencyKey)
+			r, operationErr = revoker.StopPolicySharing(ctx, current, sharing.PolicyRevokeInput{OperationID: call.requestID, AcceptanceID: in.SharingIntentID, ExpectedRevision: in.ExpectedRevision, IdempotencyKey: in.IdempotencyKey})
 			if operationErr == nil {
 				out.Data = policySharingStopData{SharingIntentID: r.AcceptanceID, State: "Stopped", Revision: 2}
 			}
 		case "transfer_share":
-			input := sharing.TransferInput{ShareID: in.ShareID, ExpectedRevision: in.ExpectedRevision, IdempotencyKey: in.IdempotencyKey}
+			input := sharing.TransferInput{OperationID: call.requestID, ShareID: in.ShareID, ExpectedRevision: in.ExpectedRevision, IdempotencyKey: in.IdempotencyKey}
 			var share authorization.Share
 			if input.Management, operationErr = in.Management.request(i.Principal.Issuer); operationErr == nil {
 				share, _, operationErr = s.shares.Transfer(ctx, current, input)

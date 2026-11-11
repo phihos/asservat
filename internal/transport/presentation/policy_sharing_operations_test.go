@@ -32,16 +32,17 @@ type policyRevokeFixture struct {
 	acceptance string
 	expected   int64
 	stopped    bool
+	input      sharing.PolicyRevokeInput
 }
 
-func (f *policyRevokeFixture) StopPolicySharing(_ context.Context, _ identities.CurrentIdentity, acceptance string, expected int64, _ string) (sharing.PolicyRevokeResult, error) {
-	f.acceptance, f.expected, f.stopped = acceptance, expected, true
-	return sharing.PolicyRevokeResult{AcceptanceID: acceptance}, nil
+func (f *policyRevokeFixture) StopPolicySharing(_ context.Context, _ identities.CurrentIdentity, in sharing.PolicyRevokeInput) (sharing.PolicyRevokeResult, error) {
+	f.acceptance, f.expected, f.stopped, f.input = in.AcceptanceID, in.ExpectedRevision, true, in
+	return sharing.PolicyRevokeResult{AcceptanceID: in.AcceptanceID}, nil
 }
 
-func (f *policyRevokeFixture) RevokePolicySharing(_ context.Context, _ identities.CurrentIdentity, acceptance string, expected int64, _ string) (sharing.PolicyRevokeResult, error) {
-	f.acceptance, f.expected = acceptance, expected
-	return sharing.PolicyRevokeResult{AcceptanceID: acceptance, Revoked: 3}, nil
+func (f *policyRevokeFixture) RevokePolicySharing(_ context.Context, _ identities.CurrentIdentity, in sharing.PolicyRevokeInput) (sharing.PolicyRevokeResult, error) {
+	f.acceptance, f.expected, f.input = in.AcceptanceID, in.ExpectedRevision, in
+	return sharing.PolicyRevokeResult{AcceptanceID: in.AcceptanceID, Revoked: 3}, nil
 }
 
 func policyShareInstruction(end time.Time) *value.PolicyShareInstruction {

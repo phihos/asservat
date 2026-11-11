@@ -104,3 +104,46 @@ func TestCaptureCleanupFullPolicyConstructorRetainsValidation(t *testing.T) {
 		t.Fatal("scope accepted missing recovery", err)
 	}
 }
+
+func TestWorkerCleanupScopeKeepsHistoricalRowsAndExcludesOtherLanes(t *testing.T) {
+	in := captureCleanupScopedIntent(t, time.Now().UTC().Truncate(time.Microsecond), 1)
+	scope := captureLifecycleScope{in.RootID, in.Lifecycle.Policy.InstallationID, in.Lifecycle.Policy.StoreID}
+	if !scope.matchesWorker(in) {
+		t.Fatal("historical capture cannot finish under the shared worker")
+	}
+	for _, tc := range []struct{ name, lane, layout string }{
+		{"get_case", "normal", value.OperationVerificationHistoryLayout},
+		{"resolve_capture_request", "resolution", value.OperationVerificationHistoryLayout},
+	} {
+		// Synthetic shape only: this checks scoped selection, never supplies a
+		// current SQL, provider or human authorization fact.
+		row := in
+		row.Name, row.InputFormat, row.Capture = tc.name, "context-input/v1", nil
+		binding := *in.Lifecycle
+		row.Lifecycle = &binding
+		q := *binding.Policy.History
+		q.Layout = tc.layout
+		binding.Policy.Lane, binding.Policy.History = tc.lane, &q
+		b, w := q.SlotBacking(binding.Policy.MaxPurgeLeases)
+		binding.Policy.BackupReservedBytes, binding.Policy.WALReservedBytes = b*binding.Policy.MetadataSlots, w*binding.Policy.MetadataSlots
+		if !row.Valid() || !scope.matchesWorker(row) || scope.matches(row) {
+			t.Fatal("shared scope rejected a historical ordinary row or legacy capture scope widened", tc.name)
+		}
+		before, _ := json.Marshal(row)
+		wrong := scope
+		wrong.store = "10000000-0000-4000-8000-000000000099"
+		if wrong.matchesWorker(row) {
+			t.Fatal("worker tried another historical provider store")
+		}
+		after, _ := json.Marshal(row)
+		if !bytes.Equal(before, after) {
+			t.Fatal("scope selection renewed the original binding")
+		}
+	}
+	s := &OperationLifecycles{worker: true, journal: &OperationJournal{lane: "capture"}}
+	for _, lane := range []string{"identity", "processing", "", "other"} {
+		if s.acceptsLane(lane) {
+			t.Fatal("worker crossed a separate process boundary", lane)
+		}
+	}
+}

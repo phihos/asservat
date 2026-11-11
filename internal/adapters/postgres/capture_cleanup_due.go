@@ -8,6 +8,7 @@ import (
 	app "asservat.local/asservat/internal/application/audit"
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/identity"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // DueCaptureOperations is a bounded scheduling page over the private filtered
@@ -16,7 +17,23 @@ import (
 // The caller retains at most one UUID cursor and wraps only after the last page,
 // so an unresolved early row cannot starve the rest or create an unbounded list.
 func (s *OperationLifecycles) DueCaptureOperations(ctx context.Context, after string) ([]string, error) {
-	if s == nil || !s.capture || s.journal == nil || s.journal.ledger == nil || s.captureScope.root == "" || ctx == nil || ctx.Err() != nil || after != "" && !authorization.UUID(after) {
+	if s == nil || !s.capture {
+		return nil, app.ErrUnavailable
+	}
+	return s.dueOperations(ctx, after)
+}
+
+// DueWorkerOperations uses one UUID cursor and one total sixteen-row page
+// across all three compiled worker lanes. A stuck row cannot starve later IDs.
+func (s *OperationLifecycles) DueWorkerOperations(ctx context.Context, after string) ([]string, error) {
+	if s == nil || !s.worker {
+		return nil, app.ErrUnavailable
+	}
+	return s.dueOperations(ctx, after)
+}
+
+func (s *OperationLifecycles) dueOperations(ctx context.Context, after string) ([]string, error) {
+	if s == nil || s.journal == nil || s.journal.ledger == nil || s.captureScope.root == "" || ctx == nil || ctx.Err() != nil || after != "" && !authorization.UUID(after) {
 		return nil, app.ErrUnavailable
 	}
 	if after == "" {
@@ -31,7 +48,12 @@ func (s *OperationLifecycles) DueCaptureOperations(ctx context.Context, after st
 		if err != nil {
 			return err
 		}
-		rows, err := q.CaptureDueOperationLifecycles(call, custodydb.CaptureDueOperationLifecyclesParams{RootID: id(j.root), AfterID: id(after)})
+		var rows []pgtype.UUID
+		if s.worker {
+			rows, err = q.WorkerDueOperationLifecycles(call, custodydb.WorkerDueOperationLifecyclesParams{RootID: id(j.root), AfterID: id(after)})
+		} else {
+			rows, err = q.CaptureDueOperationLifecycles(call, custodydb.CaptureDueOperationLifecyclesParams{RootID: id(j.root), AfterID: id(after)})
+		}
 		if err != nil || len(rows) > 16 {
 			return app.ErrUnavailable
 		}

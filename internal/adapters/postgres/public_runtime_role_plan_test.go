@@ -49,6 +49,20 @@ func TestPublicRuntimeRolePlanKeepsPurposeIdentityAndProjection(t *testing.T) {
 	}
 }
 
+func TestShareEffectUsesOnlyCompiledHubCredential(t *testing.T) {
+	function := publicRuntimeGrant{"function", "begin_share_effect(uuid,uuid,text,text,text,text,uuid)", "", "EXECUTE"}
+	column := publicRuntimeGrant{"table", "evidence_share", "last_operation_id", "UPDATE"}
+	for _, purpose := range contracts.PublicRuntimeRolePurposes() {
+		grants, ok := publicRuntimeRoleGrants(purpose)
+		if !ok {
+			t.Fatal("missing compiled role", purpose)
+		}
+		if slices.Contains(grants, function) != (purpose == "hub-runtime") || slices.Contains(grants, column) != (purpose == "hub-runtime") {
+			t.Fatal("share effects escaped the exact compiled hub grant", purpose)
+		}
+	}
+}
+
 func TestPublicDownloadSourceRoleReadsReceiptsWithoutEffectPrivileges(t *testing.T) {
 	grants, ok := publicRuntimeDutyGrants("download-source")
 	if !ok {

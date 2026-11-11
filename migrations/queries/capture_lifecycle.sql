@@ -65,6 +65,23 @@ SELECT records::bigint,overdue::boolean FROM finish_capture_operation_history(sq
 -- current recovery and rechecks original lifecycle/closure before every effect.
 SELECT operation_id FROM capture_operation_lifecycle
 WHERE root_id=sqlc.arg(root_id)::uuid
+  AND lane='capture'
   AND operation_id>sqlc.arg(after_id)::uuid
   AND original_purge_at<=clock_timestamp()
 ORDER BY operation_id LIMIT 16;
+
+-- name: WorkerDueOperationLifecycles :many
+-- One globally ordered page across the worker's closed lane set. Every paid
+-- effect still checks the exact original policy/store and current recovery.
+SELECT operation_id FROM capture_operation_lifecycle
+WHERE root_id=sqlc.arg(root_id)::uuid
+  AND lane IN ('capture','normal','resolution')
+  AND operation_id>sqlc.arg(after_id)::uuid
+  AND original_purge_at<=clock_timestamp()
+ORDER BY operation_id LIMIT 16;
+
+-- name: WorkerDueOperationAuditHistory :many
+SELECT root_id,lane,principal_digest,release_at,delete_by
+FROM capture_operation_history WHERE root_id=$1
+  AND lane IN ('capture','normal','resolution') AND eligible_at<=clock_timestamp()
+ORDER BY eligible_at,release_at,delete_by,principal_digest,lane LIMIT 16;

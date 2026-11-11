@@ -20,11 +20,11 @@ type ConfigurationProviderRoleRecipe struct {
 	Policy  json.RawMessage `json:"policy"`
 }
 
-// Two fixed effects. This pure recipe neither applies provider configuration
+// Two configuration effects and an optional fixed quartet of cleanup effects. This pure recipe neither applies provider configuration
 // nor issues credentials; the installer verifies its actual provider readback.
 type ConfigurationProviderRecipe struct {
 	Profile contracts.ConfigurationProviderAuthentication
-	Roles   [2]ConfigurationProviderRoleRecipe
+	Roles   []ConfigurationProviderRoleRecipe
 }
 
 // ValidateConfigurationProviderSelection checks only the original public
@@ -43,12 +43,15 @@ func ValidateConfigurationProviderSelection(installation string, p contracts.Con
 	if d := p.ContextDeletionSigning; d != (contracts.OwnerPublicTransit{}) && (!providerName.MatchString(d.Mount) || d.Mount == "sys" || d.Mount == "auth" || d.Key != contracts.ContextDeletionSigningKeyName(installation)) {
 		return cfg.ErrInvalid
 	}
+	if c := p.CleanupAudit; c != (contracts.OwnerPublicTransit{}) && (!providerName.MatchString(c.Mount) || !providerName.MatchString(c.Key) || p.ContextDeletionSigning == (contracts.OwnerPublicTransit{})) {
+		return cfg.ErrInvalid
+	}
 	return nil
 }
 
 // configurationProviderSelectionOf is the selection a profile was derived from.
 func configurationProviderSelectionOf(p contracts.ConfigurationProviderAuthentication) contracts.ConfigurationProviderSelection {
-	return contracts.ConfigurationProviderSelection{AuthMount: p.AuthMount, AuthMountAccessor: p.AuthMountAccessor, AuditCredentials: p.AuditCredentials, WorkerConfigurationAudit: p.WorkerConfigurationAudit, ContextDeletionSigning: p.ContextDeletionSigning}
+	return contracts.ConfigurationProviderSelection{AuthMount: p.AuthMount, AuthMountAccessor: p.AuthMountAccessor, AuditCredentials: p.AuditCredentials, WorkerConfigurationAudit: p.WorkerConfigurationAudit, ContextDeletionSigning: p.ContextDeletionSigning, CleanupAudit: p.CleanupAudit}
 }
 
 func ConfigurationProviderRecipeFor(in contracts.HubWorkerDeployment, selection contracts.ConfigurationProviderSelection, account contracts.WorkerObjectReference, now time.Time) (ConfigurationProviderRecipe, error) {
@@ -79,9 +82,12 @@ func ConfigurationProviderRecipeFor(in contracts.HubWorkerDeployment, selection 
 	if signing != (contracts.OwnerPublicTransit{}) && (signing.Mount != in.KeyService.AuditMount || signing.Key == in.KeyService.AuditKey || signing == worker) {
 		return out, cfg.ErrInvalid
 	}
+	if selection.CleanupAudit != (contracts.OwnerPublicTransit{}) && selection.CleanupAudit != (contracts.OwnerPublicTransit{Mount: in.KeyService.AuditMount, Key: in.KeyService.AuditKey}) {
+		return out, cfg.ErrInvalid
+	}
 	out.Profile = contracts.ConfigurationProviderAuthentication{Format: contracts.ConfigurationProviderAuthenticationFormat,
 		AuthMount: selection.AuthMount, AuthMountAccessor: selection.AuthMountAccessor,
-		ServiceAccount: account, AuditCredentials: selection.AuditCredentials, WorkerConfigurationAudit: worker, ContextDeletionSigning: signing}
+		ServiceAccount: account, AuditCredentials: selection.AuditCredentials, WorkerConfigurationAudit: worker, ContextDeletionSigning: signing, CleanupAudit: selection.CleanupAudit}
 	scope, err := ownerProviderCanonical(struct {
 		Format         string                          `json:"format"`
 		InstallationID string                          `json:"installationID"`
@@ -94,13 +100,18 @@ func ConfigurationProviderRecipeFor(in contracts.HubWorkerDeployment, selection 
 	}
 	digest := sha256.Sum256(scope)
 	prefix := "asservat-configuration-" + hex.EncodeToString(digest[:]) + "-"
-	purposes := [2]string{"audit-wrap", "audit-unwrap"}
-	paths := [2]string{in.KeyService.AuditMount + "/encrypt/" + in.KeyService.AuditKey, in.KeyService.AuditMount + "/decrypt/" + in.KeyService.AuditKey}
+	purposes := []string{"audit-wrap", "audit-unwrap"}
+	paths := []string{in.KeyService.AuditMount + "/encrypt/" + in.KeyService.AuditKey, in.KeyService.AuditMount + "/decrypt/" + in.KeyService.AuditKey}
 	// ADR-204: the same two purposes, on the worker configuration audit key.
 	var workerPaths [2]string
 	if worker != (contracts.OwnerPublicTransit{}) {
 		workerPaths = [2]string{worker.Mount + "/encrypt/" + worker.Key, worker.Mount + "/decrypt/" + worker.Key}
 	}
+	if selection.CleanupAudit != (contracts.OwnerPublicTransit{}) {
+		purposes = append(purposes, "cleanup-wrap", "cleanup-open", "cleanup-verify", "cleanup-sign")
+		paths = append(paths, paths[0], paths[1], paths[1], signing.Mount+"/sign/"+signing.Key)
+	}
+	out.Roles = make([]ConfigurationProviderRoleRecipe, len(purposes))
 	for i, purpose := range purposes {
 		name := prefix + purpose
 		role := OwnerKubernetesAuthRole{Accounts: []string{account.Name}, Namespaces: []string{in.Namespace.Name},
@@ -114,7 +125,7 @@ func ConfigurationProviderRecipeFor(in contracts.HubWorkerDeployment, selection 
 			"auth/token/revoke-self": {Capabilities: []string{"update"}},
 			paths[i]:                 {Capabilities: []string{"update"}},
 		}}
-		if workerPaths[i] != "" {
+		if i < 2 && workerPaths[i] != "" {
 			acl.Path[workerPaths[i]] = ownerProviderACLRule{Capabilities: []string{"update"}}
 		}
 		// ADR-205 decision 6: only audit-wrap signs deletion records.
@@ -165,7 +176,7 @@ func configurationProviderRecipeBody(in contracts.HubWorkerDeployment, r Configu
 		KeyService     contracts.ConfigurationKeyService             `json:"keyService"`
 		AuditStore     contracts.OwnerAuditStore                     `json:"auditStore"`
 		Profile        contracts.ConfigurationProviderAuthentication `json:"profile"`
-		Roles          [2]ConfigurationProviderRoleRecipe            `json:"roles"`
+		Roles          []ConfigurationProviderRoleRecipe             `json:"roles"`
 	}{"asservat-configuration-provider-recipe/v1", in.InstallationID, in.ClusterID, in.Namespace, in.FleetSource,
 		in.OwnerSource, in.Kubernetes, in.KeyService, in.AuditStore, r.Profile, r.Roles})
 }

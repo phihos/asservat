@@ -64,7 +64,7 @@ func (f *processingTestFixture) Close() {
 	}
 	f.mac.Close()
 }
-func newProcessingTestFixture(t *testing.T, ctx context.Context, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, s captureAdmissionScenario, e artifact.ContextExpectation) *processingTestFixture {
+func newProcessingTestFixture(t *testing.T, ctx context.Context, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, s captureAdmissionScenario, e artifact.ContextExpectation, sharingCohort ...bool) *processingTestFixture {
 	t.Helper()
 	f := &processingTestFixture{}
 	open := func(role, password string) *pgxpool.Pool {
@@ -104,18 +104,33 @@ func newProcessingTestFixture(t *testing.T, ctx context.Context, poolFor func(st
 	if err != nil {
 		t.Fatal(err)
 	}
+	shares := len(sharingCohort) > 0 && sharingCohort[0]
+	normalRetained := int64(3600)
+	if shares {
+		normalRetained = 7200
+	}
 	policy := func(lane string, accounts, records int64) audit.OperationLifecyclePolicy {
 		p := audit.OperationLifecyclePolicy{RootID: s.a.RootID, Lane: lane, InstallationID: s.recovery.installation, StoreID: custodyID(), PolicyID: custodyID(), BackupProfileID: custodyID(), PolicyDigest: artifact.Digest{1}, BackupProfileDigest: artifact.Digest{2}, BackingRevision: 1, MetadataSlots: accounts * records, MaxPurgeLeases: 4, CleanupBudgetSeconds: 8, ProofWindowSeconds: 2, ValidUntil: until}
 		layout := audit.OperationVerificationHistoryLayout
 		if lane == "processing" {
 			layout = audit.ProcessingReleaseHistoryLayout
+		} else if shares {
+			layout = audit.ShareOperationHistoryLayout
 		}
 		p.History = &audit.OperationHistoryQualification{ID: custodyID(), Digest: artifact.Digest{5}, Layout: layout, MaximumRowFootprintBytes: 128 << 10, MaximumTransitionWALBytes: 128 << 10, BackupCopies: 2, WALCopies: 2}
+		if lane == "normal" && shares {
+			// Explicit synthetic per-scenario input, measured by the bounded
+			// policy100 test. It is not production maximum-width qualification.
+			p.History.MaximumTransitionWALBytes = 2 << 20
+		}
 		bb, ww := p.History.SlotBacking(p.MaxPurgeLeases)
 		p.BackupReservedBytes = bb * p.MetadataSlots
 		p.WALReservedBytes = ww * p.MetadataSlots
 		now := time.Now().UTC().Truncate(time.Microsecond)
 		b := auditapp.OperationAuditPool{RootID: s.a.RootID, Lane: lane, AccountVersion: "accounts-v1", Accounts: accounts, RecordsPerAccount: records, RetainedSeconds: 3600, ObservedAt: now, FreshUntil: now.Add(5 * time.Second), ValidUntil: until}
+		if lane == "normal" {
+			b.RetainedSeconds = normalRetained
+		}
 		if lane == "processing" {
 			err = auditConfig.ProvisionProcessingReleaseAuditPool(ctx, b, p)
 		} else {
@@ -126,7 +141,13 @@ func newProcessingTestFixture(t *testing.T, ctx context.Context, poolFor func(st
 		}
 		return p
 	}
-	normalPolicy := policy("normal", 2, 2)
+	normalAccounts, normalRecords := int64(2), int64(2)
+	if shares {
+		// Original bounded sharing scenario, including negative ingress and
+		// replays; global/default fixture quotas remain unchanged.
+		normalAccounts, normalRecords = 16, 256
+	}
+	normalPolicy := policy("normal", normalAccounts, normalRecords)
 	releasePolicy := policy("processing", f.backing.MaxRules, 16)
 	makeAudit := func(p audit.OperationLifecyclePolicy, jp, ap *pgxpool.Pool) *auditapp.HealthyOperationAuditor {
 		var j *postgres.OperationJournal
@@ -174,7 +195,7 @@ func newProcessingTestFixture(t *testing.T, ctx context.Context, poolFor func(st
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.service = privacyapp.ProcessingChanges{RootID: s.a.RootID, InstallationID: s.recovery.installation, Policies: f.policy, Recovery: s.recovery.reader, Decisions: decisions, Audit: makeAudit(normalPolicy, normalPool, normalAck), ReleaseAudit: makeAudit(releasePolicy, releasePool, releaseAck), MAC: f.mac, AuditPolicy: normalPolicy, ReleaseAuditPolicy: releasePolicy, RetainedSeconds: 3600, Now: time.Now}
+	f.service = privacyapp.ProcessingChanges{RootID: s.a.RootID, InstallationID: s.recovery.installation, Policies: f.policy, Recovery: s.recovery.reader, Decisions: decisions, Audit: makeAudit(normalPolicy, normalPool, normalAck), ReleaseAudit: makeAudit(releasePolicy, releasePool, releaseAck), MAC: f.mac, AuditPolicy: normalPolicy, ReleaseAuditPolicy: releasePolicy, RetainedSeconds: normalRetained, Now: time.Now}
 	epoch := custodyID()
 	config, err := postgres.NewProcessingConfiguration(ctx, configPool, f.backing, releasePolicy, epoch, f.policy.value.Revision.UID, f.policy.value.ProtectionDigest, s.recovery.guard)
 	if err != nil {

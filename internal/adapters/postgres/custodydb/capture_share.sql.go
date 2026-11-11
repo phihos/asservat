@@ -13,7 +13,7 @@ import (
 
 const readCaptureShare = `-- name: ReadCaptureShare :one
 
-SELECT id FROM evidence_share WHERE root_id=$1 AND id=$2
+SELECT id FROM evidence_share WHERE root_id=$1 AND id=$2 AND retire_by>clock_timestamp()
 `
 
 type ReadCaptureShareParams struct {

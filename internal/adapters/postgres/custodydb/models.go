@@ -552,6 +552,8 @@ type CaptureOperationLifecycle struct {
 	OverdueSelectedAt         pgtype.Timestamptz
 	OverduePurge              []byte
 	CertificateVerifyAttempts int64
+	ShareEffectTarget         pgtype.UUID
+	ShareEffectXid            pgtype.Uint64
 }
 
 type CaptureOperationPool struct {
@@ -821,6 +823,8 @@ type ConnectorOperationLifecycle struct {
 	OverdueSelectedAt         pgtype.Timestamptz
 	OverduePurge              []byte
 	CertificateVerifyAttempts int64
+	ShareEffectTarget         pgtype.UUID
+	ShareEffectXid            pgtype.Uint64
 }
 
 type ConnectorOperationPool struct {
@@ -1637,31 +1641,34 @@ type DownloadWorkerOwner struct {
 }
 
 type EvidenceShare struct {
-	ID                 pgtype.UUID
-	RootID             pgtype.UUID
-	ArtifactID         pgtype.UUID
-	CaseID             pgtype.UUID
-	ClusterID          pgtype.UUID
-	NamespaceUid       string
-	WorkloadUid        string
-	PodUid             string
-	Version            []byte
-	CreatorIssuer      string
-	CreatorSubject     string
-	CreatorClient      string
-	Management         []byte
-	Recipients         []byte
-	RecipientKeys      []string
-	IdempotencyKey     string
-	RequestDigest      []byte
-	CreatedAt          pgtype.Timestamptz
-	ExpiresAt          pgtype.Timestamptz
-	RevokedAt          pgtype.Timestamptz
-	RevokeKey          pgtype.Text
-	Revision           int64
-	TransferKey        pgtype.Text
-	TransferDigest     []byte
-	PolicyAcceptanceID pgtype.UUID
+	ID                  pgtype.UUID
+	RootID              pgtype.UUID
+	ArtifactID          pgtype.UUID
+	CaseID              pgtype.UUID
+	ClusterID           pgtype.UUID
+	NamespaceUid        string
+	WorkloadUid         string
+	PodUid              string
+	Version             []byte
+	CreatorIssuer       string
+	CreatorSubject      string
+	CreatorClient       string
+	Management          []byte
+	Recipients          []byte
+	RecipientKeys       []string
+	IdempotencyKey      string
+	RequestDigest       []byte
+	CreatedAt           pgtype.Timestamptz
+	ExpiresAt           pgtype.Timestamptz
+	RevokedAt           pgtype.Timestamptz
+	RevokeKey           pgtype.Text
+	Revision            int64
+	TransferKey         pgtype.Text
+	TransferDigest      []byte
+	PolicyAcceptanceID  pgtype.UUID
+	CreatingOperationID pgtype.UUID
+	RetireBy            pgtype.Timestamptz
+	LastOperationID     pgtype.UUID
 }
 
 type FleetBootstrap struct {
@@ -1995,6 +2002,8 @@ type OperationAuditLifecycle struct {
 	OverdueSelectedAt         pgtype.Timestamptz
 	OverduePurge              []byte
 	CertificateVerifyAttempts int64
+	ShareEffectTarget         pgtype.UUID
+	ShareEffectXid            pgtype.Uint64
 }
 
 type OperationAuditPool struct {

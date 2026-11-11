@@ -20,12 +20,11 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-// These six independently provisioned provider credentials are private input
+// These two independently provisioned storage credentials are private input
 // to the installer, never a journal payload or public digest. The producer
 // chooses no endpoint/key from a token and creates no provider authority.
 type CaptureCleanupProviderMaterial struct {
-	Cleanup, Verify                              contracts.OwnerStorageCredential
-	WrapToken, OpenToken, VerifyToken, SignToken string
+	Cleanup, Verify contracts.OwnerStorageCredential
 }
 
 // One concrete producer owns its original first claim attempt. A failed or
@@ -44,7 +43,9 @@ func NewCaptureCleanupProjection(bridge *InitialRuntimeBridge, resources *Initia
 	if bridge == nil || resources == nil || root == nil || bridge.preparer != resources.preparer || bridge.rootUID != resources.rootUID ||
 		!equalJSON(bridge.initial, resources.initial) || resources.workerLayout == "" || !initialRuntimeProviderSelectionValid(resources.initial.InstallationID, resources.workerLayout, resources.ownerLayout, resources.workerProvider, resources.ownerProvider) ||
 		deployment.Format != contracts.CaptureCleanupDeploymentFormat || deployment.InstallationID != bridge.initial.InstallationID ||
-		deployment.InstallationID != root.input.InstallationID || !publicRuntimeWorkerBindingValid(root.input) {
+		deployment.InstallationID != root.input.InstallationID || !reflect.DeepEqual(deployment.AuditStore, resources.initial.AuditStore) || !reflect.DeepEqual(deployment.KeyService, resources.initial.KeyService) || !publicRuntimeWorkerBindingValid(root.input) || resources.workerProvider == nil || resources.workerProvider.CleanupAudit == (contracts.OwnerPublicTransit{}) ||
+		resources.workerProvider.CleanupAudit != (contracts.OwnerPublicTransit{Mount: deployment.KeyService.AuditMount, Key: deployment.KeyService.AuditKey}) ||
+		resources.workerProvider.ContextDeletionSigning != (contracts.OwnerPublicTransit{Mount: deployment.Signing.Mount, Key: deployment.Signing.Name}) {
 		return nil, cfg.ErrInvalid
 	}
 	raw, err := json.Marshal(deployment)
@@ -76,17 +77,12 @@ func captureCleanupProjectionData(initial contracts.InitialInstaller, deployment
 			return nil, "", cfg.ErrInvalid
 		}
 	}
-	for _, token := range []string{provider.WrapToken, provider.OpenToken, provider.VerifyToken, provider.SignToken} {
-		if !identity.Text(token, 8192) || strings.ContainsAny(token, " \t\r\n") {
-			return nil, "", cfg.ErrInvalid
-		}
-	}
 	for _, credential := range []contracts.OwnerStorageCredential{provider.Cleanup, provider.Verify} {
 		if !identity.Text(credential.AccessKeyID, 256) || !identity.Text(credential.SecretAccessKey, 8192) || len(credential.SessionToken) > 8192 {
 			return nil, "", cfg.ErrInvalid
 		}
 	}
-	if provider.Cleanup.AccessKeyID == provider.Verify.AccessKeyID || provider.OpenToken == provider.VerifyToken {
+	if provider.Cleanup.AccessKeyID == provider.Verify.AccessKeyID {
 		return nil, "", cfg.ErrInvalid
 	}
 	data := map[string][]byte{}
@@ -110,8 +106,6 @@ func captureCleanupProjectionData(initial contracts.InitialInstaller, deployment
 	data[contracts.HubWorkerCleanupDeploymentFile], _ = json.Marshal(deployment)
 	data["cleanup-storage.json"], _ = json.Marshal(provider.Cleanup)
 	data["verify-storage.json"], _ = json.Marshal(provider.Verify)
-	data["certificate-wrap.token"], data["certificate-open.token"] = []byte(provider.WrapToken), []byte(provider.OpenToken)
-	data["certificate-verify.token"], data["certificate-sign.token"] = []byte(provider.VerifyToken), []byte(provider.SignToken)
 	digest, err := contracts.CaptureCleanupProjectionDigest(deployment, manifest)
 	if err != nil {
 		return nil, "", cfg.ErrInvalid

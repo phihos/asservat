@@ -10,6 +10,7 @@ import (
 const CaptureOperationName = "persist_capture_intent"
 const CaptureOperationInputFormat = "capture-intent/v2"
 const CaptureOperationHistoryLayout = "capture-intent-history/v1"
+const ShareCaptureOperationHistoryLayout = "capture-intent-history/v2"
 const CaptureOperationReconcileAttempts = 2
 
 // This private payload is the already accepted minimized intent, never a public
@@ -36,7 +37,7 @@ func (r OperationOutcome) captureOutcomeValid() bool {
 	return r.Status == "success" && r.Reason == "prepared" && r.Effect == "accepted" && len(r.CaseIDs) == 0 && len(r.ArtifactIDs) == 0 && len(r.CaptureIDs) == 1 && r.CaptureIDs[0] == r.Intent.ID && r.OutputBytes == 0 && r.Credential == nil
 }
 func CaptureOperationPolicy(p OperationLifecyclePolicy) bool {
-	return p.CertificateVerificationBacked() && p.Lane == "capture" && p.History != nil && p.History.Layout == CaptureOperationHistoryLayout
+	return p.CertificateVerificationBacked() && p.Lane == "capture" && p.History != nil && captureHistoryLayout(p.History.Layout)
 }
 
 // Private protected account selection. The stable digest identifies only this

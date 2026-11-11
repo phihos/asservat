@@ -11,17 +11,35 @@ binding, finite business-key replay and shared cleanup composition.
 Source review found that active-share limits do not bound retained history and
 share DELETE is unconditionally refused. The existing capture cleanup component
 has no production installer projection caller; activating it is real new runtime
-work, not already installed qualification. Exact pool/credential activation cost
-is being checked before wiring. Reuse the existing audit slots and finalization;
+work, not already installed qualification. Activation is nine bindings: three
+existing SQL logins, two supplied S3 credentials and four provider purposes.
+Three cold pools allow +3 connections per worker, already counted in the
+compiled 114-connection installation requirement; the API hub's 32 is unchanged.
+Reuse the existing audit slots and finalization;
 add no lifetime-share quota, permanent key tombstone or share-specific cleaner.
 
 The bounded baseline fixture accepts eight owners before actual publication,
 uses compiled hub grants, records share/replay/transfer/revoke/rollback costs and
-checks 65 retained rows despite the 32-active limit. Only fixture-gated compilation
-has run; real-service measurement and the 100-share revoke-all cost are pending.
-No product behavior or new credential has changed. Next: freeze/commit the
-measurement source, run the owned fixture, establish compatible original
-provider/funding bounds and implement the complete installed retirement path.
+checks 65 retained rows despite the 32-active limit. The corrected owned service
+run at `2a2bc0f1` passed in 8.170 s. The sequence took 1,160 ms, retained 65 rows
+with 32 active, grew relations by 1,114,112 bytes and whole-instance WAL by
+1,085,704 bytes. This is an observed baseline, not a maximum-byte qualification.
+All 4,546 source hashes matched; source stayed frozen, cleanup failures were
+empty and owned containers were independently absent. Evidence is external in
+`share-retirement/baseline-2a2bc0f1`. The 100-share revoke-all cost remains pending.
+
+The integrated candidate now carries server-owned mutation IDs and new prepaid
+normal-v4/capture-v2 layouts. Focused domain and capacity tests pass (0.007 s and
+8.146 s), including historical non-promotion and underfunded aggregate refusal.
+SQL retirement, provider login/lifetime and actual installer projection wiring
+are implemented on the candidate. Focused PostgreSQL scope and bootstrap checks
+passed (0.014 s/0.107 s), and provider/KMS/Kubernetes/component regressions passed.
+Integration compiles. First cleanup use needs four login/lookup pairs; healthy
+reuse requires no provider refresh. Combined installed latency is pending.
+The collector-free `share-retirement` focus exercises both manual and capture
+shares with original short bounds selected before installation. Current-source
+real-service, maximum-width policy100, broad and fresh installed qualification
+have not run; no new installed outcome is claimed.
 
 The first owned fixture at `1dc7c616` failed before measurement (Go 4.946 s):
 the query-publication helper requested 60-second evidence retention under the
@@ -29,14 +47,15 @@ baseline's original 60-second root, leaving no deletion margin. The correction
 uses its existing 20-second managed capture and publishes that exact admission;
 no root backing, quota or original deadline is increased. All 4,546 failed-run
 source hashes match and source was unchanged. Cleanup failures are empty and
-owned containers were independently confirmed absent. The corrected fixture
-has compiled with an explicit service skip; actual service execution is pending.
+owned containers were independently confirmed absent. The corrected service
+execution above supersedes the subsequent compile-only check.
 
 ## Merged processing inventory export (2026-11-11)
 
 [PR222](https://github.com/phihos/asservat/pull/222) merged at `cef71802`.
 Its complete tree matches reviewed `382a5071`; required PR CI42962003612
-passed all 14 Go shards, the browser job and `ci-ok`. The branch started from
+passed all 14 Go shards, the browser job and `ci-ok`. Post-merge push CI42963062617
+also passed on authoritative `cef71802`. The branch started from
 authoritative `fec1e03e`. The console exports seven ordered sections of retained artifacts
 including deletions, recipients, native sessions, operation responses, rules,
 technical paths and declared processors. Finite JSON parts preserve the original

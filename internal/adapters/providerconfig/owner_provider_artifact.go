@@ -31,7 +31,7 @@ type ownerProviderSetupRequest struct {
 // credential (ADR-204 decision 5); it adds no provider request. A deletion
 // evidence store likewise describes the context deletion child's own
 // list-and-delete evidence credential (ADR-205 decision 4).
-func OwnerProviderSetupArtifact(in contracts.OwnerDeployment, profile contracts.OwnerProviderAuthentication, pool fleet.OwnerPool, roots [][]byte, now time.Time, federation *contracts.FederationDeployment, publisher *contracts.PublisherDeployment, downloads, deletion *contracts.InstallerEvidenceStore) ([]byte, error) {
+func OwnerProviderSetupArtifact(in contracts.OwnerDeployment, profile contracts.OwnerProviderAuthentication, pool fleet.OwnerPool, roots [][]byte, now time.Time, federation *contracts.FederationDeployment, publisher *contracts.PublisherDeployment, downloads, deletion *contracts.InstallerEvidenceStore, cleanup ...bool) ([]byte, error) {
 	if !authorization.UUID(in.ConfigurationUID) {
 		return nil, ErrSetupUnavailable
 	}
@@ -152,21 +152,36 @@ func OwnerProviderSetupArtifact(in contracts.OwnerDeployment, profile contracts.
 		// phase's inspection token (ADR-205 decision 6).
 		inspect = append(inspect, in.KeyService.AuditMount+"/keys/"+contracts.ContextDeletionSigningKeyName(in.InstallationID))
 	}
+	var cleanupStorage *OperationCleanupStorageRequirements
+	if len(cleanup) > 1 {
+		return nil, ErrSetupUnavailable
+	}
+	if len(cleanup) == 1 && cleanup[0] {
+		if !authorization.UUID(in.PermissionRootID) {
+			return nil, ErrSetupUnavailable
+		}
+		cleanupStorage = OperationCleanupStorageRequirementsFor(in.AuditStore, in.PermissionRootID)
+		path := in.KeyService.AuditMount + "/keys/" + contracts.ContextDeletionSigningKeyName(in.InstallationID)
+		if !slices.Contains(inspect, path) {
+			inspect = append(inspect, path)
+		}
+	}
 	return ownerProviderCanonical(struct {
-		Format                      string                      `json:"format"`
-		ConfigurationUID            string                      `json:"configurationUID"`
-		Setup                       OwnerSetupRecipe            `json:"setup"`
-		Federation                  *FederationProviderSetup    `json:"federation,omitempty"`
-		Publisher                   *publisherArtifact          `json:"publisher,omitempty"`
-		Public                      bool                        `json:"public,omitempty"`
-		Apply                       []ownerProviderSetupRequest `json:"apply"`
-		Inspect                     []string                    `json:"inspect"`
-		AuditStorage                any                         `json:"auditStorage"`
-		FederationAuditStorage      any                         `json:"federationAuditStorage,omitempty"`
-		DownloadEvidenceReadStorage *publisherStorage           `json:"downloadEvidenceReadStorage,omitempty"`
-		EvidenceDeleteStorage       *evidenceDeleteStorage      `json:"evidenceDeleteStorage,omitempty"`
-		ExternalAdministration      bool                        `json:"externalAdministration"`
-	}{"asservat-owner-provider-setup/v1", in.ConfigurationUID, setup, federationSetup, publisherSection, public, requests, inspect, storage, federationStorage, downloadStorage, deletionStorage, true})
+		Format                      string                               `json:"format"`
+		ConfigurationUID            string                               `json:"configurationUID"`
+		Setup                       OwnerSetupRecipe                     `json:"setup"`
+		Federation                  *FederationProviderSetup             `json:"federation,omitempty"`
+		Publisher                   *publisherArtifact                   `json:"publisher,omitempty"`
+		Public                      bool                                 `json:"public,omitempty"`
+		Apply                       []ownerProviderSetupRequest          `json:"apply"`
+		Inspect                     []string                             `json:"inspect"`
+		AuditStorage                any                                  `json:"auditStorage"`
+		FederationAuditStorage      any                                  `json:"federationAuditStorage,omitempty"`
+		DownloadEvidenceReadStorage *publisherStorage                    `json:"downloadEvidenceReadStorage,omitempty"`
+		EvidenceDeleteStorage       *evidenceDeleteStorage               `json:"evidenceDeleteStorage,omitempty"`
+		OperationCleanupStorage     *OperationCleanupStorageRequirements `json:"operationCleanupStorage,omitempty"`
+		ExternalAdministration      bool                                 `json:"externalAdministration"`
+	}{"asservat-owner-provider-setup/v1", in.ConfigurationUID, setup, federationSetup, publisherSection, public, requests, inspect, storage, federationStorage, downloadStorage, deletionStorage, cleanupStorage, true})
 }
 
 // evidenceDeleteStorage is the context deletion child's evidence credential

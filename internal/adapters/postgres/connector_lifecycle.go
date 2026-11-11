@@ -34,6 +34,9 @@ type operationLifecycleQueries interface {
 }
 
 func (s *OperationLifecycles) queries(q *custodydb.Queries) operationLifecycleQueries {
+	if s.worker {
+		return workerLifecycleQueries{captureLifecycleQueries{q}}
+	}
 	if s.capture {
 		return captureLifecycleQueries{q}
 	}

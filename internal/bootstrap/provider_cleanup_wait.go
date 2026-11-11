@@ -7,6 +7,7 @@ import (
 	"os"
 	"time"
 
+	"asservat.local/asservat/internal/adapters/kms"
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/adapters/mounts"
 	fleetapp "asservat.local/asservat/internal/application/fleet"
@@ -16,6 +17,7 @@ import (
 type providerCleanupStartup struct {
 	operation *kube.WorkerProjectionOperation
 	admission *fleetapp.WorkerRuntimeAdmission
+	providers *kms.InstalledConfigurationProviderEffects
 }
 
 func (d *InstalledHubWorkerDeployment) runProviderCleanup(ctx context.Context) error {
@@ -82,7 +84,7 @@ func (d *InstalledHubWorkerDeployment) openProviderCleanup(ctx context.Context) 
 			files.Close()
 		}
 	}()
-	child, err := newCaptureCleanupWorkerDeployment(ctx, b.mounts, files, b.input, b.activation, claim, &providerCleanupStartup{op, b.admission})
+	child, err := newCaptureCleanupWorkerDeployment(ctx, b.mounts, files, b.input, b.activation, claim, &providerCleanupStartup{op, b.admission, b.configuration.providers})
 	if err != nil {
 		return nil, nil, err
 	}

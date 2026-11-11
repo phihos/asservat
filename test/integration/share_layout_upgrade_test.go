@@ -1,0 +1,172 @@
+package integration
+
+import (
+	"context"
+	"errors"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/pressly/goose/v3"
+)
+
+// Uses the existing owned upgrade database, not a second service fixture.
+// Temporary NOLOGIN roles qualify real view ownership and table/column grants.
+func qualifyShareLayoutUpgrade(t *testing.T, ctx context.Context, conn *pgx.Conn, provider *goose.Provider) {
+	t.Helper()
+	checkLayouts := func(current bool) {
+		t.Helper()
+		for _, row := range []struct {
+			lane, layout string
+			valid        bool
+			transitions  int64
+		}{
+			{"normal", "operation-audit-history/v1", true, 16}, {"normal", "operation-audit-history/v2", true, 19},
+			{"normal", "operation-audit-history/v3", true, 21}, {"resolution", "operation-audit-history/v3", true, 21},
+			{"normal", "operation-audit-history/v4", current, 24}, {"resolution", "operation-audit-history/v4", current, 24},
+			{"capture", "capture-intent-history/v1", true, 32}, {"capture", "capture-intent-history/v2", current, 34},
+			{"identity", "operation-audit-history/v4", false, 24}, {"processing", "operation-audit-history/v4", false, 24},
+		} {
+			var valid bool
+			var transitions *int64
+			if err := conn.QueryRow(ctx, `SELECT public.operation_audit_history_layout_valid($1,$2),public.operation_audit_history_fixed_transitions($2)`, row.lane, row.layout).Scan(&valid, &transitions); err != nil || valid != row.valid {
+				t.Fatal("actual SQL audit layout", row.lane, row.layout, valid, err)
+			}
+			fresh := row.layout == "operation-audit-history/v4" || row.layout == "capture-intent-history/v2"
+			if !current && fresh {
+				if transitions != nil {
+					t.Fatal("Down retained new fixed transition layout", row.layout)
+				}
+			} else if transitions == nil || *transitions != row.transitions {
+				t.Fatal("actual SQL fixed transition budget", row.layout, transitions)
+			}
+		}
+		for _, pair := range []struct{ lane, old, next string }{
+			{"normal", "operation-audit-history/v3", "operation-audit-history/v4"},
+			{"capture", "capture-intent-history/v1", "capture-intent-history/v2"},
+		} {
+			var promoted bool
+			if err := conn.QueryRow(ctx, `SELECT public.operation_audit_profile_covers(jsonb_build_object('Lane',$1::text,'History',jsonb_build_object('Layout',$2::text)),jsonb_build_object('Lane',$1::text,'History',jsonb_build_object('Layout',$3::text)))`, pair.lane, pair.next, pair.old).Scan(&promoted); err != nil || promoted {
+				t.Fatal("retained profile implicitly promoted", pair.lane, err)
+			}
+		}
+		var floor string
+		want := "asservat:oldest-binary-schema=153"
+		if current {
+			want = "asservat:oldest-binary-schema=154"
+		}
+		if err := conn.QueryRow(ctx, `SELECT obj_description('public.goose_db_version'::regclass,'pg_class')`).Scan(&floor); err != nil || floor != want {
+			t.Fatal("share layout compatibility floor", floor, want, err)
+		}
+	}
+	views := []string{"capture_operation_lifecycle", "connector_operation_lifecycle"}
+	owners := map[string]string{}
+	for _, view := range views {
+		var owner string
+		if err := conn.QueryRow(ctx, `SELECT pg_get_userbyid(relowner) FROM pg_class WHERE oid=$1::regclass`, "public."+view).Scan(&owner); err != nil {
+			t.Fatal(err)
+		}
+		owners[view] = owner
+	}
+	prefix := "share_acl_" + strings.ReplaceAll(custodyID(), "-", "")
+	owner, reader, column := prefix+"_o", prefix+"_r", prefix+"_c"
+	roles := []string{owner, reader, column}
+	for _, role := range roles {
+		if _, err := conn.Exec(ctx, "CREATE ROLE "+pgx.Identifier{role}.Sanitize()+" NOLOGIN NOINHERIT"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	defer func() {
+		cleanup, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		for _, view := range views {
+			if _, err := conn.Exec(cleanup, "ALTER VIEW public."+pgx.Identifier{view}.Sanitize()+" OWNER TO "+pgx.Identifier{owners[view]}.Sanitize()); err != nil {
+				t.Error("restore original lifecycle view owner", err)
+				return
+			}
+		}
+		for _, role := range roles {
+			if _, err := conn.Exec(cleanup, "DROP OWNED BY "+pgx.Identifier{role}.Sanitize()); err != nil {
+				t.Error("remove temporary view grants", err)
+				continue
+			}
+			if _, err := conn.Exec(cleanup, "DROP ROLE "+pgx.Identifier{role}.Sanitize()); err != nil {
+				t.Error("remove temporary view role", err)
+			}
+		}
+	}()
+	if _, err := conn.Exec(ctx, "GRANT USAGE,CREATE ON SCHEMA public TO "+pgx.Identifier{owner}.Sanitize()); err != nil {
+		t.Fatal(err)
+	}
+	for _, view := range views {
+		name := "public." + pgx.Identifier{view}.Sanitize()
+		if _, err := conn.Exec(ctx, "ALTER VIEW "+name+" OWNER TO "+pgx.Identifier{owner}.Sanitize()+"; GRANT SELECT ON "+name+" TO "+pgx.Identifier{reader}.Sanitize()+" WITH GRANT OPTION; GRANT UPDATE (lease) ON "+name+" TO "+pgx.Identifier{column}.Sanitize()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	snapshot := func() string {
+		t.Helper()
+		var value string
+		if err := conn.QueryRow(ctx, `SELECT jsonb_agg(jsonb_build_object('name',c.relname,'owner',c.relowner,
+   'table',COALESCE((SELECT jsonb_agg(jsonb_build_array(x.grantor,x.grantee,x.privilege_type,x.is_grantable) ORDER BY x.grantor,x.grantee,x.privilege_type) FROM aclexplode(COALESCE(c.relacl,acldefault('r',c.relowner))) x),'[]'::jsonb),
+   'columns',COALESCE((SELECT jsonb_agg(jsonb_build_array(a.attname,x.grantor,x.grantee,x.privilege_type,x.is_grantable) ORDER BY a.attname,x.grantor,x.grantee,x.privilege_type) FROM pg_attribute a CROSS JOIN LATERAL aclexplode(a.attacl) x WHERE a.attrelid=c.oid AND a.attnum>0 AND NOT a.attisdropped),'[]'::jsonb)) ORDER BY c.relname)::text
+   FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relname IN ('capture_operation_lifecycle','connector_operation_lifecycle')`).Scan(&value); err != nil {
+			t.Fatal("lifecycle owner/grant snapshot", err)
+		}
+		return value
+	}
+	columns := func(markers bool) {
+		t.Helper()
+		var count int
+		if err := conn.QueryRow(ctx, `SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND table_name IN ('capture_operation_lifecycle','connector_operation_lifecycle') AND column_name IN ('share_effect_target','share_effect_xid')`).Scan(&count); err != nil || count != map[bool]int{true: 4, false: 0}[markers] {
+			t.Fatal("lifecycle view marker projection", count, err)
+		}
+	}
+	checkLayouts(true)
+	columns(true)
+	before := snapshot()
+	// An actual grant on a new-only column cannot be silently discarded by Down.
+	if _, err := conn.Exec(ctx, "GRANT UPDATE (share_effect_target) ON public.capture_operation_lifecycle TO "+pgx.Identifier{column}.Sanitize()); err != nil {
+		t.Fatal(err)
+	}
+	unsupported := snapshot()
+	_, err := provider.DownTo(ctx, 153)
+	var refusal *pgconn.PgError
+	if !errors.As(err, &refusal) || refusal.Code != "23514" || !strings.Contains(refusal.Message, "marker-column grants") {
+		t.Fatal("new-only column grant did not refuse Down atomically", err)
+	}
+	if snapshot() != unsupported {
+		t.Fatal("failed Down changed retained owner or grants")
+	}
+	checkLayouts(true)
+	columns(true)
+	if _, err := conn.Exec(ctx, "REVOKE UPDATE (share_effect_target) ON public.capture_operation_lifecycle FROM "+pgx.Identifier{column}.Sanitize()); err != nil {
+		t.Fatal(err)
+	}
+	if snapshot() != before {
+		t.Fatal("marker grant revocation changed original grants")
+	}
+	if _, err := provider.DownTo(ctx, 153); err != nil {
+		t.Fatal("empty SQL154 Down", err)
+	}
+	checkLayouts(false)
+	columns(false)
+	if snapshot() != before {
+		t.Fatal("SQL154 Down changed lifecycle owners/table/column grants")
+	}
+	// SQL153 can now remove its marker columns without view dependency errors.
+	if _, err := provider.DownTo(ctx, 152); err != nil {
+		t.Fatal("standalone SQL153 Down after SQL154", err)
+	}
+	if _, err := provider.Up(ctx); err != nil {
+		t.Fatal("SQL153/154 Up after empty roundtrip", err)
+	}
+	checkLayouts(true)
+	columns(true)
+	if snapshot() != before {
+		t.Fatal("SQL153/154 roundtrip changed lifecycle owners/table/column grants")
+	}
+	t.Log("SQL154 admitted fixed24/34 layouts without old-profile promotion; empty Down154/153/Up preserved actual owners and table/column grant options; new-only grants refused atomically")
+}

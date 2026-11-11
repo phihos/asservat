@@ -62,7 +62,7 @@ func TestInstalledReportSharingAuthority(t *testing.T) {
 		foci  string
 		owner bool
 	}{
-		{"privacy-inventory", true}, {"share", true}, {"browser", true},
+		{"privacy-inventory", true}, {"share", true}, {"browser", true}, {"share-retirement", true},
 		{"early-erasure", false}, {"early-erasure,privacy-inventory", true},
 	} {
 		t.Run(fixture.foci, func(t *testing.T) {

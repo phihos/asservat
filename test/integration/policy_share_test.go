@@ -33,9 +33,10 @@ import (
 // acceptance never backfills, a capture published after notAfter is unshared,
 // and revoke-all revokes exactly its acceptance's shares and stops its
 // pending captures from being shared.
-func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, create func(*testing.T, int64) captureAdmissionScenario, prepare func(*testing.T, captureAdmissionScenario, capture.Accepted, bool) captureShareFixture) {
+func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, create func(*testing.T, int64) captureAdmissionScenario, prepare func(*testing.T, captureAdmissionScenario, capture.Accepted, bool) captureShareFixture, configureCapture func(*testing.T, *captureAdmissionScenario) shareCaptureAudit) {
 	t.Helper()
 	s := create(t, 12)
+	qualifiedCapture := configureCapture(t, &s)
 	root, installation := s.a.RootID, s.recovery.installation
 	pod := s.a.Plan.Input.Target.Target()
 	workload := authorization.WorkloadScope(pod.ClusterID, pod.NamespaceUID, pod.WorkloadUID)
@@ -314,16 +315,11 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 	// narrowRole names one role per prefix and database.
 	captureAdmissions := func(prefix string) *postgres.ContextAdmissions {
 		t.Helper()
-		role := narrowRole(t, ctx, admin, prefix, "synthetic-policy-share-admit", func(role string) []string {
-			grants, ok := postgres.PublicRuntimeRoleGrantSQL("capture-admit", role)
-			if !ok {
-				t.Fatal("missing compiled capture-admit grants")
-			}
-			return grants
-		})
-		pool := poolFor(role, "synthetic-policy-share-admit")
+		// A fresh pool/adapter uses the same original pinned capture role;
+		// a process restart cannot invent a replacement admission identity.
+		pool := poolFor("capture_operation_admit_runtime", "synthetic-capture-operation-admit")
 		t.Cleanup(pool.Close)
-		a, err := postgres.NewContextAdmissions(ctx, pool, root, postgres.EffectTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard})
+		a, err := postgres.NewAuditedContextAdmissions(ctx, pool, root, qualifiedCapture.mac, postgres.EffectTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -446,7 +442,7 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 	if err != nil {
 		t.Fatal(err)
 	}
-	service := sharing.Service{RootID: root, InstallationID: installation, Routes: routes, Permissions: s.p, Catalog: f1.reader, Store: ledger, Policies: ledger, Recovery: s.recovery.reader, NewID: custodyID, Now: time.Now}
+	service := paidShareService{Service: sharing.Service{RootID: root, InstallationID: installation, Routes: routes, Permissions: s.p, Catalog: f1.reader, Store: ledger, Policies: ledger, Recovery: s.recovery.reader, NewID: custodyID, Now: time.Now}, audit: newShareBusinessAudit(t, ctx, hubPool, store, keys, s)}
 	as := func(subject string, groups []string) identities.CurrentIdentity {
 		t.Helper()
 		refresh()
@@ -459,23 +455,23 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 		}
 		return current
 	}
-	if _, err := service.RevokePolicySharing(ctx, as("synthetic-policy-recipient", nil), first, 1, "revoke-all"); !errors.Is(err, capture.ErrDenied) {
+	if _, err := service.RevokePolicySharing(ctx, as("synthetic-policy-recipient", nil), sharing.PolicyRevokeInput{AcceptanceID: first, ExpectedRevision: 1, IdempotencyKey: "revoke-all"}); !errors.Is(err, capture.ErrDenied) {
 		t.Fatal("a recipient revoked the policy's sharing", err)
 	}
 	// A current owner-team member (not the creator) manages the sharing.
-	r, err := service.RevokePolicySharing(ctx, as("synthetic-team-mate", []string{"maintainers"}), first, 1, "revoke-all")
+	r, err := service.RevokePolicySharing(ctx, as("synthetic-team-mate", []string{"maintainers"}), sharing.PolicyRevokeInput{AcceptanceID: first, ExpectedRevision: 1, IdempotencyKey: "revoke-all"})
 	if err != nil || r.Revoked != 2 || r.Replay {
 		t.Fatal("revoke-all", r, err)
 	}
-	if again, err := service.RevokePolicySharing(ctx, as(creator.Subject, []string{"maintainers"}), first, 1, "revoke-all"); err != nil || !again.Replay || again.Revoked != 2 {
+	if again, err := service.RevokePolicySharing(ctx, as(creator.Subject, []string{"maintainers"}), sharing.PolicyRevokeInput{AcceptanceID: first, ExpectedRevision: 1, IdempotencyKey: "revoke-all"}); err != nil || !again.Replay || again.Revoked != 2 {
 		t.Fatal("revoke-all replay", again, err)
 	}
 	// A replay with a stale expected revision cannot report a revision the
 	// store never produced.
-	if _, err := service.RevokePolicySharing(ctx, as(creator.Subject, []string{"maintainers"}), first, 2, "revoke-all"); !errors.Is(err, capture.ErrConflict) {
+	if _, err := service.RevokePolicySharing(ctx, as(creator.Subject, []string{"maintainers"}), sharing.PolicyRevokeInput{AcceptanceID: first, ExpectedRevision: 2, IdempotencyKey: "revoke-all"}); !errors.Is(err, capture.ErrConflict) {
 		t.Fatal("replay with another expected revision", err)
 	}
-	if _, err := service.RevokePolicySharing(ctx, as(creator.Subject, []string{"maintainers"}), first, 1, "another-key"); !errors.Is(err, capture.ErrConflict) {
+	if _, err := service.RevokePolicySharing(ctx, as(creator.Subject, []string{"maintainers"}), sharing.PolicyRevokeInput{AcceptanceID: first, ExpectedRevision: 1, IdempotencyKey: "another-key"}); !errors.Is(err, capture.ErrConflict) {
 		t.Fatal("second revoke-all under another key", err)
 	}
 	got = shares()
@@ -495,16 +491,16 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 	if w := stored(c8); w == nil || w.Acceptance != third {
 		t.Fatal("acceptance C does not share", w)
 	}
-	if _, err := service.StopPolicySharing(ctx, as("synthetic-policy-recipient", nil), third, 1, "stop"); !errors.Is(err, capture.ErrDenied) {
+	if _, err := service.StopPolicySharing(ctx, as("synthetic-policy-recipient", nil), sharing.PolicyRevokeInput{AcceptanceID: third, ExpectedRevision: 1, IdempotencyKey: "stop"}); !errors.Is(err, capture.ErrDenied) {
 		t.Fatal("a recipient stopped the policy's sharing", err)
 	}
-	if r, err := service.StopPolicySharing(ctx, as("synthetic-team-mate", []string{"maintainers"}), third, 1, "stop"); err != nil || r.Replay {
+	if r, err := service.StopPolicySharing(ctx, as("synthetic-team-mate", []string{"maintainers"}), sharing.PolicyRevokeInput{AcceptanceID: third, ExpectedRevision: 1, IdempotencyKey: "stop"}); err != nil || r.Replay {
 		t.Fatal("stop future sharing", r, err)
 	}
-	if r, err := service.StopPolicySharing(ctx, as(creator.Subject, []string{"maintainers"}), third, 1, "stop"); err != nil || !r.Replay {
+	if r, err := service.StopPolicySharing(ctx, as(creator.Subject, []string{"maintainers"}), sharing.PolicyRevokeInput{AcceptanceID: third, ExpectedRevision: 1, IdempotencyKey: "stop"}); err != nil || !r.Replay {
 		t.Fatal("stop replay", r, err)
 	}
-	if _, err := service.StopPolicySharing(ctx, as(creator.Subject, []string{"maintainers"}), third, 1, "stop-again"); !errors.Is(err, capture.ErrConflict) {
+	if _, err := service.StopPolicySharing(ctx, as(creator.Subject, []string{"maintainers"}), sharing.PolicyRevokeInput{AcceptanceID: third, ExpectedRevision: 1, IdempotencyKey: "stop-again"}); !errors.Is(err, capture.ErrConflict) {
 		t.Fatal("second stop under another key", err)
 	}
 	if c9 := admit(hub); stored(c9) != nil || spent(third) != 1 {
@@ -515,10 +511,10 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 	if r := shares()["capture:"+c8.CaptureID]; r.Acceptance != third || r.Revoked {
 		t.Fatal("a capture claimed before the Stop did not publish its share", r)
 	}
-	if _, err := service.RevokePolicySharing(ctx, as(creator.Subject, []string{"maintainers"}), third, 1, "revoke-third"); !errors.Is(err, capture.ErrConflict) {
+	if _, err := service.RevokePolicySharing(ctx, as(creator.Subject, []string{"maintainers"}), sharing.PolicyRevokeInput{AcceptanceID: third, ExpectedRevision: 1, IdempotencyKey: "revoke-third"}); !errors.Is(err, capture.ErrConflict) {
 		t.Fatal("revoke-all at a stale revision", err)
 	}
-	if r, err := service.RevokePolicySharing(ctx, as(creator.Subject, []string{"maintainers"}), third, 2, "revoke-third"); err != nil || r.Revoked != 1 {
+	if r, err := service.RevokePolicySharing(ctx, as(creator.Subject, []string{"maintainers"}), sharing.PolicyRevokeInput{AcceptanceID: third, ExpectedRevision: 2, IdempotencyKey: "revoke-third"}); err != nil || r.Revoked != 1 {
 		t.Fatal("revoke-all after stop", r, err)
 	}
 	if !shares()["capture:"+c8.CaptureID].Revoked || shares()["capture:"+c5.CaptureID].Revoked {

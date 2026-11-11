@@ -1,3 +1,8 @@
+-- name: BeginShareEffect :one
+SELECT effect_available::boolean,retire_by::timestamptz,effect_until::timestamptz FROM begin_share_effect(
+ sqlc.arg(root_id)::uuid,sqlc.arg(operation_id)::uuid,sqlc.arg(action)::text,
+ sqlc.arg(issuer)::text,sqlc.arg(subject)::text,sqlc.arg(client)::text,sqlc.arg(target)::uuid);
+
 -- ADR-232 concrete evidence shares.
 
 -- name: LockShareArtifact :exec
@@ -8,14 +13,14 @@ SELECT pg_advisory_xact_lock(hashtextextended('evidence_share:' || @artifact_key
 SELECT * FROM evidence_share WHERE root_id=$1 AND creator_issuer=$2 AND creator_subject=$3 AND idempotency_key=$4;
 
 -- name: CountActiveShares :one
-SELECT count(*) FROM evidence_share WHERE root_id=$1 AND artifact_id=$2 AND revoked_at IS NULL AND expires_at>clock_timestamp();
+SELECT count(*) FROM evidence_share WHERE root_id=$1 AND artifact_id=$2 AND retire_by>clock_timestamp() AND revoked_at IS NULL AND expires_at>clock_timestamp();
 
 -- name: InsertShare :one
 -- The artifact, case and target come from the published case route, never
 -- only from the caller.
-INSERT INTO evidence_share(id,root_id,artifact_id,case_id,cluster_id,namespace_uid,workload_uid,pod_uid,version,creator_issuer,creator_subject,creator_client,management,recipients,recipient_keys,idempotency_key,request_digest,expires_at)
+INSERT INTO evidence_share(id,root_id,artifact_id,case_id,cluster_id,namespace_uid,workload_uid,pod_uid,version,creator_issuer,creator_subject,creator_client,management,recipients,recipient_keys,idempotency_key,request_digest,expires_at,creating_operation_id,last_operation_id)
 SELECT @id::uuid, r.root_id, r.artifact_id, r.case_id, r.cluster_id, r.namespace_uid, r.workload_uid, r.pod_uid, @version::bytea, @creator_issuer, @creator_subject, @creator_client::text,
- @management::jsonb, @recipients::jsonb, @recipient_keys::text[], @idempotency_key::text, @request_digest::bytea, @expires_at::timestamptz
+ @management::jsonb, @recipients::jsonb, @recipient_keys::text[], @idempotency_key::text, @request_digest::bytea, @expires_at::timestamptz,@operation_id::uuid,@operation_id::uuid
 FROM context_case_locator r
 WHERE r.root_id=sqlc.arg(root_id)::uuid AND r.artifact_id=sqlc.arg(artifact_id)::uuid AND r.case_id=sqlc.arg(case_id)::uuid AND r.cluster_id=sqlc.arg(cluster_id)::uuid
  AND r.namespace_uid=sqlc.arg(namespace_uid)::text AND r.workload_uid=sqlc.arg(workload_uid)::text AND r.pod_uid=sqlc.arg(pod_uid)::text
@@ -24,7 +29,7 @@ RETURNING *;
 
 -- name: ReadRecipientShares :many
 -- Keyed by (artifact, the caller's own user/group keys); at most the cap.
-SELECT * FROM evidence_share WHERE root_id=$1 AND artifact_id=$2 AND revoked_at IS NULL AND expires_at>clock_timestamp() AND recipient_keys && sqlc.arg(keys)::text[]
+SELECT * FROM evidence_share WHERE root_id=$1 AND artifact_id=$2 AND retire_by>clock_timestamp() AND revoked_at IS NULL AND expires_at>clock_timestamp() AND recipient_keys && sqlc.arg(keys)::text[]
 ORDER BY created_at, id LIMIT 32;
 
 -- name: ListOwnedShares :many
@@ -33,7 +38,7 @@ ORDER BY created_at, id LIMIT 32;
 -- (ADR-232 increment 4; each pattern is a one-element array
 -- [{"Kind","Issuer","SubjectID"}]). Candidates only: the service lists a team
 -- share only while the caller holds a pinned assignment that is still current.
-SELECT * FROM evidence_share WHERE root_id=sqlc.arg(root_id)
+SELECT * FROM evidence_share WHERE root_id=sqlc.arg(root_id) AND retire_by>clock_timestamp()
  AND ((creator_issuer=sqlc.arg(creator_issuer) AND creator_subject=sqlc.arg(creator_subject))
   OR (revoked_at IS NULL AND expires_at>clock_timestamp() AND management @> ANY(sqlc.arg(managers)::jsonb[])))
 -- Active rows first, so old revoked/expired own shares never push a share the
@@ -41,28 +46,28 @@ SELECT * FROM evidence_share WHERE root_id=sqlc.arg(root_id)
 ORDER BY (revoked_at IS NULL AND expires_at>clock_timestamp()) DESC, created_at DESC, id LIMIT sqlc.arg(row_limit);
 
 -- name: ReadShare :one
-SELECT * FROM evidence_share WHERE root_id=$1 AND id=$2;
+SELECT * FROM evidence_share WHERE root_id=$1 AND id=$2 AND retire_by>clock_timestamp();
 
 -- name: ListReceivedShares :many
-SELECT * FROM evidence_share WHERE root_id=$1 AND recipient_keys && sqlc.arg(keys)::text[] AND revoked_at IS NULL AND expires_at>clock_timestamp()
+SELECT * FROM evidence_share WHERE root_id=$1 AND retire_by>clock_timestamp() AND recipient_keys && sqlc.arg(keys)::text[] AND revoked_at IS NULL AND expires_at>clock_timestamp()
 ORDER BY created_at DESC, id LIMIT @row_limit;
 
 -- name: ReadShareForUpdate :one
 SELECT * FROM evidence_share WHERE root_id=$1 AND id=$2 FOR UPDATE;
 
 -- name: RevokeShare :one
-UPDATE evidence_share SET revoked_at=clock_timestamp(), revoke_key=$3, revision=revision+1
+UPDATE evidence_share SET revoked_at=clock_timestamp(), revoke_key=$3, revision=revision+1,last_operation_id=sqlc.arg(operation_id)::uuid
 WHERE root_id=$1 AND id=$2 AND revoked_at IS NULL RETURNING *;
 
 -- name: TransferShare :one
 -- ADR-238: replaces the pinned management of a live share; one revision.
-UPDATE evidence_share SET management=sqlc.arg(management)::jsonb, transfer_key=sqlc.arg(transfer_key)::text, transfer_digest=sqlc.arg(transfer_digest)::bytea, revision=revision+1
+UPDATE evidence_share SET management=sqlc.arg(management)::jsonb, transfer_key=sqlc.arg(transfer_key)::text, transfer_digest=sqlc.arg(transfer_digest)::bytea, revision=revision+1,last_operation_id=sqlc.arg(operation_id)::uuid
 WHERE root_id=sqlc.arg(root_id)::uuid AND id=sqlc.arg(id)::uuid AND revoked_at IS NULL AND expires_at>clock_timestamp() AND revision<1000000000 RETURNING *;
 
 -- name: ListAdministeredShares :many
 -- ADR-238: the installation administrator's management-only listing, newest
 -- first, keyset-paged on (created_at, id) (index evidence_share_administered).
-SELECT * FROM evidence_share WHERE root_id=sqlc.arg(root_id)::uuid
+SELECT * FROM evidence_share WHERE root_id=sqlc.arg(root_id)::uuid AND retire_by>clock_timestamp()
  AND (NOT sqlc.arg(paged)::boolean OR (created_at,id)<(sqlc.arg(after_created_at)::timestamptz,sqlc.arg(after_id)::uuid))
 ORDER BY created_at DESC, id DESC LIMIT sqlc.arg(row_limit);
 
@@ -89,8 +94,8 @@ WHERE root_id=$1 AND id=$2 AND sharing_revoked_at IS NULL AND record ? 'Sharing'
 -- name: RevokePolicyShares :many
 -- Every still-unrevoked share materialized from exactly this acceptance; at
 -- most its capture limit (100).
-UPDATE evidence_share SET revoked_at=clock_timestamp(), revoke_key=$3, revision=revision+1
-WHERE root_id=$1 AND policy_acceptance_id=$2 AND revoked_at IS NULL RETURNING id;
+UPDATE evidence_share SET revoked_at=clock_timestamp(), revoke_key=$3, revision=revision+1,last_operation_id=sqlc.arg(operation_id)::uuid
+WHERE root_id=$1 AND policy_acceptance_id=$2 AND revoked_at IS NULL AND retire_by>clock_timestamp() RETURNING id;
 
 -- name: CountPolicyShareRevocations :one
 SELECT count(*) FROM evidence_share WHERE root_id=$1 AND policy_acceptance_id=$2 AND revoke_key=$3;

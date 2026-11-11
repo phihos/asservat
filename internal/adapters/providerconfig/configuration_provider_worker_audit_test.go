@@ -45,17 +45,17 @@ func TestConfigurationProviderRecipeDigestUnchangedWithoutWorkerAudit(t *testing
 		t.Fatal(err)
 	}
 	legacy, err := ownerProviderCanonical(struct {
-		Format         string                             `json:"format"`
-		InstallationID string                             `json:"installationID"`
-		ClusterID      string                             `json:"clusterID"`
-		Namespace      contracts.WorkerObjectReference    `json:"namespace"`
-		FleetSource    contracts.WorkerObjectReference    `json:"fleetSource"`
-		OwnerSource    contracts.WorkerObjectReference    `json:"ownerSource"`
-		Kubernetes     contracts.OwnerProviderEndpoint    `json:"kubernetes"`
-		KeyService     contracts.ConfigurationKeyService  `json:"keyService"`
-		AuditStore     contracts.OwnerAuditStore          `json:"auditStore"`
-		Profile        map[string]any                     `json:"profile"`
-		Roles          [2]ConfigurationProviderRoleRecipe `json:"roles"`
+		Format         string                            `json:"format"`
+		InstallationID string                            `json:"installationID"`
+		ClusterID      string                            `json:"clusterID"`
+		Namespace      contracts.WorkerObjectReference   `json:"namespace"`
+		FleetSource    contracts.WorkerObjectReference   `json:"fleetSource"`
+		OwnerSource    contracts.WorkerObjectReference   `json:"ownerSource"`
+		Kubernetes     contracts.OwnerProviderEndpoint   `json:"kubernetes"`
+		KeyService     contracts.ConfigurationKeyService `json:"keyService"`
+		AuditStore     contracts.OwnerAuditStore         `json:"auditStore"`
+		Profile        map[string]any                    `json:"profile"`
+		Roles          []ConfigurationProviderRoleRecipe `json:"roles"`
 	}{"asservat-configuration-provider-recipe/v1", in.InstallationID, in.ClusterID, in.Namespace, in.FleetSource, in.OwnerSource, in.Kubernetes, in.KeyService, in.AuditStore,
 		map[string]any{"format": r.Profile.Format, "authMount": r.Profile.AuthMount, "authMountAccessor": r.Profile.AuthMountAccessor, "serviceAccount": r.Profile.ServiceAccount, "auditCredentials": r.Profile.AuditCredentials, "recipeSHA256": ""}, r.Roles})
 	if err != nil {

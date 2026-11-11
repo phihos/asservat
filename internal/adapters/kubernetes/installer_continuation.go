@@ -11,6 +11,7 @@ import (
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/authorization"
 	cfg "asservat.local/asservat/internal/domain/configuration"
+	"asservat.local/asservat/internal/domain/identity"
 	apps "k8s.io/api/apps/v1"
 	authv1 "k8s.io/api/authentication/v1"
 	core "k8s.io/api/core/v1"
@@ -132,7 +133,8 @@ type InstallerInbox struct {
 	DownloadEvidenceCredential []byte
 	// EvidenceDeleteCredential is present when the phase-3 artifact named the
 	// context deletion child's evidence list-and-delete principal (ADR-205).
-	EvidenceDeleteCredential []byte
+	EvidenceDeleteCredential                        []byte
+	CleanupAuditCredential, CleanupVerifyCredential []byte
 	// Public holds exactly the InstallerInboxPublicFiles when the phase-3
 	// artifact carried a promoted owner (ADR-194); otherwise it is nil.
 	Public map[string][]byte
@@ -159,7 +161,7 @@ func ReadInstallerInbox(ctx context.Context, config *rest.Config, namespace, ins
 		FederationAuditCredential: s.Data[contracts.InstallerInboxFederationAuditCredential],
 		PublisherAuditCredential:  s.Data[contracts.InstallerInboxPublisherAuditCredential], EvidenceReadCredential: s.Data[contracts.InstallerInboxEvidenceReadCredential],
 		DownloadEvidenceCredential: s.Data[contracts.InstallerInboxDownloadEvidenceCredential],
-		EvidenceDeleteCredential:   s.Data[contracts.InstallerInboxEvidenceDeleteCredential]}
+		EvidenceDeleteCredential:   s.Data[contracts.InstallerInboxEvidenceDeleteCredential], CleanupAuditCredential: s.Data[contracts.InstallerInboxCleanupAuditCredential], CleanupVerifyCredential: s.Data[contracts.InstallerInboxCleanupVerifyCredential]}
 	for _, key := range contracts.InstallerInboxPublicFiles() {
 		if v := s.Data[key]; len(v) != 0 {
 			if out.Public == nil {
@@ -281,7 +283,7 @@ func ReadInstallerOutbox(ctx context.Context, config *rest.Config, namespace, in
 // (ADR-203), downloads the optional download workers' evidence read
 // credential (ADR-204) and deletion the optional context deletion child's
 // evidence delete credential (ADR-205).
-func WriteInstallerInbox(ctx context.Context, config *rest.Config, namespace, installation string, phase int, token, credential, federation []byte, public, publisher map[string][]byte, downloads, deletion []byte) error {
+func WriteInstallerInbox(ctx context.Context, config *rest.Config, namespace, installation string, phase int, token, credential, federation []byte, public, publisher map[string][]byte, downloads, deletion []byte, cleanup ...map[string][]byte) error {
 	api, err := installerAPI(config)
 	if err != nil || namespace == "" || !authorization.UUID(installation) || len(token) == 0 || len(credential) == 0 {
 		return cfg.ErrInvalid
@@ -299,6 +301,28 @@ func WriteInstallerInbox(ctx context.Context, config *rest.Config, namespace, in
 	if len(deletion) != 0 {
 		s.Data[contracts.InstallerInboxEvidenceDeleteCredential] = deletion
 	}
+	if len(cleanup) > 1 {
+		return cfg.ErrInvalid
+	}
+	if len(cleanup) == 1 {
+		if phase != 3 || len(cleanup[0]) != 2 {
+			return cfg.ErrInvalid
+		}
+		for _, key := range []string{contracts.InstallerInboxCleanupAuditCredential, contracts.InstallerInboxCleanupVerifyCredential} {
+			b := cleanup[0][key]
+			c, e := contracts.DecodeOwnerStorageCredential(bytes.NewReader(b))
+			if e != nil || !identity.Text(c.AccessKeyID, 256) || !identity.Text(c.SecretAccessKey, 8192) || c.SessionToken != "" {
+				return cfg.ErrInvalid
+			}
+			s.Data[key] = b
+		}
+		a, _ := contracts.DecodeOwnerStorageCredential(bytes.NewReader(cleanup[0][contracts.InstallerInboxCleanupAuditCredential]))
+		v, _ := contracts.DecodeOwnerStorageCredential(bytes.NewReader(cleanup[0][contracts.InstallerInboxCleanupVerifyCredential]))
+		if a.AccessKeyID == v.AccessKeyID {
+			return cfg.ErrInvalid
+		}
+	}
+
 	if publisher != nil {
 		for _, key := range []string{contracts.InstallerInboxPublisherAuditCredential, contracts.InstallerInboxEvidenceReadCredential} {
 			if len(publisher[key]) == 0 {

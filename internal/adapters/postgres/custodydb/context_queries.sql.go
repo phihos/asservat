@@ -709,7 +709,7 @@ func (q *Queries) ReadContextQueryCall(ctx context.Context, arg ReadContextQuery
 }
 
 const readContextQueryInvocation = `-- name: ReadContextQueryInvocation :one
-SELECT a.id, a.root_id, a.lane, a.issuer_epoch, a.principal_digest, a.intent, a.request_until, a.write_until, a.retain_until, a.intent_started, a.intent_receipt, a.outcome, a.outcome_started, a.outcome_receipt,l.operation_id, l.root_id, l.lane, l.principal_digest, l.installation_id, l.issuer_epoch, l.postmaster_at, l.database_oid, l.binding, l.original_purge_at, l.certificate_purge_at, l.live_retire_by, l.intent_completion, l.outcome_completion, l.lease_fence, l.lease, l.retirement, l.certificate_started, l.certificate_completion, l.certificate_receipt, l.certificate_acknowledged_at, l.terminal_purge, l.terminal_acknowledged_at, l.finalization_xid, l.overdue_selected_at, l.overdue_purge, l.certificate_verify_attempts FROM operation_audit a JOIN operation_audit_lifecycle l ON l.operation_id=a.id AND l.root_id=a.root_id
+SELECT a.id, a.root_id, a.lane, a.issuer_epoch, a.principal_digest, a.intent, a.request_until, a.write_until, a.retain_until, a.intent_started, a.intent_receipt, a.outcome, a.outcome_started, a.outcome_receipt,l.operation_id, l.root_id, l.lane, l.principal_digest, l.installation_id, l.issuer_epoch, l.postmaster_at, l.database_oid, l.binding, l.original_purge_at, l.certificate_purge_at, l.live_retire_by, l.intent_completion, l.outcome_completion, l.lease_fence, l.lease, l.retirement, l.certificate_started, l.certificate_completion, l.certificate_receipt, l.certificate_acknowledged_at, l.terminal_purge, l.terminal_acknowledged_at, l.finalization_xid, l.overdue_selected_at, l.overdue_purge, l.certificate_verify_attempts, l.share_effect_target, l.share_effect_xid FROM operation_audit a JOIN operation_audit_lifecycle l ON l.operation_id=a.id AND l.root_id=a.root_id
 WHERE a.id=$1 AND a.root_id=$2 AND a.lane='normal' AND l.lane='normal' FOR SHARE OF a,l
 `
 
@@ -768,6 +768,8 @@ func (q *Queries) ReadContextQueryInvocation(ctx context.Context, arg ReadContex
 		&i.OperationAuditLifecycle.OverdueSelectedAt,
 		&i.OperationAuditLifecycle.OverduePurge,
 		&i.OperationAuditLifecycle.CertificateVerifyAttempts,
+		&i.OperationAuditLifecycle.ShareEffectTarget,
+		&i.OperationAuditLifecycle.ShareEffectXid,
 	)
 	return i, err
 }

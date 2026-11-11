@@ -6,6 +6,8 @@ Requirements: REQ-SHR-001/002/003 (narrowed below), S-06 (TASK-07). Plan: the S-
 `docs/reviews/s06-plan-2026-10-26.md` (branch `simplify/s06-plan`), increment 1 (F1 concrete share, F2 recipient-only
 view, F3 revocation).
 
+Identifying share history and business-key replay are bounded by the creating audit slot under [ADR-323](323-finite-share-metadata-retirement.md). That refinement supersedes incidental indefinite replay after metadata retirement; it does not extend evidence access or turn the active-share cap into a lifetime quota.
+
 ## Problem
 
 Every read of stored evidence requires current whole-pod rights on the workload plus membership in

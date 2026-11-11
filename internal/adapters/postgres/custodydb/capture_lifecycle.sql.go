@@ -183,6 +183,7 @@ func (q *Queries) CaptureDueOperationAuditHistory(ctx context.Context, arg Captu
 const captureDueOperationLifecycles = `-- name: CaptureDueOperationLifecycles :many
 SELECT operation_id FROM capture_operation_lifecycle
 WHERE root_id=$1::uuid
+  AND lane='capture'
   AND operation_id>$2::uuid
   AND original_purge_at<=clock_timestamp()
 ORDER BY operation_id LIMIT 16
@@ -376,7 +377,7 @@ func (q *Queries) CaptureLockOperationAuditPool(ctx context.Context, arg Capture
 }
 
 const captureLockOperationLifecycle = `-- name: CaptureLockOperationLifecycle :one
-SELECT operation_id, root_id, lane, principal_digest, installation_id, issuer_epoch, postmaster_at, database_oid, binding, original_purge_at, certificate_purge_at, live_retire_by, intent_completion, outcome_completion, lease_fence, lease, retirement, certificate_started, certificate_completion, certificate_receipt, certificate_acknowledged_at, terminal_purge, terminal_acknowledged_at, finalization_xid, overdue_selected_at, overdue_purge, certificate_verify_attempts FROM capture_operation_lifecycle WHERE root_id=$1 AND operation_id=$2 FOR UPDATE
+SELECT operation_id, root_id, lane, principal_digest, installation_id, issuer_epoch, postmaster_at, database_oid, binding, original_purge_at, certificate_purge_at, live_retire_by, intent_completion, outcome_completion, lease_fence, lease, retirement, certificate_started, certificate_completion, certificate_receipt, certificate_acknowledged_at, terminal_purge, terminal_acknowledged_at, finalization_xid, overdue_selected_at, overdue_purge, certificate_verify_attempts, share_effect_target, share_effect_xid FROM capture_operation_lifecycle WHERE root_id=$1 AND operation_id=$2 FOR UPDATE
 `
 
 type CaptureLockOperationLifecycleParams struct {
@@ -415,6 +416,8 @@ func (q *Queries) CaptureLockOperationLifecycle(ctx context.Context, arg Capture
 		&i.OverdueSelectedAt,
 		&i.OverduePurge,
 		&i.CertificateVerifyAttempts,
+		&i.ShareEffectTarget,
+		&i.ShareEffectXid,
 	)
 	return i, err
 }
@@ -524,4 +527,81 @@ func (q *Queries) CaptureSaveTerminalOperationPurge(ctx context.Context, arg Cap
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const workerDueOperationAuditHistory = `-- name: WorkerDueOperationAuditHistory :many
+SELECT root_id,lane,principal_digest,release_at,delete_by
+FROM capture_operation_history WHERE root_id=$1
+  AND lane IN ('capture','normal','resolution') AND eligible_at<=clock_timestamp()
+ORDER BY eligible_at,release_at,delete_by,principal_digest,lane LIMIT 16
+`
+
+type WorkerDueOperationAuditHistoryRow struct {
+	RootID          pgtype.UUID
+	Lane            string
+	PrincipalDigest []byte
+	ReleaseAt       pgtype.Timestamptz
+	DeleteBy        pgtype.Timestamptz
+}
+
+func (q *Queries) WorkerDueOperationAuditHistory(ctx context.Context, rootID pgtype.UUID) ([]WorkerDueOperationAuditHistoryRow, error) {
+	rows, err := q.db.Query(ctx, workerDueOperationAuditHistory, rootID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []WorkerDueOperationAuditHistoryRow{}
+	for rows.Next() {
+		var i WorkerDueOperationAuditHistoryRow
+		if err := rows.Scan(
+			&i.RootID,
+			&i.Lane,
+			&i.PrincipalDigest,
+			&i.ReleaseAt,
+			&i.DeleteBy,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const workerDueOperationLifecycles = `-- name: WorkerDueOperationLifecycles :many
+SELECT operation_id FROM capture_operation_lifecycle
+WHERE root_id=$1::uuid
+  AND lane IN ('capture','normal','resolution')
+  AND operation_id>$2::uuid
+  AND original_purge_at<=clock_timestamp()
+ORDER BY operation_id LIMIT 16
+`
+
+type WorkerDueOperationLifecyclesParams struct {
+	RootID  pgtype.UUID
+	AfterID pgtype.UUID
+}
+
+// One globally ordered page across the worker's closed lane set. Every paid
+// effect still checks the exact original policy/store and current recovery.
+func (q *Queries) WorkerDueOperationLifecycles(ctx context.Context, arg WorkerDueOperationLifecyclesParams) ([]pgtype.UUID, error) {
+	rows, err := q.db.Query(ctx, workerDueOperationLifecycles, arg.RootID, arg.AfterID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []pgtype.UUID{}
+	for rows.Next() {
+		var operation_id pgtype.UUID
+		if err := rows.Scan(&operation_id); err != nil {
+			return nil, err
+		}
+		items = append(items, operation_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }

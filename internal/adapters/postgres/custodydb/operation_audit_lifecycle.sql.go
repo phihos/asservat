@@ -254,7 +254,7 @@ func (q *Queries) LeaseOperationPurge(ctx context.Context, arg LeaseOperationPur
 }
 
 const lockOperationLifecycle = `-- name: LockOperationLifecycle :one
-SELECT operation_id, root_id, lane, principal_digest, installation_id, issuer_epoch, postmaster_at, database_oid, binding, original_purge_at, certificate_purge_at, live_retire_by, intent_completion, outcome_completion, lease_fence, lease, retirement, certificate_started, certificate_completion, certificate_receipt, certificate_acknowledged_at, terminal_purge, terminal_acknowledged_at, finalization_xid, overdue_selected_at, overdue_purge, certificate_verify_attempts FROM operation_audit_lifecycle WHERE root_id=$1 AND operation_id=$2 FOR UPDATE
+SELECT operation_id, root_id, lane, principal_digest, installation_id, issuer_epoch, postmaster_at, database_oid, binding, original_purge_at, certificate_purge_at, live_retire_by, intent_completion, outcome_completion, lease_fence, lease, retirement, certificate_started, certificate_completion, certificate_receipt, certificate_acknowledged_at, terminal_purge, terminal_acknowledged_at, finalization_xid, overdue_selected_at, overdue_purge, certificate_verify_attempts, share_effect_target, share_effect_xid FROM operation_audit_lifecycle WHERE root_id=$1 AND operation_id=$2 FOR UPDATE
 `
 
 type LockOperationLifecycleParams struct {
@@ -293,6 +293,8 @@ func (q *Queries) LockOperationLifecycle(ctx context.Context, arg LockOperationL
 		&i.OverdueSelectedAt,
 		&i.OverduePurge,
 		&i.CertificateVerifyAttempts,
+		&i.ShareEffectTarget,
+		&i.ShareEffectXid,
 	)
 	return i, err
 }

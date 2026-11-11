@@ -61,7 +61,7 @@ func buildCapacityQualification(p contracts.InstallerCapacitySettings, d capacit
 		return audit.OperationHistoryQualification{ID: newID(), Digest: profileDigest("history/"+layout, f), Layout: layout,
 			MaximumRowFootprintBytes: f.RowBytes, MaximumTransitionWALBytes: f.TransitionWALBytes, BackupCopies: b.BackupCopies, WALCopies: b.WALCopies}
 	}
-	capture := history(audit.CaptureOperationHistoryLayout, p.Footprints.Capture)
+	capture := history(audit.ShareCaptureOperationHistoryLayout, p.Footprints.Capture)
 	lane := func(name string, q audit.OperationHistoryQualification, accounts, records, retained int64) app.RootAuditBacking {
 		backupBytes, walBytes := q.SlotBacking(p.PurgeLeases)
 		return app.RootAuditBacking{Accounts: accounts, RecordsPerAccount: records, RetainedSeconds: retained, Policy: audit.OperationLifecyclePolicy{
@@ -76,7 +76,7 @@ func buildCapacityQualification(p contracts.InstallerCapacitySettings, d capacit
 		SystemPoolUID: d.SystemPoolUID, AccountVersion: d.AccountVersion, Accounts: p.Accounts, RecordsPerAccount: p.Records, AdmissionSeconds: p.AdmissionSeconds,
 		ProcessingEpoch: newID(), ProcessingSourceUID: d.ProcessingSourceUID, ProcessingProtectionDigest: d.ProcessingProtection,
 		Capture:             lane("capture", capture, p.Accounts, p.Records, l.CaptureRetainedSeconds),
-		Normal:              lane("normal", history(audit.OperationVerificationHistoryLayout, p.Footprints.Operation), l.Normal.Accounts, l.Normal.Records, l.Normal.RetainedSeconds),
+		Normal:              lane("normal", history(audit.ShareOperationHistoryLayout, p.Footprints.Operation), l.Normal.Accounts, l.Normal.Records, l.Normal.RetainedSeconds),
 		Resolution:          lane("resolution", history(audit.OperationVerificationHistoryLayout, p.Footprints.Operation), l.Resolution.Accounts, l.Resolution.Records, l.Resolution.RetainedSeconds),
 		Processing:          lane("processing", history(audit.ProcessingReleaseHistoryLayout, p.Footprints.Processing), l.Processing.Accounts, l.Processing.Records, l.Processing.RetainedSeconds),
 		StopRetainedSeconds: p.StopRetainedSeconds,

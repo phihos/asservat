@@ -79,7 +79,7 @@ func TestShareTransfer(t *testing.T) {
 		t.Fatal(err, share.Management)
 	}
 	to := func(key string, rev int64, teams ...string) TransferInput {
-		return TransferInput{ShareID: share.ID, ExpectedRevision: rev, Management: value.ManagementRequest{Mode: "teams", Teams: teams}, IdempotencyKey: key}
+		return TransferInput{OperationID: testID(900), ShareID: share.ID, ExpectedRevision: rev, Management: value.ManagementRequest{Mode: "teams", Teams: teams}, IdempotencyKey: key}
 	}
 	mate := creator
 	mate.Principal.Subject, mate.Groups = "mate", []string{"owners", "owners-b"}
@@ -87,7 +87,7 @@ func TestShareTransfer(t *testing.T) {
 	if _, _, err := s.Transfer(ctx, f, to("t0", 1, "owners-c")); !errors.Is(err, ErrManagementNotHeld) {
 		t.Fatal("transfer to a team the caller does not hold", err)
 	}
-	if _, _, err := s.Transfer(ctx, f, TransferInput{ShareID: share.ID, ExpectedRevision: 1, Management: value.ManagementRequest{Mode: "creator"}, IdempotencyKey: "t0"}); !errors.Is(err, ErrManagementNotHeld) {
+	if _, _, err := s.Transfer(ctx, f, TransferInput{OperationID: testID(900), ShareID: share.ID, ExpectedRevision: 1, Management: value.ManagementRequest{Mode: "creator"}, IdempotencyKey: "t0"}); !errors.Is(err, ErrManagementNotHeld) {
 		t.Fatal("a member chose creator management", err)
 	}
 	// A projection outage is not a loss of management: the manager gets
@@ -125,7 +125,7 @@ func TestShareTransfer(t *testing.T) {
 	member := creator
 	member.Principal.Subject, member.Groups = "old-member", []string{"owners"}
 	f.i = member
-	if _, _, err := s.Revoke(ctx, f, share.ID, 2, "r-old"); !errors.Is(err, capture.ErrDenied) {
+	if _, _, err := s.Revoke(ctx, f, RevokeInput{OperationID: testID(900), ShareID: share.ID, ExpectedRevision: 2, IdempotencyKey: "r-old"}); !errors.Is(err, capture.ErrDenied) {
 		t.Fatal("a member of the replaced team still manages", err)
 	}
 	if owned, _, _ := s.List(ctx, f, "owned", 20); len(owned) != 0 {
@@ -171,24 +171,24 @@ func TestShareAdministratorRevoke(t *testing.T) {
 	admin := owner
 	admin.Principal.Subject, admin.Groups = "admin", []string{"platform"}
 	f.i = admin
-	if _, _, err := s.Revoke(ctx, f, share.ID, 1, "r"); !errors.Is(err, capture.ErrDenied) {
+	if _, _, err := s.Revoke(ctx, f, RevokeInput{OperationID: testID(900), ShareID: share.ID, ExpectedRevision: 1, IdempotencyKey: "r"}); !errors.Is(err, capture.ErrDenied) {
 		t.Fatal("revoke without a configured administration", err)
 	}
 	s.Administration = f.fleetOperators()
 	stranger := admin
 	stranger.Principal.Subject, stranger.Groups = "stranger", []string{"team"}
 	f.i = stranger
-	if _, _, err := s.Revoke(ctx, f, share.ID, 1, "r"); !errors.Is(err, capture.ErrDenied) {
+	if _, _, err := s.Revoke(ctx, f, RevokeInput{OperationID: testID(900), ShareID: share.ID, ExpectedRevision: 1, IdempotencyKey: "r"}); !errors.Is(err, capture.ErrDenied) {
 		t.Fatal("non-admin non-manager revoked", err)
 	}
 	f.i = admin
-	if _, _, err := s.Transfer(ctx, f, TransferInput{ShareID: share.ID, ExpectedRevision: 1, Management: value.ManagementRequest{Mode: "teams", Teams: []string{"platform"}}, IdempotencyKey: "t"}); !errors.Is(err, ErrManagementNotHeld) {
+	if _, _, err := s.Transfer(ctx, f, TransferInput{OperationID: testID(900), ShareID: share.ID, ExpectedRevision: 1, Management: value.ManagementRequest{Mode: "teams", Teams: []string{"platform"}}, IdempotencyKey: "t"}); !errors.Is(err, ErrManagementNotHeld) {
 		t.Fatal("administrator assigned a group that is not an owner team", err)
 	}
 	// No projection for the target: an administrator's revocation still
 	// restricts.
 	f.p.Target.PodUID = "elsewhere"
-	revoked, _, err := s.Revoke(ctx, f, share.ID, 1, "admin-revoke")
+	revoked, _, err := s.Revoke(ctx, f, RevokeInput{OperationID: testID(900), ShareID: share.ID, ExpectedRevision: 1, IdempotencyKey: "admin-revoke"})
 	if err != nil || revoked.Revision != 2 || len(f.store.revokers) != 1 || !f.store.revokers[0].Administrator || f.store.revokers[0].Actor.Subject != "admin" {
 		t.Fatal("administrator revoke", err, f.store.revokers)
 	}
@@ -197,18 +197,18 @@ func TestShareAdministratorRevoke(t *testing.T) {
 	ops := f.fleetOperators()
 	ops.a.Suspended = true
 	s.Administration = ops
-	if _, _, err := s.Revoke(ctx, f, second.ID, 1, "r2"); !errors.Is(err, capture.ErrDenied) {
+	if _, _, err := s.Revoke(ctx, f, RevokeInput{OperationID: testID(900), ShareID: second.ID, ExpectedRevision: 1, IdempotencyKey: "r2"}); !errors.Is(err, capture.ErrDenied) {
 		t.Fatal("suspended administration revoked", err)
 	}
 	ops = f.fleetOperators()
 	ops.a.InstallationID = testID(99)
 	s.Administration = ops
-	if _, _, err := s.Revoke(ctx, f, second.ID, 1, "r2"); !errors.Is(err, capture.ErrDenied) {
+	if _, _, err := s.Revoke(ctx, f, RevokeInput{OperationID: testID(900), ShareID: second.ID, ExpectedRevision: 1, IdempotencyKey: "r2"}); !errors.Is(err, capture.ErrDenied) {
 		t.Fatal("another installation's administration revoked", err)
 	}
 	// A manager's revocation is not an administrator's.
 	f.i = owner
-	if _, _, err := s.Revoke(ctx, f, second.ID, 1, "r3"); err != nil || f.store.revokers[1].Administrator {
+	if _, _, err := s.Revoke(ctx, f, RevokeInput{OperationID: testID(900), ShareID: second.ID, ExpectedRevision: 1, IdempotencyKey: "r3"}); err != nil || f.store.revokers[1].Administrator {
 		t.Fatal("creator revoke", err)
 	}
 }
@@ -273,7 +273,7 @@ func TestShareAdministratorRecovery(t *testing.T) {
 	if got, _, _ := s.List(ctx, f, "received", 20); len(got) != 0 {
 		t.Fatal("suspended share received", got)
 	}
-	recover := TransferInput{ShareID: share.ID, ExpectedRevision: 1, Management: value.ManagementRequest{Mode: "teams", Teams: []string{"owners-b"}}, IdempotencyKey: "recover"}
+	recover := TransferInput{OperationID: testID(900), ShareID: share.ID, ExpectedRevision: 1, Management: value.ManagementRequest{Mode: "teams", Teams: []string{"owners-b"}}, IdempotencyKey: "recover"}
 	member := creator
 	member.Principal.Subject, member.Groups = "b-member", []string{"owners-b"}
 	f.i = member
@@ -284,7 +284,7 @@ func TestShareAdministratorRecovery(t *testing.T) {
 	admin.Principal.Subject, admin.Groups = "admin", []string{"platform"}
 	f.i = admin
 	reads := f.catalogReads
-	if _, _, err := s.Transfer(ctx, f, TransferInput{ShareID: share.ID, ExpectedRevision: 1, Management: value.ManagementRequest{Mode: "creator"}, IdempotencyKey: "c"}); !errors.Is(err, ErrManagementNotHeld) {
+	if _, _, err := s.Transfer(ctx, f, TransferInput{OperationID: testID(900), ShareID: share.ID, ExpectedRevision: 1, Management: value.ManagementRequest{Mode: "creator"}, IdempotencyKey: "c"}); !errors.Is(err, ErrManagementNotHeld) {
 		t.Fatal("administrator chose creator management", err)
 	}
 	recovered, _, err := s.Transfer(ctx, f, recover)
@@ -303,10 +303,10 @@ func TestShareAdministratorRecovery(t *testing.T) {
 		t.Fatal("new team does not manage the recovered share", owned)
 	}
 	f.i = admin
-	if _, _, err := s.Revoke(ctx, f, share.ID, 2, "r"); err != nil {
+	if _, _, err := s.Revoke(ctx, f, RevokeInput{OperationID: testID(900), ShareID: share.ID, ExpectedRevision: 2, IdempotencyKey: "r"}); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := s.Transfer(ctx, f, TransferInput{ShareID: share.ID, ExpectedRevision: 3, Management: recover.Management, IdempotencyKey: "again"}); !errors.Is(err, capture.ErrDenied) {
+	if _, _, err := s.Transfer(ctx, f, TransferInput{OperationID: testID(900), ShareID: share.ID, ExpectedRevision: 3, Management: recover.Management, IdempotencyKey: "again"}); !errors.Is(err, capture.ErrDenied) {
 		t.Fatal("revoked share recovered", err)
 	}
 }

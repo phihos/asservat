@@ -66,7 +66,7 @@ func CompileContextProtocolBacking(contextSlice BudgetAmount, h ContextBackingHi
 	if h.ProfileProtocol != "" && h.ProfileProtocol != ProfileProtocolVersion {
 		return zero, ErrBudgetInvalid
 	}
-	if !contextSlice.positive() || !h.Capture.Valid() || h.Capture.Layout != audit.CaptureOperationHistoryLayout || h.CapturePurgeLeases < 2 || h.CapturePurgeLeases > 32 || !h.Native.Valid() || !h.Stop.Valid() {
+	if !contextSlice.positive() || !h.Capture.Valid() || (h.Capture.Layout != audit.CaptureOperationHistoryLayout && h.Capture.Layout != audit.ShareCaptureOperationHistoryLayout) || h.CapturePurgeLeases < 2 || h.CapturePurgeLeases > 32 || !h.Native.Valid() || !h.Stop.Valid() {
 		return zero, ErrBudgetInvalid
 	}
 	unit := artifact.Registration{NativeLimit: artifact.MaxContextBytes}.ReservedBytes()

@@ -15,6 +15,7 @@ import (
 	value "asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/identity"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -67,7 +68,10 @@ func (s *EvidenceShares) observed(ctx context.Context, q *custodydb.Queries, row
 		if err != nil || v.RootID != s.root {
 			return nil, value.ErrUnavailable
 		}
-		v.ObservedAt, v.ValidUntil = now.Time, until
+		v.ObservedAt, v.ValidUntil = now.Time, identity.Earlier(until, r.RetireBy.Time)
+		if !now.Time.Before(v.ValidUntil) {
+			return nil, value.ErrUnavailable
+		}
 		out = append(out, v)
 	}
 	return out, nil
@@ -96,10 +100,18 @@ func shareFromRow(r custodydb.EvidenceShare) (authorization.Share, error) {
 	stored := slices.Clone(r.RecipientKeys)
 	slices.Sort(stored)
 	slices.Sort(keys)
-	if !v.Valid() || !slices.Equal(stored, keys) {
+	if !v.Valid() || !slices.Equal(stored, keys) || !r.CreatingOperationID.Valid || !r.LastOperationID.Valid || !r.RetireBy.Valid || !v.ExpiresAt.Before(r.RetireBy.Time) {
 		return authorization.Share{}, value.ErrUnavailable
 	}
 	return v, nil
+}
+
+// beginEffect consumes at most one business-effect marker in the existing paid
+// normal operation. It precedes artifact/share/acceptance locks. A stable
+// business replay may return its original row even when this operation's marker
+// was already spent; a new effect must require EffectAvailable.
+func (s *EvidenceShares) beginEffect(ctx context.Context, q *custodydb.Queries, operation, action string, actor identity.Principal, target string) (custodydb.BeginShareEffectRow, error) {
+	return q.BeginShareEffect(ctx, custodydb.BeginShareEffectParams{RootID: id(s.root), OperationID: id(operation), Action: action, Issuer: actor.Issuer, Subject: actor.Subject, Client: actor.ClientID, Target: id(target)})
 }
 
 func (s *EvidenceShares) RecipientShares(ctx context.Context, artifactID string, caller identity.Identity) ([]authorization.Share, error) {
@@ -244,7 +256,7 @@ func (s *EvidenceShares) ReceivedShares(ctx context.Context, caller identity.Ide
 func (s *EvidenceShares) CreateShare(ctx context.Context, r sharing.Request, recovery artifact.RecoveryProof) (authorization.Share, bool, error) {
 	var zero authorization.Share
 	v := r.Share
-	if s == nil || ctx == nil || ctx.Err() != nil || v.RootID != s.root || !authorization.UUID(v.ID) || !identity.Text(r.IdempotencyKey, 128) || r.RequestDigest == (artifact.Digest{}) {
+	if s == nil || ctx == nil || ctx.Err() != nil || v.RootID != s.root || !authorization.UUID(v.ID) || !authorization.UUID(r.OperationID) || !identity.Text(r.IdempotencyKey, 128) || r.RequestDigest == (artifact.Digest{}) {
 		return zero, false, value.ErrInvalid
 	}
 	// Validate the complete prepared row with a provisional creation time.
@@ -275,6 +287,10 @@ func (s *EvidenceShares) CreateShare(ctx context.Context, r sharing.Request, rec
 		if err != nil {
 			return err
 		}
+		effect, err := s.beginEffect(ctx, q, r.OperationID, "create_share", v.Creator, v.ID)
+		if err != nil {
+			return err
+		}
 		if err = q.LockShareArtifact(ctx, v.ArtifactID); err != nil {
 			return err
 		}
@@ -286,6 +302,12 @@ func (s *EvidenceShares) CreateShare(ctx context.Context, r sharing.Request, rec
 			}
 			replay = true
 		case errors.Is(err, pgx.ErrNoRows):
+			if !effect.EffectAvailable {
+				return value.ErrConflict
+			}
+			if !effect.EffectUntil.Valid || v.ExpiresAt.After(effect.EffectUntil.Time) {
+				return sharing.ErrRetentionCapacity
+			}
 			active, err := q.CountActiveShares(ctx, custodydb.CountActiveSharesParams{RootID: id(s.root), ArtifactID: id(v.ArtifactID)})
 			if err != nil {
 				return err
@@ -296,7 +318,7 @@ func (s *EvidenceShares) CreateShare(ctx context.Context, r sharing.Request, rec
 			row, err = q.InsertShare(ctx, custodydb.InsertShareParams{ID: id(v.ID), RootID: id(s.root), ArtifactID: id(v.ArtifactID), CaseID: id(v.CaseID),
 				ClusterID: id(v.Target.ClusterID), NamespaceUid: v.Target.NamespaceUID, WorkloadUid: v.Target.WorkloadUID, PodUid: v.Target.PodUID,
 				Version: v.Version[:], CreatorIssuer: v.Creator.Issuer, CreatorSubject: v.Creator.Subject, CreatorClient: v.Creator.ClientID,
-				Management: management, Recipients: recipients, RecipientKeys: keys, IdempotencyKey: r.IdempotencyKey, RequestDigest: r.RequestDigest[:], ExpiresAt: ts(v.ExpiresAt)})
+				Management: management, Recipients: recipients, RecipientKeys: keys, IdempotencyKey: r.IdempotencyKey, RequestDigest: r.RequestDigest[:], ExpiresAt: ts(v.ExpiresAt), OperationID: id(r.OperationID)})
 			if errors.Is(err, pgx.ErrNoRows) {
 				// No published route with this case and target, or an expiry
 				// outside (now, now+7 days].
@@ -332,7 +354,7 @@ func (s *EvidenceShares) CreateShare(ctx context.Context, r sharing.Request, rec
 // any other share (or none) is Denied without saying which.
 func (s *EvidenceShares) RevokeShare(ctx context.Context, r sharing.Revocation, recovery artifact.RecoveryProof) (authorization.Share, bool, error) {
 	var zero authorization.Share
-	if s == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(r.ShareID) || !r.Actor.Valid() || len(r.Managers) > authorization.ShareMaxManagers || !identity.Text(r.IdempotencyKey, 128) || r.ExpectedRevision < 1 {
+	if s == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(r.ShareID) || !authorization.UUID(r.OperationID) || !r.Actor.Valid() || len(r.Managers) > authorization.ShareMaxManagers || !identity.Text(r.IdempotencyKey, 128) || r.ExpectedRevision < 1 {
 		return zero, false, value.ErrInvalid
 	}
 	var out authorization.Share
@@ -340,6 +362,10 @@ func (s *EvidenceShares) RevokeShare(ctx context.Context, r sharing.Revocation, 
 	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
 		replay = false
 		trust, err := s.recovery.lock(ctx, q, s.root, recovery)
+		if err != nil {
+			return err
+		}
+		effect, err := s.beginEffect(ctx, q, r.OperationID, "revoke_share", r.Actor, r.ShareID)
 		if err != nil {
 			return err
 		}
@@ -359,7 +385,10 @@ func (s *EvidenceShares) RevokeShare(ctx context.Context, r sharing.Revocation, 
 		case row.RevokedAt.Valid || row.Revision != r.ExpectedRevision:
 			return value.ErrConflict
 		default:
-			if row, err = q.RevokeShare(ctx, custodydb.RevokeShareParams{RootID: id(s.root), ID: id(r.ShareID), RevokeKey: pgtype.Text{String: r.IdempotencyKey, Valid: true}}); err != nil {
+			if !effect.EffectAvailable {
+				return value.ErrConflict
+			}
+			if row, err = q.RevokeShare(ctx, custodydb.RevokeShareParams{RootID: id(s.root), ID: id(r.ShareID), RevokeKey: pgtype.Text{String: r.IdempotencyKey, Valid: true}, OperationID: id(r.OperationID)}); err != nil {
 				return err
 			}
 		}
@@ -387,7 +416,7 @@ func (s *EvidenceShares) RevokeShare(ctx context.Context, r sharing.Revocation, 
 // managed share is Denied.
 func (s *EvidenceShares) TransferShare(ctx context.Context, r sharing.Transfer, recovery artifact.RecoveryProof) (authorization.Share, bool, error) {
 	var zero authorization.Share
-	if s == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(r.ShareID) || !r.Actor.Valid() || len(r.Managers) < 1 && !r.Administrator || len(r.Managers) > authorization.ShareMaxManagers ||
+	if s == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(r.ShareID) || !authorization.UUID(r.OperationID) || !r.Actor.Valid() || len(r.Managers) < 1 && !r.Administrator || len(r.Managers) > authorization.ShareMaxManagers ||
 		len(r.Management) < 1 || len(r.Management) > authorization.ShareMaxManagers || !identity.Text(r.IdempotencyKey, 128) || r.RequestDigest == (artifact.Digest{}) || r.ExpectedRevision < 1 {
 		return zero, false, value.ErrInvalid
 	}
@@ -400,6 +429,10 @@ func (s *EvidenceShares) TransferShare(ctx context.Context, r sharing.Transfer, 
 	err = s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
 		replay = false
 		trust, err := s.recovery.lock(ctx, q, s.root, recovery)
+		if err != nil {
+			return err
+		}
+		effect, err := s.beginEffect(ctx, q, r.OperationID, "transfer_share", r.Actor, r.ShareID)
 		if err != nil {
 			return err
 		}
@@ -422,7 +455,10 @@ func (s *EvidenceShares) TransferShare(ctx context.Context, r sharing.Transfer, 
 		case row.RevokedAt.Valid || row.Revision != r.ExpectedRevision:
 			return value.ErrConflict
 		default:
-			row, err = q.TransferShare(ctx, custodydb.TransferShareParams{RootID: id(s.root), ID: id(r.ShareID), Management: management, TransferKey: r.IdempotencyKey, TransferDigest: r.RequestDigest[:]})
+			if !effect.EffectAvailable {
+				return value.ErrConflict
+			}
+			row, err = q.TransferShare(ctx, custodydb.TransferShareParams{RootID: id(s.root), ID: id(r.ShareID), Management: management, TransferKey: r.IdempotencyKey, TransferDigest: r.RequestDigest[:], OperationID: id(r.OperationID)})
 			if errors.Is(err, pgx.ErrNoRows) {
 				// Expired (or at the revision bound): nothing to manage.
 				return value.ErrDenied
@@ -463,7 +499,11 @@ func pinsAll(management []byte, ids []string) bool {
 }
 
 func shareError(err error) error {
-	for _, sentinel := range []error{value.ErrConflict, value.ErrCapacity, value.ErrDenied, value.ErrInvalid} {
+	var sqlError *pgconn.PgError
+	if errors.As(err, &sqlError) && sqlError.Code == "P1530" {
+		return sharing.ErrRetentionCapacity
+	}
+	for _, sentinel := range []error{sharing.ErrRetentionCapacity, value.ErrConflict, value.ErrCapacity, value.ErrDenied, value.ErrInvalid} {
 		if errors.Is(err, sentinel) {
 			return sentinel
 		}

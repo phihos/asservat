@@ -26,12 +26,12 @@ WHERE p.root_id=sqlc.arg(root_id)::uuid AND p.retire_by>sqlc.arg(observed_at)::t
 ORDER BY p.cluster_id,p.artifact_id,p.attempt_id LIMIT sqlc.arg(page_limit)::integer;
 
 -- name: ReportProcessingShares :many
-SELECT s.id,s.artifact_id,s.created_at,s.expires_at,s.revoked_at,p.retire_by,
+SELECT s.id,s.artifact_id,s.created_at,s.expires_at,s.revoked_at,LEAST(s.retire_by,p.retire_by)::timestamptz AS retire_by,
  recipient.ordinality::bigint AS ordinal,recipient.value::jsonb AS recipient
 FROM evidence_share s
 JOIN context_processing p ON p.root_id=s.root_id AND p.artifact_id=s.artifact_id
 CROSS JOIN LATERAL jsonb_array_elements(s.recipients) WITH ORDINALITY recipient(value,ordinality)
-WHERE s.root_id=sqlc.arg(root_id)::uuid AND p.retire_by>sqlc.arg(observed_at)::timestamptz
+WHERE s.root_id=sqlc.arg(root_id)::uuid AND LEAST(s.retire_by,p.retire_by)>sqlc.arg(observed_at)::timestamptz
  AND s.created_at<=sqlc.arg(created_before)::timestamptz
  AND (s.created_at,s.id,recipient.ordinality)>(sqlc.arg(after_created_at)::timestamptz,sqlc.arg(after_id)::uuid,sqlc.arg(after_ordinal)::bigint)
 ORDER BY s.created_at,s.id,recipient.ordinality LIMIT sqlc.arg(page_limit)::integer;

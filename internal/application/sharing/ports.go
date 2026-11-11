@@ -16,6 +16,7 @@ import (
 // The store derives the case route and target from the published locator and
 // rejects a mismatch; it never trusts these fields alone.
 type Request struct {
+	OperationID    string `json:"-"`
 	Share          authorization.Share
 	IdempotencyKey string
 	RequestDigest  artifact.Digest
@@ -28,6 +29,7 @@ type Request struct {
 // revocation (ADR-238): the service checked the protected fleet
 // administration; revocation only restricts access.
 type Revocation struct {
+	OperationID      string `json:"-"`
 	ShareID          string
 	Actor            identity.Principal
 	Managers         []string
@@ -42,9 +44,10 @@ type Revocation struct {
 // complete new set, all held by the actor now. Creator, recipients, artifact
 // and expiry never change.
 type Transfer struct {
-	ShareID  string
-	Actor    identity.Principal
-	Managers []string
+	OperationID string `json:"-"`
+	ShareID     string
+	Actor       identity.Principal
+	Managers    []string
 	// Administrator marks an installation administrator's assignment or
 	// recovery (the service checked the fleet administration); the store
 	// then requires no pinned manager.
@@ -103,6 +106,7 @@ type PolicySharing struct {
 // sharing. Actor is the instruction's creator or, with Managers, a current
 // manager (the pinned assignment IDs the service found the actor holding).
 type PolicyRevocation struct {
+	OperationID      string `json:"-"`
 	AcceptanceID     string
 	Actor            identity.Principal
 	Managers         []string

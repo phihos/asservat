@@ -73,6 +73,36 @@ func TestCapacityRootBackingPaysSharedLanesAndFullAccountCeilingOnce(t *testing.
 	}
 }
 
+func TestCapacityRootBackingShareLayoutsIncreaseTheOriginalEnvelope(t *testing.T) {
+	in, pool := capacityRootBackingFixture()
+	old, err := CompileRootBacking(in, pool)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, lane := range []*RootAuditBacking{&in.Capture, &in.Normal, &in.Resolution} {
+		q := *lane.Policy.History
+		q.Layout = audit.ShareOperationHistoryLayout
+		if lane.Policy.Lane == "capture" {
+			q.Layout = audit.ShareCaptureOperationHistoryLayout
+			in.ContextHistory.Capture = q
+		}
+		lane.Policy.History = &q
+		b, w := q.SlotBacking(lane.Policy.MaxPurgeLeases)
+		lane.Policy.BackupReservedBytes, lane.Policy.WALReservedBytes = b*lane.Policy.MetadataSlots, w*lane.Policy.MetadataSlots
+	}
+	next, err := CompileRootBacking(in, pool)
+	if err != nil {
+		t.Fatal("fully funded share layouts rejected", err)
+	}
+	if next.Totals().WALBytes <= old.Totals().WALBytes {
+		t.Fatal("share effects and retirement added no prepaid WAL")
+	}
+	in.Envelope.WALBytes = old.Totals().WALBytes
+	if _, err := CompileRootBacking(in, pool); err != ErrBudgetFull {
+		t.Fatal("old aggregate WAL envelope accepted for the new layouts", err)
+	}
+}
+
 func TestCapacityRootBackingEveryDimensionMustBeIndependentlyFunded(t *testing.T) {
 	in, pool := capacityRootBackingFixture()
 	p, e := CompileRootBacking(in, pool)

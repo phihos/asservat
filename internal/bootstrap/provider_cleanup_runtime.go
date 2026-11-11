@@ -18,7 +18,7 @@ func (d *CaptureCleanupWorkerDeployment) runProviderCleanup(ctx context.Context)
 	cursor := ""
 	for ctx.Err() == nil {
 		schedule, end := context.WithTimeout(ctx, 5*time.Second)
-		ids, err := d.journal.DueCaptureOperations(schedule, cursor)
+		ids, err := d.journal.DueWorkerOperations(schedule, cursor)
 		end()
 		if err != nil || len(ids) > 16 {
 			if err == nil {
@@ -87,6 +87,12 @@ func (d *CaptureCleanupWorkerDeployment) beginProviderCleanup(ctx context.Contex
 }
 
 func (d *CaptureCleanupWorkerDeployment) advanceProviderCleanup(ctx context.Context, id string) (error, bool) {
+	if d.providers == nil {
+		return mounts.ErrUnavailable, false
+	}
+	if err := d.providers.RefreshCleanup(ctx); err != nil {
+		return err, ctx.Err() == nil
+	}
 	op, lease, err := d.beginProviderCleanup(ctx)
 	if err != nil {
 		return err, false

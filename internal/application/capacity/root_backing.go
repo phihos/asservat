@@ -55,13 +55,17 @@ type RootAuditBacking struct {
 }
 
 func (p RootAuditBacking) valid(root, installation, lane, layout string) bool {
-	if p.Accounts < 1 || p.Accounts > 1000000 || p.RecordsPerAccount < 1 || p.RecordsPerAccount > 1000000 || p.RetainedSeconds < 60 || p.RetainedSeconds > 316224000 || !p.Policy.CertificateVerificationBacked() || p.Policy.RootID != root || p.Policy.InstallationID != installation || p.Policy.Lane != lane || p.Policy.History.Layout != layout || p.Policy.BackingRevision != 1 || p.Policy.OverdueTerminal != audit.OperationOverdueTerminal {
+	if p.Accounts < 1 || p.Accounts > 1000000 || p.RecordsPerAccount < 1 || p.RecordsPerAccount > 1000000 || p.RetainedSeconds < 60 || p.RetainedSeconds > 316224000 || !p.Policy.CertificateVerificationBacked() || p.Policy.RootID != root || p.Policy.InstallationID != installation || p.Policy.Lane != lane || !rootHistoryLayout(p.Policy.History.Layout, layout) || p.Policy.BackingRevision != 1 || p.Policy.OverdueTerminal != audit.OperationOverdueTerminal {
 		return false
 	}
 	slots, ok := capacityProduct(p.Accounts, p.RecordsPerAccount)
 	// Exact values keep unused prepaid slots explicit and prevent unrelated
 	// component profiles from silently claiming the same logical reserve.
 	return ok && slots == p.Policy.MetadataSlots && p.RetainedSeconds > 2*p.Policy.BackupHorizonSeconds+3*p.Policy.CleanupBudgetSeconds+p.Policy.ProofWindowSeconds+30
+}
+
+func rootHistoryLayout(actual, original string) bool {
+	return actual == original || original == audit.OperationVerificationHistoryLayout && actual == audit.ShareOperationHistoryLayout || original == audit.CaptureOperationHistoryLayout && actual == audit.ShareCaptureOperationHistoryLayout
 }
 
 // RootBackingInput is an independently protected installer input. None of its

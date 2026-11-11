@@ -2,17 +2,17 @@ package integration
 
 import (
 	"context"
+	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/tls"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"slices"
-	"strings"
 	"testing"
 	"time"
 
+	"asservat.local/asservat/internal/adapters/jose"
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
@@ -21,22 +21,38 @@ import (
 	configapp "asservat.local/asservat/internal/application/configuration"
 	"asservat.local/asservat/internal/application/sharing"
 	"asservat.local/asservat/internal/domain/artifact"
+	auditvalue "asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/execution"
 	"asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// Baseline business-ledger measurements, not a qualified capacity profile.
+// The 65-row unbounded-history reproduction passed at source 2a2bc0f1; its
+// archived measurements remain inputs, not a qualified capacity profile.
+// This successor exercises current paid-slot effects and their retirement.
 // The owned fixture really admits, encrypts, verifies and publishes the artifact;
 // the share mutations use the installation's compiled hub role/current adapter.
 // Synthetic human/permission inputs and local test crypto remain explicit.
 // Public-operation audit and remote provider costs are outside these samples.
-func TestShareMetadataRetirementBaselineWithRealServices(t *testing.T) {
+func TestShareMetadataSlotsWithRealServices(t *testing.T) {
 	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, administration fleet.Administration, objects *objectstore.AuthorityObjects) {
 		f := newCapacitySQLFixture(t, ctx, admin, address, tlsConfig, scope, claim, administration, objects, func(f *capacitySQLFixture) {
+			// Select this finite component-test cohort before the first audit.
+			// Counts stay unchanged; these synthetic bounds do not qualify IAM,
+			// maximum-byte rows or the separate 100-share policy transaction.
+			normal := &f.qualification.RootBacking.Normal
+			normal.RetainedSeconds = 60
+			normal.Policy.History.Layout = auditvalue.ShareOperationHistoryLayout
+			normal.Policy.BackupHorizonSeconds = 2
+			normal.Policy.CleanupBudgetSeconds = 3
+			normal.Policy.ProofWindowSeconds = 2
+			backup, wal := normal.Policy.History.SlotBacking(normal.Policy.MaxPurgeLeases)
+			normal.Policy.BackupReservedBytes = backup * normal.Policy.MetadataSlots
+			normal.Policy.WALReservedBytes = wal * normal.Policy.MetadataSlots
 			// Accept the full owner set BEFORE admission/publication. Never widen
 			// the immutable audience of an existing artifact for measurement.
 			next := f.batch
@@ -104,7 +120,7 @@ func TestShareMetadataRetirementBaselineWithRealServices(t *testing.T) {
 		s, accepted := f.admitManagedContext(t, root, enrolled)
 		s, published := publishPreparedQueryLedgerContext(t, f, s, accepted, nil, execution.APIExecution{}, nil, false)
 		t.Logf("share_baseline_original_access_remaining_ms=%d", time.Until(published.Expectation.Registration.ExpiresAt).Milliseconds())
-		qualifyShareMetadataBaseline(t, f, s, published)
+		qualifyShareMetadataSlots(t, f, s, published)
 	})
 }
 
@@ -138,172 +154,286 @@ func logShareMetadata(t *testing.T, f *capacitySQLFixture, phase string, before,
 	t.Logf("UNQUALIFIED share_business phase=%s elapsed_ms=%d rows=%d active=%d row_delta=%d tuple_bytes=%d max_tuple_bytes=%d heap_bytes=%d indexes_bytes=%d toast_bytes=%d total_bytes=%d heap_growth=%d indexes_growth=%d toast_growth=%d total_growth=%d whole_instance_wal_delta=%d; logical counts are exact-artifact; physical sizes cover entire relations; WAL includes background noise, aborted work and page images; excludes public audit/provider work", phase, elapsed.Milliseconds(), after.Rows, after.Active, after.Rows-before.Rows, after.TupleBytes, after.MaxTupleBytes, after.HeapBytes, after.IndexBytes, after.ToastBytes, after.TotalBytes, after.HeapBytes-before.HeapBytes, after.IndexBytes-before.IndexBytes, after.ToastBytes-before.ToastBytes, after.TotalBytes-before.TotalBytes, wal)
 }
 
-func qualifyShareMetadataBaseline(t *testing.T, f *capacitySQLFixture, s captureAdmissionScenario, published artifact.PublishedContext) {
+// A real positive writer and independent SQL acknowledgement, reused by share
+// qualifiers. The MAC and policy are their original already accepted inputs.
+func beginPaidShareOperation(t *testing.T, ctx context.Context, gate *auditapp.HealthyOperationAuditor, mac *auditapp.OperationMAC, policy auditvalue.OperationLifecyclePolicy, actor identity.Principal, name, key string, retainedSeconds int64) auditvalue.OperationIntent {
+	t.Helper()
+	n := time.Now().UTC().Truncate(time.Microsecond)
+	principal, err := mac.Principal(actor)
+	if err != nil {
+		t.Fatal(err)
+	}
+	input, err := mac.Digest("context-input/v1", []byte(key))
+	if err != nil {
+		t.Fatal(err)
+	}
+	operation := custodyID()
+	in := auditvalue.OperationIntent{ID: operation, RootID: policy.RootID, TraceID: operation, Name: name, InputFormat: "context-input/v1", MACVersion: mac.Version(), AccountVersion: mac.AccountVersion(), Actor: actor, PrincipalDigest: principal, InputDigest: input, CreatedAt: n, RequestUntil: n.Add(5 * time.Second), WriteUntil: n.Add(8 * time.Second), RetainUntil: n.Add(time.Duration(retainedSeconds) * time.Second)}
+	if err = gate.Begin(ctx, in); err != nil {
+		t.Fatal("actual paid share Begin", name, err)
+	}
+	bound, err := auditapp.BindOperationLifecycle(in, policy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return bound
+}
+
+func qualifyShareMetadataSlots(t *testing.T, f *capacitySQLFixture, s captureAdmissionScenario, published artifact.PublishedContext) {
 	t.Helper()
 	ctx, hub, e := f.ctx, f.roles["hub-runtime"], published.Expectation
 	store, err := postgres.NewEvidenceShares(ctx, hub, s.a.RootID, s.recovery.guard)
 	if err != nil {
-		t.Fatal("compiled hub share store", err)
+		t.Fatal(err)
 	}
 	catalog, err := postgres.NewContextPublications(ctx, hub, s.a.RootID, postgres.EffectTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard})
 	if err != nil {
-		t.Fatal("published share source", err)
+		t.Fatal(err)
 	}
 	verified, err := catalog.ContextDownloadEvidence(ctx, e.Registration.Location.ArtifactID)
 	if err != nil {
-		t.Fatal("independently verified source", err)
+		t.Fatal(err)
 	}
+	profiles := f.readAuditProfiles(t)
+	policy := profiles.Normal.Policy
+	journal, err := postgres.NewHealthyOperationJournal(ctx, hub, policy, s.recovery.guard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	acknowledgements, err := postgres.NewOperationAcknowledgements(ctx, hub, s.a.RootID, "normal", s.recovery.guard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	completions, err := postgres.NewOperationLifecycles(ctx, hub, s.a.RootID, "normal", s.recovery.guard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writer, err := objectstore.NewClosedOperationAuditObjects(f.store, policy.StoreID, f.keys, f.keys)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gate, err := auditapp.NewHealthyOperationAuditor(policy, journal, acknowledgements, &objectstore.OperationAuditObjects{Store: f.store, Seal: f.keys, Open: f.keys}, writer, completions, time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	material := f.root.value.State.MAC
+	mac, err := auditapp.NewOperationMAC(material.InputVersion, material.InputKey, material.AccountVersion, material.AccountKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mac.Close()
+	creator := s.a.Eligibility.VerifiedIdentity.Principal
 	var managers []artifact.AudienceAssignment
 	for _, a := range e.Audience {
 		if a.Role == "evidence-owner" {
 			managers = append(managers, a)
 		}
 	}
-	if len(managers) != authorization.ShareMaxManagers {
-		t.Fatal("original capture does not retain eight owners", len(managers))
+	if len(managers) != 8 {
+		t.Fatal("original eight-owner audience", len(managers))
 	}
-	creator := s.a.Eligibility.VerifiedIdentity.Principal
-	recipients := make([]authorization.ShareRecipient, authorization.ShareMaxRecipients)
-	for n := range recipients {
-		var entropy [192]byte // 256 printable bytes, the legal recipient-ID maximum.
-		if _, err = rand.Read(entropy[:]); err != nil {
-			t.Fatal(err)
-		}
-		recipients[n] = authorization.ShareRecipient{Kind: "Group", Issuer: creator.Issuer, ID: base64.RawURLEncoding.EncodeToString(entropy[:])}
-	}
-	slices.SortFunc(recipients, func(a, b authorization.ShareRecipient) int { return strings.Compare(a.Key(), b.Key()) })
-	t.Logf("representative count-maximal share: managers=%d recipients=%d recipient_id_bytes=%d issuer_bytes=%d; actual original owner field widths; not maximum-byte issuer/manager qualification; no policy100 measurement (existing acceptance/publication fixture is not a reusable constructor)", len(managers), len(recipients), len(recipients[0].ID), len(creator.Issuer))
 	proof := func() artifact.RecoveryProof {
 		t.Helper()
 		f.refreshFleet(t)
 		p, err := s.recovery.reader.RecoveryState(ctx)
 		if err != nil {
-			t.Fatal("original current recovery", err)
+			t.Fatal(err)
 		}
 		return p
 	}
-	create := func(n int) (sharing.Request, authorization.Share) {
+	begin := func(name, key string) auditvalue.OperationIntent {
 		t.Helper()
-		r := sharing.Request{Share: authorization.Share{ID: custodyID(), RootID: s.a.RootID, ArtifactID: e.Registration.Location.ArtifactID, CaseID: e.CaseID, Target: s.a.Eligibility.Target, Version: verified.Version, Creator: creator, Management: slices.Clone(managers), Recipients: slices.Clone(recipients), ExpiresAt: e.Registration.ExpiresAt}, IdempotencyKey: fmt.Sprintf("synthetic-history-%03d", n), RequestDigest: sha256.Sum256([]byte(fmt.Sprintf("synthetic-history-%03d", n)))}
-		out, replay, err := store.CreateShare(ctx, r, proof())
-		if err != nil || replay || len(out.Management) != 8 || len(out.Recipients) != 8 {
-			t.Fatal("create original share", n, err, replay)
-		}
-		return r, out
+		f.refreshFleet(t)
+		return beginPaidShareOperation(t, ctx, gate, mac, policy, creator, name, key, profiles.Normal.RetainedSeconds)
 	}
-	baseline := sampleShareMetadata(t, f, e.Registration.Location.ArtifactID)
-	wholeStarted := time.Now()
-	started := wholeStarted
-	request, first := create(0)
-	firstSample := sampleShareMetadata(t, f, e.Registration.Location.ArtifactID)
-	logShareMetadata(t, f, "create-eight-by-eight", baseline, firstSample, time.Since(started))
-	p := proof()
-	before := sampleShareMetadata(t, f, e.Registration.Location.ArtifactID)
-	started = time.Now()
-	if replayed, replay, err := store.CreateShare(ctx, request, p); err != nil || !replay || replayed.ID != first.ID {
-		t.Fatal("create replay", err, replay)
-	}
-	logShareMetadata(t, f, "create-replay", before, sampleShareMetadata(t, f, e.Registration.Location.ArtifactID), time.Since(started))
-
-	// A real management transfer rewrites the same count-maximal owner set.
-	replacement := slices.Clone(managers)
-	slices.Reverse(replacement)
-	managerIDs := make([]string, len(managers))
-	for n, m := range managers {
-		managerIDs[n] = m.AssignmentID
-	}
-	transfer := sharing.Transfer{ShareID: first.ID, Actor: creator, Managers: managerIDs, Management: replacement, ExpectedRevision: first.Revision, IdempotencyKey: "synthetic-transfer", RequestDigest: artifact.Digest{84}}
-	p = proof()
-	before = sampleShareMetadata(t, f, e.Registration.Location.ArtifactID)
-	started = time.Now()
-	first, replay, err := store.TransferShare(ctx, transfer, p)
-	if err != nil || replay || first.Revision != 2 {
-		t.Fatal("full management transfer", err, replay)
-	}
-	logShareMetadata(t, f, "transfer-eight-managers", before, sampleShareMetadata(t, f, e.Registration.Location.ArtifactID), time.Since(started))
-	all := []authorization.Share{first}
-	for n := 1; n < authorization.ShareMaxActivePerArtifact; n++ {
-		_, share := create(n)
-		all = append(all, share)
-	}
-	full := sampleShareMetadata(t, f, e.Registration.Location.ArtifactID)
-	if full.Rows != 32 || full.Active != 32 {
-		t.Fatal("actual active cap setup", full)
-	}
-	refused := request
-	refused.Share.ID, refused.IdempotencyKey, refused.RequestDigest = custodyID(), "synthetic-capacity-refusal", artifact.Digest{85}
-	p = proof()
-	before = sampleShareMetadata(t, f, e.Registration.Location.ArtifactID)
-	started = time.Now()
-	if _, replay, err := store.CreateShare(ctx, refused, p); !errors.Is(err, capture.ErrCapacity) || replay {
-		t.Fatal("thirty-third active share was not refused", err, replay)
-	}
-	after := sampleShareMetadata(t, f, e.Registration.Location.ArtifactID)
-	if after.Rows != 32 || after.Active != 32 {
-		t.Fatal("capacity refusal changed history", after)
-	}
-	logShareMetadata(t, f, "active-cap-refusal-rollback", before, after, time.Since(started))
-
-	for _, share := range all {
-		p = proof()
-		before = sampleShareMetadata(t, f, e.Registration.Location.ArtifactID)
-		started = time.Now()
-		out, replay, err := store.RevokeShare(ctx, sharing.Revocation{ShareID: share.ID, Actor: creator, ExpectedRevision: share.Revision, IdempotencyKey: "synthetic-revoke-" + share.ID}, p)
-		if err != nil || replay || out.RevokedAt.IsZero() || out.Revision != share.Revision+1 {
-			t.Fatal("revoke original share", err, replay)
-		}
-		if share.ID == first.ID {
-			logShareMetadata(t, f, "revoke-after-transfer", before, sampleShareMetadata(t, f, e.Registration.Location.ArtifactID), time.Since(started))
+	finish := func(in auditvalue.OperationIntent) {
+		t.Helper()
+		out := auditvalue.OperationOutcome{Intent: in, Status: "success", Reason: "prepared", Effect: "accepted", ClientReceipt: "unknown", OutputDigest: artifact.Digest{99}, OutputBytes: 12, MetadataUntil: in.RequestUntil, RecordedAt: time.Now().UTC().Truncate(time.Microsecond)}
+		if err := gate.Finish(ctx, out); err != nil {
+			t.Fatal("actual share outcome", err)
 		}
 	}
-	for n := 32; n < 64; n++ {
-		_, share := create(n)
-		all = append(all, share)
-	}
-	after = sampleShareMetadata(t, f, e.Registration.Location.ArtifactID)
-	if after.Rows != 64 || after.Active != 32 {
-		t.Fatal("active cap unexpectedly bounded retained history", after)
-	}
-
-	// Execute the actual generated mutation under the compiled hub role and
-	// roll it back explicitly. This observes aborted tuple/index/WAL costs;
-	// it does not claim the adapter's outer recovery transaction was exercised.
-	last := all[len(all)-1]
-	var shareID, rootID pgtype.UUID
-	_ = shareID.Scan(last.ID)
-	_ = rootID.Scan(s.a.RootID)
-	before = sampleShareMetadata(t, f, e.Registration.Location.ArtifactID)
-	started = time.Now()
-	tx, err := hub.Begin(ctx)
+	request := sharing.Request{Share: authorization.Share{ID: custodyID(), RootID: s.a.RootID, ArtifactID: e.Registration.Location.ArtifactID, CaseID: e.CaseID, Target: s.a.Eligibility.Target, Version: verified.Version, Creator: creator, Management: managers, Recipients: []authorization.ShareRecipient{{Kind: "User", Issuer: creator.Issuer, ID: "synthetic-recipient"}}, ExpiresAt: e.Registration.ExpiresAt}, IdempotencyKey: "finite-original-share", RequestDigest: artifact.Digest{97}}
+	// A reserved but unacknowledged normal record cannot fund an effect.
+	reserved := begin("create_share", "unacknowledged-source")
+	// Begin above proved acknowledgement. A distinct raw journal reservation
+	// below is intentionally never written/acknowledged; it is not a fake receipt.
+	raw := reserved
+	raw.ID = custodyID()
+	raw.TraceID = raw.ID
+	raw.Lifecycle = nil
+	raw, err = auditapp.BindOperationLifecycle(raw, policy)
 	if err != nil {
-		t.Fatal("begin generated mutation rollback", err)
-	}
-	defer tx.Rollback(context.Background())
-	q := custodydb.New(tx)
-	if _, err = q.ReadShareForUpdate(ctx, custodydb.ReadShareForUpdateParams{RootID: rootID, ID: shareID}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = q.RevokeShare(ctx, custodydb.RevokeShareParams{RootID: rootID, ID: shareID, RevokeKey: pgtype.Text{String: "synthetic-explicit-rollback", Valid: true}}); err != nil {
-		t.Fatal("generated full revoke before rollback", err)
+	if _, err = journal.ReserveOperation(ctx, raw); err != nil {
+		t.Fatal("unacknowledged reservation", err)
 	}
-	if err = tx.Rollback(ctx); err != nil {
-		t.Fatal("rollback generated mutation", err)
+	request.OperationID = raw.ID
+	if _, _, err = store.CreateShare(ctx, request, proof()); err == nil {
+		t.Fatal("unacknowledged operation funded share")
 	}
-	got, err := store.Share(ctx, last.ID)
-	if err != nil || !got.RevokedAt.IsZero() || got.Revision != last.Revision {
-		t.Fatal("rollback retained a mutation", err)
+	// The already acknowledged source is current and has not spent a marker.
+	request.OperationID = reserved.ID
+	before := sampleShareMetadata(t, f, e.Registration.Location.ArtifactID)
+	started := time.Now()
+	first, replay, err := store.CreateShare(ctx, request, proof())
+	if err != nil || replay {
+		t.Fatal("paid share create", err, replay)
 	}
-	logShareMetadata(t, f, "generated-full-revoke-explicit-rollback", before, sampleShareMetadata(t, f, e.Registration.Location.ArtifactID), time.Since(started))
-	if _, replay, err = store.RevokeShare(ctx, sharing.Revocation{ShareID: last.ID, Actor: creator, ExpectedRevision: last.Revision, IdempotencyKey: "synthetic-final-revoke"}, proof()); err != nil || replay {
-		t.Fatal("free one active position", err)
+	logShareMetadata(t, f, "qualified-paid-create", before, sampleShareMetadata(t, f, e.Registration.Location.ArtifactID), time.Since(started))
+	another := request
+	another.Share.ID = custodyID()
+	another.IdempotencyKey = "same-operation-second-share"
+	another.RequestDigest = artifact.Digest{98}
+	if _, _, err = store.CreateShare(ctx, another, proof()); !errors.Is(err, capture.ErrConflict) {
+		t.Fatal("paid source created second share", err)
 	}
-	create(64)
-	after = sampleShareMetadata(t, f, e.Registration.Location.ArtifactID)
-	if after.Rows != 65 || after.Active != 32 {
-		t.Fatal("repeat cycle did not retain history beyond active cap", after)
+	var creatorID, lastID string
+	var retire time.Time
+	if err = f.admin.QueryRow(ctx, `SELECT creating_operation_id::text,last_operation_id::text,retire_by FROM evidence_share WHERE id=$1`, first.ID).Scan(&creatorID, &lastID, &retire); err != nil || creatorID != reserved.ID || lastID != reserved.ID || !retire.Equal(reserved.Lifecycle.LiveRetireBy) {
+		t.Fatal("original share dependency", err, creatorID, lastID, retire)
 	}
-	logShareMetadata(t, f, "complete-65-row-retained-history", baseline, after, time.Since(wholeStarted))
-	if _, err = hub.Exec(ctx, `DELETE FROM evidence_share WHERE root_id=$1`, s.a.RootID); err == nil {
-		t.Fatal("compiled hub can physically delete share history")
+	finish(reserved)
+	replayOp := begin("create_share", "business-replay")
+	replayRequest := request
+	replayRequest.OperationID = replayOp.ID
+	replayRequest.Share.ID = custodyID()
+	again, replay, err := store.CreateShare(ctx, replayRequest, proof())
+	if err != nil || !replay || again.ID != first.ID || !again.ExpiresAt.Equal(first.ExpiresAt) {
+		t.Fatal("fresh operation changed original business replay", err, replay)
 	}
+	finish(replayOp)
+	tooLong := begin("create_share", "incompatible-original-cutoff")
+	rejected := another
+	rejected.OperationID = tooLong.ID
+	rejected.Share.ExpiresAt = tooLong.Lifecycle.OriginalPurgeAt.Add(time.Microsecond)
+	if _, _, err = store.CreateShare(ctx, rejected, proof()); !errors.Is(err, sharing.ErrRetentionCapacity) {
+		t.Fatal("incompatible original effect bound", err)
+	}
+	transferOp := begin("transfer_share", "one-transfer")
+	replacement := slices.Clone(managers)
+	slices.Reverse(replacement)
+	ids := make([]string, len(managers))
+	for n, a := range managers {
+		ids[n] = a.AssignmentID
+	}
+	transfer := sharing.Transfer{OperationID: transferOp.ID, ShareID: first.ID, Actor: creator, Managers: ids, Management: replacement, ExpectedRevision: 1, IdempotencyKey: "first-transfer", RequestDigest: artifact.Digest{96}}
+	updated, replay, err := store.TransferShare(ctx, transfer, proof())
+	if err != nil || replay {
+		t.Fatal("paid transfer", err, replay)
+	}
+	transfer.IdempotencyKey = "second-transfer"
+	transfer.ExpectedRevision = updated.Revision
+	transfer.RequestDigest = artifact.Digest{95}
+	if _, _, err = store.TransferShare(ctx, transfer, proof()); !errors.Is(err, capture.ErrConflict) {
+		t.Fatal("one paid operation transferred twice", err)
+	}
+	finish(transferOp)
+	revokeOp := begin("revoke_share", "revoke-original")
+	if _, replay, err = store.RevokeShare(ctx, sharing.Revocation{OperationID: revokeOp.ID, ShareID: first.ID, Actor: creator, ExpectedRevision: updated.Revision, IdempotencyKey: "finite-revoke"}, proof()); err != nil || replay {
+		t.Fatal("paid revoke", err, replay)
+	}
+	finish(revokeOp)
+	if _, err = hub.Exec(ctx, `DELETE FROM evidence_share WHERE id=$1`, first.ID); err == nil {
+		t.Fatal("hub directly deleted identifying share")
+	}
+	// The report SQL must honor this share's original cutoff even while the
+	// parent processing metadata has a later horizon. This is a query-boundary
+	// check with an explicit future observation, not elapsed-time qualification.
+	var parentRetire time.Time
+	if err = f.admin.QueryRow(ctx, `SELECT retire_by FROM context_processing WHERE artifact_id=$1`, e.Registration.Location.ArtifactID).Scan(&parentRetire); err != nil || !parentRetire.After(retire) {
+		t.Fatal("independent parent horizon", err)
+	}
+	var rootID pgtype.UUID
+	_ = rootID.Scan(s.a.RootID)
+	rows, err := custodydb.New(hub).ReportProcessingShares(ctx, custodydb.ReportProcessingSharesParams{RootID: rootID, ObservedAt: pgtype.Timestamptz{Time: retire, Valid: true}, CreatedBefore: pgtype.Timestamptz{Time: time.Now().Add(time.Hour), Valid: true}, AfterCreatedAt: pgtype.Timestamptz{Time: time.Unix(0, 0), Valid: true}, AfterID: rootID, AfterOrdinal: 0, PageLimit: 4})
+	if err != nil || len(rows) != 0 {
+		t.Fatal("report renewed share visibility from parent", err, len(rows))
+	}
+	qualifyPaidShareRetirement(t, f, s, reserved, first.ID, policy)
+}
+
+func qualifyPaidShareRetirement(t *testing.T, f *capacitySQLFixture, s captureAdmissionScenario, in auditvalue.OperationIntent, shareID string, policy auditvalue.OperationLifecyclePolicy) {
+	t.Helper()
+	ctx := f.ctx
+	ledgers := make([]*postgres.OperationLifecycles, 0, 3)
+	for _, purpose := range []string{"capture-cleanup", "capture-verifier", "capture-finalizer"} {
+		l, err := postgres.NewScopedWorkerOperationLifecycles(ctx, f.roles[purpose], s.a.RootID, s.recovery.installation, policy.StoreID, s.recovery.guard)
+		if err != nil {
+			t.Fatal("compiled worker cleanup facet", purpose, err)
+		}
+		ledgers = append(ledgers, l)
+	}
+	public, private, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sign, err := jose.NewOperationRetirementSignatures(s.a.RootID, "synthetic-retirement", private, map[string]ed25519.PublicKey{"synthetic-retirement": public})
+	if err != nil {
+		t.Fatal(err)
+	}
+	verify, err := jose.NewOperationRetirementSignatures(s.a.RootID, "", nil, map[string]ed25519.PublicKey{"synthetic-retirement": public})
+	if err != nil {
+		t.Fatal(err)
+	}
+	objects, err := objectstore.NewOperationAuditCleanupObjects(f.store, policy.StoreID, f.keys, f.keys, sign, verify)
+	if err != nil {
+		t.Fatal(err)
+	}
+	checks, err := objectstore.NewOperationAuditCleanupVerifier(f.store, policy.StoreID, f.keys, verify)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cleaner := auditapp.OperationCleanup{Journal: ledgers[0], Acknowledgements: ledgers[1], Finalizer: ledgers[2], Objects: objects, Verifier: checks}
+	t.Logf("share_retirement_stage=await_original_purge remaining_ms=%d; original source bound unchanged; synthetic local signing/storage credentials do not qualify installed IAM", time.Until(in.Lifecycle.OriginalPurgeAt).Milliseconds())
+	deadline := in.Lifecycle.LiveRetireBy.Add(5 * time.Second)
+	removed := false
+	for time.Now().Before(deadline) {
+		f.refreshFleet(t)
+		err = cleaner.Advance(ctx, in.ID)
+		var count int
+		if e := f.admin.QueryRow(ctx, `SELECT count(*) FROM operation_audit WHERE id=$1`, in.ID).Scan(&count); e != nil {
+			t.Fatal(e)
+		}
+		if count == 0 {
+			removed = true
+			break
+		}
+		select {
+		case <-ctx.Done():
+			t.Fatal(ctx.Err())
+		case <-time.After(200 * time.Millisecond):
+		}
+	}
+	if !removed {
+		t.Fatal("original provider/finalization did not retire share", err)
+	}
+	var shareCount, historyCount, charged int64
+	var eligible time.Time
+	if err = f.admin.QueryRow(ctx, `SELECT (SELECT count(*) FROM evidence_share WHERE id=$1),h.records,h.eligible_at,a.charged FROM operation_audit_history h JOIN operation_audit_account a USING(root_id,lane,principal_digest) WHERE h.root_id=$2 AND h.lane='normal' AND h.principal_digest=$3`, shareID, s.a.RootID, in.PrincipalDigest[:]).Scan(&shareCount, &historyCount, &eligible, &charged); err != nil || shareCount != 0 || historyCount != 1 || time.Now().After(eligible) {
+		t.Fatal("share deletion did not retain original H charge", err, shareCount, historyCount, eligible)
+	}
+	t.Logf("share_retirement_stage=child_and_parent_deleted original_H=%d remaining_cooling_ms=%d charged=%d", policy.BackupHorizonSeconds, time.Until(eligible).Milliseconds(), charged)
+	for time.Now().Before(eligible) {
+		f.refreshFleet(t)
+		select {
+		case <-ctx.Done():
+			t.Fatal(ctx.Err())
+		case <-time.After(100 * time.Millisecond):
+		}
+	}
+	f.refreshFleet(t)
+	keys, err := ledgers[0].DueOperationHistory(ctx)
+	if err != nil || len(keys) != 1 {
+		t.Fatal("original cooling selection", err, len(keys))
+	}
+	if _, err = ledgers[2].ReleaseOperationHistory(ctx, keys[0]); err != nil {
+		t.Fatal("original cooling drain", err)
+	}
+	var after int64
+	if err = f.admin.QueryRow(ctx, `SELECT charged FROM operation_audit_account WHERE root_id=$1 AND lane='normal' AND principal_digest=$2`, s.a.RootID, in.PrincipalDigest[:]).Scan(&after); err != nil || after != charged-1 {
+		t.Fatal("cooling failed exact original slot release", err, charged, after)
+	}
+	t.Log("share_retirement_stage=original_H_elapsed_exact_one_charge_released")
 }
