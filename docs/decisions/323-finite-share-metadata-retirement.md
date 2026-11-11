@@ -213,3 +213,17 @@ no role, API call, process, fallback, state or configuration. Existing protected
 input/image pins and unsupported-development-state refusal remain in force;
 no permanent compatibility mechanism is introduced. Focused tests and fresh
 installed qualification must establish the correction before it is delivered.
+
+## Cold cleanup scheduling correction
+
+The `1d1451f8` installed worker opened its three SQL facets but could not obtain
+its first cleanup provider credentials. `RefreshCleanup` uses the existing
+cleanup admission ticket and awaits a fresh fleet scheduling notice; the
+notice's closed purpose list omitted cleanup and refused it before provider
+login. Admit that one intended maintenance purpose. The original notice end
+still bounds the context, and cancellation, one-use scheduling, native/recovery
+proofs and the four exact provider/key purposes remain unchanged. A notice is
+not effect or owner/authority-audit authority. This is a correction of the
+component composition, with no new role, cache, timeout, API call or task.
+Cold regressions must cover the actual cleanup ticket and unseeded credential
+slots; healthy cached-token tests alone cannot establish cold startup.

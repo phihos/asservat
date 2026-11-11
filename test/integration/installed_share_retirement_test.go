@@ -10,7 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // SC-PRV-015: this collector-free focus uses actual public manual/capture sharing, the
@@ -30,6 +30,7 @@ func qualifyInstalledShareRetirement(t *testing.T, parent context.Context, clust
 		share, operation, lane         string
 		principal                      []byte
 		purge, live, release, deleteBy time.Time
+		eligible                       time.Time
 		horizon                        int64
 		healthy, cooling, gone         bool
 	}
@@ -79,40 +80,61 @@ func qualifyInstalledShareRetirement(t *testing.T, parent context.Context, clust
 		complete := true
 		for i := range originals {
 			o := &originals[i]
-			var share, operation, lifecycle, healthy bool
-			if err = run.SQL.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM evidence_share WHERE id=$1),
- EXISTS(SELECT 1 FROM operation_audit WHERE id=$2),EXISTS(SELECT 1 FROM operation_audit_lifecycle WHERE operation_id=$2),
- EXISTS(SELECT 1 FROM operation_audit_lifecycle WHERE operation_id=$2 AND certificate_acknowledged_at IS NOT NULL)`, o.share, o.operation).Scan(&share, &operation, &lifecycle, &healthy); err != nil {
+			sample, err := readShareRetirementSnapshot(ctx, run.SQL, run.RootID, o.lane, o.principal, o.share, o.operation, o.release, o.deleteBy)
+			snapshotAt, observedAt := sample.SnapshotAt, sample.ObservedAt
+			share, operation, lifecycle, healthy := sample.Share, sample.Operation, sample.Lifecycle, sample.Healthy
+			eligible, originalRecords := sample.Eligible, sample.OriginalRecords
+			accountCharge, liveRecords, historyRecords := sample.AccountCharge, sample.LiveRecords, sample.HistoryRecords
+			if err != nil {
 				run.Diagnose()
-				t.Fatal("installed share retirement observation", err)
+				t.Fatal("installed share retirement/account snapshot", err)
+			}
+			if share != operation || lifecycle != operation {
+				t.Fatal("installed retirement did not remove share, operation and lifecycle atomically", o.lane)
+			}
+			var charged int64
+			if accountCharge == nil {
+				if liveRecords+historyRecords != 0 {
+					t.Fatal("installed audit account disappeared with outstanding charges", o.lane, liveRecords, historyRecords)
+				}
+			} else {
+				charged = *accountCharge
+			}
+			if charged != liveRecords+historyRecords {
+				t.Fatal("installed audit account charge differs from live and residual records", o.lane, charged, liveRecords, historyRecords)
+			}
+			if operation && !snapshotAt.Before(o.live) {
+				t.Fatal("installed identifying share/audit rows outlived original live_retire_by", o.lane)
 			}
 			if healthy && !o.healthy {
 				t.Logf("installed_share_retirement lane=%s stage=healthy_certificate_acknowledged", o.lane)
 			}
 			o.healthy = o.healthy || healthy
 			if !operation {
-				if share || lifecycle || time.Now().Before(o.purge) {
-					t.Fatal("installed retirement broke atomic dependency or original cutoff", o.lane)
+				if observedAt.Before(o.purge) {
+					t.Fatal("installed retirement preceded original purge cutoff", o.lane)
 				}
 				if !o.gone {
 					t.Logf("installed_share_retirement lane=%s stage=atomic_live_deletion", o.lane)
 				}
 				o.gone = true
 			}
-			var eligible time.Time
-			var charged int64
-			err = run.SQL.QueryRow(ctx, `SELECT eligible_at,records FROM operation_audit_history
- WHERE root_id=$1 AND lane=$2 AND principal_digest=$3 AND release_at=$4 AND delete_by=$5`, run.RootID, o.lane, o.principal, o.release, o.deleteBy).Scan(&eligible, &charged)
-			if err != nil && err != pgx.ErrNoRows {
-				t.Fatal("installed original residual history", err)
-			}
-			if err == nil && o.gone && charged > 0 {
-				if !o.cooling {
-					t.Logf("installed_share_retirement lane=%s stage=original_history_charged remaining_ms=%d", o.lane, time.Until(eligible).Milliseconds())
+			if eligible != nil {
+				if originalRecords < 1 || !o.eligible.IsZero() && eligible.Before(o.eligible) {
+					t.Fatal("installed original history charge or eligibility regressed", o.lane)
 				}
-				o.cooling = true
+				o.eligible = *eligible
+				if o.gone && !o.cooling {
+					if !observedAt.Before(*eligible) {
+						t.Fatal("installed retirement did not retain a future original cooling bound", o.lane)
+					}
+					t.Logf("installed_share_retirement lane=%s stage=original_history_charged remaining_ms=%d", o.lane, eligible.Sub(observedAt).Milliseconds())
+					o.cooling = true
+				}
+			} else if originalRecords != 0 || o.cooling && observedAt.Before(o.eligible) {
+				t.Fatal("installed original history released before its observed eligibility", o.lane)
 			}
-			if !o.gone || err == nil {
+			if !o.gone || eligible != nil {
 				complete = false
 			}
 		}
@@ -139,4 +161,34 @@ func qualifyInstalledShareRetirement(t *testing.T, parent context.Context, clust
 		}
 	}
 	t.Logf("installed manual/capture share retirement: healthy certificates, atomic live deletion, independent version/multipart absence and original cooling/release in %s", time.Since(started).Round(time.Millisecond))
+}
+
+// This one concrete reader is shared with the paid-share real SQL fixture so
+// installed proof changes cannot defer SQL/nullable scan mistakes to a full run.
+// All account totals and original-object state come from one MVCC snapshot.
+type shareRetirementSnapshot struct {
+	SnapshotAt, ObservedAt                       time.Time
+	Share, Operation, Lifecycle, Healthy         bool
+	Eligible                                     *time.Time
+	OriginalRecords, LiveRecords, HistoryRecords int64
+	AccountCharge                                *int64
+}
+
+func readShareRetirementSnapshot(ctx context.Context, pool *pgxpool.Pool, root, lane string, principal []byte, share, operation string, release, deleteBy time.Time) (sample shareRetirementSnapshot, err error) {
+	err = pool.QueryRow(ctx, `WITH
+ account AS (SELECT charged FROM operation_audit_account WHERE root_id=$1 AND lane=$2 AND principal_digest=$3),
+ live AS (SELECT count(*) AS records FROM operation_audit WHERE root_id=$1 AND lane=$2 AND principal_digest=$3),
+ history AS (SELECT COALESCE(sum(records),0)::bigint AS records FROM operation_audit_history WHERE root_id=$1 AND lane=$2 AND principal_digest=$3),
+ original_history AS (SELECT eligible_at,records FROM operation_audit_history WHERE root_id=$1 AND lane=$2 AND principal_digest=$3 AND release_at=$6 AND delete_by=$7),
+ snapshot AS MATERIALIZED (SELECT
+ EXISTS(SELECT 1 FROM evidence_share WHERE root_id=$1 AND id=$4) AS share_present,
+ EXISTS(SELECT 1 FROM operation_audit WHERE root_id=$1 AND id=$5) AS operation_present,
+ EXISTS(SELECT 1 FROM operation_audit_lifecycle WHERE root_id=$1 AND operation_id=$5) AS lifecycle_present,
+ EXISTS(SELECT 1 FROM operation_audit_lifecycle WHERE root_id=$1 AND operation_id=$5 AND certificate_acknowledged_at IS NOT NULL) AS healthy,
+ (SELECT eligible_at FROM original_history) AS eligible_at,COALESCE((SELECT records FROM original_history),0) AS original_records,
+ (SELECT charged FROM account) AS charged,(SELECT records FROM live) AS live_records,(SELECT records FROM history) AS history_records)
+ SELECT statement_timestamp(),clock_timestamp(),share_present,operation_present,lifecycle_present,healthy,eligible_at,original_records,charged,live_records,history_records FROM snapshot`, root, lane, principal, share, operation, release, deleteBy).Scan(
+		&sample.SnapshotAt, &sample.ObservedAt, &sample.Share, &sample.Operation, &sample.Lifecycle, &sample.Healthy,
+		&sample.Eligible, &sample.OriginalRecords, &sample.AccountCharge, &sample.LiveRecords, &sample.HistoryRecords)
+	return
 }

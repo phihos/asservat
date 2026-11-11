@@ -87,6 +87,33 @@ tests0.014s. Fresh installed qualification is pending;
 no installed share retirement is claimed. Evidence is external in
 `share-retirement/{policy-cost-52ce1797,slots-selector-4192e6bd,installed-4192e6bd}`.
 
+At `1d1451f8`, pre-push passes again (121s affected race tests). The fresh
+installed run passes the corrected recipe, installation and public MCP
+manual/capture-time sharing, but no healthy retirement certificate is observed:
+Go619.155s/harness691.5s, test1/make2. All4,852 source hashes match; source stays
+frozen, cleanup failures are empty and owned resources are independently absent.
+The worker opens all three real cleanup SQL facets. Source reproduction finds
+that `RefreshCleanup` calls `AwaitFleetObservation` on a cleanup ticket, but the
+notice's purpose predicate rejects that ticket before any provider login.
+
+The correction permits exactly the existing cleanup purpose to consume its
+original scheduling observation. It adds no deadline, cache, role, provider
+scope or effect authority. Cold fleet and actual `RefreshCleanup` regressions
+fail on the old predicate and pass after correction; the latter has four empty
+credential slots and still refuses absent native proof, with zero provider
+logins. Focused race tests pass (fleet6.163s/KMS1.301s). Closed, rate-suppressed
+runtime diagnostics now name scheduling, provider-refresh, projection and
+effect/history stages without identifiers or dependency error text.
+
+Review also strengthens the installed observer: one SQL snapshot checks atomic
+share/audit/lifecycle disappearance, the original live-row cutoff, real account
+charge equal to all live plus retained history records, future cooling
+eligibility and no premature release. The exact query is shared with the paid
+share service fixture; nullable account/history fields and aggregated history
+must be exercised there before another installed run. This focus covers public
+MCP sharing; the separate built-browser evidence remains separately scoped.
+No installed retirement or full specification completion is claimed.
+
 ## Merged installable context trial (2026-11-11)
 
 [PR223](https://github.com/phihos/asservat/pull/223) merged at `b389b7c9`;

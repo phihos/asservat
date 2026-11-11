@@ -357,6 +357,10 @@ func qualifyShareMetadataSlots(t *testing.T, f *capacitySQLFixture, s captureAdm
 func qualifyPaidShareRetirement(t *testing.T, f *capacitySQLFixture, s captureAdmissionScenario, in auditvalue.OperationIntent, shareID string, policy auditvalue.OperationLifecyclePolicy) {
 	t.Helper()
 	ctx := f.ctx
+	live, err := readShareRetirementSnapshot(ctx, f.admin, s.a.RootID, "normal", in.PrincipalDigest[:], shareID, in.ID, in.Lifecycle.HistoryReleaseAt, in.Lifecycle.HistoryDeleteBy)
+	if err != nil || !live.Share || !live.Operation || !live.Lifecycle || live.AccountCharge == nil || *live.AccountCharge != live.LiveRecords+live.HistoryRecords {
+		t.Fatal("paid share original snapshot or charge invariant", err)
+	}
 	ledgers := make([]*postgres.OperationLifecycles, 0, 3)
 	for _, purpose := range []string{"capture-cleanup", "capture-verifier", "capture-finalizer"} {
 		l, err := postgres.NewScopedWorkerOperationLifecycles(ctx, f.roles[purpose], s.a.RootID, s.recovery.installation, policy.StoreID, s.recovery.guard)
@@ -415,11 +419,14 @@ func qualifyPaidShareRetirement(t *testing.T, f *capacitySQLFixture, s captureAd
 			selected = true
 		}
 		err = cleaner.Advance(ctx, in.ID)
-		var count int
-		if e := f.admin.QueryRow(ctx, `SELECT count(*) FROM operation_audit WHERE id=$1`, in.ID).Scan(&count); e != nil {
-			t.Fatal(e)
+		state, e := readShareRetirementSnapshot(ctx, f.admin, s.a.RootID, "normal", in.PrincipalDigest[:], shareID, in.ID, in.Lifecycle.HistoryReleaseAt, in.Lifecycle.HistoryDeleteBy)
+		if e != nil || state.Share != state.Operation || state.Lifecycle != state.Operation || state.AccountCharge == nil || *state.AccountCharge != state.LiveRecords+state.HistoryRecords {
+			t.Fatal("paid share atomic retirement/account snapshot", e)
 		}
-		if count == 0 {
+		if state.Operation && !state.SnapshotAt.Before(in.Lifecycle.LiveRetireBy) {
+			t.Fatal("paid share exceeded original live retirement bound")
+		}
+		if !state.Operation {
 			removed = true
 			break
 		}
@@ -432,11 +439,11 @@ func qualifyPaidShareRetirement(t *testing.T, f *capacitySQLFixture, s captureAd
 	if !removed || !selected {
 		t.Fatal("original provider/finalization did not select and retire share", err)
 	}
-	var shareCount, historyCount, charged int64
-	var eligible time.Time
-	if err = f.admin.QueryRow(ctx, `SELECT (SELECT count(*) FROM evidence_share WHERE id=$1),h.records,h.eligible_at,a.charged FROM operation_audit_history h JOIN operation_audit_account a USING(root_id,lane,principal_digest) WHERE h.root_id=$2 AND h.lane='normal' AND h.principal_digest=$3`, shareID, s.a.RootID, in.PrincipalDigest[:]).Scan(&shareCount, &historyCount, &eligible, &charged); err != nil || shareCount != 0 || historyCount != 1 || time.Now().After(eligible) {
-		t.Fatal("share deletion did not retain original H charge", err, shareCount, historyCount, eligible)
+	cooling, err := readShareRetirementSnapshot(ctx, f.admin, s.a.RootID, "normal", in.PrincipalDigest[:], shareID, in.ID, in.Lifecycle.HistoryReleaseAt, in.Lifecycle.HistoryDeleteBy)
+	if err != nil || cooling.Share || cooling.Operation || cooling.Lifecycle || cooling.OriginalRecords != 1 || cooling.Eligible == nil || cooling.AccountCharge == nil || !cooling.ObservedAt.Before(*cooling.Eligible) || *cooling.AccountCharge != cooling.LiveRecords+cooling.HistoryRecords {
+		t.Fatal("share deletion did not retain original H charge", err)
 	}
+	eligible, charged := *cooling.Eligible, *cooling.AccountCharge
 	t.Logf("share_retirement_stage=child_and_parent_deleted original_H=%d remaining_cooling_ms=%d charged=%d", policy.BackupHorizonSeconds, time.Until(eligible).Milliseconds(), charged)
 	for time.Now().Before(eligible) {
 		f.refreshFleet(t)
@@ -457,6 +464,17 @@ func qualifyPaidShareRetirement(t *testing.T, f *capacitySQLFixture, s captureAd
 	var after int64
 	if err = f.admin.QueryRow(ctx, `SELECT charged FROM operation_audit_account WHERE root_id=$1 AND lane='normal' AND principal_digest=$2`, s.a.RootID, in.PrincipalDigest[:]).Scan(&after); err != nil || after != charged-1 {
 		t.Fatal("cooling failed exact original slot release", err, charged, after)
+	}
+	drained, err := readShareRetirementSnapshot(ctx, f.admin, s.a.RootID, "normal", in.PrincipalDigest[:], shareID, in.ID, in.Lifecycle.HistoryReleaseAt, in.Lifecycle.HistoryDeleteBy)
+	if err != nil || drained.Share || drained.Operation || drained.Lifecycle || drained.Eligible != nil || drained.OriginalRecords != 0 || drained.ObservedAt.Before(eligible) || drained.AccountCharge == nil || *drained.AccountCharge != drained.LiveRecords+drained.HistoryRecords {
+		t.Fatal("paid share original eligibility/refund snapshot", err)
+	}
+	// An unmatched principal is a read-only decoder boundary, never an actor
+	// or authority: exercise a missing account's NULL without creating one.
+	absentPrincipal := append(append([]byte{}, in.PrincipalDigest[:]...), 0)
+	absent, err := readShareRetirementSnapshot(ctx, f.admin, s.a.RootID, "normal", absentPrincipal, shareID, in.ID, in.Lifecycle.HistoryReleaseAt, in.Lifecycle.HistoryDeleteBy)
+	if err != nil || absent.AccountCharge != nil || absent.LiveRecords+absent.HistoryRecords != 0 || absent.Eligible != nil {
+		t.Fatal("absent paid-share account snapshot decoding", err)
 	}
 	t.Log("share_retirement_stage=original_H_elapsed_exact_one_charge_released")
 }
