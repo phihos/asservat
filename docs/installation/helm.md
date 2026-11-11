@@ -2,14 +2,14 @@
 
 Helm is the official installation and upgrade path. The [chart README](../../charts/asservat/README.md) contains the runnable commands and complete values table for the current package. The [operations contract](../operations.md) describes the eventual runtime profiles. TASK-11, REQ-UX-001 and REQ-ARC-001 cover installation ergonomics and role isolation.
 
-For a source-built installation through enrollment, pod-status capture and native download, follow the [external-services context trial](context-trial.md). Its reference run covers one hub and one separate workload cluster with preloaded images; same-cluster qualification is pending.
+For a source-built installation through enrollment, pod-status capture and native download, follow the [external-services context trial](context-trial.md). Its reference runs cover separate hub/workload APIs and a shared API with preloaded images; the shared path uses hub Helm followed by the regional CLI.
 
 ## Current scope
 
 Version `0.1.0-dev.1` packages eight structural CRDs: AccessBinding,
 PermissionSource, DebugPolicy, EvidenceRetentionPolicy, EvidenceBudgetPolicy,
 EvidenceStoragePool, CapacityReservation and CaptureProfile, plus a nonauthorizing release
-inventory. All three topology modes are accepted. By default, no runtime Deployment, collector, public route, database migration, default permission grant or baseline policy is installed. The optional ADR-137 bootstrap hook packages initial schema and activation. Explicit runtime continuation adds its final command to the same fixed runner Pod. The consolidated runner passed the context trial in the owned two-cluster reference environment; registry distribution and same-cluster topology remain outside that result. Default policies must be protected and accepted by the runtime before becoming authoritative; rendering a policy does not establish acceptance.
+inventory. All three topology modes are accepted. By default, no runtime Deployment, collector, public route, database migration, default permission grant or baseline policy is installed. The optional ADR-137 bootstrap hook packages initial schema and activation. Explicit runtime continuation adds its final command to the same fixed runner Pod. The consolidated runner passed the context trial in the owned two-cluster reference environment; the shared-API hub-Helm/regional-CLI path also passes, while registry distribution remains outside those results. Default policies must be protected and accepted by the runtime before becoming authoritative; rendering a policy does not establish acceptance.
 
 The initial external identity provider is **Keycloak**, selected by the maintainer. Reuse the [qualified reference profile](../architecture/keycloak-profile.md) for its browser/MCP implementation; issuer/client/group configuration remains independently protected. The maintainer subsequently required an internal users/login option and small-deployment alternatives under [ADR-063](../decisions/063-small-deployment-alternatives.md). Those are planned features; the current chart does not provide them. Do not auto-install a realm, embed an administrator password or infer authority from group display names. The context trial includes actual Keycloak browser/MCP sign-in and installer acceptance; broader identity/deployment profiles remain unfinished.
 

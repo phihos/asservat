@@ -59,8 +59,8 @@ matching source-built, digest-pinned images accessible to the cluster; and the
 [context-trial procedure](installation/context-trial.md),
 including separate credentials, identity and permission configuration, delegation
 where needed and regional enrollment. The actual Helm/profile journey passed
-with separate hub/workload APIs and preloaded images; same-API qualification
-is still being corrected. Runtime image pulls require anonymous or node-configured
+with separate hub/workload APIs and a shared API, using preloaded images.
+The shared path uses hub Helm followed by the regional CLI. Runtime image pulls require anonymous or node-configured
 access, or exact preloads; the bootstrap pull Secret covers only its runner.
 
 The default Helm install starts no services. The documented
