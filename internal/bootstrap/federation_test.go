@@ -176,3 +176,15 @@ func TestFederationProviderAuthenticationNeedsOwnerGuardAndExactRecipe(t *testin
 		t.Fatal("profile that does not match its recipe")
 	}
 }
+
+// The log consumes fixed local stages and closed classes, never provider text.
+func TestFederationEnrollmentDiagnosticNamesCompositionBoundary(t *testing.T) {
+	private := errors.New("synthetic private provider error")
+	err := federationEnrollmentError{"audit-journal", private}
+	if federationEnrollmentStep(err) != "resolve/audit-journal" || federationCause(err) != "unavailable" || !errors.Is(err, private) {
+		t.Fatal("composition boundary or error class lost")
+	}
+	if strings.Contains(err.Error(), "synthetic") {
+		t.Fatal("provider text entered fixed diagnostic")
+	}
+}

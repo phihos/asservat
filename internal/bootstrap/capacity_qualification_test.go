@@ -212,3 +212,34 @@ func TestProfileCapacityQualificationFundsRenewalsWithinFiniteEnvelope(t *testin
 	}
 	t.Logf("installed complete root: accounts=%d records/account=%d SQL=%d backup=%d WAL=%d nativeWAL/workload=%d nativeBackup/workload=%d", p.Accounts, p.Records, totals.SQLBytes, totals.BackupBytes, totals.WALBytes, work.NativeWALBytes, work.NativeBackupBytes)
 }
+
+// The complete source can be valid while promising admission beyond its own
+// earliest prepaid retirement ticket. Reject that relation before installer I/O.
+func TestConnectorBackingRejectsAdmissionPastOriginalRetirement(t *testing.T) {
+	c := contracts.InstallerConnectorSettings{Accounts: 1, RecordsPerAccount: 96, RetainedSeconds: 3902, Profiles: 1, SourceTransitions: 8, PurgeLeases: 2, ValidSeconds: 3600,
+		Footprint: contracts.InstallerCapacityFootprint{RowBytes: 1 << 20, TransitionWALBytes: 1 << 20}}
+	backup := contracts.InstallerCapacityBackup{HorizonSeconds: 1, CleanupBudgetSeconds: 60, ProofWindowSeconds: 60, BackupCopies: 1, WALCopies: 1}
+	d := capacityDerivedFixture()
+	now := time.Date(2026, 11, 11, 12, 0, 0, 123456789, time.FixedZone("synthetic", 19800))
+	original := now.UTC().Truncate(time.Microsecond)
+	accepted, err := buildConnectorBacking(c, backup, d.Root, d.Installation, d.AccountVersion, d.Root, now)
+	if err != nil || !accepted.Policy.ValidUntil.Equal(original.Add(time.Hour)) || accepted.ProcessRunSeconds() != 3600 {
+		t.Fatal("exact original retirement boundary refused or shifted", err)
+	}
+	for _, tc := range []struct {
+		name   string
+		change func(*contracts.InstallerConnectorSettings)
+	}{
+		{"retention-one-second-short", func(c *contracts.InstallerConnectorSettings) { c.RetainedSeconds-- }},
+		{"admission-one-second-long", func(c *contracts.InstallerConnectorSettings) { c.ValidSeconds++ }},
+		{"original-trial-promise", func(c *contracts.InstallerConnectorSettings) { c.RetainedSeconds, c.ValidSeconds = 3600, 7200 }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			bad := c
+			tc.change(&bad)
+			if _, err := buildConnectorBacking(bad, backup, d.Root, d.Installation, d.AccountVersion, d.Root, now); err == nil {
+				t.Fatal("admission outlives the original prepaid retirement boundary")
+			}
+		})
+	}
+}

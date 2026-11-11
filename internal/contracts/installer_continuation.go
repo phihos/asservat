@@ -36,7 +36,25 @@ const (
 	// evidence list-and-delete principal in the phase-3 inbox (ADR-205
 	// decision 4); it is copied only into EvidenceDeleteCredentialName.
 	InstallerInboxEvidenceDeleteCredential = "evidence-delete.json"
+	InstallerInboxFederationTLSCertificate = "federation-tls.crt"
+	InstallerInboxFederationTLSKey         = "federation-tls.key"
+	InstallerInboxFederationTLSCA          = "federation-ca.crt"
+	InstallerInboxKeyServiceTLSCertificate = "key-service-tls.crt"
+	InstallerInboxKeyServiceTLSKey         = "key-service-tls.key"
+	InstallerInboxKeyServiceTLSCA          = "key-service-ca.crt"
 )
+
+// InstallerServingTLSPlan is public hostname selection in the phase-3 recipe.
+// Private material is supplied only through the operator inbox, never values.
+type InstallerServingTLSPlan struct {
+	FederationServerName string `json:"federationServerName,omitempty"`
+	KeyServiceServerName string `json:"keyServiceServerName,omitempty"`
+}
+
+func InstallerInboxServingTLSFiles() []string {
+	return []string{InstallerInboxFederationTLSCertificate, InstallerInboxFederationTLSKey, InstallerInboxFederationTLSCA,
+		InstallerInboxKeyServiceTLSCertificate, InstallerInboxKeyServiceTLSKey, InstallerInboxKeyServiceTLSCA}
+}
 
 // InstallerInboxPublicFiles are the operator's public material in a promoted
 // phase-3 inbox (ADR-194 decision 11), keyed by the owner's fixed public

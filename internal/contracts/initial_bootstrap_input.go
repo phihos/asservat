@@ -13,6 +13,7 @@ type InitialBootstrapInput struct {
 	BootstrapNamespace     string                          `json:"bootstrapNamespace"`
 	TargetNamespace        string                          `json:"targetNamespace"`
 	RunnerAccount          string                          `json:"runnerAccount"`
+	Administrators         []OwnerDeploymentActor          `json:"administrators,omitempty"`
 	Image                  string                          `json:"image"`
 	RegistryAuthentication string                          `json:"registryAuthentication,omitempty"`
 	ProbeAudience          string                          `json:"probeAudience,omitempty"`

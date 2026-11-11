@@ -79,6 +79,15 @@ The first accepted source form is `namespaceMetadata` with an explicit value map
 
 `admissionEnforced` protection names the installation's namespace label guard (`guardRef: namespace-guard`, the capacity selector guard of the source's cluster): the source grants only while a live proof — pinned policy and binding unchanged and an unprivileged probe's dry-run namespace update denied by exactly this guard, within its original five-second interval — covers every selector and mapping key. That guard protects namespace labels only (CREATE without the keys, UPDATE keeps their presence and values; a namespace recreated by another writer is a CREATE); a source whose mapping is an annotation key is `SourceUnsupported` under it. A lost or failing proof makes the source unavailable (kept, granting nothing). `groupID` mapping validates a value against the protected identity settings' administrator-configured `eligibleGroups` of the source's issuer — the configured directory; no directory reader is used — and a value outside it grants nothing. Namespaces of clusters other than the hub's are read from that cluster's regional connector over the existing cluster-observation channel: the connector keeps one continuous LIST+watch journal per key set and reports each namespace with a version that changes only when an observed value changes (A → B → A included); the hub rereads it every 10 seconds, compares versions exactly and never claims continuity across reads, so unrelated namespace writes keep an assignment and an ownership round trip re-mints it. A journal restart is a new journal and re-mints.
 
+Global namespace/workload metadata guards MUST isolate their independent
+no-effect probes when sharing a Kubernetes API ([ADR-324](../docs/decisions/324-installable-context-trial.md)).
+Only explicitly true dry-run namespace UPDATE or workload CREATE outside the
+respective guard's own probe namespace is exempt from that guard. Its own
+probe still requires its exact policy denial; another active guard MUST NOT
+conceal a missing or ineffective target guard. Persistent metadata writes,
+RBAC and authority based on actual object UID/source observations are unchanged.
+Dry-run output never grants evidence or execution authority.
+
 ### SC-PER-003
 
 Given an enabled source reading an administrator-managed ownership annotation, when the provisioner creates a new namespace for the payments group, then members gain only the configured role there. A developer changing unrelated workload labels gains nothing. In guarded mode, an unauthorized ownership-key edit or removal is rejected; missing or non-enforcing guard state disables inheritance.

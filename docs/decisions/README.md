@@ -1,5 +1,9 @@
 # Decision records
 
+[ADR-324 — Installable context trial](324-installable-context-trial.md)
+closes missing Helm/installer producers for the existing context workflow.
+Implementation and fresh actual-chart qualification are in progress.
+
 [ADR-322 — Processing inventory export](322-processing-inventory-export.md)
 adds bounded audited JSON export of retained artifacts, recipient history,
 processing rules, placement and explicit processor declarations. The named

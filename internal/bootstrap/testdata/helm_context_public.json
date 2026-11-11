@@ -1,0 +1,260 @@
+{
+  "capacity": {
+    "pool": "capacity",
+    "policy": "applications",
+    "namespaceKeys": [
+      "team"
+    ],
+    "accounts": 16,
+    "recordsPerAccount": 8,
+    "admissionSeconds": 86400,
+    "lanes": {
+      "captureRetainedSeconds": 10000,
+      "normal": {
+        "accounts": 4,
+        "recordsPerAccount": 128,
+        "retainedSeconds": 10000
+      },
+      "resolution": {
+        "accounts": 4,
+        "recordsPerAccount": 128,
+        "retainedSeconds": 10000
+      },
+      "processing": {
+        "accounts": 4,
+        "recordsPerAccount": 128,
+        "retainedSeconds": 10000
+      }
+    },
+    "stopRetainedSeconds": 10000,
+    "backup": {
+      "horizonSeconds": 3600,
+      "cleanupBudgetSeconds": 60,
+      "proofWindowSeconds": 60,
+      "backupCopies": 2,
+      "walCopies": 3
+    },
+    "footprints": {
+      "capture": {
+        "rowBytes": 131072,
+        "transitionWALBytes": 262144
+      },
+      "operation": {
+        "rowBytes": 131072,
+        "transitionWALBytes": 262144
+      },
+      "processing": {
+        "rowBytes": 131072,
+        "transitionWALBytes": 262144
+      },
+      "native": {
+        "rowBytes": 131072,
+        "transitionWALBytes": 262144
+      },
+      "stop": {
+        "rowBytes": 131072,
+        "transitionWALBytes": 262144
+      },
+      "processingState": {
+        "rowBytes": 131072,
+        "transitionWALBytes": 262144
+      }
+    },
+    "purgeLeases": 4,
+    "processing": {
+      "maxRules": 2,
+      "maxRootTransitions": 512
+    },
+    "metadata": {
+      "fixedRowBytes": 1048576,
+      "accountRowBytes": 262144,
+      "recordRowBytes": 131072,
+      "recordWALBytes": 8388608,
+      "recordKeyAttempts": 16,
+      "transitionWALBytes": 1048576,
+      "configurationTransitions": 4096
+    },
+    "envelope": {
+      "systemObjects": {
+        "bytes": 1125899906842624,
+        "objects": 1125899906842624
+      },
+      "sqlBytes": 1125899906842624,
+      "backupBytes": 1125899906842624,
+      "walBytes": 1125899906842624,
+      "keyAttempts": 1125899906842624
+    },
+    "backends": [
+      {
+        "storageProfile": "dedicated",
+        "usable": {
+          "bytes": 1125899906842624,
+          "objects": 1000000000
+        }
+      }
+    ],
+    "poolSpec": {
+      "storageProfileRef": "dedicated",
+      "capacity": {
+        "bytes": 137438953472,
+        "objects": 100000
+      },
+      "safetyHeadroom": {
+        "bytes": 17179869184,
+        "objects": 10000
+      },
+      "systemReserve": {
+        "bytes": 8589934592,
+        "objects": 10000
+      },
+      "sharedBurst": {
+        "bytes": 42949672960,
+        "objects": 40000
+      },
+      "protectedAllocations": [
+        {
+          "budgetPolicyRef": "applications",
+          "workloadSlots": 4,
+          "protectedPerWorkload": {
+            "bytes": 17179869184,
+            "objects": 10000
+          }
+        }
+      ],
+      "upload": {
+        "bytesPerSecond": 134217728,
+        "burstBytes": 16777216
+      },
+      "maxUploadRequestsPerSecond": 100,
+      "capacityAssurance": "qualifiedReservedBackend"
+    },
+    "policySpec": {
+      "poolRef": "capacity",
+      "scope": {
+        "namespaceSelector": {
+          "matchLabels": {
+            "team": "applications"
+          }
+        }
+      },
+      "namespaceEnvelope": {
+        "maxWorkloadAccounts": 4,
+        "maxStoredBytes": 111669149696,
+        "maxObjects": 80000
+      },
+      "workload": {
+        "protected": {
+          "bytes": 17179869184,
+          "objects": 10000
+        },
+        "hardLimit": {
+          "bytes": 34359738368,
+          "objects": 20000
+        },
+        "contextReserve": {
+          "bytes": 1073741824,
+          "objects": 1000
+        },
+        "dump": {
+          "burst": 1,
+          "minimumIntervalSeconds": 900,
+          "maxStartsPerRollingHour": 2,
+          "maxInputBytesPerRollingHour": 4294967296
+        },
+        "maxConcurrentExpensive": 1,
+        "maxQueuedExpensive": 1,
+        "maxQueueAgeSeconds": 30,
+        "upload": {
+          "bytesPerSecond": 33554432,
+          "burstBytes": 4194304
+        },
+        "maxUploadRequestsPerSecond": 20,
+        "maxSpoolBytes": 2147483648,
+        "onFull": "RejectNewExpensive"
+      },
+      "node": {
+        "maxConcurrentExpensive": 2,
+        "maxQueuedExpensive": 10,
+        "upload": {
+          "bytesPerSecond": 67108864,
+          "burstBytes": 8388608
+        },
+        "maxSpoolBytes": 4294967296,
+        "impactProfileRef": "standard-node",
+        "unhealthySamples": 3,
+        "sampleIntervalSeconds": 5,
+        "recoveryHealthySeconds": 60
+      }
+    }
+  },
+  "processingOperators": [
+    {
+      "clientID": "console",
+      "issuer": "https://id.example/realms/org",
+      "kind": "Group",
+      "id": "stable-group-id"
+    }
+  ],
+  "federation": {
+    "connectorPKIMount": "connector-pki",
+    "connectorIssuerRootsPEM": "-----BEGIN CERTIFICATE-----\nPUBLIC\n-----END CERTIFICATE-----\n",
+    "endpoint": "https://federation.example:31446",
+    "serverName": "federation.example",
+    "serviceType": "NodePort",
+    "nodePort": 31446,
+    "ownerAddress": "owner.example:31447",
+    "ownerNodePort": 31447,
+    "ownerOperationAddress": "owner.example:31449",
+    "ownerOperationNodePort": 31449,
+    "keyServiceEndpoint": "https://keys.example:31448",
+    "keyServiceNodePort": 31448,
+    "evidenceStore": {
+      "endpoint": "https://store.example",
+      "rootsPEM": "PUBLIC-CA",
+      "region": "region-a",
+      "bucket": "evidence"
+    },
+    "connector": {
+      "accounts": 4,
+      "recordsPerAccount": 256,
+      "retainedSeconds": 15000,
+      "profiles": 2,
+      "sourceTransitions": 64,
+      "purgeLeases": 2,
+      "validSeconds": 7200,
+      "footprint": {
+        "rowBytes": 1048576,
+        "transitionWALBytes": 1048576
+      }
+    },
+    "fleet": {
+      "channelMount": "fleet-kv",
+      "deliveryProfile": "regional-installer"
+    }
+  },
+  "retentionBaseline": {
+    "purposeRef": "trial-context",
+    "defaults": {
+      "evidenceSeconds": 86400,
+      "caseMetadataSeconds": 86400,
+      "auditMetadataSeconds": 86400
+    },
+    "maxima": {
+      "evidenceSeconds": 604800,
+      "caseMetadataSeconds": 604800,
+      "auditMetadataSeconds": 604800
+    },
+    "deletionBudgetSeconds": 3600
+  },
+  "promotion": {
+    "browserAudience": "asservat-api",
+    "providerRootsPEM": "PUBLIC-CA",
+    "transitMount": "public-transit",
+    "workerPKIMount": "worker-pki",
+    "version": "trial",
+    "exposure": {
+      "serviceType": "NodePort",
+      "nodePort": 31450
+    }
+  }
+}

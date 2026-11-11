@@ -60,7 +60,9 @@ func prepareInstallerContinuationNative(t *testing.T, ctx context.Context, api k
 	t.Helper()
 	namespace := desired.BootstrapNamespace
 	providers := initialRuntimeProviderPrerequisites(t, ctx, api, f, desired, desired.Kubernetes, namespace)
-	installerContinuationRBAC(t, ctx, api, namespace, desired.Name+"-bootstrap-runner")
+	if os.Getenv("ASSERVAT_HELM_CONTEXT_NATIVE") != "1" {
+		installerContinuationRBAC(t, ctx, api, namespace, desired.Name+"-bootstrap-runner")
+	}
 	installShippedPermissionCRDs(t, ctx, api)
 	var roots bytes.Buffer
 	for _, der := range providers.issuerRoots {
@@ -111,10 +113,31 @@ func prepareInstallerContinuationNative(t *testing.T, ctx context.Context, api k
 	}
 	approvals := installedIdentityApprovals()
 	var processors []contracts.ProcessingOrganization
+	var eligibleSubjects []contracts.IdentitySubject
+	if os.Getenv("ASSERVAT_HELM_CONTEXT_NATIVE") == "1" {
+		// The chart's public list contract represents no selected subjects as
+		// an empty array. Keep the declared installer bytes exact in this mode.
+		eligibleSubjects = []contracts.IdentitySubject{}
+	}
 	if installedJourneyFocus() == "privacy-inventory" {
 		for _, organization := range reportFixtureProcessors() {
 			processors = append(processors, contracts.ProcessingOrganization{ID: organization.ID, Name: organization.Name, Activities: organization.Activities, Regions: organization.Regions})
 		}
+	}
+	capacity := nativeCapacityProfile()
+	connector := contracts.InstallerConnectorSettings{Accounts: 4, RecordsPerAccount: 256, RetainedSeconds: 15000, Profiles: 2, SourceTransitions: 64, PurgeLeases: 2, ValidSeconds: 7200,
+		Footprint: contracts.InstallerCapacityFootprint{RowBytes: 1 << 20, TransitionWALBytes: 1 << 20}}
+	baseline := &contracts.InstallerRetentionBaseline{PurposeRef: "synthetic-baseline",
+		Defaults:              contracts.InstallerRetentionDurations{EvidenceSeconds: 86400, CaseMetadataSeconds: 86400, AuditMetadataSeconds: 86400},
+		Maxima:                contracts.InstallerRetentionDurations{EvidenceSeconds: 604800, CaseMetadataSeconds: 604800, AuditMetadataSeconds: 604800},
+		DeletionBudgetSeconds: 3600}
+	maxLifetime, maxLogins, maxSessions, maxLogout := 3600, 8*int(installedFundedRuns()), 8*int(installedFundedRuns()), 8*int(installedFundedRuns())
+	var captureHistory *contracts.CaptureHistoryLimits
+	if os.Getenv("ASSERVAT_HELM_CONTEXT_NATIVE") == "1" {
+		trial := helmContextTrialProfile(t).Public
+		capacity, connector, baseline = trial.Capacity, trial.Federation.Connector, trial.RetentionBaseline
+		maxLifetime, maxLogins, maxSessions, maxLogout = trial.MaxLifetimeSeconds, trial.MaxLogins, trial.MaxSessions, trial.MaxLogoutEvents
+		captureHistory, processors = trial.CaptureHistory, trial.Processors
 	}
 	document, _ := json.Marshal(contracts.InstallerContinuation{Format: contracts.InstallerContinuationFormat, Namespace: namespace,
 		WorkerProvider:      contracts.InstallerProviderSelection{AuthMount: providers.worker.AuthMount, AuthMountAccessor: providers.worker.AuthMountAccessor},
@@ -122,10 +145,11 @@ func prepareInstallerContinuationNative(t *testing.T, ctx context.Context, api k
 		OwnerIssuerRootsPEM: roots.String(), OwnerPKIMount: "owner-pki", OwnerConnections: 4, OwnerConcurrency: 2,
 		// ADR-185: synthetic browser identity settings exercise the public sources step.
 		Public: &contracts.InstallerPublicSettings{Origin: origin, Issuer: issuer, ClientID: "console",
-			MaxLifetimeSeconds: 3600, MaxLogins: 8 * int(installedFundedRuns()), MaxSessions: 8 * int(installedFundedRuns()), MaxLogoutEvents: 8 * int(installedFundedRuns()), Clients: clients,
-			EligibleGroups: []string{"synthetic-group", installedUnrelatedGroup}, GroupMaxAgeSeconds: 300, Approvals: approvals,
+			MaxLifetimeSeconds: maxLifetime, MaxLogins: maxLogins, MaxSessions: maxSessions, MaxLogoutEvents: maxLogout, Clients: clients,
+			EligibleSubjects: eligibleSubjects,
+			EligibleGroups:   []string{"synthetic-group", installedUnrelatedGroup}, GroupMaxAgeSeconds: 300, Approvals: approvals,
 			// ADR-190: the operator's synthetic capacity profile and release operator.
-			Capacity: nativeCapacityProfile(),
+			Capacity: capacity, CaptureHistory: captureHistory,
 			// ADR-210: the synthetic group's console users are the processing
 			// operators, so the journey's one user initializes processing.
 			ProcessingOperators: []contracts.ProcessingOperator{{ClientID: "console", Issuer: issuer, Kind: "Group", ID: installedIdentityGroup}},
@@ -140,14 +164,10 @@ func prepareInstallerContinuationNative(t *testing.T, ctx context.Context, api k
 				// ADR-198: the key service on the same node, named by its IP.
 				KeyServiceEndpoint: "https://" + net.JoinHostPort(keyServiceHost, "31448"), KeyServiceNodePort: 31448,
 				EvidenceStore: &contracts.InstallerEvidenceStore{Endpoint: desired.AuditStore.Endpoint, RootsPEM: storeRoots.String(), Region: desired.AuditStore.Region, Bucket: evidenceBucket},
-				Connector: contracts.InstallerConnectorSettings{Accounts: 4, RecordsPerAccount: 256, RetainedSeconds: 15000, Profiles: 2, SourceTransitions: 64, PurgeLeases: 2, ValidSeconds: 7200,
-					Footprint: contracts.InstallerCapacityFootprint{RowBytes: 1 << 20, TransitionWALBytes: 1 << 20}},
-				Fleet: &contracts.InstallerFleetIssuance{ChannelMount: fleetKV, DeliveryProfile: "regional-installer"}},
+				Connector:     connector,
+				Fleet:         &contracts.InstallerFleetIssuance{ChannelMount: fleetKV, DeliveryProfile: "regional-installer"}},
 			// ADR-195: the operator's synthetic baseline retention values.
-			RetentionBaseline: &contracts.InstallerRetentionBaseline{PurposeRef: "synthetic-baseline",
-				Defaults:              contracts.InstallerRetentionDurations{EvidenceSeconds: 86400, CaseMetadataSeconds: 86400, AuditMetadataSeconds: 86400},
-				Maxima:                contracts.InstallerRetentionDurations{EvidenceSeconds: 604800, CaseMetadataSeconds: 604800, AuditMetadataSeconds: 604800},
-				DeletionBudgetSeconds: 3600},
+			RetentionBaseline: baseline,
 			// ADR-194: the promoted launch.
 			Promotion: &contracts.InstallerOwnerPromotion{BrowserAudience: "asservat-api", ProviderRootsPEM: providerRoots,
 				// ADR-202: the public API's NodePort for the installed journey.
@@ -158,7 +178,7 @@ func prepareInstallerContinuationNative(t *testing.T, ctx context.Context, api k
 
 // Complete the actual five-command runner through both operator provider waits,
 // then keep all installed process, SQL, regional and public journey assertions.
-func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *rest.Config, kubeconfig string, api kubernetes.Interface, admin *pgxpool.Pool, f fixture, desired contracts.InitialBootstrap, original contracts.InitialPreparer, unified *installedUnifiedRunner) {
+func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *rest.Config, kubeconfig string, api kubernetes.Interface, admin *pgxpool.Pool, f fixture, desired contracts.InitialBootstrap, original contracts.InitialPreparer, unified *installedUnifiedRunner, regionalPhysicalIndex int) {
 	t.Helper()
 	installation, namespace := original.Plan.InstallationID, desired.BootstrapNamespace
 	setup := unified.continuation
@@ -168,17 +188,17 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 	providers.installation, providers.cluster = installation, original.Plan.ClusterID
 	prefix := "asservat-" + strings.ReplaceAll(installation, "-", "")
 	t.Cleanup(func() { initialRuntimeNativeCleanup(t, api, desired.TargetNamespace, installation, prefix) })
-	// Use the original compiled runner actor for guarded operator prerequisites;
-	// fixture administration is not added to the product administrator list.
-	runnerConfig := installedUnifiedRunnerConfig(kc, desired)
+	// Helm mode retains the original explicitly configured operator identity.
+	// Existing native modes keep their original runner-actor boundary.
+	runnerConfig := installerContinuationOperatorConfig(kc, desired)
 	runnerAPI, err := kubernetes.NewForConfig(runnerConfig)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer installerContinuationLaunchedCleanup(t, api, runnerAPI, desired, prefix)
-	installNativeCapacityObjects(t, ctx, runnerAPI, desired.TargetNamespace, original.Plan.ClusterID)
-	servingCA := installerFederationServingSecret(t, ctx, runnerAPI, desired.TargetNamespace, installation, "federation.synthetic.invalid")
-	keyServingCA := installerServingSecret(t, ctx, runnerAPI, desired.TargetNamespace, contracts.KeyServiceServingSecretName(installation), setup.keyServiceHost)
+	// External operator TLS material goes through the actual phase-3 inbox;
+	// final capacity objects and serving Secrets are produced by the installer.
+	var servingCA, keyServingCA []byte
 	var publicRoot []byte // DER of the public listener's synthetic CA
 	// The interruption/resume qualifies the installer itself; the fast feature
 	// fixture continues the original runner through its provider waits.
@@ -202,9 +222,9 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 	limit, stop := context.WithTimeout(ctx, 25*time.Minute)
 	defer stop()
 	for {
-		current, e := api.CoreV1().Pods(namespace).Get(limit, pod.Name, meta.GetOptions{})
-		if e != nil || current.UID != pod.UID {
-			t.Fatal("continuation Pod lost or replaced", e)
+		current := unified.current(t, limit, api)
+		if current.UID != pod.UID {
+			t.Fatal("continuation Pod replaced")
 		}
 		if current.Status.Phase == core.PodFailed {
 			installedProcessDiagnostics(t, ctx, api, desired.TargetNamespace, prefix+"-worker", prefix+"-owner")
@@ -242,7 +262,8 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 					Bucket   string   `json:"bucket"`
 					Prefixes []string `json:"prefixes"`
 				} `json:"evidenceDeleteStorage"`
-				Public bool `json:"public"`
+				Public     bool                              `json:"public"`
+				ServingTLS contracts.InstallerServingTLSPlan `json:"servingTLS"`
 			}
 			if json.Unmarshal(outbox.Recipe, &artifact) != nil {
 				t.Fatal("outbox artifact unreadable")
@@ -322,6 +343,15 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 				}
 				args = append(args, "--oidc-client-secret", filepath.Join(work, "oidc-client-secret"), "--public-tls-certificate", filepath.Join(work, "public-tls.crt"), "--public-tls-key", filepath.Join(work, "public-tls.key"))
 			}
+			if outbox.Phase == 3 {
+				want := contracts.InstallerServingTLSPlan{FederationServerName: "federation.synthetic.invalid", KeyServiceServerName: setup.keyServiceHost}
+				if artifact.ServingTLS != want {
+					t.Fatal("provider recipe changed the original serving hostnames", artifact.ServingTLS)
+				}
+				var tlsArgs []string
+				tlsArgs, servingCA, keyServingCA = installerOperatorServingTLSArgs(t, work, artifact.ServingTLS)
+				args = append(args, tlsArgs...)
+			}
 			var out bytes.Buffer
 			if e = bootstrap.RunInstallerProviderApply(limit, args, &out); e != nil {
 				t.Fatal("actual applier", outbox.Phase, e, out.String())
@@ -338,6 +368,7 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 	if !applied[1] || !applied[3] || len(applied) != 2 {
 		t.Fatal("continuation finished without both provider waits", applied)
 	}
+	unified.completeHelm(t, ctx, api)
 	if _, err = api.CoreV1().Secrets(namespace).Get(ctx, contracts.InstallerInboxName(installation), meta.GetOptions{}); err == nil {
 		t.Fatal("consumed inbox retained")
 	}
@@ -517,8 +548,10 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 	// The first installed S-02 slice runs once the regional workload holds a
 	// fresh binding; it reads the public root generated during provider apply.
 	publicAddress := net.JoinHostPort(nodeInternalIP(t, ctx, api, f.Clusters[0].NodeUID), "31450")
-	if installedJourneyFocus() == "chain" || installedJourneyFocus() == "" {
-		qualifyInstalledFleetIssuance(t, ctx, admin, identity, publicRoot, publicAddress, origin, installation, "fleet-kv-"+desired.BootstrapNamespace, providers)
+	var issuedRecord []byte
+	if installedJourneyFocus() == "chain" || installedJourneyFocus() == "" || os.Getenv("ASSERVAT_HELM_CONTEXT_NATIVE") == "1" {
+		issuedRecord = qualifyInstalledFleetIssuance(t, ctx, admin, identity, publicRoot, publicAddress, origin, installation, "fleet-kv-"+desired.BootstrapNamespace, providers)
+		defer clear(issuedRecord)
 	}
 	// runFocus runs the current focus; journey runs every listed focus, each
 	// as its own subtest when there are several (installedRunFoci).
@@ -551,25 +584,25 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 		}
 		if installedLogsFocus() {
 			t.Run("manual-logs", func(t *testing.T) {
-				qualifyInstalledManualLogs(t, ctx, admin, api, p.RootID, identity, publicRoot, publicAddress, origin, f.Clusters[1].Config, cluster, namespace, workload, diagnose)
+				qualifyInstalledManualLogs(t, ctx, admin, api, p.RootID, identity, publicRoot, publicAddress, origin, f.Clusters[regionalPhysicalIndex].Config, cluster, namespace, workload, diagnose)
 			})
 			return
 		}
 		if installedJourneyFocus() == "policy-profile" {
 			t.Run("policy-profile", func(t *testing.T) {
-				qualifyInstalledPolicyProfile(t, ctx, admin, p.RootID, identity, publicRoot, publicAddress, origin, f.Clusters[1].Config, diagnose)
+				qualifyInstalledPolicyProfile(t, ctx, admin, p.RootID, identity, publicRoot, publicAddress, origin, f.Clusters[regionalPhysicalIndex].Config, diagnose)
 			})
 			return
 		}
 		if installedJourneyFocus() == "policy-arguments" {
 			t.Run("policy-arguments", func(t *testing.T) {
-				qualifyInstalledPolicyArguments(t, ctx, admin, p.RootID, identity, publicRoot, publicAddress, origin, f.Clusters[1].Config, diagnose)
+				qualifyInstalledPolicyArguments(t, ctx, admin, p.RootID, identity, publicRoot, publicAddress, origin, f.Clusters[regionalPhysicalIndex].Config, diagnose)
 			})
 			return
 		}
 		if installedJourneyFocus() == "policy-recording" {
 			t.Run("policy-recording", func(t *testing.T) {
-				qualifyInstalledPolicyRecording(t, ctx, admin, p.RootID, identity, publicRoot, publicAddress, origin, f.Clusters[1].Config, diagnose)
+				qualifyInstalledPolicyRecording(t, ctx, admin, p.RootID, identity, publicRoot, publicAddress, origin, f.Clusters[regionalPhysicalIndex].Config, diagnose)
 			})
 			return
 		}
@@ -586,7 +619,7 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 				if err != nil {
 					t.Fatal(err)
 				}
-				qualifyInstalledLiveObservation(t, ctx, installedLiveRun{SQL: admin, API: api, Administrator: administrator, AdministratorUser: administratorUser, RootID: p.RootID, Installation: installation, HubNamespace: desired.TargetNamespace, OwnerDeployment: prefix + "-owner", Identity: identity, PublicRoot: publicRoot, Address: publicAddress, Origin: origin, RegionalConfig: f.Clusters[1].Config, ClusterID: cluster, Namespace: namespace, Workload: workload, Diagnose: diagnose})
+				qualifyInstalledLiveObservation(t, ctx, installedLiveRun{SQL: admin, API: api, Administrator: administrator, AdministratorUser: administratorUser, RootID: p.RootID, Installation: installation, HubNamespace: desired.TargetNamespace, OwnerDeployment: prefix + "-owner", Identity: identity, PublicRoot: publicRoot, Address: publicAddress, Origin: origin, RegionalConfig: f.Clusters[regionalPhysicalIndex].Config, ClusterID: cluster, Namespace: namespace, Workload: workload, Diagnose: diagnose})
 			})
 			return
 		}
@@ -643,7 +676,7 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 					}()
 					var sources []installedProfileComparisonSource
 					for index := 0; index < 2; index++ {
-						qualifyInstalledApprovedRecording(t, ctx, identity, publicRoot, publicAddress, origin, cluster, namespace, workload, f.Clusters[1].Config, diagnose, nil, func(captureID string) { installedHistoryStorageDiagnostics(t, ctx, admin, p.RootID, captureID) }, func(previewID string) { installedInitialStorageDiagnostics(t, ctx, admin, p.RootID, previewID) }, nil, nil, nil, nil, installedStoppedDownloadSQLCheck(t, ctx, admin, kc, p.RootID, original.Plan.ClusterID), installedProfileCaptureContinuation{InitializeProcessing: index == 0, Captured: func(transport http.RoundTripper, source installedProfileComparisonSource) {
+						qualifyInstalledApprovedRecording(t, ctx, identity, publicRoot, publicAddress, origin, cluster, namespace, workload, f.Clusters[regionalPhysicalIndex].Config, diagnose, nil, func(captureID string) { installedHistoryStorageDiagnostics(t, ctx, admin, p.RootID, captureID) }, func(previewID string) { installedInitialStorageDiagnostics(t, ctx, admin, p.RootID, previewID) }, nil, nil, nil, nil, installedStoppedDownloadSQLCheck(t, ctx, admin, kc, p.RootID, original.Plan.ClusterID), installedProfileCaptureContinuation{InitializeProcessing: index == 0, Captured: func(transport http.RoundTripper, source installedProfileComparisonSource) {
 							if installedAcceptedHeavyComparison() {
 								if err := acceptedHeavySourceMatches(f.ProfileContainment, index, source.Native); err != nil {
 									t.Fatal("accepted-heavy original downloaded source", err)
@@ -704,7 +737,7 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 							return check(artifactID)
 						}
 					}
-					qualifyInstalledApprovedRecording(t, ctx, identity, publicRoot, publicAddress, origin, cluster, namespace, workload, f.Clusters[1].Config, diagnose, measurement, func(captureID string) { installedHistoryStorageDiagnostics(t, ctx, admin, p.RootID, captureID) }, func(previewID string) { installedInitialStorageDiagnostics(t, ctx, admin, p.RootID, previewID) }, summaryCheck, packetQueryCheck, packetDrain, installedArgumentsSQLSource(t, ctx, admin, p.RootID), installedStoppedDownloadSQLCheck(t, ctx, admin, kc, p.RootID, original.Plan.ClusterID), profileChecks...)
+					qualifyInstalledApprovedRecording(t, ctx, identity, publicRoot, publicAddress, origin, cluster, namespace, workload, f.Clusters[regionalPhysicalIndex].Config, diagnose, measurement, func(captureID string) { installedHistoryStorageDiagnostics(t, ctx, admin, p.RootID, captureID) }, func(previewID string) { installedInitialStorageDiagnostics(t, ctx, admin, p.RootID, previewID) }, summaryCheck, packetQueryCheck, packetDrain, installedArgumentsSQLSource(t, ctx, admin, p.RootID), installedStoppedDownloadSQLCheck(t, ctx, admin, kc, p.RootID, original.Plan.ClusterID), profileChecks...)
 					for _, retired := range packetQueryRetirements {
 						retired()
 					}
@@ -809,8 +842,15 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 		}
 		installedRunFoci(t, ctx, iso, func(t *testing.T) { runFocus(t, cluster, namespace, workload, deny, gone) })
 	}
-	hubKubeconfig := installedUnifiedRunnerKubeconfig(t, f.Clusters[0].Config, desired)
-	qualifyRegionalInstall(t, ctx, f, 1, admin, runnerAPI, api, hubKubeconfig, desired.TargetNamespace, issuer, journey, providers, offerMap.Data[contracts.RegionalOfferFile], installation)
+	hubKubeconfig := f.Clusters[0].Config
+	if os.Getenv("ASSERVAT_HELM_CONTEXT_NATIVE") != "1" {
+		hubKubeconfig = installedUnifiedRunnerKubeconfig(t, hubKubeconfig, desired)
+	}
+	var regionalRecord []byte
+	if os.Getenv("ASSERVAT_HELM_CONTEXT_NATIVE") == "1" {
+		regionalRecord = issuedRecord
+	}
+	qualifyRegionalInstall(t, ctx, f, 1, regionalPhysicalIndex, admin, runnerAPI, api, hubKubeconfig, desired.TargetNamespace, issuer, journey, providers, offerMap.Data[contracts.RegionalOfferFile], installation, regionalRecord)
 	if focus := installedJourneyFocus(); focus == "restart" || focus == "journey" || focus == "browser" || focus == "upgrade" || focus == "policy" || focus == "alert" || focus == "logresource" || focus == "chain" || focus == "share" || focus == "journey-store-failure" || focus == "journey-start-failure" || focus == "retention-shortening" || focus == "early-erasure" || focus == "processing-workload" || focus == "privacy-inventory" || installedRecordingFocus() || installedLogsFocus() {
 		t.Log("focused " + focus + " run complete: the second workload cluster and replay checks were not run")
 		return
@@ -822,7 +862,7 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 	short := func(cluster, namespace, workload string, _ func(bool), _ func(string)) {
 		journey(cluster, namespace, workload, nil, nil)
 	}
-	qualifyRegionalInstall(t, ctx, f, 2, admin, runnerAPI, api, hubKubeconfig, desired.TargetNamespace, issuer, short, providers, offerMap.Data[contracts.RegionalOfferFile], installation)
+	qualifyRegionalInstall(t, ctx, f, 2, 2, admin, runnerAPI, api, hubKubeconfig, desired.TargetNamespace, issuer, short, providers, offerMap.Data[contracts.RegionalOfferFile], installation, nil)
 	// After the guard bridge, the same five-command profile replays (as on
 	// upgrade), finds the installation complete and preserves guard/journal state.
 	guard, err := api.AdmissionregistrationV1().ValidatingAdmissionPolicies().Get(ctx, original.Plan.Workload.WorkloadGuard, meta.GetOptions{})
@@ -1090,13 +1130,28 @@ func installerContinuationLogs(t *testing.T, api kubernetes.Interface, pod *core
 	}
 }
 
-// installShippedPermissionCRDs installs the chart's own AccessBinding and
-// PermissionSource CRDs, as Helm does from crds/ (ADR-189), and waits until
-// both are established.
+// Install the legacy permission subset, or the entire canonical chart CRD
+// bundle for the actual Helm operator flow, and wait for every entry to be
+// established before the runner starts with --skip-crds.
 func installShippedPermissionCRDs(t *testing.T, ctx context.Context, api kubernetes.Interface) {
 	t.Helper()
 	client := api.CoreV1().RESTClient()
-	for _, file := range []string{"accessbindings.yaml", "permissionsources.yaml", "evidencestoragepools.yaml", "evidencebudgetpolicies.yaml", "evidenceretentionpolicies.yaml", "debugpolicies.yaml"} {
+	files := []string{"accessbindings.yaml", "permissionsources.yaml", "evidencestoragepools.yaml", "evidencebudgetpolicies.yaml", "evidenceretentionpolicies.yaml", "debugpolicies.yaml"}
+	if os.Getenv("ASSERVAT_HELM_CONTEXT_NATIVE") == "1" {
+		// Match the guide's full canonical operator prerequisite, once, before
+		// Helm runs with --skip-crds. The inventory remains on this real API.
+		entries, err := os.ReadDir("../../charts/asservat/crds")
+		if err != nil {
+			t.Fatal("shipped chart CRD bundle", err)
+		}
+		files = nil
+		for _, entry := range entries {
+			if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".yaml") {
+				files = append(files, entry.Name())
+			}
+		}
+	}
+	for _, file := range files {
 		data, err := os.ReadFile("../../charts/asservat/crds/" + file)
 		if err != nil {
 			t.Fatal(err)
@@ -1170,7 +1225,8 @@ func nativeCapacityProfile() *contracts.InstallerCapacitySettings {
 		r, n := installedFocusCapacityRecords()
 		records, normal = records+r, normal+n
 	})
-	return &contracts.InstallerCapacitySettings{Pool: "capacity", Policy: "applications", NamespaceKeys: []string{"team"}, Accounts: 16, Records: records, AdmissionSeconds: 86400,
+	poolSpec, policySpec := installerDeclaredCapacitySpecs()
+	return &contracts.InstallerCapacitySettings{Pool: "capacity", Policy: "applications", PoolSpec: poolSpec, PolicySpec: policySpec, NamespaceKeys: []string{"team"}, Accounts: 16, Records: records, AdmissionSeconds: 86400,
 		Lanes:               contracts.InstallerCapacityLanes{CaptureRetainedSeconds: 10000, Normal: lane(4, normal*installedKeptRuns()), Resolution: lane(4, 8*installedFundedRuns()), Processing: lane(2, 16)},
 		StopRetainedSeconds: 10000,
 		Backup:              contracts.InstallerCapacityBackup{HorizonSeconds: 3600, CleanupBudgetSeconds: 60, ProofWindowSeconds: 60, BackupCopies: 2, WALCopies: 3},
@@ -1222,36 +1278,6 @@ func installedFocusCapacityRecords() (records, normal int64) {
 	return records, normal
 }
 
-// installNativeCapacityObjects creates the operator's pool and budget policy
-// in the hub namespace, as the chart renders them from values (ADR-190).
-func installNativeCapacityObjects(t *testing.T, ctx context.Context, api kubernetes.Interface, namespace, cluster string) {
-	t.Helper()
-	client := api.CoreV1().RESTClient()
-	amount := func(bytes, objects int64) map[string]int64 {
-		return map[string]int64{"bytes": bytes, "objects": objects}
-	}
-	upload := map[string]int64{"bytesPerSecond": 134217728, "burstBytes": 16777216}
-	systemObjects, burstObjects := installedCapacityObjectPartitions()
-	capacityObjects := installedPoolCapacityObjects()
-	pool := map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "EvidenceStoragePool", "metadata": map[string]any{"name": "capacity"}, "spec": map[string]any{
-		"storageProfileRef": "dedicated", "capacity": amount(137438953472, capacityObjects), "safetyHeadroom": amount(17179869184, 10000), "systemReserve": amount(8589934592, systemObjects), "sharedBurst": amount(42949672960, burstObjects),
-		"protectedAllocations": []any{map[string]any{"budgetPolicyRef": "applications", "workloadSlots": 4, "protectedPerWorkload": amount(17179869184, 10000)}},
-		"upload":               upload, "maxUploadRequestsPerSecond": 100, "capacityAssurance": "qualifiedReservedBackend"}}
-	policy := map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "EvidenceBudgetPolicy", "metadata": map[string]any{"name": "applications"}, "spec": map[string]any{
-		"poolRef": "capacity", "scope": map[string]any{"clusterID": cluster, "namespaceSelector": map[string]any{"matchLabels": map[string]string{"team": "applications"}}},
-		"namespaceEnvelope": map[string]int64{"maxWorkloadAccounts": 4, "maxStoredBytes": 111669149696, "maxObjects": 80000},
-		"workload": map[string]any{"protected": amount(17179869184, 10000), "hardLimit": amount(34359738368, 20000), "contextReserve": amount(1073741824, 1000),
-			"dump":                   map[string]int64{"burst": 1, "minimumIntervalSeconds": 900, "maxStartsPerRollingHour": 2, "maxInputBytesPerRollingHour": 4294967296},
-			"maxConcurrentExpensive": 1, "maxQueuedExpensive": 1, "maxQueueAgeSeconds": 30, "upload": map[string]int64{"bytesPerSecond": 33554432, "burstBytes": 4194304}, "maxUploadRequestsPerSecond": 20, "maxSpoolBytes": 2147483648, "onFull": "RejectNewExpensive"},
-		"node": map[string]any{"maxConcurrentExpensive": 2, "maxQueuedExpensive": 10, "upload": map[string]int64{"bytesPerSecond": 67108864, "burstBytes": 8388608}, "maxSpoolBytes": 4294967296, "impactProfileRef": "standard-node", "unhealthySamples": 3, "sampleIntervalSeconds": 5, "recoveryHealthySeconds": 60}}}
-	for plural, object := range map[string]map[string]any{"evidencestoragepools": pool, "evidencebudgetpolicies": policy} {
-		body, _ := json.Marshal(object)
-		if err := client.Post().AbsPath("/apis/asservat.io/v1alpha1/namespaces/" + namespace + "/" + plural).Body(body).Do(ctx).Error(); err != nil {
-			t.Fatal("operator capacity object", plural, err)
-		}
-	}
-}
-
 // installedProcessDiagnostics logs each named Deployment's Pod restarts, last
 // termination and log tails. The products print fixed step names and error
 // classes only, never projected file contents.
@@ -1298,25 +1324,6 @@ func installedPodDiagnostics(t *testing.T, c context.Context, api kubernetes.Int
 			}
 		}
 	}
-}
-
-// installerFederationServingSecret creates the operator's synthetic federation
-// TLS Secret (a self-signed CA and a serverAuth leaf for serverName) and
-// returns the CA certificate.
-func installerFederationServingSecret(t *testing.T, ctx context.Context, api kubernetes.Interface, namespace, installation, serverName string) []byte {
-	t.Helper()
-	return installerServingSecret(t, ctx, api, namespace, contracts.FederationServingSecretName(installation), serverName)
-}
-
-func installerServingSecret(t *testing.T, ctx context.Context, api kubernetes.Interface, namespace, name, serverName string) []byte {
-	t.Helper()
-	caDER, certPEM, keyPEM := syntheticServingPair(t, serverName)
-	secret := &core.Secret{ObjectMeta: meta.ObjectMeta{Name: name}, Type: core.SecretTypeTLS, Data: map[string][]byte{
-		"tls.crt": certPEM, "tls.key": keyPEM, "ca.crt": pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: caDER})}}
-	if _, err := api.CoreV1().Secrets(namespace).Create(ctx, secret, meta.CreateOptions{}); err != nil {
-		t.Fatal("serving Secret", name, err)
-	}
-	return caDER
 }
 
 // syntheticServingPair is a synthetic CA and one server leaf for serverName.

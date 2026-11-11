@@ -219,3 +219,26 @@ func TestConnectorActivatedReplayAfterAuditWriteDeadline(t *testing.T) {
 		})
 	}
 }
+
+func TestConnectorProcessEnrollmentReportsFailedPaidStageWithoutProviderText(t *testing.T) {
+	for _, tc := range []struct {
+		name, step string
+		mutate     func(*connectorProcessFixture)
+	}{
+		{"intent", "intent-audit", func(f *connectorProcessFixture) { f.failBegin = true }},
+		{"outcome", "outcome-audit", func(f *connectorProcessFixture) { f.failFinish = true }},
+		{"accepted-unknown", "activate", func(f *connectorProcessFixture) { f.loseProcessAccept = true }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f, s, _ := newConnectorProcessFixture(t)
+			tc.mutate(f)
+			_, err := s.Enroll(context.Background(), f.connectorRenewalFixture.request.ID, f.request)
+			if !errors.Is(err, value.ErrUnavailable) || ConnectorEnrollmentStep(err) != tc.step {
+				t.Fatalf("failed stage/class: %s/%v", ConnectorEnrollmentStep(err), err)
+			}
+			if tc.name == "accepted-unknown" && (f.admission == nil || !f.admission.Activated || f.processAccepts != 1) {
+				t.Fatal("diagnostic lost the original accepted effect")
+			}
+		})
+	}
+}

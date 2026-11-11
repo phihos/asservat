@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"io"
 	"net"
 	"net/http"
@@ -18,6 +19,7 @@ import (
 	"testing"
 	"time"
 
+	wire "asservat.local/asservat/api/v1alpha1"
 	"asservat.local/asservat/internal/adapters/kms"
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/adapters/objectstore"
@@ -32,6 +34,7 @@ import (
 	"asservat.local/asservat/internal/domain/identity"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	apps "k8s.io/api/apps/v1"
 	authn "k8s.io/api/authentication/v1"
@@ -47,14 +50,14 @@ import (
 
 // qualifyRegionalInstall is ADR-193 step 5 on top of the installed hub: a
 // product BootstrapIssuer slot, the operator's read of the KV record, then
-// `installer-cluster` against owned workload cluster f.Clusters[index]
-// (index 1 or 2; Clusters[0] is the hub). Both leaves must
+// `installer-cluster` against its preselected original physical API. Logical
+// index 1 may share the hub API; the descriptor is never aliased. Both leaves must
 // activate, a Pod restart is readmitted, a rerun is idempotent and a
 // non-administrator source write is denied. The issuance logins are the
 // product fleet-bootstrap purposes the continuation provisioned; only the
 // fleet operator authority is fixture setup. Hub operations use the accepted
 // runner; the original observer retains diagnostic log access only.
-func qualifyRegionalInstall(t *testing.T, ctx context.Context, f fixture, index int, admin *pgxpool.Pool, hub, hubObserver kubernetes.Interface, hubKubeconfig, namespace, issuer string, journey func(cluster, namespace, workload string, deny func(bool), gone func(string)), providers *initialRuntimeNativeProviders, offerJSON string, installation string) {
+func qualifyRegionalInstall(t *testing.T, ctx context.Context, f fixture, index, physicalIndex int, admin *pgxpool.Pool, hub, hubObserver kubernetes.Interface, hubKubeconfig, namespace, issuer string, journey func(cluster, namespace, workload string, deny func(bool), gone func(string)), providers *initialRuntimeNativeProviders, offerJSON string, installation string, issuedRecord []byte) {
 	t.Helper()
 	var offer contracts.RegionalOffer
 	if json.Unmarshal([]byte(offerJSON), &offer) != nil {
@@ -64,7 +67,11 @@ func qualifyRegionalInstall(t *testing.T, ctx context.Context, f fixture, index 
 	if err != nil {
 		t.Fatal("partial executor offer", err)
 	}
-	config, err := clientcmd.BuildConfigFromFlags("", f.Clusters[index].Config)
+	if physicalIndex < 0 || physicalIndex >= len(f.Clusters) {
+		t.Fatal("original regional physical API unavailable")
+	}
+	regionalKubeconfig := f.Clusters[physicalIndex].Config
+	config, err := clientcmd.BuildConfigFromFlags("", regionalKubeconfig)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,20 +79,28 @@ func qualifyRegionalInstall(t *testing.T, ctx context.Context, f fixture, index 
 	if err != nil {
 		t.Fatal(err)
 	}
-	if executor {
+	if executor && physicalIndex != 0 {
 		// Match the chart/operator prerequisite in each workload cluster,
 		// before issuing the short-lived bootstrap. The product installer
 		// reads discovery only and never installs or adopts a shared CRD.
 		installRegionalStartCRD(t, ctx, region)
 	}
-	record := issueInstalledBootstrap(t, ctx, admin, hub, namespace, providers, installation, index)
+	var record []byte
+	if os.Getenv("ASSERVAT_HELM_CONTEXT_NATIVE") == "1" {
+		if index != 1 || len(issuedRecord) == 0 {
+			t.Fatal("Helm context trial requires its one original browser-issued bootstrap")
+		}
+		record = bytes.Clone(issuedRecord)
+	} else {
+		record = issueInstalledBootstrap(t, ctx, admin, hub, namespace, providers, installation, index)
+	}
 	dir := t.TempDir()
 	offerFile, recordFile := filepath.Join(dir, "regional-offer.json"), filepath.Join(dir, "bootstrap.json")
 	if os.WriteFile(offerFile, []byte(offerJSON), 0o600) != nil || os.WriteFile(recordFile, record, 0o600) != nil {
 		t.Fatal("operator files")
 	}
 	clear(record)
-	args := []string{"--kubeconfig", f.Clusters[index].Config, "--offer", offerFile, "--bootstrap", recordFile, "--namespace", "asservat-connector"}
+	args := []string{"--kubeconfig", regionalKubeconfig, "--offer", offerFile, "--bootstrap", recordFile, "--namespace", "asservat-connector"}
 	envelope, err := kms.DecodeBootstrapRecord(mustRead(t, recordFile))
 	if err != nil {
 		t.Fatal(err)
@@ -165,11 +180,12 @@ func qualifyRegionalInstall(t *testing.T, ctx context.Context, f fixture, index 
 		t.Fatal("installer-cluster result")
 	}
 	if executor && installedRecordingFocus() && index == 1 {
-		installApprovedRecordingCollector(t, ctx, region, f.Clusters[index].Config, f.CollectorImage, installation, envelope.Binding.ClusterID, installed.Namespace.Name)
+		installApprovedRecordingCollector(t, ctx, region, regionalKubeconfig, f.CollectorImage, installation, envelope.Binding.ClusterID, installed.Namespace.Name)
 	}
 	peer := envelope.Binding.PeerID
 	waitActive := func(except string) string {
 		t.Helper()
+		diagnoseAt, diagnosed := time.Now().Add(30*time.Second), false
 		for until := time.Now().Add(3 * time.Minute); time.Now().Before(until); time.Sleep(installedPoll) {
 			var pod string
 			e := admin.QueryRow(ctx, `SELECT p.pod_uid::text FROM connector_identity_process p WHERE p.root_id=$1 AND p.peer_id=$2 AND p.accepted_at IS NOT NULL AND p.pod_uid::text<>$3
@@ -178,8 +194,13 @@ func qualifyRegionalInstall(t *testing.T, ctx context.Context, f fixture, index 
 			if e == nil {
 				return pod
 			}
+			if !diagnosed && time.Now().After(diagnoseAt) {
+				regionalEnrollmentDiagnostics(t, ctx, admin, installation, envelope.BootstrapID, offer.PermissionRootID, peer)
+				diagnosed = true
+			}
 		}
 		regionalLogs(t, ctx, region)
+		regionalEnrollmentDiagnostics(t, ctx, admin, installation, envelope.BootstrapID, offer.PermissionRootID, peer)
 		t.Fatal("regional connector not enrolled with both leaves")
 		return ""
 	}
@@ -189,8 +210,14 @@ func qualifyRegionalInstall(t *testing.T, ctx context.Context, f fixture, index 
 		qualifyRegionalExecutor(t, ctx, admin, region, offer, installed, peer)
 		qualifyRegionalJoin(t, ctx, hub, hubObserver, hubKubeconfig, namespace, installation, *installed.Join, index)
 		if offer.Capacity != nil {
-			qualifyRegionalCapacity(t, ctx, admin, hub, hubObserver, region, namespace, issuer, journey, installation, offer, installed, index, existing, f.ProfileTLSDirectory)
+			qualifyRegionalCapacity(t, ctx, admin, hub, hubObserver, region, namespace, issuer, journey, installation, offer, installed, index, existing, f.ProfileTLSDirectory, physicalIndex == 0)
 		}
+	}
+	if physicalIndex == 0 {
+		if existing == nil {
+			t.Fatal("same-api trial did not retain its originally created workload")
+		}
+		assertUnusedRegionalAPI(t, ctx, f, installed.Namespace.Name, existing.workload.ns.Name)
 	}
 	if !installedRegionalInstallerChecks(index) {
 		// The rerun, restarted-connector readmission and source-write denial
@@ -228,6 +255,84 @@ func qualifyRegionalInstall(t *testing.T, ctx context.Context, f fixture, index 
 		t.Fatal("non-administrator source write not denied", err)
 	}
 	t.Log("non-administrator source write denied by the source guard")
+}
+
+// One read-only snapshot of this exact bootstrap/peer names the last durable
+// checkpoint. Only fixed labels, booleans and counts leave SQL: never records,
+// identifiers, credentials, certificate bytes, payload digests or raw errors.
+func regionalEnrollmentDiagnostics(t *testing.T, ctx context.Context, admin *pgxpool.Pool, installation, bootstrap, root, peer string) {
+	t.Helper()
+	call, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	var state []byte
+	err := admin.QueryRow(call, `WITH
+ intent AS (SELECT issued_at,credential_recorded_at,audit_acknowledged_at FROM fleet_bootstrap_intent WHERE installation_id=$1 AND id=$2),
+ slot AS (SELECT revoked,not_before,not_after,claimed_at,claim_acknowledged_at FROM fleet_bootstrap WHERE installation_id=$1 AND id=$2),
+ activation AS (SELECT lineage_id,audit_acknowledged_at,activated_at FROM cluster_bootstrap_activation WHERE installation_id=$1 AND bootstrap_id=$2),
+ profile AS (SELECT accepted_id,suspended,fenced,blocked FROM connector_identity_profile WHERE root_id=$3 AND peer_id=$4),
+ processes AS (SELECT id,accepted_at,serving,retired_at,run_until FROM connector_identity_process WHERE root_id=$3 AND peer_id=$4),
+ leaves AS (SELECT usage,provider_started,issued IS NOT NULL AS certificate_issued,activated_at,detached_at,certificate_not_after FROM connector_credential_attempt WHERE root_id=$3 AND peer_id=$4),
+ checkpoints AS (SELECT
+  EXISTS(SELECT 1 FROM intent) AS intent_present,
+  EXISTS(SELECT 1 FROM intent WHERE credential_recorded_at IS NOT NULL) AS credential_recorded,
+  EXISTS(SELECT 1 FROM intent WHERE audit_acknowledged_at IS NOT NULL) AS issue_audited,
+  EXISTS(SELECT 1 FROM intent WHERE issued_at IS NOT NULL) AS issued,
+  EXISTS(SELECT 1 FROM slot) AS slot_present,
+  EXISTS(SELECT 1 FROM slot WHERE revoked) AS revoked,
+  EXISTS(SELECT 1 FROM slot WHERE clock_timestamp()>=not_before AND clock_timestamp()<not_after) AS original_slot_current,
+  EXISTS(SELECT 1 FROM slot WHERE claimed_at IS NOT NULL) AS claimed,
+  EXISTS(SELECT 1 FROM slot WHERE claim_acknowledged_at IS NOT NULL) AS claim_audited,
+  EXISTS(SELECT 1 FROM activation) AS activation_reserved,
+  EXISTS(SELECT 1 FROM activation WHERE audit_acknowledged_at IS NOT NULL) AS activation_audited,
+  EXISTS(SELECT 1 FROM activation WHERE activated_at IS NOT NULL) AS activated,
+  EXISTS(SELECT 1 FROM profile) AS profile_present,
+  EXISTS(SELECT 1 FROM profile WHERE accepted_id IS NOT NULL AND NOT suspended AND NOT fenced AND NOT blocked) AS profile_accepted,
+  EXISTS(SELECT 1 FROM processes WHERE accepted_at IS NOT NULL AND retired_at IS NULL AND clock_timestamp()<run_until) AS process_accepted,
+  EXISTS(SELECT 1 FROM leaves WHERE usage='client' AND activated_at IS NOT NULL AND detached_at IS NULL AND clock_timestamp()<certificate_not_after) AS client_leaf_active,
+  EXISTS(SELECT 1 FROM leaves WHERE usage='server' AND activated_at IS NOT NULL AND detached_at IS NULL AND clock_timestamp()<certificate_not_after) AS server_leaf_active)
+ SELECT jsonb_build_object(
+  'stage',CASE WHEN NOT slot_present THEN 'issued-slot-missing'
+   WHEN NOT issued THEN 'issue-pending' WHEN revoked THEN 'bootstrap-revoked'
+   WHEN NOT claimed THEN 'bootstrap-unclaimed' WHEN NOT claim_audited THEN 'claim-audit-pending'
+   WHEN NOT activation_reserved THEN 'activation-reservation-missing'
+   WHEN NOT activation_audited THEN 'activation-audit-pending' WHEN NOT activated THEN 'activation-pending'
+   WHEN NOT profile_accepted THEN 'profile-acceptance-pending' WHEN NOT process_accepted THEN 'process-admission-pending'
+   WHEN NOT client_leaf_active THEN 'client-leaf-pending' WHEN NOT server_leaf_active THEN 'server-leaf-pending'
+   ELSE 'paired-process-not-observed' END,
+  'intent_present',intent_present,'credential_recorded',credential_recorded,'issue_audited',issue_audited,'issued',issued,
+  'slot_present',slot_present,'revoked',revoked,'original_slot_current',original_slot_current,'claimed',claimed,'claim_audited',claim_audited,
+  'activation_reserved',activation_reserved,'activation_audited',activation_audited,'activated',activated,
+  'fleet_trust_current',EXISTS(SELECT 1 FROM fleet_current_trust WHERE installation_id=$1 AND NOT suspended AND NOT recovery_blocked AND clock_timestamp()<fresh_until),
+  'registered_peer',EXISTS(SELECT 1 FROM fleet_peer WHERE installation_id=$1 AND peer_id=$4 AND enabled),
+  'profile_present',profile_present,'profile_accepted',profile_accepted,
+  'profile_suspended',EXISTS(SELECT 1 FROM profile WHERE suspended),
+  'profile_fenced',EXISTS(SELECT 1 FROM profile WHERE fenced),'profile_blocked',EXISTS(SELECT 1 FROM profile WHERE blocked),
+  'source_capacity',(SELECT jsonb_build_object('root_present',true,'root_current',clock_timestamp()<valid_until,
+    'profiles',profiles,'profile_limit',profile_limit,'source_transitions',source_transitions,
+    'source_transition_limit',source_transition_limit,'backing_pending',pending_id IS NOT NULL)
+    FROM connector_identity_root WHERE root_id=$3),
+  'lineage_present',EXISTS(SELECT 1 FROM activation a JOIN cluster_enrollment_lineage l USING(lineage_id)),
+  'lineage_fenced',EXISTS(SELECT 1 FROM activation a JOIN cluster_enrollment_lineage l USING(lineage_id) WHERE l.fenced IS NOT NULL),
+  'generation_one_present',EXISTS(SELECT 1 FROM activation a JOIN cluster_enrollment_credential c USING(lineage_id) WHERE c.generation=1),
+  'generation_one_used',EXISTS(SELECT 1 FROM activation a JOIN cluster_enrollment_credential c USING(lineage_id) WHERE c.generation=1 AND c.first_used_at IS NOT NULL),
+  'legacy_public_sign_attempts',(SELECT count(*) FROM fleet_certificate_issue WHERE installation_id=$1 AND bootstrap_id=$2),
+  'processes',(SELECT count(*) FROM processes),'process_accepted',process_accepted,
+  'serving_processes',(SELECT count(*) FROM processes WHERE serving AND retired_at IS NULL),
+  'client_sign_attempts',(SELECT count(*) FROM leaves WHERE usage='client'),
+  'server_sign_attempts',(SELECT count(*) FROM leaves WHERE usage='server'),
+  'provider_started',(SELECT count(*) FROM leaves WHERE provider_started),
+  'certificates_issued',(SELECT count(*) FROM leaves WHERE certificate_issued),
+  'client_leaf_active',client_leaf_active,'server_leaf_active',server_leaf_active) FROM checkpoints`, installation, bootstrap, root, peer).Scan(&state)
+	if err != nil {
+		code := "unavailable"
+		var sqlError *pgconn.PgError
+		if errors.As(err, &sqlError) {
+			code = sqlError.Code
+		}
+		t.Logf("regional enrollment checkpoint: diagnostic=%s canceled=%v", code, call.Err() != nil)
+		return
+	}
+	t.Logf("regional enrollment checkpoint: %s", state)
 }
 
 // installRegionalStartCRD is the owned fixture's operator setup, equivalent to
@@ -665,7 +770,7 @@ func nodeInternalIP(t *testing.T, ctx context.Context, api kubernetes.Interface,
 // hub-worker enrolls that workload through v2 to ready_at with a fresh binding.
 // Workload cluster index n adds its own policy, binding and pool slot; the
 // pool then holds n revisions.
-func qualifyRegionalCapacity(t *testing.T, ctx context.Context, admin *pgxpool.Pool, hub, hubObserver, region kubernetes.Interface, namespace, issuer string, journey func(cluster, namespace, workload string, deny func(bool), gone func(string)), installation string, offer contracts.RegionalOffer, installed kube.RegionalInstallation, index int, existing *regionalPrepared, tlsDirectory string) {
+func qualifyRegionalCapacity(t *testing.T, ctx context.Context, admin *pgxpool.Pool, hub, hubObserver, region kubernetes.Interface, namespace, issuer string, journey func(cluster, namespace, workload string, deny func(bool), gone func(string)), installation string, offer contracts.RegionalOffer, installed kube.RegionalInstallation, index int, existing *regionalPrepared, tlsDirectory string, sameAPI bool) {
 	t.Helper()
 	j := installed.Join
 	if j == nil || j.Capacity == nil || !slices.Equal(j.Capacity.Keys, slices.Sorted(slices.Values(offer.Capacity.Keys))) {
@@ -783,6 +888,9 @@ func qualifyRegionalCapacity(t *testing.T, ctx context.Context, admin *pgxpool.P
 			t.Fatal("installed regional Pod observation", err)
 		}
 		target := authorization.Target{ClusterID: cluster, NamespaceUID: string(ns.UID), WorkloadUID: string(app.UID), PodUID: string(pods.Items[0].UID)}
+		if sameAPI {
+			assertSameAPIRegionalTarget(t, ctx, hubObserver, installed, w, pods.Items[0].Name, target)
+		}
 		denyUID := ""
 		observeDeny := func(on bool) {
 			t.Helper()
@@ -904,8 +1012,15 @@ func newRegionalBudget(t *testing.T, ctx context.Context, hub kubernetes.Interfa
 	if index > 1 {
 		suffix = "-" + strconv.Itoa(index)
 	}
-	return &regionalBudget{t: t, ctx: ctx, client: hub.CoreV1().RESTClient(), base: "/apis/asservat.io/v1alpha1/namespaces/" + namespace + "/", issuer: issuer, cluster: cluster,
+	b := &regionalBudget{t: t, ctx: ctx, client: hub.CoreV1().RESTClient(), base: "/apis/asservat.io/v1alpha1/namespaces/" + namespace + "/", issuer: issuer, cluster: cluster,
 		policyName: "regional" + suffix, bindingName: "regional-maintainers" + suffix, index: index}
+	if os.Getenv("ASSERVAT_HELM_CONTEXT_NATIVE") == "1" {
+		if index != 1 {
+			t.Fatal("the declared context trial covers one regional cluster")
+		}
+		b.policyName = "trial-region"
+	}
+	return b
 }
 
 func (b *regionalBudget) amount(bytes, objects int64) map[string]int64 {
@@ -950,6 +1065,10 @@ func installedFocusContextReserve() (bytes, objects int64) {
 
 func (b *regionalBudget) addPolicy() {
 	b.t.Helper()
+	if os.Getenv("ASSERVAT_HELM_CONTEXT_NATIVE") == "1" {
+		b.addDeclaredPolicy()
+		return
+	}
 	// The operator's regional budget: a policy for the joined cluster and its
 	// slot in the existing pool, with the pool's capacity raised to fit.
 	// Ongoing sources, re-arms, Saves and incident snapshots share the default
@@ -984,6 +1103,47 @@ func (b *regionalBudget) addPolicy() {
 	body, _ = json.Marshal(pool)
 	if err = b.client.Put().AbsPath(b.base + "evidencestoragepools/capacity").Body(body).Do(b.ctx).Error(); err != nil {
 		b.t.Fatal("operator pool extension", err)
+	}
+}
+
+// The guide's operator step derives a regional policy from the original public
+// policy and spends one pre-reserved pool slot. It never raises backend/pool
+// capacity to make the test fit or changes the root's accepted record ceiling.
+func (b *regionalBudget) addDeclaredPolicy() {
+	b.t.Helper()
+	profile := helmContextTrialProfile(b.t).Public.Capacity
+	spec := *profile.PolicySpec
+	spec.Scope.ClusterID = b.cluster
+	spec.NamespaceEnvelope = wire.CapacityNamespaceEnvelope{MaxWorkloadAccounts: 1, MaxStoredBytes: spec.Workload.HardLimit.Bytes, MaxObjects: spec.Workload.HardLimit.Objects}
+	policy := map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "EvidenceBudgetPolicy", "metadata": map[string]any{"name": b.policyName}, "spec": spec}
+	body, err := json.Marshal(policy)
+	if err != nil {
+		b.t.Fatal("declared regional policy", err)
+	}
+	if err = b.client.Post().AbsPath(b.base + "evidencebudgetpolicies").Body(body).Do(b.ctx).Error(); err != nil {
+		b.t.Fatal("operator declared regional policy", err)
+	}
+	path := b.base + "evidencestoragepools/" + profile.Pool
+	raw, err := b.client.Get().AbsPath(path).DoRaw(b.ctx)
+	var pool map[string]any
+	if err != nil || json.Unmarshal(raw, &pool) != nil {
+		b.t.Fatal("operator declared pool read", err)
+	}
+	poolSpec, ok := pool["spec"].(map[string]any)
+	if !ok {
+		b.t.Fatal("operator declared pool spec")
+	}
+	allocations, ok := poolSpec["protectedAllocations"].([]any)
+	if !ok {
+		b.t.Fatal("operator declared pool allocations")
+	}
+	poolSpec["protectedAllocations"] = append(allocations, wire.CapacityProtectedAllocation{BudgetPolicyRef: b.policyName, WorkloadSlots: 1, ProtectedPerWorkload: spec.Workload.Protected})
+	body, err = json.Marshal(pool)
+	if err != nil {
+		b.t.Fatal("operator declared pool update", err)
+	}
+	if err = b.client.Put().AbsPath(path).Body(body).Do(b.ctx).Error(); err != nil {
+		b.t.Fatal("operator declared pool slot", err)
 	}
 }
 
@@ -1046,6 +1206,13 @@ func createRegionalWorkload(t *testing.T, ctx context.Context, region kubernetes
 	// The regional workload: a labeled namespace (the selector guard admits
 	// the administrator) and a Deployment with no replicas.
 	labels := map[string]string{"team": "regional"}
+	if os.Getenv("ASSERVAT_HELM_CONTEXT_NATIVE") == "1" {
+		selector := helmContextTrialProfile(t).Public.Capacity.PolicySpec.Scope.NamespaceSelector
+		if len(selector.MatchLabels) == 0 {
+			t.Fatal("context trial requires its exact declared namespace labels")
+		}
+		labels = selector.MatchLabels
+	}
 	if installedRecordingFocus() || installedLogsFocus() {
 		labels["pod-security.kubernetes.io/enforce"] = "restricted"
 	}

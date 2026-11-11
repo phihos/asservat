@@ -1,0 +1,42 @@
+# Public site choices only. Replace EVERY example.invalid value before use.
+# Merge after context-trial-profile.yaml; see docs/installation/context-trial.md.
+# All rootsPEM fields are filled by the guide's --set-file arguments.
+# Credentials/private keys never belong in this file.
+bootstrap:
+  image: registry.example.invalid/asservat@sha256:REPLACE_WITH_VERIFIED_DIGEST
+  administrators:
+    - kind: User
+      name: REPLACE_WITH_KUBERNETES_AUTHENTICATED_USERNAME
+  kubernetes: { endpoint: "https://api.hub.example.invalid:6443", rootsPEM: "" }
+  postgres: { host: postgres.example.invalid, rootsPEM: "" }
+  auditStore: { endpoint: "https://s3.example.invalid", region: us-east-1, bucket: asservat-audit, rootsPEM: "" }
+  keyService: { endpoint: "https://bao.example.invalid", rootsPEM: "" }
+  fleet:
+    issuer: https://id.example.invalid/realms/homelab
+    clients: [asservat-console]
+    groups: [REPLACE_WITH_STABLE_FLEET_OPERATOR_GROUP_ID]
+  continuation:
+    workerProvider: { authMount: hub-worker-k8s, authMountAccessor: REPLACE_WITH_WORKER_MOUNT_ACCESSOR }
+    ownerProvider: { authMount: hub-owner-k8s, authMountAccessor: REPLACE_WITH_OWNER_MOUNT_ACCESSOR }
+    ownerIssuerRootsPEM: ""
+    public:
+      origin: https://asservat.hub.example.invalid:31450
+      issuer: https://id.example.invalid/realms/homelab
+      clientID: asservat-console
+      clients: [ { id: asservat-console, kind: human } ]
+      eligibleGroups: [REPLACE_WITH_STABLE_TRIAL_USERS_GROUP_ID]
+      processingOperators:
+        - clientID: asservat-console
+          issuer: https://id.example.invalid/realms/homelab
+          kind: Group
+          id: REPLACE_WITH_STABLE_TRIAL_USERS_GROUP_ID
+      federation:
+        connectorPKIMount: connector-pki
+        connectorIssuerRootsPEM: ""
+        endpoint: https://federation.hub.example.invalid:31446
+        serverName: federation.hub.example.invalid
+        ownerAddress: owner.hub.example.invalid:31447
+        ownerOperationAddress: owner.hub.example.invalid:31449
+        keyServiceEndpoint: https://keys.hub.example.invalid:31448
+        evidenceStore: { endpoint: "https://s3.example.invalid", region: us-east-1, bucket: asservat-evidence, rootsPEM: "" }
+      promotion: { browserAudience: asservat-api, providerRootsPEM: "" }

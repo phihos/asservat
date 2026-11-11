@@ -163,6 +163,16 @@
     },
     "registryAuthentication": {
       "const": "dockerconfigjson/v1"
+    },
+    "administrators": {
+      "description": "Explicit original installation administrators in addition to the derived runner. These are Kubernetes identities; evidence access still requires AccessBindings. Omission keeps the runner-only profile.",
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 31,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "https://asservat.io/spec/v1/owner-deployment.schema.json#/properties/workloadGuard/properties/administrators/items"
+      }
     }
   }
 }

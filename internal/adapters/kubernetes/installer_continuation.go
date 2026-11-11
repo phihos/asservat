@@ -136,6 +136,8 @@ type InstallerInbox struct {
 	// Public holds exactly the InstallerInboxPublicFiles when the phase-3
 	// artifact carried a promoted owner (ADR-194); otherwise it is nil.
 	Public map[string][]byte
+	// ServingTLS holds the optional closed federation/key-service TLS bundles.
+	ServingTLS map[string][]byte
 }
 
 // ReadInstallerInbox returns the inbox only when it answers phase; any other
@@ -167,6 +169,17 @@ func ReadInstallerInbox(ctx context.Context, config *rest.Config, namespace, ins
 			}
 			out.Public[key] = v
 		}
+	}
+	for _, key := range contracts.InstallerInboxServingTLSFiles() {
+		if v, exists := s.Data[key]; exists {
+			if out.ServingTLS == nil {
+				out.ServingTLS = map[string][]byte{}
+			}
+			out.ServingTLS[key] = v
+		}
+	}
+	if !installerServingTLSFilesValid(out.ServingTLS) || phase != 3 && len(out.ServingTLS) != 0 {
+		return zero, cfg.ErrUnavailable
 	}
 	return out, nil
 }
@@ -281,15 +294,23 @@ func ReadInstallerOutbox(ctx context.Context, config *rest.Config, namespace, in
 // (ADR-203), downloads the optional download workers' evidence read
 // credential (ADR-204) and deletion the optional context deletion child's
 // evidence delete credential (ADR-205).
-func WriteInstallerInbox(ctx context.Context, config *rest.Config, namespace, installation string, phase int, token, credential, federation []byte, public, publisher map[string][]byte, downloads, deletion []byte) error {
+func WriteInstallerInbox(ctx context.Context, config *rest.Config, namespace, installation string, phase int, token, credential, federation []byte, public, publisher map[string][]byte, downloads, deletion []byte, servingTLS ...map[string][]byte) error {
 	api, err := installerAPI(config)
 	if err != nil || namespace == "" || !authorization.UUID(installation) || len(token) == 0 || len(credential) == 0 {
+		return cfg.ErrInvalid
+	}
+	if len(servingTLS) > 1 || len(servingTLS) == 1 && (!installerServingTLSFilesValid(servingTLS[0]) || phase != 3 && len(servingTLS[0]) != 0) {
 		return cfg.ErrInvalid
 	}
 	call, end := context.WithTimeout(ctx, 5*time.Second)
 	defer end()
 	s := &core.Secret{ObjectMeta: meta.ObjectMeta{Name: contracts.InstallerInboxName(installation)}, Type: core.SecretTypeOpaque, Data: map[string][]byte{
 		contracts.InstallerInboxPhase: []byte(strconv.Itoa(phase)), contracts.InstallerInboxInspectionToken: token, contracts.InstallerInboxAuditCredential: credential}}
+	if len(servingTLS) == 1 {
+		for key, data := range servingTLS[0] {
+			s.Data[key] = data
+		}
+	}
 	if len(federation) != 0 {
 		s.Data[contracts.InstallerInboxFederationAuditCredential] = federation
 	}

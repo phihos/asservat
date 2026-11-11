@@ -442,12 +442,12 @@ type Runners func(context.Context, value.ClusterCredentialProfile) (PeerDuties, 
 func (s Runners) Enroll(ctx context.Context, region *Region, id string, r value.ConnectorProcessRequest) (value.ConnectorCredentialProcess, error) {
 	d, err := s(ctx, region.Presented().Profile)
 	if err != nil {
-		return value.ConnectorCredentialProcess{}, err
+		return value.ConnectorCredentialProcess{}, enrollmentError{"resolve", err}
 	}
 	source := d.Source
 	source.Reader = region
 	if err = source.Observe(ctx); err != nil {
-		return value.ConnectorCredentialProcess{}, err
+		return value.ConnectorCredentialProcess{}, enrollmentError{"source", err}
 	}
 	e := d.Enrollment
 	e.Native = region
@@ -519,4 +519,21 @@ func (s Runners) Recovery(ctx context.Context, region *Region) (value.RecoverySt
 		return value.RecoveryState{}, ErrChannel
 	}
 	return d.Recovery.RecoveryState(ctx)
+}
+
+// enrollmentError names the two pre-runner boundaries without provider text.
+type enrollmentError struct {
+	step string
+	err  error
+}
+
+func (e enrollmentError) Error() string     { return "connector enrollment " + e.step }
+func (e enrollmentError) Unwrap() error     { return e.err }
+func (e enrollmentError) FixedStep() string { return e.step }
+func EnrollmentStep(err error) string {
+	var failure enrollmentError
+	if errors.As(err, &failure) {
+		return failure.step
+	}
+	return app.ConnectorEnrollmentStep(err)
 }

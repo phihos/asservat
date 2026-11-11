@@ -1,5 +1,78 @@
 # Sustained implementation progress
 
+## Active candidate: installable context trial (2026-11-11)
+
+Outcome: let the maintainer install and try the existing collector-free
+pod-status workflow. `feature/homelab-context-trial` starts at merged main
+`cef71802`; [ADR324](decisions/324-installable-context-trial.md) records the
+observed packaging defects, finite remedies and shared-API probe refinement.
+Use the [source-built trial guide](installation/context-trial.md) and exact
+[profile](../examples/helm/context-trial-profile.yaml). No image was pushed,
+release published or homelab changed; target context/dependency choices await
+the maintainer. The full specification goal remains active.
+
+Implemented on the candidate: Helm forwards its five omitted public settings;
+the installer creates exact marked capacity objects and two validated serving
+TLS Secrets through existing authority; explicit Kubernetes administrators
+remain distinct from browser evidence rights. `make image` builds the actual
+static binary and console without fixture helpers. The authenticated Fleet
+form issues/replays one bootstrap through the existing API and KV contract.
+There are no new runtime processes, roles, watches or background loops.
+
+The reference profile retains full shared-query support, original footprints
+and normal4×128 headroom. Connector validity3600s fits its original retirement
+bound4000s, with96 finite history records; no ticket deadline is clamped.
+Profile SHA256:
+`e38b68011e79ff0e35ec4c5632e56e5a9bd42b5850399781eb86b9931251061c`.
+
+| Fresh installed source | Actual result and scope |
+| --- | --- |
+| `76d641f9` | Fails at actual CRD defaulting, Go178.511s/harness227.7s. Focused native reproduction fails0.046s; copying the existing default without changing original input passes race1.169s and preserves explicit2. |
+| `830eca51` | Hook's five original commands and Helm completion pass; regional enrollment fails, Go408.504s/harness481.5s. |
+| `36613b83` / `8948a800` | Focused real-service connector reproduction fails1.349s at ticket preparation; correcting the authored profile's admission/retirement relationship passes2.779s, with both ordinary leaves activated. |
+| `2413fa78` | Separate hub/workload APIs pass: Go432.678s/harness491.7s, exits0. Actual chart/profile hook, joined Helm/hook deletion, browser-issued bootstrap/KV replay, enrollment/join/capacity, browser/MCP capture/publication,706-byte native/Range/If-Range parity, processing restriction/release, unrelated-user opacity, Stop after Deny with exact replay, TargetGone and original80s expiry refusal. Failed cleanup retains evidence/receipts/charges; later independent inventory removes all objects/versions/markers/multipart, refunds storage and retains control charges. |
+| `9a55d5de` | Same API fails at regional readiness after successful hook/enrollment/join/standby: Go540.263s/harness598.4s, test1/make2. Two global metadata guards mask the second guard's exact admission denial. No same-API capture is claimed. |
+| `f10c064d` | Shared API passes: Go430.862s/harness501.6s, exits0; hub/region physical0, unused physical1 has neither actual connector nor workload namespace. Completes the same context journey including354-byte native parity, Range/If-Range, original80s expiry and independent deletion. All4,834 source hashes match, cleanup is empty, owned resources are independently absent and scratch is removed. |
+
+All installed source inventories independently match their frozen inputs;
+cleanup failures are empty and owned clusters/containers/networks/volumes/images
+are independently absent. The two topology successes contain4,832/4,834 hashes.
+The2413 packaged chart SHA256 is
+`ce6e7e72a6d34c81439833249291f8a62f8da423f55468d06c71c7d3d3563b7b`.
+Actual reports remain external under
+`/home/phil/.cache/asservat-build/homelab-context-trial/installed-<source>`.
+
+The shared-API defect now has a fast real-API regression: two genuine guards
+fail6.591s before correction. Explicitly true dry-run namespace UPDATE and
+workload CREATE outside each guard's own probe namespace isolate the probes;
+all persistent protection and RBAC stay unchanged. Fresh native checks pass
+5.961s, including both policy families, exact other-guard persistent denial
+after own-binding removal, own-proof refusal, false/null rejection and no
+persisted probe state. Component race checks pass1.163s. Each owned Kind run
+cleans up; source hashes remain unchanged. Evidence is external in
+`capacity-guard-first-denial` and `capacity-guard-isolated`. Closed nested
+`guard/enforcement` diagnostics reach existing runtime logs. Fresh integrated same-API qualification at `f10c064d` passes as above.
+`make pre-push` also passes at that source, including384s affected Go race
+tests. Required PR CI and merge are next. Its packaged chart SHA256 is
+`cbcfdd2e5b778bf5d2fbfea41c5929b6401a670595e5b060fe14d83854dce4c3`.
+
+Earlier broad gates: `make pre-push` at76d/31e passes (affected Go race503s/382s).
+All static pre-push targets pass at2413;353s Go race evidence is reused only
+after independently checking unchanged relevant894 inputs. Full built-browser
+gate passes157.279s; added Fleet coverage passes30 journeys/31 accessibility
+scans in31.426s, including same-key503→201 retry and403 through real session/CSRF.
+The image's private-umask regression fails before mode normalization and passes
+afterwards: nonroot read-only CLI and exact reads of all10 console files.
+Dedicated smoke images/containers are removed; evidence is external.
+
+Limits: preloaded reference images, no registry-pull or one-hour renewal proof,
+no second workload cluster/replay campaign in these focused trials, no active
+stream-interruption claim, no sustained history recycling, supported release,
+restore or production qualification. External services and provider-specific
+S3 capabilities remain operator tasks. The sharing-retirement work is parked
+cleanly at `e5e77be7`, with local/stress/schema passes but no installed
+qualification or merge; it is not delivered by this trial.
+
 ## Active candidate: processing inventory export (2026-11-11)
 
 [PR222](https://github.com/phihos/asservat/pull/222) starts from authoritative
