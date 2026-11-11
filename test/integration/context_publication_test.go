@@ -124,9 +124,10 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 				t.Fatal(err)
 			}
 		}
-		// A later capture of the root may already be audited: the first
-		// preparation's publisher writes every pending capture intent.
-		if _, err = f.verify.AcceptedContextForPublication(ctx, accepted.CaptureID); err == nil && initialize {
+		// Sharing admissions acknowledge their own pair immediately. Other
+		// fixtures still exercise the initial unaudited publication refusal.
+		_, shareQualified := shareCaptures[s.a.RootID]
+		if _, err = f.verify.AcceptedContextForPublication(ctx, accepted.CaptureID); err == nil && initialize && !shareQualified {
 			t.Fatal("unaudited capture accepted for publication")
 		}
 		if _, err = f.reader.RetainedAudience(ctx, f.e.Registration.Location.ArtifactID); err == nil {
@@ -138,7 +139,7 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 		}
 		if qualified, ok := shareCaptures[s.a.RootID]; ok {
 			if _, err = qualified.publication.AcknowledgedCaptureIntent(ctx, accepted.CaptureID); err != nil {
-				t.Fatal("actual share-qualified capture pair", err)
+				t.Fatal("actual share-qualified capture pair", shareFixtureFailureStage(err), err)
 			}
 		} else if err = (auditapp.CaptureIntentPublisher{Ledger: intents, Objects: &objectstore.CaptureIntentObjects{Store: store, Seal: keys, Open: keys}}).PublishCaptureIntents(ctx); err != nil {
 			t.Fatal(err)

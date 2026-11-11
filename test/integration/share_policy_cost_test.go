@@ -29,7 +29,8 @@ import (
 // This manufactures no persisted identity, signature, receipt or qualification.
 func policyShareAcceptanceSizeFixture(t *testing.T, issuerBytes int) capture.PolicyAcceptance {
 	t.Helper()
-	now := time.Now().UTC().Truncate(time.Microsecond)
+	// Fix timestamp width so the encoded-size boundary is reproducible.
+	now := time.Date(2026, time.November, 11, 12, 13, 14, 123456000, time.UTC)
 	creator, groups, recipients := widePolicyShareActors(t, issuerBytes)
 	root, installation, policyID, cluster, epoch, delegation := custodyID(), custodyID(), custodyID(), custodyID(), custodyID(), custodyID()
 	revision := identity.Revision{UID: policyID, Generation: 1, Digest: artifact.Digest{1}}
@@ -75,6 +76,32 @@ func TestPolicyShareAcceptanceRecordSizeBoundary(t *testing.T) {
 	}
 }
 
+func TestPolicyShareAcceptanceEvaluatesAfterRecoveryRead(t *testing.T) {
+	r := policyShareAcceptanceSizeFixture(t, policyWideSampleIssuerBytes)
+	created := r.AcceptedAt
+	// A real RecoveryReader starts its SQL observation after the request was
+	// created. Its original cutoff remains fixed while the read completes.
+	r.Recovery.ObservedAt = created.Add(time.Millisecond)
+	originalRecovery := r.Recovery
+	originalAuthority := r.Authority
+	originalSubmission := r.Submission
+	in := capture.PolicyAdmission{RootID: r.RootID, Submission: r.Submission, Authority: r.Authority,
+		Author: identity.Identity{Principal: r.Submitter, Scopes: []string{authorization.ShareScope}, Policy: r.IdentityRevision, VerifiedAt: created, ValidUntil: created.Add(30 * time.Second)},
+		Target: authorization.WorkloadScope(r.Authority.ClusterID, r.Authority.NamespaceUID, r.Authority.WorkloadUID), Recovery: r.Recovery, Sharing: r.Sharing}
+	in.Verification = syntheticSubmissionCheck(in, created)
+	if r.Valid() || in.Valid(created) || r.Recovery.Valid(created) {
+		t.Fatal("past evaluation accepted a subsequently observed recovery proof")
+	}
+	checked := created.Add(2 * time.Millisecond)
+	r.AcceptedAt = checked // The immutable acceptance is created after its reads.
+	if !r.Valid() || !in.Valid(checked) || !r.Recovery.Valid(checked) {
+		t.Fatal("completed-read evaluation refused otherwise current originals")
+	}
+	if r.Recovery != originalRecovery || r.Authority.NotAfter != originalAuthority.NotAfter || r.Authority.IssuedAt != originalAuthority.IssuedAt || r.Submission != originalSubmission {
+		t.Fatal("evaluation changed an original observation, submission or authority bound")
+	}
+}
+
 // Only closures from the existing accepted policy/admission/publication fixture.
 // No table-copy producer or fabricated capture/audit/share links are introduced.
 type policyShareCostFixture struct {
@@ -87,6 +114,14 @@ type policyShareCostFixture struct {
 	Prepare  func(capture.Accepted, bool) captureShareFixture
 	Publish  func(captureShareFixture)
 	Refresh  func()
+}
+
+func shareFixtureFailureStage(err error) string {
+	var fixed interface{ FixedStep() string }
+	if errors.As(err, &fixed) {
+		return fixed.FixedStep()
+	}
+	return "unclassified"
 }
 
 // Mirror the existing API-work producer predicates as read-only diagnostics:

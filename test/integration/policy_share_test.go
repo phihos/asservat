@@ -196,14 +196,19 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 			Sharing:    &capture.PolicyShareInstruction{Creator: creator, Management: shareManagers, Recipients: shareRecipients, MaxCaptures: maxCaptures, NotAfter: notAfter.UTC().Truncate(time.Second)}}
 		in.Verification = syntheticSubmissionCheck(in, now)
 		if wide {
+			// The recovery read began after the request's original timestamps.
+			// Validate at delivery time, as AcceptPolicy does, without renewing
+			// any original input observation or authority deadline.
 			var version int64
 			if err := readPool.QueryRow(ctx, `SELECT intent_version FROM policy_source WHERE root_id=$1 AND policy_uid=$2`, root, policyUID).Scan(&version); err != nil {
 				t.Fatal("wide-sample acceptance source revision", err)
 			}
-			candidate := capture.PolicyAcceptance{ID: custodyID(), RootID: root, Source: source, Submission: in.Submission, Authority: in.Authority, Submitter: in.Author.Principal, IdentityRevision: in.Author.Policy, PermissionRevision: projection.Revision, Recovery: in.Recovery, AcceptedAt: now, IntentVersion: version, Sharing: in.Sharing}
+			checkedAt := clock()
+			candidate := capture.PolicyAcceptance{ID: custodyID(), RootID: root, Source: source, Submission: in.Submission, Authority: in.Authority, Submitter: in.Author.Principal, IdentityRevision: in.Author.Policy, PermissionRevision: projection.Revision, Recovery: in.Recovery, AcceptedAt: checkedAt, IntentVersion: version, Sharing: in.Sharing}
 			body, encodeErr := json.Marshal(candidate)
-			t.Logf("policy_cost_stage=original_wide_acceptance_shape issuer_bytes=%d source_candidate_valid=%t input_valid=%t encode_ok=%t encoded_bytes=%d closed_adapter_limit=%d", len(creator.Issuer), candidate.Valid(), in.Valid(now), encodeErr == nil, len(body), 64<<10)
-			if !candidate.Valid() || !in.Valid(now) || encodeErr != nil || len(body) > 64<<10 {
+			t.Logf("policy_cost_stage=original_wide_acceptance_shape issuer_bytes=%d source_candidate_valid=%t input_valid=%t encode_ok=%t encoded_bytes=%d closed_adapter_limit=%d", len(creator.Issuer), candidate.Valid(), in.Valid(checkedAt), encodeErr == nil, len(body), 64<<10)
+			t.Logf("policy_acceptance_predicates source=%t submission=%t verification=%t author=%t authority=%t target=%t sharing=%t recovery=%t original_request_precedes_recovery=%t", source.Valid(checkedAt), in.Submission.Valid(checkedAt), in.Verification.Valid(checkedAt), in.Author.Valid(checkedAt), in.Authority.Valid(checkedAt), in.Target.Valid(), in.Sharing.Valid(), in.Recovery.Valid(checkedAt), now.Before(in.Recovery.ObservedAt))
+			if !candidate.Valid() || !in.Valid(checkedAt) || encodeErr != nil || len(body) > 64<<10 {
 				t.Fatal("fixed wide sample violates original acceptance predicates")
 			}
 		}
@@ -294,6 +299,12 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 			use := authorization.PolicyUse{PolicyUID: authority.PolicyUID, ScopeDigest: authority.ScopeDigest, Target: pod, Purpose: authorization.PolicyIncident}
 			e := (authapp.AutomationEvaluator{Accepted: reader, Current: automation, Now: time.Now}).Eligibility(ctx, use)
 			t.Fatalf("policy capture admission: %v (evaluator %s, eligible until %s, now %s)", err, e.Reason, a.Eligibility.ValidUntil, time.Now())
+		}
+		// Runtime acknowledges this selected capture immediately. Later test
+		// waits may exhaust its original writer window and cannot authorize a
+		// new pair write or renew that window.
+		if _, err := qualifiedCapture.publication.AcknowledgedCaptureIntent(ctx, got.CaptureID); err != nil {
+			t.Fatal("policy capture original intent pair", shareFixtureFailureStage(err), err)
 		}
 		// A replayed admission (a lost reply) returns the same capture and
 		// claims no second slot.
@@ -431,13 +442,8 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 	f1, f2 := prepare(t, s, c1, true), prepare(t, s, c2, false)
 	publish(f1)
 	publish(f2)
-	// The private publisher persists the selected capture, rather than the
-	// old batch publisher's unrelated pending captures. Persist c4's own genuine
-	// pair before its prepaid API work is consumed.
-	assertPolicyAPIWorkSource(t, ctx, admin, c4, false)
-	if _, err := qualifiedCapture.publication.AcknowledgedCaptureIntent(ctx, c4.CaptureID); err != nil {
-		t.Fatal("prepaid API original intent pair", err)
-	}
+	// Each selected capture already persisted its own genuine pair immediately
+	// after admission; c4's prepaid API work consumes that acknowledgement.
 	assertPolicyAPIWorkSource(t, ctx, admin, c4, true)
 	qualifyOriginalPolicyGrantAcquisition(t, ctx, admin, poolFor, s, authority, c4, firstGrant, func() string {
 		return attachPolicyAccountingGrant(t, ctx, admin, poolFor, s, authority, authorityScope, "replacement-review")
