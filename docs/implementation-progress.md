@@ -139,6 +139,18 @@ same-API installation, long renewal and sustained operation remain outside
 this installed result. Same-API qualification is next; required PR CI and merge
 remain pending. The full specification goal stays active.
 
+Same-API qualification at `9a55d5de` fails at regional workload readiness
+(Go540.263s, harness598.4s, test1/make2):
+the actual Helm hook, ordinary connector leaves, join and capacity standby
+complete, but the regional guarded-workload observation repeatedly refuses its
+namespace guard proof. No same-cluster capture is claimed. All4,833 source
+hashes independently match, source remains unchanged, cleanup failures are
+empty and all owned clusters/containers/networks/volumes/images are absent.
+Evidence is external in `homelab-context-trial/installed-9a55d5de`.
+A focused native admission reproduction must identify the refusal before
+another full installed run. The two-API `2413fa78` result remains applicable
+to its named topology and unchanged production inputs.
+
 ## Active candidate: processing inventory export (2026-11-11)
 
 [PR222](https://github.com/phihos/asservat/pull/222) starts from authoritative

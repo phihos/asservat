@@ -55,7 +55,7 @@ CHART_ARCHIVE="$TRIAL/package/asservat-0.1.0-dev.1.tgz"
 printf 'Trial directory for both terminals: %s\n' "$TRIAL"
 ```
 
-Use a build filesystem with room; `ASSERVAT_BUILD_TMP` defaults to `$HOME/.cache/asservat-build/tmp`. `make image` builds the product executable and compiled React assets locally. It does not push an image. Distribute that image through your existing registry process and set `bootstrap.image` to its actual `repository@sha256:…` registry manifest digest. The printed local image ID is not that digest. If the registry needs authentication, create the Docker config Secret in `asservat-bootstrap` before Helm and set `bootstrap.registrySecret` to its name.
+Use a build filesystem with room; `ASSERVAT_BUILD_TMP` defaults to `$HOME/.cache/asservat-build/tmp`. `make image` builds the product executable and compiled React assets locally. It does not push an image. Distribute that image through your existing registry process and set `bootstrap.image` to its actual `repository@sha256:…` registry manifest digest. The printed local image ID is not that digest. `bootstrap.registrySecret` authenticates only the bootstrap runner; it is not propagated to runtime, regional or download Pods. For this trial, every participating node must be able to pull the exact digest through anonymous or node-configured registry access, or have that image preloaded. If the bootstrap runner also needs a pull Secret, create it in `asservat-bootstrap` before Helm and set `bootstrap.registrySecret` to its name.
 
 Place the following private files in `$TRIAL/private`, mode 0600. All paths below are relative to `$TRIAL`; neither credentials nor evidence belong in the checkout, Helm values or command arguments.
 
@@ -148,7 +148,7 @@ In terminal B, observe the original runner:
 kubectl --context "$HUB_CONTEXT" -n asservat-bootstrap get pod asservat-bootstrap -w
 ```
 
-After `asservat-system` exists:
+Once `asservat-system` exists, press Ctrl+C to stop the watch; this does not stop the installer Pod. Continue in terminal B:
 
 ```sh
 INSTALLATION=$(kubectl --context "$HUB_CONTEXT" get namespace asservat-system -o json |

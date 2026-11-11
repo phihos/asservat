@@ -1,7 +1,9 @@
 # ADR-324: Install the existing context workflow through Helm
 
-Status: implementation candidate, 2026-11-11. Fresh complete Helm qualification
-and a homelab trial are pending. This does not mark the specification complete.
+Status: implementation candidate, 2026-11-11. The short actual Helm context
+journey passes with separate hub/workload APIs and preloaded images. Same-API
+qualification and a homelab trial remain pending. This does not mark the
+specification complete.
 
 The maintainer wants to install and try the working vertical slice now. Native
 installed tests exercise actual product services, but their setup supplies
