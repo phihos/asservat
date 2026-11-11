@@ -78,7 +78,7 @@ func humanOperationInputValid(name, format string) bool {
 	switch name {
 	case "get_file_excerpt", "get_http_headers", "get_profile_summary", "get_pcap_summary", "pcap_query", "compare_profiles", "get_syscall_summary", "get_syscall_events", "syscall_query", "get_logs", "get_query_result":
 		return format == "context-query-input/v1"
-	case "search_processing_evidence", "get_processing_erasure":
+	case "search_processing_evidence", "get_processing_erasure", "get_processing_report":
 		return format == "context-input/v1"
 	case "download_artifact_content":
 		return format == "native-content-input/v1"

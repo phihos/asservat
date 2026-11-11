@@ -1,5 +1,10 @@
 # Decision records
 
+[ADR-322 — Processing inventory export](322-processing-inventory-export.md)
+adds bounded audited JSON export of retained artifacts, recipient history,
+processing rules, placement and explicit processor declarations. Implementation
+and qualification are in progress.
+
 [ADR-318 — Processing operator rule inventory and release](318-processing-operator-rule-inventory-and-release.md)
 composes the existing reserved release lane with a bounded console inventory and
 exact-revision controls. Implementation candidate; installed qualification pending.

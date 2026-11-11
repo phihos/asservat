@@ -17069,6 +17069,115 @@
       }
     },
     {
+      "name": "get_processing_report",
+      "description": "Privacy operators read one bounded section of the processing inventory, including retained artifact purposes, placement, deadlines, recorded recipients and delivery activity, restrictions, and operator-declared organizations. Continue with the returned exact query. Each page is a current metadata observation; client receipt remains unknown and legal exceptions are not inferred.",
+      "enabledByDefault": true,
+      "transports": [
+        "browser"
+      ],
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "section": {},
+          "limit": {},
+          "after": {},
+          "created_before": {},
+          "policy_digest": {}
+        },
+        "allOf": [
+          {
+            "$ref": "https://asservat.io/spec/v1/processing-report.schema.json#/$defs/Query"
+          }
+        ]
+      },
+      "outputSchema": {
+        "allOf": [
+          {
+            "$ref": "https://asservat.io/spec/v1/mcp-result.schema.json"
+          },
+          {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "const": "ok"
+                  },
+                  "data": {
+                    "$ref": "https://asservat.io/spec/v1/processing-report.schema.json#/$defs/Page"
+                  }
+                },
+                "required": [
+                  "status",
+                  "data"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "const": "error"
+                  },
+                  "data": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "code": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      },
+                      "message": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 1024
+                      },
+                      "retryable": {
+                        "type": "boolean"
+                      },
+                      "navigation_uri": {
+                        "type": "string",
+                        "format": "uri",
+                        "maxLength": 2048
+                      },
+                      "responsible_role": {
+                        "enum": [
+                          "maintainer",
+                          "approver",
+                          "administrator",
+                          "none"
+                        ]
+                      },
+                      "retry_after_seconds": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 60
+                      }
+                    },
+                    "required": [
+                      "code",
+                      "message",
+                      "retryable"
+                    ]
+                  }
+                },
+                "required": [
+                  "status",
+                  "data"
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
       "name": "get_processing_erasure",
       "description": "Privacy operators read the exact accepted erasure request and its signed audit and managed-copy deletion status.",
       "enabledByDefault": true,

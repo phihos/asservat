@@ -26,6 +26,7 @@ type DownloadClient struct {
 type ProcessingOperator struct{ Issuer, ClientID, Kind, ID string }
 
 type DownloadPolicy struct {
+	Processors                            []ProcessingOrganization
 	LiveRead                              *LiveRead
 	RootID, InstallationID, RecoveryEpoch string
 	Revision                              identity.Revision
@@ -51,7 +52,7 @@ func (p DownloadPolicy) DownloadValid(now time.Time) bool {
 // WellFormed validates configuration only, never its current protection.
 func (p DownloadPolicy) WellFormed() bool {
 	if !authorization.UUID(p.RootID) || !authorization.UUID(p.InstallationID) || !authorization.UUID(p.RecoveryEpoch) || !p.Revision.Valid() ||
-		p.PermittedRegions == nil || !identity.Strings(p.PermittedRegions, 64, 63) ||
+		!ProcessingOrganizationsValid(p.Processors) || p.PermittedRegions == nil || !identity.Strings(p.PermittedRegions, 64, 63) ||
 		p.Paths == nil || len(p.Paths) > 32 || p.Clients == nil || len(p.Clients) > 64 || len(p.Operators) < 1 || len(p.Operators) > 32 {
 		return false
 	}

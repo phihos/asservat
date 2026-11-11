@@ -252,6 +252,7 @@ func TestDownloadPolicyObservationWaiterCancellation(t *testing.T) {
 func TestDownloadPolicyObservationOwnsReturnedSlices(t *testing.T) {
 	f, _, _, _ := newEnvironmentFixture()
 	original := f.policy.Clients[0].Purposes[0]
+	f.policy.Processors = []privacy.ProcessingOrganization{{ID: "org-1", Name: "Declared organization", Activities: []string{"Storage"}, Regions: []string{"operator-region"}}}
 	reader := policyObservationForTest(t, observationPolicyReader(func(context.Context) (privacy.DownloadPolicy, error) { return f.policy, nil }), func() time.Time { return f.now })
 	p, err := reader.DownloadPolicy(t.Context())
 	if err != nil {
@@ -265,13 +266,17 @@ func TestDownloadPolicyObservationOwnsReturnedSlices(t *testing.T) {
 	p.PermittedRegions[0] = "changed"
 	p.Paths[0].StorageRegion = "changed"
 	p.Operators[0].ID = "changed"
+	p.Processors[0].Name = "changed"
+	p.Processors[0].Activities[0] = "changed"
+	p.Processors[0].Regions[0] = "changed"
 	again, err := reader.DownloadPolicy(t.Context())
-	if err != nil || again.Clients[0].DataClasses[0] == "changed" || again.Clients[0].PrivacyClasses[0] == "changed" || again.Clients[0].EvidenceTypes[0] == "changed" || again.Clients[0].Purposes[0] != original || again.Clients[0].PathIDs[0] == "changed" || again.PermittedRegions[0] == "changed" || again.Paths[0].StorageRegion == "changed" || again.Operators[0].ID == "changed" || f.policy.Clients[0].Purposes[0] != original {
+	if err != nil || again.Clients[0].DataClasses[0] == "changed" || again.Clients[0].PrivacyClasses[0] == "changed" || again.Clients[0].EvidenceTypes[0] == "changed" || again.Clients[0].Purposes[0] != original || again.Clients[0].PathIDs[0] == "changed" || again.PermittedRegions[0] == "changed" || again.Paths[0].StorageRegion == "changed" || again.Operators[0].ID == "changed" || again.Processors[0].Name == "changed" || again.Processors[0].Activities[0] == "changed" || again.Processors[0].Regions[0] == "changed" || f.policy.Clients[0].Purposes[0] != original {
 		t.Fatal("returned data aliases retained/source policy", err)
 	}
 	f.policy.Clients[0].Purposes[0] = "source changed"
+	f.policy.Processors[0].Activities[0] = "source changed"
 	again, err = reader.DownloadPolicy(t.Context())
-	if err != nil || again.Clients[0].Purposes[0] != original {
+	if err != nil || again.Clients[0].Purposes[0] != original || again.Processors[0].Activities[0] != "Storage" {
 		t.Fatal("source retained an alias of the owned observation", err)
 	}
 }

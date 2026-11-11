@@ -78,6 +78,13 @@ bootstrap:
       eligibleSubjects: []
       eligibleGroups: []
       groupMaxAgeSeconds: 300
+      # Optional operator-declared organizations for privacy inventory reports.
+      # Omitted means undeclared; an explicit empty list declares none.
+      # processors:
+      #   - id: evidence-provider
+      #     name: Example organization
+      #     activities: ["Evidence storage"]
+      #     regions: []
       # Optional protected manual-collection policy; without stepUp no
       # independent approval can be decided. ACR values are provider-specific.
       # approvals:

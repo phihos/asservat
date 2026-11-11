@@ -525,6 +525,13 @@ operations:
   - browser
   effect: read
   role: fleet-operator-or-delegation-previewer
+- operation: get_processing_report
+  path: /api/v1/operations/get_processing_report
+  transport:
+  - browser
+  effect: read
+  role: privacy-operator
+  contract: specs/contracts/mcp-tools.json
 - operation: get_processing_erasure
   path: /api/v1/operations/get_processing_erasure
   transport:

@@ -32,7 +32,18 @@ func qualifyCapacityProducerSQL(t *testing.T, ctx context.Context, admin *pgxpoo
 	if !t.Run("lifecycle-policy-timestamp-wire", func(t *testing.T) { qualifyCapacityPolicyTimestampSQL(t, ctx, admin) }) {
 		return
 	}
-	f := newCapacitySQLFixture(t, ctx, admin, address, tlsConfig, scope, claim, administration, objects)
+	f := newCapacitySQLFixture(t, ctx, admin, address, tlsConfig, scope, claim, administration, objects, func(f *capacitySQLFixture) {
+		// Keep artifact control metadata longer than the original native
+		// session so report retirement tests isolate the session's own bound.
+		backing := &f.qualification.RootBacking.ProcessingState
+		backing.CleanupSeconds += 60
+		backing.RetireBy = backing.RetireBy.Add(time.Minute)
+		var ok bool
+		backing.BackupBytes, backing.WALBytes, ok = backing.RequiredBytes()
+		if !ok {
+			t.Fatal("processing report fixture backing")
+		}
+	})
 	// Stop dependent cases after any prerequisite failure. A later missing row
 	// must not hide the actual first failed role/SQL phase.
 	if !t.Run("actual-paired-root-and-lost-receipt", func(t *testing.T) {

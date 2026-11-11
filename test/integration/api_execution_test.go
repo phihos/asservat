@@ -384,7 +384,12 @@ func qualifyAPIExecutionTransactions(t *testing.T, ctx context.Context, admin *p
 					t.Fatal("execution identity duplicated", records, err)
 				}
 				if erasure != nil {
+					erasure.policy.value.Processors = reportFixtureProcessors()
+					unknown := stageProcessingReportUnknown(t, ctx, erasure)
+					stageProcessingReportRule(t, ctx, erasure, accepted.Expectation)
+					qualifyProcessingReport(t, ctx, sharedPool, s, erasure, accepted.Expectation, artifact.StoredUnpublished, unknown)
 					qualifyProcessingEarlyErasure(t, ctx, admin, sharedPool, poolFor, store, bound, keys, s3admin, bucket, s, erasure, published)
+					qualifyProcessingReport(t, ctx, sharedPool, s, erasure, accepted.Expectation, artifact.Deleted, unknown)
 					return
 				}
 				// The completed execution qualifier no longer uses its deliberately

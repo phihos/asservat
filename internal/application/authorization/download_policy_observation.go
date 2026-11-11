@@ -152,6 +152,12 @@ func cloneDownloadPolicy(p privacy.DownloadPolicy) privacy.DownloadPolicy {
 	p.PermittedRegions = slices.Clone(p.PermittedRegions)
 	p.Paths = slices.Clone(p.Paths)
 	p.Operators = slices.Clone(p.Operators)
+	p.Processors = slices.Clone(p.Processors)
+	for i := range p.Processors {
+		organization := &p.Processors[i]
+		organization.Activities = slices.Clone(organization.Activities)
+		organization.Regions = slices.Clone(organization.Regions)
+	}
 	p.Clients = slices.Clone(p.Clients)
 	for i := range p.Clients {
 		c := &p.Clients[i]

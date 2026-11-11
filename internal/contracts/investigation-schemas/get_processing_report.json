@@ -1,0 +1,2228 @@
+{
+  "name": "get_processing_report",
+  "description": "Privacy operators read one bounded section of the processing inventory, including retained artifact purposes, placement, deadlines, recorded recipients and delivery activity, restrictions, and operator-declared organizations. Continue with the returned exact query. Each page is a current metadata observation; client receipt remains unknown and legal exceptions are not inferred.",
+  "transports": [
+    "browser"
+  ],
+  "annotations": {
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "openWorldHint": false
+  },
+  "inputSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "section": {},
+      "limit": {},
+      "after": {},
+      "created_before": {},
+      "policy_digest": {}
+    },
+    "allOf": [
+      {
+        "$ref": "#/$defs/d0"
+      }
+    ],
+    "$defs": {
+      "d1": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "cluster_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "attempt_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "id",
+          "cluster_id",
+          "attempt_id"
+        ]
+      },
+      "d2": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "ordinal": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 8
+          }
+        },
+        "required": [
+          "id",
+          "created_at",
+          "ordinal"
+        ]
+      },
+      "d3": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "d4": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "ordinal": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "d5": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "d0": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "section": {
+                "const": "artifacts",
+                "default": "artifacts"
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 3,
+                "default": 3
+              },
+              "created_before": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "policy_digest": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "after": {
+                "$ref": "#/$defs/d1"
+              }
+            },
+            "required": [],
+            "dependentRequired": {
+              "created_before": [
+                "policy_digest"
+              ],
+              "policy_digest": [
+                "created_before"
+              ],
+              "after": [
+                "created_before",
+                "policy_digest"
+              ]
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "section": {
+                "const": "shares"
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 3,
+                "default": 3
+              },
+              "created_before": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "policy_digest": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "after": {
+                "$ref": "#/$defs/d2"
+              }
+            },
+            "required": [
+              "section"
+            ],
+            "dependentRequired": {
+              "created_before": [
+                "policy_digest"
+              ],
+              "policy_digest": [
+                "created_before"
+              ],
+              "after": [
+                "created_before",
+                "policy_digest"
+              ]
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "section": {
+                "const": "downloads"
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 3,
+                "default": 3
+              },
+              "created_before": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "policy_digest": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "after": {
+                "$ref": "#/$defs/d3"
+              }
+            },
+            "required": [
+              "section"
+            ],
+            "dependentRequired": {
+              "created_before": [
+                "policy_digest"
+              ],
+              "policy_digest": [
+                "created_before"
+              ],
+              "after": [
+                "created_before",
+                "policy_digest"
+              ]
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "section": {
+                "const": "operations"
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 3,
+                "default": 3
+              },
+              "created_before": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "policy_digest": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "after": {
+                "$ref": "#/$defs/d4"
+              }
+            },
+            "required": [
+              "section"
+            ],
+            "dependentRequired": {
+              "created_before": [
+                "policy_digest"
+              ],
+              "policy_digest": [
+                "created_before"
+              ],
+              "after": [
+                "created_before",
+                "policy_digest"
+              ]
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "section": {
+                "const": "rules"
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 3,
+                "default": 3
+              },
+              "created_before": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "policy_digest": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "after": {
+                "$ref": "#/$defs/d3"
+              }
+            },
+            "required": [
+              "section"
+            ],
+            "dependentRequired": {
+              "created_before": [
+                "policy_digest"
+              ],
+              "policy_digest": [
+                "created_before"
+              ],
+              "after": [
+                "created_before",
+                "policy_digest"
+              ]
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "section": {
+                "const": "paths"
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 3,
+                "default": 3
+              },
+              "created_before": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "policy_digest": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "after": {
+                "$ref": "#/$defs/d3"
+              }
+            },
+            "required": [
+              "section"
+            ],
+            "dependentRequired": {
+              "created_before": [
+                "policy_digest"
+              ],
+              "policy_digest": [
+                "created_before"
+              ],
+              "after": [
+                "created_before",
+                "policy_digest"
+              ]
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "section": {
+                "const": "processors"
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 3,
+                "default": 3
+              },
+              "created_before": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "policy_digest": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "after": {
+                "$ref": "#/$defs/d5"
+              }
+            },
+            "required": [
+              "section"
+            ],
+            "dependentRequired": {
+              "created_before": [
+                "policy_digest"
+              ],
+              "policy_digest": [
+                "created_before"
+              ],
+              "after": [
+                "created_before",
+                "policy_digest"
+              ]
+            }
+          }
+        ]
+      }
+    }
+  },
+  "outputSchema": {
+    "title": "Asservat mcp-result v1",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "schema_version": {
+        "const": "mcp-result/v1"
+      },
+      "request_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "data_class": {
+        "const": "metadata"
+      },
+      "status": {
+        "type": "string",
+        "enum": [
+          "ok",
+          "pending",
+          "error"
+        ]
+      },
+      "data": {
+        "type": "object"
+      },
+      "truncated": {
+        "const": false
+      },
+      "next_cursor": {
+        "type": "null"
+      },
+      "narrowing_hint": {
+        "type": "null"
+      },
+      "warnings": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "maxItems": 32,
+        "minItems": 0,
+        "uniqueItems": true
+      },
+      "provenance": {
+        "type": "array",
+        "maxItems": 0
+      }
+    },
+    "required": [
+      "schema_version",
+      "request_id",
+      "data_class",
+      "status",
+      "data",
+      "truncated",
+      "next_cursor",
+      "narrowing_hint",
+      "warnings",
+      "provenance"
+    ],
+    "allOf": [
+      {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": "ok"
+              },
+              "data": {
+                "$ref": "#/$defs/d0"
+              }
+            },
+            "required": [
+              "status",
+              "data"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": "error"
+              },
+              "data": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "message": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1024
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "navigation_uri": {
+                    "type": "string",
+                    "format": "uri",
+                    "maxLength": 2048
+                  },
+                  "responsible_role": {
+                    "enum": [
+                      "maintainer",
+                      "approver",
+                      "administrator",
+                      "none"
+                    ]
+                  },
+                  "retry_after_seconds": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 60
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ]
+              }
+            },
+            "required": [
+              "status",
+              "data"
+            ]
+          }
+        ]
+      }
+    ],
+    "$defs": {
+      "d1": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "uid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "generation": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "digest": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        },
+        "required": [
+          "uid",
+          "generation",
+          "digest"
+        ]
+      },
+      "d4": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "cluster_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "attempt_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "id",
+          "cluster_id",
+          "attempt_id"
+        ]
+      },
+      "d5": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "ordinal": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 8
+          }
+        },
+        "required": [
+          "id",
+          "created_at",
+          "ordinal"
+        ]
+      },
+      "d6": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "d7": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "ordinal": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "d8": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "d3": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "section": {
+                "const": "artifacts",
+                "default": "artifacts"
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 3,
+                "default": 3
+              },
+              "created_before": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "policy_digest": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "after": {
+                "$ref": "#/$defs/d4"
+              }
+            },
+            "required": [],
+            "dependentRequired": {
+              "created_before": [
+                "policy_digest"
+              ],
+              "policy_digest": [
+                "created_before"
+              ],
+              "after": [
+                "created_before",
+                "policy_digest"
+              ]
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "section": {
+                "const": "shares"
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 3,
+                "default": 3
+              },
+              "created_before": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "policy_digest": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "after": {
+                "$ref": "#/$defs/d5"
+              }
+            },
+            "required": [
+              "section"
+            ],
+            "dependentRequired": {
+              "created_before": [
+                "policy_digest"
+              ],
+              "policy_digest": [
+                "created_before"
+              ],
+              "after": [
+                "created_before",
+                "policy_digest"
+              ]
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "section": {
+                "const": "downloads"
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 3,
+                "default": 3
+              },
+              "created_before": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "policy_digest": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "after": {
+                "$ref": "#/$defs/d6"
+              }
+            },
+            "required": [
+              "section"
+            ],
+            "dependentRequired": {
+              "created_before": [
+                "policy_digest"
+              ],
+              "policy_digest": [
+                "created_before"
+              ],
+              "after": [
+                "created_before",
+                "policy_digest"
+              ]
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "section": {
+                "const": "operations"
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 3,
+                "default": 3
+              },
+              "created_before": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "policy_digest": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "after": {
+                "$ref": "#/$defs/d7"
+              }
+            },
+            "required": [
+              "section"
+            ],
+            "dependentRequired": {
+              "created_before": [
+                "policy_digest"
+              ],
+              "policy_digest": [
+                "created_before"
+              ],
+              "after": [
+                "created_before",
+                "policy_digest"
+              ]
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "section": {
+                "const": "rules"
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 3,
+                "default": 3
+              },
+              "created_before": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "policy_digest": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "after": {
+                "$ref": "#/$defs/d6"
+              }
+            },
+            "required": [
+              "section"
+            ],
+            "dependentRequired": {
+              "created_before": [
+                "policy_digest"
+              ],
+              "policy_digest": [
+                "created_before"
+              ],
+              "after": [
+                "created_before",
+                "policy_digest"
+              ]
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "section": {
+                "const": "paths"
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 3,
+                "default": 3
+              },
+              "created_before": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "policy_digest": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "after": {
+                "$ref": "#/$defs/d6"
+              }
+            },
+            "required": [
+              "section"
+            ],
+            "dependentRequired": {
+              "created_before": [
+                "policy_digest"
+              ],
+              "policy_digest": [
+                "created_before"
+              ],
+              "after": [
+                "created_before",
+                "policy_digest"
+              ]
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "section": {
+                "const": "processors"
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 3,
+                "default": 3
+              },
+              "created_before": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "policy_digest": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "after": {
+                "$ref": "#/$defs/d8"
+              }
+            },
+            "required": [
+              "section"
+            ],
+            "dependentRequired": {
+              "created_before": [
+                "policy_digest"
+              ],
+              "policy_digest": [
+                "created_before"
+              ],
+              "after": [
+                "created_before",
+                "policy_digest"
+              ]
+            }
+          }
+        ]
+      },
+      "d2": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/d3"
+          }
+        ],
+        "required": [
+          "section",
+          "limit",
+          "created_before",
+          "policy_digest"
+        ]
+      },
+      "d10": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "artifact_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "capture_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "case_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "cluster_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "attempt_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "namespace_uid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "workload_uid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "store_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "purpose_ref": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "native_type": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "data_class": {
+            "enum": [
+              "metadata",
+              "extract",
+              "raw"
+            ]
+          },
+          "privacy_class": {
+            "const": "potentialPersonalData"
+          },
+          "origin": {
+            "enum": [
+              "capture",
+              "derived"
+            ]
+          },
+          "parents": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "minItems": 0,
+            "maxItems": 16,
+            "uniqueItems": true
+          },
+          "anchor_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "original_expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "original_delete_by": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "delete_by": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "custody_state": {
+            "enum": [
+              "stored_unpublished",
+              "deleting",
+              "deleted"
+            ]
+          },
+          "deleted_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "deletion_state": {
+            "enum": [
+              "retained",
+              "pending",
+              "overdue",
+              "deleted"
+            ]
+          }
+        },
+        "required": [
+          "artifact_id",
+          "capture_id",
+          "case_id",
+          "cluster_id",
+          "attempt_id",
+          "namespace_uid",
+          "workload_uid",
+          "store_id",
+          "purpose_ref",
+          "native_type",
+          "data_class",
+          "privacy_class",
+          "origin",
+          "parents",
+          "anchor_at",
+          "original_expires_at",
+          "original_delete_by",
+          "expires_at",
+          "delete_by",
+          "custody_state",
+          "deletion_state"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "origin": {
+                  "const": "capture"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "parents": {
+                  "maxItems": 0
+                }
+              }
+            },
+            "else": {
+              "properties": {
+                "parents": {
+                  "minItems": 1
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "custody_state": {
+                  "const": "deleted"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "deleted_at"
+              ]
+            },
+            "else": {
+              "not": {
+                "required": [
+                  "deleted_at"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "d9": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "visible_until": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "artifact": {
+            "$ref": "#/$defs/d10"
+          }
+        },
+        "required": [
+          "visible_until",
+          "artifact"
+        ]
+      },
+      "d12": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "share_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "artifact_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "recipient_kind": {
+            "enum": [
+              "User",
+              "Group"
+            ]
+          },
+          "recipient_issuer": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048
+          },
+          "recipient_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "ordinal": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 8
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "revoked_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "state": {
+            "enum": [
+              "recorded",
+              "expired",
+              "revoked"
+            ]
+          }
+        },
+        "required": [
+          "share_id",
+          "artifact_id",
+          "recipient_kind",
+          "recipient_issuer",
+          "recipient_id",
+          "ordinal",
+          "created_at",
+          "expires_at",
+          "state"
+        ]
+      },
+      "d11": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "visible_until": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "share": {
+            "$ref": "#/$defs/d12"
+          }
+        },
+        "required": [
+          "visible_until",
+          "share"
+        ]
+      },
+      "d14": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "download_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "artifact_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "issuer": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048
+          },
+          "subject": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "client_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "principal_kind": {
+            "enum": [
+              "human",
+              "workload"
+            ]
+          },
+          "state": {
+            "enum": [
+              "Preparing",
+              "Ready",
+              "Streaming",
+              "Interrupted",
+              "Completed",
+              "Cancelled",
+              "Expired",
+              "Denied",
+              "Failed"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "deadline": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "emitted_bytes": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1152921504606846976
+          },
+          "client_receipt": {
+            "const": "unknown"
+          }
+        },
+        "required": [
+          "download_id",
+          "artifact_id",
+          "issuer",
+          "subject",
+          "client_id",
+          "principal_kind",
+          "state",
+          "created_at",
+          "deadline",
+          "emitted_bytes",
+          "client_receipt"
+        ]
+      },
+      "d13": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "visible_until": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "download": {
+            "$ref": "#/$defs/d14"
+          }
+        },
+        "required": [
+          "visible_until",
+          "download"
+        ]
+      },
+      "d16": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "operation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "artifact_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "ordinal": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "not": {
+              "const": "get_processing_report"
+            }
+          },
+          "issuer": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048
+          },
+          "subject": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "client_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "principal_kind": {
+            "enum": [
+              "human",
+              "workload"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "intent_acknowledged": {
+            "type": "boolean"
+          },
+          "outcome_acknowledged": {
+            "type": "boolean"
+          },
+          "status": {
+            "enum": [
+              "unknown",
+              "success",
+              "denied",
+              "invalid",
+              "unavailable",
+              "interrupted"
+            ]
+          },
+          "output_bytes": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1152921504606846976
+          },
+          "client_receipt": {
+            "const": "unknown"
+          },
+          "lane": {
+            "enum": [
+              "normal",
+              "resolution",
+              "processing"
+            ]
+          }
+        },
+        "required": [
+          "operation_id",
+          "ordinal",
+          "name",
+          "issuer",
+          "subject",
+          "client_id",
+          "principal_kind",
+          "created_at",
+          "intent_acknowledged",
+          "outcome_acknowledged",
+          "status",
+          "client_receipt",
+          "lane"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "ordinal": {
+                  "const": 0
+                }
+              }
+            },
+            "then": {
+              "not": {
+                "required": [
+                  "artifact_id"
+                ]
+              }
+            },
+            "else": {
+              "required": [
+                "artifact_id"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "outcome_acknowledged": {
+                  "const": true
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "output_bytes"
+              ],
+              "properties": {
+                "intent_acknowledged": {
+                  "const": true
+                }
+              }
+            }
+          }
+        ]
+      },
+      "d15": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "visible_until": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "operation": {
+            "$ref": "#/$defs/d16"
+          }
+        },
+        "required": [
+          "visible_until",
+          "operation"
+        ]
+      },
+      "d20": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "cluster_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "artifact_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "attempt_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "cluster_id",
+          "artifact_id",
+          "attempt_id"
+        ]
+      },
+      "d19": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "const": "artifact"
+              },
+              "location": {
+                "$ref": "#/$defs/d20"
+              }
+            },
+            "required": [
+              "kind",
+              "location"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "const": "workloadInterval"
+              },
+              "cluster_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "namespace_uid": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "workload_uid": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "acquired_from": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "acquired_until": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "kind",
+              "cluster_id",
+              "namespace_uid",
+              "workload_uid",
+              "acquired_from",
+              "acquired_until"
+            ]
+          }
+        ]
+      },
+      "d18": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 16
+          },
+          "state": {
+            "enum": [
+              "reserved",
+              "restricted",
+              "released"
+            ]
+          },
+          "scope": {
+            "$ref": "#/$defs/d19"
+          },
+          "administration_until": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "retire_by": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "revision",
+          "state",
+          "scope",
+          "administration_until",
+          "retire_by"
+        ]
+      },
+      "d17": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "visible_until": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "rule": {
+            "$ref": "#/$defs/d18"
+          }
+        },
+        "required": [
+          "visible_until",
+          "rule"
+        ]
+      },
+      "d22": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "target_cluster_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "store_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "storage_region": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 63
+          },
+          "acquisition_cluster_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "acquisition_region": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 63
+          },
+          "connector_cluster_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "connector_region": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 63
+          },
+          "hub_cluster_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "hub_region": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 63
+          }
+        },
+        "required": [
+          "id",
+          "target_cluster_id",
+          "store_id",
+          "storage_region",
+          "acquisition_cluster_id",
+          "acquisition_region",
+          "connector_cluster_id",
+          "connector_region",
+          "hub_cluster_id",
+          "hub_region"
+        ]
+      },
+      "d21": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "visible_until": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "path": {
+            "$ref": "#/$defs/d22"
+          }
+        },
+        "required": [
+          "visible_until",
+          "path"
+        ]
+      },
+      "d24": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "activities": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "minItems": 1,
+            "maxItems": 8,
+            "uniqueItems": true
+          },
+          "regions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "minItems": 0,
+            "maxItems": 16,
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "activities",
+          "regions"
+        ]
+      },
+      "d23": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "visible_until": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "processor": {
+            "$ref": "#/$defs/d24"
+          }
+        },
+        "required": [
+          "visible_until",
+          "processor"
+        ]
+      },
+      "d0": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "schema_version": {
+            "const": "processing-report/v1"
+          },
+          "root_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "installation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "section": {
+            "enum": [
+              "artifacts",
+              "shares",
+              "downloads",
+              "operations",
+              "rules",
+              "paths",
+              "processors"
+            ]
+          },
+          "selection_created_before": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "policy_revision": {
+            "$ref": "#/$defs/d1"
+          },
+          "records": {
+            "type": "array",
+            "maxItems": 3
+          },
+          "next": {
+            "$ref": "#/$defs/d2"
+          },
+          "observed_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "valid_until": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "processor_declarations": {
+            "enum": [
+              "supplied",
+              "unsupplied"
+            ]
+          },
+          "coverage": {
+            "const": [
+              "retained metadata observations",
+              "unknown client receipt",
+              "legal exceptions disabled",
+              "recorded lineage"
+            ]
+          }
+        },
+        "required": [
+          "schema_version",
+          "root_id",
+          "installation_id",
+          "section",
+          "selection_created_before",
+          "policy_revision",
+          "records",
+          "observed_at",
+          "valid_until",
+          "processor_declarations",
+          "coverage"
+        ],
+        "oneOf": [
+          {
+            "properties": {
+              "section": {
+                "const": "artifacts"
+              },
+              "records": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/d9"
+                },
+                "minItems": 0,
+                "maxItems": 3
+              },
+              "next": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/d2"
+                  },
+                  {
+                    "oneOf": [
+                      {
+                        "properties": {
+                          "section": {
+                            "const": "artifacts"
+                          }
+                        },
+                        "required": [
+                          "after"
+                        ]
+                      },
+                      {
+                        "properties": {
+                          "section": {
+                            "const": "shares"
+                          }
+                        },
+                        "not": {
+                          "required": [
+                            "after"
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            "required": [
+              "section",
+              "records",
+              "next"
+            ]
+          },
+          {
+            "properties": {
+              "section": {
+                "const": "shares"
+              },
+              "records": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/d11"
+                },
+                "minItems": 0,
+                "maxItems": 3
+              },
+              "next": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/d2"
+                  },
+                  {
+                    "oneOf": [
+                      {
+                        "properties": {
+                          "section": {
+                            "const": "shares"
+                          }
+                        },
+                        "required": [
+                          "after"
+                        ]
+                      },
+                      {
+                        "properties": {
+                          "section": {
+                            "const": "downloads"
+                          }
+                        },
+                        "not": {
+                          "required": [
+                            "after"
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            "required": [
+              "section",
+              "records",
+              "next"
+            ]
+          },
+          {
+            "properties": {
+              "section": {
+                "const": "downloads"
+              },
+              "records": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/d13"
+                },
+                "minItems": 0,
+                "maxItems": 3
+              },
+              "next": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/d2"
+                  },
+                  {
+                    "oneOf": [
+                      {
+                        "properties": {
+                          "section": {
+                            "const": "downloads"
+                          }
+                        },
+                        "required": [
+                          "after"
+                        ]
+                      },
+                      {
+                        "properties": {
+                          "section": {
+                            "const": "operations"
+                          }
+                        },
+                        "not": {
+                          "required": [
+                            "after"
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            "required": [
+              "section",
+              "records",
+              "next"
+            ]
+          },
+          {
+            "properties": {
+              "section": {
+                "const": "operations"
+              },
+              "records": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/d15"
+                },
+                "minItems": 0,
+                "maxItems": 3
+              },
+              "next": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/d2"
+                  },
+                  {
+                    "oneOf": [
+                      {
+                        "properties": {
+                          "section": {
+                            "const": "operations"
+                          }
+                        },
+                        "required": [
+                          "after"
+                        ]
+                      },
+                      {
+                        "properties": {
+                          "section": {
+                            "const": "rules"
+                          }
+                        },
+                        "not": {
+                          "required": [
+                            "after"
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            "required": [
+              "section",
+              "records",
+              "next"
+            ]
+          },
+          {
+            "properties": {
+              "section": {
+                "const": "rules"
+              },
+              "records": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/d17"
+                },
+                "minItems": 0,
+                "maxItems": 3
+              },
+              "next": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/d2"
+                  },
+                  {
+                    "oneOf": [
+                      {
+                        "properties": {
+                          "section": {
+                            "const": "rules"
+                          }
+                        },
+                        "required": [
+                          "after"
+                        ]
+                      },
+                      {
+                        "properties": {
+                          "section": {
+                            "const": "paths"
+                          }
+                        },
+                        "not": {
+                          "required": [
+                            "after"
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            "required": [
+              "section",
+              "records",
+              "next"
+            ]
+          },
+          {
+            "properties": {
+              "section": {
+                "const": "paths"
+              },
+              "records": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/d21"
+                },
+                "minItems": 0,
+                "maxItems": 3
+              },
+              "next": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/d2"
+                  },
+                  {
+                    "oneOf": [
+                      {
+                        "properties": {
+                          "section": {
+                            "const": "paths"
+                          }
+                        },
+                        "required": [
+                          "after"
+                        ]
+                      },
+                      {
+                        "properties": {
+                          "section": {
+                            "const": "processors"
+                          }
+                        },
+                        "not": {
+                          "required": [
+                            "after"
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            "required": [
+              "section",
+              "records",
+              "next"
+            ]
+          },
+          {
+            "properties": {
+              "section": {
+                "const": "processors"
+              },
+              "records": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/d23"
+                },
+                "minItems": 0,
+                "maxItems": 3
+              },
+              "next": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/d2"
+                  },
+                  {
+                    "oneOf": [
+                      {
+                        "properties": {
+                          "section": {
+                            "const": "processors"
+                          }
+                        },
+                        "required": [
+                          "after"
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            "required": [
+              "section",
+              "records"
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

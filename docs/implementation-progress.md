@@ -1,12 +1,33 @@
 # Sustained implementation progress
 
-## Active candidate: workload-interval processing restriction (2026-11-11)
+## Active candidate: processing inventory export (2026-11-11)
+
+Outcome is a complete sequence of bounded audited inventory pages covering
+retained artifacts and deletions, recipients, native sessions, operation
+responses, rules, technical placement and processor declarations. The console
+exports finite JSON parts and continues through every section before reporting
+completion. ADR-322 and SC-PRV-014 record the source and lifetime contracts.
+
+The candidate starts from authoritative `fec1e03e`. Declaration preservation,
+domain and application authority checks, generated contracts and focused schema
+tests pass. The browser and real SQL fixtures are being connected. Review found
+and corrected a draft query that used renewed shared backing as a native
+session's metadata horizon. The reader now uses the original session snapshot
+as an additional immutable bound. Real renewal and upgrade regressions, broad
+gates and fresh installed qualification remain pending.
+
+## Merged workload-interval processing restriction (2026-11-11)
+
+[PR #221](https://github.com/phihos/asservat/pull/221) merged at `fec1e03e`.
+Its complete tree matches reviewed `032a88f6`. All 14 Go shards and `ci-ok`
+passed in [required PR CI](https://github.com/phihos/asservat/actions/runs/42941610819).
+All 4,787 qualification hashes match installed-tested `75b7606b`.
 
 Outcome: a privacy operator searches by workload and acquisition time,
 reviews the complete immutable scope, restricts it, then reloads and releases
 that exact rule. The existing canonical workload scope, audited change,
 durable inventory and compiled SQL grants already support the behavior.
-The console currently offers only exact-artifact restriction. SC-PRV-013
+SC-PRV-013
 records the full review, all-purpose/all-page coverage and replay semantics.
 
 One candidate starts from authoritative `d94ab63f`. The missing review
@@ -39,7 +60,6 @@ owned clusters, labelled Docker resources and build scratch are removed.
 Original reports are archived externally under
 `privacy-workload-restriction/installed-75b7606b`.
 
-Required PR CI and merge remain pending.
 Added routes, roles, SQL state, schema migrations, background jobs and polls
 are zero. Confirmation itself performs no request. One existing audited
 change records the workload rule and the existing reserve funds release.

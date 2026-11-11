@@ -3102,6 +3102,41 @@ paths:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
+  /api/v1/operations/get_processing_report:
+    post:
+      operationId: get_processing_report
+      summary: Read a bounded processing inventory section as a privacy operator (browser only).
+      tags:
+      - Human console
+      x-domain-contract: get_processing_report
+      x-effect: read
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/McpInput_get_processing_report'
+      parameters:
+      - name: X-CSRF-Token
+        in: header
+        required: true
+        description: Required on session-authenticated POST; validate origin and session-bound token.
+        schema:
+          type: string
+          maxLength: 256
+      responses:
+        '200':
+          description: Existing bounded MCP domain-result envelope; domain errors remain status=error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/McpOutput_get_processing_report'
+        default:
+          description: Transport/session/validation failure; no evidence in error details.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
   /api/v1/operations/get_processing_erasure:
     post:
       operationId: get_processing_erasure
@@ -4259,6 +4294,71 @@ components:
           required:
           - status
           - data
+    McpInput_get_processing_report:
+      type: object
+      additionalProperties: false
+      properties:
+        section: {}
+        limit: {}
+        after: {}
+        created_before: {}
+        policy_digest: {}
+      allOf:
+      - $ref: https://asservat.io/spec/v1/processing-report.schema.json#/$defs/Query
+    McpOutput_get_processing_report:
+      allOf:
+      - $ref: https://asservat.io/spec/v1/mcp-result.schema.json
+      - oneOf:
+        - type: object
+          properties:
+            status:
+              const: ok
+            data:
+              $ref: https://asservat.io/spec/v1/processing-report.schema.json#/$defs/Page
+          required:
+          - status
+          - data
+        - type: object
+          properties:
+            status:
+              const: error
+            data:
+              type: object
+              additionalProperties: false
+              properties:
+                code:
+                  type: string
+                  minLength: 1
+                  maxLength: 64
+                message:
+                  type: string
+                  minLength: 1
+                  maxLength: 1024
+                retryable:
+                  type: boolean
+                navigation_uri:
+                  type: string
+                  format: uri
+                  maxLength: 2048
+                responsible_role:
+                  enum:
+                  - maintainer
+                  - approver
+                  - administrator
+                  - none
+                retry_after_seconds:
+                  type: integer
+                  minimum: 1
+                  maximum: 60
+              required:
+              - code
+              - message
+              - retryable
+          required:
+          - status
+          - data
+    ProcessingReportExport:
+      $ref: https://asservat.io/spec/v1/processing-report.schema.json#/$defs/ExportPart
     McpInput_get_processing_erasure:
       type: object
       additionalProperties: false

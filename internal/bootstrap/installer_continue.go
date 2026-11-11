@@ -29,6 +29,7 @@ import (
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	fleetvalue "asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
+	"asservat.local/asservat/internal/domain/privacy"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"k8s.io/client-go/rest"
@@ -120,6 +121,9 @@ func OpenInstallerContinuation(ctx context.Context, files, preparer *os.Root, st
 	}
 	// ADR-194 decision 1: promotion needs the capacity and federation steps.
 	if p := k.input.Public; p != nil {
+		if !privacy.ProcessingOrganizationsValid(installerProcessingOrganizations(p.Processors)) {
+			return nil, mounts.ErrUnavailable
+		}
 		if _, err := captureHistoryBounds(p.CaptureHistory); err != nil {
 			return nil, err
 		}
@@ -723,11 +727,22 @@ func installerIdentitySettings(p *contracts.InstallerPublicSettings) contracts.I
 // cluster's derived path is added to them by the join.
 func (k *InstallerContinuation) processingSettings(root string) contracts.DownloadEnvironmentSettings {
 	s := contracts.DownloadEnvironmentSettings{Format: contracts.DownloadEnvironmentFormat, RootID: root, InstallationID: k.record.Scope.InstallationID, RecoveryEpoch: k.record.Scope.IssuerEpoch, Revision: 1,
-		PermittedRegions: []string{}, Paths: []contracts.DownloadEnvironmentPath{}, Clients: []contracts.DownloadEnvironmentClient{}, Operators: k.input.Public.ProcessingOperators}
+		PermittedRegions: []string{}, Paths: []contracts.DownloadEnvironmentPath{}, Clients: []contracts.DownloadEnvironmentClient{}, Operators: k.input.Public.ProcessingOperators, Processors: k.input.Public.Processors}
 	if k.downloadsEnabled() {
 		s.PermittedRegions, s.Clients = []string{k.downloadRegion()}, downloadClients(*k.input.Public)
 	}
 	return s
+}
+
+func installerProcessingOrganizations(declarations []contracts.ProcessingOrganization) []privacy.ProcessingOrganization {
+	if declarations == nil {
+		return nil
+	}
+	organizations := make([]privacy.ProcessingOrganization, 0, len(declarations))
+	for _, declaration := range declarations {
+		organizations = append(organizations, privacy.ProcessingOrganization{ID: declaration.ID, Name: declaration.Name, Activities: declaration.Activities, Regions: declaration.Regions})
+	}
+	return organizations
 }
 
 // PublicRoles provisions the public runtime roles before the owner's one

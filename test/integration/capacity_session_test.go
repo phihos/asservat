@@ -198,6 +198,7 @@ func (f *capacitySQLFixture) assertOriginalSession(t *testing.T, s capacityManag
 	if json.Unmarshal(n.CapacityBacking, &original) != nil || !original.Matches(s.session) || !original.Native.ValidUntil.Equal(native) || !original.ControlUntil.Equal(control) || !n.SessionDeadline.Time.Equal(s.session.Deadline) || !c.SessionDeadline.Time.Equal(s.session.Deadline) || string(n.CapacityBacking) != string(c.CapacityBacking) || string(n.CapacityBackingDigest) != string(c.CapacityBackingDigest) || n.CapacityAccountID != c.CapacityAccountID || n.CapacityAccountID != capacityProjectionUUID(t, original.AccountID) {
 		t.Fatal("session projection lost original identity, snapshot or cutoff")
 	}
+	f.assertReportOriginalSession(t, s.session)
 }
 
 func capacityProjectionUUID(t *testing.T, text string) pgtype.UUID {

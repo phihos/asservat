@@ -5,6 +5,7 @@ import { processingArtifactIDFromPath } from '../routes';
 import { ProcessingDiscovery } from './ProcessingDiscovery';
 import type { ProcessingDiscoveryClient } from './discovery-http';
 import { ProcessingErasureStatus } from './ProcessingErasureStatus';
+import { ProcessingReport } from './ProcessingReport';
 import type { ProcessingErasureClient } from './erasure-http';
 import { processingClient, ProcessingFailure, uuid, type ProcessingClient, type Inventory, type Change, type Receipt, type Rule, type WorkloadScope } from './http';
 
@@ -152,5 +153,6 @@ export function ProcessingWorkspace({ session, scope, client = processingClient,
     {pending && !busy && <Button className="button" onPress={() => void change(pending)}>{pending.input.action === 'request_early_erasure' ? 'Retry same erasure request' : 'Retry same change'}</Button>}
     <ProcessingErasureStatus session={session} scope={scope} client={erasureClient} disabled={locked}
       acceptedRequestID={current() && receipt?.state === 'erasureRequested' ? receipt.requestID : undefined}/>
+    <ProcessingReport session={session} scope={scope} disabled={locked}/>
   </div>;
 }

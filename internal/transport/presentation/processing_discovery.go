@@ -17,6 +17,7 @@ import (
 const (
 	processingDiscoveryOperation     = "search_processing_evidence"
 	processingErasureStatusOperation = "get_processing_erasure"
+	processingReportOperation        = "get_processing_report"
 )
 
 type ProcessingDiscoveryOperations struct {
@@ -25,10 +26,11 @@ type ProcessingDiscoveryOperations struct {
 	newID         func() string
 	reader        privacy.ProcessingEvidenceDiscovery
 	erasureStatus *privacy.ProcessingErasureStatus
+	report        *privacy.ProcessingReport
 	contracts     *contracts.InvestigationContracts
 }
 
-func NewProcessingDiscoveryOperations(origin string, now func() time.Time, newID func() string, reader privacy.ProcessingEvidenceDiscovery, erasureStatus *privacy.ProcessingErasureStatus) (*ProcessingDiscoveryOperations, error) {
+func NewProcessingDiscoveryOperations(origin string, now func() time.Time, newID func() string, reader privacy.ProcessingEvidenceDiscovery, erasureStatus *privacy.ProcessingErasureStatus, report *privacy.ProcessingReport) (*ProcessingDiscoveryOperations, error) {
 	u, err := url.Parse(origin)
 	if err != nil || u.Scheme != "https" || u.Host == "" || u.Path != "" || now == nil || newID == nil || reader.Discovery == nil {
 		return nil, ErrOperationsConfiguration
@@ -37,21 +39,36 @@ func NewProcessingDiscoveryOperations(origin string, now func() time.Time, newID
 	if err != nil {
 		return nil, err
 	}
-	return &ProcessingDiscoveryOperations{origin, now, newID, reader, erasureStatus, wire}, nil
+	return &ProcessingDiscoveryOperations{origin: origin, now: now, newID: newID, reader: reader, erasureStatus: erasureStatus, report: report, contracts: wire}, nil
 }
 
 func (s *ProcessingDiscoveryOperations) PublicOrigin() string { return s.origin }
 func (s *ProcessingDiscoveryOperations) ToolNames() []string {
+	names := []string{processingDiscoveryOperation}
 	if s.erasureStatus != nil {
-		return []string{processingDiscoveryOperation, processingErasureStatusOperation}
+		names = append(names, processingErasureStatusOperation)
 	}
-	return []string{processingDiscoveryOperation}
+	if s.report != nil {
+		names = append(names, processingReportOperation)
+	}
+	return names
 }
 func (s *ProcessingDiscoveryOperations) Tool(name string) (contracts.InvestigationTool, bool) {
-	if name != processingDiscoveryOperation && (name != processingErasureStatusOperation || s.erasureStatus == nil) {
+	if name != processingDiscoveryOperation && (name != processingErasureStatusOperation || s.erasureStatus == nil) && (name != processingReportOperation || s.report == nil) {
 		return contracts.InvestigationTool{}, false
 	}
 	return s.contracts.Tool(name)
+}
+
+func processingReportQuery(raw []byte) (value.ProcessingReportQuery, error) {
+	var query value.ProcessingReportQuery
+	if json.Unmarshal(raw, &query) != nil || !query.Valid() {
+		return value.ProcessingReportQuery{}, contracts.ErrInvestigationWire
+	}
+	query = query.Normalized()
+	query.CreatedBefore = query.CreatedBefore.UTC()
+	query.After.CreatedAt = query.After.CreatedAt.UTC()
+	return query, nil
 }
 
 func processingDiscoveryQuery(raw []byte) (value.ProcessingDiscoveryQuery, error) {
@@ -75,7 +92,17 @@ func (s *ProcessingDiscoveryOperations) CallWithContext(ctx context.Context, cur
 	}
 	var data any
 	var validUntil time.Time
-	if name == processingErasureStatusOperation {
+	if name == processingReportOperation {
+		query, err := processingReportQuery(raw)
+		if err != nil {
+			return OperationReply{}, err
+		}
+		page, err := s.report.Get(ctx, current, query)
+		if err != nil {
+			return OperationReply{}, err
+		}
+		data, validUntil = page, page.ValidUntil
+	} else if name == processingErasureStatusOperation {
 		var input processingErasureStatusInput
 		if json.Unmarshal(raw, &input) != nil || !authorization.UUID(input.RequestID) {
 			return OperationReply{}, contracts.ErrInvestigationWire

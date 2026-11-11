@@ -34,3 +34,23 @@ func TestInstallerApprovalSettingsWireCompatibility(t *testing.T) {
 		t.Fatal("approval policy not preserved", err)
 	}
 }
+
+func TestInstallerProcessingOrganizationsPreserveOptionalWireShape(t *testing.T) {
+	for _, declarations := range [][]ProcessingOrganization{nil, {}, {{ID: "org-1", Name: "Declared organization", Activities: []string{"Storage"}, Regions: []string{}}}} {
+		raw, err := json.Marshal(InstallerContinuation{Public: &InstallerPublicSettings{Processors: declarations}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if bytes.Contains(raw, []byte(`"processors"`)) != (declarations != nil) {
+			t.Fatal("installer changed declaration presence")
+		}
+		decoded, err := DecodeInstallerContinuation(bytes.NewReader(raw))
+		if err != nil || decoded.Public == nil || (decoded.Public.Processors == nil) != (declarations == nil) || len(decoded.Public.Processors) != len(declarations) {
+			t.Fatal("installer declarations did not round trip", err)
+		}
+	}
+	raw := `{"public":{"processors":[{"id":"org-1","name":"Org","activities":["Storage"],"regions":[],"endpoint":"https://outside.invalid"}]}}`
+	if _, err := DecodeInstallerContinuation(strings.NewReader(raw)); err == nil {
+		t.Fatal("installer accepted an unrecognized processor field")
+	}
+}

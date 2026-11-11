@@ -286,7 +286,7 @@ func (s *AuditedOperations) call(ctx context.Context, current identities.Current
 			rejection = IngressInvalid
 		} else if normalized, err = s.normalize(name, raw); err != nil {
 			rejection = IngressInvalid
-		} else if name != processingDiscoveryOperation && name != processingErasureStatusOperation && !slices.Contains(initial.Scopes, "evidence:read") {
+		} else if name != processingDiscoveryOperation && name != processingErasureStatusOperation && name != processingReportOperation && !slices.Contains(initial.Scopes, "evidence:read") {
 			rejection = IngressDenied
 		} else if (name == "prepare_artifact_download" || name == "get_artifact_download") && !slices.Contains(initial.Scopes, "evidence:download") {
 			rejection, downloadScopeDenied = IngressDenied, true
@@ -542,6 +542,13 @@ func (s *AuditedOperations) normalize(name string, raw []byte) ([]byte, error) {
 			return nil, contracts.ErrInvestigationWire
 		}
 		return json.Marshal(in)
+	}
+	if name == processingReportOperation {
+		query, err := processingReportQuery(raw)
+		if err != nil {
+			return nil, err
+		}
+		return json.Marshal(query)
 	}
 	if name == processingErasureStatusOperation {
 		var input processingErasureStatusInput

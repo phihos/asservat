@@ -14,6 +14,7 @@ const DownloadEnvironmentMaxBytes = 128 << 10
 // Private administrator policy. No endpoint, credential, raw artifact content,
 // subject search index, or caller-selected processing placement is accepted.
 type DownloadEnvironmentSettings struct {
+	Processors       []ProcessingOrganization    `json:"processors,omitzero"`
 	LiveRead         *LiveReadSettings           `json:"liveRead,omitempty"`
 	Format           string                      `json:"format"`
 	RootID           string                      `json:"rootID"`
@@ -26,6 +27,15 @@ type DownloadEnvironmentSettings struct {
 	Clients          []DownloadEnvironmentClient `json:"clients"`
 	Operators        []ProcessingOperator        `json:"operators"`
 }
+
+// ProcessingOrganization declares an organization for privacy inventory reports.
+type ProcessingOrganization struct {
+	ID         string   `json:"id"`
+	Name       string   `json:"name"`
+	Activities []string `json:"activities"`
+	Regions    []string `json:"regions"`
+}
+
 type DownloadEnvironmentRevision struct {
 	UID        string `json:"uid"`
 	Generation int64  `json:"generation"`

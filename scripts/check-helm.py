@@ -190,6 +190,24 @@ def check_bootstrap(directory):
     assert "permissionDelegations" not in settings, "empty delegations changed existing installer identities"
     assert "approvals" not in settings, "absent approval settings changed existing installer identities"
     assert "captureHistory" not in settings, "absent history limits changed existing installer identities"
+    assert "processors" not in settings, "absent organization declarations changed existing installer identities"
+    organization = {"id": "org-1", "name": "Declared organization", "activities": ["Evidence storage"], "regions": []}
+    for declarations in ([], [organization]):
+        declared = copy.deepcopy(public)
+        declared["bootstrap"]["continuation"]["public"]["processors"] = declarations
+        declared_docs = render(declared)
+        declared_input, = [r for r in declared_docs if "continuation.json" in r.get("data", {})]
+        assert json.loads(declared_input["data"]["continuation.json"])["public"]["processors"] == declarations
+    for declarations in (None, [organization, organization], [dict(organization, activities=[])],
+                         [dict(organization, regions=None)], [dict(organization, endpoint="https://outside.invalid")],
+                         [dict(organization, name="n" * 161)], [dict(organization, activities=["a" * 129])],
+                         [dict(organization, regions=["r" * 129])], [dict(organization, id=str(n)) for n in range(17)]):
+        bad = copy.deepcopy(public)
+        bad["bootstrap"]["continuation"]["public"]["processors"] = declarations
+        render(bad, ok=False)
+    no_public = copy.deepcopy(continued)
+    no_public["bootstrap"]["continuation"]["public"]["processors"] = []
+    render(no_public, ok=False)
     bounded = copy.deepcopy(public)
     bounded["bootstrap"]["continuation"]["public"]["captureHistory"] = {"perSelector": 200, "perInstallation": 10000}
     bdocs = render(bounded)
