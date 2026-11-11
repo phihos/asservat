@@ -353,7 +353,7 @@ func (s *federationPeers) resolve(ctx context.Context, p value.ClusterCredential
 	}
 	profile, backing, err := s.profiles.ReadStagedConnector(ctx, p)
 	if err != nil {
-		return zero, value.ErrDenied // never staged, suspended or blocked
+		return zero, federationEnrollmentError{"staged-profile", value.ErrDenied} // never staged, suspended or blocked
 	}
 	staged, err := json.Marshal(struct {
 		Profile value.ConnectorCredentialProfile
@@ -379,41 +379,55 @@ func (s *federationPeers) resolve(ctx context.Context, p value.ClusterCredential
 }
 
 // federationPeer composes one staged peer's unchanged ADR-153 duties.
-func federationPeer(ctx context.Context, c contracts.FederationDeployment, profile value.ConnectorCredentialProfile, backing fleetapp.ConnectorIdentityBacking, pools map[string]*pgxpool.Pool, mac *auditapp.OperationMAC, accountVersion string, recovery *postgres.RecoveryReader, store *objectstore.Store, seal *kms.Sealer, open *kms.Opener, keys *http.Client, in *providerInputs, providers *kms.InstalledFederationProviderEffects) (connectorlifecycle.PeerDuties, error) {
+func federationPeer(ctx context.Context, c contracts.FederationDeployment, profile value.ConnectorCredentialProfile, backing fleetapp.ConnectorIdentityBacking, pools map[string]*pgxpool.Pool, mac *auditapp.OperationMAC, accountVersion string, recovery *postgres.RecoveryReader, store *objectstore.Store, seal *kms.Sealer, open *kms.Opener, keys *http.Client, in *providerInputs, providers *kms.InstalledFederationProviderEffects) (_ connectorlifecycle.PeerDuties, err error) {
+	step := "inputs"
+	defer func() {
+		if err != nil {
+			err = federationEnrollmentError{step, err}
+		}
+	}()
 	var zero connectorlifecycle.PeerDuties
 	binding := profile.Binding
 	q := backing.Policy
 	if !profile.Valid() || profile.Suspended || binding.InstallationID != c.InstallationID || profile.RootID != c.PermissionRootID || backing.AccountVersion != accountVersion || q.History == nil {
 		return zero, mounts.ErrUnavailable
 	}
+	step = "process-journal"
 	process, err := postgres.NewConnectorProcesses(ctx, pools["connector-journal"], profile.RootID, binding, backing, mac)
 	if err != nil {
 		return zero, mounts.ErrUnavailable
 	}
+	step = "credential-journal"
 	credential, err := postgres.NewConnectorCredentials(ctx, pools["connector-journal"], profile.RootID, binding, backing, mac)
 	if err != nil {
 		return zero, mounts.ErrUnavailable
 	}
+	step = "audit-journal"
 	journal, err := postgres.NewConnectorAuditJournal(ctx, pools["connector-journal"], q)
 	if err != nil {
 		return zero, mounts.ErrUnavailable
 	}
+	step = "audit-acknowledgements"
 	ack, err := postgres.NewConnectorAuditAcknowledgements(ctx, pools["connector-ack"], q)
 	if err != nil {
 		return zero, mounts.ErrUnavailable
 	}
+	step = "audit-objects"
 	closed, err := objectstore.NewClosedOperationAuditObjects(store, q.StoreID, seal, open)
 	if err != nil {
 		return zero, mounts.ErrUnavailable
 	}
+	step = "auditor"
 	auditor, err := fleetapp.NewConnectorOperationAuditor(q, journal, ack, &objectstore.OperationAuditObjects{Store: store, Seal: seal, Open: open}, closed, ack, time.Now)
 	if err != nil {
 		return zero, mounts.ErrUnavailable
 	}
+	step = "credential-verifier"
 	verifier, err := mtls.NewConnectorCredentialVerifier(profile, time.Now)
 	if err != nil {
 		return zero, mounts.ErrUnavailable
 	}
+	step = "credential-issuer"
 	var issuers federationIssuer
 	for _, usage := range []string{"client", "server"} {
 		role := c.KeyService.ClientRole
@@ -437,6 +451,7 @@ func federationPeer(ctx context.Context, c contracts.FederationDeployment, profi
 		}
 	}
 	pin := fleetapp.ConnectorQualificationPin{InstallationID: q.InstallationID, StoreID: q.StoreID, BackupProfileID: q.BackupProfileID, Qualification: *q.History}
+	step = "source-journal"
 	sources, err := postgres.NewConnectorIdentitySources(ctx, pools["connector-source"], profile.RootID, binding, pin)
 	if err != nil {
 		return zero, mounts.ErrUnavailable
@@ -539,7 +554,7 @@ func (s *federationPeers) stage(ctx context.Context, region *connectorlifecycle.
 func (s federationServices) Enroll(ctx context.Context, region *connectorlifecycle.Region, id string, r value.ConnectorProcessRequest) (value.ConnectorCredentialProcess, error) {
 	out, err := s.Runners.Enroll(ctx, region, id, r)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "federation enroll failed: "+federationCause(err))
+		fmt.Fprintln(os.Stderr, "federation enroll failed: "+federationEnrollmentStep(err)+" "+federationCause(err))
 	}
 	return out, err
 }
@@ -647,4 +662,22 @@ func federationOwnerReads(ctx context.Context, c contracts.FederationDeployment,
 	}
 	routes := &fleetapp.OwnerRoutes{Configurations: configurations, Endpoints: endpoints, Now: time.Now}
 	return connectorlifecycle.OwnerReads{Candidates: registry, ObservationCandidates: registry, Registry: registry, Authenticator: &fleetapp.OwnerAuthenticator{Registry: registry, Routes: routes, Protection: guard, Now: time.Now}}, guard, nil
+}
+
+// Each stage is a local literal. Do not format SQL/provider errors, request
+// bodies, key material or identities into the operator line.
+type federationEnrollmentError struct {
+	step string
+	err  error
+}
+
+func (e federationEnrollmentError) Error() string     { return "federation enrollment " + e.step }
+func (e federationEnrollmentError) Unwrap() error     { return e.err }
+func (e federationEnrollmentError) FixedStep() string { return e.step }
+func federationEnrollmentStep(err error) string {
+	var failure federationEnrollmentError
+	if errors.As(err, &failure) {
+		return "resolve/" + failure.step
+	}
+	return connectorlifecycle.EnrollmentStep(err)
 }

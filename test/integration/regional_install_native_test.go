@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"io"
 	"net"
 	"net/http"
@@ -33,6 +34,7 @@ import (
 	"asservat.local/asservat/internal/domain/identity"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	apps "k8s.io/api/apps/v1"
 	authn "k8s.io/api/authentication/v1"
@@ -179,6 +181,7 @@ func qualifyRegionalInstall(t *testing.T, ctx context.Context, f fixture, index 
 	peer := envelope.Binding.PeerID
 	waitActive := func(except string) string {
 		t.Helper()
+		diagnoseAt, diagnosed := time.Now().Add(30*time.Second), false
 		for until := time.Now().Add(3 * time.Minute); time.Now().Before(until); time.Sleep(installedPoll) {
 			var pod string
 			e := admin.QueryRow(ctx, `SELECT p.pod_uid::text FROM connector_identity_process p WHERE p.root_id=$1 AND p.peer_id=$2 AND p.accepted_at IS NOT NULL AND p.pod_uid::text<>$3
@@ -187,8 +190,13 @@ func qualifyRegionalInstall(t *testing.T, ctx context.Context, f fixture, index 
 			if e == nil {
 				return pod
 			}
+			if !diagnosed && time.Now().After(diagnoseAt) {
+				regionalEnrollmentDiagnostics(t, ctx, admin, installation, envelope.BootstrapID, offer.PermissionRootID, peer)
+				diagnosed = true
+			}
 		}
 		regionalLogs(t, ctx, region)
+		regionalEnrollmentDiagnostics(t, ctx, admin, installation, envelope.BootstrapID, offer.PermissionRootID, peer)
 		t.Fatal("regional connector not enrolled with both leaves")
 		return ""
 	}
@@ -237,6 +245,84 @@ func qualifyRegionalInstall(t *testing.T, ctx context.Context, f fixture, index 
 		t.Fatal("non-administrator source write not denied", err)
 	}
 	t.Log("non-administrator source write denied by the source guard")
+}
+
+// One read-only snapshot of this exact bootstrap/peer names the last durable
+// checkpoint. Only fixed labels, booleans and counts leave SQL: never records,
+// identifiers, credentials, certificate bytes, payload digests or raw errors.
+func regionalEnrollmentDiagnostics(t *testing.T, ctx context.Context, admin *pgxpool.Pool, installation, bootstrap, root, peer string) {
+	t.Helper()
+	call, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	var state []byte
+	err := admin.QueryRow(call, `WITH
+ intent AS (SELECT issued_at,credential_recorded_at,audit_acknowledged_at FROM fleet_bootstrap_intent WHERE installation_id=$1 AND id=$2),
+ slot AS (SELECT revoked,not_before,not_after,claimed_at,claim_acknowledged_at FROM fleet_bootstrap WHERE installation_id=$1 AND id=$2),
+ activation AS (SELECT lineage_id,audit_acknowledged_at,activated_at FROM cluster_bootstrap_activation WHERE installation_id=$1 AND bootstrap_id=$2),
+ profile AS (SELECT accepted_id,suspended,fenced,blocked FROM connector_identity_profile WHERE root_id=$3 AND peer_id=$4),
+ processes AS (SELECT id,accepted_at,serving,retired_at,run_until FROM connector_identity_process WHERE root_id=$3 AND peer_id=$4),
+ leaves AS (SELECT usage,provider_started,issued IS NOT NULL AS certificate_issued,activated_at,detached_at,certificate_not_after FROM connector_credential_attempt WHERE root_id=$3 AND peer_id=$4),
+ checkpoints AS (SELECT
+  EXISTS(SELECT 1 FROM intent) AS intent_present,
+  EXISTS(SELECT 1 FROM intent WHERE credential_recorded_at IS NOT NULL) AS credential_recorded,
+  EXISTS(SELECT 1 FROM intent WHERE audit_acknowledged_at IS NOT NULL) AS issue_audited,
+  EXISTS(SELECT 1 FROM intent WHERE issued_at IS NOT NULL) AS issued,
+  EXISTS(SELECT 1 FROM slot) AS slot_present,
+  EXISTS(SELECT 1 FROM slot WHERE revoked) AS revoked,
+  EXISTS(SELECT 1 FROM slot WHERE clock_timestamp()>=not_before AND clock_timestamp()<not_after) AS original_slot_current,
+  EXISTS(SELECT 1 FROM slot WHERE claimed_at IS NOT NULL) AS claimed,
+  EXISTS(SELECT 1 FROM slot WHERE claim_acknowledged_at IS NOT NULL) AS claim_audited,
+  EXISTS(SELECT 1 FROM activation) AS activation_reserved,
+  EXISTS(SELECT 1 FROM activation WHERE audit_acknowledged_at IS NOT NULL) AS activation_audited,
+  EXISTS(SELECT 1 FROM activation WHERE activated_at IS NOT NULL) AS activated,
+  EXISTS(SELECT 1 FROM profile) AS profile_present,
+  EXISTS(SELECT 1 FROM profile WHERE accepted_id IS NOT NULL AND NOT suspended AND NOT fenced AND NOT blocked) AS profile_accepted,
+  EXISTS(SELECT 1 FROM processes WHERE accepted_at IS NOT NULL AND retired_at IS NULL AND clock_timestamp()<run_until) AS process_accepted,
+  EXISTS(SELECT 1 FROM leaves WHERE usage='client' AND activated_at IS NOT NULL AND detached_at IS NULL AND clock_timestamp()<certificate_not_after) AS client_leaf_active,
+  EXISTS(SELECT 1 FROM leaves WHERE usage='server' AND activated_at IS NOT NULL AND detached_at IS NULL AND clock_timestamp()<certificate_not_after) AS server_leaf_active)
+ SELECT jsonb_build_object(
+  'stage',CASE WHEN NOT slot_present THEN 'issued-slot-missing'
+   WHEN NOT issued THEN 'issue-pending' WHEN revoked THEN 'bootstrap-revoked'
+   WHEN NOT claimed THEN 'bootstrap-unclaimed' WHEN NOT claim_audited THEN 'claim-audit-pending'
+   WHEN NOT activation_reserved THEN 'activation-reservation-missing'
+   WHEN NOT activation_audited THEN 'activation-audit-pending' WHEN NOT activated THEN 'activation-pending'
+   WHEN NOT profile_accepted THEN 'profile-acceptance-pending' WHEN NOT process_accepted THEN 'process-admission-pending'
+   WHEN NOT client_leaf_active THEN 'client-leaf-pending' WHEN NOT server_leaf_active THEN 'server-leaf-pending'
+   ELSE 'paired-process-not-observed' END,
+  'intent_present',intent_present,'credential_recorded',credential_recorded,'issue_audited',issue_audited,'issued',issued,
+  'slot_present',slot_present,'revoked',revoked,'original_slot_current',original_slot_current,'claimed',claimed,'claim_audited',claim_audited,
+  'activation_reserved',activation_reserved,'activation_audited',activation_audited,'activated',activated,
+  'fleet_trust_current',EXISTS(SELECT 1 FROM fleet_current_trust WHERE installation_id=$1 AND NOT suspended AND NOT recovery_blocked AND clock_timestamp()<fresh_until),
+  'registered_peer',EXISTS(SELECT 1 FROM fleet_peer WHERE installation_id=$1 AND peer_id=$4 AND enabled),
+  'profile_present',profile_present,'profile_accepted',profile_accepted,
+  'profile_suspended',EXISTS(SELECT 1 FROM profile WHERE suspended),
+  'profile_fenced',EXISTS(SELECT 1 FROM profile WHERE fenced),'profile_blocked',EXISTS(SELECT 1 FROM profile WHERE blocked),
+  'source_capacity',(SELECT jsonb_build_object('root_present',true,'root_current',clock_timestamp()<valid_until,
+    'profiles',profiles,'profile_limit',profile_limit,'source_transitions',source_transitions,
+    'source_transition_limit',source_transition_limit,'backing_pending',pending_id IS NOT NULL)
+    FROM connector_identity_root WHERE root_id=$3),
+  'lineage_present',EXISTS(SELECT 1 FROM activation a JOIN cluster_enrollment_lineage l USING(lineage_id)),
+  'lineage_fenced',EXISTS(SELECT 1 FROM activation a JOIN cluster_enrollment_lineage l USING(lineage_id) WHERE l.fenced IS NOT NULL),
+  'generation_one_present',EXISTS(SELECT 1 FROM activation a JOIN cluster_enrollment_credential c USING(lineage_id) WHERE c.generation=1),
+  'generation_one_used',EXISTS(SELECT 1 FROM activation a JOIN cluster_enrollment_credential c USING(lineage_id) WHERE c.generation=1 AND c.first_used_at IS NOT NULL),
+  'legacy_public_sign_attempts',(SELECT count(*) FROM fleet_certificate_issue WHERE installation_id=$1 AND bootstrap_id=$2),
+  'processes',(SELECT count(*) FROM processes),'process_accepted',process_accepted,
+  'serving_processes',(SELECT count(*) FROM processes WHERE serving AND retired_at IS NULL),
+  'client_sign_attempts',(SELECT count(*) FROM leaves WHERE usage='client'),
+  'server_sign_attempts',(SELECT count(*) FROM leaves WHERE usage='server'),
+  'provider_started',(SELECT count(*) FROM leaves WHERE provider_started),
+  'certificates_issued',(SELECT count(*) FROM leaves WHERE certificate_issued),
+  'client_leaf_active',client_leaf_active,'server_leaf_active',server_leaf_active) FROM checkpoints`, installation, bootstrap, root, peer).Scan(&state)
+	if err != nil {
+		code := "unavailable"
+		var sqlError *pgconn.PgError
+		if errors.As(err, &sqlError) {
+			code = sqlError.Code
+		}
+		t.Logf("regional enrollment checkpoint: diagnostic=%s canceled=%v", code, call.Err() != nil)
+		return
+	}
+	t.Logf("regional enrollment checkpoint: %s", state)
 }
 
 // installRegionalStartCRD is the owned fixture's operator setup, equivalent to

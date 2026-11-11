@@ -57,6 +57,32 @@ default correction are next. No complete Helm installation or
 homelab outcome is claimed. Target context/dependency choices await the
 maintainer; owned collector-free qualification can proceed independently.
 
+At `31e7b7ab`, full `make pre-push` passes (affected Go race382s). The proposed
+reference profile's zero history horizon fails promoted shared-query admission;
+changing only that configured allowance to1s passes actual Helm decoding,
+complete root/backend/pool conservation and connector compilation. No footprint
+or required query capability is reduced. Root configured totals are97,828,864
+SQL bytes,195,657,728 backup bytes,16,005,726,208 WAL bytes and1,392 system objects.
+The profile is shipped at `examples/helm/context-trial-profile.yaml`.
+
+Actual Helm qualification at `830eca51` uses that exact profile (including
+one bootstrap/cluster, normal4×128 headroom and pre-reserved regional capacity).
+All five hook commands exit0; Helm joins successfully and the original hook
+is deleted. Public services, protected capacity and retention become ready.
+The actual browser API issues one audited bootstrap, and the operator reads
+and reuses that same KV record for regional enrollment. The connector starts
+without restarts, but enrollment is refused and both ordinary leaves never
+activate: overall Go408.504s/harness481.5s, exits1/nonzero. No successful capture
+is claimed. Federation logs classify the ordinary enrollment error as
+unavailable; focused reproduction and bounded stage diagnostics are next.
+
+All4,830 source hashes independently match `830eca51`, source stays frozen,
+cleanup failures are empty and all owned clusters, labelled resources and
+networks are independently absent; build scratch is removed. The actual profile
+SHA and packaged chart SHA are retained in
+`homelab-context-trial/installed-830eca51`. This is a successful Helm bootstrap
+boundary, not a qualified end-to-end trial or completed specification.
+
 ## Active candidate: processing inventory export (2026-11-11)
 
 [PR222](https://github.com/phihos/asservat/pull/222) starts from authoritative
