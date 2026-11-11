@@ -2,10 +2,15 @@ package integration
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
 	"time"
+
+	capacityapp "asservat.local/asservat/internal/application/capacity"
+	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/audit"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -28,6 +33,9 @@ func qualifyShareLayoutUpgrade(t *testing.T, ctx context.Context, conn *pgx.Conn
 	}
 	checkLayouts := func(current bool) {
 		t.Helper()
+		if current {
+			qualifyShareBusinessWALMinimum(t, ctx, conn)
+		}
 		for _, row := range []struct {
 			lane, layout string
 			valid        bool
@@ -183,4 +191,35 @@ func qualifyShareLayoutUpgrade(t *testing.T, ctx context.Context, conn *pgx.Conn
 		t.Fatal("SQL153/154 roundtrip changed lifecycle owners/table/column grants")
 	}
 	t.Log("SQL154 admitted fixed24/34 layouts without old-profile promotion; empty Down154/153/Up preserved actual owners and table/column grant options; new-only grants refused atomically")
+}
+
+// Exercise the final SQL protected-source validator against Go-produced policies:
+// protocol-only backing and one-byte-short backing must both refuse v4.
+func qualifyShareBusinessWALMinimum(t *testing.T, ctx context.Context, conn *pgx.Conn) {
+	t.Helper()
+	id := "40000000-0000-4000-8000-000000000001"
+	for _, lane := range []string{"normal", "resolution"} {
+		q := audit.OperationHistoryQualification{ID: id, Digest: artifact.Digest{1}, Layout: audit.ShareOperationHistoryLayout, MaximumRowFootprintBytes: 128 << 10, MaximumTransitionWALBytes: 256 << 10, BackupCopies: 2, WALCopies: 3}
+		b, w := q.SlotBacking(4)
+		v := capacityapp.RootAuditBacking{Accounts: 2, RecordsPerAccount: 3, RetainedSeconds: 10000, Policy: audit.OperationLifecyclePolicy{RootID: id, Lane: lane, InstallationID: id, StoreID: id, PolicyID: id, BackupProfileID: id, PolicyDigest: artifact.Digest{2}, BackupProfileDigest: artifact.Digest{3}, BackingRevision: 1, MetadataSlots: 6, BackupReservedBytes: 6 * b, WALReservedBytes: 6 * w, BackupHorizonSeconds: 1, CleanupBudgetSeconds: 1, ProofWindowSeconds: 1, ValidUntil: time.Now().UTC().Truncate(time.Microsecond).Add(time.Hour), MaxPurgeLeases: 4, History: &q, OverdueTerminal: audit.OperationOverdueTerminal}}
+		for _, tc := range []struct {
+			name    string
+			missing int64
+			valid   bool
+		}{
+			{"exact", 0, true}, {"one-byte", 1, false}, {"protocol-only", 6 * 2 * 3 * (8 << 20), false},
+		} {
+			candidate := v
+			candidate.Policy.WALReservedBytes -= tc.missing
+			raw, err := json.Marshal(candidate)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var valid bool
+			err = conn.QueryRow(ctx, `SELECT capacity_root_audit_valid($1::jsonb,$2::uuid,$2::uuid,$3,'operation-audit-history/v4')`, raw, id, lane).Scan(&valid)
+			if err != nil || valid != tc.valid {
+				t.Fatal("SQL business WAL minimum", lane, tc.name, valid, err)
+			}
+		}
+	}
 }

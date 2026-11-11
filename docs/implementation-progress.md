@@ -36,6 +36,7 @@ cleanup failures empty and owned containers independently absent):
 | `ef8e019a` | Policy Go 69.886 s, exit1; 4,562 hashes | Full recurring matrix passed39.18 s. Wide acceptance, capture, manifest and first publication passed;25 shared before the fixture's unrenewed30s fleet observation expired. Existing same-pin observation refresh is now called per operation, without changing capture/writer deadlines or the30s window. `policy-cost-ef8e019a`. |
 | `bef1348e` | Policy Go 105.570 s, exit1; 4,562 hashes | Recurring matrix passed39.07 s; all100 wide captures/shares were genuinely published. The mutation stage used a token name rejected by its synthetic resolver; correct that contract and preflight the caller before the100 loop. Observed share-relation growth4,481,024 bytes and whole-instance WAL15,215,968 bytes cover capture/publication, not revoke-all. `policy-cost-bef1348e`. |
 | `dac2d40d` | Wide Go 67.533 s, exit1; 4,562 hashes | All100 captures/shares, rollback, paid revoke-all and replay semantics passed. Final cost assertion refused measured WAL6,731,960/7,703,136 bytes versus the original2MiB bound. Smaller trigger/index changes are being measured before any blanket reservation increase. `policy-cost-dac2d40d`. |
+| `a3ca495f` | Go69.301 s, exit1; 4,562 hashes | All100 wide shares and paid mutation/refusal/replay semantics pass. Exact tuple checks and partial recipient GIN reduce paid WAL to1,949,488 bytes and rollback to2,957,808; paid TOAST growth is0. Rollback still exceeds the original2MiB fixture value. Schema upgrade/rollback passes2.41 s, including both index forms. `policy-cost-a3ca495f`. |
 
 The original baseline failure at `1dc7c616` requested incompatible 60-second
 retention. The corrected fixture used its original 20-second managed capture,
@@ -51,10 +52,11 @@ schema IDs, full specification validation passed (13,970 assertions). Independen
 installer composition found no actionable issue. These are component results,
 not installed provider/IAM, backup-chain or universal footprint qualification.
 
-Next: measure the admitted wide policy100 sample through genuine audited capture
-and paid revoke-all (1,536-byte issuer, eight groups/recipients, 256-byte IDs;
-pure record59,133 bytes). Keep the all-field-max rejection explicit, establish
-justified row/WAL bounds, run final broad gates, then
+Next: fund the measured bounded sharing effect once per normal-v4 slot with
+the fixed8MiB business-WAL allowance documented in ADR323, separately from
+per-transition audit-protocol backing. Keep Go compilation and SQL validation
+identical, preserve old layouts and all-field-max rejection, rerun the same
+wide100 sample and schema roundtrip, run final broad gates, then
 fresh collector-free `share-retirement` installed qualification. Its original
 short bounds are selected before installation; timestamps are never rewritten
 to make cleanup due. No new installed outcome or completed spec is claimed.

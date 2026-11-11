@@ -94,8 +94,19 @@ func TestCapacityRootBackingShareLayoutsIncreaseTheOriginalEnvelope(t *testing.T
 	if err != nil {
 		t.Fatal("fully funded share layouts rejected", err)
 	}
-	if next.Totals().WALBytes <= old.Totals().WALBytes {
-		t.Fatal("share effects and retirement added no prepaid WAL")
+	// Capture v2 adds two protocol transitions; normal/resolution v4 each
+	// add three, plus the one fixed business effect per generation/copy.
+	wantDelta := int64(0)
+	for _, lane := range []RootAuditBacking{in.Capture, in.Normal, in.Resolution} {
+		q := lane.Policy.History
+		extra := int64(3)*q.MaximumTransitionWALBytes + 8<<20
+		if lane.Policy.Lane == "capture" {
+			extra = 2 * q.MaximumTransitionWALBytes
+		}
+		wantDelta += lane.Policy.MetadataSlots * 2 * q.WALCopies * extra
+	}
+	if got := next.Totals().WALBytes - old.Totals().WALBytes; got != wantDelta {
+		t.Fatalf("aggregate share WAL delta=%d want %d", got, wantDelta)
 	}
 	in.Envelope.WALBytes = old.Totals().WALBytes
 	if _, err := CompileRootBacking(in, pool); err != ErrBudgetFull {

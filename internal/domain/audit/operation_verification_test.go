@@ -73,6 +73,14 @@ func TestSharingRequiresItsOwnPrepaidLayoutAndLane(t *testing.T) {
 			if !p.SharingBacked() {
 				t.Fatal("fully prepaid share layout rejected")
 			}
+			if tc.next == ShareOperationHistoryLayout {
+				business := p.MetadataSlots * 2 * q.WALCopies * ShareOperationBusinessWALBytes
+				p.WALReservedBytes -= business
+				if p.Valid() {
+					t.Fatal("audit protocol backing accepted without the business allowance")
+				}
+				p.WALReservedBytes += business
+			}
 			p.WALReservedBytes--
 			if p.SharingBacked() {
 				t.Fatal("one-byte short backing accepted")
@@ -85,5 +93,27 @@ func TestSharingRequiresItsOwnPrepaidLayoutAndLane(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestShareBusinessWALIsPrepaidPerGenerationAndCopy(t *testing.T) {
+	q := OperationHistoryQualification{Layout: ShareOperationHistoryLayout, MaximumRowFootprintBytes: 128 << 10, MaximumTransitionWALBytes: 256 << 10, BackupCopies: 2, WALCopies: 3}
+	b, w := q.SlotBacking(4)
+	if b != 512<<10 || w != 102<<20 {
+		t.Fatalf("share slot backup/WAL = %d/%d, want 512KiB/102MiB", b, w)
+	}
+	for _, tc := range []struct {
+		layout string
+		fixed  int64
+	}{
+		{OperationHistoryLayout, 16}, {OperationOverdueHistoryLayout, 19}, {OperationVerificationHistoryLayout, 21},
+		{CaptureOperationHistoryLayout, 32}, {ShareCaptureOperationHistoryLayout, 34}, {ProcessingReleaseHistoryLayout, 32},
+		{ConnectorOperationHistoryLayout, 32}, {ConnectorRetirementHistoryLayout, 40},
+	} {
+		q.Layout = tc.layout
+		_, got := q.SlotBacking(4)
+		if want := 2 * q.WALCopies * q.MaximumTransitionWALBytes * (tc.fixed + 12); got != want {
+			t.Fatalf("historical/nonbusiness layout %s WAL=%d want %d", tc.layout, got, want)
+		}
 	}
 }

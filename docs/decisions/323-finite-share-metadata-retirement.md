@@ -158,6 +158,31 @@ Mechanism references checked 2026-11-11: [PostgreSQL HOT](https://www.postgresql
 and [partial indexes](https://www.postgresql.org/docs/current/indexes-partial.html).
 They explain update/index behavior; they do not qualify this candidate.
 
+The small patch at `a3ca495f` preserved all 100-share semantics and the paid
+revocation/management-mutation refusal. Paid WAL fell to 1,949,488 bytes
+(71% lower), rollback to 2,957,808 bytes (62% lower), and paid TOAST growth to
+zero. Schema upgrade/rollback passed with both index forms. Rollback still
+exceeds the original 2 MiB fixture transition value; the run remains a failure.
+
+Fund that bounded business effect once per normal-v4 slot, separately from the
+existing per-transition audit-protocol allowance: add a fixed 8 MiB business-WAL
+allowance inside each of the same two residual generations and WAL-copy count.
+Keep the 24 baseline transitions and finite purge-lease costs. This applies
+only to normal/resolution-v4 layouts; it never promotes or changes old layouts.
+The source compiler and SQL validators must calculate the same amount before
+admission, and the 100-share test must compare its complete paid/aborted effect
+to this separately prepaid allowance. The per-transition field continues to
+qualify the audit protocol; it is not redefined as an average.
+
+Eight MiB is a conservative engineering allowance above the observed 2.96 MB
+aborted effect, not a universal physical-layout proof. With 256 KiB transitions,
+four purge leases and three WAL copies, normal-v4 reserves 102 MiB per slot
+including both generations, versus 54 MiB before this allowance. Raising every
+transition to 8 MiB would reserve 1,728 MiB instead. This is zero new rows,
+state, configuration, reads, roles or workers: one versioned arithmetic term,
+reusing current prepaid slots and release. It avoids a new mutable-state table
+and its joins/locks while preserving conservative unknown-effect accounting.
+
 Then qualify actual upgrade/rollback, all three producers, original cutoffs,
 replay, late publication, mutation/finalization concurrency, recovery refusal,
 unknown effects, direct-DELETE denial, provider scope rejection, managed-object

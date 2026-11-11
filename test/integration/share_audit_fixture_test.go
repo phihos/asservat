@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
 	"time"
 
@@ -14,6 +15,8 @@ import (
 	"asservat.local/asservat/internal/application/sharing"
 	value "asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/authorization"
+	"asservat.local/asservat/internal/domain/identity"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -39,6 +42,13 @@ func newShareBusinessAudit(t *testing.T, ctx context.Context, hub *pgxpool.Pool,
 	if json.Unmarshal(encoded, &policy) != nil || policy.History == nil || policy.History.Layout != value.ShareOperationHistoryLayout {
 		t.Fatal("share fixture must select original qualified cohort before first audit")
 	}
+	// Exact existing synthetic MAC material of newProcessingTestFixture.
+	mac, err := auditapp.NewOperationMAC("input-v1", bytes.Repeat([]byte{31}, 32), "accounts-v1", bytes.Repeat([]byte{32}, 32))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(mac.Close)
+	qualifyShareLifecycleBusinessWAL(t, ctx, hub, policy, retained, mac, s.a.Eligibility.VerifiedIdentity.Principal)
 	journal, err := postgres.NewHealthyOperationJournal(ctx, hub, policy, s.recovery.guard)
 	if err != nil {
 		t.Fatal(err)
@@ -59,13 +69,58 @@ func newShareBusinessAudit(t *testing.T, ctx context.Context, hub *pgxpool.Pool,
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Exact existing synthetic MAC material of newProcessingTestFixture.
-	mac, err := auditapp.NewOperationMAC("input-v1", bytes.Repeat([]byte{31}, 32), "accounts-v1", bytes.Repeat([]byte{32}, 32))
+	return &shareBusinessAudit{t, gate, mac, policy, retained}
+}
+
+// Attack the actual reservation table through the compiled hub role. The
+// otherwise valid envelope is deliberately underfunded after Go binding, so a
+// Go-side refusal cannot substitute for the lifecycle INSERT trigger's fence.
+// Both the reservation and its charge roll back; no audit/provider I/O occurs.
+func qualifyShareLifecycleBusinessWAL(t *testing.T, ctx context.Context, hub *pgxpool.Pool, policy value.OperationLifecyclePolicy, retained int64, mac *auditapp.OperationMAC, actor identity.Principal) {
+	t.Helper()
+	principal, err := mac.Principal(actor)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(mac.Close)
-	return &shareBusinessAudit{t, gate, mac, policy, retained}
+	input, err := mac.Digest("context-input/v1", []byte("business-wal-admission-probe"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, slotWAL := policy.History.SlotBacking(policy.MaxPurgeLeases)
+	minimumWAL := policy.MetadataSlots * slotWAL
+	for _, tc := range []struct {
+		name    string
+		missing int64
+	}{{"protocol-only", policy.MetadataSlots * 2 * policy.History.WALCopies * value.ShareOperationBusinessWALBytes}, {"one-byte-short", 1}} {
+		n := time.Now().UTC().Truncate(time.Microsecond)
+		operation := custodyID()
+		in := value.OperationIntent{ID: operation, RootID: policy.RootID, TraceID: operation, Name: "create_share", InputFormat: "context-input/v1", MACVersion: mac.Version(), AccountVersion: mac.AccountVersion(), Actor: actor, PrincipalDigest: principal, InputDigest: input, CreatedAt: n, RequestUntil: n.Add(5 * time.Second), WriteUntil: n.Add(8 * time.Second), RetainUntil: n.Add(time.Duration(retained) * time.Second)}
+		in, err = auditapp.BindOperationLifecycle(in, policy)
+		if err != nil || !in.Valid() {
+			t.Fatal("business WAL probe original envelope", err)
+		}
+		in.Lifecycle.Policy.WALReservedBytes = minimumWAL - tc.missing
+		body, err := json.Marshal(in)
+		if err != nil {
+			t.Fatal(err)
+		}
+		tx, err := hub.Begin(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, insertErr := tx.Exec(ctx, `INSERT INTO operation_audit(id,root_id,lane,principal_digest,intent,request_until,write_until,retain_until,issuer_epoch)
+ SELECT $1,$2,'normal',$3,$4,$5,$6,$7,issuer_epoch FROM fleet_current_trust WHERE installation_id=$8`, in.ID, in.RootID, in.PrincipalDigest[:], body, in.RequestUntil, in.WriteUntil, in.RetainUntil, policy.InstallationID)
+		rollbackErr := tx.Rollback(ctx)
+		var refusal *pgconn.PgError
+		if !errors.As(insertErr, &refusal) || refusal.Code != "23514" || refusal.Message != "audit history qualification unavailable" || rollbackErr != nil {
+			t.Fatal("actual lifecycle accepted missing business WAL or refused outside funding guard", tc.name, insertErr, rollbackErr)
+		}
+		var absent bool
+		if err := hub.QueryRow(ctx, `SELECT NOT EXISTS(SELECT 1 FROM operation_audit WHERE id=$1) AND NOT EXISTS(SELECT 1 FROM operation_audit_lifecycle WHERE operation_id=$1)`, operation).Scan(&absent); err != nil || !absent {
+			t.Fatal("underfunded lifecycle probe left retained rows", tc.name, err)
+		}
+	}
+	t.Log("actual normal-v4 lifecycle INSERT rejected protocol-only and one-byte-short business WAL through compiled hub grants; both transactions rolled back")
 }
 
 func (a *shareBusinessAudit) begin(ctx context.Context, current identities.CurrentIdentity, name, key string) value.OperationIntent {

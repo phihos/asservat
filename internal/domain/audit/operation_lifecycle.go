@@ -14,6 +14,11 @@ const OperationVerificationHistoryLayout = "operation-audit-history/v3"
 // dependent row retirement. Earlier qualifications do not imply this coverage.
 const ShareOperationHistoryLayout = "operation-audit-history/v4"
 
+// ShareOperationBusinessWALBytes prepays one complete business effect, including
+// the bounded 100-share mutation or its rollback, separately from audit phases.
+// Every residual generation and WAL copy retains this allowance until release.
+const ShareOperationBusinessWALBytes int64 = 8 << 20
+
 // This distinct private qualification includes retained connector source/process/
 // certificate dependencies; a public v3 result is never automatically sufficient.
 const ConnectorOperationHistoryLayout = "connector-operation-history/v1"
@@ -91,7 +96,11 @@ func (q OperationHistoryQualification) SlotBacking(leases int64) (backup, wal in
 		// SQL49 enforces that graph; actual transaction cost needs its own test.
 		transitions = 32
 	}
-	return 2 * q.MaximumRowFootprintBytes * q.BackupCopies, 2 * q.MaximumTransitionWALBytes * q.WALCopies * (transitions + 3*leases)
+	business := int64(0)
+	if q.Layout == ShareOperationHistoryLayout {
+		business = ShareOperationBusinessWALBytes
+	}
+	return 2 * q.MaximumRowFootprintBytes * q.BackupCopies, 2 * q.WALCopies * (q.MaximumTransitionWALBytes*(transitions+3*leases) + business)
 }
 
 // These facts come only from accepted protected installation composition. They

@@ -232,7 +232,7 @@ BEGIN
  slots:=(v->>'Accounts')::numeric*(v->>'RecordsPerAccount')::numeric;
  transitions:=CASE WHEN layout_name='operation-audit-history/v3' THEN 21 WHEN layout_name='operation-audit-history/v4' THEN 24 WHEN layout_name='capture-intent-history/v2' THEN 34 WHEN layout_name IN ('capture-intent-history/v1','processing-release-history/v1') THEN 32 ELSE 0 END;
  b:=2*(h->>'MaximumRowFootprintBytes')::numeric*(h->>'BackupCopies')::numeric;
- w:=2*(h->>'MaximumTransitionWALBytes')::numeric*(h->>'WALCopies')::numeric*(transitions+3*(p->>'MaxPurgeLeases')::bigint);
+ w:=2*(h->>'WALCopies')::numeric*((h->>'MaximumTransitionWALBytes')::numeric*(transitions+3*(p->>'MaxPurgeLeases')::bigint)+CASE WHEN layout_name='operation-audit-history/v4' THEN 8388608 ELSE 0 END);
  RETURN transitions>0 AND slots=(p->>'MetadataSlots')::numeric AND
   (p->>'BackupReservedBytes')::numeric>=slots*b AND (p->>'WALReservedBytes')::numeric>=slots*w AND
   (v->>'RetainedSeconds')::bigint>2*(p->>'BackupHorizonSeconds')::bigint+3*(p->>'CleanupBudgetSeconds')::bigint+(p->>'ProofWindowSeconds')::bigint+30;
@@ -475,6 +475,70 @@ WITH LOCAL CHECK OPTION;
 
 -- +goose StatementBegin
 DO $$ BEGIN EXECUTE 'COMMENT ON TABLE public.goose_db_version IS ''asservat:oldest-binary-schema=154'''; END $$;
+-- +goose StatementEnd
+
+
+-- Same versioned per-slot minimum at actual lifecycle admission, not only
+-- the protected root compiler. Old layouts retain their original arithmetic.
+-- +goose StatementBegin
+CREATE OR REPLACE FUNCTION create_operation_audit_lifecycle() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
+DECLARE b jsonb; p jsonb; t public.fleet_current_trust; a public.operation_audit_pool; n timestamptz:=clock_timestamp(); budget interval; horizon interval; proof interval; prepaid boolean:=false;
+BEGIN
+ IF TG_RELID<>'public.operation_audit'::regclass OR TG_WHEN<>'AFTER' OR TG_OP<>'INSERT' OR TG_LEVEL<>'ROW' THEN RAISE EXCEPTION 'invalid audit lifecycle source' USING ERRCODE='23514'; END IF;
+ b:=NEW.intent->'Lifecycle';
+ IF b IS NULL THEN RETURN NEW; END IF;
+ p:=b->'Policy';
+ SELECT * INTO STRICT t FROM public.fleet_current_trust WHERE installation_id=(p->>'InstallationID')::uuid FOR SHARE;
+ SELECT * INTO STRICT a FROM public.operation_audit_pool WHERE root_id=NEW.root_id AND lane=NEW.lane FOR UPDATE;
+ n:=clock_timestamp();
+ prepaid:=public.connector_retirement_prepaid(NEW);
+ budget:=make_interval(secs=>(p->>'CleanupBudgetSeconds')::double precision);
+ horizon:=make_interval(secs=>(p->>'BackupHorizonSeconds')::double precision);
+ proof:=make_interval(secs=>(p->>'ProofWindowSeconds')::double precision);
+ IF (p ? 'OverdueTerminal' AND p->>'OverdueTerminal' IS DISTINCT FROM 'overdue-original/v1') OR b->>'Protocol' IS DISTINCT FROM 'closed-operation-audit/v1' OR jsonb_typeof(p)<>'object' OR
+  NOT(p ?& ARRAY['MaxPurgeLeases','RootID','Lane','InstallationID','StoreID','PolicyID','BackupProfileID','PolicyDigest','BackupProfileDigest','BackingRevision','MetadataSlots','BackupReservedBytes','WALReservedBytes','BackupHorizonSeconds','CleanupBudgetSeconds','ProofWindowSeconds','ValidUntil']) OR
+  (p->>'RootID')::uuid<>NEW.root_id OR p->>'Lane'<>NEW.lane OR (p->>'StoreID')::uuid IS NULL OR (p->>'PolicyID')::uuid IS NULL OR (p->>'BackupProfileID')::uuid IS NULL OR
+  jsonb_array_length(p->'PolicyDigest')<>32 OR jsonb_array_length(p->'BackupProfileDigest')<>32 OR
+  (NOT prepaid AND (p->>'BackingRevision')::bigint<>a.revision) OR (p->>'MetadataSlots')::bigint<a.account_limit*a.records_per_account OR (p->>'MetadataSlots')::bigint>1000000000000 OR
+  budget<interval '1 second' OR budget>interval '1 day' OR horizon<interval '0 seconds' OR horizon>interval '3660 days' OR proof<interval '1 second' OR proof>interval '3660 days' OR
+  (p->>'BackupReservedBytes')::bigint<0 OR (p->>'WALReservedBytes')::bigint<0 OR horizon>interval '0 seconds' AND ((p->>'BackupReservedBytes')::bigint<=0 OR (p->>'WALReservedBytes')::bigint<=0) OR
+  n>=(p->>'ValidUntil')::timestamptz OR n>=NEW.request_until OR (NOT prepaid AND n>=a.valid_until) OR t.recovery_blocked OR t.suspended OR n>=t.fresh_until OR t.observed_at>n OR t.issuer_epoch<>NEW.issuer_epoch OR
+  (p->>'MaxPurgeLeases')::bigint NOT BETWEEN 2 AND 32 OR
+  (b->>'HistoryReleaseAt')::timestamptz<>NEW.retain_until-horizon-budget OR (b->>'HistoryDeleteBy')::timestamptz<>NEW.retain_until-horizon OR
+  (b->>'LiveRetireBy')::timestamptz<>NEW.retain_until-2*horizon-budget OR (b->>'CertificatePurgeAt')::timestamptz<>(b->>'LiveRetireBy')::timestamptz-budget OR
+  (b->>'OriginalPurgeAt')::timestamptz<>(b->>'CertificatePurgeAt')::timestamptz-proof-budget OR (b->>'OriginalPurgeAt')::timestamptz<=NEW.write_until THEN
+  RAISE EXCEPTION 'audit lifecycle backing unavailable' USING ERRCODE='23514'; END IF;
+ -- A qualification is an exact accepted layout/profile, with conservative
+ -- measured full-transaction bounds. Positive arbitrary byte counts are not a
+ -- qualification; source acceptance is deliberately outside this adapter.
+ IF p->'History' IS NULL OR NOT public.operation_audit_history_verifier_backed(p->'History'->>'Layout') OR NOT public.operation_audit_history_layout_valid(NEW.lane,p->'History'->>'Layout') OR
+   NOT(p->'History' ?& ARRAY['ID','Digest','Layout','MaximumRowFootprintBytes','MaximumTransitionWALBytes','BackupCopies','WALCopies']) OR
+   (p->'History'->>'ID')::uuid IS NULL OR jsonb_array_length(p->'History'->'Digest')<>32 OR
+   (p->'History'->>'MaximumRowFootprintBytes')::bigint NOT BETWEEN public.operation_audit_history_minimum_row(p->'History'->>'Layout') AND 16777216 OR
+   (p->'History'->>'MaximumTransitionWALBytes')::bigint NOT BETWEEN 131072 AND 67108864 OR
+   (p->'History'->>'BackupCopies')::bigint NOT BETWEEN 1 AND 64 OR (p->'History'->>'WALCopies')::bigint NOT BETWEEN 1 AND 64 OR
+   (p->>'BackupReservedBytes')::bigint/(p->>'MetadataSlots')::bigint < 2*(p->'History'->>'MaximumRowFootprintBytes')::bigint*(p->'History'->>'BackupCopies')::bigint OR
+   (p->>'WALReservedBytes')::bigint/(p->>'MetadataSlots')::bigint < 2*(p->'History'->>'WALCopies')::bigint*((p->'History'->>'MaximumTransitionWALBytes')::bigint*(public.operation_audit_history_fixed_transitions(p->'History'->>'Layout')+3*(p->>'MaxPurgeLeases')::bigint)+CASE WHEN p->'History'->>'Layout'='operation-audit-history/v4' THEN 8388608 ELSE 0 END) THEN
+   RAISE EXCEPTION 'audit history qualification unavailable' USING ERRCODE='23514'; END IF;
+
+ IF a.history_backing_until IS NOT NULL AND n<a.history_backing_until AND NOT public.operation_audit_profile_covers((p-ARRAY['ValidUntil','BackingRevision','MetadataSlots','BackupReservedBytes','WALReservedBytes','PolicyID','PolicyDigest','CleanupBudgetSeconds','ProofWindowSeconds']),a.history_profile) THEN
+  RAISE EXCEPTION 'residual audit history backing protected' USING ERRCODE='23514'; END IF;
+ -- Renewal may refresh a source/revision or increase backing. Outstanding
+ -- obligations cannot be moved to a smaller/different backup or account profile.
+ IF EXISTS(SELECT 1 FROM public.operation_audit_lifecycle d WHERE d.root_id=NEW.root_id AND d.lane=NEW.lane AND
+   NOT public.operation_audit_profile_covers((p-ARRAY['ValidUntil','BackingRevision','MetadataSlots','BackupReservedBytes','WALReservedBytes','PolicyID','PolicyDigest','CleanupBudgetSeconds','ProofWindowSeconds']),((d.binding->'Policy') - ARRAY['ValidUntil','BackingRevision','MetadataSlots','BackupReservedBytes','WALReservedBytes','PolicyID','PolicyDigest','CleanupBudgetSeconds','ProofWindowSeconds']))) OR
+  EXISTS(SELECT 1 FROM public.operation_audit_history h WHERE h.root_id=NEW.root_id AND h.lane=NEW.lane AND NOT public.operation_audit_profile_covers((p-ARRAY['ValidUntil','BackingRevision','MetadataSlots','BackupReservedBytes','WALReservedBytes','PolicyID','PolicyDigest','CleanupBudgetSeconds','ProofWindowSeconds']),h.history_policy)) THEN
+  RAISE EXCEPTION 'outstanding audit history profile mismatch' USING ERRCODE='23514'; END IF;
+ IF horizon>interval '0 seconds' THEN
+  UPDATE public.operation_audit_pool SET
+   history_profile=p-ARRAY['ValidUntil','BackingRevision','MetadataSlots','BackupReservedBytes','WALReservedBytes','PolicyID','PolicyDigest','CleanupBudgetSeconds','ProofWindowSeconds'],
+   history_backing_until=GREATEST(history_backing_until,NEW.retain_until)
+  WHERE root_id=NEW.root_id AND lane=NEW.lane;
+ END IF;
+ INSERT INTO public.operation_audit_lifecycle(operation_id,root_id,lane,principal_digest,installation_id,issuer_epoch,postmaster_at,database_oid,binding,original_purge_at,certificate_purge_at,live_retire_by,certificate_verify_attempts)
+ VALUES(NEW.id,NEW.root_id,NEW.lane,NEW.principal_digest,t.installation_id,t.issuer_epoch,(SELECT activated_postmaster_at FROM public.fleet_trust WHERE installation_id=t.installation_id),(SELECT oid FROM pg_catalog.pg_database WHERE datname=current_database()),b,(b->>'OriginalPurgeAt')::timestamptz,(b->>'CertificatePurgeAt')::timestamptz,(b->>'LiveRetireBy')::timestamptz,0);
+ RETURN NEW;
+END $$;
 -- +goose StatementEnd
 
 -- +goose Down
@@ -997,4 +1061,65 @@ END $rollback_views$;
 
 -- +goose StatementBegin
 DO $$ BEGIN EXECUTE 'COMMENT ON TABLE public.goose_db_version IS ''asservat:oldest-binary-schema=153'''; END $$;
+-- +goose StatementEnd
+
+-- +goose StatementBegin
+CREATE OR REPLACE FUNCTION create_operation_audit_lifecycle() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
+DECLARE b jsonb; p jsonb; t public.fleet_current_trust; a public.operation_audit_pool; n timestamptz:=clock_timestamp(); budget interval; horizon interval; proof interval; prepaid boolean:=false;
+BEGIN
+ IF TG_RELID<>'public.operation_audit'::regclass OR TG_WHEN<>'AFTER' OR TG_OP<>'INSERT' OR TG_LEVEL<>'ROW' THEN RAISE EXCEPTION 'invalid audit lifecycle source' USING ERRCODE='23514'; END IF;
+ b:=NEW.intent->'Lifecycle';
+ IF b IS NULL THEN RETURN NEW; END IF;
+ p:=b->'Policy';
+ SELECT * INTO STRICT t FROM public.fleet_current_trust WHERE installation_id=(p->>'InstallationID')::uuid FOR SHARE;
+ SELECT * INTO STRICT a FROM public.operation_audit_pool WHERE root_id=NEW.root_id AND lane=NEW.lane FOR UPDATE;
+ n:=clock_timestamp();
+ prepaid:=public.connector_retirement_prepaid(NEW);
+ budget:=make_interval(secs=>(p->>'CleanupBudgetSeconds')::double precision);
+ horizon:=make_interval(secs=>(p->>'BackupHorizonSeconds')::double precision);
+ proof:=make_interval(secs=>(p->>'ProofWindowSeconds')::double precision);
+ IF (p ? 'OverdueTerminal' AND p->>'OverdueTerminal' IS DISTINCT FROM 'overdue-original/v1') OR b->>'Protocol' IS DISTINCT FROM 'closed-operation-audit/v1' OR jsonb_typeof(p)<>'object' OR
+  NOT(p ?& ARRAY['MaxPurgeLeases','RootID','Lane','InstallationID','StoreID','PolicyID','BackupProfileID','PolicyDigest','BackupProfileDigest','BackingRevision','MetadataSlots','BackupReservedBytes','WALReservedBytes','BackupHorizonSeconds','CleanupBudgetSeconds','ProofWindowSeconds','ValidUntil']) OR
+  (p->>'RootID')::uuid<>NEW.root_id OR p->>'Lane'<>NEW.lane OR (p->>'StoreID')::uuid IS NULL OR (p->>'PolicyID')::uuid IS NULL OR (p->>'BackupProfileID')::uuid IS NULL OR
+  jsonb_array_length(p->'PolicyDigest')<>32 OR jsonb_array_length(p->'BackupProfileDigest')<>32 OR
+  (NOT prepaid AND (p->>'BackingRevision')::bigint<>a.revision) OR (p->>'MetadataSlots')::bigint<a.account_limit*a.records_per_account OR (p->>'MetadataSlots')::bigint>1000000000000 OR
+  budget<interval '1 second' OR budget>interval '1 day' OR horizon<interval '0 seconds' OR horizon>interval '3660 days' OR proof<interval '1 second' OR proof>interval '3660 days' OR
+  (p->>'BackupReservedBytes')::bigint<0 OR (p->>'WALReservedBytes')::bigint<0 OR horizon>interval '0 seconds' AND ((p->>'BackupReservedBytes')::bigint<=0 OR (p->>'WALReservedBytes')::bigint<=0) OR
+  n>=(p->>'ValidUntil')::timestamptz OR n>=NEW.request_until OR (NOT prepaid AND n>=a.valid_until) OR t.recovery_blocked OR t.suspended OR n>=t.fresh_until OR t.observed_at>n OR t.issuer_epoch<>NEW.issuer_epoch OR
+  (p->>'MaxPurgeLeases')::bigint NOT BETWEEN 2 AND 32 OR
+  (b->>'HistoryReleaseAt')::timestamptz<>NEW.retain_until-horizon-budget OR (b->>'HistoryDeleteBy')::timestamptz<>NEW.retain_until-horizon OR
+  (b->>'LiveRetireBy')::timestamptz<>NEW.retain_until-2*horizon-budget OR (b->>'CertificatePurgeAt')::timestamptz<>(b->>'LiveRetireBy')::timestamptz-budget OR
+  (b->>'OriginalPurgeAt')::timestamptz<>(b->>'CertificatePurgeAt')::timestamptz-proof-budget OR (b->>'OriginalPurgeAt')::timestamptz<=NEW.write_until THEN
+  RAISE EXCEPTION 'audit lifecycle backing unavailable' USING ERRCODE='23514'; END IF;
+ -- A qualification is an exact accepted layout/profile, with conservative
+ -- measured full-transaction bounds. Positive arbitrary byte counts are not a
+ -- qualification; source acceptance is deliberately outside this adapter.
+ IF p->'History' IS NULL OR NOT public.operation_audit_history_verifier_backed(p->'History'->>'Layout') OR NOT public.operation_audit_history_layout_valid(NEW.lane,p->'History'->>'Layout') OR
+   NOT(p->'History' ?& ARRAY['ID','Digest','Layout','MaximumRowFootprintBytes','MaximumTransitionWALBytes','BackupCopies','WALCopies']) OR
+   (p->'History'->>'ID')::uuid IS NULL OR jsonb_array_length(p->'History'->'Digest')<>32 OR
+   (p->'History'->>'MaximumRowFootprintBytes')::bigint NOT BETWEEN public.operation_audit_history_minimum_row(p->'History'->>'Layout') AND 16777216 OR
+   (p->'History'->>'MaximumTransitionWALBytes')::bigint NOT BETWEEN 131072 AND 67108864 OR
+   (p->'History'->>'BackupCopies')::bigint NOT BETWEEN 1 AND 64 OR (p->'History'->>'WALCopies')::bigint NOT BETWEEN 1 AND 64 OR
+   (p->>'BackupReservedBytes')::bigint/(p->>'MetadataSlots')::bigint < 2*(p->'History'->>'MaximumRowFootprintBytes')::bigint*(p->'History'->>'BackupCopies')::bigint OR
+   (p->>'WALReservedBytes')::bigint/(p->>'MetadataSlots')::bigint < 2*(p->'History'->>'MaximumTransitionWALBytes')::bigint*(p->'History'->>'WALCopies')::bigint*(public.operation_audit_history_fixed_transitions(p->'History'->>'Layout')+3*(p->>'MaxPurgeLeases')::bigint) THEN
+   RAISE EXCEPTION 'audit history qualification unavailable' USING ERRCODE='23514'; END IF;
+
+ IF a.history_backing_until IS NOT NULL AND n<a.history_backing_until AND NOT public.operation_audit_profile_covers((p-ARRAY['ValidUntil','BackingRevision','MetadataSlots','BackupReservedBytes','WALReservedBytes','PolicyID','PolicyDigest','CleanupBudgetSeconds','ProofWindowSeconds']),a.history_profile) THEN
+  RAISE EXCEPTION 'residual audit history backing protected' USING ERRCODE='23514'; END IF;
+ -- Renewal may refresh a source/revision or increase backing. Outstanding
+ -- obligations cannot be moved to a smaller/different backup or account profile.
+ IF EXISTS(SELECT 1 FROM public.operation_audit_lifecycle d WHERE d.root_id=NEW.root_id AND d.lane=NEW.lane AND
+   NOT public.operation_audit_profile_covers((p-ARRAY['ValidUntil','BackingRevision','MetadataSlots','BackupReservedBytes','WALReservedBytes','PolicyID','PolicyDigest','CleanupBudgetSeconds','ProofWindowSeconds']),((d.binding->'Policy') - ARRAY['ValidUntil','BackingRevision','MetadataSlots','BackupReservedBytes','WALReservedBytes','PolicyID','PolicyDigest','CleanupBudgetSeconds','ProofWindowSeconds']))) OR
+  EXISTS(SELECT 1 FROM public.operation_audit_history h WHERE h.root_id=NEW.root_id AND h.lane=NEW.lane AND NOT public.operation_audit_profile_covers((p-ARRAY['ValidUntil','BackingRevision','MetadataSlots','BackupReservedBytes','WALReservedBytes','PolicyID','PolicyDigest','CleanupBudgetSeconds','ProofWindowSeconds']),h.history_policy)) THEN
+  RAISE EXCEPTION 'outstanding audit history profile mismatch' USING ERRCODE='23514'; END IF;
+ IF horizon>interval '0 seconds' THEN
+  UPDATE public.operation_audit_pool SET
+   history_profile=p-ARRAY['ValidUntil','BackingRevision','MetadataSlots','BackupReservedBytes','WALReservedBytes','PolicyID','PolicyDigest','CleanupBudgetSeconds','ProofWindowSeconds'],
+   history_backing_until=GREATEST(history_backing_until,NEW.retain_until)
+  WHERE root_id=NEW.root_id AND lane=NEW.lane;
+ END IF;
+ INSERT INTO public.operation_audit_lifecycle(operation_id,root_id,lane,principal_digest,installation_id,issuer_epoch,postmaster_at,database_oid,binding,original_purge_at,certificate_purge_at,live_retire_by,certificate_verify_attempts)
+ VALUES(NEW.id,NEW.root_id,NEW.lane,NEW.principal_digest,t.installation_id,t.issuer_epoch,(SELECT activated_postmaster_at FROM public.fleet_trust WHERE installation_id=t.installation_id),(SELECT oid FROM pg_catalog.pg_database WHERE datname=current_database()),b,(b->>'OriginalPurgeAt')::timestamptz,(b->>'CertificatePurgeAt')::timestamptz,(b->>'LiveRetireBy')::timestamptz,0);
+ RETURN NEW;
+END $$;
 -- +goose StatementEnd

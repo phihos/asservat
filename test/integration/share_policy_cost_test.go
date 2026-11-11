@@ -17,6 +17,7 @@ import (
 	identities "asservat.local/asservat/internal/application/identity"
 	"asservat.local/asservat/internal/application/sharing"
 	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/identity"
@@ -262,6 +263,15 @@ func qualifyWidePolicyShareCost(t *testing.T, ctx context.Context, admin *pgxpoo
 	firstSample := samplePolicyShareCost(t, ctx, admin, root)
 	logPolicyShareCost(t, ctx, admin, "first-wide-capture-through-published-share", baseline, firstSample)
 	service, hub := newPolicyPaidShareService(t, ctx, admin, poolFor, objects, keys, f.Scenario, first.reader)
+	policy := service.audit.policy
+	if policy.History.Layout != audit.ShareOperationHistoryLayout || !policy.Valid() {
+		t.Fatal("wide effect requires the actually funded normal-v4 policy")
+	}
+	_, prepaidWAL := policy.History.SlotBacking(policy.MaxPurgeLeases)
+	protocolWAL := 2 * policy.History.WALCopies * policy.History.MaximumTransitionWALBytes * (24 + 3*policy.MaxPurgeLeases)
+	if prepaidWAL-protocolWAL != 2*policy.History.WALCopies*audit.ShareOperationBusinessWALBytes || policy.WALReservedBytes/policy.MetadataSlots < prepaidWAL {
+		t.Fatal("business effect allowance was not prepaid in the original slot", prepaidWAL, protocolWAL, policy.WALReservedBytes, policy.MetadataSlots)
+	}
 	current := func() identities.CurrentIdentity {
 		t.Helper()
 		f.Refresh()
@@ -391,9 +401,9 @@ func qualifyWidePolicyShareCost(t *testing.T, ctx context.Context, admin *pgxpoo
 		t.Fatal("replay changed business rows")
 	}
 	logPolicyShareCost(t, ctx, admin, "paid-replay-new-normal-operation-no-business-effect", beforeReplay, afterReplay)
-	bound := service.audit.policy.History.MaximumTransitionWALBytes
-	t.Logf("policy_cost_stage=observed_budget_comparison original_fixture_transition_WAL=%d default_configured_transition_WAL=%d observed_full_paid_WAL=%d observed_rollback_WAL=%d; no universal physical-layout claim", bound, 256<<10, paidWAL, rollbackWAL)
+	bound := int64(audit.ShareOperationBusinessWALBytes)
+	t.Logf("policy_cost_stage=observed_budget_comparison prepaid_business_effect_WAL=%d original_fixture_protocol_transition_WAL=%d original_slot_WAL=%d observed_full_paid_WAL=%d observed_rollback_WAL=%d; no universal physical-layout claim", bound, policy.History.MaximumTransitionWALBytes, prepaidWAL, paidWAL, rollbackWAL)
 	if paidWAL > bound || rollbackWAL > bound {
-		t.Fatal("original fixture profile does not cover measured 100-share transaction", bound, paidWAL, rollbackWAL)
+		t.Fatal("prepaid business effect allowance does not cover measured 100-share transaction", bound, paidWAL, rollbackWAL)
 	}
 }
