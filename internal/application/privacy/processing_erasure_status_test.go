@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"asservat.local/asservat/internal/domain/identity"
 	value "asservat.local/asservat/internal/domain/privacy"
 )
 
@@ -62,7 +63,11 @@ func TestProcessingErasureStatusPreservesOneCurrentOperatorObservation(t *testin
 				}
 				return
 			}
-			if !errors.Is(err, value.ErrUnavailable) || out != (value.ProcessingErasureStatus{}) {
+			wantErr := value.ErrUnavailable
+			if name == "ordinary-reader" {
+				wantErr = identity.ErrDenied
+			}
+			if !errors.Is(err, wantErr) || out != (value.ProcessingErasureStatus{}) {
 				t.Fatal("status disclosed outside its request or authority", out, err)
 			}
 			if (name == "malformed-id" || name == "ordinary-reader") && reads != 0 {
