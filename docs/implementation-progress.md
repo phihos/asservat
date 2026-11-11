@@ -1,6 +1,6 @@
 # Sustained implementation progress
 
-## Active candidate: installed retention lifecycle publication (2026-11-11)
+## Installed-qualified candidate: retention lifecycle publication (2026-11-11)
 
 Outcome: after an administrator tightens retention on published evidence,
 the installed hub worker publishes and acknowledges the signed lifecycle
@@ -12,9 +12,27 @@ Go race, schema, architecture and SQL generation checks pass. The owned
 PostgreSQL/S3 fixture at `e3bb2442` passed in 2.886 s, verifying one
 acknowledged signed decision, empty queue on replay and immutable cutoffs.
 All 4,516 source hashes match and cleanup had no failures. It uses fixture
-signing material. The fresh installed check of the pinned Transit signer
-and source readiness remains pending. This supplies the signed lifecycle
-path needed by the separate early-erasure request and status workflow.
+signing material. `make pre-push` exited 0 at `b99c4ff9`, with 635 console
+tests and affected Go race tests passing in 635 s.
+
+Fresh `make installed-focus FOCUS=retention-shortening ARGS=--keep-on-failure`
+at `b99c4ff9` exited 0 (Go 295.037 s, harness 364.9 s). A signed-in Keycloak
+user downloaded the published regional pod-status file before an administrator
+applied a scoped retention policy. Both effective cutoffs shortened on the
+original anchor while the original registration dates remained unchanged.
+An independent version-pinned S3 read matched the SQL acknowledgement and
+verified the decrypted record and detached JWS against the installed Transit
+pin. The hub retention source returned to Ready at sequence 3 with both
+policies. The original case returned `NotAvailable` before its original
+expiry. All 4,768 source hashes match, and both owned clusters, labelled
+Docker resources and build scratch were removed. Original reports are in
+`retention-lifecycle/installed-b99c4ff9`.
+
+This qualifies the signed publication and restored source readiness for
+an installed policy shortening. The focus exercises one published capture
+and the earlier read cutoff. The separate early-erasure request, verified
+managed-copy deletion status and derivative/exception coverage remain under
+REQ-PRV-006.
 
 ## Merged privacy evidence discovery (2026-11-11)
 

@@ -1,6 +1,6 @@
 # ADR-320 — Installed retention lifecycle publication
 
-Date: 2026-11-11. Status: implementation and qualification in progress.
+Date: 2026-11-11. Status: implemented and installed-qualified.
 Requirements: REQ-PRV-002, REQ-PRV-004. This completes the runtime composition
 planned in ADR-195 step 5b and amends the signing purpose in ADR-205 decision 6.
 
@@ -61,7 +61,10 @@ boundary, with separate rollout and rollback work.
 11. Reusing the admitted publisher and verified key closes source readiness
     without adding another provider role or controller.
 
-Qualify a protected shortening on an already published artifact, verify the
-immutable original registration, independently match its signed lifecycle
-record and observe source readiness return. Early erasure and its separate
-request and status remain part of REQ-PRV-006.
+The fresh installed `retention-shortening` focus at `b99c4ff9` passed. It
+verified the original registration, both tighter cutoffs, the version-pinned
+signed lifecycle record and restored source readiness. The original case
+was refused before its previous expiry. The
+[implementation ledger](../implementation-progress.md) records the terminal
+results and cleanup. Early erasure and its separate request and status remain
+part of REQ-PRV-006.
