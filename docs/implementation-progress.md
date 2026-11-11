@@ -38,8 +38,19 @@ Integration compiles. First cleanup use needs four login/lookup pairs; healthy
 reuse requires no provider refresh. Combined installed latency is pending.
 The collector-free `share-retirement` focus exercises both manual and capture
 shares with original short bounds selected before installation. Current-source
-real-service, maximum-width policy100, broad and fresh installed qualification
-have not run; no new installed outcome is claimed.
+maximum-width policy100, broad and fresh installed qualification have not run;
+no new installed outcome is claimed.
+
+At `63da31e8`, the owned storage permission probe passed (0.92 s), including
+certificate-only conditional creation and independent verifier separation. The
+paired schema check failed before its round-trip assertions: the compiled SQL
+head still named 152, so the embedded 154-migration bundle was refused. The
+existing embedded-bundle test reproduced that failure; advancing the compiled
+head to 154 passed the affected schema unit tests (0.079 s). All 4,561 run-source
+hashes match, source stayed frozen, cleanup failures are empty and both owned
+containers are independently absent. The failed harness exited 1; its storage
+pass is distinct from the pending schema retry. Evidence is external in
+`share-retirement/boundaries-63da31e8`.
 
 The first owned fixture at `1dc7c616` failed before measurement (Go 4.946 s):
 the query-publication helper requested 60-second evidence retention under the
