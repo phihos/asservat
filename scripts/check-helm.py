@@ -24,6 +24,58 @@ def run(args, ok=True):
     return result.stdout + result.stderr if not ok else result.stdout
 
 
+def check_context_public(public, render):
+    # Explicit synthetic shape exercises packaging only. These values are not
+    # a usable backend qualification or an operator capacity recommendation.
+    additions = json.loads((ROOT / "internal/bootstrap/testdata/helm_context_public.json").read_text())
+    capacity = additions["capacity"]
+    configured = copy.deepcopy(public)
+    configured["bootstrap"]["continuation"]["public"].update(additions)
+    docs = render(configured)
+    projection, = [r for r in docs if "continuation.json" in r.get("data", {})]
+    actual = json.loads(projection["data"]["continuation.json"])["public"]
+    expected = copy.deepcopy(additions)
+    expected["capacity"]["policySpec"]["scope"].setdefault("clusterID", "")
+    for key, value in expected.items():
+        assert actual[key] == value, "public context installer field was lost or rewritten: " + key
+    assert not any(r["kind"] in ["Deployment", "DaemonSet", "Secret"] for r in docs), "forwarding configuration added another runtime or private Helm payload"
+    for field in additions:
+        bad = copy.deepcopy(public)
+        bad["bootstrap"]["continuation"]["public"] = {"origin": "", field: additions[field]}
+        render(bad, ok=False)
+    oversized = copy.deepcopy(configured)
+    oversized_public = oversized["bootstrap"]["continuation"]["public"]
+    oversized_public["promotion"]["providerRootsPEM"] = "P" * 32768
+    oversized_public["federation"]["connectorIssuerRootsPEM"] = "P" * 32768
+    assert "complete continuation public input exceeds 64 KiB" in render(oversized, ok=False)
+    for field, value in [("capacity", {**capacity, "password": "forbidden"}),
+                         ("promotion", {**additions["promotion"], "clientSecret": "forbidden"}),
+                         ("federation", {**additions["federation"], "token": "forbidden"}),
+                         ("retentionBaseline", {**additions["retentionBaseline"], "unknown": True})]:
+        bad = copy.deepcopy(configured)
+        bad["bootstrap"]["continuation"]["public"][field] = value
+        render(bad, ok=False)
+    preprovided = copy.deepcopy(configured)
+    preprovided_capacity = preprovided["bootstrap"]["continuation"]["public"]["capacity"]
+    preprovided_capacity.pop("poolSpec", None)
+    preprovided_capacity.pop("policySpec", None)
+    preprovided_docs = render(preprovided)
+    preprovided_input, = [r for r in preprovided_docs if "continuation.json" in r.get("data", {})]
+    assert "poolSpec" not in json.loads(preprovided_input["data"]["continuation.json"])["public"]["capacity"]
+    for missing in ["poolSpec", "policySpec"]:
+        bad = copy.deepcopy(configured)
+        del bad["bootstrap"]["continuation"]["public"]["capacity"][missing]
+        render(bad, ok=False)
+    for section in ["poolSpec", "policySpec"]:
+        bad = copy.deepcopy(configured)
+        bad["bootstrap"]["continuation"]["public"]["capacity"][section]["metadata"] = {"uid": "forbidden"}
+        render(bad, ok=False)
+    bad = copy.deepcopy(configured)
+    del bad["bootstrap"]["continuation"]["public"]["capacity"]
+    render(bad, ok=False)
+    return configured, projection
+
+
 def check_bootstrap(directory):
     # Static render evidence only. PEM/provider and actual authority validation
     # are performed by the compiled product and native chain separately.
@@ -94,6 +146,19 @@ def check_bootstrap(directory):
     public_input = json.loads(data["bootstrap.json"])
     assert public_input["registryAuthentication"] == "dockerconfigjson/v1"
     assert "probeAudience" not in public_input and "rootsPEM" not in public_input["kubernetes"]
+    assert "administrators" not in public_input, "omission changed existing runner-only input"
+    admin_values = copy.deepcopy(values)
+    actors = [{"kind": "User", "name": "operator@example.org"}, {"kind": "Group", "name": "platform-admins"}]
+    admin_values["bootstrap"]["administrators"] = actors
+    admin_docs = render(admin_values)
+    admin_input, = [r for r in admin_docs if "bootstrap.json" in r.get("data", {})]
+    assert json.loads(admin_input["data"]["bootstrap.json"])["administrators"] == actors
+    assert admin_input["metadata"]["name"] != public["metadata"]["name"], "administrator scope is not bound to immutable input"
+    for invalid in [[], [actors[0], actors[0]], [{"kind": "ServiceAccount", "name": "unsupported"}], [{"kind": "User", "name": ""}], [{"kind": "User", "name": "x" * 257}], [{"kind": "User", "name": str(i)} for i in range(32)]]:
+        bad = copy.deepcopy(values)
+        bad["bootstrap"]["administrators"] = invalid
+        render(bad, ok=False)
+
     assert not any(r["kind"] in ["Secret", "Namespace", "Deployment", "Job"] for r in docs)
     role, = [r for r in docs if r["kind"] == "ClusterRole"]
     assert len(role["rules"]) == 5 and all("*" not in json.dumps(rule) for rule in role["rules"])
@@ -191,6 +256,7 @@ def check_bootstrap(directory):
     assert "approvals" not in settings, "absent approval settings changed existing installer identities"
     assert "captureHistory" not in settings, "absent history limits changed existing installer identities"
     assert "processors" not in settings, "absent organization declarations changed existing installer identities"
+    check_context_public(public, render)
     organization = {"id": "org-1", "name": "Declared organization", "activities": ["Evidence storage"], "regions": []}
     for declarations in ([], [organization]):
         declared = copy.deepcopy(public)
@@ -633,7 +699,7 @@ def main():
                 assert yaml.safe_load(bundle.extractfile("asservat/crds/" + name).read()) == content
         run(["lint", "--strict", str(archive)])
         assert run(["template", "asservat", str(archive), "--include-crds"]) == run(["template", "asservat", str(CHART), "--include-crds"])
-    print("Helm schema/render/package checks passed: 3 foundation modes, 7 canonical CRDs, fixed bootstrap hook/compartments/revisions, the regional installer hook, the guarded collector DaemonSet, invalid values and unavailable runtime rejected.")
+    print("Helm schema/render/package checks passed: 3 foundation modes, 8 canonical CRDs, public context continuation/administrator inputs, fixed bootstrap hook/compartments/revisions, the regional installer hook, the guarded collector DaemonSet, invalid values and unavailable runtime rejected.")
     print(run(["version", "--short"]).strip())
 
 

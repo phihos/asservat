@@ -85,7 +85,7 @@ func TestStaticSnapshotAndCacheBoundaries(t *testing.T) {
 	files[strings.TrimPrefix(testJS, "/")].Data[0] = 'x'
 	files["assets/new-01234567.js"] = &fstest.MapFile{Data: []byte("new")}
 
-	for _, target := range []string{"/", "/captures/new", "/live", "/policies", "/shares", "/capacity", "/processing", "/processing/artifacts/00000000-0000-4000-8000-000000000008", "/captures/00000000-0000-4000-8000-000000000008", "/cases/00000000-0000-4000-8000-000000000007", testJS, testCSS} {
+	for _, target := range []string{"/", "/fleet", "/captures/new", "/live", "/policies", "/shares", "/capacity", "/processing", "/processing/artifacts/00000000-0000-4000-8000-000000000008", "/captures/00000000-0000-4000-8000-000000000008", "/cases/00000000-0000-4000-8000-000000000007", testJS, testCSS} {
 		w := httptest.NewRecorder()
 		h.ServeHTTP(w, request("GET", target))
 		if w.Code != 200 {
@@ -144,7 +144,7 @@ func TestNoFallbackOrRequestAuthority(t *testing.T) {
 			}
 		})
 	}
-	for _, target := range []string{"/processing/", "/processing?artifact=00000000-0000-4000-8000-000000000008", "/processing/artifacts/", "/processing/artifacts/not-a-uuid", "/processing/artifacts/00000000-0000-4000-8000-000000000008/", "/processing/artifacts/00000000-0000-4000-8000-000000000008/raw", "/processing/artifacts/00000000-0000-4000-8000-000000000008?secret=anything", "/processing/artifacts/%30%30%30%30%30%30%30%30-0000-4000-8000-000000000008", "/live/", "/live?source_handle=private", "/cases", "/cases/", "/cases/not-a-uuid", "/cases/00000000-0000-4000-8000-000000000007/raw", "/cases/00000000-0000-4000-8000-000000000007?token=secret", "/cases/%30%30%30%30%30%30%30%30-0000-4000-8000-000000000007", "/captures", "/captures/", "/captures/new/", "/captures/new?preview_id=secret", "/captures/00000000-0000-4000-8000-000000000008/raw", "/captures/%30%30%30%30%30%30%30%30-0000-4000-8000-000000000008", "/policies/", "/policies?name=secret", "/capacity/", "/capacity?cluster_id=secret", "/shares/", "/shares?view=owned"} {
+	for _, target := range []string{"/fleet/", "/fleet?token=private", "/fleet/anything", "/processing/", "/processing?artifact=00000000-0000-4000-8000-000000000008", "/processing/artifacts/", "/processing/artifacts/not-a-uuid", "/processing/artifacts/00000000-0000-4000-8000-000000000008/", "/processing/artifacts/00000000-0000-4000-8000-000000000008/raw", "/processing/artifacts/00000000-0000-4000-8000-000000000008?secret=anything", "/processing/artifacts/%30%30%30%30%30%30%30%30-0000-4000-8000-000000000008", "/live/", "/live?source_handle=private", "/cases", "/cases/", "/cases/not-a-uuid", "/cases/00000000-0000-4000-8000-000000000007/raw", "/cases/00000000-0000-4000-8000-000000000007?token=secret", "/cases/%30%30%30%30%30%30%30%30-0000-4000-8000-000000000007", "/captures", "/captures/", "/captures/new/", "/captures/new?preview_id=secret", "/captures/00000000-0000-4000-8000-000000000008/raw", "/captures/%30%30%30%30%30%30%30%30-0000-4000-8000-000000000008", "/policies/", "/policies?name=secret", "/capacity/", "/capacity?cluster_id=secret", "/shares/", "/shares?view=owned"} {
 		w := httptest.NewRecorder()
 		h.ServeHTTP(w, request("GET", target))
 		if w.Code != http.StatusNotFound || w.Body.String() != "Not found\n" {

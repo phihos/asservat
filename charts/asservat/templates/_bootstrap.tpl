@@ -2,6 +2,7 @@
 {{- define "asservat.bootstrap.input" -}}
 {{- $b := .Values.bootstrap -}}
 {{- $v := dict "format" "asservat-bootstrap-input/v1" "name" $b.name "bootstrapNamespace" .Release.Namespace "targetNamespace" $b.targetNamespace "runnerAccount" (printf "%s-bootstrap-runner" $b.name) "image" $b.image "kubernetes" $b.kubernetes "postgres" $b.postgres "auditStore" $b.auditStore "keyService" $b.keyService "fleet" $b.fleet "providers" $b.providers -}}
+{{- if hasKey $b "administrators" }}{{ $_ := set $v "administrators" $b.administrators }}{{ end -}}
 {{- if $b.probeAudience }}{{ $_ := set $v "probeAudience" $b.probeAudience }}{{ end -}}
 {{- if $b.registrySecret }}{{ $_ := set $v "registryAuthentication" "dockerconfigjson/v1" }}{{ end -}}
 {{/* Preserve omitempty semantics required by the closed public wire. */}}
@@ -30,6 +31,7 @@
 {{- if or (eq $n "") (gt (len $n) 253) (not (regexMatch "^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$" $n)) }}{{ fail "bootstrap requires the existing producer, schema and retirement Secret references" }}{{ end -}}
 {{- end -}}
 {{- if gt (len (include "asservat.bootstrap.input" .)) 49152 }}{{ fail "complete bootstrap public input exceeds 48 KiB" }}{{ end -}}
+{{- if and $b.continuation.enabled (gt (len (include "asservat.bootstrap.continuation" .)) 65536) }}{{ fail "complete continuation public input exceeds 64 KiB" }}{{ end -}}
 {{- end -}}
 {{- end -}}
 
@@ -85,11 +87,25 @@ limits:
 {{- if and (hasKey $c.public "processors") (not $c.public.origin) }}{{ fail "bootstrap.continuation.public.processors requires public.origin" }}{{ end -}}
 {{- if and (hasKey $c.public "captureHistory") (not $c.public.origin) }}{{ fail "bootstrap.continuation.public.captureHistory requires public.origin" }}{{ end -}}
 {{- if and $c.public.permissionDelegations (not $c.public.origin) }}{{ fail "bootstrap.continuation.public.permissionDelegations requires public.origin" }}{{ end -}}
+{{- range $field := list "capacity" "processingOperators" "federation" "promotion" "retentionBaseline" -}}
+{{- if and (hasKey $c.public $field) (not $c.public.origin) }}{{ fail (printf "bootstrap.continuation.public.%s requires public.origin" $field) }}{{ end -}}
+{{- end -}}
 {{- if $c.public.origin -}}
 {{- $p := $c.public -}}
 {{- $clients := list -}}
 {{- range $p.clients }}{{ $clients = append $clients (dict "id" .id "kind" .kind "classQualified" true) }}{{ end -}}
 {{- $_ := set $v "public" (dict "origin" $p.origin "issuer" $p.issuer "clientID" $p.clientID "maxLifetimeSeconds" (int $p.maxLifetimeSeconds) "maxLogins" (int $p.maxLogins) "maxSessions" (int $p.maxSessions) "maxLogoutEvents" (int $p.maxLogoutEvents) "clients" $clients "eligibleSubjects" $p.eligibleSubjects "eligibleGroups" $p.eligibleGroups "groupMaxAgeSeconds" (int $p.groupMaxAgeSeconds)) -}}
+{{- range $field := list "processingOperators" "federation" "promotion" "retentionBaseline" -}}
+{{- if hasKey $p $field }}{{ $_ := set (get $v "public") $field (get $p $field) }}{{ end -}}
+{{- end -}}
+{{- if hasKey $p "capacity" -}}
+{{- $capacity := deepCopy $p.capacity -}}
+{{- if hasKey $capacity "policySpec" -}}
+{{- $scope := get $capacity.policySpec "scope" -}}
+{{- if not (hasKey $scope "clusterID") }}{{ $_ := set $scope "clusterID" "" }}{{ end -}}
+{{- end -}}
+{{- $_ := set (get $v "public") "capacity" $capacity -}}
+{{- end -}}
 {{- if hasKey $p "processors" }}{{ $_ := set (get $v "public") "processors" $p.processors }}{{ end -}}
 {{- if hasKey $p "approvals" }}{{ $_ := set (get $v "public") "approvals" $p.approvals }}{{ end -}}
 {{- if hasKey $p "captureHistory" }}{{ $_ := set (get $v "public") "captureHistory" $p.captureHistory }}{{ end -}}

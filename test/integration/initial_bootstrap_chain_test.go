@@ -20,6 +20,7 @@ import (
 	"asservat.local/asservat/internal/adapters/kms"
 	"asservat.local/asservat/internal/adapters/objectstore/framed"
 	"asservat.local/asservat/internal/adapters/postgres"
+	"asservat.local/asservat/internal/adapters/providerconfig"
 	"asservat.local/asservat/internal/bootstrap"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/audit"
@@ -56,6 +57,10 @@ func TestInitialBootstrapChainWithRealServices(t *testing.T) {
 		t.Fatal("owned single-cluster/native services unavailable")
 	}
 	installedMode := os.Getenv("ASSERVAT_INSTALLER_CONTINUATION") == "1"
+	helmContext := os.Getenv("ASSERVAT_HELM_CONTEXT_NATIVE") == "1"
+	if helmContext && (!installedMode || installedJourneyFocus() != "journey") {
+		t.Fatal("actual chart context requires the collector-free installed journey")
+	}
 	if err := installedFocusGroupError(); installedMode && err != nil {
 		t.Fatal("focuses cannot share one installation:", err)
 	}
@@ -149,56 +154,70 @@ func TestInitialBootstrapChainWithRealServices(t *testing.T) {
 	desired.AuditStore = contracts.OwnerAuditStore{Endpoint: f.NativeProviders.S3, Roots: [][]byte{f.NativeProviders.Root}, Region: "us-east-1", Bucket: "initial-bootstrap-chain"}
 	desired.KeyService = contracts.ConfigurationKeyService{Endpoint: f.NativeProviders.KMS, Roots: [][]byte{f.NativeProviders.Root}, AuditMount: "bootstrap-chain-transit", AuditKey: "audit"}
 	desired.Providers = contracts.InitialBootstrapProviders{IssuerPolicy: "bootstrap-chain-issuer", WrapRole: "bootstrap-chain-wrap", WrapPolicy: "bootstrap-chain-encrypt", UnwrapRole: "bootstrap-chain-unwrap", UnwrapPolicy: "bootstrap-chain-decrypt"}
-	runnerAccount := "trusted-runner"
-	if installedMode {
-		runnerAccount = desired.Name + "-bootstrap-runner"
+	var roleUID, bindingUID types.UID
+	if !helmContext {
+		runnerAccount := "trusted-runner"
+		if installedMode {
+			runnerAccount = desired.Name + "-bootstrap-runner"
+		}
+		account, err := api.CoreV1().ServiceAccounts(namespace).Create(ctx, &core.ServiceAccount{ObjectMeta: meta.ObjectMeta{Name: runnerAccount}, AutomountServiceAccountToken: ptr.To(false)}, meta.CreateOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		desired.Administrators = append(desired.Administrators, contracts.OwnerDeploymentActor{Kind: "User", Name: "system:serviceaccount:" + namespace + ":" + account.Name})
+		// Explicit initial administrator trust, not product runtime RBAC. Same finite
+		// resource union as the qualified original preparation fixture.
+		role, err := api.RbacV1().ClusterRoles().Create(ctx, &rbac.ClusterRole{ObjectMeta: meta.ObjectMeta{Name: namespace + "-administrator"}, Rules: []rbac.PolicyRule{
+			{APIGroups: []string{""}, Resources: []string{"namespaces", "serviceaccounts", "serviceaccounts/token", "configmaps", "secrets", "pods"}, Verbs: []string{"get", "create", "update", "delete"}},
+			// New closure effects use metadata-only JSON PATCH on three exact managed
+			// Secrets. This belongs only to the trusted initial administrator.
+			{APIGroups: []string{""}, Resources: []string{"secrets"}, ResourceNames: []string{desired.Name + "-bootstrap-state", desired.Name + "-sql-material", desired.Name + "-provider-material"}, Verbs: []string{"patch"}},
+			{APIGroups: []string{rbac.GroupName}, Resources: []string{"roles", "rolebindings", "clusterroles", "clusterrolebindings"}, Verbs: []string{"get", "create", "update"}},
+			{APIGroups: []string{"admissionregistration.k8s.io"}, Resources: []string{"validatingadmissionpolicies", "validatingadmissionpolicybindings"}, Verbs: []string{"get", "create", "update"}},
+			{APIGroups: []string{"authentication.k8s.io"}, Resources: []string{"selfsubjectreviews", "tokenreviews"}, Verbs: []string{"create"}},
+		}}, meta.CreateOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		binding, err := api.RbacV1().ClusterRoleBindings().Create(ctx, &rbac.ClusterRoleBinding{ObjectMeta: meta.ObjectMeta{Name: role.Name}, RoleRef: rbac.RoleRef{APIGroup: rbac.GroupName, Kind: "ClusterRole", Name: role.Name}, Subjects: []rbac.Subject{{Kind: "ServiceAccount", Namespace: namespace, Name: account.Name}}}, meta.CreateOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		roleUID, bindingUID = role.UID, binding.UID
+		// Read the actual default API audience without treating decoded claims as
+		// authentication; the runner and producer still use real API authentication.
+		audience, err := api.CoreV1().ServiceAccounts(namespace).CreateToken(ctx, account.Name, &auth.TokenRequest{Spec: auth.TokenRequestSpec{ExpirationSeconds: ptr.To(int64(600))}}, meta.CreateOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		parts := strings.Split(audience.Status.Token, ".")
+		if len(parts) != 3 {
+			t.Fatal("API audience missing")
+		}
+		claims, err := base64.RawURLEncoding.DecodeString(parts[1])
+		if err != nil {
+			t.Fatal(err)
+		}
+		var aud struct {
+			Audience []string `json:"aud"`
+		}
+		if json.Unmarshal(claims, &aud) != nil || len(aud.Audience) != 1 {
+			t.Fatal("API audience profile unsupported")
+		}
+		clear(claims)
+		desired.ProbeAudience = aud.Audience[0]
+
+	} else {
+		// The existing owned API token supplies only a public audience hint. The
+		// actual chart runner authenticates with its own projected API token.
+		hint := helmBootstrapPublicInput(desired)
+		hinted, e := providerconfig.CompileInitialBootstrapInput(hint, kc.CAData, []byte(f.Clusters[0].Token), time.Now())
+		if e != nil {
+			t.Fatal("actual chart API audience hint unavailable", e)
+		}
+		desired.ProbeAudience = hinted.ProbeAudience
 	}
-	account, err := api.CoreV1().ServiceAccounts(namespace).Create(ctx, &core.ServiceAccount{ObjectMeta: meta.ObjectMeta{Name: runnerAccount}, AutomountServiceAccountToken: ptr.To(false)}, meta.CreateOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	desired.Administrators = append(desired.Administrators, contracts.OwnerDeploymentActor{Kind: "User", Name: "system:serviceaccount:" + namespace + ":" + account.Name})
-	// Explicit initial administrator trust, not product runtime RBAC. Same finite
-	// resource union as the qualified original preparation fixture.
-	role, err := api.RbacV1().ClusterRoles().Create(ctx, &rbac.ClusterRole{ObjectMeta: meta.ObjectMeta{Name: namespace + "-administrator"}, Rules: []rbac.PolicyRule{
-		{APIGroups: []string{""}, Resources: []string{"namespaces", "serviceaccounts", "serviceaccounts/token", "configmaps", "secrets", "pods"}, Verbs: []string{"get", "create", "update", "delete"}},
-		// New closure effects use metadata-only JSON PATCH on three exact managed
-		// Secrets. This belongs only to the trusted initial administrator.
-		{APIGroups: []string{""}, Resources: []string{"secrets"}, ResourceNames: []string{desired.Name + "-bootstrap-state", desired.Name + "-sql-material", desired.Name + "-provider-material"}, Verbs: []string{"patch"}},
-		{APIGroups: []string{rbac.GroupName}, Resources: []string{"roles", "rolebindings", "clusterroles", "clusterrolebindings"}, Verbs: []string{"get", "create", "update"}},
-		{APIGroups: []string{"admissionregistration.k8s.io"}, Resources: []string{"validatingadmissionpolicies", "validatingadmissionpolicybindings"}, Verbs: []string{"get", "create", "update"}},
-		{APIGroups: []string{"authentication.k8s.io"}, Resources: []string{"selfsubjectreviews", "tokenreviews"}, Verbs: []string{"create"}},
-	}}, meta.CreateOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	binding, err := api.RbacV1().ClusterRoleBindings().Create(ctx, &rbac.ClusterRoleBinding{ObjectMeta: meta.ObjectMeta{Name: role.Name}, RoleRef: rbac.RoleRef{APIGroup: rbac.GroupName, Kind: "ClusterRole", Name: role.Name}, Subjects: []rbac.Subject{{Kind: "ServiceAccount", Namespace: namespace, Name: account.Name}}}, meta.CreateOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { initialBootstrapChainCleanup(t, api, desired, ns.UID, role.UID, binding.UID) })
-	// Read the actual default API audience without treating decoded claims as
-	// authentication; the runner and producer still use real API authentication.
-	audience, err := api.CoreV1().ServiceAccounts(namespace).CreateToken(ctx, account.Name, &auth.TokenRequest{Spec: auth.TokenRequestSpec{ExpirationSeconds: ptr.To(int64(600))}}, meta.CreateOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	parts := strings.Split(audience.Status.Token, ".")
-	if len(parts) != 3 {
-		t.Fatal("API audience missing")
-	}
-	claims, err := base64.RawURLEncoding.DecodeString(parts[1])
-	if err != nil {
-		t.Fatal(err)
-	}
-	var aud struct {
-		Audience []string `json:"aud"`
-	}
-	if json.Unmarshal(claims, &aud) != nil || len(aud.Audience) != 1 {
-		t.Fatal("API audience profile unsupported")
-	}
-	clear(claims)
-	desired.ProbeAudience = aud.Audience[0]
+	t.Cleanup(func() { initialBootstrapChainCleanup(t, api, desired, ns.UID, roleUID, bindingUID) })
 	var publicInput contracts.InitialBootstrapInput
 	rootCert, err := x509.ParseCertificate(f.NativeProviders.Root)
 	if err != nil {
@@ -227,7 +246,14 @@ func TestInitialBootstrapChainWithRealServices(t *testing.T) {
 		desired.Fleet.Groups = []string{installedIdentityGroup}
 		desired.Fleet.DeliveryProfiles = []string{"regional-installer"}
 		publicInput, desired = installedUnifiedPublicInput(t, desired)
-		unified = newInstalledUnifiedRunner(t, ctx, api, publicInput, setup, f.Clusters[0].Pod.NodeName)
+		if helmContext {
+			if f.HelmContext == nil || f.HelmContext.ChartArchive == "" {
+				t.Fatal("packaged actual context chart unavailable")
+			}
+			unified = &installedUnifiedRunner{continuation: setup, ownedNode: f.Clusters[0].Pod.NodeName, helm: newHelmContextRunner(t, f.Clusters[0].Config, publicInput, setup, f.HelmContext.ChartArchive)}
+		} else {
+			unified = newInstalledUnifiedRunner(t, ctx, api, publicInput, setup, f.Clusters[0].Pod.NodeName)
+		}
 		t.Log("operator prerequisites prepared: providers, CRDs, PKI mounts, identity and runner inputs")
 	} else {
 		public, e := json.Marshal(desired)
@@ -334,7 +360,7 @@ func TestInitialBootstrapChainWithRealServices(t *testing.T) {
 	originalSeed.State.Passwords.Manager = ""
 	closureAPI := kubernetes.Interface(api)
 	closureConfig := kc
-	if unified != nil {
+	if unified != nil && !helmContext {
 		closureConfig = installedUnifiedRunnerConfig(kc, desired)
 		closureAPI, err = kubernetes.NewForConfig(closureConfig)
 		if err != nil {
@@ -437,7 +463,7 @@ func TestInitialBootstrapChainWithRealServices(t *testing.T) {
 	initialBootstrapCopyGuardRBAC(t, ctx, api, desired, originalSeed)
 	t.Run("administrator-removal-detected-without-recreation", func(t *testing.T) {
 		boundaryConfig := direct
-		if unified != nil {
+		if unified != nil && !helmContext {
 			boundaryConfig = installedUnifiedRunnerConfig(direct, desired)
 		}
 		initialBootstrapCopyAdministratorBoundary(t, ctx, directAPI, boundaryConfig, desired)
@@ -792,11 +818,15 @@ func initialBootstrapChainCleanup(t *testing.T, api kubernetes.Interface, d cont
 		}
 	}
 	name := d.BootstrapNamespace + "-administrator"
-	if e := api.RbacV1().ClusterRoleBindings().Delete(ctx, name, meta.DeleteOptions{Preconditions: &meta.Preconditions{UID: &bindingUID}}); e != nil && !apierrors.IsNotFound(e) {
-		t.Error(e)
+	if bindingUID != "" {
+		if e := api.RbacV1().ClusterRoleBindings().Delete(ctx, name, meta.DeleteOptions{Preconditions: &meta.Preconditions{UID: &bindingUID}}); e != nil && !apierrors.IsNotFound(e) {
+			t.Error(e)
+		}
 	}
-	if e := api.RbacV1().ClusterRoles().Delete(ctx, name, meta.DeleteOptions{Preconditions: &meta.Preconditions{UID: &roleUID}}); e != nil && !apierrors.IsNotFound(e) {
-		t.Error(e)
+	if roleUID != "" {
+		if e := api.RbacV1().ClusterRoles().Delete(ctx, name, meta.DeleteOptions{Preconditions: &meta.Preconditions{UID: &roleUID}}); e != nil && !apierrors.IsNotFound(e) {
+			t.Error(e)
+		}
 	}
 	if ctx.Err() != nil {
 		t.Error("owned bootstrap cleanup did not converge")

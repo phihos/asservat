@@ -272,24 +272,8 @@ func readServingRoots(ctx context.Context, config *rest.Config, namespace, secre
 		return nil, cfg.ErrUnavailable
 	}
 	defer clear(s.Data["tls.key"])
-	roots, err := pemRoots(s.Data["ca.crt"])
-	if err != nil {
-		return nil, err
-	}
-	pool := x509.NewCertPool()
-	for _, der := range roots {
-		c, _ := x509.ParseCertificate(der)
-		pool.AddCert(c)
-	}
-	block, _ := pem.Decode(s.Data["tls.crt"])
-	if block == nil || len(roots) == 0 || len(roots) > 4 {
-		return nil, cfg.ErrInvalid
-	}
-	leaf, err := x509.ParseCertificate(block.Bytes)
-	if err != nil {
-		return nil, cfg.ErrInvalid
-	}
-	if _, err = leaf.Verify(x509.VerifyOptions{DNSName: serverName, Roots: pool, KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}}); err != nil {
+	roots, err := ValidateInstallerServingTLS(s.Data["tls.crt"], s.Data["tls.key"], s.Data["ca.crt"], serverName, time.Now())
+	if err != nil || call.Err() != nil {
 		return nil, cfg.ErrInvalid
 	}
 	return roots, nil

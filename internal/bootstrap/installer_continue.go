@@ -904,6 +904,14 @@ func (k *InstallerContinuation) Owner(ctx context.Context, resources *kube.Initi
 	if err != nil {
 		return err
 	}
+	serving, err := k.servingTLSPlan()
+	if err != nil {
+		return err
+	}
+	artifact, err = withInstallerServingTLSRecipe(artifact, serving)
+	if err != nil {
+		return err
+	}
 	admin := k.in.kubernetes("administrator-token")
 	if err = kube.PublishInstallerRecipe(ctx, admin, k.input.Namespace, k.record.Scope.InstallationID, contracts.InstallerRecipeOutbox{Format: contracts.InstallerRecipeOutboxFormat, Phase: 3, Purpose: "owner-provider", Recipe: artifact}); err != nil {
 		return err
@@ -917,6 +925,13 @@ func (k *InstallerContinuation) Owner(ctx context.Context, resources *kube.Initi
 	defer clear(inbox.AuditCredential)
 	for _, b := range inbox.Public {
 		defer clear(b)
+	}
+	for _, b := range inbox.ServingTLS {
+		defer clear(b)
+	}
+	k.at("owner/serving-tls")
+	if err = kube.EnsureInstallerServingTLS(ctx, admin, inventory.Namespace.Name, k.record.Scope.InstallationID, serving, inbox.ServingTLS); err != nil {
+		return err
 	}
 	defer clear(inbox.DownloadEvidenceCredential)
 	// ADR-204 decision 5: the download workers' own evidence read principal,
@@ -1421,6 +1436,10 @@ func (k *InstallerContinuation) Capacity(ctx context.Context, inventory kube.Ini
 	// One sorted key list for the guard, its proof, the qualification and the
 	// runtime pins, which compare keys in order.
 	keys := slices.Sorted(slices.Values(p.NamespaceKeys))
+	k.at("capacity/objects")
+	if err := kube.EnsureInstallerCapacityObjects(ctx, admin, control, installation, cluster, *p); err != nil {
+		return err
+	}
 	k.at("capacity/sources")
 	sources, err := kube.EnsureCapacitySources(ctx, admin, control, installation, admins, inventory.WorkerAccount, inventory.OwnerAccount, keys, k.processingSettings(owner.PermissionRootID))
 	if err != nil {

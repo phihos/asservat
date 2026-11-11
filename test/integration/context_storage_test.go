@@ -32,6 +32,9 @@ import (
 )
 
 type fixture struct {
+	HelmContext *struct {
+		ChartArchive string `json:"chartArchive"`
+	} `json:"helmContext,omitempty"`
 	S3, KMS, Postgres   string
 	NativeSQLStatistics bool
 	NativeTrafficHelper nativeTrafficHelper

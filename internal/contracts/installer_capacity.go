@@ -1,5 +1,7 @@
 package contracts
 
+import wire "asservat.local/asservat/api/v1alpha1"
+
 // InstallerCapacitySettings is the operator's capacity profile (ADR-190):
 // every value a qualified deployment supplies. The installer mints the
 // identities and derives the root, account version, pool UID, guard digests,
@@ -8,6 +10,11 @@ type InstallerCapacitySettings struct {
 	Pool          string   `json:"pool"`
 	Policy        string   `json:"policy"`
 	NamespaceKeys []string `json:"namespaceKeys"`
+	// PoolSpec and PolicySpec optionally create the initial desired objects.
+	// Both are required together; omission preserves preprovided sources.
+	// An empty policy scope clusterID is filled with the generated hub ID.
+	PoolSpec   *wire.EvidenceStoragePoolSpec  `json:"poolSpec,omitempty"`
+	PolicySpec *wire.EvidenceBudgetPolicySpec `json:"policySpec,omitempty"`
 	// WorkloadKeys are the Deployment/StatefulSet label and annotation keys
 	// the workload metadata guard protects (ADR-247); absent, no guard is
 	// installed and workloadMetadata sources grant nothing.

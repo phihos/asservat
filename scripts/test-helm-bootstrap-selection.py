@@ -18,6 +18,20 @@ spec.loader.exec_module(fixture)
 
 
 class HelmSelection(unittest.TestCase):
+    def test_context_chart_mode_is_explicit_and_stays_in_installed_workflow(self):
+        flag = "ASSERVAT_HELM_CONTEXT_NATIVE"
+        base = {flag: "1"}
+        ordinary = fixture.qualification_environment(base, Path("fixture"), Path("work"), False, False)
+        self.assertNotIn(flag, ordinary)
+        selected = fixture.qualification_environment(base, Path("fixture"), Path("work"), False, False, initial_bootstrap_chain=True, runtime_provider_pair=True, installer_continuation=True)
+        self.assertEqual(selected[flag], "1")
+        with patch.dict("os.environ", base, clear=True), patch.object(fixture, "run", side_effect=AssertionError("external setup")) as external:
+            with self.assertRaisesRegex(ValueError, "Helm context qualification"):
+                fixture.main()
+            with self.assertRaisesRegex(ValueError, "single journey focus"):
+                fixture.main(initial_bootstrap_chain=True, runtime_provider_pair=True, installer_continuation=True)
+            external.assert_not_called()
+
     def test_exported_layer_retains_exact_bytes_and_original_rootfs(self):
         plain = b"synthetic tar payload"
         digest = "sha256:"+hashlib.sha256(plain).hexdigest()

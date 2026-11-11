@@ -242,6 +242,9 @@ def qualification_selection(test_pattern, initial_handover, initial_schema_hando
 def qualification_environment(base, fixture_path, work, initial_handover, initial_schema_handover, initial_bootstrap_chain=False, helm_bootstrap=False, regional_context_start=None, runtime_object_roundtrip=False, owner_provider_auth=False, runtime_provider_pair=False, runtime_provider_worker=False, runtime_provider_owner=False, installer_continuation=False):
     env = base.copy()
     env["ASSERVAT_CONTEXT_FIXTURES"] = str(fixture_path)
+    env.pop("ASSERVAT_HELM_CONTEXT_NATIVE", None)
+    if installer_continuation and base.get("ASSERVAT_HELM_CONTEXT_NATIVE") == "1":
+        env["ASSERVAT_HELM_CONTEXT_NATIVE"] = "1"
     # Development-only keep/rerun switches never leak from the caller's shell.
     for key in DEVELOPMENT_ENVIRONMENT:
         env.pop(key, None)
@@ -663,8 +666,13 @@ def collect_profile_containment_artifacts(work, results):
 
 
 def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=False, initial_bootstrap_chain=False, helm_bootstrap=False, regional_context_start=None, runtime_object_roundtrip=False, owner_provider_auth=False, runtime_provider_pair=False, runtime_provider_worker=False, runtime_provider_owner=False, installer_continuation=False, helm_cluster=False, keep_on_failure=False, keep_installed=False):
+    helm_context = os.environ.get("ASSERVAT_HELM_CONTEXT_NATIVE") == "1"
+    if helm_context and (not installer_continuation or not initial_bootstrap_chain or helm_bootstrap or helm_cluster):
+        raise ValueError("Helm context qualification requires the installed bootstrap continuation and its exact workflow")
     focus = os.environ.get("ASSERVAT_JOURNEY_FOCUS")
     foci = journey_foci()
+    if helm_context and foci != ["journey"]:
+        raise ValueError("Helm context qualification requires the single journey focus")
     if keep_installed:
         refuse_development_mode_in_ci("--keep-installed")
         if not (installer_continuation and runtime_provider_pair and initial_bootstrap_chain) or focus not in RERUN_FOCUSES:
@@ -729,6 +737,7 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
         audit_started = False
         audit_nodes = []
         report = {"scope": "component integration, not S-02 release acceptance", "runtimeProviderPairQualification": runtime_provider_pair, "runtimeProviderWorkerQualification": runtime_provider_worker, "runtimeProviderOwnerQualification": runtime_provider_owner, "installerContinuationQualification": installer_continuation, "aggregateGoTimeout": qualification_go_timeout(helm_bootstrap, runtime_provider_owner, installer_continuation, native_traffic_probe), "bootstrapFixtureSeconds": (2700 if installer_continuation else 720 if runtime_provider_owner else 480) if initial_bootstrap_chain else None, "images": {"s3": SEAWEED, "kms": BAO, "kubernetes": NODE, "postgres": POSTGRES}, "clusters": [], "testPattern": test_pattern, "testPackage": test_package, "runtimeObjectRoundTripQualification": runtime_object_roundtrip, "ownerProviderAuthenticationQualification": owner_provider_auth, "initialHandoverQualification": initial_handover, "initialSchemaHandoverQualification": initial_schema_handover, "initialBootstrapChainQualification": initial_bootstrap_chain, "helmBootstrapQualification": helm_bootstrap and not helm_cluster, "helmClusterQualification": helm_cluster, "regionalContextStartQualification": regional_context_start, "fixtureMigratesDatabase": not (initial_schema_handover or initial_bootstrap_chain or helm_bootstrap)}
+        report["helmContextQualification"] = helm_context
         if keep_installed:
             report["qualification"] = False
             report["developmentMode"] = "keep-installed: the installation is left running for --rerun-installed; never a qualification"
@@ -877,6 +886,8 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
                 registry = HelmRegistry(work, network, run_id, containers, run)
                 registry.upload(worker_tag, worker_info["Id"])
                 report["registryImageIdentity"] = registry.export_identity
+            if helm_bootstrap or helm_context:
+                report["helmVersion"] = run(["helm", "version", "--short"])
                 chart_dir = work/"chart"
                 chart_dir.mkdir()
                 run(["helm", "package", str(ROOT/"charts/asservat"), "--destination", str(chart_dir)])
@@ -966,6 +977,8 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
                 fixture["directObservation"] = report["directObservation"]
             # Product Pods in the second cluster need the image loaded there too.
             fixture["twoClusterPods"] = two_cluster_pods
+            if helm_context:
+                fixture["helmContext"] = {"chartArchive": str(chart_archive)}
             if helm_bootstrap:
                 fixture["helmBootstrap"] = {"registryConfig": registry.material(), "productBinary": str(image_dir/"asservat"), "chartArchive": str(chart_archive)}
             phase("servicesStarted")

@@ -1,5 +1,36 @@
 # Sustained implementation progress
 
+## Active candidate: installable context trial (2026-11-11)
+
+The maintainer's immediate priority is trying the existing context vertical
+slice on a homelab. Candidate `feature/homelab-context-trial` starts at
+authoritative merged `cef71802`; ADR324 records the packaging defects and
+bounded remedies. The sharing-retirement candidate is preserved separately
+at `e5e77be7`, with broad local and stress/schema passes but no fresh installed
+qualification or merge. It is parked while this installation workflow proceeds.
+
+Observed main gaps: Helm cannot pass five required public context settings;
+native setup supplies the storage pool/budget and serving TLS Secrets; the
+public bootstrap input hides existing explicit installation administrators.
+The candidate adds those producers using current contracts and guard branches.
+It does not copy synthetic grants or weaken browser evidence authorization.
+
+Local image packaging succeeds (linux/amd64) with actual static CLI and compiled
+React; a nonroot, read-only, network-disabled recipe invocation returns valid
+JSON and the exported image has no fixture helper binaries. Nothing was pushed.
+Original administrator normalization tests pass0.007s. Full Helm render/schema
+checks pass; rendered public inputs decode through actual installer DTOs and
+capacity compilers. Capacity producer race checks pass1.429s; serving TLS
+producer/consumer checks pass0.068s/0.021s. Independent composition review found
+no blocker. The operator Fleet form uses the existing authenticated issuance
+route;9 focused UI/HTTP tests and TypeScript pass. Exact `/fleet` console and
+safe login return checks pass. Actual-chart fixture render/race checks pass
+1.132s and integration compilation passes; no final objects are seeded on that
+path and no installer impersonation is used for operator management.
+Broad gates and fresh actual Helm qualification are next. No complete Helm installation or
+homelab outcome is claimed. Target context/dependency choices await the
+maintainer; owned collector-free qualification can proceed independently.
+
 ## Active candidate: processing inventory export (2026-11-11)
 
 [PR222](https://github.com/phihos/asservat/pull/222) starts from authoritative

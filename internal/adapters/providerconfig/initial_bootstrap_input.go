@@ -25,6 +25,10 @@ func CompileInitialBootstrapInput(v contracts.InitialBootstrapInput, kubernetesC
 	if v.Format != contracts.InitialBootstrapInputFormat || v.RegistryAuthentication != "" && v.RegistryAuthentication != contracts.InitialRegistryAuthentication || now.IsZero() || len(validation.IsDNS1123Label(v.RunnerAccount)) != 0 || len(validation.IsDNS1123Label(v.BootstrapNamespace)) != 0 {
 		return zero, cfg.ErrInvalid
 	}
+	admins, err := initialBootstrapAdministrators(v)
+	if err != nil {
+		return zero, err
+	}
 	kubePEM := []byte(v.Kubernetes.RootsPEM)
 	if len(kubePEM) == 0 {
 		kubePEM = kubernetesCA
@@ -55,7 +59,7 @@ func CompileInitialBootstrapInput(v contracts.InitialBootstrapInput, kubernetesC
 	if !identity.Text(audience, 256) {
 		return zero, cfg.ErrInvalid
 	}
-	d := contracts.InitialBootstrap{Format: contracts.InitialBootstrapVersionedAuditFormat, Name: v.Name, BootstrapNamespace: v.BootstrapNamespace, TargetNamespace: v.TargetNamespace, Image: v.Image, RegistryAuthentication: v.RegistryAuthentication, Administrators: []contracts.OwnerDeploymentActor{{Kind: "User", Name: "system:serviceaccount:" + v.BootstrapNamespace + ":" + v.RunnerAccount}}, ProbeAudience: audience, Kubernetes: contracts.OwnerProviderEndpoint{Endpoint: v.Kubernetes.Endpoint, Roots: k}, Postgres: contracts.OwnerPostgresEndpoint{Host: v.Postgres.Host, Port: v.Postgres.Port, Database: v.Postgres.Database, MaxConnections: v.Postgres.MaxConnections, Roots: p}, AuditStore: contracts.OwnerAuditStore{Endpoint: v.AuditStore.Endpoint, Region: v.AuditStore.Region, Bucket: v.AuditStore.Bucket, Roots: a}, KeyService: contracts.ConfigurationKeyService{Endpoint: v.KeyService.Endpoint, AuditMount: v.KeyService.AuditMount, AuditKey: v.KeyService.AuditKey, Roots: b}, Fleet: v.Fleet, Providers: v.Providers}
+	d := contracts.InitialBootstrap{Format: contracts.InitialBootstrapVersionedAuditFormat, Name: v.Name, BootstrapNamespace: v.BootstrapNamespace, TargetNamespace: v.TargetNamespace, Image: v.Image, RegistryAuthentication: v.RegistryAuthentication, Administrators: admins, ProbeAudience: audience, Kubernetes: contracts.OwnerProviderEndpoint{Endpoint: v.Kubernetes.Endpoint, Roots: k}, Postgres: contracts.OwnerPostgresEndpoint{Host: v.Postgres.Host, Port: v.Postgres.Port, Database: v.Postgres.Database, MaxConnections: v.Postgres.MaxConnections, Roots: p}, AuditStore: contracts.OwnerAuditStore{Endpoint: v.AuditStore.Endpoint, Region: v.AuditStore.Region, Bucket: v.AuditStore.Bucket, Roots: a}, KeyService: contracts.ConfigurationKeyService{Endpoint: v.KeyService.Endpoint, AuditMount: v.KeyService.AuditMount, AuditKey: v.KeyService.AuditKey, Roots: b}, Fleet: v.Fleet, Providers: v.Providers}
 	if Validate(d.Kubernetes, d.Postgres, d.AuditStore, d.KeyService, now) != nil || !InitialProviderNames(d.Providers.IssuerPolicy, d.Providers.WrapRole, d.Providers.WrapPolicy, d.Providers.UnwrapRole, d.Providers.UnwrapPolicy) {
 		return zero, cfg.ErrInvalid
 	}
@@ -64,6 +68,25 @@ func CompileInitialBootstrapInput(v contracts.InitialBootstrapInput, kubernetesC
 		return zero, cfg.ErrInvalid
 	}
 	return d, nil
+}
+
+// These are explicit original installation administrators, independent of
+// browser identities and evidence grants. The runner remains an administrator.
+func initialBootstrapAdministrators(v contracts.InitialBootstrapInput) ([]contracts.OwnerDeploymentActor, error) {
+	if len(v.Administrators) > 31 || v.Administrators != nil && len(v.Administrators) == 0 {
+		return nil, cfg.ErrInvalid
+	}
+	runner := contracts.OwnerDeploymentActor{Kind: "User", Name: "system:serviceaccount:" + v.BootstrapNamespace + ":" + v.RunnerAccount}
+	admins := []contracts.OwnerDeploymentActor{runner}
+	seen := map[contracts.OwnerDeploymentActor]bool{runner: true}
+	for _, actor := range v.Administrators {
+		if (actor.Kind != "User" && actor.Kind != "Group") || !identity.Text(actor.Name, 256) || seen[actor] {
+			return nil, cfg.ErrInvalid
+		}
+		seen[actor] = true
+		admins = append(admins, actor)
+	}
+	return admins, nil
 }
 
 // TrustRootsPEM parses at most four exact certificate blocks into sorted,
