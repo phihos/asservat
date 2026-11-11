@@ -530,7 +530,7 @@ func qualifyCompiledCleanupOverdueCounter(t *testing.T, f *capacitySQLFixture, s
   CASE current_setting('asservat.test_pool_mutation',true)
    WHEN 'reset' THEN UPDATE public.operation_audit_pool SET proof_window_missed=0 WHERE root_id=NEW.root_id AND lane=NEW.lane;
    WHEN 'jump' THEN UPDATE public.operation_audit_pool SET proof_window_missed=proof_window_missed+2 WHERE root_id=NEW.root_id AND lane=NEW.lane;
-   WHEN 'backing' THEN UPDATE public.operation_audit_pool SET proof_window_missed=proof_window_missed+1,revision=revision+1 WHERE root_id=NEW.root_id AND lane=NEW.lane;
+   WHEN 'backing' THEN UPDATE public.operation_audit_pool SET proof_window_missed=proof_window_missed+1,history_backing_until=history_backing_until+interval '1 microsecond' WHERE root_id=NEW.root_id AND lane=NEW.lane;
    ELSE RAISE EXCEPTION 'unknown fixture mutation';
   END CASE;
   RETURN NULL;

@@ -70,8 +70,13 @@ timestamps are never rewritten. At `ad4662b7`, the compiled-role service regress
 healthy retirement/refund still passes; overdue selection increments its
 original counter once and replay preserves it. Negative mutation assertions
 are being strengthened to require the exact nested guard context, since an
-earlier recovery guard can also return23514. Fresh installed work remains
-pending, with all original bounds unchanged.
+earlier recovery guard can also return23514. At `f107d8e4`, schema upgrade/rollback passes3.32s; the stronger service
+assertion correctly rejects the fixture's backing-mutation probe because the
+earlier capacity configuration guard handles revision writes. The probe now
+targets history backing, which that guard permits to reach the intended audit
+guard, rather than accepting an arbitrary23514. This is fixture correction,
+not a runtime-permission expansion. Fresh installed work remains pending, with
+all original bounds unchanged.
 
 Earlier failed boundary reports remain in `baseline-1dc7c616`,
 `boundaries-63da31e8`, `schema-retry`, `slots-d7a2fd1a`, `slots-eca00f46`,
