@@ -34,11 +34,13 @@ func (v AcceptedCapacityAuditProfiles) Valid(now time.Time) bool {
 		return false
 	}
 	for _, lane := range []struct {
-		name, layout string
-		value        CapacityAuditProfile
-	}{{"normal", OperationVerificationHistoryLayout, v.Normal}, {"processing", ProcessingReleaseHistoryLayout, v.Processing}, {"resolution", OperationVerificationHistoryLayout, v.Resolution}} {
+		name  string
+		value CapacityAuditProfile
+	}{{"normal", v.Normal}, {"processing", v.Processing}, {"resolution", v.Resolution}} {
 		p := lane.value.Policy
-		if !p.CertificateVerificationBacked() || p.History.Layout != lane.layout || p.RootID != v.RootID || p.InstallationID != v.InstallationID || p.Lane != lane.name || p.BackingRevision != v.ConfigurationRevision || p.OverdueTerminal != OperationOverdueTerminal || v.FreshUntil.After(p.ValidUntil) || lane.value.RetainedSeconds < 60 || lane.value.RetainedSeconds > 316224000 || lane.value.RetainedSeconds <= 2*p.BackupHorizonSeconds+3*p.CleanupBudgetSeconds+p.ProofWindowSeconds+30 {
+		// Policy validation owns the closed lane/layout matrix. Preserve the
+		// accepted layout rather than translating it to a historical version.
+		if !p.CertificateVerificationBacked() || p.RootID != v.RootID || p.InstallationID != v.InstallationID || p.Lane != lane.name || p.BackingRevision != v.ConfigurationRevision || p.OverdueTerminal != OperationOverdueTerminal || v.FreshUntil.After(p.ValidUntil) || lane.value.RetainedSeconds < 60 || lane.value.RetainedSeconds > 316224000 || lane.value.RetainedSeconds <= 2*p.BackupHorizonSeconds+3*p.CleanupBudgetSeconds+p.ProofWindowSeconds+30 {
 			return false
 		}
 	}

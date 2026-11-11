@@ -52,6 +52,18 @@ containers are independently absent. The failed harness exited 1; its storage
 pass is distinct from the pending schema retry. Evidence is external in
 `share-retirement/boundaries-63da31e8`.
 
+Schema retry at `d7a2fd1a` passed (Go 3.701 s): actual upgrade153→154,
+idempotency, empty Down154/153/Up, original owners/table/column grants, new-only
+grant rollback refusal and old-profile non-promotion. All 4,561 source hashes
+match and owned cleanup is independently complete. The paid-share run on that
+head failed before mutation (Go 4.263 s): SQL supplied normal-v4 but the domain
+profile consumer still required v3. A new focused unit reproduced that refusal.
+The correction uses the policy's closed lane/layout validator without rewriting
+accepted history. Affected audit/capacity/PostgreSQL/bootstrap unit suites pass
+(0.006/0.135/8.146/1.302/67.019 s). The failed run's 4,561 hashes match, cleanup
+failures are empty and all three owned containers are absent. The paid-share
+retry remains pending; evidence is external in `share-retirement/slots-d7a2fd1a`.
+
 The first owned fixture at `1dc7c616` failed before measurement (Go 4.946 s):
 the query-publication helper requested 60-second evidence retention under the
 baseline's original 60-second root, leaving no deletion margin. The correction
