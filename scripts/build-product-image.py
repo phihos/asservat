@@ -23,6 +23,12 @@ def main():
         subprocess.run(["make", "--no-print-directory", "hub-binary", "HUB_BINARY=" + str(context / "asservat"), "ASSERVAT_BUILD_TMP=" + str(build_tmp)], cwd=ROOT, env=env, check=True)
         subprocess.run(["npm", "run", "build"], cwd=ROOT / "web", env=env, check=True)
         shutil.copytree(ROOT / "web/dist", context / "console")
+        # COPY keeps host modes but the image runs as UID 65532. These public
+        # release files must remain usable when the operator uses umask 077.
+        (context / "asservat").chmod(0o755)
+        (context / "console").chmod(0o755)
+        for entry in (context / "console").rglob("*"):
+            entry.chmod(0o755 if entry.is_dir() else 0o644)
         shutil.copyfile(ROOT / "packaging/Dockerfile", context / "Dockerfile")
         subprocess.run(["docker", "build", "--tag", args.tag, str(context)], cwd=ROOT, env=env, check=True)
     image = json.loads(subprocess.check_output(["docker", "image", "inspect", args.tag], text=True))[0]

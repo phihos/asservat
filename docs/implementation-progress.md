@@ -97,6 +97,22 @@ relaxing ticket predicates. The trial uses3,600s validity/4,000s retention;
 96 records and all footprints remain unchanged. Focused boundary/race and
 actual Helm render checks pass (Go1.306s); the exact real-service rerun is next.
 
+The corrected exact-profile real PG/S3 case at `8948a800` passes (Go2.779s):
+one admitted process, acknowledged audits and both active leaves. All4,558
+source hashes match, source stays frozen, cleanup failures are empty and owned
+containers/network are independently absent. The affected Go race phase passes
+353s at the same production source; archive `gates-8948a800`.
+
+Source-build instructions exposed a separate packaging defect under their
+private `umask077`: root-owned binary0700 and console assets0600 prevented the
+image's UID65532 from executing/reading them. The builder now normalizes only
+public artifacts to binary/directories0755 and asset files0644. Actual before
+CLI exit126/read-denied becomes successful nonroot execution and exact reads of
+all10 console files under the same mask, read-only root and disabled network.
+Dedicated smoke containers/image tags are removed; evidence is external in
+`homelab-image-umask`. The draft trial guide and public site example keep their
+end-to-end-pending status until the next fresh actual Helm journey succeeds.
+
 ## Active candidate: processing inventory export (2026-11-11)
 
 [PR222](https://github.com/phihos/asservat/pull/222) starts from authoritative
