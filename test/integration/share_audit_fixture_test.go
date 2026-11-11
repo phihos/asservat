@@ -139,16 +139,28 @@ func (s paidShareService) StopPolicySharing(ctx context.Context, current identit
 // synthetic fixture inputs. Admission, immutable pair, positive writer closure,
 // independent acknowledgements and publication use the current real components.
 type shareCaptureAudit struct {
-	publication auditapp.CaptureOperationPublication
-	admissions  *postgres.ContextAdmissions
-	mac         *auditapp.OperationMAC
+	publication   auditapp.CaptureOperationPublication
+	admissions    *postgres.ContextAdmissions
+	mac           *auditapp.OperationMAC
+	admissionRole string
 }
 
 func newShareCaptureAudit(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, s captureAdmissionScenario) shareCaptureAudit {
 	t.Helper()
 	roles := map[string]*pgxpool.Pool{}
+	admissionRole := narrowRole(t, ctx, admin, "share_capture_admit_", "synthetic-share-capture-admit", func(role string) []string {
+		grants, ok := postgres.PublicRuntimeRoleGrantSQL("capture-admit", role)
+		if !ok {
+			t.Fatal("compiled policy-aware capture admission role")
+		}
+		return grants
+	})
 	for _, purpose := range []string{"source", "admit", "journal", "ack", "read"} {
-		roles[purpose] = poolFor("capture_operation_"+purpose+"_runtime", "synthetic-capture-operation-"+purpose)
+		if purpose == "admit" {
+			roles[purpose] = poolFor(admissionRole, "synthetic-share-capture-admit")
+		} else {
+			roles[purpose] = poolFor("capture_operation_"+purpose+"_runtime", "synthetic-capture-operation-"+purpose)
+		}
 		t.Cleanup(roles[purpose].Close)
 	}
 	defer roles["source"].Close()
@@ -162,7 +174,7 @@ func newShareCaptureAudit(t *testing.T, ctx context.Context, admin *pgxpool.Pool
 	}
 	t.Cleanup(mac.Close)
 	now := time.Now().UTC().Truncate(time.Microsecond)
-	if _, err = admin.Exec(ctx, `INSERT INTO capture_audit_root(root_id,installation_id,source_role,admission_role,journal_role,acknowledge_role,cleanup_role,verifier_role,finalizer_role,reader_role,revision,paused,valid_until) VALUES($1,$2,'capture_operation_source_runtime'::regrole::oid,'capture_operation_admit_runtime'::regrole::oid,'capture_operation_journal_runtime'::regrole::oid,'capture_operation_ack_runtime'::regrole::oid,'capture_operation_cleanup_runtime'::regrole::oid,'capture_operation_verify_runtime'::regrole::oid,'capture_operation_retire_runtime'::regrole::oid,'capture_operation_read_runtime'::regrole::oid,1,false,$3)`, s.a.RootID, s.recovery.installation, now.Add(time.Hour)); err != nil {
+	if _, err = admin.Exec(ctx, `INSERT INTO capture_audit_root(root_id,installation_id,source_role,admission_role,journal_role,acknowledge_role,cleanup_role,verifier_role,finalizer_role,reader_role,revision,paused,valid_until) VALUES($1,$2,'capture_operation_source_runtime'::regrole::oid,$4::regrole::oid,'capture_operation_journal_runtime'::regrole::oid,'capture_operation_ack_runtime'::regrole::oid,'capture_operation_cleanup_runtime'::regrole::oid,'capture_operation_verify_runtime'::regrole::oid,'capture_operation_retire_runtime'::regrole::oid,'capture_operation_read_runtime'::regrole::oid,1,false,$3)`, s.a.RootID, s.recovery.installation, now.Add(time.Hour), admissionRole); err != nil {
 		t.Fatal("original synthetic protected capture pins", err)
 	}
 	account := nativeContinuationAuditAccount(t, s.a.RootID, s.recovery.installation, s.a.Registration.AllocationID, now, mac)
@@ -199,5 +211,5 @@ func newShareCaptureAudit(t *testing.T, ctx context.Context, admin *pgxpool.Pool
 	if err != nil {
 		t.Fatal(err)
 	}
-	return shareCaptureAudit{auditapp.CaptureOperationPublication{RootID: s.a.RootID, Completed: completed, Journal: journal, Acknowledgements: acks, Writer: writer, Reader: &objectstore.OperationAuditObjects{Store: store, Seal: keys, Open: keys}, MAC: mac, Now: time.Now}, admissions, mac}
+	return shareCaptureAudit{auditapp.CaptureOperationPublication{RootID: s.a.RootID, Completed: completed, Journal: journal, Acknowledgements: acks, Writer: writer, Reader: &objectstore.OperationAuditObjects{Store: store, Seal: keys, Open: keys}, MAC: mac, Now: time.Now}, admissions, mac, admissionRole}
 }

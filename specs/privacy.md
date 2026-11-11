@@ -239,6 +239,10 @@ Regional evidence-text indexes MUST have deletion at the storage-copy level. Ini
 
 Given 90-day metadata and a seven-day residual backup horizon, when a backup profile is planned, then live removal is due by day 83 minus cleanup margin. A day-90 row DELETE is rejected as insufficient. Given an index segment containing a six-hour core extract, expiry/early deletion removes the managed segment copies, not only its search hit.
 
+### SC-PRV-015
+
+Given a manual or capture-time share with its original prepaid audit slot, when the share ends and that slot reaches its original cleanup window, then the final SQL transaction removes the identifying share and parent atomically after independent audit-object retirement verification, and retains the capacity charge until the original residual-history release conditions are met. Replay, revocation and management transfer never move those bounds. A requested access end that cannot fit is refused with an earlier-expiry/backing remedy; an unknown cleanup result retains the charge. A recurring revoke-all remains bounded to its original 100 concrete children and cannot recreate a retired child. This proves neither erasure of independent policy instructions nor absence from an unqualified backup chain.
+
 ## Discovery and recommendation copies
 
 The [guided selection](guidance.md) acquisition recipes have an initial 15-minute requested lifetime and ordinary classification, approved projection, deletion budget and hard retention clamping. Samples, process/flow projections, analysis scratch, cached pages and evidence-bearing recommendation drafts are managed copies. Do not copy paths, IPs, packet-derived text or user goals into unbounded SQL/audit fields. The five-minute navigation-handle lifetime is not a fresh retention anchor. Saving a selector as recurring configuration is explicit and does not retain sampled traffic/process lists or extend their expiry.

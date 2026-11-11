@@ -1,7 +1,8 @@
 # ADR-323 — Finite share metadata and public audit retirement
 
-Date: 2026-11-11. Status: implementation plan; cost and runtime qualification pending.
+Date: 2026-11-11. Status: candidate implemented; maximum-width cost and installed qualification pending.
 Requirements REQ-PRV-008, REQ-PRV-004 and REQ-SHR-001 through REQ-SHR-008.
+Scenario SC-PRV-015 binds the finite share and audit-retirement workflow.
 
 ## Observed gap and scope
 

@@ -5,6 +5,8 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
+	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -19,6 +21,7 @@ import (
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/capture"
+	cfg "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/identity"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -33,9 +36,23 @@ import (
 // acceptance never backfills, a capture published after notAfter is unshared,
 // and revoke-all revokes exactly its acceptance's shares and stops its
 // pending captures from being shared.
-func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, create func(*testing.T, int64) captureAdmissionScenario, prepare func(*testing.T, captureAdmissionScenario, capture.Accepted, bool) captureShareFixture, configureCapture func(*testing.T, *captureAdmissionScenario) shareCaptureAudit) {
+func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, create func(*testing.T, int64) captureAdmissionScenario, prepare func(*testing.T, captureAdmissionScenario, capture.Accepted, bool) captureShareFixture, configureCapture func(*testing.T, *captureAdmissionScenario) shareCaptureAudit, maximumCost ...bool) {
 	t.Helper()
-	s := create(t, 12)
+	maximum := len(maximumCost) > 0 && maximumCost[0]
+	slots := int64(12)
+	if maximum {
+		slots = 112
+	}
+	s := create(t, slots)
+	authorGroups := []string{"maintainers"}
+	var widthRecipients []authorization.ShareRecipient
+	if maximum {
+		creator, groups, recipients := maximumPolicyShareActors(t)
+		s.a.Eligibility.VerifiedIdentity.Principal = creator
+		s.a.Eligibility.VerifiedIdentity.Groups = groups
+		authorGroups, widthRecipients = groups, recipients
+	}
+
 	qualifiedCapture := configureCapture(t, &s)
 	root, installation := s.a.RootID, s.recovery.installation
 	pod := s.a.Plan.Input.Target.Target()
@@ -64,6 +81,12 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 	// holds evidence-owner too: the policy's owner team (ADR-239).
 	b := &s.batch.Bases[0]
 	b.Roles = []string{"workload-maintainer", "evidence-owner"}
+	if maximum {
+		b.Subjects = nil
+		for _, group := range authorGroups {
+			b.Subjects = append(b.Subjects, cfg.Subject{Kind: "Group", Issuer: s.a.Eligibility.VerifiedIdentity.Principal.Issuer, ID: group})
+		}
+	}
 	b.Automation = &authorization.AutomationEnvelope{AllowedActions: []string{authorization.PolicyContextAction}, MaxLifetimeSeconds: 3600, MaxExecutions: 100, MaxBytes: 1 << 30}
 	b.Resource.Generation++
 	b.Resource.SpecDigest[0]++
@@ -84,17 +107,25 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 		t.Fatal(err)
 	}
 	var sponsor, owner artifact.AudienceAssignment
+	var sponsors, managers []artifact.AudienceAssignment
 	for _, a := range projection.Allows {
 		if a.Audience.BasisUID == b.Resource.UID && a.Audience.Role == "workload-maintainer" {
 			sponsor = a.Audience
+			sponsors = append(sponsors, a.Audience)
 		}
 		if a.Audience.BasisUID == b.Resource.UID && a.Audience.Role == "evidence-owner" {
 			owner = a.Audience
+			managers = append(managers, a.Audience)
 		}
 	}
 	if sponsor.AssignmentID == "" || owner.AssignmentID == "" {
 		t.Fatal("automation binding assignments", projection.Allows)
 	}
+	if maximum && (len(sponsors) != 8 || len(managers) != 8) {
+		t.Fatal("maximum-width original owner projection", len(sponsors), len(managers))
+	}
+	slices.SortFunc(sponsors, func(a, b artifact.AudienceAssignment) int { return strings.Compare(a.AssignmentID, b.AssignmentID) })
+	slices.SortFunc(managers, func(a, b artifact.AudienceAssignment) int { return strings.Compare(a.AssignmentID, b.AssignmentID) })
 
 	factory := func(role, password string) *postgres.Policies {
 		pool := poolFor(role, password)
@@ -115,6 +146,14 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 	policyUID := custodyID()
 	creator := s.a.Eligibility.VerifiedIdentity.Principal
 	recipient := authorization.ShareRecipient{Kind: "User", Issuer: creator.Issuer, ID: "synthetic-policy-recipient"}
+	shareRecipients := []authorization.ShareRecipient{recipient}
+	shareManagers := []artifact.AudienceAssignment{owner}
+	authorityOwners := []artifact.AudienceAssignment{sponsor}
+	maxExecutions := int64(50)
+	if maximum {
+		shareRecipients, shareManagers, authorityOwners, maxExecutions = widthRecipients, managers, sponsors, 100
+	}
+
 	source := capture.PolicySource{InstallationID: installation, ClusterID: custodyID(), NamespaceUID: "control", Name: "restarts", Revision: identity.Revision{UID: policyUID, Generation: 1, Digest: artifact.Digest{51}}, ResourceVersion: "policy-1", CollectionDigest: artifact.Digest{52}}
 	observe := func() {
 		t.Helper()
@@ -149,11 +188,11 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 			t.Fatal(err)
 		}
 		authority = authorization.AcceptedPolicyAuthority{InstallationID: installation, PolicyUID: policyUID, Creator: creator, Executor: authorization.PolicyPrincipal(installation, policyUID), ScopeDigest: sha256.Sum256(authorityScope), ClusterID: pod.ClusterID, NamespaceUID: pod.NamespaceUID, WorkloadUID: pod.WorkloadUID,
-			Delegation: identity.Revision{UID: b.Resource.UID, Generation: b.Resource.Generation, Digest: b.Resource.SpecDigest}, Owners: []artifact.AudienceAssignment{sponsor}, Actions: []string{authorization.PolicyContextAction}, Limits: authorization.AutomationLimits{MaxExecutions: 50, MaxBytes: 1 << 20}, IssuedAt: now, NotAfter: now.Add(time.Hour)}
-		author := identity.Identity{Principal: creator, Scopes: []string{"evidence:read", "evidence:capture", authorization.ShareScope}, Groups: []string{"maintainers"}, Policy: s.a.Eligibility.VerifiedIdentity.Policy, VerifiedAt: now, ValidUntil: now.Add(30 * time.Second)}
+			Delegation: identity.Revision{UID: b.Resource.UID, Generation: b.Resource.Generation, Digest: b.Resource.SpecDigest}, Owners: authorityOwners, Actions: []string{authorization.PolicyContextAction}, Limits: authorization.AutomationLimits{MaxExecutions: maxExecutions, MaxBytes: 1 << 20}, IssuedAt: now, NotAfter: now.Add(time.Hour)}
+		author := identity.Identity{Principal: creator, Scopes: []string{"evidence:read", "evidence:capture", authorization.ShareScope}, Groups: authorGroups, Policy: s.a.Eligibility.VerifiedIdentity.Policy, VerifiedAt: now, ValidUntil: now.Add(30 * time.Second)}
 		in := capture.PolicyAdmission{RootID: root, Recovery: recovery, Target: workload, Authority: authority, Author: author,
 			Submission: capture.VerifiedPolicySubmission{ReplacesID: active, Nonce: custodyID(), Actor: creator, Source: source.Revision, ClusterID: source.ClusterID, NamespaceUID: source.NamespaceUID, Name: source.Name, ScopeDigest: authority.ScopeDigest, EnvelopeDigest: artifact.Digest{53}, IssuedAt: now, ExpiresAt: now.Add(30 * time.Second)},
-			Sharing:    &capture.PolicyShareInstruction{Creator: creator, Management: []artifact.AudienceAssignment{owner}, Recipients: []authorization.ShareRecipient{recipient}, MaxCaptures: maxCaptures, NotAfter: notAfter.UTC().Truncate(time.Second)}}
+			Sharing:    &capture.PolicyShareInstruction{Creator: creator, Management: shareManagers, Recipients: shareRecipients, MaxCaptures: maxCaptures, NotAfter: notAfter.UTC().Truncate(time.Second)}}
 		in.Verification = syntheticSubmissionCheck(in, now)
 		r, err := acceptor.AcceptPolicy(ctx, in)
 		if err != nil {
@@ -317,7 +356,7 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 		t.Helper()
 		// A fresh pool/adapter uses the same original pinned capture role;
 		// a process restart cannot invent a replacement admission identity.
-		pool := poolFor("capture_operation_admit_runtime", "synthetic-capture-operation-admit")
+		pool := poolFor(qualifiedCapture.admissionRole, "synthetic-share-capture-admit")
 		t.Cleanup(pool.Close)
 		a, err := postgres.NewAuditedContextAdmissions(ctx, pool, root, qualifiedCapture.mac, postgres.EffectTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard})
 		if err != nil {
@@ -326,6 +365,18 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 		return a
 	}
 
+	if maximum {
+		qualifyMaximumPolicyShareCost(t, ctx, admin, poolFor, store, keys, policyShareCostFixture{
+			Scenario: s, Creator: creator, Groups: authorGroups, Accept: func() string { return accept(99, 100, clock().Add(time.Hour)) },
+			Grant: func() {
+				attachPolicyAccountingGrantWithLimits(t, ctx, admin, poolFor, s, authority, authorityScope, "maximum-width-accounting", authorization.AutomationLimits{MaxExecutions: 100, MaxBytes: 100 * artifact.MaxContextBytes})
+			},
+			Admit: func() capture.Accepted { return admit(qualifiedCapture.admissions) }, Prepare: func(accepted capture.Accepted, initialize bool) captureShareFixture {
+				return prepare(t, s, accepted, initialize)
+			}, Publish: publish, Refresh: refresh,
+		})
+		return
+	}
 	// Acceptance A of generation 1 shares at most three captures.
 	first := accept(61, 3, time.Now().Add(time.Hour))
 	firstGrant := attachPolicyAccountingGrant(t, ctx, admin, poolFor, s, authority, authorityScope, "accounting-review")
@@ -425,24 +476,7 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 	}
 
 	// Revoke-all of A revokes exactly A's shares, through the hub's own grants.
-	hubRole := narrowRole(t, ctx, admin, "policy_share_hub_", "synthetic-policy-share-hub", func(role string) []string {
-		grants, ok := postgres.PublicRuntimeRoleGrantSQL("hub-runtime", role)
-		if !ok {
-			t.Fatal("missing compiled hub grants")
-		}
-		return grants
-	})
-	hubPool := poolFor(hubRole, "synthetic-policy-share-hub")
-	t.Cleanup(hubPool.Close)
-	ledger, err := postgres.NewEvidenceShares(ctx, hubPool, root, s.recovery.guard)
-	if err != nil {
-		t.Fatal(err)
-	}
-	routes, err := postgres.NewContextCaseReads(ctx, hubPool, root, s.recovery.guard)
-	if err != nil {
-		t.Fatal(err)
-	}
-	service := paidShareService{Service: sharing.Service{RootID: root, InstallationID: installation, Routes: routes, Permissions: s.p, Catalog: f1.reader, Store: ledger, Policies: ledger, Recovery: s.recovery.reader, NewID: custodyID, Now: time.Now}, audit: newShareBusinessAudit(t, ctx, hubPool, store, keys, s)}
+	service, _ := newPolicyPaidShareService(t, ctx, admin, poolFor, store, keys, s, f1.reader)
 	as := func(subject string, groups []string) identities.CurrentIdentity {
 		t.Helper()
 		refresh()

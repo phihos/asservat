@@ -3,85 +3,52 @@
 ## Active candidate: finite share metadata retirement (2026-11-11)
 
 Candidate `feature/finite-share-history` starts from authoritative `cef71802`
-in the owned `asservat-share-retirement` worktree. Outcome is a complete share
-workflow through live metadata deletion, managed audit-object retirement and
-original residual-history accounting. ADR-323 records the proposed creating-slot
-binding, finite business-key replay and shared cleanup composition.
+in the owned `asservat-share-retirement` worktree. ADR-323 binds each concrete
+share to its original prepaid operation; later mutations pay their own effect,
+replay cannot renew it, and finalization removes the child before its parent.
+SQL153/154 require compiled head/floor154 and refuse unlinked development-era
+shares without adoption or deletion. Historical proved layouts remain readable;
+new sharing requires normal-v4/capture-v2. Resolution defaults remain v3.
 
-Source review found that active-share limits do not bound retained history and
-share DELETE is unconditionally refused. The existing capture cleanup component
-has no production installer projection caller; activating it is real new runtime
-work, not already installed qualification. Activation is nine bindings: three
-existing SQL logins, two supplied S3 credentials and four provider purposes.
-Three cold pools allow +3 connections per worker, already counted in the
-compiled 114-connection installation requirement; the API hub's 32 is unchanged.
-Reuse the existing audit slots and finalization;
-add no lifetime-share quota, permanent key tombstone or share-specific cleaner.
+The installer now provisions the existing worker cleanup projection for the
+closed capture/normal/resolution lanes. Nine bindings activate: three existing
+SQL logins, two supplied S3 credentials and four native provider purposes.
+Three cold pools add at most three connections per worker, already counted in
+the compiled 114-connection installation requirement; API32 is unchanged.
+First provider use needs four login/lookup pairs, healthy reuse needs no refresh.
+There is no new deployment, watch, cleanup-tuning knob or child goroutine.
+Combined installed latency and throughput remain pending.
 
-The bounded baseline fixture accepts eight owners before actual publication,
-uses compiled hub grants, records share/replay/transfer/revoke/rollback costs and
-checks 65 retained rows despite the 32-active limit. The corrected owned service
-run at `2a2bc0f1` passed in 8.170 s. The sequence took 1,160 ms, retained 65 rows
-with 32 active, grew relations by 1,114,112 bytes and whole-instance WAL by
-1,085,704 bytes. This is an observed baseline, not a maximum-byte qualification.
-All 4,546 source hashes matched; source stayed frozen, cleanup failures were
-empty and owned containers were independently absent. Evidence is external in
-`share-retirement/baseline-2a2bc0f1`. The 100-share revoke-all cost remains pending.
+Current real-service evidence (all sources frozen, hashes independently match,
+cleanup failures empty and owned containers independently absent):
 
-The integrated candidate now carries server-owned mutation IDs and new prepaid
-normal-v4/capture-v2 layouts. Focused domain and capacity tests pass (0.007 s and
-8.146 s), including historical non-promotion and underfunded aggregate refusal.
-SQL retirement, provider login/lifetime and actual installer projection wiring
-are implemented on the candidate. Focused PostgreSQL scope and bootstrap checks
-passed (0.014 s/0.107 s), and provider/KMS/Kubernetes/component regressions passed.
-Integration compiles. First cleanup use needs four login/lookup pairs; healthy
-reuse requires no provider refresh. Combined installed latency is pending.
-The collector-free `share-retirement` focus exercises both manual and capture
-shares with original short bounds selected before installation. Current-source
-maximum-width policy100, broad and fresh installed qualification have not run;
-no new installed outcome is claimed.
+| Source | Actual result | Scope and external archive under `share-retirement/` |
+| --- | --- | --- |
+| `2a2bc0f1` | Go 8.170 s, exit0; 4,546 hashes | Original baseline: 65 retained/32 active shares; 1,160 ms sequence, relations +1,114,112 bytes, whole-instance WAL +1,085,704 bytes. Count-maximal eight-manager/eight-recipient observation, not maximum-byte qualification. `baseline-2a2bc0f1`. |
+| `63da31e8` | Go 3.622 s, exit1; 4,561 hashes | S3 scope probe passed0.92 s (certificate-only conditional creation, independent verifier); schema setup refused stale compiled head152. `boundaries-63da31e8`. |
+| `d7a2fd1a` | Schema Go 3.701 s, exit0; 4,561 hashes | Upgrade153→154, idempotency, empty Down154/153/Up, owners/table/column grants, new-only grant rollback refusal and no old-profile promotion. `schema-retry`. |
+| `d7a2fd1a` | Share Go 4.263 s, exit1; 4,561 hashes | Before mutation, domain profile reader rejected funded normal-v4. Focused unit reproduced it; reader now preserves the policy's closed lane/layout validation. `slots-d7a2fd1a`. |
+| `eca00f46` | Share Go 6.451 s, exit1; 4,561 hashes | Paid create/replay passed; transaction sanitization lost the new typed backing refusal. Preserve that closed sentinel and translate only P1530 before the transaction boundary. `slots-eca00f46`. |
+| `4d17772d` | Share Go 62.181 s, exit0; 4,561 hashes | Actual prepaid creation/fresh-op replay, once-only effects, expiry refusal, transfer/revoke, atomic child/parent deletion, managed-object verification and originalH cooling followed by exactly one charge release. `slots-4d17772d`. |
+| `4d17772d` | Producer Go 18.154 s, exit1; 4,561 hashes | Manual matrix passed8.93 s and capture-time matrix passed6.14 s, including all three child cases. Recurring admission refused because the new fixture used the old manual-only SQL role without policy reads. Production's compiled capture-admit role already has them; fixture correction is pending. `sharing-producers-4d17772d`. |
 
-At `63da31e8`, the owned storage permission probe passed (0.92 s), including
-certificate-only conditional creation and independent verifier separation. The
-paired schema check failed before its round-trip assertions: the compiled SQL
-head still named 152, so the embedded 154-migration bundle was refused. The
-existing embedded-bundle test reproduced that failure; advancing the compiled
-head to 154 passed the affected schema unit tests (0.079 s). All 4,561 run-source
-hashes match, source stayed frozen, cleanup failures are empty and both owned
-containers are independently absent. The failed harness exited 1; its storage
-pass is distinct from the pending schema retry. Evidence is external in
-`share-retirement/boundaries-63da31e8`.
+The original baseline failure at `1dc7c616` requested incompatible 60-second
+retention. The corrected fixture used its original 20-second managed capture,
+without raising root backing or moving deadlines. Its 4,546 hashes and cleanup
+were verified; failed-run evidence remains `baseline-1dc7c616`.
 
-Schema retry at `d7a2fd1a` passed (Go 3.701 s): actual upgrade153→154,
-idempotency, empty Down154/153/Up, original owners/table/column grants, new-only
-grant rollback refusal and old-profile non-promotion. All 4,561 source hashes
-match and owned cleanup is independently complete. The paid-share run on that
-head failed before mutation (Go 4.263 s): SQL supplied normal-v4 but the domain
-profile consumer still required v3. A new focused unit reproduced that refusal.
-The correction uses the policy's closed lane/layout validator without rewriting
-accepted history. Affected audit/capacity/PostgreSQL/bootstrap unit suites pass
-(0.006/0.135/8.146/1.302/67.019 s). The failed run's 4,561 hashes match, cleanup
-failures are empty and all three owned containers are absent. The paid-share
-retry remains pending; evidence is external in `share-retirement/slots-d7a2fd1a`.
+Affected audit/capacity/PostgreSQL/bootstrap unit suites pass
+(0.006/0.135/8.146/1.302/67.019 s); error-boundary PostgreSQL/sharing/presentation
+suites pass (1.311/0.003/93.262 s). Provider/KMS/Kubernetes and canonical-schema
+focused regressions pass. Independent review of the shared cleanup adapter and
+installer composition found no actionable issue. These are component results,
+not installed provider/IAM, backup-chain or universal footprint qualification.
 
-At `eca00f46`, genuine paid creation and fresh-operation replay passed. The
-incompatible-expiry assertion exposed transaction error sanitization: the new
-typed backing refusal was collapsed to unavailable (Go 6.451 s, harness exit1).
-The correction preserves that one closed sentinel and translates only P1530
-before the transaction boundary. PostgreSQL/sharing/presentation suites pass
-(1.311/0.003/93.262 s). All 4,561 failed-run hashes match; source stayed frozen
-and all three owned containers are absent. Independent review of shared cleanup
-and installer composition found no actionable remaining issue. Physical
-retirement qualification is still pending; no failed run is counted as a pass.
-
-The first owned fixture at `1dc7c616` failed before measurement (Go 4.946 s):
-the query-publication helper requested 60-second evidence retention under the
-baseline's original 60-second root, leaving no deletion margin. The correction
-uses its existing 20-second managed capture and publishes that exact admission;
-no root backing, quota or original deadline is increased. All 4,546 failed-run
-source hashes match and source was unchanged. Cleanup failures are empty and
-owned containers were independently confirmed absent. The corrected service
-execution above supersedes the subsequent compile-only check.
+Next: measure maximum-width policy100 through genuine audited capture and paid
+revoke-all, establish justified row/WAL bounds, run final broad gates, then
+fresh collector-free `share-retirement` installed qualification. Its original
+short bounds are selected before installation; timestamps are never rewritten
+to make cleanup due. No new installed outcome or completed spec is claimed.
 
 ## Merged processing inventory export (2026-11-11)
 

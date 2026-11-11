@@ -13,7 +13,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// This collector-free focus uses actual public manual/capture sharing, the
+// SC-PRV-015: this collector-free focus uses actual public manual/capture sharing, the
 // installed worker's three credential facets and its native provider login.
 // Short original bounds are selected before installation; SQL timestamps and
 // outstanding audit records are never rewritten to manufacture cleanup.
