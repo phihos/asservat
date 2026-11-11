@@ -126,9 +126,10 @@ func TestJoinRegionalClusterAddsDownloadPathOnce(t *testing.T) {
 			EvidenceTypes: []string{"context"}, Purposes: []string{"incident"}, PathIDs: append([]string{}, paths...)}
 	}
 	settings := contracts.DownloadEnvironmentSettings{Format: contracts.DownloadEnvironmentFormat, RootID: root, InstallationID: installation, RecoveryEpoch: ownerID(75), Revision: 3, PermittedRegions: []string{},
-		Paths:     []contracts.DownloadEnvironmentPath{pinned},
-		Operators: []contracts.ProcessingOperator{{ClientID: "synthetic-console", Issuer: "https://issuer.synthetic.invalid", Kind: "Group", ID: "synthetic-operators"}},
-		Clients:   []contracts.DownloadEnvironmentClient{client("synthetic-downloads", pinned.ID), client("synthetic-mcp")}}
+		Paths:      []contracts.DownloadEnvironmentPath{pinned},
+		Processors: []contracts.ProcessingOrganization{{ID: "operator-org", Name: "Declared organization", Activities: []string{"Evidence storage"}, Regions: []string{}}},
+		Operators:  []contracts.ProcessingOperator{{ClientID: "synthetic-console", Issuer: "https://issuer.synthetic.invalid", Kind: "Group", ID: "synthetic-operators"}},
+		Clients:    []contracts.DownloadEnvironmentClient{client("synthetic-downloads", pinned.ID), client("synthetic-mcp")}}
 	body, _ := json.Marshal(settings)
 	api := newJoinAPI(t)
 	api.put(catalogPath, catalogName, ownerID(50), contracts.OwnerClusterCatalogFile, string(empty))
@@ -173,7 +174,7 @@ func TestJoinRegionalClusterAddsDownloadPathOnce(t *testing.T) {
 		got := read(at)
 		if puts(at) != 1 || got.Revision != 4 || len(got.Paths) != 2 || got.Paths[0] != pinned || got.Paths[1] != path ||
 			!slices.Equal(got.Clients[0].PathIDs, []string{pinned.ID, path.ID}) || !slices.Equal(got.Clients[1].PathIDs, []string{path.ID}) ||
-			!equalJSON(got.Operators, settings.Operators) || !equalJSON(got.PermittedRegions, settings.PermittedRegions) {
+			!equalJSON(got.Operators, settings.Operators) || !equalJSON(got.PermittedRegions, settings.PermittedRegions) || !equalJSON(got.Processors, settings.Processors) {
 			t.Fatal("download source after the join and its rerun", at, puts(at), got)
 		}
 	}

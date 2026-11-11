@@ -386,6 +386,32 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 		}
 		checkErasureSchema(false)
 	}
+	var originalReportDefinitions string
+	checkReportSchema := func(installed bool) {
+		t.Helper()
+		var routed, exactFormats bool
+		var indexes int
+		expectedIndexes := 0
+		if installed {
+			expectedIndexes = 3
+		}
+		if err := conn.QueryRow(ctx, `SELECT
+ coalesce(public.operation_audit_lane('get_processing_report')='normal',false),
+ public.operation_audit_human_input_valid('get_processing_report','context-input/v1') IS TRUE
+ AND public.operation_audit_human_input_valid('get_processing_report','invalid-input/v1') IS FALSE
+ AND public.operation_audit_human_input_valid('get_processing_report','processing-input/v1') IS FALSE
+ AND public.operation_audit_human_input_valid('get_processing_report',NULL) IS FALSE,
+ (SELECT count(*) FROM pg_indexes WHERE schemaname='public' AND indexname IN ('processing_report_downloads','processing_report_operations','processing_report_rule_created'))`).Scan(&routed, &exactFormats, &indexes); err != nil || routed != installed || exactFormats != installed || indexes != expectedIndexes {
+			t.Fatal("processing report audit admission and routing indexes", installed, routed, exactFormats, indexes, err)
+		}
+		checkErasureSchema(true)
+	}
+	if head == 152 {
+		if e = conn.QueryRow(ctx, rawAuditFunctions).Scan(&originalReportDefinitions); e != nil {
+			t.Fatal("previous processing report audit definitions", e)
+		}
+		checkReportSchema(false)
+	}
 	const rawGrantShape = `SELECT jsonb_build_object('constraints',(SELECT jsonb_agg(x ORDER BY x) FROM (SELECT pg_get_constraintdef(oid) x FROM pg_constraint WHERE conrelid IN ('access_grant'::regclass,'access_grant_child'::regclass)) q),'columns',(SELECT jsonb_agg(to_jsonb(c) ORDER BY c.table_name,c.ordinal_position) FROM (SELECT table_name,column_name,ordinal_position,is_nullable,data_type FROM information_schema.columns WHERE table_schema='public' AND table_name IN ('access_grant','access_grant_child')) c))::text`
 	if head == 131 {
 		if e = conn.QueryRow(ctx, rawAuditFunctions).Scan(&originalRawAuditFunctions); e != nil {
@@ -497,6 +523,25 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 		}
 		checkErasureSchema(true)
 		t.Log("SQL151 kept floor149 and restored exact previous guards and audit validators on empty Down")
+	}
+	if head == 152 {
+		if state.Floor != 149 || !state.Compatible(151) {
+			t.Fatal("processing report raised compatibility floor", state)
+		}
+		checkReportSchema(true)
+		if _, e = p.DownTo(ctx, head-1); e != nil {
+			t.Fatal("empty processing report Down", e)
+		}
+		var restored string
+		if e = conn.QueryRow(ctx, rawAuditFunctions).Scan(&restored); e != nil || restored != originalReportDefinitions {
+			t.Fatal("processing report Down changed prior audit definitions", e)
+		}
+		checkReportSchema(false)
+		if from, to, e = upgrade.Run(ctx); e != nil || from != head-1 || to != head {
+			t.Fatal("processing report Up after Down", from, to, e)
+		}
+		checkReportSchema(true)
+		t.Log("SQL152 preserved floor149, admitted only the report context format and restored prior validators and indexes on empty Down")
 	}
 	// Migration 103 changes this function only. Down restores its exact old
 	// definition; it neither rewrites projections nor changes activation state.

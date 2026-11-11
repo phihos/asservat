@@ -110,6 +110,12 @@ func prepareInstallerContinuationNative(t *testing.T, ctx context.Context, api k
 		clients = append(clients, contracts.IdentityClient{ID: "mcp", Kind: "human", ClassQualified: true})
 	}
 	approvals := installedIdentityApprovals()
+	var processors []contracts.ProcessingOrganization
+	if installedJourneyFocus() == "privacy-inventory" {
+		for _, organization := range reportFixtureProcessors() {
+			processors = append(processors, contracts.ProcessingOrganization{ID: organization.ID, Name: organization.Name, Activities: organization.Activities, Regions: organization.Regions})
+		}
+	}
 	document, _ := json.Marshal(contracts.InstallerContinuation{Format: contracts.InstallerContinuationFormat, Namespace: namespace,
 		WorkerProvider:      contracts.InstallerProviderSelection{AuthMount: providers.worker.AuthMount, AuthMountAccessor: providers.worker.AuthMountAccessor},
 		OwnerProvider:       contracts.InstallerProviderSelection{AuthMount: providers.owner.AuthMount, AuthMountAccessor: providers.owner.AuthMountAccessor},
@@ -123,6 +129,7 @@ func prepareInstallerContinuationNative(t *testing.T, ctx context.Context, api k
 			// ADR-210: the synthetic group's console users are the processing
 			// operators, so the journey's one user initializes processing.
 			ProcessingOperators: []contracts.ProcessingOperator{{ClientID: "console", Issuer: issuer, Kind: "Group", ID: installedIdentityGroup}},
+			Processors:          processors,
 			// ADR-193: the federation's operator choices.
 			Federation: &contracts.InstallerFederationSettings{ConnectorPKIMount: connectorPKI, ConnectorIssuerRootsPEM: connectorRoots,
 				Endpoint: federationEndpoint, ServerName: "federation.synthetic.invalid", ServiceType: "NodePort", NodePort: 31446,
@@ -727,6 +734,12 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 		}
 		var postDownload func(cluster string, run installedProcessingRun)
 		switch installedJourneyFocus() {
+		case "privacy-inventory":
+			erasure := installedEarlyErasure{hub: api, providers: providers, installation: installation, namespace: desired.TargetNamespace, evidenceBucket: evidenceBucket}
+			postDownload = func(cluster string, run installedProcessingRun) {
+				qualifyInstalledProcessingReport(t, ctx, cluster, run, erasure)
+			}
+			deny, gone = nil, nil
 		case "processing-workload":
 			postDownload = func(_ string, run installedProcessingRun) {
 				run.WorkloadRestriction = true
@@ -798,7 +811,7 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 	}
 	hubKubeconfig := installedUnifiedRunnerKubeconfig(t, f.Clusters[0].Config, desired)
 	qualifyRegionalInstall(t, ctx, f, 1, admin, runnerAPI, api, hubKubeconfig, desired.TargetNamespace, issuer, journey, providers, offerMap.Data[contracts.RegionalOfferFile], installation)
-	if focus := installedJourneyFocus(); focus == "restart" || focus == "journey" || focus == "browser" || focus == "upgrade" || focus == "policy" || focus == "alert" || focus == "logresource" || focus == "chain" || focus == "share" || focus == "journey-store-failure" || focus == "journey-start-failure" || focus == "retention-shortening" || focus == "early-erasure" || focus == "processing-workload" || installedRecordingFocus() || installedLogsFocus() {
+	if focus := installedJourneyFocus(); focus == "restart" || focus == "journey" || focus == "browser" || focus == "upgrade" || focus == "policy" || focus == "alert" || focus == "logresource" || focus == "chain" || focus == "share" || focus == "journey-store-failure" || focus == "journey-start-failure" || focus == "retention-shortening" || focus == "early-erasure" || focus == "processing-workload" || focus == "privacy-inventory" || installedRecordingFocus() || installedLogsFocus() {
 		t.Log("focused " + focus + " run complete: the second workload cluster and replay checks were not run")
 		return
 	}

@@ -69,7 +69,7 @@ func TestAuditedProcessingDiscoveryGuardsMetadataAndFitsOutputBound(t *testing.T
 				return page
 			}
 			base := s.inner.(*InvestigationOperations)
-			ops, err := NewProcessingDiscoveryOperations(base.origin, s.config.Now, s.config.NewID, privacyapp.ProcessingEvidenceDiscovery{RootID: root, InstallationID: root, Policies: fixture, Recovery: fixture, Discovery: fixture, Now: s.config.Now}, nil)
+			ops, err := NewProcessingDiscoveryOperations(base.origin, s.config.Now, s.config.NewID, privacyapp.ProcessingEvidenceDiscovery{RootID: root, InstallationID: root, Policies: fixture, Recovery: fixture, Discovery: fixture, Now: s.config.Now}, nil, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -141,7 +141,7 @@ func TestAuditedProcessingErasureStatusUsesExactRequestAndPrivacyAuthority(t *te
 			base := s.inner.(*InvestigationOperations)
 			ops, err := NewProcessingDiscoveryOperations(base.origin, s.config.Now, s.config.NewID,
 				privacyapp.ProcessingEvidenceDiscovery{RootID: root, InstallationID: root, Policies: fixture, Recovery: fixture, Discovery: fixture, Now: s.config.Now},
-				&privacyapp.ProcessingErasureStatus{RootID: root, InstallationID: root, Policies: fixture, Recovery: fixture, Status: reader, Now: s.config.Now})
+				&privacyapp.ProcessingErasureStatus{RootID: root, InstallationID: root, Policies: fixture, Recovery: fixture, Status: reader, Now: s.config.Now}, nil)
 			if err != nil {
 				t.Fatal(err)
 			}

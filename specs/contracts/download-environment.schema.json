@@ -81,6 +81,16 @@
     },
     "liveRead": {
       "$ref": "https://asservat.io/spec/v1/download-environment.schema.json#/$defs/liveRead"
+    },
+    "processors": {
+      "type": "array",
+      "maxItems": 16,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "https://asservat.io/spec/v1/download-environment.schema.json#/$defs/processingOrganization"
+      },
+      "minItems": 0,
+      "description": "Optional operator declarations for inventory reporting only. Omission means declarations were not supplied; an empty array explicitly declares none. These values grant no access or processing authority."
     }
   },
   "$defs": {
@@ -478,6 +488,53 @@
               "minimum": 24576,
               "maximum": 1073741824
             }
+          }
+        }
+      }
+    },
+    "processingOrganization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "activities",
+        "regions"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[^\\x00-\\x1f\\x7f-\\x9f]+$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[^\\x00-\\x1f\\x7f-\\x9f]+$"
+        },
+        "activities": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[^\\x00-\\x1f\\x7f-\\x9f]+$"
+          }
+        },
+        "regions": {
+          "type": "array",
+          "maxItems": 16,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[^\\x00-\\x1f\\x7f-\\x9f]+$"
           }
         }
       }

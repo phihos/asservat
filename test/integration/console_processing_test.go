@@ -149,7 +149,7 @@ func newConsoleProcessing(t *testing.T, erasure bool) (string, string, *consoleP
 	}
 	discovery, err := presentation.NewProcessingDiscoveryOperations(origin, time.Now, custodyID, privacyapp.ProcessingEvidenceDiscovery{
 		RootID: rootID, InstallationID: rootID, Policies: facts, Recovery: facts, Discovery: facts, Now: time.Now,
-	}, status)
+	}, status, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

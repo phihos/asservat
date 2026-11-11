@@ -98,6 +98,14 @@ func (s *DownloadEnvironmentSource) snapshot(ctx context.Context) (privacy.Downl
 		return out, privacy.ErrInvalid
 	}
 	out = privacy.DownloadPolicy{RootID: w.RootID, InstallationID: w.InstallationID, RecoveryEpoch: w.RecoveryEpoch, Revision: identity.Revision{UID: s.uid, Generation: w.Revision, Digest: sha256.Sum256(a)}, Suspended: w.Suspended, PermittedRegions: w.PermittedRegions, Paths: make([]privacy.DownloadPath, 0, len(w.Paths)), Clients: make([]privacy.DownloadClient, 0, len(w.Clients)), Operators: make([]privacy.ProcessingOperator, 0, len(w.Operators))}
+	if w.Processors != nil {
+		out.Processors = make([]privacy.ProcessingOrganization, 0, len(w.Processors))
+		for _, organization := range w.Processors {
+			out.Processors = append(out.Processors, privacy.ProcessingOrganization{
+				ID: organization.ID, Name: organization.Name, Activities: organization.Activities, Regions: organization.Regions,
+			})
+		}
+	}
 	if w.LiveRead != nil {
 		l := w.LiveRead
 		out.LiveRead = &privacy.LiveRead{Root: privacy.LiveRootLimits{Watches: l.Root.Watches, PrincipalWatches: l.Root.PrincipalWatches, WorkloadWatches: l.Root.WorkloadWatches, Rate: l.Root.Rate, Burst: l.Root.Burst}, Projections: l.Projections, Clients: make([]privacy.LiveClient, 0, len(l.Clients)), Ceilings: make([]privacy.LiveCeiling, 0, len(l.Ceilings))}

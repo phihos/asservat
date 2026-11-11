@@ -33,6 +33,8 @@ build another test framework or duplicate the production workflow with mocks.
    race/component tests without Docker, collection, privileged access or a
    deployment; it does not establish installed qualification.
 2. Once integrated: run `make pre-push` and the affected service fixtures.
+   Static gates run in parallel before the affected Go race suite, so static
+   failure stops the invocation before that longer phase starts.
    For profiles, `make profile-service-preflight` runs the real write-only
    producer/publication and funded summary ledger against owned SQL/S3 fixtures.
    Run the full Go gate once per final candidate, locally or in exact-commit CI;

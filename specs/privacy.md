@@ -158,6 +158,26 @@ not establish that any user appears in the evidence or that all derivatives
 are known. The operator can select an exact result for the existing explicit
 restriction action.
 
+### SC-PRV-014
+
+Given a current privacy operator, the console exports the installation's retained
+processing inventory as bounded audited JSON pages. The ordered sections cover
+artifacts including retained deleted attempts, recorded share recipients,
+native sessions, prepared or unknown operation responses, processing rules,
+current technical paths and processor organizations declared in protected
+configuration. Every page states its observation time, source revision,
+selection ceiling and coverage. Unknown client receipt remains unknown.
+
+Each record and continuation uses its original metadata visibility horizon.
+Renewed backing cannot extend an old session or artifact's visibility. Missing
+processor declarations and an explicit empty declaration list remain distinct.
+Technical regions do not imply processor organization identities.
+
+The console downloads finite parts and offers continuation when more pages
+remain. Completion requires exhausting every section. A principal change or
+cancellation clears unfinished output. An ordinary evidence reader cannot
+export the report. Exported local copies remain outside managed deletion.
+
 ### SC-PRV-013
 
 Given a current privacy operator has searched by exact workload and a half-open

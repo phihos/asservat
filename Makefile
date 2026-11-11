@@ -24,7 +24,7 @@ console-build:
 	cd web && npm run build
 
 console-browser-check: console-build
-	ASSERVAT_CONSOLE_BROWSER_TEST=1 TMPDIR="$(ASSERVAT_BUILD_TMP)" go test -count=1 -run '^TestConsole(Browser|NativeRestart|ProfileComparison|HeapProfile|PacketSummary|PacketQuery|SyscallQuery|SyscallCaptureAuthoring|LogsQuery|LiveObservation|Processing|WorkloadProcessing|Erasure)WithBuiltPackage$$' -v ./test/integration
+	ASSERVAT_CONSOLE_BROWSER_TEST=1 TMPDIR="$(ASSERVAT_BUILD_TMP)" go test -count=1 -run '^TestConsole(Browser|NativeRestart|ProfileComparison|HeapProfile|PacketSummary|PacketQuery|SyscallQuery|SyscallCaptureAuthoring|LogsQuery|LiveObservation|Processing|WorkloadProcessing|ProcessingReport|Erasure)WithBuiltPackage$$' -v ./test/integration
 
 .PHONY: openapi-check
 openapi-check:
@@ -70,7 +70,7 @@ context-integration:
 # owned kind clusters, e.g. make installed-focus FOCUS=manual-logs. The harness
 # refuses collector focuses without the disposable-host guard; this target
 # additionally accepts only the collector-free focuses below.
-LOCAL_FOCUSES = chain journey browser restart clusters upgrade policy alert logresource share manual-logs journey-store-failure journey-start-failure retention-shortening early-erasure processing-workload
+LOCAL_FOCUSES = chain journey browser restart clusters upgrade policy alert logresource share manual-logs journey-store-failure journey-start-failure retention-shortening early-erasure processing-workload privacy-inventory
 .PHONY: installed-focus
 installed-focus:
 	$(if $(and $(filter 1,$(words $(FOCUS))),$(filter $(FOCUS),$(LOCAL_FOCUSES))),,$(error FOCUS must be one collector-free focus: $(LOCAL_FOCUSES)))
@@ -250,7 +250,8 @@ PRE_PUSH_GATES := spec-check architecture-check design-check openapi-check live-
 	gate-self-tests sql-check console-check gofmt-check go-vet go-affected-test authority-window-check
 .PHONY: pre-push gate-self-tests gofmt-check go-vet go-affected-test
 pre-push:
-	$(MAKE) -k -j4 -O $(PRE_PUSH_GATES)
+	$(MAKE) -k -j4 -O $(filter-out go-affected-test,$(PRE_PUSH_GATES))
+	$(MAKE) go-affected-test
 
 gate-self-tests:
 	for f in scripts/test-ci-changes.py scripts/test-go-shards.py scripts/test-kept-cleanup.py scripts/test-*-selection.py scripts/test-direct-helper-regression.py scripts/test-collector-provenance.py scripts/test-pod-log-stream.py; do $(PYTHON) "$$f" || exit 1; done

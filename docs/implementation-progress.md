@@ -1,12 +1,96 @@
 # Sustained implementation progress
 
-## Active candidate: workload-interval processing restriction (2026-11-11)
+## Active candidate: processing inventory export (2026-11-11)
+
+[PR222](https://github.com/phihos/asservat/pull/222) starts from authoritative
+`fec1e03e`. The console exports seven ordered sections of retained artifacts
+including deletions, recipients, native sessions, operation responses, rules,
+technical paths and declared processors. Finite JSON parts preserve the original
+selection and continue before completion. ADR-322 and SC-PRV-014 define the
+per-page observations and original visibility horizons. Missing declarations
+and an explicit empty list remain distinct; regions do not imply organizations.
+
+Fresh installed qualification at `8fe07f0a` passed (Go 312.047 s, harness
+368.7 s, both exits 0). The Keycloak user captured, published and downloaded
+the regional pod-status file, created a share with four existing recipients and
+completed verified early erasure. The real console exported every section with
+exact acknowledged page bytes, recipients across 3+1 pages, a completed native
+session, retained verified deletion and the declared processors. Ordinary
+readership could not export and produced the exact acknowledged denial audit.
+The actual SQL152 Down guard refused retained report history with 23514;
+rollback preserved schema 152 and all three index definitions.
+
+All 4,813 qualification source hashes independently match. Source stayed
+frozen, cleanup failures are empty, both owned clusters and labelled Docker
+resources are gone, and build scratch was removed. The focus uses one regional
+target; broader replay and second-workload matrices were not run. Original
+reports are external in `privacy-inventory-report/installed-8fe07f0a`. Required
+final PR CI and merge remain pending. The end-to-end specification goal stays
+active.
+
+Local validation passed: 683 console tests, 41 focused UI/HTTP cases, TypeScript,
+59 report contract cases, Helm and specification/architecture/design checks.
+`make pre-push` passed at `021142f4`; its affected Go race phase took 103 s with
+unchanged packages cached, following the changed-source 517 s pass at `a657fca4`.
+All 14 Go shards and the Go gate passed in required PR CI42957758840 at
+`b74d49d5`. Production, UI, SQL and canonical contracts are unchanged afterward.
+The corrected driver's full browser gate passed at `8fe07f0a` (149.514 s),
+including 29 standard journeys and 28 accessibility scans. Exact-head focused
+race/browser checks passed (6.042 s), alongside vet, formatting and design gates.
+
+Owned service checks at `25e9a774` passed sequentially. All 4,544 source hashes
+match and owned containers/networks were independently confirmed absent:
+
+- Schema-owner upgrade 151→152 and empty Down/Up passed in 3.680 s, preserving
+  floor 149, exact prior validators/indexes and unknown-history refusal.
+- PostgreSQL/S3 report and erasure checks passed in 6.669 s, including every
+  section before/after purge, a released rule and an actual unknown audit outcome.
+- The PostgreSQL/OpenBao/S3 renewal matrix passed in 82.064 s. After actual
+  renewal the original session disappears at its immutable cutoff while shared
+  backing and artifact metadata remain valid.
+
+The earlier failures remain recorded in their commits and external archives.
+At `b871dd60`, architecture/authority gates rejected a domain hex decoder and a
+literal observation interval; both were corrected without weakening the gates.
+Static pre-push checks now precede the longer race phase. Installed `a657fca4`
+failed prerequisite sharing because its focus omitted ownership before capture.
+The regression reproduced the missing role. Installed `021142f4` passed sharing
+and erasure but its report assertion read the owner download source instead of
+the separately pinned processing source. The two-source regression reproduced
+that distinct-UID mismatch. All sources matched each failed head; official
+retained-environment cleanup completed with no leftovers. Installed `72a459be`
+then passed (Go 312.453 s, harness 371.0 s; 4,812 matching source hashes).
+
+CI42957758840 failed only the report browser observer: Chromium discarded a
+response body after Blob download navigation. The exact failure reproduced in
+4/20 local runs (29.074 s). The report-only observer now captures real upstream
+bytes before fulfillment, preserves full intercepted headers including Cookie,
+uses zero retries/redirects and joins/disposes its handlers. The closed CONNECT
+probe verifies original cookies despite jar mutation, exact UTF-8/whitespace
+bytes through download/navigation and truncated-response failure without replay.
+Twenty repeated runs with the probe passed (47.823 s); final source check passed
+in 2.388 s. Bounded process-group cancellation follows the existing Chromium
+pattern. HTTP and part checks enforce 24 KiB and 1 MiB. Logs remain external in
+`browser-response-capture`, `ci-42957758840` and the named installed archives;
+no generated result files are committed.
+
+This report bounds visibility by original metadata lifetimes. Physical retirement
+of all sharing/control metadata, complete retained-derivative production and
+erasure propagation, reviewed extracts, preservation and wider qualification
+remain open under the accepted specification.
+
+## Merged workload-interval processing restriction (2026-11-11)
+
+[PR #221](https://github.com/phihos/asservat/pull/221) merged at `fec1e03e`.
+Its complete tree matches reviewed `032a88f6`. All 14 Go shards and `ci-ok`
+passed in [required PR CI](https://github.com/phihos/asservat/actions/runs/42941610819).
+All 4,787 qualification hashes match installed-tested `75b7606b`.
 
 Outcome: a privacy operator searches by workload and acquisition time,
 reviews the complete immutable scope, restricts it, then reloads and releases
 that exact rule. The existing canonical workload scope, audited change,
 durable inventory and compiled SQL grants already support the behavior.
-The console currently offers only exact-artifact restriction. SC-PRV-013
+SC-PRV-013
 records the full review, all-purpose/all-page coverage and replay semantics.
 
 One candidate starts from authoritative `d94ab63f`. The missing review
@@ -39,7 +123,6 @@ owned clusters, labelled Docker resources and build scratch are removed.
 Original reports are archived externally under
 `privacy-workload-restriction/installed-75b7606b`.
 
-Required PR CI and merge remain pending.
 Added routes, roles, SQL state, schema migrations, background jobs and polls
 are zero. Confirmation itself performs no request. One existing audited
 change records the workload rule and the existing reserve funds release.

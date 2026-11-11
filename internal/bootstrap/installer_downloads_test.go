@@ -296,3 +296,23 @@ func TestInstallerIdentityApprovalSettings(t *testing.T) {
 		t.Fatal("explicit disabled policy changed")
 	}
 }
+
+func TestInstallerProcessingOrganizationsReachBothSourceDocuments(t *testing.T) {
+	declarations := []contracts.ProcessingOrganization{{ID: "org-1", Name: "Declared organization", Activities: []string{"Storage"}, Regions: []string{}}}
+	k := &InstallerContinuation{input: contracts.InstallerContinuation{Public: &contracts.InstallerPublicSettings{Processors: declarations}}}
+	settings := k.processingSettings(runtimeID)
+	if !reflect.DeepEqual(settings.Processors, declarations) || !privacy.ProcessingOrganizationsValid(installerProcessingOrganizations(settings.Processors)) {
+		t.Fatal("installer lost processor declarations")
+	}
+	for _, absent := range [][]contracts.ProcessingOrganization{nil, {}} {
+		k.input.Public.Processors = absent
+		settings = k.processingSettings(runtimeID)
+		if (settings.Processors == nil) != (absent == nil) || (installerProcessingOrganizations(absent) == nil) != (absent == nil) {
+			t.Fatal("installer lost declaration presence")
+		}
+	}
+	declarations[0].Activities = nil
+	if privacy.ProcessingOrganizationsValid(installerProcessingOrganizations(declarations)) {
+		t.Fatal("installer accepted malformed declarations")
+	}
+}

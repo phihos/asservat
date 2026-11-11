@@ -1124,6 +1124,45 @@ def main() -> None:
     # Cross-object order, identity and deadline checks have separate runtime tests.
     owner_id = lambda n: f"00000000-0000-4000-8000-{n:012d}"
     owner_ref = lambda name, n: {"name": name, "uid": owner_id(n)}
+    # Optional administrator declarations retain absent versus explicit empty.
+    # This synthetic document grants no installation or processing authority.
+    download_environment = {
+        "format": "asservat-download-environment/v1", "rootID": owner_id(1),
+        "installationID": owner_id(2), "recoveryEpoch": owner_id(3), "revision": 1,
+        "suspended": False, "permittedRegions": [], "paths": [], "clients": [],
+        "operators": [{"issuer": "https://identity.invalid", "clientID": "console", "kind": "User", "id": "operator"}],
+    }
+    organization = {"id": "declared-organization", "name": "Declared organization", "activities": ["Evidence storage"], "regions": []}
+    for declarations in (None, [], [organization], [
+        {"id": str(n).zfill(64), "name": "n" * 160, "activities": [str(i).zfill(128) for i in range(8)],
+         "regions": [str(i).zfill(128) for i in range(16)]} for n in range(16)
+    ]):
+        declared_environment = copy.deepcopy(download_environment)
+        if declarations is not None:
+            declared_environment["processors"] = declarations
+        validate(declared_environment, schemas[BASE + "download-environment.schema.json"])
+    declared_environment = {**download_environment, "processors": [organization]}
+    for mutate in (
+        lambda d: d.update(processors=None),
+        lambda d: d.update(processors=[{**organization, "id": str(n)} for n in range(17)]),
+        lambda d: d.update(processors=[organization, organization]),
+        lambda d: d["processors"][0].update(endpoint="https://unexpected.invalid"),
+        lambda d: d["processors"][0].pop("regions"),
+        lambda d: d["processors"][0].update(regions=None),
+        lambda d: d["processors"][0].update(activities=[]),
+        lambda d: d["processors"][0].update(activities=["storage"] * 2),
+        lambda d: d["processors"][0].update(regions=["local"] * 2),
+        lambda d: d["processors"][0].update(id="x" * 65),
+        lambda d: d["processors"][0].update(name="x" * 161),
+        lambda d: d["processors"][0].update(activities=[str(i) for i in range(9)]),
+        lambda d: d["processors"][0].update(activities=["x" * 129]),
+        lambda d: d["processors"][0].update(regions=[str(i) for i in range(17)]),
+        lambda d: d["processors"][0].update(regions=["x" * 129]),
+        lambda d: d["processors"][0].update(id=""),
+        lambda d: d["processors"][0].update(name="line\nfeed"),
+        lambda d: d["processors"][0].update(activities=["control\u0085"]),
+    ):
+        rejects(declared_environment, "download-environment", mutate)
     owner_roles = {
         "format": "asservat-owner-identity-roles/v1",
         "installationID": owner_id(1), "initialClaimID": owner_id(2),

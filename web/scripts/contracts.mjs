@@ -109,6 +109,7 @@ await operationBundle(['preview_retention_change'], 'retention-preview');
 await operationBundle(['get_live_capacity'], 'capacity');
 await operationBundle(['search_processing_evidence'], 'processing-discovery');
 await operationBundle(['get_processing_erasure'], 'processing-erasure');
+await operationBundle(['get_processing_report'], 'processing-report', ['ProcessingReportExport']);
 await operationBundle(['request_policy_grant', 'request_raw_access', 'get_grant', 'list_reviews', 'decide_review', 'revoke_grant'], 'approvals');
 
 await operationBundle(['list_live_sources', 'open_live_watch', 'read_live_watch', 'update_live_watch', 'close_live_watch'], 'live');
@@ -134,6 +135,7 @@ function browserModules(source) {
 }
 outputs['validate-processing.js'] = browserModules(outputs['validate-processing.js']);
 outputs['validate-processing-discovery.js'] = browserModules(outputs['validate-processing-discovery.js']);
+outputs['validate-processing-report.js'] = browserModules(outputs['validate-processing-report.js']);
 outputs['validate-processing-erasure.js'] = browserModules(outputs['validate-processing-erasure.js']);
 outputs['validate-live.js'] = browserModules(outputs['validate-live.js']);
 outputs['validate-auth.js'] = browserModules(outputs['validate-auth.js']);
