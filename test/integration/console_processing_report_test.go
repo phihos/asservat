@@ -3,7 +3,11 @@ package integration
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -12,6 +16,8 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
+	"syscall"
 	"testing"
 	"time"
 
@@ -33,6 +39,7 @@ func TestConsoleProcessingReportWithBuiltPackage(t *testing.T) {
 	if os.Getenv("ASSERVAT_CONSOLE_BROWSER_TEST") != "1" {
 		t.Skip("set ASSERVAT_CONSOLE_BROWSER_TEST=1 after building web/dist")
 	}
+	qualifyConsoleReportResponseCapture(t)
 	root, err := filepath.Abs("../..")
 	if err != nil {
 		t.Fatal(err)
@@ -124,6 +131,68 @@ func TestConsoleProcessingReportWithBuiltPackage(t *testing.T) {
 		t.Fatal("export lost retained records", len(records), want)
 	}
 	t.Log("compiled report consumer exported all seven sections over two JSON parts with exact HTTP payloads and normal audit byte counts")
+}
+
+func qualifyConsoleReportResponseCapture(t *testing.T) {
+	t.Helper()
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	page := value.ProcessingReportPage{SchemaVersion: value.ProcessingReportFormat, RootID: consoleCaptureID(1), InstallationID: consoleCaptureID(2),
+		Section: "processors", SelectionCreatedBefore: now, PolicyRevision: value.ProcessingReportRevision{UID: consoleCaptureID(3), Generation: 1, Digest: strings.Repeat("a", 64)},
+		Records: []value.ProcessingReportRecord{}, ObservedAt: now, ValidUntil: now.Add(time.Second), ProcessorDeclarations: "unsupplied", Coverage: value.ProcessingReportCoverage()}
+	body, err := json.MarshalIndent(presentation.OperationEnvelope{SchemaVersion: "mcp-result/v1", RequestID: consoleCaptureID(4), DataClass: "metadata", Status: "ok",
+		Data: page, Warnings: []string{"synthetic UTF-8 café"}, Provenance: []any{}}, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var requests atomic.Int32
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/operations/get_processing_report" {
+			_, _ = io.WriteString(w, "<!doctype html><title>synthetic report proxy</title>")
+			return
+		}
+		n := requests.Add(1)
+		raw, err := io.ReadAll(io.LimitReader(r.Body, 1024))
+		if err != nil || r.Method != http.MethodPost || string(raw) != `{"section":"processors","limit":3}` ||
+			r.Header.Get("Origin") != "https://report.synthetic.invalid" || r.Header.Get("Cookie") != "synthetic=original" || r.Header.Get("X-CSRF-Token") != strings.Repeat("A", 43) {
+			t.Error("proxied report capture changed original synthetic request")
+		}
+		w.Header().Set("Content-Type", "application/json")
+		if n == 1 {
+			_, _ = w.Write(body)
+			return
+		}
+		connection, _, err := w.(http.Hijacker).Hijack()
+		if err != nil {
+			t.Error("controlled truncated response", err)
+			return
+		}
+		_, _ = io.WriteString(connection, "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 10000\r\n\r\n{\"status\":")
+		_ = connection.Close()
+	}))
+	defer server.Close()
+	digest := sha256.Sum256(body)
+	command, cancel := installedBoundedCommand(t.Context(), 30*time.Second, "node", filepath.Join("..", "..", "web", "scripts", "processing-report-response-test.mjs"), server.URL, hex.EncodeToString(digest[:]), fmt.Sprint(len(body)))
+	defer cancel()
+	command.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	command.Cancel = func() error {
+		if command.Process == nil {
+			return os.ErrProcessDone
+		}
+		return syscall.Kill(-command.Process.Pid, syscall.SIGKILL)
+	}
+	command.WaitDelay = 5 * time.Second
+	var output consoleBoundedOutput
+	command.Stdout, command.Stderr = &output, &output
+	if err := command.Run(); err != nil {
+		if command.Process != nil {
+			_ = syscall.Kill(-command.Process.Pid, syscall.SIGKILL)
+		}
+		t.Fatal("report response capture proxy boundary", err, output.String())
+	}
+	if requests.Load() != 2 {
+		t.Fatal("report response capture replayed an upstream POST", requests.Load())
+	}
+	t.Log(output.String())
 }
 
 type consoleReportFacts struct {

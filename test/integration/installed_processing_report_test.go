@@ -100,7 +100,7 @@ func startProcessingReportBrowser(t *testing.T, ctx context.Context, config map[
 			if os.IsNotExist(err) {
 				break
 			}
-			if err != nil || !info.Mode().IsRegular() || info.Size() > 4<<20 {
+			if err != nil || !info.Mode().IsRegular() || info.Size() > 1<<20 {
 				t.Log("preserve failed processing report: invalid bounded part", part, err)
 				break
 			}
@@ -190,7 +190,7 @@ func readProcessingReportExports(t *testing.T, driver *installedLiveBrowser, dir
 			break
 		}
 		parts++
-		if event.Kind != "exported" || event.Part != parts || parts > 8 || event.File != fmt.Sprintf("processing-report-%d.json", parts) || event.Bytes < 1 || event.Bytes > 4<<20 {
+		if event.Kind != "exported" || event.Part != parts || parts > 8 || event.File != fmt.Sprintf("processing-report-%d.json", parts) || event.Bytes < 1 || event.Bytes > 1<<20 {
 			t.Fatal("invalid bounded report part summary")
 		}
 		raw, err := os.ReadFile(filepath.Join(directory, event.File))

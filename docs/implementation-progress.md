@@ -28,6 +28,32 @@ and broader replay matrix were not run. Reports are archived externally in
 `privacy-inventory-report/installed-72a459be`. Required PR CI and merge remain
 pending. The specification goal stays active.
 
+[PR222](https://github.com/phihos/asservat/pull/222) opened at `b74d49d5`.
+Its first required `pull_request` CI, run 42957758840, completed with all
+14 Go shards, the Go gate, contract checks and console tests passing. The
+browser job alone failed: the report driver requested a Chromium response
+body after Blob download navigation had discarded it, and its pending capture
+rejected before being joined. A focused local loop reproduced the exact
+failure in 4 of 20 runs (29.074 s, exit 1). The observer needs to retain the
+actual upstream bytes before delivery, preserve the original session/CSRF and
+proxy transport, propagate capture failures and perform no retries. The fixed
+driver requires focused, full browser and fresh installed qualification before
+another CI push. Original CI logs and timing are archived externally in
+`privacy-inventory-report/ci-42957758840`.
+The corrected report-only observer captures the actual upstream bytes before
+fulfilling the browser response. It preserves all intercepted headers, including
+the original cookie, uses zero retries/redirects, joins pending handlers and
+disposes responses. A closed CONNECT-proxy probe changes the cookie jar after
+interception, compares exact UTF-8/whitespace bytes through Blob download and
+navigation, and verifies truncated-response failure without replay. It runs
+inside the existing CI-selected report browser test. Twenty repeated exports
+with that probe pass (47.823 s, exit 0); the final focused source check passes
+in 2.388 s. Probe process-group cancellation follows the existing bounded
+Chromium cleanup pattern. HTTP and part assertions enforce the product's
+24 KiB and 1 MiB bounds. Application and UI sources remain unchanged. Logs are
+external in `browser-response-capture`; new browser/native qualification is
+still pending for this driver correction.
+
 The candidate starts from authoritative `fec1e03e`. Declaration preservation,
 domain and application authority checks, 41 focused UI/HTTP tests, TypeScript,
 59 generated contract cases, Helm and specification checks pass. The focused
