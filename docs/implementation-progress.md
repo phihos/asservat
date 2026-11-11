@@ -37,6 +37,7 @@ cleanup failures empty and owned containers independently absent):
 | `bef1348e` | Policy Go 105.570 s, exit1; 4,562 hashes | Recurring matrix passed39.07 s; all100 wide captures/shares were genuinely published. The mutation stage used a token name rejected by its synthetic resolver; correct that contract and preflight the caller before the100 loop. Observed share-relation growth4,481,024 bytes and whole-instance WAL15,215,968 bytes cover capture/publication, not revoke-all. `policy-cost-bef1348e`. |
 | `dac2d40d` | Wide Go 67.533 s, exit1; 4,562 hashes | All100 captures/shares, rollback, paid revoke-all and replay semantics passed. Final cost assertion refused measured WAL6,731,960/7,703,136 bytes versus the original2MiB bound. Smaller trigger/index changes are being measured before any blanket reservation increase. `policy-cost-dac2d40d`. |
 | `a3ca495f` | Go69.301 s, exit1; 4,562 hashes | All100 wide shares and paid mutation/refusal/replay semantics pass. Exact tuple checks and partial recipient GIN reduce paid WAL to1,949,488 bytes and rollback to2,957,808; paid TOAST growth is0. Rollback still exceeds the original2MiB fixture value. Schema upgrade/rollback passes2.41 s, including both index forms. `policy-cost-a3ca495f`. |
+| `d4a63a8e` | Go72.578 s, exit0; 4,562 hashes | Same100-share case passes with separately prepaid8MiB business-WAL allowance. Full paid WAL1,999,848 bytes and rollback2,939,816. Actual lifecycle INSERT and protected-source validation reject missing/one-byte-short funding. Schema roundtrip passes2.54 s; all hashes match, source unchanged, containers/network absent. `policy-cost-d4a63a8e`. |
 
 The original baseline failure at `1dc7c616` requested incompatible 60-second
 retention. The corrected fixture used its original 20-second managed capture,
@@ -52,12 +53,11 @@ schema IDs, full specification validation passed (13,970 assertions). Independen
 installer composition found no actionable issue. These are component results,
 not installed provider/IAM, backup-chain or universal footprint qualification.
 
-Next: fund the measured bounded sharing effect once per normal-v4 slot with
-the fixed8MiB business-WAL allowance documented in ADR323, separately from
-per-transition audit-protocol backing. Keep Go compilation and SQL validation
-identical, preserve old layouts and all-field-max rejection, rerun the same
-wide100 sample and schema roundtrip, run final broad gates, then
-fresh collector-free `share-retirement` installed qualification. Its original
+`make pre-push` passes at `d4a63a8e`, including the affected Go race phase
+(506 s); archive `pre-push-d4a63a8e`. This branch is now parked while the
+maintainer-requested homelab context installation path takes priority. It is
+unmerged and still requires fresh collector-free `share-retirement` installed
+qualification, required PR CI and authoritative merge readback. Its original
 short bounds are selected before installation; timestamps are never rewritten
 to make cleanup due. No new installed outcome or completed spec is claimed.
 
