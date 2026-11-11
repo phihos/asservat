@@ -1,6 +1,6 @@
 # ADR-322 — Processing inventory export
 
-Date: 2026-11-11. Status: implementation and qualification in progress.
+Date: 2026-11-11. Status: implemented; named installed workflow qualified.
 Requirements REQ-PRV-006, SC-PRV-014, TASK-07 and TASK-11.
 
 Privacy operators need an inventory covering retained artifacts, recipients,

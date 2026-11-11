@@ -8,6 +8,26 @@ responses, rules, technical placement and processor declarations. The console
 exports finite JSON parts and continues through every section before reporting
 completion. ADR-322 and SC-PRV-014 record the source and lifetime contracts.
 
+Fresh installed qualification at `72a459be` passed (Go 312.453 s, harness
+371.0 s, both exits 0). The Keycloak user captured, published and downloaded
+the original regional pod-status file, created a share with four existing
+recipients and completed verified early erasure. The real console exported
+every report section with exact acknowledged page bytes, the same recipients
+across 3+1 pages, the completed native session, retained deletion and declared
+processors. Ordinary readership could not export and produced the exact denied
+audit. The actual SQL152 Down guard refused retained report history with 23514;
+rollback preserved schema 152 and all three index definitions.
+
+All 4,812 qualification source hashes independently match. Source stayed frozen,
+cleanup failures are empty, both owned clusters and labelled Docker resources
+are gone, and build scratch was removed. Final focused race/browser, vet and
+formatting checks passed at that head; full pre-push at `021142f4` and the full
+browser gate at `a657fca4` remain applicable to identical production/browser
+sources. The final native focus used one regional target; the second-workload
+and broader replay matrix were not run. Reports are archived externally in
+`privacy-inventory-report/installed-72a459be`. Required PR CI and merge remain
+pending. The specification goal stays active.
+
 The candidate starts from authoritative `fec1e03e`. Declaration preservation,
 domain and application authority checks, 41 focused UI/HTTP tests, TypeScript,
 59 generated contract cases, Helm and specification checks pass. The focused
@@ -32,8 +52,8 @@ were independently confirmed absent.
 Reports are archived externally under
 `privacy-inventory-report/services-25e9a774`. The later installed-only assertion
 will exercise the exact migration Down guard against real retained report audit
-rows and verify the schema/indexes remain unchanged after refusal. Broad gates,
-fresh installed qualification, required PR CI and merge remain pending.
+rows and verify the schema/indexes remain unchanged after refusal. These checks
+were pending at that earlier checkpoint; the final installed result is above.
 
 The first `make pre-push` at `b871dd60` returned 2. All 683 console tests and
 the affected Go race suite passed (522 s), while Go architecture and authority
