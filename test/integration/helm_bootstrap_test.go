@@ -295,7 +295,7 @@ func TestHelmBootstrapWithRealServices(t *testing.T) {
 	}
 	var publicIdentity *installedIdentity
 	if identitySource != nil {
-		publicIdentity = identitySource.Resolve(t, ctx, api, &publicInput, &f)
+		publicIdentity = identitySource.Resolve(t, ctx, kc, &publicInput, &f)
 	}
 	if bundled != nil {
 		desired, store = bundled.VerifiedStore(t, ctx, api, kc, publicInput, []byte(f.Clusters[0].Token), node)

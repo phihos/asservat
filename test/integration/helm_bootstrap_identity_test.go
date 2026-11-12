@@ -4,15 +4,18 @@ import (
 	"context"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"net"
 	"strings"
 	"testing"
 
+	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/bootstrap"
 	"asservat.local/asservat/internal/contracts"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 )
 
 type helmBundledIdentity struct {
@@ -57,10 +60,10 @@ func (k *helmBundledIdentity) Values(t *testing.T, values map[string]any, input 
 	input.IdentitySource = "bundledKeycloak"
 }
 
-func (k *helmBundledIdentity) Resolve(t *testing.T, ctx context.Context, api kubernetes.Interface, input *contracts.InitialBootstrapInput, f *fixture) *installedIdentity {
+func (k *helmBundledIdentity) Resolve(t *testing.T, ctx context.Context, config *rest.Config, input *contracts.InitialBootstrapInput, f *fixture) *installedIdentity {
 	t.Helper()
-	source, err := api.CoreV1().Secrets(k.settings.Namespace).Get(ctx, k.settings.SecretName, meta.GetOptions{})
-	if err != nil || bootstrap.ValidateSmallKeycloakMaterial(k.settings, source) != nil || source.UID == "" || source.ResourceVersion == "" {
+	source, err := readHelmBundledKeycloakMaterial(ctx, config, k.settings)
+	if err != nil {
 		t.Fatal("actual original retained Keycloak material", err)
 	}
 	k.usersGroup = string(source.Data[contracts.SmallKeycloakUsersGroup])
@@ -79,4 +82,21 @@ func (k *helmBundledIdentity) Resolve(t *testing.T, ctx context.Context, api kub
 
 func bundledKeycloakIssuer(s contracts.SmallKeycloakSettings) string {
 	return strings.TrimSuffix(s.Hostname, "/") + "/realms/" + s.Realm
+}
+
+func readHelmBundledKeycloakMaterial(ctx context.Context, config *rest.Config, settings contracts.SmallKeycloakSettings) (*core.Secret, error) {
+	// The typed client intentionally clears GVK. Reuse the production bounded
+	// wire reader so the original validator can check the actual kind/version.
+	store, err := kube.NewSmallKeycloakStateStore(config, settings, "", strings.TrimSuffix(settings.SecretName, "-state"), nil)
+	if err != nil {
+		return nil, err
+	}
+	source, err := store.Read(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if bootstrap.ValidateSmallKeycloakMaterial(settings, source) != nil || source.UID == "" || source.ResourceVersion == "" {
+		return nil, errors.New("retained Keycloak material invalid")
+	}
+	return source, nil
 }

@@ -1,389 +1,110 @@
 # Sustained implementation progress
 
-## Active small-installation workflow (2026-11-11)
+## Active small-installation workflow (2026-11-12)
 
-The active candidate is `feature/small-installation-profile` in
-`asservat-small-installation`, based on authoritative main `62b80beb`.
-The maintainer has no external PostgreSQL, S3 or OpenBao and explicitly requests
-bundled Keycloak even though an existing Keycloak is available. Every bundled
-service must be independently selectable. The external-services context trial
-cannot satisfy this installation. The complete specification goal remains active;
-manual command work is parked separately at `c0b58cb0` and is not integrated here.
+Candidate: `feature/small-installation-profile`, worktree
+`asservat-small-installation`, [PR225](https://github.com/phihos/asservat/pull/225),
+based on authoritative main `62b80beb`. The complete accepted-specification goal
+remains active. Manual commands are parked separately at `c0b58cb0`.
 
-[ADR-326](decisions/326-individually-selectable-small-services.md) records this
-candidate. Provider packaging and component checks are implementation evidence,
-not an installed small-profile result. There is no homelab deployment, supported
-release, image publication or completed REQ-DEP-001–005 qualification.
+The maintainer has no external PostgreSQL, S3 or OpenBao and requests bundled
+Keycloak despite having an existing Keycloak. Every service must be independently
+configurable. [ADR-326](decisions/326-individually-selectable-small-services.md)
+records the selected existing-provider packaging. This does not cancel ADR-063's
+accepted local-identity/static-key alternatives. No homelab deployment, release or
+image publication is claimed.
 
-| Boundary | Current evidence | Remaining work |
+| Boundary | Implemented and observed | Remaining qualification or work |
 | --- | --- | --- |
-| Selection | Closed Helm values independently select PostgreSQL, SeaweedFS, Keycloak and OpenBao; external defaults remain selectable | Complete integrated provider composition and the accepted isolated static-key alternative |
-| PostgreSQL | Create-once TLS/SCRAM state, retained PVCs, server budget117/122 and client pool2; actual image/TLS/separate logins/encrypted full backup/restart and Helm/native Pod parity pass | Restore and installed profile qualification |
-| Keycloak | Actual26.8.2 import, HTTPS readiness, console/MCP PKCE, group refresh and restart pass; generated identity, optional email and literal external-password handling verified | Installed Asservat identity/approval composition and broader lifecycle qualification |
-| SeaweedFS | Actual4.53 TLS, scoped policies, immutable versions, delayed projection/reload with new ordinary credential consumption and pinned exact-byte reads after restart pass | Provider phase composition, multipart and installed authority/lifecycle qualification |
-| OpenBao | Actual2.7.2 TLS/static auto-unseal/self-initialization, same-data restart and partial-initialization refusal pass; same-API setup and real bounded initial-issuer adapters pass | Original mint journal, installer composition and installed lifecycle qualification |
-| Installation | Finite preparation command and actual rendered-role integration pass; generated CA and public Keycloak identity resolve before canonical compilation; full Helm/native Pod parity passes | Complete all provider inputs and continuation, then fresh Helm→login→capture→exact native download→expiry/deletion→restart journey |
+| Selection | Independent closed Helm provider choices; external defaults; generated state retained outside release values | Automatic continuation still couples bundled OpenBao and SeaweedFS; decouple the two mixed paths before delivery |
+| PostgreSQL | Actual18.6/pgBackRest2.60 TLS/SCRAM, separate DDL and Keycloak logins, encrypted full backup, same-volume restart; budget117/122 and client pool2 | Physical restore and full installed restart/recovery workflow |
+| Keycloak | Actual26.8.2 HTTPS/import/console and MCP PKCE, stable groups, group refresh and restart; opt-in empty processing group | Public installed login and inspection; correct the test reader's metadata loss was reproduced and corrected |
+| SeaweedFS | Actual4.53 TLS, scoped IAM, versioned pinned bytes, delayed reload/new credential consumption and restart; initial audit installation passes | Full public acquisition/native download/deletion and multipart workflow |
+| OpenBao | Actual2.7.2 TLS/static seal/self-initialization, same-data restart, partial-init refusal and original bounded issuer mint | Full public workflow and broader lifecycle; no static-key alternative claim |
+| Installation | Selected all-four Helm run starts every service and completes the original five commands; regional installer uses real fleet bootstrap, existing credential carriers and ordinary join | Public login → regional Helm → context collection → native/range download → React inspection → expiry/managed deletion; actionable operator guide |
 
-The initial object-store join follows component checkpoint `4fcf60f7`: public
-`bundledSeaweed` CA/plan normalization, matching Helm/native projections,
-first-material raw credential generation and original stored-ID binding, plus
-one monotonic native initialization record before bucket effects. Root creates
-no new user/evidence authority from that record. Focused bootstrap/Kubernetes/
-provider tests pass. A fresh actual-chart initial installation now passes with
-the generated original credential and encrypted audit. Runtime provider
-provisioning and the full small-profile journey remain unfinished. No defaults
-or external deployment have changed.
+Production composition persists original credentials before IAM effects, reuses
+existing purpose-specific Secrets/inboxes and refuses unknown retained state.
+Selected setup uses original finite Kubernetes-authenticated OpenBao authority;
+no root token or private provider CA enters runtime mounts. Generated public roots
+are resolved and checked against the protected preparer before closed consumers.
+Storage use has its own original30-minute bound, distinct from the five-minute
+initial KMS parent. Consumed mint claims retain their original deadline. Setup
+accepts only the exact upstream role-TTL cap notice and verifies returned bounds.
 
-`python scripts/test-context-storage.py --helm-bootstrap --bundled-objectstore`
-returned Go0/242.941s and harness0/331.54s. It verifies actual activation,
-same-credential IAM binding, independently read encrypted audit, setup-free
-four-command replay with unchanged IAM/binding, original failed-hook resume and
-retained product state after uninstall. The first attempt failed before Go tests:
-`ctr` treated the unqualified chart repository as a registry hostname. The
-fixture now uses `crictl pull` with the exact chart reference; all eight Python
-selection tests pass. The successful run froze all4,912 inventoried sources;
-root independently rehashed each and confirmed ten exact owned resource absences,
-temporary-directory removal and restoration of the repository result directory.
-Receipts are in `native-initial-s3-20261112T001702Z/` under the external archive.
-PostgreSQL/OpenBao were explicit fixtures: this is initial storage-boundary
-qualification, not an external-service-free or browser/MCP journey result.
+The same-API regional path selects `cluster.bundledHub` and the actual
+`cluster.bootstrapID` on a second Helm release in the original bootstrap
+namespace. It reads only the issued bootstrap's version1, retains two regional
+keys in the existing immutable evidence Secret before additive IAM/policy setup,
+and uses the normal connector installer/catalog join. Existing grants survive
+append; conflicts refuse. Operator provider administration is serialized.
 
-The broad Go run passed70 packages or no-test packages and found one malformed
-new provider fixture: `{}` omitted fields required by the existing closed
-credential decoder. The test now marshals the actual typed blank credential;
-the decoder is unchanged and the full provider package passes under `-race`.
-The original `make go-check` returned2. All739 discovered Kubernetes tests then
-passed in the repository's19 exact sequential groups, preserving race/count/
-deadline flags, exit0/1,812.207s. Combined coverage is complete for all72 packages
-at `c26f1cc1`:70 original passes/no-test packages, the corrected full provider
-package, and the Kubernetes groups. The failed original command is retained,
-not relabeled as exit0. Final spec/Helm/Go-architecture gates returned0; generated
-logs and combined coverage receipts are in `initial-s3-local-gate/` externally.
+### Integrated checks at `996bb205`
 
-The first usable homelab candidate will add an explicitly selectable bundled
-OpenBao using existing provider adapters. This leaves external defaults unchanged
-and does not replace the accepted static-key alternative. The latter still needs
-all key purposes and PKI; a proposed initial-audit-only shortcut is parked while
-the bundled existing-provider path is integrated. No complete small-profile
-qualification or deployment is claimed.
+- `make pre-push`: exit0/619.331s;84 Go race jobs passed, all66 tested packages
+  covered and72 packages compiled;692 console tests passed. The first wrapper
+  attempt failed because it temporarily hid historical result links. The corrected
+  run preserved them. Canonical `make spec-check` after restoring the real result
+  directory separately returned0:137 schemas,65 tools,199 examples,176 requirements,
+  198 scenarios,11 tasks,6,437 links and14,004 assertions. The failed command is
+  preserved, not relabeled.
+- `make console-browser-check`: exit0/150.301s at `67ff9e2f`; relevant console
+  sources are unchanged. Actual React/Go metadata tests passed, including30
+  console journeys and31 accessibility scans. Generated outputs were archived and
+  historical tracked files restored.
+- PR CI43171831299: eligible `pull_request`, exact head `996bb205`, completed
+  success;21 checks including `ci-ok` passed. Gitar found no issues. This is CI
+  evidence, not installed qualification.
+- Latest fresh all-four installed run at `996bb205`: Go1/233.917s,
+  harness1/349.457s. Original five-command installation completed and the registry
+  handoff ran. Before public login, the fixture's typed Kubernetes Secret reader
+  stripped APIVersion/kind and failed strict retained-Keycloak validation. The
+  actual retained wire object and public settings are valid; production uses a
+  bounded raw reader. The exact TLS decoder regression failed before switching
+  the fixture to that production reader; final focused races pass0/1.908s without
+  changing validation. All4,993 hashes independently match the committed and working sources;
+  source stayed frozen and the result directory was restored. Original environment
+  `context-4zmp6cz4` was used for a bounded real cookie-login diagnostic,
+  exit0/1.260s, with unchanged five consumer sources and no product redeployment.
+  This is explicitly not qualification. Root cleanup then returned0 with no owned
+  containers, volumes, networks, images, cluster or private directory remaining.
 
-The next local join resolves the continuation's generated store trust against
-the original preparer and uses one owned bucket with existing disjoint audit/
-evidence prefixes. Exact-UID credential initialization/recovery, expired-Ready
-provenance without initial-authority renewal, the known retained initial key and
-the compiled worker grant are implemented. Worker storage setup precedes input
-acknowledgement; acknowledged replay preserves later IAM roles. Phase-3 complete
-hub grants and automatic worker/owner setup are now wired locally; regional grants
-and installed qualification remain unfinished.
-Focused Kubernetes/bootstrap/contracts checks pass3.043s/1.729s/1.034s; the full
-affected provider package passes6.397s after correcting a missing-prefix test
-fixture. Actual Helm output, generated/explicit root equivalence and unchanged
-external validation pass; the added worker recipe checks pass1.353s. These are
-local checks after `cd931b3f`, not a new native journey result. OpenBao component
-work now has the distinct backend and same-API qualifications below; the full installation remains unqualified.
+### Component and earlier installed evidence
 
-The optional bundled OpenBao backend uses exact2.7.2, native HCL, static
-sealed private state, local same-API TokenReview and the existing application
-provider adapters. Its backend component returned0/48.499s with same-key/data
-restart and native refusal to unseal after an injected partial initialization.
-The final initialization marker is a fixed deny-only policy, not application
-or recovery authority. The server account can create TokenReviews only. Setup
-administration has API-scoped `sudo` on the two exact application auth mounts;
-no wildcard sudo, root token, tune/delete or host privilege is added. Earlier
-failed parser/TLS/fixture attempts remain archived rather than relabeled.
+All paths below are under the external archive
+`/home/phil/.cache/asservat-build/small-installation/`. Reports, logs and images
+remain outside Git; prior detailed checkpoints remain in repository history.
 
-The fresh same-API probe returned harness0/probe0/86.283s. The actual setup
-identity observer plus actual Check/Issue/Verify/Revoke/revocation-replay adapters
-passed for wrap and unwrap. The issuer expired16.493s before its original setup
-parent; no relogin or renewal extended that bound. The external constructor
-still refused inherited entity identity. Root independently rehashed all82
-frozen sources and confirmed owned nodes/image absent and cleanup empty. These
-are provider compatibility checks with synthetic installation facts, not SQL or
-installed evidence authority. Receipts are in
-`openbao-kubernetes/selected-original-parent/` below the external archive.
+| Evidence | Actual result and limits |
+| --- | --- |
+| `native-initial-s3-20261112T001702Z/` at `c26f1cc1` | Go0/242.941s, harness0/331.54s;4,912 hashes match and owned cleanup empty. Actual chart/audit, four-command replay and retained uninstall state; PostgreSQL/OpenBao were external fixtures |
+| `postgres-image-smoke/asv-small-pg-96152fac56/` | Actual image/TLS/separate identities/encrypted full backup/same-data restart pass, unchanged sources and empty cleanup; no restore test |
+| `keycloak-component/asv-small-kc-1b02d0f955/` | Exit0/48.135s,26 hashes match, empty cleanup; actual OAuth/SQL/password/retained identity component |
+| `keycloak-processing-native-20261112T0458Z/` at `48682842` | Exit0/55.925s,113 hashes match, empty cleanup; actual signed claims, operator eligibility and restart, explicit synthetic humans/authority inputs |
+| `seaweed-component-pinned-reader-453/` | Go0/37.033s, harness0/41.468s;4,648 hashes match, empty cleanup.12KiB synthetic versioned/pinned bytes and role/restart checks; no multipart/public authority |
+| `openbao-component/application-prerequisites/` | Actual backend initialization/restart/partial-init refusal passes; component scope |
+| `openbao-mint-notice-20261112T040309Z/` | Exit0/78.202s,86 hashes match, empty cleanup; actual setup/mint original-parent expiry and denial checks |
 
-Helm and the native bootstrap runner now agree for selected OpenBao with
-PostgreSQL external/bundled and continuation off/on. Only public plan/CA/backend
-identity is projected to replay phases; the fixed setup-audience token is limited
-to producer/continuation. No seal/private CA key is projected. Focused runner
-race checks returned0/1.975s. Original private identity propagation and strict
-source/endpoint refusal tests returned0/1.070s and0/1.141s. The original8KiB
-private-material cap remains. Initial credential minting now consumes its original
-acknowledged single-use intent inside the existing seed before any provider POST,
-without another object or controller. Affected bootstrap race tests passed48.716s
-and closed material/state checks pass. The current producer join is still pending
-its real installed run.
+Earlier failures are retained with their original results: missing exact PVC GET/
+state PATCH (`42ad15e5`); upstream TTL-cap notice (`9d214e1f`); storage use incorrectly
+inheriting KMS expiry (`dcb99083`); fixture service-map replacement (`8a917fc3`);
+and an immediate new NodePort ECONNREFUSED (`a0a32391`). Each has a focused
+reproduction and correction. Their owned fixtures were removed with empty cleanup.
 
-The updated backend configuration includes actual fixed application prerequisites
-before the final marker: local configuration/owner auth mounts, the initial audit
-key/shared exact policies/token roles, three internal PKI roots and bootstrap KVv2.
-A fresh pinned backend run returned0/55.019s with unchanged original values after
-restart and preserved partial-initialization refusal. Root independently checked
-all18 source hashes and absence of owned containers/networks/volumes; cleanup was
-empty. `openbao-component/application-prerequisites/` holds the receipts.
+`native-small-public-20261112T054953Z/` at `67ff9e2f` returned Go1/669.307s and
+harness1/782.718s after the operator stopped the owned Helm child on a concrete
+private-registry pull blocker. All4,990 committed hashes match. A bounded check
+with the same image on both owned nodes passed after registry-scoped node transport
+credentials, preserving default kubelet verification and exact image identity.
+That check did not exercise the live handoff or qualify the installation. The
+original environment was removed with empty cleanup. The selected fixture now
+records authenticated cold pulls before supplying runtime registry access through
+private stdin; the current run exercised that handoff.
 
-Automatic phase3 now derives the complete grants from the existing actual recipe,
-retains generated keys in the existing private inbox before IAM and changes only
-its real inspection token on refresh. Source TLS/client material must match the
-checked original carrier. This adds no object/watch/controller. The full recipe
-compiler passed1.761s; original-carrier/unknown-reply/CAS regressions passed1.401s.
-The private-material source and integrated continuation tests are being finalized;
-these are local joins, not installed runtime-storage or browser qualification.
-The new `--bundled-keyservice` Helm fixture compiles and its9 Python selection
-tests pass; no native run for that selection has yet completed.
-
-The frozen candidate's selected integration races now pass: bootstrap5.222s,
-contracts1.042s, provider configuration1.307s and KMS1.994s. The initial selection
-found an omitted `keyServiceSecret` argument in the test's expected runner
-constructor; correcting that producer/consumer fixture restores full Pod parity,
-without changing product behavior. `spec-check`, `helm-check`, Go architecture
-and design architecture all returned0; the design report was archived outside
-the repository and its tracked bytes restored. Go integration compile returned0
-with no tests selected, and is not native evidence. No generated result log is
-staged or committed. A fresh combined bundled OpenBao/S3 initial installation is
-the next qualification; full-profile PostgreSQL/identity/public workflows remain
-pending afterward.
-
-The first combined bundled-key/S3 native attempt at `42ad15e5` failed during
-producer readiness, before schema/activation: Go1/72.076s, harness1/178.879s.
-All4,967 sources remained unchanged. Cleanup completed with no failures; root
-independently checked source hashes, owned container/network prefix absence,
-private-work removal and result-route restoration. Receipts are in
-`native-initial-bao-s3-20261112T033134Z/`; this remains a failed run.
-
-The actual main runner lacked GET on the selected Bao PVC and PATCH on its
-state Secret. Its existing S3 Role covers only S3. A conditional namespaced
-Role/Binding now grants only those two exact named operations, with no new
-global privilege or runtime identity. A test using actual Helm rules and the
-actual Ready helper reproduced the denial before the fix and passes afterward
-under race (1.387s); removing either rule fails and external selection adds none.
-The CLI now reports only allowlisted key-provider stage labels, never raw errors
-or credential values. Its regression failed before the change and passes1.075s.
-The next fresh native run must qualify this corrected role/producer boundary.
-
-The corrected-role run at `9d214e1f` passed readiness and failed at the newly
-visible mint-response boundary: Go1/79.222s, harness1/172.391s. All4,971 sources
-matched; cleanup completed without failures and the result route was restored.
-No schema/activation ran. `native-initial-bao-s3-20261112T034354Z/` remains failed.
-
-A smaller real-provider reproduction used the exact initialized installation
-role and unchanged SDK request, including metadata. It returned a real token
-plus one notice, without API error or deadline failure. The pinned provider
-always reports the lesser cap when both role and request set explicit maxima.
-The guard now accepts only that exact computed notice; altered/multiple/other
-warnings refuse, and all actual token/policy/entity/nonrenewal/expiry readbacks
-remain mandatory. The historical guard fails its new regression; focused race
-checks pass bootstrap1.330s/provider1.031s. The unchanged exact request then
-passed the real same-API component, exit0/78.202s: one expected notice, zero
-unknown notices, actual issuer/child checks and revocation/replay, and issuer
-expiry16.759s before its original parent. Root independently checked all86
-source hashes and owned-node/image absence; cleanup was empty. Receipts are in
-`openbao-mint-notice-20261112T040309Z/`. This is provider qualification, not an
-installed workflow result.
-
-The required authority-window gate also caught the new mint claim constructing
-another five-second end. A one-second caller regression reproduced the extension.
-The claim now persists its original bounded deadline, normalized downward to SQL
-precision, with a positive interval of at most five seconds. Focused races pass
-Kubernetes7.947s/bootstrap1.226s; the unchanged baseline gate passes362 sites in262
-files. This creates no replacement authority window or renewed original bound.
-Final affected spec/Helm/Go-architecture/authority checks pass; the fresh installed
-join must now qualify these corrections together.
-
-The third initial run at `dcb99083` passed producer and schema setup, then
-preparation refused a saved-state mismatch: Go1/170.410s, harness1/271.666s.
-All4,973 sources matched and cleanup completed without failures; the original
-result route was restored. The receipt remains failed in
-`native-initial-bao-s3-20261112T041152Z/`.
-
-The producer wrongly coupled storage use to the short key-provider parent;
-the actual provider consumer requires coverage of the fifteen-minute SQL binding.
-The fully bundled generator now declares storage use through original setup
-issue+30min, independently of the unchanged original five-minute KMS session.
-A regression using actual generation, closed decoding and actual SQL-material
-binding failed before the fix and passes1.140s afterward; retained retries and
-external declarations preserve their original bytes/deadlines. This resource
-use end is not an authority observation or a backend credential-revocation claim.
-CLI output now preserves the existing owned loader/run stage diagnostics; its
-new regression failed before the change and affected tests pass1.134s.
-
-The next initial fixture independently selects bundled PostgreSQL too. It uses
-the previously qualified cached18.6/pgBackRest image, actual imported OCI/CRI
-identity, two owned data/backup PVs and generated actual SQL credentials/CA.
-Ten selector tests and integration compile pass. Actual Helm/SQL/backup/replay
-qualification for this selection remains pending; an external fixture database
-is not substituted into the product.
-
-The first all-three-bundled run at `8a917fc3` stopped before any Helm installation:
-Go1/1.483s, harness1/101.859s. The object-store fixture replaced the entire services
-map, dropping the earlier PostgreSQL selection; the chart correctly rejected the
-resulting external-database selection without its producer Secret. A regression
-using the exact fixture order failed before the merge-only fix and then passed
-with actual schema-enabled Helm rendering, all three StatefulSets and the exact
-generated source references (0/0.116s). Product schema validation is unchanged.
-All4,976 inventoried sources independently match committed `8a917fc3` and stayed
-unchanged during the failed run. The retained environment was subsequently removed
-with verified empty owned resources and no cleanup failures; the repository result
-directory was restored. Original failure and separate cleanup receipts are in
-`native-initial-pg-bao-s3-20261112T044718Z/` externally. Image/CRI preflight passed;
-this run did not exercise product SQL, backup or activation.
-
-The corrected all-three run at `a0a32391` returned Go1/254.125s and
-harness1/340.318s, after Helm revision1 reached deployed and all four original
-bootstrap commands exited0. Its first new inspection NodePort was queried before
-kube-proxy programmed it. Five owned diagnostic NodePorts reproduced immediate
-ECONNREFUSED, then the same TLS/SQL read succeeded after0.307–1.804s; all five were
-removed. The fixture now waits only for ECONNREFUSED within its original parent
-and at most10s; SQL/TLS failures and all version/identity/budget assertions remain.
-Focused race/composition checks pass0/1.307s. Subsequent read-only checks confirm
-schema154, separate non-superuser DDL identity, original postmaster and encrypted
-full backup. These do not relabel the original failed command as passed. All4,977
-sources match the committed candidate and stayed unchanged; separate cleanup
-verified no owned resources and removed the retained work directory. Receipts:
-`native-initial-pg-bao-s3-20261112T045943Z/` and `pg-retained-diagnostic/` externally.
-
-The same-API regional join now has local implementation: selected Helm inputs
-carry the original hub name and actual issued bootstrap ID; the finite installer
-retains keys before IAM, appends exact existing-purpose grants and uses ordinary
-connector installation/catalog join. No new service, watch, SQL pool, journal or
-runtime role is added. Exact-read/append and provider-source race tests pass
-across KMS1.177s, provider configuration1.093s, objectstore1.309s and
-Kubernetes1.488s. Separate original-carrier/uncertain-create races pass1.377s;
-source/offer/CLI races pass1.362s and combined affected bootstrap races3.850s.
-Four regional chart tests pass2.468s, with exact external
-plain/executor rendering preserved. Combined compilation passes with no runtime
-tests selected. The new path and imported-Keycloak attachment still require the
-fresh public installed journey; this remains the active next outcome.
-
-The first all-four installed reproduction now selects the actual chart/imported
-Keycloak and automatic fifth continuation command. Imported identity attachment
-creates only explicit synthetic humans/memberships; clients, realms and stable
-groups are not replaced. Local actual-render/DTO/TLS routing races pass1.936s and
-all41 harness selectors pass1.021s. The shared-IP/different-port login regression
-failed before exact-authority routing and passes afterward. The console browser
-gate returned0/150.301s; generated outputs are archived externally and tracked
-historical results restored. This reproduction requires five positive commands
-and actual public session login, then stops explicitly before capture/download.
-The test/Helm envelope is20min, Go22min; product authority and effect bounds are
-unchanged. Full investigation/lifecycle qualification and final broad gates remain
-pending; the implementation goal continues through them.
-
-The first public run at `67ff9e2f` was deliberately stopped after its concrete
-registry blocker: Go1/669.307s, harness1/782.718s. The original four commands
-exited0; continuation launched a worker whose container never started because
-it lacked ongoing private-registry pull access. Both nodes already had the exact
-CRI-resolvable image. Effective Kubernetes1.37 credential verification still
-required access for that Secret-pulled image, as described in the
-[Kubernetes image documentation](https://kubernetes.io/docs/concepts/containers/images/#ensure-image-pull-credential-verification).
-No application-authentication diagnosis or successful login follows from this
-failure. All4,990 hashes independently match the committed candidate and stayed
-unchanged; the result route was restored. A bounded registry-only debug check then
-ran two new restricted tokenless Pods with the same exact image, both exit0,
-without changing kubelet policy, deleting pull records or renewing product bounds.
-The original hook had already been removed, so this did not exercise the strict
-live handoff callback or qualify the installation. Root checked both diagnostic
-Pod absences and source hash, then removed the original owned environment with
-verified empty cleanup. The next fresh result remains pending. Receipts:
-`native-small-public-20261112T054953Z/` and `pg-retained-diagnostic/` externally.
-
-The selected fixture now records both original authenticated cold pulls before
-installing registry-only node transport credentials through private stdin. It
-keeps the same image/CA/Pods and default kubelet verification; ordinary bootstrap
-fixtures still install no node credentials. Pure protocol tests and focused
-four-command-boundary races pass. The next run also includes the prepared actual
-regional Helm, MCP context/native-download, React and managed-deletion journey,
-using original runtime inventory/audit readers rather than fixture administrators.
-Login and journey must each pass explicitly; the old synthetic backend-denial
-injection remains separately covered by its original fixture, not this profile.
-
-Public-profile prerequisites are also integrated locally: explicit
-`services.identity.keycloak.processingOperators=true` creates an empty dedicated
-group, derives its stable UUID from the original public users UUID and fills only
-an omitted operator list. Default-false bytes and explicit lists are preserved;
-ordinary users gain no privacy authority. Actual eligibility/operator and six
-Helm cases pass. Connector CA normalization reads the exact existing connector
-issuer only when federation is selected, compares explicit roots and mutates no
-input on failure. Focused race checks pass3.910s/bootstrap and1.029s/contracts;
-spec/Helm/Go-architecture/authority checks pass. These are component checks;
-actual bundled Keycloak group behavior and the full public/region journey remain
-unqualified.
-
-The optional Keycloak group now has actual provider qualification at `48682842`:
-`python scripts/test-small-keycloak.py --processing-operators` with the existing
-owned PostgreSQL image returned0/55.925s. The imported group starts empty; explicit
-fixture assignment reaches signed console/MCP claims, ordinary-group removal
-removes eligibility, group renaming preserves stable IDs and restart retains
-the deliberately assigned memberships. Root independently verified all113 source
-hashes and empty owned container/volume/network cleanup. The receipt is in
-`keycloak-processing-native-20261112T0458Z/` externally. Its policy inputs and
-synthetic user administration remain component facts, not installed authority.
-
-Selected bundled-provider continuation rendering now permits omitted generated
-auth mounts/accessors and owner/connector CA roots. The original runtime resolver
-derives and verifies them before consuming the closed input. Explicit conflicting
-values still refuse; external-provider required fields are unchanged. An actual
-schema-enabled Helm→closed DTO→TLS-backed resolver regression failed before the
-fix and passes under race0/1.639s. This removes manual generated-value inputs; it
-does not qualify the continuation or grant regional enrollment authority.
-
-Actual OpenSSL strict verification exposed missing leaf Authority Key Identifiers
-in generated PostgreSQL and SeaweedFS TLS certificates. Parsing the generated CA
-DER before leaf signing fixes both generators; the new actual OpenSSL regression
-failed for both before the fix and focused service tests pass0/3.460s afterward.
-Earlier native Go-TLS evidence remains historical at its exact source. The next
-installed qualification must use these corrected current generators.
-
-The first PostgreSQL image failed because `/etc/asservat` was nontraversable
-(mode0444). Creating that directory as0755 fixed the actual nonroot startup.
-The fresh component then passed with PostgreSQL18.6/pgBackRest2.60.0, exact TLS
-hostname checks, separate DDL/Keycloak logins, encrypted full backup and data/TLS
-persistence across restart; exit0, unchanged source and independent empty cleanup
-receipts are in `postgres-image-smoke/asv-small-pg-96152fac56/result.json` below.
-Restore was not tested. A retained-workload/missing-data-PVC regression failed
-before its fix and passes afterward; complete loss of both PVCs and all workloads
-still cannot be distinguished from an unfinished initial preparation by surviving
-credential state alone.
-
-The combined focused race selection passes across bootstrap2.691s,
-Kubernetes2.883s, PostgreSQL1.093s, provider configuration1.059s and
-object storage1.262s. It exercises actual Helm public inputs and named RBAC,
-KC→PG→S3 state→IAM preparation, byte-preserving/no-create replay, changed database
-target refusal and full native runner parity. `spec-check`, `helm-check`,
-`go-architecture-check` and `architecture-check` returned0; these are static and
-component checks, not installed qualification. The generated architecture report
-was archived outside the repository and restored in the worktree.
-
-The final Keycloak component returned0 in48.135s at
-`keycloak-component/asv-small-kc-1b02d0f955/result.json`, including real SQL empty/
-retained-state checks, exact literal `${...}`/`$$` external password through
-`KCRAW_DB_PASSWORD`, OAuth and persistence. All26 recorded relevant hashes,
-including the shared database-coordinate contract, match current files; root
-independently rehashed them and confirmed no owned Docker resources remain.
-Earlier failures retain their exact scopes: fixture readiness, rejected missing
-built-in email definition (fixed while keeping email optional), then fixture
-session reuse after deliberately replayed code. Component tokens and fixture
-administration are not evidence of installed Asservat approval authority.
-
-The final Seaweed component returned Go0/37.033s and harness0/41.468s at
-`seaweed-component-pinned-reader-453/receipt.json`. All4,648 before/after source
-hashes independently matched at terminal readback, and exact owned containers/
-network are absent. One trailing blank line in the PVC template was subsequently
-removed for `git diff --check`; its unchanged non-whitespace bytes are recorded
-separately. No Seaweed Go implementation, image or configuration changed. It verifies12KiB of bounded synthetic successful writes: TLS/plain HTTP
-refusal, internal loopback listeners, owned tags/versioning/policy, immutable
-versioned bytes, actual delayed projection plus fixed SIGHUP, new ordinary
-credential use, exact403 role/prefix/administration refusals, delete-only effects
-and restart reads through production `Store.Pin.ReadRange`. There is no SQL
-funding, multipart, public grant or installed workflow claim. The two failures
-remain preserved: strict policy readback exposed upstream singleton-array
-canonicalization (compiler fixed without weakening equality), then the fixture's
-short raw-SDK read was replaced with the actual production pinned consumer.
-
-All generated test reports remain outside the repository under
-`/home/phil/.cache/asservat-build/small-installation/`. No report is committed.
-The component candidate was frozen during each named service run. Provider setup
-and key-service integration remain the next implementation work; the full goal
-is active. No PR or merge is claimed for this local checkpoint.
+Next: integrate independent mixed provider continuation, ship checked operator
+instructions, and finish a fresh
+installed public workflow before qualified merge. Backup retention/physical
+restore and accepted local-identity/static-key alternatives remain unfinished.
 
 ## Installed-qualified finite share metadata retirement (2026-11-11)
 
