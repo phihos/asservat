@@ -327,8 +327,7 @@ A fresh installed restart attempt at `569ce960` recovered the bundled PostgreSQL
 Pod, original database incarnation lineage and application observers in about 35 s,
 then failed the first new Keycloak login with HTTP 400 and a closed pooled JDBC
 connection. Passing readiness did not establish that every cached connection
-survived. This is an observed availability defect; the corrected restart journey
-still requires fresh qualification.
+survived. This observed availability defect is corrected and qualified below.
 
 The selected Keycloak 26.8.2 pins Quarkus 3.40.1.1. Its database options expose no
 first-class validation setting. Set the fixed raw Quarkus environment properties
@@ -345,8 +344,9 @@ budget remain unchanged; no application HTTP request is retried.
 
 [Keycloak documents raw Quarkus properties as unsupported by Keycloak](https://github.com/keycloak/keycloak/blob/26.8.2/docs/guides/server/configuration.adoc#format-for-raw-quarkus-properties).
 Asservat must qualify this configuration against the exact pinned image; it is
-not a first-class Keycloak support promise. Until the populated-pool restart component
-and full installed journey pass, its recovery benefit remains unqualified. It
+not a first-class Keycloak support promise. The populated-pool component passed at `f8b7de46` with the same provider inputs;
+the fresh installed restart journey passed at `15501a6a`. See the implementation
+ledger for terminal exits and independent source/cleanup verification. This
 does not promise transparent recovery from a database loss during an already
 running transaction or every interruption shorter than the idle threshold.
 

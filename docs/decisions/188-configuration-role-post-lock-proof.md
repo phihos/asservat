@@ -97,3 +97,9 @@ protected proof or waiting longer for controllers. Rollback is a normal binary
 rollback and restores the former availability failure; stored contracts and SQL
 schema are unchanged. Focused positive status-only and negative identity/spec/
 metadata/generation cases must pass before fresh installed qualification.
+
+The corrected source passed the fresh all-four installed workflow at `15501a6a`
+(Go0/616.790s, harness0/746.610s), including launch receipt completion, real public
+login, PostgreSQL restart and both original/new artifact expiry/deletion. All
+5,009 inventoried source hashes matched and owned cleanup was independently
+verified. See the implementation ledger for focused regressions and prior failures.
