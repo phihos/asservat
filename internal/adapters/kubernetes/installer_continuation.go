@@ -63,7 +63,7 @@ func EnsureProviderAuditSecrets(ctx context.Context, config *rest.Config, namesp
 // PublishInstallerRecipe writes the public recipe outbox (ADR-183). It holds
 // no credential; an existing outbox is replaced only for a later phase.
 func PublishInstallerRecipe(ctx context.Context, config *rest.Config, namespace, installation string, outbox contracts.InstallerRecipeOutbox) error {
-	if ctx == nil || config == nil || !authorization.UUID(installation) || namespace == "" || outbox.Format != contracts.InstallerRecipeOutboxFormat || outbox.Phase < 1 || outbox.Phase > 4 || len(outbox.Recipe) == 0 {
+	if ctx == nil || config == nil || !authorization.UUID(installation) || namespace == "" || outbox.Format != contracts.InstallerRecipeOutboxFormat || outbox.Phase < 1 || outbox.Phase > 4 || !contracts.InstallerProviderModeValid(outbox.ProviderMode) || len(outbox.Recipe) == 0 {
 		return cfg.ErrInvalid
 	}
 	api, err := installerAPI(config)
@@ -282,7 +282,7 @@ func ReadInstallerOutbox(ctx context.Context, config *rest.Config, namespace, in
 	call, end := context.WithTimeout(ctx, 5*time.Second)
 	defer end()
 	c, err := api.CoreV1().ConfigMaps(namespace).Get(call, contracts.InstallerRecipeOutboxName(installation), meta.GetOptions{})
-	if err != nil || json.Unmarshal([]byte(c.Data["outbox.json"]), &out) != nil || out.Format != contracts.InstallerRecipeOutboxFormat || out.Phase < 1 || out.Phase > 4 {
+	if err != nil || json.Unmarshal([]byte(c.Data["outbox.json"]), &out) != nil || out.Format != contracts.InstallerRecipeOutboxFormat || out.Phase < 1 || out.Phase > 4 || !contracts.InstallerProviderModeValid(out.ProviderMode) {
 		return out, cfg.ErrUnavailable
 	}
 	return out, nil

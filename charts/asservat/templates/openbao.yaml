@@ -1,0 +1,139 @@
+{{- if eq .Values.services.keyService.provider "openbao" }}
+{{- $b := .Values.bootstrap }}
+{{- $p := .Values.services.keyService.openbao }}
+{{- if not (regexMatch "^[a-z0-9][a-z0-9./:_-]{0,383}@sha256:[a-f0-9]{64}$" $p.image) }}
+{{- fail "services.keyService.openbao.image requires the qualified repository@sha256 image" }}
+{{- end }}
+{{- $name := printf "%s-openbao" $b.name }}
+{{- $reviewer := printf "%s-%s-reviewer" .Release.Namespace $name }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+automountServiceAccountToken: false
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ $reviewer }}
+rules:
+  - apiGroups: [authentication.k8s.io]
+    resources: [tokenreviews]
+    verbs: [create]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ $reviewer }}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: {{ $reviewer }}}
+subjects:
+  - kind: ServiceAccount
+    name: {{ $name }}
+    namespace: {{ .Release.Namespace }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ printf "%s-data" $name }}
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  accessModes: [ReadWriteOnce]
+  {{- if $p.persistence.storageClass }}
+  storageClassName: {{ $p.persistence.storageClass | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ $p.persistence.size | quote }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  selector: {asservat.io/key-provider: {{ $name }}}
+  ports:
+    - {name: https, port: 8200, targetPort: https}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  serviceName: {{ $name }}
+  replicas: 1
+  revisionHistoryLimit: 1
+  selector:
+    matchLabels: {asservat.io/key-provider: {{ $name }}}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: asservat-openbao
+        asservat.io/key-provider: {{ $name }}
+    spec:
+      serviceAccountName: {{ $name }}
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      terminationGracePeriodSeconds: 30
+      {{- if $b.registrySecret }}
+      imagePullSecrets: [{name: {{ $b.registrySecret | quote }}}]
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: openbao
+          image: {{ $p.image | quote }}
+          imagePullPolicy: IfNotPresent
+          # Override the upstream image's development entrypoint/default.
+          command: [/usr/bin/bao, server, -config=/run/asservat/openbao/config.hcl]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          ports: [{name: https, containerPort: 8200}]
+          resources: {{ toYaml $p.resources | nindent 12 }}
+          # Infrastructure health grants no application readiness/authority.
+          # The installer separately verifies the exact final backend marker.
+          readinessProbe:
+            httpGet: {path: /v1/sys/health, port: https, scheme: HTTPS}
+            periodSeconds: 5
+            timeoutSeconds: 2
+          startupProbe:
+            httpGet: {path: /v1/sys/health, port: https, scheme: HTTPS}
+            periodSeconds: 2
+            failureThreshold: 60
+            timeoutSeconds: 2
+          volumeMounts:
+            - {name: data, mountPath: /data}
+            - {name: private, mountPath: /run/asservat/openbao, readOnly: true}
+            - {name: reviewer, mountPath: /var/run/secrets/kubernetes.io/serviceaccount, readOnly: true}
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        - name: data
+          persistentVolumeClaim: {claimName: {{ printf "%s-data" $name }}}
+        - name: private
+          secret:
+            secretName: {{ printf "%s-state" $name }}
+            defaultMode: 0444
+            items:
+              - {key: config.hcl, path: config.hcl}
+              - {key: seal.key, path: seal.key}
+              - {key: tls.crt, path: tls.crt}
+              - {key: tls.key, path: tls.key}
+        - name: reviewer
+          projected:
+            defaultMode: 0444
+            sources:
+              - serviceAccountToken: {path: token, expirationSeconds: 600}
+        - name: tmp
+          emptyDir: {medium: Memory, sizeLimit: 64Mi}
+{{- end }}

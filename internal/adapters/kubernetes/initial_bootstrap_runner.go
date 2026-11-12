@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"strings"
 
+	"asservat.local/asservat/internal/contracts"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/identity"
 	core "k8s.io/api/core/v1"
@@ -24,6 +25,10 @@ type InitialBootstrapRunnerPlan struct {
 	ProducerSecret, SchemaSecret, RetirementSecret, RegistrySecret string
 	ProbeAudience                                                  string
 	ContinuationDigest                                             string
+	PostgresSecret                                                 string
+	KeycloakSecret                                                 string
+	ObjectStoreSecret                                              string
+	KeyServiceSecret                                               string
 }
 
 func BuildInitialBootstrapRunner(p InitialBootstrapRunnerPlan) (*core.Pod, error) {
@@ -36,6 +41,18 @@ func BuildInitialBootstrapRunner(p InitialBootstrapRunnerPlan) (*core.Pod, error
 		}
 	}
 	if p.RegistrySecret != "" && len(validation.IsDNS1123Subdomain(p.RegistrySecret)) != 0 {
+		return nil, cfg.ErrInvalid
+	}
+	if p.PostgresSecret != "" && p.PostgresSecret != p.Name+"-postgres-state" {
+		return nil, cfg.ErrInvalid
+	}
+	if p.KeycloakSecret != "" && p.KeycloakSecret != p.Name+"-keycloak-state" {
+		return nil, cfg.ErrInvalid
+	}
+	if p.ObjectStoreSecret != "" && p.ObjectStoreSecret != p.Name+"-objectstore-state" {
+		return nil, cfg.ErrInvalid
+	}
+	if p.KeyServiceSecret != "" && p.KeyServiceSecret != p.Name+"-openbao-state" {
 		return nil, cfg.ErrInvalid
 	}
 	if p.ContinuationDigest != "" && !preparationDigestValid(p.ContinuationDigest) {
@@ -51,23 +68,61 @@ func BuildInitialBootstrapRunner(p InitialBootstrapRunnerPlan) (*core.Pod, error
 	public := core.VolumeProjection{ConfigMap: &core.ConfigMapProjection{LocalObjectReference: core.LocalObjectReference{Name: initialBootstrapRunnerInputName(p.Name, p.InputDigest)}, Items: []core.KeyToPath{{Key: "bootstrap.json", Path: "bootstrap.json"}}, Optional: ptr.To(false)}}
 	token := core.VolumeProjection{ServiceAccountToken: &core.ServiceAccountTokenProjection{Path: "administrator-token", Audience: p.ProbeAudience, ExpirationSeconds: ptr.To(int64(600))}}
 	ca := core.VolumeProjection{ConfigMap: &core.ConfigMapProjection{LocalObjectReference: core.LocalObjectReference{Name: "kube-root-ca.crt"}, Items: []core.KeyToPath{{Key: "ca.crt", Path: "kube-ca.crt"}}, Optional: ptr.To(true)}}
+	keycloak := core.VolumeProjection{Secret: &core.SecretProjection{LocalObjectReference: core.LocalObjectReference{Name: p.KeycloakSecret}, Items: []core.KeyToPath{{Key: contracts.SmallKeycloakSettingsFile, Path: "keycloak-settings.json"}, {Key: contracts.SmallKeycloakUsersGroup, Path: contracts.SmallKeycloakUsersGroup}}, Optional: ptr.To(false)}}
+	objectStore := core.VolumeProjection{Secret: &core.SecretProjection{LocalObjectReference: core.LocalObjectReference{Name: p.ObjectStoreSecret}, Items: []core.KeyToPath{{Key: "ca.crt", Path: contracts.InitialBootstrapObjectStoreCAFile}, {Key: contracts.SmallSeaweedPlanKey, Path: contracts.InitialBootstrapObjectStorePlanFile}}, Optional: ptr.To(false)}}
+
+	keyService := core.VolumeProjection{Secret: &core.SecretProjection{LocalObjectReference: core.LocalObjectReference{Name: p.KeyServiceSecret}, Items: []core.KeyToPath{{Key: contracts.SmallOpenBaoPlanKey, Path: contracts.InitialBootstrapKeyServicePlanFile}, {Key: "ca.crt", Path: contracts.InitialBootstrapKeyServiceCAFile}, {Key: contracts.SmallOpenBaoBackendKey, Path: contracts.InitialBootstrapKeyServiceBackendFile}}, Optional: ptr.To(false)}}
+	setupToken := core.VolumeProjection{ServiceAccountToken: &core.ServiceAccountTokenProjection{Path: contracts.InitialBootstrapKeyServiceTokenFile, Audience: contracts.SmallOpenBaoSetupAudience, ExpirationSeconds: ptr.To(int64(600))}}
 	inputs := func(name string, keys []string, registry bool) core.VolumeSource {
 		items := []core.KeyToPath{}
 		for _, key := range keys {
+			if p.PostgresSecret != "" && key == "postgres-administrator.json" {
+				continue
+			}
 			items = append(items, core.KeyToPath{Key: key, Path: key})
 		}
-		sources := []core.VolumeProjection{public, token, ca, {Secret: &core.SecretProjection{LocalObjectReference: core.LocalObjectReference{Name: name}, Items: items, Optional: ptr.To(true)}}}
+		sources := []core.VolumeProjection{public, token, ca}
+		if p.PostgresSecret != "" {
+			sources = append(sources, core.VolumeProjection{Secret: &core.SecretProjection{LocalObjectReference: core.LocalObjectReference{Name: p.PostgresSecret}, Items: []core.KeyToPath{{Key: "ca.crt", Path: contracts.InitialBootstrapPostgresCAFile}}, Optional: ptr.To(false)}})
+		}
+		if p.KeycloakSecret != "" {
+			sources = append(sources, keycloak)
+		}
+		if p.ObjectStoreSecret != "" {
+			sources = append(sources, objectStore)
+		}
+
+		if p.KeyServiceSecret != "" {
+			sources = append(sources, keyService)
+			// Only the producer receives the provider-setup identity; retirement
+			// resolves public desired input but never configures the key provider.
+			if registry {
+				sources = append(sources, setupToken)
+			}
+		}
+		if len(items) > 0 {
+			sources = append(sources, core.VolumeProjection{Secret: &core.SecretProjection{LocalObjectReference: core.LocalObjectReference{Name: name}, Items: items, Optional: ptr.To(true)}})
+		}
+		if p.PostgresSecret != "" {
+			sources = append(sources, core.VolumeProjection{Secret: &core.SecretProjection{LocalObjectReference: core.LocalObjectReference{Name: p.PostgresSecret}, Items: []core.KeyToPath{{Key: "postgres-administrator.json", Path: "postgres-administrator.json"}}, Optional: ptr.To(true)}})
+		}
 		if registry && p.RegistrySecret != "" {
 			sources = append(sources, core.VolumeProjection{Secret: &core.SecretProjection{LocalObjectReference: core.LocalObjectReference{Name: p.RegistrySecret}, Items: []core.KeyToPath{{Key: core.DockerConfigJsonKey, Path: core.DockerConfigJsonKey}}, Optional: ptr.To(true)}})
 		}
 		return core.VolumeSource{Projected: &core.ProjectedVolumeSource{DefaultMode: ptr.To(int32(0440)), Sources: sources}}
 	}
 	memory := resource.MustParse("8Mi")
+	schemaSecret := p.SchemaSecret
+	administratorSecret := p.ProducerSecret
+	if p.PostgresSecret != "" {
+		schemaSecret = p.PostgresSecret
+		administratorSecret = p.PostgresSecret
+	}
 	volumes := []core.Volume{
 		{Name: "scratch", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{Medium: core.StorageMediumMemory, SizeLimit: &memory}}},
 		{Name: "producer-input", VolumeSource: inputs(p.ProducerSecret, []string{"postgres-administrator.json", "provider-material.json"}, true)},
 		{Name: "retirement-input", VolumeSource: inputs(p.RetirementSecret, []string{"postgres-administrator.json"}, false)},
-		{Name: "ddl-input", VolumeSource: core.VolumeSource{Secret: &core.SecretVolumeSource{SecretName: p.SchemaSecret, DefaultMode: ptr.To(int32(0440)), Optional: ptr.To(true), Items: []core.KeyToPath{{Key: "postgres-ddl.json", Path: "postgres-ddl.json"}}}}},
+		{Name: "ddl-input", VolumeSource: core.VolumeSource{Secret: &core.SecretVolumeSource{SecretName: schemaSecret, DefaultMode: ptr.To(int32(0440)), Optional: ptr.To(true), Items: []core.KeyToPath{{Key: "postgres-ddl.json", Path: "postgres-ddl.json"}}}}},
 	}
 	scratch := core.VolumeMount{Name: "scratch", MountPath: "/run/asservat/initial-bootstrap-work"}
 	container := func(name, command string, mounts ...core.VolumeMount) core.Container {
@@ -90,8 +145,20 @@ func BuildInitialBootstrapRunner(p InitialBootstrapRunnerPlan) (*core.Pod, error
 		pod.Spec.Volumes = append(pod.Spec.Volumes, core.Volume{Name: "continuation-input", VolumeSource: core.VolumeSource{Projected: &core.ProjectedVolumeSource{DefaultMode: ptr.To(int32(0440)), Sources: []core.VolumeProjection{
 			{ConfigMap: &core.ConfigMapProjection{LocalObjectReference: core.LocalObjectReference{Name: initialBootstrapContinuationInputName(p.Name, p.ContinuationDigest)}, Items: []core.KeyToPath{{Key: "continuation.json", Path: "continuation.json"}}, Optional: ptr.To(false)}},
 			token,
-			{Secret: &core.SecretProjection{LocalObjectReference: core.LocalObjectReference{Name: p.ProducerSecret}, Items: []core.KeyToPath{{Key: "postgres-administrator.json", Path: "postgres-administrator.json"}}, Optional: ptr.To(false)}},
+			{Secret: &core.SecretProjection{LocalObjectReference: core.LocalObjectReference{Name: administratorSecret}, Items: []core.KeyToPath{{Key: "postgres-administrator.json", Path: "postgres-administrator.json"}}, Optional: ptr.To(false)}},
 		}}}})
+		if p.KeycloakSecret != "" {
+			last := &pod.Spec.Volumes[len(pod.Spec.Volumes)-1]
+			last.Projected.Sources = append(last.Projected.Sources, keycloak)
+		}
+		if p.ObjectStoreSecret != "" {
+			last := &pod.Spec.Volumes[len(pod.Spec.Volumes)-1]
+			last.Projected.Sources = append(last.Projected.Sources, objectStore)
+		}
+		if p.KeyServiceSecret != "" {
+			last := &pod.Spec.Volumes[len(pod.Spec.Volumes)-1]
+			last.Projected.Sources = append(last.Projected.Sources, keyService, setupToken)
+		}
 	}
 	return pod, nil
 }

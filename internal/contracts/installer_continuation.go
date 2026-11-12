@@ -66,7 +66,16 @@ func InstallerInboxPublicFiles() []string {
 }
 
 type InstallerContinuation struct {
-	Format string `json:"format"`
+	Format         string `json:"format"`
+	IdentitySource string `json:"identitySource,omitempty"`
+	// ObjectStoreSource selects the fixed public bundled-store projection.
+	// Resolve it before ordinary provider consumers; it grants no authority.
+	ObjectStoreSource string `json:"objectStoreSource,omitempty"`
+	// KeyServiceSource explicitly selects the fixed public bundled provider.
+	KeyServiceSource string `json:"keyServiceSource,omitempty"`
+	// Optional existing private TLS/OIDC material in the bootstrap namespace.
+	// Credentials remain outside values and the public continuation document.
+	MaterialSecretName string `json:"materialSecretName,omitempty"`
 	// Namespace is the chart's release namespace holding the outbox and inbox;
 	// operators cannot write the guarded installation namespace.
 	Namespace      string                     `json:"namespace"`
@@ -233,11 +242,22 @@ type InstallerProviderSelection struct {
 }
 
 // InstallerRecipeOutbox is the public recipe a continuation phase waits on.
+const (
+	InstallerProviderBundledKeyService  = "bundled-keyservice"
+	InstallerProviderBundledObjectStore = "bundled-objectstore"
+)
+
+func InstallerProviderModeValid(mode string) bool {
+	return mode == "" || mode == InstallerProviderBundledObjectStore
+}
+
 type InstallerRecipeOutbox struct {
-	Format  string          `json:"format"`
-	Phase   int             `json:"phase"`
-	Purpose string          `json:"purpose"`
-	Recipe  json.RawMessage `json:"recipe"`
+	// Present only for mixed provider selections; empty preserves both existing paths.
+	ProviderMode string          `json:"providerMode,omitempty"`
+	Format       string          `json:"format"`
+	Phase        int             `json:"phase"`
+	Purpose      string          `json:"purpose"`
+	Recipe       json.RawMessage `json:"recipe"`
 }
 
 func InstallerRecipeOutboxName(installationID string) string {

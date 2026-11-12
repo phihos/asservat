@@ -1,7 +1,8 @@
 """Owned authenticated TLS registry fixture; never imported by product code.
 
-Only the current test image is uploaded. No host Docker credential/trust changes,
-external publication, node auth file, or credential-bearing diagnostic output.
+Only the current test image is uploaded. Optional runtime access configures only
+owned Kind nodes after the original authenticated cold-pull proof is recorded.
+No host Docker credential/trust changes, publication or credential diagnostics.
 """
 import base64
 import gzip
@@ -9,6 +10,7 @@ import hashlib
 import io
 import json
 import os
+import re
 from pathlib import Path
 import ssl
 import shutil
@@ -22,6 +24,13 @@ import urllib.request
 # Official docker-library/repo-info registry:3 / Distribution 3.1.2, 2026-10-12.
 # Published provenance is distinct from qualification of this fixture.
 REGISTRY = "registry@sha256:ddf754342cfc8acc51a56d5d0ab6af06826461864460636d8bd5c546dab2a7b8"
+
+
+def node_registry_hosts(endpoint):
+    authority = urllib.parse.urlsplit(endpoint).netloc
+    return ('server = "'+endpoint+'"\n[host."'+endpoint+'"]\n'
+            '  capabilities = ["pull", "resolve"]\n'
+            '  ca = "/etc/containerd/certs.d/'+authority+'/ca.crt"\n')
 
 
 def exported_image_identity(content, expected_image, config):
@@ -224,7 +233,7 @@ class HelmRegistry:
         self.run(["docker", "exec", name, "mkdir", "-p", directory])
         self.run(["docker", "cp", str(self.work/"ca.pem"), name+":"+directory+"/ca.crt"])
         hosts = self.work/"hosts.toml"
-        hosts.write_text('server = "'+self.endpoint+'"\n[host."'+self.endpoint+'"]\n  capabilities = ["pull", "resolve"]\n  ca = "'+directory+'/ca.crt"\n')
+        hosts.write_text(node_registry_hosts(self.endpoint))
         self.run(["docker", "cp", str(hosts), name+":"+directory+"/hosts.toml"])
         # No auth is installed into containerd/node state; only the public CA.
         self.assert_absent(name)
@@ -258,7 +267,102 @@ class HelmRegistry:
                 counts[remote] += 1
         if not all(counts.values()):
             raise RuntimeError("authenticated exact-image GET evidence missing for an owned node")
-        return {"image": REGISTRY, "productImage": self.image, "anonymousExactImageDenied": True, "authenticatedManifestGetsByOwnedNode": counts, "nodeCredentialsInstalled": False}
+        out = {"image": REGISTRY, "productImage": self.image, "anonymousExactImageDenied": True, "authenticatedManifestGetsByOwnedNode": counts, "nodeCredentialsInstalled": False}
+        path = self.work.parent / "runtime-node-access.json" if hasattr(self, "work") else None
+        if path is not None and path.exists():
+            runtime = json.loads(path.read_text())
+            if runtime["productImage"] != self.image or not runtime["runtimeNodeCredentialsInstalled"] or set(runtime["initialColdPulls"]["authenticatedManifestGetsByOwnedNode"]) != set(expected_nodes):
+                raise RuntimeError("runtime registry handoff incomplete or changed")
+            out["initialColdPulls"] = runtime["initialColdPulls"]
+            out["nodeCredentialsInstalled"] = True
+            out["runtimeNodeAccess"] = runtime
+        return out
+
+
+def runtime_registry_command(args, *, data=None):
+    result = subprocess.run(args, input=data, text=True, capture_output=True, timeout=15)
+    if result.returncode != 0:
+        raise RuntimeError("owned runtime registry command unavailable")
+    return result.stdout
+
+
+def enable_runtime_node_access(fixture_path, proof):
+    """Finite fixture-only handoff; no image or kubelet policy is changed."""
+    fixture_path = Path(fixture_path).resolve()
+    work = fixture_path.parent
+    if fixture_path.name != "fixtures.json" or not re.fullmatch(r"context-[a-z0-9_-]+", work.name):
+        raise RuntimeError("original private fixture unavailable")
+    fixture = json.loads(fixture_path.read_text())
+    selected = fixture["helmBootstrap"]
+    run_id = work.name.replace("_", "-")
+    network = "asservat-" + run_id
+    nodes = [network+"-0-control-plane", network+"-0-worker"]
+    if [selected["nodeA"], selected["nodeB"]] != nodes:
+        raise RuntimeError("original Kind node names changed")
+    match = re.fullmatch(r"([0-9.]+:5000)/asservat@(sha256:[a-f0-9]{64})", fixture["workerImage"])
+    if not match:
+        raise RuntimeError("original registry image unavailable")
+    authority, digest = match.groups()
+    hook = proof["originalHook"]
+    uuid = r"[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}"
+    if hook["image"] != fixture["workerImage"] or not re.fullmatch(uuid, hook["uid"]) or not hook["namespace"] or not hook["name"] or set(proof["nodeUIDs"]) != set(nodes) or any(not re.fullmatch(uuid, value) for value in proof["nodeUIDs"].values()):
+        raise RuntimeError("original hook or node proof unavailable")
+    commands = hook["commands"]
+    if [c["name"] for c in commands] != ["produce", "schema", "prepare", "retire"] or any(c["exitCode"] != 0 or c["restartCount"] != 0 or not c["imageID"].endswith(digest) for c in commands):
+        raise RuntimeError("original four positive command exits unavailable")
+    auths = selected["registryConfig"]["auths"]
+    if set(auths) != {authority} or set(auths[authority]) != {"auth"}:
+        raise RuntimeError("original registry authentication changed")
+    r = object.__new__(HelmRegistry)
+    r.work, r.name, r.authority = work / "registry", network+"-registry", authority
+    r.endpoint, r.auth, r.image, r.digest = "https://"+authority, auths[authority]["auth"], fixture["workerImage"], digest
+    if base64.b64decode(r.auth, validate=True) != b"synthetic-pull:allmine":
+        raise RuntimeError("unsupported fixture registry credential")
+    receipt_path = work / "runtime-node-access.json"
+    if receipt_path.exists():
+        raise RuntimeError("runtime registry handoff already attempted")
+    inspect = lambda name: json.loads(runtime_registry_command(["docker", "inspect", name]))[0]
+    registry = inspect(r.name)
+    if registry["Config"]["Labels"].get("asservat.test") != run_id or not registry["State"]["Running"] or registry["NetworkSettings"]["Networks"][network]["IPAddress"]+":5000" != authority:
+        raise RuntimeError("owned registry identity changed")
+    expected = node_registry_hosts(r.endpoint)
+    directory = "/etc/containerd/certs.d/"+authority
+    public_ca = (r.work / "ca.pem").read_text()
+    addresses = []
+    for node in nodes:
+        info = inspect(node)
+        if info["Config"]["Labels"].get("io.x-k8s.kind.cluster") != network+"-0" or not info["State"]["Running"]:
+            raise RuntimeError("owned Kind node identity changed")
+        addresses.append(info["NetworkSettings"]["Networks"][network]["IPAddress"])
+        if runtime_registry_command(["docker", "exec", node, "cat", directory+"/hosts.toml"]) != expected or runtime_registry_command(["docker", "exec", node, "cat", directory+"/ca.crt"]) != public_ca:
+            raise RuntimeError("initial node registry transport was not CA-only")
+    r.client = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect(), urllib.request.HTTPSHandler(context=ssl.create_default_context(cafile=str(r.work/"ca.pem"))))
+    try:
+        with r.request("GET", "/v2/asservat/manifests/"+digest, authenticated=False):
+            pass
+    except urllib.error.HTTPError as exc:
+        if exc.code != 401:
+            raise RuntimeError("original anonymous image denial unavailable") from None
+        exc.close()
+    else:
+        raise RuntimeError("original image allowed anonymous pull")
+    cold = r.report(addresses)
+    receipt = {"productImage": r.image, "originalHook": hook, "nodeUIDs": proof["nodeUIDs"], "initialColdPulls": cold, "coldProofRecordedAt": time.time(), "runtimeNodeCredentialsInstalled": False, "nodes": nodes}
+    # Persist sanitized proof before the first node write. Later runtime pulls
+    # cannot count toward either node's original authenticated cold-pull proof.
+    with receipt_path.open("x") as output:
+        output.write(json.dumps(receipt, indent=2)+"\n")
+    receipt_path.chmod(0o600)
+    hosts = expected+'  [host."'+r.endpoint+'".header]\n    authorization = ["Basic '+r.auth+'"]\n'
+    script = 'umask 077; cat > "$1.next" && chmod 0600 "$1.next" && mv "$1.next" "$1"'
+    for node in nodes:
+        runtime_registry_command(["docker", "exec", "-i", node, "/bin/sh", "-ec", script, "registry-hosts", directory+"/hosts.toml"], data=hosts)
+        if runtime_registry_command(["docker", "exec", node, "cat", directory+"/hosts.toml"]) != hosts:
+            raise RuntimeError("runtime node registry transport not acknowledged")
+    receipt["runtimeNodeCredentialsInstalled"] = True
+    receipt["runtimeAccessInstalledAt"] = time.time()
+    receipt_path.write_text(json.dumps(receipt, indent=2)+"\n")
+    return receipt
 
 
 def verify_registry_cleanup(run, work, network):
@@ -279,3 +383,20 @@ def verify_registry_cleanup(run, work, network):
         raise RuntimeError("owned registry private files remain")
     return {"containerAbsent": True, "privateNetworkAbsent": True,
             "fixtureTLSAndAuthFilesAbsent": True, "upstreamImageCacheRemoved": False}
+
+
+if __name__ == "__main__":
+    import argparse
+    import sys
+    parser = argparse.ArgumentParser(description="Finite owned registry fixture helper")
+    parser.add_argument("--runtime-node-access", type=Path, required=True, metavar="FIXTURES")
+    arguments = parser.parse_args()
+    try:
+        raw = sys.stdin.buffer.read(16385)
+        if len(raw) > 16384:
+            raise RuntimeError("original terminal proof exceeds bound")
+        enable_runtime_node_access(arguments.runtime_node_access, json.loads(raw))
+    except Exception:
+        # Subprocess/HTTP exceptions must not print private stdin or headers.
+        raise SystemExit("owned runtime registry handoff unavailable") from None
+    print("owned runtime registry access installed after recorded cold-pull proof")

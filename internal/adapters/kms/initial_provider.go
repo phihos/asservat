@@ -28,6 +28,7 @@ type InitialProviderIssuer struct {
 	profile                           contracts.InitialProviderProfile
 	installation, request, mount, key string
 	now                               func() time.Time
+	bundled                           *contracts.BundledInitialProviderIdentity
 }
 
 func NewInitialProviderIssuer(endpoint, token, mount, key, installation, request string, profile contracts.InitialProviderProfile, h *http.Client, now func() time.Time) (*InitialProviderIssuer, error) {
@@ -211,25 +212,13 @@ func InitialBootstrapProviderPolicies(names contracts.InitialBootstrapProviders,
 }
 
 func initialProviderPolicyBodies(issuerPolicy, wrapRole, wrapPolicy, unwrapRole, unwrapPolicy, mount, key string) (map[string]string, error) {
-	paths := map[string]initialACLRule{"auth/token/lookup-self": {[]string{"read"}}, "auth/token/lookup-accessor": {[]string{"update"}}, "auth/token/revoke-accessor": {[]string{"update"}}}
-	for _, role := range []string{wrapRole, unwrapRole} {
-		paths["auth/token/roles/"+role] = initialACLRule{[]string{"read"}}
-		paths["auth/token/create/"+role] = initialACLRule{[]string{"update"}}
+	policies, err := providerconfig.InitialProviderPolicyBodies(issuerPolicy, wrapRole, wrapPolicy, unwrapRole, unwrapPolicy, mount, key)
+	if err != nil {
+		return nil, ErrKeyService
 	}
-	for _, policy := range []string{issuerPolicy, wrapPolicy, unwrapPolicy} {
-		paths["sys/policies/acl/"+policy] = initialACLRule{[]string{"read"}}
-	}
-	specs := map[string]initialACL{issuerPolicy: {paths}, wrapPolicy: {map[string]initialACLRule{"auth/token/lookup-self": {[]string{"read"}}, mount + "/encrypt/" + key: {[]string{"update"}}}}, unwrapPolicy: {map[string]initialACLRule{"auth/token/lookup-self": {[]string{"read"}}, mount + "/decrypt/" + key: {[]string{"update"}}}}}
-	out := map[string]string{}
-	for name, v := range specs {
-		b, e := json.Marshal(v)
-		if e != nil {
-			return nil, ErrKeyService
-		}
-		out[name] = string(b)
-	}
-	return out, nil
+	return policies, nil
 }
+
 func (s *InitialProviderIssuer) policies(ctx context.Context) error {
 	expected, e := InitialProviderPolicies(s.profile, s.mount, s.key)
 	if e != nil {
@@ -267,7 +256,7 @@ func (s *InitialProviderIssuer) policies(ctx context.Context) error {
 func (s *InitialProviderIssuer) lookup(ctx context.Context, c *bao.Client, policy, role string) (initialTokenLookup, error) {
 	r, _, e := initialProviderCall(ctx, c, http.MethodGet, "auth/token/lookup-self", nil)
 	var d initialTokenLookup
-	if e != nil || !initialProviderFields(r.Data, "accessor", "type", "policies", "num_uses", "orphan", "renewable", "entity_id", "creation_ttl", "explicit_max_ttl", "issue_time", "expire_time") || !initialProviderDecode(r.Data, &d) || !identity.Text(d.Accessor, 128) || d.Type != "service" || d.Orphan || d.Renewable || d.Period != 0 || d.Entity != "" || len(d.IdentityPolicies) != 0 || len(d.Bound) != 0 || d.Uses != 0 || !reflect.DeepEqual(d.Policies, []string{policy}) || d.MaxTTL < 0 || d.MaxTTL > 900 || d.MaxTTL == 0 && (role == "" || d.Role != role || d.Path != "auth/token/create/"+role) || d.CreationTTL < 1 || d.CreationTTL > 900 || d.Issued.IsZero() || d.Expire.IsZero() || !d.Issued.Before(d.Expire) || d.Expire.Sub(d.Issued) > 901*time.Second || d.LastRenewal != 0 || !d.LastRenewalDate.IsZero() || s.now().Before(d.Issued) || !s.now().Before(d.Expire) || ctx.Err() != nil {
+	if e != nil || !initialProviderFields(r.Data, "accessor", "type", "policies", "num_uses", "orphan", "renewable", "entity_id", "creation_ttl", "explicit_max_ttl", "issue_time", "expire_time") || !initialProviderDecode(r.Data, &d) || !identity.Text(d.Accessor, 128) || d.Type != "service" || d.Orphan || d.Renewable || d.Period != 0 || d.Entity != s.expectedEntity() || !s.withinSetupBound(d.Expire) || len(d.IdentityPolicies) != 0 || len(d.Bound) != 0 || d.Uses != 0 || !reflect.DeepEqual(d.Policies, []string{policy}) || d.MaxTTL < 0 || d.MaxTTL > 900 || d.MaxTTL == 0 && (role == "" || d.Role != role || d.Path != "auth/token/create/"+role) || d.CreationTTL < 1 || d.CreationTTL > 900 || d.Issued.IsZero() || d.Expire.IsZero() || !d.Issued.Before(d.Expire) || d.Expire.Sub(d.Issued) > 901*time.Second || d.LastRenewal != 0 || !d.LastRenewalDate.IsZero() || s.now().Before(d.Issued) || !s.now().Before(d.Expire) || ctx.Err() != nil {
 		return initialTokenLookup{}, ErrKeyService
 	}
 	return d, nil
@@ -371,7 +360,7 @@ func (s *InitialProviderIssuer) Issue(ctx context.Context, purpose string, i con
 	body := map[string]any{"policies": []string{policy}, "meta": s.metadata(purpose, i), "no_parent": false, "no_default_policy": true, "renewable": false, "ttl": strconv.FormatInt(seconds, 10) + "s", "type": "service", "num_uses": 0, "display_name": "asservat-initial-" + purpose}
 	r, _, e := initialProviderCall(ctx, s.client, http.MethodPost, "auth/token/create/"+role, body)
 	a := r.Auth
-	if e != nil || a == nil || !ValidProviderToken([]byte(a.ClientToken)) || len(a.ClientToken) > contracts.InitialProviderTokenMaxBytes || !identity.Text(a.Accessor, 128) || a.Type != "service" || a.Orphan || a.Renewable || a.EntityID != "" || len(a.IdentityPolicies) != 0 || a.MFARequirement != nil || a.Uses != 0 || a.LeaseDuration < 1 || int64(a.LeaseDuration) > seconds || !reflect.DeepEqual(a.Policies, []string{policy}) || !reflect.DeepEqual(a.TokenPolicies, []string{policy}) || !reflect.DeepEqual(a.Metadata, s.metadata(purpose, i)) {
+	if e != nil || a == nil || !ValidProviderToken([]byte(a.ClientToken)) || len(a.ClientToken) > contracts.InitialProviderTokenMaxBytes || !identity.Text(a.Accessor, 128) || a.Type != "service" || a.Orphan || a.Renewable || a.EntityID != s.expectedEntity() || len(a.IdentityPolicies) != 0 || a.MFARequirement != nil || a.Uses != 0 || a.LeaseDuration < 1 || int64(a.LeaseDuration) > seconds || !reflect.DeepEqual(a.Policies, []string{policy}) || !reflect.DeepEqual(a.TokenPolicies, []string{policy}) || !reflect.DeepEqual(a.Metadata, s.metadata(purpose, i)) {
 		return zero, ErrKeyService
 	}
 	c, e := s.client.Clone()

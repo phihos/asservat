@@ -1,6 +1,6 @@
 # Asservat Helm chart
 
-Helm is Asservat's officially supported installation method. The release layout is one hub and one cluster release per workload cluster; `combined` is for single-cluster evaluation. PostgreSQL, S3-compatible storage, KMS and Keycloak are operated separately. No dependency chart, external download hook or operator-managed credentials are bundled.
+Helm is Asservat's officially supported installation method. The release layout is one hub and one cluster release per workload cluster; `combined` is for single-cluster evaluation. PostgreSQL, S3-compatible storage, KMS and Keycloak default to externally operated services. Explicit small-profile selections can install bundled service workloads and prepare retained credentials; see the [bundled-services candidate guide](../../docs/installation/small-profile.md) for source builds, site inputs and pending qualification.
 
 **Current version: configuration foundation with optional installer.** By default this development chart installs eight implemented CRDs, including CaptureProfile and a small release inventory ConfigMap. The optional `bootstrap.enabled` hook performs initial schema and activation; `bootstrap.continuation.enabled` adds runtime continuation as its fifth sequential command. The consolidated single-Pod runner passed the [external-services context trial](../../docs/installation/context-trial.md) with one hub and one separate workload cluster using preloaded images. Same-cluster qualification and registry distribution remain outside that result; [implementation status](../../docs/implementation-status.md) records the measured scope. Rendering the chart alone does not activate permissions, qualify an identity provider or collect evidence. `runtime.enabled: true` is rejected. The inventory ConfigMap records intent and is never an authority/readiness source.
 
@@ -29,16 +29,57 @@ For GitOps, use the same chart and checked-in nonsecret values. Give one adminis
 | --- | --- | --- |
 | `mode` | `hub` | `hub`, `cluster` or `combined` release topology |
 | `runtime.enabled` | `false` | Only `false` is supported by this development package |
-| `bootstrap.enabled` | `false` | Run the fixed initial checkpoint using explicit external services; no runtime enablement |
+| `bootstrap.enabled` | `false` | Run the fixed initial checkpoint; selected bundled-service support is scoped below |
 | `bootstrap.continuation.enabled` | `false` | Add runtime continuation after retirement in the same fixed installer Pod |
 | `bootstrap.name`, `targetNamespace`, `image` | `asservat`, `asservat-system`, empty | Stable original installation choices and verified image digest |
-| `bootstrap.secrets.*` | empty | Existing producer, schema and retirement private input references |
+| `bootstrap.secrets.*` | empty | Provider-material input reference; external PostgreSQL also needs schema/retirement references |
 | `bootstrap.registrySecret` | empty | Optional bootstrap-runner Docker auth Secret; not propagated to runtime workloads |
 | `bootstrap.kubernetes`, `postgres`, `auditStore`, `keyService` | See values.yaml | Public endpoints, PEM roots and external provider choices |
 | `bootstrap.fleet`, `providers`, `probeAudience` | See values.yaml | Explicit initial fleet scope/ceilings, fixed provider names and optional API audience |
 | `bootstrap.continuation.public.permissionDelegations` | `[]` | Trusted initial AccessBinding writer envelopes and browser previewers; [configuration and scope](../../docs/installation/helm.md#delegate-permission-management) |
 
 Unknown values are rejected to catch typos and avoid accepting ineffective security settings. Future runtime configuration will use existing Secret references. Never put passwords, tokens, client secrets, private keys or evidence in Helm values: Helm retains release state.
+
+## Small-service candidate
+
+The small profile is under implementation and is not yet an installation recipe.
+`services.postgres.provider` selects `external` or `bundled`;
+`services.objectStore.provider` selects `external` or `seaweedfs`;
+`services.identity.provider` selects `external` or `keycloak`;
+`services.keyService.provider` selects `external` or `openbao`. Each defaults to
+`external` and can be selected independently. These are hub services; a
+workload-cluster release must reuse the hub rather than install duplicates.
+
+Bundled services require the trusted bootstrap namespace and `bootstrap.enabled`.
+PostgreSQL additionally requires a built, verified PostgreSQL/pgBackRest image
+pin. Keycloak requires its browser/Pod-reachable HTTPS hostname and an operator
+TLS Secret. Its database may be the bundled PostgreSQL server or an explicitly
+selected external database with password/CA Secret references. No password,
+client secret or private key belongs in values.
+
+A finite preparation hook retains generated provider credentials before any
+provider initializes. Keycloak's selected database coordinates are part of its
+retained state; changing them is not an implicit migration. Data/backup PVCs and
+private state survive uninstall. Missing original state over retained data must
+be recovered, not regenerated. If both PostgreSQL PVCs and every provider
+workload are removed, surviving credential state alone cannot distinguish that
+loss from an interrupted first preparation; that broader recovery case remains
+unqualified. There is no precreated-PVC adoption option.
+
+Component/render evidence, key-service packaging, provider setup and the full
+login/capture/download/lifecycle qualification are tracked in the
+[implementation ledger](../../docs/implementation-progress.md) and
+[ADR-326](../../docs/decisions/326-individually-selectable-small-services.md).
+
+The candidate's same-API regional path uses a second `mode: cluster` release in
+the original hub bootstrap namespace. Set `cluster.bundledHub` to the original
+bootstrap name and `cluster.bootstrapID` to the actual ID issued in `/fleet`;
+`cluster.namespace` remains a distinct connector namespace. Leave manual offer,
+bootstrap and evidence Secret references empty. The finite hook reuses the
+original trusted bootstrap account, obtains the issued credential internally,
+retains separate scoped keys and runs the normal connector install/catalog join.
+Provider administration is serialized. This path has local checks; its full
+installed workflow is still pending qualification.
 
 ## Named Go profile endpoint TLS
 

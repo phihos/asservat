@@ -36,14 +36,7 @@ func installedPermissionObserver(t *testing.T, ctx context.Context, admin *pgxpo
 		t.Fatal("installed hub metadata login missing")
 	}
 	defer clear(raw)
-	c := admin.Config().ConnConfig
-	address, tlsConfig := pgTLSBridge(t, net.JoinHostPort(c.Host, strconv.Itoa(int(c.Port))))
-	dsn := url.URL{Scheme: "postgres", User: url.UserPassword(login.Username, login.Password), Host: address, Path: "/" + c.Database, RawQuery: "sslmode=disable"}
-	pc, err := pgxpool.ParseConfig(dsn.String())
-	if err != nil {
-		t.Fatal("installed permission pool configuration")
-	}
-	pc.ConnConfig.TLSConfig, pc.ConnConfig.Fallbacks, pc.MaxConns = tlsConfig, nil, 1
+	pc := installedPermissionObserverPoolConfig(t, admin, login)
 	reader, err := pgxpool.NewWithConfig(ctx, pc)
 	if err != nil {
 		t.Fatal("installed permission pool")
@@ -67,6 +60,29 @@ func installedPermissionObserver(t *testing.T, ctx context.Context, admin *pgxpo
 	}
 	retained = true
 	return permissions, reader.Close
+}
+
+func installedPermissionObserverPoolConfig(t *testing.T, admin *pgxpool.Pool, login contracts.OwnerSQLCredential) *pgxpool.Config {
+	t.Helper()
+	// Bundled PostgreSQL already requires and verifies TLS. Preserve that
+	// original endpoint, trust/name and connection settings; only the installed
+	// compiled login changes. The legacy fixture alone needs a TLS bridge over
+	// its plaintext backend.
+	original := admin.Config()
+	if original.ConnConfig.TLSConfig != nil {
+		original.ConnConfig.User, original.ConnConfig.Password = login.Username, login.Password
+		original.MaxConns, original.MinConns = 1, 0
+		return original
+	}
+	c := original.ConnConfig
+	address, tlsConfig := pgTLSBridge(t, net.JoinHostPort(c.Host, strconv.Itoa(int(c.Port))))
+	dsn := url.URL{Scheme: "postgres", User: url.UserPassword(login.Username, login.Password), Host: address, Path: "/" + c.Database, RawQuery: "sslmode=disable"}
+	pc, err := pgxpool.ParseConfig(dsn.String())
+	if err != nil {
+		t.Fatal("installed permission pool configuration")
+	}
+	pc.ConnConfig.TLSConfig, pc.ConnConfig.Fallbacks, pc.MaxConns = tlsConfig, nil, 1
+	return pc
 }
 
 // Actual PostgreSQL role/TLS checks, with a synthetic projected Secret only.

@@ -1,5 +1,193 @@
 # Sustained implementation progress
 
+## Active small-installation workflow (2026-11-12)
+
+Candidate: `feature/small-installation-profile`, worktree
+`asservat-small-installation`, [PR225](https://github.com/phihos/asservat/pull/225),
+based on authoritative main `62b80beb`. The complete accepted-specification goal
+remains active. Manual commands are parked separately at `c0b58cb0`.
+
+The maintainer has no external PostgreSQL, S3 or OpenBao and requests bundled
+Keycloak despite having an existing Keycloak. Every service must be independently
+configurable. [ADR-326](decisions/326-individually-selectable-small-services.md)
+records the selected existing-provider packaging. This does not cancel ADR-063's
+accepted local-identity/static-key alternatives. No homelab deployment, release or
+image publication is claimed.
+
+| Boundary | Implemented and observed | Remaining qualification or work |
+| --- | --- | --- |
+| Selection | Independent closed Helm provider choices; external defaults; generated state retained outside release values | Both mixed continuation paths now use existing private sources/carriers; real mixed-service qualification remains pending |
+| PostgreSQL | Actual18.6/pgBackRest2.60 TLS/SCRAM, separate DDL and Keycloak logins, encrypted full backup, same-volume restart; budget117/122 and client pool2 | Physical restore and full installed restart/recovery workflow |
+| Keycloak | Actual26.8.2 HTTPS/import/console and MCP PKCE, stable groups, group refresh and restart; opt-in empty processing group | Broader identity/session lifecycle qualification; actual installed login and inspection now pass |
+| SeaweedFS | Actual4.53 TLS, scoped IAM, versioned pinned bytes, delayed reload/new credential consumption and restart; initial audit installation passes | Actual multipart creation, larger evidence and broader lifecycle matrices |
+| OpenBao | Actual2.7.2 TLS/static seal/self-initialization, same-data restart, partial-init refusal and original bounded issuer mint | Broader lifecycle and the accepted static-key alternative |
+| Installation | Fresh all-four Helm → login → regional enrollment → context/native/range/React → expiry/deletion passes with verified cleanup and a checked operator guide | Final eligible-head CI/merge readback, supported artifacts and complete operational lifecycle |
+
+Production composition persists original credentials before IAM effects, reuses
+existing purpose-specific Secrets/inboxes and refuses unknown retained state.
+Selected setup uses original finite Kubernetes-authenticated OpenBao authority;
+no root token or private provider CA enters runtime mounts. Generated public roots
+are resolved and checked against the protected preparer before closed consumers.
+Storage use has its own original30-minute bound, distinct from the five-minute
+initial KMS parent. Consumed mint claims retain their original deadline. Setup
+accepts only the exact upstream role-TTL cap notice and verifies returned bounds.
+
+The same-API regional path selects `cluster.bundledHub` and the actual
+`cluster.bootstrapID` on a second Helm release in the original bootstrap
+namespace. It reads only the issued bootstrap's version1, retains two regional
+keys in the existing immutable evidence Secret before additive IAM/policy setup,
+and uses the normal connector installer/catalog join. Existing grants survive
+append; conflicts refuse. Operator provider administration is serialized.
+
+### Fresh installed context qualification at `f9e972b8`
+
+`python scripts/test-context-storage.py --helm-bootstrap --bundled-objectstore
+--bundled-keyservice --bundled-postgres --bundled-identity
+--installer-continuation --keep-on-failure` returned Go0/389.933s and
+harness0/521.942s. Both exact login/context stages passed. Root independently
+matched all5,004 inventoried source hashes to the committed and working files,
+confirmed source stayed frozen and the result directory was restored, and
+verified no owned container, volume, network, image, Kind cluster or temporary
+fixture directory remains. Cleanup owner is the existing outer harness;
+`cleanupComplete=true` and `cleanupFailures=[]`.
+
+This fresh run covers five-command Helm, retained initial audit/decryption and
+child retirement, real imported-Keycloak cookie/MCP identity, one actual
+browser-issued fleet slot and second regional Helm, connector leaves/executor/
+capacity, exact whole-Pod target and compiled scoped SQL authority, MCP capture/
+replay/conflict, verification/publication,354-byte native download, React
+restriction/release/replays,708 charged range/resume bytes, unrelated-principal
+refusal, Stop/Deny/TargetGone, original expiry, complete object/version/marker/
+multipart absence, immutable audit ciphertext and evidence refund with control
+charges retained. It does not qualify actual multipart creation, large evidence
+matrices, physical restore, every mixed provider or production operation.
+
+Affected `make pre-push` at `f9e972b8` returned0/132.379s with baseline `8d970fde`;
+its integration package passed76s. The previous affected run at `8d970fde` returned
+0/133.141s with baseline `777864de`. These reuse unchanged runtime/package evidence
+from the complete84-job broad gate and eligible PR CI at `777864de`; product
+`cmd`, `internal` and chart sources are unchanged. Generated artifacts remain in
+`native-small-public-20261112T084110Z/` and named pre-push archives outside Git.
+
+### Integrated checks at `777864de`
+
+- `make pre-push`: exit0/479.787s, including all84 Go race jobs,692 console
+  tests and canonical spec/schema/architecture/Helm/SQL gates. Go jobs took404s;
+  6,463 local links and14,030 spec assertions passed. Generated results and the
+  architecture report were archived externally; the worktree was clean afterward.
+- PR CI43177557675: completed success, eligible `pull_request`, exact head
+  `777864deba90c78cd1d777f6013f37c6f7c31351`. Independent review found no material
+  blocker. Gitar automatic reviews are paused for billing-period headroom; no
+  refreshed automated review is claimed.
+- `make console-browser-check`: exit0/150.301s at `67ff9e2f`, with unchanged
+  relevant console sources:30 journeys and31 accessibility scans. Current broad
+  CI also passed its browser gate. Historical generated results were preserved.
+- Fresh all-four run `native-small-public-20261112T074715Z/`: Go1/247.328s,
+  harness1/374.770s. The original five commands and independently decrypted
+  initial audit passed. `bundled-public-login` failed because the fixture's new
+  readiness wrapper expected200 from cookie-less `/api/v1/session`; production
+  correctly returned401. The actual-handler regression failed before its narrow
+  correction and passes afterward. All5,001 source hashes independently match the
+  committed and working sources, source stayed frozen and the result directory
+  was restored. This failed run remains failed.
+
+The retained full-workflow diagnostic passed login, actual public fleet issuance,
+second Helm install, regional certificates/executor/capacity, then exposed a
+fixture observer that forwarded plaintext to TLS-only PostgreSQL. The observer
+now preserves the original verified TLS connection and substitutes only its
+actual compiled login; the real42501 mutation-denial assertion remains. Focused
+listener/observer races pass0/1.211s. No runtime product code changed.
+
+Resuming only downstream from the original issued slot/Job/target/budget passed
+Go0/134.256s: MCP collection, verification/publication, exact354-byte native read,
+React restriction/release/replays, range/If-Range708 charged bytes, outsider and
+Stop/Deny/TargetGone, original expiry, complete object/version/marker/multipart
+absence, immutable audit ciphertext and evidence refund. Root independently
+verified all5,003 before/after/working hashes. This is explicitly diagnostic,
+not fresh qualification; its transport pinned the original protected public leaf
+because the fixture CA had been memory-only. No product rebuild, new bootstrap,
+replacement Job or renewed original bound occurred. Root then removed owned
+`context-j1zwwp2-` with cleanup0, empty leftovers and private-directory absence.
+
+Earlier `996bb205` broad gates/eligible CI passed. Its installed run returned
+Go1/233.917s and harness1/349.457s on typed Kubernetes decoding that stripped
+Secret GVK. The fixture now uses the unchanged production bounded raw reader;
+its red/green regression and final race pass0/1.908s. All4,993 committed and
+working hashes matched. A separate real cookie-login diagnostic passed0/1.260s
+with five unchanged consumers and no product redeployment; it bypassed the new
+readiness wrapper, so did not cover the latest failure. That environment was
+removed with independently checked empty cleanup. The first broad wrapper also
+had a historical-result-link error; its failed command is retained, not relabeled.
+
+### Component and earlier installed evidence
+
+All paths below are under the external archive
+`/home/phil/.cache/asservat-build/small-installation/`. Reports, logs and images
+remain outside Git; prior detailed checkpoints remain in repository history.
+
+| Evidence | Actual result and limits |
+| --- | --- |
+| `native-initial-s3-20261112T001702Z/` at `c26f1cc1` | Go0/242.941s, harness0/331.54s;4,912 hashes match and owned cleanup empty. Actual chart/audit, four-command replay and retained uninstall state; PostgreSQL/OpenBao were external fixtures |
+| `postgres-image-smoke/asv-small-pg-96152fac56/` | Actual image/TLS/separate identities/encrypted full backup/same-data restart pass, unchanged sources and empty cleanup; no restore test |
+| `keycloak-component/asv-small-kc-1b02d0f955/` | Exit0/48.135s,26 hashes match, empty cleanup; actual OAuth/SQL/password/retained identity component |
+| `keycloak-processing-native-20261112T0458Z/` at `48682842` | Exit0/55.925s,113 hashes match, empty cleanup; actual signed claims, operator eligibility and restart, explicit synthetic humans/authority inputs |
+| `seaweed-component-pinned-reader-453/` | Go0/37.033s, harness0/41.468s;4,648 hashes match, empty cleanup.12KiB synthetic versioned/pinned bytes and role/restart checks; no multipart/public authority |
+| `openbao-component/application-prerequisites/` | Actual backend initialization/restart/partial-init refusal passes; component scope |
+| `openbao-mint-notice-20261112T040309Z/` | Exit0/78.202s,86 hashes match, empty cleanup; actual setup/mint original-parent expiry and denial checks |
+
+Earlier failures are retained with their original results: missing exact PVC GET/
+state PATCH (`42ad15e5`); upstream TTL-cap notice (`9d214e1f`); storage use incorrectly
+inheriting KMS expiry (`dcb99083`); fixture service-map replacement (`8a917fc3`);
+and an immediate new NodePort ECONNREFUSED (`a0a32391`). Each has a focused
+reproduction and correction. Their owned fixtures were removed with empty cleanup.
+
+`native-small-public-20261112T054953Z/` at `67ff9e2f` returned Go1/669.307s and
+harness1/782.718s after the operator stopped the owned Helm child on a concrete
+private-registry pull blocker. All4,990 committed hashes match. A bounded check
+with the same image on both owned nodes passed after registry-scoped node transport
+credentials, preserving default kubelet verification and exact image identity.
+That check did not exercise the live handoff or qualify the installation. The
+original environment was removed with empty cleanup. The selected fixture now
+records authenticated cold pulls before supplying runtime registry access through
+private stdin; the current run exercised that handoff.
+
+Independent continuation is now implemented locally. Bundled OpenBao with external
+S3 requires the existing named private material source; bundled SeaweedFS with
+external OpenBao retains original inputs and uses the existing provider CLI with
+no private-file flags. Only the latter emits the closed public selection field.
+Acknowledged worker replay verifies current launched inputs/SQL grants instead
+of awaiting a consumed phase1 carrier. Focused races pass0/2.023s (bootstrap)
+and0/1.616s (Kubernetes), including actual CLI SDK/TLS requests and original
+UID/RV completion. These are component checks, not mixed installed qualification.
+
+The shipped [operator guide](installation/small-profile.md) and
+[site overlay](../examples/helm/small-profile-values.yaml) cover source builds,
+TLS, generated administrator/first-human setup, processing, regional Helm,
+capacity and workload permissions. Actual all-four and external-Keycloak Helm
+schema/renders return0;15 shell blocks and local links pass. No default human,
+external service mutation, published image or installed-workflow claim is added.
+
+Fresh `8d970fde` then passed both exact workflow subtests, including the complete
+managed-deletion proof, but its parent returned Go1/452.835s and harness1/569.059s.
+The bootstrap-only cleanup tried deleting a running guarded namespace; the
+namespace controller correctly refused DeleteCollection for four protected CRDs.
+All5,003 committed/working hashes matched and source stayed frozen. The failed
+helper had already removed initial guards/RBAC and requested namespace deletion;
+that partial mutation is recorded, with no repair or guard bypass.
+
+The full installed profile now explicitly hands disposable-environment teardown
+to the existing owned context harness. Bootstrap-only cleanup remains unchanged;
+the selected-profile fake-client regression proves zero namespace/policy/PVC
+mutation. Focused race tests pass0/1.207s and42 Python selectors pass0/1.434s.
+The outer harness's mandatory leftover/error checks are unchanged. Running its
+existing cleanup on that exact retained environment returned0 with no owned
+resources or private directory remaining. No uninstall qualification is claimed.
+
+Next: record final documentation gates, push the single delivery batch, verify
+eligible exact-head PR CI and merge/read back authoritative main. Continue the
+accepted specification through backup/restore, provider lifecycle and remaining
+workflows. The full goal stays active; no release or homelab deployment is implied.
+
 ## Installed-qualified finite share metadata retirement (2026-11-11)
 
 The manual/capture-time sharing workflow now passes through healthy certificate

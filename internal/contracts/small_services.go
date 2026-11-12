@@ -1,0 +1,43 @@
+package contracts
+
+import "io"
+
+const SmallServicesFormat = "asservat-small-services/v1"
+const SmallServicesMaxBytes = 384 << 10
+
+// SmallServicesPreparation contains public installation choices only. It is
+// consumed by one finite hook before provider workloads start; it is neither
+// an installation witness nor recovery or evidence authority.
+type SmallServicesPreparation struct {
+	Format      string                        `json:"format"`
+	Namespace   string                        `json:"namespace"`
+	Name        string                        `json:"name"`
+	Kubernetes  InitialBootstrapEndpointInput `json:"kubernetes"`
+	Postgres    bool                          `json:"postgres"`
+	Keycloak    *SmallKeycloakSettings        `json:"keycloak,omitempty"`
+	ObjectStore *SmallSeaweedPlan             `json:"objectStore,omitempty"`
+	OpenBao     *SmallOpenBaoSelection        `json:"openBao,omitempty"`
+	// Its password and roots remain separate selected operator Secret mounts.
+	KeycloakExternalDatabase bool `json:"keycloakExternalDatabase,omitempty"`
+}
+
+// API trust is resolved from the preparation's existing Kubernetes projection;
+// callers do not invent a second API or setup account for the bundled provider.
+type SmallOpenBaoSelection struct {
+	Image string `json:"image"`
+}
+
+type SmallKeycloakDatabase struct {
+	Host     string `json:"host"`
+	Port     int    `json:"port"`
+	Database string `json:"database"`
+	Username string `json:"username"`
+}
+
+func DecodeSmallServicesPreparation(r io.Reader) (SmallServicesPreparation, error) {
+	return decodeClosedRPC[SmallServicesPreparation](r, SmallServicesMaxBytes)
+}
+
+func DecodeSmallKeycloakSettings(r io.Reader) (SmallKeycloakSettings, error) {
+	return decodeClosedRPC[SmallKeycloakSettings](r, SmallServicesMaxBytes)
+}

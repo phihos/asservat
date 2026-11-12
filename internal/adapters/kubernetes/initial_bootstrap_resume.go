@@ -73,11 +73,40 @@ func ResumeInitialBootstrapRunner(ctx context.Context, c *rest.Config, namespace
 	if err != nil || refs.Format != contracts.InitialBootstrapRunnerInputFormat || (refs.RegistrySecret != "") != (input.RegistryAuthentication == contracts.InitialRegistryAuthentication) || input.RegistryAuthentication != "" && input.RegistryAuthentication != contracts.InitialRegistryAuthentication {
 		return zero, cfg.ErrChanged
 	}
+	if input.Postgres.RootsSource == contracts.InitialBootstrapBundledPostgresRoots {
+		if input.Postgres.RootsPEM != "" || refs.PostgresSecret != name+"-postgres-state" || input.Postgres.Host != name+"-postgres."+namespace+".svc" || input.Postgres.Port != 5432 || input.Postgres.Database != "asservat" || input.Postgres.MaxConnections != 2 {
+			return zero, cfg.ErrChanged
+		}
+	} else if input.Postgres.RootsSource != "" || refs.PostgresSecret != "" {
+		return zero, cfg.ErrChanged
+	}
+	if input.IdentitySource == "bundledKeycloak" {
+		if refs.KeycloakSecret != name+"-keycloak-state" {
+			return zero, cfg.ErrChanged
+		}
+	} else if input.IdentitySource != "" || refs.KeycloakSecret != "" {
+		return zero, cfg.ErrChanged
+	}
+	if input.AuditStore.RootsSource == contracts.InitialBootstrapBundledSeaweedRoots {
+		if input.AuditStore.RootsPEM != "" || refs.ObjectStoreSecret != name+"-objectstore-state" || input.AuditStore.Endpoint != "https://"+name+"-objectstore."+namespace+".svc:8333" {
+			return zero, cfg.ErrChanged
+		}
+	} else if input.AuditStore.RootsSource != "" || refs.ObjectStoreSecret != "" {
+		return zero, cfg.ErrChanged
+	}
+
+	if input.KeyService.RootsSource == contracts.InitialBootstrapBundledOpenBaoRoots {
+		if input.KeyService.RootsPEM != "" || refs.KeyServiceSecret != name+"-openbao-state" || input.KeyService.Endpoint != "https://"+name+"-openbao."+namespace+".svc:8200" || input.KeyService.AuditMount != contracts.SmallOpenBaoAuditMount {
+			return zero, cfg.ErrChanged
+		}
+	} else if input.KeyService.RootsSource != "" || refs.KeyServiceSecret != "" {
+		return zero, cfg.ErrChanged
+	}
 	sum := sha256.Sum256([]byte(cm.Data["bootstrap.json"] + "\n" + cm.Data["runner.json"]))
 	if hex.EncodeToString(sum[:]) != originalDigest {
 		return zero, cfg.ErrChanged
 	}
-	plan := InitialBootstrapRunnerPlan{Namespace: namespace, Name: name, Image: input.Image, InputDigest: hex.EncodeToString(sum[:]), ProducerSecret: refs.ProducerSecret, SchemaSecret: refs.SchemaSecret, RetirementSecret: refs.RetirementSecret, RegistrySecret: refs.RegistrySecret, ProbeAudience: input.ProbeAudience, ContinuationDigest: refs.ContinuationDigest}
+	plan := InitialBootstrapRunnerPlan{Namespace: namespace, Name: name, Image: input.Image, InputDigest: hex.EncodeToString(sum[:]), ProducerSecret: refs.ProducerSecret, SchemaSecret: refs.SchemaSecret, RetirementSecret: refs.RetirementSecret, RegistrySecret: refs.RegistrySecret, ProbeAudience: input.ProbeAudience, ContinuationDigest: refs.ContinuationDigest, PostgresSecret: refs.PostgresSecret, KeycloakSecret: refs.KeycloakSecret, ObjectStoreSecret: refs.ObjectStoreSecret, KeyServiceSecret: refs.KeyServiceSecret}
 	want, err := BuildInitialBootstrapRunner(plan)
 	if err != nil {
 		return zero, err

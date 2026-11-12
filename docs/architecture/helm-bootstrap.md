@@ -108,6 +108,24 @@ from the named pull Secret. Primary sources: [API validation](https://github.com
 [kubelet credential extraction](https://github.com/kubernetes/kubernetes/blob/v1.37.0/pkg/credentialprovider/secrets/secrets.go),
 [image pull Secrets](https://kubernetes.io/docs/concepts/containers/images/#specifying-imagepullsecrets-on-a-pod).
 
+## Independent bundled provider continuation
+
+[ADR-326](../decisions/326-individually-selectable-small-services.md) composes
+key-service and object-store selections independently. Bundled OpenBao with
+external storage requires the existing named private material source for scoped
+storage credentials; continuation applies its own finite provider recipe.
+Bundled SeaweedFS with an external key provider retains its generated inputs in
+the original carrier and publishes only `providerMode: bundled-objectstore` in
+the nonsecret recipe outbox. The existing provider CLI uses those retained inputs
+and attaches the real inspection token by original UID/RV. Other selections omit
+the field. No credential is returned through the outbox.
+
+Current acknowledged launch/SQL verification handles worker replay without
+recreating a consumed phase1 inbox. Source/recipe/mode/phase identity, original
+deadlines and the ordinary final provider inspection remain binding. The
+[small-profile guide](../installation/small-profile.md) documents the all-bundled
+site inputs, current context qualification and remaining lifecycle work; rendering alone grants no authority.
+
 ## Qualification and remaining installed prerequisites
 
 The single five-command layout and expanded resume path are a packaging
@@ -128,6 +146,15 @@ activation Pod to node B. Require anonymous denial and successful authenticated
 manifest GETs from both nodes without recording headers/credentials. Shared
 layer caches are not cold exact-image evidence. The pinned registry image is
 fixture provenance, not a measured pull result.
+
+The selected bundled public workflow snapshots that cold-pull evidence after
+the first four acknowledged commands, before configuring a separate runtime
+registry prerequisite on its owned nodes. Runtime pulls use the same manifest
+and TLS root with registry-scoped node transport authentication. This preserves
+default kubelet credential verification and introduces no product credential
+propagation. The ordinary bootstrap-only fixture remains CA-only. Runtime pulls
+cannot be counted retroactively as the original cold pulls; both phases have
+separate receipts.
 
 The [packaged native run](../../test/results/helm137-native-hook-diagnostic-check.log)
 passes original manager/schema/audit/activation and v3 positive closure,

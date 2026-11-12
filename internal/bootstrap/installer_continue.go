@@ -37,19 +37,23 @@ import (
 
 // InstallerContinuation is one ADR-183 continuation process. It reopens the
 // completed bootstrap under the chart's runner account and runs the existing
-// post-activation producers. It holds no provider administration credential.
+// post-activation producers. External provider administration stays with the
+// operator; selected bundled-store setup uses a finite private provider client.
 type InstallerContinuation struct {
-	in       *providerInputs
-	plan     contracts.InitialPreparer
-	input    contracts.InstallerContinuation
-	roots    [][]byte
-	preparer *kube.InitialPreparer
-	observer *kube.InitialBootstrapObserver
-	record   audit.InitialInstallation
-	receipt  audit.Receipt
-	sql      *postgres.InitialRuntimeBridgeSQL
-	admin    *pgxpool.Config
-	closers  []func()
+	in              *providerInputs
+	plan            contracts.InitialPreparer
+	input           contracts.InstallerContinuation
+	roots           [][]byte
+	objectStore     *contracts.SmallSeaweedPlan
+	keyService      *initialOpenBaoProvider
+	bundledIdentity bool
+	preparer        *kube.InitialPreparer
+	observer        *kube.InitialBootstrapObserver
+	record          audit.InitialInstallation
+	receipt         audit.Receipt
+	sql             *postgres.InitialRuntimeBridgeSQL
+	admin           *pgxpool.Config
+	closers         []func()
 	// The bridge's control-namespace observer and owner workload guard, reused
 	// by the public runtime role root (ADR-184).
 	control    *kube.PermissionClient
@@ -119,6 +123,15 @@ func OpenInstallerContinuation(ctx context.Context, files, preparer *os.Root, st
 	if err != nil || k.input.Format != contracts.InstallerContinuationFormat {
 		return nil, mounts.ErrUnavailable
 	}
+	k.bundledIdentity = k.input.IdentitySource == bundledKeycloakIdentitySource
+	if err := resolveInstallerContinuationIdentity(ctx, files, &k.input); err != nil {
+		return nil, err
+	}
+	var objectStoreRoots [][]byte
+	k.objectStore, objectStoreRoots, err = resolveInstallerContinuationObjectStore(ctx, files, &k.input)
+	if err != nil {
+		return nil, err
+	}
 	// ADR-194 decision 1: promotion needs the capacity and federation steps.
 	if p := k.input.Public; p != nil {
 		if !privacy.ProcessingOrganizationsValid(installerProcessingOrganizations(p.Processors)) {
@@ -148,10 +161,6 @@ func OpenInstallerContinuation(ctx context.Context, files, preparer *os.Root, st
 	if p := k.input.Public; p != nil && p.Federation != nil && p.Federation.OwnerOperationAddress != "" && (p.Federation.EvidenceStore == nil || p.Capacity == nil || !ownerDialAddress(p.Federation.OwnerOperationAddress)) {
 		return nil, mounts.ErrUnavailable
 	}
-	*step = "open/owner-roots"
-	if k.roots, err = providerconfig.TrustRootsPEM([]byte(k.input.OwnerIssuerRootsPEM), time.Now()); err != nil {
-		return nil, mounts.ErrUnavailable
-	}
 	*step = "open/preparer"
 	if k.preparer, k.plan, k.in, k.observer, err = initialBootstrapPreparerTokens(ctx, preparer, files); err != nil {
 		return nil, err
@@ -163,6 +172,20 @@ func OpenInstallerContinuation(ctx context.Context, files, preparer *os.Root, st
 		return nil, mounts.ErrUnavailable
 	}
 	k.closers = append(k.closers, k.in.closeHTTP, k.observer.Close, k.preparer.Close)
+	if !continuationObjectStoreMatchesOriginal(k.objectStore, objectStoreRoots, k.input, k.plan) {
+		return nil, mounts.ErrUnavailable
+	}
+	*step = "open/key-provider"
+	if k.keyService, err = resolveInstallerContinuationKeyService(ctx, files, &k.input, k.plan, k.in.kubernetes("administrator-token")); err != nil {
+		return nil, err
+	}
+	if k.keyService != nil {
+		k.closers = append(k.closers, k.keyService.Close)
+	}
+	*step = "open/owner-roots"
+	if k.roots, err = providerconfig.TrustRootsPEM([]byte(k.input.OwnerIssuerRootsPEM), time.Now()); err != nil {
+		return nil, mounts.ErrUnavailable
+	}
 	*step = "open/history"
 	reader, pool, err := initialBootstrapHistoryBounded(ctx, preparer, k.preparer, k.plan, 1)
 	if err != nil {
@@ -531,7 +554,12 @@ func (k *InstallerContinuation) WorkerRecipe(ctx context.Context, resources *kub
 	if err != nil {
 		return docs, err
 	}
-	return docs, kube.PublishInstallerRecipe(ctx, admin, k.input.Namespace, k.record.Scope.InstallationID, contracts.InstallerRecipeOutbox{Format: contracts.InstallerRecipeOutboxFormat, Phase: 1, Purpose: "worker-provider", Recipe: artifact})
+	// Automatic replay reconstructs the phase-1 recipe directly. Once worker
+	// inputs exist it must not overwrite a later phase-3 outbox.
+	if (k.keyService != nil || k.objectStore != nil) && snapshot.State.WorkerInputs != nil && snapshot.State.WorkerInputs.Receipt != nil {
+		return docs, nil
+	}
+	return docs, kube.PublishInstallerRecipe(ctx, admin, k.input.Namespace, k.record.Scope.InstallationID, contracts.InstallerRecipeOutbox{Format: contracts.InstallerRecipeOutboxFormat, Phase: 1, Purpose: "worker-provider", ProviderMode: k.mixedProviderOutboxMode(), Recipe: artifact})
 }
 
 // awaitInbox polls the operator inbox for phase until ctx ends; the caller's
@@ -568,8 +596,40 @@ func (k *InstallerContinuation) WorkerLaunch(ctx context.Context, resources *kub
 	if err != nil {
 		return roles, err
 	}
+	// Completed worker inputs follow successful storage preparation. Replaying
+	// that stage must not reapply its smaller IAM set after later roles exist.
+	if snapshot.State.WorkerInputs == nil || snapshot.State.WorkerInputs.Receipt == nil {
+		k.at("worker/bundled-storage")
+		if err := k.prepareSmallWorkerStore(ctx, deployment, *worker, installer.Roles.ServiceAccount, snapshot.State.WorkerLayout); err != nil {
+			return roles, err
+		}
+	}
+	// A consumed phase-1 carrier is not required to observe the original
+	// acknowledged launch. Verify current launched inputs and SQL grants through
+	// the existing lookup-only path before proceeding to a retained phase3.
+	if k.mixedProviderMode() != "" && snapshot.State.WorkerInputs != nil && snapshot.State.WorkerInputs.Receipt != nil {
+		k.at("worker/replay-root")
+		root, e := kube.NewConfigurationRuntimeRoleRoot(ctx, source, installer.Roles)
+		if e != nil {
+			return roles, e
+		}
+		defer root.Close()
+		current, e := root.ReadConfigurationRuntimeRoles(ctx)
+		if e != nil {
+			return roles, e
+		}
+		if current.State.Launch != nil && current.State.Launch.Receipt != nil {
+			k.at("worker/replay-roles")
+			producer, e := postgres.NewConfigurationRuntimeSQLRoles(ctx, k.admin.ConnConfig, root, installer.Roles)
+			if e != nil {
+				return roles, e
+			}
+			defer producer.Close()
+			return producer.VerifyLaunchedConfigurationRuntimeRoles(ctx)
+		}
+	}
 	k.at("worker/inbox")
-	inbox, err := k.awaitInbox(ctx, 1)
+	inbox, err := k.workerProviderInbox(ctx, deployment, *worker, installer.Roles.ServiceAccount, snapshot.State.WorkerLayout)
 	if err != nil {
 		return roles, err
 	}
@@ -580,7 +640,7 @@ func (k *InstallerContinuation) WorkerLaunch(ctx context.Context, resources *kub
 		return roles, mounts.ErrUnavailable
 	}
 	k.at("worker/inspection")
-	inspector, err := providerconfig.NewSetupReader(contracts.OwnerProviderEndpoint{Endpoint: deployment.KeyService.Endpoint, Roots: deployment.KeyService.Roots}, inbox.InspectionToken)
+	inspector, err := k.providerSetupReader(contracts.OwnerProviderEndpoint{Endpoint: deployment.KeyService.Endpoint, Roots: deployment.KeyService.Roots}, inbox.InspectionToken)
 	if err != nil {
 		return roles, err
 	}
@@ -633,6 +693,9 @@ func (k *InstallerContinuation) WorkerLaunch(ctx context.Context, resources *kub
 	launched, err := inputs.CompleteLaunch(ctx)
 	if err != nil || launched.Progress != kube.ConfigurationWorkerLaunchAcknowledged {
 		return roles, errors.Join(mounts.ErrUnavailable, err)
+	}
+	if inbox.UID == "" {
+		return launched.Snapshot, nil
 	}
 	return launched.Snapshot, kube.DeleteInstallerInbox(ctx, admin, k.input.Namespace, k.record.Scope.InstallationID, inbox.UID)
 }
@@ -924,11 +987,11 @@ func (k *InstallerContinuation) Owner(ctx context.Context, resources *kube.Initi
 	}
 	k.at("owner/outbox")
 	admin := k.in.kubernetes("administrator-token")
-	if err = kube.PublishInstallerRecipe(ctx, admin, k.input.Namespace, k.record.Scope.InstallationID, contracts.InstallerRecipeOutbox{Format: contracts.InstallerRecipeOutboxFormat, Phase: 3, Purpose: "owner-provider", Recipe: artifact}); err != nil {
+	if err = kube.PublishInstallerRecipe(ctx, admin, k.input.Namespace, k.record.Scope.InstallationID, contracts.InstallerRecipeOutbox{Format: contracts.InstallerRecipeOutboxFormat, Phase: 3, Purpose: "owner-provider", ProviderMode: k.mixedProviderOutboxMode(), Recipe: artifact}); err != nil {
 		return err
 	}
 	k.at("owner/inbox")
-	inbox, err := k.awaitInbox(ctx, 3)
+	inbox, err := k.ownerProviderInbox(ctx, resources, inventory, named, profile, artifact, serving)
 	if err != nil {
 		return err
 	}
@@ -969,7 +1032,7 @@ func (k *InstallerContinuation) Owner(ctx context.Context, resources *kube.Initi
 	if c, e := contracts.DecodeOwnerStorageCredential(bytes.NewReader(inbox.AuditCredential)); e != nil || c.AccessKeyID == "" || c.SecretAccessKey == "" {
 		return mounts.ErrUnavailable
 	}
-	inspector, err := providerconfig.NewSetupReader(contracts.OwnerProviderEndpoint{Endpoint: input.KeyService.Endpoint, Roots: input.KeyService.Roots}, inbox.InspectionToken)
+	inspector, err := k.providerSetupReader(contracts.OwnerProviderEndpoint{Endpoint: input.KeyService.Endpoint, Roots: input.KeyService.Roots}, inbox.InspectionToken)
 	if err != nil {
 		return err
 	}

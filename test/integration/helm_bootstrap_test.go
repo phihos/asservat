@@ -43,21 +43,30 @@ func TestHelmBootstrapWithRealServices(t *testing.T) {
 	if os.Getenv("ASSERVAT_CONTEXT_FIXTURES") == "" || os.Getenv("ASSERVAT_HELM_BOOTSTRAP_NATIVE") != "1" {
 		t.Skip("run owned --helm-bootstrap with empty SQL and authenticated registry")
 	}
+	bundledPostgres := os.Getenv("ASSERVAT_HELM_BUNDLED_POSTGRES") == "1"
+	bundledIdentity := os.Getenv("ASSERVAT_HELM_BUNDLED_IDENTITY") == "1"
 	var f fixture
 	raw, err := os.ReadFile(os.Getenv("ASSERVAT_CONTEXT_FIXTURES"))
-	if err != nil || json.Unmarshal(raw, &f) != nil || len(f.Clusters) != 1 || f.WorkerImage == "" || f.NativeProviders.Postgres == "" {
+	if err != nil || json.Unmarshal(raw, &f) != nil || len(f.Clusters) != 1 || f.WorkerImage == "" || !bundledPostgres && f.NativeProviders.Postgres == "" {
 		t.Fatal("owned single-cluster/native services unavailable")
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
-	defer cancel()
-	admin, err := pgxpool.New(ctx, f.Postgres)
-	if err != nil {
-		t.Fatal(err)
+	testBound := 10 * time.Minute
+	if bundledIdentity {
+		testBound = 20 * time.Minute
 	}
-	defer admin.Close()
-	var pristine bool
-	if err = admin.QueryRow(ctx, `SELECT NOT EXISTS(SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public') AND NOT EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public')`).Scan(&pristine); err != nil || !pristine {
-		t.Fatal("product must initialize actually empty SQL")
+	ctx, cancel := context.WithTimeout(context.Background(), testBound)
+	defer cancel()
+	var admin *pgxpool.Pool
+	if !bundledPostgres {
+		admin, err = pgxpool.New(ctx, f.Postgres)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer admin.Close()
+		var pristine bool
+		if err = admin.QueryRow(ctx, `SELECT NOT EXISTS(SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public') AND NOT EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public')`).Scan(&pristine); err != nil || !pristine {
+			t.Fatal("product must initialize actually empty SQL")
+		}
 	}
 	kc, err := clientcmd.BuildConfigFromFlags("", f.Clusters[0].Config)
 	if err != nil {
@@ -104,15 +113,17 @@ func TestHelmBootstrapWithRealServices(t *testing.T) {
 	if err != nil || actual.UID != node.UID {
 		t.Fatal("shared exact API origin invalid", err)
 	}
-	host, portText, err := net.SplitHostPort(f.NativeProviders.Postgres)
-	if err != nil {
-		t.Fatal(err)
+	if !bundledPostgres {
+		host, portText, err := net.SplitHostPort(f.NativeProviders.Postgres)
+		if err != nil {
+			t.Fatal(err)
+		}
+		port, err := strconv.Atoi(portText)
+		if err != nil {
+			t.Fatal(err)
+		}
+		desired.Postgres = contracts.OwnerPostgresEndpoint{Host: host, Port: port, Database: "custody_test", MaxConnections: 2, Roots: [][]byte{f.NativeProviders.Root}}
 	}
-	port, err := strconv.Atoi(portText)
-	if err != nil {
-		t.Fatal(err)
-	}
-	desired.Postgres = contracts.OwnerPostgresEndpoint{Host: host, Port: port, Database: "custody_test", MaxConnections: 2, Roots: [][]byte{f.NativeProviders.Root}}
 	desired.AuditStore = contracts.OwnerAuditStore{Endpoint: f.NativeProviders.S3, Roots: [][]byte{f.NativeProviders.Root}, Region: "us-east-1", Bucket: "initial-bootstrap-chain"}
 	desired.KeyService = contracts.ConfigurationKeyService{Endpoint: f.NativeProviders.KMS, Roots: [][]byte{f.NativeProviders.Root}, AuditMount: "bootstrap-chain-transit", AuditKey: "audit"}
 	desired.Providers = contracts.InitialBootstrapProviders{IssuerPolicy: "bootstrap-chain-issuer", WrapRole: "bootstrap-chain-wrap", WrapPolicy: "bootstrap-chain-encrypt", UnwrapRole: "bootstrap-chain-unwrap", UnwrapPolicy: "bootstrap-chain-decrypt"}
@@ -123,13 +134,34 @@ func TestHelmBootstrapWithRealServices(t *testing.T) {
 		t.Fatal("owned Helm/registry inputs unavailable")
 	}
 	x := extras.HelmBootstrap
+	bundledObjectStore := os.Getenv("ASSERVAT_HELM_BUNDLED_OBJECTSTORE") == "1"
+	bundledKeyService := os.Getenv("ASSERVAT_HELM_BUNDLED_KEYSERVICE") == "1"
+	if bundledKeyService {
+		desired.Providers = contracts.SmallOpenBaoInitialProviders()
+	}
 	publicInput := helmBootstrapPublicInput(desired)
+	if bundledIdentity {
+		publicInput.Administrators = append([]contracts.OwnerDeploymentActor(nil), desired.Administrators...)
+	}
 	compiled, err := providerconfig.CompileInitialBootstrapInput(publicInput, kc.CAData, []byte(f.Clusters[0].Token), time.Now())
 	if err != nil {
 		t.Fatal("fixture public compiler", err)
 	}
 	desired = compiled
-	t.Cleanup(func() { helmBootstrapCleanup(t, api, desired, ns.UID) })
+	var bundledPG *helmBundledPostgres
+	if bundledPostgres {
+		bundledPG = newHelmBundledPostgres(t, ctx, api, desired, x)
+		bundledPG.plan.Keycloak = bundledIdentity
+	}
+	var bundled *helmBundledObjectStore
+	if bundledObjectStore {
+		bundled = newHelmBundledObjectStore(t, ctx, api, desired, x)
+	}
+	var bundledKeys *helmBundledKeyService
+	if bundledKeyService {
+		bundledKeys = newHelmBundledKeyService(t, ctx, api, desired, x)
+	}
+	t.Cleanup(func() { helmBootstrapCleanup(t, api, desired, ns.UID, bundledIdentity) })
 	rootCert, err := x509.ParseCertificate(f.NativeProviders.Root)
 	if err != nil {
 		t.Fatal(err)
@@ -139,15 +171,43 @@ func TestHelmBootstrapWithRealServices(t *testing.T) {
 	transport := &http.Transport{Proxy: nil, TLSClientConfig: &tls.Config{RootCAs: roots, MinVersion: tls.VersionTLS13}}
 	defer transport.CloseIdleConnections()
 	providerHTTP := &http.Client{Transport: transport, Timeout: 5 * time.Second}
-	issuer := initialBootstrapChainProvider(t, ctx, f, desired)
-	store := s3.New(s3.Options{Region: desired.AuditStore.Region, BaseEndpoint: aws.String(desired.AuditStore.Endpoint), UsePathStyle: true, Credentials: credentials.NewStaticCredentialsProvider("synthetic-only", "synthetic-only-secret", ""), HTTPClient: providerHTTP})
-	if _, err = store.CreateBucket(ctx, &s3.CreateBucketInput{Bucket: &desired.AuditStore.Bucket}); err != nil {
-		t.Fatal(err)
+	issuer := ""
+	if !bundledKeyService {
+		issuer = initialBootstrapChainProvider(t, ctx, f, desired)
 	}
-	if _, err = store.PutBucketVersioning(ctx, &s3.PutBucketVersioningInput{Bucket: &desired.AuditStore.Bucket, VersioningConfiguration: &s3types.VersioningConfiguration{Status: s3types.BucketVersioningStatusEnabled}}); err != nil {
-		t.Fatal(err)
+	store := s3.New(s3.Options{Region: desired.AuditStore.Region, BaseEndpoint: aws.String(desired.AuditStore.Endpoint), UsePathStyle: true, Credentials: credentials.NewStaticCredentialsProvider("synthetic-only", "synthetic-only-secret", ""), HTTPClient: providerHTTP})
+	if !bundledObjectStore {
+		if _, err = store.CreateBucket(ctx, &s3.CreateBucketInput{Bucket: &desired.AuditStore.Bucket}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err = store.PutBucketVersioning(ctx, &s3.PutBucketVersioningInput{Bucket: &desired.AuditStore.Bucket, VersioningConfiguration: &s3types.VersioningConfiguration{Status: s3types.BucketVersioningStatusEnabled}}); err != nil {
+			t.Fatal(err)
+		}
 	}
 	values := helmBootstrapValues(publicInput)
+	if bundledPG != nil {
+		bundledPG.Values(values)
+		publicInput.Postgres = contracts.InitialBootstrapPostgresInput{Host: bundledPG.plan.Host(), Port: 5432, Database: "asservat", MaxConnections: 2, RootsSource: contracts.InitialBootstrapBundledPostgresRoots}
+	}
+	if bundled != nil {
+		bundled.Values(values)
+		publicInput.AuditStore = contracts.InitialBootstrapAuditStoreInput{Endpoint: bundled.plan.Endpoint(), Region: desired.AuditStore.Region, Bucket: desired.AuditStore.Bucket, RootsSource: contracts.InitialBootstrapBundledSeaweedRoots}
+	}
+	if bundledKeys != nil {
+		bundledKeys.Values(values)
+		publicInput.KeyService = contracts.InitialBootstrapKeyServiceInput{Endpoint: bundledKeys.plan.Endpoint(), AuditMount: contracts.SmallOpenBaoAuditMount, AuditKey: "audit", RootsSource: contracts.InitialBootstrapBundledOpenBaoRoots}
+	}
+	var bundledPublic *helmBundledPublic
+	var identitySource *helmBundledIdentity
+	if bundledIdentity {
+		if !bundledPostgres || !bundledObjectStore || !bundledKeyService || os.Getenv("ASSERVAT_INSTALLER_CONTINUATION") != "1" {
+			t.Fatal("bundled public qualification requires all four services and automatic continuation")
+		}
+		nodeIP := nodeInternalIP(t, ctx, api, f.Clusters[0].NodeUID)
+		bundledPublic = newHelmBundledPublic(t, ctx, api, desired, nodeIP)
+		identitySource = newHelmBundledIdentity(t, ctx, api, desired, nodeIP, x)
+		identitySource.Values(t, values, &publicInput, bundledPublic)
+	}
 	valuesPath := filepath.Join(t.TempDir(), "values.json")
 	helmBootstrapWriteValues(t, valuesPath, values)
 	registryBytes, err := json.Marshal(x.RegistryConfig)
@@ -158,12 +218,36 @@ func TestHelmBootstrapWithRealServices(t *testing.T) {
 	if _, err = api.CoreV1().Secrets(namespace).Create(ctx, &core.Secret{ObjectMeta: meta.ObjectMeta{Name: "operator-pull"}, Type: core.SecretTypeDockerConfigJson, Immutable: ptr.To(true), Data: map[string][]byte{core.DockerConfigJsonKey: registryBytes}}, meta.CreateOptions{}); err != nil {
 		t.Fatal("operator pull input", err)
 	}
-	sql := admin.Config().ConnConfig
-	credentialsJSON, _ := json.Marshal(contracts.OwnerSQLCredential{Username: sql.User, Password: sql.Password})
-	defer clear(credentialsJSON)
-	providerJSON, _ := json.Marshal(contracts.InitialBootstrapMaterial{Format: contracts.InitialBootstrapMaterialFormat, IssuerToken: issuer, Storage: contracts.OwnerStorageCredential{AccessKeyID: "synthetic-only", SecretAccessKey: "synthetic-only-secret"}, StorageUseUntil: time.Now().UTC().Add(time.Hour)})
+	var credentialsJSON []byte
+	if !bundledPostgres {
+		sql := admin.Config().ConnConfig
+		credentialsJSON, _ = json.Marshal(contracts.OwnerSQLCredential{Username: sql.User, Password: sql.Password})
+		defer clear(credentialsJSON)
+	}
+	storage := contracts.OwnerStorageCredential{AccessKeyID: "synthetic-only", SecretAccessKey: "synthetic-only-secret"}
+	if bundled != nil {
+		storage = contracts.OwnerStorageCredential{}
+	}
+	privateInput := contracts.InitialBootstrapProviderInput{Format: contracts.InitialBootstrapMaterialFormat, IssuerToken: issuer, StorageUseUntil: time.Now().UTC().Add(time.Hour)}
+	if !bundledObjectStore {
+		privateInput.Storage = &storage
+	}
+	providerJSON, _ := json.Marshal(privateInput)
 	defer clear(providerJSON)
-	for name, data := range map[string]map[string][]byte{"operator-producer": {"postgres-administrator.json": credentialsJSON, "provider-material.json": providerJSON}, "operator-ddl": {"postgres-ddl.json": credentialsJSON}, "operator-retirement": {"postgres-administrator.json": credentialsJSON}} {
+	operatorInputs := map[string]map[string][]byte{}
+	if !bundledPostgres {
+		operatorInputs["operator-producer"] = map[string][]byte{"postgres-administrator.json": credentialsJSON, "provider-material.json": providerJSON}
+		operatorInputs["operator-ddl"] = map[string][]byte{"postgres-ddl.json": credentialsJSON}
+		operatorInputs["operator-retirement"] = map[string][]byte{"postgres-administrator.json": credentialsJSON}
+	} else if !bundledObjectStore || !bundledKeyService {
+		// Only the explicitly external provider fragment is supplied. SQL private
+		// material always comes from the product-created retained PG-state source.
+		operatorInputs["operator-producer"] = map[string][]byte{"provider-material.json": providerJSON}
+	} else {
+		values["bootstrap"].(map[string]any)["secrets"].(map[string]any)["producer"] = ""
+		helmBootstrapWriteValues(t, valuesPath, values)
+	}
+	for name, data := range operatorInputs {
 		if _, err = api.CoreV1().Secrets(namespace).Create(ctx, &core.Secret{ObjectMeta: meta.ObjectMeta{Name: name}, Immutable: ptr.To(true), Type: core.SecretTypeOpaque, Data: data}, meta.CreateOptions{}); err != nil {
 			t.Fatal("explicit operator input", err)
 		}
@@ -202,9 +286,34 @@ func TestHelmBootstrapWithRealServices(t *testing.T) {
 		t.Fatal("original activation terminal missing")
 	}
 	originalSeed := retirement.Take(t, ctx)
+	if bundledPG != nil {
+		admin = bundledPG.Resolve(t, ctx, api, &publicInput, node, f.Clusters[0].Config)
+	}
+
+	if bundledKeys != nil {
+		bundledKeys.Resolve(t, ctx, api, kc, &publicInput, originalSeed.State, node)
+	}
+	var publicIdentity *installedIdentity
+	if identitySource != nil {
+		publicIdentity = identitySource.Resolve(t, ctx, kc, &publicInput, &f)
+	}
+	if bundled != nil {
+		desired, store = bundled.VerifiedStore(t, ctx, api, kc, publicInput, []byte(f.Clusters[0].Token), node)
+	} else if bundledKeys != nil || bundledPG != nil {
+		desired, err = providerconfig.CompileInitialBootstrapInput(publicInput, kc.CAData, []byte(f.Clusters[0].Token), time.Now())
+		if err != nil {
+			t.Fatal("actual generated bundled key-service public compiler", err)
+		}
+	}
+	if bundled != nil && (originalSeed.UID != string(bundled.seedUID) || originalSeed.State.InstallationID != bundled.installation) {
+		t.Fatal("generated writer did not belong to the original retained bootstrap seed")
+	}
 	state, configuration, root := initialBootstrapChainState(t, ctx, api, desired, originalSeed)
 	if root.Schema == nil || root.Schema.CompletedAt == nil || state.Manager == nil || state.Manager.Receipt == nil || state.Manager.RetiredAt == nil {
 		t.Fatal("product schema/manager lifecycle incomplete")
+	}
+	if bundledPG != nil {
+		bundledPG.VerifySchema(t, ctx, admin, *root.Schema)
 	}
 	if root.Schema.Manager != *state.Manager.Receipt || configuration.Plan.HistoryManager == nil || *configuration.Plan.HistoryManager != *state.Manager.Receipt {
 		t.Fatal("manager was replaced or fixture-injected")
@@ -245,7 +354,11 @@ func TestHelmBootstrapWithRealServices(t *testing.T) {
 	if _, err = api.CoreV1().Pods(desired.TargetNamespace).Get(ctx, desired.Name, meta.GetOptions{}); !apierrors.IsNotFound(err) {
 		t.Fatal("product did not remove original activation Pod", err)
 	}
-	initialBootstrapChainAudit(t, ctx, admin, store, providerHTTP, f, desired, state, root)
+	if bundledKeys != nil {
+		bundledKeys.VerifyAudit(t, ctx, api, admin, store, desired, state, root, configuration)
+	} else {
+		initialBootstrapChainAudit(t, ctx, admin, store, providerHTTP, f, desired, state, root)
+	}
 	var login, create bool
 	var sessions int
 	if err = admin.QueryRow(ctx, "SELECT rolcanlogin,rolcreaterole FROM pg_roles WHERE oid=$1 AND rolname=$2", state.Manager.Receipt.OID, state.Manager.Receipt.Name).Scan(&login, &create); err != nil || login || create {
@@ -254,10 +367,7 @@ func TestHelmBootstrapWithRealServices(t *testing.T) {
 	if err = admin.QueryRow(ctx, "SELECT count(*) FROM pg_stat_activity WHERE usesysid=$1", state.Manager.Receipt.OID).Scan(&sessions); err != nil || sessions != 0 {
 		t.Fatal("original manager sessions remain", err)
 	}
-	denied, err := pgx.ParseConfig(f.Postgres)
-	if err != nil {
-		t.Fatal(err)
-	}
+	denied := admin.Config().ConnConfig.Copy()
 	denied.User = state.Manager.Receipt.Name
 	denied.Password = state.Passwords.Manager
 	attempt, stop := context.WithTimeout(ctx, 2*time.Second)
@@ -269,6 +379,17 @@ func TestHelmBootstrapWithRealServices(t *testing.T) {
 	}
 	state.Passwords.Manager = ""
 	originalSeed.State.Passwords.Manager = ""
+	if bundledPublic != nil {
+		var browser *installedBrowser
+		if !t.Run("bundled-public-login", func(t *testing.T) { browser = bundledPublic.Login(t, ctx, publicIdentity) }) {
+			return
+		}
+		t.Run("bundled-context-journey", func(t *testing.T) {
+			qualifyHelmBundledContext(t, ctx, api, kc, f, x, desired, configuration, admin, store, bundledPublic, publicIdentity, browser)
+		})
+		t.Log("bundled workflow completed its explicitly selected public login and context journey subtests")
+		return
+	}
 	// The compiled chart input names the runner account as the only trusted
 	// bootstrap administrator, so closure checks act as that runner (as the
 	// chain's unified path does). The cluster administrator matches neither
@@ -281,7 +402,7 @@ func TestHelmBootstrapWithRealServices(t *testing.T) {
 	finalSeed := initialBootstrapVerifyCopyClosure(t, ctx, closureAPI, closureConfig, desired, originalSeed)
 	// Remove only operator fixture inputs. Product copies must already have
 	// positively closed; a fresh runner receives no setup SQL/provider inputs.
-	for _, name := range []string{"operator-producer", "operator-ddl", "operator-retirement"} {
+	for name := range operatorInputs {
 		object, e := api.CoreV1().Secrets(namespace).Get(ctx, name, meta.GetOptions{})
 		if e != nil {
 			t.Fatal(e)
@@ -290,7 +411,9 @@ func TestHelmBootstrapWithRealServices(t *testing.T) {
 			t.Fatal(e)
 		}
 	}
-	request(t, f.KMS, "synthetic-root", "auth/token/revoke", map[string]any{"token": issuer}, 204)
+	if !bundledKeyService {
+		request(t, f.KMS, "synthetic-root", "auth/token/revoke", map[string]any{"token": issuer}, 204)
+	}
 	t.Run("all-four-commands-passive-without-setup-files", func(t *testing.T) {
 		second := helmBootstrapRun(t, ctx, api, f.Clusters[0].Config, desired, x, valuesPath, false, true)
 		if second.UID == first.UID {
@@ -316,12 +439,28 @@ func TestHelmBootstrapWithRealServices(t *testing.T) {
 		if err := admin.QueryRow(ctx, "SELECT count(*) FROM fleet_initial_activation WHERE installation_id=$1", state.InstallationID).Scan(&count); err != nil || count != 1 {
 			t.Fatal("passive replay repeated activation", err)
 		}
+		if bundled != nil {
+			bundled.VerifyReplay(t, ctx, api)
+		}
+		if bundledKeys != nil {
+			bundledKeys.VerifyReplay(t, ctx, api, kc)
+		}
+		if bundledPG != nil {
+			bundledPG.VerifyReplay(t, ctx, api, admin)
+		}
 	})
 	t.Run("failed-hook-original-revision-resume", func(t *testing.T) {
 		var bad map[string]any
 		encoded, _ := json.Marshal(values)
 		_ = json.Unmarshal(encoded, &bad)
-		bad["bootstrap"].(map[string]any)["postgres"].(map[string]any)["rootsPEM"] = "invalid-first-input"
+		if bundledPG != nil {
+			// Bundled producer derives PostgreSQL roots, so that field would be
+			// ineffective. The prepare hook uses its own normal API JWT; only
+			// the retained bootstrap runner receives this invalid API audience.
+			bad["bootstrap"].(map[string]any)["probeAudience"] = "https://invalid-asservat-fixture.invalid/" + custodyID()
+		} else {
+			bad["bootstrap"].(map[string]any)["postgres"].(map[string]any)["rootsPEM"] = "invalid-first-input"
+		}
 		helmBootstrapWriteValues(t, valuesPath, bad)
 		failed := helmBootstrapRun(t, ctx, api, f.Clusters[0].Config, desired, x, valuesPath, false, false)
 		helmBootstrapWriteValues(t, valuesPath, values)
@@ -368,6 +507,9 @@ func TestHelmBootstrapWithRealServices(t *testing.T) {
 		if after.InstallationID != state.InstallationID || !equalJSONForBootstrap(afterRoot, root) {
 			t.Fatal("Helm erased original product progress")
 		}
+		if bundledPG != nil {
+			bundledPG.VerifyRetention(t, ctx, api)
+		}
 		// Uninstall removes the chart's runner account and its RBAC, so no
 		// identity remains that the guard accepts as administrator; the full
 		// closure check (runner-only probe token) ran before uninstall. Here
@@ -404,17 +546,24 @@ func TestHelmBootstrapWithRealServices(t *testing.T) {
 			t.Fatal("Helm uninstall removed or changed the copy tombstone binding", e)
 		}
 	})
-	t.Log("actual Helm package, authenticated cold exact-image pulls on two owned nodes, original manager/schema/activation/audit/retirement, positive v3 copy closure, setup-free hook replay, bounded terminal CLI resume and retained public revision inputs; no public runtime/restore/backup claim")
+	if bundledPG != nil {
+		t.Log("actual chart PG18.6 with generated separate admin/DDL/backup roles, original database incarnation, first encrypted full pgBackRest backup, unchanged original credentials and both retained data/backup PVCs; no external PG material supplied to product")
+	}
+	t.Log("actual Helm package, authenticated cold exact-image pulls on two owned nodes, original manager/schema/activation/audit/retirement, positive v3 copy closure, setup-free hook replay, bounded terminal CLI resume and retained public revision inputs; no public runtime/restore/sustained-backup claim")
 }
 
 type helmBootstrapFixture struct {
-	RegistryConfig map[string]any `json:"registryConfig"`
-	ProductBinary  string         `json:"productBinary"`
-	ChartArchive   string         `json:"chartArchive"`
-	NodeA          string         `json:"nodeA"`
-	NodeAUID       string         `json:"nodeAUID"`
-	NodeB          string         `json:"nodeB"`
-	NodeBUID       string         `json:"nodeBUID"`
+	RegistryConfig   map[string]any `json:"registryConfig"`
+	ProductBinary    string         `json:"productBinary"`
+	ChartArchive     string         `json:"chartArchive"`
+	NodeA            string         `json:"nodeA"`
+	NodeAUID         string         `json:"nodeAUID"`
+	NodeB            string         `json:"nodeB"`
+	NodeBUID         string         `json:"nodeBUID"`
+	ObjectStoreImage string         `json:"objectStoreImage,omitempty"`
+	KeyServiceImage  string         `json:"keyServiceImage,omitempty"`
+	PostgresImage    string         `json:"postgresImage,omitempty"`
+	IdentityImage    string         `json:"identityImage,omitempty"`
 }
 
 func helmBootstrapPublicInput(d contracts.InitialBootstrap) contracts.InitialBootstrapInput {
@@ -454,7 +603,11 @@ func helmBootstrapWriteValues(t *testing.T, path string, values map[string]any) 
 	}
 }
 func helmBootstrapCommand(ctx context.Context, x helmBootstrapFixture, kubeconfig, namespace, values string) error {
-	command := exec.CommandContext(ctx, "helm", "upgrade", "--install", "asservat", x.ChartArchive, "--kubeconfig", kubeconfig, "--namespace", namespace, "--values", values, "--wait", "--timeout", "6m", "--history-max", "4")
+	timeout := "6m"
+	if os.Getenv("ASSERVAT_HELM_BUNDLED_IDENTITY") == "1" {
+		timeout = "20m"
+	}
+	command := exec.CommandContext(ctx, "helm", "upgrade", "--install", "asservat", x.ChartArchive, "--kubeconfig", kubeconfig, "--namespace", namespace, "--values", values, "--wait", "--timeout", timeout, "--history-max", "4")
 	// Helm only receives public values and references; its output is not a
 	// credential transport. Keep even unexpected diagnostics bounded.
 	output := &helmBootstrapOutput{}
@@ -479,7 +632,11 @@ func (b *helmBootstrapOutput) Write(p []byte) (int, error) {
 
 func helmBootstrapRun(t *testing.T, ctx context.Context, api kubernetes.Interface, kubeconfig string, d contracts.InitialBootstrap, x helmBootstrapFixture, values string, flipNodes, wantSuccess bool) *core.Pod {
 	t.Helper()
-	runCtx, stop := context.WithTimeout(ctx, 6*time.Minute)
+	bound := 6 * time.Minute
+	if os.Getenv("ASSERVAT_HELM_BUNDLED_IDENTITY") == "1" {
+		bound = 20 * time.Minute
+	}
+	runCtx, stop := context.WithTimeout(ctx, bound)
 	defer stop()
 	name := d.Name + "-bootstrap"
 	list, e := api.CoreV1().Pods(d.BootstrapNamespace).List(runCtx, meta.ListOptions{FieldSelector: "metadata.name=" + name})
@@ -504,6 +661,7 @@ func helmBootstrapRun(t *testing.T, ctx context.Context, api kubernetes.Interfac
 	var terminal *core.Pod
 	var commandErr error
 	flipped := false
+	runtimeRegistry := false
 	defer func() {
 		if t.Failed() && original != "" {
 			helmBootstrapFailureLogs(t, api, d, name, original)
@@ -568,6 +726,16 @@ func helmBootstrapRun(t *testing.T, ctx context.Context, api kubernetes.Interfac
 				}
 				flipped = true
 			}
+			if os.Getenv("ASSERVAT_HELM_BUNDLED_IDENTITY") == "1" && !runtimeRegistry {
+				proof, ready, err := helmRuntimeRegistryProof(pod, d.BootstrapNamespace, name, d.Image, original)
+				if err != nil {
+					t.Fatal("runtime registry original cold boundary", err)
+				}
+				if ready {
+					helmEnableRuntimeRegistry(t, runCtx, api, x, proof)
+					runtimeRegistry = true
+				}
+			}
 			if pod.Status.Phase == core.PodSucceeded || pod.Status.Phase == core.PodFailed {
 				terminal = pod.DeepCopy()
 			}
@@ -583,7 +751,11 @@ func helmBootstrapRun(t *testing.T, ctx context.Context, api kubernetes.Interfac
 	}
 	if wantSuccess {
 		statuses := append(append([]core.ContainerStatus{}, terminal.Status.InitContainerStatuses...), terminal.Status.ContainerStatuses...)
-		if len(statuses) != 4 {
+		if os.Getenv("ASSERVAT_HELM_BUNDLED_IDENTITY") == "1" {
+			if err := helmContextTerminalValid(terminal, d.BootstrapNamespace, name, d.Image, original); err != nil {
+				t.Fatal("actual bundled five-command terminal", err)
+			}
+		} else if len(statuses) != 4 {
 			t.Fatal("fixed four commands were not all observed")
 		}
 		digest := strings.Split(d.Image, "@")[1]
@@ -614,9 +786,16 @@ func helmBootstrapFailureLogs(t *testing.T, api kubernetes.Interface, d contract
 	}
 	containers := append(append([]core.Container{}, pod.Spec.InitContainers...), pod.Spec.Containers...)
 	statuses := append(append([]core.ContainerStatus{}, pod.Status.InitContainerStatuses...), pod.Status.ContainerStatuses...)
-	if len(containers) != 4 || len(statuses) > 4 {
+	if (len(containers) != 4 && len(containers) != 5) || len(statuses) > len(containers) {
 		t.Log("original hook diagnostic has unexpected command count")
 		return
+	}
+	commands := []string{"produce", "schema", "prepare", "retire", "continue"}
+	for i, c := range containers {
+		if c.Name != commands[i] || c.Image != d.Image {
+			t.Log("original hook diagnostic has unexpected command/image")
+			return
+		}
 	}
 	for _, status := range statuses {
 		valid := false
@@ -708,8 +887,17 @@ func (w *helmBootstrapProviderWatch) Take(t *testing.T, ctx context.Context) str
 	}
 	return ""
 }
-func helmBootstrapCleanup(t *testing.T, api kubernetes.Interface, d contracts.InitialBootstrap, namespaceUID types.UID) {
+func helmBootstrapCleanup(t *testing.T, api kubernetes.Interface, d contracts.InitialBootstrap, namespaceUID types.UID, installedPublic bool) {
 	t.Helper()
+	if installedPublic {
+		// This selected workflow leaves a running guarded installation, retained
+		// services/PVCs and regional enrollment. The bootstrap-only namespace
+		// cleanup cannot uninstall that runtime. Its disposable environment belongs
+		// to the existing outer harness, whose terminal receipt requires absence of
+		// the owned clusters, containers, volumes, networks and images.
+		t.Log("full installed public fixture cleanup owner: owned-context-harness; runtime guards and retained sources remain intact until owned environment teardown")
+		return
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 	name := d.Name + "-bootstrap"

@@ -1,0 +1,158 @@
+{{- $services := default dict .Values.services }}
+{{- if eq (dig "postgres" "provider" "external" $services) "bundled" }}
+{{- $p := .Values.services.postgres.bundled }}
+{{- if not (regexMatch "^[a-z0-9][a-z0-9./:_-]{0,383}@sha256:[a-f0-9]{64}$" $p.image) }}
+{{- fail "services.postgres.bundled.image requires the verified PostgreSQL/pgBackRest image repository@sha256 digest" }}
+{{- end }}
+{{- $name := printf "%s-postgres" .Values.bootstrap.name }}
+{{- $sameKeycloak := and (eq (dig "identity" "provider" "external" $services) "keycloak") (eq (dig "identity" "keycloak" "database" "host" "" $services) "") }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  clusterIP: None
+  # The backup container must resolve the exact server while establishing the
+  # first backup, before the complete Pod can become Ready.
+  publishNotReadyAddresses: true
+  selector:
+    asservat.io/postgres: {{ $name }}
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  serviceName: {{ $name }}
+  replicas: 1
+  revisionHistoryLimit: 1
+  selector:
+    matchLabels:
+      asservat.io/postgres: {{ $name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: asservat-postgres
+        asservat.io/postgres: {{ $name }}
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      terminationGracePeriodSeconds: 90
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: postgres
+          image: {{ $p.image | quote }}
+          imagePullPolicy: IfNotPresent
+          args: [server]
+          ports:
+            - name: postgres
+              containerPort: 5432
+          env: &postgresEnvironment
+            - name: PGHOST
+              value: {{ printf "%s.%s.svc" $name .Release.Namespace | quote }}
+            - name: PGMAXCONNECTIONS
+              value: {{ ternary "122" "117" $sameKeycloak | quote }}
+            - name: KEYCLOAK_DATABASE
+              value: {{ ternary "true" "false" $sameKeycloak | quote }}
+          securityContext: &postgresSecurity
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          resources: {{ toYaml $p.resources | nindent 12 }}
+          readinessProbe:
+            exec:
+              command: [pg_isready, -h, "127.0.0.1", -p, "5432"]
+            periodSeconds: 5
+            timeoutSeconds: 2
+          startupProbe:
+            exec:
+              command: [pg_isready, -h, "127.0.0.1", -p, "5432"]
+            periodSeconds: 2
+            failureThreshold: 150
+            timeoutSeconds: 2
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql
+            - name: backup
+              mountPath: /var/lib/pgbackrest
+            - name: server-material
+              mountPath: /run/asservat/postgres-private
+              readOnly: true
+            - name: server-work
+              mountPath: /run/asservat/postgres
+            - name: server-tmp
+              mountPath: /tmp
+        - name: backup
+          image: {{ $p.image | quote }}
+          imagePullPolicy: IfNotPresent
+          args: [backup]
+          env: *postgresEnvironment
+          securityContext: *postgresSecurity
+          resources: {{ toYaml $p.backupResources | nindent 12 }}
+          readinessProbe:
+            exec:
+              command: [bash, -ec, 'test -f /var/lib/pgbackrest/last-success && test "$(( $(date +%s) - $(cat /var/lib/pgbackrest/last-success) ))" -lt 93600']
+            periodSeconds: 30
+            timeoutSeconds: 2
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql
+              readOnly: true
+            - name: backup
+              mountPath: /var/lib/pgbackrest
+            - name: backup-material
+              mountPath: /run/asservat/postgres-private
+              readOnly: true
+            - name: backup-work
+              mountPath: /run/asservat/postgres
+            - name: backup-tmp
+              mountPath: /tmp
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ printf "%s-data" $name }}
+        - name: backup
+          persistentVolumeClaim:
+            claimName: {{ printf "%s-backup" $name }}
+        - name: server-work
+          emptyDir: {medium: Memory, sizeLimit: 16Mi}
+        - name: backup-work
+          emptyDir: {medium: Memory, sizeLimit: 16Mi}
+        - name: server-tmp
+          emptyDir: {medium: Memory, sizeLimit: 16Mi}
+        - name: backup-tmp
+          emptyDir: {medium: Memory, sizeLimit: 16Mi}
+        - name: server-material
+          secret:
+            secretName: {{ printf "%s-state" $name }}
+            defaultMode: 0440
+            items:
+              {{- range list "ca.crt" "server.crt" "server.key" "administrator-password" "ddl-verifier" "backup-verifier" "backup.pgpass" "backup-cipher" }}
+              - {key: {{ . | quote }}, path: {{ . | quote }}}
+              {{- end }}
+              {{- if $sameKeycloak }}
+              - {key: keycloak-verifier, path: keycloak-verifier}
+              {{- end }}
+        - name: backup-material
+          secret:
+            secretName: {{ printf "%s-state" $name }}
+            defaultMode: 0440
+            items:
+              {{- range list "ca.crt" "backup.pgpass" "backup-cipher" }}
+              - {key: {{ . | quote }}, path: {{ . | quote }}}
+              {{- end }}
+{{- end }}

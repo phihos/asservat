@@ -88,7 +88,35 @@ func RunInstallerProviderApply(ctx context.Context, args []string, out io.Writer
 	evidenceDeleteFile := flags.String("evidence-delete-credential", "", "the context deletion's list-and-delete evidence storage credential JSON file (phase 3 with deletion)")
 	cleanupFile := flags.String("cleanup-audit-credential", "", "operation audit cleanup storage credential JSON file (phase 3 with cleanup)")
 	cleanupVerifyFile := flags.String("cleanup-verify-credential", "", "independent operation audit verification storage credential JSON file (phase 3 with cleanup)")
-	if flags.Parse(args) != nil || flags.NArg() != 0 || *installation == "" || *credentialFile == "" {
+	if flags.Parse(args) != nil || flags.NArg() != 0 || *installation == "" {
+		return mounts.ErrUnavailable
+	}
+	configuration, current, resolved, err := localKubernetes(*kubeconfig, *selected, *namespace)
+	if err != nil {
+		return err
+	}
+	ctx, end := context.WithTimeout(ctx, time.Minute)
+	defer end()
+	outbox, err := kube.ReadInstallerOutbox(ctx, configuration, resolved, *installation)
+	if err != nil {
+		return err
+	}
+	if outbox.ProviderMode == contracts.InstallerProviderBundledObjectStore {
+		ambiguous := false
+		flags.Visit(func(f *flag.Flag) {
+			switch f.Name {
+			case "kubeconfig", "context", "namespace", "installation":
+			default:
+				ambiguous = true
+			}
+		})
+		if ambiguous {
+			_, _ = fmt.Fprintln(out, "The selected bundled object store retains the original private inputs; omit credential, OIDC and TLS file flags.")
+			return mounts.ErrUnavailable
+		}
+		return applyMixedExternalProvider(ctx, configuration, current, resolved, *installation, outbox, out)
+	}
+	if *credentialFile == "" {
 		return mounts.ErrUnavailable
 	}
 	var serving map[string][]byte
@@ -199,28 +227,13 @@ func RunInstallerProviderApply(ctx context.Context, args []string, out io.Writer
 			return mounts.ErrUnavailable
 		}
 	}
-	configuration, current, resolved, err := localKubernetes(*kubeconfig, *selected, *namespace)
-	if err != nil {
-		return err
-	}
-	ctx, end := context.WithTimeout(ctx, time.Minute)
-	defer end()
-	outbox, err := kube.ReadInstallerOutbox(ctx, configuration, resolved, *installation)
-	if err != nil {
-		return err
-	}
 	// An artifact with a federation section needs its separate credential,
 	// checked before any provider write.
-	var plan struct {
-		Federation json.RawMessage                   `json:"federation"`
-		Publisher  json.RawMessage                   `json:"publisher"`
-		Public     bool                              `json:"public"`
-		Downloads  json.RawMessage                   `json:"downloadEvidenceReadStorage"`
-		Cleanup    json.RawMessage                   `json:"operationCleanupStorage"`
-		Deletion   json.RawMessage                   `json:"evidenceDeleteStorage"`
-		ServingTLS contracts.InstallerServingTLSPlan `json:"servingTLS"`
+	plan, err := readInstallerProviderMaterialPlan(outbox.Recipe)
+	if err != nil {
+		return err
 	}
-	if json.Unmarshal(outbox.Recipe, &plan) == nil && len(plan.Federation) != 0 && string(plan.Federation) != "null" && federation == nil {
+	if len(plan.Federation) != 0 && string(plan.Federation) != "null" && federation == nil {
 		_, _ = fmt.Fprintln(out, "This recipe provisions the federation: pass --federation-audit-credential with its separately scoped audit credential.")
 		return mounts.ErrUnavailable
 	}

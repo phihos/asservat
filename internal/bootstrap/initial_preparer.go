@@ -220,7 +220,7 @@ func newInitialPreparationDeployment(ctx context.Context, files *os.Root, observ
 		}
 		defer h.CloseIdleConnections()
 		phase = "provider-constructor"
-		d.providerIssuer, e = kms.NewInitialProviderIssuer(c.Services.KeyService.Endpoint, material.IssuerToken, c.Services.KeyService.AuditMount, c.Services.KeyService.AuditKey, c.Plan.InstallationID, c.Plan.RequestID, *c.Providers, h, time.Now)
+		d.providerIssuer, e = initialPreparerIssuer(c, material, h, time.Now)
 		if e != nil {
 			return nil, e
 		}
@@ -375,6 +375,24 @@ func RunInitialPreparer(ctx context.Context) error {
 // InitialPreparationRemedy is safe fixed CLI copy. Never append raw Kubernetes
 // or provider errors, tokens, configuration bodies or request metadata.
 func InitialPreparationRemedy(err error) string {
+	if stage := initialOpenBaoDiagnostic(err); stage != "" {
+		return "initial key-service setup stopped at " + stage + ": retain the original installation, private state and volumes; check this stage's provider inputs and Kubernetes permissions before resuming"
+	}
+	// These owned wrappers already contain only fixed local phase names and
+	// closed diagnostics. Preserve them through the CLI instead of collapsing
+	// every consumer failure into an indistinguishable saved-state message.
+	var load initialPreparerLoadFailure
+	if errors.As(err, &load) {
+		return load.Error() + "; retain the original installation and private state before resuming"
+	}
+	var run initialPreparerRunFailure
+	if errors.As(err, &run) {
+		return run.Error() + "; retain the original installation and private state before resuming"
+	}
+	var store initialSeaweedFailure
+	if errors.As(err, &store) {
+		return "initial object-store setup stopped at " + store.FixedStep() + ": retain the original installation, bucket, private state and volumes; check this stage's provider inputs and permissions before resuming"
+	}
 	switch {
 	case errors.Is(err, providerconfig.ErrInitialRegistry):
 		return providerconfig.ErrInitialRegistry.Error()

@@ -1,7 +1,6 @@
 package bootstrap
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -29,6 +28,8 @@ type initialBootstrapProcess struct {
 	state            contracts.InitialBootstrapState
 	passiveCompleted bool
 	passiveHistory   *kube.InitialBootstrapPassiveRead
+	desired          contracts.InitialBootstrap
+	services         initialBootstrapServices
 }
 
 func newInitialBootstrapProcess(ctx context.Context, input, output *os.Root, creation bool) (_ *initialBootstrapProcess, err error) {
@@ -43,10 +44,11 @@ func newInitialBootstrapProcess(ctx context.Context, input, output *os.Root, cre
 			d.Close()
 		}
 	}()
-	desired, err := readInitialBootstrapDesired(root, input)
+	desired, services, err := readInitialBootstrapDesiredAndServices(root, input)
 	if err != nil || desired.Format != contracts.InitialBootstrapFormat && !contracts.InitialBootstrapHasPassiveHistory(desired.Format) {
 		return nil, mounts.ErrUnavailable
 	}
+	d.desired, d.services = desired, services
 	// This internal persisted capability is installer-selected. Operators do
 	// not author dynamic replay pins or choose a weaker completed path.
 	d.inputs = &providerInputs{files: input, kubernetesEndpoint: desired.Kubernetes, postgresEndpoint: desired.Postgres}
@@ -98,21 +100,26 @@ func newInitialBootstrapProcess(ctx context.Context, input, output *os.Root, cre
 	// Existing protected state is checked before any supplied provider material
 	// or SQL credential is opened. Only exact first-creation absence requests
 	// private source data; all other failure classes stop the phase.
+	var firstMaterial *contracts.InitialBootstrapMaterial
+	defer func() {
+		if firstMaterial != nil {
+			clear(firstMaterial.RegistryConfig)
+			firstMaterial.SetupToken, firstMaterial.IssuerToken = "", ""
+		}
+	}()
 	for {
 		d.state, err = d.producer.Open(root, nil)
 		if errors.Is(err, kube.ErrInitialBootstrapMaterialRequired) && creation {
-			b, readErr := mounts.Read(root, input, "provider-material.json", 8192)
-			if readErr != nil {
-				return nil, mounts.ErrUnavailable
-			}
-			material, decodeErr := contracts.DecodeInitialBootstrapMaterial(bytes.NewReader(b))
-			clear(b)
-			if decodeErr != nil || len(material.RegistryConfig) != 0 {
-				return nil, mounts.ErrUnavailable
+			if firstMaterial == nil {
+				material, readErr := d.firstMaterial(root, input)
+				if readErr != nil {
+					return nil, readErr
+				}
+				firstMaterial = &material
 			}
 			// Only original fresh admission consumes this separate explicit
 			// registry input. Completed replay never opens or copies it.
-			if desired.RegistryAuthentication != "" {
+			if desired.RegistryAuthentication != "" && len(firstMaterial.RegistryConfig) == 0 {
 				if desired.RegistryAuthentication != contracts.InitialRegistryAuthentication {
 					return nil, mounts.ErrUnavailable
 				}
@@ -120,14 +127,13 @@ func newInitialBootstrapProcess(ctx context.Context, input, output *os.Root, cre
 				if registryErr != nil {
 					return nil, mounts.ErrUnavailable
 				}
-				material.RegistryConfig, registryErr = providerconfig.NormalizeInitialRegistry(desired.Image, supplied)
+				firstMaterial.RegistryConfig, registryErr = providerconfig.NormalizeInitialRegistry(desired.Image, supplied)
 				clear(supplied)
 				if registryErr != nil {
 					return nil, registryErr
 				}
 			}
-			d.state, err = d.producer.Open(root, &material)
-			clear(material.RegistryConfig)
+			d.state, err = d.producer.Open(root, firstMaterial)
 		}
 		if !errors.Is(err, kube.ErrInitialPreparationPolicyPending) {
 			break
@@ -137,6 +143,9 @@ func newInitialBootstrapProcess(ctx context.Context, input, output *os.Root, cre
 		}
 	}
 	if err != nil {
+		return nil, err
+	}
+	if err := d.completeSmallKeyProvider(); err != nil {
 		return nil, err
 	}
 	complete = true
@@ -355,6 +364,12 @@ func (d *initialBootstrapProcess) prepare() error {
 	// Actual consumers authenticate and check original SQL/schema authority.
 	m := d.state.Manager
 	if m == nil || m.Receipt == nil || m.Closing != nil || m.RetiredAt != nil || d.state.Retired || !time.Now().Before(m.Until) {
+		return mounts.ErrUnavailable
+	}
+	if err := d.prepareSmallObjectStore(); err != nil {
+		return err
+	}
+	if d.root.Err() != nil || !time.Now().Before(m.Until) {
 		return mounts.ErrUnavailable
 	}
 	b, err := json.Marshal(contracts.OwnerSQLCredential{Username: m.Receipt.Name, Password: d.state.Passwords.Manager})

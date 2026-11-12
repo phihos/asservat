@@ -38,6 +38,10 @@ type installedIdentity struct {
 	Issuer          string
 	RootPEM         string
 	ReviewerSubject string
+	// Imported bundled realms use their actual immutable identities and client
+	// configuration. Empty fields preserve the original external fixture.
+	UsersGroupID, ProcessingGroupID, SubjectID, UnrelatedSubjectID string
+	MCPClientID, MCPScope, DownloadsScope                          string
 }
 
 // installedConsoleScopes produces the actual owned Keycloak console input.
@@ -142,21 +146,48 @@ const installedUnrelatedGroup = "synthetic-unrelated-group"
 func (i *installedIdentity) unrelated() *installedIdentity {
 	kc, client := *i.kc, *i.kc.http
 	kc.http, kc.username = &client, "outsider"
-	return &installedIdentity{kc: &kc, Issuer: i.Issuer, RootPEM: i.RootPEM}
+	out := *i
+	out.kc, out.SubjectID, out.ReviewerSubject = &kc, i.UnrelatedSubjectID, ""
+	return &out
 }
 
 const installedMCPScope, installedDownloadsScope = "resource-mcp", "resource-downloads"
 
+func (i *installedIdentity) mcpClient() string {
+	if i.MCPClientID != "" {
+		return i.MCPClientID
+	}
+	return "mcp"
+}
+func (i *installedIdentity) mcpResourceScope() string {
+	if i.MCPScope != "" {
+		return i.MCPScope
+	}
+	return installedMCPScope
+}
+func (i *installedIdentity) downloadResourceScope() string {
+	if i.DownloadsScope != "" {
+		return i.DownloadsScope
+	}
+	return installedDownloadsScope
+}
+func (i *installedIdentity) usersGroup() string {
+	if i.UsersGroupID != "" {
+		return i.UsersGroupID
+	}
+	return installedIdentityGroup
+}
+
 // mcpToken logs the synthetic user in to the MCP client with authorization
 // code and S256 PKCE and returns its access token for the MCP endpoint.
 func (i *installedIdentity) mcpToken() string {
-	return i.kc.loginScope("mcp", installedMCPScope).Access
+	return i.kc.loginScope(i.mcpClient(), i.mcpResourceScope()).Access
 }
 
 // downloadToken returns the same client's access token for the download
 // content route: a download is bound to the client that prepared it.
 func (i *installedIdentity) downloadToken() string {
-	return i.kc.loginScope("mcp", installedDownloadsScope).Access
+	return i.kc.loginScope(i.mcpClient(), i.downloadResourceScope()).Access
 }
 
 // installedJourneyTokenSource refreshes the real user's original OAuth session.
@@ -164,41 +195,48 @@ func (i *installedIdentity) downloadToken() string {
 // server's full signature, current identity and authority checks. Refresh never
 // extends an evidence, download or server request deadline.
 type installedJourneyTokenSource struct {
-	mu               sync.Mutex
-	issuer, resource string
-	now              func() time.Time
-	login            func() kcTokens
-	refresh          func(string) kcTokens
-	tokens           kcTokens
-	subject          string
-	until            time.Time
-	approvedOnly     bool
-	packetQueryOnly  bool
+	mu                         sync.Mutex
+	issuer, resource, clientID string
+	now                        func() time.Time
+	login                      func() kcTokens
+	refresh                    func(string) kcTokens
+	tokens                     kcTokens
+	subject                    string
+	until                      time.Time
+	approvedOnly               bool
+	packetQueryOnly            bool
 }
 
 func (i *installedIdentity) mcpTokenSource(origin string) *installedJourneyTokenSource {
-	return &installedJourneyTokenSource{issuer: i.Issuer, resource: strings.TrimSuffix(origin, "/") + "/mcp", now: time.Now,
-		login:   func() kcTokens { return i.kc.loginScope("mcp", installedMCPScope) },
-		refresh: func(token string) kcTokens { return i.kc.refresh("mcp", token, http.StatusOK) }}
+	return &installedJourneyTokenSource{issuer: i.Issuer, clientID: i.mcpClient(), resource: strings.TrimSuffix(origin, "/") + "/mcp", now: time.Now,
+		login:   func() kcTokens { return i.kc.loginScope(i.mcpClient(), i.mcpResourceScope()) },
+		refresh: func(token string) kcTokens { return i.kc.refresh(i.mcpClient(), token, http.StatusOK) }}
 }
 
 // The same configured MCP client/principal uses a distinct real OAuth session
 // without native-download scope. Refresh keeps that original scope selection.
 func (i *installedIdentity) approvedTokenSource(origin string) *installedJourneyTokenSource {
-	return &installedJourneyTokenSource{issuer: i.Issuer, resource: strings.TrimSuffix(origin, "/") + "/mcp", now: time.Now, approvedOnly: true,
-		login:   func() kcTokens { return i.kc.loginScopes("mcp", "openid evidence:read "+installedMCPScope) },
-		refresh: func(token string) kcTokens { return i.kc.refresh("mcp", token, http.StatusOK) }}
+	return &installedJourneyTokenSource{issuer: i.Issuer, clientID: i.mcpClient(), resource: strings.TrimSuffix(origin, "/") + "/mcp", now: time.Now, approvedOnly: true,
+		login:   func() kcTokens { return i.kc.loginScopes(i.mcpClient(), "openid evidence:read "+i.mcpResourceScope()) },
+		refresh: func(token string) kcTokens { return i.kc.refresh(i.mcpClient(), token, http.StatusOK) }}
 }
 
 // shareTokenSource is the same principal's MCP session with the optional
 // evidence:share scope (ADR-232) and, for the ADR-235 capture-time share, the
 // evidence:capture scope; no download scope.
 func (i *installedIdentity) shareTokenSource(origin string) *installedJourneyTokenSource {
-	return &installedJourneyTokenSource{issuer: i.Issuer, resource: strings.TrimSuffix(origin, "/") + "/mcp", now: time.Now,
+	return &installedJourneyTokenSource{issuer: i.Issuer, clientID: i.mcpClient(), resource: strings.TrimSuffix(origin, "/") + "/mcp", now: time.Now,
 		login: func() kcTokens {
-			return i.kc.loginScopes("mcp", "openid evidence:read evidence:share evidence:capture "+installedMCPScope)
+			return i.kc.loginScopes(i.mcpClient(), "openid evidence:read evidence:share evidence:capture "+i.mcpResourceScope())
 		},
-		refresh: func(token string) kcTokens { return i.kc.refresh("mcp", token, http.StatusOK) }}
+		refresh: func(token string) kcTokens { return i.kc.refresh(i.mcpClient(), token, http.StatusOK) }}
+}
+
+func (s *installedJourneyTokenSource) client() string {
+	if s.clientID != "" {
+		return s.clientID
+	}
+	return "mcp"
 }
 
 func (s *installedJourneyTokenSource) Token(ctx context.Context) (string, error) {
@@ -246,7 +284,7 @@ func (s *installedJourneyTokenSource) Token(ctx context.Context) (string, error)
 	if ctx.Err() != nil {
 		return "", ctx.Err()
 	}
-	if claims.Issuer != s.issuer || claims.Subject == "" || s.subject != "" && claims.Subject != s.subject || claims.Client != "mcp" ||
+	if claims.Issuer != s.issuer || claims.Subject == "" || s.subject != "" && claims.Subject != s.subject || claims.Client != s.client() ||
 		len(audiences) != 1 || audiences[0] != s.resource || !s.now().Add(30*time.Second).Before(until) || next.Refresh == "" {
 		return "", errors.New("installed identity refresh changed its principal/resource or returned expired credentials")
 	}
@@ -287,9 +325,7 @@ func (i *installedIdentity) initializeProcessing(t *testing.T, ctx context.Conte
 	client := &http.Client{Jar: jar, Timeout: 15 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 		Transport: &http.Transport{Proxy: nil, TLSClientConfig: &tls.Config{RootCAs: roots, MinVersion: tls.VersionTLS12},
 			DialContext: func(ctx context.Context, network, target string) (net.Conn, error) {
-				if host, _, e := net.SplitHostPort(target); e == nil && host == u.Hostname() {
-					target = address
-				}
+				target = installedConsoleDialTarget(u, target, address)
 				return dial.DialContext(ctx, network, target)
 			}}}
 	defer client.CloseIdleConnections()
@@ -365,7 +401,7 @@ func (i *installedIdentity) initializeProcessing(t *testing.T, ctx context.Conte
 
 // Raw query inspection is a distinct OAuth session; it has no capture or native-download scope.
 func (i *installedIdentity) packetQueryTokenSource(origin string) *installedJourneyTokenSource {
-	return &installedJourneyTokenSource{issuer: i.Issuer, resource: strings.TrimSuffix(origin, "/") + "/mcp", now: time.Now, approvedOnly: true, packetQueryOnly: true, login: func() kcTokens {
-		return i.kc.loginScopes("mcp", "openid evidence:read evidence:raw "+installedMCPScope)
-	}, refresh: func(token string) kcTokens { return i.kc.refresh("mcp", token, http.StatusOK) }}
+	return &installedJourneyTokenSource{issuer: i.Issuer, clientID: i.mcpClient(), resource: strings.TrimSuffix(origin, "/") + "/mcp", now: time.Now, approvedOnly: true, packetQueryOnly: true, login: func() kcTokens {
+		return i.kc.loginScopes(i.mcpClient(), "openid evidence:read evidence:raw "+i.mcpResourceScope())
+	}, refresh: func(token string) kcTokens { return i.kc.refresh(i.mcpClient(), token, http.StatusOK) }}
 }

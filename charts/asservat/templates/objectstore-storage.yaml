@@ -1,0 +1,21 @@
+{{- $services := default dict .Values.services }}
+{{- if eq (dig "objectStore" "provider" "external" $services) "seaweedfs" }}
+{{- $p := .Values.services.objectStore.seaweedfs.persistence }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ printf "%s-objectstore-data" .Values.bootstrap.name }}
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    helm.sh/resource-policy: keep
+  labels:
+    app.kubernetes.io/name: asservat-objectstore
+spec:
+  accessModes: [ReadWriteOnce]
+  {{- if $p.storageClass }}
+  storageClassName: {{ $p.storageClass | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ $p.size | quote }}
+{{- end }}

@@ -36,6 +36,9 @@ type kcFixture struct {
 	// username selects the realm user loginScopes signs in; empty means the
 	// fixture's original "developer".
 	username string
+	// The actual selected imported client owns this exact callback. Empty keeps
+	// the original external fixture's loopback URI.
+	redirectURI string
 }
 type kcTokens struct {
 	Access  string `json:"access_token"`
@@ -114,6 +117,13 @@ func (f *kcFixture) loginScope(client, extra string, mode ...string) kcTokens {
 
 // loginScopes allows a real least-scope PKCE session; token claims are still
 // issued and validated by Keycloak and the product, never synthesized here.
+func (f *kcFixture) callback() string {
+	if f.redirectURI != "" {
+		return f.redirectURI
+	}
+	return "http://127.0.0.1:1/callback"
+}
+
 func (f *kcFixture) loginScopes(client, scopes string, mode ...string) kcTokens {
 	f.t.Helper()
 	// Real authorization code + S256 PKCE. The loopback callback is never fetched;
@@ -124,7 +134,7 @@ func (f *kcFixture) loginScopes(client, scopes string, mode ...string) kcTokens 
 	defer func() { f.http.Jar = previous }()
 	verifier, state, nonce := randomPKCE(), randomPKCE(), randomPKCE()
 	sum := sha256.Sum256([]byte(verifier))
-	query := url.Values{"client_id": {client}, "redirect_uri": {"http://127.0.0.1:1/callback"}, "response_type": {"code"}, "scope": {scopes}, "state": {state}, "nonce": {nonce}, "code_challenge_method": {"S256"}, "code_challenge": {base64.RawURLEncoding.EncodeToString(sum[:])}}
+	query := url.Values{"client_id": {client}, "redirect_uri": {f.callback()}, "response_type": {"code"}, "scope": {scopes}, "state": {state}, "nonce": {nonce}, "code_challenge_method": {"S256"}, "code_challenge": {base64.RawURLEncoding.EncodeToString(sum[:])}}
 	status, page, _ := f.request("GET", f.Issuer+"/protocol/openid-connect/auth?"+query.Encode(), "", "", nil)
 	if status != 200 {
 		f.t.Fatalf("PKCE login page status %d", status)
@@ -147,10 +157,10 @@ func (f *kcFixture) loginScopes(client, scopes string, mode ...string) kcTokens 
 		f.t.Fatalf("fixture login status %d", status)
 	}
 	callback, err := url.Parse(headers.Get("Location"))
-	if err != nil || callback.Scheme != "http" || callback.Host != "127.0.0.1:1" || callback.Path != "/callback" || callback.Query().Get("state") != state || callback.Query().Get("code") == "" {
+	if err != nil || callback.Scheme+"://"+callback.Host+callback.Path != f.callback() || callback.Query().Get("state") != state || callback.Query().Get("code") == "" {
 		f.t.Fatal("fixture callback binding")
 	}
-	form := url.Values{"grant_type": {"authorization_code"}, "client_id": {client}, "code": {callback.Query().Get("code")}, "redirect_uri": {"http://127.0.0.1:1/callback"}, "code_verifier": {verifier}}
+	form := url.Values{"grant_type": {"authorization_code"}, "client_id": {client}, "code": {callback.Query().Get("code")}, "redirect_uri": {f.callback()}, "code_verifier": {verifier}}
 	if len(mode) > 0 && mode[0] == "wrong-verifier" {
 		form.Set("code_verifier", randomPKCE())
 		f.tokens(f.Issuer+"/protocol/openid-connect/token", form, 400)

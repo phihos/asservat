@@ -28,19 +28,65 @@ func qualifyInstalledFleetIssuance(t *testing.T, ctx context.Context, sql *pgxpo
 		t.Fatal("installed fleet issuance requires the public root and actual browser identity")
 	}
 	b := identity.consoleSession(t, ctx, root, address, origin)
+	first := issueInstalledFleetBootstrap(t, ctx, sql, b, installation)
+	// The fleet operator reads the configured channel separately, as the regional
+	// installer does. Its strict product decoder checks the private record shape.
+	raw := providers.admin(t, ctx, http.MethodGet, mount+"/data/connector/"+installation+"/"+first.BootstrapID, nil, http.StatusOK)
+	defer clear(raw)
+	var stored struct {
+		Data struct {
+			Data     json.RawMessage `json:"data"`
+			Metadata struct {
+				Version   int  `json:"version"`
+				Destroyed bool `json:"destroyed"`
+			} `json:"metadata"`
+		} `json:"data"`
+	}
+	if json.Unmarshal(raw, &stored) != nil || stored.Data.Metadata.Version != 1 || stored.Data.Metadata.Destroyed {
+		t.Fatal("installed fleet operator channel version")
+	}
+	defer clear(stored.Data.Data)
+	envelope, err := kms.DecodeBootstrapRecord(stored.Data.Data)
+	if err != nil || envelope.BootstrapID != first.BootstrapID || envelope.Binding.InstallationID != installation || envelope.Binding.ClusterID != first.ClusterID ||
+		envelope.Binding.PeerID != first.PeerID || envelope.Binding.IssuerEpoch != first.IssuerEpoch || envelope.DeliveryProfile != first.DeliveryProfile ||
+		!envelope.NotBefore.Equal(first.NotBefore) || !envelope.NotAfter.Equal(first.NotAfter) {
+		t.Fatal("installed fleet channel did not preserve the issued binding and original deadline")
+	}
+	digest, err := mtls.BootstrapDigest(installation, envelope.BootstrapID, envelope.Secret)
+	if err != nil {
+		t.Fatal("installed fleet channel secret format")
+	}
+	var matches bool
+	if err := sql.QueryRow(ctx, `SELECT i.credential_sha256=$3 AND i.request_digest=$4
+		AND i.cluster_id=$5 AND i.peer_id=$6 AND i.issuer_epoch=$7 AND i.not_before=$8 AND i.not_after=$9
+		FROM fleet_bootstrap_intent i WHERE i.installation_id=$1 AND i.id=$2`,
+		installation, first.BootstrapID, digest[:], envelope.RequestDigest[:], first.ClusterID, first.PeerID, first.IssuerEpoch, first.NotBefore, first.NotAfter).Scan(&matches); err != nil || !matches {
+		t.Fatal("installed fleet channel credential did not match the issued SQL binding", err)
+	}
+	t.Log("installed fleet issuance: authenticated browser returned one audited slot; replay kept all receipts and bounds; operator KV held the matching version-1 credential")
+	// The exact operator-read record can fund the subsequent actual enrollment.
+	// Returning a copy preserves the strict decoded original while clearing the
+	// response buffers here; the caller owns and clears this one private copy.
+	return bytes.Clone(stored.Data.Data)
+}
+
+type installedFleetBootstrapReceipt struct {
+	BootstrapID       string    `json:"bootstrapID"`
+	ClusterID         string    `json:"clusterID"`
+	PeerID            string    `json:"peerID"`
+	IssuerEpoch       string    `json:"issuerEpoch"`
+	DeliveryProfile   string    `json:"deliveryProfile"`
+	CredentialVersion int       `json:"credentialVersion"`
+	NotBefore         time.Time `json:"notBefore"`
+	NotAfter          time.Time `json:"notAfter"`
+}
+
+func issueInstalledFleetBootstrap(t *testing.T, ctx context.Context, sql *pgxpool.Pool, b *installedBrowser, installation string) installedFleetBootstrapReceipt {
+	t.Helper()
 	const profile = "regional-installer"
 	const key = "installed-fleet-bootstrap-0001"
-	type reply struct {
-		BootstrapID       string    `json:"bootstrapID"`
-		ClusterID         string    `json:"clusterID"`
-		PeerID            string    `json:"peerID"`
-		IssuerEpoch       string    `json:"issuerEpoch"`
-		DeliveryProfile   string    `json:"deliveryProfile"`
-		CredentialVersion int       `json:"credentialVersion"`
-		NotBefore         time.Time `json:"notBefore"`
-		NotAfter          time.Time `json:"notAfter"`
-	}
-	issue := func() reply {
+
+	issue := func() installedFleetBootstrapReceipt {
 		t.Helper()
 		request, err := http.NewRequestWithContext(ctx, http.MethodPost, b.base+browser.FleetBootstrapPath,
 			bytes.NewBufferString(`{"displayName":"installed public issuance","region":"eu-test","deliveryProfile":"regional-installer"}`))
@@ -63,7 +109,7 @@ func qualifyInstalledFleetIssuance(t *testing.T, ctx context.Context, sql *pgxpo
 		if err != nil || len(raw) > 4096 {
 			t.Fatal("installed fleet receipt size/read")
 		}
-		var out reply
+		var out installedFleetBootstrapReceipt
 		decoder := json.NewDecoder(bytes.NewReader(raw))
 		decoder.DisallowUnknownFields() // the public receipt must contain no secret
 		if decoder.Decode(&out) != nil || decoder.Decode(new(any)) != io.EOF ||
@@ -109,43 +155,5 @@ func qualifyInstalledFleetIssuance(t *testing.T, ctx context.Context, sql *pgxpo
 	if nextIntent, nextToken := snapshot(); nextIntent != intent || nextToken != token {
 		t.Fatal("installed fleet replay changed a persisted receipt or original bound")
 	}
-	// The fleet operator reads the configured channel separately, as the regional
-	// installer does. Its strict product decoder checks the private record shape.
-	raw := providers.admin(t, ctx, http.MethodGet, mount+"/data/connector/"+installation+"/"+first.BootstrapID, nil, http.StatusOK)
-	defer clear(raw)
-	var stored struct {
-		Data struct {
-			Data     json.RawMessage `json:"data"`
-			Metadata struct {
-				Version   int  `json:"version"`
-				Destroyed bool `json:"destroyed"`
-			} `json:"metadata"`
-		} `json:"data"`
-	}
-	if json.Unmarshal(raw, &stored) != nil || stored.Data.Metadata.Version != 1 || stored.Data.Metadata.Destroyed {
-		t.Fatal("installed fleet operator channel version")
-	}
-	defer clear(stored.Data.Data)
-	envelope, err := kms.DecodeBootstrapRecord(stored.Data.Data)
-	if err != nil || envelope.BootstrapID != first.BootstrapID || envelope.Binding.InstallationID != installation || envelope.Binding.ClusterID != first.ClusterID ||
-		envelope.Binding.PeerID != first.PeerID || envelope.Binding.IssuerEpoch != first.IssuerEpoch || envelope.DeliveryProfile != first.DeliveryProfile ||
-		!envelope.NotBefore.Equal(first.NotBefore) || !envelope.NotAfter.Equal(first.NotAfter) {
-		t.Fatal("installed fleet channel did not preserve the issued binding and original deadline")
-	}
-	digest, err := mtls.BootstrapDigest(installation, envelope.BootstrapID, envelope.Secret)
-	if err != nil {
-		t.Fatal("installed fleet channel secret format")
-	}
-	var matches bool
-	if err := sql.QueryRow(ctx, `SELECT i.credential_sha256=$3 AND i.request_digest=$4
-		AND i.cluster_id=$5 AND i.peer_id=$6 AND i.issuer_epoch=$7 AND i.not_before=$8 AND i.not_after=$9
-		FROM fleet_bootstrap_intent i WHERE i.installation_id=$1 AND i.id=$2`,
-		installation, first.BootstrapID, digest[:], envelope.RequestDigest[:], first.ClusterID, first.PeerID, first.IssuerEpoch, first.NotBefore, first.NotAfter).Scan(&matches); err != nil || !matches {
-		t.Fatal("installed fleet channel credential did not match the issued SQL binding", err)
-	}
-	t.Log("installed fleet issuance: authenticated browser returned one audited slot; replay kept all receipts and bounds; operator KV held the matching version-1 credential")
-	// The exact operator-read record can fund the subsequent actual enrollment.
-	// Returning a copy preserves the strict decoded original while clearing the
-	// response buffers here; the caller owns and clears this one private copy.
-	return bytes.Clone(stored.Data.Data)
+	return first
 }

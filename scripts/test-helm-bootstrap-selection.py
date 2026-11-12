@@ -18,6 +18,80 @@ spec.loader.exec_module(fixture)
 
 
 class HelmSelection(unittest.TestCase):
+    def test_bundled_objectstore_is_explicit_and_keeps_exact_helm_selection(self):
+        flag = "ASSERVAT_HELM_BUNDLED_OBJECTSTORE"
+        base = {flag: "1"}
+        ordinary = fixture.qualification_environment(base, Path("fixture"), Path("work"), False, False)
+        self.assertNotIn(flag, ordinary)
+        selected = fixture.qualification_environment(base, Path("fixture"), Path("work"), False, False, helm_bootstrap=True, bundled_objectstore=True)
+        self.assertEqual(selected[flag], "1")
+        self.assertEqual(selected["ASSERVAT_HELM_BOOTSTRAP_NATIVE"], "1")
+        self.assertEqual(fixture.qualification_selection(None, False, False, helm_bootstrap=True), ("^TestHelmBootstrapWithRealServices$", 1))
+        with patch.dict("os.environ", {}, clear=True), patch.object(fixture, "run", side_effect=AssertionError("external setup")) as external:
+            with self.assertRaisesRegex(ValueError, "requires --helm-bootstrap"):
+                fixture.main(bundled_objectstore=True)
+            with self.assertRaisesRegex(ValueError, "without --helm-cluster"):
+                fixture.main(helm_bootstrap=True, helm_cluster=True, bundled_objectstore=True)
+            external.assert_not_called()
+
+    def test_bundled_postgres_is_explicit_independent_and_sanitized(self):
+        blobs = {}
+        def blob(value):
+            raw = json.dumps(value, separators=(",", ":")).encode()
+            digest = "sha256:" + hashlib.sha256(raw).hexdigest()
+            blobs["blobs/sha256/" + digest[7:]] = raw
+            return {"digest": digest, "size": len(raw), "mediaType": value.get("mediaType")}
+        config = blob({"os": "linux", "architecture": "amd64", "rootfs": {"diff_ids": []}})
+        manifest = blob({"schemaVersion": 2, "mediaType": "application/vnd.oci.image.manifest.v1+json", "config": config, "layers": []})
+        index = blob({"schemaVersion": 2, "mediaType": "application/vnd.oci.image.index.v1+json", "manifests": [dict(manifest, platform={"os": "linux", "architecture": "amd64"})]})
+        def content(path, maximum):
+            self.assertLessEqual(len(blobs[path]), maximum)
+            return blobs[path]
+        for original in (config["digest"], manifest["digest"], index["digest"]):
+            for resolved in (manifest["digest"], index["digest"]):
+                reference = "docker.io/library/asservat-small-postgres-smoke@" + resolved
+                status = {"id": config["digest"], "repoDigests": [reference]}
+                self.assertEqual(fixture.verify_bundled_postgres_cri_image(json.dumps({"status": status}), reference, original, content), config["digest"])
+        for status in ({"id": config["digest"], "repoDigests": []}, {"id": resolved, "repoDigests": [reference]}, {}):
+            with self.assertRaises(RuntimeError):
+                fixture.verify_bundled_postgres_cri_image(json.dumps({"status": status}), reference, index["digest"], content)
+        flag = "ASSERVAT_HELM_BUNDLED_POSTGRES"
+        base = {flag: "1", "ASSERVAT_HELM_BUNDLED_KEYSERVICE": "1"}
+        ordinary = fixture.qualification_environment(base, Path("fixture"), Path("work"), False, False)
+        self.assertNotIn(flag, ordinary)
+        for keys, objects in ((False, False), (False, True), (True, False), (True, True)):
+            selected = fixture.qualification_environment(base, Path("fixture"), Path("work"), False, False, helm_bootstrap=True, bundled_postgres=True, bundled_keyservice=keys, bundled_objectstore=objects)
+            self.assertEqual(selected[flag], "1")
+            self.assertEqual(selected.get("ASSERVAT_HELM_BUNDLED_KEYSERVICE"), "1" if keys else None)
+            self.assertEqual(selected.get("ASSERVAT_HELM_BUNDLED_OBJECTSTORE"), "1" if objects else None)
+        self.assertEqual(fixture.qualification_selection(None, False, False, helm_bootstrap=True), ("^TestHelmBootstrapWithRealServices$", 1))
+        with patch.dict("os.environ", {}, clear=True), patch.object(fixture, "run", side_effect=AssertionError("external setup")) as external:
+            with self.assertRaisesRegex(ValueError, "requires --helm-bootstrap"):
+                fixture.main(bundled_postgres=True)
+            with self.assertRaisesRegex(ValueError, "without --helm-cluster"):
+                fixture.main(helm_bootstrap=True, helm_cluster=True, bundled_postgres=True)
+            external.assert_not_called()
+
+    def test_bundled_keyservice_is_explicit_independent_and_sanitized(self):
+        flag = "ASSERVAT_HELM_BUNDLED_KEYSERVICE"
+        object_flag = "ASSERVAT_HELM_BUNDLED_OBJECTSTORE"
+        base = {flag: "1", object_flag: "1"}
+        ordinary = fixture.qualification_environment(base, Path("fixture"), Path("work"), False, False)
+        self.assertNotIn(flag, ordinary)
+        self.assertNotIn(object_flag, ordinary)
+        for object_store in (False, True):
+            selected = fixture.qualification_environment(base, Path("fixture"), Path("work"), False, False, helm_bootstrap=True, bundled_keyservice=True, bundled_objectstore=object_store)
+            self.assertEqual(selected[flag], "1")
+            self.assertEqual(selected.get(object_flag), "1" if object_store else None)
+            self.assertEqual(selected["ASSERVAT_HELM_BOOTSTRAP_NATIVE"], "1")
+        with self.assertRaisesRegex(ValueError, "requires --helm-bootstrap"):
+            fixture.qualification_environment(base, Path("fixture"), Path("work"), False, False, bundled_keyservice=True)
+        with patch.dict("os.environ", {}, clear=True), patch.object(fixture, "run", side_effect=AssertionError("external setup")) as external:
+            for options in ({"bundled_keyservice": True}, {"helm_bootstrap": True, "helm_cluster": True, "bundled_keyservice": True}):
+                with self.assertRaisesRegex(ValueError, "requires --helm-bootstrap"):
+                    fixture.main(**options)
+            external.assert_not_called()
+
     def test_context_chart_mode_is_explicit_and_stays_in_installed_workflow(self):
         flag = "ASSERVAT_HELM_CONTEXT_NATIVE"
         base = {flag: "1"}

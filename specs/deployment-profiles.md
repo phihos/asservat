@@ -1,6 +1,6 @@
 # Deployment profiles and internal dependency alternatives
 
-The maintainer requires a small-deployment path that does not require separately operated SSO, KMS, S3 or PostgreSQL and has accepted the recommendations in [ADR-063](../docs/decisions/063-small-deployment-alternatives.md). The [research report](../docs/research/small-deployments.md) distinguishes selected choices from measured qualification. These requirements are planned behavior, not available chart settings.
+The maintainer requires a small-deployment path that does not require separately operated SSO, KMS, S3 or PostgreSQL and has accepted the recommendations in [ADR-063](../docs/decisions/063-small-deployment-alternatives.md). The [research report](../docs/research/small-deployments.md) distinguishes selected choices from measured qualification. Qualification remains incomplete; the implementation ledger distinguishes component settings from an installable profile.
 
 ## REQ-DEP-001 — Independently selectable infrastructure
 
@@ -33,6 +33,42 @@ permanently fail that call; no reacquisition or cross-call cache is allowed.
 An unavailable read MUST NOT be reported as evidence of changed identity.
 Unknown writes retain original claims and lookup-only recovery. This exception
 provides bounded freshness, not instantaneous revocation or runtime enablement.
+
+The maintainer's 2026-11-11 refinement requires bundled Keycloak as an explicit
+identity choice, independently of the PostgreSQL, object-store and key-service
+selections. An existing external Keycloak remains selectable. Bundled Keycloak
+MUST retain its original realm/client/group identities and selected database
+target across retries, restart and upgrade; changing the target requires an
+explicit supported migration. Generated credentials MUST remain outside Helm
+values and release data. See [ADR-326](../docs/decisions/326-individually-selectable-small-services.md).
+
+Provider selections MUST remain independent during runtime continuation.
+Bundled key services with external storage MUST consume explicitly supplied
+purpose-specific storage credentials from the existing private installer source;
+no external key-provider administration token is required. Bundled storage with
+an external key provider MUST retain its original generated credentials before
+provider setup and consume the real external inspection result through the
+existing carrier. Credentials MUST NOT enter public recipes. Acknowledged worker
+replay MUST verify its current retained launch rather than recreate or await a
+consumed earlier-phase carrier. See ADR-326 for the finite composition.
+
+For the selected bundled same-API regional path, the finite installer MUST read
+the original fleet-issued bootstrap by its public ID and exact version1, preserve
+its original bounds, and persist separate regional evidence/history credentials
+in the existing protected carrier before enabling provider access. It MUST reuse
+the normal connector installation and catalog join. Provider setup MUST preserve
+all retained identities/keys and policy statements; conflicts or uncertain writes
+MUST NOT rotate keys or silently replace state. This path adds no runtime
+bootstrap-issuance permission and requires no externally operated provider admin.
+
+Bundled storage MUST resolve generated public trust before canonical installation
+inputs and bind continuation to that original source. A completed bucket binding
+is provenance, never renewed initial authority. The first bundled store uses one
+owned audit/evidence bucket with disjoint existing purpose prefixes; an explicit
+incompatible bucket or region MUST be refused. Runtime keys MUST be retained in
+their original protected credential objects before IAM enablement. Replay MUST
+preserve later roles, while external storage keeps its complete explicit input
+requirements. These contracts do not establish installed profile qualification.
 
 Official Helm installation MUST offer explicit bundled and external choices for identity, key services, PostgreSQL and evidence storage. A small profile selects compatible internal/bundled defaults; administrators can override each provider independently. Deployment size is separate from hub/cluster topology and never introduces tenants. Workload-cluster enrollment MUST NOT install duplicate hub databases or identity services. Reuse existing configured infrastructure without taking ownership of it.
 
@@ -255,3 +291,10 @@ actor or resource is exempted. Fresh installed inputs MUST derive this branch
 and the fixed processing-source UPDATE probe before their original guard claims,
 and preserve them through configuration role production, worker activation and
 owner startup. Existing receipts MUST NOT be rewritten to adopt the new plan.
+
+
+Bundled Keycloak may explicitly opt into an initially empty dedicated processing
+operator group. The original retained settings and protected generated public
+group identity determine the resulting Kubernetes processing-operator declaration.
+This does not grant ordinary users privacy authority or replace current ordinary
+evidence permission checks. With opt-in disabled, current behavior is unchanged.

@@ -1,0 +1,162 @@
+{{- $s := .Values.services }}
+{{- $pg := eq $s.postgres.provider "bundled" }}
+{{- $kc := eq $s.identity.provider "keycloak" }}
+{{- $s3 := eq $s.objectStore.provider "seaweedfs" }}
+{{- $bao := eq $s.keyService.provider "openbao" }}
+{{- if or $pg $kc $s3 $bao }}
+{{- $b := .Values.bootstrap }}
+{{- if or (not $b.enabled) (eq .Values.mode "cluster") }}
+{{- fail "bundled hub services require bootstrap.enabled in a hub or combined release" }}
+{{- end }}
+{{- $name := printf "%s-services-prepare" $b.name }}
+{{- $kubernetes := dict "endpoint" $b.kubernetes.endpoint }}
+{{- if $b.kubernetes.rootsPEM }}{{ $_ := set $kubernetes "rootsPEM" $b.kubernetes.rootsPEM }}{{ end }}
+{{- $plan := dict "format" "asservat-small-services/v1" "namespace" .Release.Namespace "name" $b.name "kubernetes" $kubernetes "postgres" $pg }}
+{{- if $kc }}
+{{- $k := $s.identity.keycloak }}
+{{- $p := $b.continuation.public }}
+{{- if not $p.origin }}{{ fail "bundled Keycloak requires bootstrap.continuation.public.origin" }}{{ end }}
+{{- $client := default "asservat-console" $p.clientID }}
+{{- $audience := default $client (dig "browserAudience" "" (default dict $p.promotion)) }}
+{{- $db := dict "host" (default (printf "%s-postgres.%s.svc" $b.name .Release.Namespace) $k.database.host) "port" $k.database.port "database" $k.database.name "username" $k.database.user }}
+{{- $_ := set $plan "keycloak" (dict "namespace" .Release.Namespace "secretName" (printf "%s-keycloak-state" $b.name) "hostname" $k.hostname "realm" $k.realm "origin" $p.origin "consoleClientID" $client "browserAudience" $audience "mcpClientID" "asservat-mcp" "mcpRedirectURIs" $k.mcpRedirectURIs "database" $db) }}
+{{- if $k.processingOperators }}{{ $_ := set (get $plan "keycloak") "processingOperators" true }}{{ end }}
+{{- if or (not $pg) $k.database.host }}
+{{- $_ := set $plan "keycloakExternalDatabase" true }}
+{{- end }}
+{{- end }}
+{{- if $s3 }}
+{{- $_ := set $plan "objectStore" (dict "format" "asservat-small-seaweed/v1" "namespace" .Release.Namespace "name" $b.name "image" $s.objectStore.seaweedfs.image) }}
+{{- end }}
+{{- if $bao }}{{ $_ := set $plan "openBao" (dict "image" $s.keyService.openbao.image) }}{{ end }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-20"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+automountServiceAccountToken: false
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-20"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+rules:
+  # CREATE cannot be constrained by resourceNames in Kubernetes RBAC. This
+  # finite installer account stays in the explicitly trusted bootstrap namespace.
+  - apiGroups: [""]
+    resources: [secrets]
+    verbs: [create]
+  - apiGroups: [""]
+    resources: [secrets]
+    resourceNames: [{{ printf "%s-postgres-state" $b.name | quote }}, {{ printf "%s-keycloak-state" $b.name | quote }}, {{ printf "%s-objectstore-state" $b.name | quote }}, {{ printf "%s-objectstore-iam" $b.name | quote }}{{ if $bao }}, {{ printf "%s-openbao-state" $b.name | quote }}{{ end }}]
+    verbs: [get]
+  - apiGroups: [""]
+    resources: [persistentvolumeclaims]
+    resourceNames: [{{ printf "%s-postgres-data" $b.name | quote }}, {{ printf "%s-postgres-backup" $b.name | quote }}, {{ printf "%s-objectstore-data" $b.name | quote }}{{ if $bao }}, {{ printf "%s-openbao-data" $b.name | quote }}{{ end }}]
+    verbs: [get]
+  - apiGroups: [apps]
+    resources: [deployments]
+    resourceNames: [{{ printf "%s-keycloak" $b.name | quote }}]
+    verbs: [get]
+  - apiGroups: [apps]
+    resources: [statefulsets]
+    resourceNames: [{{ printf "%s-objectstore" $b.name | quote }}, {{ printf "%s-postgres" $b.name | quote }}{{ if $bao }}, {{ printf "%s-openbao" $b.name | quote }}{{ end }}]
+    verbs: [get]
+  - apiGroups: [""]
+    resources: [pods]
+    resourceNames: [{{ printf "%s-objectstore-0" $b.name | quote }}, {{ printf "%s-postgres-0" $b.name | quote }}{{ if $bao }}, {{ printf "%s-openbao-0" $b.name | quote }}{{ end }}]
+    verbs: [get]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-10"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: {{ $name }}}
+subjects: [{kind: ServiceAccount, namespace: {{ .Release.Namespace }}, name: {{ $name }}}]
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-10"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+data:
+  preparation.json: {{ toJson $plan | quote }}
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+  labels: {app.kubernetes.io/name: asservat, asservat.io/private-role: services-prepare}
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "0"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  serviceAccountName: {{ $name }}
+  automountServiceAccountToken: false
+  enableServiceLinks: false
+  restartPolicy: Never
+  activeDeadlineSeconds: 120
+  terminationGracePeriodSeconds: 15
+  {{- if $b.registrySecret }}
+  imagePullSecrets: [{name: {{ $b.registrySecret | quote }}}]
+  {{- end }}
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 65532
+    runAsGroup: 65532
+    fsGroup: 65532
+    seccompProfile: {type: RuntimeDefault}
+  containers:
+    - name: prepare
+      image: {{ $b.image | quote }}
+      imagePullPolicy: IfNotPresent
+      command: [/asservat, small-services-prepare]
+      securityContext: {{ include "asservat.bootstrap.security" . | nindent 8 }}
+      resources: {{ include "asservat.bootstrap.resources" . | nindent 8 }}
+      volumeMounts: [{name: input, mountPath: /run/asservat/small-services, readOnly: true}]
+  volumes:
+    - name: input
+      projected:
+        defaultMode: 0440
+        sources:
+          - configMap:
+              name: {{ $name }}
+              items: [{key: preparation.json, path: preparation.json}]
+          - configMap:
+              name: kube-root-ca.crt
+              optional: {{ if $b.kubernetes.rootsPEM }}true{{ else }}false{{ end }}
+              items: [{key: ca.crt, path: kube-ca.crt}]
+          - serviceAccountToken:
+              path: administrator-token
+              expirationSeconds: 600
+          {{- if and $kc (or (not $pg) $s.identity.keycloak.database.host) }}
+          - secret:
+              name: {{ $s.identity.keycloak.database.credentialsSecretName | quote }}
+              optional: true
+              items: [{key: keycloak-password, path: keycloak-database-password}]
+          - secret:
+              name: {{ $s.identity.keycloak.database.rootsSecretName | quote }}
+              optional: true
+              items: [{key: ca.crt, path: keycloak-database-ca.crt}]
+          {{- end }}
+{{- end }}

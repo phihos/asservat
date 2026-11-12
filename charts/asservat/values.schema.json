@@ -5,7 +5,8 @@
   "additionalProperties": false,
   "required": [
     "mode",
-    "runtime"
+    "runtime",
+    "services"
   ],
   "properties": {
     "mode": {
@@ -866,18 +867,19 @@
                 }
               },
               "dependencies": {
-                "capacity": [
-                  "processingOperators"
-                ],
                 "promotion": [
                   "capacity",
-                  "federation",
-                  "processingOperators"
+                  "federation"
                 ],
                 "federation": [
                   "capacity"
                 ]
               }
+            },
+            "materialSecretName": {
+              "type": "string",
+              "maxLength": 253,
+              "pattern": "^([a-z0-9]([-a-z0-9.]*[a-z0-9])?)?$"
             }
           }
         },
@@ -923,75 +925,6 @@
             "properties": {
               "image": {
                 "minLength": 73
-              },
-              "secrets": {
-                "properties": {
-                  "producer": {
-                    "minLength": 1
-                  },
-                  "schema": {
-                    "minLength": 1
-                  },
-                  "retirement": {
-                    "minLength": 1
-                  }
-                }
-              },
-              "postgres": {
-                "properties": {
-                  "host": {
-                    "minLength": 1
-                  },
-                  "database": {
-                    "minLength": 1
-                  },
-                  "rootsPEM": {
-                    "minLength": 1
-                  }
-                }
-              },
-              "auditStore": {
-                "properties": {
-                  "endpoint": {
-                    "minLength": 1
-                  },
-                  "region": {
-                    "minLength": 1
-                  },
-                  "bucket": {
-                    "minLength": 1
-                  },
-                  "rootsPEM": {
-                    "minLength": 1
-                  }
-                }
-              },
-              "keyService": {
-                "properties": {
-                  "endpoint": {
-                    "minLength": 1
-                  },
-                  "auditMount": {
-                    "minLength": 1
-                  },
-                  "auditKey": {
-                    "minLength": 1
-                  },
-                  "rootsPEM": {
-                    "minLength": 1
-                  }
-                }
-              },
-              "fleet": {
-                "properties": {
-                  "issuer": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "clients": {
-                    "minItems": 1
-                  }
-                }
               }
             }
           }
@@ -1168,18 +1101,51 @@
                 "pattern": "^[a-z0-9.:\\[\\]-]+$"
               },
               "credential": {
-                "type": "object", "additionalProperties": false, "required": ["audiences"],
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "audiences"
+                ],
                 "description": "ADR-302: public exact workload audiences; private values belong only in profile-authorization.json in the existing evidenceSecret.",
-                "properties": {"audiences": {"type": "array", "minItems": 1, "maxItems": 64, "uniqueItems": true, "items": {
-                  "type": "object", "additionalProperties": false,
-                  "required": ["clusterID", "namespaceUID", "workloadKind", "workloadUID"],
-                  "properties": {
-                    "clusterID": {"type": "string", "format": "uuid"},
-                    "namespaceUID": {"type": "string", "format": "uuid"},
-                    "workloadKind": {"enum": ["Deployment", "StatefulSet", "Pod"]},
-                    "workloadUID": {"type": "string", "format": "uuid"}
+                "properties": {
+                  "audiences": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 64,
+                    "uniqueItems": true,
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "clusterID",
+                        "namespaceUID",
+                        "workloadKind",
+                        "workloadUID"
+                      ],
+                      "properties": {
+                        "clusterID": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "namespaceUID": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "workloadKind": {
+                          "enum": [
+                            "Deployment",
+                            "StatefulSet",
+                            "Pod"
+                          ]
+                        },
+                        "workloadUID": {
+                          "type": "string",
+                          "format": "uuid"
+                        }
+                      }
+                    }
                   }
-                }}}
+                }
               },
               "tls": {
                 "type": "object",
@@ -1273,8 +1239,59 @@
               }
             ]
           }
+        },
+        "bundledHub": {
+          "type": "string",
+          "maxLength": 30,
+          "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+          "description": "Explicit original bundled hub bootstrap name in the same release namespace; selects its existing trusted runner."
+        },
+        "bootstrapID": {
+          "type": "string",
+          "pattern": "^$|^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}$",
+          "not": {
+            "const": "00000000-0000-0000-0000-000000000000"
+          },
+          "description": "Exact already-issued fleet bootstrap ID; only with bundledHub."
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "bundledHub": {
+                "minLength": 1
+              }
+            },
+            "required": [
+              "bundledHub"
+            ]
+          },
+          "then": {
+            "properties": {
+              "bootstrapID": {
+                "minLength": 36
+              },
+              "offer": {
+                "const": ""
+              },
+              "bootstrapSecret": {
+                "const": ""
+              },
+              "evidenceSecret": {
+                "const": ""
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "bootstrapID": {
+                "const": ""
+              }
+            }
+          }
+        }
+      ]
     },
     "collector": {
       "type": "object",
@@ -1483,6 +1500,464 @@
           }
         }
       }
+    },
+    "services": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "postgres": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "provider": {
+              "enum": [
+                "external",
+                "bundled"
+              ]
+            },
+            "bundled": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "image": {
+                  "type": "string",
+                  "pattern": "^$|^[a-z0-9][a-z0-9./:_-]{0,383}@sha256:[a-f0-9]{64}$"
+                },
+                "storageClass": {
+                  "type": "string"
+                },
+                "dataSize": {
+                  "type": "string",
+                  "pattern": "^[1-9][0-9]*(Mi|Gi|Ti)$"
+                },
+                "backupSize": {
+                  "type": "string",
+                  "pattern": "^[1-9][0-9]*(Mi|Gi|Ti)$"
+                },
+                "resources": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "requests": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "cpu": {
+                          "type": [
+                            "string",
+                            "number"
+                          ]
+                        },
+                        "memory": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "limits": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "cpu": {
+                          "type": [
+                            "string",
+                            "number"
+                          ]
+                        },
+                        "memory": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                },
+                "backupResources": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "requests": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "cpu": {
+                          "type": [
+                            "string",
+                            "number"
+                          ]
+                        },
+                        "memory": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "limits": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "cpu": {
+                          "type": [
+                            "string",
+                            "number"
+                          ]
+                        },
+                        "memory": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "required": [
+                "image",
+                "storageClass",
+                "dataSize",
+                "backupSize",
+                "resources",
+                "backupResources"
+              ]
+            }
+          },
+          "required": [
+            "provider",
+            "bundled"
+          ]
+        },
+        "objectStore": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "provider": {
+              "enum": [
+                "external",
+                "seaweedfs"
+              ]
+            },
+            "seaweedfs": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "image": {
+                  "type": "string",
+                  "pattern": "^$|^[a-z0-9][a-z0-9./:_-]{0,383}@sha256:[a-f0-9]{64}$"
+                },
+                "persistence": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "storageClass": {
+                      "type": "string"
+                    },
+                    "size": {
+                      "type": "string",
+                      "pattern": "^[1-9][0-9]*(Mi|Gi|Ti)$"
+                    }
+                  },
+                  "required": [
+                    "storageClass",
+                    "size"
+                  ]
+                },
+                "resources": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "requests": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "cpu": {
+                          "type": [
+                            "string",
+                            "number"
+                          ]
+                        },
+                        "memory": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "limits": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "cpu": {
+                          "type": [
+                            "string",
+                            "number"
+                          ]
+                        },
+                        "memory": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "required": [
+                "image",
+                "persistence",
+                "resources"
+              ]
+            }
+          },
+          "required": [
+            "provider",
+            "seaweedfs"
+          ]
+        },
+        "identity": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "provider": {
+              "enum": [
+                "external",
+                "keycloak"
+              ]
+            },
+            "keycloak": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "image": {
+                  "type": "string",
+                  "pattern": "^$|^[a-z0-9][a-z0-9./:_-]{0,383}@sha256:[a-f0-9]{64}$"
+                },
+                "hostname": {
+                  "type": "string",
+                  "maxLength": 2048,
+                  "pattern": "^$|^https://[^/@?#\\s]+/?$"
+                },
+                "realm": {
+                  "type": "string",
+                  "pattern": "^[a-zA-Z0-9._-]{1,128}$"
+                },
+                "tlsSecretName": {
+                  "type": "string"
+                },
+                "mcpRedirectURIs": {
+                  "type": "array",
+                  "maxItems": 32,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "maxLength": 2048
+                  }
+                },
+                "database": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "host": {
+                      "type": "string",
+                      "maxLength": 253,
+                      "pattern": "^$|^[a-zA-Z0-9]([a-zA-Z0-9.-]{0,251}[a-zA-Z0-9])?$"
+                    },
+                    "port": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 65535
+                    },
+                    "name": {
+                      "type": "string",
+                      "pattern": "^[a-zA-Z_][a-zA-Z0-9_-]{0,62}$"
+                    },
+                    "user": {
+                      "type": "string",
+                      "pattern": "^[a-zA-Z_][a-zA-Z0-9_-]{0,62}$"
+                    },
+                    "credentialsSecretName": {
+                      "type": "string"
+                    },
+                    "rootsSecretName": {
+                      "type": "string"
+                    },
+                    "maxConnections": {
+                      "const": 5
+                    }
+                  },
+                  "required": [
+                    "host",
+                    "port",
+                    "name",
+                    "user",
+                    "credentialsSecretName",
+                    "rootsSecretName",
+                    "maxConnections"
+                  ]
+                },
+                "service": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "type": {
+                      "enum": [
+                        "ClusterIP",
+                        "NodePort"
+                      ]
+                    },
+                    "nodePort": {
+                      "type": "integer",
+                      "minimum": 30000,
+                      "maximum": 32767
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "nodePort"
+                  ]
+                },
+                "resources": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "requests": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "cpu": {
+                          "type": [
+                            "string",
+                            "number"
+                          ]
+                        },
+                        "memory": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "limits": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "cpu": {
+                          "type": [
+                            "string",
+                            "number"
+                          ]
+                        },
+                        "memory": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                },
+                "processingOperators": {
+                  "type": "boolean",
+                  "default": false,
+                  "description": "Explicit opt-in to an initially empty dedicated privacy processing group; never ordinary-users authority."
+                }
+              },
+              "required": [
+                "image",
+                "hostname",
+                "realm",
+                "tlsSecretName",
+                "mcpRedirectURIs",
+                "database",
+                "service",
+                "resources"
+              ]
+            }
+          },
+          "required": [
+            "provider",
+            "keycloak"
+          ]
+        },
+        "keyService": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "provider": {
+              "enum": [
+                "external",
+                "openbao"
+              ]
+            },
+            "openbao": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "image": {
+                  "type": "string",
+                  "pattern": "^$|^[a-z0-9][a-z0-9./:_-]{0,383}@sha256:[a-f0-9]{64}$"
+                },
+                "persistence": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "storageClass": {
+                      "type": "string"
+                    },
+                    "size": {
+                      "type": "string",
+                      "pattern": "^[1-9][0-9]*(Mi|Gi|Ti)$"
+                    }
+                  },
+                  "required": [
+                    "storageClass",
+                    "size"
+                  ]
+                },
+                "resources": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "requests": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "cpu": {
+                          "type": [
+                            "string",
+                            "number"
+                          ]
+                        },
+                        "memory": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "limits": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "cpu": {
+                          "type": [
+                            "string",
+                            "number"
+                          ]
+                        },
+                        "memory": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "required": [
+                "image",
+                "persistence",
+                "resources"
+              ]
+            }
+          },
+          "required": [
+            "provider",
+            "openbao"
+          ]
+        }
+      },
+      "required": [
+        "postgres",
+        "objectStore",
+        "identity",
+        "keyService"
+      ]
     }
   },
   "definitions": {
@@ -1942,32 +2417,22 @@
       "properties": {
         "endpoint": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 2048,
-          "pattern": "^https://[^/?#@]+/?$"
+          "maxLength": 2048
         },
         "rootsPEM": {
           "type": "string",
-          "minLength": 1,
           "maxLength": 32768
         },
         "region": {
           "type": "string",
-          "minLength": 1,
           "maxLength": 128
         },
         "bucket": {
           "type": "string",
-          "minLength": 1,
           "maxLength": 63
         }
       },
-      "required": [
-        "endpoint",
-        "rootsPEM",
-        "region",
-        "bucket"
-      ]
+      "description": "Bundled storage derives these public coordinates and roots. External storage requires all four fields."
     },
     "installerConnector": {
       "type": "object",
@@ -2029,13 +2494,11 @@
       "properties": {
         "connectorPKIMount": {
           "type": "string",
-          "minLength": 1,
           "maxLength": 128,
-          "pattern": "^[a-zA-Z0-9_-]+$"
+          "pattern": "^([a-zA-Z0-9_-]+)?$"
         },
         "connectorIssuerRootsPEM": {
           "type": "string",
-          "minLength": 1,
           "maxLength": 32768
         },
         "endpoint": {
@@ -2120,8 +2583,6 @@
         }
       },
       "required": [
-        "connectorPKIMount",
-        "connectorIssuerRootsPEM",
         "endpoint",
         "serverName",
         "serviceType",
@@ -2797,5 +3258,610 @@
       ],
       "additionalProperties": false
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "bootstrap": {
+            "properties": {
+              "enabled": {
+                "const": true
+              }
+            }
+          },
+          "services": {
+            "properties": {
+              "postgres": {
+                "properties": {
+                  "provider": {
+                    "const": "external"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "bootstrap": {
+            "properties": {
+              "postgres": {
+                "properties": {
+                  "host": {
+                    "minLength": 1
+                  },
+                  "database": {
+                    "minLength": 1
+                  },
+                  "rootsPEM": {
+                    "minLength": 1
+                  }
+                }
+              },
+              "secrets": {
+                "properties": {
+                  "schema": {
+                    "minLength": 1
+                  },
+                  "retirement": {
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "services": {
+            "properties": {
+              "postgres": {
+                "properties": {
+                  "provider": {
+                    "const": "bundled"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "services": {
+            "properties": {
+              "postgres": {
+                "properties": {
+                  "bundled": {
+                    "properties": {
+                      "image": {
+                        "minLength": 73
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "bootstrap": {
+            "properties": {
+              "enabled": {
+                "const": true
+              }
+            }
+          },
+          "services": {
+            "properties": {
+              "identity": {
+                "properties": {
+                  "provider": {
+                    "const": "external"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "bootstrap": {
+            "properties": {
+              "fleet": {
+                "properties": {
+                  "issuer": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "clients": {
+                    "minItems": 1
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "services": {
+            "properties": {
+              "identity": {
+                "properties": {
+                  "provider": {
+                    "const": "keycloak"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "services": {
+            "properties": {
+              "identity": {
+                "properties": {
+                  "keycloak": {
+                    "properties": {
+                      "image": {
+                        "minLength": 73
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "services": {
+            "properties": {
+              "objectStore": {
+                "properties": {
+                  "provider": {
+                    "const": "seaweedfs"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "services": {
+            "properties": {
+              "objectStore": {
+                "properties": {
+                  "seaweedfs": {
+                    "properties": {
+                      "image": {
+                        "minLength": 73
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "bootstrap": {
+            "properties": {
+              "enabled": {
+                "const": true
+              }
+            }
+          },
+          "services": {
+            "properties": {
+              "objectStore": {
+                "properties": {
+                  "provider": {
+                    "const": "external"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "bootstrap": {
+            "properties": {
+              "auditStore": {
+                "properties": {
+                  "endpoint": {
+                    "minLength": 1
+                  },
+                  "region": {
+                    "minLength": 1
+                  },
+                  "bucket": {
+                    "minLength": 1
+                  },
+                  "rootsPEM": {
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "services": {
+            "properties": {
+              "objectStore": {
+                "properties": {
+                  "provider": {
+                    "const": "external"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "bootstrap": {
+            "properties": {
+              "continuation": {
+                "properties": {
+                  "public": {
+                    "properties": {
+                      "federation": {
+                        "properties": {
+                          "evidenceStore": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                              "endpoint": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 2048,
+                                "pattern": "^https://[^/?#@]+/?$"
+                              },
+                              "rootsPEM": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 32768
+                              },
+                              "region": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 128
+                              },
+                              "bucket": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 63
+                              }
+                            },
+                            "required": [
+                              "endpoint",
+                              "rootsPEM",
+                              "region",
+                              "bucket"
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "services": {
+            "properties": {
+              "keyService": {
+                "properties": {
+                  "provider": {
+                    "const": "openbao"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "bootstrap": {
+            "properties": {
+              "enabled": {
+                "const": true
+              }
+            }
+          },
+          "mode": {
+            "enum": [
+              "hub",
+              "combined"
+            ]
+          },
+          "services": {
+            "properties": {
+              "keyService": {
+                "properties": {
+                  "openbao": {
+                    "properties": {
+                      "image": {
+                        "minLength": 1
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "bootstrap": {
+            "properties": {
+              "enabled": {
+                "const": true
+              }
+            }
+          },
+          "services": {
+            "properties": {
+              "keyService": {
+                "properties": {
+                  "provider": {
+                    "const": "external"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "bootstrap": {
+            "properties": {
+              "keyService": {
+                "properties": {
+                  "endpoint": {
+                    "minLength": 1
+                  },
+                  "auditMount": {
+                    "minLength": 1
+                  },
+                  "auditKey": {
+                    "minLength": 1
+                  },
+                  "rootsPEM": {
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "allOf": [
+          {
+            "properties": {
+              "bootstrap": {
+                "properties": {
+                  "enabled": {
+                    "const": true
+                  }
+                }
+              }
+            }
+          },
+          {
+            "not": {
+              "properties": {
+                "services": {
+                  "properties": {
+                    "postgres": {
+                      "properties": {
+                        "provider": {
+                          "const": "bundled"
+                        }
+                      }
+                    },
+                    "objectStore": {
+                      "properties": {
+                        "provider": {
+                          "const": "seaweedfs"
+                        }
+                      }
+                    },
+                    "keyService": {
+                      "properties": {
+                        "provider": {
+                          "const": "openbao"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "then": {
+        "properties": {
+          "bootstrap": {
+            "properties": {
+              "secrets": {
+                "properties": {
+                  "producer": {
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "not": {
+          "required": [
+            "services"
+          ],
+          "properties": {
+            "services": {
+              "required": [
+                "identity"
+              ],
+              "properties": {
+                "identity": {
+                  "required": [
+                    "provider",
+                    "keycloak"
+                  ],
+                  "properties": {
+                    "provider": {
+                      "const": "keycloak"
+                    },
+                    "keycloak": {
+                      "required": [
+                        "processingOperators"
+                      ],
+                      "properties": {
+                        "processingOperators": {
+                          "const": true
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "bootstrap": {
+            "properties": {
+              "continuation": {
+                "properties": {
+                  "public": {
+                    "dependencies": {
+                      "capacity": [
+                        "processingOperators"
+                      ],
+                      "promotion": [
+                        "processingOperators"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "not": {
+          "required": [
+            "services"
+          ],
+          "properties": {
+            "services": {
+              "required": [
+                "keyService"
+              ],
+              "properties": {
+                "keyService": {
+                  "required": [
+                    "provider"
+                  ],
+                  "properties": {
+                    "provider": {
+                      "const": "openbao"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "bootstrap": {
+            "properties": {
+              "continuation": {
+                "properties": {
+                  "public": {
+                    "properties": {
+                      "federation": {
+                        "required": [
+                          "connectorPKIMount",
+                          "connectorIssuerRootsPEM"
+                        ],
+                        "properties": {
+                          "connectorPKIMount": {
+                            "minLength": 1
+                          },
+                          "connectorIssuerRootsPEM": {
+                            "minLength": 1
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
 }

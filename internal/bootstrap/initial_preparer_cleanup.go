@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	"asservat.local/asservat/internal/adapters/kms"
 	"asservat.local/asservat/internal/adapters/mounts"
 	"asservat.local/asservat/internal/adapters/postgres"
 	"asservat.local/asservat/internal/contracts"
@@ -56,7 +55,7 @@ func (d *InitialPreparationDeployment) RetireInitialProvider(ctx context.Context
 			return e
 		}
 		defer h.CloseIdleConnections()
-		d.providerIssuer, e = kms.NewInitialProviderIssuer(c.Services.KeyService.Endpoint, material.IssuerToken, c.Services.KeyService.AuditMount, c.Services.KeyService.AuditKey, c.Plan.InstallationID, c.Plan.RequestID, *c.Providers, h, time.Now)
+		d.providerIssuer, e = initialPreparerIssuer(c, material, h, time.Now)
 		if e != nil {
 			return e
 		}
