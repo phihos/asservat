@@ -39,35 +39,55 @@ keys in the existing immutable evidence Secret before additive IAM/policy setup,
 and uses the normal connector installer/catalog join. Existing grants survive
 append; conflicts refuse. Operator provider administration is serialized.
 
-### Integrated checks at `996bb205`
+### Integrated checks at `777864de`
 
-- `make pre-push`: exit0/619.331s;84 Go race jobs passed, all66 tested packages
-  covered and72 packages compiled;692 console tests passed. The first wrapper
-  attempt failed because it temporarily hid historical result links. The corrected
-  run preserved them. Canonical `make spec-check` after restoring the real result
-  directory separately returned0:137 schemas,65 tools,199 examples,176 requirements,
-  198 scenarios,11 tasks,6,437 links and14,004 assertions. The failed command is
-  preserved, not relabeled.
-- `make console-browser-check`: exit0/150.301s at `67ff9e2f`; relevant console
-  sources are unchanged. Actual React/Go metadata tests passed, including30
-  console journeys and31 accessibility scans. Generated outputs were archived and
-  historical tracked files restored.
-- PR CI43171831299: eligible `pull_request`, exact head `996bb205`, completed
-  success;21 checks including `ci-ok` passed. Gitar found no issues. This is CI
-  evidence, not installed qualification.
-- Latest fresh all-four installed run at `996bb205`: Go1/233.917s,
-  harness1/349.457s. Original five-command installation completed and the registry
-  handoff ran. Before public login, the fixture's typed Kubernetes Secret reader
-  stripped APIVersion/kind and failed strict retained-Keycloak validation. The
-  actual retained wire object and public settings are valid; production uses a
-  bounded raw reader. The exact TLS decoder regression failed before switching
-  the fixture to that production reader; final focused races pass0/1.908s without
-  changing validation. All4,993 hashes independently match the committed and working sources;
-  source stayed frozen and the result directory was restored. Original environment
-  `context-4zmp6cz4` was used for a bounded real cookie-login diagnostic,
-  exit0/1.260s, with unchanged five consumer sources and no product redeployment.
-  This is explicitly not qualification. Root cleanup then returned0 with no owned
-  containers, volumes, networks, images, cluster or private directory remaining.
+- `make pre-push`: exit0/479.787s, including all84 Go race jobs,692 console
+  tests and canonical spec/schema/architecture/Helm/SQL gates. Go jobs took404s;
+  6,463 local links and14,030 spec assertions passed. Generated results and the
+  architecture report were archived externally; the worktree was clean afterward.
+- PR CI43177557675: completed success, eligible `pull_request`, exact head
+  `777864deba90c78cd1d777f6013f37c6f7c31351`. Independent review found no material
+  blocker. Gitar automatic reviews are paused for billing-period headroom; no
+  refreshed automated review is claimed.
+- `make console-browser-check`: exit0/150.301s at `67ff9e2f`, with unchanged
+  relevant console sources:30 journeys and31 accessibility scans. Current broad
+  CI also passed its browser gate. Historical generated results were preserved.
+- Fresh all-four run `native-small-public-20261112T074715Z/`: Go1/247.328s,
+  harness1/374.770s. The original five commands and independently decrypted
+  initial audit passed. `bundled-public-login` failed because the fixture's new
+  readiness wrapper expected200 from cookie-less `/api/v1/session`; production
+  correctly returned401. The actual-handler regression failed before its narrow
+  correction and passes afterward. All5,001 source hashes independently match the
+  committed and working sources, source stayed frozen and the result directory
+  was restored. This failed run remains failed.
+
+The retained full-workflow diagnostic passed login, actual public fleet issuance,
+second Helm install, regional certificates/executor/capacity, then exposed a
+fixture observer that forwarded plaintext to TLS-only PostgreSQL. The observer
+now preserves the original verified TLS connection and substitutes only its
+actual compiled login; the real42501 mutation-denial assertion remains. Focused
+listener/observer races pass0/1.211s. No runtime product code changed.
+
+Resuming only downstream from the original issued slot/Job/target/budget passed
+Go0/134.256s: MCP collection, verification/publication, exact354-byte native read,
+React restriction/release/replays, range/If-Range708 charged bytes, outsider and
+Stop/Deny/TargetGone, original expiry, complete object/version/marker/multipart
+absence, immutable audit ciphertext and evidence refund. Root independently
+verified all5,003 before/after/working hashes. This is explicitly diagnostic,
+not fresh qualification; its transport pinned the original protected public leaf
+because the fixture CA had been memory-only. No product rebuild, new bootstrap,
+replacement Job or renewed original bound occurred. Root then removed owned
+`context-j1zwwp2-` with cleanup0, empty leftovers and private-directory absence.
+
+Earlier `996bb205` broad gates/eligible CI passed. Its installed run returned
+Go1/233.917s and harness1/349.457s on typed Kubernetes decoding that stripped
+Secret GVK. The fixture now uses the unchanged production bounded raw reader;
+its red/green regression and final race pass0/1.908s. All4,993 committed and
+working hashes matched. A separate real cookie-login diagnostic passed0/1.260s
+with five unchanged consumers and no product redeployment; it bypassed the new
+readiness wrapper, so did not cover the latest failure. That environment was
+removed with independently checked empty cleanup. The first broad wrapper also
+had a historical-result-link error; its failed command is retained, not relabeled.
 
 ### Component and earlier installed evidence
 
@@ -117,7 +137,8 @@ capacity and workload permissions. Actual all-four and external-Keycloak Helm
 schema/renders return0;15 shell blocks and local links pass. No default human,
 external service mutation, published image or installed-workflow claim is added.
 
-Next: run the integrated broad gates and finish a fresh
+Next: run affected gates against the last full-qualified source evidence, then
+finish a fresh
 installed public workflow before qualified merge. Backup retention/physical
 restore and accepted local-identity/static-key alternatives remain unfinished.
 

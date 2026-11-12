@@ -206,7 +206,7 @@ func waitHelmBundledPublicListener(ctx context.Context, client *http.Client, ori
 		if response.StatusCode == http.StatusServiceUnavailable {
 			return false, nil
 		}
-		if response.StatusCode != http.StatusOK {
+		if response.StatusCode != http.StatusOK && response.StatusCode != http.StatusUnauthorized {
 			return false, fmt.Errorf("public session readiness status %d", response.StatusCode)
 		}
 		return true, nil
