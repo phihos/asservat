@@ -375,6 +375,9 @@ func RunInitialPreparer(ctx context.Context) error {
 // InitialPreparationRemedy is safe fixed CLI copy. Never append raw Kubernetes
 // or provider errors, tokens, configuration bodies or request metadata.
 func InitialPreparationRemedy(err error) string {
+	if stage := initialOpenBaoDiagnostic(err); stage != "" {
+		return "initial key-service setup stopped at " + stage + ": retain the original installation, private state and volumes; check this stage's provider inputs and Kubernetes permissions before resuming"
+	}
 	var store initialSeaweedFailure
 	if errors.As(err, &store) {
 		return "initial object-store setup stopped at " + store.FixedStep() + ": retain the original installation, bucket, private state and volumes; check this stage's provider inputs and permissions before resuming"

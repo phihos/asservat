@@ -1,0 +1,31 @@
+{{- if and .Values.bootstrap.enabled (eq .Values.services.keyService.provider "openbao") }}
+{{- $b := .Values.bootstrap }}
+{{- $name := printf "%s-openbao-bootstrap" $b.name }}
+# Cold setup provenance only. The runner reads the original PVC and records a
+# metadata-only Ready acknowledgement; no provider workload or key material.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+rules:
+  - apiGroups: [""]
+    resources: [persistentvolumeclaims]
+    resourceNames: [{{ printf "%s-openbao-data" $b.name | quote }}]
+    verbs: [get]
+  - apiGroups: [""]
+    resources: [secrets]
+    resourceNames: [{{ printf "%s-openbao-state" $b.name | quote }}]
+    verbs: [patch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: {{ $name }}}
+subjects:
+  - kind: ServiceAccount
+    namespace: {{ .Release.Namespace }}
+    name: {{ printf "%s-bootstrap-runner" $b.name }}
+{{- end }}

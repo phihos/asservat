@@ -144,6 +144,23 @@ staged or committed. A fresh combined bundled OpenBao/S3 initial installation is
 the next qualification; full-profile PostgreSQL/identity/public workflows remain
 pending afterward.
 
+The first combined bundled-key/S3 native attempt at `42ad15e5` failed during
+producer readiness, before schema/activation: Go1/72.076s, harness1/178.879s.
+All4,967 sources remained unchanged. Cleanup completed with no failures; root
+independently checked source hashes, owned container/network prefix absence,
+private-work removal and result-route restoration. Receipts are in
+`native-initial-bao-s3-20261112T033134Z/`; this remains a failed run.
+
+The actual main runner lacked GET on the selected Bao PVC and PATCH on its
+state Secret. Its existing S3 Role covers only S3. A conditional namespaced
+Role/Binding now grants only those two exact named operations, with no new
+global privilege or runtime identity. A test using actual Helm rules and the
+actual Ready helper reproduced the denial before the fix and passes afterward
+under race (1.387s); removing either rule fails and external selection adds none.
+The CLI now reports only allowlisted key-provider stage labels, never raw errors
+or credential values. Its regression failed before the change and passes1.075s.
+The next fresh native run must qualify this corrected role/producer boundary.
+
 Actual OpenSSL strict verification exposed missing leaf Authority Key Identifiers
 in generated PostgreSQL and SeaweedFS TLS certificates. Parsing the generated CA
 DER before leaf signing fixes both generators; the new actual OpenSSL regression
