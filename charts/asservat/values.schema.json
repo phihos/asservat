@@ -2443,13 +2443,11 @@
       "properties": {
         "connectorPKIMount": {
           "type": "string",
-          "minLength": 1,
           "maxLength": 128,
-          "pattern": "^[a-zA-Z0-9_-]+$"
+          "pattern": "^([a-zA-Z0-9_-]+)?$"
         },
         "connectorIssuerRootsPEM": {
           "type": "string",
-          "minLength": 1,
           "maxLength": 32768
         },
         "endpoint": {
@@ -2534,8 +2532,6 @@
         }
       },
       "required": [
-        "connectorPKIMount",
-        "connectorIssuerRootsPEM",
         "endpoint",
         "serverName",
         "serviceType",
@@ -3749,6 +3745,64 @@
                       "promotion": [
                         "processingOperators"
                       ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "not": {
+          "required": [
+            "services"
+          ],
+          "properties": {
+            "services": {
+              "required": [
+                "keyService"
+              ],
+              "properties": {
+                "keyService": {
+                  "required": [
+                    "provider"
+                  ],
+                  "properties": {
+                    "provider": {
+                      "const": "openbao"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "bootstrap": {
+            "properties": {
+              "continuation": {
+                "properties": {
+                  "public": {
+                    "properties": {
+                      "federation": {
+                        "required": [
+                          "connectorPKIMount",
+                          "connectorIssuerRootsPEM"
+                        ],
+                        "properties": {
+                          "connectorPKIMount": {
+                            "minLength": 1
+                          },
+                          "connectorIssuerRootsPEM": {
+                            "minLength": 1
+                          }
+                        }
+                      }
                     }
                   }
                 }

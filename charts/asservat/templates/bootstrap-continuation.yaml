@@ -2,10 +2,11 @@
 {{- if and .Values.bootstrap.enabled .Values.bootstrap.continuation.enabled }}
 {{- $b := .Values.bootstrap }}
 {{- $c := $b.continuation }}
+{{- $bundledKeyService := eq .Values.services.keyService.provider "openbao" }}
 {{- range $p := list $c.workerProvider $c.ownerProvider }}
-{{- if or (not (regexMatch "^[a-zA-Z0-9_-]{1,128}$" $p.authMount)) (not (regexMatch "^[a-zA-Z0-9_-]{1,128}$" $p.authMountAccessor)) }}{{ fail "bootstrap.continuation requires both operator-created provider auth mounts and accessors" }}{{ end }}
+{{- if or (and (or (not $bundledKeyService) $p.authMount) (not (regexMatch "^[a-zA-Z0-9_-]{1,128}$" $p.authMount))) (and (or (not $bundledKeyService) $p.authMountAccessor) (not (regexMatch "^[a-zA-Z0-9_-]{1,128}$" $p.authMountAccessor))) }}{{ fail "bootstrap.continuation requires both operator-created provider auth mounts and accessors" }}{{ end }}
 {{- end }}
-{{- if not (contains "-----BEGIN CERTIFICATE-----" $c.ownerIssuerRootsPEM) }}{{ fail "bootstrap.continuation.ownerIssuerRootsPEM requires the owner PKI roots" }}{{ end }}
+{{- if and (or (not $bundledKeyService) $c.ownerIssuerRootsPEM) (not (contains "-----BEGIN CERTIFICATE-----" $c.ownerIssuerRootsPEM)) }}{{ fail "bootstrap.continuation.ownerIssuerRootsPEM requires the owner PKI roots" }}{{ end }}
 {{- $input := include "asservat.bootstrap.continuation" . }}
 {{- $name := printf "%s-continuation.%s" $b.name (substr 0 32 (sha256sum $input)) }}
 {{- $role := printf "%s-%s-bootstrap-continuation" .Release.Namespace $b.name }}

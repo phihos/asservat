@@ -240,6 +240,24 @@ spec/Helm/Go-architecture/authority checks pass. These are component checks;
 actual bundled Keycloak group behavior and the full public/region journey remain
 unqualified.
 
+The optional Keycloak group now has actual provider qualification at `48682842`:
+`python scripts/test-small-keycloak.py --processing-operators` with the existing
+owned PostgreSQL image returned0/55.925s. The imported group starts empty; explicit
+fixture assignment reaches signed console/MCP claims, ordinary-group removal
+removes eligibility, group renaming preserves stable IDs and restart retains
+the deliberately assigned memberships. Root independently verified all113 source
+hashes and empty owned container/volume/network cleanup. The receipt is in
+`keycloak-processing-native-20261112T0458Z/` externally. Its policy inputs and
+synthetic user administration remain component facts, not installed authority.
+
+Selected bundled-provider continuation rendering now permits omitted generated
+auth mounts/accessors and owner/connector CA roots. The original runtime resolver
+derives and verifies them before consuming the closed input. Explicit conflicting
+values still refuse; external-provider required fields are unchanged. An actual
+schema-enabled Helm→closed DTO→TLS-backed resolver regression failed before the
+fix and passes under race0/1.639s. This removes manual generated-value inputs; it
+does not qualify the continuation or grant regional enrollment authority.
+
 Actual OpenSSL strict verification exposed missing leaf Authority Key Identifiers
 in generated PostgreSQL and SeaweedFS TLS certificates. Parsing the generated CA
 DER before leaf signing fixes both generators; the new actual OpenSSL regression

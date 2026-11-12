@@ -201,6 +201,14 @@ limits:
 {{- range $field := list "processingOperators" "federation" "promotion" "retentionBaseline" -}}
 {{- if hasKey $p $field }}{{ $_ := set (get $v "public") $field (get $p $field) }}{{ end -}}
 {{- end -}}
+{{- if and (eq .Values.services.keyService.provider "openbao") $p.federation -}}
+{{- $f := deepCopy (get (get $v "public") "federation") -}}
+{{/* Closed DTO fields stay explicit until the original provider resolves them. */}}
+{{- range $field := list "connectorPKIMount" "connectorIssuerRootsPEM" -}}
+{{- if not (hasKey $f $field) }}{{ $_ := set $f $field "" }}{{ end -}}
+{{- end -}}
+{{- $_ := set (get $v "public") "federation" $f -}}
+{{- end -}}
 {{- if and (eq .Values.services.objectStore.provider "seaweedfs") $p.federation (hasKey $p.federation "evidenceStore") -}}
 {{- $b := .Values.bootstrap -}}
 {{- $f := deepCopy (get (get $v "public") "federation") -}}
