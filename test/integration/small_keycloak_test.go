@@ -27,6 +27,8 @@ import (
 	"asservat.local/asservat/internal/bootstrap"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/identity"
+	"asservat.local/asservat/internal/domain/privacy"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/xdg-go/scram"
 )
@@ -138,6 +140,27 @@ func TestSmallKeycloakBundleWithRealPostgres(t *testing.T) {
 	if json.Unmarshal(f.json("GET", prefix+"/groups/"+group, nil), &actualGroup) != nil || actualGroup.ID != group || !slices.Equal(actualGroup.Attributes["asservat_group_id"], []string{group}) {
 		t.Fatal("import changed native stable group identity")
 	}
+	processingGroup := ""
+	if settings.ProcessingOperators {
+		usersID, err := uuid.Parse(group)
+		if err != nil || usersID.Version() != 4 || usersID.String() != group {
+			t.Fatal("original users group is not the generated immutable UUID")
+		}
+		processingGroup = uuid.NewSHA1(usersID, []byte("asservat-processing-operators")).String()
+		var actual struct {
+			ID, Name   string
+			Attributes map[string][]string
+		}
+		if json.Unmarshal(f.json("GET", prefix+"/groups/"+processingGroup, nil), &actual) != nil || actual.ID != processingGroup || !slices.Equal(actual.Attributes["asservat_group_id"], []string{processingGroup}) || actual.ID == group {
+			t.Fatal("import changed dedicated processing group identity")
+		}
+		if os.Getenv("ASSERVAT_SMALL_KEYCLOAK_STAGE") != "restart" {
+			var members []json.RawMessage
+			if actual.Name != "asservat-processing-operators" || json.Unmarshal(f.json("GET", prefix+"/groups/"+processingGroup+"/members", nil), &members) != nil || len(members) != 0 {
+				t.Fatal("imported processing group was not empty before deliberate fixture assignment")
+			}
+		}
+	}
 	var profile struct {
 		Attributes []struct {
 			Name        string
@@ -176,7 +199,10 @@ func TestSmallKeycloakBundleWithRealPostgres(t *testing.T) {
 	}
 	clientID := clients[0].ID
 	receiptPath := os.Getenv("ASSERVAT_SMALL_KEYCLOAK_RECEIPT")
-	var original struct{ Subject, Group, Client string }
+	var original struct {
+		Subject, Group, Client string
+		ProcessingGroup        string `json:",omitempty"`
+	}
 	if os.Getenv("ASSERVAT_SMALL_KEYCLOAK_STAGE") == "restart" {
 		raw, err := os.ReadFile(receiptPath)
 		if err != nil || json.Unmarshal(raw, &original) != nil {
@@ -190,8 +216,15 @@ func TestSmallKeycloakBundleWithRealPostgres(t *testing.T) {
 		t.Fatal("actual synthetic user identity")
 	}
 	userID := users[0].ID
-	if original.Subject != "" && (original.Subject != userID || original.Group != group || original.Client != clientID) {
+	if original.Subject != "" && (original.Subject != userID || original.Group != group || original.Client != clientID || original.ProcessingGroup != processingGroup) {
 		t.Fatal("restart replaced persisted identity/client/group")
+	}
+	if processingGroup != "" && os.Getenv("ASSERVAT_SMALL_KEYCLOAK_STAGE") == "restart" {
+		// Check retained membership before any PUT could repair it.
+		var groups []struct{ ID string }
+		if json.Unmarshal(f.json("GET", prefix+"/users/"+userID+"/groups", nil), &groups) != nil || len(groups) != 2 || !slices.ContainsFunc(groups, func(g struct{ ID string }) bool { return g.ID == group }) || !slices.ContainsFunc(groups, func(g struct{ ID string }) bool { return g.ID == processingGroup }) {
+			t.Fatal("restart lost original deliberate dual membership")
+		}
 	}
 	f.json("PUT", prefix+"/users/"+userID+"/groups/"+group, nil)
 	verifier, err := oidc.New(oidc.Trust{Issuer: f.Issuer, Audience: settings.BrowserAudience, JWKSURL: f.Issuer + "/protocol/openid-connect/certs", Profile: oidc.Keycloak, RootCA: kcPEM, KeyMaxAge: time.Minute}, time.Now)
@@ -202,23 +235,53 @@ func TestSmallKeycloakBundleWithRealPostgres(t *testing.T) {
 	check := func(raw string, wantGroups []string) identity.Claims {
 		t.Helper()
 		claims, err := verifier.Verify(t.Context(), raw)
-		if err != nil || claims.Subject != userID || claims.ClientID != settings.ConsoleClientID || !slices.Equal(claims.Groups, wantGroups) || claims.ACR == "" || claims.AuthTime.IsZero() {
+		if err != nil || claims.Subject != userID || claims.ClientID != settings.ConsoleClientID || !smallKeycloakSameGroups(claims.Groups, wantGroups) || claims.ACR == "" || claims.AuthTime.IsZero() {
 			t.Fatal("actual console token did not satisfy the product identity profile", err)
 		}
 		return claims
 	}
 	tokens := smallKeycloakConsoleCode(t, f, settings, consoleSecret, false)
-	check(tokens.Access, []string{group})
+	activeGroups := []string{group}
+	if processingGroup != "" && os.Getenv("ASSERVAT_SMALL_KEYCLOAK_STAGE") == "restart" {
+		activeGroups = append(activeGroups, processingGroup)
+	}
+	consoleClaims := check(tokens.Access, activeGroups)
+	if processingGroup != "" {
+		smallKeycloakAssertProcessingClaims(t, settings, consoleClaims, group, processingGroup, true, len(activeGroups) == 2)
+	}
 	refresh := func(token string) kcTokens {
 		return f.tokens(f.Issuer+"/protocol/openid-connect/token", url.Values{"grant_type": {"refresh_token"}, "client_id": {settings.ConsoleClientID}, "client_secret": {consoleSecret}, "refresh_token": {token}}, 200)
 	}
+	if processingGroup != "" && os.Getenv("ASSERVAT_SMALL_KEYCLOAK_STAGE") != "restart" {
+		// This is explicit synthetic administrator action after proving empty import.
+		f.json("PUT", prefix+"/users/"+userID+"/groups/"+processingGroup, nil)
+		activeGroups = append(activeGroups, processingGroup)
+		tokens = refresh(tokens.Refresh)
+		claims := check(tokens.Access, activeGroups)
+		smallKeycloakAssertProcessingClaims(t, settings, claims, group, processingGroup, true, true)
+		f.json("PUT", prefix+"/groups/"+processingGroup, map[string]any{"name": "renamed-component-processing-group", "attributes": map[string]any{"asservat_group_id": []string{processingGroup}}})
+	}
 	f.json("PUT", prefix+"/groups/"+group, map[string]any{"name": "renamed-component-group", "attributes": map[string]any{"asservat_group_id": []string{group}}})
 	tokens = refresh(tokens.Refresh)
-	check(tokens.Access, []string{group})
+	claimsAfterRename := check(tokens.Access, activeGroups)
+	if processingGroup != "" {
+		smallKeycloakAssertProcessingClaims(t, settings, claimsAfterRename, group, processingGroup, true, true)
+	}
 	f.json("DELETE", prefix+"/users/"+userID+"/groups/"+group, nil)
 	tokens = refresh(tokens.Refresh)
-	check(tokens.Access, nil)
+	var remainingGroups []string
+	if processingGroup != "" {
+		remainingGroups = []string{processingGroup}
+	}
+	claimsWithoutOrdinary := check(tokens.Access, remainingGroups)
+	if processingGroup != "" {
+		smallKeycloakAssertProcessingClaims(t, settings, claimsWithoutOrdinary, group, processingGroup, false, false)
+	}
 	f.json("PUT", prefix+"/users/"+userID+"/groups/"+group, nil)
+	if processingGroup != "" {
+		tokens = refresh(tokens.Refresh)
+		smallKeycloakAssertProcessingClaims(t, settings, check(tokens.Access, activeGroups), group, processingGroup, true, true)
+	}
 	f.tokens(f.Issuer+"/protocol/openid-connect/token", url.Values{"grant_type": {"password"}, "client_id": {settings.ConsoleClientID}, "client_secret": {consoleSecret}, "username": {"developer"}, "password": {f.UserPassword}}, 400)
 	// Authorization-code replay can invalidate that client session, so negative
 	// replay checks own separate logins instead of supplying refresh fixtures.
@@ -230,13 +293,16 @@ func TestSmallKeycloakBundleWithRealPostgres(t *testing.T) {
 	}
 	defer mcpVerifier.Close()
 	claims, err := mcpVerifier.Verify(t.Context(), mcp.Access)
-	if err != nil || claims.Subject != userID || claims.ClientID != settings.MCPClientID || !slices.Equal(claims.Groups, []string{group}) {
+	if err != nil || claims.Subject != userID || claims.ClientID != settings.MCPClientID || !smallKeycloakSameGroups(claims.Groups, activeGroups) {
 		t.Fatal("actual MCP resource token binding", err)
 	}
 	f.loginScopes(settings.MCPClientID, "openid evidence:read asservat:mcp", "replay")
 	f.loginScopes(settings.MCPClientID, "openid evidence:read asservat:mcp", "wrong-verifier")
 	if receiptPath != "" {
-		body, _ := json.Marshal(struct{ Subject, Group, Client string }{userID, group, clientID})
+		body, _ := json.Marshal(struct {
+			Subject, Group, Client string
+			ProcessingGroup        string `json:",omitempty"`
+		}{userID, group, clientID, processingGroup})
 		if err = os.WriteFile(receiptPath, body, 0600); err != nil {
 			t.Fatal("write public synthetic identity receipt")
 		}
@@ -252,6 +318,11 @@ func exportSmallKeycloakComponent(t *testing.T, dir string) {
 		t.Fatal(err)
 	}
 	settings := contracts.SmallKeycloakSettings{Namespace: "smoke", SecretName: "trial-keycloak-state", Hostname: "https://identity.smoke:8443", Realm: "asservat", Origin: "https://console.smoke", Database: contracts.SmallKeycloakDatabase{Host: "trial-postgres.smoke.svc", Port: 5432, Database: "keycloak", Username: "keycloak"}, ConsoleClientID: "console", BrowserAudience: "asservat-api", MCPClientID: "mcp", MCPRedirectURIs: []string{"http://127.0.0.1:1/callback"}}
+	selection := os.Getenv("ASSERVAT_SMALL_KEYCLOAK_PROCESSING_OPERATORS")
+	if selection != "" && selection != "false" && selection != "true" {
+		t.Fatal("invalid explicit component processing-operator selection")
+	}
+	settings.ProcessingOperators = selection == "true"
 	kc, err := bootstrap.BuildSmallKeycloakMaterial(settings, rand.Reader)
 	if err != nil {
 		t.Fatal(err)
@@ -393,4 +464,39 @@ func smallKeycloakConsoleCode(t *testing.T, f *kcFixture, s contracts.SmallKeycl
 		f.tokens(f.Issuer+"/protocol/openid-connect/token", form, 400)
 	}
 	return tokens
+}
+
+// Group ordering is not authority. Compare the complete signed UUID set while
+// preserving verifier rejection of duplicate/malformed groups.
+func smallKeycloakSameGroups(a, b []string) bool {
+	a, b = slices.Clone(a), slices.Clone(b)
+	slices.Sort(a)
+	slices.Sort(b)
+	return slices.Equal(a, b)
+}
+
+// Actual signed provider claims enter the product eligibility and privacy
+// evaluators. The current policy below is explicit synthetic component input,
+// not a fixture grant used by any installed Asservat process.
+func smallKeycloakAssertProcessingClaims(t *testing.T, s contracts.SmallKeycloakSettings, claims identity.Claims, users, operators string, wantEligible, wantOperator bool) {
+	t.Helper()
+	now := time.Now().UTC()
+	revision := identity.Revision{UID: "component-protected-settings", Generation: 1, Digest: [32]byte{1}}
+	eligible := identity.Policy{Revision: revision, Issuer: s.Hostname + "/realms/" + s.Realm, ObservedAt: now, FreshUntil: now.Add(30 * time.Second), Clients: []identity.Client{{ID: s.ConsoleClientID, Kind: identity.Human, ClassQualified: true}}, EligibleGroups: []string{users}, GroupsAtIssueQualified: true, GroupMaxAge: 5 * time.Minute}
+	admitted, err := identity.Admit(claims, eligible, now)
+	if !wantEligible {
+		if err == nil {
+			t.Fatal("operator-only membership bypassed ordinary eligibility")
+		}
+		return
+	}
+	if err != nil || !smallKeycloakSameGroups(admitted.Groups, claims.Groups) {
+		t.Fatal("actual eligibility discarded signed groups", err)
+	}
+	id := "41414141-4141-4141-8141-414141414141"
+	policy := privacy.DownloadPolicy{RootID: id, InstallationID: id, RecoveryEpoch: id, Revision: revision, ProtectionDigest: [32]byte{1}, PermittedRegions: []string{}, Paths: []privacy.DownloadPath{}, Clients: []privacy.DownloadClient{}, Operators: []privacy.ProcessingOperator{{ClientID: s.ConsoleClientID, Issuer: eligible.Issuer, Kind: "Group", ID: operators}}, ObservedAt: now, FreshUntil: now.Add(3 * time.Second)}
+	if !policy.Valid(now) || policy.Operator(admitted, now) != wantOperator {
+		t.Fatal("actual processing operator evaluator did not honor dedicated membership")
+	}
+	t.Log("actual signed group claims passed product eligibility/privacy evaluator; synthetic current-policy input is not installed authority")
 }
