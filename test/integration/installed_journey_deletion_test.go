@@ -23,6 +23,13 @@ import (
 // bucket policy changes; cleanup, cutoffs, completion, audit and charges remain
 // product effects. The existing callback brackets original publication/expiry.
 func installedJourneyDeletion(t *testing.T, ctx context.Context, admin *pgxpool.Pool, p *initialRuntimeNativeProviders, evidenceBucket, root string, diagnose func()) func(string) func() {
+	store := s3.New(s3.Options{Region: p.desired.AuditStore.Region, BaseEndpoint: aws.String(p.desired.AuditStore.Endpoint), UsePathStyle: true, Credentials: credentials.NewStaticCredentialsProvider("synthetic-only", "synthetic-only-secret", ""), HTTPClient: p.client, RetryMaxAttempts: 1})
+	return installedJourneyDeletionWithStores(t, ctx, admin, store, store, evidenceBucket, p.desired.AuditStore.Bucket, root, p, diagnose)
+}
+
+// Explicit retained readers serve the bundled path; no fixture backend admin
+// or bucket policy mutation is needed for healthy deletion qualification.
+func installedJourneyDeletionWithStores(t *testing.T, ctx context.Context, admin *pgxpool.Pool, store, auditReader *s3.Client, evidenceBucket, auditBucket, root string, p *initialRuntimeNativeProviders, diagnose func()) func(string) func() {
 	return func(artifactID string) func() {
 		t.Helper()
 		loc := artifact.Location{ArtifactID: artifactID}
@@ -49,8 +56,6 @@ WHERE c.root_id=$1 AND c.artifact_id=$2 AND a.state='stored_unpublished'`, root,
 		if err != nil || loc.Validate() != nil || reserved <= 0 || chargedBytes != reserved || chargedObjects != 4 || full < 1 || replay < 1 || !time.Now().Before(expiresAt) || !expiresAt.Before(deleteBy) {
 			t.Fatal("installed deletion: published attempt lacks its original completed writer and storage charge", err)
 		}
-		store := s3.New(s3.Options{Region: p.desired.AuditStore.Region, BaseEndpoint: aws.String(p.desired.AuditStore.Endpoint), UsePathStyle: true,
-			Credentials: credentials.NewStaticCredentialsProvider("synthetic-only", "synthetic-only-secret", ""), HTTPClient: p.client, RetryMaxAttempts: 1})
 		inventory := func(read context.Context) (current, versions, markers, uploads int, identity artifact.Digest) {
 			t.Helper()
 			prefix := loc.Prefix()
@@ -96,50 +101,55 @@ WHERE c.root_id=$1 AND c.artifact_id=$2 AND a.state='stored_unpublished'`, root,
 			!original.ExpiresAt.Equal(expiresAt) || !original.DeleteBy.Equal(deleteBy) || !original.Now.Before(expiresAt) {
 			t.Fatal("installed deletion: original obligation unavailable before fault", err)
 		}
-		// These are the existing fixture credentials issued by
-		// installerOperatorStorage; this creates no user, key or grant. Positive
-		// read-only controls below reject drift from the actual fixture identity.
-		cleaner := s3.New(s3.Options{Region: p.desired.AuditStore.Region, BaseEndpoint: aws.String(p.desired.AuditStore.Endpoint), UsePathStyle: true,
-			Credentials: credentials.NewStaticCredentialsProvider("evidence-delete-continuation", "evidence-delete-continuation-secret", ""), HTTPClient: p.client, RetryMaxAttempts: 1})
-		prefix, controlPrefix := loc.Prefix(), "v1/deletion-permission-probe/"+loc.AttemptID+"/"
-		if ok, err := installedDeletionInventoryAccess(before, cleaner, evidenceBucket, prefix, false); err != nil || !ok {
-			t.Fatal("installed deletion: original cleaner inventory unavailable", err)
-		}
-		fault := &installedDeletionFault{store: store, bucket: evidenceBucket}
-		fault.original, err = fault.read(before)
-		if err != nil {
-			t.Fatal("installed deletion: original fixture policy unavailable", err)
-		}
-		if unexpected, ok := installedDeletionInstalledPolicy(fault.original, installerEvidenceBucketPolicy(evidenceBucket)); !ok {
-			t.Fatal("installed deletion: unexpected original fixture policy", unexpected)
-		}
-		fault.denied, err = installedDeletionFaultPolicy(fault.original, evidenceBucket, loc)
-		if err != nil {
-			t.Fatal("installed deletion: invalid fault policy", err)
-		}
-		// Registered before the mutation: Fatal/unknown replies still restore
-		// synchronously before this test completes, under a separate finite bound.
-		t.Cleanup(func() {
-			cleanup, end := context.WithTimeout(context.Background(), 10*time.Second)
-			defer end()
-			if err := fault.restore(cleanup); err != nil {
-				t.Error("installed deletion: original policy cleanup", err)
+		var fault *installedDeletionFault
+		var cleaner *s3.Client
+		var prefix, controlPrefix string
+		if p != nil {
+			// These are the existing fixture credentials issued by
+			// installerOperatorStorage; this creates no user, key or grant. Positive
+			// read-only controls below reject drift from the actual fixture identity.
+			cleaner = s3.New(s3.Options{Region: p.desired.AuditStore.Region, BaseEndpoint: aws.String(p.desired.AuditStore.Endpoint), UsePathStyle: true,
+				Credentials: credentials.NewStaticCredentialsProvider("evidence-delete-continuation", "evidence-delete-continuation-secret", ""), HTTPClient: p.client, RetryMaxAttempts: 1})
+			prefix, controlPrefix = loc.Prefix(), "v1/deletion-permission-probe/"+loc.AttemptID+"/"
+			if ok, err := installedDeletionInventoryAccess(before, cleaner, evidenceBucket, prefix, false); err != nil || !ok {
+				t.Fatal("installed deletion: original cleaner inventory unavailable", err)
 			}
-		})
-		arm, endArm := context.WithDeadline(before, expiresAt)
-		defer endArm()
-		if err = fault.arm(arm); err != nil {
-			t.Fatal("installed deletion: arm exact inventory denial", err)
-		}
-		if err = installedDeletionWaitAccess(arm, cleaner, evidenceBucket, prefix, true); err != nil {
-			t.Fatal("installed deletion: exact cleaner inventory was not denied", err)
-		}
-		if ok, err := installedDeletionInventoryAccess(arm, cleaner, evidenceBucket, controlPrefix, false); err != nil || !ok {
-			t.Fatal("installed deletion: fault affected the independent prefix", err)
-		}
-		armed, err := readInstalledDeletionState(arm, admin, root, loc)
-		if err != nil || !armed.Now.Before(expiresAt) || !time.Now().Before(expiresAt) || armed.State != "stored_unpublished" || armed.Fence != original.Fence {
-			t.Fatal("installed deletion: fault was not established before original expiry", err)
+			fault = &installedDeletionFault{store: store, bucket: evidenceBucket}
+			fault.original, err = fault.read(before)
+			if err != nil {
+				t.Fatal("installed deletion: original fixture policy unavailable", err)
+			}
+			if unexpected, ok := installedDeletionInstalledPolicy(fault.original, installerEvidenceBucketPolicy(evidenceBucket)); !ok {
+				t.Fatal("installed deletion: unexpected original fixture policy", unexpected)
+			}
+			fault.denied, err = installedDeletionFaultPolicy(fault.original, evidenceBucket, loc)
+			if err != nil {
+				t.Fatal("installed deletion: invalid fault policy", err)
+			}
+			// Registered before the mutation: Fatal/unknown replies still restore
+			// synchronously before this test completes, under a separate finite bound.
+			t.Cleanup(func() {
+				cleanup, end := context.WithTimeout(context.Background(), 10*time.Second)
+				defer end()
+				if err := fault.restore(cleanup); err != nil {
+					t.Error("installed deletion: original policy cleanup", err)
+				}
+			})
+			arm, endArm := context.WithDeadline(before, expiresAt)
+			defer endArm()
+			if err = fault.arm(arm); err != nil {
+				t.Fatal("installed deletion: arm exact inventory denial", err)
+			}
+			if err = installedDeletionWaitAccess(arm, cleaner, evidenceBucket, prefix, true); err != nil {
+				t.Fatal("installed deletion: exact cleaner inventory was not denied", err)
+			}
+			if ok, err := installedDeletionInventoryAccess(arm, cleaner, evidenceBucket, controlPrefix, false); err != nil || !ok {
+				t.Fatal("installed deletion: fault affected the independent prefix", err)
+			}
+			armed, err := readInstalledDeletionState(arm, admin, root, loc)
+			if err != nil || !armed.Now.Before(expiresAt) || !time.Now().Before(expiresAt) || armed.State != "stored_unpublished" || armed.Fence != original.Fence {
+				t.Fatal("installed deletion: fault was not established before original expiry", err)
+			}
 		}
 		return func() {
 			t.Helper()
@@ -152,42 +162,48 @@ WHERE c.root_id=$1 AND c.artifact_id=$2 AND a.state='stored_unpublished'`, root,
 			wait, stop := context.WithDeadline(ctx, until)
 			defer stop()
 			failure := installedDeletionFailure{}
-			for {
-				observed, err := readInstalledDeletionState(wait, admin, root, loc)
-				if err != nil {
-					diagnose()
-					t.Fatal("installed deletion: failed-lease observation unavailable", err)
+			if fault == nil {
+				failure.Fence = original.Fence
+			}
+			if fault != nil {
+
+				for {
+					observed, err := readInstalledDeletionState(wait, admin, root, loc)
+					if err != nil {
+						diagnose()
+						t.Fatal("installed deletion: failed-lease observation unavailable", err)
+					}
+					done, err := failure.observe(original, observed)
+					if err != nil {
+						diagnose()
+						t.Fatal("installed deletion: failed cleanup did not retain the original obligation", err)
+					}
+					if done {
+						break
+					}
+					if err := installedJourneyPause(wait, time.Second); err != nil {
+						diagnose()
+						t.Fatal("installed deletion: no unsuccessful installed lease observed", err)
+					}
 				}
-				done, err := failure.observe(original, observed)
-				if err != nil {
-					diagnose()
-					t.Fatal("installed deletion: failed cleanup did not retain the original obligation", err)
+				// Policy propagation was established before expiry. This checkpoint
+				// must reject any unexpected permission result, not retry it away.
+				if ok, err := installedDeletionInventoryAccess(wait, cleaner, evidenceBucket, prefix, true); err != nil || !ok {
+					t.Fatal("installed deletion: denial disappeared before failed-lease verification", err)
 				}
-				if done {
-					break
+				if ok, err := installedDeletionInventoryAccess(wait, cleaner, evidenceBucket, controlPrefix, false); err != nil || !ok {
+					t.Fatal("installed deletion: independent inventory control failed", err)
 				}
-				if err := installedJourneyPause(wait, time.Second); err != nil {
-					diagnose()
-					t.Fatal("installed deletion: no unsuccessful installed lease observed", err)
+				if _, _, _, _, identity := inventory(wait); identity != originalInventory {
+					t.Fatal("installed deletion: failed cleanup changed original evidence inventory")
 				}
-			}
-			// Policy propagation was established before expiry. This checkpoint
-			// must reject any unexpected permission result, not retry it away.
-			if ok, err := installedDeletionInventoryAccess(wait, cleaner, evidenceBucket, prefix, true); err != nil || !ok {
-				t.Fatal("installed deletion: denial disappeared before failed-lease verification", err)
-			}
-			if ok, err := installedDeletionInventoryAccess(wait, cleaner, evidenceBucket, controlPrefix, false); err != nil || !ok {
-				t.Fatal("installed deletion: independent inventory control failed", err)
-			}
-			if _, _, _, _, identity := inventory(wait); identity != originalInventory {
-				t.Fatal("installed deletion: failed cleanup changed original evidence inventory")
-			}
-			t.Log("installed journey: an installed cleanup lease expired under the exact inventory denial; original evidence, receipts, deadlines and storage/control charges remain, with no purge checkpoint")
-			if err := fault.restore(wait); err != nil {
-				t.Fatal("installed deletion: original policy restoration", err)
-			}
-			if err := installedDeletionWaitAccess(wait, cleaner, evidenceBucket, prefix, false); err != nil {
-				t.Fatal("installed deletion: original cleaner inventory did not recover", err)
+				t.Log("installed journey: an installed cleanup lease expired under the exact inventory denial; original evidence, receipts, deadlines and storage/control charges remain, with no purge checkpoint")
+				if err := fault.restore(wait); err != nil {
+					t.Fatal("installed deletion: original policy restoration", err)
+				}
+				if err := installedDeletionWaitAccess(wait, cleaner, evidenceBucket, prefix, false); err != nil {
+					t.Fatal("installed deletion: original cleaner inventory did not recover", err)
+				}
 			}
 			var receiptJSON []byte
 			var deletedAt, purgedAt, acknowledgedAt time.Time
@@ -236,7 +252,7 @@ WHERE a.id=$2 AND a.allocation_id=$3 AND a.state='deleted'`, root, loc.AttemptID
 			if json.Unmarshal(receiptJSON, &receipt) != nil || !receipt.ValidContextDeletion(root, loc.AttemptID) || receipt.Version == "" || receipt.Version == "null" {
 				t.Fatal("installed deletion: missing immutable audit receipt")
 			}
-			object, err := store.GetObject(wait, &s3.GetObjectInput{Bucket: aws.String(p.desired.AuditStore.Bucket), Key: &receipt.Key, VersionId: &receipt.Version, IfMatch: &receipt.ETag})
+			object, err := auditReader.GetObject(wait, &s3.GetObjectInput{Bucket: aws.String(auditBucket), Key: &receipt.Key, VersionId: &receipt.Version, IfMatch: &receipt.ETag})
 			if err != nil {
 				t.Fatal("installed deletion: acknowledged audit version unavailable", err)
 			}

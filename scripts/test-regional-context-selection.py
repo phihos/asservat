@@ -58,6 +58,17 @@ class RegionalContextSelection(unittest.TestCase):
                     fixture.main(**invalid)
                 external.assert_not_called()
 
+    def test_bundled_public_requires_both_exact_positive_stage_receipts(self):
+        prefix = "TestHelmBootstrapWithRealServices/"
+        login, context = prefix + "bundled-public-login", prefix + "bundled-context-journey"
+        expected = ["bundled-public-login", "bundled-context-journey"]
+        self.assertEqual(fixture.missing_bundled_public_stages(set()), expected)
+        self.assertEqual(fixture.missing_bundled_public_stages({"TestHelmBootstrapWithRealServices"}), expected)
+        self.assertEqual(fixture.missing_bundled_public_stages({login}), ["bundled-context-journey"])
+        self.assertEqual(fixture.missing_bundled_public_stages({context}), ["bundled-public-login"])
+        self.assertEqual(fixture.missing_bundled_public_stages({login, context + "/child"}), ["bundled-context-journey"])
+        self.assertEqual(fixture.missing_bundled_public_stages({login, context}), [])
+
     def test_manual_logs_api_only_focus_and_resource_selector(self):
         with patch.dict(os.environ, {"ASSERVAT_JOURNEY_FOCUS":"manual-logs"}):
             self.assertEqual(fixture.qualification_cluster_count(3, installer_continuation=True),2)

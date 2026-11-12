@@ -235,6 +235,7 @@ identity-integration:
 helm-check: permission-crd-check policy-crd-check start-crd-check retention-crd-check profile-crd-check
 	$(PYTHON) scripts/check-helm.py
 	$(PYTHON) scripts/test-helm-bundled-cluster.py
+	$(PYTHON) scripts/test-helm-runtime-node-access.py
 
 helm-integration: helm-check
 	$(PYTHON) scripts/test-helm.py

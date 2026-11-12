@@ -129,6 +129,15 @@ manifest GETs from both nodes without recording headers/credentials. Shared
 layer caches are not cold exact-image evidence. The pinned registry image is
 fixture provenance, not a measured pull result.
 
+The selected bundled public workflow snapshots that cold-pull evidence after
+the first four acknowledged commands, before configuring a separate runtime
+registry prerequisite on its owned nodes. Runtime pulls use the same manifest
+and TLS root with registry-scoped node transport authentication. This preserves
+default kubelet credential verification and introduces no product credential
+propagation. The ordinary bootstrap-only fixture remains CA-only. Runtime pulls
+cannot be counted retroactively as the original cold pulls; both phases have
+separate receipts.
+
 The [packaged native run](../../test/results/helm137-native-hook-diagnostic-check.log)
 passes original manager/schema/audit/activation and v3 positive closure,
 setup-free fresh Helm replay, failed-hook original-revision CLI resume and

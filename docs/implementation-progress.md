@@ -268,6 +268,34 @@ The test/Helm envelope is20min, Go22min; product authority and effect bounds are
 unchanged. Full investigation/lifecycle qualification and final broad gates remain
 pending; the implementation goal continues through them.
 
+The first public run at `67ff9e2f` was deliberately stopped after its concrete
+registry blocker: Go1/669.307s, harness1/782.718s. The original four commands
+exited0; continuation launched a worker whose container never started because
+it lacked ongoing private-registry pull access. Both nodes already had the exact
+CRI-resolvable image. Effective Kubernetes1.37 credential verification still
+required access for that Secret-pulled image, as described in the
+[Kubernetes image documentation](https://kubernetes.io/docs/concepts/containers/images/#ensure-image-pull-credential-verification).
+No application-authentication diagnosis or successful login follows from this
+failure. All4,990 hashes independently match the committed candidate and stayed
+unchanged; the result route was restored. A bounded registry-only debug check then
+ran two new restricted tokenless Pods with the same exact image, both exit0,
+without changing kubelet policy, deleting pull records or renewing product bounds.
+The original hook had already been removed, so this did not exercise the strict
+live handoff callback or qualify the installation. Root checked both diagnostic
+Pod absences and source hash, then removed the original owned environment with
+verified empty cleanup. The next fresh result remains pending. Receipts:
+`native-small-public-20261112T054953Z/` and `pg-retained-diagnostic/` externally.
+
+The selected fixture now records both original authenticated cold pulls before
+installing registry-only node transport credentials through private stdin. It
+keeps the same image/CA/Pods and default kubelet verification; ordinary bootstrap
+fixtures still install no node credentials. Pure protocol tests and focused
+four-command-boundary races pass. The next run also includes the prepared actual
+regional Helm, MCP context/native-download, React and managed-deletion journey,
+using original runtime inventory/audit readers rather than fixture administrators.
+Login and journey must each pass explicitly; the old synthetic backend-denial
+injection remains separately covered by its original fixture, not this profile.
+
 Public-profile prerequisites are also integrated locally: explicit
 `services.identity.keycloak.processingOperators=true` creates an empty dedicated
 group, derives its stable UUID from the original public users UUID and fills only

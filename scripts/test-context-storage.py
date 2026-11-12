@@ -527,6 +527,15 @@ def qualification_cluster_count(default_count, installer_continuation=False, bun
     return default_count
 
 
+BUNDLED_PUBLIC_REQUIRED_STAGES = ("bundled-public-login", "bundled-context-journey")
+
+
+def missing_bundled_public_stages(passed):
+    """Only exact positive subtest receipts qualify the joined workflow."""
+    return [stage for stage in BUNDLED_PUBLIC_REQUIRED_STAGES
+            if "TestHelmBootstrapWithRealServices/" + stage not in passed]
+
+
 def focus_results(output, foci):
     """Each focus subtest's result and seconds from go test -v output; a focus
     without a result line did not run."""
@@ -827,7 +836,8 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
         report["bundledIdentityQualification"] = bundled_identity
         if bundled_identity:
             report["logicalTopology"] = {"hub": 0, "regional": 0, "physicalAPIs": 1}
-            report["bundledPublicCheckpoint"] = "five-commands-public-login"
+            report["bundledPublicCheckpoint"] = "five-commands-public-cookie-context-native-react-deletion"
+            report["bundledPublicRequestedWorkflow"] = ["five-command-helm", "bundled-keycloak-cookie-login", "same-api-regional-enrollment", "whole-pod-context-capture", "approved-inspection", "native-range-download", "react-processing-restrict-release", "stop-deny-targetgone-expiry", "sql-and-versioned-storage-deletion"]
             report["bundledPublicTestContextSeconds"] = 1200
             report["bundledPublicHelmTimeoutSeconds"] = 1200
             report["bundledContextReferenceProfileSHA256"] = hashlib.sha256((ROOT/"examples/helm/context-trial-profile.yaml").read_bytes()).hexdigest()
@@ -1351,9 +1361,12 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
                 if helm_test not in passed:
                     report["missingRequiredHelmBootstrap"] = True
                     exit_code = 1
-                if bundled_identity and "TestHelmBootstrapWithRealServices/bundled-public-login" not in passed:
-                    report["missingRequiredBundledPublicLogin"] = True
-                    exit_code = 1
+                if bundled_identity:
+                    missing = missing_bundled_public_stages(passed)
+                    report["bundledPublicStageResults"] = {stage: ("notPassed" if stage in missing else "PASS") for stage in BUNDLED_PUBLIC_REQUIRED_STAGES}
+                    if missing:
+                        report["missingRequiredBundledPublicStages"] = missing
+                        exit_code = 1
                 if exit_code == 0:
                     # The cluster hook runs once on the schedulable node; the
                     # bootstrap test flips nodes so both pull.

@@ -86,7 +86,7 @@ func qualifyRegionalInstall(t *testing.T, ctx context.Context, f fixture, index,
 		installRegionalStartCRD(t, ctx, region)
 	}
 	var record []byte
-	if os.Getenv("ASSERVAT_HELM_CONTEXT_NATIVE") == "1" {
+	if os.Getenv("ASSERVAT_HELM_CONTEXT_NATIVE") == "1" || os.Getenv("ASSERVAT_HELM_BUNDLED_IDENTITY") == "1" {
 		if index != 1 || len(issuedRecord) == 0 {
 			t.Fatal("Helm context trial requires its one original browser-issued bootstrap")
 		}
@@ -902,13 +902,13 @@ func qualifyRegionalCapacity(t *testing.T, ctx context.Context, admin *pgxpool.P
 					found, allowed := false, false
 					for _, row := range projection.Denies {
 						a := row.Audience
-						if a.BasisUID == denyUID && a.Kind == "Group" && a.Issuer == issuer && a.SubjectID == installedIdentityGroup && a.Role == "workload-maintainer" {
+						if a.BasisUID == denyUID && a.Kind == budget.subjectKindValue() && a.Issuer == issuer && a.SubjectID == budget.subjectIDValue() && a.Role == "workload-maintainer" {
 							found = true
 						}
 					}
 					for _, row := range projection.Allows {
 						a := row.Audience
-						if a.Kind == "Group" && a.Issuer == issuer && a.SubjectID == installedIdentityGroup && a.Role == "workload-maintainer" {
+						if a.Kind == budget.subjectKindValue() && a.Issuer == issuer && a.SubjectID == budget.subjectIDValue() && a.Role == "workload-maintainer" {
 							allowed = true
 						}
 					}
@@ -1002,6 +1002,7 @@ type regionalBudget struct {
 	ctx                     context.Context
 	client                  rest.Interface
 	base, issuer, cluster   string
+	subjectKind, subjectID  string
 	policyName, bindingName string
 	index                   int
 	binding                 map[string]any
@@ -1014,7 +1015,7 @@ func newRegionalBudget(t *testing.T, ctx context.Context, hub kubernetes.Interfa
 	}
 	b := &regionalBudget{t: t, ctx: ctx, client: hub.CoreV1().RESTClient(), base: "/apis/asservat.io/v1alpha1/namespaces/" + namespace + "/", issuer: issuer, cluster: cluster,
 		policyName: "regional" + suffix, bindingName: "regional-maintainers" + suffix, index: index}
-	if os.Getenv("ASSERVAT_HELM_CONTEXT_NATIVE") == "1" {
+	if os.Getenv("ASSERVAT_HELM_CONTEXT_NATIVE") == "1" || os.Getenv("ASSERVAT_HELM_BUNDLED_IDENTITY") == "1" {
 		if index != 1 {
 			t.Fatal("the declared context trial covers one regional cluster")
 		}
@@ -1065,7 +1066,7 @@ func installedFocusContextReserve() (bytes, objects int64) {
 
 func (b *regionalBudget) addPolicy() {
 	b.t.Helper()
-	if os.Getenv("ASSERVAT_HELM_CONTEXT_NATIVE") == "1" {
+	if os.Getenv("ASSERVAT_HELM_CONTEXT_NATIVE") == "1" || os.Getenv("ASSERVAT_HELM_BUNDLED_IDENTITY") == "1" {
 		b.addDeclaredPolicy()
 		return
 	}
@@ -1163,11 +1164,24 @@ func installedRegionalBindingRoles() []any {
 	return roles
 }
 
+func (b *regionalBudget) subjectKindValue() string {
+	if b.subjectKind != "" {
+		return b.subjectKind
+	}
+	return "Group"
+}
+func (b *regionalBudget) subjectIDValue() string {
+	if b.subjectID != "" {
+		return b.subjectID
+	}
+	return installedIdentityGroup
+}
+
 func (b *regionalBudget) addBinding(w regionalWorkload) {
 	b.t.Helper()
 	roles := installedRegionalBindingRoles()
 	b.binding = map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "AccessBinding", "metadata": map[string]any{"name": b.bindingName}, "spec": map[string]any{"effect": "Allow",
-		"subjects": []any{map[string]any{"kind": "Group", "issuer": b.issuer, "id": "synthetic-group"}}, "roles": roles,
+		"subjects": []any{map[string]any{"kind": b.subjectKindValue(), "issuer": b.issuer, "id": b.subjectIDValue()}}, "roles": roles,
 		"scope":  map[string]any{"clusterID": b.cluster, "namespaceRef": map[string]any{"name": w.ns.Name, "uid": string(w.ns.UID)}, "workloads": []any{map[string]any{"kind": "Deployment", "name": w.app.Name, "uid": string(w.app.UID)}}},
 		"reason": "ADR-197 native regional capacity"}}
 	body, _ := json.Marshal(b.binding)
@@ -1206,14 +1220,14 @@ func createRegionalWorkload(t *testing.T, ctx context.Context, region kubernetes
 	// The regional workload: a labeled namespace (the selector guard admits
 	// the administrator) and a Deployment with no replicas.
 	labels := map[string]string{"team": "regional"}
-	if os.Getenv("ASSERVAT_HELM_CONTEXT_NATIVE") == "1" {
+	if os.Getenv("ASSERVAT_HELM_CONTEXT_NATIVE") == "1" || os.Getenv("ASSERVAT_HELM_BUNDLED_IDENTITY") == "1" {
 		selector := helmContextTrialProfile(t).Public.Capacity.PolicySpec.Scope.NamespaceSelector
 		if len(selector.MatchLabels) == 0 {
 			t.Fatal("context trial requires its exact declared namespace labels")
 		}
 		labels = selector.MatchLabels
 	}
-	if installedRecordingFocus() || installedLogsFocus() {
+	if installedRecordingFocus() || installedLogsFocus() || os.Getenv("ASSERVAT_HELM_BUNDLED_IDENTITY") == "1" {
 		labels["pod-security.kubernetes.io/enforce"] = "restricted"
 	}
 	ns, err := region.CoreV1().Namespaces().Create(ctx, &core.Namespace{ObjectMeta: meta.ObjectMeta{Name: name, Labels: labels}}, meta.CreateOptions{})

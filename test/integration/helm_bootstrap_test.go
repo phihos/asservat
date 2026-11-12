@@ -380,8 +380,14 @@ func TestHelmBootstrapWithRealServices(t *testing.T) {
 	state.Passwords.Manager = ""
 	originalSeed.State.Passwords.Manager = ""
 	if bundledPublic != nil {
-		t.Run("bundled-public-login", func(t *testing.T) { bundledPublic.Login(t, ctx, publicIdentity) })
-		t.Log("bundled public checkpoint: five actual commands, automatic provider continuation and real imported Keycloak login; capture/download qualification follows separately")
+		var browser *installedBrowser
+		if !t.Run("bundled-public-login", func(t *testing.T) { browser = bundledPublic.Login(t, ctx, publicIdentity) }) {
+			return
+		}
+		t.Run("bundled-context-journey", func(t *testing.T) {
+			qualifyHelmBundledContext(t, ctx, api, kc, f, x, desired, configuration, admin, store, bundledPublic, publicIdentity, browser)
+		})
+		t.Log("bundled workflow completed its explicitly selected public login and context journey subtests")
 		return
 	}
 	// The compiled chart input names the runner account as the only trusted
@@ -655,6 +661,7 @@ func helmBootstrapRun(t *testing.T, ctx context.Context, api kubernetes.Interfac
 	var terminal *core.Pod
 	var commandErr error
 	flipped := false
+	runtimeRegistry := false
 	defer func() {
 		if t.Failed() && original != "" {
 			helmBootstrapFailureLogs(t, api, d, name, original)
@@ -718,6 +725,16 @@ func helmBootstrapRun(t *testing.T, ctx context.Context, api kubernetes.Interfac
 					}
 				}
 				flipped = true
+			}
+			if os.Getenv("ASSERVAT_HELM_BUNDLED_IDENTITY") == "1" && !runtimeRegistry {
+				proof, ready, err := helmRuntimeRegistryProof(pod, d.BootstrapNamespace, name, d.Image, original)
+				if err != nil {
+					t.Fatal("runtime registry original cold boundary", err)
+				}
+				if ready {
+					helmEnableRuntimeRegistry(t, runCtx, api, x, proof)
+					runtimeRegistry = true
+				}
 			}
 			if pod.Status.Phase == core.PodSucceeded || pod.Status.Phase == core.PodFailed {
 				terminal = pod.DeepCopy()
