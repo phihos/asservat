@@ -18,10 +18,10 @@ image publication is claimed.
 | --- | --- | --- |
 | Selection | Independent closed Helm provider choices; external defaults; generated state retained outside release values | Both mixed continuation paths now use existing private sources/carriers; real mixed-service qualification remains pending |
 | PostgreSQL | Actual18.6/pgBackRest2.60 TLS/SCRAM, separate DDL and Keycloak logins, encrypted full backup, same-volume restart; budget117/122 and client pool2 | Physical restore and full installed restart/recovery workflow |
-| Keycloak | Actual26.8.2 HTTPS/import/console and MCP PKCE, stable groups, group refresh and restart; opt-in empty processing group | Fresh public login and inspection; test reader metadata loss corrected with a passing focused regression |
-| SeaweedFS | Actual4.53 TLS, scoped IAM, versioned pinned bytes, delayed reload/new credential consumption and restart; initial audit installation passes | Full public acquisition/native download/deletion and multipart workflow |
-| OpenBao | Actual2.7.2 TLS/static seal/self-initialization, same-data restart, partial-init refusal and original bounded issuer mint | Full public workflow and broader lifecycle; no static-key alternative claim |
-| Installation | Selected all-four Helm run starts every service and completes the original five commands; regional installer uses real fleet bootstrap, existing credential carriers and ordinary join | Public login → regional Helm → context collection → native/range download → React inspection → expiry/managed deletion; actionable operator guide |
+| Keycloak | Actual26.8.2 HTTPS/import/console and MCP PKCE, stable groups, group refresh and restart; opt-in empty processing group | Broader identity/session lifecycle qualification; actual installed login and inspection now pass |
+| SeaweedFS | Actual4.53 TLS, scoped IAM, versioned pinned bytes, delayed reload/new credential consumption and restart; initial audit installation passes | Actual multipart creation, larger evidence and broader lifecycle matrices |
+| OpenBao | Actual2.7.2 TLS/static seal/self-initialization, same-data restart, partial-init refusal and original bounded issuer mint | Broader lifecycle and the accepted static-key alternative |
+| Installation | Fresh all-four Helm → login → regional enrollment → context/native/range/React → expiry/deletion passes with verified cleanup and a checked operator guide | Final eligible-head CI/merge readback, supported artifacts and complete operational lifecycle |
 
 Production composition persists original credentials before IAM effects, reuses
 existing purpose-specific Secrets/inboxes and refuses unknown retained state.
@@ -38,6 +38,36 @@ namespace. It reads only the issued bootstrap's version1, retains two regional
 keys in the existing immutable evidence Secret before additive IAM/policy setup,
 and uses the normal connector installer/catalog join. Existing grants survive
 append; conflicts refuse. Operator provider administration is serialized.
+
+### Fresh installed context qualification at `f9e972b8`
+
+`python scripts/test-context-storage.py --helm-bootstrap --bundled-objectstore
+--bundled-keyservice --bundled-postgres --bundled-identity
+--installer-continuation --keep-on-failure` returned Go0/389.933s and
+harness0/521.942s. Both exact login/context stages passed. Root independently
+matched all5,004 inventoried source hashes to the committed and working files,
+confirmed source stayed frozen and the result directory was restored, and
+verified no owned container, volume, network, image, Kind cluster or temporary
+fixture directory remains. Cleanup owner is the existing outer harness;
+`cleanupComplete=true` and `cleanupFailures=[]`.
+
+This fresh run covers five-command Helm, retained initial audit/decryption and
+child retirement, real imported-Keycloak cookie/MCP identity, one actual
+browser-issued fleet slot and second regional Helm, connector leaves/executor/
+capacity, exact whole-Pod target and compiled scoped SQL authority, MCP capture/
+replay/conflict, verification/publication,354-byte native download, React
+restriction/release/replays,708 charged range/resume bytes, unrelated-principal
+refusal, Stop/Deny/TargetGone, original expiry, complete object/version/marker/
+multipart absence, immutable audit ciphertext and evidence refund with control
+charges retained. It does not qualify actual multipart creation, large evidence
+matrices, physical restore, every mixed provider or production operation.
+
+Affected `make pre-push` at `f9e972b8` returned0/132.379s with baseline `8d970fde`;
+its integration package passed76s. The previous affected run at `8d970fde` returned
+0/133.141s with baseline `777864de`. These reuse unchanged runtime/package evidence
+from the complete84-job broad gate and eligible PR CI at `777864de`; product
+`cmd`, `internal` and chart sources are unchanged. Generated artifacts remain in
+`native-small-public-20261112T084110Z/` and named pre-push archives outside Git.
 
 ### Integrated checks at `777864de`
 
@@ -153,10 +183,10 @@ The outer harness's mandatory leftover/error checks are unchanged. Running its
 existing cleanup on that exact retained environment returned0 with no owned
 resources or private directory remaining. No uninstall qualification is claimed.
 
-Next: run affected gates using unchanged product evidence from the complete broad
-checks, then finish a fresh
-installed public workflow before qualified merge. Backup retention/physical
-restore and accepted local-identity/static-key alternatives remain unfinished.
+Next: record final documentation gates, push the single delivery batch, verify
+eligible exact-head PR CI and merge/read back authoritative main. Continue the
+accepted specification through backup/restore, provider lifecycle and remaining
+workflows. The full goal stays active; no release or homelab deployment is implied.
 
 ## Installed-qualified finite share metadata retirement (2026-11-11)
 

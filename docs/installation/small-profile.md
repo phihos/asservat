@@ -2,11 +2,11 @@
 
 Build Asservat from source and install PostgreSQL/pgBackRest, OpenBao, SeaweedFS and Keycloak in your Kubernetes cluster. Enroll that same API as a workload region through a second Helm release. The cluster remains free of node collectors; this procedure targets pod-status capture.
 
-**Candidate guide: end-to-end qualification is pending.** The bundled PostgreSQL/TLS/backup and Keycloak components have separate passing results. The current all-four-services, automatic five-command installation and public-login run is still being qualified. Same-API automatic regional enrollment and the subsequent capture/download/deletion workflow are not yet qualified with all four bundled services. This is a source-built developer trial, with no published Asservat or PostgreSQL image release, production/HA guarantee or supported restore procedure. Check the [implementation ledger](../implementation-progress.md) before using it.
+**Qualified source-built context trial.** A fresh installation with all four bundled services passed the five-command Helm installation, actual Keycloak login, regional enrollment, pod-status capture, native/range download, React inspection, expiry and managed deletion. The parent test and owned-environment harness both exited 0 at source `f9e972b8`; see the [implementation ledger](../implementation-progress.md) for source and cleanup evidence. This is a developer trial with no published Asservat/PostgreSQL release, production/HA qualification or supported physical restore procedure. Mixed key/store selections and broader lifecycle qualification remain separate work.
 
 ## Before you start
 
-Use a fresh disposable installation on Kubernetes 1.35 or newer with Helm, kubectl, jq, OpenSSL, Docker, Python, the Go and Node/npm versions required by this checkout available (see `go.mod` and `web/package.json`). Build on the same OS/CPU architecture as your nodes. The chart supplies service workloads; you still supply persistent storage, DNS, routing, TLS serving certificates and image distribution.
+Use a fresh disposable installation on Kubernetes 1.35 or newer with Helm, kubectl, jq, OpenSSL, Docker, Python, the Go and Node/npm versions required by this checkout available (see `go.mod` and `web/package.json`). Build on the same OS/CPU architecture as your nodes. The chart supplies service workloads; you still supply persistent storage, DNS, routing, TLS serving certificates and image distribution. Source image builds also need a C compiler, make, flex, bison, curl, tar/xz and `file` for the pinned static libpcap build.
 
 Choose an existing persistent StorageClass with enough space for the configured 64 GiB PostgreSQL data PVC, 64 GiB backup PVC, 8 GiB OpenBao PVC and 32 GiB object-store PVC. These quantities are configuration, not measured minimums or a storage assurance. Retain all PVCs and generated state Secrets together. Keeping backups on the same homelab storage is not independent disaster recovery.
 
@@ -250,7 +250,7 @@ The second Helm release already performs the join; do not run a second manual jo
 
 Once current sources and capacity are Ready, open `/captures/new`, choose the issued cluster and your Deployment, then **Find diagnostics**, **Review collection**, and **Collect pod status**. Inspect the resulting case and use the native download before its original expiry. The reference evidence default is 300 seconds plus a 300-second deletion budget. Verify subsequent reads refuse at expiry and managed deletion completes. Downloaded external copies remain yours to manage.
 
-This guide's all-four-services capture/download/deletion sequence remains pending fresh installed qualification. Do not infer full-workflow success from the login checkpoint, component tests or this renderable values example.
+The all four bundled services context sequence has fresh installed qualification. That result does not qualify physical restore, every mixed-provider combination, larger evidence types or sustained operation.
 
 ## Replace one bundled service
 

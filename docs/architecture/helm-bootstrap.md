@@ -124,7 +124,7 @@ Current acknowledged launch/SQL verification handles worker replay without
 recreating a consumed phase1 inbox. Source/recipe/mode/phase identity, original
 deadlines and the ordinary final provider inspection remain binding. The
 [small-profile guide](../installation/small-profile.md) documents the all-bundled
-site inputs and pending qualification; rendering alone grants no authority.
+site inputs, current context qualification and remaining lifecycle work; rendering alone grants no authority.
 
 ## Qualification and remaining installed prerequisites
 

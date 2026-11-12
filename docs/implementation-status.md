@@ -1,15 +1,18 @@
 # Product implementation status
 
-Evidence updated on **2026-11-11**. The context-trial main baseline is [PR223](https://github.com/phihos/asservat/pull/223), merge `b389b7c9`. Required PR CI and [post-merge main CI](https://github.com/phihos/asservat/actions/runs/43020311620) passed. The source-built collector-free context trial has actual Helm qualification with two APIs and a shared API; all 4,834 shared-API runtime hashes match main. PR222's processing-inventory evidence has its separately qualified 4,813-hash source scope. Finite concrete-share/audit retirement is freshly installed-qualified at `bc444f36`; full CI and delivery status belong to its implementation PR. Other rows retain their named evidence scopes; [implementation progress](implementation-progress.md) preserves actual results, failures and remaining gaps.
+Evidence updated on **2026-11-12**. The context-trial main baseline is [PR223](https://github.com/phihos/asservat/pull/223), merge `b389b7c9`. Required PR CI and [post-merge main CI](https://github.com/phihos/asservat/actions/runs/43020311620) passed. The source-built collector-free context trial has actual Helm qualification with two APIs and a shared API; all 4,834 shared-API runtime hashes match main. PR222's processing-inventory evidence has its separately qualified 4,813-hash source scope. Finite concrete-share/audit retirement is freshly installed-qualified at `bc444f36`; full CI and delivery status belong to its implementation PR. Other rows retain their named evidence scopes; [implementation progress](implementation-progress.md) preserves actual results, failures and remaining gaps.
 
 **There is no supported homelab release yet.** Several packaged operator/developer workflows have installed evidence. That evidence applies to the named environments and inputs; it does not complete the accepted first-release scope or qualify sustained production operation. Component, built-browser and installed evidence remain distinct.
 
-The active next workflow is the self-contained small installation, following the
-maintainer's correction that the external-services trial is unusable without
-external PostgreSQL and S3. Bundled PostgreSQL/pgBackRest, SeaweedFS and Keycloak
-are being integrated with independent provider choices. PostgreSQL has component
-startup/backup/restart evidence; the complete small-profile install remains
-unqualified. See the [current ledger](implementation-progress.md).
+The context trial with all four bundled services now has fresh installed
+qualification at `f9e972b8` ([PR225](https://github.com/phihos/asservat/pull/225)):
+bundled PostgreSQL/pgBackRest, SeaweedFS, OpenBao and Keycloak, followed by real
+login, regional Helm enrollment, collection, native/range download, React
+inspection, expiry and verified managed deletion. Both Go and the owned harness
+exited 0 with 5,004 matching source hashes and complete cleanup. Provider choices
+are independent; mixed key/store installed qualification, physical restore and
+local-identity/static-key alternatives remain unfinished. See the
+[guide](installation/small-profile.md) and [current ledger](implementation-progress.md).
 
 No overall completion percentage or calendar ETA is established. Earlier estimates lacked a consistent scope/effort baseline and are withdrawn.
 
@@ -52,7 +55,7 @@ the features that depend on them.
 | Capture profiles, guidance, history and repeat | Builtin/organization/namespace versioned catalogs, flat composition, typed edits, combined review, plan diff and Save as profile are merged. Named context, recording Save and Go profile workflows cover immutable history/settings and fresh Repeat; the former blanket recording-history gap is superseded. [Console implementation](implementation-progress.md#console-plan-diff-and-save-as-profile), [trace/history proof](../test/results/runtime-trace-native-41912395184/README.md). | Broader profile/action/composition and guidance coverage; a successful named Repeat does not establish continuous availability or every history source. |
 | Permission/privacy administration | Merged restriction/release, operator discovery, signed retention lifecycle, exact early erasure and workload-interval restriction have named installed evidence (PR217–221). Merged PR222 adds the installed operator-only processing inventory export, including retained deletions, paginated recipients, native sessions, acknowledged page bytes and explicit processor declarations (SC-PRV-014). Fresh `bc444f36` additionally qualifies manual/capture-time concrete share/audit retirement, healthy certificates, original live cutoffs, managed-object absence and original cooling/release (SC-PRV-015). [Ledger](implementation-progress.md). | Complete derivative lineage and erasure propagation, reviewed extracts and exceptions, broader policy/instruction/control metadata retirement, browser-session cleanup, managed-copy and backup lifetime closure, and wider operational and upgrade qualification. |
 | Incident notification and recurrence investigation | Trigger-to-case and bounded case/navigation foundations exist; Go profile acquisition timing is displayed as a verified HTTP-fetch window, with unknown process/clock attribution. [Ledger](implementation-progress.md), [timing contract](decisions/297-verified-profile-acquisition-metadata.md). | Complete incident grouping, notification delivery, findings and recurrence investigation. Acquisition timing is not a full incident timeline or proof of common process identity. |
-| Small deployment alternatives | Local wrapping/signing/key-service components exist. [Scope](product.md), [installation](installation/helm.md). | Installed internal accounts, local PKI lifecycle, bundled PostgreSQL/pgBackRest/evidence store and provider lifecycle qualification. |
+| Small deployment alternatives | All-four bundled PostgreSQL/pgBackRest, SeaweedFS, OpenBao and Keycloak context trial is freshly installed-qualified. Local wrapping/signing components also exist. [Guide](installation/small-profile.md), [ledger](implementation-progress.md). | Internal accounts/static keys and local PKI lifecycle; physical restore, mixed-provider installed matrices and broader provider lifecycle qualification. |
 | Recover, upgrade and operate production | Protected bootstrap, database-incarnation fencing, selected schema/image upgrades and accepted-history accounting/rollback have real fixture evidence. [History/upgrade proof](../test/results/accepted-history-capacity-local/README.md), [ledger](implementation-progress.md). | Supported backup/restore, failover/partition/version-skew profiles, sustained operation, distributable verified artifacts and production acceptance. A selected upgrade fixture is not complete operational qualification. |
 
 These groups describe capabilities, not a completion score. Earlier failures are retained in the ledger and original reports; later successes supersede only the exact boundaries they exercise. No complete S-02/S-04/S-05 or whole-specification exit is asserted here.
@@ -66,23 +69,24 @@ This does not complete other identifying metadata or a whole specification slice
 
 ## Homelab trial status
 
-A source-built, context-only developer experiment can use an ordinary owned
-homelab Kubernetes cluster without a node collector or disposable-node marker.
-It requires external PostgreSQL, S3-compatible storage, OpenBao and Keycloak;
-matching source-built, digest-pinned images accessible to the cluster; and the
-[context-trial procedure](installation/context-trial.md),
-including separate credentials, identity and permission configuration, delegation
-where needed and regional enrollment. The actual Helm/profile journey passed
-with separate hub/workload APIs and a shared API, using preloaded images.
-The shared path uses hub Helm followed by the regional CLI. Runtime image pulls require anonymous or node-configured
-access, or exact preloads; the bootstrap pull Secret covers only its runner.
+A source-built, context-only trial can use an ordinary owned homelab Kubernetes
+cluster without a node collector or disposable-node marker. Choose the
+[bundled-services trial](installation/small-profile.md) to install PostgreSQL,
+SeaweedFS, OpenBao and Keycloak, or the
+[external-services procedure](installation/context-trial.md) to reuse separately
+operated services. Both require digest-pinned source-built images, storage, DNS,
+trusted TLS and explicit identity/workload permissions. The bundled trial enrolls
+the same API through a second Helm release. Existing Keycloak can be selected
+independently. Runtime image pulls need anonymous or node-configured access, or
+exact preloads accepted by kubelet policy; the bootstrap pull Secret covers only
+its runner.
 
 The default Helm install starts no services. The documented
 `bootstrap.enabled: true` with `bootstrap.continuation.enabled: true` runs the
-runtime continuation while `runtime.enabled` remains `false`.
-`runtime.enabled: true` is still rejected. This is a developer experiment;
-internal users, the bundled small-deployment profile and a supported release
-remain unfinished.
+runtime continuation while `runtime.enabled` remains `false`; direct runtime
+mode is still rejected. These are developer trials. A supported release,
+physical restore, internal accounts/static keys and full production operational
+qualification remain unfinished.
 
 Packet/syscall collectors remain
 [disposable-test-host only](installation/helm.md#node-collector-test-hosts-only).

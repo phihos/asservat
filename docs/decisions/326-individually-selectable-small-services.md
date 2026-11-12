@@ -1,6 +1,6 @@
 # ADR-326 — Individually selectable small services
 
-Status: implementation candidate; installed qualification pending.
+Status: context workflow qualified with all four bundled services; full operational lifecycle qualification pending.
 
 ## Decision and scope
 
