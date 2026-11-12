@@ -836,6 +836,7 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
         report["bundledIdentityQualification"] = bundled_identity
         if bundled_identity:
             report["logicalTopology"] = {"hub": 0, "regional": 0, "physicalAPIs": 1}
+            report["cleanupOwner"] = "owned-context-harness"
             report["bundledPublicCheckpoint"] = "five-commands-public-cookie-context-native-react-deletion"
             report["bundledPublicRequestedWorkflow"] = ["five-command-helm", "bundled-keycloak-cookie-login", "same-api-regional-enrollment", "whole-pod-context-capture", "approved-inspection", "native-range-download", "react-processing-restrict-release", "stop-deny-targetgone-expiry", "sql-and-versioned-storage-deletion"]
             report["bundledPublicTestContextSeconds"] = 1200

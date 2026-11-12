@@ -137,8 +137,24 @@ capacity and workload permissions. Actual all-four and external-Keycloak Helm
 schema/renders return0;15 shell blocks and local links pass. No default human,
 external service mutation, published image or installed-workflow claim is added.
 
-Next: run affected gates against the last full-qualified source evidence, then
-finish a fresh
+Fresh `8d970fde` then passed both exact workflow subtests, including the complete
+managed-deletion proof, but its parent returned Go1/452.835s and harness1/569.059s.
+The bootstrap-only cleanup tried deleting a running guarded namespace; the
+namespace controller correctly refused DeleteCollection for four protected CRDs.
+All5,003 committed/working hashes matched and source stayed frozen. The failed
+helper had already removed initial guards/RBAC and requested namespace deletion;
+that partial mutation is recorded, with no repair or guard bypass.
+
+The full installed profile now explicitly hands disposable-environment teardown
+to the existing owned context harness. Bootstrap-only cleanup remains unchanged;
+the selected-profile fake-client regression proves zero namespace/policy/PVC
+mutation. Focused race tests pass0/1.207s and42 Python selectors pass0/1.434s.
+The outer harness's mandatory leftover/error checks are unchanged. Running its
+existing cleanup on that exact retained environment returned0 with no owned
+resources or private directory remaining. No uninstall qualification is claimed.
+
+Next: run affected gates using unchanged product evidence from the complete broad
+checks, then finish a fresh
 installed public workflow before qualified merge. Backup retention/physical
 restore and accepted local-identity/static-key alternatives remain unfinished.
 

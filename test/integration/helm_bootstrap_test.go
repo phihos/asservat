@@ -161,7 +161,7 @@ func TestHelmBootstrapWithRealServices(t *testing.T) {
 	if bundledKeyService {
 		bundledKeys = newHelmBundledKeyService(t, ctx, api, desired, x)
 	}
-	t.Cleanup(func() { helmBootstrapCleanup(t, api, desired, ns.UID) })
+	t.Cleanup(func() { helmBootstrapCleanup(t, api, desired, ns.UID, bundledIdentity) })
 	rootCert, err := x509.ParseCertificate(f.NativeProviders.Root)
 	if err != nil {
 		t.Fatal(err)
@@ -887,8 +887,17 @@ func (w *helmBootstrapProviderWatch) Take(t *testing.T, ctx context.Context) str
 	}
 	return ""
 }
-func helmBootstrapCleanup(t *testing.T, api kubernetes.Interface, d contracts.InitialBootstrap, namespaceUID types.UID) {
+func helmBootstrapCleanup(t *testing.T, api kubernetes.Interface, d contracts.InitialBootstrap, namespaceUID types.UID, installedPublic bool) {
 	t.Helper()
+	if installedPublic {
+		// This selected workflow leaves a running guarded installation, retained
+		// services/PVCs and regional enrollment. The bootstrap-only namespace
+		// cleanup cannot uninstall that runtime. Its disposable environment belongs
+		// to the existing outer harness, whose terminal receipt requires absence of
+		// the owned clusters, containers, volumes, networks and images.
+		t.Log("full installed public fixture cleanup owner: owned-context-harness; runtime guards and retained sources remain intact until owned environment teardown")
+		return
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 	name := d.Name + "-bootstrap"
