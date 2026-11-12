@@ -134,6 +134,7 @@ seconds before to 10 seconds after the trigger.
 - [Product definition](docs/product.md): users, workflows and first-release scope
 - [MCP workflows](docs/interfaces/mcp-workflows.md): what an AI agent can do, tool by tool
 - [Try pod-status capture](docs/installation/context-trial.md): source-built Helm trial with your PostgreSQL, S3, OpenBao and Keycloak
+- [Try bundled services](docs/installation/small-profile.md): source-built small-profile candidate with PostgreSQL, OpenBao, SeaweedFS and Keycloak; full workflow qualification pending
 - [Helm installation](docs/installation/helm.md): chart scope and configuration reference
 - [Decision records](docs/decisions/README.md): every accepted design decision and why
 - [Project guide](docs/project-guide.md): reading map, specifications and checks for contributors
