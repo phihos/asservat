@@ -40,6 +40,19 @@ type installedBrowser struct {
 	wire   *contracts.InvestigationContracts
 }
 
+// Only the public origin is remapped to its independently observed listener.
+// A selected IdP may share that hostname on another port.
+func installedConsoleDialTarget(origin *url.URL, target, address string) string {
+	port := origin.Port()
+	if port == "" {
+		port = "443"
+	}
+	if target == net.JoinHostPort(origin.Hostname(), port) {
+		return address
+	}
+	return target
+}
+
 // consoleSession logs the synthetic user in through the console client, like
 // initializeProcessing, and keeps the cookie session for the browser journey.
 func (i *installedIdentity) consoleSession(t *testing.T, ctx context.Context, publicRoot *x509.Certificate, address, origin string) *installedBrowser {
@@ -58,9 +71,7 @@ func (i *installedIdentity) consoleSession(t *testing.T, ctx context.Context, pu
 	client := &http.Client{Jar: jar, Timeout: 30 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 		Transport: &http.Transport{Proxy: nil, ForceAttemptHTTP2: true, TLSClientConfig: &tls.Config{RootCAs: roots, MinVersion: tls.VersionTLS12},
 			DialContext: func(ctx context.Context, network, target string) (net.Conn, error) {
-				if host, _, e := net.SplitHostPort(target); e == nil && host == u.Hostname() {
-					target = address
-				}
+				target = installedConsoleDialTarget(u, target, address)
 				return dial.DialContext(ctx, network, target)
 			}}}
 	t.Cleanup(client.CloseIdleConnections)

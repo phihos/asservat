@@ -31,6 +31,33 @@ def native_needs(suite):
 
 
 class RegionalContextSelection(unittest.TestCase):
+    def test_bundled_identity_owns_same_api_automatic_helm_workflow(self):
+        selected = dict(helm_bootstrap=True, installer_continuation=True, bundled_identity=True)
+        self.assertEqual(fixture.qualification_selection(None, False, False, **selected), ("^TestHelmBootstrapWithRealServices$", 1))
+        self.assertEqual(fixture.qualification_go_timeout(helm_bootstrap=True, installer_continuation=True, bundled_identity=True), "22m")
+        with patch.dict(os.environ, {"ASSERVAT_JOURNEY_FOCUS": "journey"}, clear=True):
+            self.assertEqual(fixture.qualification_cluster_count(3, True, bundled_identity=True), 1)
+        for invalid in (dict(selected, helm_bootstrap=False), dict(selected, installer_continuation=False), dict(selected, runtime_provider_pair=True), dict(selected, initial_bootstrap_chain=True)):
+            with self.subTest(invalid=invalid), self.assertRaisesRegex(ValueError, "Bundled identity"):
+                fixture.qualification_selection(None, False, False, **invalid)
+        options = dict(selected, bundled_postgres=True, bundled_keyservice=True, bundled_objectstore=True)
+        with tempfile.TemporaryDirectory() as directory:
+            env = fixture.qualification_environment({"ASSERVAT_HELM_CONTEXT_NATIVE": "1", "ASSERVAT_HELM_CONTEXT_TOPOLOGY": "same-api"}, "fixture.json", Path(directory), False, False, **options)
+            self.assertEqual(env["ASSERVAT_HELM_BUNDLED_IDENTITY"], "1")
+            self.assertEqual(env["ASSERVAT_INSTALLER_CONTINUATION"], "1")
+            self.assertNotIn("ASSERVAT_INITIAL_RUNTIME_PROVIDER_PAIR", env)
+            # This is the existing all-service Helm driver, not a competing
+            # bootstrap-chain/impersonation path or an external identity realm.
+            self.assertNotIn("ASSERVAT_HELM_CONTEXT_NATIVE", env)
+            clean = fixture.qualification_environment({"ASSERVAT_HELM_BUNDLED_IDENTITY": "1"}, "fixture.json", Path(directory), False, False)
+            self.assertNotIn("ASSERVAT_HELM_BUNDLED_IDENTITY", clean)
+        for missing in ("bundled_postgres", "bundled_keyservice", "bundled_objectstore", "helm_bootstrap", "installer_continuation"):
+            invalid = dict(options, **{missing: False})
+            with self.subTest(missing=missing), patch.object(fixture, "run", side_effect=AssertionError("external setup")) as external:
+                with self.assertRaisesRegex(ValueError, "Bundled identity"):
+                    fixture.main(**invalid)
+                external.assert_not_called()
+
     def test_manual_logs_api_only_focus_and_resource_selector(self):
         with patch.dict(os.environ, {"ASSERVAT_JOURNEY_FOCUS":"manual-logs"}):
             self.assertEqual(fixture.qualification_cluster_count(3, installer_continuation=True),2)

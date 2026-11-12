@@ -255,6 +255,19 @@ plain/executor rendering preserved. Combined compilation passes with no runtime
 tests selected. The new path and imported-Keycloak attachment still require the
 fresh public installed journey; this remains the active next outcome.
 
+The first all-four installed reproduction now selects the actual chart/imported
+Keycloak and automatic fifth continuation command. Imported identity attachment
+creates only explicit synthetic humans/memberships; clients, realms and stable
+groups are not replaced. Local actual-render/DTO/TLS routing races pass1.936s and
+all41 harness selectors pass1.021s. The shared-IP/different-port login regression
+failed before exact-authority routing and passes afterward. The console browser
+gate returned0/150.301s; generated outputs are archived externally and tracked
+historical results restored. This reproduction requires five positive commands
+and actual public session login, then stops explicitly before capture/download.
+The test/Helm envelope is20min, Go22min; product authority and effect bounds are
+unchanged. Full investigation/lifecycle qualification and final broad gates remain
+pending; the implementation goal continues through them.
+
 Public-profile prerequisites are also integrated locally: explicit
 `services.identity.keycloak.processingOperators=true` creates an empty dedicated
 group, derives its stable UUID from the original public users UUID and fills only

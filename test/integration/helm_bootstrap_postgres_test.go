@@ -6,12 +6,15 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
 	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -24,9 +27,61 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/kubernetes"
 )
+
+// Creating a Service does not acknowledge kube-proxy's NodePort programming.
+// These are read-only fixture queries, not repeated installer/SQL effects.
+func waitHelmPostgresInspection(ctx context.Context, read func(context.Context) error) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (bool, error) {
+		err := read(ctx)
+		if errors.Is(err, syscall.ECONNREFUSED) {
+			return false, nil
+		}
+		return err == nil, err
+	})
+}
+
+func TestHelmPostgresInspectionWaitsOnlyForNodePort(t *testing.T) {
+	ctx, stop := context.WithTimeout(context.Background(), time.Second)
+	defer stop()
+	calls := 0
+	if err := waitHelmPostgresInspection(ctx, func(context.Context) error {
+		calls++
+		if calls == 1 {
+			return fmt.Errorf("connect: %w", syscall.ECONNREFUSED)
+		}
+		return nil
+	}); err != nil || calls != 2 {
+		t.Fatal("original NodePort refusal was not resolved by a read", err, calls)
+	}
+	denied := errors.New("definitive SQL or TLS refusal")
+	calls = 0
+	if err := waitHelmPostgresInspection(ctx, func(context.Context) error { calls++; return denied }); !errors.Is(err, denied) || calls != 1 {
+		t.Fatal("definitive readback refusal was retried", err, calls)
+	}
+	original, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+	defer cancel()
+	deadline, _ := original.Deadline()
+	if err := waitHelmPostgresInspection(original, func(observed context.Context) error {
+		until, ok := observed.Deadline()
+		if !ok || until.After(deadline) {
+			t.Fatal("readiness extended original parent deadline")
+		}
+		return syscall.ECONNREFUSED
+	}); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatal("original deadline was not retained", err)
+	}
+	calls = 0
+	if err := waitHelmPostgresInspection(original, func(context.Context) error { calls++; return nil }); !errors.Is(err, context.DeadlineExceeded) || calls != 0 {
+		t.Fatal("expired readiness issued a new query", err, calls)
+	}
+}
 
 func TestHelmBundledServicesCompose(t *testing.T) {
 	image := "registry.example/asservat@sha256:" + strings.Repeat("a", 64)
@@ -218,8 +273,18 @@ func (p *helmBundledPostgres) Resolve(t *testing.T, ctx context.Context, api kub
 	t.Cleanup(admin.Close)
 	var user, database, version, maximum string
 	var superuser, createRole bool
-	if err = admin.QueryRow(ctx, "SELECT current_user,current_database(),current_setting('server_version'),current_setting('max_connections'),pg_postmaster_start_time(),rolsuper,rolcreaterole FROM pg_roles WHERE rolname=current_user").Scan(&user, &database, &version, &maximum, &p.postmaster, &superuser, &createRole); err != nil || user != "asservat_admin" || database != "asservat" || !strings.HasPrefix(version, "18.6") || maximum != "117" || !superuser || !createRole {
-		t.Fatal("actual bundled PostgreSQL identity/version/budget mismatch")
+	if err = waitHelmPostgresInspection(ctx, func(read context.Context) error {
+		return admin.QueryRow(read, "SELECT current_user,current_database(),current_setting('server_version'),current_setting('max_connections'),pg_postmaster_start_time(),rolsuper,rolcreaterole FROM pg_roles WHERE rolname=current_user").Scan(&user, &database, &version, &maximum, &p.postmaster, &superuser, &createRole)
+	}); err != nil {
+		t.Fatalf("actual bundled PostgreSQL readback unavailable (%T)", err)
+	}
+	if user != "asservat_admin" || database != "asservat" || !strings.HasPrefix(version, "18.6") || maximum != func() string {
+		if p.plan.Keycloak {
+			return "122"
+		}
+		return "117"
+	}() || !superuser || !createRole {
+		t.Fatalf("actual bundled PostgreSQL mismatch: user=%q database=%q version=%q max_connections=%q superuser=%t createrole=%t", user, database, version, maximum, superuser, createRole)
 	}
 	pod, err := api.CoreV1().Pods(p.plan.Namespace).Get(ctx, p.plan.ServiceName()+"-0", meta.GetOptions{})
 	if err != nil || pod.Spec.NodeName != node.Name || pod.Status.Phase != core.PodRunning || len(pod.Spec.Containers) != 2 {

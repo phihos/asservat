@@ -44,12 +44,17 @@ func TestHelmBootstrapWithRealServices(t *testing.T) {
 		t.Skip("run owned --helm-bootstrap with empty SQL and authenticated registry")
 	}
 	bundledPostgres := os.Getenv("ASSERVAT_HELM_BUNDLED_POSTGRES") == "1"
+	bundledIdentity := os.Getenv("ASSERVAT_HELM_BUNDLED_IDENTITY") == "1"
 	var f fixture
 	raw, err := os.ReadFile(os.Getenv("ASSERVAT_CONTEXT_FIXTURES"))
 	if err != nil || json.Unmarshal(raw, &f) != nil || len(f.Clusters) != 1 || f.WorkerImage == "" || !bundledPostgres && f.NativeProviders.Postgres == "" {
 		t.Fatal("owned single-cluster/native services unavailable")
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	testBound := 10 * time.Minute
+	if bundledIdentity {
+		testBound = 20 * time.Minute
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), testBound)
 	defer cancel()
 	var admin *pgxpool.Pool
 	if !bundledPostgres {
@@ -135,6 +140,9 @@ func TestHelmBootstrapWithRealServices(t *testing.T) {
 		desired.Providers = contracts.SmallOpenBaoInitialProviders()
 	}
 	publicInput := helmBootstrapPublicInput(desired)
+	if bundledIdentity {
+		publicInput.Administrators = append([]contracts.OwnerDeploymentActor(nil), desired.Administrators...)
+	}
 	compiled, err := providerconfig.CompileInitialBootstrapInput(publicInput, kc.CAData, []byte(f.Clusters[0].Token), time.Now())
 	if err != nil {
 		t.Fatal("fixture public compiler", err)
@@ -143,6 +151,7 @@ func TestHelmBootstrapWithRealServices(t *testing.T) {
 	var bundledPG *helmBundledPostgres
 	if bundledPostgres {
 		bundledPG = newHelmBundledPostgres(t, ctx, api, desired, x)
+		bundledPG.plan.Keycloak = bundledIdentity
 	}
 	var bundled *helmBundledObjectStore
 	if bundledObjectStore {
@@ -187,6 +196,17 @@ func TestHelmBootstrapWithRealServices(t *testing.T) {
 	if bundledKeys != nil {
 		bundledKeys.Values(values)
 		publicInput.KeyService = contracts.InitialBootstrapKeyServiceInput{Endpoint: bundledKeys.plan.Endpoint(), AuditMount: contracts.SmallOpenBaoAuditMount, AuditKey: "audit", RootsSource: contracts.InitialBootstrapBundledOpenBaoRoots}
+	}
+	var bundledPublic *helmBundledPublic
+	var identitySource *helmBundledIdentity
+	if bundledIdentity {
+		if !bundledPostgres || !bundledObjectStore || !bundledKeyService || os.Getenv("ASSERVAT_INSTALLER_CONTINUATION") != "1" {
+			t.Fatal("bundled public qualification requires all four services and automatic continuation")
+		}
+		nodeIP := nodeInternalIP(t, ctx, api, f.Clusters[0].NodeUID)
+		bundledPublic = newHelmBundledPublic(t, ctx, api, desired, nodeIP)
+		identitySource = newHelmBundledIdentity(t, ctx, api, desired, nodeIP, x)
+		identitySource.Values(t, values, &publicInput, bundledPublic)
 	}
 	valuesPath := filepath.Join(t.TempDir(), "values.json")
 	helmBootstrapWriteValues(t, valuesPath, values)
@@ -273,6 +293,10 @@ func TestHelmBootstrapWithRealServices(t *testing.T) {
 	if bundledKeys != nil {
 		bundledKeys.Resolve(t, ctx, api, kc, &publicInput, originalSeed.State, node)
 	}
+	var publicIdentity *installedIdentity
+	if identitySource != nil {
+		publicIdentity = identitySource.Resolve(t, ctx, api, &publicInput, &f)
+	}
 	if bundled != nil {
 		desired, store = bundled.VerifiedStore(t, ctx, api, kc, publicInput, []byte(f.Clusters[0].Token), node)
 	} else if bundledKeys != nil || bundledPG != nil {
@@ -355,6 +379,11 @@ func TestHelmBootstrapWithRealServices(t *testing.T) {
 	}
 	state.Passwords.Manager = ""
 	originalSeed.State.Passwords.Manager = ""
+	if bundledPublic != nil {
+		t.Run("bundled-public-login", func(t *testing.T) { bundledPublic.Login(t, ctx, publicIdentity) })
+		t.Log("bundled public checkpoint: five actual commands, automatic provider continuation and real imported Keycloak login; capture/download qualification follows separately")
+		return
+	}
 	// The compiled chart input names the runner account as the only trusted
 	// bootstrap administrator, so closure checks act as that runner (as the
 	// chain's unified path does). The cluster administrator matches neither
@@ -528,6 +557,7 @@ type helmBootstrapFixture struct {
 	ObjectStoreImage string         `json:"objectStoreImage,omitempty"`
 	KeyServiceImage  string         `json:"keyServiceImage,omitempty"`
 	PostgresImage    string         `json:"postgresImage,omitempty"`
+	IdentityImage    string         `json:"identityImage,omitempty"`
 }
 
 func helmBootstrapPublicInput(d contracts.InitialBootstrap) contracts.InitialBootstrapInput {
@@ -567,7 +597,11 @@ func helmBootstrapWriteValues(t *testing.T, path string, values map[string]any) 
 	}
 }
 func helmBootstrapCommand(ctx context.Context, x helmBootstrapFixture, kubeconfig, namespace, values string) error {
-	command := exec.CommandContext(ctx, "helm", "upgrade", "--install", "asservat", x.ChartArchive, "--kubeconfig", kubeconfig, "--namespace", namespace, "--values", values, "--wait", "--timeout", "6m", "--history-max", "4")
+	timeout := "6m"
+	if os.Getenv("ASSERVAT_HELM_BUNDLED_IDENTITY") == "1" {
+		timeout = "20m"
+	}
+	command := exec.CommandContext(ctx, "helm", "upgrade", "--install", "asservat", x.ChartArchive, "--kubeconfig", kubeconfig, "--namespace", namespace, "--values", values, "--wait", "--timeout", timeout, "--history-max", "4")
 	// Helm only receives public values and references; its output is not a
 	// credential transport. Keep even unexpected diagnostics bounded.
 	output := &helmBootstrapOutput{}
@@ -592,7 +626,11 @@ func (b *helmBootstrapOutput) Write(p []byte) (int, error) {
 
 func helmBootstrapRun(t *testing.T, ctx context.Context, api kubernetes.Interface, kubeconfig string, d contracts.InitialBootstrap, x helmBootstrapFixture, values string, flipNodes, wantSuccess bool) *core.Pod {
 	t.Helper()
-	runCtx, stop := context.WithTimeout(ctx, 6*time.Minute)
+	bound := 6 * time.Minute
+	if os.Getenv("ASSERVAT_HELM_BUNDLED_IDENTITY") == "1" {
+		bound = 20 * time.Minute
+	}
+	runCtx, stop := context.WithTimeout(ctx, bound)
 	defer stop()
 	name := d.Name + "-bootstrap"
 	list, e := api.CoreV1().Pods(d.BootstrapNamespace).List(runCtx, meta.ListOptions{FieldSelector: "metadata.name=" + name})
@@ -696,7 +734,11 @@ func helmBootstrapRun(t *testing.T, ctx context.Context, api kubernetes.Interfac
 	}
 	if wantSuccess {
 		statuses := append(append([]core.ContainerStatus{}, terminal.Status.InitContainerStatuses...), terminal.Status.ContainerStatuses...)
-		if len(statuses) != 4 {
+		if os.Getenv("ASSERVAT_HELM_BUNDLED_IDENTITY") == "1" {
+			if err := helmContextTerminalValid(terminal, d.BootstrapNamespace, name, d.Image, original); err != nil {
+				t.Fatal("actual bundled five-command terminal", err)
+			}
+		} else if len(statuses) != 4 {
 			t.Fatal("fixed four commands were not all observed")
 		}
 		digest := strings.Split(d.Image, "@")[1]
@@ -727,9 +769,16 @@ func helmBootstrapFailureLogs(t *testing.T, api kubernetes.Interface, d contract
 	}
 	containers := append(append([]core.Container{}, pod.Spec.InitContainers...), pod.Spec.Containers...)
 	statuses := append(append([]core.ContainerStatus{}, pod.Status.InitContainerStatuses...), pod.Status.ContainerStatuses...)
-	if len(containers) != 4 || len(statuses) > 4 {
+	if (len(containers) != 4 && len(containers) != 5) || len(statuses) > len(containers) {
 		t.Log("original hook diagnostic has unexpected command count")
 		return
+	}
+	commands := []string{"produce", "schema", "prepare", "retire", "continue"}
+	for i, c := range containers {
+		if c.Name != commands[i] || c.Image != d.Image {
+			t.Log("original hook diagnostic has unexpected command/image")
+			return
+		}
 	}
 	for _, status := range statuses {
 		valid := false
