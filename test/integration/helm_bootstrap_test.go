@@ -385,7 +385,7 @@ func TestHelmBootstrapWithRealServices(t *testing.T) {
 			return
 		}
 		t.Run("bundled-context-journey", func(t *testing.T) {
-			qualifyHelmBundledContext(t, ctx, api, kc, f, x, desired, configuration, admin, store, bundledPublic, publicIdentity, browser)
+			qualifyHelmBundledContext(t, ctx, api, kc, f, x, desired, configuration, admin, store, bundledPublic, publicIdentity, browser, bundledPG)
 		})
 		t.Log("bundled workflow completed its explicitly selected public login and context journey subtests")
 		return

@@ -1,10 +1,62 @@
 # Sustained implementation progress
 
-## Active small-installation workflow (2026-11-12)
+## Active bundled PostgreSQL restart qualification (2026-11-12)
 
-Candidate: `feature/small-installation-profile`, worktree
-`asservat-small-installation`, [PR225](https://github.com/phihos/asservat/pull/225),
-based on authoritative main `62b80beb`. The complete accepted-specification goal
+Candidate: `feature/bundled-postgres-restart` in `asservat-small-restart`, based
+on authoritative main `db0e27dc` (merged PR225). Post-merge CI43188834579 passed
+on that exact SHA. The complete accepted specification goal remains active.
+
+REQ-DEP-004 / SC-DEP-004 / TASK-11 require restart to preserve committed evidence
+and accounting. ADR-226 already provides lossless process reactivation through
+the existing fleet observer and migration80. Current installed restart evidence
+targets external Docker PostgreSQL; the bundled Pod/PVC/Secret path is missing.
+This workflow does not implement or qualify archive/PITR restore.
+
+Reuse the existing `ASSERVAT_JOURNEY_FOCUS=restart` with the all-bundled Helm
+fixture. First publish/download an artifact; then delete only the exact observed
+PostgreSQL Pod UID with normal grace. Require the replacement under the original
+StatefulSet/image and PVC/Secret UIDs, a new PostgreSQL start with unchanged
+system identifier/database OID/timeline/activation, and product-written restart
+lineage plus current trust/permissions. No fixture SQL activates recovery.
+
+The second request must retain the original workload/Pod identity, preserve the
+first artifact's immutable execution/writer/cutoff/charge facts and download its
+original bytes through a fresh session. The first request's original240-second
+access bound caps this proof; it is not extended. The existing post-restart
+journey then verifies new collection, native/range transfer, React processing,
+Stop/Deny/TargetGone, original expiry and independent deletion for both cases.
+
+Complexity: routine database maintenance is an accepted product requirement;
+no new production mechanism, service, watch, role, credential, migration or
+configuration is added. Only the owned fixture's existing administrator deletes
+one exact Pod. The existing restart focus also captures through the browser, so
+funding covers three captures and histories:9,646,080 of12,353,536 reserved bytes
+and24 of32 objects; six native sessions remain within eight, two approved queries
+within eight, and three histories within16/32. These are static budget checks,
+not measured qualification. Existing profile limits are unchanged. Actual paid
+poll/retry usage remains to be verified in the installed run.
+
+Fast preflight executed both new SELECTs against real PostgreSQL schema154 with
+absent IDs: Go-race0/1.112s, harness0/41.609s,4,723 unchanged hashes and empty owned
+cleanup. This proves SQL shape, not populated typed scans or restart authority.
+Review caught and corrected two fixture ordering issues before installed dispatch:
+the original artifact's deletion observer is captured while live, and the exact
+owned node A is uncordoned after the completed cold-pull proof because the local
+PostgreSQL PVs require that node. The node update preserves its original UID/RV
+and every field except scheduling; no production scheduling configuration changes.
+
+Focused client and selector checks are passing while the integrated candidate is
+assembled. Next execute both new read-only SQL snapshots against the real current
+schema without synthetic activation, inspect the integrated producer/consumer
+boundaries, run affected repository/browser gates, then freeze sources for a fresh
+owned installation. Generated reports remain outside Git. Physical restore and
+other accepted specification work remain unfinished.
+
+## Merged small-installation context workflow (2026-11-12)
+
+Merged [PR225](https://github.com/phihos/asservat/pull/225) as `db0e27dc`, with
+the exact qualified delivery tree from `599fd2e5`. The clean source checkpoint
+remains in `asservat-small-installation` on `feature/small-installation-profile`. The complete accepted-specification goal
 remains active. Manual commands are parked separately at `c0b58cb0`.
 
 The maintainer has no external PostgreSQL, S3 or OpenBao and requests bundled

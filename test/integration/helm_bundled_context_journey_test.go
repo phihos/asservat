@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"io"
 	"net"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -27,9 +28,16 @@ import (
 // This joins the same installed workflow after its actual
 // login. No provider administration, extra bootstrap issue, credential mint or
 // fixture SQL activation occurs; the selected product hook consumes its KV.
-func qualifyHelmBundledContext(t *testing.T, ctx context.Context, api kubernetes.Interface, config *rest.Config, f fixture, x helmBootstrapFixture, desired contracts.InitialBootstrap, original contracts.InitialPreparer, sql *pgxpool.Pool, originalStore *s3.Client, public *helmBundledPublic, identity *installedIdentity, browser *installedBrowser) {
+func qualifyHelmBundledContext(t *testing.T, ctx context.Context, api kubernetes.Interface, config *rest.Config, f fixture, x helmBootstrapFixture, desired contracts.InitialBootstrap, original contracts.InitialPreparer, sql *pgxpool.Pool, originalStore *s3.Client, public *helmBundledPublic, identity *installedIdentity, browser *installedBrowser, postgres *helmBundledPostgres) {
 	t.Helper()
-	t.Setenv("ASSERVAT_JOURNEY_FOCUS", "journey")
+	focus := os.Getenv("ASSERVAT_JOURNEY_FOCUS")
+	if focus == "" {
+		focus = "journey"
+	}
+	if focus != "journey" && focus != "restart" {
+		t.Fatal("bundled context requires journey or restart focus")
+	}
+	t.Setenv("ASSERVAT_JOURNEY_FOCUS", focus)
 	if browser == nil || identity.SubjectID == "" || len(f.Clusters) != 1 || original.Plan.InstallationID == "" {
 		t.Fatal("actual bundled context prerequisites")
 	}
@@ -67,7 +75,81 @@ func qualifyHelmBundledContext(t *testing.T, ctx context.Context, api kubernetes
 		waitInstalledPublisherSettled(t, current, api, desired.TargetNamespace, installation)
 	}
 	installedContextStandbyWindow(t, ctx, api, desired.TargetNamespace, prefix+"-owner")
-	journey := installedJourney(t, ctx, sql, offer.PermissionRootID, identity, public.root, net.JoinHostPort(public.nodeIP, "31450"), browser.base, diagnose, deleted, installedProjectionSQLCheck(t, ctx, sql, api, offer.PermissionRootID), nil)
+	var before installedProcessingRun
+	var snapshot bundledRestartArtifact
+	var checkedOriginal bool
+	var checkBeforeDeleted func()
+	var postDownload func(string, installedProcessingRun)
+	if focus == "restart" {
+		postDownload = func(_ string, current installedProcessingRun) {
+			if before.ArtifactID == "" {
+				before = current
+				before.Native = bytes.Clone(current.Native)
+				// The first run closes these handles; only the next request's
+				// live transport/session may observe the original artifact.
+				before.Call, before.Transport = nil, nil
+				snapshot = readBundledRestartArtifact(t, ctx, sql, current.RootID, current.CaseID, current.ArtifactID)
+				checkBeforeDeleted = deleted(current.ArtifactID)
+				return
+			}
+			bounded, stop := context.WithDeadline(ctx, before.ExpiresAt)
+			defer stop()
+			after := readBundledRestartArtifact(t, bounded, sql, before.RootID, before.CaseID, before.ArtifactID)
+			compareBundledRestartArtifact(t, snapshot, after)
+			currentTarget := readBundledRestartArtifact(t, bounded, sql, current.RootID, current.CaseID, current.ArtifactID)
+			if currentTarget.ClusterID != snapshot.ClusterID || currentTarget.NamespaceUID != snapshot.NamespaceUID || currentTarget.WorkloadUID != snapshot.WorkloadUID || currentTarget.PodUID != snapshot.PodUID {
+				t.Fatal("PostgreSQL restart changed the original workload target")
+			}
+			original := before
+			original.Call, original.Transport = current.Call, current.Transport
+			original.Identity = current.Identity
+			assertInstalledOriginalNative(t, bounded, original, "restart-original-"+before.ArtifactID)
+			checkedOriginal = true
+			// The existing restart focus also runs console collection and
+			// approved projection checks. Retain the artifact processing UI
+			// proof which the ordinary journey runs automatically.
+			qualifyInstalledProcessing(t, ctx, current)
+		}
+	}
+	journey := installedJourney(t, ctx, sql, offer.PermissionRootID, identity, public.root, net.JoinHostPort(public.nodeIP, "31450"), browser.base, diagnose, deleted, installedProjectionSQLCheck(t, ctx, sql, api, offer.PermissionRootID), postDownload)
+	if focus == "restart" {
+		if postgres == nil {
+			t.Fatal("bundled restart requires the actual PostgreSQL plan")
+		}
+		run := journey
+		journey = func(cluster, namespace, workload string, deny func(bool), gone func(string)) {
+			run(cluster, namespace, workload, nil, nil)
+			if before.ArtifactID == "" || !time.Now().Before(before.ExpiresAt) {
+				t.Fatal("restart has no original live published artifact")
+			}
+			bounded, stop := context.WithDeadline(ctx, before.ExpiresAt)
+			defer stop()
+			restarts := installedHubRestarts(t, bounded, api, desired.TargetNamespace)
+			if !t.Run("postgres-restart", func(t *testing.T) {
+				// The original cold-pull proof cordoned node A, where these
+				// owned local PVs live. Restore only that node's scheduling
+				// flag before testing a same-volume Pod restart.
+				if err := uncordonHelmBundledPostgresNode(bounded, api, x.NodeA, x.NodeAUID); err != nil {
+					t.Fatal("owned PostgreSQL node scheduling", err)
+				}
+				restartHelmBundledPostgres(t, bounded, sql, api, postgres.plan, postgres.image, installation)
+			}) {
+				return
+			}
+			installedHubSettled(t, bounded, api, desired.TargetNamespace, restarts)
+			// Fresh preview/request resolves the same workload after the
+			// database restart; no replacement workload is introduced.
+			run(cluster, namespace, workload, deny, gone)
+			if !checkedOriginal {
+				t.Fatal("post-restart capture did not verify the original artifact")
+			}
+			if checkBeforeDeleted == nil {
+				t.Fatal("pre-restart deletion observation was not captured while live")
+			}
+			checkBeforeDeleted()
+			t.Log("bundled PostgreSQL restart preserved the original artifact, charged storage and deadlines; a fresh capture/native download and original expiry/deletion passed")
+		}
+	}
 	qualifyRegionalCapacity(t, ctx, sql, api, api, api, desired.TargetNamespace, identity.Issuer, journey, installation, offer, installed, 1, &regionalPrepared{workload: workload, budget: budget}, "", true)
 	t.Log("actual bundled same-API context: one browser-issued slot, product-selected regional Helm, new logical cluster, real User binding, native/range download and read-only managed deletion proof; no synthetic policy-denial injection")
 }

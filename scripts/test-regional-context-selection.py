@@ -69,6 +69,26 @@ class RegionalContextSelection(unittest.TestCase):
         self.assertEqual(fixture.missing_bundled_public_stages({login, context + "/child"}), ["bundled-context-journey"])
         self.assertEqual(fixture.missing_bundled_public_stages({login, context}), [])
 
+    def test_bundled_restart_requires_its_own_exact_receipt(self):
+        prefix = "TestHelmBootstrapWithRealServices/"
+        base = {prefix + stage for stage in fixture.BUNDLED_PUBLIC_REQUIRED_STAGES}
+        restart = "bundled-context-journey/postgres-restart"
+        self.assertEqual(fixture.missing_bundled_public_stages(base, "restart"), [restart])
+        self.assertEqual(fixture.missing_bundled_public_stages(base | {prefix + restart + "/child"}, "restart"), [restart])
+        self.assertEqual(fixture.missing_bundled_public_stages(base | {prefix + restart}, "restart"), [])
+        self.assertEqual(fixture.bundled_public_focus({}), "journey")
+        self.assertEqual(fixture.bundled_public_focus({"ASSERVAT_JOURNEY_FOCUS": "restart"}), "restart")
+        options = dict(helm_bootstrap=True, installer_continuation=True, bundled_identity=True,
+                       bundled_postgres=True, bundled_keyservice=True, bundled_objectstore=True)
+        env = fixture.qualification_environment({"ASSERVAT_JOURNEY_FOCUS": "restart"}, "fixture", Path("work"), False, False, **options)
+        self.assertEqual(env["ASSERVAT_JOURNEY_FOCUS"], "restart")
+        for focus in ("manual-profile", "journey,restart", "restart,restart"):
+            with self.subTest(focus=focus), patch.dict(os.environ, {"ASSERVAT_JOURNEY_FOCUS": focus}, clear=True):
+                with patch.object(fixture, "run", side_effect=AssertionError("external setup")) as external:
+                    with self.assertRaises(ValueError):
+                        fixture.main(**options)
+                    external.assert_not_called()
+
     def test_manual_logs_api_only_focus_and_resource_selector(self):
         with patch.dict(os.environ, {"ASSERVAT_JOURNEY_FOCUS":"manual-logs"}):
             self.assertEqual(fixture.qualification_cluster_count(3, installer_continuation=True),2)
