@@ -55,7 +55,7 @@ func mintInitialOpenBaoIssuerWithHTTP(ctx context.Context, desired contracts.Ini
 	}
 	no := false
 	response, err := c.Auth().Token().CreateWithRoleWithContext(ctx, &bao.TokenCreateRequest{Policies: []string{desired.Providers.IssuerPolicy}, NoDefaultPolicy: true, Renewable: &no, Type: "service", TTL: fmt.Sprintf("%ds", seconds), ExplicitMaxTTL: fmt.Sprintf("%ds", seconds), Metadata: map[string]string{"asservat-installation": s.InstallationID, "asservat-request": s.RequestID, "asservat-operation": s.ProviderMint.OperationID}}, contracts.SmallOpenBaoInitialIssuerRole)
-	if err != nil || response == nil || response.Auth == nil || len(response.Warnings) != 0 || response.WrapInfo != nil || !kms.ValidProviderToken([]byte(response.Auth.ClientToken)) || len(response.Auth.ClientToken) > contracts.InitialProviderTokenMaxBytes || ctx.Err() != nil {
+	if err != nil || response == nil || response.Auth == nil || !providerconfig.InitialIssuerWarningsAllowed(response.Warnings, seconds) || response.WrapInfo != nil || !kms.ValidProviderToken([]byte(response.Auth.ClientToken)) || len(response.Auth.ClientToken) > contracts.InitialProviderTokenMaxBytes || ctx.Err() != nil {
 		return "", zero, initialOpenBaoCheck("mint-response")
 	}
 	issuer, err := kms.NewBundledInitialProviderIssuer(desired.KeyService.Endpoint, response.Auth.ClientToken, desired.KeyService.AuditMount, desired.KeyService.AuditKey, s.InstallationID, s.RequestID, profile, *s.Material.BundledIdentity, h, time.Now)

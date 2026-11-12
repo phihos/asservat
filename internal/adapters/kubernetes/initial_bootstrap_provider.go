@@ -53,9 +53,18 @@ func (s *InitialBootstrap) ClaimBundledProvider(ctx context.Context) (InitialBoo
 		if err != nil {
 			return zero, err
 		}
+
+		deadline, boundedDeadline := bounded.Deadline()
+		if !boundedDeadline {
+			return zero, cfg.ErrUnavailable
+		}
 		at := time.Now().UTC().Truncate(time.Microsecond)
+		until := deadline.UTC().Truncate(time.Microsecond)
+		if !at.Before(until) {
+			return zero, cfg.ErrUnavailable
+		}
 		next := state
-		next.ProviderMint = &contracts.InitialBootstrapProviderMint{OperationID: id, StartedAt: at, Until: at.Add(5 * time.Second), ExpiresBefore: state.Material.BundledIdentity.SetupParent.ExpiresAt.Add(-contracts.BundledInitialProviderSafetyMargin)}
+		next.ProviderMint = &contracts.InitialBootstrapProviderMint{OperationID: id, StartedAt: at, Until: until, ExpiresBefore: state.Material.BundledIdentity.SetupParent.ExpiresAt.Add(-contracts.BundledInitialProviderSafetyMargin)}
 		if !next.ProviderMint.Until.Before(next.ProviderMint.ExpiresBefore) {
 			return zero, cfg.ErrUnavailable
 		}

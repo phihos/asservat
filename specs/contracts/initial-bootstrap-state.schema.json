@@ -304,7 +304,7 @@
         "until",
         "expiresBefore"
       ],
-      "description": "One original 5 s POST claim in the existing seed. Pending replay never grants Fresh. Optional response is positive issuer identity; token exists only in private material. No SQL manager or projection before completion. Go validates exact original ancestor, dates and monotonic transitions.",
+      "description": "One original positive POST claim of at most 5 s in the existing seed, retaining the original bounded caller deadline (UTC microsecond floor). Pending replay never grants Fresh. Optional response is positive issuer identity; token exists only in private material. No SQL manager or projection before completion. Go validates exact original ancestor, dates and monotonic transitions.",
       "properties": {
         "operationID": {
           "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"

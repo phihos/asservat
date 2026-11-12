@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"encoding/pem"
+	"fmt"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -108,7 +109,17 @@ func (f *initialBaoMintFixture) serve(w http.ResponseWriter, r *http.Request) {
 		}
 		f.issued = time.Now().UTC()
 		f.expiry = f.issued.Add(f.ttl)
-		reply(map[string]any{"auth": map[string]any{"client_token": "original-issued-token", "accessor": "positive-original-issuer", "token_type": "service", "entity_id": s.Material.BundledIdentity.EntityID, "policies": body.Policies, "token_policies": body.Policies, "metadata": body.Metadata, "lease_duration": int64(f.ttl / time.Second), "renewable": false, "orphan": false, "num_uses": 0}})
+		response := map[string]any{"auth": map[string]any{"client_token": "original-issued-token", "accessor": "positive-original-issuer", "token_type": "service", "entity_id": s.Material.BundledIdentity.EntityID, "policies": body.Policies, "token_policies": body.Policies, "metadata": body.Metadata, "lease_duration": int64(f.ttl / time.Second), "renewable": false, "orphan": false, "num_uses": 0}}
+		notice := fmt.Sprintf("Explicit max TTL specified both during creation call and in role; using the lesser value of %d seconds", int64(f.ttl/time.Second))
+		switch f.mode {
+		case "cap-notice", "cap-notice-foreign-entity":
+			response["warnings"] = []string{notice}
+		case "extra-warning":
+			response["warnings"] = []string{notice, "Policy does not exist"}
+		case "changed-warning":
+			response["warnings"] = []string{notice + " changed"}
+		}
+		reply(response)
 		return
 	}
 	f.reads++
@@ -137,7 +148,7 @@ func (f *initialBaoMintFixture) serve(w http.ResponseWriter, r *http.Request) {
 		reply(map[string]any{"data": map[string]any{"name": name, "policy": policies[name], "version": 1, "cas_required": false, "allow_wildcards_in_identity_templates": false, "allow_slashes_in_identity_templates": false}})
 	case r.URL.Path == "/v1/auth/token/lookup-self":
 		entity := f.claim.State.Material.BundledIdentity.EntityID
-		if f.mode == "foreign-entity" {
+		if f.mode == "foreign-entity" || f.mode == "cap-notice-foreign-entity" {
 			entity = initialBaoPVC
 		}
 		expiry := f.expiry
@@ -162,14 +173,14 @@ func TestInitialOpenBaoMintOneOriginalPOSTAndActualProfileCheck(t *testing.T) {
 	}
 }
 func TestInitialOpenBaoMintUnknownRefusalNeverRetries(t *testing.T) {
-	for _, mode := range []string{"unknown", "redirect", "foreign-entity", "late-expiry"} {
+	for _, mode := range []string{"unknown", "redirect", "foreign-entity", "late-expiry", "extra-warning", "changed-warning", "cap-notice-foreign-entity"} {
 		t.Run(mode, func(t *testing.T) {
 			f := newInitialBaoMintFixture(t, mode)
 			token, _, err := mintInitialOpenBaoIssuerWithHTTP(t.Context(), f.desired, f.claim, f.http)
 			if err == nil || token != "" || f.posts != 1 {
 				t.Fatal("unknown/refused original mint replayed or accepted", err, f.posts)
 			}
-			if (mode == "foreign-entity" || mode == "late-expiry") && err.Error() != "bundled key provider mint-verification/issuer-profile" {
+			if (mode == "foreign-entity" || mode == "late-expiry" || mode == "cap-notice-foreign-entity") && err.Error() != "bundled key provider mint-verification/issuer-profile" {
 				t.Fatal("fixed failure phase lost", err)
 			}
 			if strings.Contains(err.Error(), initialBaoToken) || strings.Contains(err.Error(), "private-provider-details") {
@@ -183,5 +194,13 @@ func TestInitialOpenBaoMintInvalidSeedRefusesBeforePOST(t *testing.T) {
 	f.claim.State.SeedUID = ""
 	if _, _, err := mintInitialOpenBaoIssuerWithHTTP(t.Context(), f.desired, f.claim, f.http); err == nil || f.posts != 0 {
 		t.Fatal("missing actual seed UID spent mint effect", err, f.posts)
+	}
+}
+
+func TestInitialOpenBaoMintExpectedNoticeStillChecksActualProfile(t *testing.T) {
+	f := newInitialBaoMintFixture(t, "cap-notice")
+	token, parent, err := mintInitialOpenBaoIssuerWithHTTP(t.Context(), f.desired, f.claim, f.http)
+	if err != nil || token != "original-issued-token" || f.posts != 1 || f.reads != 6 || !parent.ExpiresAt.Before(f.claim.State.ProviderMint.ExpiresBefore) {
+		t.Fatal("intentional caps notice blocked verified original mint", err, f.posts, f.reads)
 	}
 }

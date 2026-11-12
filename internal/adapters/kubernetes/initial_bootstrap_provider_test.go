@@ -205,3 +205,47 @@ func TestBootstrapProviderClaimAndResultAreMonotonic(t *testing.T) {
 		t.Fatal("verified original result did not enable next phase")
 	}
 }
+
+func TestBootstrapProviderClaimRetainsOriginalCallerDeadline(t *testing.T) {
+	f := newBootstrapProviderCASFixture(t)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	original, _ := ctx.Deadline()
+	claim, err := f.producer.ClaimBundledProvider(ctx)
+	if err != nil || !claim.Fresh || claim.State.ProviderMint == nil || f.puts != 1 {
+		t.Fatal("original bounded claim refused", err)
+	}
+	mint := claim.State.ProviderMint
+	if mint.Until.After(original) || mint.Until.After(original.UTC().Truncate(time.Microsecond)) || claim.ValidUntil.After(original) {
+		t.Fatal("mint claim extended original caller deadline")
+	}
+	if !mint.Until.After(mint.StartedAt) || mint.Until.Sub(mint.StartedAt) > time.Second || mint.StartedAt != mint.StartedAt.UTC().Truncate(time.Microsecond) || mint.Until != mint.Until.UTC().Truncate(time.Microsecond) {
+		t.Fatal("persisted mint interval lost original finite precision")
+	}
+	if !f.state.ProviderMint.Until.Equal(mint.Until) || !bootstrapStateValid(f.producer.desired, f.state) {
+		t.Fatal("returned claim was not the persisted original interval")
+	}
+}
+
+func TestBootstrapProviderMintStateAcceptsOnlyPositiveBoundedIntervals(t *testing.T) {
+	f := newBootstrapProviderCASFixture(t)
+	claim, err := f.producer.ClaimBundledProvider(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, duration := range []time.Duration{-time.Microsecond, 0, time.Microsecond, time.Second, 5 * time.Second, 5*time.Second + time.Microsecond} {
+		t.Run(duration.String(), func(t *testing.T) {
+			state := cloneBootstrapState(t, claim.State)
+			state.ProviderMint.Until = state.ProviderMint.StartedAt.Add(duration)
+			if bootstrapStateValid(f.producer.desired, state) != (duration > 0 && duration <= 5*time.Second) {
+				t.Fatal("mint state accepted wrong interval")
+			}
+		})
+	}
+	expired, cancel := context.WithDeadline(context.Background(), time.Now().Add(-time.Second))
+	defer cancel()
+	before := f.puts
+	if c, err := f.producer.ClaimBundledProvider(expired); err == nil || c.Fresh || f.puts != before {
+		t.Fatal("expired caller obtained renewed claim or mutation")
+	}
+}

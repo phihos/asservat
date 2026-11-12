@@ -161,6 +161,35 @@ The CLI now reports only allowlisted key-provider stage labels, never raw errors
 or credential values. Its regression failed before the change and passes1.075s.
 The next fresh native run must qualify this corrected role/producer boundary.
 
+The corrected-role run at `9d214e1f` passed readiness and failed at the newly
+visible mint-response boundary: Go1/79.222s, harness1/172.391s. All4,971 sources
+matched; cleanup completed without failures and the result route was restored.
+No schema/activation ran. `native-initial-bao-s3-20261112T034354Z/` remains failed.
+
+A smaller real-provider reproduction used the exact initialized installation
+role and unchanged SDK request, including metadata. It returned a real token
+plus one notice, without API error or deadline failure. The pinned provider
+always reports the lesser cap when both role and request set explicit maxima.
+The guard now accepts only that exact computed notice; altered/multiple/other
+warnings refuse, and all actual token/policy/entity/nonrenewal/expiry readbacks
+remain mandatory. The historical guard fails its new regression; focused race
+checks pass bootstrap1.330s/provider1.031s. The unchanged exact request then
+passed the real same-API component, exit0/78.202s: one expected notice, zero
+unknown notices, actual issuer/child checks and revocation/replay, and issuer
+expiry16.759s before its original parent. Root independently checked all86
+source hashes and owned-node/image absence; cleanup was empty. Receipts are in
+`openbao-mint-notice-20261112T040309Z/`. This is provider qualification, not an
+installed workflow result.
+
+The required authority-window gate also caught the new mint claim constructing
+another five-second end. A one-second caller regression reproduced the extension.
+The claim now persists its original bounded deadline, normalized downward to SQL
+precision, with a positive interval of at most five seconds. Focused races pass
+Kubernetes7.947s/bootstrap1.226s; the unchanged baseline gate passes362 sites in262
+files. This creates no replacement authority window or renewed original bound.
+Final affected spec/Helm/Go-architecture/authority checks pass; the fresh installed
+join must now qualify these corrections together.
+
 Actual OpenSSL strict verification exposed missing leaf Authority Key Identifiers
 in generated PostgreSQL and SeaweedFS TLS certificates. Parsing the generated CA
 DER before leaf signing fixes both generators; the new actual OpenSSL regression

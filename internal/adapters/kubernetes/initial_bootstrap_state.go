@@ -313,7 +313,7 @@ func bootstrapProviderMintValid(s contracts.InitialBootstrapState, seen map[stri
 	if mint == nil {
 		return true
 	}
-	if !authorization.UUID(mint.OperationID) || seen[mint.OperationID] || mint.StartedAt.IsZero() || mint.Until.Sub(mint.StartedAt) != 5*time.Second || !mint.Until.Before(mint.ExpiresBefore) || mint.ExpiresBefore.Sub(mint.StartedAt) > 301*time.Second {
+	if !authorization.UUID(mint.OperationID) || seen[mint.OperationID] || mint.StartedAt.IsZero() || !mint.Until.After(mint.StartedAt) || mint.Until.Sub(mint.StartedAt) > 5*time.Second || !mint.Until.Before(mint.ExpiresBefore) || mint.ExpiresBefore.Sub(mint.StartedAt) > 301*time.Second {
 		return false
 	}
 	seen[mint.OperationID] = true

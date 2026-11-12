@@ -27,6 +27,7 @@ RELEVANT = [
     'go.mod', 'go.sum', 'scripts/test-small-openbao-kubernetes.py', 'scripts/test-small-openbao-kubernetes_test.py',
     'specs/contracts/small-openbao.schema.json',
     'internal/adapters/kubernetes/small_openbao_material_test.go',
+    'internal/bootstrap/initial_openbao_mint.go',
     'test/fixtures/openbao-setup/main.go', 'test/fixtures/openbao-setup/main_test.go', 'test/fixtures/openbao-setup/Dockerfile',
     'internal/contracts/small_openbao.go', 'internal/contracts/owner_deployment.go',
     'internal/contracts/key_service_codec.go', 'internal/contracts/hub_worker.go',

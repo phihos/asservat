@@ -6,7 +6,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
@@ -141,6 +140,82 @@ func login(ctx context.Context, c *bao.Client, role, jwt string) (*bao.Secret, e
 	return c.Logical().WriteWithContext(ctx, "auth/"+contracts.SmallOpenBaoSetupMount+"/login", map[string]any{"role": role, "jwt": jwt})
 }
 
+// Keep this request identical to initial_openbao_mint.go, including SDK zero
+// fields and metadata. IDs are synthetic probe facts, never production claims.
+func productionInitialMintRequest(seconds int64) *bao.TokenCreateRequest {
+	no := false
+	return &bao.TokenCreateRequest{Policies: []string{contracts.SmallOpenBaoInitialProviders().IssuerPolicy}, NoDefaultPolicy: true, Renewable: &no, Type: "service", TTL: fmt.Sprintf("%ds", seconds), ExplicitMaxTTL: fmt.Sprintf("%ds", seconds), Metadata: map[string]string{"asservat-installation": "10000000-0000-4000-8000-000000000001", "asservat-request": "10000000-0000-4000-8000-000000000009", "asservat-operation": "10000000-0000-4000-8000-000000000010"}}
+}
+
+type productionMintResponseFacts struct {
+	ErrorHTTPStatus               int      `json:"errorHTTPStatus"`
+	ErrorPresent                  bool     `json:"errorPresent"`
+	AuthPresent                   bool     `json:"authPresent"`
+	WarningCount                  int      `json:"warningCount"`
+	TTLCappedWarningCount         int      `json:"ttlCappedWarningCount"`
+	ExplicitMaxTTLRoleNoticeCount int      `json:"explicitMaxTTLRoleNoticeCount"`
+	WarningProtocolFields         []string `json:"warningProtocolFields"`
+	UnknownWarningCount           int      `json:"unknownWarningCount"`
+	WrapInfoPresent               bool     `json:"wrapInfoPresent"`
+	TokenLength                   int      `json:"tokenLength"`
+	ContextCanceled               bool     `json:"ctxCanceled"`
+	RequestRemainingMS            int64    `json:"requestRemainingMS"`
+	ProductionGuardAccepted       bool     `json:"productionGuardAccepted"`
+}
+
+func classifyProductionMintResponse(ctx context.Context, until time.Time, response *bao.Secret, err error, now time.Time, requestedSeconds int64) productionMintResponseFacts {
+	f := productionMintResponseFacts{ErrorHTTPStatus: status(err), ErrorPresent: err != nil, ContextCanceled: ctx == nil || ctx.Err() != nil, RequestRemainingMS: until.Sub(now).Milliseconds(), WarningProtocolFields: []string{}}
+	if response == nil {
+		return f
+	}
+	f.AuthPresent = response.Auth != nil
+	f.WarningCount = len(response.Warnings)
+	f.WrapInfoPresent = response.WrapInfo != nil
+	warningsAllowed := providerconfig.InitialIssuerWarningsAllowed(response.Warnings, requestedSeconds)
+	if warningsAllowed && f.WarningCount == 1 {
+		f.ExplicitMaxTTLRoleNoticeCount = 1
+	}
+	fields := map[string]bool{}
+	for _, warning := range response.Warnings {
+		if f.ExplicitMaxTTLRoleNoticeCount == 1 {
+			continue
+		}
+		// Count this closed protocol class without exposing either duration
+		// string. It remains a refusal exactly as in production.
+		if strings.HasPrefix(warning, "TTL of ") && strings.Contains(warning, " exceeded the effective max_ttl of ") && strings.HasSuffix(strings.TrimSuffix(warning, "."), "TTL value is capped accordingly") {
+			f.TTLCappedWarningCount++
+			continue
+		}
+		const prefix = "Endpoint ignored these unrecognized parameters: ["
+		if !strings.HasPrefix(warning, prefix) || !strings.HasSuffix(warning, "]") {
+			f.UnknownWarningCount++
+			continue
+		}
+		unknown := false
+		for _, field := range strings.Fields(strings.TrimSuffix(strings.TrimPrefix(warning, prefix), "]")) {
+			field = strings.Trim(field, ",\"'")
+			switch field {
+			case "meta", "metadata", "policies", "no_default_policy", "renewable", "ttl", "explicit_max_ttl", "type", "display_name", "num_uses", "entity_alias", "no_parent", "period", "id":
+				fields[field] = true
+			default:
+				unknown = true
+			}
+		}
+		if unknown {
+			f.UnknownWarningCount++
+		}
+	}
+	for field := range fields {
+		f.WarningProtocolFields = append(f.WarningProtocolFields, field)
+	}
+	sort.Strings(f.WarningProtocolFields)
+	if response.Auth != nil {
+		f.TokenLength = len(response.Auth.ClientToken)
+	}
+	f.ProductionGuardAccepted = err == nil && response.Auth != nil && warningsAllowed && !f.WrapInfoPresent && kms.ValidProviderToken([]byte(response.Auth.ClientToken)) && f.TokenLength <= contracts.InitialProviderTokenMaxBytes && !f.ContextCanceled
+	return f
+}
+
 func run(in input) (result map[string]any, err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 110*time.Second)
 	defer cancel()
@@ -222,17 +297,10 @@ func run(in input) (result map[string]any, err error) {
 	step("configuration-prerequisites")
 	const mount = contracts.SmallOpenBaoConfigurationAuthMount
 	const audit = contracts.SmallOpenBaoAuditMount
-	step("configuration-auth-mount-create")
-	if e = write(ctx, c, "sys/auth/"+mount, map[string]any{"type": "kubernetes"}); e != nil {
-		return result, e
-	}
-	var apiCA bytes.Buffer
-	for _, der := range in.Plan.Kubernetes.Roots {
-		_ = pem.Encode(&apiCA, &pem.Block{Type: "CERTIFICATE", Bytes: der})
-	}
-	step("configuration-local-api-config")
-	if e = write(ctx, c, "auth/"+mount+"/config", map[string]any{"kubernetes_host": in.Plan.Kubernetes.Endpoint, "kubernetes_ca_cert": apiCA.String(), "disable_local_ca_jwt": false, "disable_iss_validation": true}); e != nil {
-		return result, e
+	step("configuration-existing-api-config")
+	apiConfig, e := c.Logical().ReadWithContext(ctx, "auth/"+mount+"/config")
+	if e != nil || apiConfig == nil || apiConfig.Data["kubernetes_host"] != in.Plan.Kubernetes.Endpoint {
+		return result, errors.New("default local API configuration missing")
 	}
 	step("configuration-auth-mount-read")
 	authMount, e := c.Logical().ReadWithContext(ctx, "sys/mounts/auth/"+mount)
@@ -240,9 +308,10 @@ func run(in input) (result map[string]any, err error) {
 		return result, errors.New("auth mount read")
 	}
 	accessor, _ := authMount.Data["accessor"].(string)
-	step("configuration-transit-mount-create")
-	if e = write(ctx, c, "sys/mounts/"+audit, map[string]any{"type": "transit"}); e != nil {
-		return result, e
+	step("configuration-existing-transit-mount")
+	transit, e := c.Logical().ReadWithContext(ctx, "sys/mounts/"+audit)
+	if e != nil || transit == nil || transit.Data["type"] != "transit" {
+		return result, errors.New("default Transit mount missing")
 	}
 	step("configuration-transit-key-create")
 	if e = write(ctx, c, audit+"/keys/configuration", map[string]any{"type": "aes256-gcm96", "exportable": false, "allow_plaintext_backup": false}); e != nil {
@@ -309,28 +378,12 @@ func run(in input) (result map[string]any, err error) {
 		return result, errors.New("reader mismatch")
 	}
 	result["configurationReaderVerified"] = true
-	step("initial-issuer-prerequisites")
-	profile := contracts.InitialProviderProfile{Format: contracts.InitialProviderProfileFormat, Material: contracts.WorkerObjectReference{Name: "fixture-material", UID: "10000000-0000-4000-8000-000000000007"}, IssuerPolicy: "asservat-initial-issuer", WrapRole: "asservat-initial-wrap", WrapPolicy: "asservat-initial-encrypt", UnwrapRole: "asservat-initial-unwrap", UnwrapPolicy: "asservat-initial-decrypt"}
-	policies, e := kms.InitialProviderPolicies(profile, audit, "initial-audit")
-	if e != nil {
-		return result, e
-	}
-	for name, policy := range policies {
-		if e = write(ctx, c, "sys/policies/acl/"+name, map[string]any{"policy": policy}); e != nil {
-			return result, e
-		}
-	}
-	role := func(policy string) map[string]any {
-		return map[string]any{"allowed_policies": []string{policy}, "orphan": false, "renewable": false, "token_no_default_policy": true, "token_type": "service", "token_explicit_max_ttl": 900, "token_num_uses": 0}
-	}
-	for name, policy := range map[string]string{profile.WrapRole: profile.WrapPolicy, profile.UnwrapRole: profile.UnwrapPolicy, "asservat-initial-issuer-issue": profile.IssuerPolicy} {
-		if e = write(ctx, c, "auth/token/roles/"+name, role(policy)); e != nil {
-			return result, e
-		}
-	}
-	if e = write(ctx, c, audit+"/keys/initial-audit", map[string]any{"type": "aes256-gcm96"}); e != nil {
-		return result, e
-	}
+	step("initial-self-init-prerequisites")
+	names := contracts.SmallOpenBaoInitialProviders()
+	profile := contracts.InitialProviderProfile{Format: contracts.InitialProviderProfileFormat, Material: contracts.WorkerObjectReference{Name: "fixture-material", UID: "10000000-0000-4000-8000-000000000007"}, IssuerPolicy: names.IssuerPolicy, WrapRole: names.WrapRole, WrapPolicy: names.WrapPolicy, UnwrapRole: names.UnwrapRole, UnwrapPolicy: names.UnwrapPolicy}
+	// No custom policy/role/key is provisioned for this request: these are
+	// exactly the pinned self-init prerequisites consumed by production.
+	result["productionSelfInitIssuerRoleSelected"] = true
 	create := func(owner *bao.Client, name, policy string) (*bao.Secret, error) {
 		no := false
 		return owner.Auth().Token().CreateWithRoleWithContext(ctx, &bao.TokenCreateRequest{Policies: []string{policy}, NoDefaultPolicy: true, Renewable: &no, TTL: "900s", ExplicitMaxTTL: "900s", Type: "service"}, name)
@@ -342,15 +395,19 @@ func run(in input) (result map[string]any, err error) {
 	if seconds < 1 || seconds > 900 {
 		return result, errors.New("original setup interval exhausted")
 	}
-	noRenewal := false
 	issueCtx, issueDone := context.WithDeadline(ctx, issueUntil)
-	issuerSecret, e := c.Auth().Token().CreateWithRoleWithContext(issueCtx, &bao.TokenCreateRequest{Policies: []string{profile.IssuerPolicy}, NoDefaultPolicy: true, Renewable: &noRenewal, TTL: fmt.Sprintf("%ds", seconds), ExplicitMaxTTL: fmt.Sprintf("%ds", seconds), Type: "service"}, "asservat-initial-issuer-issue")
+	issuerSecret, e := c.Auth().Token().CreateWithRoleWithContext(issueCtx, productionInitialMintRequest(seconds), contracts.SmallOpenBaoInitialIssuerRole)
+	// Observe BEFORE cancellation; canceling first would invent a refusal
+	// that the production caller does not have while validating its response.
+	facts := classifyProductionMintResponse(issueCtx, issueUntil, issuerSecret, e, time.Now(), seconds)
+	result["productionMintResponse"] = facts
+	emit(map[string]any{"productionMintResponse": facts})
 	issueDone()
-	if e != nil {
-		return result, e
+	if !facts.ProductionGuardAccepted {
+		return result, errors.New("production mint response refused")
 	}
-	if issuerSecret == nil || issuerSecret.Auth == nil || !time.Now().Before(issueUntil) {
-		return result, errors.New("late or missing original issuer")
+	if !time.Now().Before(issueUntil) {
+		return result, errors.New("original issuer response late")
 	}
 	issuerClient := copyClient(c, issuerSecret.Auth.ClientToken)
 	issuerLookup, e := tokenLookup(ctx, issuerClient)
@@ -362,7 +419,7 @@ func run(in input) (result map[string]any, err error) {
 	if expiry(issuerLookup).After(originalCutoff) {
 		return result, errors.New("issuer exceeded original setup cutoff")
 	}
-	defaultIssuer, e := kms.NewInitialProviderIssuer(in.Plan.Endpoint(), issuerSecret.Auth.ClientToken, audit, "initial-audit", installation, "10000000-0000-4000-8000-000000000009", profile, h, time.Now)
+	defaultIssuer, e := kms.NewInitialProviderIssuer(in.Plan.Endpoint(), issuerSecret.Auth.ClientToken, audit, "audit", installation, "10000000-0000-4000-8000-000000000009", profile, h, time.Now)
 	if e != nil {
 		return result, e
 	}
@@ -372,7 +429,7 @@ func run(in input) (result map[string]any, err error) {
 		return result, errors.New("external profile accepted inherited entity")
 	}
 	result["defaultInitialIssuerRefusedEntity"] = true
-	issuer, e := kms.NewBundledInitialProviderIssuer(in.Plan.Endpoint(), issuerSecret.Auth.ClientToken, audit, "initial-audit", installation, "10000000-0000-4000-8000-000000000009", profile, serviceIdentity, h, time.Now)
+	issuer, e := kms.NewBundledInitialProviderIssuer(in.Plan.Endpoint(), issuerSecret.Auth.ClientToken, audit, "audit", installation, "10000000-0000-4000-8000-000000000009", profile, serviceIdentity, h, time.Now)
 	if e != nil {
 		return result, e
 	}
@@ -438,7 +495,7 @@ func run(in input) (result map[string]any, err error) {
 	if e != nil {
 		return result, e
 	}
-	shortChild, e := create(shortClient, "asservat-initial-issuer-issue", profile.IssuerPolicy)
+	shortChild, e := create(shortClient, contracts.SmallOpenBaoInitialIssuerRole, profile.IssuerPolicy)
 	if e != nil {
 		return result, e
 	}

@@ -213,3 +213,19 @@ is checked for its actual selected hostname before effects. These bytes never
 enter Helm values/release data or the public continuation document. Retained
 inbox TLS/client bytes must match the checked source before IAM enablement.
 This does not create browser certificate trust or qualify installed login.
+
+## Initial issuer response compatibility
+
+The pinned OpenBao implementation emits an informational notice whenever both
+role and request provide explicit maxima, reporting their smaller value
+([provider source](https://github.com/openbao/openbao/blob/9e0a0d3c3504a0a00b45e61355afac5e35c78379/internal/vault/token_store.go#L4492)).
+Both bounds are intentional: the role caps issuance at900s, and the request
+selects a shorter original-parent-bound interval. Accept only the single exact
+notice for that computed interval. Other, altered or additional warnings refuse.
+Keep all independent role/policy/entity/nonrenewal and actual-expiry checks;
+there is no broader warning bypass or added provider read, privilege or state.
+
+The durable mint claim consumes the existing operation's original deadline,
+normalized downward to microseconds; its positive interval is at most5s. It
+never creates another five-second window after blocking work. The Fresh/CAS,
+unknown-reply and original parent bounds are unchanged.
