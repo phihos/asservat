@@ -252,6 +252,14 @@ Once current sources and capacity are Ready, open `/captures/new`, choose the is
 
 The all four bundled services context sequence has fresh installed qualification. That result does not qualify physical restore, every mixed-provider combination, larger evidence types or sustained operation.
 
+A subsequent PostgreSQL restart test recovered the database and its observers,
+but the first new Keycloak login failed on a stale pooled database connection.
+The bundled Keycloak 26.8.2 template now validates a connection after five seconds
+idle, with a two-second validation timeout and the same five-connection budget.
+These are raw Quarkus settings, which Keycloak labels unsupported; Asservat must
+qualify them against its pinned image. The corrected component and complete
+restart journey remain pending. See the [decision and cost estimate](../decisions/326-individually-selectable-small-services.md#keycloak-idle-database-connections-after-postgresql-restart).
+
 ## Replace one bundled service
 
 The four `services.*.provider` choices are independent and default to `external`. Make these choices before a fresh installation. Changing a completed installation's provider is not a supported migration or restore procedure. Keep the other selected services and their original inputs; do not copy the entire external-services example over this overlay.

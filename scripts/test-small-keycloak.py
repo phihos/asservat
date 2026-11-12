@@ -10,6 +10,7 @@ parser=argparse.ArgumentParser()
 parser.add_argument("--processing-operators",action="store_true",help="explicitly qualify the imported empty dedicated group")
 parser.add_argument("--archive",type=pathlib.Path,required=True,help="new archive below ~/.cache/asservat-build")
 parser.add_argument("--postgres-image",required=True,help="exact already-built bundled PostgreSQL component image")
+parser.add_argument("--pool-validation-baseline",action="store_true",help="negative reproduction: omit the two fixed JDBC validation settings")
 args=parser.parse_args()
 os.umask(0o077)
 repo=pathlib.Path(__file__).resolve().parent.parent
@@ -30,7 +31,7 @@ sourcepaths=['scripts/test-small-keycloak.py','go.mod','go.sum','internal/contra
 sourcepaths += [str(p.relative_to(repo)) for folder in ['internal/adapters/oidc','internal/domain/identity'] for p in sorted((repo/folder).glob('*.go')) if not p.name.endswith('_test.go')]
 sourcepaths += ['internal/adapters/mtls/owner_roots.go']
 sourcepaths += [str(p.relative_to(repo)) for folder in ['internal/domain/privacy','internal/domain/artifact','internal/domain/authorization'] for p in sorted((repo/folder).glob('*.go')) if not p.name.endswith('_test.go')]
-report={'scope':'owned PG/Keycloak component with actual generated material; synthetic realm administration is not Asservat installation/evidence authority','owner':owner,'steps':[],'sources':{p:hashlib.sha256((repo/p).read_bytes()).hexdigest() for p in sourcepaths},'driverSHA256':hashlib.sha256(pathlib.Path(__file__).read_bytes()).hexdigest(),'processingOperators':args.processing_operators}
+report={'scope':'owned PG/Keycloak component with actual generated material; synthetic realm administration is not Asservat installation/evidence authority','owner':owner,'steps':[],'sources':{p:hashlib.sha256((repo/p).read_bytes()).hexdigest() for p in sourcepaths},'driverSHA256':hashlib.sha256(pathlib.Path(__file__).read_bytes()).hexdigest(),'processingOperators':args.processing_operators,'jdbcValidationEnabled':not args.pool_validation_baseline}
 log=out/'commands.log'
 def command(args,check=True,timeout=60):
  r=subprocess.run(args,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=timeout)
@@ -104,6 +105,8 @@ chmod 0440 /kc/*
  client('database')
  envfile=out/'keycloak.env'
  envfile.write_text('\n'.join(['KC_HOSTNAME=https://identity.smoke:8443','KC_HOSTNAME_STRICT=true','KC_HTTPS_CERTIFICATE_FILE=/private/tls.crt','KC_HTTPS_CERTIFICATE_KEY_FILE=/private/tls.key','KC_DB_URL=jdbc:postgresql://trial-postgres.smoke.svc:5432/keycloak?sslmode=verify-full&sslrootcert=/private/ca.crt','KC_DB_USERNAME=keycloak','KCRAW_DB_PASSWORD='+(material/'operator-keycloak-password').read_text(),'ASSERVAT_UNUSED_LITERAL=interpolation-must-not-happen','KC_DB_POOL_INITIAL_SIZE=1','KC_DB_POOL_MIN_SIZE=1','KC_DB_POOL_MAX_SIZE=5','KC_BOOTSTRAP_ADMIN_USERNAME='+(material/'kc/bootstrap-admin-username').read_text(),'KC_BOOTSTRAP_ADMIN_PASSWORD='+(material/'kc/bootstrap-admin-password').read_text(),'KC_ASSERVAT_CONSOLE_SECRET='+(material/'kc/console-client-secret').read_text()])+'\n')
+ if not args.pool_validation_baseline:
+  with envfile.open('a') as f:f.write('QUARKUS_DATASOURCE_JDBC_FOREGROUND_VALIDATION_INTERVAL=5s\nQUARKUS_DATASOURCE_JDBC_VALIDATION_QUERY_TIMEOUT=2s\n')
  kcname=owner+'-keycloak';containers.append(kcname)
  start_mark=str(int(time.time()))
  docker(['run','-d','--name',kcname,'--label','asservat.test.owner='+owner,'--network',network,'--network-alias','identity.smoke','--user','1000:1000','--cap-drop','ALL','--security-opt','no-new-privileges','--memory','1g','--cpus','2','--pids-limit','512','--tmpfs','/tmp:rw,uid=1000,gid=1000,mode=1777,size=64m','--mount','type=volume,src='+volumes['kc-secret']+',dst=/private,readonly','--mount','type=volume,src='+volumes['kc-secret']+',dst=/opt/keycloak/data/import,readonly','--env-file',str(envfile),kcimage,'start','--import-realm','--db=postgres','--cache=local','--http-enabled=false','--https-port=8443','--health-enabled=true'])
@@ -117,6 +120,21 @@ chmod 0440 /kc/*
   if docker(['inspect',owned,'--format','{{json .HostConfig.PortBindings}}']).stdout.strip() not in [b'{}',b'null']:raise RuntimeError('unexpected published port')
  report['steps'].append('no-published-ports')
  client('identity')
+ client('prime-pool')
+ report['poolBeforePostgresRestart']=json.loads((out/'pool-receipt.json').read_text())
+ before_kc=json.loads(docker(['inspect',kcname,'--format','{{json .State}}']).stdout)
+ before_pg=json.loads(docker(['inspect',pgname,'--format','{{json .State}}']).stdout)
+ # Make the existing pooled connections idle past the fixed validation interval.
+ # No Keycloak health/admin request is allowed between this and first logins.
+ time.sleep(6)
+ docker(['restart','-t','20',pgname])
+ wait(lambda:docker(['exec',pgname,'pg_isready','-h','127.0.0.1'],check=False).returncode==0,45,'postgres-restart-ready')
+ after_kc=json.loads(docker(['inspect',kcname,'--format','{{json .State}}']).stdout)
+ after_pg=json.loads(docker(['inspect',pgname,'--format','{{json .State}}']).stdout)
+ if before_kc['StartedAt']!=after_kc['StartedAt'] or before_kc['Pid']!=after_kc['Pid'] or not after_kc['Running']:raise RuntimeError('Keycloak changed process during PostgreSQL-only restart')
+ if before_pg['StartedAt']==after_pg['StartedAt']:raise RuntimeError('PostgreSQL process did not restart')
+ report['postgresRestart']={'keycloakProcessUnchanged':True,'postgresProcessChanged':True,'idleSeconds':6}
+ client('postgres-restart')
  docker(['stop','-t','20',kcname])
  client('retained')
  start_mark=str(int(time.time()))

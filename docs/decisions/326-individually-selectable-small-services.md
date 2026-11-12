@@ -320,3 +320,42 @@ or default memberships are created. An administrator deliberately assigns real
 humans to the dedicated group through Keycloak; ordinary evidence AccessBindings
 and current privacy authority checks remain independent. The selected example
 omits the derived list rather than inserting fabricated IDs.
+
+### Keycloak idle database connections after PostgreSQL restart
+
+A fresh installed restart attempt at `569ce960` recovered the bundled PostgreSQL
+Pod, original database incarnation lineage and application observers in about 35 s,
+then failed the first new Keycloak login with HTTP 400 and a closed pooled JDBC
+connection. Passing readiness did not establish that every cached connection
+survived. This is an observed availability defect; the corrected restart journey
+still requires fresh qualification.
+
+The selected Keycloak 26.8.2 pins Quarkus 3.40.1.1. Its database options expose no
+first-class validation setting. Set the fixed raw Quarkus environment properties
+`QUARKUS_DATASOURCE_JDBC_FOREGROUND_VALIDATION_INTERVAL=5s` and
+`QUARKUS_DATASOURCE_JDBC_VALIDATION_QUERY_TIMEOUT=2s` in the bundled Deployment.
+[Quarkus documents both environment names](https://quarkus.io/guides/all-config/);
+its [pinned runtime configuration](https://github.com/quarkusio/quarkus/blob/3.40.1.1/extensions/agroal/runtime/src/main/java/io/quarkus/agroal/runtime/DataSourceJdbcRuntimeConfig.java)
+retains background validation at two minutes and leaves validation on every
+checkout disabled. The [pinned Keycloak environment source](https://github.com/keycloak/keycloak/blob/26.8.2/quarkus/runtime/src/main/java/org/keycloak/quarkus/runtime/configuration/KcEnvConfigSource.java)
+passes these non-`KC_` environment names to SmallRye configuration.
+Idle checkout validation discards invalid connections before
+transaction association. Existing TLS, credentials and the five-connection pool
+budget remain unchanged; no application HTTP request is retried.
+
+[Keycloak documents raw Quarkus properties as unsupported by Keycloak](https://github.com/keycloak/keycloak/blob/26.8.2/docs/guides/server/configuration.adoc#format-for-raw-quarkus-properties).
+Asservat must qualify this configuration against the exact pinned image; it is
+not a first-class Keycloak support promise. Until the populated-pool restart component
+and full installed journey pass, its recovery benefit remains unqualified. It
+does not promise transparent recovery from a database loss during an already
+running transaction or every interruption shorter than the idle threshold.
+
+Cost estimate, not measurement: five healthy connections can add roughly at most
+five idle-validation round trips per five seconds under repeated reuse, versus
+one on every checkout with unconditional validation. Unused connections add no
+foreground work, and continuously hot connections avoid the idle check. There
+are two fixed environment entries, zero new user knobs, credentials, roles,
+objects, services, watches or application loops. The existing pool handles
+connection validation and replacement. Version changes must requalify this raw
+configuration. Removing it requires a rollout and restores the previous stale
+connection exposure; retained state is unchanged.

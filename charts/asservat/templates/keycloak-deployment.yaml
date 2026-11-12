@@ -78,6 +78,10 @@ spec:
             - {name: KC_DB_POOL_INITIAL_SIZE, value: "1"}
             - {name: KC_DB_POOL_MIN_SIZE, value: "1"}
             - {name: KC_DB_POOL_MAX_SIZE, value: "5"}
+            # Pinned Quarkus runtime properties: validate idle connections before
+            # transaction enlistment after a PostgreSQL restart (ADR-326).
+            - {name: QUARKUS_DATASOURCE_JDBC_FOREGROUND_VALIDATION_INTERVAL, value: "5s"}
+            - {name: QUARKUS_DATASOURCE_JDBC_VALIDATION_QUERY_TIMEOUT, value: "2s"}
             - name: KC_BOOTSTRAP_ADMIN_USERNAME
               valueFrom: {secretKeyRef: {name: {{ printf "%s-state" $name }}, key: bootstrap-admin-username}}
             - name: KC_BOOTSTRAP_ADMIN_PASSWORD

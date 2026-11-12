@@ -99,6 +99,16 @@ func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, ro
 		if identity == nil {
 			t.Fatal("installed journey requires the harness identity provider")
 		}
+		// Authentication helpers may outlive the parent setup which built the
+		// identity. Bind diagnostics to this current journey subtest while
+		// retaining the original provider/client/session material.
+		currentIdentity := *identity
+		if currentIdentity.kc != nil {
+			currentProvider := *currentIdentity.kc
+			currentProvider.t = t
+			currentIdentity.kc = &currentProvider
+		}
+		identity := &currentIdentity
 		short, keys := deny == nil, "installed-journey"
 		if short {
 			keys += "-" + cluster

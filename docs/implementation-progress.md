@@ -27,8 +27,9 @@ journey then verifies new collection, native/range transfer, React processing,
 Stop/Deny/TargetGone, original expiry and independent deletion for both cases.
 
 Complexity: routine database maintenance is an accepted product requirement;
-no new production mechanism, service, watch, role, credential, migration or
-configuration is added. Only the owned fixture's existing administrator deletes
+the restart coordinator adds no production mechanism, service, watch, role,
+credential or migration. The first installed run exposed a separate Keycloak
+connection-pool recovery defect described below. Only the owned fixture's existing administrator deletes
 one exact Pod. The existing restart focus also captures through the browser, so
 funding covers three captures and histories:9,646,080 of12,353,536 reserved bytes
 and24 of32 objects; six native sessions remain within eight, two approved queries
@@ -45,12 +46,32 @@ owned node A is uncordoned after the completed cold-pull proof because the local
 PostgreSQL PVs require that node. The node update preserves its original UID/RV
 and every field except scheduling; no production scheduling configuration changes.
 
-Focused client and selector checks are passing while the integrated candidate is
-assembled. Next execute both new read-only SQL snapshots against the real current
-schema without synthetic activation, inspect the integrated producer/consumer
-boundaries, run affected repository/browser gates, then freeze sources for a fresh
-owned installation. Generated reports remain outside Git. Physical restore and
-other accepted specification work remain unfinished.
+At `569ce960`, affected `make pre-push` passed0/166.331s, including the
+integration package and692 console tests; built browser checks passed0/202.146s
+with30 journeys and31 accessibility scans. The focused restart client races and
+43 selector checks also passed. Generated reports remain outside Git.
+
+The first fresh all-four restart run at that SHA returned Go1/351.352s and
+harness1/467.243s. Root independently matched all5,008 working and committed
+source hashes; sources stayed frozen and the historical result directory was
+restored. Login, the original published354-byte artifact and its populated SQL
+snapshot passed. The exact `postgres-restart` stage passed in35.03s with preserved
+activation, PVC/Secret identities and product-written restart lineage.
+
+The next fresh MCP login failed with HTTP400 before post-restart collection or
+original-artifact retrieval. Keycloak logged closed pooled PostgreSQL connections.
+This remains a failed workflow, not qualification of retained evidence. The
+owned environment was retained for bounded read-only diagnosis, then removed
+with cleanup0/9.066s and independently empty resource/Kind inventories and absent
+private directory. The original artifact's deadline was not extended. Evidence is in the external
+`native-bundled-postgres-restart-20261112T095634Z/` archive.
+
+Current work fixes selected idle connection validation in the pinned bundled
+Keycloak distribution and adds a short real-provider PostgreSQL-restart loop
+before another complete installed run. It keeps five maximum connections and
+adds no service, role or credential. Raw Quarkus settings require explicit
+pinned-image qualification; their estimated cost is not measured overhead.
+Physical restore and other accepted specification work remain unfinished.
 
 ## Merged small-installation context workflow (2026-11-12)
 
@@ -73,7 +94,7 @@ image publication is claimed.
 | Keycloak | Actual26.8.2 HTTPS/import/console and MCP PKCE, stable groups, group refresh and restart; opt-in empty processing group | Broader identity/session lifecycle qualification; actual installed login and inspection now pass |
 | SeaweedFS | Actual4.53 TLS, scoped IAM, versioned pinned bytes, delayed reload/new credential consumption and restart; initial audit installation passes | Actual multipart creation, larger evidence and broader lifecycle matrices |
 | OpenBao | Actual2.7.2 TLS/static seal/self-initialization, same-data restart, partial-init refusal and original bounded issuer mint | Broader lifecycle and the accepted static-key alternative |
-| Installation | Fresh all-four Helm → login → regional enrollment → context/native/range/React → expiry/deletion passes with verified cleanup and a checked operator guide | Final eligible-head CI/merge readback, supported artifacts and complete operational lifecycle |
+| Installation | Fresh all-four Helm → login → regional enrollment → context/native/range/React → expiry/deletion passes with verified cleanup and a checked operator guide | Supported artifacts and complete operational lifecycle; exact eligible-head and post-merge CI passed |
 
 Production composition persists original credentials before IAM effects, reuses
 existing purpose-specific Secrets/inboxes and refuses unknown retained state.

@@ -195,7 +195,7 @@ Single-instance deployments MUST state downtime and failure-domain limitations. 
 
 ### SC-DEP-004
 
-Given a small deployment with two workload allocations, when one workload reaches its evidence quota or the object disk becomes pressured, then expensive acquisition is suppressed before consuming another workload's protected allocation or database/system reserve. Restart preserves committed artifacts and accounting. Restore remains fenced until current revocations, expiries and deletion obligations are reapplied. Chart uninstall does not erase retained data or recovery keys.
+Given a small deployment with two workload allocations, when one workload reaches its evidence quota or the object disk becomes pressured, then expensive acquisition is suppressed before consuming another workload's protected allocation or database/system reserve. Restart preserves committed artifacts and accounting. After a same-volume PostgreSQL restart and service recovery, fresh console and MCP logins retain the original user, group and client identities; a new capture and a fresh authorized download of an earlier artifact succeed within the original evidence bounds. Restart does not renew retention, permissions or reservations. Restore remains fenced until current revocations, expiries and deletion obligations are reapplied. Chart uninstall does not erase retained data or recovery keys.
 
 ## REQ-DEP-005 — Low-effort bootstrap and safe provider migration
 
