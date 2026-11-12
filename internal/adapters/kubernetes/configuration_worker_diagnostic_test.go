@@ -27,6 +27,7 @@ func TestConfigurationWorkerDiagnosticMutationKeepsActualGraph(t *testing.T) {
 				case "deployment":
 					if r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/deployments/"+f.source.input.Deployment.Name) && boundaries.Add(1) == 2 {
 						f.workloadVersion.Store(2)
+						f.workloadGeneration.Add(1)
 					}
 				}
 				return false

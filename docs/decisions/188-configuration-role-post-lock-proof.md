@@ -58,3 +58,42 @@ inventory and projection operation takes 85 requests instead of 120. No
 deadline is extended, and a change between the post-lock recheck and the
 receipt write is caught by the next operation's proof and by the final
 inventory verification.
+
+
+## 2026-11-12 correction: Deployment status is not a source change
+
+A fresh all-bundled installation at `f8b7de46` stopped after the acknowledged
+worker launch PUT, before its receipt. A retained bounded API watch recovered
+five versions of that same Deployment: each had generation2, one replica, the
+recorded running Spec digest and identical metadata except resourceVersion and
+managedFields. The controller advanced observedGeneration and Ready/Available
+status during the original five-second claim. The exact two failing GET versions
+were not logged; the historical events establish status-only evolution in that
+window. Go1/179.337s and harness1/297.764s remain failed results.
+
+The earlier settling wait does not prevent later legitimate status writes.
+[Kubernetes resourceVersion identifies object modifications](https://kubernetes.io/docs/reference/using-api/api-concepts/#resource-versions),
+including status. Requiring exact resourceVersion across read-only Deployment
+observations was an implementation restriction, not a maintainer product
+requirement. Replace it in configuration-role source/native/current/recheck and
+the owner projection/identity comparisons with complete Spec plus metadata
+identity, ignoring only resourceVersion, managedFields and Status. UID,
+generation, labels, annotations, owner references, finalizers and deletion state
+must remain unchanged. Generation retains detection of a spec change and reversal.
+Accounts, source/guard/journal objects and their original checks remain unchanged.
+
+Retain the latest validated Deployment and its actual resourceVersion for the
+existing launch claim and exact UID/resourceVersion write CAS. This correction
+never retries a PUT, adopts a replacement, renews a claim or treats a late reply
+as a new operation. Read-only observations retain their earliest original dates.
+The failed launch's original claim and absent receipt are not rewritten by tests.
+
+Complexity: one observed fresh installation failure, routine controller behavior,
+no added privileges, credentials, network/API calls, watches, background tasks,
+configuration or fallback states. One private operation-local Deployment snapshot
+and the existing bounded Spec/metadata comparisons replace a raw version string;
+there is no global cache. The smaller correction avoids retrying an entire
+protected proof or waiting longer for controllers. Rollback is a normal binary
+rollback and restores the former availability failure; stored contracts and SQL
+schema are unchanged. Focused positive status-only and negative identity/spec/
+metadata/generation cases must pass before fresh installed qualification.

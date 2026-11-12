@@ -8,6 +8,8 @@ import (
 	"time"
 
 	cfg "asservat.local/asservat/internal/domain/configuration"
+	apps "k8s.io/api/apps/v1"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestOwnerOperationDiagnosticsNeverRenderDriverValues(t *testing.T) {
@@ -49,7 +51,7 @@ func TestOwnerOriginalDiagnosticKeepsExactFieldsAndFirstDifference(t *testing.T)
 		{"fleet-reference", "original.source-configuration", func(v *ownerIdentityOperationNative) { v.source.fleetRef.UID = "changed" }},
 		{"owner-reference", "original.source-configuration", func(v *ownerIdentityOperationNative) { v.source.ownerRef.UID = "changed" }},
 		{"owner-configuration", "original.source-configuration", func(v *ownerIdentityOperationNative) { v.source.owner.Pool.ServiceUID = "changed" }},
-		{"deployment-version", "original.deployment", func(v *ownerIdentityOperationNative) { v.source.deployment.ResourceVersion = "changed" }},
+		{"deployment-generation", "original.deployment", func(v *ownerIdentityOperationNative) { v.source.deployment.Generation++ }},
 		{"deployment-spec", "original.deployment", func(v *ownerIdentityOperationNative) {
 			replicas := int32(1)
 			v.source.deployment.Spec.Replicas = &replicas
@@ -72,6 +74,21 @@ func TestOwnerOriginalDiagnosticKeepsExactFieldsAndFirstDifference(t *testing.T)
 				t.Fatal("changed original check precedence", got)
 			}
 		})
+	}
+}
+
+func TestOwnerOriginalDiagnosticIgnoresOnlyDeploymentStatusVersion(t *testing.T) {
+	var a, b ownerIdentityOperationNative
+	a.source.deployment.Generation, b.source.deployment.Generation = 1, 1
+	a.source.deployment.ResourceVersion, b.source.deployment.ResourceVersion = "original", "later"
+	b.source.deployment.Status = apps.DeploymentStatus{ObservedGeneration: 1, Replicas: 1, ReadyReplicas: 1}
+	b.source.deployment.ManagedFields = []meta.ManagedFieldsEntry{{Manager: "controller", Subresource: "status"}}
+	if !ownerIdentityOperationOriginalsEqual(a, b) || ownerIdentityOperationOriginalDifference(a, b) != ownerOperationNoFailure {
+		t.Fatal("controller-only Deployment status updates changed original owner operation identity")
+	}
+	b.source.deployment.Annotations = map[string]string{"changed": "protected"}
+	if ownerIdentityOperationOriginalDifference(a, b) != ownerOriginalDeployment {
+		t.Fatal("protected Deployment metadata change hidden with controller status")
 	}
 }
 

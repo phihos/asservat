@@ -4,15 +4,167 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	cfg "asservat.local/asservat/internal/domain/configuration"
+	apps "k8s.io/api/apps/v1"
 	auth "k8s.io/api/authentication/v1"
+	core "k8s.io/api/core/v1"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/flowcontrol"
 )
+
+func TestConfigurationWorkerStatusUpdatesKeepOriginalProofAndLatestCAS(t *testing.T) {
+	f := newConfigurationSourcePathFixture(t)
+	var reads atomic.Int32
+	f.deploymentEdit = func(d *apps.Deployment) {
+		if d.Name != f.source.input.Deployment.Name {
+			return
+		}
+		n := reads.Add(1)
+		d.ResourceVersion = strconv.Itoa(int(n))
+		d.Status = apps.DeploymentStatus{ObservedGeneration: d.Generation, Replicas: 1, ReadyReplicas: n % 2, AvailableReplicas: n % 2}
+		d.ManagedFields = []meta.ManagedFieldsEntry{{Manager: "controller", Subresource: "status", Time: &meta.Time{Time: time.Unix(int64(n), 0)}}}
+	}
+	ctx, stop := context.WithTimeout(context.Background(), 5*time.Second)
+	defer stop()
+	initial, err := f.source.readConfigurationWorkerNative(ctx)
+	if err != nil {
+		t.Fatal("status-only first/final reads refused", err)
+	}
+	if initial.deployment.ResourceVersion != "2" {
+		t.Fatal("initial native proof did not retain latest CAS version")
+	}
+	current, err := f.source.readConfigurationWorkerCurrent(ctx, initial)
+	if err != nil || current.proof.observation != initial.proof.observation || current.deployment.ResourceVersion != "3" {
+		t.Fatal("status-only post-lock read refused, renewed proof or lost latest CAS version", err)
+	}
+	final, err := f.source.readConfigurationWorkerNative(ctx)
+	if err != nil || final.deployment.ResourceVersion != "5" || !configurationRoleSameSources(initial.proof.observation, final.proof.observation) {
+		t.Fatal("status-only final bracket refused or lost exact source/latest version", err)
+	}
+	if f.requests.Load() != 78 || f.probes.Load() != 6 || f.secretWrites.Load() != 0 {
+		t.Fatal("status updates changed API/probe/effect counts", f.requests.Load(), f.probes.Load(), f.secretWrites.Load())
+	}
+}
+
+func TestConfigurationWorkerStatusUpdatesDoNotHideProtectedChanges(t *testing.T) {
+	changes := map[string]func(*apps.Deployment){
+		"uid":        func(d *apps.Deployment) { d.UID = types.UID(ownerID(16000)) },
+		"generation": func(d *apps.Deployment) { d.Generation++ },
+		"spec": func(d *apps.Deployment) {
+			d.Spec.Template.Spec.Containers = []core.Container{{Name: "replacement", Image: "foreign"}}
+		},
+		"service-account": func(d *apps.Deployment) { d.Spec.Template.Spec.ServiceAccountName = "replacement" },
+		"labels":          func(d *apps.Deployment) { d.Labels = map[string]string{"changed": "protected"} },
+		"annotations":     func(d *apps.Deployment) { d.Annotations = map[string]string{"changed": "protected"} },
+		"owner-references": func(d *apps.Deployment) {
+			d.OwnerReferences = []meta.OwnerReference{{APIVersion: "v1", Kind: "Pod", Name: "foreign", UID: types.UID(ownerID(16001))}}
+		},
+		"finalizers":     func(d *apps.Deployment) { d.Finalizers = []string{"example.test/hold"} },
+		"deletion":       func(d *apps.Deployment) { at := meta.Now(); d.DeletionTimestamp = &at },
+		"deletion-grace": func(d *apps.Deployment) { seconds := int64(30); d.DeletionGracePeriodSeconds = &seconds },
+		"zero-one-zero":  func(d *apps.Deployment) { d.Generation += 2 },
+	}
+	for _, boundary := range []string{"first-final", "post-lock"} {
+		for name, change := range changes {
+			t.Run(boundary+"/"+name, func(t *testing.T) {
+				f := newConfigurationSourcePathFixture(t)
+				if name == "zero-one-zero" {
+					f.replicas.Store(0)
+				}
+				var reads atomic.Int32
+				f.deploymentEdit = func(d *apps.Deployment) {
+					if d.Name != f.source.input.Deployment.Name {
+						return
+					}
+					n := reads.Add(1)
+					d.ResourceVersion = strconv.Itoa(int(n))
+					d.Status.ReadyReplicas = n % 2
+					at := int32(2)
+					if boundary == "post-lock" {
+						at = 3
+					}
+					if n >= at {
+						change(d)
+					}
+				}
+				ctx, stop := context.WithTimeout(context.Background(), 5*time.Second)
+				defer stop()
+				initial, err := f.source.readConfigurationWorkerNative(ctx)
+				if boundary == "post-lock" {
+					if err != nil {
+						t.Fatal("unchanged opening bracket refused", err)
+					}
+					_, err = f.source.readConfigurationWorkerCurrent(ctx, initial)
+				}
+				if err == nil || f.secretWrites.Load() != 0 || f.probes.Load() != 3 {
+					t.Fatal("protected change hidden behind status update or added an effect/probe", err)
+				}
+			})
+		}
+	}
+}
+
+func TestConfigurationRoleStatusUpdatesKeepOriginalSourceAndRecheck(t *testing.T) {
+	f := newConfigurationSourcePathFixture(t)
+	var reads atomic.Int32
+	f.deploymentEdit = func(d *apps.Deployment) {
+		if d.Name == f.source.input.Deployment.Name {
+			n := reads.Add(1)
+			d.ResourceVersion = strconv.Itoa(int(n))
+			d.Status.ReadyReplicas = n % 2
+		}
+	}
+	ctx, stop := context.WithTimeout(context.Background(), 5*time.Second)
+	defer stop()
+	initial, err := f.source.readConfigurationRoleSource(ctx)
+	if err != nil {
+		t.Fatal("ordinary source rejected status-only first/final bracket", err)
+	}
+	current, err := f.source.recheckConfigurationRoleSource(ctx, initial)
+	if err != nil || current.observation != initial.observation || current.deployment == nil || current.deployment.ResourceVersion != "3" {
+		t.Fatal("ordinary post-lock recheck lost source/deadline/latest snapshot", err)
+	}
+	if f.secretWrites.Load() != 0 || f.probes.Load() != 6 {
+		t.Fatal("ordinary status update recheck added a write or changed probe count")
+	}
+}
+
+func TestOwnerProjectionSourceTailKeepsControllerStatusAndOriginalBounds(t *testing.T) {
+	f := newConfigurationSourcePathFixture(t)
+	var reads atomic.Int32
+	f.deploymentEdit = func(d *apps.Deployment) {
+		if d.Name == f.source.input.Deployment.Name {
+			n := reads.Add(1)
+			d.ResourceVersion = strconv.Itoa(int(n))
+			d.Status.ReadyReplicas = n % 2
+		}
+	}
+	ctx, stop := context.WithTimeout(context.Background(), 5*time.Second)
+	defer stop()
+	prefix, err := f.source.readOwnerProjectionSourcePrefix(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tail, err := prefix.readTail(ctx)
+	if err != nil {
+		t.Fatal("owner source tail rejected a controller-only update", err)
+	}
+	finished, err := prefix.finish(ctx, tail)
+	if err != nil || finished.deployment.ResourceVersion != "2" || finished.proof.deployment == nil || finished.proof.deployment.ResourceVersion != "2" ||
+		!finished.proof.observation.ObservedAt.Equal(prefix.started) || finished.proof.observation.FreshUntil.After(prefix.until) {
+		t.Fatal("owner source tail lost original proof bounds or latest complete deployment", err)
+	}
+	if f.requests.Load() != 33 || f.probes.Load() != 3 || f.secretWrites.Load() != 0 {
+		t.Fatal("owner source tail changed API/probe/effect counts", f.requests.Load(), f.probes.Load(), f.secretWrites.Load())
+	}
+}
 
 // Actual production HTTP clients/20QPS buckets and concrete source code against
 // loopback simulated enforcement. This does not qualify a real Kubernetes

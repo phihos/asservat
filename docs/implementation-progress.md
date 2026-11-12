@@ -66,12 +66,40 @@ with cleanup0/9.066s and independently empty resource/Kind inventories and absen
 private directory. The original artifact's deadline was not extended. Evidence is in the external
 `native-bundled-postgres-restart-20261112T095634Z/` archive.
 
-Current work fixes selected idle connection validation in the pinned bundled
-Keycloak distribution and adds a short real-provider PostgreSQL-restart loop
-before another complete installed run. It keeps five maximum connections and
-adds no service, role or credential. Raw Quarkus settings require explicit
-pinned-image qualification; their estimated cost is not measured overhead.
-Physical restore and other accepted specification work remain unfinished.
+At `f8b7de46`, the focused pinned PostgreSQL/Keycloak reproduction used the same
+113 committed/working source hashes. With validation disabled, both first fresh
+console/MCP credential POSTs failed400 (harness1/71.676s); with the fixed settings,
+both first fresh logins passed in0.10/0.14s, followed by retained Keycloak restart
+checks (harness0/74.227s). Keycloak stayed the same process during each PostgreSQL
+restart. Actual pools held3/4 connections under the unchanged maximum5. Both
+owned environments were independently cleaned. Affected `make pre-push` passed
+0/595.903s, including Go races503s. No raw-property support promise is inferred.
+
+The next fresh all-four run at that SHA failed before public login/restart:
+Go1/179.337s, harness1/297.764s. All5,008 committed/working hashes independently
+match and source stayed frozen. Original produce/schema/prepare/retire succeeded;
+continuation stopped at `worker/launch/source.deployment-final-bound (changed)`
+after the actual worker launch PUT. Its original claim has no receipt. The
+retained bounded watch recovered five same-UID/generation2/Spec/metadata versions
+with only controller Status, resourceVersion and managedFields evolution during
+the original claim. Exact failing GET versions were not logged. Evidence remains
+external in `native-bundled-postgres-restart-20261112T103537Z/`. The retained
+environment was removed with cleanup0/14.294s; independent owned inventories
+are empty and its private directory is absent.
+
+The focused status-only regression failed before the correction (Go1/0.137s)
+and the integrated new regressions now pass (Go0/29.765s), including actual launch
+PUT followed by controller status updates and its original receipt. Exact API/
+probe counts, original dates and22 protected field/generation negative cases
+remain asserted. Required broader and fresh installed checks are pending.
+
+Current candidate corrects read-only Deployment observation equality under the
+[ADR-188 correction](decisions/188-configuration-role-post-lock-proof.md#2026-11-12-correction-deployment-status-is-not-a-source-change),
+retaining complete identity/generation/Spec/metadata, latest exact mutation CAS,
+original deadlines and uncertain-effect journals. No new retries, watches or API
+calls are added. Reproduce with focused regressions before another fresh installed
+run; never replay the expired retained launch. Physical restore and the remaining
+accepted specification work remain unfinished.
 
 ## Merged small-installation context workflow (2026-11-12)
 

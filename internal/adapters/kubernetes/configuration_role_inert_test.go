@@ -106,6 +106,7 @@ func TestConfigurationRoleZeroToOneAfterClaimInvalidatesOriginalOperation(t *tes
 		writes := f.secretWrites.Load()
 		f.replicas.Store(1)
 		f.workloadVersion.Add(1)
+		f.workloadGeneration.Add(1)
 		if _, e = root.ReadConfigurationRuntimeRoles(ctx); e == nil {
 			t.Fatal("post-lock current read accepted changed launch phase")
 		}
@@ -115,6 +116,7 @@ func TestConfigurationRoleZeroToOneAfterClaimInvalidatesOriginalOperation(t *tes
 		}
 		f.replicas.Store(0)
 		f.workloadVersion.Add(1)
+		f.workloadGeneration.Add(1)
 		if _, e = root.ReadConfigurationRuntimeRoles(ctx); e == nil {
 			t.Fatal("zero-one-zero revived invalidated original operation")
 		}

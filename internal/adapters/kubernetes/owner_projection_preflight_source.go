@@ -188,7 +188,7 @@ func (p *ownerProjectionSourcePrefix) readTail(ctx context.Context) (ownerProjec
 	if err != nil {
 		return zero, configurationSourceError(configurationSourceDeploymentFinalRead, err)
 	}
-	if !configurationRoleDeploymentBound(d2, s.input) || !equalJSON(p.deployment.Spec, d2.Spec) || p.deployment.ResourceVersion != d2.ResourceVersion {
+	if !configurationRoleDeploymentBound(d2, s.input) || !configurationDeploymentSame(p.deployment, d2) {
 		return zero, configurationSourceError(configurationSourceDeploymentFinalBound, cfg.ErrChanged)
 	}
 	account2, err := ownerResource[core.ServiceAccount](reader, call, accountPath, "v1", "ServiceAccount")
@@ -253,7 +253,7 @@ func (p *ownerProjectionSourcePrefix) finish(ctx context.Context, last ownerProj
 		return zero, configurationSourceError(configurationSourceObservationMatch, cfg.ErrUnavailable)
 	}
 	responses := &configurationRoleNativeResponses{clients: [3]*PermissionClient{s.protection.probe, s.fleet.protection.probe, s.owner.protection.probe}, identities: p.actors, worker: *last.account.DeepCopy()}
-	return configurationWorkerNative{proof: configurationRoleObserved{observation: observation, deploymentVersion: p.deployment.ResourceVersion,
+	return configurationWorkerNative{proof: configurationRoleObserved{observation: observation, deployment: last.deployment.DeepCopy(),
 		accountVersion: p.account.ResourceVersion, guards: p.guards, native: responses}, fleet: p.fleet, owner: p.owner, deployment: last.deployment, account: last.account,
 		administrator: p.administrator, fleetRef: p.fleetRef, ownerRef: p.ownerRef, ownerDeployment: p.ownerDeployment}, nil
 }

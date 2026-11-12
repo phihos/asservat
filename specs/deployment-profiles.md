@@ -199,6 +199,8 @@ Given a small deployment with two workload allocations, when one workload reache
 
 ## REQ-DEP-005 — Low-effort bootstrap and safe provider migration
 
+Routine controller status updates alone MUST NOT invalidate a protected Deployment input observation. Preserve identity, generation, complete specification, relevant metadata and original authority bounds; effectful launch writes retain exact UID/resource-version CAS.
+
 [ADR-147](../docs/decisions/147-standard-owner-provider-authentication.md) selects
 ordinary OpenBao Kubernetes authentication for ongoing owner audit wrapping,
 audit unwrapping and the two certificate-signing purposes. Installation generates
