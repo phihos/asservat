@@ -6,7 +6,9 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
+	"io"
 	"os/exec"
+	"path/filepath"
 	"reflect"
 	"strconv"
 	"strings"
@@ -22,8 +24,77 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/kubernetes"
 )
+
+func TestHelmBundledServicesCompose(t *testing.T) {
+	image := "registry.example/asservat@sha256:" + strings.Repeat("a", 64)
+	input := contracts.InitialBootstrapInput{Format: contracts.InitialBootstrapInputFormat, Name: "install", BootstrapNamespace: "trusted-bootstrap", TargetNamespace: "asservat-runtime", RunnerAccount: "install-bootstrap-runner", Image: image,
+		Kubernetes: contracts.InitialBootstrapEndpointInput{Endpoint: "https://kubernetes.default.svc"},
+		Postgres:   contracts.InitialBootstrapPostgresInput{Host: "postgres.example", Port: 5432, Database: "asservat", MaxConnections: 2, RootsPEM: "PUBLIC-CA"},
+		AuditStore: contracts.InitialBootstrapAuditStoreInput{Endpoint: "https://store.example", Region: "region-a", Bucket: "audit", RootsPEM: "PUBLIC-CA"},
+		KeyService: contracts.InitialBootstrapKeyServiceInput{Endpoint: "https://bao.example", AuditMount: "asservat-audit", AuditKey: "audit", RootsPEM: "PUBLIC-CA"},
+		Fleet:      contracts.InitialBootstrapFleet{Issuer: "https://id.example/realms/org", Clients: []string{"console"}, Subjects: []contracts.IdentitySubject{}, Groups: []string{"stable-group"}, DeliveryProfiles: []string{"regional-installer"}, MaxActiveBootstraps: 1, MaxBootstrapHistory: 16, MaxClusters: 1}, Providers: contracts.SmallOpenBaoInitialProviders()}
+	values := helmBootstrapValues(input)
+	p := helmBundledPostgres{image: image}
+	s := helmBundledObjectStore{plan: contracts.SmallSeaweedPlan{Image: image}}
+	k := helmBundledKeyService{plan: contracts.SmallOpenBaoPlan{Image: image}}
+	// Match the native fixture's exact producer order, including the last
+	// identity selection preserving both earlier storage selections.
+	p.Values(values)
+	s.Values(values)
+	k.Values(values)
+	services := values["services"].(map[string]any)
+	for name, provider := range map[string]string{"postgres": "bundled", "objectStore": "seaweedfs", "keyService": "openbao"} {
+		service, ok := services[name].(map[string]any)
+		if !ok || service["provider"] != provider {
+			t.Fatalf("bundled service composition lost %s", name)
+		}
+	}
+	values["bootstrap"].(map[string]any)["secrets"].(map[string]any)["producer"] = ""
+	if _, err := exec.LookPath("helm"); err != nil {
+		t.Skip("pure composition passed; Helm unavailable for actual chart render")
+	}
+	path := filepath.Join(t.TempDir(), "values.json")
+	helmBootstrapWriteValues(t, path, values)
+	ctx, stop := context.WithTimeout(context.Background(), 30*time.Second)
+	defer stop()
+	raw, err := exec.CommandContext(ctx, "helm", "template", "asservat", "../../charts/asservat", "--namespace", input.BootstrapNamespace, "--values", path).CombinedOutput()
+	if err != nil {
+		t.Fatalf("all-bundled chart render: %v %s", err, raw)
+	}
+	decoder := yaml.NewYAMLOrJSONDecoder(bytes.NewReader(raw), 4096)
+	sets, inputs := 0, 0
+	for {
+		var doc struct {
+			Kind string            `json:"kind"`
+			Data map[string]string `json:"data"`
+		}
+		if err := decoder.Decode(&doc); err == io.EOF {
+			break
+		} else if err != nil {
+			t.Fatal("rendered service document", err)
+		}
+		if doc.Kind == "StatefulSet" {
+			sets++
+		}
+		if doc.Kind != "ConfigMap" || doc.Data["bootstrap.json"] == "" {
+			continue
+		}
+		inputs++
+		var public contracts.InitialBootstrapInput
+		var refs contracts.InitialBootstrapRunnerInput
+		if json.Unmarshal([]byte(doc.Data["bootstrap.json"]), &public) != nil || json.Unmarshal([]byte(doc.Data["runner.json"]), &refs) != nil ||
+			public.Postgres.RootsSource != contracts.InitialBootstrapBundledPostgresRoots || public.AuditStore.RootsSource != contracts.InitialBootstrapBundledSeaweedRoots || public.KeyService.RootsSource != contracts.InitialBootstrapBundledOpenBaoRoots ||
+			public.Postgres.Host != "install-postgres.trusted-bootstrap.svc" || public.Postgres.MaxConnections != 2 || refs.ProducerSecret != "install-postgres-state" || refs.PostgresSecret != refs.ProducerSecret || refs.KeyServiceSecret != "install-openbao-state" || refs.ObjectStoreSecret != "install-objectstore-state" {
+			t.Fatal("actual chart did not preserve all selected generated sources")
+		}
+	}
+	if sets != 3 || inputs != 1 {
+		t.Fatalf("all-bundled chart rendered %d service StatefulSets and %d original public inputs", sets, inputs)
+	}
+}
 
 type helmBundledPostgres struct {
 	plan       contracts.SmallPostgresPlan

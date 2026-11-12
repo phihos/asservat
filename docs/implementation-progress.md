@@ -214,6 +214,20 @@ Ten selector tests and integration compile pass. Actual Helm/SQL/backup/replay
 qualification for this selection remains pending; an external fixture database
 is not substituted into the product.
 
+The first all-three-bundled run at `8a917fc3` stopped before any Helm installation:
+Go1/1.483s, harness1/101.859s. The object-store fixture replaced the entire services
+map, dropping the earlier PostgreSQL selection; the chart correctly rejected the
+resulting external-database selection without its producer Secret. A regression
+using the exact fixture order failed before the merge-only fix and then passed
+with actual schema-enabled Helm rendering, all three StatefulSets and the exact
+generated source references (0/0.116s). Product schema validation is unchanged.
+All4,976 inventoried sources independently match committed `8a917fc3` and stayed
+unchanged during the failed run. The retained environment was subsequently removed
+with verified empty owned resources and no cleanup failures; the repository result
+directory was restored. Original failure and separate cleanup receipts are in
+`native-initial-pg-bao-s3-20261112T044718Z/` externally. Image/CRI preflight passed;
+this run did not exercise product SQL, backup or activation.
+
 Public-profile prerequisites are also integrated locally: explicit
 `services.identity.keycloak.processingOperators=true` creates an empty dedicated
 group, derives its stable UUID from the original public users UUID and fills only

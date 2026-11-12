@@ -147,7 +147,12 @@ func newHelmBundledObjectStore(t *testing.T, ctx context.Context, api kubernetes
 }
 
 func (b *helmBundledObjectStore) Values(values map[string]any) {
-	values["services"] = map[string]any{"objectStore": map[string]any{"provider": "seaweedfs", "seaweedfs": map[string]any{"image": b.plan.Image, "persistence": map[string]any{"storageClass": "asservat-owned-local", "size": "32Gi"}}}}
+	services, ok := values["services"].(map[string]any)
+	if !ok {
+		services = map[string]any{}
+		values["services"] = services
+	}
+	services["objectStore"] = map[string]any{"provider": "seaweedfs", "seaweedfs": map[string]any{"image": b.plan.Image, "persistence": map[string]any{"storageClass": "asservat-owned-local", "size": "32Gi"}}}
 }
 
 // Verify using the exact credential observed from the acknowledged original
