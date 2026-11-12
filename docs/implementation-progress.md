@@ -102,12 +102,32 @@ All other passing `8981c2b8` source evidence is reused; the correction changes
 only that six-line fixture and this ledger. Full eligible-head CI remains required.
 Fresh installed checks are next.
 
-Current candidate corrects read-only Deployment observation equality under the
-[ADR-188 correction](decisions/188-configuration-role-post-lock-proof.md#2026-11-12-correction-deployment-status-is-not-a-source-change),
-retaining complete identity/generation/Spec/metadata, latest exact mutation CAS,
-original deadlines and uncertain-effect journals. No new retries, watches or API
-calls are added. Reproduce with focused regressions before another fresh installed
-run; never replay the expired retained launch. Physical restore and the remaining
+The fresh `348ab45c` run passed installation, public login, exact PostgreSQL
+restart33.584s, fresh console/MCP captures, prior354-byte readback under original
+bounds, unchanged artifact/accounting snapshots, React processing, range708-byte
+charges, Stop/Deny/TargetGone and current-artifact expiry/deletion. It returned
+Go1/610.993s and harness1/738.997s at the saved pre-restart deletion observer.
+All5,009 inventoried committed/working source hashes independently match and
+sources stayed frozen. Evidence is external in
+`native-bundled-postgres-restart-20261112T111055Z/`.
+
+Read-only retained SQL confirms all deletion cutoffs/order, acknowledgement,
+finalization, zero copies and relative evidence refund are correct. The sole
+false assertion compared old shared control counters1/1 with current3/3 after
+two legitimate later captures. All three retained capture charges remain; this
+is an observer scope mismatch, not a product accounting refund. Current work
+requires each observer's own capture charge and subtracts other context-capture
+charges in all three queries, regardless of evidence deletion. Initial floors,
+exact final equality, original cutoffs, immutable audit and inventory assertions
+remain. Focused observer races pass0/1.098s. The exact corrected SELECTs passed on
+all three actual retained captures (read-only Go0/0.406s), including30 negative
+checks for counter drift and missing own-charge rows. All final/state cutoffs,
+relative evidence0/0 and retained controls1/1 pass; the expired initial lookup
+returns no rows. Root matched both source hashes and independently checked the
+sanitized results. The retained environment was removed with cleanup0/15.438s
+and independently empty owned inventories/absent private directory. Fresh
+complete qualification remains pending. No product source, quota or authority
+changes follow this final observer correction. Physical restore and the remaining
 accepted specification work remain unfinished.
 
 ## Merged small-installation context workflow (2026-11-12)
