@@ -75,8 +75,8 @@ The earlier settling wait does not prevent later legitimate status writes.
 [Kubernetes resourceVersion identifies object modifications](https://kubernetes.io/docs/reference/using-api/api-concepts/#resource-versions),
 including status. Requiring exact resourceVersion across read-only Deployment
 observations was an implementation restriction, not a maintainer product
-requirement. Replace it in configuration-role source/native/current/recheck and
-the owner projection/identity comparisons with complete Spec plus metadata
+requirement. Replace it in configuration-role source/native/current/recheck, the worker-input final
+bracket and the owner projection/identity comparisons with complete Spec plus metadata
 identity, ignoring only resourceVersion, managedFields and Status. UID,
 generation, labels, annotations, owner references, finalizers and deletion state
 must remain unchanged. Generation retains detection of a spec change and reversal.
@@ -103,3 +103,10 @@ The corrected source passed the fresh all-four installed workflow at `15501a6a`
 login, PostgreSQL restart and both original/new artifact expiry/deletion. All
 5,009 inventoried source hashes matched and owned cleanup was independently
 verified. See the implementation ledger for focused regressions and prior failures.
+
+PR226 review identified the worker-input final bracket as one further occurrence
+of the same raw-version comparison. Its correction uses the same helper; the
+actual Advance/post-lock/receipt-effect/final/completion component regression
+failed before the change0.491s and passed with race detection12.641s, including
+refusal of genuine generation/Spec/metadata changes and original-bound checks.
+Fresh integrated qualification and eligible-head CI are required for that delivery.

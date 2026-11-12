@@ -5,8 +5,17 @@
 Candidate: `feature/bundled-postgres-restart` in `asservat-small-restart`, based
 on main `db0e27dc` (PR225; its exact post-merge CI43188834579 passed).
 Fresh installed source: `15501a6aed7c7d89b8d7ff0674e7eabf271a192a`.
-The delivery update changes documentation only; eligible-head CI and merge
-readback remain pending. The complete accepted specification goal remains active.
+PR226 review at `de7e1950` found one missed worker-input final-bracket comparison
+in `ReadConfigurationWorkerFinal`. The delivery now applies the same status-neutral
+helper there, with a real-phase component regression: old code1/0.491s, fixed
+race0/12.641s; status succeeds while generation/Spec/metadata changes refuse.
+The test retains one original receipt CAS, original proof/end and no replay after
+completion. SQL locks/precompleted role receipts are explicitly synthetic; the
+concrete source/native/bridge/SetupReader and operation phases run. No other raw
+Deployment observation-version equality remains in the bounded family review.
+Superseded PR CI43214028200 was cancelled to avoid further runner work; its
+`ci-ok` failure reflects cancelled dependencies. A fresh integrated run and final
+eligible-head CI/merge readback are pending. The complete accepted specification goal remains active.
 
 REQ-DEP-004 / SC-DEP-004 / TASK-11 now have fresh all-four-service evidence for
 same-PVC PostgreSQL restart. The actual five-command Helm installation, imported
