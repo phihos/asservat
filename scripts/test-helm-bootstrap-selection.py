@@ -34,6 +34,26 @@ class HelmSelection(unittest.TestCase):
                 fixture.main(helm_bootstrap=True, helm_cluster=True, bundled_objectstore=True)
             external.assert_not_called()
 
+    def test_bundled_keyservice_is_explicit_independent_and_sanitized(self):
+        flag = "ASSERVAT_HELM_BUNDLED_KEYSERVICE"
+        object_flag = "ASSERVAT_HELM_BUNDLED_OBJECTSTORE"
+        base = {flag: "1", object_flag: "1"}
+        ordinary = fixture.qualification_environment(base, Path("fixture"), Path("work"), False, False)
+        self.assertNotIn(flag, ordinary)
+        self.assertNotIn(object_flag, ordinary)
+        for object_store in (False, True):
+            selected = fixture.qualification_environment(base, Path("fixture"), Path("work"), False, False, helm_bootstrap=True, bundled_keyservice=True, bundled_objectstore=object_store)
+            self.assertEqual(selected[flag], "1")
+            self.assertEqual(selected.get(object_flag), "1" if object_store else None)
+            self.assertEqual(selected["ASSERVAT_HELM_BOOTSTRAP_NATIVE"], "1")
+        with self.assertRaisesRegex(ValueError, "requires --helm-bootstrap"):
+            fixture.qualification_environment(base, Path("fixture"), Path("work"), False, False, bundled_keyservice=True)
+        with patch.dict("os.environ", {}, clear=True), patch.object(fixture, "run", side_effect=AssertionError("external setup")) as external:
+            for options in ({"bundled_keyservice": True}, {"helm_bootstrap": True, "helm_cluster": True, "bundled_keyservice": True}):
+                with self.assertRaisesRegex(ValueError, "requires --helm-bootstrap"):
+                    fixture.main(**options)
+            external.assert_not_called()
+
     def test_context_chart_mode_is_explicit_and_stays_in_installed_workflow(self):
         flag = "ASSERVAT_HELM_CONTEXT_NATIVE"
         base = {flag: "1"}

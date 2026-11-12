@@ -69,6 +69,10 @@ func readInitialBootstrapDesiredAndServices(ctx context.Context, input *os.Root)
 		}
 		defer clear(token)
 	}
+	services.KeyService, err = resolveInitialBootstrapKeyService(ctx, input, &v, ca)
+	if err != nil {
+		return zero, initialBootstrapServices{}, err
+	}
 	d, err := providerconfig.CompileInitialBootstrapInput(v, ca, token, time.Now())
 	if err != nil || ctx.Err() != nil {
 		return zero, initialBootstrapServices{}, mounts.ErrUnavailable

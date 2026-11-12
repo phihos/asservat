@@ -45,6 +45,40 @@ func setupApplyPath(p string) bool {
 // exact. It then installs a read-only inspection policy over the artifact's
 // named paths and returns one short-lived non-renewable inspection token.
 func ApplySetupArtifact(ctx context.Context, client *bao.Client, name string, artifact []byte, out io.Writer) ([]byte, error) {
+	return applySetupArtifact(ctx, client, name, artifact, out, false)
+}
+
+// BundledSetupInspectionRole is the one protected token role provisioned by the
+// bundled provider's trusted setup. It is not an operator-selectable grant.
+const BundledSetupInspectionRole = "asservat-inspection"
+
+// ApplyBundledSetupArtifact uses the same create-only interpreter as the
+// external operator path, but requests its inspection child through the fixed
+// protected role. Unknown effects are not retried or redirected. The downstream
+// SetupReader still independently verifies token and selected provider identity.
+func ApplyBundledSetupArtifact(ctx context.Context, client *bao.Client, name string, artifact []byte, out io.Writer) ([]byte, error) {
+	if ctx == nil || ctx.Err() != nil || client == nil {
+		return nil, ErrSetupUnavailable
+	}
+	config := client.CloneConfig()
+	config.Address = client.Address()
+	config.MaxRetries = 0
+	config.DisableRedirects = true
+	config.DisableEnvironment = true
+	isolated, err := bao.NewClient(config)
+	if err != nil {
+		return nil, ErrSetupUnavailable
+	}
+	isolated.SetToken(client.Token())
+	isolated.SetHeaders(client.Headers().Clone())
+	token, err := applySetupArtifact(ctx, isolated, name, artifact, out, true)
+	if err != nil {
+		return nil, ErrSetupUnavailable
+	}
+	return token, nil
+}
+
+func applySetupArtifact(ctx context.Context, client *bao.Client, name string, artifact []byte, out io.Writer, bundled bool) ([]byte, error) {
 	var plan setupArtifactPlan
 	if client == nil || out == nil || !providerName.MatchString(name) || json.Unmarshal(artifact, &plan) != nil || len(plan.Apply) == 0 || len(plan.Inspect) == 0 {
 		return nil, ErrSetupUnavailable
@@ -81,7 +115,14 @@ func ApplySetupArtifact(ctx context.Context, client *bao.Client, name string, ar
 		}
 		_, _ = fmt.Fprintf(out, "created: %s\n", r.Path)
 	}
-	secret, err := client.Auth().Token().CreateWithContext(ctx, &bao.TokenCreateRequest{Policies: []string{name}, NoDefaultPolicy: true, Renewable: new(bool), TTL: "10m", ExplicitMaxTTL: "10m", DisplayName: name})
+	request := &bao.TokenCreateRequest{Policies: []string{name}, NoDefaultPolicy: true, Renewable: new(bool), TTL: "10m", ExplicitMaxTTL: "10m", DisplayName: name}
+	var secret *bao.Secret
+	if bundled {
+		request.Type = "service"
+		secret, err = client.Auth().Token().CreateWithRoleWithContext(ctx, request, BundledSetupInspectionRole)
+	} else {
+		secret, err = client.Auth().Token().CreateWithContext(ctx, request)
+	}
 	if err != nil || secret == nil || secret.Auth == nil || secret.Auth.ClientToken == "" {
 		return nil, ErrSetupUnavailable
 	}

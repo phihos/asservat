@@ -48,10 +48,24 @@ func bootstrapPreludeValid(d contracts.InitialBootstrap, p contracts.InitialBoot
 }
 
 func bootstrapMaterialValid(m contracts.InitialBootstrapMaterial) bool {
-	if m.Format != contracts.InitialBootstrapMaterialFormat || !initialProviderASCII(m.IssuerToken, contracts.InitialProviderTokenMaxBytes) || !initialProviderASCII(m.Storage.AccessKeyID, 256) || !initialProviderASCII(m.Storage.SecretAccessKey, 1024) || len(m.Storage.SessionToken) > 4096 || m.StorageUseUntil.Year() < 2020 || m.StorageUseUntil.Year() > 9998 {
+	if m.BundledIdentity != nil && !m.BundledIdentity.Valid() {
 		return false
 	}
-	return m.Storage.SessionToken == "" || initialProviderASCII(m.Storage.SessionToken, 4096)
+	if m.Format != contracts.InitialBootstrapMaterialFormat || !initialProviderASCII(m.Storage.AccessKeyID, 256) || !initialProviderASCII(m.Storage.SecretAccessKey, 1024) || len(m.Storage.SessionToken) > 4096 || m.StorageUseUntil.Year() < 2020 || m.StorageUseUntil.Year() > 9998 {
+		return false
+	}
+	if m.Storage.SessionToken != "" && !initialProviderASCII(m.Storage.SessionToken, 4096) {
+		return false
+	}
+	if m.IssuerToken != "" {
+		return m.SetupToken == "" && initialProviderASCII(m.IssuerToken, contracts.InitialProviderTokenMaxBytes)
+	}
+	return bootstrapProviderPending(m)
+}
+
+func bootstrapBundledIdentityValid(d contracts.InitialBootstrap, p contracts.InitialBootstrapPrelude, m contracts.InitialBootstrapMaterial) bool {
+	v := m.BundledIdentity
+	return v == nil || v.Valid() && v.BackendName == d.Name && v.Namespace == p.Namespace && v.Namespace.Name == d.BootstrapNamespace && v.Endpoint() == d.KeyService.Endpoint
 }
 
 // Check both serialized private-material envelopes before seed/SQL/provider
@@ -64,7 +78,12 @@ func bootstrapRegistryMaterialValid(d contracts.InitialBootstrap, m contracts.In
 	b, e := json.Marshal(m)
 	defer clear(b)
 	const uuid = "00000000-0000-4000-8000-000000000000"
-	provider := contracts.InitialProviderMaterial{Format: contracts.InitialProviderMaterialFormat, InstallationID: uuid, RequestID: uuid, IssuerToken: m.IssuerToken, Storage: m.Storage, StorageUseUntil: m.StorageUseUntil, RegistryConfig: m.RegistryConfig}
+	provider := contracts.InitialProviderMaterial{Format: contracts.InitialProviderMaterialFormat, InstallationID: uuid, RequestID: uuid, IssuerToken: m.IssuerToken, Storage: m.Storage, StorageUseUntil: m.StorageUseUntil, RegistryConfig: m.RegistryConfig, BundledIdentity: m.BundledIdentity}
+	// Reserve the unchanged final envelope bound before accepting a pending
+	// setup token; the actual issued token cannot exceed its existing 1024 B cap.
+	if bootstrapProviderPending(m) {
+		provider.IssuerToken = strings.Repeat("x", contracts.InitialProviderTokenMaxBytes)
+	}
 	data, err := json.Marshal(provider)
 	defer clear(data)
 	return e == nil && err == nil && len(b) <= contracts.InitialProviderMaterialMaxBytes && len(data) <= contracts.InitialProviderMaterialMaxBytes
@@ -72,7 +91,7 @@ func bootstrapRegistryMaterialValid(d contracts.InitialBootstrap, m contracts.In
 
 func newBootstrapState(d contracts.InitialBootstrap, p contracts.InitialBootstrapPrelude, m contracts.InitialBootstrapMaterial) (contracts.InitialBootstrapState, error) {
 	var s contracts.InitialBootstrapState
-	if validateBootstrap(d) != nil || !bootstrapPreludeValid(d, p) || !bootstrapMaterialValid(m) || !bootstrapRegistryMaterialValid(d, m) {
+	if validateBootstrap(d) != nil || !bootstrapPreludeValid(d, p) || !bootstrapMaterialValid(m) || !bootstrapRegistryMaterialValid(d, m) || !bootstrapBundledIdentityValid(d, p, m) {
 		return s, cfg.ErrInvalid
 	}
 	s = contracts.InitialBootstrapState{Format: contracts.InitialBootstrapStateFormat, DesiredDigest: bootstrapDigest(d), Prelude: p, Material: &m, Creates: []contracts.InitialBootstrapCreate{}}
@@ -134,7 +153,10 @@ func bootstrapStateValid(d contracts.InitialBootstrap, s contracts.InitialBootst
 		if s.Material != nil {
 			return false
 		}
-	} else if s.Material == nil || !bootstrapMaterialValid(*s.Material) || !bootstrapRegistryMaterialValid(d, *s.Material) {
+	} else if s.Material == nil || !bootstrapMaterialValid(*s.Material) || !bootstrapRegistryMaterialValid(d, *s.Material) || !bootstrapBundledIdentityValid(d, s.Prelude, *s.Material) {
+		return false
+	}
+	if !bootstrapProviderMintValid(s, seen) {
 		return false
 	}
 	if m := s.Manager; m != nil {
@@ -201,6 +223,20 @@ func bootstrapStateTransition(d contracts.InitialBootstrap, old, next contracts.
 		x.SeedUID = next.SeedUID
 		return equalJSON(x, next)
 	}
+	if old.ProviderMint == nil && next.ProviderMint != nil && old.Material != nil && bootstrapProviderPending(*old.Material) && next.ProviderMint.Response == nil {
+		x.ProviderMint = next.ProviderMint
+		return equalJSON(x, next)
+	}
+	if old.ProviderMint != nil && old.ProviderMint.Response == nil && next.ProviderMint != nil && next.ProviderMint.Response != nil && old.Material != nil && next.Material != nil {
+		mint := *old.ProviderMint
+		mint.Response = next.ProviderMint.Response
+		x.ProviderMint = &mint
+		material := *old.Material
+		material.SetupToken = ""
+		material.IssuerToken = next.Material.IssuerToken
+		x.Material = &material
+		return equalJSON(x, next)
+	}
 	if old.Manager == nil && next.Manager != nil && next.Manager.Receipt == nil && next.Manager.Closing == nil && next.Manager.RetiredAt == nil {
 		x.Manager = next.Manager
 		return equalJSON(x, next)
@@ -260,4 +296,36 @@ func bootstrapStateTransition(d contracts.InitialBootstrap, old, next contracts.
 		return equalJSON(x, next)
 	}
 	return false
+}
+
+func bootstrapProviderPending(m contracts.InitialBootstrapMaterial) bool {
+	return m.IssuerToken == "" && m.BundledIdentity != nil && m.BundledIdentity.Valid() && initialProviderASCII(m.SetupToken, contracts.InitialProviderTokenMaxBytes)
+}
+func bootstrapProviderReady(s contracts.InitialBootstrapState) bool {
+	return s.Material != nil && s.Material.SetupToken == "" && initialProviderASCII(s.Material.IssuerToken, contracts.InitialProviderTokenMaxBytes) && (s.ProviderMint == nil || s.ProviderMint.Response != nil)
+}
+func bootstrapProviderMintValid(s contracts.InitialBootstrapState, seen map[string]bool) bool {
+	pending := s.Material != nil && bootstrapProviderPending(*s.Material)
+	if pending && (s.Retired || s.Manager != nil || len(s.Creates) != 0 || s.Projection != nil || s.PassiveHistory != nil) {
+		return false
+	}
+	mint := s.ProviderMint
+	if mint == nil {
+		return true
+	}
+	if !authorization.UUID(mint.OperationID) || seen[mint.OperationID] || mint.StartedAt.IsZero() || mint.Until.Sub(mint.StartedAt) != 5*time.Second || !mint.Until.Before(mint.ExpiresBefore) || mint.ExpiresBefore.Sub(mint.StartedAt) > 301*time.Second {
+		return false
+	}
+	seen[mint.OperationID] = true
+	if !s.Retired && (s.Material == nil || s.Material.BundledIdentity == nil || mint.StartedAt.Before(s.Material.BundledIdentity.SetupParent.IssuedAt) || !mint.ExpiresBefore.Equal(s.Material.BundledIdentity.SetupParent.ExpiresAt.Add(-contracts.BundledInitialProviderSafetyMargin))) {
+		return false
+	}
+	if mint.Response == nil {
+		return pending
+	}
+	if !s.Retired && mint.Response.Accessor == s.Material.BundledIdentity.SetupParent.Accessor {
+		return false
+	}
+	r := mint.Response
+	return !pending && (s.Retired || bootstrapProviderReady(s)) && initialProviderASCII(r.Accessor, 128) && !r.IssuedAt.Before(mint.StartedAt) && !r.IssuedAt.After(mint.Until) && r.IssuedAt.Before(r.ExpiresAt) && !r.ExpiresAt.After(mint.ExpiresBefore)
 }

@@ -64,6 +64,10 @@ func BuildSmallSeaweedMaterial(p contracts.SmallSeaweedPlan, now time.Time) (map
 	if e != nil {
 		return nil, cfg.ErrUnavailable
 	}
+	ca, e = x509.ParseCertificate(caDER)
+	if e != nil {
+		return nil, cfg.ErrUnavailable
+	}
 	leaf := &x509.Certificate{SerialNumber: leafSerial, Subject: pkix.Name{CommonName: p.Host()}, DNSNames: []string{p.ServiceName(), p.ServiceName() + "." + p.Namespace, p.Host(), p.Host() + ".cluster.local"}, NotBefore: ca.NotBefore, NotAfter: now.AddDate(1, 0, 0), KeyUsage: x509.KeyUsageDigitalSignature, ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}}
 	leafDER, e := x509.CreateCertificate(rand.Reader, leaf, ca, &leafKey.PublicKey, caKey)
 	if e != nil {

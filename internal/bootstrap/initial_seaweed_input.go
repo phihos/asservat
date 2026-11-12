@@ -13,6 +13,7 @@ import (
 // for the canonical desired identity or an installation/evidence capability.
 type initialBootstrapServices struct {
 	ObjectStore *contracts.SmallSeaweedPlan
+	KeyService  *contracts.SmallOpenBaoPlan
 }
 
 func resolveInitialBootstrapObjectStore(ctx context.Context, input *os.Root, v *contracts.InitialBootstrapInput) (*contracts.SmallSeaweedPlan, error) {

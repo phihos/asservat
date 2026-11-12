@@ -167,7 +167,7 @@ func (f *initialProviderFixture) handle(w http.ResponseWriter, r *http.Request) 
 		role := strings.TrimPrefix(r.URL.Path, "/v1/auth/token/create/")
 		value := "original-child-" + strconv.Itoa(f.posts)
 		accessor := "original-accessor-" + strconv.Itoa(f.posts)
-		d := initialTokenLookup{Accessor: accessor, Type: "service", Policies: body.Policies, MaxTTL: int64(ttl / time.Second), CreationTTL: int64(ttl / time.Second), Issued: now, Expire: now.Add(ttl), TTL: int64(ttl / time.Second), Role: role, Path: "auth/token/create/" + role, Meta: body.Meta}
+		d := initialTokenLookup{Accessor: accessor, Type: "service", Policies: body.Policies, MaxTTL: int64(ttl / time.Second), CreationTTL: int64(ttl / time.Second), Issued: now, Expire: now.Add(ttl), TTL: int64(ttl / time.Second), Role: role, Path: "auth/token/create/" + role, Meta: body.Meta, Entity: f.parent.Entity}
 		f.children[value] = d
 		if f.issueMode == "lost" {
 			w.WriteHeader(503)
@@ -180,7 +180,10 @@ func (f *initialProviderFixture) handle(w http.ResponseWriter, r *http.Request) 
 		if f.issueMode == "oversize" {
 			value = strings.Repeat("x", 1025)
 		}
-		auth := map[string]any{"client_token": value, "accessor": accessor, "token_type": "service", "policies": body.Policies, "token_policies": body.Policies, "metadata": body.Meta, "lease_duration": int64(ttl / time.Second), "renewable": false, "orphan": false, "num_uses": 0, "entity_id": ""}
+		auth := map[string]any{"client_token": value, "accessor": accessor, "token_type": "service", "policies": body.Policies, "token_policies": body.Policies, "metadata": body.Meta, "lease_duration": int64(ttl / time.Second), "renewable": false, "orphan": false, "num_uses": 0, "entity_id": f.parent.Entity}
+		if f.issueMode == "foreign-entity" {
+			auth["entity_id"] = "20000000-0000-4000-8000-000000000099"
+		}
 		if f.issueMode == "orphan" {
 			auth["orphan"] = true
 		}

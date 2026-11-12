@@ -307,64 +307,88 @@ func SeaweedRuntimeCredential(c contracts.SeaweedCredential) (contracts.OwnerSto
 	return contracts.OwnerStorageCredential{AccessKeyID: c.AccessKeyID, SecretAccessKey: c.SecretAccessKey}, nil
 }
 
+func decodeSeaweedIdentities(raw []byte) (map[string]seaweedIdentity, error) {
+	if len(raw) == 0 || len(raw) > SeaweedConfigLimit {
+		return nil, ErrSeaweedStorage
+	}
+	var doc struct {
+		Identities []seaweedIdentity `json:"identities"`
+	}
+	d := json.NewDecoder(bytes.NewReader(raw))
+	d.DisallowUnknownFields()
+	if d.Decode(&doc) != nil || d.Decode(new(any)) != io.EOF || len(doc.Identities) == 0 || len(doc.Identities) > 4097 {
+		return nil, ErrSeaweedStorage
+	}
+	out := map[string]seaweedIdentity{}
+	keys := map[string]bool{}
+	admins := 0
+	for _, id := range doc.Identities {
+		if len(id.Name) < 46 || !strings.HasPrefix(id.Name, "asservat-") || len(id.Credentials) != 1 || len(id.Actions) == 0 || len(id.Actions) > 65 || out[id.Name].Name != "" {
+			return nil, ErrSeaweedStorage
+		}
+		suffix := len(id.Name) - 36
+		k := contracts.SeaweedPrincipalKey{Purpose: id.Name[len("asservat-") : suffix-1], ScopeID: id.Name[suffix:]}
+		name, e := SeaweedPrincipalName(k)
+		if e != nil || name != id.Name {
+			return nil, ErrSeaweedStorage
+		}
+		key := id.Credentials[0]
+		if ValidateSeaweedCredential(contracts.SeaweedCredential{Principal: k, AccessKeyID: key.Access, SecretAccessKey: key.Secret}) != nil || keys[key.Access] {
+			return nil, ErrSeaweedStorage
+		}
+		keys[key.Access] = true
+		if k.Purpose == "admin" {
+			admins++
+			if !slices.Equal(id.Actions, []string{"Admin", "Read", "Write", "List"}) {
+				return nil, ErrSeaweedStorage
+			}
+		} else {
+			for _, action := range id.Actions {
+				if !(strings.HasPrefix(action, "Read:") || strings.HasPrefix(action, "Write:") || strings.HasPrefix(action, "List:")) || strings.ContainsAny(action, "\r\n") {
+					return nil, ErrSeaweedStorage
+				}
+			}
+		}
+		out[id.Name] = id
+	}
+	if admins != 1 {
+		return nil, ErrSeaweedStorage
+	}
+	return out, nil
+}
+
+// ReadSeaweedInitialAuditCredential reads only the exact original installation's
+// initial-audit entry from private retained IAM. The caller must independently
+// pin that IAM source and installation; these bytes grant no principal authority.
+func ReadSeaweedInitialAuditCredential(raw []byte, installationID string) (contracts.SeaweedCredential, error) {
+	var zero contracts.SeaweedCredential
+	principal := contracts.SeaweedPrincipalKey{Purpose: "initial-audit", ScopeID: installationID}
+	name, err := SeaweedPrincipalName(principal)
+	if err != nil {
+		return zero, ErrSeaweedStorage
+	}
+	identities, err := decodeSeaweedIdentities(raw)
+	if err != nil {
+		return zero, ErrSeaweedStorage
+	}
+	defer clear(identities)
+	identity, ok := identities[name]
+	if !ok {
+		return zero, ErrSeaweedStorage
+	}
+	key := identity.Credentials[0]
+	return contracts.SeaweedCredential{Principal: principal, AccessKeyID: key.Access, SecretAccessKey: key.Secret}, nil
+}
+
 // ValidateSeaweedConfigTransition prevents later installer phases from replacing
 // or dropping a retained principal/key/capability. Inputs remain private. It is
 // not a replacement for CompileSeaweedStorage's purpose/recipe checks.
 func ValidateSeaweedConfigTransition(before, after []byte) error {
-	decode := func(raw []byte) (map[string]seaweedIdentity, error) {
-		if len(raw) == 0 || len(raw) > SeaweedConfigLimit {
-			return nil, ErrSeaweedStorage
-		}
-		var doc struct {
-			Identities []seaweedIdentity `json:"identities"`
-		}
-		d := json.NewDecoder(bytes.NewReader(raw))
-		d.DisallowUnknownFields()
-		if d.Decode(&doc) != nil || d.Decode(new(any)) != io.EOF || len(doc.Identities) == 0 || len(doc.Identities) > 4097 {
-			return nil, ErrSeaweedStorage
-		}
-		out := map[string]seaweedIdentity{}
-		keys := map[string]bool{}
-		admins := 0
-		for _, id := range doc.Identities {
-			if len(id.Name) < 46 || !strings.HasPrefix(id.Name, "asservat-") || len(id.Credentials) != 1 || len(id.Actions) == 0 || len(id.Actions) > 65 || out[id.Name].Name != "" {
-				return nil, ErrSeaweedStorage
-			}
-			suffix := len(id.Name) - 36
-			k := contracts.SeaweedPrincipalKey{Purpose: id.Name[len("asservat-") : suffix-1], ScopeID: id.Name[suffix:]}
-			name, e := SeaweedPrincipalName(k)
-			if e != nil || name != id.Name {
-				return nil, ErrSeaweedStorage
-			}
-			key := id.Credentials[0]
-			if ValidateSeaweedCredential(contracts.SeaweedCredential{Principal: k, AccessKeyID: key.Access, SecretAccessKey: key.Secret}) != nil || keys[key.Access] {
-				return nil, ErrSeaweedStorage
-			}
-			keys[key.Access] = true
-			if k.Purpose == "admin" {
-				admins++
-				if !slices.Equal(id.Actions, []string{"Admin", "Read", "Write", "List"}) {
-					return nil, ErrSeaweedStorage
-				}
-			} else {
-				for _, action := range id.Actions {
-					if !(strings.HasPrefix(action, "Read:") || strings.HasPrefix(action, "Write:") || strings.HasPrefix(action, "List:")) || strings.ContainsAny(action, "\r\n") {
-						return nil, ErrSeaweedStorage
-					}
-				}
-			}
-			out[id.Name] = id
-		}
-		if admins != 1 {
-			return nil, ErrSeaweedStorage
-		}
-		return out, nil
-	}
-	old, e := decode(before)
+	old, e := decodeSeaweedIdentities(before)
 	if e != nil {
 		return e
 	}
-	next, e := decode(after)
+	next, e := decodeSeaweedIdentities(after)
 	if e != nil {
 		return e
 	}

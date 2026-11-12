@@ -24,13 +24,14 @@ type InitialProviderProfile struct {
 // Original immutable bootstrap material. S3 credentials are externally managed;
 // their declared use interval is not proof that Asservat can revoke them.
 type InitialProviderMaterial struct {
-	Format          string                 `json:"format"`
-	InstallationID  string                 `json:"installationID"`
-	RequestID       string                 `json:"requestID"`
-	IssuerToken     string                 `json:"issuerToken"`
-	Storage         OwnerStorageCredential `json:"storage"`
-	StorageUseUntil time.Time              `json:"storageUseUntil"`
-	RegistryConfig  []byte                 `json:"registryConfig,omitempty"`
+	Format          string                          `json:"format"`
+	InstallationID  string                          `json:"installationID"`
+	RequestID       string                          `json:"requestID"`
+	IssuerToken     string                          `json:"issuerToken"`
+	Storage         OwnerStorageCredential          `json:"storage"`
+	StorageUseUntil time.Time                       `json:"storageUseUntil"`
+	RegistryConfig  []byte                          `json:"registryConfig,omitempty"`
+	BundledIdentity *BundledInitialProviderIdentity `json:"bundledIdentity,omitempty"`
 }
 
 func DecodeInitialProviderMaterial(r io.Reader) (InitialProviderMaterial, error) {

@@ -43,11 +43,14 @@ func newBootstrapObserverFixture(t *testing.T, ctx context.Context) *bootstrapOb
 	return newBootstrapObserverFixtureVersion(t, ctx, contracts.InitialBootstrapFormat)
 }
 
-func newBootstrapObserverFixtureVersion(t *testing.T, ctx context.Context, format string) *bootstrapObserverFixture {
+func newBootstrapObserverFixtureVersion(t *testing.T, ctx context.Context, format string, customize ...func(*contracts.InitialBootstrap)) *bootstrapObserverFixture {
 	t.Helper()
 	f := &bootstrapObserverFixture{entered: make(chan struct{}, 1), release: make(chan struct{})}
 	d := bootstrapAdmissionFixture(t)
 	d.Format = format
+	for _, change := range customize {
+		change(&d)
+	}
 	_, state := bootstrapStateFixture(t)
 	if contracts.InitialBootstrapHasCopyClosure(format) {
 		state.Prelude.CopyMarker = &contracts.WorkerObjectReference{Name: bootstrapNames(d).copyMarker, UID: ownerID(19)}

@@ -16,8 +16,15 @@ type SmallServicesPreparation struct {
 	Postgres    bool                          `json:"postgres"`
 	Keycloak    *SmallKeycloakSettings        `json:"keycloak,omitempty"`
 	ObjectStore *SmallSeaweedPlan             `json:"objectStore,omitempty"`
+	OpenBao     *SmallOpenBaoSelection        `json:"openBao,omitempty"`
 	// Its password and roots remain separate selected operator Secret mounts.
 	KeycloakExternalDatabase bool `json:"keycloakExternalDatabase,omitempty"`
+}
+
+// API trust is resolved from the preparation's existing Kubernetes projection;
+// callers do not invent a second API or setup account for the bundled provider.
+type SmallOpenBaoSelection struct {
+	Image string `json:"image"`
 }
 
 type SmallKeycloakDatabase struct {

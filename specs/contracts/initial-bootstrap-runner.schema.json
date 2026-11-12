@@ -45,6 +45,10 @@
       "type": "string",
       "pattern": "^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$",
       "maxLength": 253
+    },
+    "keyServiceSecret": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/name",
+      "description": "Optional fixed <bootstrap-name>-openbao-state. Projects only public plan/CA/backend identity; setup JWT is separate and only enters producer/continuation."
     }
   }
 }

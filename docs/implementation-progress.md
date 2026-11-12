@@ -17,10 +17,11 @@ release, image publication or completed REQ-DEP-001–005 qualification.
 
 | Boundary | Current evidence | Remaining work |
 | --- | --- | --- |
-| Selection | Closed Helm values independently select PostgreSQL, SeaweedFS and Keycloak; external defaults remain selectable | Complete the accepted isolated static-key provider; optional bundled OpenBao has not been selected |
+| Selection | Closed Helm values independently select PostgreSQL, SeaweedFS, Keycloak and OpenBao; external defaults remain selectable | Complete integrated provider composition and the accepted isolated static-key alternative |
 | PostgreSQL | Create-once TLS/SCRAM state, retained PVCs, server budget117/122 and client pool2; actual image/TLS/separate logins/encrypted full backup/restart and Helm/native Pod parity pass | Restore and installed profile qualification |
 | Keycloak | Actual26.8.2 import, HTTPS readiness, console/MCP PKCE, group refresh and restart pass; generated identity, optional email and literal external-password handling verified | Installed Asservat identity/approval composition and broader lifecycle qualification |
 | SeaweedFS | Actual4.53 TLS, scoped policies, immutable versions, delayed projection/reload with new ordinary credential consumption and pinned exact-byte reads after restart pass | Provider phase composition, multipart and installed authority/lifecycle qualification |
+| OpenBao | Actual2.7.2 TLS/static auto-unseal/self-initialization, same-data restart and partial-initialization refusal pass; same-API setup and real bounded initial-issuer adapters pass | Original mint journal, installer composition and installed lifecycle qualification |
 | Installation | Finite preparation command and actual rendered-role integration pass; generated CA and public Keycloak identity resolve before canonical compilation; full Helm/native Pod parity passes | Complete all provider inputs and continuation, then fresh Helm→login→capture→exact native download→expiry/deletion→restart journey |
 
 The initial object-store join follows component checkpoint `4fcf60f7`: public
@@ -65,6 +66,90 @@ and does not replace the accepted static-key alternative. The latter still needs
 all key purposes and PKI; a proposed initial-audit-only shortcut is parked while
 the bundled existing-provider path is integrated. No complete small-profile
 qualification or deployment is claimed.
+
+The next local join resolves the continuation's generated store trust against
+the original preparer and uses one owned bucket with existing disjoint audit/
+evidence prefixes. Exact-UID credential initialization/recovery, expired-Ready
+provenance without initial-authority renewal, the known retained initial key and
+the compiled worker grant are implemented. Worker storage setup precedes input
+acknowledgement; acknowledged replay preserves later IAM roles. Phase-3 complete
+hub grants and automatic worker/owner setup are now wired locally; regional grants
+and installed qualification remain unfinished.
+Focused Kubernetes/bootstrap/contracts checks pass3.043s/1.729s/1.034s; the full
+affected provider package passes6.397s after correcting a missing-prefix test
+fixture. Actual Helm output, generated/explicit root equivalence and unchanged
+external validation pass; the added worker recipe checks pass1.353s. These are
+local checks after `cd931b3f`, not a new native journey result. OpenBao component
+work now has the distinct backend and same-API qualifications below; the full installation remains unqualified.
+
+The optional bundled OpenBao backend uses exact2.7.2, native HCL, static
+sealed private state, local same-API TokenReview and the existing application
+provider adapters. Its backend component returned0/48.499s with same-key/data
+restart and native refusal to unseal after an injected partial initialization.
+The final initialization marker is a fixed deny-only policy, not application
+or recovery authority. The server account can create TokenReviews only. Setup
+administration has API-scoped `sudo` on the two exact application auth mounts;
+no wildcard sudo, root token, tune/delete or host privilege is added. Earlier
+failed parser/TLS/fixture attempts remain archived rather than relabeled.
+
+The fresh same-API probe returned harness0/probe0/86.283s. The actual setup
+identity observer plus actual Check/Issue/Verify/Revoke/revocation-replay adapters
+passed for wrap and unwrap. The issuer expired16.493s before its original setup
+parent; no relogin or renewal extended that bound. The external constructor
+still refused inherited entity identity. Root independently rehashed all82
+frozen sources and confirmed owned nodes/image absent and cleanup empty. These
+are provider compatibility checks with synthetic installation facts, not SQL or
+installed evidence authority. Receipts are in
+`openbao-kubernetes/selected-original-parent/` below the external archive.
+
+Helm and the native bootstrap runner now agree for selected OpenBao with
+PostgreSQL external/bundled and continuation off/on. Only public plan/CA/backend
+identity is projected to replay phases; the fixed setup-audience token is limited
+to producer/continuation. No seal/private CA key is projected. Focused runner
+race checks returned0/1.975s. Original private identity propagation and strict
+source/endpoint refusal tests returned0/1.070s and0/1.141s. The original8KiB
+private-material cap remains. Initial credential minting now consumes its original
+acknowledged single-use intent inside the existing seed before any provider POST,
+without another object or controller. Affected bootstrap race tests passed48.716s
+and closed material/state checks pass. The current producer join is still pending
+its real installed run.
+
+The updated backend configuration includes actual fixed application prerequisites
+before the final marker: local configuration/owner auth mounts, the initial audit
+key/shared exact policies/token roles, three internal PKI roots and bootstrap KVv2.
+A fresh pinned backend run returned0/55.019s with unchanged original values after
+restart and preserved partial-initialization refusal. Root independently checked
+all18 source hashes and absence of owned containers/networks/volumes; cleanup was
+empty. `openbao-component/application-prerequisites/` holds the receipts.
+
+Automatic phase3 now derives the complete grants from the existing actual recipe,
+retains generated keys in the existing private inbox before IAM and changes only
+its real inspection token on refresh. Source TLS/client material must match the
+checked original carrier. This adds no object/watch/controller. The full recipe
+compiler passed1.761s; original-carrier/unknown-reply/CAS regressions passed1.401s.
+The private-material source and integrated continuation tests are being finalized;
+these are local joins, not installed runtime-storage or browser qualification.
+The new `--bundled-keyservice` Helm fixture compiles and its9 Python selection
+tests pass; no native run for that selection has yet completed.
+
+The frozen candidate's selected integration races now pass: bootstrap5.222s,
+contracts1.042s, provider configuration1.307s and KMS1.994s. The initial selection
+found an omitted `keyServiceSecret` argument in the test's expected runner
+constructor; correcting that producer/consumer fixture restores full Pod parity,
+without changing product behavior. `spec-check`, `helm-check`, Go architecture
+and design architecture all returned0; the design report was archived outside
+the repository and its tracked bytes restored. Go integration compile returned0
+with no tests selected, and is not native evidence. No generated result log is
+staged or committed. A fresh combined bundled OpenBao/S3 initial installation is
+the next qualification; full-profile PostgreSQL/identity/public workflows remain
+pending afterward.
+
+Actual OpenSSL strict verification exposed missing leaf Authority Key Identifiers
+in generated PostgreSQL and SeaweedFS TLS certificates. Parsing the generated CA
+DER before leaf signing fixes both generators; the new actual OpenSSL regression
+failed for both before the fix and focused service tests pass0/3.460s afterward.
+Earlier native Go-TLS evidence remains historical at its exact source. The next
+installed qualification must use these corrected current generators.
 
 The first PostgreSQL image failed because `/etc/asservat` was nontraversable
 (mode0444). Creating that directory as0755 fixed the actual nonroot startup.

@@ -54,11 +54,18 @@ type InitialBootstrapAuditStoreInput struct {
 	RootsSource string `json:"rootsSource,omitempty"`
 }
 type InitialBootstrapKeyServiceInput struct {
-	Endpoint   string `json:"endpoint"`
-	AuditMount string `json:"auditMount"`
-	AuditKey   string `json:"auditKey"`
-	RootsPEM   string `json:"rootsPEM"`
+	Endpoint    string `json:"endpoint"`
+	AuditMount  string `json:"auditMount"`
+	AuditKey    string `json:"auditKey"`
+	RootsPEM    string `json:"rootsPEM"`
+	RootsSource string `json:"rootsSource,omitempty"`
 }
+
+const InitialBootstrapBundledOpenBaoRoots = "bundledOpenBao"
+const InitialBootstrapKeyServicePlanFile = "openbao-plan.json"
+const InitialBootstrapKeyServiceCAFile = "openbao-ca.crt"
+const InitialBootstrapKeyServiceBackendFile = "openbao-backend-id"
+const InitialBootstrapKeyServiceTokenFile = "keyprovider-setup-token"
 
 func DecodeInitialBootstrapInput(r io.Reader) (InitialBootstrapInput, error) {
 	return decodeClosedRPC[InitialBootstrapInput](r, InitialBootstrapMaxBytes)

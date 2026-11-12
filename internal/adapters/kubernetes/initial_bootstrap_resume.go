@@ -94,11 +94,19 @@ func ResumeInitialBootstrapRunner(ctx context.Context, c *rest.Config, namespace
 	} else if input.AuditStore.RootsSource != "" || refs.ObjectStoreSecret != "" {
 		return zero, cfg.ErrChanged
 	}
+
+	if input.KeyService.RootsSource == contracts.InitialBootstrapBundledOpenBaoRoots {
+		if input.KeyService.RootsPEM != "" || refs.KeyServiceSecret != name+"-openbao-state" || input.KeyService.Endpoint != "https://"+name+"-openbao."+namespace+".svc:8200" || input.KeyService.AuditMount != contracts.SmallOpenBaoAuditMount {
+			return zero, cfg.ErrChanged
+		}
+	} else if input.KeyService.RootsSource != "" || refs.KeyServiceSecret != "" {
+		return zero, cfg.ErrChanged
+	}
 	sum := sha256.Sum256([]byte(cm.Data["bootstrap.json"] + "\n" + cm.Data["runner.json"]))
 	if hex.EncodeToString(sum[:]) != originalDigest {
 		return zero, cfg.ErrChanged
 	}
-	plan := InitialBootstrapRunnerPlan{Namespace: namespace, Name: name, Image: input.Image, InputDigest: hex.EncodeToString(sum[:]), ProducerSecret: refs.ProducerSecret, SchemaSecret: refs.SchemaSecret, RetirementSecret: refs.RetirementSecret, RegistrySecret: refs.RegistrySecret, ProbeAudience: input.ProbeAudience, ContinuationDigest: refs.ContinuationDigest, PostgresSecret: refs.PostgresSecret, KeycloakSecret: refs.KeycloakSecret, ObjectStoreSecret: refs.ObjectStoreSecret}
+	plan := InitialBootstrapRunnerPlan{Namespace: namespace, Name: name, Image: input.Image, InputDigest: hex.EncodeToString(sum[:]), ProducerSecret: refs.ProducerSecret, SchemaSecret: refs.SchemaSecret, RetirementSecret: refs.RetirementSecret, RegistrySecret: refs.RegistrySecret, ProbeAudience: input.ProbeAudience, ContinuationDigest: refs.ContinuationDigest, PostgresSecret: refs.PostgresSecret, KeycloakSecret: refs.KeycloakSecret, ObjectStoreSecret: refs.ObjectStoreSecret, KeyServiceSecret: refs.KeyServiceSecret}
 	want, err := BuildInitialBootstrapRunner(plan)
 	if err != nil {
 		return zero, err

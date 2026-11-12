@@ -879,6 +879,11 @@
                   "capacity"
                 ]
               }
+            },
+            "materialSecretName": {
+              "type": "string",
+              "maxLength": 253,
+              "pattern": "^([a-z0-9]([-a-z0-9.]*[a-z0-9])?)?$"
             }
           }
         },
@@ -924,29 +929,6 @@
             "properties": {
               "image": {
                 "minLength": 73
-              },
-              "secrets": {
-                "properties": {
-                  "producer": {
-                    "minLength": 1
-                  }
-                }
-              },
-              "keyService": {
-                "properties": {
-                  "endpoint": {
-                    "minLength": 1
-                  },
-                  "auditMount": {
-                    "minLength": 1
-                  },
-                  "auditKey": {
-                    "minLength": 1
-                  },
-                  "rootsPEM": {
-                    "minLength": 1
-                  }
-                }
               }
             }
           }
@@ -1832,12 +1814,97 @@
             "provider",
             "keycloak"
           ]
+        },
+        "keyService": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "provider": {
+              "enum": [
+                "external",
+                "openbao"
+              ]
+            },
+            "openbao": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "image": {
+                  "type": "string",
+                  "pattern": "^$|^[a-z0-9][a-z0-9./:_-]{0,383}@sha256:[a-f0-9]{64}$"
+                },
+                "persistence": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "storageClass": {
+                      "type": "string"
+                    },
+                    "size": {
+                      "type": "string",
+                      "pattern": "^[1-9][0-9]*(Mi|Gi|Ti)$"
+                    }
+                  },
+                  "required": [
+                    "storageClass",
+                    "size"
+                  ]
+                },
+                "resources": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "requests": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "cpu": {
+                          "type": [
+                            "string",
+                            "number"
+                          ]
+                        },
+                        "memory": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "limits": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "cpu": {
+                          "type": [
+                            "string",
+                            "number"
+                          ]
+                        },
+                        "memory": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "required": [
+                "image",
+                "persistence",
+                "resources"
+              ]
+            }
+          },
+          "required": [
+            "provider",
+            "openbao"
+          ]
         }
       },
       "required": [
         "postgres",
         "objectStore",
-        "identity"
+        "identity",
+        "keyService"
       ]
     }
   },
@@ -2298,32 +2365,22 @@
       "properties": {
         "endpoint": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 2048,
-          "pattern": "^https://[^/?#@]+/?$"
+          "maxLength": 2048
         },
         "rootsPEM": {
           "type": "string",
-          "minLength": 1,
           "maxLength": 32768
         },
         "region": {
           "type": "string",
-          "minLength": 1,
           "maxLength": 128
         },
         "bucket": {
           "type": "string",
-          "minLength": 1,
           "maxLength": 63
         }
       },
-      "required": [
-        "endpoint",
-        "rootsPEM",
-        "region",
-        "bucket"
-      ]
+      "description": "Bundled storage derives these public coordinates and roots. External storage requires all four fields."
     },
     "installerConnector": {
       "type": "object",
@@ -3400,6 +3457,236 @@
                     "minLength": 1
                   },
                   "rootsPEM": {
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "services": {
+            "properties": {
+              "objectStore": {
+                "properties": {
+                  "provider": {
+                    "const": "external"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "bootstrap": {
+            "properties": {
+              "continuation": {
+                "properties": {
+                  "public": {
+                    "properties": {
+                      "federation": {
+                        "properties": {
+                          "evidenceStore": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                              "endpoint": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 2048,
+                                "pattern": "^https://[^/?#@]+/?$"
+                              },
+                              "rootsPEM": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 32768
+                              },
+                              "region": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 128
+                              },
+                              "bucket": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 63
+                              }
+                            },
+                            "required": [
+                              "endpoint",
+                              "rootsPEM",
+                              "region",
+                              "bucket"
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "services": {
+            "properties": {
+              "keyService": {
+                "properties": {
+                  "provider": {
+                    "const": "openbao"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "bootstrap": {
+            "properties": {
+              "enabled": {
+                "const": true
+              }
+            }
+          },
+          "mode": {
+            "enum": [
+              "hub",
+              "combined"
+            ]
+          },
+          "services": {
+            "properties": {
+              "keyService": {
+                "properties": {
+                  "openbao": {
+                    "properties": {
+                      "image": {
+                        "minLength": 1
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "bootstrap": {
+            "properties": {
+              "enabled": {
+                "const": true
+              }
+            }
+          },
+          "services": {
+            "properties": {
+              "keyService": {
+                "properties": {
+                  "provider": {
+                    "const": "external"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "bootstrap": {
+            "properties": {
+              "keyService": {
+                "properties": {
+                  "endpoint": {
+                    "minLength": 1
+                  },
+                  "auditMount": {
+                    "minLength": 1
+                  },
+                  "auditKey": {
+                    "minLength": 1
+                  },
+                  "rootsPEM": {
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "allOf": [
+          {
+            "properties": {
+              "bootstrap": {
+                "properties": {
+                  "enabled": {
+                    "const": true
+                  }
+                }
+              }
+            }
+          },
+          {
+            "not": {
+              "properties": {
+                "services": {
+                  "properties": {
+                    "postgres": {
+                      "properties": {
+                        "provider": {
+                          "const": "bundled"
+                        }
+                      }
+                    },
+                    "objectStore": {
+                      "properties": {
+                        "provider": {
+                          "const": "seaweedfs"
+                        }
+                      }
+                    },
+                    "keyService": {
+                      "properties": {
+                        "provider": {
+                          "const": "openbao"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "then": {
+        "properties": {
+          "bootstrap": {
+            "properties": {
+              "secrets": {
+                "properties": {
+                  "producer": {
                     "minLength": 1
                   }
                 }

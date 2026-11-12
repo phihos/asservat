@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/small-openbao.schema.json",
+  "title": "Derived bundled OpenBao infrastructure plan v1",
+  "description": "Public preparation plan, at most 96 KiB; not Helm credential input or installation authority. The producer independently requires setupAccount == name + '-bootstrap-runner' and validates distinct DER CA certificates. Private seal/TLS material is persisted separately before backend effects.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "namespace", "name", "image", "kubernetes", "setupAccount"],
+  "properties": {
+    "format": {"const": "asservat-small-openbao/v1"},
+    "namespace": {"type": "string", "minLength": 1, "maxLength": 63, "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"},
+    "name": {"type": "string", "minLength": 1, "maxLength": 30, "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"},
+    "image": {"type": "string", "maxLength": 512, "pattern": "^[a-zA-Z0-9./:_-]+@sha256:[a-f0-9]{64}$"},
+    "setupAccount": {"type": "string", "maxLength": 47, "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?-bootstrap-runner$"},
+    "kubernetes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["endpoint", "roots"],
+      "properties": {
+        "endpoint": {"type": "string", "format": "uri", "maxLength": 2048, "pattern": "^https://[^/?#@]+$"},
+        "roots": {"type": "array", "minItems": 1, "maxItems": 4, "uniqueItems": true, "items": {"type": "string", "contentEncoding": "base64", "maxLength": 21848}}
+      }
+    }
+  }
+}

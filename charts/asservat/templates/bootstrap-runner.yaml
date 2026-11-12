@@ -4,6 +4,8 @@
 {{- $services := default dict .Values.services }}
 {{- $bundledPostgres := eq (dig "postgres" "provider" "external" $services) "bundled" }}
 {{- $postgresSecret := printf "%s-postgres-state" $b.name }}
+{{- $bundledKeyService := eq (dig "keyService" "provider" "external" $services) "openbao" }}
+{{- $refs := fromJson (include "asservat.bootstrap.runner" .) }}
 {{- if $b.continuation.enabled }}
 {{- $legacy := lookup "v1" "Pod" .Release.Namespace (printf "%s-continuation" $b.name) }}
 {{- if $legacy }}
@@ -124,8 +126,14 @@ spec:
       projected:
         defaultMode: 0440
         sources: {{ include "asservat.bootstrap.commonProjection" . | nindent 10 }}
+          {{- if $bundledKeyService }}
+          - serviceAccountToken:
+              path: keyprovider-setup-token
+              audience: https://asservat.io/openbao/setup
+              expirationSeconds: 600
+          {{- end }}
           - secret:
-              name: {{ $b.secrets.producer | quote }}
+              name: {{ $refs.producerSecret | quote }}
               optional: true
               items:
                 {{- if not $bundledPostgres }}
@@ -186,7 +194,7 @@ spec:
               audience: {{ $b.probeAudience | quote }}
               {{- end }}
           - secret:
-              name: {{ ternary $postgresSecret $b.secrets.producer $bundledPostgres | quote }}
+              name: {{ ternary $postgresSecret $refs.producerSecret $bundledPostgres | quote }}
               optional: false
               items:
                 - key: postgres-administrator.json
@@ -210,6 +218,22 @@ spec:
                   path: objectstore-ca.crt
                 - key: plan.json
                   path: objectstore-plan.json
+          {{- end }}
+          {{- if $bundledKeyService }}
+          - secret:
+              name: {{ printf "%s-openbao-state" $b.name | quote }}
+              optional: false
+              items:
+                - key: plan.json
+                  path: openbao-plan.json
+                - key: ca.crt
+                  path: openbao-ca.crt
+                - key: backend-id
+                  path: openbao-backend-id
+          - serviceAccountToken:
+              path: keyprovider-setup-token
+              audience: https://asservat.io/openbao/setup
+              expirationSeconds: 600
           {{- end }}
   {{- end }}
 {{- end }}

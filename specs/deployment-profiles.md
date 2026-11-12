@@ -42,6 +42,15 @@ target across retries, restart and upgrade; changing the target requires an
 explicit supported migration. Generated credentials MUST remain outside Helm
 values and release data. See [ADR-326](../docs/decisions/326-individually-selectable-small-services.md).
 
+Bundled storage MUST resolve generated public trust before canonical installation
+inputs and bind continuation to that original source. A completed bucket binding
+is provenance, never renewed initial authority. The first bundled store uses one
+owned audit/evidence bucket with disjoint existing purpose prefixes; an explicit
+incompatible bucket or region MUST be refused. Runtime keys MUST be retained in
+their original protected credential objects before IAM enablement. Replay MUST
+preserve later roles, while external storage keeps its complete explicit input
+requirements. These contracts do not establish installed profile qualification.
+
 Official Helm installation MUST offer explicit bundled and external choices for identity, key services, PostgreSQL and evidence storage. A small profile selects compatible internal/bundled defaults; administrators can override each provider independently. Deployment size is separate from hub/cluster topology and never introduces tenants. Workload-cluster enrollment MUST NOT install duplicate hub databases or identity services. Reuse existing configured infrastructure without taking ownership of it.
 
 Preserve the same authorization, audit, retention, fair capacity and native-download contracts in both profiles. Do not require a broker, email service, external monitoring backend, paid service, licence key or runtime internet access. Existing Kubernetes and durable persistent storage remain explicit prerequisites. Offline analysis may be unavailable without qualified encrypted scratch under ADR-036; that MUST NOT disable independently usable collection, live projections or native downloads.

@@ -294,6 +294,139 @@
           }
         }
       }
+    },
+    "providerMint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operationID",
+        "startedAt",
+        "until",
+        "expiresBefore"
+      ],
+      "description": "One original 5 s POST claim in the existing seed. Pending replay never grants Fresh. Optional response is positive issuer identity; token exists only in private material. No SQL manager or projection before completion. Go validates exact original ancestor, dates and monotonic transitions.",
+      "properties": {
+        "operationID": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        },
+        "startedAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        },
+        "until": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        },
+        "expiresBefore": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        },
+        "response": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "accessor",
+            "issuedAt",
+            "expiresAt"
+          ],
+          "properties": {
+            "accessor": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[!-~]+$"
+            },
+            "issuedAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "Z$"
+            },
+            "expiresAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "Z$"
+            }
+          }
+        }
+      }
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": [
+          "material"
+        ],
+        "properties": {
+          "material": {
+            "required": [
+              "setupToken"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "creates": {
+            "maxItems": 0
+          }
+        },
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "manager"
+              ]
+            },
+            {
+              "required": [
+                "projection"
+              ]
+            },
+            {
+              "required": [
+                "passiveHistory"
+              ]
+            },
+            {
+              "required": [
+                "retired"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "providerMint"
+        ],
+        "properties": {
+          "providerMint": {
+            "not": {
+              "required": [
+                "response"
+              ]
+            }
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "material"
+        ],
+        "properties": {
+          "material": {
+            "required": [
+              "setupToken"
+            ]
+          }
+        }
+      }
+    }
+  ]
 }

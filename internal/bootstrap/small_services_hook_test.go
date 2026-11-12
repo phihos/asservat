@@ -64,6 +64,15 @@ func smallServicesHookTLS(t *testing.T) (tls.Certificate, string) {
 // This fake API enforces the actual rendered namespace Role. It does not use
 // cluster-admin, grant missing rules, execute SQL or start provider services.
 func TestSmallServicesHookUsesRenderedPlanAndExactRole(t *testing.T) {
+	for _, bundledKeys := range []bool{false, true} {
+		t.Run(fmt.Sprintf("bundled-keys-%t", bundledKeys), func(t *testing.T) {
+			smallServicesRenderedHook(t, bundledKeys)
+		})
+	}
+}
+
+func smallServicesRenderedHook(t *testing.T, bundledKeys bool) {
+	t.Helper()
 	helm, e := exec.LookPath("helm")
 	if e != nil {
 		t.Skip("Helm is required")
@@ -73,6 +82,9 @@ func TestSmallServicesHookUsesRenderedPlanAndExactRole(t *testing.T) {
 		"identity":    map[string]any{"provider": "keycloak", "keycloak": map[string]any{"hostname": "https://identity.example", "tlsSecretName": "operator-identity-tls", "mcpRedirectURIs": []string{"http://127.0.0.1:42000/callback"}}},
 		"objectStore": map[string]any{"provider": "seaweedfs"},
 	}}
+	if bundledKeys {
+		values["services"].(map[string]any)["keyService"] = map[string]any{"provider": "openbao"}
+	}
 	input, e := json.Marshal(values)
 	if e != nil {
 		t.Fatal(e)
@@ -158,8 +170,8 @@ func TestSmallServicesHookUsesRenderedPlanAndExactRole(t *testing.T) {
 	if e != nil {
 		t.Fatal("actual chart preparation.json rejected by closed production decoder", e)
 	}
-	if !plan.Postgres || plan.Keycloak == nil || plan.ObjectStore == nil {
-		t.Fatal("chart did not select all three real preparation adapters")
+	if !plan.Postgres || plan.Keycloak == nil || plan.ObjectStore == nil || (plan.OpenBao != nil) != bundledKeys {
+		t.Fatal("chart did not select the requested real preparation adapters")
 	}
 	// Compare the complete actual runner before changing any transport input.
 	if bootstrapPublic == nil || bootstrapPod == nil {
@@ -177,7 +189,7 @@ func TestSmallServicesHookUsesRenderedPlanAndExactRole(t *testing.T) {
 		t.Fatal("runner omitted selected private-state references/public identity source")
 	}
 	digest := sha256.Sum256([]byte(bootstrapPublic.Data["bootstrap.json"] + "\n" + bootstrapPublic.Data["runner.json"]))
-	expectedRunner, e := kube.BuildInitialBootstrapRunner(kube.InitialBootstrapRunnerPlan{Namespace: initial.BootstrapNamespace, Name: initial.Name, Image: initial.Image, InputDigest: hex.EncodeToString(digest[:]), ProducerSecret: refs.ProducerSecret, SchemaSecret: refs.SchemaSecret, RetirementSecret: refs.RetirementSecret, RegistrySecret: refs.RegistrySecret, ProbeAudience: initial.ProbeAudience, ContinuationDigest: refs.ContinuationDigest, PostgresSecret: refs.PostgresSecret, KeycloakSecret: refs.KeycloakSecret, ObjectStoreSecret: refs.ObjectStoreSecret})
+	expectedRunner, e := kube.BuildInitialBootstrapRunner(kube.InitialBootstrapRunnerPlan{Namespace: initial.BootstrapNamespace, Name: initial.Name, Image: initial.Image, InputDigest: hex.EncodeToString(digest[:]), ProducerSecret: refs.ProducerSecret, SchemaSecret: refs.SchemaSecret, RetirementSecret: refs.RetirementSecret, RegistrySecret: refs.RegistrySecret, ProbeAudience: initial.ProbeAudience, ContinuationDigest: refs.ContinuationDigest, PostgresSecret: refs.PostgresSecret, KeycloakSecret: refs.KeycloakSecret, ObjectStoreSecret: refs.ObjectStoreSecret, KeyServiceSecret: refs.KeyServiceSecret})
 	if e != nil {
 		t.Fatal("actual native runner builder", e)
 	}
@@ -341,7 +353,11 @@ func TestSmallServicesHookUsesRenderedPlanAndExactRole(t *testing.T) {
 			}
 		}
 	}()
-	if !slices.Equal(order, []string{"trial-keycloak-state", "trial-postgres-state", "trial-objectstore-state", "trial-objectstore-iam"}) {
+	expectedOrder := []string{"trial-keycloak-state", "trial-postgres-state", "trial-objectstore-state", "trial-objectstore-iam"}
+	if bundledKeys {
+		expectedOrder = append(expectedOrder, "trial-openbao-state")
+	}
+	if !slices.Equal(order, expectedOrder) {
 		t.Fatalf("actual preparation order=%v", order)
 	}
 	if e = runSmallServicesPreparation(t.Context(), files); e != nil {
@@ -354,7 +370,7 @@ func TestSmallServicesHookUsesRenderedPlanAndExactRole(t *testing.T) {
 		t.Helper()
 		mu.Lock()
 		defer mu.Unlock()
-		if len(creates) != 4 || len(secrets) != len(original) {
+		if len(creates) != len(expectedOrder) || len(secrets) != len(original) {
 			t.Fatal("repeat/changed target created new private state")
 		}
 		for name, before := range original {

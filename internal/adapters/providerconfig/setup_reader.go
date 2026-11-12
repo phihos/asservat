@@ -26,12 +26,13 @@ var ErrSetupUnavailable = errors.New("provider setup unavailable or does not mat
 // never a runtime key credential and is never included in a setup observation.
 // The public methods select fixed recipes; there is no generic request method.
 type SetupReader struct {
-	mu       sync.Mutex
-	endpoint contracts.OwnerProviderEndpoint
-	token    []byte
-	http     *http.Client
-	closed   bool
-	active   *setupObservation
+	mu                sync.Mutex
+	endpoint          contracts.OwnerProviderEndpoint
+	bundledKubernetes *contracts.OwnerProviderEndpoint
+	token             []byte
+	http              *http.Client
+	closed            bool
+	active            *setupObservation
 }
 
 func NewSetupReader(endpoint contracts.OwnerProviderEndpoint, inspectionToken []byte) (*SetupReader, error) {
@@ -61,6 +62,22 @@ func NewSetupReader(endpoint contracts.OwnerProviderEndpoint, inspectionToken []
 		Transport: transport, Timeout: 5 * time.Second,
 		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 	}}, nil
+}
+
+// NewBundledSetupReader selects the local reviewer profile from an independently
+// protected original provider plan. The URL alone never selects this profile,
+// and construction grants neither installer nor Kubernetes TokenReview authority.
+// Every operation must match the plan's exact Kubernetes endpoint and DER roots.
+func NewBundledSetupReader(endpoint contracts.OwnerProviderEndpoint, inspectionToken []byte, plan contracts.SmallOpenBaoPlan) (*SetupReader, error) {
+	if !plan.Valid() || endpoint.Endpoint != plan.Endpoint() {
+		return nil, ErrSetupUnavailable
+	}
+	reader, err := NewSetupReader(endpoint, inspectionToken)
+	if err != nil {
+		return nil, err
+	}
+	reader.bundledKubernetes = &contracts.OwnerProviderEndpoint{Endpoint: plan.Kubernetes.Endpoint, Roots: cloneSetupRoots(plan.Kubernetes.Roots)}
+	return reader, nil
 }
 
 func cloneSetupRoots(roots [][]byte) [][]byte {

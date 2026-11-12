@@ -46,7 +46,15 @@ func smallSeaweedBindingRequestValid(r contracts.SmallSeaweedBindingRequest) boo
 	return authorization.UUID(r.InstallationID) && authorization.UUID(r.RequestID) && smallSeaweedBindingBucket.MatchString(r.Bucket) && !strings.Contains(r.Bucket, "..") && r.StorageUseUntil.Year() >= 2020 && r.StorageUseUntil.Year() < 9999
 }
 func (s *SmallSeaweedBinding) current(ctx context.Context, r contracts.SmallSeaweedBindingRequest) bool {
-	return ctx != nil && ctx.Err() == nil && smallSeaweedBindingRequestValid(r) && s.now().Before(r.StorageUseUntil)
+	if s == nil || ctx == nil || ctx.Err() != nil || !smallSeaweedBindingRequestValid(r) {
+		return false
+	}
+	now := s.now()
+	if !now.Before(r.StorageUseUntil) {
+		return false
+	}
+	until, bounded := ctx.Deadline()
+	return !bounded || now.Before(until)
 }
 func smallSeaweedBindingRequest(b contracts.SmallSeaweedBinding) contracts.SmallSeaweedBindingRequest {
 	return contracts.SmallSeaweedBindingRequest{InstallationID: b.Initialization.InstallationID, RequestID: b.RequestID, Bucket: b.Initialization.Bucket, StorageUseUntil: b.StorageUseUntil}
@@ -94,18 +102,48 @@ func smallSeaweedBindingReceipt(cm *core.ConfigMap, b contracts.SmallSeaweedBind
 	return contracts.SmallSeaweedBindingReceipt{Binding: b, ConfigMap: contracts.WorkerObjectReference{Name: cm.Name, UID: string(cm.UID)}, ResourceVersion: cm.ResourceVersion}
 }
 
-// observe reads exactly the original named private state, IAM and PVC. It
-// derives all generated identities, without changing any of those objects.
+// sourceCurrent checks the existing caller deadline; it creates no deadline
+// and has no knowledge of an initial storage authorization interval.
+func (s *SmallSeaweedBinding) sourceCurrent(ctx context.Context) bool {
+	if s == nil || ctx == nil || ctx.Err() != nil {
+		return false
+	}
+	until, bounded := ctx.Deadline()
+	return bounded && s.now().Before(until)
+}
+
+// observe is the initial-operation consumer: provenance alone never bypasses
+// its original StorageUseUntil, including after a blocking source read.
 func (s *SmallSeaweedBinding) observe(ctx context.Context, r contracts.SmallSeaweedBindingRequest) (contracts.SmallSeaweedBinding, contracts.SmallSeaweedPrepared, bool, error) {
+	if !s.current(ctx, r) {
+		return contracts.SmallSeaweedBinding{}, contracts.SmallSeaweedPrepared{}, false, seaweedProviderFailure("binding-expired")
+	}
+	b, p, only, err := s.observeSources(ctx, r)
+	if err != nil {
+		return b, p, only, err
+	}
+	if !s.current(ctx, r) {
+		clear(p.RootsPEM)
+		return contracts.SmallSeaweedBinding{}, contracts.SmallSeaweedPrepared{}, false, seaweedProviderFailure("binding-expired")
+	}
+	return b, p, only, nil
+}
+
+// observeSources reads named state/IAM/PVC provenance under the caller's
+// original bounded context. It does not consume or renew initial authority.
+func (s *SmallSeaweedBinding) observeSources(ctx context.Context, r contracts.SmallSeaweedBindingRequest) (contracts.SmallSeaweedBinding, contracts.SmallSeaweedPrepared, bool, error) {
 	var zero contracts.SmallSeaweedBinding
 	var none contracts.SmallSeaweedPrepared
+	if !s.sourceCurrent(ctx) {
+		return zero, none, false, seaweedProviderFailure("binding-source-context")
+	}
 	source := &SmallSeaweedPreparation{api: s.api, plan: s.plan, now: s.now}
 	state, e := source.readSecret(ctx, s.plan.StateSecretName())
 	if e != nil {
 		return zero, none, false, seaweedProviderFailure("binding-state")
 	}
 	defer clearSmallSeaweedData(state.Data)
-	if !source.validState(state) {
+	if !s.sourceCurrent(ctx) || !source.validState(state) {
 		return zero, none, false, seaweedProviderFailure("binding-state")
 	}
 	admin, e := decodeSmallSeaweedAdmin(state.Data[contracts.SmallSeaweedAdminKey])
@@ -117,13 +155,19 @@ func (s *SmallSeaweedBinding) observe(ctx context.Context, r contracts.SmallSeaw
 		return zero, none, false, seaweedProviderFailure("binding-admin")
 	}
 	defer clear(initial.Config)
+	if !s.sourceCurrent(ctx) {
+		return zero, none, false, seaweedProviderFailure("binding-source-context")
+	}
 	iam, e := source.readSecret(ctx, s.plan.IAMSecretName())
 	if e != nil {
 		return zero, none, false, seaweedProviderFailure("binding-iam")
 	}
 	defer clearSmallSeaweedData(iam.Data)
-	if !source.validIAM(iam, state, initial.Config) {
+	if !s.sourceCurrent(ctx) || !source.validIAM(iam, state, initial.Config) {
 		return zero, none, false, seaweedProviderFailure("binding-iam")
+	}
+	if !s.sourceCurrent(ctx) {
+		return zero, none, false, seaweedProviderFailure("binding-source-context")
 	}
 	raw, e := s.api.Get().AbsPath("/api/v1/namespaces/" + s.plan.Namespace + "/persistentvolumeclaims/" + s.plan.DataPVCName()).MaxRetries(0).DoRaw(ctx)
 	defer clear(raw)
@@ -131,7 +175,7 @@ func (s *SmallSeaweedBinding) observe(ctx context.Context, r contracts.SmallSeaw
 	if e != nil || len(raw) > 64<<10 || strictGuardJSON(raw, &pvc) != nil || pvc.APIVersion != "v1" || pvc.Kind != "PersistentVolumeClaim" || pvc.Name != s.plan.DataPVCName() || pvc.Namespace != s.plan.Namespace || !authorization.UUID(string(pvc.UID)) || pvc.ResourceVersion == "" || pvc.DeletionTimestamp != nil {
 		return zero, none, false, seaweedProviderFailure("binding-pvc")
 	}
-	if !s.current(ctx, r) {
+	if !s.sourceCurrent(ctx) {
 		return zero, none, false, seaweedProviderFailure("binding-expired")
 	}
 	b := contracts.SmallSeaweedBinding{Format: contracts.SmallSeaweedBindingFormat, RequestID: r.RequestID, Initialization: contracts.SeaweedBucketInitialization{BackendID: string(state.Data[contracts.SmallSeaweedBackendKey]), InstallationID: r.InstallationID, InitializationID: string(state.Data[contracts.SmallSeaweedInitializationKey]), StateSecretUID: string(state.UID), PVCUID: string(pvc.UID), Endpoint: s.plan.Endpoint(), Image: s.plan.Image, Bucket: r.Bucket, Pending: true}, IAMSecretUID: string(iam.UID), StorageUseUntil: r.StorageUseUntil.UTC()}
@@ -142,14 +186,14 @@ func (s *SmallSeaweedBinding) observe(ctx context.Context, r contracts.SmallSeaw
 func (s *SmallSeaweedBinding) Begin(ctx context.Context, r contracts.SmallSeaweedBindingRequest) (contracts.SmallSeaweedBindingReceipt, contracts.SmallSeaweedPrepared, error) {
 	var zero contracts.SmallSeaweedBindingReceipt
 	var none contracts.SmallSeaweedPrepared
-	if s == nil || !s.current(ctx, r) {
+	if !s.current(ctx, r) {
 		return zero, none, seaweedProviderFailure("binding-input")
 	}
 	ctx, end := context.WithDeadline(ctx, r.StorageUseUntil)
 	defer end()
 	cm, stored, e := s.read(ctx)
 	fresh := apierrors.IsNotFound(e)
-	if e != nil && !fresh {
+	if !s.current(ctx, r) || e != nil && !fresh {
 		return zero, none, seaweedProviderFailure("binding-read")
 	}
 	if !fresh {
@@ -167,7 +211,7 @@ func (s *SmallSeaweedBinding) Begin(ctx context.Context, r contracts.SmallSeawee
 		return zero, none, seaweedProviderFailure(step)
 	}
 	if !fresh {
-		if !sameSmallSeaweedBinding(wanted, stored) || stored.Initialization.Pending && !adminOnly {
+		if !s.current(ctx, r) || !sameSmallSeaweedBinding(wanted, stored) || stored.Initialization.Pending && !adminOnly {
 			return fail("binding-source")
 		}
 		return smallSeaweedBindingReceipt(cm, stored), p, nil
@@ -184,6 +228,9 @@ func (s *SmallSeaweedBinding) Begin(ctx context.Context, r contracts.SmallSeawee
 	if e != nil {
 		return fail("binding-encoding")
 	}
+	if !s.current(ctx, r) {
+		return fail("binding-expired")
+	}
 	raw, createErr := s.api.Post().AbsPath("/api/v1/namespaces/"+s.plan.Namespace+"/configmaps").Param("fieldValidation", "Strict").Body(body).MaxRetries(0).DoRaw(ctx)
 	defer clear(raw)
 	unknown := createErr != nil
@@ -192,6 +239,9 @@ func (s *SmallSeaweedBinding) Begin(ctx context.Context, r contracts.SmallSeawee
 		unknown = e != nil
 	}
 	if unknown {
+		if !s.current(ctx, r) {
+			return fail("binding-expired")
+		}
 		cm, stored, e = s.read(ctx)
 	}
 	if e != nil || !sameSmallSeaweedBinding(wanted, stored) || !s.current(ctx, r) {
@@ -213,6 +263,9 @@ func (s *SmallSeaweedBinding) Begin(ctx context.Context, r contracts.SmallSeawee
 		clear(p.RootsPEM)
 		p = current
 	}
+	if !s.current(ctx, r) {
+		return fail("binding-expired")
+	}
 	return smallSeaweedBindingReceipt(cm, stored), p, nil
 }
 
@@ -231,7 +284,7 @@ func (s *SmallSeaweedBinding) MarkReady(ctx context.Context, receipt contracts.S
 	ctx, end := context.WithDeadline(ctx, r.StorageUseUntil)
 	defer end()
 	cm, stored, e := s.read(ctx)
-	if e != nil || string(cm.UID) != receipt.ConfigMap.UID || !sameSmallSeaweedBinding(stored, receipt.Binding) {
+	if e != nil || !s.current(ctx, r) || string(cm.UID) != receipt.ConfigMap.UID || !sameSmallSeaweedBinding(stored, receipt.Binding) {
 		return zero, seaweedProviderFailure("binding-ready-record")
 	}
 	observed, p, adminOnly, e := s.observe(ctx, r)
@@ -240,6 +293,9 @@ func (s *SmallSeaweedBinding) MarkReady(ctx context.Context, receipt contracts.S
 		return zero, seaweedProviderFailure("binding-ready-source")
 	}
 	if !stored.Initialization.Pending {
+		if !s.current(ctx, r) {
+			return zero, seaweedProviderFailure("binding-expired")
+		}
 		return smallSeaweedBindingReceipt(cm, stored), nil
 	}
 	if !receipt.Binding.Initialization.Pending || cm.ResourceVersion != receipt.ResourceVersion {
@@ -268,6 +324,9 @@ func (s *SmallSeaweedBinding) MarkReady(ctx context.Context, receipt contracts.S
 		unknown = e != nil
 	}
 	if unknown {
+		if !s.current(ctx, r) {
+			return zero, seaweedProviderFailure("binding-expired")
+		}
 		actual, ready, e = s.read(ctx)
 	}
 	if e != nil || string(actual.UID) != receipt.ConfigMap.UID || ready.Initialization.Pending || !sameSmallSeaweedBinding(ready, stored) || !s.current(ctx, r) {
@@ -280,5 +339,29 @@ func (s *SmallSeaweedBinding) MarkReady(ctx context.Context, receipt contracts.S
 			return zero, seaweedProviderFailure("binding-ready-unknown-source")
 		}
 	}
+	if !s.current(ctx, r) {
+		return zero, seaweedProviderFailure("binding-expired")
+	}
 	return smallSeaweedBindingReceipt(actual, ready), nil
+}
+
+// ReadReady observes the original completed bucket/source binding. Historical
+// StorageUseUntil is returned unchanged and may be expired. This method grants
+// no initial setup, provider effect, activation or recovery authority.
+func (s *SmallSeaweedBinding) ReadReady(ctx context.Context, installationID, requestID, bucket string) (contracts.SmallSeaweedBindingReceipt, contracts.SmallSeaweedPrepared, error) {
+	var zero contracts.SmallSeaweedBindingReceipt
+	var none contracts.SmallSeaweedPrepared
+	if !s.sourceCurrent(ctx) || !authorization.UUID(installationID) || !authorization.UUID(requestID) || !smallSeaweedBindingBucket.MatchString(bucket) || strings.Contains(bucket, "..") {
+		return zero, none, seaweedProviderFailure("binding-ready-read-input")
+	}
+	cm, stored, err := s.read(ctx)
+	if err != nil || !s.sourceCurrent(ctx) || stored.Initialization.Pending || stored.Initialization.InstallationID != installationID || stored.RequestID != requestID || stored.Initialization.Bucket != bucket {
+		return zero, none, seaweedProviderFailure("binding-ready-read-record")
+	}
+	observed, prepared, _, err := s.observeSources(ctx, smallSeaweedBindingRequest(stored))
+	if err != nil || !s.sourceCurrent(ctx) || !sameSmallSeaweedBinding(observed, stored) {
+		clear(prepared.RootsPEM)
+		return zero, none, seaweedProviderFailure("binding-ready-read-source")
+	}
+	return smallSeaweedBindingReceipt(cm, stored), prepared, nil
 }

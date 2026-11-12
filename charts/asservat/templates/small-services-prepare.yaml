@@ -2,7 +2,8 @@
 {{- $pg := eq $s.postgres.provider "bundled" }}
 {{- $kc := eq $s.identity.provider "keycloak" }}
 {{- $s3 := eq $s.objectStore.provider "seaweedfs" }}
-{{- if or $pg $kc $s3 }}
+{{- $bao := eq $s.keyService.provider "openbao" }}
+{{- if or $pg $kc $s3 $bao }}
 {{- $b := .Values.bootstrap }}
 {{- if or (not $b.enabled) (eq .Values.mode "cluster") }}
 {{- fail "bundled hub services require bootstrap.enabled in a hub or combined release" }}
@@ -26,6 +27,7 @@
 {{- if $s3 }}
 {{- $_ := set $plan "objectStore" (dict "format" "asservat-small-seaweed/v1" "namespace" .Release.Namespace "name" $b.name "image" $s.objectStore.seaweedfs.image) }}
 {{- end }}
+{{- if $bao }}{{ $_ := set $plan "openBao" (dict "image" $s.keyService.openbao.image) }}{{ end }}
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -54,11 +56,11 @@ rules:
     verbs: [create]
   - apiGroups: [""]
     resources: [secrets]
-    resourceNames: [{{ printf "%s-postgres-state" $b.name | quote }}, {{ printf "%s-keycloak-state" $b.name | quote }}, {{ printf "%s-objectstore-state" $b.name | quote }}, {{ printf "%s-objectstore-iam" $b.name | quote }}]
+    resourceNames: [{{ printf "%s-postgres-state" $b.name | quote }}, {{ printf "%s-keycloak-state" $b.name | quote }}, {{ printf "%s-objectstore-state" $b.name | quote }}, {{ printf "%s-objectstore-iam" $b.name | quote }}{{ if $bao }}, {{ printf "%s-openbao-state" $b.name | quote }}{{ end }}]
     verbs: [get]
   - apiGroups: [""]
     resources: [persistentvolumeclaims]
-    resourceNames: [{{ printf "%s-postgres-data" $b.name | quote }}, {{ printf "%s-postgres-backup" $b.name | quote }}, {{ printf "%s-objectstore-data" $b.name | quote }}]
+    resourceNames: [{{ printf "%s-postgres-data" $b.name | quote }}, {{ printf "%s-postgres-backup" $b.name | quote }}, {{ printf "%s-objectstore-data" $b.name | quote }}{{ if $bao }}, {{ printf "%s-openbao-data" $b.name | quote }}{{ end }}]
     verbs: [get]
   - apiGroups: [apps]
     resources: [deployments]
@@ -66,11 +68,11 @@ rules:
     verbs: [get]
   - apiGroups: [apps]
     resources: [statefulsets]
-    resourceNames: [{{ printf "%s-objectstore" $b.name | quote }}, {{ printf "%s-postgres" $b.name | quote }}]
+    resourceNames: [{{ printf "%s-objectstore" $b.name | quote }}, {{ printf "%s-postgres" $b.name | quote }}{{ if $bao }}, {{ printf "%s-openbao" $b.name | quote }}{{ end }}]
     verbs: [get]
   - apiGroups: [""]
     resources: [pods]
-    resourceNames: [{{ printf "%s-objectstore-0" $b.name | quote }}, {{ printf "%s-postgres-0" $b.name | quote }}]
+    resourceNames: [{{ printf "%s-objectstore-0" $b.name | quote }}, {{ printf "%s-postgres-0" $b.name | quote }}{{ if $bao }}, {{ printf "%s-openbao-0" $b.name | quote }}{{ end }}]
     verbs: [get]
 ---
 apiVersion: rbac.authorization.k8s.io/v1

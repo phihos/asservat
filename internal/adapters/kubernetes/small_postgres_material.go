@@ -89,6 +89,10 @@ func BuildSmallPostgresMaterial(p contracts.SmallPostgresPlan, now time.Time) (m
 	if err != nil {
 		return nil, cfg.ErrUnavailable
 	}
+	ca, err = x509.ParseCertificate(caDER)
+	if err != nil {
+		return nil, cfg.ErrUnavailable
+	}
 	leaf := &x509.Certificate{SerialNumber: leafSerial, Subject: pkix.Name{CommonName: p.Host()}, DNSNames: []string{p.ServiceName(), p.ServiceName() + "." + p.Namespace, p.Host(), p.Host() + ".cluster.local"}, NotBefore: ca.NotBefore, NotAfter: now.AddDate(1, 0, 0), KeyUsage: x509.KeyUsageDigitalSignature, ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}}
 	leafDER, err := x509.CreateCertificate(rand.Reader, leaf, ca, &leafKey.PublicKey, caKey)
 	if err != nil {

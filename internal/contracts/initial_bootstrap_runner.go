@@ -17,6 +17,8 @@ type InitialBootstrapRunnerInput struct {
 	PostgresSecret    string `json:"postgresSecret,omitempty"`
 	KeycloakSecret    string `json:"keycloakSecret,omitempty"`
 	ObjectStoreSecret string `json:"objectStoreSecret,omitempty"`
+	// Bundled provider public plan/CA/backend only; never seal or CA private keys.
+	KeyServiceSecret string `json:"keyServiceSecret,omitempty"`
 	// The full public continuation digest selects its immutable ConfigMap.
 	// Omission keeps the original bootstrap-only runner bytes and layout.
 	ContinuationDigest string `json:"continuationDigest,omitempty"`

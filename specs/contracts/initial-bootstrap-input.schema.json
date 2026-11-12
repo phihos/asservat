@@ -181,6 +181,9 @@
         "rootsPEM": {
           "type": "string",
           "maxLength": 32768
+        },
+        "rootsSource": {
+          "const": "bundledOpenBao"
         }
       }
     },

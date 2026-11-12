@@ -38,6 +38,9 @@ func bootstrapPlan(d contracts.InitialBootstrap, s contracts.InitialBootstrapSta
 	return contracts.InitialPreparationPlan{SchemaInitialization: contracts.InitialSchemaProtocol, Handover: contracts.InitialPreparationHandoverProtocol, HistoryManager: &manager, HistoryProbe: &probe, ProbeAudience: d.ProbeAudience, PrivateState: &private, Continuation: contracts.InitialPreparationActivationProtocol, InstallationID: s.InstallationID, RequestID: s.RequestID, ClusterID: s.ClusterID, BootstrapNamespace: s.Prelude.Namespace, RootName: n.root, ProbeName: n.continuityMarker, ContinuityName: n.continuity, Administrators: append([]contracts.OwnerDeploymentActor(nil), d.Administrators...), Workload: contracts.InitialPreparationWorkload{RegistryAuthentication: w.RegistryAuthentication, Namespace: w.Namespace, Name: w.Name, WriterAccount: w.WriterAccount, ProbeAccount: w.ProbeAccount, Configuration: w.Configuration, Credentials: w.Credentials, Image: w.Image, Witness: w.Witness, FleetSource: w.FleetSource, WitnessGuard: w.WitnessGuard, FleetGuard: w.FleetGuard, WorkloadGuard: w.WorkloadGuard, StagingGuard: d.TargetNamespace + "-" + d.Name + "-staging", Journal: d.Name + "-journal"}}, nil
 }
 func bootstrapPrivateObject(d contracts.InitialBootstrap, s contracts.InitialBootstrapState, index int) (runtime.Object, error) {
+	if !s.Retired && !bootstrapProviderReady(s) {
+		return nil, cfg.ErrUnavailable
+	}
 	n := bootstrapNames(d)
 	name, key := "", ""
 	var payload any
@@ -55,7 +58,7 @@ func bootstrapPrivateObject(d contracts.InitialBootstrap, s contracts.InitialBoo
 			return nil, cfg.ErrUnavailable
 		}
 		name, key = n.providerMaterial, "material.json"
-		payload = contracts.InitialProviderMaterial{Format: contracts.InitialProviderMaterialFormat, InstallationID: s.InstallationID, RequestID: s.RequestID, IssuerToken: s.Material.IssuerToken, Storage: s.Material.Storage, StorageUseUntil: s.Material.StorageUseUntil, RegistryConfig: s.Material.RegistryConfig}
+		payload = contracts.InitialProviderMaterial{Format: contracts.InitialProviderMaterialFormat, InstallationID: s.InstallationID, RequestID: s.RequestID, IssuerToken: s.Material.IssuerToken, Storage: s.Material.Storage, StorageUseUntil: s.Material.StorageUseUntil, RegistryConfig: s.Material.RegistryConfig, BundledIdentity: s.Material.BundledIdentity}
 	default:
 		return nil, cfg.ErrInvalid
 	}
@@ -117,6 +120,9 @@ func (s *InitialBootstrap) stepObject(ctx context.Context, state contracts.Initi
 	return path, object, nil
 }
 func bootstrapProjectionValue(d contracts.InitialBootstrap, state contracts.InitialBootstrapState) (contracts.InitialPreparer, error) {
+	if !state.Retired && !bootstrapProviderReady(state) {
+		return contracts.InitialPreparer{}, cfg.ErrUnavailable
+	}
 	var zero contracts.InitialPreparer
 	n := bootstrapNames(d)
 	plan, e := bootstrapPlan(d, state)

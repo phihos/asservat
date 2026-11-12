@@ -170,6 +170,20 @@
         "name",
         "image"
       ]
+    },
+    "openBao": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "image": {
+          "type": "string",
+          "maxLength": 512,
+          "pattern": "^[a-zA-Z0-9./:_-]+@sha256:[a-f0-9]{64}$"
+        }
+      },
+      "required": [
+        "image"
+      ]
     }
   },
   "required": [

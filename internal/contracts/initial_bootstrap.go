@@ -54,14 +54,17 @@ type InitialBootstrapProviders struct {
 	UnwrapPolicy string `json:"unwrapPolicy"`
 }
 
-// Explicit supplied material, not a request for the product to mint provider
-// privileges. Generated installation/request IDs are bound after seed acceptance.
+// Private original material. The explicit external profile is unchanged; the
+// bundled profile records its independently observed setup identity. Generated
+// installation/request IDs are bound after seed acceptance.
 type InitialBootstrapMaterial struct {
-	Format          string                 `json:"format"`
-	IssuerToken     string                 `json:"issuerToken"`
-	Storage         OwnerStorageCredential `json:"storage"`
-	StorageUseUntil time.Time              `json:"storageUseUntil"`
-	RegistryConfig  []byte                 `json:"registryConfig,omitempty"`
+	Format          string                          `json:"format"`
+	IssuerToken     string                          `json:"issuerToken"`
+	SetupToken      string                          `json:"setupToken,omitempty"`
+	Storage         OwnerStorageCredential          `json:"storage"`
+	StorageUseUntil time.Time                       `json:"storageUseUntil"`
+	RegistryConfig  []byte                          `json:"registryConfig,omitempty"`
+	BundledIdentity *BundledInitialProviderIdentity `json:"bundledIdentity,omitempty"`
 }
 
 type InitialBootstrapPrelude struct {
@@ -81,21 +84,22 @@ type InitialBootstrapPrelude struct {
 // until their corresponding original intent is acknowledged. Inventory is a
 // fixed compiled set, not caller-defined Kubernetes bodies or effects.
 type InitialBootstrapState struct {
-	Format         string                    `json:"format"`
-	DesiredDigest  string                    `json:"desiredDigest"`
-	InstallationID string                    `json:"installationID"`
-	RequestID      string                    `json:"requestID"`
-	ClusterID      string                    `json:"clusterID"`
-	IssuerEpoch    string                    `json:"issuerEpoch"`
-	SeedUID        string                    `json:"seedUID,omitempty"`
-	Prelude        InitialBootstrapPrelude   `json:"prelude"`
-	Passwords      InitialBootstrapPasswords `json:"passwords"`
-	Material       *InitialBootstrapMaterial `json:"material,omitempty"`
-	Manager        *InitialBootstrapManager  `json:"manager,omitempty"`
-	Creates        []InitialBootstrapCreate  `json:"creates"`
-	Projection     *WorkerObjectReference    `json:"projection,omitempty"`
-	PassiveHistory *InitialBootstrapCreate   `json:"passiveHistory,omitempty"`
-	Retired        bool                      `json:"retired,omitempty"`
+	Format         string                        `json:"format"`
+	DesiredDigest  string                        `json:"desiredDigest"`
+	InstallationID string                        `json:"installationID"`
+	RequestID      string                        `json:"requestID"`
+	ClusterID      string                        `json:"clusterID"`
+	IssuerEpoch    string                        `json:"issuerEpoch"`
+	SeedUID        string                        `json:"seedUID,omitempty"`
+	Prelude        InitialBootstrapPrelude       `json:"prelude"`
+	Passwords      InitialBootstrapPasswords     `json:"passwords"`
+	Material       *InitialBootstrapMaterial     `json:"material,omitempty"`
+	ProviderMint   *InitialBootstrapProviderMint `json:"providerMint,omitempty"`
+	Manager        *InitialBootstrapManager      `json:"manager,omitempty"`
+	Creates        []InitialBootstrapCreate      `json:"creates"`
+	Projection     *WorkerObjectReference        `json:"projection,omitempty"`
+	PassiveHistory *InitialBootstrapCreate       `json:"passiveHistory,omitempty"`
+	Retired        bool                          `json:"retired,omitempty"`
 }
 
 type InitialBootstrapPasswords struct {
@@ -144,3 +148,14 @@ func (InitialBootstrapState) String() string       { return "protected initial b
 func (InitialBootstrapState) GoString() string     { return "protected initial bootstrap state" }
 func (InitialBootstrapPasswords) String() string   { return "protected initial bootstrap passwords" }
 func (InitialBootstrapPasswords) GoString() string { return "protected initial bootstrap passwords" }
+
+// InitialBootstrapProviderMint is one original provider POST intent. The token
+// is retained only in private Material; Response is the positive issued identity.
+// Unknown POSTs never reopen this claim or authorize another mint.
+type InitialBootstrapProviderMint struct {
+	OperationID   string                 `json:"operationID"`
+	StartedAt     time.Time              `json:"startedAt"`
+	Until         time.Time              `json:"until"`
+	ExpiresBefore time.Time              `json:"expiresBefore"`
+	Response      *InitialProviderParent `json:"response,omitempty"`
+}

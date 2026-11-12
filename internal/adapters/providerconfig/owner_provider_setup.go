@@ -180,7 +180,7 @@ func (r *SetupReader) VerifyOwner(ctx context.Context, in contracts.OwnerDeploym
 	issuerUntil := o.until
 	checks := []setupReadCheck{
 		{"sys/mounts/auth/" + profile.AuthMount, "authentication mount", func(d map[string]json.RawMessage) error { return verifyAuthMount(d, profile.AuthMountAccessor) }},
-		{"auth/" + profile.AuthMount + "/config", "Kubernetes authentication", func(d map[string]json.RawMessage) error { return verifyKubernetesAuthConfig(d, in.Kubernetes) }},
+		{"auth/" + profile.AuthMount + "/config", "Kubernetes authentication", func(d map[string]json.RawMessage) error { return r.verifyKubernetesAuthConfig(d, in.Kubernetes) }},
 		{"sys/mounts/" + in.KeyService.AuditMount, "audit engine", verifyTransitMount},
 		{in.KeyService.AuditMount + "/keys/" + in.KeyService.AuditKey, "audit key", func(d map[string]json.RawMessage) error { return verifyTransitKey(d, in.KeyService.AuditKey) }},
 	}

@@ -3,6 +3,7 @@ package kubernetes
 import (
 	"bytes"
 	"context"
+	"strings"
 	"time"
 
 	"asservat.local/asservat/internal/adapters/providerconfig"
@@ -24,6 +25,9 @@ func initialProviderASCII(s string, limit int) bool {
 	return true
 }
 func validInitialProviderMaterial(v contracts.InitialProviderMaterial, installation, request string, now time.Time) bool {
+	if v.BundledIdentity != nil && !v.BundledIdentity.Valid() {
+		return false
+	}
 	return v.Format == contracts.InitialProviderMaterialFormat && v.InstallationID == installation && v.RequestID == request && initialProviderASCII(v.IssuerToken, contracts.InitialProviderTokenMaxBytes) && initialProviderASCII(v.Storage.AccessKeyID, 256) && initialProviderASCII(v.Storage.SecretAccessKey, 1024) && (v.Storage.SessionToken == "" || initialProviderASCII(v.Storage.SessionToken, 4096)) && !v.StorageUseUntil.IsZero() && v.StorageUseUntil.Location() == time.UTC && now.Before(v.StorageUseUntil)
 }
 func (s *InitialPreparer) readProviderMaterial(ctx context.Context) (contracts.InitialProviderMaterial, error) {
@@ -49,6 +53,9 @@ func (s *InitialPreparer) readProviderMaterial(ctx context.Context) (contracts.I
 	}
 	v, e := contracts.DecodeInitialProviderMaterial(bytes.NewReader(secret.Data["material.json"]))
 	if e != nil || !validInitialProviderMaterial(v, s.plan.InstallationID, s.plan.RequestID, s.protection.observer.now()) || !providerconfig.InitialRegistryMaterial(s.plan.Workload.Image, s.plan.Workload.RegistryAuthentication, v.RegistryConfig) {
+		return zero, cfg.ErrChanged
+	}
+	if b := v.BundledIdentity; b != nil && (b.Namespace != s.plan.BootstrapNamespace || b.BackendName != strings.TrimSuffix(s.plan.RootName, "-preparation")) {
 		return zero, cfg.ErrChanged
 	}
 	return v, nil

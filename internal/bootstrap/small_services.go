@@ -28,7 +28,7 @@ func SmallServicesDiagnostic(err error) string {
 	var stage smallServicesFailure
 	if errors.As(err, &stage) {
 		switch stage {
-		case "KeycloakStateUnavailable", "PostgresStateUnavailable", "ObjectStoreStateUnavailable":
+		case "KeycloakStateUnavailable", "PostgresStateUnavailable", "ObjectStoreStateUnavailable", "KeyServiceStateUnavailable":
 			return "small-services-prepare: " + string(stage) + "; inspect the selected service's original private state and retained data"
 		}
 	}
@@ -68,7 +68,7 @@ func runSmallServicesPreparation(ctx context.Context, files *os.Root) error {
 	if err != nil || p.Format != contracts.SmallServicesFormat || !pg.Valid() || p.Namespace == "default" || strings.HasPrefix(p.Namespace, "kube-") {
 		return mounts.ErrUnavailable
 	}
-	if !p.Postgres && p.Keycloak == nil && p.ObjectStore == nil || !ownerEndpoint(p.Kubernetes.Endpoint) || p.KeycloakExternalDatabase && p.Keycloak == nil {
+	if !p.Postgres && p.Keycloak == nil && p.ObjectStore == nil && p.OpenBao == nil || !ownerEndpoint(p.Kubernetes.Endpoint) || p.KeycloakExternalDatabase && p.Keycloak == nil {
 		return mounts.ErrUnavailable
 	}
 	if k := p.Keycloak; k != nil {
@@ -96,7 +96,7 @@ func runSmallServicesPreparation(ctx context.Context, files *os.Root) error {
 	in := &providerInputs{files: files, oneShot: true, kubernetesEndpoint: contracts.OwnerProviderEndpoint{Endpoint: p.Kubernetes.Endpoint, Roots: roots}}
 	defer in.closeHTTP()
 	config := in.kubernetes("administrator-token")
-	var prepareKC, preparePG, prepareS3 func(context.Context) error
+	var prepareKC, preparePG, prepareS3, prepareKeys func(context.Context) error
 	if p.Keycloak != nil {
 		databaseState := pg.StateSecretName()
 		var externalPresence func(context.Context) (bool, error)
@@ -170,7 +170,23 @@ func runSmallServicesPreparation(ctx context.Context, files *os.Root) error {
 			return nil
 		}
 	}
-	return prepareSmallServices(ctx, prepareKC, preparePG, prepareS3)
+	if p.OpenBao != nil {
+		plan := contracts.SmallOpenBaoPlan{Format: contracts.SmallOpenBaoFormat, Namespace: p.Namespace, Name: p.Name, Image: p.OpenBao.Image,
+			Kubernetes: in.kubernetesEndpoint, SetupAccount: p.Name + "-bootstrap-runner"}
+		service, err := kube.NewSmallOpenBaoPreparation(config, plan)
+		if err != nil {
+			return mounts.ErrUnavailable
+		}
+		prepareKeys = func(ctx context.Context) error {
+			state, err := service.Prepare(ctx)
+			clear(state.RootsPEM)
+			if err != nil {
+				return smallServicesFailure("KeyServiceStateUnavailable")
+			}
+			return nil
+		}
+	}
+	return prepareSmallServices(ctx, prepareKC, preparePG, prepareS3, prepareKeys)
 }
 
 // RunSmallServicesPreparation runs only in the finite trusted provider hook.

@@ -220,3 +220,28 @@ func (s *SeaweedProvider) Reload(ctx context.Context, config []byte) error {
 	}
 	return nil
 }
+
+// InitialAuditCredential reads the known original installation credential from
+// the current pinned provider and IAM source. The caller supplies its original
+// bounded operation context and independently established installation authority.
+// It installs nothing and does not infer authority from retained private bytes.
+func (s *SeaweedProvider) InitialAuditCredential(ctx context.Context) (contracts.SeaweedCredential, error) {
+	var zero contracts.SeaweedCredential
+	if s == nil || ctx == nil || ctx.Err() != nil || !validSeaweedTarget(s.target) {
+		return zero, seaweedProviderFailure("initial-audit-input")
+	}
+	deadline, bounded := ctx.Deadline()
+	if !bounded || !time.Now().Before(deadline) {
+		return zero, seaweedProviderFailure("initial-audit-deadline")
+	}
+	secret, err := s.snapshot(ctx)
+	if err != nil {
+		return zero, err
+	}
+	defer clearSmallSeaweedData(secret.Data)
+	credential, err := providerconfig.ReadSeaweedInitialAuditCredential(secret.Data[providerconfig.SeaweedConfigKey], s.target.InstallationID)
+	if err != nil || ctx.Err() != nil || !time.Now().Before(deadline) {
+		return zero, seaweedProviderFailure("initial-audit-credential")
+	}
+	return credential, nil
+}

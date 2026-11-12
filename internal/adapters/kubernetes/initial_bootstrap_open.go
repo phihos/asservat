@@ -208,6 +208,8 @@ func (s *InitialBootstrap) qualifyWithClients(ctx context.Context, p contracts.I
 
 // Open creates only the finite public prelude and one private seed. Material is
 // mandatory on first creation and may be absent for passive historical reopen.
+// Selected bundled material may contain only its original setup credential;
+// Claim/CompleteBundledProvider must finish before SQL/private projections.
 // No role/provider credential or activation effect occurs here.
 func (s *InitialBootstrap) Open(ctx context.Context, material *contracts.InitialBootstrapMaterial) (contracts.InitialBootstrapState, error) {
 	var zero contracts.InitialBootstrapState

@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/bundled-initial-provider-identity.schema.json",
+  "title": "Private original bundled setup identity",
+  "description": "Created only from an independently checked actual same-API setup login and trusted native namespace/account observations. Original setup expiry is an additional nonrenewable ancestor bound; this value grants no runtime or installation authority. Cross-field exact-name/deadline checks are mandatory in the typed adapter.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "backendName",
+    "namespace",
+    "setupAccount",
+    "entityID",
+    "setupParent"
+  ],
+  "properties": {
+    "format": {
+      "const": "asservat-bundled-initial-identity/v1"
+    },
+    "backendName": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 30,
+      "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+    },
+    "namespace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "uid"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 63,
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+        },
+        "uid": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        }
+      }
+    },
+    "setupAccount": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "uid"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 63,
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+        },
+        "uid": {
+          "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+        }
+      }
+    },
+    "entityID": {
+      "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/uuid"
+    },
+    "setupParent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "accessor",
+        "issuedAt",
+        "expiresAt"
+      ],
+      "properties": {
+        "accessor": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[!-~]+$"
+        },
+        "issuedAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        },
+        "expiresAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        }
+      }
+    }
+  }
+}

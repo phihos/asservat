@@ -220,7 +220,7 @@ func newInitialPreparationDeployment(ctx context.Context, files *os.Root, observ
 		}
 		defer h.CloseIdleConnections()
 		phase = "provider-constructor"
-		d.providerIssuer, e = kms.NewInitialProviderIssuer(c.Services.KeyService.Endpoint, material.IssuerToken, c.Services.KeyService.AuditMount, c.Services.KeyService.AuditKey, c.Plan.InstallationID, c.Plan.RequestID, *c.Providers, h, time.Now)
+		d.providerIssuer, e = initialPreparerIssuer(c, material, h, time.Now)
 		if e != nil {
 			return nil, e
 		}

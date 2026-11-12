@@ -9,6 +9,9 @@
 {{- if eq (dig "objectStore" "provider" "external" $services) "seaweedfs" -}}
 {{- $_ := set $v "auditStore" (dict "endpoint" (printf "https://%s-objectstore.%s.svc:8333" $b.name .Release.Namespace) "region" (default "us-east-1" $b.auditStore.region) "bucket" (default (printf "%s-audit" $b.name) $b.auditStore.bucket) "rootsPEM" "" "rootsSource" "bundledSeaweed") -}}
 {{- end -}}
+{{- if eq (dig "keyService" "provider" "external" $services) "openbao" -}}
+{{- $_ := set $v "keyService" (dict "endpoint" (printf "https://%s-openbao.%s.svc:8200" $b.name .Release.Namespace) "auditMount" "asservat-audit" "auditKey" "audit" "rootsPEM" "" "rootsSource" "bundledOpenBao") -}}
+{{- end -}}
 {{- if eq (dig "identity" "provider" "external" $services) "keycloak" -}}
 {{- $k := .Values.services.identity.keycloak -}}
 {{- $f := deepCopy $b.fleet -}}
@@ -35,6 +38,10 @@
 {{- $b := .Values.bootstrap -}}
 {{- $v := dict "format" "asservat-bootstrap-runner/v1" "producerSecret" $b.secrets.producer "schemaSecret" $b.secrets.schema "retirementSecret" $b.secrets.retirement -}}
 {{- $services := default dict .Values.services -}}
+{{- if and (eq $b.secrets.producer "") (eq (dig "postgres" "provider" "external" $services) "bundled") (eq (dig "objectStore" "provider" "external" $services) "seaweedfs") (eq (dig "keyService" "provider" "external" $services) "openbao") -}}
+{{/* All private input is generated; the phase still selects only named keys. */}}
+{{- $_ := set $v "producerSecret" (printf "%s-postgres-state" $b.name) -}}
+{{- end -}}
 {{- if eq (dig "postgres" "provider" "external" $services) "bundled" -}}
 {{- $pg := printf "%s-postgres-state" $b.name -}}
 {{- $_ := set $v "postgresSecret" $pg -}}
@@ -43,6 +50,7 @@
 {{- end -}}
 {{- if eq (dig "identity" "provider" "external" $services) "keycloak" }}{{ $_ := set $v "keycloakSecret" (printf "%s-keycloak-state" $b.name) }}{{ end -}}
 {{- if eq (dig "objectStore" "provider" "external" $services) "seaweedfs" }}{{ $_ := set $v "objectStoreSecret" (printf "%s-objectstore-state" $b.name) }}{{ end -}}
+{{- if eq (dig "keyService" "provider" "external" $services) "openbao" }}{{ $_ := set $v "keyServiceSecret" (printf "%s-openbao-state" $b.name) }}{{ end -}}
 {{- if $b.registrySecret }}{{ $_ := set $v "registrySecret" $b.registrySecret }}{{ end -}}
 {{- if $b.continuation.enabled }}{{ $_ := set $v "continuationDigest" (include "asservat.bootstrap.continuation" . | sha256sum) }}{{ end -}}
 {{- toJson $v -}}
@@ -137,6 +145,18 @@ limits:
       - key: plan.json
         path: objectstore-plan.json
 {{- end }}
+{{- if eq (dig "keyService" "provider" "external" $services) "openbao" }}
+- secret:
+    name: {{ printf "%s-openbao-state" .Values.bootstrap.name | quote }}
+    optional: false
+    items:
+      - key: plan.json
+        path: openbao-plan.json
+      - key: ca.crt
+        path: openbao-ca.crt
+      - key: backend-id
+        path: openbao-backend-id
+{{- end }}
 {{- end -}}
 
 {{- define "asservat.bootstrap.inputDigest" -}}
@@ -151,6 +171,9 @@ limits:
 {{- define "asservat.bootstrap.continuation" -}}
 {{- $c := .Values.bootstrap.continuation -}}
 {{- $v := dict "format" "asservat-installer-continuation/v1" "namespace" .Release.Namespace "workerProvider" $c.workerProvider "ownerProvider" $c.ownerProvider "ownerIssuerRootsPEM" $c.ownerIssuerRootsPEM "ownerPKIMount" $c.ownerPKIMount "ownerConnections" (int $c.ownerConnections) "ownerConcurrency" (int $c.ownerConcurrency) -}}
+{{- if $c.materialSecretName }}{{ $_ := set $v "materialSecretName" $c.materialSecretName }}{{ end -}}
+{{- if eq .Values.services.objectStore.provider "seaweedfs" }}{{ $_ := set $v "objectStoreSource" "bundledSeaweed" }}{{ end -}}
+{{- if eq .Values.services.keyService.provider "openbao" }}{{ $_ := set $v "keyServiceSource" "bundledOpenBao" }}{{ end -}}
 {{- if and (hasKey $c.public "processors") (not $c.public.origin) }}{{ fail "bootstrap.continuation.public.processors requires public.origin" }}{{ end -}}
 {{- if and (hasKey $c.public "captureHistory") (not $c.public.origin) }}{{ fail "bootstrap.continuation.public.captureHistory requires public.origin" }}{{ end -}}
 {{- if and $c.public.permissionDelegations (not $c.public.origin) }}{{ fail "bootstrap.continuation.public.permissionDelegations requires public.origin" }}{{ end -}}
@@ -177,6 +200,19 @@ limits:
 {{- end -}}
 {{- range $field := list "processingOperators" "federation" "promotion" "retentionBaseline" -}}
 {{- if hasKey $p $field }}{{ $_ := set (get $v "public") $field (get $p $field) }}{{ end -}}
+{{- end -}}
+{{- if and (eq .Values.services.objectStore.provider "seaweedfs") $p.federation (hasKey $p.federation "evidenceStore") -}}
+{{- $b := .Values.bootstrap -}}
+{{- $f := deepCopy (get (get $v "public") "federation") -}}
+{{- $e := get $f "evidenceStore" -}}
+{{- $region := default "us-east-1" $b.auditStore.region -}}
+{{- $bucket := default (printf "%s-audit" $b.name) $b.auditStore.bucket -}}
+{{- if or (and $e.region (ne $e.region $region)) (and $e.bucket (ne $e.bucket $bucket)) }}{{ fail "bundled object storage uses one owned audit/evidence bucket and region" }}{{ end -}}
+{{- $_ := set $e "endpoint" (printf "https://%s-objectstore.%s.svc:8333" $b.name .Release.Namespace) -}}
+{{- $_ := set $e "rootsPEM" "" -}}
+{{- $_ := set $e "region" $region -}}
+{{- $_ := set $e "bucket" $bucket -}}
+{{- $_ := set (get $v "public") "federation" $f -}}
 {{- end -}}
 {{- if hasKey $p "capacity" -}}
 {{- $capacity := deepCopy $p.capacity -}}

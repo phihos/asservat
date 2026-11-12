@@ -124,7 +124,7 @@ func (r *SetupReader) VerifyConfiguration(ctx context.Context, in contracts.HubW
 		return zero, setupComponentError("configuration auth mount")
 	}
 	data, err = o.get(paths[1])
-	if err != nil || verifyKubernetesAuthConfig(data, in.Kubernetes) != nil {
+	if err != nil || r.verifyKubernetesAuthConfig(data, in.Kubernetes) != nil {
 		return zero, setupComponentError("configuration Kubernetes authentication")
 	}
 	data, err = o.get(paths[2])

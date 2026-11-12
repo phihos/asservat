@@ -56,14 +56,32 @@ func verifyAuthMount(data map[string]json.RawMessage, accessor string) error {
 }
 
 func verifyKubernetesAuthConfig(data map[string]json.RawMessage, endpoint contracts.OwnerProviderEndpoint) error {
-	host, ok := setupValue[string](data, "kubernetes_host")
-	ca, caOK := setupValue[string](data, "kubernetes_ca_cert")
-	if !ok || !caOK || host != endpoint.Endpoint || !setupIs(data, "disable_local_ca_jwt", true) || !setupIs(data, "token_reviewer_jwt_set", true) || !setupEmpty(data, "pem_keys") {
+	return verifyKubernetesAuthConfigProfile(data, endpoint, true)
+}
+
+func (r *SetupReader) verifyKubernetesAuthConfig(data map[string]json.RawMessage, endpoint contracts.OwnerProviderEndpoint) error {
+	if r == nil {
 		return ErrSetupUnavailable
 	}
-	// The initial installed profile requires the externally managed reviewer.
-	// The boolean establishes configured presence only, never possession,
-	// rotation, TokenReview authorization or ongoing provider availability.
+	if r.bundledKubernetes == nil {
+		return verifyKubernetesAuthConfig(data, endpoint)
+	}
+	if !sameSetupEndpoint(*r.bundledKubernetes, endpoint) {
+		return ErrSetupUnavailable
+	}
+	return verifyKubernetesAuthConfigProfile(data, endpoint, false)
+}
+
+// The two closed profiles share host/PEM checks. Only the selected bundled
+// reader admits the provider's rotating in-Pod reviewer, never a remote API.
+func verifyKubernetesAuthConfigProfile(data map[string]json.RawMessage, endpoint contracts.OwnerProviderEndpoint, explicitReviewer bool) error {
+	host, ok := setupValue[string](data, "kubernetes_host")
+	ca, caOK := setupValue[string](data, "kubernetes_ca_cert")
+	if !ok || !caOK || host != endpoint.Endpoint || !setupIs(data, "disable_local_ca_jwt", explicitReviewer) || !setupIs(data, "token_reviewer_jwt_set", explicitReviewer) || !setupEmpty(data, "pem_keys") {
+		return ErrSetupUnavailable
+	}
+	// These booleans establish only the selected configuration shape, never
+	// possession, rotation, TokenReview authorization or provider availability.
 	if raw, exists := data["use_annotations_as_alias_metadata"]; exists && (!bytes.Equal(raw, []byte("false"))) {
 		return ErrSetupUnavailable
 	}

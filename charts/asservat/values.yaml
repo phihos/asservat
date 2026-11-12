@@ -61,6 +61,9 @@ bootstrap:
   # waits for `asservat installer-provider-apply` to write the inbox.
   continuation:
     enabled: false
+    # Existing private TLS/OIDC material for automatic bundled-provider setup.
+    # With bundled Keycloak its console secret is generated independently.
+    materialSecretName: ""
     workerProvider:
       authMount: ""
       authMountAccessor: ""
@@ -236,6 +239,16 @@ collector:
 # Independently selectable dependencies. External choices use the existing
 # bootstrap provider inputs and are never provisioned or adopted by this chart.
 services:
+  keyService:
+    provider: external
+    openbao:
+      image: ghcr.io/openbao/openbao@sha256:5046911075e137e154ce49ab051502f4ec7cf367d484ae4a4dce665d9b90561f
+      persistence:
+        storageClass: ""
+        size: 8Gi
+      resources:
+        requests: {cpu: 100m, memory: 128Mi}
+        limits: {cpu: "2", memory: 512Mi}
   postgres:
     provider: external
     bundled:
