@@ -1239,8 +1239,59 @@
               }
             ]
           }
+        },
+        "bundledHub": {
+          "type": "string",
+          "maxLength": 30,
+          "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+          "description": "Explicit original bundled hub bootstrap name in the same release namespace; selects its existing trusted runner."
+        },
+        "bootstrapID": {
+          "type": "string",
+          "pattern": "^$|^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}$",
+          "not": {
+            "const": "00000000-0000-0000-0000-000000000000"
+          },
+          "description": "Exact already-issued fleet bootstrap ID; only with bundledHub."
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "bundledHub": {
+                "minLength": 1
+              }
+            },
+            "required": [
+              "bundledHub"
+            ]
+          },
+          "then": {
+            "properties": {
+              "bootstrapID": {
+                "minLength": 36
+              },
+              "offer": {
+                "const": ""
+              },
+              "bootstrapSecret": {
+                "const": ""
+              },
+              "evidenceSecret": {
+                "const": ""
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "bootstrapID": {
+                "const": ""
+              }
+            }
+          }
+        }
+      ]
     },
     "collector": {
       "type": "object",

@@ -245,3 +245,26 @@ func (s *SeaweedProvider) InitialAuditCredential(ctx context.Context) (contracts
 	}
 	return credential, nil
 }
+
+// Configuration returns private retained IAM only to a finite trusted installer.
+// The current pinned backend is checked independently before reading its source.
+// The caller must clear the returned bytes; they confer no new regional scope.
+func (s *SeaweedProvider) Configuration(ctx context.Context) ([]byte, error) {
+	if s == nil || ctx == nil || ctx.Err() != nil || !validSeaweedTarget(s.target) {
+		return nil, seaweedProviderFailure("configuration-input")
+	}
+	deadline, bounded := ctx.Deadline()
+	if !bounded || !time.Now().Before(deadline) {
+		return nil, seaweedProviderFailure("configuration-deadline")
+	}
+	secret, err := s.snapshot(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer clearSmallSeaweedData(secret.Data)
+	raw := secret.Data[providerconfig.SeaweedConfigKey]
+	if providerconfig.ValidateSeaweedConfigTransition(raw, raw) != nil || ctx.Err() != nil || !time.Now().Before(deadline) {
+		return nil, seaweedProviderFailure("configuration-source")
+	}
+	return bytes.Clone(raw), nil
+}

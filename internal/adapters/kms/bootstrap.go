@@ -221,3 +221,56 @@ func DecodeBootstrapRecord(raw []byte) (value.BootstrapEnvelope, error) {
 	}
 	return out, nil
 }
+
+// ReadBootstrapEnvelope delivers only the original version-one credential from
+// an administrator-selected existing channel. It creates no slot or credential;
+// the connector still has to claim the exact current SQL bootstrap before use.
+func (c *BootstrapChannel) ReadBootstrapEnvelope(ctx context.Context, bootstrapID string) (value.BootstrapEnvelope, error) {
+	var zero value.BootstrapEnvelope
+	if c == nil || c.client == nil || c.now == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(bootstrapID) {
+		return zero, value.ErrInvalid
+	}
+	call, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	path := "/v1/" + c.mount + "/data/" + c.prefix + "/" + c.installation + "/" + bootstrapID
+	request := c.client.NewRequest(http.MethodGet, path)
+	request.Params.Set("version", "1")
+	response, err := c.client.RawRequestWithContext(call, request)
+	if response != nil && response.Body != nil {
+		defer response.Body.Close()
+	}
+	if err != nil || response == nil || response.Body == nil || response.StatusCode != http.StatusOK {
+		return zero, ErrKeyService
+	}
+	raw, err := io.ReadAll(io.LimitReader(response.Body, 16385))
+	defer clear(raw)
+	if err != nil || len(raw) > 16384 || !jsontext.Value(raw).IsValid() {
+		return zero, ErrKeyService
+	}
+	var reply struct {
+		Data struct {
+			Data     json.RawMessage `json:"data"`
+			Metadata struct {
+				Version      int    `json:"version"`
+				Destroyed    bool   `json:"destroyed"`
+				DeletionTime string `json:"deletion_time"`
+			} `json:"metadata"`
+		} `json:"data"`
+	}
+	if json.Unmarshal(raw, &reply) != nil || reply.Data.Metadata.Version != 1 || reply.Data.Metadata.Destroyed {
+		return zero, ErrKeyService
+	}
+	defer clear(reply.Data.Data)
+	envelope, err := DecodeBootstrapRecord(reply.Data.Data)
+	now := c.now()
+	if err != nil || envelope.BootstrapID != bootstrapID || envelope.Binding.InstallationID != c.installation || envelope.DeliveryProfile != c.profile || now.Before(envelope.NotBefore) || !now.Before(envelope.NotAfter) || call.Err() != nil {
+		return zero, value.ErrDenied
+	}
+	if when := reply.Data.Metadata.DeletionTime; when != "" {
+		end, err := time.Parse(time.RFC3339Nano, when)
+		if err != nil || !now.Before(end) {
+			return zero, value.ErrDenied
+		}
+	}
+	return envelope, nil
+}

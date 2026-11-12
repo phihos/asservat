@@ -239,6 +239,9 @@ func smallOpenBaoSetupPolicy() string {
 	for _, path := range []string{"auth/token/lookup-self", "sys/mounts/auth/asservat-*", contracts.SmallOpenBaoBackendPolicyPath} {
 		paths[path] = map[string]any{"capabilities": []string{"read"}}
 	}
+	// The finite trusted installer delivers an existing fleet-issued credential
+	// to the regional installer; it cannot create, replace or list channel data.
+	paths[contracts.SmallOpenBaoBootstrapMount+"/data/connector/*"] = map[string]any{"capabilities": []string{"read"}}
 	raw, _ := json.Marshal(map[string]any{"path": paths})
 	return string(raw)
 }

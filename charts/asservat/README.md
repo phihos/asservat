@@ -45,7 +45,8 @@ Unknown values are rejected to catch typos and avoid accepting ineffective secur
 The small profile is under implementation and is not yet an installation recipe.
 `services.postgres.provider` selects `external` or `bundled`;
 `services.objectStore.provider` selects `external` or `seaweedfs`;
-`services.identity.provider` selects `external` or `keycloak`. Each defaults to
+`services.identity.provider` selects `external` or `keycloak`;
+`services.keyService.provider` selects `external` or `openbao`. Each defaults to
 `external` and can be selected independently. These are hub services; a
 workload-cluster release must reuse the hub rather than install duplicates.
 
@@ -69,6 +70,16 @@ Component/render evidence, key-service packaging, provider setup and the full
 login/capture/download/lifecycle qualification are tracked in the
 [implementation ledger](../../docs/implementation-progress.md) and
 [ADR-326](../../docs/decisions/326-individually-selectable-small-services.md).
+
+The candidate's same-API regional path uses a second `mode: cluster` release in
+the original hub bootstrap namespace. Set `cluster.bundledHub` to the original
+bootstrap name and `cluster.bootstrapID` to the actual ID issued in `/fleet`;
+`cluster.namespace` remains a distinct connector namespace. Leave manual offer,
+bootstrap and evidence Secret references empty. The finite hook reuses the
+original trusted bootstrap account, obtains the issued credential internally,
+retains separate scoped keys and runs the normal connector install/catalog join.
+Provider administration is serialized. This path has local checks; its full
+installed workflow is still pending qualification.
 
 ## Named Go profile endpoint TLS
 

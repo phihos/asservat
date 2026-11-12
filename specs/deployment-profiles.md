@@ -42,6 +42,15 @@ target across retries, restart and upgrade; changing the target requires an
 explicit supported migration. Generated credentials MUST remain outside Helm
 values and release data. See [ADR-326](../docs/decisions/326-individually-selectable-small-services.md).
 
+For the selected bundled same-API regional path, the finite installer MUST read
+the original fleet-issued bootstrap by its public ID and exact version1, preserve
+its original bounds, and persist separate regional evidence/history credentials
+in the existing protected carrier before enabling provider access. It MUST reuse
+the normal connector installation and catalog join. Provider setup MUST preserve
+all retained identities/keys and policy statements; conflicts or uncertain writes
+MUST NOT rotate keys or silently replace state. This path adds no runtime
+bootstrap-issuance permission and requires no externally operated provider admin.
+
 Bundled storage MUST resolve generated public trust before canonical installation
 inputs and bind continuation to that original source. A completed bucket binding
 is provenance, never renewed initial authority. The first bundled store uses one

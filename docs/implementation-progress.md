@@ -228,6 +228,33 @@ directory was restored. Original failure and separate cleanup receipts are in
 `native-initial-pg-bao-s3-20261112T044718Z/` externally. Image/CRI preflight passed;
 this run did not exercise product SQL, backup or activation.
 
+The corrected all-three run at `a0a32391` returned Go1/254.125s and
+harness1/340.318s, after Helm revision1 reached deployed and all four original
+bootstrap commands exited0. Its first new inspection NodePort was queried before
+kube-proxy programmed it. Five owned diagnostic NodePorts reproduced immediate
+ECONNREFUSED, then the same TLS/SQL read succeeded after0.307–1.804s; all five were
+removed. The fixture now waits only for ECONNREFUSED within its original parent
+and at most10s; SQL/TLS failures and all version/identity/budget assertions remain.
+Focused race/composition checks pass0/1.307s. Subsequent read-only checks confirm
+schema154, separate non-superuser DDL identity, original postmaster and encrypted
+full backup. These do not relabel the original failed command as passed. All4,977
+sources match the committed candidate and stayed unchanged; separate cleanup
+verified no owned resources and removed the retained work directory. Receipts:
+`native-initial-pg-bao-s3-20261112T045943Z/` and `pg-retained-diagnostic/` externally.
+
+The same-API regional join now has local implementation: selected Helm inputs
+carry the original hub name and actual issued bootstrap ID; the finite installer
+retains keys before IAM, appends exact existing-purpose grants and uses ordinary
+connector installation/catalog join. No new service, watch, SQL pool, journal or
+runtime role is added. Exact-read/append and provider-source race tests pass
+across KMS1.177s, provider configuration1.093s, objectstore1.309s and
+Kubernetes1.488s. Separate original-carrier/uncertain-create races pass1.377s;
+source/offer/CLI races pass1.362s and combined affected bootstrap races3.850s.
+Four regional chart tests pass2.468s, with exact external
+plain/executor rendering preserved. Combined compilation passes with no runtime
+tests selected. The new path and imported-Keycloak attachment still require the
+fresh public installed journey; this remains the active next outcome.
+
 Public-profile prerequisites are also integrated locally: explicit
 `services.identity.keycloak.processingOperators=true` creates an empty dedicated
 group, derives its stable UUID from the original public users UUID and fills only

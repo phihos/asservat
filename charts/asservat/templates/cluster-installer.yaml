@@ -1,21 +1,36 @@
 {{- if .Values.cluster.enabled }}
 {{- $c := .Values.cluster }}
+{{- $bundled := ne $c.bundledHub "" }}
+{{- if $bundled }}
+{{- if or (gt (len $c.bundledHub) 30) (not (regexMatch "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$" $c.bundledHub)) }}{{ fail "cluster.bundledHub requires the original bootstrap name" }}{{ end }}
+{{- if or (not (regexMatch "^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}$" $c.bootstrapID)) (eq $c.bootstrapID "00000000-0000-0000-0000-000000000000") }}{{ fail "cluster.bootstrapID requires the exact issued bootstrap UUID" }}{{ end }}
+{{- if or $c.offer $c.bootstrapSecret $c.evidenceSecret }}{{ fail "cluster.bundledHub forbids manual offer, bootstrapSecret and evidenceSecret" }}{{ end }}
+{{- else }}
+{{- if $c.bootstrapID }}{{ fail "cluster.bootstrapID requires cluster.bundledHub" }}{{ end }}
+{{- end }}
 {{- if ne .Values.mode "cluster" }}{{ fail "cluster.enabled requires mode=cluster" }}{{ end }}
 {{- if or (hasPrefix "kube-" $c.namespace) (eq $c.namespace "default") (eq $c.namespace .Release.Namespace) }}{{ fail "cluster.namespace must be a dedicated connector namespace distinct from the release namespace" }}{{ end }}
 {{- if not (regexMatch "^[a-z0-9][a-z0-9./:_-]{0,383}@sha256:[a-f0-9]{64}$" $c.image) }}{{ fail "cluster.image requires the exact verified product repository@sha256 digest" }}{{ end }}
+{{- $executor := $bundled }}
+{{- if not $bundled }}
 {{- if or (eq $c.bootstrapSecret "") (eq $c.offer "") }}{{ fail "cluster.enabled requires the hub's offer and the operator's bootstrap Secret reference" }}{{ end }}
 {{- $offer := fromJson $c.offer }}
 {{- if or (hasKey $offer "Error") (ne (get $offer "format") "asservat-regional-offer/v1") }}{{ fail "cluster.offer must be the hub's regional-offer.json" }}{{ end }}
-{{- $executor := and (hasKey $offer "owners") (hasKey $offer "keyService") (hasKey $offer "workKey") (hasKey $offer "evidenceStore") }}
-{{- if and $executor (eq ($c.evidenceSecret | default "") "") }}{{ fail "cluster.evidenceSecret is required when the offer names the regional executor" }}{{ end }}
+{{- $executor = and (hasKey $offer "owners") (hasKey $offer "keyService") (hasKey $offer "workKey") (hasKey $offer "evidenceStore") }}
+{{- end }}
+{{- if and (not $bundled) $executor (eq ($c.evidenceSecret | default "") "") }}{{ fail "cluster.evidenceSecret is required when the offer names the regional executor" }}{{ end }}
 {{- if and (not $executor) (ne ($c.evidenceSecret | default "") "") }}{{ fail "cluster.evidenceSecret requires an offer naming the regional executor" }}{{ end }}
 {{- if and (not $executor) (ne ($c.alertmanager | default "") "") }}{{ fail "cluster.alertmanager requires an offer naming the regional executor" }}{{ end }}
 {{- if and (not $executor) ($c.identityMappings | default list) }}{{ fail "cluster.identityMappings requires an offer naming the regional executor" }}{{ end }}
 {{- if and (not $executor) ($c.profileEndpoints | default list) }}{{ fail "cluster.profileEndpoints requires an offer naming the regional executor" }}{{ end }}
 {{- $profileAuth := false }}
 {{- range $c.profileEndpoints }}{{- if .credential }}{{- $profileAuth = true }}{{- end }}{{- end }}
+{{- if and $bundled $profileAuth }}{{ fail "cluster.bundledHub does not supply private profile authorization" }}{{ end }}
 {{- $name := printf "%s-cluster-installer" .Release.Name }}
+{{- $account := $name }}
+{{- if $bundled }}{{ $account = printf "%s-bootstrap-runner" $c.bundledHub }}{{ end }}
 {{- $role := printf "%s-%s" .Release.Namespace $name }}
+{{- if not $bundled }}
 # The release-scoped installer account: the connector guards' explicit trusted
 # initial administrator (like the hub bootstrap runner). It holds every
 # permission it grants the connector account.
@@ -26,6 +41,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
 automountServiceAccountToken: false
 ---
+{{- end }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -147,7 +163,8 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     namespace: {{ .Release.Namespace }}
-    name: {{ $name }}
+    name: {{ $account }}
+{{- if not $bundled }}
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -157,6 +174,7 @@ metadata:
 immutable: true
 data:
   regional-offer.json: {{ $c.offer | quote }}
+{{- end }}
 ---
 apiVersion: batch/v1
 kind: Job
@@ -171,7 +189,7 @@ spec:
   activeDeadlineSeconds: 600
   template:
     spec:
-      serviceAccountName: {{ $name }}
+      serviceAccountName: {{ $account }}
       # The hook alone uses the in-cluster account; the CLI never does.
       automountServiceAccountToken: true
       enableServiceLinks: false
@@ -192,7 +210,7 @@ spec:
         - name: installer
           image: {{ $c.image }}
           imagePullPolicy: IfNotPresent
-          command: [/asservat, installer-cluster, --in-cluster, --offer, /run/asservat/cluster/regional-offer.json, --bootstrap, /run/asservat/cluster/bootstrap.json, --namespace, {{ $c.namespace }}{{ if $executor }}, --evidence-credential, /run/asservat/cluster/evidence-storage.json, --history-credential, /run/asservat/cluster/history-storage.json{{ end }}{{ if $c.alertmanager }}, --alertmanager, {{ $c.alertmanager | quote }}{{ end }}{{ if $c.identityMappings }}, --identity-mappings, {{ $c.identityMappings | toJson | quote }}{{ end }}{{ if $profileAuth }}, --profile-authorization, /run/asservat/cluster/profile-authorization.json{{ end }}{{ if $c.profileEndpoints }}, --profile-endpoints, {{ $c.profileEndpoints | toJson | quote }}{{ end }}{{ if .Values.collector.enabled }}, --collector-namespace, {{ .Values.collector.namespace }}, --collector-name, {{ printf "%s-node" .Release.Name }}{{ end }}]
+          command: [/asservat, installer-cluster, --in-cluster{{ if $bundled }}, --bundled-hub, {{ $c.bundledHub | quote }}, --bootstrap-id, {{ $c.bootstrapID | quote }}, --join-hub{{ else }}, --offer, /run/asservat/cluster/regional-offer.json, --bootstrap, /run/asservat/cluster/bootstrap.json{{ end }}, --namespace, {{ $c.namespace }}{{ if and $executor (not $bundled) }}, --evidence-credential, /run/asservat/cluster/evidence-storage.json, --history-credential, /run/asservat/cluster/history-storage.json{{ end }}{{ if $c.alertmanager }}, --alertmanager, {{ $c.alertmanager | quote }}{{ end }}{{ if $c.identityMappings }}, --identity-mappings, {{ $c.identityMappings | toJson | quote }}{{ end }}{{ if $profileAuth }}, --profile-authorization, /run/asservat/cluster/profile-authorization.json{{ end }}{{ if $c.profileEndpoints }}, --profile-endpoints, {{ $c.profileEndpoints | toJson | quote }}{{ end }}{{ if .Values.collector.enabled }}, --collector-namespace, {{ .Values.collector.namespace }}, --collector-name, {{ printf "%s-node" .Release.Name }}{{ end }}]
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
@@ -203,13 +221,28 @@ spec:
             limits: {cpu: 500m, memory: 256Mi}
           volumeMounts:
             - name: inputs
-              mountPath: /run/asservat/cluster
+              mountPath: {{ ternary "/run/asservat/cluster/bundled" "/run/asservat/cluster" $bundled }}
               readOnly: true
       volumes:
         - name: inputs
           projected:
             defaultMode: 0440
             sources:
+              {{- if $bundled }}
+              - configMap:
+                  name: {{ printf "%s-preparer" $c.bundledHub | quote }}
+                  items: [{key: deployment.json, path: hub-preparer.json}]
+              - secret:
+                  name: {{ printf "%s-openbao-state" $c.bundledHub | quote }}
+                  items: [{key: plan.json, path: openbao-plan.json}, {key: ca.crt, path: openbao-ca.crt}, {key: backend-id, path: openbao-backend-id}]
+              - secret:
+                  name: {{ printf "%s-objectstore-state" $c.bundledHub | quote }}
+                  items: [{key: plan.json, path: objectstore-plan.json}, {key: ca.crt, path: objectstore-ca.crt}]
+              - serviceAccountToken:
+                  path: keyprovider-setup-token
+                  audience: https://asservat.io/openbao/setup
+                  expirationSeconds: 600
+              {{- else }}
               - configMap:
                   name: {{ printf "%s-cluster-offer" .Release.Name }}
                   items: [{key: regional-offer.json, path: regional-offer.json}]
@@ -220,5 +253,6 @@ spec:
               - secret:
                   name: {{ $c.evidenceSecret }}
                   items: [{key: evidence-storage.json, path: evidence-storage.json}, {key: history-storage.json, path: history-storage.json}{{ if $profileAuth }}, {key: profile-authorization.json, path: profile-authorization.json}{{ end }}]
+              {{- end }}
               {{- end }}
 {{- end }}

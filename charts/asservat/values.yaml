@@ -128,13 +128,18 @@ bootstrap:
 
 # ADR-193: with mode=cluster, a post-install/post-upgrade hook installs one
 # regional connector through `asservat installer-cluster --in-cluster`. The
-# release-scoped installer account is the guards' trusted initial
-# administrator. The bootstrap record stays in an operator-created Secret.
+# external branch uses its release-scoped installer as trusted administrator.
+# The selected bundled branch reuses the original hub bootstrap account.
 cluster:
   enabled: false
   namespace: asservat-connector
   image: ""
   registrySecret: ""
+  # Explicit same-API enrollment with the original bundled hub's trusted runner.
+  # Use the exact bootstrapID issued through /fleet; this never issues one.
+  # Manual offer/bootstrapSecret/evidenceSecret must stay empty in this mode.
+  bundledHub: ""
+  bootstrapID: ""
   offer: ""
   bootstrapSecret: ""
   # Existing operator Secret: evidence-storage.json is the write-only evidence

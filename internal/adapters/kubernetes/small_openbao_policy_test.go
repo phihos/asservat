@@ -72,3 +72,23 @@ func TestSmallOpenBaoSetupMountsMatchBundledConsumers(t *testing.T) {
 		t.Fatal("audit and session/work mounts must remain distinct")
 	}
 }
+
+func TestSmallOpenBaoSetupReadsOnlyExistingConnectorBootstrapData(t *testing.T) {
+	var policy struct {
+		Path map[string]struct {
+			Capabilities []string `json:"capabilities"`
+		} `json:"path"`
+	}
+	if err := json.Unmarshal([]byte(smallOpenBaoSetupPolicy()), &policy); err != nil {
+		t.Fatal(err)
+	}
+	path := contracts.SmallOpenBaoBootstrapMount + "/data/connector/*"
+	if !slices.Equal(policy.Path[path].Capabilities, []string{"read"}) {
+		t.Fatal("missing read-only existing bootstrap delivery")
+	}
+	for _, p := range []string{contracts.SmallOpenBaoBootstrapMount + "/*", contracts.SmallOpenBaoBootstrapMount + "/data/*", contracts.SmallOpenBaoBootstrapMount + "/metadata/*"} {
+		if _, ok := policy.Path[p]; ok {
+			t.Fatal("broadened bootstrap data administration")
+		}
+	}
+}

@@ -79,6 +79,40 @@ state failures. Backend backup/recovery claims require their own actual tests.
 The current ledger records actual results and remaining gaps. No homelab or
 publication action follows merely from this candidate.
 
+## Bundled regional provisioning
+
+The first same-API small profile reuses the ordinary regional connector and
+catalog join. `combined` alone does not provide a local execution bypass.
+After the fleet operator issues an ordinary finite bootstrap, a second regional
+Helm release in the original bootstrap namespace selects `cluster.bundledHub`
+and its public `cluster.bootstrapID`. Its finite installer uses the original
+trusted bootstrap account and projects only existing public provider plans,
+roots/backend identity and the dedicated setup-audience token. No root token,
+seal key, provider private CA key or runtime hub identity is mounted.
+
+The installer compares those sources with the original preparer and current
+installed owner/offer, reads only version1 of that issued bootstrap, and preserves
+its original expiry. It persists the two purpose-specific storage keys in the
+existing immutable regional evidence Secret before any IAM enablement. Unknown
+creates permit exact candidate readback only. Later retries recover those keys.
+Additive provider setup preserves every retained IAM identity and policy SID;
+conflicts refuse. The normal protected connector install and normal catalog join
+follow. Operator provider administration is serialized; concurrent provider
+administrators and incomplete-state adoption are not supported by this profile.
+
+Complexity reassessment: this removes two actual external-provider administration
+steps required for every first small-profile capture. The maintainer has not
+accepted keeping those external dependencies. Existing regional installers and
+create-only credential carriers supply precedent. Cost is two existing-purpose
+keys per region, one existing regional Secret, one finite existing installer Job
+and one exact read-only KV path in the existing setup policy; zero new services,
+watches, SQL connections, runtime roles or journals. Provider append adds one
+policy GET and three current pinned IAM-source reads, with ordinary bounded
+setup/readback/reload work. Only normal metadata scales with regional count;
+there is no background task or new tuning. Replay preserves original credentials,
+and uninstall preserves existing data/identity. Fresh installed qualification
+remains required. Documentation alone cannot supply the missing credentials.
+
 ## Initial object-store provisioning join
 
 The implementation consumes the original bootstrap state's installation/

@@ -11,6 +11,7 @@ import (
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/providerconfig"
 	"asservat.local/asservat/internal/contracts"
+	"k8s.io/client-go/rest"
 )
 
 // A cold provider operation owns the administrator client only until Close.
@@ -43,27 +44,33 @@ func (k *InstallerContinuation) openSmallStore(ctx context.Context) (_ *continua
 	if k == nil || k.objectStore == nil || k.plan.Services == nil {
 		return nil, mounts.ErrUnavailable
 	}
+	return openSmallSeaweedStore(ctx, k.in.kubernetes("administrator-token"), k.plan, *k.objectStore, k.record.Scope.InstallationID)
+}
+
+func openSmallSeaweedStore(ctx context.Context, admin *rest.Config, original contracts.InitialPreparer, plan contracts.SmallSeaweedPlan, installation string) (_ *continuationSeaweed, err error) {
+	if ctx == nil || ctx.Err() != nil || admin == nil || original.Services == nil || !plan.Valid() || original.Plan.InstallationID != installation {
+		return nil, mounts.ErrUnavailable
+	}
 	s := &continuationSeaweed{}
 	defer func() {
 		if err != nil {
 			s.Close()
 		}
 	}()
-	admin := k.in.kubernetes("administrator-token")
-	binder, err := kube.NewSmallSeaweedBinding(admin, *k.objectStore)
+	binder, err := kube.NewSmallSeaweedBinding(admin, plan)
 	if err != nil {
 		return nil, &fixedStepError{"binding-client", err}
 	}
-	a := k.plan.Services.AuditStore
-	s.binding, s.backend, err = binder.ReadReady(ctx, k.record.Scope.InstallationID, k.plan.Plan.RequestID, a.Bucket)
+	a := original.Services.AuditStore
+	s.binding, s.backend, err = binder.ReadReady(ctx, installation, original.Plan.RequestID, a.Bucket)
 	if err != nil {
 		return nil, &fixedStepError{"ready-source", err}
 	}
 	roots, err := providerconfig.TrustRootsPEM(s.backend.RootsPEM, time.Now())
-	if err != nil || !reflect.DeepEqual(roots, a.Roots) || a.Endpoint != k.objectStore.Endpoint() {
+	if err != nil || !reflect.DeepEqual(roots, a.Roots) || a.Endpoint != plan.Endpoint() {
 		return nil, &fixedStepError{"original-trust", mounts.ErrUnavailable}
 	}
-	s.provider, err = kube.ResolveSmallSeaweedProvider(ctx, admin, *k.objectStore, k.record.Scope.InstallationID, s.backend.IAM)
+	s.provider, err = kube.ResolveSmallSeaweedProvider(ctx, admin, plan, installation, s.backend.IAM)
 	if err != nil {
 		return nil, &fixedStepError{"current-provider", err}
 	}
@@ -71,7 +78,7 @@ func (k *InstallerContinuation) openSmallStore(ctx context.Context) (_ *continua
 	if err != nil {
 		return nil, &fixedStepError{"original-initial-credential", err}
 	}
-	s.initial = contracts.SeaweedGrant{Credential: c, Bucket: a.Bucket, InstallationID: k.record.Scope.InstallationID}
+	s.initial = contracts.SeaweedGrant{Credential: c, Bucket: a.Bucket, InstallationID: installation}
 	client, err := ownerHTTP(a.Endpoint, a.Roots)
 	if err != nil {
 		return nil, &fixedStepError{"tls-client", err}

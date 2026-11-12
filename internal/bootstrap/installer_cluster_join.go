@@ -17,6 +17,7 @@ import (
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	cfg "asservat.local/asservat/internal/domain/configuration"
+	"k8s.io/client-go/rest"
 )
 
 // RunInstallerClusterJoin is ADR-196's hub-side join. Run as an installation
@@ -55,20 +56,29 @@ func RunInstallerClusterJoin(ctx context.Context, args []string, out io.Writer) 
 	if err != nil {
 		return err
 	}
-	offer, err := kube.ReadRegionalOffer(ctx, config, *namespace, join.InstallationID)
+	joined, err := joinInstalledRegionalCluster(ctx, config, *namespace, join, *standby, *captures)
 	if err != nil {
 		return err
+	}
+	return json.NewEncoder(out).Encode(joined)
+}
+
+func joinInstalledRegionalCluster(ctx context.Context, config *rest.Config, namespace string, join contracts.RegionalJoin, standby, captures int) (contracts.OwnerPublicCluster, error) {
+	var zero contracts.OwnerPublicCluster
+	offer, err := kube.ReadRegionalOffer(ctx, config, namespace, join.InstallationID)
+	if err != nil {
+		return zero, err
 	}
 	if executor, err := offer.RegionalExecutorOffered(); err != nil || !executor {
-		return mounts.ErrUnavailable
+		return zero, mounts.ErrUnavailable
 	}
-	owner, err := kube.OwnerInputs(ctx, config, *namespace, join.InstallationID)
+	owner, err := kube.OwnerInputs(ctx, config, namespace, join.InstallationID)
 	if err != nil {
-		return err
+		return zero, err
 	}
-	entry, topology, err := regionalJoinEntry(offer, owner, join, *standby, *captures)
+	entry, topology, err := regionalJoinEntry(offer, owner, join, standby, captures)
 	if err != nil {
-		return err
+		return zero, err
 	}
 	g := owner.Public.ClusterCatalog.Guard
 	admins := make([]cfg.KubernetesActor, len(g.Administrators))
@@ -81,22 +91,22 @@ func RunInstallerClusterJoin(ctx context.Context, args []string, out io.Writer) 
 	plan := cfg.RetentionAdministration{Name: contracts.RetentionGuardName(join.InstallationID), ControlNamespace: control, Administrators: admins, StatusUsers: []string{contracts.RetentionStatusUser}}
 	retention, err := kube.EnsureRetentionGuard(ctx, config, plan)
 	if err != nil {
-		return err
+		return zero, err
 	}
 	digest, err := kube.RetentionGuardDigest(offer.HubClusterID, plan, kube.GuardPin{PolicyUID: retention.PolicyUID, PolicyGeneration: retention.PolicyGeneration, BindingUID: retention.BindingUID, BindingResourceVersion: retention.BindingResourceVersion})
 	if err != nil {
-		return err
+		return zero, err
 	}
 	topology.Hub = contracts.RetentionPolicySource{ClusterID: offer.HubClusterID, ControlNamespaceUID: owner.Namespace.UID, ProtectionSHA256: hex.EncodeToString(digest[:])}
 	downloads, err := regionalJoinDownloads(owner, entry)
 	if err != nil {
-		return err
+		return zero, err
 	}
 	joined, err := kube.JoinRegionalCluster(ctx, config, kube.ClusterJoinPlan{Control: control, Installation: join.InstallationID, Admins: admins, Catalog: owner.Public.ClusterCatalog.Source, Topology: topology, Entry: entry, Downloads: downloads})
 	if err != nil {
-		return err
+		return zero, err
 	}
-	return json.NewEncoder(out).Encode(joined)
+	return joined, nil
 }
 
 // regionalJoinDownloads is the joined cluster's derived download path
