@@ -122,6 +122,10 @@
             "database",
             "username"
           ]
+        },
+        "processingOperators": {
+          "type": "boolean",
+          "description": "Immutable explicit opt-in; false is omitted. Adds one empty dedicated group; derives no human grants."
         }
       },
       "required": [

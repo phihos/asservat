@@ -68,6 +68,13 @@ func resolveInstallerContinuationIdentity(ctx context.Context, files *os.Root, i
 	if !slices.Contains(p.EligibleGroups, group) {
 		p.EligibleGroups = append(p.EligibleGroups, group)
 	}
+	if s.ProcessingOperators && len(p.ProcessingOperators) == 0 {
+		id, err := smallKeycloakProcessingGroup(group)
+		if err != nil {
+			return mounts.ErrUnavailable
+		}
+		p.ProcessingOperators = []contracts.ProcessingOperator{{ClientID: s.ConsoleClientID, Issuer: s.Hostname + "/realms/" + s.Realm, Kind: "Group", ID: id}}
+	}
 	input.IdentitySource = ""
 	return nil
 }

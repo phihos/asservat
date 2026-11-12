@@ -229,3 +229,24 @@ The durable mint claim consumes the existing operation's original deadline,
 normalized downward to microseconds; its positive interval is at most5s. It
 never creates another five-second window after blocking work. The Fresh/CAS,
 unknown-reply and original parent bounds are unchanged.
+
+
+### Explicit bundled processing-operator group (proposed)
+
+`services.identity.keycloak.processingOperators` defaults false. True is retained
+in the original immutable settings and creates one initially empty
+`asservat-processing-operators` group. Its UUIDv5 is derived with the existing
+UUID implementation from the protected original random users-group UUID as
+namespace and that fixed group name. This is public identity derivation, not a
+secret-payload hash. No extra Secret field, API call, role, watch or service is
+added. Legacy false settings and realm bytes remain unchanged. Existing retained
+settings cannot be upgraded by changing this flag.
+
+Only this explicit selected profile may omit the processing-operator list before
+normalization. It fills an empty list with the dedicated Group principal and
+actual console client/issuer; an explicit nonempty list is preserved. Ordinary
+users remain in their separate eligibility/fleet group. No users/default password
+or default memberships are created. An administrator deliberately assigns real
+humans to the dedicated group through Keycloak; ordinary evidence AccessBindings
+and current privacy authority checks remain independent. The selected example
+omits the derived list rather than inserting fabricated IDs.

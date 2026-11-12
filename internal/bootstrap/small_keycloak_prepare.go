@@ -154,5 +154,25 @@ func smallKeycloakRealm(s contracts.SmallKeycloakSettings, group string) ([]byte
 		map[string]any{"name": "email", "permissions": map[string]any{"view": []string{"admin", "user"}, "edit": []string{"admin", "user"}}, "validations": map[string]any{"email": map[string]any{}, "length": map[string]int{"max": 255}}},
 		map[string]any{"name": "asservat_group_id", "multivalued": true, "permissions": map[string]any{"view": []string{"admin"}, "edit": []string{"admin"}}},
 	}, "groups": []any{}})
-	return json.Marshal(map[string]any{"realm": s.Realm, "attributes": map[string]string{"CreateDefaultClientScopes": "true"}, "enabled": true, "sslRequired": "all", "registrationAllowed": false, "resetPasswordAllowed": false, "loginWithEmailAllowed": false, "accessTokenLifespan": 300, "revokeRefreshToken": true, "refreshTokenMaxReuse": 0, "bruteForceProtected": true, "clientScopes": scopes, "clients": clients, "users": []any{}, "groups": []any{map[string]any{"id": group, "name": "asservat-users", "attributes": map[string]any{"asservat_group_id": []string{group}}}}, "components": map[string]any{"org.keycloak.userprofile.UserProfileProvider": []any{map[string]any{"providerId": "declarative-user-profile", "config": map[string]any{"kc.user.profile.config": []string{string(profile)}}}}}})
+	realmGroups := []any{map[string]any{"id": group, "name": "asservat-users", "attributes": map[string]any{"asservat_group_id": []string{group}}}}
+	if s.ProcessingOperators {
+		id, err := smallKeycloakProcessingGroup(group)
+		if err != nil {
+			return nil, err
+		}
+		realmGroups = append(realmGroups, map[string]any{"id": id, "name": smallKeycloakProcessingGroupName, "attributes": map[string]any{"asservat_group_id": []string{id}}})
+	}
+	return json.Marshal(map[string]any{"realm": s.Realm, "attributes": map[string]string{"CreateDefaultClientScopes": "true"}, "enabled": true, "sslRequired": "all", "registrationAllowed": false, "resetPasswordAllowed": false, "loginWithEmailAllowed": false, "accessTokenLifespan": 300, "revokeRefreshToken": true, "refreshTokenMaxReuse": 0, "bruteForceProtected": true, "clientScopes": scopes, "clients": clients, "users": []any{}, "groups": realmGroups, "components": map[string]any{"org.keycloak.userprofile.UserProfileProvider": []any{map[string]any{"providerId": "declarative-user-profile", "config": map[string]any{"kc.user.profile.config": []string{string(profile)}}}}}})
+}
+
+// Public identity derivation only; no secret payload or human membership enters
+// this UUID. The original random users group remains the namespace anchor.
+const smallKeycloakProcessingGroupName = "asservat-processing-operators"
+
+func smallKeycloakProcessingGroup(users string) (string, error) {
+	source, err := uuid.Parse(users)
+	if err != nil || source.String() != users || source.Version() != 4 {
+		return "", mounts.ErrUnavailable
+	}
+	return uuid.NewSHA1(source, []byte(smallKeycloakProcessingGroupName)).String(), nil
 }

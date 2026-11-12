@@ -867,13 +867,9 @@
                 }
               },
               "dependencies": {
-                "capacity": [
-                  "processingOperators"
-                ],
                 "promotion": [
                   "capacity",
-                  "federation",
-                  "processingOperators"
+                  "federation"
                 ],
                 "federation": [
                   "capacity"
@@ -1796,6 +1792,11 @@
                       }
                     }
                   }
+                },
+                "processingOperators": {
+                  "type": "boolean",
+                  "default": false,
+                  "description": "Explicit opt-in to an initially empty dedicated privacy processing group; never ordinary-users authority."
                 }
               },
               "required": [
@@ -3688,6 +3689,67 @@
                 "properties": {
                   "producer": {
                     "minLength": 1
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "not": {
+          "required": [
+            "services"
+          ],
+          "properties": {
+            "services": {
+              "required": [
+                "identity"
+              ],
+              "properties": {
+                "identity": {
+                  "required": [
+                    "provider",
+                    "keycloak"
+                  ],
+                  "properties": {
+                    "provider": {
+                      "const": "keycloak"
+                    },
+                    "keycloak": {
+                      "required": [
+                        "processingOperators"
+                      ],
+                      "properties": {
+                        "processingOperators": {
+                          "const": true
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "bootstrap": {
+            "properties": {
+              "continuation": {
+                "properties": {
+                  "public": {
+                    "dependencies": {
+                      "capacity": [
+                        "processingOperators"
+                      ],
+                      "promotion": [
+                        "processingOperators"
+                      ]
+                    }
                   }
                 }
               }

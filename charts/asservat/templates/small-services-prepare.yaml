@@ -20,6 +20,7 @@
 {{- $audience := default $client (dig "browserAudience" "" (default dict $p.promotion)) }}
 {{- $db := dict "host" (default (printf "%s-postgres.%s.svc" $b.name .Release.Namespace) $k.database.host) "port" $k.database.port "database" $k.database.name "username" $k.database.user }}
 {{- $_ := set $plan "keycloak" (dict "namespace" .Release.Namespace "secretName" (printf "%s-keycloak-state" $b.name) "hostname" $k.hostname "realm" $k.realm "origin" $p.origin "consoleClientID" $client "browserAudience" $audience "mcpClientID" "asservat-mcp" "mcpRedirectURIs" $k.mcpRedirectURIs "database" $db) }}
+{{- if $k.processingOperators }}{{ $_ := set (get $plan "keycloak") "processingOperators" true }}{{ end }}
 {{- if or (not $pg) $k.database.host }}
 {{- $_ := set $plan "keycloakExternalDatabase" true }}
 {{- end }}

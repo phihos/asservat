@@ -5,16 +5,17 @@ import "regexp"
 // SmallKeycloakSettings are public inputs to the create-once small-installation
 // preparation. No password, client secret or human identity belongs here.
 type SmallKeycloakSettings struct {
-	Namespace       string                `json:"namespace"`
-	SecretName      string                `json:"secretName"`
-	Hostname        string                `json:"hostname"`
-	Realm           string                `json:"realm"`
-	Origin          string                `json:"origin"`
-	ConsoleClientID string                `json:"consoleClientID"`
-	BrowserAudience string                `json:"browserAudience"`
-	MCPClientID     string                `json:"mcpClientID"`
-	MCPRedirectURIs []string              `json:"mcpRedirectURIs"`
-	Database        SmallKeycloakDatabase `json:"database"`
+	Namespace           string                `json:"namespace"`
+	SecretName          string                `json:"secretName"`
+	Hostname            string                `json:"hostname"`
+	Realm               string                `json:"realm"`
+	Origin              string                `json:"origin"`
+	ConsoleClientID     string                `json:"consoleClientID"`
+	BrowserAudience     string                `json:"browserAudience"`
+	MCPClientID         string                `json:"mcpClientID"`
+	MCPRedirectURIs     []string              `json:"mcpRedirectURIs"`
+	Database            SmallKeycloakDatabase `json:"database"`
+	ProcessingOperators bool                  `json:"processingOperators,omitempty"`
 }
 
 var smallKeycloakDBHost = regexp.MustCompile(`^[a-zA-Z0-9](?:[a-zA-Z0-9.-]{0,251}[a-zA-Z0-9])?$`)

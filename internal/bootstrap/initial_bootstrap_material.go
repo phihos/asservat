@@ -43,9 +43,6 @@ func (d *initialBootstrapProcess) firstMaterial(ctx context.Context, input *os.R
 		material.SetupToken = string(provider.Token)
 		selected := provider.Identity
 		material.BundledIdentity = &selected
-		if d.services.ObjectStore != nil {
-			material.StorageUseUntil = selected.SetupParent.ExpiresAt.Add(-contracts.BundledInitialProviderSafetyMargin)
-		}
 	}
 	if d.services.ObjectStore != nil {
 		if err := generateInitialSeaweedStorage(&material); err != nil {

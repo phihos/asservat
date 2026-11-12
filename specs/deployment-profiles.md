@@ -272,3 +272,10 @@ actor or resource is exempted. Fresh installed inputs MUST derive this branch
 and the fixed processing-source UPDATE probe before their original guard claims,
 and preserve them through configuration role production, worker activation and
 owner startup. Existing receipts MUST NOT be rewritten to adopt the new plan.
+
+
+Bundled Keycloak may explicitly opt into an initially empty dedicated processing
+operator group. The original retained settings and protected generated public
+group identity determine the resulting Kubernetes processing-operator declaration.
+This does not grant ordinary users privacy authority or replace current ordinary
+evidence permission checks. With opt-in disabled, current behavior is unchanged.

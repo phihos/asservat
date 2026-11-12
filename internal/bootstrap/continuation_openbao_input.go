@@ -47,6 +47,12 @@ func resolveInstallerContinuationKeyServiceWithOpen(ctx context.Context, files *
 	if normalized.WorkerProvider.AuthMount != "" && normalized.WorkerProvider.AuthMount != contracts.SmallOpenBaoConfigurationAuthMount || normalized.OwnerProvider.AuthMount != "" && normalized.OwnerProvider.AuthMount != contracts.SmallOpenBaoOwnerAuthMount || normalized.OwnerPKIMount != "" && normalized.OwnerPKIMount != contracts.SmallOpenBaoOwnerPKIMount {
 		return nil, initialOpenBaoCheck("continuation-mount")
 	}
+	if normalized.Public != nil && normalized.Public.Federation != nil {
+		mount := normalized.Public.Federation.ConnectorPKIMount
+		if mount != "" && mount != contracts.SmallOpenBaoConnectorPKIMount {
+			return nil, initialOpenBaoCheck("continuation-connector-mount")
+		}
+	}
 	provider, err := open(ctx, files, plan, config)
 	if err != nil {
 		return nil, err
@@ -91,6 +97,32 @@ func resolveInstallerContinuationKeyServiceWithOpen(ctx context.Context, files *
 		}
 	} else {
 		normalized.OwnerIssuerRootsPEM = certificate.Certificate
+	}
+	if normalized.Public != nil && normalized.Public.Federation != nil {
+		federation := *normalized.Public.Federation
+		reply, err := initialOpenBaoCall(ctx, provider.HTTP, plan.Endpoint(), string(provider.Token), http.MethodGet, contracts.SmallOpenBaoConnectorPKIMount+"/cert/ca", nil)
+		var certificate struct {
+			Certificate string `json:"certificate"`
+		}
+		if err != nil || json.Unmarshal(reply.Data, &certificate) != nil || certificate.Certificate == "" {
+			return nil, initialOpenBaoCheck("continuation-connector-issuer")
+		}
+		roots, err := providerconfig.TrustRootsPEM([]byte(certificate.Certificate), time.Now())
+		if err != nil || len(roots) != 1 {
+			return nil, initialOpenBaoCheck("continuation-connector-issuer")
+		}
+		if federation.ConnectorIssuerRootsPEM != "" {
+			supplied, err := providerconfig.TrustRootsPEM([]byte(federation.ConnectorIssuerRootsPEM), time.Now())
+			if err != nil || !reflect.DeepEqual(supplied, roots) {
+				return nil, initialOpenBaoCheck("continuation-connector-roots")
+			}
+		} else {
+			federation.ConnectorIssuerRootsPEM = certificate.Certificate
+		}
+		federation.ConnectorPKIMount = contracts.SmallOpenBaoConnectorPKIMount
+		public := *normalized.Public
+		public.Federation = &federation
+		normalized.Public = &public
 	}
 	if !initialOpenBaoCurrent(ctx) {
 		return nil, initialOpenBaoCheck("continuation-context")

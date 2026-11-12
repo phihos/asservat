@@ -25,7 +25,7 @@ import urllib.error
 import urllib.request
 import yaml
 
-from helm_registry import HelmRegistry, REGISTRY, verify_registry_cleanup
+from helm_registry import HelmRegistry, REGISTRY, exported_image_identity, verify_registry_cleanup
 import native_kube_audit
 from pod_log_stream import PodLogStreamer
 
@@ -35,6 +35,11 @@ BAO = "quay.io/openbao/openbao@sha256:6d2b93856e3fcf7b18ad855a0b51eaba474dc8b79c
 NODE = "kindest/node@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5"
 PAUSE = "registry.k8s.io/pause@sha256:ee6521f290b2168b6e0935a181d4cff9be1ac3f505666ef0e3c98fae8199917a"
 POSTGRES = "postgres@sha256:afc7e2d441324c0388fa80c3d24f733b4194a4eb7f47dd8ee2b08eb1a24a647c"
+# Local, already qualified PG18.6/pgBackRest2.60 packaging component. Its actual
+# CRI manifest is resolved after loading, never inferred from the Docker ID.
+BUNDLED_POSTGRES_IMAGE = "asservat-small-postgres-smoke:20261111-pg2"
+BUNDLED_POSTGRES_IMAGE_ID = "sha256:e38fdf988dff7b8d535614c09f46f71a326d7d537cb399b691d26d4db38b0fdf"
+
 # The identity suite's pinned Keycloak (scripts/test-identity.py).
 KEYCLOAK = "quay.io/keycloak/keycloak@sha256:b0f60d489d51c5d113390bdf5461d4c06e6051be026c05549f2e1e10ec352bcc"
 # The alert focus's official Alertmanager v0.28.1 (ADR-231). Like PAUSE, the
@@ -48,6 +53,30 @@ METRICS_SERVER = "registry.k8s.io/metrics-server/metrics-server@sha256:89258156d
 
 def run(args, *, data=None):
     return subprocess.check_output(args, text=True, input=data, stderr=subprocess.PIPE).strip()
+
+
+def verify_bundled_postgres_cri_image(raw, reference, expected_image, content):
+    """Check the kubelet's resolver, separately from ctr's manifest alias."""
+    try:
+        status = json.loads(raw)["status"]
+        config_digest = status["id"]
+        if not re.fullmatch(r"sha256:[a-f0-9]{64}", config_digest) or reference not in status["repoDigests"]:
+            raise ValueError("different CRI alias")
+        config = content("blobs/sha256/" + config_digest[7:], 64 << 10)
+        if "sha256:" + hashlib.sha256(config).hexdigest() != config_digest:
+            raise ValueError("different CRI config")
+        platform = json.loads(config)
+        if platform.get("os") != "linux" or platform.get("architecture") != "amd64":
+            raise ValueError("different CRI platform")
+        # Docker's containerd store returns an index as Image.Id. Bind both
+        # that original descriptor and the actual imported reference to the
+        # config selected by CRI; neither digest is assumed to be a config ID.
+        exported_image_identity(content, expected_image, config)
+        exported_image_identity(content, reference.split("@", 1)[1], config)
+        return config_digest
+    except (ValueError, KeyError, TypeError):
+        pass
+    raise RuntimeError("bundled PostgreSQL CRI alias does not resolve the qualified image")
 
 
 
@@ -241,10 +270,15 @@ def qualification_selection(test_pattern, initial_handover, initial_schema_hando
     return test_pattern, 2
 
 
-def qualification_environment(base, fixture_path, work, initial_handover, initial_schema_handover, initial_bootstrap_chain=False, helm_bootstrap=False, regional_context_start=None, runtime_object_roundtrip=False, owner_provider_auth=False, runtime_provider_pair=False, runtime_provider_worker=False, runtime_provider_owner=False, installer_continuation=False, bundled_objectstore=False, bundled_keyservice=False):
+def qualification_environment(base, fixture_path, work, initial_handover, initial_schema_handover, initial_bootstrap_chain=False, helm_bootstrap=False, regional_context_start=None, runtime_object_roundtrip=False, owner_provider_auth=False, runtime_provider_pair=False, runtime_provider_worker=False, runtime_provider_owner=False, installer_continuation=False, bundled_objectstore=False, bundled_keyservice=False, bundled_postgres=False):
     env = base.copy()
     env.pop("ASSERVAT_HELM_BUNDLED_OBJECTSTORE", None)
     env.pop("ASSERVAT_HELM_BUNDLED_KEYSERVICE", None)
+    env.pop("ASSERVAT_HELM_BUNDLED_POSTGRES", None)
+    if bundled_postgres:
+        if not helm_bootstrap:
+            raise ValueError("Bundled PostgreSQL qualification requires --helm-bootstrap")
+        env["ASSERVAT_HELM_BUNDLED_POSTGRES"] = "1"
     if bundled_keyservice:
         if not helm_bootstrap:
             raise ValueError("Bundled key service qualification requires --helm-bootstrap")
@@ -679,7 +713,9 @@ def collect_profile_containment_artifacts(work, results):
     return {"directory": str(destination), "files": collected, "scope": "explicit terminal collection from the private harness directory, including failed runs"}
 
 
-def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=False, initial_bootstrap_chain=False, helm_bootstrap=False, regional_context_start=None, runtime_object_roundtrip=False, owner_provider_auth=False, runtime_provider_pair=False, runtime_provider_worker=False, runtime_provider_owner=False, installer_continuation=False, helm_cluster=False, keep_on_failure=False, keep_installed=False, bundled_objectstore=False, bundled_keyservice=False):
+def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=False, initial_bootstrap_chain=False, helm_bootstrap=False, regional_context_start=None, runtime_object_roundtrip=False, owner_provider_auth=False, runtime_provider_pair=False, runtime_provider_worker=False, runtime_provider_owner=False, installer_continuation=False, helm_cluster=False, keep_on_failure=False, keep_installed=False, bundled_objectstore=False, bundled_keyservice=False, bundled_postgres=False):
+    if bundled_postgres and (not helm_bootstrap or helm_cluster):
+        raise ValueError("Bundled PostgreSQL qualification requires --helm-bootstrap without --helm-cluster")
     if bundled_keyservice and (not helm_bootstrap or helm_cluster):
         raise ValueError("Bundled key service qualification requires --helm-bootstrap without --helm-cluster")
     if bundled_objectstore and (not helm_bootstrap or helm_cluster):
@@ -716,6 +752,15 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
     # ADR-193 step 6: the Helm registry/chart infrastructure, another test.
     helm_bootstrap = helm_bootstrap or helm_cluster
     test_pattern, cluster_count = qualification_selection(test_pattern, initial_handover, initial_schema_handover, initial_bootstrap_chain, helm_bootstrap, regional_context_start, runtime_object_roundtrip, owner_provider_auth, runtime_provider_pair, runtime_provider_worker, runtime_provider_owner, installer_continuation)
+    bundled_postgres_source = None
+    if bundled_postgres:
+        try:
+            bundled_postgres_source = json.loads(run(["docker", "image", "inspect", BUNDLED_POSTGRES_IMAGE]))[0]
+        except (subprocess.CalledProcessError, ValueError, IndexError, KeyError):
+            raise ValueError("qualified cached PostgreSQL image unavailable; no build/pull fallback") from None
+        if bundled_postgres_source["Id"] != BUNDLED_POSTGRES_IMAGE_ID or bundled_postgres_source["Architecture"] != "amd64" or bundled_postgres_source["Os"] != "linux":
+            raise ValueError("qualified local bundled PostgreSQL image changed")
+
     cluster_count = qualification_cluster_count(cluster_count, installer_continuation)
     if native_traffic_probe:
         (ROOT/"test/results/native-traffic-probe.json").unlink(missing_ok=True)
@@ -761,7 +806,8 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
         report["helmContextQualification"] = helm_context
         report["bundledObjectStoreQualification"] = bundled_objectstore
         report["bundledKeyServiceQualification"] = bundled_keyservice
-        report["qualificationArguments"] = {"helmBootstrap": helm_bootstrap, "bundledObjectStore": bundled_objectstore, "bundledKeyService": bundled_keyservice, "testPattern": test_pattern}
+        report["bundledPostgresQualification"] = bundled_postgres
+        report["qualificationArguments"] = {"helmBootstrap": helm_bootstrap, "bundledObjectStore": bundled_objectstore, "bundledKeyService": bundled_keyservice, "bundledPostgres": bundled_postgres, "testPattern": test_pattern}
         if helm_context:
             profile = ROOT/"examples/helm/context-trial-profile.yaml"
             report["helmContextReferenceProfileSHA256"] = hashlib.sha256(profile.read_bytes()).hexdigest()
@@ -1065,6 +1111,29 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
                             run(["docker", "exec", node_name, "crictl", "pull", object_image])
                             fixture["helmBootstrap"]["objectStoreImage"] = object_image
                             report["images"]["bundledObjectStore"] = object_image
+                        if bundled_postgres:
+                            image = bundled_postgres_source
+                            if image["Id"] != BUNDLED_POSTGRES_IMAGE_ID or image["Architecture"] != "amd64" or image["Os"] != "linux":
+                                raise RuntimeError("qualified local bundled PostgreSQL image changed")
+                            run(["kind", "load", "docker-image", BUNDLED_POSTGRES_IMAGE, "--name", name, "--nodes", node_name])
+                            native = "docker.io/library/" + BUNDLED_POSTGRES_IMAGE
+                            rows = run(["docker", "exec", node_name, "ctr", "-n", "k8s.io", "images", "ls"]).splitlines()
+                            matches = [row.split()[2] for row in rows if row.split()[0] == native]
+                            if len(matches) != 1 or not re.fullmatch(r"sha256:[a-f0-9]{64}", matches[0]):
+                                raise RuntimeError("bundled PostgreSQL CRI manifest identity unavailable")
+                            reference = "docker.io/library/asservat-small-postgres-smoke@" + matches[0]
+                            run(["docker", "exec", node_name, "ctr", "-n", "k8s.io", "images", "tag", native, reference])
+                            def content(path, maximum):
+                                digest = "sha256:" + path.removeprefix("blobs/sha256/")
+                                if not re.fullmatch(r"sha256:[a-f0-9]{64}", digest):
+                                    raise RuntimeError("invalid bundled PostgreSQL descriptor")
+                                raw = subprocess.check_output(["docker", "exec", node_name, "ctr", "-n", "k8s.io", "content", "get", digest], stderr=subprocess.PIPE)
+                                if len(raw) > maximum:
+                                    raise RuntimeError("unbounded bundled PostgreSQL descriptor")
+                                return raw
+                            config_digest = verify_bundled_postgres_cri_image(run(["docker", "exec", node_name, "crictl", "inspecti", reference]), reference, image["Id"], content)
+                            fixture["helmBootstrap"]["postgresImage"] = reference
+                            report["images"]["bundledPostgres"] = {"source": BUNDLED_POSTGRES_IMAGE, "dockerID": image["Id"], "criImage": reference, "criConfigDigest": config_digest, "node": node_name}
                         if bundled_keyservice:
                             chart_values = yaml.safe_load((ROOT/"charts/asservat/values.yaml").read_text())
                             key_image = chart_values["services"]["keyService"]["openbao"]["image"]
@@ -1153,7 +1222,7 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
             path = work/"fixtures.json"
             path.touch(mode=0o600)
             path.write_text(json.dumps(fixture))
-            env = qualification_environment(os.environ, path, work, initial_handover, initial_schema_handover, initial_bootstrap_chain, helm_bootstrap, regional_context_start, runtime_object_roundtrip, owner_provider_auth, runtime_provider_pair, runtime_provider_worker, runtime_provider_owner, installer_continuation, bundled_objectstore, bundled_keyservice)
+            env = qualification_environment(os.environ, path, work, initial_handover, initial_schema_handover, initial_bootstrap_chain, helm_bootstrap, regional_context_start, runtime_object_roundtrip, owner_provider_auth, runtime_provider_pair, runtime_provider_worker, runtime_provider_owner, installer_continuation, bundled_objectstore, bundled_keyservice, bundled_postgres)
 
             if build_scratch is not None:
                 env["TMPDIR"] = str(build_scratch)
@@ -1639,8 +1708,9 @@ if __name__ == "__main__":
     parser.add_argument("--initial-bootstrap-chain", action="store_true", help="Qualify all four fixed bootstrap commands in a Restricted runner and the original activation Pod on an empty database.")
     parser.add_argument("--helm-cluster", action="store_true", help="ADR-193 step 6: the packaged chart in mode=cluster runs the regional installer hook with a synthetic offer and record, on the --helm-bootstrap registry/node infrastructure.")
     parser.add_argument("--helm-bootstrap", action="store_true", help="Actual chart/four-command empty-database chain with authenticated TLS registry and two owned cold-image nodes.")
-    parser.add_argument("--bundled-objectstore", action="store_true", help="With --helm-bootstrap, qualify the actual bundled S3 chart and generated original audit credential; PostgreSQL remains external and OpenBao may be selected independently.")
-    parser.add_argument("--bundled-keyservice", action="store_true", help="With --helm-bootstrap, qualify the actual bundled OpenBao chart and generated initial issuer/children; PostgreSQL remains external and S3 may be selected independently.")
+    parser.add_argument("--bundled-objectstore", action="store_true", help="With --helm-bootstrap, qualify the actual bundled S3 chart and generated original audit credential; PostgreSQL/OpenBao may be selected independently.")
+    parser.add_argument("--bundled-postgres", action="store_true", help="With --helm-bootstrap, qualify actual chart PostgreSQL18/pgBackRest with generated original credentials, both retained PVCs and product schema/role initialization; no external PG credential enters the product.")
+    parser.add_argument("--bundled-keyservice", action="store_true", help="With --helm-bootstrap, qualify the actual bundled OpenBao chart and generated initial issuer/children; PostgreSQL/S3 may be selected independently.")
     parser.add_argument("--regional-context-start", choices=("first", "continuation", "journey"), help="Qualify actual signed same-port H2 context start; journey adds the shared operation factory, publication and native download. Owns its exact fresh-fixture test selection; synthetic authority remains explicit.")
     parser.add_argument("--runtime-object-roundtrip", action="store_true", help="Qualify inert generated resource defaults in one owned API, using the exact package-local test; no installer authority claim.")
     parser.add_argument("--owner-provider-auth", action="store_true", help="Qualify fixed owner Kubernetes authentication against the pinned provider and one owned API; no installed-runtime qualification.")
@@ -1664,4 +1734,4 @@ if __name__ == "__main__":
         parser.error("Select exactly one installation qualification")
     if args.test_pattern is not None and not 1 <= len(args.test_pattern) <= 256:
         parser.error("--run must contain 1 to 256 characters")
-    raise SystemExit(main(args.test_pattern, initial_handover=args.initial_handover, initial_schema_handover=args.initial_schema_handover, initial_bootstrap_chain=args.initial_bootstrap_chain, helm_bootstrap=args.helm_bootstrap, regional_context_start=args.regional_context_start, runtime_object_roundtrip=args.runtime_object_roundtrip, owner_provider_auth=args.owner_provider_auth, runtime_provider_pair=args.runtime_provider_pair, runtime_provider_worker=args.runtime_provider_worker, runtime_provider_owner=args.runtime_provider_owner, installer_continuation=args.installer_continuation, helm_cluster=args.helm_cluster, keep_on_failure=args.keep_on_failure, keep_installed=args.keep_installed, bundled_objectstore=args.bundled_objectstore, bundled_keyservice=args.bundled_keyservice))
+    raise SystemExit(main(args.test_pattern, initial_handover=args.initial_handover, initial_schema_handover=args.initial_schema_handover, initial_bootstrap_chain=args.initial_bootstrap_chain, helm_bootstrap=args.helm_bootstrap, regional_context_start=args.regional_context_start, runtime_object_roundtrip=args.runtime_object_roundtrip, owner_provider_auth=args.owner_provider_auth, runtime_provider_pair=args.runtime_provider_pair, runtime_provider_worker=args.runtime_provider_worker, runtime_provider_owner=args.runtime_provider_owner, installer_continuation=args.installer_continuation, helm_cluster=args.helm_cluster, keep_on_failure=args.keep_on_failure, keep_installed=args.keep_installed, bundled_objectstore=args.bundled_objectstore, bundled_keyservice=args.bundled_keyservice, bundled_postgres=args.bundled_postgres))

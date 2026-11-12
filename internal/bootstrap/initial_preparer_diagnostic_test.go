@@ -52,3 +52,19 @@ func TestInitialPreparerRunPreservesOnlyQualifiedProviderDiagnostic(t *testing.T
 		t.Fatal("provider detail lost", err)
 	}
 }
+
+func TestInitialPreparationRemedyPreservesClosedLoaderAndRunStage(t *testing.T) {
+	secret := errors.New("DO-NOT-LEAK-provider-token-sql-password")
+	for _, tc := range []struct {
+		err   error
+		stage string
+	}{
+		{initialPreparerLoadFailure{phase: "provider-material", cause: secret}, "loader provider-material"},
+		{initialPreparerRunFailure{phase: "sql-and-providers", cause: initialPreparerRunFailure{phase: "provider-wrap", cause: secret}}, "run sql-and-providers/provider-wrap"},
+	} {
+		got := InitialPreparationRemedy(tc.err)
+		if !strings.Contains(got, tc.stage) || strings.Contains(got, secret.Error()) {
+			t.Fatal("safe closed stage lost or cause exposed", got)
+		}
+	}
+}

@@ -101,11 +101,22 @@ func generateInitialSeaweedStorage(material *contracts.InitialBootstrapMaterial)
 	if material == nil || material.Storage != (contracts.OwnerStorageCredential{}) {
 		return mounts.ErrUnavailable
 	}
+	storageUseEnd := material.StorageUseUntil
+	if storageUseEnd.IsZero() {
+		if material.BundledIdentity == nil || !material.BundledIdentity.Valid() {
+			return mounts.ErrUnavailable
+		}
+		// Storage use is an original resource declaration, not a setup-token
+		// authority window. Thirty minutes from the original setup issue
+		// covers the later fifteen-minute SQL binding without changing the
+		// provider's five-minute parent or any request/session deadline.
+		storageUseEnd = material.BundledIdentity.SetupParent.IssuedAt.Add(30 * time.Minute)
+	}
 	c, err := providerconfig.GenerateSeaweedStorageCredential()
 	if err != nil {
 		return mounts.ErrUnavailable
 	}
-	material.Storage = c
+	material.Storage, material.StorageUseUntil = c, storageUseEnd
 	return nil
 }
 

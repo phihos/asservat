@@ -23,10 +23,11 @@ import (
 )
 
 type continuationBaoFixture struct {
-	base   *initialBaoProviderFixture
-	issuer string
-	opened *initialOpenBaoProvider
-	opens  int
+	base            *initialBaoProviderFixture
+	issuer          string
+	connectorIssuer string
+	opened          *initialOpenBaoProvider
+	opens           int
 }
 
 func newContinuationBaoFixture(t *testing.T, mode string) *continuationBaoFixture {
@@ -48,12 +49,13 @@ func newContinuationBaoFixture(t *testing.T, mode string) *continuationBaoFixtur
 		}
 	}
 	_, f.issuer = smallServicesHookTLS(t)
+	_, f.connectorIssuer = smallServicesHookTLS(t)
 	pair, err := tls.X509KeyPair(material["tls.crt"], material["tls.key"])
 	if err != nil {
 		t.Fatal(err)
 	}
 	server := httptest.NewUnstartedServer(initialBaoBuffered(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/v1/sys/mounts/auth/"+contracts.SmallOpenBaoConfigurationAuthMount && r.URL.Path != "/v1/sys/mounts/auth/"+contracts.SmallOpenBaoOwnerAuthMount && r.URL.Path != "/v1/"+contracts.SmallOpenBaoOwnerPKIMount+"/cert/ca" {
+		if r.URL.Path != "/v1/sys/mounts/auth/"+contracts.SmallOpenBaoConfigurationAuthMount && r.URL.Path != "/v1/sys/mounts/auth/"+contracts.SmallOpenBaoOwnerAuthMount && r.URL.Path != "/v1/"+contracts.SmallOpenBaoOwnerPKIMount+"/cert/ca" && r.URL.Path != "/v1/"+contracts.SmallOpenBaoConnectorPKIMount+"/cert/ca" {
 			f.base.provider(w, r)
 			return
 		}
@@ -70,9 +72,16 @@ func newContinuationBaoFixture(t *testing.T, mode string) *continuationBaoFixtur
 			w.WriteHeader(404)
 			return
 		}
+		if mode == "missing-connector" && r.URL.Path == "/v1/"+contracts.SmallOpenBaoConnectorPKIMount+"/cert/ca" {
+			w.WriteHeader(404)
+			return
+		}
 		if strings.HasSuffix(r.URL.Path, "/cert/ca") {
 			cert := f.issuer
-			if mode == "invalid-issuer" {
+			if strings.HasPrefix(r.URL.Path, "/v1/"+contracts.SmallOpenBaoConnectorPKIMount+"/") {
+				cert = f.connectorIssuer
+			}
+			if mode == "invalid-issuer" || mode == "invalid-connector" && strings.HasPrefix(r.URL.Path, "/v1/"+contracts.SmallOpenBaoConnectorPKIMount+"/") {
 				cert = "not a certificate"
 			}
 			_ = json.NewEncoder(w).Encode(map[string]any{"data": map[string]any{"certificate": cert}})

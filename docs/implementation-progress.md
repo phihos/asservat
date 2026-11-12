@@ -190,6 +190,42 @@ files. This creates no replacement authority window or renewed original bound.
 Final affected spec/Helm/Go-architecture/authority checks pass; the fresh installed
 join must now qualify these corrections together.
 
+The third initial run at `dcb99083` passed producer and schema setup, then
+preparation refused a saved-state mismatch: Go1/170.410s, harness1/271.666s.
+All4,973 sources matched and cleanup completed without failures; the original
+result route was restored. The receipt remains failed in
+`native-initial-bao-s3-20261112T041152Z/`.
+
+The producer wrongly coupled storage use to the short key-provider parent;
+the actual provider consumer requires coverage of the fifteen-minute SQL binding.
+The fully bundled generator now declares storage use through original setup
+issue+30min, independently of the unchanged original five-minute KMS session.
+A regression using actual generation, closed decoding and actual SQL-material
+binding failed before the fix and passes1.140s afterward; retained retries and
+external declarations preserve their original bytes/deadlines. This resource
+use end is not an authority observation or a backend credential-revocation claim.
+CLI output now preserves the existing owned loader/run stage diagnostics; its
+new regression failed before the change and affected tests pass1.134s.
+
+The next initial fixture independently selects bundled PostgreSQL too. It uses
+the previously qualified cached18.6/pgBackRest image, actual imported OCI/CRI
+identity, two owned data/backup PVs and generated actual SQL credentials/CA.
+Ten selector tests and integration compile pass. Actual Helm/SQL/backup/replay
+qualification for this selection remains pending; an external fixture database
+is not substituted into the product.
+
+Public-profile prerequisites are also integrated locally: explicit
+`services.identity.keycloak.processingOperators=true` creates an empty dedicated
+group, derives its stable UUID from the original public users UUID and fills only
+an omitted operator list. Default-false bytes and explicit lists are preserved;
+ordinary users gain no privacy authority. Actual eligibility/operator and six
+Helm cases pass. Connector CA normalization reads the exact existing connector
+issuer only when federation is selected, compares explicit roots and mutates no
+input on failure. Focused race checks pass3.910s/bootstrap and1.029s/contracts;
+spec/Helm/Go-architecture/authority checks pass. These are component checks;
+actual bundled Keycloak group behavior and the full public/region journey remain
+unqualified.
+
 Actual OpenSSL strict verification exposed missing leaf Authority Key Identifiers
 in generated PostgreSQL and SeaweedFS TLS certificates. Parsing the generated CA
 DER before leaf signing fixes both generators; the new actual OpenSSL regression
