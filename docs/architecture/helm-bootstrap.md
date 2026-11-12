@@ -108,6 +108,24 @@ from the named pull Secret. Primary sources: [API validation](https://github.com
 [kubelet credential extraction](https://github.com/kubernetes/kubernetes/blob/v1.37.0/pkg/credentialprovider/secrets/secrets.go),
 [image pull Secrets](https://kubernetes.io/docs/concepts/containers/images/#specifying-imagepullsecrets-on-a-pod).
 
+## Independent bundled provider continuation
+
+[ADR-326](../decisions/326-individually-selectable-small-services.md) composes
+key-service and object-store selections independently. Bundled OpenBao with
+external storage requires the existing named private material source for scoped
+storage credentials; continuation applies its own finite provider recipe.
+Bundled SeaweedFS with an external key provider retains its generated inputs in
+the original carrier and publishes only `providerMode: bundled-objectstore` in
+the nonsecret recipe outbox. The existing provider CLI uses those retained inputs
+and attaches the real inspection token by original UID/RV. Other selections omit
+the field. No credential is returned through the outbox.
+
+Current acknowledged launch/SQL verification handles worker replay without
+recreating a consumed phase1 inbox. Source/recipe/mode/phase identity, original
+deadlines and the ordinary final provider inspection remain binding. The
+[small-profile guide](../installation/small-profile.md) documents the all-bundled
+site inputs and pending qualification; rendering alone grants no authority.
+
 ## Qualification and remaining installed prerequisites
 
 The single five-command layout and expanded resume path are a packaging

@@ -168,8 +168,8 @@ import arbitrary provider identities or permissions as authority.
 The worker grant uses the existing compiled provider recipe's prefixes. Storage
 setup precedes worker-input acknowledgement. Once those inputs are acknowledged,
 replay skips that smaller IAM compilation so it cannot remove later hub roles.
-The complete hub-role provisioning and automatic provider inbox remain unfinished;
-focused checks are not installed runtime-storage qualification.
+Complete hub-role provisioning and the automatic provider inbox are implemented
+below; focused checks are not installed runtime-storage qualification.
 
 ## Bundled OpenBao composition
 
@@ -247,6 +247,42 @@ is checked for its actual selected hostname before effects. These bytes never
 enter Helm values/release data or the public continuation document. Retained
 inbox TLS/client bytes must match the checked source before IAM enablement.
 This does not create browser certificate trust or qualify installed login.
+
+## Independent continuation selections
+
+The provider choices apply independently to continuation as well as initial
+preparation. The both-bundled and both-external paths retain their existing wire
+shape. For bundled OpenBao with external storage, the existing
+`materialSecretName` is required: `configuration-audit-storage.json` supplies the
+worker credential; phase3 uses the existing closed inbox storage filenames.
+The installer combines these with selected serving inputs and the original
+Keycloak client secret, retains the original carrier before effects and applies
+its bundled provider recipe. No operator OpenBao token or extra CLI staging path
+is introduced.
+
+For bundled SeaweedFS with external OpenBao, continuation retains its generated
+storage keys and serving inputs in the existing phase1/phase3 carrier. The public
+recipe outbox adds optional `providerMode: bundled-objectstore`. The ordinary
+`installer-provider-apply` derives this selection from that outbox: omit private
+file flags and use the external provider's normal administration environment.
+It applies that exact recipe and attaches only its actual inspection response to
+the original recipe/mode/phase-bound carrier through UID/RV CAS. Empty mode keeps
+legacy bytes; unknown modes and ambiguous private-file arguments refuse. Private
+credentials never enter the public outbox.
+
+Replay after acknowledged worker launch verifies the existing current launch
+root and SQL roles instead of awaiting a consumed phase1 carrier or overwriting
+a later phase3 outbox. No new journal or replacement launch is created.
+
+Complexity reassessment: two requested mixed configurations were blocked by a
+concrete both-providers conditional. Independent provider choice is already a
+maintainer requirement. The smaller fix reuses existing finite setup clients,
+private material and carriers; zero new services, watches, SQL connections,
+runtime roles, credentials or objects are added. Cost is one optional public
+selection field and bounded original-carrier reads/CAS for the existing phases.
+There is no additional tuning, credential export or compatibility fallback.
+Unknown state still refuses; original deadlines and provider inspection remain.
+Tests and installed qualification are recorded separately in the ledger.
 
 ## Initial issuer response compatibility
 

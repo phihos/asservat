@@ -21,6 +21,9 @@ func (k *InstallerContinuation) providerSetupReader(endpoint contracts.OwnerProv
 }
 
 func (k *InstallerContinuation) workerProviderInbox(ctx context.Context, in contracts.HubWorkerDeployment, selected contracts.ConfigurationProviderSelection, account contracts.WorkerObjectReference, layout string) (kube.InstallerInbox, error) {
+	if k.mixedProviderMode() != "" {
+		return k.mixedWorkerProviderInbox(ctx, in, selected, account, layout)
+	}
 	if k.keyService == nil || k.objectStore == nil {
 		return k.awaitInbox(ctx, 1)
 	}

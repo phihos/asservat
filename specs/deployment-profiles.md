@@ -42,6 +42,16 @@ target across retries, restart and upgrade; changing the target requires an
 explicit supported migration. Generated credentials MUST remain outside Helm
 values and release data. See [ADR-326](../docs/decisions/326-individually-selectable-small-services.md).
 
+Provider selections MUST remain independent during runtime continuation.
+Bundled key services with external storage MUST consume explicitly supplied
+purpose-specific storage credentials from the existing private installer source;
+no external key-provider administration token is required. Bundled storage with
+an external key provider MUST retain its original generated credentials before
+provider setup and consume the real external inspection result through the
+existing carrier. Credentials MUST NOT enter public recipes. Acknowledged worker
+replay MUST verify its current retained launch rather than recreate or await a
+consumed earlier-phase carrier. See ADR-326 for the finite composition.
+
 For the selected bundled same-API regional path, the finite installer MUST read
 the original fleet-issued bootstrap by its public ID and exact version1, preserve
 its original bounds, and persist separate regional evidence/history credentials

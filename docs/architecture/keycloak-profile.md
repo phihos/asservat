@@ -1,6 +1,6 @@
 # Keycloak reference identity profile
 
-The maintainer selected Keycloak as the first supported and tested provider for browser sign-in and MCP access. This provider remains operator-managed; the official Helm chart does not install Keycloak automatically.
+The maintainer selected Keycloak as the first supported and tested provider for browser sign-in and MCP access. With `services.identity.provider: external`, the provider remains operator-managed. The optional [bundled-services candidate](../installation/small-profile.md) explicitly selects Keycloak and prepares its own realm; external selection never changes an existing realm.
 
 Partial C-02/C-21, TASK-07, S-01/S-02 and REQ-AUT-001. [ADR-053](../decisions/053-keycloak-access-profile.md) adds an explicitly selected provider profile while retaining the stricter generic RFC 9068 profile. `oidc.Trust.Profile` is trusted bootstrap configuration, not client input. Both profiles reuse the existing bounded HTTPS/JWKS and signature verification.
 

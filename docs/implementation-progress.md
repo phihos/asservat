@@ -16,7 +16,7 @@ image publication is claimed.
 
 | Boundary | Implemented and observed | Remaining qualification or work |
 | --- | --- | --- |
-| Selection | Independent closed Helm provider choices; external defaults; generated state retained outside release values | Automatic continuation still couples bundled OpenBao and SeaweedFS; decouple the two mixed paths before delivery |
+| Selection | Independent closed Helm provider choices; external defaults; generated state retained outside release values | Both mixed continuation paths now use existing private sources/carriers; real mixed-service qualification remains pending |
 | PostgreSQL | Actual18.6/pgBackRest2.60 TLS/SCRAM, separate DDL and Keycloak logins, encrypted full backup, same-volume restart; budget117/122 and client pool2 | Physical restore and full installed restart/recovery workflow |
 | Keycloak | Actual26.8.2 HTTPS/import/console and MCP PKCE, stable groups, group refresh and restart; opt-in empty processing group | Fresh public login and inspection; test reader metadata loss corrected with a passing focused regression |
 | SeaweedFS | Actual4.53 TLS, scoped IAM, versioned pinned bytes, delayed reload/new credential consumption and restart; initial audit installation passes | Full public acquisition/native download/deletion and multipart workflow |
@@ -101,8 +101,23 @@ original environment was removed with empty cleanup. The selected fixture now
 records authenticated cold pulls before supplying runtime registry access through
 private stdin; the current run exercised that handoff.
 
-Next: integrate independent mixed provider continuation, ship checked operator
-instructions, and finish a fresh
+Independent continuation is now implemented locally. Bundled OpenBao with external
+S3 requires the existing named private material source; bundled SeaweedFS with
+external OpenBao retains original inputs and uses the existing provider CLI with
+no private-file flags. Only the latter emits the closed public selection field.
+Acknowledged worker replay verifies current launched inputs/SQL grants instead
+of awaiting a consumed phase1 carrier. Focused races pass0/2.023s (bootstrap)
+and0/1.616s (Kubernetes), including actual CLI SDK/TLS requests and original
+UID/RV completion. These are component checks, not mixed installed qualification.
+
+The shipped [operator guide](installation/small-profile.md) and
+[site overlay](../examples/helm/small-profile-values.yaml) cover source builds,
+TLS, generated administrator/first-human setup, processing, regional Helm,
+capacity and workload permissions. Actual all-four and external-Keycloak Helm
+schema/renders return0;15 shell blocks and local links pass. No default human,
+external service mutation, published image or installed-workflow claim is added.
+
+Next: run the integrated broad gates and finish a fresh
 installed public workflow before qualified merge. Backup retention/physical
 restore and accepted local-identity/static-key alternatives remain unfinished.
 

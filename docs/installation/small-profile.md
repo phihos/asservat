@@ -251,3 +251,61 @@ The second Helm release already performs the join; do not run a second manual jo
 Once current sources and capacity are Ready, open `/captures/new`, choose the issued cluster and your Deployment, then **Find diagnostics**, **Review collection**, and **Collect pod status**. Inspect the resulting case and use the native download before its original expiry. The reference evidence default is 300 seconds plus a 300-second deletion budget. Verify subsequent reads refuse at expiry and managed deletion completes. Downloaded external copies remain yours to manage.
 
 This guide's all-four-services capture/download/deletion sequence remains pending fresh installed qualification. Do not infer full-workflow success from the login checkpoint, component tests or this renderable values example.
+
+## Replace one bundled service
+
+The four `services.*.provider` choices are independent and default to `external`. Make these choices before a fresh installation. Changing a completed installation's provider is not a supported migration or restore procedure. Keep the other selected services and their original inputs; do not copy the entire external-services example over this overlay.
+
+| Replace | Select and supply | Existing input reference |
+| --- | --- | --- |
+| PostgreSQL | `services.postgres.provider: external`; set `bootstrap.postgres.host`, `port`, `database`, public `rootsPEM`, and the existing producer/schema/retirement Secret references. The initial client `maxConnections` remains 2; size the external server for the actual aggregate connection plan. If bundled Keycloak remains selected, configure its separate `services.identity.keycloak.database` host/name/user and password/CA Secret references as well. | [SQL credentials and Secret keys](helm.md#optional-initial-bootstrap-checkpoint), [external database prerequisites](context-trial.md#prepare-the-external-services-and-files), [Keycloak database selection](../../charts/asservat/README.md#small-service-candidate) |
+| Object store | `services.objectStore.provider: external`; set `bootstrap.auditStore` endpoint/region/bucket/public roots and `bootstrap.continuation.public.federation.evidenceStore` to the actual qualified store. Supply the original initial storage credential through `bootstrap.secrets.producer` and the scoped continuation credentials described below. | [Initial private material](context-trial.md#prepare-the-external-services-and-files), [versioned storage and per-role recipe capabilities](context-trial.md#install-the-hub) |
+| OpenBao | `services.keyService.provider: external`; set `bootstrap.keyService` endpoint/audit mount/key/public roots, continuation worker/owner auth mounts and their actual accessors, `ownerPKIMount`/`ownerIssuerRootsPEM`, and federation connector PKI mount/roots. Supply the finite initial issuer through the producer input. Existing external OpenBao mount, reviewer, PKI and KV prerequisites still apply. | [Initial provider prerequisites](context-trial.md#prepare-the-external-services-and-files), [continuation roles and inspection](helm.md#runtime-continuation-development) |
+| Keycloak | `services.identity.provider: external`; supply the exact issuer, qualified client declarations, stable eligible/fleet/operator IDs, public identity-provider roots and private console client secret. No Keycloak Deployment, realm or users are created. | [External Keycloak configuration below](#use-your-existing-keycloak), [client/scopes and stable-ID mapper](../architecture/keycloak-profile.md), [site input example](../../examples/helm/context-trial-site.example.yaml) |
+
+A mixed/external key-provider or store selection still uses the existing private `provider-material.json` in `bootstrap.secrets.producer`. It declares the format and original finite `storageUseUntil`; include `issuerToken` only for external OpenBao and `storage` only for an external object store. Omit the bundled provider's credential field rather than supplying a placeholder or another backend's credential. Keep separate PostgreSQL administrator inputs when PostgreSQL is external. The [external input procedure](context-trial.md#prepare-the-external-services-and-files) defines the credential bodies; no secret belongs in values.
+
+With **bundled OpenBao and external S3**, keep `bootstrap.continuation.materialSecretName` pointing at your existing private material Secret. Add `configuration-audit-storage.json` for the phase-1 worker. Phase 3 uses `audit-storage.json` for the owner and, only when selected by the actual recipe, `federation-audit-storage.json`, `publisher-audit-storage.json`, `evidence-read.json`, `download-evidence-read.json`, `evidence-delete.json`, `cleanup-audit.json` and `cleanup-verify.json`. These are distinct narrowly scoped S3 credentials, using the closed `accessKeyID`/`secretAccessKey`/`sessionToken` JSON body. Retain the serving TLS files above and add `oidc-client-secret` if identity is external. The source must already contain the actual phase's inputs when read; the generated-prefix recipes are published in the existing outbox. After a named missing-input refusal, supply the exact source keys, observe terminal failure and follow the [existing resume procedure](helm.md#interrupted-or-failed-hook) with the same original values. The installer verifies retained progress; retry does not replace IDs or extend the original stage, credential or journal bounds, and expired bounds can still refuse. Do not substitute broad S3 administration or an OpenBao token. This path applies bundled OpenBao setup itself; it has no operator `installer-provider-apply` fallback.
+
+With **bundled SeaweedFS and external OpenBao**, the continuation retains its generated original storage keys and private serving/identity inputs in its existing inbox. Answer each published worker/owner recipe with the existing local command:
+
+```bash
+"$ASSERVAT" installer-provider-apply --context "$HUB_CONTEXT" \
+  --namespace "$HUB_NAMESPACE" --installation "$INSTALLATION"
+```
+
+Set `INSTALLATION` from the actual target namespace annotation as in the [outbox procedure](context-trial.md#install-the-hub). The OpenBao SDK uses your existing `BAO_ADDR`, `BAO_CACERT` and `BAO_TOKEN` environment for that actual external provider. Pass no credential or TLS file flags in this selected mixed path: the command consumes the retained original inbox. It never exports a bundled OpenBao administrator token. Mixed-provider installation qualification remains pending.
+
+The automatic second-release regional procedure above selects the original bundled OpenBao and SeaweedFS sources. For an external key provider or store, use the [external regional enrollment procedure](context-trial.md#install-and-join-the-workload-cluster) and its actual issued credentials instead; the same-API helper does not discover an external provider.
+
+### Use your existing Keycloak
+
+Keep PostgreSQL, OpenBao and SeaweedFS bundled. In a final overlay after `small-profile-values.yaml`, select external identity and replace the following public placeholders with the existing realm's values:
+
+```yaml
+services:
+  identity:
+    provider: external
+bootstrap:
+  fleet:
+    issuer: https://id.example.invalid/realms/company
+    clients: [asservat-console, asservat-mcp]
+    groups: [REPLACE_WITH_STABLE_FLEET_OPERATOR_GROUP_ID]
+  continuation:
+    public:
+      issuer: https://id.example.invalid/realms/company
+      clientID: asservat-console
+      clients:
+        - {id: asservat-console, kind: human}
+        - {id: asservat-mcp, kind: human}
+      eligibleGroups: [REPLACE_WITH_STABLE_USERS_GROUP_ID]
+      processingOperators:
+        - clientID: asservat-console
+          issuer: https://id.example.invalid/realms/company
+          kind: Group
+          id: REPLACE_WITH_STABLE_PROCESSING_OPERATOR_GROUP_ID
+```
+
+Client IDs must match your actual qualified clients; omit the MCP declaration and fleet client if you are configuring only the console. Keep `bootstrap.continuation.public.origin` at your Asservat browser address. Set `promotion.browserAudience` to the configured API audience and use the external Keycloak's genuine public roots for the existing `--set-file bootstrap.continuation.public.promotion.providerRootsPEM=...` argument. Add the raw confidential console client secret as key `oidc-client-secret` to the **same** `operator-serving-material` Secret; there is no second phase-3 Secret. Append `--from-file=oidc-client-secret="$TRIAL/private/oidc-client-secret"` to the earlier `kubectl create secret generic operator-serving-material` command. Create/review that source before starting installation; this passes a file path, never the private value, in arguments.
+
+Configure authorization code with S256 PKCE, exact redirect `<public.origin>/auth/callback`, the API audience, the built-in `basic` subject scope and the [required operation scopes and protected stable-ID mapper](context-trial.md#prepare-the-external-services-and-files). For sharing, include the profile's `evidence:share` scope. Public eligibility, fleet issuance and processing operation are separate explicit assignments. Create your human and memberships in your existing realm; skip this guide's generated Keycloak administrator retrieval and generated-group steps. Use the actual issuer and users-group ID in the regional `AccessBinding`. No generated Keycloak group UUID is added to external identity settings.

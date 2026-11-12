@@ -19,6 +19,7 @@ import (
 )
 
 const BundledInstallerInboxRecipeAnnotation = "asservat.io/provider-recipe-sha256"
+const InstallerInboxProviderModeAnnotation = "asservat.io/provider-mode"
 const bundledInstallerInboxRole = "bundled-installer-inbox"
 
 func bundledInboxContextCurrent(ctx context.Context) bool {
@@ -28,8 +29,12 @@ func bundledInboxContextCurrent(ctx context.Context) bool {
 	until, ok := ctx.Deadline()
 	return ok && time.Now().Before(until)
 }
-func bundledInboxDataValid(data map[string][]byte, tokenAllowed bool) bool {
-	if string(data[contracts.InstallerInboxPhase]) != "3" || len(data[contracts.InstallerInboxAuditCredential]) == 0 {
+func bundledInboxModeValid(mode string) bool {
+	return mode == "" || mode == contracts.InstallerProviderBundledKeyService || mode == contracts.InstallerProviderBundledObjectStore
+}
+func bundledInboxDataValid(data map[string][]byte, tokenAllowed bool, mode string) bool {
+	phase := string(data[contracts.InstallerInboxPhase])
+	if !bundledInboxModeValid(mode) || (phase != "3" && (mode == "" || phase != "1")) || len(data[contracts.InstallerInboxAuditCredential]) == 0 {
 		return false
 	}
 	allowed := map[string]int{contracts.InstallerInboxPhase: 1}
@@ -37,7 +42,7 @@ func bundledInboxDataValid(data map[string][]byte, tokenAllowed bool) bool {
 		allowed[key] = 32 << 10
 		if raw, present := data[key]; present {
 			c, err := contracts.DecodeOwnerStorageCredential(bytes.NewReader(raw))
-			if err != nil || !identity.Text(c.AccessKeyID, 256) || !identity.Text(c.SecretAccessKey, 8192) || c.SessionToken != "" {
+			if err != nil || !identity.Text(c.AccessKeyID, 256) || !identity.Text(c.SecretAccessKey, 8192) || c.SessionToken != "" && (mode != contracts.InstallerProviderBundledKeyService || key == contracts.InstallerInboxCleanupAuditCredential || key == contracts.InstallerInboxCleanupVerifyCredential) {
 				return false
 			}
 		}
@@ -70,6 +75,13 @@ func bundledInboxDataValid(data map[string][]byte, tokenAllowed bool) bool {
 	if tokenAllowed {
 		allowed[contracts.InstallerInboxInspectionToken] = 4096
 	}
+	if phase == "1" {
+		for key := range data {
+			if key != contracts.InstallerInboxPhase && key != contracts.InstallerInboxAuditCredential && !(tokenAllowed && key == contracts.InstallerInboxInspectionToken) {
+				return false
+			}
+		}
+	}
 	total := 0
 	for key, raw := range data {
 		limit, known := allowed[key]
@@ -90,8 +102,13 @@ func bundledInboxDataValid(data map[string][]byte, tokenAllowed bool) bool {
 	}
 	return true
 }
-func bundledInboxSecretValid(s *core.Secret, namespace, installation, digest string) bool {
-	return s != nil && s.APIVersion == "v1" && s.Kind == "Secret" && s.Name == contracts.InstallerInboxName(installation) && s.Namespace == namespace && authorization.UUID(string(s.UID)) && identity.Text(s.ResourceVersion, 128) && s.DeletionTimestamp == nil && (s.Immutable == nil || !*s.Immutable) && s.Type == core.SecretTypeOpaque && len(s.StringData) == 0 && len(s.OwnerReferences) == 0 && len(s.Finalizers) == 0 && len(s.Labels) == 1 && s.Labels["asservat.io/private-role"] == bundledInstallerInboxRole && len(s.Annotations) == 1 && s.Annotations[BundledInstallerInboxRecipeAnnotation] == digest && bundledInboxDataValid(s.Data, true)
+func bundledInboxSecretValid(s *core.Secret, namespace, installation, digest, mode string) bool {
+	annotations := 1
+	if mode != "" {
+		annotations = 2
+	}
+
+	return s != nil && s.APIVersion == "v1" && s.Kind == "Secret" && s.Name == contracts.InstallerInboxName(installation) && s.Namespace == namespace && authorization.UUID(string(s.UID)) && identity.Text(s.ResourceVersion, 128) && s.DeletionTimestamp == nil && (s.Immutable == nil || !*s.Immutable) && s.Type == core.SecretTypeOpaque && len(s.StringData) == 0 && len(s.OwnerReferences) == 0 && len(s.Finalizers) == 0 && len(s.Labels) == 1 && s.Labels["asservat.io/private-role"] == bundledInstallerInboxRole && len(s.Annotations) == annotations && s.Annotations[InstallerInboxProviderModeAnnotation] == mode && s.Annotations[BundledInstallerInboxRecipeAnnotation] == digest && bundledInboxDataValid(s.Data, true, mode)
 }
 func bundledInboxSelectedKeys(a, b map[string][]byte) bool {
 	count := 0
@@ -114,7 +131,7 @@ func bundledInboxSelectedKeys(a, b map[string][]byte) bool {
 func bundledInboxInputValid(ctx context.Context, config *rest.Config, namespace, installation, digest string) bool {
 	return config != nil && len(validation.IsDNS1123Label(namespace)) == 0 && authorization.UUID(installation) && preparationDigestValid(digest) && bundledInboxContextCurrent(ctx)
 }
-func readBundledInbox(ctx context.Context, api rest.Interface, namespace, installation, digest string) (*core.Secret, error) {
+func readBundledInbox(ctx context.Context, api rest.Interface, namespace, installation, digest, mode string) (*core.Secret, error) {
 	raw, err := api.Get().AbsPath("/api/v1/namespaces/" + namespace + "/secrets/" + contracts.InstallerInboxName(installation)).MaxRetries(0).DoRaw(ctx)
 	defer clear(raw)
 	if err != nil {
@@ -124,7 +141,7 @@ func readBundledInbox(ctx context.Context, api rest.Interface, namespace, instal
 		return nil, cfg.ErrUnavailable
 	}
 	var s core.Secret
-	if len(raw) > 2<<20 || strictGuardJSON(raw, &s) != nil || !bundledInboxSecretValid(&s, namespace, installation, digest) {
+	if len(raw) > 2<<20 || strictGuardJSON(raw, &s) != nil || !bundledInboxSecretValid(&s, namespace, installation, digest, mode) {
 		clearSmallSeaweedData(s.Data)
 		return nil, cfg.ErrChanged
 	}
@@ -140,14 +157,26 @@ func readBundledInbox(ctx context.Context, api rest.Interface, namespace, instal
 // validates actual principal scopes/material. Existing bytes win; this helper
 // grants no authority and never overwrites an earlier candidate or makes a token.
 func ReadOrCreateBundledInstallerInbox(ctx context.Context, config *rest.Config, namespace, installation, recipeDigest string, candidate map[string][]byte) (*core.Secret, error) {
-	if !bundledInboxInputValid(ctx, config, namespace, installation, recipeDigest) || !bundledInboxDataValid(candidate, false) {
+	return readOrCreateProviderInbox(ctx, config, namespace, installation, recipeDigest, "", candidate)
+}
+
+// ReadOrCreateMixedInstallerInbox uses the same original carrier for the two
+// explicitly selected mixed modes; it never creates a provider token.
+func ReadOrCreateMixedInstallerInbox(ctx context.Context, config *rest.Config, namespace, installation, recipeDigest, mode string, candidate map[string][]byte) (*core.Secret, error) {
+	if mode == "" || !bundledInboxModeValid(mode) {
+		return nil, cfg.ErrInvalid
+	}
+	return readOrCreateProviderInbox(ctx, config, namespace, installation, recipeDigest, mode, candidate)
+}
+func readOrCreateProviderInbox(ctx context.Context, config *rest.Config, namespace, installation, recipeDigest, mode string, candidate map[string][]byte) (*core.Secret, error) {
+	if !bundledInboxInputValid(ctx, config, namespace, installation, recipeDigest) || !bundledInboxDataValid(candidate, false, mode) {
 		return nil, cfg.ErrInvalid
 	}
 	api, err := newBoundedAPI(config)
 	if err != nil {
 		return nil, cfg.ErrInvalid
 	}
-	existing, err := readBundledInbox(ctx, api, namespace, installation, recipeDigest)
+	existing, err := readBundledInbox(ctx, api, namespace, installation, recipeDigest, mode)
 	if err == nil {
 		if !bundledInboxSelectedKeys(existing.Data, candidate) {
 			clearSmallSeaweedData(existing.Data)
@@ -165,6 +194,9 @@ func ReadOrCreateBundledInstallerInbox(ctx context.Context, config *rest.Config,
 		return nil, cfg.ErrUnavailable
 	}
 	request := core.Secret{TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "Secret"}, ObjectMeta: meta.ObjectMeta{Name: contracts.InstallerInboxName(installation), Namespace: namespace, Labels: map[string]string{"asservat.io/private-role": bundledInstallerInboxRole}, Annotations: map[string]string{BundledInstallerInboxRecipeAnnotation: recipeDigest}}, Type: core.SecretTypeOpaque, Data: maps.Clone(candidate)}
+	if mode != "" {
+		request.Annotations[InstallerInboxProviderModeAnnotation] = mode
+	}
 	body, err := json.Marshal(request)
 	if err != nil {
 		return nil, cfg.ErrInvalid
@@ -173,13 +205,13 @@ func ReadOrCreateBundledInstallerInbox(ctx context.Context, config *rest.Config,
 	raw, createErr := api.Post().AbsPath("/api/v1/namespaces/"+namespace+"/secrets").Param("fieldValidation", "Strict").Body(body).MaxRetries(0).DoRaw(ctx)
 	defer clear(raw)
 	var created core.Secret
-	if createErr == nil && len(raw) <= 2<<20 && strictGuardJSON(raw, &created) == nil && bundledInboxSecretValid(&created, namespace, installation, recipeDigest) && maps.EqualFunc(created.Data, candidate, bytes.Equal) && bundledInboxContextCurrent(ctx) {
+	if createErr == nil && len(raw) <= 2<<20 && strictGuardJSON(raw, &created) == nil && bundledInboxSecretValid(&created, namespace, installation, recipeDigest, mode) && maps.EqualFunc(created.Data, candidate, bytes.Equal) && bundledInboxContextCurrent(ctx) {
 		return &created, nil
 	}
 	clearSmallSeaweedData(created.Data)
 	// Lost/malformed CREATE replies allow one exact named lookup only. A valid
 	// racing original wins, but selection drift and foreign objects do not.
-	winner, err := readBundledInbox(ctx, api, namespace, installation, recipeDigest)
+	winner, err := readBundledInbox(ctx, api, namespace, installation, recipeDigest, mode)
 	if err != nil {
 		if err == cfg.ErrChanged {
 			return nil, err
@@ -197,7 +229,28 @@ func ReadOrCreateBundledInstallerInbox(ctx context.Context, config *rest.Config,
 // returned original UID/RV. A new real token may replace an expired one; storage
 // and supplied public/TLS material remain byte-identical. No mutation is retried.
 func CompleteBundledInstallerInbox(ctx context.Context, config *rest.Config, namespace, installation, recipeDigest string, original *core.Secret, inspectionToken []byte) (*core.Secret, error) {
-	if !bundledInboxInputValid(ctx, config, namespace, installation, recipeDigest) || !bundledInboxSecretValid(original, namespace, installation, recipeDigest) || len(inspectionToken) == 0 || len(inspectionToken) > 4096 {
+	return completeProviderInbox(ctx, config, namespace, installation, recipeDigest, "", original, inspectionToken)
+}
+
+// ReadMixedInstallerInbox only observes the original recipe/mode-bound carrier.
+func ReadMixedInstallerInbox(ctx context.Context, config *rest.Config, namespace, installation, recipeDigest, mode string) (*core.Secret, error) {
+	if mode == "" || !bundledInboxModeValid(mode) || !bundledInboxInputValid(ctx, config, namespace, installation, recipeDigest) {
+		return nil, cfg.ErrInvalid
+	}
+	api, err := newBoundedAPI(config)
+	if err != nil {
+		return nil, cfg.ErrInvalid
+	}
+	return readBundledInbox(ctx, api, namespace, installation, recipeDigest, mode)
+}
+func CompleteMixedInstallerInbox(ctx context.Context, config *rest.Config, namespace, installation, recipeDigest, mode string, original *core.Secret, token []byte) (*core.Secret, error) {
+	if mode == "" || !bundledInboxModeValid(mode) {
+		return nil, cfg.ErrInvalid
+	}
+	return completeProviderInbox(ctx, config, namespace, installation, recipeDigest, mode, original, token)
+}
+func completeProviderInbox(ctx context.Context, config *rest.Config, namespace, installation, recipeDigest, mode string, original *core.Secret, inspectionToken []byte) (*core.Secret, error) {
+	if !bundledInboxInputValid(ctx, config, namespace, installation, recipeDigest) || !bundledInboxSecretValid(original, namespace, installation, recipeDigest, mode) || len(inspectionToken) == 0 || len(inspectionToken) > 4096 {
 		return nil, cfg.ErrInvalid
 	}
 	for _, b := range inspectionToken {
@@ -209,7 +262,7 @@ func CompleteBundledInstallerInbox(ctx context.Context, config *rest.Config, nam
 	if err != nil {
 		return nil, cfg.ErrInvalid
 	}
-	current, err := readBundledInbox(ctx, api, namespace, installation, recipeDigest)
+	current, err := readBundledInbox(ctx, api, namespace, installation, recipeDigest, mode)
 	if err != nil {
 		if err == cfg.ErrChanged {
 			return nil, err
@@ -235,11 +288,11 @@ func CompleteBundledInstallerInbox(ctx context.Context, config *rest.Config, nam
 	raw, writeErr := api.Put().AbsPath("/api/v1/namespaces/"+namespace+"/secrets/"+current.Name).Param("fieldValidation", "Strict").Body(body).MaxRetries(0).DoRaw(ctx)
 	defer clear(raw)
 	var completed core.Secret
-	if writeErr == nil && len(raw) <= 2<<20 && strictGuardJSON(raw, &completed) == nil && bundledInboxSecretValid(&completed, namespace, installation, recipeDigest) && completed.UID == original.UID && maps.EqualFunc(completed.Data, current.Data, bytes.Equal) && bundledInboxContextCurrent(ctx) {
+	if writeErr == nil && len(raw) <= 2<<20 && strictGuardJSON(raw, &completed) == nil && bundledInboxSecretValid(&completed, namespace, installation, recipeDigest, mode) && completed.UID == original.UID && maps.EqualFunc(completed.Data, current.Data, bytes.Equal) && bundledInboxContextCurrent(ctx) {
 		return &completed, nil
 	}
 	clearSmallSeaweedData(completed.Data)
-	actual, err := readBundledInbox(ctx, api, namespace, installation, recipeDigest)
+	actual, err := readBundledInbox(ctx, api, namespace, installation, recipeDigest, mode)
 	if err != nil {
 		if err == cfg.ErrChanged {
 			return nil, err

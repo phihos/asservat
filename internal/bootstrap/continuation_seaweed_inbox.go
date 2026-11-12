@@ -12,6 +12,7 @@ import (
 	"asservat.local/asservat/internal/adapters/mounts"
 	"asservat.local/asservat/internal/adapters/providerconfig"
 	"asservat.local/asservat/internal/contracts"
+	core "k8s.io/api/core/v1"
 )
 
 func seaweedInboxCredential(raw []byte, purpose, installation string) (contracts.SeaweedCredential, error) {
@@ -66,7 +67,10 @@ func (k *InstallerContinuation) retainedWorkerStoreGrant(ctx context.Context, re
 // only its short-lived token. No scoped storage key is regenerated in place.
 func (k *InstallerContinuation) ownerProviderInbox(ctx context.Context, resources *kube.InitialRuntimeResources, inventory kube.InitialRuntimeResourceInventory, owner contracts.OwnerDeployment, profile contracts.OwnerProviderAuthentication, artifact []byte, serving contracts.InstallerServingTLSPlan) (kube.InstallerInbox, error) {
 	var zero kube.InstallerInbox
-	if k.keyService == nil || k.objectStore == nil {
+	if k.keyService != nil && k.objectStore == nil {
+		return k.mixedOwnerProviderInbox(ctx, artifact)
+	}
+	if k.keyService == nil && k.objectStore == nil {
 		return k.awaitInbox(ctx, 3)
 	}
 	data, err := k.smallOwnerMaterial(ctx, serving)
@@ -109,7 +113,12 @@ func (k *InstallerContinuation) ownerProviderInbox(ctx context.Context, resource
 	digest := sha256.Sum256(artifact)
 	recipe := hex.EncodeToString(digest[:])
 	admin := k.in.kubernetes("administrator-token")
-	original, err := kube.ReadOrCreateBundledInstallerInbox(ctx, admin, k.input.Namespace, owner.InstallationID, recipe, data)
+	var original *core.Secret
+	if k.keyService == nil {
+		original, err = kube.ReadOrCreateMixedInstallerInbox(ctx, admin, k.input.Namespace, owner.InstallationID, recipe, contracts.InstallerProviderBundledObjectStore, data)
+	} else {
+		original, err = kube.ReadOrCreateBundledInstallerInbox(ctx, admin, k.input.Namespace, owner.InstallationID, recipe, data)
+	}
 	if err != nil {
 		return zero, err
 	}
@@ -155,6 +164,9 @@ func (k *InstallerContinuation) ownerProviderInbox(ctx context.Context, resource
 	defer store.Close()
 	if err := store.enable(ctx, grants); err != nil {
 		return zero, err
+	}
+	if k.keyService == nil {
+		return k.awaitMixedProviderInbox(ctx, 3, recipe, contracts.InstallerProviderBundledObjectStore)
 	}
 	token, err := k.applySmallProvider(ctx, 3, artifact)
 	if err != nil {

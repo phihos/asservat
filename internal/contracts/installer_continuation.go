@@ -242,11 +242,22 @@ type InstallerProviderSelection struct {
 }
 
 // InstallerRecipeOutbox is the public recipe a continuation phase waits on.
+const (
+	InstallerProviderBundledKeyService  = "bundled-keyservice"
+	InstallerProviderBundledObjectStore = "bundled-objectstore"
+)
+
+func InstallerProviderModeValid(mode string) bool {
+	return mode == "" || mode == InstallerProviderBundledObjectStore
+}
+
 type InstallerRecipeOutbox struct {
-	Format  string          `json:"format"`
-	Phase   int             `json:"phase"`
-	Purpose string          `json:"purpose"`
-	Recipe  json.RawMessage `json:"recipe"`
+	// Present only for mixed provider selections; empty preserves both existing paths.
+	ProviderMode string          `json:"providerMode,omitempty"`
+	Format       string          `json:"format"`
+	Phase        int             `json:"phase"`
+	Purpose      string          `json:"purpose"`
+	Recipe       json.RawMessage `json:"recipe"`
 }
 
 func InstallerRecipeOutboxName(installationID string) string {

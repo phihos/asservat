@@ -556,10 +556,10 @@ func (k *InstallerContinuation) WorkerRecipe(ctx context.Context, resources *kub
 	}
 	// Automatic replay reconstructs the phase-1 recipe directly. Once worker
 	// inputs exist it must not overwrite a later phase-3 outbox.
-	if k.keyService != nil && k.objectStore != nil && snapshot.State.WorkerInputs != nil && snapshot.State.WorkerInputs.Receipt != nil {
+	if (k.keyService != nil || k.objectStore != nil) && snapshot.State.WorkerInputs != nil && snapshot.State.WorkerInputs.Receipt != nil {
 		return docs, nil
 	}
-	return docs, kube.PublishInstallerRecipe(ctx, admin, k.input.Namespace, k.record.Scope.InstallationID, contracts.InstallerRecipeOutbox{Format: contracts.InstallerRecipeOutboxFormat, Phase: 1, Purpose: "worker-provider", Recipe: artifact})
+	return docs, kube.PublishInstallerRecipe(ctx, admin, k.input.Namespace, k.record.Scope.InstallationID, contracts.InstallerRecipeOutbox{Format: contracts.InstallerRecipeOutboxFormat, Phase: 1, Purpose: "worker-provider", ProviderMode: k.mixedProviderOutboxMode(), Recipe: artifact})
 }
 
 // awaitInbox polls the operator inbox for phase until ctx ends; the caller's
@@ -602,6 +602,30 @@ func (k *InstallerContinuation) WorkerLaunch(ctx context.Context, resources *kub
 		k.at("worker/bundled-storage")
 		if err := k.prepareSmallWorkerStore(ctx, deployment, *worker, installer.Roles.ServiceAccount, snapshot.State.WorkerLayout); err != nil {
 			return roles, err
+		}
+	}
+	// A consumed phase-1 carrier is not required to observe the original
+	// acknowledged launch. Verify current launched inputs and SQL grants through
+	// the existing lookup-only path before proceeding to a retained phase3.
+	if k.mixedProviderMode() != "" && snapshot.State.WorkerInputs != nil && snapshot.State.WorkerInputs.Receipt != nil {
+		k.at("worker/replay-root")
+		root, e := kube.NewConfigurationRuntimeRoleRoot(ctx, source, installer.Roles)
+		if e != nil {
+			return roles, e
+		}
+		defer root.Close()
+		current, e := root.ReadConfigurationRuntimeRoles(ctx)
+		if e != nil {
+			return roles, e
+		}
+		if current.State.Launch != nil && current.State.Launch.Receipt != nil {
+			k.at("worker/replay-roles")
+			producer, e := postgres.NewConfigurationRuntimeSQLRoles(ctx, k.admin.ConnConfig, root, installer.Roles)
+			if e != nil {
+				return roles, e
+			}
+			defer producer.Close()
+			return producer.VerifyLaunchedConfigurationRuntimeRoles(ctx)
 		}
 	}
 	k.at("worker/inbox")
@@ -963,7 +987,7 @@ func (k *InstallerContinuation) Owner(ctx context.Context, resources *kube.Initi
 	}
 	k.at("owner/outbox")
 	admin := k.in.kubernetes("administrator-token")
-	if err = kube.PublishInstallerRecipe(ctx, admin, k.input.Namespace, k.record.Scope.InstallationID, contracts.InstallerRecipeOutbox{Format: contracts.InstallerRecipeOutboxFormat, Phase: 3, Purpose: "owner-provider", Recipe: artifact}); err != nil {
+	if err = kube.PublishInstallerRecipe(ctx, admin, k.input.Namespace, k.record.Scope.InstallationID, contracts.InstallerRecipeOutbox{Format: contracts.InstallerRecipeOutboxFormat, Phase: 3, Purpose: "owner-provider", ProviderMode: k.mixedProviderOutboxMode(), Recipe: artifact}); err != nil {
 		return err
 	}
 	k.at("owner/inbox")

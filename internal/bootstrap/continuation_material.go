@@ -7,8 +7,6 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
-	"io"
-	"net/http"
 	"net/url"
 	"slices"
 	"strings"
@@ -17,18 +15,17 @@ import (
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/adapters/mounts"
 	"asservat.local/asservat/internal/contracts"
-	"asservat.local/asservat/internal/domain/authorization"
-	"asservat.local/asservat/internal/domain/identity"
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/validation"
-	coreclient "k8s.io/client-go/kubernetes/typed/core/v1"
-	"k8s.io/client-go/rest"
 )
 
 // smallOwnerMaterial reads only the finite operator source names. The original
 // phase-three inbox must retain the returned bytes before provider effects; this
 // read grants no public serving trust or evidence/key authority.
-func (k *InstallerContinuation) smallOwnerMaterial(ctx context.Context, serving contracts.InstallerServingTLSPlan) (_ map[string][]byte, err error) {
+func (k *InstallerContinuation) smallOwnerMaterial(ctx context.Context, serving contracts.InstallerServingTLSPlan) (map[string][]byte, error) {
+	return k.smallOwnerMaterialFromSource(ctx, serving, nil)
+}
+func (k *InstallerContinuation) smallOwnerMaterialFromSource(ctx context.Context, serving contracts.InstallerServingTLSPlan, selected *core.Secret) (_ map[string][]byte, err error) {
 	fail := func(step string) error {
 		return &fixedStepError{step: "owner-material/" + step, err: mounts.ErrUnavailable}
 	}
@@ -50,44 +47,18 @@ func (k *InstallerContinuation) smallOwnerMaterial(ctx context.Context, serving 
 	if k.in == nil || len(validation.IsDNS1123Label(k.input.Namespace)) != 0 || len(validation.IsDNS1123Subdomain(k.input.MaterialSecretName)) != 0 {
 		return nil, fail("source")
 	}
-	config := k.in.kubernetes("administrator-token")
-	client, e := rest.HTTPClientFor(config)
-	if e != nil {
-		return nil, fail("client")
-	}
-	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
-	api, e := coreclient.NewForConfigAndClient(config, client)
-	if e != nil {
-		return nil, fail("client")
-	}
-	read := func(name string) (*core.Secret, error) {
-		stream, e := api.RESTClient().Get().AbsPath("/api/v1/namespaces/"+k.input.Namespace+"/secrets/"+name).SetHeader("Accept", "application/json").MaxRetries(0).Stream(ctx)
-		if e != nil {
-			return nil, fail("read")
-		}
-		defer stream.Close()
-		raw, e := io.ReadAll(io.LimitReader(stream, (1<<20)+1))
-		defer clear(raw)
-		var secret core.Secret
-		decoder := json.NewDecoder(bytes.NewReader(raw))
-		decoder.DisallowUnknownFields()
-		if e != nil || len(raw) > 1<<20 || decoder.Decode(&secret) != nil || decoder.Decode(new(any)) != io.EOF || !initialOpenBaoCurrent(ctx) {
-			for _, value := range secret.Data {
-				clear(value)
-			}
-			return nil, fail("decode")
-		}
-		if secret.APIVersion != "v1" || secret.Kind != "Secret" || secret.Name != name || secret.Namespace != k.input.Namespace || !authorization.UUID(string(secret.UID)) || !identity.Text(secret.ResourceVersion, 128) || secret.DeletionTimestamp != nil || (secret.Type != core.SecretTypeOpaque && secret.Type != core.SecretTypeTLS) || len(secret.StringData) != 0 {
-			for _, value := range secret.Data {
-				clear(value)
-			}
-			return nil, fail("metadata")
-		}
-		return &secret, nil
-	}
-	material, e := read(k.input.MaterialSecretName)
+	read, e := k.smallInstallerSecretReader(ctx)
 	if e != nil {
 		return nil, e
+	}
+	var material *core.Secret
+	if selected != nil {
+		material = selected.DeepCopy()
+	} else {
+		material, e = read(k.input.MaterialSecretName)
+		if e != nil {
+			return nil, e
+		}
 	}
 	defer func() {
 		for _, raw := range material.Data {
