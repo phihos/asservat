@@ -6,6 +6,9 @@
 {{- if eq (dig "postgres" "provider" "external" $services) "bundled" -}}
 {{- $_ := set $v "postgres" (dict "host" (printf "%s-postgres.%s.svc" $b.name .Release.Namespace) "port" 5432 "database" "asservat" "maxConnections" 2 "rootsPEM" "" "rootsSource" "bundledPostgres") -}}
 {{- end -}}
+{{- if eq (dig "objectStore" "provider" "external" $services) "seaweedfs" -}}
+{{- $_ := set $v "auditStore" (dict "endpoint" (printf "https://%s-objectstore.%s.svc:8333" $b.name .Release.Namespace) "region" (default "us-east-1" $b.auditStore.region) "bucket" (default (printf "%s-audit" $b.name) $b.auditStore.bucket) "rootsPEM" "" "rootsSource" "bundledSeaweed") -}}
+{{- end -}}
 {{- if eq (dig "identity" "provider" "external" $services) "keycloak" -}}
 {{- $k := .Values.services.identity.keycloak -}}
 {{- $f := deepCopy $b.fleet -}}
@@ -39,6 +42,7 @@
 {{- $_ := set $v "retirementSecret" $pg -}}
 {{- end -}}
 {{- if eq (dig "identity" "provider" "external" $services) "keycloak" }}{{ $_ := set $v "keycloakSecret" (printf "%s-keycloak-state" $b.name) }}{{ end -}}
+{{- if eq (dig "objectStore" "provider" "external" $services) "seaweedfs" }}{{ $_ := set $v "objectStoreSecret" (printf "%s-objectstore-state" $b.name) }}{{ end -}}
 {{- if $b.registrySecret }}{{ $_ := set $v "registrySecret" $b.registrySecret }}{{ end -}}
 {{- if $b.continuation.enabled }}{{ $_ := set $v "continuationDigest" (include "asservat.bootstrap.continuation" . | sha256sum) }}{{ end -}}
 {{- toJson $v -}}
@@ -122,6 +126,16 @@ limits:
         path: keycloak-settings.json
       - key: users-group-id
         path: users-group-id
+{{- end }}
+{{- if eq (dig "objectStore" "provider" "external" $services) "seaweedfs" }}
+- secret:
+    name: {{ printf "%s-objectstore-state" .Values.bootstrap.name | quote }}
+    optional: false
+    items:
+      - key: ca.crt
+        path: objectstore-ca.crt
+      - key: plan.json
+        path: objectstore-plan.json
 {{- end }}
 {{- end -}}
 

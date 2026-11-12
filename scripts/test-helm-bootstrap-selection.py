@@ -18,6 +18,22 @@ spec.loader.exec_module(fixture)
 
 
 class HelmSelection(unittest.TestCase):
+    def test_bundled_objectstore_is_explicit_and_keeps_exact_helm_selection(self):
+        flag = "ASSERVAT_HELM_BUNDLED_OBJECTSTORE"
+        base = {flag: "1"}
+        ordinary = fixture.qualification_environment(base, Path("fixture"), Path("work"), False, False)
+        self.assertNotIn(flag, ordinary)
+        selected = fixture.qualification_environment(base, Path("fixture"), Path("work"), False, False, helm_bootstrap=True, bundled_objectstore=True)
+        self.assertEqual(selected[flag], "1")
+        self.assertEqual(selected["ASSERVAT_HELM_BOOTSTRAP_NATIVE"], "1")
+        self.assertEqual(fixture.qualification_selection(None, False, False, helm_bootstrap=True), ("^TestHelmBootstrapWithRealServices$", 1))
+        with patch.dict("os.environ", {}, clear=True), patch.object(fixture, "run", side_effect=AssertionError("external setup")) as external:
+            with self.assertRaisesRegex(ValueError, "requires --helm-bootstrap"):
+                fixture.main(bundled_objectstore=True)
+            with self.assertRaisesRegex(ValueError, "without --helm-cluster"):
+                fixture.main(helm_bootstrap=True, helm_cluster=True, bundled_objectstore=True)
+            external.assert_not_called()
+
     def test_context_chart_mode_is_explicit_and_stays_in_installed_workflow(self):
         flag = "ASSERVAT_HELM_CONTEXT_NATIVE"
         base = {flag: "1"}

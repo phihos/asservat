@@ -2,7 +2,6 @@ package providerconfig
 
 import (
 	"bytes"
-	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -32,18 +31,11 @@ func GenerateSeaweedCredential(k contracts.SeaweedPrincipalKey) (contracts.Seawe
 	if _, err := SeaweedPrincipalName(k); err != nil {
 		return contracts.SeaweedCredential{}, err
 	}
-	var access [20]byte
-	var secret [32]byte
-	if _, err := rand.Read(access[:]); err != nil {
+	credential, err := GenerateSeaweedStorageCredential()
+	if err != nil {
 		return contracts.SeaweedCredential{}, ErrSeaweedStorage
 	}
-	if _, err := rand.Read(secret[:]); err != nil {
-		return contracts.SeaweedCredential{}, ErrSeaweedStorage
-	}
-	out := contracts.SeaweedCredential{Principal: k, AccessKeyID: "ASV" + hex.EncodeToString(access[:]), SecretAccessKey: hex.EncodeToString(secret[:])}
-	clear(access[:])
-	clear(secret[:])
-	return out, nil
+	return contracts.SeaweedCredential{Principal: k, AccessKeyID: credential.AccessKeyID, SecretAccessKey: credential.SecretAccessKey}, nil
 }
 func ValidateSeaweedCredential(c contracts.SeaweedCredential) error {
 	if _, err := SeaweedPrincipalName(c.Principal); err != nil || len(c.AccessKeyID) != 43 || !strings.HasPrefix(c.AccessKeyID, "ASV") || len(c.SecretAccessKey) != 64 {

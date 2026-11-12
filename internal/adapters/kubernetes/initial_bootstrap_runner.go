@@ -27,6 +27,7 @@ type InitialBootstrapRunnerPlan struct {
 	ContinuationDigest                                             string
 	PostgresSecret                                                 string
 	KeycloakSecret                                                 string
+	ObjectStoreSecret                                              string
 }
 
 func BuildInitialBootstrapRunner(p InitialBootstrapRunnerPlan) (*core.Pod, error) {
@@ -47,6 +48,9 @@ func BuildInitialBootstrapRunner(p InitialBootstrapRunnerPlan) (*core.Pod, error
 	if p.KeycloakSecret != "" && p.KeycloakSecret != p.Name+"-keycloak-state" {
 		return nil, cfg.ErrInvalid
 	}
+	if p.ObjectStoreSecret != "" && p.ObjectStoreSecret != p.Name+"-objectstore-state" {
+		return nil, cfg.ErrInvalid
+	}
 	if p.ContinuationDigest != "" && !preparationDigestValid(p.ContinuationDigest) {
 		return nil, cfg.ErrInvalid
 	}
@@ -61,6 +65,7 @@ func BuildInitialBootstrapRunner(p InitialBootstrapRunnerPlan) (*core.Pod, error
 	token := core.VolumeProjection{ServiceAccountToken: &core.ServiceAccountTokenProjection{Path: "administrator-token", Audience: p.ProbeAudience, ExpirationSeconds: ptr.To(int64(600))}}
 	ca := core.VolumeProjection{ConfigMap: &core.ConfigMapProjection{LocalObjectReference: core.LocalObjectReference{Name: "kube-root-ca.crt"}, Items: []core.KeyToPath{{Key: "ca.crt", Path: "kube-ca.crt"}}, Optional: ptr.To(true)}}
 	keycloak := core.VolumeProjection{Secret: &core.SecretProjection{LocalObjectReference: core.LocalObjectReference{Name: p.KeycloakSecret}, Items: []core.KeyToPath{{Key: contracts.SmallKeycloakSettingsFile, Path: "keycloak-settings.json"}, {Key: contracts.SmallKeycloakUsersGroup, Path: contracts.SmallKeycloakUsersGroup}}, Optional: ptr.To(false)}}
+	objectStore := core.VolumeProjection{Secret: &core.SecretProjection{LocalObjectReference: core.LocalObjectReference{Name: p.ObjectStoreSecret}, Items: []core.KeyToPath{{Key: "ca.crt", Path: contracts.InitialBootstrapObjectStoreCAFile}, {Key: contracts.SmallSeaweedPlanKey, Path: contracts.InitialBootstrapObjectStorePlanFile}}, Optional: ptr.To(false)}}
 	inputs := func(name string, keys []string, registry bool) core.VolumeSource {
 		items := []core.KeyToPath{}
 		for _, key := range keys {
@@ -75,6 +80,9 @@ func BuildInitialBootstrapRunner(p InitialBootstrapRunnerPlan) (*core.Pod, error
 		}
 		if p.KeycloakSecret != "" {
 			sources = append(sources, keycloak)
+		}
+		if p.ObjectStoreSecret != "" {
+			sources = append(sources, objectStore)
 		}
 		if len(items) > 0 {
 			sources = append(sources, core.VolumeProjection{Secret: &core.SecretProjection{LocalObjectReference: core.LocalObjectReference{Name: name}, Items: items, Optional: ptr.To(true)}})
@@ -126,6 +134,10 @@ func BuildInitialBootstrapRunner(p InitialBootstrapRunnerPlan) (*core.Pod, error
 		if p.KeycloakSecret != "" {
 			last := &pod.Spec.Volumes[len(pod.Spec.Volumes)-1]
 			last.Projected.Sources = append(last.Projected.Sources, keycloak)
+		}
+		if p.ObjectStoreSecret != "" {
+			last := &pod.Spec.Volumes[len(pod.Spec.Volumes)-1]
+			last.Projected.Sources = append(last.Projected.Sources, objectStore)
 		}
 	}
 	return pod, nil

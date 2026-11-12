@@ -17,11 +17,42 @@ release, image publication or completed REQ-DEP-001–005 qualification.
 
 | Boundary | Current evidence | Remaining work |
 | --- | --- | --- |
-| Selection | Closed Helm values independently select PostgreSQL, SeaweedFS and Keycloak; external defaults remain selectable | Key-provider preference is pending: bundled OpenBao versus the accepted isolated static-key service |
+| Selection | Closed Helm values independently select PostgreSQL, SeaweedFS and Keycloak; external defaults remain selectable | Complete the accepted isolated static-key provider; optional bundled OpenBao has not been selected |
 | PostgreSQL | Create-once TLS/SCRAM state, retained PVCs, server budget117/122 and client pool2; actual image/TLS/separate logins/encrypted full backup/restart and Helm/native Pod parity pass | Restore and installed profile qualification |
 | Keycloak | Actual26.8.2 import, HTTPS readiness, console/MCP PKCE, group refresh and restart pass; generated identity, optional email and literal external-password handling verified | Installed Asservat identity/approval composition and broader lifecycle qualification |
 | SeaweedFS | Actual4.53 TLS, scoped policies, immutable versions, delayed projection/reload with new ordinary credential consumption and pinned exact-byte reads after restart pass | Provider phase composition, multipart and installed authority/lifecycle qualification |
 | Installation | Finite preparation command and actual rendered-role integration pass; generated CA and public Keycloak identity resolve before canonical compilation; full Helm/native Pod parity passes | Complete all provider inputs and continuation, then fresh Helm→login→capture→exact native download→expiry/deletion→restart journey |
+
+The initial object-store join follows component checkpoint `4fcf60f7`: public
+`bundledSeaweed` CA/plan normalization, matching Helm/native projections,
+first-material raw credential generation and original stored-ID binding, plus
+one monotonic native initialization record before bucket effects. Root creates
+no new user/evidence authority from that record. Focused bootstrap/Kubernetes/
+provider tests pass. A fresh actual-chart initial installation now passes with
+the generated original credential and encrypted audit. Runtime provider
+provisioning and the full small-profile journey remain unfinished. No defaults
+or external deployment have changed.
+
+`python scripts/test-context-storage.py --helm-bootstrap --bundled-objectstore`
+returned Go0/242.941s and harness0/331.54s. It verifies actual activation,
+same-credential IAM binding, independently read encrypted audit, setup-free
+four-command replay with unchanged IAM/binding, original failed-hook resume and
+retained product state after uninstall. The first attempt failed before Go tests:
+`ctr` treated the unqualified chart repository as a registry hostname. The
+fixture now uses `crictl pull` with the exact chart reference; all eight Python
+selection tests pass. The successful run froze all4,912 inventoried sources;
+root independently rehashed each and confirmed ten exact owned resource absences,
+temporary-directory removal and restoration of the repository result directory.
+Receipts are in `native-initial-s3-20261112T001702Z/` under the external archive.
+PostgreSQL/OpenBao were explicit fixtures: this is initial storage-boundary
+qualification, not an external-service-free or browser/MCP journey result.
+
+The broad Go run passed70 packages or no-test packages and found one malformed
+new provider fixture: `{}` omitted fields required by the existing closed
+credential decoder. The test now marshals the actual typed blank credential;
+the decoder is unchanged and the full provider package passes under `-race`.
+The original `make go-check` returned2; the remaining exact repository Kubernetes
+groups are running separately. A combined pass is not yet claimed.
 
 The first PostgreSQL image failed because `/etc/asservat` was nontraversable
 (mode0444). Creating that directory as0755 fixed the actual nonroot startup.

@@ -14,8 +14,9 @@ type InitialBootstrapRunnerInput struct {
 	RegistrySecret   string `json:"registrySecret,omitempty"`
 	// Fixed retained bundled-PostgreSQL source. Only the public CA and exact
 	// phase credential keys are projected; provider material remains separate.
-	PostgresSecret string `json:"postgresSecret,omitempty"`
-	KeycloakSecret string `json:"keycloakSecret,omitempty"`
+	PostgresSecret    string `json:"postgresSecret,omitempty"`
+	KeycloakSecret    string `json:"keycloakSecret,omitempty"`
+	ObjectStoreSecret string `json:"objectStoreSecret,omitempty"`
 	// The full public continuation digest selects its immutable ConfigMap.
 	// Omission keeps the original bootstrap-only runner bytes and layout.
 	ContinuationDigest string `json:"continuationDigest,omitempty"`

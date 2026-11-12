@@ -87,11 +87,18 @@ func ResumeInitialBootstrapRunner(ctx context.Context, c *rest.Config, namespace
 	} else if input.IdentitySource != "" || refs.KeycloakSecret != "" {
 		return zero, cfg.ErrChanged
 	}
+	if input.AuditStore.RootsSource == contracts.InitialBootstrapBundledSeaweedRoots {
+		if input.AuditStore.RootsPEM != "" || refs.ObjectStoreSecret != name+"-objectstore-state" || input.AuditStore.Endpoint != "https://"+name+"-objectstore."+namespace+".svc:8333" {
+			return zero, cfg.ErrChanged
+		}
+	} else if input.AuditStore.RootsSource != "" || refs.ObjectStoreSecret != "" {
+		return zero, cfg.ErrChanged
+	}
 	sum := sha256.Sum256([]byte(cm.Data["bootstrap.json"] + "\n" + cm.Data["runner.json"]))
 	if hex.EncodeToString(sum[:]) != originalDigest {
 		return zero, cfg.ErrChanged
 	}
-	plan := InitialBootstrapRunnerPlan{Namespace: namespace, Name: name, Image: input.Image, InputDigest: hex.EncodeToString(sum[:]), ProducerSecret: refs.ProducerSecret, SchemaSecret: refs.SchemaSecret, RetirementSecret: refs.RetirementSecret, RegistrySecret: refs.RegistrySecret, ProbeAudience: input.ProbeAudience, ContinuationDigest: refs.ContinuationDigest, PostgresSecret: refs.PostgresSecret, KeycloakSecret: refs.KeycloakSecret}
+	plan := InitialBootstrapRunnerPlan{Namespace: namespace, Name: name, Image: input.Image, InputDigest: hex.EncodeToString(sum[:]), ProducerSecret: refs.ProducerSecret, SchemaSecret: refs.SchemaSecret, RetirementSecret: refs.RetirementSecret, RegistrySecret: refs.RegistrySecret, ProbeAudience: input.ProbeAudience, ContinuationDigest: refs.ContinuationDigest, PostgresSecret: refs.PostgresSecret, KeycloakSecret: refs.KeycloakSecret, ObjectStoreSecret: refs.ObjectStoreSecret}
 	want, err := BuildInitialBootstrapRunner(plan)
 	if err != nil {
 		return zero, err

@@ -201,5 +201,15 @@ spec:
                 - key: users-group-id
                   path: users-group-id
           {{- end }}
+          {{- if eq .Values.services.objectStore.provider "seaweedfs" }}
+          - secret:
+              name: {{ printf "%s-objectstore-state" $b.name | quote }}
+              optional: false
+              items:
+                - key: ca.crt
+                  path: objectstore-ca.crt
+                - key: plan.json
+                  path: objectstore-plan.json
+          {{- end }}
   {{- end }}
 {{- end }}

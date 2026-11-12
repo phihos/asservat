@@ -29,6 +29,8 @@ type initialBootstrapProcess struct {
 	state            contracts.InitialBootstrapState
 	passiveCompleted bool
 	passiveHistory   *kube.InitialBootstrapPassiveRead
+	desired          contracts.InitialBootstrap
+	services         initialBootstrapServices
 }
 
 func newInitialBootstrapProcess(ctx context.Context, input, output *os.Root, creation bool) (_ *initialBootstrapProcess, err error) {
@@ -43,10 +45,11 @@ func newInitialBootstrapProcess(ctx context.Context, input, output *os.Root, cre
 			d.Close()
 		}
 	}()
-	desired, err := readInitialBootstrapDesired(root, input)
+	desired, services, err := readInitialBootstrapDesiredAndServices(root, input)
 	if err != nil || desired.Format != contracts.InitialBootstrapFormat && !contracts.InitialBootstrapHasPassiveHistory(desired.Format) {
 		return nil, mounts.ErrUnavailable
 	}
+	d.desired, d.services = desired, services
 	// This internal persisted capability is installer-selected. Operators do
 	// not author dynamic replay pins or choose a weaker completed path.
 	d.inputs = &providerInputs{files: input, kubernetesEndpoint: desired.Kubernetes, postgresEndpoint: desired.Postgres}
@@ -109,6 +112,11 @@ func newInitialBootstrapProcess(ctx context.Context, input, output *os.Root, cre
 			clear(b)
 			if decodeErr != nil || len(material.RegistryConfig) != 0 {
 				return nil, mounts.ErrUnavailable
+			}
+			if d.services.ObjectStore != nil {
+				if err := generateInitialSeaweedStorage(&material); err != nil {
+					return nil, err
+				}
 			}
 			// Only original fresh admission consumes this separate explicit
 			// registry input. Completed replay never opens or copies it.
@@ -355,6 +363,12 @@ func (d *initialBootstrapProcess) prepare() error {
 	// Actual consumers authenticate and check original SQL/schema authority.
 	m := d.state.Manager
 	if m == nil || m.Receipt == nil || m.Closing != nil || m.RetiredAt != nil || d.state.Retired || !time.Now().Before(m.Until) {
+		return mounts.ErrUnavailable
+	}
+	if err := d.prepareSmallObjectStore(); err != nil {
+		return err
+	}
+	if d.root.Err() != nil || !time.Now().Before(m.Until) {
 		return mounts.ErrUnavailable
 	}
 	b, err := json.Marshal(contracts.OwnerSQLCredential{Username: m.Receipt.Name, Password: d.state.Passwords.Manager})

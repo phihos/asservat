@@ -16,54 +16,64 @@ import (
 // official chart selects a distinct public normalization format; there is no
 // fallback from malformed canonical input and no private setup file read here.
 func readInitialBootstrapDesired(ctx context.Context, input *os.Root) (contracts.InitialBootstrap, error) {
+	d, _, err := readInitialBootstrapDesiredAndServices(ctx, input)
+	return d, err
+}
+
+func readInitialBootstrapDesiredAndServices(ctx context.Context, input *os.Root) (contracts.InitialBootstrap, initialBootstrapServices, error) {
 	var zero contracts.InitialBootstrap
+	var services initialBootstrapServices
 	raw, err := mounts.Read(ctx, input, "bootstrap.json", contracts.InitialBootstrapMaxBytes)
 	if err != nil {
-		return zero, mounts.ErrUnavailable
+		return zero, initialBootstrapServices{}, mounts.ErrUnavailable
 	}
 	defer clear(raw)
 	var kind struct {
 		Format string `json:"format"`
 	}
 	if json.Unmarshal(raw, &kind) != nil {
-		return zero, mounts.ErrUnavailable
+		return zero, initialBootstrapServices{}, mounts.ErrUnavailable
 	}
 	if kind.Format != contracts.InitialBootstrapInputFormat {
 		d, err := contracts.DecodeInitialBootstrap(bytes.NewReader(raw))
 		if err != nil || ctx.Err() != nil {
-			return zero, mounts.ErrUnavailable
+			return zero, initialBootstrapServices{}, mounts.ErrUnavailable
 		}
-		return d, nil
+		return d, services, nil
 	}
 	v, err := contracts.DecodeInitialBootstrapInput(bytes.NewReader(raw))
 	if err != nil {
-		return zero, mounts.ErrUnavailable
+		return zero, initialBootstrapServices{}, mounts.ErrUnavailable
 	}
 	if err := resolveInitialBootstrapPostgresRoots(ctx, input, &v); err != nil {
-		return zero, err
+		return zero, initialBootstrapServices{}, err
 	}
 	if err := resolveInitialBootstrapIdentity(ctx, input, &v); err != nil {
-		return zero, err
+		return zero, initialBootstrapServices{}, err
+	}
+	services.ObjectStore, err = resolveInitialBootstrapObjectStore(ctx, input, &v)
+	if err != nil {
+		return zero, initialBootstrapServices{}, err
 	}
 	var ca, token []byte
 	if v.Kubernetes.RootsPEM == "" {
 		ca, err = mounts.Read(ctx, input, "kube-ca.crt", 32<<10)
 		if err != nil {
-			return zero, mounts.ErrUnavailable
+			return zero, initialBootstrapServices{}, mounts.ErrUnavailable
 		}
 	}
 	if v.ProbeAudience == "" {
 		token, err = mounts.Read(ctx, input, "administrator-token", contracts.WorkerEnrollmentMaxToken)
 		if err != nil {
-			return zero, mounts.ErrUnavailable
+			return zero, initialBootstrapServices{}, mounts.ErrUnavailable
 		}
 		defer clear(token)
 	}
 	d, err := providerconfig.CompileInitialBootstrapInput(v, ca, token, time.Now())
 	if err != nil || ctx.Err() != nil {
-		return zero, mounts.ErrUnavailable
+		return zero, initialBootstrapServices{}, mounts.ErrUnavailable
 	}
-	return d, nil
+	return d, services, nil
 }
 
 func resolveInitialBootstrapPostgresRoots(ctx context.Context, input *os.Root, v *contracts.InitialBootstrapInput) error {

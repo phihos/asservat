@@ -177,7 +177,7 @@ func TestSmallServicesHookUsesRenderedPlanAndExactRole(t *testing.T) {
 		t.Fatal("runner omitted selected private-state references/public identity source")
 	}
 	digest := sha256.Sum256([]byte(bootstrapPublic.Data["bootstrap.json"] + "\n" + bootstrapPublic.Data["runner.json"]))
-	expectedRunner, e := kube.BuildInitialBootstrapRunner(kube.InitialBootstrapRunnerPlan{Namespace: initial.BootstrapNamespace, Name: initial.Name, Image: initial.Image, InputDigest: hex.EncodeToString(digest[:]), ProducerSecret: refs.ProducerSecret, SchemaSecret: refs.SchemaSecret, RetirementSecret: refs.RetirementSecret, RegistrySecret: refs.RegistrySecret, ProbeAudience: initial.ProbeAudience, ContinuationDigest: refs.ContinuationDigest, PostgresSecret: refs.PostgresSecret, KeycloakSecret: refs.KeycloakSecret})
+	expectedRunner, e := kube.BuildInitialBootstrapRunner(kube.InitialBootstrapRunnerPlan{Namespace: initial.BootstrapNamespace, Name: initial.Name, Image: initial.Image, InputDigest: hex.EncodeToString(digest[:]), ProducerSecret: refs.ProducerSecret, SchemaSecret: refs.SchemaSecret, RetirementSecret: refs.RetirementSecret, RegistrySecret: refs.RegistrySecret, ProbeAudience: initial.ProbeAudience, ContinuationDigest: refs.ContinuationDigest, PostgresSecret: refs.PostgresSecret, KeycloakSecret: refs.KeycloakSecret, ObjectStoreSecret: refs.ObjectStoreSecret})
 	if e != nil {
 		t.Fatal("actual native runner builder", e)
 	}

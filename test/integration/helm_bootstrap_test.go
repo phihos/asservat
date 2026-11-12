@@ -123,12 +123,17 @@ func TestHelmBootstrapWithRealServices(t *testing.T) {
 		t.Fatal("owned Helm/registry inputs unavailable")
 	}
 	x := extras.HelmBootstrap
+	bundledObjectStore := os.Getenv("ASSERVAT_HELM_BUNDLED_OBJECTSTORE") == "1"
 	publicInput := helmBootstrapPublicInput(desired)
 	compiled, err := providerconfig.CompileInitialBootstrapInput(publicInput, kc.CAData, []byte(f.Clusters[0].Token), time.Now())
 	if err != nil {
 		t.Fatal("fixture public compiler", err)
 	}
 	desired = compiled
+	var bundled *helmBundledObjectStore
+	if bundledObjectStore {
+		bundled = newHelmBundledObjectStore(t, ctx, api, desired, x)
+	}
 	t.Cleanup(func() { helmBootstrapCleanup(t, api, desired, ns.UID) })
 	rootCert, err := x509.ParseCertificate(f.NativeProviders.Root)
 	if err != nil {
@@ -141,13 +146,19 @@ func TestHelmBootstrapWithRealServices(t *testing.T) {
 	providerHTTP := &http.Client{Transport: transport, Timeout: 5 * time.Second}
 	issuer := initialBootstrapChainProvider(t, ctx, f, desired)
 	store := s3.New(s3.Options{Region: desired.AuditStore.Region, BaseEndpoint: aws.String(desired.AuditStore.Endpoint), UsePathStyle: true, Credentials: credentials.NewStaticCredentialsProvider("synthetic-only", "synthetic-only-secret", ""), HTTPClient: providerHTTP})
-	if _, err = store.CreateBucket(ctx, &s3.CreateBucketInput{Bucket: &desired.AuditStore.Bucket}); err != nil {
-		t.Fatal(err)
-	}
-	if _, err = store.PutBucketVersioning(ctx, &s3.PutBucketVersioningInput{Bucket: &desired.AuditStore.Bucket, VersioningConfiguration: &s3types.VersioningConfiguration{Status: s3types.BucketVersioningStatusEnabled}}); err != nil {
-		t.Fatal(err)
+	if !bundledObjectStore {
+		if _, err = store.CreateBucket(ctx, &s3.CreateBucketInput{Bucket: &desired.AuditStore.Bucket}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err = store.PutBucketVersioning(ctx, &s3.PutBucketVersioningInput{Bucket: &desired.AuditStore.Bucket, VersioningConfiguration: &s3types.VersioningConfiguration{Status: s3types.BucketVersioningStatusEnabled}}); err != nil {
+			t.Fatal(err)
+		}
 	}
 	values := helmBootstrapValues(publicInput)
+	if bundled != nil {
+		bundled.Values(values)
+		publicInput.AuditStore = contracts.InitialBootstrapAuditStoreInput{Endpoint: bundled.plan.Endpoint(), Region: desired.AuditStore.Region, Bucket: desired.AuditStore.Bucket, RootsSource: contracts.InitialBootstrapBundledSeaweedRoots}
+	}
 	valuesPath := filepath.Join(t.TempDir(), "values.json")
 	helmBootstrapWriteValues(t, valuesPath, values)
 	registryBytes, err := json.Marshal(x.RegistryConfig)
@@ -161,7 +172,11 @@ func TestHelmBootstrapWithRealServices(t *testing.T) {
 	sql := admin.Config().ConnConfig
 	credentialsJSON, _ := json.Marshal(contracts.OwnerSQLCredential{Username: sql.User, Password: sql.Password})
 	defer clear(credentialsJSON)
-	providerJSON, _ := json.Marshal(contracts.InitialBootstrapMaterial{Format: contracts.InitialBootstrapMaterialFormat, IssuerToken: issuer, Storage: contracts.OwnerStorageCredential{AccessKeyID: "synthetic-only", SecretAccessKey: "synthetic-only-secret"}, StorageUseUntil: time.Now().UTC().Add(time.Hour)})
+	storage := contracts.OwnerStorageCredential{AccessKeyID: "synthetic-only", SecretAccessKey: "synthetic-only-secret"}
+	if bundled != nil {
+		storage = contracts.OwnerStorageCredential{}
+	}
+	providerJSON, _ := json.Marshal(contracts.InitialBootstrapMaterial{Format: contracts.InitialBootstrapMaterialFormat, IssuerToken: issuer, Storage: storage, StorageUseUntil: time.Now().UTC().Add(time.Hour)})
 	defer clear(providerJSON)
 	for name, data := range map[string]map[string][]byte{"operator-producer": {"postgres-administrator.json": credentialsJSON, "provider-material.json": providerJSON}, "operator-ddl": {"postgres-ddl.json": credentialsJSON}, "operator-retirement": {"postgres-administrator.json": credentialsJSON}} {
 		if _, err = api.CoreV1().Secrets(namespace).Create(ctx, &core.Secret{ObjectMeta: meta.ObjectMeta{Name: name}, Immutable: ptr.To(true), Type: core.SecretTypeOpaque, Data: data}, meta.CreateOptions{}); err != nil {
@@ -195,6 +210,9 @@ func TestHelmBootstrapWithRealServices(t *testing.T) {
 	providerUID := helmBootstrapWatchProvider(t, ctx, api, desired, registryBytes)
 	defer providerUID.Close()
 	first := helmBootstrapRun(t, ctx, api, f.Clusters[0].Config, desired, x, valuesPath, true, true)
+	if bundled != nil {
+		desired, store = bundled.VerifiedStore(t, ctx, api, kc, publicInput, []byte(f.Clusters[0].Token), node)
+	}
 	var terminal *core.Pod
 	select {
 	case terminal = <-terminals:
@@ -202,6 +220,9 @@ func TestHelmBootstrapWithRealServices(t *testing.T) {
 		t.Fatal("original activation terminal missing")
 	}
 	originalSeed := retirement.Take(t, ctx)
+	if bundled != nil && (originalSeed.UID != string(bundled.seedUID) || originalSeed.State.InstallationID != bundled.installation) {
+		t.Fatal("generated writer did not belong to the original retained bootstrap seed")
+	}
 	state, configuration, root := initialBootstrapChainState(t, ctx, api, desired, originalSeed)
 	if root.Schema == nil || root.Schema.CompletedAt == nil || state.Manager == nil || state.Manager.Receipt == nil || state.Manager.RetiredAt == nil {
 		t.Fatal("product schema/manager lifecycle incomplete")
@@ -316,6 +337,9 @@ func TestHelmBootstrapWithRealServices(t *testing.T) {
 		if err := admin.QueryRow(ctx, "SELECT count(*) FROM fleet_initial_activation WHERE installation_id=$1", state.InstallationID).Scan(&count); err != nil || count != 1 {
 			t.Fatal("passive replay repeated activation", err)
 		}
+		if bundled != nil {
+			bundled.VerifyReplay(t, ctx, api)
+		}
 	})
 	t.Run("failed-hook-original-revision-resume", func(t *testing.T) {
 		var bad map[string]any
@@ -408,13 +432,14 @@ func TestHelmBootstrapWithRealServices(t *testing.T) {
 }
 
 type helmBootstrapFixture struct {
-	RegistryConfig map[string]any `json:"registryConfig"`
-	ProductBinary  string         `json:"productBinary"`
-	ChartArchive   string         `json:"chartArchive"`
-	NodeA          string         `json:"nodeA"`
-	NodeAUID       string         `json:"nodeAUID"`
-	NodeB          string         `json:"nodeB"`
-	NodeBUID       string         `json:"nodeBUID"`
+	RegistryConfig   map[string]any `json:"registryConfig"`
+	ProductBinary    string         `json:"productBinary"`
+	ChartArchive     string         `json:"chartArchive"`
+	NodeA            string         `json:"nodeA"`
+	NodeAUID         string         `json:"nodeAUID"`
+	NodeB            string         `json:"nodeB"`
+	NodeBUID         string         `json:"nodeBUID"`
+	ObjectStoreImage string         `json:"objectStoreImage,omitempty"`
 }
 
 func helmBootstrapPublicInput(d contracts.InitialBootstrap) contracts.InitialBootstrapInput {

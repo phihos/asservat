@@ -9,6 +9,9 @@ const InitialBootstrapInputFormat = "asservat-bootstrap-input/v1"
 // excludes the actual trust bytes from the immutable installation identity.
 const InitialBootstrapBundledPostgresRoots = "bundledPostgres"
 const InitialBootstrapPostgresCAFile = "postgres-ca.crt"
+const InitialBootstrapBundledSeaweedRoots = "bundledSeaweed"
+const InitialBootstrapObjectStoreCAFile = "objectstore-ca.crt"
+const InitialBootstrapObjectStorePlanFile = "objectstore-plan.json"
 
 // Public installer input for the official chart. Only static operator choices
 // occur here; the product obtains all UIDs, SQL OIDs and original effect IDs.
@@ -44,10 +47,11 @@ type InitialBootstrapPostgresInput struct {
 	RootsSource    string `json:"rootsSource,omitempty"`
 }
 type InitialBootstrapAuditStoreInput struct {
-	Endpoint string `json:"endpoint"`
-	Region   string `json:"region"`
-	Bucket   string `json:"bucket"`
-	RootsPEM string `json:"rootsPEM"`
+	Endpoint    string `json:"endpoint"`
+	Region      string `json:"region"`
+	Bucket      string `json:"bucket"`
+	RootsPEM    string `json:"rootsPEM"`
+	RootsSource string `json:"rootsSource,omitempty"`
 }
 type InitialBootstrapKeyServiceInput struct {
 	Endpoint   string `json:"endpoint"`

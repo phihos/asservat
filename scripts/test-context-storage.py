@@ -23,6 +23,7 @@ import tempfile
 import time
 import urllib.error
 import urllib.request
+import yaml
 
 from helm_registry import HelmRegistry, REGISTRY, verify_registry_cleanup
 import native_kube_audit
@@ -240,8 +241,13 @@ def qualification_selection(test_pattern, initial_handover, initial_schema_hando
     return test_pattern, 2
 
 
-def qualification_environment(base, fixture_path, work, initial_handover, initial_schema_handover, initial_bootstrap_chain=False, helm_bootstrap=False, regional_context_start=None, runtime_object_roundtrip=False, owner_provider_auth=False, runtime_provider_pair=False, runtime_provider_worker=False, runtime_provider_owner=False, installer_continuation=False):
+def qualification_environment(base, fixture_path, work, initial_handover, initial_schema_handover, initial_bootstrap_chain=False, helm_bootstrap=False, regional_context_start=None, runtime_object_roundtrip=False, owner_provider_auth=False, runtime_provider_pair=False, runtime_provider_worker=False, runtime_provider_owner=False, installer_continuation=False, bundled_objectstore=False):
     env = base.copy()
+    env.pop("ASSERVAT_HELM_BUNDLED_OBJECTSTORE", None)
+    if bundled_objectstore:
+        if not helm_bootstrap:
+            raise ValueError("Bundled object store qualification requires --helm-bootstrap")
+        env["ASSERVAT_HELM_BUNDLED_OBJECTSTORE"] = "1"
     env["ASSERVAT_CONTEXT_FIXTURES"] = str(fixture_path)
     env.pop("ASSERVAT_HELM_CONTEXT_NATIVE", None)
     env.pop("ASSERVAT_HELM_CONTEXT_TOPOLOGY", None)
@@ -668,7 +674,9 @@ def collect_profile_containment_artifacts(work, results):
     return {"directory": str(destination), "files": collected, "scope": "explicit terminal collection from the private harness directory, including failed runs"}
 
 
-def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=False, initial_bootstrap_chain=False, helm_bootstrap=False, regional_context_start=None, runtime_object_roundtrip=False, owner_provider_auth=False, runtime_provider_pair=False, runtime_provider_worker=False, runtime_provider_owner=False, installer_continuation=False, helm_cluster=False, keep_on_failure=False, keep_installed=False):
+def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=False, initial_bootstrap_chain=False, helm_bootstrap=False, regional_context_start=None, runtime_object_roundtrip=False, owner_provider_auth=False, runtime_provider_pair=False, runtime_provider_worker=False, runtime_provider_owner=False, installer_continuation=False, helm_cluster=False, keep_on_failure=False, keep_installed=False, bundled_objectstore=False):
+    if bundled_objectstore and (not helm_bootstrap or helm_cluster):
+        raise ValueError("Bundled object store qualification requires --helm-bootstrap without --helm-cluster")
     helm_context = os.environ.get("ASSERVAT_HELM_CONTEXT_NATIVE") == "1"
     helm_context_topology = os.environ.get("ASSERVAT_HELM_CONTEXT_TOPOLOGY", "separate-api")
     if helm_context_topology not in ("separate-api", "same-api") or ("ASSERVAT_HELM_CONTEXT_TOPOLOGY" in os.environ and not helm_context):
@@ -744,6 +752,8 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
         audit_nodes = []
         report = {"scope": "component integration, not S-02 release acceptance", "runtimeProviderPairQualification": runtime_provider_pair, "runtimeProviderWorkerQualification": runtime_provider_worker, "runtimeProviderOwnerQualification": runtime_provider_owner, "installerContinuationQualification": installer_continuation, "aggregateGoTimeout": qualification_go_timeout(helm_bootstrap, runtime_provider_owner, installer_continuation, native_traffic_probe), "bootstrapFixtureSeconds": (2700 if installer_continuation else 720 if runtime_provider_owner else 480) if initial_bootstrap_chain else None, "images": {"s3": SEAWEED, "kms": BAO, "kubernetes": NODE, "postgres": POSTGRES}, "clusters": [], "testPattern": test_pattern, "testPackage": test_package, "runtimeObjectRoundTripQualification": runtime_object_roundtrip, "ownerProviderAuthenticationQualification": owner_provider_auth, "initialHandoverQualification": initial_handover, "initialSchemaHandoverQualification": initial_schema_handover, "initialBootstrapChainQualification": initial_bootstrap_chain, "helmBootstrapQualification": helm_bootstrap and not helm_cluster, "helmClusterQualification": helm_cluster, "regionalContextStartQualification": regional_context_start, "fixtureMigratesDatabase": not (initial_schema_handover or initial_bootstrap_chain or helm_bootstrap)}
         report["helmContextQualification"] = helm_context
+        report["bundledObjectStoreQualification"] = bundled_objectstore
+        report["qualificationArguments"] = {"helmBootstrap": helm_bootstrap, "bundledObjectStore": bundled_objectstore, "testPattern": test_pattern}
         if helm_context:
             profile = ROOT/"examples/helm/context-trial-profile.yaml"
             report["helmContextReferenceProfileSHA256"] = hashlib.sha256(profile.read_bytes()).hexdigest()
@@ -1036,6 +1046,17 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
                         a = json.loads(run(k+["get","node",node_name,"-o","json"]))
                         b = json.loads(run(k+["get","node",worker_node,"-o","json"]))
                         fixture["helmBootstrap"].update(nodeA=node_name,nodeAUID=a["metadata"]["uid"],nodeB=worker_node,nodeBUID=b["metadata"]["uid"])
+                        if bundled_objectstore:
+                            # The actual chart pin, not the separate external S3
+                            # fixture image. Only this run's PV-affine node pulls it.
+                            chart_values = yaml.safe_load((ROOT/"charts/asservat/values.yaml").read_text())
+                            object_image = chart_values["services"]["objectStore"]["seaweedfs"]["image"]
+                            # CRI uses the same image-name normalization as the
+                            # kubelet. ctr treats an unqualified repository's
+                            # first component as a registry hostname instead.
+                            run(["docker", "exec", node_name, "crictl", "pull", object_image])
+                            fixture["helmBootstrap"]["objectStoreImage"] = object_image
+                            report["images"]["bundledObjectStore"] = object_image
                     else:
                         run(["kind", "load", "docker-image", worker_tag, "--name", name])
                         native_tag = "docker.io/library/"+worker_tag
@@ -1118,7 +1139,7 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
             path = work/"fixtures.json"
             path.touch(mode=0o600)
             path.write_text(json.dumps(fixture))
-            env = qualification_environment(os.environ, path, work, initial_handover, initial_schema_handover, initial_bootstrap_chain, helm_bootstrap, regional_context_start, runtime_object_roundtrip, owner_provider_auth, runtime_provider_pair, runtime_provider_worker, runtime_provider_owner, installer_continuation)
+            env = qualification_environment(os.environ, path, work, initial_handover, initial_schema_handover, initial_bootstrap_chain, helm_bootstrap, regional_context_start, runtime_object_roundtrip, owner_provider_auth, runtime_provider_pair, runtime_provider_worker, runtime_provider_owner, installer_continuation, bundled_objectstore)
 
             if build_scratch is not None:
                 env["TMPDIR"] = str(build_scratch)
@@ -1604,6 +1625,7 @@ if __name__ == "__main__":
     parser.add_argument("--initial-bootstrap-chain", action="store_true", help="Qualify all four fixed bootstrap commands in a Restricted runner and the original activation Pod on an empty database.")
     parser.add_argument("--helm-cluster", action="store_true", help="ADR-193 step 6: the packaged chart in mode=cluster runs the regional installer hook with a synthetic offer and record, on the --helm-bootstrap registry/node infrastructure.")
     parser.add_argument("--helm-bootstrap", action="store_true", help="Actual chart/four-command empty-database chain with authenticated TLS registry and two owned cold-image nodes.")
+    parser.add_argument("--bundled-objectstore", action="store_true", help="With --helm-bootstrap, qualify the actual bundled S3 chart, generated original audit credential and encrypted initial audit; external PostgreSQL/OpenBao remain test fixtures.")
     parser.add_argument("--regional-context-start", choices=("first", "continuation", "journey"), help="Qualify actual signed same-port H2 context start; journey adds the shared operation factory, publication and native download. Owns its exact fresh-fixture test selection; synthetic authority remains explicit.")
     parser.add_argument("--runtime-object-roundtrip", action="store_true", help="Qualify inert generated resource defaults in one owned API, using the exact package-local test; no installer authority claim.")
     parser.add_argument("--owner-provider-auth", action="store_true", help="Qualify fixed owner Kubernetes authentication against the pinned provider and one owned API; no installed-runtime qualification.")
@@ -1627,4 +1649,4 @@ if __name__ == "__main__":
         parser.error("Select exactly one installation qualification")
     if args.test_pattern is not None and not 1 <= len(args.test_pattern) <= 256:
         parser.error("--run must contain 1 to 256 characters")
-    raise SystemExit(main(args.test_pattern, initial_handover=args.initial_handover, initial_schema_handover=args.initial_schema_handover, initial_bootstrap_chain=args.initial_bootstrap_chain, helm_bootstrap=args.helm_bootstrap, regional_context_start=args.regional_context_start, runtime_object_roundtrip=args.runtime_object_roundtrip, owner_provider_auth=args.owner_provider_auth, runtime_provider_pair=args.runtime_provider_pair, runtime_provider_worker=args.runtime_provider_worker, runtime_provider_owner=args.runtime_provider_owner, installer_continuation=args.installer_continuation, helm_cluster=args.helm_cluster, keep_on_failure=args.keep_on_failure, keep_installed=args.keep_installed))
+    raise SystemExit(main(args.test_pattern, initial_handover=args.initial_handover, initial_schema_handover=args.initial_schema_handover, initial_bootstrap_chain=args.initial_bootstrap_chain, helm_bootstrap=args.helm_bootstrap, regional_context_start=args.regional_context_start, runtime_object_roundtrip=args.runtime_object_roundtrip, owner_provider_auth=args.owner_provider_auth, runtime_provider_pair=args.runtime_provider_pair, runtime_provider_worker=args.runtime_provider_worker, runtime_provider_owner=args.runtime_provider_owner, installer_continuation=args.installer_continuation, helm_cluster=args.helm_cluster, keep_on_failure=args.keep_on_failure, keep_installed=args.keep_installed, bundled_objectstore=args.bundled_objectstore))

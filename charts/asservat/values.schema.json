@@ -932,22 +932,6 @@
                   }
                 }
               },
-              "auditStore": {
-                "properties": {
-                  "endpoint": {
-                    "minLength": 1
-                  },
-                  "region": {
-                    "minLength": 1
-                  },
-                  "bucket": {
-                    "minLength": 1
-                  },
-                  "rootsPEM": {
-                    "minLength": 1
-                  }
-                }
-              },
               "keyService": {
                 "properties": {
                   "endpoint": {
@@ -3369,6 +3353,54 @@
                         "minLength": 73
                       }
                     }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "bootstrap": {
+            "properties": {
+              "enabled": {
+                "const": true
+              }
+            }
+          },
+          "services": {
+            "properties": {
+              "objectStore": {
+                "properties": {
+                  "provider": {
+                    "const": "external"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "bootstrap": {
+            "properties": {
+              "auditStore": {
+                "properties": {
+                  "endpoint": {
+                    "minLength": 1
+                  },
+                  "region": {
+                    "minLength": 1
+                  },
+                  "bucket": {
+                    "minLength": 1
+                  },
+                  "rootsPEM": {
+                    "minLength": 1
                   }
                 }
               }
