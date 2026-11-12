@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"html"
+	"io"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
@@ -94,6 +95,16 @@ func TestSmallKeycloakBundleWithRealPostgres(t *testing.T) {
 	client := &http.Client{Timeout: 5 * time.Second, Transport: &http.Transport{Proxy: nil, TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS13, RootCAs: roots}}, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	defer client.CloseIdleConnections()
 	f := &kcFixture{t: t, base: settings.Hostname, Issuer: settings.Hostname + "/realms/" + settings.Realm, http: client, AdminUser: string(read("kc/" + contracts.SmallKeycloakAdminUsername)), AdminPassword: string(read("kc/" + contracts.SmallKeycloakAdminPassword)), UserPassword: "synthetic-component-password-not-a-default"}
+	if os.Getenv("ASSERVAT_SMALL_KEYCLOAK_STAGE") == "prime-pool" {
+		smallKeycloakPrimePool(t, f, endpoint, read("pg/postgres-administrator.json"))
+		return
+	}
+	if os.Getenv("ASSERVAT_SMALL_KEYCLOAK_STAGE") == "postgres-restart" {
+		// In particular, do not run the ordinary readiness/admin requests first:
+		// they could discard stale connections before the first human login.
+		smallKeycloakFirstLoginsAfterPostgres(t, f, settings, kcPEM, string(read("kc/"+contracts.SmallKeycloakConsoleSecret)))
+		return
+	}
 	if os.Getenv("ASSERVAT_SMALL_KEYCLOAK_STAGE") == "readiness" {
 		ctx, end := context.WithTimeout(t.Context(), 60*time.Second)
 		defer end()
@@ -199,10 +210,7 @@ func TestSmallKeycloakBundleWithRealPostgres(t *testing.T) {
 	}
 	clientID := clients[0].ID
 	receiptPath := os.Getenv("ASSERVAT_SMALL_KEYCLOAK_RECEIPT")
-	var original struct {
-		Subject, Group, Client string
-		ProcessingGroup        string `json:",omitempty"`
-	}
+	var original smallKeycloakReceipt
 	if os.Getenv("ASSERVAT_SMALL_KEYCLOAK_STAGE") == "restart" {
 		raw, err := os.ReadFile(receiptPath)
 		if err != nil || json.Unmarshal(raw, &original) != nil {
@@ -299,15 +307,167 @@ func TestSmallKeycloakBundleWithRealPostgres(t *testing.T) {
 	f.loginScopes(settings.MCPClientID, "openid evidence:read asservat:mcp", "replay")
 	f.loginScopes(settings.MCPClientID, "openid evidence:read asservat:mcp", "wrong-verifier")
 	if receiptPath != "" {
-		body, _ := json.Marshal(struct {
-			Subject, Group, Client string
-			ProcessingGroup        string `json:",omitempty"`
-		}{userID, group, clientID, processingGroup})
+		body, _ := json.Marshal(smallKeycloakReceipt{userID, group, clientID, processingGroup})
 		if err = os.WriteFile(receiptPath, body, 0600); err != nil {
 			t.Fatal("write public synthetic identity receipt")
 		}
 	}
 	t.Log("actual pinned Keycloak import, protected stable identity, console/MCP code+PKCE, membership refresh and disabled password flow passed; fixture administration grants no Asservat authority")
+}
+
+type smallKeycloakReceipt struct {
+	Subject, Group, Client string
+	ProcessingGroup        string `json:",omitempty"`
+}
+
+// Grow the unchanged five-connection pool using bounded concurrent reads, then
+// observe its actual PostgreSQL sessions. No artificial SQL locks hold KC work.
+func smallKeycloakPrimePool(t *testing.T, f *kcFixture, endpoint contracts.OwnerPostgresEndpoint, administrator []byte) {
+	t.Helper()
+	defer clear(administrator)
+	c, err := contracts.DecodeOwnerSQLCredential(strings.NewReader(string(administrator)))
+	if err != nil || c.Username != "asservat_admin" {
+		t.Fatal("component pool observation administrator unavailable")
+	}
+	roots := x509.NewCertPool()
+	for _, der := range endpoint.Roots {
+		cert, err := x509.ParseCertificate(der)
+		if err != nil {
+			t.Fatal("component pool observation roots unavailable")
+		}
+		roots.AddCert(cert)
+	}
+	config, err := pgx.ParseConfig("host=localhost port=1 user=unused dbname=unused sslmode=disable")
+	if err != nil {
+		t.Fatal("component pool observation configuration unavailable")
+	}
+	config.Host, config.Port, config.Database = endpoint.Host, uint16(endpoint.Port), endpoint.Database
+	config.User, config.Password = c.Username, c.Password
+	config.TLSConfig = &tls.Config{RootCAs: roots, ServerName: endpoint.Host, MinVersion: tls.VersionTLS13}
+	config.Fallbacks = nil
+	ctx, end := context.WithTimeout(t.Context(), 30*time.Second)
+	defer end()
+	conn, err := pgx.ConnectConfig(ctx, config)
+	if err != nil {
+		t.Fatal("component pool observation connection unavailable")
+	}
+	defer conn.Close(ctx)
+	f.admin = f.tokens(f.base+"/realms/master/protocol/openid-connect/token", url.Values{"grant_type": {"password"}, "client_id": {"admin-cli"}, "username": {f.AdminUser}, "password": {f.AdminPassword}}, 200).Access
+	var count int
+	calls := 0
+	for round := 0; round < 6; round++ {
+		statuses := make(chan int, 5)
+		for i := 0; i < 5; i++ {
+			go func() {
+				request, err := http.NewRequestWithContext(ctx, http.MethodGet, f.base+"/admin/realms/asservat/users?max=1&search=pool-prime-"+randomPKCE(), nil)
+				if err != nil {
+					statuses <- 0
+					return
+				}
+				request.Header.Set("Authorization", "Bearer "+f.admin)
+				response, err := f.http.Do(request)
+				if err != nil {
+					statuses <- 0
+					return
+				}
+				_, err = io.Copy(io.Discard, io.LimitReader(response.Body, 256<<10))
+				response.Body.Close()
+				if err != nil {
+					statuses <- 0
+					return
+				}
+				statuses <- response.StatusCode
+			}()
+		}
+		good := true
+		for i := 0; i < 5; i++ {
+			good = (<-statuses == http.StatusOK) && good
+		}
+		calls += 5
+		if !good {
+			t.Fatal("component pool priming read failed")
+		}
+		if err := conn.QueryRow(ctx, "SELECT count(*) FROM pg_stat_activity WHERE datname='keycloak' AND usename='keycloak' AND backend_type='client backend'").Scan(&count); err != nil || count > 5 {
+			t.Fatal("component actual Keycloak pool count unavailable or above five")
+		}
+		if count >= 2 {
+			break
+		}
+	}
+	if count < 2 {
+		t.Fatal("component did not prime multiple actual Keycloak PostgreSQL sessions")
+	}
+	receipt, _ := json.Marshal(map[string]int{"keycloakConnections": count, "maximum": 5, "concurrentReadCalls": calls})
+	if err := os.WriteFile(filepath.Join(filepath.Dir(os.Getenv("ASSERVAT_SMALL_KEYCLOAK_RECEIPT")), "pool-receipt.json"), receipt, 0600); err != nil {
+		t.Fatal("component pool observation receipt unavailable")
+	}
+	t.Logf("primed %d actual Keycloak PostgreSQL sessions under the unchanged five-connection cap", count)
+}
+
+// The first post-outage requests are fresh human flows, not health checks or
+// administrator logins that could repair the pool before the assertion.
+func smallKeycloakFirstLoginsAfterPostgres(t *testing.T, f *kcFixture, settings contracts.SmallKeycloakSettings, roots []byte, consoleSecret string) {
+	t.Helper()
+	var original smallKeycloakReceipt
+	raw, err := os.ReadFile(os.Getenv("ASSERVAT_SMALL_KEYCLOAK_RECEIPT"))
+	if err != nil || json.Unmarshal(raw, &original) != nil || original.Subject == "" || original.Group == "" || original.Client == "" {
+		t.Fatal("original synthetic identity receipt unavailable")
+	}
+	wantGroups := []string{original.Group}
+	if original.ProcessingGroup != "" {
+		wantGroups = append(wantGroups, original.ProcessingGroup)
+	}
+	if !t.Run("first-fresh-logins", func(t *testing.T) {
+		for _, console := range []bool{true, false} {
+			name := "mcp"
+			if console {
+				name = "console"
+			}
+			t.Run(name, func(t *testing.T) {
+				t.Parallel()
+				owned := *f
+				client := *f.http
+				owned.t, owned.http = t, &client
+				owned.redirectURI = settings.MCPRedirectURIs[0]
+				clientID, audience := settings.MCPClientID, settings.Origin+"/mcp"
+				var tokens kcTokens
+				if console {
+					clientID, audience = settings.ConsoleClientID, settings.BrowserAudience
+					tokens = smallKeycloakConsoleCode(t, &owned, settings, consoleSecret, false)
+				} else {
+					tokens = owned.loginScopes(clientID, "openid evidence:read asservat:mcp")
+				}
+				verifier, err := oidc.New(oidc.Trust{Issuer: f.Issuer, Audience: audience, JWKSURL: f.Issuer + "/protocol/openid-connect/certs", Profile: oidc.Keycloak, RootCA: roots, KeyMaxAge: time.Minute}, time.Now)
+				if err != nil {
+					t.Fatal("post-PostgreSQL-restart token verifier unavailable")
+				}
+				defer verifier.Close()
+				claims, err := verifier.Verify(t.Context(), tokens.Access)
+				if err != nil || claims.Subject != original.Subject || claims.ClientID != clientID || !smallKeycloakSameGroups(claims.Groups, wantGroups) {
+					t.Fatal("first fresh post-PostgreSQL-restart token lost its original identity/client/groups")
+				}
+			})
+		}
+	}) {
+		return
+	}
+	// Only now may an administrator inspect retained client/group metadata.
+	f.admin = f.tokens(f.base+"/realms/master/protocol/openid-connect/token", url.Values{"grant_type": {"password"}, "client_id": {"admin-cli"}, "username": {f.AdminUser}, "password": {f.AdminPassword}}, 200).Access
+	var clients []struct{ ID, Secret string }
+	prefix := "/admin/realms/" + settings.Realm
+	if json.Unmarshal(f.json("GET", prefix+"/clients?clientId="+url.QueryEscape(settings.ConsoleClientID), nil), &clients) != nil || len(clients) != 1 || clients[0].ID != original.Client || clients[0].Secret != consoleSecret {
+		t.Fatal("PostgreSQL restart replaced the original console client")
+	}
+	for _, id := range wantGroups {
+		var group struct {
+			ID         string
+			Attributes map[string][]string
+		}
+		if json.Unmarshal(f.json("GET", prefix+"/groups/"+id, nil), &group) != nil || group.ID != id || !slices.Equal(group.Attributes["asservat_group_id"], []string{id}) {
+			t.Fatal("PostgreSQL restart replaced an original stable group")
+		}
+	}
+	t.Log("first fresh console/MCP code+PKCE logins succeeded without POST retries after PostgreSQL-only restart; original subject/client/groups preserved")
 }
 
 func exportSmallKeycloakComponent(t *testing.T, dir string) {

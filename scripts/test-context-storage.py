@@ -296,6 +296,7 @@ def qualification_environment(base, fixture_path, work, initial_handover, initia
         if not (helm_bootstrap and installer_continuation and bundled_postgres and bundled_objectstore and bundled_keyservice):
             raise ValueError("Bundled identity qualification requires all four bundled services and Helm continuation")
         env["ASSERVAT_HELM_BUNDLED_IDENTITY"] = "1"
+        env["ASSERVAT_JOURNEY_FOCUS"] = bundled_public_focus(base)
     env["ASSERVAT_CONTEXT_FIXTURES"] = str(fixture_path)
     env.pop("ASSERVAT_HELM_CONTEXT_NATIVE", None)
     env.pop("ASSERVAT_HELM_CONTEXT_TOPOLOGY", None)
@@ -530,9 +531,24 @@ def qualification_cluster_count(default_count, installer_continuation=False, bun
 BUNDLED_PUBLIC_REQUIRED_STAGES = ("bundled-public-login", "bundled-context-journey")
 
 
-def missing_bundled_public_stages(passed):
-    """Only exact positive subtest receipts qualify the joined workflow."""
-    return [stage for stage in BUNDLED_PUBLIC_REQUIRED_STAGES
+def bundled_public_focus(environ=os.environ):
+    foci = journey_foci(environ)
+    if not foci:
+        return "journey"
+    if foci not in (["journey"], ["restart"]):
+        raise ValueError("Bundled public qualification requires a single journey or restart focus")
+    return foci[0]
+
+
+def bundled_public_stages(focus="journey"):
+    if focus not in ("journey", "restart"):
+        raise ValueError("Unknown bundled public focus")
+    return BUNDLED_PUBLIC_REQUIRED_STAGES + (("bundled-context-journey/postgres-restart",) if focus == "restart" else ())
+
+
+def missing_bundled_public_stages(passed, focus="journey"):
+    """Only exact positive subtest receipts qualify the selected workflow."""
+    return [stage for stage in bundled_public_stages(focus)
             if "TestHelmBootstrapWithRealServices/" + stage not in passed]
 
 
@@ -754,6 +770,9 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
         raise ValueError("Helm context qualification requires the installed bootstrap continuation and its exact workflow")
     focus = os.environ.get("ASSERVAT_JOURNEY_FOCUS")
     foci = journey_foci()
+    if bundled_identity:
+        focus = bundled_public_focus()
+        foci = [focus]
     if helm_context and foci != ["journey"]:
         raise ValueError("Helm context qualification requires the single journey focus")
     if keep_installed:
@@ -837,9 +856,14 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
         if bundled_identity:
             report["logicalTopology"] = {"hub": 0, "regional": 0, "physicalAPIs": 1}
             report["cleanupOwner"] = "owned-context-harness"
+            report["bundledPublicFocus"] = focus
+            if focus == "restart":
+                report["bundledPostgresRestartQualification"] = True
             report["bundledPublicCheckpoint"] = "five-commands-public-cookie-context-native-react-deletion"
             report["bundledPublicRequestedWorkflow"] = ["five-command-helm", "bundled-keycloak-cookie-login", "same-api-regional-enrollment", "whole-pod-context-capture", "approved-inspection", "native-range-download", "react-processing-restrict-release", "stop-deny-targetgone-expiry", "sql-and-versioned-storage-deletion"]
             report["bundledPublicTestContextSeconds"] = 1200
+            if focus == "restart":
+                report["bundledPublicRequestedWorkflow"] += ["published-artifact-before-restart", "same-pvc-postgres-pod-restart", "original-artifact-charges-deadlines-and-bytes", "fresh-post-restart-capture"]
             report["bundledPublicHelmTimeoutSeconds"] = 1200
             report["bundledContextReferenceProfileSHA256"] = hashlib.sha256((ROOT/"examples/helm/context-trial-profile.yaml").read_bytes()).hexdigest()
         report["qualificationArguments"] = {"helmBootstrap": helm_bootstrap, "bundledObjectStore": bundled_objectstore, "bundledKeyService": bundled_keyservice, "bundledPostgres": bundled_postgres, "bundledIdentity": bundled_identity, "testPattern": test_pattern}
@@ -1363,8 +1387,8 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
                     report["missingRequiredHelmBootstrap"] = True
                     exit_code = 1
                 if bundled_identity:
-                    missing = missing_bundled_public_stages(passed)
-                    report["bundledPublicStageResults"] = {stage: ("notPassed" if stage in missing else "PASS") for stage in BUNDLED_PUBLIC_REQUIRED_STAGES}
+                    missing = missing_bundled_public_stages(passed, focus)
+                    report["bundledPublicStageResults"] = {stage: ("notPassed" if stage in missing else "PASS") for stage in bundled_public_stages(focus)}
                     if missing:
                         report["missingRequiredBundledPublicStages"] = missing
                         exit_code = 1

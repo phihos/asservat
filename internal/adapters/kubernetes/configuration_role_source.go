@@ -150,7 +150,7 @@ func (s *ConfigurationRoleSource) readConfigurationRoleSource(ctx context.Contex
 	}
 	narrow(lastRootsUntil)
 	d2, e := ownerResource[apps.Deployment](reader, live, "/apis/apps/v1/namespaces/"+s.input.Namespace.Name+"/deployments/"+s.input.Deployment.Name, "apps/v1", "Deployment")
-	if e != nil || !configurationRoleDeploymentBound(d2, s.input) || !equalJSON(d.Spec, d2.Spec) || d.ResourceVersion != d2.ResourceVersion {
+	if e != nil || !configurationRoleDeploymentBound(d2, s.input) || !configurationDeploymentSame(d, d2) {
 		return zero, cfg.ErrChanged
 	}
 	account2, e := ownerResource[core.ServiceAccount](reader, live, "/api/v1/namespaces/"+s.input.Namespace.Name+"/serviceaccounts/"+s.input.ServiceAccount.Name, "v1", "ServiceAccount")
@@ -180,15 +180,16 @@ func (s *ConfigurationRoleSource) readConfigurationRoleSource(ctx context.Contex
 	if guard == (artifact.Digest{}) || !identity.Fresh(out.ObservedAt, out.FreshUntil, s.client.now(), 5*time.Second) {
 		return zero, cfg.ErrUnavailable
 	}
-	return configurationRoleObserved{observation: out, deploymentVersion: d.ResourceVersion, accountVersion: account.ResourceVersion, guards: versions,
+	return configurationRoleObserved{observation: out, deployment: d2.DeepCopy(), accountVersion: account.ResourceVersion, guards: versions,
 		native: &configurationRoleNativeResponses{clients: [3]*PermissionClient{s.protection.probe, s.fleet.protection.probe, s.owner.protection.probe},
 			identities: [3]auth.UserInfo{workloadIdentity, fleetIdentity, ownerIdentity}, worker: *account2.DeepCopy()}}, nil
 }
 
 // Credential provisioning also accepts the exact inert installation phase at
 // zero desired replicas. It conveys neither readiness nor permission to launch.
-// The full spec/resourceVersion is retained by the surrounding observation, so
-// zero -> one during an operation invalidates its original proof. The rollout
+// The full spec and status-neutral metadata are retained by the surrounding
+// observation, so zero -> one during an operation invalidates its original proof.
+// The actual latest resourceVersion remains the launch write CAS. The rollout
 // bound is calculated at future desired=1 even while inert; a later launch
 // cannot reveal a previously hidden unbacked surge allowance.
 // A stale/closing process still consumes the role-wide SQL connection limit.

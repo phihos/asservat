@@ -97,6 +97,26 @@ func TestSmallKeycloakHelmUsesPreparedMaterialAndIndependentDatabase(t *testing.
 	if env["KC_DB_POOL_MAX_SIZE"].Value != "5" || env["KC_DB_URL"].Value != "jdbc:postgresql://trial-postgres.installation.svc:5432/keycloak?sslmode=verify-full&sslrootcert=/opt/keycloak/db/ca.crt" {
 		t.Fatal("database producer disagrees with private role/certificate inputs")
 	}
+	checkPoolRecovery := func(container core.Container) {
+		t.Helper()
+		settings := map[string]core.EnvVar{}
+		for _, item := range container.Env {
+			settings[item.Name] = item
+		}
+		for name, want := range map[string]string{
+			"KC_DB_POOL_INITIAL_SIZE": "1", "KC_DB_POOL_MIN_SIZE": "1", "KC_DB_POOL_MAX_SIZE": "5",
+			"QUARKUS_DATASOURCE_JDBC_FOREGROUND_VALIDATION_INTERVAL": "5s",
+			"QUARKUS_DATASOURCE_JDBC_VALIDATION_QUERY_TIMEOUT":       "2s",
+		} {
+			if settings[name].Value != want || settings[name].ValueFrom != nil {
+				t.Fatalf("pinned Keycloak pool recovery setting %s: got %q, want %q", name, settings[name].Value, want)
+			}
+		}
+		if settings["QUARKUS_DATASOURCE_JDBC_VALIDATE_ON_BORROW"].Name != "" {
+			t.Fatal("pool recovery must retain idle validation without validating every checkout")
+		}
+	}
+	checkPoolRecovery(container)
 	password := env["KCRAW_DB_PASSWORD"]
 	if password.ValueFrom == nil || password.ValueFrom.SecretKeyRef == nil || password.ValueFrom.SecretKeyRef.Name != "trial-postgres-state" || password.ValueFrom.SecretKeyRef.Key != "keycloak-password" || env["KC_DB_PASSWORD"].Name != "" {
 		t.Fatal("operator database password must bypass Keycloak configuration interpolation")
@@ -130,6 +150,7 @@ func TestSmallKeycloakHelmUsesPreparedMaterialAndIndependentDatabase(t *testing.
 		t.Fatalf("independent external database: %v\n%s", err, raw)
 	}
 	d, _ = read(raw)
+	checkPoolRecovery(d.Spec.Template.Spec.Containers[0])
 	for _, v := range d.Spec.Template.Spec.Containers[0].Env {
 		if v.Name == "KC_DB_URL" && !strings.Contains(v.Value, "external-postgres.example") {
 			t.Fatal("external database silently replaced")

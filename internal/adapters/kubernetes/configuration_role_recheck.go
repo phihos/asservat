@@ -89,7 +89,7 @@ func (s *ConfigurationRoleSource) recheckConfigurationRoleSource(ctx context.Con
 	}
 	reader := &OwnerEndpoints{client: s.client, pool: o.Pool}
 	d, e := ownerResource[apps.Deployment](reader, live, "/apis/apps/v1/namespaces/"+s.input.Namespace.Name+"/deployments/"+s.input.Deployment.Name, "apps/v1", "Deployment")
-	if e != nil || !configurationRoleDeploymentBound(d, s.input) || d.ResourceVersion != original.deploymentVersion {
+	if e != nil || !configurationRoleDeploymentBound(d, s.input) || (original.deployment == nil || !configurationDeploymentSame(d, *original.deployment)) {
 		return zero, configurationSourceError(configurationSourceDeploymentFinalBound, cfg.ErrChanged)
 	}
 	encoded, e := json.Marshal(d.Spec)
@@ -123,5 +123,6 @@ func (s *ConfigurationRoleSource) recheckConfigurationRoleSource(ctx context.Con
 	// process-local monotonic clock payload is not part of the JSON contract.
 	p.FreshUntil = p.FreshUntil.UTC()
 	original.observation = p
+	original.deployment = d.DeepCopy()
 	return original, nil
 }

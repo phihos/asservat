@@ -38,17 +38,7 @@ func installedJourneyDeletionWithStores(t *testing.T, ctx context.Context, admin
 		var expiresAt, deleteBy time.Time
 		before, cancel := context.WithTimeout(ctx, 20*time.Second)
 		defer cancel()
-		err := admin.QueryRow(before, `
-SELECT a.cluster_id::text, a.id::text, a.allocation_id::text,
-       a.reserved_bytes, ca.charged_bytes-(SELECT coalesce(sum(x.reserved_bytes),0) FROM custody_attempt x WHERE x.allocation_id=a.allocation_id AND x.id<>a.id AND x.state<>'deleted'), ca.charged_objects-4*(SELECT count(*) FROM custody_attempt x WHERE x.allocation_id=a.allocation_id AND x.id<>a.id AND x.state<>'deleted'),
-       cc.charged_full, cc.charged_replay,
-       a.effective_expires_at, a.effective_delete_by
-FROM context_catalog c
-JOIN custody_attempt a ON a.artifact_id=c.artifact_id
-JOIN context_writer_completion w ON w.attempt_id=a.id AND w.root_id=c.root_id AND w.capture_id=c.capture_id
-JOIN custody_allocation ca ON ca.id=a.allocation_id
-JOIN context_control_account cc ON cc.allocation_id=ca.id
-WHERE c.root_id=$1 AND c.artifact_id=$2 AND a.state='stored_unpublished'`, root, artifactID).Scan(
+		err := admin.QueryRow(before, installedDeletionInitialSQL, root, artifactID).Scan(
 			&loc.ClusterID, &loc.AttemptID, &allocation, &reserved, &chargedBytes, &chargedObjects,
 			&full, &replay, &expiresAt, &deleteBy)
 		// Charges are this attempt's share: the browser journey's own capture
@@ -231,16 +221,7 @@ WHERE a.id=$2 AND a.artifact_id=$3`, root, loc.AttemptID, artifactID).Scan(&stat
 			}
 			var remainingBytes, remainingObjects, remainingFull, remainingReplay, copies, purgeFence int64
 			var finalExpires, finalDeleteBy time.Time
-			err := admin.QueryRow(wait, `
-SELECT a.deleted_at, d.purged_at, d.audit_acknowledged_at, d.audit_receipt_json,
-       ca.charged_bytes-(SELECT coalesce(sum(x.reserved_bytes),0) FROM custody_attempt x WHERE x.allocation_id=a.allocation_id AND x.id<>a.id AND x.state<>'deleted'), ca.charged_objects-4*(SELECT count(*) FROM custody_attempt x WHERE x.allocation_id=a.allocation_id AND x.id<>a.id AND x.state<>'deleted'), cc.charged_full, cc.charged_replay,
-       (SELECT count(*) FROM custody_copy cp WHERE cp.attempt_id=a.id AND cp.ciphertext_bytes IS NOT NULL),
-       a.effective_expires_at, a.effective_delete_by, d.purge_fence
-FROM custody_attempt a
-JOIN context_deletion_checkpoint d ON d.attempt_id=a.id AND d.root_id=$1
-JOIN custody_allocation ca ON ca.id=a.allocation_id
-JOIN context_control_account cc ON cc.allocation_id=ca.id
-WHERE a.id=$2 AND a.allocation_id=$3 AND a.state='deleted'`, root, loc.AttemptID, allocation).Scan(
+			err := admin.QueryRow(wait, installedDeletionFinalSQL, root, loc.AttemptID, allocation).Scan(
 				&deletedAt, &purgedAt, &acknowledgedAt, &receiptJSON,
 				&remainingBytes, &remainingObjects, &remainingFull, &remainingReplay, &copies, &finalExpires, &finalDeleteBy, &purgeFence)
 			if err != nil || purgedAt.Before(expiresAt) || deletedAt.Before(purgedAt) || acknowledgedAt.Before(purgedAt) || !deletedAt.Before(deleteBy) ||
@@ -269,3 +250,31 @@ WHERE a.id=$2 AND a.allocation_id=$3 AND a.state='deleted'`, root, loc.AttemptID
 		}
 	}
 }
+
+// Control records remain charged after evidence deletion. Subtract every
+// OTHER context charge, including deleted artifacts, while retaining the exact
+// original capture charge and any non-context charges in this account.
+const installedDeletionInitialSQL = `
+SELECT a.cluster_id::text, a.id::text, a.allocation_id::text,
+       a.reserved_bytes, ca.charged_bytes-(SELECT coalesce(sum(x.reserved_bytes),0) FROM custody_attempt x WHERE x.allocation_id=a.allocation_id AND x.id<>a.id AND x.state<>'deleted'), ca.charged_objects-4*(SELECT count(*) FROM custody_attempt x WHERE x.allocation_id=a.allocation_id AND x.id<>a.id AND x.state<>'deleted'),
+       cc.charged_full-(SELECT count(*) FROM context_control_charge other WHERE other.root_id=cc.root_id AND other.allocation_id=cc.allocation_id AND other.capture_id<>own_charge.capture_id), cc.charged_replay-(SELECT count(*) FROM context_control_charge other WHERE other.root_id=cc.root_id AND other.allocation_id=cc.allocation_id AND other.capture_id<>own_charge.capture_id),
+       a.effective_expires_at, a.effective_delete_by
+FROM context_catalog c
+JOIN custody_attempt a ON a.artifact_id=c.artifact_id
+JOIN context_writer_completion w ON w.attempt_id=a.id AND w.root_id=c.root_id AND w.capture_id=c.capture_id
+JOIN custody_allocation ca ON ca.id=a.allocation_id
+JOIN context_control_account cc ON cc.allocation_id=ca.id AND cc.root_id=c.root_id
+JOIN context_control_charge own_charge ON own_charge.capture_id=c.capture_id AND own_charge.root_id=c.root_id AND own_charge.allocation_id=a.allocation_id
+WHERE c.root_id=$1 AND c.artifact_id=$2 AND a.state='stored_unpublished'`
+
+const installedDeletionFinalSQL = `
+SELECT a.deleted_at, d.purged_at, d.audit_acknowledged_at, d.audit_receipt_json,
+       ca.charged_bytes-(SELECT coalesce(sum(x.reserved_bytes),0) FROM custody_attempt x WHERE x.allocation_id=a.allocation_id AND x.id<>a.id AND x.state<>'deleted'), ca.charged_objects-4*(SELECT count(*) FROM custody_attempt x WHERE x.allocation_id=a.allocation_id AND x.id<>a.id AND x.state<>'deleted'), cc.charged_full-(SELECT count(*) FROM context_control_charge other WHERE other.root_id=cc.root_id AND other.allocation_id=cc.allocation_id AND other.capture_id<>own_charge.capture_id), cc.charged_replay-(SELECT count(*) FROM context_control_charge other WHERE other.root_id=cc.root_id AND other.allocation_id=cc.allocation_id AND other.capture_id<>own_charge.capture_id),
+       (SELECT count(*) FROM custody_copy cp WHERE cp.attempt_id=a.id AND cp.ciphertext_bytes IS NOT NULL),
+       a.effective_expires_at, a.effective_delete_by, d.purge_fence
+FROM custody_attempt a
+JOIN context_deletion_checkpoint d ON d.attempt_id=a.id AND d.root_id=$1
+JOIN custody_allocation ca ON ca.id=a.allocation_id
+JOIN context_control_account cc ON cc.allocation_id=ca.id AND cc.root_id=d.root_id
+JOIN context_control_charge own_charge ON own_charge.capture_id=d.capture_id AND own_charge.root_id=d.root_id AND own_charge.allocation_id=a.allocation_id
+WHERE a.id=$2 AND a.allocation_id=$3 AND a.state='deleted'`

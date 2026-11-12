@@ -57,7 +57,7 @@ func (s *ConfigurationRoleSource) readConfigurationWorkerCurrent(ctx context.Con
 	if err != nil {
 		return zero, configurationSourceError(configurationSourceCurrentDeploymentRead, err)
 	}
-	if !configurationRoleDeploymentBound(d, s.input) || d.ResourceVersion != original.deployment.ResourceVersion || !equalJSON(d.Spec, original.deployment.Spec) {
+	if !configurationRoleDeploymentBound(d, s.input) || (original.proof.deployment == nil || !configurationDeploymentSame(d, *original.proof.deployment)) {
 		return zero, configurationSourceError(configurationSourceCurrentDeployment, cfg.ErrChanged)
 	}
 	account, err := ownerResource[core.ServiceAccount](reader, call, "/api/v1/namespaces/"+s.input.Namespace.Name+"/serviceaccounts/"+s.input.ServiceAccount.Name, "v1", "ServiceAccount")
@@ -74,6 +74,8 @@ func (s *ConfigurationRoleSource) readConfigurationWorkerCurrent(ctx context.Con
 	// All dates and actual enforcement responses remain the first bracket's.
 	// This result can only narrow the end, never supply a new source grant.
 	out := original
+	out.deployment = d
+	out.proof.deployment = d.DeepCopy()
 	out.proof.observation.FreshUntil = until
 	out.proof.observation.Fleet.FreshUntil = identity.Earlier(p.Fleet.FreshUntil, until)
 	out.proof.observation.Owner.FreshUntil = identity.Earlier(p.Owner.FreshUntil, until)

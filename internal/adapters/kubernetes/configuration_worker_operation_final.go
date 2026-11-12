@@ -48,7 +48,7 @@ func (p *ConfigurationWorkerOperation) ReadConfigurationWorkerFinal(ctx context.
 	if !configurationRoleSameSources(native.proof.observation, p.native.proof.observation) ||
 		native.proof.guards != p.native.proof.guards || native.fleetRef != p.native.fleetRef || native.ownerRef != p.native.ownerRef ||
 		!equalJSON(native.administrator, p.native.administrator) || !equalJSON(native.account, p.native.account) ||
-		native.deployment.ResourceVersion != p.native.deployment.ResourceVersion || !equalJSON(native.deployment.Spec, p.native.deployment.Spec) ||
+		!configurationDeploymentSame(native.deployment, p.native.deployment) ||
 		!equalJSON(native.ownerDeployment.Spec, p.native.ownerDeployment.Spec) ||
 		retained.bridge.UID != p.retained.bridge.UID || !equalJSON(retained.bridge.State, p.retained.bridge.State) ||
 		retained.resources.UID != p.retained.resources.UID || retained.resources.ResourceVersion != p.retained.resources.ResourceVersion || !equalJSON(retained.resources.State, p.retained.resources.State) {

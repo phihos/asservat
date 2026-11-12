@@ -62,8 +62,8 @@ func ownerIdentityOperationOriginalsEqual(a, b ownerIdentityOperationNative) boo
 	return ownerIdentityOperationOriginalDifference(a, b) == ownerOperationNoFailure
 }
 
-// Pure, ordered groups of the exact former conjunction. No extra API or clock
-// read and no relaxed field/date equality; stop at the same first false term.
+// Pure, ordered authority comparisons; the Deployment uses the status-neutral
+// metadata/spec helper. No API or clock reads; stop at the first false term.
 func ownerIdentityOperationOriginalDifference(a, b ownerIdentityOperationNative) ownerOperationCheck {
 	if a.input != b.input {
 		return ownerOriginalInput
@@ -80,7 +80,7 @@ func ownerIdentityOperationOriginalDifference(a, b ownerIdentityOperationNative)
 	if a.source.fleetRef != b.source.fleetRef || a.source.ownerRef != b.source.ownerRef || !a.source.owner.Equal(b.source.owner) {
 		return ownerOriginalSourceConfiguration
 	}
-	if a.source.deployment.ResourceVersion != b.source.deployment.ResourceVersion || !equalJSON(a.source.deployment.Spec, b.source.deployment.Spec) {
+	if !configurationDeploymentSame(a.source.deployment, b.source.deployment) {
 		return ownerOriginalDeployment
 	}
 	if !equalJSON(a.source.account, b.source.account) || !equalJSON(a.source.administrator, b.source.administrator) {

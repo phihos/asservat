@@ -160,7 +160,7 @@ func (s *ConfigurationRoleSource) readConfigurationWorkerNative(ctx context.Cont
 	if err != nil {
 		return zero, configurationSourceError(configurationSourceDeploymentFinalRead, err)
 	}
-	if !configurationRoleDeploymentBound(d2, s.input) || !equalJSON(d.Spec, d2.Spec) || d.ResourceVersion != d2.ResourceVersion {
+	if !configurationRoleDeploymentBound(d2, s.input) || !configurationDeploymentSame(d, d2) {
 		return zero, configurationSourceError(configurationSourceDeploymentFinalBound, cfg.ErrChanged)
 	}
 	account2, err := ownerResource[core.ServiceAccount](reader, call, accountPath, "v1", "ServiceAccount")
@@ -206,7 +206,7 @@ func (s *ConfigurationRoleSource) readConfigurationWorkerNative(ctx context.Cont
 		return zero, configurationSourceError(configurationSourceObservationMatch, cfg.ErrUnavailable)
 	}
 	responses := &configurationRoleNativeResponses{clients: [3]*PermissionClient{s.protection.probe, s.fleet.protection.probe, s.owner.protection.probe}, identities: actors, worker: *account2.DeepCopy()}
-	return configurationWorkerNative{proof: configurationRoleObserved{observation: observation, deploymentVersion: d.ResourceVersion,
+	return configurationWorkerNative{proof: configurationRoleObserved{observation: observation, deployment: d2.DeepCopy(),
 		accountVersion: account.ResourceVersion, guards: guards, native: responses}, fleet: f, owner: o, deployment: d2, account: account2,
 		administrator: administrator, fleetRef: fref, ownerRef: oref, ownerDeployment: ownerDeployment}, nil
 }

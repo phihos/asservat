@@ -84,9 +84,11 @@ produced; it is not a permanent fallback for installed public serving.
 
 Installed ordering is exact inert Deployment, protected inputs and immutable
 SQL projection, then an independently checked UID/resource-version CAS launch.
-The source proof retains the complete original spec digest and resourceVersion,
-so zero-to-one during an original claim is a source change and rejects that
-operation. Claims and SQL role provenance keep their original inert spec digest.
+The source proof retains the complete original Spec digest and Deployment
+metadata/generation. Controller-only Status/resourceVersion/managedFields changes
+do not invalidate a read-only observation (ADR-188 correction). The latest
+validated resourceVersion still binds the exact launch write CAS, and zero-to-one
+during an original role claim is a source change which rejects that operation. Claims and SQL role provenance keep their original inert spec digest.
 A successful later launch therefore needs its own exact retained disposition
 for read-only installer replay; it cannot reinterpret the running spec as the
 original role claim or authorize another CREATE. The one-use launch component now implements that retained disposition. The

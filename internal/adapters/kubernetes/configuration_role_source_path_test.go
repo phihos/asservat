@@ -29,20 +29,22 @@ import (
 )
 
 type configurationSourcePathFixture struct {
-	source          *ConfigurationRoleSource
-	extraHandler    func(http.ResponseWriter, *http.Request) bool
-	requests        atomic.Int32
-	probes          atomic.Int32
-	purposeProbes   [3]atomic.Int32
-	secretWrites    atomic.Int32
-	guardVersion    atomic.Int32
-	flipGuard       atomic.Bool
-	fault           atomic.Int32 // 1: changed RBAC; 2: changed admission with identical objects
-	replicas        atomic.Int32
-	workloadVersion atomic.Int32
-	mu              sync.Mutex
-	secret          *core.Secret
-	projection      *core.Secret
+	source             *ConfigurationRoleSource
+	extraHandler       func(http.ResponseWriter, *http.Request) bool
+	deploymentEdit     func(*apps.Deployment)
+	requests           atomic.Int32
+	probes             atomic.Int32
+	purposeProbes      [3]atomic.Int32
+	secretWrites       atomic.Int32
+	guardVersion       atomic.Int32
+	flipGuard          atomic.Bool
+	fault              atomic.Int32 // 1: changed RBAC; 2: changed admission with identical objects
+	replicas           atomic.Int32
+	workloadVersion    atomic.Int32
+	workloadGeneration atomic.Int64
+	mu                 sync.Mutex
+	secret             *core.Secret
+	projection         *core.Secret
 }
 
 // This loopback server simulates Kubernetes enforcement only. Production
@@ -60,6 +62,7 @@ func newConfigurationSourcePathFixtureLimiter(t *testing.T, limiter flowcontrol.
 	f.guardVersion.Store(1)
 	f.replicas.Store(1)
 	f.workloadVersion.Store(1)
+	f.workloadGeneration.Store(1)
 	ns := cfg.NamespaceRef{Name: in.Namespace.Name, UID: in.Namespace.UID}
 	administrator := []cfg.KubernetesActor{{Kind: "User", Name: "installer"}}
 	workload := cfg.OwnerWorkloadAdministration{Name: "cfg-workload", ControlNamespace: ns, Deployment: "hub", DeploymentUID: ownerID(20), Administrators: administrator, ConfigurationProbes: []cfg.OwnerConfigurationProbe{{ConfigMap: in.FleetSource.Name, ServiceAccount: "probe"}, {ConfigMap: in.OwnerSource.Name, ServiceAccount: "probe"}}, SchedulingLeases: []cfg.OwnerSchedulingLease{}}
@@ -101,12 +104,13 @@ func newConfigurationSourcePathFixtureLimiter(t *testing.T, limiter flowcontrol.
 	}
 	deployment := func(name string) apps.Deployment {
 		uid, account := workload.DeploymentUID, "hub"
-		replicas, version := int32(1), "1"
+		replicas, version, generation := int32(1), "1", int64(1)
 		if name == in.Deployment.Name {
 			uid, account = in.Deployment.UID, in.ServiceAccount.Name
 			replicas, version = f.replicas.Load(), strconv.Itoa(int(f.workloadVersion.Load()))
+			generation = f.workloadGeneration.Load()
 		}
-		return apps.Deployment{TypeMeta: meta.TypeMeta{APIVersion: "apps/v1", Kind: "Deployment"}, ObjectMeta: meta.ObjectMeta{Name: name, Namespace: ns.Name, UID: types.UID(uid), ResourceVersion: version}, Spec: apps.DeploymentSpec{Replicas: ptr.To(replicas), Template: core.PodTemplateSpec{Spec: core.PodSpec{ServiceAccountName: account}}, Strategy: apps.DeploymentStrategy{Type: apps.RollingUpdateDeploymentStrategyType, RollingUpdate: &apps.RollingUpdateDeployment{MaxSurge: ptr.To(intstr.FromInt(1))}}}}
+		return apps.Deployment{TypeMeta: meta.TypeMeta{APIVersion: "apps/v1", Kind: "Deployment"}, ObjectMeta: meta.ObjectMeta{Name: name, Namespace: ns.Name, UID: types.UID(uid), ResourceVersion: version, Generation: generation}, Spec: apps.DeploymentSpec{Replicas: ptr.To(replicas), Template: core.PodTemplateSpec{Spec: core.PodSpec{ServiceAccountName: account}}, Strategy: apps.DeploymentStrategy{Type: apps.RollingUpdateDeploymentStrategyType, RollingUpdate: &apps.RollingUpdateDeployment{MaxSurge: ptr.To(intstr.FromInt(1))}}}}
 	}
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		f.requests.Add(1)
@@ -164,6 +168,11 @@ func newConfigurationSourcePathFixtureLimiter(t *testing.T, limiter flowcontrol.
 				d := deployment(name)
 				if f.fault.Load() == 5 && name == in.Deployment.Name {
 					d.ResourceVersion = "2"
+					d.Generation++
+					d.Spec.Template.Annotations = map[string]string{"fixture-change": "real-spec-change"}
+				}
+				if r.Method == http.MethodGet && f.deploymentEdit != nil {
+					f.deploymentEdit(&d)
 				}
 				object = d
 			}

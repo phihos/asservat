@@ -8,16 +8,18 @@ import (
 
 	"asservat.local/asservat/internal/contracts"
 	cfg "asservat.local/asservat/internal/domain/configuration"
+	apps "k8s.io/api/apps/v1"
 )
 
 // Private, operation-local observation. No value supplied through a decoded
 // contract can create this slot. Independent calls never share it.
 type configurationRoleOperationKey struct{}
 type configurationRoleObserved struct {
-	observation                       contracts.ConfigurationRoleObservation
-	deploymentVersion, accountVersion string
-	guards                            [3]string
-	native                            *configurationRoleNativeResponses
+	observation    contracts.ConfigurationRoleObservation
+	deployment     *apps.Deployment
+	accountVersion string
+	guards         [3]string
+	native         *configurationRoleNativeResponses
 }
 type configurationRoleOperation struct {
 	mu     sync.Mutex

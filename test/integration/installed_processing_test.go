@@ -142,6 +142,17 @@ func qualifyInstalledProcessing(t *testing.T, parent context.Context, c installe
 	c.checkReceipt(t, ctx, release, "processing", scope)
 	c.checkReplay(t, ctx, session, release)
 	t.Logf("installed processing stage=released after %s", time.Since(started).Round(time.Millisecond))
+	assertInstalledOriginalNative(t, ctx, c, "installed-processing-restored-"+c.ArtifactID)
+	driver.send(map[string]bool{"continue": true})
+	next("complete")
+	awaitInstalledProcessingBrowser(t, driver)
+	t.Logf("installed processing complete after %s for %s scope. React applied and released the same restriction after reload. Both replays preserved SQL state and native download restored the original bytes and deadline.", time.Since(started).Round(time.Millisecond), scope.Kind)
+}
+
+// assertInstalledOriginalNative uses a fresh native session and the current
+// caller's transport, while retaining the original artifact and access bounds.
+func assertInstalledOriginalNative(t *testing.T, ctx context.Context, c installedProcessingRun, key string) {
+	t.Helper()
 	invoke := func(name string, input any) (installedJourneyEnvelope, string) {
 		t.Helper()
 		out, err := c.Call(ctx, name, input)
@@ -168,7 +179,7 @@ func qualifyInstalledProcessing(t *testing.T, parent context.Context, c installe
 		} `json:"artifacts"`
 	}
 	if code != "" || out.Status != "ok" || json.Unmarshal(out.Data, &restored) != nil || len(restored.Artifacts) != 1 || restored.Artifacts[0].ArtifactID != c.ArtifactID || !restored.Artifacts[0].ExpiresAt.Equal(c.ExpiresAt) {
-		t.Fatal("release did not restore the original artifact and access deadline", code)
+		t.Fatal("original artifact or access deadline changed", code)
 	}
 	read := func(name string, input, out any) {
 		t.Helper()
@@ -179,14 +190,10 @@ func qualifyInstalledProcessing(t *testing.T, parent context.Context, c installe
 	}
 	// The baseline transfer is already Completed. A fresh user-requested native
 	// session is required; neither restriction nor release refills the old one.
-	native, _ := installedNativeDownload(t, ctx, c.Transport, c.Identity, c.Origin, c.ArtifactID, "installed-processing-restored-"+c.ArtifactID, invoke, read, c.Diagnose, ".json")
+	native, _ := installedNativeDownload(t, ctx, c.Transport, c.Identity, c.Origin, c.ArtifactID, key, invoke, read, c.Diagnose, ".json")
 	if !bytes.Equal(native, c.Native) {
-		t.Fatal("released original artifact changed its native bytes")
+		t.Fatal("original artifact changed its native bytes")
 	}
-	driver.send(map[string]bool{"continue": true})
-	next("complete")
-	awaitInstalledProcessingBrowser(t, driver)
-	t.Logf("installed processing complete after %s for %s scope. React applied and released the same restriction after reload. Both replays preserved SQL state and native download restored the original bytes and deadline.", time.Since(started).Round(time.Millisecond), scope.Kind)
 }
 
 func (c installedProcessingRun) expectedScope(t *testing.T, ctx context.Context) value.ProcessingScope {

@@ -1,10 +1,116 @@
 # Sustained implementation progress
 
-## Active small-installation workflow (2026-11-12)
+## Qualified bundled PostgreSQL restart workflow (2026-11-12)
 
-Candidate: `feature/small-installation-profile`, worktree
-`asservat-small-installation`, [PR225](https://github.com/phihos/asservat/pull/225),
-based on authoritative main `62b80beb`. The complete accepted-specification goal
+Candidate: `feature/bundled-postgres-restart` in `asservat-small-restart`, based
+on main `db0e27dc` (PR225; its exact post-merge CI43188834579 passed).
+Fresh installed source: `d6cc0ea9ce6cdb7f6d573818527f54aa37d5a368`.
+PR226 review at `de7e1950` found one missed worker-input final-bracket comparison
+in `ReadConfigurationWorkerFinal`. The delivery now applies the same status-neutral
+helper there, with a real-phase component regression: old code1/0.491s, fixed
+race0/12.641s; status succeeds while generation/Spec/metadata changes refuse.
+The test retains one original receipt CAS, original proof/end and no replay after
+completion. SQL locks/precompleted role receipts are explicitly synthetic; the
+concrete source/native/bridge/SetupReader and operation phases run. No other raw
+Deployment observation-version equality remains in the bounded family review.
+Superseded PR CI43214028200 was cancelled to avoid further runner work; its
+`ci-ok` failure reflects cancelled dependencies. The corrected integrated source now passes the fresh workflow below; final
+eligible-head CI and merge readback remain pending. The delivery result update
+changes prose documentation only. The complete accepted specification goal remains active.
+
+REQ-DEP-004 / SC-DEP-004 / TASK-11 now have fresh all-four-service evidence for
+same-PVC PostgreSQL restart. The actual five-command Helm installation, imported
+Keycloak browser login and real regional enrollment precede a published354-byte
+artifact and its readback. One normal-grace UID-preconditioned PostgreSQL Pod
+deletion retains the StatefulSet, PVC/Secret UIDs, system/database/timeline and
+activation; a new process reactivates through existing ADR-226 product lineage.
+No fixture SQL activates recovery and no evidence deadline is renewed.
+
+After restart, fresh console/MCP captures retain the original workload and Pod
+identity. The prior artifact's immutable execution/writer/cutoff/accounting tuple
+and original bytes survive through a fresh authorized native session before its
+original240-second expiry. React inspection/restriction/release/replays,708-byte
+range/resume accounting, outsider refusal, Stop/Deny/TargetGone, original expiry
+and both artifacts' independent managed deletion proofs pass. Each deletion proof
+checks all objects, versions, markers and multipart absence, immutable encrypted
+audit acknowledgement, evidence refund and the selected capture's retained
+control charge. Other legitimate captures may share the allocation.
+
+### Terminal qualification and source/cleanup audit
+
+`ASSERVAT_JOURNEY_FOCUS=restart python3 scripts/test-context-storage.py
+--helm-bootstrap --bundled-objectstore --bundled-keyservice --bundled-postgres
+--bundled-identity --installer-continuation --keep-on-failure` returned Go0 in
+651.947s and harness0 in789.669s. Exact login, context journey and PostgreSQL
+restart stages all passed; the restart took33.323s. Root independently matched
+all5,010 inventoried working and committed source hashes using `git cat-file
+--batch`, confirmed frozen sources and restored historical results, and verified
+empty owned container/volume/network/image/Kind inventories and no temporary
+fixture directory. `cleanupComplete=true`, `cleanupFailures=[]`; cleanup owner
+is the existing outer context harness. Evidence is archived outside Git in
+`native-bundled-postgres-restart-20261112T121846Z/`. The preceding `15501a6a`
+run also passed Go0/616.790s and harness0/746.610s with5,009 verified hashes and
+owned cleanup; the later source additionally closes the review finding.
+
+### Corrections and focused verification
+
+- Keycloak Ready did not imply every pooled JDBC connection survived PostgreSQL
+  restart. Fixed5-second idle validation and2-second validation timeout retain
+  the five-connection cap. Exact pinned-provider reproduction: disabled settings
+  fail both first credential POSTs (harness1/71.676s); fixed settings pass first
+  console/MCP PKCE in0.10/0.14s plus retained Keycloak restart (harness0/74.227s).
+  All113 relevant hashes match; both owned fixtures were independently removed.
+  Raw Quarkus settings remain outside Keycloak's first-class support guarantee;
+  see ADR-326. Estimated validation cost is not measured overhead.
+- Ordinary Deployment controller Status writes changed resourceVersion during
+  launch receipt recording. ADR-188 now compares complete Spec and metadata,
+  including generation, while ignoring only Status/resourceVersion/managedFields
+  in read-only observations. Latest exact write CAS, original deadlines and
+  uncertain-effect journals remain. Original red0.137s, new regressions0/29.765s,
+  and11 focused race/safety tests0/38.096s. The old RV-only negative fixture now
+  models a genuine generation change; all20 original negative/effect cases pass
+  with race detection0/82.490s.
+- The saved first deletion observer incorrectly expected global control counters
+  to remain1/1 after two further captures. Actual read-only SQL showed3/3 with
+  all deletion/refund predicates valid. All three observer queries now require
+  the selected charge and subtract other retained context charges, including
+  deleted attempts. Existing floors, exact equality, cutoffs, receipts and
+  inventory assertions remain. Focused races0/1.098s; exact retained SQL on all
+  three captures plus30 counter/missing-charge negatives passed0/0.406s.
+
+`make pre-push` at `f8b7de46` passed0/595.903s (Go races503s). At the integrated
+status correction `8981c2b8`, static gates and all other affected Go jobs passed;
+the command returned2/568.917s solely for the old RV-only negative fixture,
+subsequently corrected and rerun as the complete20-case test above. Unchanged
+passing source evidence is reused. Spec/architecture/Go-architecture checks at
+`348ab45c` passed0/20.761s. Browser checks at `569ce960` passed0/202.146s with
+30 journeys and31 accessibility scans; relevant React/browser-driver sources
+remain unchanged. Final eligible-head CI still runs the full required matrix.
+
+### Retained failures and remaining scope
+
+Earlier fresh attempts remain failed: `569ce960` Go1/351.352s, harness1/467.243s
+at the stale Keycloak login; `f8b7de46` Go1/179.337s, harness1/297.764s at the
+controller status/receipt boundary; `348ab45c` Go1/610.993s, harness1/738.997s
+at the stale shared-counter observer. Their5,008/5,008/5,009 inventoried hashes
+independently match the respective sources. All three retained environments were
+subsequently removed with verified empty inventories and absent private paths.
+Original failed claims, bounds and outcomes were never replayed or rewritten.
+
+The existing restart focus funds three captures/histories:9,646,080 of12,353,536
+reserved bytes and24 of32 objects, six native sessions within eight, two approved
+queries within eight, and three histories within16/32. Profile ceilings remain
+unchanged. No new service, watch, role, credential, migration or application request retry was
+added. Only the owned fixture administrator deletes the exact PostgreSQL Pod and
+restores scheduling on its previously cordoned local-PV node. Physical restore,
+other operational lifecycle matrices and the remaining accepted specification
+remain unfinished. No user homelab, release or registry publication is claimed.
+
+## Merged small-installation context workflow (2026-11-12)
+
+Merged [PR225](https://github.com/phihos/asservat/pull/225) as `db0e27dc`, with
+the exact qualified delivery tree from `599fd2e5`. The clean source checkpoint
+remains in `asservat-small-installation` on `feature/small-installation-profile`. The complete accepted-specification goal
 remains active. Manual commands are parked separately at `c0b58cb0`.
 
 The maintainer has no external PostgreSQL, S3 or OpenBao and requests bundled
@@ -21,7 +127,7 @@ image publication is claimed.
 | Keycloak | Actual26.8.2 HTTPS/import/console and MCP PKCE, stable groups, group refresh and restart; opt-in empty processing group | Broader identity/session lifecycle qualification; actual installed login and inspection now pass |
 | SeaweedFS | Actual4.53 TLS, scoped IAM, versioned pinned bytes, delayed reload/new credential consumption and restart; initial audit installation passes | Actual multipart creation, larger evidence and broader lifecycle matrices |
 | OpenBao | Actual2.7.2 TLS/static seal/self-initialization, same-data restart, partial-init refusal and original bounded issuer mint | Broader lifecycle and the accepted static-key alternative |
-| Installation | Fresh all-four Helm → login → regional enrollment → context/native/range/React → expiry/deletion passes with verified cleanup and a checked operator guide | Final eligible-head CI/merge readback, supported artifacts and complete operational lifecycle |
+| Installation | Fresh all-four Helm → login → regional enrollment → context/native/range/React → expiry/deletion passes with verified cleanup and a checked operator guide | Supported artifacts and complete operational lifecycle; exact eligible-head and post-merge CI passed |
 
 Production composition persists original credentials before IAM effects, reuses
 existing purpose-specific Secrets/inboxes and refuses unknown retained state.

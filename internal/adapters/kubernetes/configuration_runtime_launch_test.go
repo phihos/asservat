@@ -31,6 +31,7 @@ type configurationLaunchFixture struct {
 	deployment               *apps.Deployment
 	configuration, providers contracts.WorkerObjectReference
 	writes                   atomic.Int32
+	statusAfterLaunch        atomic.Bool
 	loseWrite                atomic.Bool
 	claimFault               atomic.Int32 // 1: lost committed reply; 2: changed enforcement after claim
 	providerFault            atomic.Int32 // 1: changed enforcement; 2: block until cancellation
@@ -60,6 +61,7 @@ func newConfigurationLaunchFixture(t *testing.T) *configurationLaunchFixture {
 	x.deployment = w.Deployment
 	x.deployment.UID = types.UID(in.Deployment.UID)
 	x.deployment.ResourceVersion = "1"
+	x.deployment.Generation = 1
 	config := contracts.HubWorkerDeployment{Format: contracts.HubWorkerDeploymentFormat, InstallationID: in.InstallationID, ClusterID: in.ClusterID, Namespace: in.Namespace, FleetSource: in.FleetSource, OwnerSource: in.OwnerSource, FleetGuard: contracts.OwnerDeploymentGuard{Name: "cfg-fleet"}, OwnerGuard: contracts.OwnerDeploymentGuard{Name: "cfg-owner"}, LeaderLease: contracts.WorkerObjectReference{Name: "leader", UID: ownerID(92)}}
 	configJSON, e := json.Marshal(config)
 	if e != nil {
@@ -127,6 +129,11 @@ func newConfigurationLaunchFixture(t *testing.T) *configurationLaunchFixture {
 			x.mu.Lock()
 			defer x.mu.Unlock()
 			if r.Method == http.MethodGet {
+				if x.statusAfterLaunch.Load() && x.writes.Load() > 0 {
+					version, _ := strconv.Atoi(x.deployment.ResourceVersion)
+					x.deployment.ResourceVersion = strconv.Itoa(version + 1)
+					x.deployment.Status = apps.DeploymentStatus{ObservedGeneration: x.deployment.Generation, Replicas: 1, ReadyReplicas: int32(version % 2)}
+				}
 				permissionReply(out, x.deployment)
 				return true
 			}
@@ -137,6 +144,7 @@ func newConfigurationLaunchFixture(t *testing.T) *configurationLaunchFixture {
 			}
 			x.writes.Add(1)
 			next.ResourceVersion = "2"
+			next.Generation = x.deployment.Generation + 1
 			x.deployment = next.DeepCopy()
 			if x.loseWrite.Load() {
 				http.Error(out, "synthetic lost reply", http.StatusServiceUnavailable)
@@ -222,6 +230,41 @@ func TestConfigurationLaunchOneCASAndReadOnlyCompletedReplay(t *testing.T) {
 	}
 	if e = f.launch(); e == nil || f.writes.Load() != 1 {
 		t.Fatal("completed replay launched again")
+	}
+}
+
+func TestConfigurationLaunchStatusUpdatesAfterPUTCanRecordOriginalReceipt(t *testing.T) {
+	f := newConfigurationLaunchFixture(t)
+	f.statusAfterLaunch.Store(true)
+	original, err := f.root.ReadConfigurationRuntimeRoles(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := f.launch(); err != nil || f.writes.Load() != 1 {
+		t.Fatal("original exact UID/RV launch CAS failed", err)
+	}
+	err = f.root.WithConfigurationRoleOperation(context.Background(), func(ctx context.Context) error {
+		verified, err := f.root.ReadLaunchedConfigurationRuntimeRoles(ctx)
+		if err != nil {
+			return err
+		}
+		return f.root.RecordConfigurationRuntimeLaunch(ctx, verified)
+	})
+	if err != nil {
+		t.Fatal("controller status updates blocked the original successful launch receipt", err)
+	}
+	completed, err := f.root.ReadLaunchedConfigurationRuntimeRoles(context.Background())
+	if err != nil || completed.State.Launch == nil || completed.State.Launch.Receipt == nil {
+		t.Fatal("original launch receipt unavailable", err)
+	}
+	launch := completed.State.Launch
+	if launch.InertResourceVersion != "1" || launch.Receipt.ResourceVersion == "2" ||
+		!completed.State.Until.Equal(original.State.Until) || !reflect.DeepEqual(completed.State.Roles, original.State.Roles) ||
+		launch.Until.After(launch.Sources.FreshUntil) || f.writes.Load() != 1 {
+		t.Fatal("status update replaced launch CAS, original credentials/deadlines or repeated the effect")
+	}
+	if err := f.launch(); err == nil || f.writes.Load() != 1 {
+		t.Fatal("recorded status-only completion replay launched again")
 	}
 }
 

@@ -2,7 +2,7 @@
 
 Build Asservat from source and install PostgreSQL/pgBackRest, OpenBao, SeaweedFS and Keycloak in your Kubernetes cluster. Enroll that same API as a workload region through a second Helm release. The cluster remains free of node collectors; this procedure targets pod-status capture.
 
-**Qualified source-built context trial.** A fresh installation with all four bundled services passed the five-command Helm installation, actual Keycloak login, regional enrollment, pod-status capture, native/range download, React inspection, expiry and managed deletion. The parent test and owned-environment harness both exited 0 at source `f9e972b8`; see the [implementation ledger](../implementation-progress.md) for source and cleanup evidence. This is a developer trial with no published Asservat/PostgreSQL release, production/HA qualification or supported physical restore procedure. Mixed key/store selections and broader lifecycle qualification remain separate work.
+**Qualified source-built context and restart trial.** A fresh installation with all four bundled services passed the five-command Helm installation, actual Keycloak login, regional enrollment, pod-status capture, native/range download, React inspection, expiry and managed deletion. The same workflow passed a PostgreSQL Pod restart using its retained volume, fresh console/MCP requests and retrieval of the earlier artifact without extending its bounds. Go and the owned-environment harness both exited0 at source `d6cc0ea9`; see the [implementation ledger](../implementation-progress.md) for source and cleanup evidence. This is a developer trial with no published Asservat/PostgreSQL release, production/HA qualification or supported physical restore procedure. Mixed-provider and broader lifecycle qualification remain separate work.
 
 ## Before you start
 
@@ -251,6 +251,9 @@ The second Helm release already performs the join; do not run a second manual jo
 Once current sources and capacity are Ready, open `/captures/new`, choose the issued cluster and your Deployment, then **Find diagnostics**, **Review collection**, and **Collect pod status**. Inspect the resulting case and use the native download before its original expiry. The reference evidence default is 300 seconds plus a 300-second deletion budget. Verify subsequent reads refuse at expiry and managed deletion completes. Downloaded external copies remain yours to manage.
 
 The all four bundled services context sequence has fresh installed qualification. That result does not qualify physical restore, every mixed-provider combination, larger evidence types or sustained operation.
+
+The pinned Keycloak image is qualified for fresh login after the tested PostgreSQL restart using fixed idle connection validation. These raw Quarkus settings are outside Keycloak's first-class supported configuration. Requalify recovery before changing the Keycloak image; see the [decision and cost estimate](../decisions/326-individually-selectable-small-services.md#keycloak-idle-database-connections-after-postgresql-restart).
+
 
 ## Replace one bundled service
 
