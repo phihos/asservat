@@ -91,7 +91,16 @@ The focused status-only regression failed before the correction (Go1/0.137s)
 and the integrated new regressions now pass (Go0/29.765s), including actual launch
 PUT followed by controller status updates and its original receipt. Exact API/
 probe counts, original dates and22 protected field/generation negative cases
-remain asserted. Required broader and fresh installed checks are pending.
+remain asserted. The integrated `8981c2b8` repository run returned2/568.917s: static gates and
+all other affected Go jobs passed, but an older owner-projection negative fixture
+failed both parallel and isolated runs because its supposed workload change only
+changed resourceVersion. Its no-private/effect assertions remain intact; the
+fixture now changes generation while preserving every original no-private/effect
+assertion. Its exact subcase passed with race detection0/5.179s, followed by the
+complete20-case parent test0/82.490s. The11 new/narrow safety races passed0/38.096s.
+All other passing `8981c2b8` source evidence is reused; the correction changes
+only that six-line fixture and this ledger. Full eligible-head CI remains required.
+Fresh installed checks are next.
 
 Current candidate corrects read-only Deployment observation equality under the
 [ADR-188 correction](decisions/188-configuration-role-post-lock-proof.md#2026-11-12-correction-deployment-status-is-not-a-source-change),

@@ -212,6 +212,12 @@ func projectionSplitMutate(t *testing.T, f *ownerProjectionOperationFixture, nam
 		metadata["generation"] = float64(91)
 	case name == "owner-deployment":
 		object["spec"].(map[string]any)["replicas"] = float64(2)
+	case name == "worker-deployment":
+		// Controller status writes may change only resourceVersion. A changed
+		// generation is still a different protected Deployment observation.
+		generation, _ := metadata["generation"].(float64)
+		metadata["generation"] = generation + 1
+		metadata["resourceVersion"] = "991"
 	case name == "worker-deployment-spec":
 		// Both desired counts satisfy the shape bound; only the original full
 		// spec comparison catches this change while resourceVersion stays fixed.
