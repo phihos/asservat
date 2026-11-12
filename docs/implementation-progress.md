@@ -4,7 +4,7 @@
 
 Candidate: `feature/bundled-postgres-restart` in `asservat-small-restart`, based
 on main `db0e27dc` (PR225; its exact post-merge CI43188834579 passed).
-Fresh installed source: `15501a6aed7c7d89b8d7ff0674e7eabf271a192a`.
+Fresh installed source: `d6cc0ea9ce6cdb7f6d573818527f54aa37d5a368`.
 PR226 review at `de7e1950` found one missed worker-input final-bracket comparison
 in `ReadConfigurationWorkerFinal`. The delivery now applies the same status-neutral
 helper there, with a real-phase component regression: old code1/0.491s, fixed
@@ -14,8 +14,9 @@ completion. SQL locks/precompleted role receipts are explicitly synthetic; the
 concrete source/native/bridge/SetupReader and operation phases run. No other raw
 Deployment observation-version equality remains in the bounded family review.
 Superseded PR CI43214028200 was cancelled to avoid further runner work; its
-`ci-ok` failure reflects cancelled dependencies. A fresh integrated run and final
-eligible-head CI/merge readback are pending. The complete accepted specification goal remains active.
+`ci-ok` failure reflects cancelled dependencies. The corrected integrated source now passes the fresh workflow below; final
+eligible-head CI and merge readback remain pending. The delivery result update
+changes prose documentation only. The complete accepted specification goal remains active.
 
 REQ-DEP-004 / SC-DEP-004 / TASK-11 now have fresh all-four-service evidence for
 same-PVC PostgreSQL restart. The actual five-command Helm installation, imported
@@ -40,14 +41,16 @@ control charge. Other legitimate captures may share the allocation.
 `ASSERVAT_JOURNEY_FOCUS=restart python3 scripts/test-context-storage.py
 --helm-bootstrap --bundled-objectstore --bundled-keyservice --bundled-postgres
 --bundled-identity --installer-continuation --keep-on-failure` returned Go0 in
-616.790s and harness0 in746.610s. Exact login, context journey and PostgreSQL
-restart stages all passed; the restart took31.52s. Root independently matched
-all5,009 inventoried working and committed source hashes using `git cat-file
+651.947s and harness0 in789.669s. Exact login, context journey and PostgreSQL
+restart stages all passed; the restart took33.323s. Root independently matched
+all5,010 inventoried working and committed source hashes using `git cat-file
 --batch`, confirmed frozen sources and restored historical results, and verified
 empty owned container/volume/network/image/Kind inventories and no temporary
 fixture directory. `cleanupComplete=true`, `cleanupFailures=[]`; cleanup owner
 is the existing outer context harness. Evidence is archived outside Git in
-`native-bundled-postgres-restart-20261112T114416Z/`.
+`native-bundled-postgres-restart-20261112T121846Z/`. The preceding `15501a6a`
+run also passed Go0/616.790s and harness0/746.610s with5,009 verified hashes and
+owned cleanup; the later source additionally closes the review finding.
 
 ### Corrections and focused verification
 

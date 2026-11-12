@@ -109,4 +109,7 @@ of the same raw-version comparison. Its correction uses the same helper; the
 actual Advance/post-lock/receipt-effect/final/completion component regression
 failed before the change0.491s and passed with race detection12.641s, including
 refusal of genuine generation/Spec/metadata changes and original-bound checks.
-Fresh integrated qualification and eligible-head CI are required for that delivery.
+The corrected integrated source `d6cc0ea9` subsequently passed Go0/651.947s and
+harness0/789.669s through the complete restart workflow; all5,010 inventoried
+source hashes match and owned cleanup is independently verified. Eligible-head
+CI is required for that delivery.

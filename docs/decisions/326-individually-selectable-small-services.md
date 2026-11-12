@@ -345,7 +345,7 @@ budget remain unchanged; no application HTTP request is retried.
 [Keycloak documents raw Quarkus properties as unsupported by Keycloak](https://github.com/keycloak/keycloak/blob/26.8.2/docs/guides/server/configuration.adoc#format-for-raw-quarkus-properties).
 Asservat must qualify this configuration against the exact pinned image; it is
 not a first-class Keycloak support promise. The populated-pool component passed at `f8b7de46` with the same provider inputs;
-the fresh installed restart journey passed at `15501a6a`. See the implementation
+the fresh installed restart journey passed at `d6cc0ea9`. See the implementation
 ledger for terminal exits and independent source/cleanup verification. This
 does not promise transparent recovery from a database loss during an already
 running transaction or every interruption shorter than the idle threshold.
