@@ -51,8 +51,20 @@ The broad Go run passed70 packages or no-test packages and found one malformed
 new provider fixture: `{}` omitted fields required by the existing closed
 credential decoder. The test now marshals the actual typed blank credential;
 the decoder is unchanged and the full provider package passes under `-race`.
-The original `make go-check` returned2; the remaining exact repository Kubernetes
-groups are running separately. A combined pass is not yet claimed.
+The original `make go-check` returned2. All739 discovered Kubernetes tests then
+passed in the repository's19 exact sequential groups, preserving race/count/
+deadline flags, exit0/1,812.207s. Combined coverage is complete for all72 packages
+at `c26f1cc1`:70 original passes/no-test packages, the corrected full provider
+package, and the Kubernetes groups. The failed original command is retained,
+not relabeled as exit0. Final spec/Helm/Go-architecture gates returned0; generated
+logs and combined coverage receipts are in `initial-s3-local-gate/` externally.
+
+The first usable homelab candidate will add an explicitly selectable bundled
+OpenBao using existing provider adapters. This leaves external defaults unchanged
+and does not replace the accepted static-key alternative. The latter still needs
+all key purposes and PKI; a proposed initial-audit-only shortcut is parked while
+the bundled existing-provider path is integrated. No complete small-profile
+qualification or deployment is claimed.
 
 The first PostgreSQL image failed because `/etc/asservat` was nontraversable
 (mode0444). Creating that directory as0755 fixed the actual nonroot startup.
