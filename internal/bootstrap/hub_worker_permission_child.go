@@ -213,7 +213,7 @@ func (w *hubWorker) openPermission(ctx context.Context) (_ *permissionWorker, er
 		if e != nil {
 			return nil, &fixedStepError{"browser/uid", e}
 		}
-		source, e := kube.NewBrowserSettingsClient(browserObserver, b.Settings, uid, w.ids.BrowserRootID)
+		source, e := kube.NewBrowserSettingsReader(browserObserver, b.Settings, uid, w.ids.BrowserRootID, w.ids.SessionEpoch)
 		if e != nil {
 			return nil, &fixedStepError{"browser/source", e}
 		}

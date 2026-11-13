@@ -40,7 +40,7 @@ BEGIN
   SELECT oid INTO o FROM pg_catalog.pg_roles WHERE rolname=prefix||lpad(ordinals[i]::text,2,'0');
   IF o IS NULL THEN RAISE EXCEPTION 'capacity initialization role missing' USING ERRCODE='55000';END IF;
   oids:=array_append(oids,o);
-  roles:=roles||jsonb_build_array(jsonb_build_object('Purpose',purposes[i],'Receipt',jsonb_build_object('roleName',prefix||lpad(ordinals[i]::text,2,'0'),'roleOID',o)));
+  roles:=roles||jsonb_build_array(jsonb_build_object('Purpose',purposes[i],'Receipt',jsonb_build_object('roleName',prefix||lpad(ordinals[i]::text,2,'0'),'roleOID',o::bigint)));
  END LOOP;
  INSERT INTO public.capture_audit_root(root_id,installation_id,source_role,admission_role,journal_role,acknowledge_role,cleanup_role,verifier_role,finalizer_role,reader_role,revision,paused,valid_until)
   VALUES(r,installation,oids[2],oids[4],oids[5],oids[6],oids[7],oids[8],oids[9],oids[10],1,false,(q->'RootBacking'->'Capture'->'Policy'->>'ValidUntil')::timestamptz);

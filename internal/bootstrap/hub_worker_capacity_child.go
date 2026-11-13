@@ -304,7 +304,7 @@ func (w *hubWorker) capacityReconciler(ctx context.Context, q app.CapacityQualif
 	if err != nil {
 		return nil, errHubWorkerCapacityConfig
 	}
-	processing, err := kube.NewPlainDownloadEnvironmentSource(observer, c.ProcessingSource, q.RootBacking.ProcessingSourceUID, root, installation, paths)
+	processing, err := kube.NewPlainDownloadEnvironmentReader(observer, c.ProcessingSource, q.RootBacking.ProcessingSourceUID, root, installation, w.ids.IssuerEpoch, paths)
 	if err != nil {
 		return nil, err
 	}
