@@ -42,6 +42,7 @@ type hubWorker struct {
 	auditStore contracts.OwnerAuditStore
 	keyRoots   [][]byte
 	admission  *app.WorkerRuntimeAdmission
+	authority  *authorityAuditTurn
 	recovery   *postgres.RecoveryReader
 	providers  *kms.InstalledConfigurationProviderEffects
 	audit      *installedConfigurationAudit
@@ -267,6 +268,7 @@ func newHubWorker(ctx context.Context, files, idFiles *os.Root) (_ *hubWorker, e
 		return nil, err
 	}
 	w.closers = append(w.closers, w.admission.Close)
+	w.authority = newAuthorityAuditTurn(w.admission)
 	at = "recovery"
 	if w.recovery, err = postgres.NewRecoveryReader(startup, pools[0], w.ids.InstallationID); err != nil {
 		return nil, err

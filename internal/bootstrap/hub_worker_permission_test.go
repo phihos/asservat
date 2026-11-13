@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"asservat.local/asservat/internal/adapters/postgres"
+	fleetapp "asservat.local/asservat/internal/application/fleet"
 	privacyapp "asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
@@ -290,4 +291,51 @@ func TestContextDeletionSweepObservesDeadlinesBeforePreparation(t *testing.T) {
 	if observed != 1 || prepared != 1 || d.cleaner != nil {
 		t.Fatal("deadline observation did not run independently of deletion", observed, prepared)
 	}
+}
+
+// The authority audit publisher holds the one authority audit admission slot
+// most of each second; the worker configuration and context deletion writers
+// share that slot. Calling the admission directly while the publisher holds it
+// fails at once (the live `audit.admission (unavailable)` after a second worker
+// profile revision); the shared turn waits for the holder to release instead.
+func TestAuthorityAuditTurnQueuesWritersBehindTheHolder(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	admission, err := fleetapp.NewWorkerRuntimeAdmission(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer admission.Close()
+	turn := newAuthorityAuditTurn(admission)
+	_, release, err := turn.wait(ctx)
+	if err != nil {
+		t.Fatal("first writer not admitted", err)
+	}
+	if _, err := admission.WaitAuthorityAudit(ctx); err == nil {
+		t.Fatal("the admission admitted a second authority audit while the slot is held")
+	}
+	time.AfterFunc(200*time.Millisecond, release)
+	wait, end := context.WithTimeout(ctx, 3*time.Second)
+	defer end()
+	started := time.Now()
+	_, second, err := turn.wait(wait)
+	if err != nil {
+		t.Fatal("queued writer failed instead of waiting for the holder", err)
+	}
+	if time.Since(started) < 150*time.Millisecond {
+		t.Fatal("queued writer was admitted while the holder still held the slot")
+	}
+	second()
+	held, release, err := turn.wait(ctx)
+	if err != nil || held == nil {
+		t.Fatal("turn not returned after release", err)
+	}
+	release()
+	cancelled, stop := context.WithCancel(ctx)
+	_, r, _ := turn.wait(ctx)
+	stop()
+	if _, _, err := turn.wait(cancelled); err == nil {
+		t.Fatal("cancelled waiter admitted")
+	}
+	r()
 }

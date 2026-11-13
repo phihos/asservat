@@ -97,7 +97,7 @@ func (w *hubWorker) openWorkerConfiguration(ctx context.Context, v contracts.Hub
 		return nil, &fixedStepError{"transit", err}
 	}
 	out.closers = append(out.closers, seal.Close, open.Close)
-	objects := &installedWorkerConfigurationAudit{installation: w.ids.InstallationID, admission: w.admission, audit: w.audit, seal: seal, open: open}
+	objects := &installedWorkerConfigurationAudit{installation: w.ids.InstallationID, authority: w.authority, audit: w.audit, seal: seal, open: open}
 	out.observer = &evidence.WorkerConfigurationObserver{Reader: stagedWorkerConfigurationSource{source, &out.read}, Ledger: ledger, Audit: objects, Acknowledgements: acknowledgements, Now: time.Now}
 	return out, nil
 }
@@ -151,30 +151,64 @@ func (s stagedWorkerConfigurationSource) ReadWorkerConfiguration(ctx context.Con
 // attempt; the next observation retries.
 type installedWorkerConfigurationAudit struct {
 	installation string
-	admission    *fleetapp.WorkerRuntimeAdmission
+	authority    *authorityAuditTurn
 	audit        *installedConfigurationAudit
 	seal         *kms.Sealer
 	open         *kms.Opener
 }
 
 func (s *installedWorkerConfigurationAudit) WriteWorkerConfiguration(ctx context.Context, c authorization.DownloadWorkerConfiguration) (audit.Receipt, error) {
-	if s == nil || s.admission == nil || s.audit == nil || s.audit.providers == nil || s.seal == nil || s.open == nil || ctx == nil || ctx.Err() != nil || !c.Valid() || c.Profile.InstallationID != s.installation {
+	if s == nil || s.authority == nil || s.audit == nil || s.audit.providers == nil || s.seal == nil || s.open == nil || ctx == nil || ctx.Err() != nil || !c.Valid() || c.Profile.InstallationID != s.installation {
 		return audit.Receipt{}, mounts.ErrUnavailable
 	}
-	return admittedAuthorityAudit(ctx, s.admission, s.audit, func(call context.Context, store *objectstore.Store) (audit.Receipt, error) {
+	return admittedAuthorityAudit(ctx, s.authority, s.audit, func(call context.Context, store *objectstore.Store) (audit.Receipt, error) {
 		writer := &objectstore.WorkerConfigurationAuditObjects{Store: store, Seal: s.seal, Open: s.open}
 		return writer.WriteWorkerConfiguration(call, c)
 	})
 }
 
-// admittedAuthorityAudit takes one authority audit admission lease, waits for
-// the fleet observation and writes under it.
-func admittedAuthorityAudit(ctx context.Context, admission *fleetapp.WorkerRuntimeAdmission, a *installedConfigurationAudit, write func(context.Context, *objectstore.Store) (audit.Receipt, error)) (audit.Receipt, error) {
-	lease, err := admission.WaitAuthorityAudit(ctx)
+// authorityAuditTurn serializes this process's authority audit writers (the
+// authority/retention publisher, worker configuration and context deletion)
+// in front of the admission's single authority audit slot. The admission
+// rejects a second ticket for a held slot at once; without the turn a writer
+// that is rarely needed loses to the publisher, which holds the slot most of
+// each second. The turn only orders process work and grants nothing.
+type authorityAuditTurn struct {
+	admission *fleetapp.WorkerRuntimeAdmission
+	turn      chan struct{}
+}
+
+func newAuthorityAuditTurn(admission *fleetapp.WorkerRuntimeAdmission) *authorityAuditTurn {
+	return &authorityAuditTurn{admission: admission, turn: make(chan struct{}, 1)}
+}
+
+// wait takes the turn, then one authority audit admission lease. release
+// returns both.
+func (g *authorityAuditTurn) wait(ctx context.Context) (_ *fleetapp.WorkerRuntimeAdmissionLease, release func(), _ error) {
+	if g == nil || g.admission == nil || ctx == nil {
+		return nil, nil, mounts.ErrUnavailable
+	}
+	select {
+	case g.turn <- struct{}{}:
+	case <-ctx.Done():
+		return nil, nil, mounts.ErrUnavailable
+	}
+	lease, err := g.admission.WaitAuthorityAudit(ctx)
+	if err != nil {
+		<-g.turn
+		return nil, nil, err
+	}
+	return lease, func() { lease.Release(); <-g.turn }, nil
+}
+
+// admittedAuthorityAudit takes one authority audit turn and admission lease,
+// waits for the fleet observation and writes under it.
+func admittedAuthorityAudit(ctx context.Context, authority *authorityAuditTurn, a *installedConfigurationAudit, write func(context.Context, *objectstore.Store) (audit.Receipt, error)) (audit.Receipt, error) {
+	lease, release, err := authority.wait(ctx)
 	if err != nil {
 		return audit.Receipt{}, &fixedStepError{"audit.admission", mounts.ErrUnavailable}
 	}
-	defer lease.Release()
+	defer release()
 	if err = lease.AwaitFleetObservation(); err != nil {
 		return audit.Receipt{}, &fixedStepError{"audit.fleet", mounts.ErrUnavailable}
 	}
@@ -245,14 +279,14 @@ func (w *hubWorker) openContextDeletion(ctx context.Context, v contracts.HubWork
 		if err != nil {
 			return nil, nil, err
 		}
-		return prepareContextCleaner(contracts.ContextDeletionDeployment{EvidenceStore: store, Signing: pin}, storeID, root, d, w.inputs, w.providers, w.admission, w.audit)
+		return prepareContextCleaner(contracts.ContextDeletionDeployment{EvidenceStore: store, Signing: pin}, storeID, root, d, w.inputs, w.providers, w.authority, w.audit)
 	}
 	return d, nil
 }
 
 // prepareContextCleaner builds the cleaner for one evidence store and
 // signing key. On failure it releases everything it opened.
-func prepareContextCleaner(v contracts.ContextDeletionDeployment, storeID, root string, d *contextDeletionWorker, inputs *providerInputs, providers *kms.InstalledConfigurationProviderEffects, admission *fleetapp.WorkerRuntimeAdmission, writer *installedConfigurationAudit) (_ *privacyapp.ContextCleaner, closers []func(), err error) {
+func prepareContextCleaner(v contracts.ContextDeletionDeployment, storeID, root string, d *contextDeletionWorker, inputs *providerInputs, providers *kms.InstalledConfigurationProviderEffects, authority *authorityAuditTurn, writer *installedConfigurationAudit) (_ *privacyapp.ContextCleaner, closers []func(), err error) {
 	defer func() {
 		if err != nil {
 			for i := len(closers) - 1; i >= 0; i-- {
@@ -292,7 +326,7 @@ func prepareContextCleaner(v contracts.ContextDeletionDeployment, storeID, root 
 	if err != nil {
 		return nil, closers, &fixedStepError{"signing", mounts.ErrUnavailable}
 	}
-	objects := &installedContextDeletionAudit{admission: admission, audit: writer, signatures: signatures}
+	objects := &installedContextDeletionAudit{authority: authority, audit: writer, signatures: signatures}
 	return &privacyapp.ContextCleaner{Ledger: d.facets[0], Audit: d.facets[1], Finalize: d.facets[2], Purger: purger, Objects: objects, Recovery: d.recovery, Now: time.Now}, closers, nil
 }
 
@@ -413,16 +447,16 @@ func (s evidenceDeleteStorage) Retrieve(ctx context.Context) (aws.Credentials, e
 // (ADR-205 decision 5). A retry reuses an object already written for the
 // same checkpoint.
 type installedContextDeletionAudit struct {
-	admission  *fleetapp.WorkerRuntimeAdmission
+	authority  *authorityAuditTurn
 	audit      *installedConfigurationAudit
 	signatures *jose.RemoteContextDeletionSignatures
 }
 
 func (s *installedContextDeletionAudit) WriteContextDeletion(ctx context.Context, r privacy.ContextDeletionCheckpoint) (audit.Receipt, error) {
-	if s == nil || s.admission == nil || s.audit == nil || s.audit.providers == nil || s.signatures == nil || ctx == nil || ctx.Err() != nil || !r.Valid() {
+	if s == nil || s.authority == nil || s.audit == nil || s.audit.providers == nil || s.signatures == nil || ctx == nil || ctx.Err() != nil || !r.Valid() {
 		return audit.Receipt{}, mounts.ErrUnavailable
 	}
-	return admittedAuthorityAudit(ctx, s.admission, s.audit, func(call context.Context, store *objectstore.Store) (audit.Receipt, error) {
+	return admittedAuthorityAudit(ctx, s.authority, s.audit, func(call context.Context, store *objectstore.Store) (audit.Receipt, error) {
 		writer := &objectstore.ContextDeletionObjects{Store: store, Seal: s.audit.providers.Sealer(), Open: s.audit.providers.Opener(), Signer: s.signatures, Verifier: s.signatures}
 		return writer.WriteContextDeletion(call, r)
 	})

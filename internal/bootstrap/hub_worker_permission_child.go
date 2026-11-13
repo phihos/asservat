@@ -17,7 +17,6 @@ import (
 	"asservat.local/asservat/internal/adapters/postgres"
 	auditapp "asservat.local/asservat/internal/application/audit"
 	app "asservat.local/asservat/internal/application/configuration"
-	fleetapp "asservat.local/asservat/internal/application/fleet"
 	identities "asservat.local/asservat/internal/application/identity"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
@@ -93,7 +92,7 @@ func validateHubWorkerPermission(c contracts.HubWorkerConfig, control cfg.Namesp
 type permissionWorker struct {
 	reconciler          app.BindingReconciler
 	publisher           auditapp.AuthorityPublisher
-	admission           *fleetapp.WorkerRuntimeAdmission
+	authority           *authorityAuditTurn
 	retention           *retentionWorker
 	workerConfiguration *workerConfigurationWorker
 	contextDeletion     *contextDeletionWorker
@@ -117,7 +116,7 @@ const permissionOpenRetry = 5 * time.Second
 // runs it until the Lease ends. It never returns early on a transient
 // failure, because a returning child tears down its siblings.
 func (w *hubWorker) runPermission(ctx context.Context) error {
-	if w == nil || w.config.Permission == nil || w.audit == nil || w.admission == nil || w.providers == nil || ctx == nil || ctx.Err() != nil {
+	if w == nil || w.config.Permission == nil || w.audit == nil || w.authority == nil || w.providers == nil || ctx == nil || ctx.Err() != nil {
 		return mounts.ErrUnavailable
 	}
 	if err := validateHubWorkerPermission(w.config, w.namespace); err != nil {
@@ -162,7 +161,7 @@ func (w *hubWorker) permissionPools(ctx context.Context, p *permissionWorker, c 
 
 func (w *hubWorker) openPermission(ctx context.Context) (_ *permissionWorker, err error) {
 	c := *w.config.Permission
-	p := &permissionWorker{admission: w.admission}
+	p := &permissionWorker{authority: w.authority}
 	defer func() {
 		if err != nil {
 			p.Close()
@@ -361,7 +360,7 @@ func (p *permissionWorker) publish(ctx context.Context) {
 	turn := 0
 	last := "ok"
 	for ctx.Err() == nil {
-		if lease, err := p.admission.WaitAuthorityAudit(ctx); err == nil {
+		if lease, release, err := p.authority.wait(ctx); err == nil {
 			if lease.AwaitFleetObservation() == nil {
 				if p.retention != nil && turn%2 == 1 {
 					p.retention.publish(lease.Context(), turn%4 == 3)
@@ -371,7 +370,7 @@ func (p *permissionWorker) publish(ctx context.Context) {
 				}
 				turn++
 			}
-			lease.Release()
+			release()
 		}
 		if !sleepContext(ctx, time.Second) {
 			return
