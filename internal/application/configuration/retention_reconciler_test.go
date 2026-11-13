@@ -160,6 +160,7 @@ func retentionReconciliation(t *testing.T) (*retentionReconcileFixture, Retentio
 	return f, r
 }
 func TestRetentionReconcilerRequiresInitialValuesAndStableGuard(t *testing.T) {
+	steps := map[string]string{"review": "start/review/absent", "guard": "start/protection", "source": "start/list/source"}
 	for _, mode := range []string{"review", "guard", "source"} {
 		t.Run(mode, func(t *testing.T) {
 			f, r := retentionReconciliation(t)
@@ -171,8 +172,13 @@ func TestRetentionReconcilerRequiresInitialValuesAndStableGuard(t *testing.T) {
 			case "source":
 				f.list.Snapshot.Hub = false
 			}
-			if err := r.Run(context.Background()); err == nil {
+			err := r.Run(context.Background())
+			if err == nil {
 				t.Fatal("invalid source accepted")
+			}
+			var fixed interface{ FixedStep() string }
+			if !errors.As(err, &fixed) || fixed.FixedStep() != steps[mode] {
+				t.Fatal("failure names the wrong reconciler step", err)
 			}
 			if !f.suspended || len(f.accepted) != 0 {
 				t.Fatal("failed bootstrap left a live source")
