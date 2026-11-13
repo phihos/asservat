@@ -54,7 +54,7 @@ func routeAPI(t *testing.T) (*rest.Config, map[string]map[string]any) {
 
 func TestOwnerPublicIngressCreateAndExactReopen(t *testing.T) {
 	config, stored := routeAPI(t)
-	e := contracts.InstallerPublicExposure{ServiceType: "ClusterIP", TLS: contracts.InstallerPublicTLSProxy, Ingress: &contracts.InstallerPublicIngress{ClassName: "haproxy", Annotations: map[string]string{"example.com/timeout": "1h"}}}
+	e := contracts.InstallerPublicExposure{ServiceType: "ClusterIP", TLS: contracts.InstallerPublicTLSProxy, Ingress: &contracts.InstallerPublicIngress{ClassName: "example-class", Annotations: map[string]string{"example.com/timeout": "1h"}}}
 	if err := EnsureOwnerPublicRoute(context.Background(), config, "hub", ownerID(1), e, "https://asservat.example"); err != nil {
 		t.Fatal(err)
 	}
@@ -63,7 +63,7 @@ func TestOwnerPublicIngressCreateAndExactReopen(t *testing.T) {
 	_ = json.Unmarshal(raw, &got)
 	rule := got.Spec.Rules[0]
 	backend := rule.HTTP.Paths[0].Backend.Service
-	if got.Name != OwnerPublicServiceName(ownerID(1)) || *got.Spec.IngressClassName != "haproxy" || rule.Host != "asservat.example" || rule.HTTP.Paths[0].Path != "/" ||
+	if got.Name != OwnerPublicServiceName(ownerID(1)) || *got.Spec.IngressClassName != "example-class" || rule.Host != "asservat.example" || rule.HTTP.Paths[0].Path != "/" ||
 		backend.Name != OwnerPublicServiceName(ownerID(1)) || backend.Port.Number != contracts.OwnerInstalledPublicPort || len(got.Spec.TLS) != 0 || got.Annotations["example.com/timeout"] != "1h" {
 		t.Fatal("owner public ingress", string(raw))
 	}
