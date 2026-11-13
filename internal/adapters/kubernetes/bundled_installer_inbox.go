@@ -47,7 +47,7 @@ func bundledInboxDataValid(data map[string][]byte, tokenAllowed bool, mode strin
 			}
 		}
 	}
-	public := contracts.InstallerInboxPublicFiles()
+	public := contracts.InstallerInboxPublicFiles(false)
 	for _, key := range public {
 		allowed[key] = 64 << 10
 	}
@@ -61,7 +61,16 @@ func bundledInboxDataValid(data map[string][]byte, tokenAllowed bool, mode strin
 	if !installerServingTLSFilesValid(tlsFiles) {
 		return false
 	}
-	for _, group := range [][]string{public, {contracts.InstallerInboxPublisherAuditCredential, contracts.InstallerInboxEvidenceReadCredential}, {contracts.InstallerInboxCleanupAuditCredential, contracts.InstallerInboxCleanupVerifyCredential}} {
+	present := map[string][]byte{}
+	for _, key := range public {
+		if raw, ok := data[key]; ok {
+			present[key] = raw
+		}
+	}
+	if len(present) != 0 && !contracts.InstallerPublicFilesShape(present) {
+		return false
+	}
+	for _, group := range [][]string{{contracts.InstallerInboxPublisherAuditCredential, contracts.InstallerInboxEvidenceReadCredential}, {contracts.InstallerInboxCleanupAuditCredential, contracts.InstallerInboxCleanupVerifyCredential}} {
 		count := 0
 		for _, key := range group {
 			if _, present := data[key]; present {

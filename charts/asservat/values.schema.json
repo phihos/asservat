@@ -2623,9 +2623,11 @@
         "exposure": {
           "type": "object",
           "additionalProperties": false,
+          "description": "Public console/MCP/API exposure (ADR-202, ADR-327). tls=proxy: your Ingress/Gateway terminates TLS and forwards HTTP; no in-Pod serving pair is needed.",
           "properties": {
             "serviceType": {
               "enum": [
+                "ClusterIP",
                 "NodePort",
                 "LoadBalancer"
               ]
@@ -2634,11 +2636,91 @@
               "type": "integer",
               "minimum": 30000,
               "maximum": 32767
+            },
+            "tls": {
+              "enum": [
+                "pod",
+                "proxy"
+              ],
+              "default": "pod"
+            },
+            "ingress": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "className": {
+                  "type": "string",
+                  "maxLength": 253
+                },
+                "annotations": {
+                  "type": "object",
+                  "maxProperties": 32,
+                  "additionalProperties": {
+                    "type": "string",
+                    "maxLength": 4096
+                  }
+                },
+                "tlsSecretName": {
+                  "type": "string",
+                  "maxLength": 253,
+                  "description": "Operator-managed Secret in the hub namespace; empty uses the controller's default certificate."
+                }
+              }
+            },
+            "httpRoute": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "parentRefs"
+              ],
+              "properties": {
+                "parentRefs": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 8,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "name"
+                    ],
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 253
+                      },
+                      "namespace": {
+                        "type": "string",
+                        "maxLength": 63
+                      },
+                      "sectionName": {
+                        "type": "string",
+                        "maxLength": 253
+                      }
+                    }
+                  }
+                },
+                "annotations": {
+                  "type": "object",
+                  "maxProperties": 32,
+                  "additionalProperties": {
+                    "type": "string",
+                    "maxLength": 4096
+                  }
+                }
+              }
             }
           },
           "required": [
             "serviceType"
-          ]
+          ],
+          "not": {
+            "required": [
+              "ingress",
+              "httpRoute"
+            ]
+          }
         }
       },
       "required": [

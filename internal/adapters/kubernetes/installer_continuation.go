@@ -135,8 +135,8 @@ type InstallerInbox struct {
 	// context deletion child's evidence list-and-delete principal (ADR-205).
 	EvidenceDeleteCredential                        []byte
 	CleanupAuditCredential, CleanupVerifyCredential []byte
-	// Public holds exactly the InstallerInboxPublicFiles when the phase-3
-	// artifact carried a promoted owner (ADR-194); otherwise it is nil.
+	// Public holds the promoted owner's public files (ADR-194): the client
+	// secret, plus the serving pair unless TLS ends at a proxy (ADR-327).
 	Public map[string][]byte
 	// ServingTLS holds the optional closed federation/key-service TLS bundles.
 	ServingTLS map[string][]byte
@@ -164,7 +164,7 @@ func ReadInstallerInbox(ctx context.Context, config *rest.Config, namespace, ins
 		PublisherAuditCredential:  s.Data[contracts.InstallerInboxPublisherAuditCredential], EvidenceReadCredential: s.Data[contracts.InstallerInboxEvidenceReadCredential],
 		DownloadEvidenceCredential: s.Data[contracts.InstallerInboxDownloadEvidenceCredential],
 		EvidenceDeleteCredential:   s.Data[contracts.InstallerInboxEvidenceDeleteCredential], CleanupAuditCredential: s.Data[contracts.InstallerInboxCleanupAuditCredential], CleanupVerifyCredential: s.Data[contracts.InstallerInboxCleanupVerifyCredential]}
-	for _, key := range contracts.InstallerInboxPublicFiles() {
+	for _, key := range contracts.InstallerInboxPublicFiles(false) {
 		if v := s.Data[key]; len(v) != 0 {
 			if out.Public == nil {
 				out.Public = map[string][]byte{}
@@ -237,15 +237,12 @@ func FillProviderAuditSecret(ctx context.Context, config *rest.Config, namespace
 // It is mutable so an administrator can rotate it; a rerun accepts only the
 // exact same content, and anything else is a change.
 func WriteOwnerPublicSecret(ctx context.Context, config *rest.Config, namespace, installation string, files map[string][]byte) error {
-	if ctx == nil || config == nil || namespace == "" || !authorization.UUID(installation) || len(files) != len(contracts.InstallerInboxPublicFiles()) {
+	if ctx == nil || config == nil || namespace == "" || !authorization.UUID(installation) || !contracts.InstallerPublicFilesShape(files) {
 		return cfg.ErrInvalid
 	}
 	data := map[string][]byte{}
-	for _, key := range contracts.InstallerInboxPublicFiles() {
-		if len(files[key]) == 0 {
-			return cfg.ErrInvalid
-		}
-		data[key] = files[key]
+	for key, value := range files {
+		data[key] = value
 	}
 	api, err := installerAPI(config)
 	if err != nil {
@@ -366,14 +363,11 @@ func WriteInstallerInbox(ctx context.Context, config *rest.Config, namespace, in
 		}
 	}
 	if public != nil {
-		if len(public) != len(contracts.InstallerInboxPublicFiles()) {
+		if !contracts.InstallerPublicFilesShape(public) {
 			return cfg.ErrInvalid
 		}
-		for _, key := range contracts.InstallerInboxPublicFiles() {
-			if len(public[key]) == 0 {
-				return cfg.ErrInvalid
-			}
-			s.Data[key] = public[key]
+		for key, value := range public {
+			s.Data[key] = value
 		}
 	}
 	if _, err = api.CoreV1().Secrets(namespace).Create(call, s, meta.CreateOptions{}); apierrors.IsAlreadyExists(err) {

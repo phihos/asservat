@@ -74,13 +74,17 @@ func (k *InstallerContinuation) smallOwnerMaterialFromSource(ctx context.Context
 		return nil
 	}
 	if promoted {
-		for _, key := range []string{contracts.OwnerPublicTLSCertificate, contracts.OwnerPublicTLSKey} {
-			if e = copyKey(key, 64<<10); e != nil {
-				return nil, e
+		// ADR-327: behind a TLS-terminating proxy the hub-api serves HTTP and
+		// needs no serving pair.
+		if !k.publicProxyTLS() {
+			for _, key := range []string{contracts.OwnerPublicTLSCertificate, contracts.OwnerPublicTLSKey} {
+				if e = copyKey(key, 64<<10); e != nil {
+					return nil, e
+				}
 			}
-		}
-		if e = validateSmallPublicTLS(out[contracts.OwnerPublicTLSCertificate], out[contracts.OwnerPublicTLSKey], k.input.Public.Origin, time.Now()); e != nil {
-			return nil, fail("public-tls")
+			if e = validateSmallPublicTLS(out[contracts.OwnerPublicTLSCertificate], out[contracts.OwnerPublicTLSKey], k.input.Public.Origin, time.Now()); e != nil {
+				return nil, fail("public-tls")
+			}
 		}
 		if !k.bundledIdentity {
 			if e = copyKey(contracts.OwnerPublicClientSecretFile, 4096); e != nil {

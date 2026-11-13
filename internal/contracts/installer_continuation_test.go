@@ -54,3 +54,26 @@ func TestInstallerProcessingOrganizationsPreserveOptionalWireShape(t *testing.T)
 		t.Fatal("installer accepted an unrecognized processor field")
 	}
 }
+
+
+func TestInstallerPublicFilesShape(t *testing.T) {
+	secret, crt, key := []byte("s"), []byte("c"), []byte("k")
+	for _, tc := range []struct {
+		files map[string][]byte
+		want  bool
+	}{
+		{map[string][]byte{OwnerPublicClientSecretFile: secret}, true},
+		{map[string][]byte{OwnerPublicClientSecretFile: secret, OwnerPublicTLSCertificate: crt, OwnerPublicTLSKey: key}, true},
+		{map[string][]byte{OwnerPublicClientSecretFile: secret, OwnerPublicTLSCertificate: crt}, false},
+		{map[string][]byte{OwnerPublicTLSCertificate: crt, OwnerPublicTLSKey: key}, false},
+		{map[string][]byte{OwnerPublicClientSecretFile: secret, "other": crt}, false},
+		{map[string][]byte{OwnerPublicClientSecretFile: {}}, false},
+	} {
+		if got := InstallerPublicFilesShape(tc.files); got != tc.want {
+			t.Errorf("%v: %v, want %v", tc.files, got, tc.want)
+		}
+	}
+	if len(InstallerInboxPublicFiles(true)) != 1 || len(InstallerInboxPublicFiles(false)) != 3 {
+		t.Fatal("public file sets")
+	}
+}

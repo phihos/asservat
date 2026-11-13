@@ -318,7 +318,7 @@ func TestBundledInstallerInboxRejectsUnboundedOrMalformedCandidateBeforeIO(t *te
 			case "partial-cleanup":
 				candidate[contracts.InstallerInboxCleanupAuditCredential] = candidate[contracts.InstallerInboxAuditCredential]
 			case "oversize":
-				for _, key := range contracts.InstallerInboxPublicFiles() {
+				for _, key := range contracts.InstallerInboxPublicFiles(false) {
 					candidate[key] = bytes.Repeat([]byte("x"), 64<<10+1)
 				}
 			}

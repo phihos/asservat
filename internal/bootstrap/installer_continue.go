@@ -145,7 +145,7 @@ func OpenInstallerContinuation(ctx context.Context, files, preparer *os.Root, st
 		return nil, mounts.ErrUnavailable
 	}
 	// ADR-202: promotion implies federation (checked above).
-	if p := k.input.Public; p != nil && p.Promotion != nil && p.Promotion.Exposure != nil && !validPublicExposure(*p.Promotion.Exposure, *p.Federation) {
+	if p := k.input.Public; p != nil && p.Promotion != nil && p.Promotion.Exposure != nil && (!validPublicExposure(*p.Promotion.Exposure, *p.Federation) || !kube.ValidOwnerPublicRoute(*p.Promotion.Exposure, p.Origin)) {
 		return nil, mounts.ErrUnavailable
 	}
 	// ADR-198 decision 6: the key service's key clients are the promoted
@@ -1022,10 +1022,11 @@ func (k *InstallerContinuation) Owner(ctx context.Context, resources *kube.Initi
 		return mounts.ErrUnavailable
 	}
 	if promotion != nil {
-		if len(inbox.Public) != len(contracts.InstallerInboxPublicFiles()) {
+		want := contracts.InstallerInboxPublicFiles(k.publicProxyTLS())
+		if len(inbox.Public) != len(want) || !contracts.InstallerPublicFilesShape(inbox.Public) {
 			return mounts.ErrUnavailable
 		}
-		if _, e := tls.X509KeyPair(inbox.Public[contracts.OwnerPublicTLSCertificate], inbox.Public[contracts.OwnerPublicTLSKey]); e != nil {
+		if _, e := tls.X509KeyPair(inbox.Public[contracts.OwnerPublicTLSCertificate], inbox.Public[contracts.OwnerPublicTLSKey]); e != nil && !k.publicProxyTLS() {
 			return mounts.ErrUnavailable
 		}
 	}
@@ -1092,11 +1093,18 @@ func (k *InstallerContinuation) Owner(ctx context.Context, resources *kube.Initi
 		return &fixedStepError{result.Phase + "/" + string(result.Stop), errors.Join(mounts.ErrUnavailable, e)}
 	}
 	if p := k.input.Public; p != nil && p.Promotion != nil && p.Promotion.Exposure != nil {
-		// ADR-202: the public API's own L4 Service; TLS ends in the hub-api.
+		// ADR-202: the public API's own Service; ADR-327: optionally behind
+		// the operator's Ingress or Gateway route.
 		k.at("public/exposure")
 		e := p.Promotion.Exposure
 		if err = kube.EnsureOwnerPublicService(ctx, k.in.kubernetes("administrator-token"), inventory.Namespace.Name, k.record.Scope.InstallationID, inventory.OwnerDeployment.Name, e.ServiceType, e.NodePort); err != nil {
 			return err
+		}
+		if e.Ingress != nil || e.HTTPRoute != nil {
+			k.at("public/route")
+			if err = kube.EnsureOwnerPublicRoute(ctx, k.in.kubernetes("administrator-token"), inventory.Namespace.Name, k.record.Scope.InstallationID, *e, p.Origin); err != nil {
+				return err
+			}
 		}
 	}
 	if err = k.CapacityProjection(ctx, resources, bridge, inventory, input); err != nil {
@@ -1815,11 +1823,21 @@ func (k *InstallerContinuation) FederationWorkload(ctx context.Context, inventor
 		ConnectorBacking: f.Connector.Backing, Image: k.plan.Plan.Workload.Image})
 }
 
+// publicProxyTLS reports whether the operator's proxy terminates public TLS
+// (ADR-327); the hub-api then needs no serving pair.
+func (k *InstallerContinuation) publicProxyTLS() bool {
+	p := k.input.Public
+	return p != nil && p.Promotion != nil && p.Promotion.Exposure.ProxyTLS()
+}
+
 // validPublicExposure accepts NodePort, with an optional fixed port in the
-// node-port range that no federation Service pins, or LoadBalancer (ADR-202).
-// A duplicate port would otherwise fail only after the owner is installed.
+// node-port range that no federation Service pins, LoadBalancer (ADR-202) or
+// ClusterIP behind a route (ADR-327). A duplicate port would otherwise fail
+// only after the owner is installed.
 func validPublicExposure(e contracts.InstallerPublicExposure, f contracts.InstallerFederationSettings) bool {
 	switch {
+	case e.ServiceType == "ClusterIP":
+		return e.NodePort == 0
 	case e.ServiceType == "LoadBalancer":
 		return e.NodePort == 0
 	case e.ServiceType != "NodePort":

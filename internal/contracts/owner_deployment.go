@@ -118,7 +118,10 @@ type OwnerPublicDeployment struct {
 	DownloadPlan OwnerPublicDownloadPlan `json:"downloadPlan"`
 	// HTTPS (ADR-180 P5). hub-api terminates TLS itself with the fixed files
 	// OwnerPublicTLSCertificate/OwnerPublicTLSKey; forwarded headers confer no
-	// transport trust. The console package is image-owned.
+	// transport trust. The console package is image-owned. ProxyTLS (ADR-327):
+	// the operator's Ingress/Gateway terminates TLS for the https origin and
+	// the hub-api serves plain HTTP on Port inside the cluster.
+	ProxyTLS             bool                      `json:"proxyTLS,omitempty"`
 	Port                 int                       `json:"port"`
 	Version              string                    `json:"version"`
 	OperationConcurrency int                       `json:"operationConcurrency"`

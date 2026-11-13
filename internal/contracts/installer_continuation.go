@@ -3,6 +3,7 @@ package contracts
 import (
 	"encoding/json"
 	"io"
+	"slices"
 	"strings"
 )
 
@@ -61,8 +62,25 @@ func InstallerInboxServingTLSFiles() []string {
 // InstallerInboxPublicFiles are the operator's public material in a promoted
 // phase-3 inbox (ADR-194 decision 11), keyed by the owner's fixed public
 // file names; the continuation writes them into OwnerPublicProjectionName.
-func InstallerInboxPublicFiles() []string {
+// With proxyTLS the hub-api serves HTTP behind the operator's proxy and needs
+// no serving pair of its own (ADR-327).
+func InstallerInboxPublicFiles(proxyTLS bool) []string {
+	if proxyTLS {
+		return []string{OwnerPublicClientSecretFile}
+	}
 	return []string{OwnerPublicClientSecretFile, OwnerPublicTLSCertificate, OwnerPublicTLSKey}
+}
+
+// InstallerPublicFilesShape reports whether files are one of the two public
+// sets: the client secret alone (proxy TLS) or with the serving pair.
+func InstallerPublicFilesShape(files map[string][]byte) bool {
+	for key := range files {
+		if !slices.Contains(InstallerInboxPublicFiles(false), key) {
+			return false
+		}
+	}
+	return len(files[OwnerPublicClientSecretFile]) != 0 &&
+		(len(files) == 1 || len(files) == 3 && len(files[OwnerPublicTLSCertificate]) != 0 && len(files[OwnerPublicTLSKey]) != 0)
 }
 
 type InstallerContinuation struct {
@@ -146,16 +164,56 @@ type InstallerOwnerPromotion struct {
 	// Version is reported by the hub-api; a chart-driven install sets the
 	// chart version.
 	Version string `json:"version"`
-	// Exposure, when set, publishes the public API on its own L4 Service
-	// (ADR-202). TLS ends in the hub-api, so no proxy may terminate it.
+	// Exposure, when set, publishes the public API on its own Service
+	// (ADR-202), optionally behind an Ingress or Gateway API route (ADR-327).
 	Exposure *InstallerPublicExposure `json:"exposure,omitempty"`
 }
 
-// InstallerPublicExposure selects the public API Service: NodePort, with an
-// optional fixed node port, or LoadBalancer.
+// InstallerPublicExposure selects the public API Service: ClusterIP, NodePort
+// (with an optional fixed node port) or LoadBalancer. TLS is "pod" (default:
+// the hub-api terminates TLS; a proxy may pass it through or re-encrypt) or
+// "proxy" (the operator's Ingress/Gateway terminates TLS and forwards HTTP).
+// Ingress or HTTPRoute, when set, makes the installer create that route to the
+// Service for the origin's host (ADR-327).
 type InstallerPublicExposure struct {
-	ServiceType string `json:"serviceType"`
-	NodePort    int32  `json:"nodePort,omitempty"`
+	ServiceType string                    `json:"serviceType"`
+	NodePort    int32                     `json:"nodePort,omitempty"`
+	TLS         string                    `json:"tls,omitempty"`
+	Ingress     *InstallerPublicIngress   `json:"ingress,omitempty"`
+	HTTPRoute   *InstallerPublicHTTPRoute `json:"httpRoute,omitempty"`
+}
+
+// ProxyTLS reports whether TLS ends at the operator's proxy.
+func (e *InstallerPublicExposure) ProxyTLS() bool {
+	return e != nil && e.TLS == InstallerPublicTLSProxy
+}
+
+const (
+	InstallerPublicTLSPod   = "pod"
+	InstallerPublicTLSProxy = "proxy"
+)
+
+// InstallerPublicIngress is a networking.k8s.io/v1 Ingress for the origin's
+// host. TLSSecretName names an operator-managed Secret in the hub namespace;
+// empty uses the controller's default certificate.
+type InstallerPublicIngress struct {
+	ClassName     string            `json:"className,omitempty"`
+	Annotations   map[string]string `json:"annotations,omitempty"`
+	TLSSecretName string            `json:"tlsSecretName,omitempty"`
+}
+
+// InstallerPublicHTTPRoute is a gateway.networking.k8s.io/v1 HTTPRoute for
+// the origin's host, attached to the operator's Gateways.
+type InstallerPublicHTTPRoute struct {
+	ParentRefs  []InstallerGatewayParent `json:"parentRefs"`
+	Annotations map[string]string        `json:"annotations,omitempty"`
+}
+
+// InstallerGatewayParent references a Gateway listener.
+type InstallerGatewayParent struct {
+	Name        string `json:"name"`
+	Namespace   string `json:"namespace,omitempty"`
+	SectionName string `json:"sectionName,omitempty"`
 }
 
 // InstallerFederationSettings are the operator's federation choices.

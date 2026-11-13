@@ -73,7 +73,7 @@ func clearMixedInstallerData(data map[string][]byte) {
 func mixedInstallerInbox(s *core.Secret) kube.InstallerInbox {
 	copy := func(key string) []byte { return bytes.Clone(s.Data[key]) }
 	out := kube.InstallerInbox{UID: string(s.UID), InspectionToken: copy(contracts.InstallerInboxInspectionToken), AuditCredential: copy(contracts.InstallerInboxAuditCredential), FederationAuditCredential: copy(contracts.InstallerInboxFederationAuditCredential), PublisherAuditCredential: copy(contracts.InstallerInboxPublisherAuditCredential), EvidenceReadCredential: copy(contracts.InstallerInboxEvidenceReadCredential), DownloadEvidenceCredential: copy(contracts.InstallerInboxDownloadEvidenceCredential), EvidenceDeleteCredential: copy(contracts.InstallerInboxEvidenceDeleteCredential), CleanupAuditCredential: copy(contracts.InstallerInboxCleanupAuditCredential), CleanupVerifyCredential: copy(contracts.InstallerInboxCleanupVerifyCredential)}
-	for _, key := range contracts.InstallerInboxPublicFiles() {
+	for _, key := range contracts.InstallerInboxPublicFiles(false) {
 		if len(s.Data[key]) != 0 {
 			if out.Public == nil {
 				out.Public = map[string][]byte{}
@@ -189,7 +189,9 @@ func mixedInstallerDataMatchesRecipe(phase int, artifact []byte, data map[string
 			{present(p.Downloads), []string{contracts.InstallerInboxDownloadEvidenceCredential}},
 			{present(p.Deletion), []string{contracts.InstallerInboxEvidenceDeleteCredential}},
 			{present(p.Cleanup), []string{contracts.InstallerInboxCleanupAuditCredential, contracts.InstallerInboxCleanupVerifyCredential}},
-			{p.Public, contracts.InstallerInboxPublicFiles()},
+			// The serving pair is optional here; installer continuation
+			// requires it unless the exposure terminates TLS at a proxy.
+			{p.Public, contracts.InstallerInboxPublicFiles(true)},
 		}
 		for _, group := range groups {
 			if group.enabled {
@@ -211,8 +213,20 @@ func mixedInstallerDataMatchesRecipe(phase int, artifact []byte, data map[string
 			return mounts.ErrUnavailable
 		}
 		if p.Public {
-			if _, err := tls.X509KeyPair(data[contracts.OwnerPublicTLSCertificate], data[contracts.OwnerPublicTLSKey]); err != nil {
+			public := map[string][]byte{}
+			for _, key := range contracts.InstallerInboxPublicFiles(false) {
+				if raw, ok := data[key]; ok {
+					public[key] = raw
+				}
+			}
+			if !contracts.InstallerPublicFilesShape(public) {
 				return mounts.ErrUnavailable
+			}
+			if len(public) == 3 {
+				if _, err := tls.X509KeyPair(public[contracts.OwnerPublicTLSCertificate], public[contracts.OwnerPublicTLSKey]); err != nil {
+					return mounts.ErrUnavailable
+				}
+				expected[contracts.OwnerPublicTLSCertificate], expected[contracts.OwnerPublicTLSKey] = true, true
 			}
 		}
 	} else if phase != 1 {

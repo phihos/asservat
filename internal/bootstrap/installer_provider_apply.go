@@ -211,11 +211,15 @@ func RunInstallerProviderApply(ctx context.Context, args []string, out io.Writer
 			return mounts.ErrUnavailable
 		}
 	}
-	// ADR-194: a promoted owner's public material, all three or none.
+	// ADR-194: a promoted owner's public material. ADR-327: the serving pair
+	// is omitted when the operator's proxy terminates public TLS.
 	var public map[string][]byte
 	if *clientSecretFile != "" || *certificateFile != "" || *keyFile != "" {
 		public = map[string][]byte{}
 		for key, file := range map[string]string{contracts.OwnerPublicClientSecretFile: *clientSecretFile, contracts.OwnerPublicTLSCertificate: *certificateFile, contracts.OwnerPublicTLSKey: *keyFile} {
+			if file == "" && key != contracts.OwnerPublicClientSecretFile {
+				continue
+			}
 			b, e := os.ReadFile(file)
 			if e != nil || len(b) == 0 || len(b) > 64<<10 {
 				return mounts.ErrUnavailable
@@ -223,8 +227,13 @@ func RunInstallerProviderApply(ctx context.Context, args []string, out io.Writer
 			defer clear(b)
 			public[key] = b
 		}
-		if _, e := tls.X509KeyPair(public[contracts.OwnerPublicTLSCertificate], public[contracts.OwnerPublicTLSKey]); e != nil {
+		if !contracts.InstallerPublicFilesShape(public) {
 			return mounts.ErrUnavailable
+		}
+		if len(public) == 3 {
+			if _, e := tls.X509KeyPair(public[contracts.OwnerPublicTLSCertificate], public[contracts.OwnerPublicTLSKey]); e != nil {
+				return mounts.ErrUnavailable
+			}
 		}
 	}
 	// An artifact with a federation section needs its separate credential,
@@ -254,7 +263,7 @@ func RunInstallerProviderApply(ctx context.Context, args []string, out io.Writer
 		return mounts.ErrUnavailable
 	}
 	if plan.Public != (public != nil) {
-		_, _ = fmt.Fprintln(out, "Pass --oidc-client-secret, --public-tls-certificate and --public-tls-key exactly when this recipe promotes the hub-api.")
+		_, _ = fmt.Fprintln(out, "Pass --oidc-client-secret (plus --public-tls-certificate and --public-tls-key unless TLS ends at your proxy) exactly when this recipe promotes the hub-api.")
 		return mounts.ErrUnavailable
 	}
 	if err := kube.ValidateInstallerServingTLSMaterial(plan.ServingTLS, serving, time.Now()); err != nil {

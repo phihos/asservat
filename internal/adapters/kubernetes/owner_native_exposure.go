@@ -28,7 +28,7 @@ func OwnerNativeServiceName(installation string) string {
 // connector, observation and bootstrap traffic apart (ADR-190 step 6).
 func EnsureOwnerNativeService(ctx context.Context, config *rest.Config, namespace, installation, deployment, serviceTypeName string, nodePort, operationNodePort int32) error {
 	serviceType := core.ServiceType(serviceTypeName)
-	if ctx == nil || config == nil || namespace == "" || deployment == "" || !authorization.UUID(installation) || (serviceType != core.ServiceTypeNodePort && serviceType != core.ServiceTypeLoadBalancer) ||
+	if ctx == nil || config == nil || namespace == "" || deployment == "" || !authorization.UUID(installation) || (serviceType != core.ServiceTypeNodePort && serviceType != core.ServiceTypeLoadBalancer && serviceType != core.ServiceTypeClusterIP) ||
 		nodePort != 0 && (serviceType != core.ServiceTypeNodePort || nodePort < 30000 || nodePort > 32767) ||
 		operationNodePort != 0 && (serviceType != core.ServiceTypeNodePort || operationNodePort < 30000 || operationNodePort > 32767 || operationNodePort == nodePort) {
 		return cfg.ErrInvalid
@@ -91,11 +91,10 @@ func OwnerPublicServiceName(installation string) string {
 	return "asservat-" + strings.ReplaceAll(installation, "-", "") + "-owner-public"
 }
 
-// EnsureOwnerPublicService creates the public API's L4 Service on the owner's
+// EnsureOwnerPublicService creates the public API's Service on the owner's
 // public port, selecting the owner Deployment's Pods, or reopens it when its
-// type, selector and port are unchanged. It is a plain TCP path: the hub-api
-// terminates TLS and trusts no forwarded headers, so it must not sit behind a
-// TLS-terminating proxy.
+// type, selector and port are unchanged. ClusterIP serves an Ingress or
+// Gateway route (ADR-327); the hub-api trusts no forwarded headers either way.
 func EnsureOwnerPublicService(ctx context.Context, config *rest.Config, namespace, installation, deployment, serviceTypeName string, nodePort int32) error {
 	serviceType := core.ServiceType(serviceTypeName)
 	if ctx == nil || config == nil || namespace == "" || deployment == "" || !authorization.UUID(installation) || (serviceType != core.ServiceTypeNodePort && serviceType != core.ServiceTypeLoadBalancer) ||

@@ -27,6 +27,7 @@ import (
 	"asservat.local/asservat/internal/contracts"
 	configuration "asservat.local/asservat/internal/domain/configuration"
 	value "asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/transport/edge"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -64,6 +65,8 @@ type OwnerDeployment struct {
 	publicContext   *publicContext
 	publicDownloads *publicDownloads
 	publicHandler   http.Handler
+	// publicProxyTLS: the operator's proxy terminates public TLS (ADR-327).
+	publicProxyTLS bool
 	// policyTrigger is the ADR-228 restart trigger; RunPublic supervises it.
 	policyTrigger *captureapp.PolicyTrigger
 	// recordingCollect is the ADR-248 collect loop; RunPublic supervises it.
@@ -310,6 +313,7 @@ func NewOwnerDeployment(ctx context.Context, files *os.Root, podUID string) (res
 		if err == nil {
 			phase = startupPublicHandler
 			d.publicHandler, err = newPublicHandler(startup, d, a)
+			d.publicProxyTLS = c.Public.ProxyTLS
 		}
 		d.closers = append(d.closers, closers...)
 		if err != nil {
@@ -486,7 +490,16 @@ func (d *OwnerDeployment) RunPublic(listener net.Listener) error {
 	d.owners.Add(1)
 	d.mu.Unlock()
 	defer d.owners.Done()
-	server := &http.Server{Handler: d.publicHandler, TLSConfig: publicTLS(d.publicFiles), ReadHeaderTimeout: 5 * time.Second, IdleTimeout: time.Minute, MaxHeaderBytes: 32 << 10, BaseContext: func(net.Listener) context.Context { return d.root }}
+	base := d.root
+	server := &http.Server{Handler: d.publicHandler, ReadHeaderTimeout: 5 * time.Second, IdleTimeout: time.Minute, MaxHeaderBytes: 32 << 10}
+	if d.publicProxyTLS {
+		// ADR-327: TLS ended at the operator's Ingress/Gateway; requests
+		// on this listener count as secure, forwarded headers still do not.
+		base = edge.WithTLSProxy(d.root)
+	} else {
+		server.TLSConfig = publicTLS(d.publicFiles)
+	}
+	server.BaseContext = func(net.Listener) context.Context { return base }
 	shutdown := func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		_ = server.Shutdown(ctx)
@@ -518,7 +531,12 @@ func (d *OwnerDeployment) RunPublic(listener net.Listener) error {
 			_ = d.history.Run(d.root, eventLog(os.Stderr, "history retirement refused"))
 		}()
 	}
-	err := server.ServeTLS(listener, "", "")
+	var err error
+	if d.publicProxyTLS {
+		err = server.Serve(listener)
+	} else {
+		err = server.ServeTLS(listener, "", "")
+	}
 	if stop() {
 		d.cancel()
 		shutdown()

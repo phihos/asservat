@@ -27,6 +27,13 @@ rules:
   - apiGroups: [""]
     resources: [services]
     verbs: [get, create]
+  # ADR-327: the optional public Ingress or Gateway API route.
+  - apiGroups: [networking.k8s.io]
+    resources: [ingresses]
+    verbs: [get, create]
+  - apiGroups: [gateway.networking.k8s.io]
+    resources: [httproutes]
+    verbs: [get, create]
   - apiGroups: [coordination.k8s.io]
     resources: [leases]
     verbs: [get, create, update]

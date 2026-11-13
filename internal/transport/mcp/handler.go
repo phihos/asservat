@@ -21,6 +21,7 @@ import (
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/audit"
 	identity "asservat.local/asservat/internal/domain/identity"
+	"asservat.local/asservat/internal/transport/edge"
 	"asservat.local/asservat/internal/transport/presentation"
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -449,7 +450,7 @@ func (h *Handler) releaseIdentity(p identity.Principal) {
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	securityHeaders(w)
 	origin, _ := url.Parse(h.config.PublicOrigin)
-	if r.TLS == nil || r.Host != origin.Host || r.URL.IsAbs() || r.URL.RawQuery != "" || r.URL.RawPath != "" || len(r.RequestURI) > 4096 || len(r.Header.Values("Origin")) > 1 || r.Header.Get("Origin") != "" && r.Header.Get("Origin") != h.config.PublicOrigin || r.Header.Get("Sec-Fetch-Site") == "cross-site" {
+	if !edge.Secure(r) || r.Host != origin.Host || r.URL.IsAbs() || r.URL.RawQuery != "" || r.URL.RawPath != "" || len(r.RequestURI) > 4096 || len(r.Header.Values("Origin")) > 1 || r.Header.Get("Origin") != "" && r.Header.Get("Origin") != h.config.PublicOrigin || r.Header.Get("Sec-Fetch-Site") == "cross-site" {
 		h.security.Add(presentation.IngressPreAdmission)
 		problem(w, 403)
 		return
