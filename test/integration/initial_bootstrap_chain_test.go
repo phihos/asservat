@@ -14,7 +14,6 @@ import (
 
 	"asservat.local/asservat/internal/adapters/kms"
 	"asservat.local/asservat/internal/adapters/objectstore/framed"
-	"asservat.local/asservat/internal/bootstrap"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/audit"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -24,7 +23,6 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/utils/ptr"
 )
 
 func initialBootstrapAdminPoolConfig(dsn string) (*pgxpool.Config, error) {
