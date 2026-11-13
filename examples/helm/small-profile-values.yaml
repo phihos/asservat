@@ -46,7 +46,7 @@ bootstrap:
     ownerProvider: { authMount: "", authMountAccessor: "" }
     ownerIssuerRootsPEM: ""
     public:
-      origin: https://asservat.lab.example.invalid:31450
+      origin: https://asservat.lab.example.invalid
       clientID: asservat-console
       eligibleGroups: [] # Product adds the original generated users-group UUID.
       federation:

@@ -12,12 +12,13 @@ Choose an existing persistent StorageClass with enough space for the configured 
 
 The reference profile declares an 8 GiB evidence-store allowance and a 32 GiB logical root-WAL envelope, alongside finite row/object/key limits. Its one-second accounting horizon is a disposable-trial choice, not a backup/restore recommendation. Connector authority lasts 3,600 seconds with 4,000-second retained history. A single server or storage failure can interrupt this profile; no high availability is configured. Avoid unattended polling; sustained cleanup and complete finite metadata retirement remain separate qualification gaps.
 
-Make these endpoints reachable from both your browser and cluster Pods:
+Point `asservat.lab.example.invalid` (the console origin) at your Ingress
+controller; the installer creates its Ingress. Make these endpoints reachable
+from both your browser and cluster Pods:
 
 | Endpoint | Direct TLS port |
 | --- | --- |
 | Keycloak, `login.lab.example.invalid` | 31451 |
-| Browser/API, `asservat.lab.example.invalid` | 31450 |
 | Federation, `federation.lab.example.invalid` | 31446 |
 | Native owner, `owner.lab.example.invalid` | 31447 and 31449 |
 | Artifact key service, `keys.lab.example.invalid` | 31448 |
@@ -182,7 +183,7 @@ Open `https://login.YOUR_DOMAIN:31451/admin/`, use the generated credentials fro
 
 Keep the generated `asservat_group_id` attributes unchanged. Their UUIDs, rather than display names, drive the imported token mapper and original protected settings. `asservat-users` grants eligibility and, under this reference fleet configuration, bootstrap issuance. It does not grant access to a workload. Processing membership grants the selected console client its explicit privacy-operator role; it is not a Kubernetes administrator.
 
-Sign in through `https://asservat.YOUR_DOMAIN:31450`, open `/processing`, choose **Refresh processing rules**, then **Initialize processing** if uninitialized. This is a required explicit operator action before captures; do not substitute direct SQL or retained state edits.
+Sign in through `https://asservat.YOUR_DOMAIN`, open `/processing`, choose **Refresh processing rules**, then **Initialize processing** if uninitialized. This is a required explicit operator action before captures; do not substitute direct SQL or retained state edits.
 
 ## Enroll the same Kubernetes API as a workload region
 
@@ -255,12 +256,14 @@ The all four bundled services context sequence has fresh installed qualification
 The pinned Keycloak image is qualified for fresh login after the tested PostgreSQL restart using fixed idle connection validation. These raw Quarkus settings are outside Keycloak's first-class supported configuration. Requalify recovery before changing the Keycloak image; see the [decision and cost estimate](../decisions/326-individually-selectable-small-services.md#keycloak-idle-database-connections-after-postgresql-restart).
 
 
-## Use your Ingress or Gateway
+## Choose how the console is reached
 
-The browser/API listener can sit behind your Ingress controller or Gateway
-([ADR-327](../decisions/327-ingress-and-gateway-exposure.md)), so the console
-URL needs no port. Set the origin without a port and replace the profile's
-`exposure`:
+By default the reference profile serves the browser/API listener through an
+Ingress for your origin's host, using the cluster's default IngressClass and
+certificate, with TLS ending at your Ingress controller
+([ADR-327](../decisions/327-ingress-and-gateway-exposure.md)). The origin has
+no port. To pick a class, use Gateway API, or keep TLS in the hub-api, override
+`exposure` in your site values:
 
 ```yaml
 bootstrap:

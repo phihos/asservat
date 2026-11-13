@@ -20,7 +20,7 @@ bootstrap:
     ownerProvider: { authMount: hub-owner-k8s, authMountAccessor: REPLACE_WITH_OWNER_MOUNT_ACCESSOR }
     ownerIssuerRootsPEM: ""
     public:
-      origin: https://asservat.hub.example.invalid:31450
+      origin: https://asservat.hub.example.invalid
       issuer: https://id.example.invalid/realms/homelab
       clientID: asservat-console
       clients: [ { id: asservat-console, kind: human } ]

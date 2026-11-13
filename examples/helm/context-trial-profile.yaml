@@ -150,4 +150,6 @@ bootstrap:
         transitMount: public-transit
         workerPKIMount: worker-pki
         version: homelab-context-trial
-        exposure: { serviceType: NodePort, nodePort: 31450 }
+        # ADR-327: the cluster's default IngressClass and certificate serve
+        # the console; set ingress.className or httpRoute to choose another.
+        exposure: { serviceType: ClusterIP, tls: proxy, ingress: {} }

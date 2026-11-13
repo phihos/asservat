@@ -20,6 +20,8 @@ import (
 	"unicode/utf8"
 
 	"golang.org/x/net/html"
+
+	"asservat.local/asservat/internal/transport/edge"
 )
 
 const (
@@ -322,9 +324,10 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("X-Frame-Options", "DENY")
 	w.Header().Set("Cross-Origin-Resource-Policy", "same-origin")
-	// Forwarded headers deliberately have no authority. TLS and Host must be
-	// correct at this handler; trusted ingress adaptation is a separate boundary.
-	if r.TLS == nil || r.Host != h.host || r.URL == nil || r.URL.IsAbs() || r.URL.Opaque != "" || r.URL.RawPath != "" || r.URL.RawQuery != "" || r.URL.ForceQuery || r.URL.Fragment != "" || len(r.RequestURI) > 2048 || r.RequestURI != r.URL.Path || len(r.Header.Values("Authorization")) != 0 || !h.sameOrigin(r) {
+	// Forwarded headers deliberately have no authority. TLS (at this
+	// listener or at the operator's TLS-terminating proxy, ADR-327) and Host
+	// must be correct at this handler.
+	if !edge.Secure(r) || r.Host != h.host || r.URL == nil || r.URL.IsAbs() || r.URL.Opaque != "" || r.URL.RawPath != "" || r.URL.RawQuery != "" || r.URL.ForceQuery || r.URL.Fragment != "" || len(r.RequestURI) > 2048 || r.RequestURI != r.URL.Path || len(r.Header.Values("Authorization")) != 0 || !h.sameOrigin(r) {
 		notFound(w, r)
 		return
 	}
