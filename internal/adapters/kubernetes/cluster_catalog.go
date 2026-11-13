@@ -64,7 +64,7 @@ func (s *ClusterCatalogSource) snapshot(ctx context.Context) ([]byte, contracts.
 	return a, out, nil
 }
 
-// ReadClusterCatalog reads the catalog twice between current guard proofs.
+// ReadClusterCatalog reads the named catalog once under ordinary RBAC.
 func (s *ClusterCatalogSource) ReadClusterCatalog(ctx context.Context) (contracts.OwnerClusterCatalog, error) {
 	var zero contracts.OwnerClusterCatalog
 	if s == nil || ctx == nil {
@@ -72,19 +72,11 @@ func (s *ClusterCatalogSource) ReadClusterCatalog(ctx context.Context) (contract
 	}
 	ctx, end := context.WithTimeout(ctx, 5*time.Second)
 	defer end()
-	if _, _, e := s.protection.current(ctx); e != nil {
-		return zero, e
-	}
-	first, out, e := s.snapshot(ctx)
+	_, out, e := s.snapshot(ctx)
 	if e != nil {
 		return zero, e
 	}
-	again, _, e := s.snapshot(ctx)
-	if e != nil || !bytes.Equal(first, again) {
-		return zero, artifact.ErrIntegrity
-	}
-	last, e := checkAdmissionGuard(ctx, s.client, s.protection.plan.Name, s.protection.pin, s.protection.policy, s.protection.binding)
-	if e != nil || last == "" || ctx.Err() != nil {
+	if ctx.Err() != nil {
 		return zero, artifact.ErrInvalid
 	}
 	return out, nil

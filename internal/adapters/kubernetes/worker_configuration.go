@@ -120,24 +120,12 @@ func (s *WorkerConfigurationSource) ReadWorkerConfiguration(ctx context.Context)
 	ctx, end := context.WithTimeout(ctx, 5*time.Second)
 	defer end()
 	started := s.client.now()
-	protection, until, e := s.protection.current(ctx)
-	if e != nil {
-		return out, e
-	}
 	c, e := s.snapshot(ctx)
 	if e != nil {
 		return out, e
 	}
-	again, e := s.snapshot(ctx)
-	if e != nil || again != c {
-		return out, artifact.ErrIntegrity
-	}
-	last, e := checkAdmissionGuard(ctx, s.client, s.protection.plan.Name, s.protection.pin, s.protection.policy, s.protection.binding)
-	if e != nil || last == "" {
-		return out, artifact.ErrInvalid
-	}
-	c.ProtectionDigest = protection
-	out = value.DownloadWorkerObservation{Configuration: c, ObservedAt: started, FreshUntil: identity.Earlier(started.Add(5*time.Second), until)}
+	c.ProtectionDigest = s.protection.digest
+	out = value.DownloadWorkerObservation{Configuration: c, ObservedAt: started, FreshUntil: started.Add(5 * time.Second)}
 	if !out.Valid(s.client.now()) || ctx.Err() != nil {
 		return value.DownloadWorkerObservation{}, artifact.ErrDownloadExpired
 	}

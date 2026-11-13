@@ -189,7 +189,7 @@ func testDownloadPreparationIdentityBudget(t *testing.T, nearExpiry bool) {
 	if f.checks != 1 || f.tokenChecks != 5 || f.permissions != 2 || f.catalog != 1 || f.retention != 1 {
 		t.Fatalf("preparation reconstructed operation authority: gates=%d token=%d permission=%d catalog=%d retention=%d; want 1/5/2/1/1 (ADR-312 drops the handoff identity re-read)", f.checks, f.tokenChecks, f.permissions, f.catalog, f.retention)
 	}
-	if f.policyReads != 1 || f.policiesOK != 1 || f.observer.Load()-f.identityRequests.Load() != 14 || f.probe.Load() != 3 || f.denied.Load() != 1 || f.identityPolicyReads.Load() != wantIdentityReads || f.identityRequests.Load() != 3*wantIdentityReads || f.tokenChecks < 2 || f.permissions < 2 || f.catalog < 1 || f.retention < 1 {
+	if f.policyReads != 1 || f.policiesOK != 1 || f.observer.Load()-f.identityRequests.Load() != 3 || f.probe.Load() != 0 || f.denied.Load() != 0 || f.identityPolicyReads.Load() != wantIdentityReads || f.identityRequests.Load() != 3*wantIdentityReads || f.tokenChecks < 2 || f.permissions < 2 || f.catalog < 1 || f.retention < 1 {
 		t.Fatal("preparation skipped or repeated a required composed observation")
 	}
 }

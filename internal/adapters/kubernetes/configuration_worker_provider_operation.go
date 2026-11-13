@@ -200,6 +200,5 @@ func (s *ConfigurationWorkerProviderReader) providerClientsBound() bool {
 		s.worker.client.workerToken.file == "kube-observer.token" && s.worker.guard.probe.workerToken.file == "kube-probe.token" &&
 		s.worker.client.workerToken.files == s.worker.guard.probe.workerToken.files &&
 		s.worker.guard.observer == s.worker.client && s.worker.guard.probe != s.worker.client &&
-		s.fleet.settings.client == s.worker.client && s.fleet.protection.observer == s.worker.client && s.owner.client == s.worker.client && s.owner.protection.observer == s.worker.client &&
-		s.fleet.protection.probe == s.worker.guard.probe && s.owner.protection.probe == s.worker.guard.probe
+		s.fleet.settings.client == s.worker.client && s.fleet.protection.observer == s.worker.client && s.owner.client == s.worker.client && s.owner.protection.observer == s.worker.client
 }

@@ -21,8 +21,8 @@ func TestConfigurationWorkerDiagnosticMutationKeepsActualGraph(t *testing.T) {
 			f.extraHandler = func(w http.ResponseWriter, r *http.Request) bool {
 				switch mode {
 				case "source":
-					if strings.HasSuffix(r.URL.Path, "/validatingadmissionpolicybindings/cfg-owner") && boundaries.Add(1) == 2 {
-						f.fault.Store(4) // Change source after its first actual probe GET.
+					if r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/configmaps/"+f.source.input.OwnerSource.Name) && boundaries.Add(1) == 2 {
+						f.fault.Store(4) // Change source after its first actual plain GET.
 					}
 				case "deployment":
 					if r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/deployments/"+f.source.input.Deployment.Name) && boundaries.Add(1) == 2 {
@@ -35,20 +35,20 @@ func TestConfigurationWorkerDiagnosticMutationKeepsActualGraph(t *testing.T) {
 			ctx, stop := context.WithTimeout(context.Background(), 5*time.Second)
 			defer stop()
 			_, err := f.source.readConfigurationWorkerNative(ctx)
-			wantCount := int32(33)
+			wantCount := int32(19)
 			switch mode {
 			case "positive":
 				if err != nil {
 					t.Fatal(err)
 				}
 			case "source":
-				wantCount = 30
+				wantCount = 16
 				requireConfigurationSourceCode(t, err, configurationSourceSourcesChanged, cfg.ErrChanged)
 			case "deployment":
-				wantCount = 31
+				wantCount = 17
 				requireConfigurationSourceCode(t, err, configurationSourceDeploymentFinalBound, cfg.ErrChanged)
 			}
-			if f.requests.Load() != wantCount || f.probes.Load() != 3 || f.secretWrites.Load() != 0 {
+			if f.requests.Load() != wantCount || f.probes.Load() != 1 || f.secretWrites.Load() != 0 {
 				t.Fatal("diagnostic changed original graph or added an effect", f.requests.Load(), f.probes.Load(), f.secretWrites.Load())
 			}
 		})
@@ -91,7 +91,7 @@ func TestConfigurationWorkerDiagnosticFinalPredicatesKeepClockOrder(t *testing.T
 			} else {
 				requireConfigurationSourceCode(t, err, want, cfg.ErrUnavailable)
 			}
-			if ctx.Err() != nil || samples.Load() != wantSamples || f.requests.Load() != 33 || f.probes.Load() != 3 {
+			if ctx.Err() != nil || samples.Load() != wantSamples || f.requests.Load() != 19 || f.probes.Load() != 1 {
 				t.Fatal("predicate was resampled, reordered or graph changed", samples.Load(), wantSamples, f.requests.Load(), f.probes.Load(), ctx.Err())
 			}
 		})
@@ -116,7 +116,8 @@ func TestConfigurationWorkerDiagnosticProbeDetailsAndJoinedPriority(t *testing.T
 			if !strings.HasSuffix(r.URL.Path, "/selfsubjectaccessreviews") {
 				return false
 			}
-			if arrived.Add(1) == 3 {
+			// Only the workload guard is probed; both sources are plain reads.
+			if arrived.Add(1) == 1 {
 				close(all)
 			}
 			select {
@@ -131,7 +132,7 @@ func TestConfigurationWorkerDiagnosticProbeDetailsAndJoinedPriority(t *testing.T
 		defer stop()
 		_, err := f.source.readConfigurationWorkerNative(ctx)
 		requireConfigurationSourceCode(t, err, configurationSourceProbeWorkload, cfg.ErrUnavailable)
-		if arrived.Load() != 3 || f.requests.Load() != 13 || f.probes.Load() != 0 {
+		if arrived.Load() != 1 || f.requests.Load() != 7 || f.probes.Load() != 0 {
 			t.Fatal("all started probes did not join at the original failure boundary", arrived.Load(), f.requests.Load(), f.probes.Load())
 		}
 	})
@@ -151,7 +152,7 @@ func TestConfigurationWorkerDiagnosticBlockedReadKeepsOriginalDeadline(t *testin
 	defer stop()
 	_, err := f.source.readConfigurationWorkerNative(ctx)
 	requireConfigurationSourceCode(t, err, configurationSourceDeploymentFinalRead, context.DeadlineExceeded)
-	if ctx.Err() != context.DeadlineExceeded || reads.Load() != 2 || f.requests.Load() != 31 || f.probes.Load() != 3 {
+	if ctx.Err() != context.DeadlineExceeded || reads.Load() != 2 || f.requests.Load() != 17 || f.probes.Load() != 1 {
 		t.Fatal("blocked native read retried or escaped original end", ctx.Err(), reads.Load(), f.requests.Load(), f.probes.Load())
 	}
 }
@@ -159,7 +160,9 @@ func TestConfigurationWorkerDiagnosticBlockedReadKeepsOriginalDeadline(t *testin
 func TestConfigurationWorkerDiagnosticGuardSubcode(t *testing.T) {
 	f := newConfigurationSourcePathFixture(t)
 	f.extraHandler = func(w http.ResponseWriter, r *http.Request) bool {
-		if strings.HasSuffix(r.URL.Path, "/validatingadmissionpolicies/cfg-owner") {
+		// The fleet and owner sources no longer have guards to read; the
+		// workload guard keeps the fixed subcode.
+		if strings.HasSuffix(r.URL.Path, "/validatingadmissionpolicies/cfg-workload") {
 			permissionReply(w, map[string]any{"apiVersion": "admissionregistration.k8s.io/v1", "kind": "ValidatingAdmissionPolicy", "metadata": map[string]any{"name": "synthetic-private-wrong-object"}})
 			return true
 		}
@@ -167,7 +170,7 @@ func TestConfigurationWorkerDiagnosticGuardSubcode(t *testing.T) {
 	}
 	_, err := f.source.readConfigurationWorkerNative(context.Background())
 	requireConfigurationSourceCode(t, err, configurationSourceGuardsFirst, cfg.ErrChanged)
-	if !strings.Contains(err.Error(), "source.guard-owner: source.guard-policy-identity") || strings.Contains(err.Error(), "synthetic-private") || f.requests.Load() != 6 || f.probes.Load() != 0 {
+	if !strings.Contains(err.Error(), "source.guard-workload: source.guard-policy-identity") || strings.Contains(err.Error(), "synthetic-private") || f.requests.Load() != 2 || f.probes.Load() != 0 {
 		t.Fatal("guard deciding predicate hidden or diagnostic leaked values", err, f.requests.Load())
 	}
 }

@@ -232,9 +232,6 @@ func (g *ConnectorAPIExecutionProtection) recheckNative(call context.Context, p 
 	if _, e = checkAdmissionGuard(call, g.attester.client, g.attester.protection.plan.Name, g.attester.protection.pin, g.attester.protection.policy, g.attester.protection.binding); e != nil {
 		return e
 	}
-	if _, e = checkAdmissionGuard(call, g.attester.client, g.settings.plan.Name, g.settings.pin, g.settings.policy, g.settings.binding); e != nil {
-		return e
-	}
 	if e = g.snapshot(call); e != nil {
 		return e
 	}

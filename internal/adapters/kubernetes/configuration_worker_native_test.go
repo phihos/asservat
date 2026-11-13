@@ -48,7 +48,7 @@ func TestConfigurationWorkerStatusUpdatesKeepOriginalProofAndLatestCAS(t *testin
 	if err != nil || final.deployment.ResourceVersion != "5" || !configurationRoleSameSources(initial.proof.observation, final.proof.observation) {
 		t.Fatal("status-only final bracket refused or lost exact source/latest version", err)
 	}
-	if f.requests.Load() != 78 || f.probes.Load() != 6 || f.secretWrites.Load() != 0 {
+	if f.requests.Load() != 46 || f.probes.Load() != 2 || f.secretWrites.Load() != 0 {
 		t.Fatal("status updates changed API/probe/effect counts", f.requests.Load(), f.probes.Load(), f.secretWrites.Load())
 	}
 }
@@ -103,7 +103,7 @@ func TestConfigurationWorkerStatusUpdatesDoNotHideProtectedChanges(t *testing.T)
 					}
 					_, err = f.source.readConfigurationWorkerCurrent(ctx, initial)
 				}
-				if err == nil || f.secretWrites.Load() != 0 || f.probes.Load() != 3 {
+				if err == nil || f.secretWrites.Load() != 0 || f.probes.Load() != 1 {
 					t.Fatal("protected change hidden behind status update or added an effect/probe", err)
 				}
 			})
@@ -131,7 +131,7 @@ func TestConfigurationRoleStatusUpdatesKeepOriginalSourceAndRecheck(t *testing.T
 	if err != nil || current.observation != initial.observation || current.deployment == nil || current.deployment.ResourceVersion != "3" {
 		t.Fatal("ordinary post-lock recheck lost source/deadline/latest snapshot", err)
 	}
-	if f.secretWrites.Load() != 0 || f.probes.Load() != 6 {
+	if f.secretWrites.Load() != 0 || f.probes.Load() != 2 {
 		t.Fatal("ordinary status update recheck added a write or changed probe count")
 	}
 }
@@ -161,7 +161,7 @@ func TestOwnerProjectionSourceTailKeepsControllerStatusAndOriginalBounds(t *test
 		!finished.proof.observation.ObservedAt.Equal(prefix.started) || finished.proof.observation.FreshUntil.After(prefix.until) {
 		t.Fatal("owner source tail lost original proof bounds or latest complete deployment", err)
 	}
-	if f.requests.Load() != 33 || f.probes.Load() != 3 || f.secretWrites.Load() != 0 {
+	if f.requests.Load() != 19 || f.probes.Load() != 1 || f.secretWrites.Load() != 0 {
 		t.Fatal("owner source tail changed API/probe/effect counts", f.requests.Load(), f.probes.Load(), f.secretWrites.Load())
 	}
 }
@@ -177,31 +177,30 @@ func TestConfigurationWorkerNativeAndPostLockReadsAreExplicit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if f.requests.Load() != 33 || f.probes.Load() != 3 {
-		t.Fatalf("initial expected24 observer+9 native, got requests=%d denials=%d", f.requests.Load(), f.probes.Load())
+	if f.requests.Load() != 19 || f.probes.Load() != 1 {
+		t.Fatalf("initial expected 16 observer+3 workload native, got requests=%d denials=%d", f.requests.Load(), f.probes.Load())
 	}
 	current, err := f.source.readConfigurationWorkerCurrent(ctx, initial)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if f.requests.Load() != 45 || f.probes.Load() != 3 || current.proof.observation != initial.proof.observation {
-		t.Fatal("post-lock read hid native I/O, renewed dates, or failed to read12 actual values")
+	if f.requests.Load() != 27 || f.probes.Load() != 1 || current.proof.observation != initial.proof.observation {
+		t.Fatal("post-lock read hid native I/O, renewed dates, or failed to read its 8 actual values")
 	}
 	final, err := f.source.readConfigurationWorkerNative(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if f.requests.Load() != 78 || f.probes.Load() != 6 || !configurationRoleSameSources(initial.proof.observation, final.proof.observation) {
+	if f.requests.Load() != 46 || f.probes.Load() != 2 || !configurationRoleSameSources(initial.proof.observation, final.proof.observation) {
 		t.Fatal("final independent native bracket missing or source changed")
 	}
 	until, _ := ctx.Deadline()
 	if final.proof.observation.FreshUntil.After(until) {
 		t.Fatal("final native bracket escaped original caller end")
 	}
-	for n := range f.purposeProbes {
-		if f.purposeProbes[n].Load() != 2 {
-			t.Fatal("one original denied probe omitted from a bracket")
-		}
+	// Only the workload guard is probed; the sources are plain reads.
+	if f.purposeProbes[0].Load() != 2 || f.purposeProbes[1].Load() != 0 || f.purposeProbes[2].Load() != 0 {
+		t.Fatal("workload denied probe omitted from a bracket or a source was probed")
 	}
 }
 
@@ -223,7 +222,7 @@ func TestConfigurationWorkerPostLockRejectsChangedCompleteValues(t *testing.T) {
 			if _, err = f.source.readConfigurationWorkerCurrent(ctx, initial); err == nil {
 				t.Fatal("post-lock read returned retained values despite current change")
 			}
-			if f.probes.Load() != 3 {
+			if f.probes.Load() != 1 {
 				t.Fatal("post-lock comparison silently acquired replacement enforcement")
 			}
 		})
@@ -242,24 +241,24 @@ func TestConfigurationWorkerFinalBracketNeedsNewNativeEnforcement(t *testing.T) 
 	if _, err := f.source.readConfigurationWorkerCurrent(ctx, initial); err != nil {
 		t.Fatal("fixture changed ordinary values instead of enforcement", err)
 	}
-	if _, err := f.source.readConfigurationWorkerNative(ctx); err == nil || f.probes.Load() <= 3 {
+	if _, err := f.source.readConfigurationWorkerNative(ctx); err == nil || f.probes.Load() <= 1 {
 		t.Fatal("old native proof hid actual enforcement loss in final bracket")
 	}
 }
 
 func TestConfigurationWorkerReadsSourceAfterFinalGuard(t *testing.T) {
 	f := newConfigurationSourcePathFixture(t)
-	var ownerBindings atomic.Int32
+	var ownerReads atomic.Int32
 	f.extraHandler = func(w http.ResponseWriter, r *http.Request) bool {
-		if strings.HasSuffix(r.URL.Path, "/validatingadmissionpolicybindings/cfg-owner") && ownerBindings.Add(1) == 2 {
-			f.fault.Store(4) // During final guard, after the original owner probe GET.
+		if r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/configmaps/"+f.source.input.OwnerSource.Name) && ownerReads.Add(1) == 2 {
+			f.fault.Store(4) // Before the final value read, after the first owner GET.
 		}
 		return false
 	}
 	ctx, stop := context.WithTimeout(context.Background(), 5*time.Second)
 	defer stop()
-	if _, err := f.source.readConfigurationWorkerNative(ctx); err == nil || ownerBindings.Load() != 2 {
-		t.Fatal("source mutation during final guard was hidden behind probe response")
+	if _, err := f.source.readConfigurationWorkerNative(ctx); err == nil || ownerReads.Load() != 2 {
+		t.Fatal("source mutation before the final value read was hidden behind the first read")
 	}
 }
 

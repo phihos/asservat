@@ -15,21 +15,15 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// Only the workload guard remains here: the fleet and owner sources are plain
+// ConfigMap reads under ordinary RBAC (Helm-native plan, slice 0), so their
+// version slots stay empty.
 func (s *ConfigurationRoleSource) configurationRoleGuardVersions(ctx context.Context) ([3]string, error) {
 	var out [3]string
 	var e error
 	w := s.protection
 	if out[0], e = checkAdmissionGuard(ctx, s.client, w.plan.Name, w.pin, w.policy, w.binding); e != nil {
 		return out, configurationSourceError(configurationSourceGuardWorkload, e)
-	}
-	for n, g := range []*configMapProtection{s.fleet.protection.configMapProtection, s.owner.protection.configMapProtection} {
-		if out[n+1], e = checkAdmissionGuard(ctx, s.client, g.plan.Name, g.pin, g.policy, g.binding); e != nil {
-			check := configurationSourceGuardFleet
-			if n == 1 {
-				check = configurationSourceGuardOwner
-			}
-			return out, configurationSourceError(check, e)
-		}
 	}
 	return out, nil
 }
@@ -72,12 +66,6 @@ func (s *ConfigurationRoleSource) recheckConfigurationRoleSource(ctx context.Con
 	// non-administrator identity, RBAC and exact denied dry-run requests.
 	if e = s.protection.prove(live, p.ObservedAt); e != nil {
 		return zero, configurationSourceError(configurationSourceProbeWorkload, e)
-	}
-	if e = s.fleet.protection.prove(live); e != nil {
-		return zero, configurationSourceError(configurationSourceProbeFleet, e)
-	}
-	if e = s.owner.protection.prove(live); e != nil {
-		return zero, configurationSourceError(configurationSourceProbeOwner, e)
 	}
 	f, e := s.fleet.settings.FleetAdministration(live)
 	if e != nil || f.Suspended || !f.Valid(s.client.now()) || f.InstallationID != p.InstallationID || f.IssuerEpoch != p.IssuerEpoch || f.Revision.UID != p.Fleet.UID || f.Revision.Generation != p.Fleet.Generation || hex.EncodeToString(f.Revision.Digest[:]) != p.Fleet.Digest {

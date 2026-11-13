@@ -41,18 +41,14 @@ func (s *ConfigurationWorkerProviderReader) providerGuardVersions(ctx context.Co
 	if err != nil {
 		return out, err
 	}
+	// The fleet and owner sources are plain reads under ordinary RBAC
+	// (Helm-native plan, slice 0); their version slots stay empty.
 	out[0] = v
-	for i, g := range []*configMapProtection{s.fleet.protection.configMapProtection, s.owner.protection.configMapProtection} {
-		out[i+1], err = checkAdmissionGuard(ctx, s.worker.client, g.plan.Name, g.pin, g.policy, g.binding)
-		if err != nil {
-			return out, err
-		}
-	}
 	return out, nil
 }
 
-// Each phase reads twenty actual observer values. Initial independently proves
-// all three denied operations (nine probe requests); final reuses only those
+// Each phase reads the actual observer values. Initial proves the workload's
+// denied operation and reads both sources plainly; final reuses only those
 // original intervals and rereads every mutable value. This is the explicit
 // whole-operation ADR148 boundary, not nested Current calls or a proof cache.
 func (s *ConfigurationWorkerProviderReader) readConfigurationProviderNative(ctx context.Context, started time.Time, epoch string, manifest contracts.ConfigurationRuntimeCredentialManifest, mounted map[string][]byte, initial bool) (configurationProviderNative, error) {
@@ -79,7 +75,7 @@ func (s *ConfigurationWorkerProviderReader) readConfigurationProviderNative(ctx 
 		return out, err
 	}
 	var sources [2]core.ConfigMap
-	var actors [3]auth.UserInfo
+	var actors [1]auth.UserInfo
 	if initial {
 		probeCall, stop := context.WithCancel(call)
 		var joined sync.WaitGroup
@@ -94,14 +90,14 @@ func (s *ConfigurationWorkerProviderReader) readConfigurationProviderNative(ctx 
 		}()
 		go func() {
 			defer joined.Done()
-			sources[0], actors[1], failures[1] = s.fleet.protection.proveObjectIdentity(probeCall)
+			failures[1] = w.get(probeCall, "/api/v1/namespaces/"+w.input.Namespace.Name+"/configmaps/"+w.input.FleetSource.Name, &sources[0])
 			if failures[1] != nil {
 				stop()
 			}
 		}()
 		go func() {
 			defer joined.Done()
-			sources[1], actors[2], failures[2] = s.owner.protection.proveObjectIdentity(probeCall)
+			failures[2] = w.get(probeCall, "/api/v1/namespaces/"+w.input.Namespace.Name+"/configmaps/"+w.input.OwnerSource.Name, &sources[1])
 			if failures[2] != nil {
 				stop()
 			}
@@ -139,11 +135,9 @@ func (s *ConfigurationWorkerProviderReader) readConfigurationProviderNative(ctx 
 		return out, err
 	}
 	if initial {
-		for _, actor := range actors {
-			name, e := w.configurationProviderActor(actor, s.podUID)
-			if e != nil || name != out.podName {
-				return out, cfg.ErrDenied
-			}
+		name, e := w.configurationProviderActor(actors[0], s.podUID)
+		if e != nil || name != out.podName {
+			return out, cfg.ErrDenied
 		}
 	}
 	out.resources, err = w.journal(call)

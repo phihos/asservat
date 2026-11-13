@@ -81,18 +81,9 @@ func (s *ConfigurationRoleSource) readConfigurationRoleSource(ctx context.Contex
 	if e != nil {
 		return zero, e
 	}
-	// These three exact enforcement proofs are bracketed by the complete guard
-	// checks in this method. Calling each nested Current reader would repeat
-	// the same namespace/guard I/O without adding another authority fact.
+	// The workload enforcement proof is bracketed by the guard checks in this
+	// method. The fleet and owner sources are plain reads below.
 	_, workloadIdentity, e := s.protection.proveObjectIdentity(live, started)
-	if e != nil {
-		return zero, e
-	}
-	_, fleetIdentity, e := s.fleet.protection.proveObjectIdentity(live)
-	if e != nil {
-		return zero, e
-	}
-	_, ownerIdentity, e := s.owner.protection.proveObjectIdentity(live)
 	if e != nil {
 		return zero, e
 	}
@@ -182,7 +173,7 @@ func (s *ConfigurationRoleSource) readConfigurationRoleSource(ctx context.Contex
 	}
 	return configurationRoleObserved{observation: out, deployment: d2.DeepCopy(), accountVersion: account.ResourceVersion, guards: versions,
 		native: &configurationRoleNativeResponses{clients: [3]*PermissionClient{s.protection.probe, s.fleet.protection.probe, s.owner.protection.probe},
-			identities: [3]auth.UserInfo{workloadIdentity, fleetIdentity, ownerIdentity}, worker: *account2.DeepCopy()}}, nil
+			identities: [3]auth.UserInfo{workloadIdentity}, worker: *account2.DeepCopy()}}, nil
 }
 
 // Credential provisioning also accepts the exact inert installation phase at

@@ -248,7 +248,7 @@ func TestDownloadPreparationFirstJobFitsOriginalPolicyBudget(t *testing.T) {
 	if err != nil || !out.ContinuePreparation || out.Session.State != artifact.DownloadPreparing || out.Metadata != nil || !f.created || !f.recorded || !f.pending {
 		t.Fatal("first acknowledged Job Pending did not fit the original five-second request")
 	}
-	if f.policyReads != 1 || f.policiesOK != 1 || f.observer.Load() != 14 || f.probe.Load() != 3 || f.denied.Load() != 1 {
+	if f.policyReads != 1 || f.policiesOK != 1 || f.observer.Load() != 3 || f.probe.Load() != 0 || f.denied.Load() != 0 {
 		t.Fatal("preparation repeated the protected policy observation", f.policyReads, f.policiesOK, f.observer.Load(), f.probe.Load(), f.denied.Load())
 	}
 }

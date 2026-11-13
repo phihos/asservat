@@ -119,17 +119,6 @@ func NewConnectorAPIExecutionProtection(a *ConnectorProcessAttester, credentials
 	if s.ClusterID != a.client.clusterID || s.Namespace != a.client.control.Name || s.NamespaceUID != a.client.control.UID || p.Deployment != s.Deployment || p.DeploymentUID != s.DeploymentUID || p.APIContextStarts == nil || p.APIContextStarts.CapacityAccount != s.CapacityAccount || p.APIContextStarts.CapacityAccountUID != s.CapacityAccountUID || p.APIContextStarts.ExecutionAccount != s.Account || p.APIContextStarts.ExecutionAccountUID != s.AccountUID || hex.EncodeToString(a.protection.digest[:]) != s.WorkloadProtectionDigest {
 		return nil, cfg.ErrInvalid
 	}
-	// An overlapping namespace denial must not impersonate the independently
-	// pinned source policy: only the exact named dry-run probe passes it.
-	probeAllowed := false
-	for _, p := range p.ConfigurationProbes {
-		if p.ConfigMap == name {
-			probeAllowed = true
-		}
-	}
-	if !probeAllowed {
-		return nil, cfg.ErrInvalid
-	}
 	s.Inputs = slices.Clone(s.Inputs)
 	startup, canonical, e := ConnectorAPIStartupDigest(settings.digest, uid, rv, s)
 	if e != nil {
@@ -166,7 +155,7 @@ func (g *ConnectorAPISettingsProtection) ReadSettings(ctx context.Context) (cont
 	if g == nil || g.configMapProtection == nil || ctx == nil {
 		return zero, "", "", cfg.ErrInvalid
 	}
-	object, e := g.proveObject(ctx)
+	object, e := g.read(ctx)
 	if e != nil {
 		return zero, "", "", e
 	}
@@ -360,7 +349,7 @@ func (g *ConnectorAPIExecutionProtection) produceProof(ctx context.Context) (con
 		return connectorAPIProof{}, stage("execution-account", e)
 	}
 	mark("execution-account")
-	digest, sourceUntil, e := g.settings.current(call)
+	digest, sourceUntil, e := g.settings.observe(call)
 	if e != nil {
 		return connectorAPIProof{}, stage("settings-guard", e)
 	}
@@ -376,7 +365,7 @@ func (g *ConnectorAPIExecutionProtection) produceProof(ctx context.Context) (con
 		return connectorAPIProof{}, stage("workload", e)
 	}
 	mark("workload")
-	last, finalUntil, e := g.settings.current(call)
+	last, finalUntil, e := g.settings.observe(call)
 	if e != nil || last != digest {
 		return connectorAPIProof{}, stage("settings-guard-after", cfg.ErrChanged)
 	}

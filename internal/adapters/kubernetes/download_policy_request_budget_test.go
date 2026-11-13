@@ -7,6 +7,7 @@ import (
 	"errors"
 	"net/http"
 	"reflect"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -17,7 +18,6 @@ import (
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/domain/privacy"
-	admission "k8s.io/api/admissionregistration/v1"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -31,9 +31,10 @@ type downloadPolicyBudgetFixture struct {
 }
 
 // Reuse the existing TLS API model and its unchanged default 20/20 clients.
-// Only the processing document and its exact guard/probe response are added.
-// Native admission, identity, SQL and installed concurrency are not simulated
-// by a successful policy observation in this test.
+// Only the processing document is added: since the Helm-native slice 0 the
+// source is a plain bracketed GET under ordinary RBAC, with no admission
+// policy, review or dry-run request. SQL and installed concurrency are not
+// simulated by a successful policy observation in this test.
 func newDownloadPolicyBudgetFixture(t *testing.T) *downloadPolicyBudgetFixture {
 	t.Helper()
 	api := newConfigurationSourcePathFixture(t)
@@ -43,13 +44,6 @@ func newDownloadPolicyBudgetFixture(t *testing.T) *downloadPolicyBudgetFixture {
 	}
 	plan := cfg.ConfigMapAdministration{Name: "download-policy", SourceName: "processing", ControlNamespace: observer.control, Administrators: []cfg.KubernetesActor{{Kind: "User", Name: "installer"}}}
 	pin := GuardPin{PolicyUID: ownerID(19000), PolicyGeneration: 1, BindingUID: ownerID(19001), BindingResourceVersion: "1"}
-	policy, binding, err := DownloadEnvironmentAdmission(plan)
-	if err != nil {
-		t.Fatal(err)
-	}
-	policy.UID, policy.Generation, policy.ResourceVersion = types.UID(pin.PolicyUID), 1, "1"
-	policy.Status.ObservedGeneration, policy.Status.TypeChecking = 1, &admission.TypeChecking{}
-	binding.UID, binding.ResourceVersion = types.UID(pin.BindingUID), pin.BindingResourceVersion
 	root, installation, sourceUID := ownerID(19002), api.source.input.InstallationID, ownerID(19003)
 	revision := identity.Revision{UID: ownerID(19004), Generation: 1, Digest: artifact.Digest{1}}
 	path := privacy.DownloadPath{ID: ownerID(19005), TargetClusterID: observer.clusterID, StoreID: ownerID(19006), StorageRegion: "storage", AcquisitionClusterID: observer.clusterID, AcquisitionRegion: "hub", ConnectorClusterID: observer.clusterID, ConnectorRegion: "hub", HubClusterID: observer.clusterID, HubRegion: "hub", WorkerConfiguration: revision, HubConfiguration: revision}
@@ -80,26 +74,12 @@ func newDownloadPolicyBudgetFixture(t *testing.T) *downloadPolicyBudgetFixture {
 		if before != nil && before(w, r) {
 			return true
 		}
-		switch r.URL.Path {
-		case "/apis/admissionregistration.k8s.io/v1/validatingadmissionpolicies/" + plan.Name:
-			permissionReply(w, policy)
-		case "/apis/admissionregistration.k8s.io/v1/validatingadmissionpolicybindings/" + plan.Name:
-			permissionReply(w, binding)
-		case objectPath:
-			if r.Method == http.MethodGet {
-				permissionReply(w, object)
-				return true
-			}
-			var submitted core.ConfigMap
-			if r.Method != http.MethodPut || r.Header.Get("Authorization") != "Bearer probe" || r.URL.Query().Get("dryRun") != "All" || r.URL.Query().Get("fieldValidation") != "Strict" || json.NewDecoder(r.Body).Decode(&submitted) != nil || !reflect.DeepEqual(submitted, *object) {
-				t.Error("processing proof changed its original object or attempted a persistent write")
-				http.Error(w, "invalid probe", http.StatusForbidden)
-				return true
-			}
-			f.denied.Add(1)
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusForbidden)
-			permissionReply(w, meta.Status{TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "Status"}, Status: meta.StatusFailure, Reason: meta.StatusReasonForbidden, Code: 403, Details: &meta.StatusDetails{Kind: "configmaps", Causes: []meta.StatusCause{{Message: "ValidatingAdmissionPolicy '" + plan.Name + "' with binding '" + plan.Name + "' denied request: " + downloadEnvironmentDenial}}}})
+		switch {
+		case strings.Contains(r.URL.Path, "/admissionregistration.k8s.io/") || strings.Contains(r.URL.Path, "/selfsubject") || r.Method != http.MethodGet:
+			t.Error("plain processing read used admission-guard machinery", r.Method, r.URL.Path)
+			http.Error(w, "unexpected", http.StatusForbidden)
+		case r.URL.Path == objectPath:
+			permissionReply(w, object)
 		default:
 			return false
 		}
@@ -133,7 +113,7 @@ func TestDownloadPolicyRequestBudgetOriginalParent(t *testing.T) {
 		if err != nil || !p.Valid(time.Now()) || p.ObservedAt.Before(readStart) || !p.FreshUntil.Equal(originalUntil) || call.Err() != nil {
 			t.Fatal("policy lost the original parent interval", err)
 		}
-		if f.observer.Load() != 14*n || f.probe.Load() != 3*n || f.denied.Load() != n {
+		if f.observer.Load() != 3*n || f.probe.Load() != 0 || f.denied.Load() != 0 {
 			t.Fatal("actual guarded policy request graph changed", f.observer.Load(), f.probe.Load(), f.denied.Load())
 		}
 	}
@@ -145,10 +125,10 @@ func TestDownloadPolicyRequestBudgetOriginalSourceInterval(t *testing.T) {
 	defer end()
 	p, err := f.source.DownloadPolicy(call)
 	if err != nil || !p.Valid(time.Now()) || !p.FreshUntil.Equal(p.ObservedAt.Add(5*time.Second)) {
-		t.Fatal("final guard renewed the initial source observation", err)
+		t.Fatal("read renewed the initial source observation", err)
 	}
-	if f.observer.Load() != 14 || f.probe.Load() != 3 || f.denied.Load() != 1 {
-		t.Fatal("source interval omitted protected reads")
+	if f.observer.Load() != 3 || f.probe.Load() != 0 || f.denied.Load() != 0 {
+		t.Fatal("source interval changed its plain read graph", f.observer.Load(), f.probe.Load())
 	}
 }
 
@@ -161,7 +141,7 @@ func TestDownloadPolicyRequestBudgetStopsAtOriginalBoundary(t *testing.T) {
 			joined := make(chan struct{})
 			f.mu.Lock()
 			f.before = func(_ http.ResponseWriter, r *http.Request) bool {
-				if f.observer.Load() != 14 || r.Header.Get("Authorization") != "Bearer administrator" {
+				if f.observer.Load() != 3 || r.Header.Get("Authorization") != "Bearer administrator" {
 					return false
 				}
 				if mode == "cancellation" {
@@ -174,7 +154,7 @@ func TestDownloadPolicyRequestBudgetStopsAtOriginalBoundary(t *testing.T) {
 			f.mu.Unlock()
 			p, err := f.source.DownloadPolicy(call)
 			if err == nil || !reflect.DeepEqual(p, privacy.DownloadPolicy{}) {
-				t.Fatal("unfinished final guard supplied policy authority")
+				t.Fatal("unfinished final read supplied policy authority")
 			}
 			want := context.DeadlineExceeded
 			if mode == "cancellation" {
@@ -186,10 +166,10 @@ func TestDownloadPolicyRequestBudgetStopsAtOriginalBoundary(t *testing.T) {
 			select {
 			case <-joined:
 			case <-time.After(time.Second):
-				t.Fatal("final guard HTTP request did not observe caller cancellation")
+				t.Fatal("final HTTP request did not observe caller cancellation")
 			}
-			if f.observer.Load() != 14 || f.probe.Load() != 3 || f.denied.Load() != 1 {
-				t.Fatal("boundary caused an implicit retry or skipped the actual guard", f.observer.Load(), f.probe.Load(), f.denied.Load())
+			if f.observer.Load() != 3 || f.probe.Load() != 0 || f.denied.Load() != 0 {
+				t.Fatal("boundary caused an implicit retry or skipped the final namespace read", f.observer.Load(), f.probe.Load(), f.denied.Load())
 			}
 		})
 	}
