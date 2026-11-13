@@ -73,8 +73,12 @@ func InitializeCapacity(ctx context.Context, pool *pgxpool.Pool, in CapacityInit
 	return "", cfg.ErrUnavailable
 }
 
+// ErrCapacityQualificationAbsent: the permission root has no capacity root
+// yet (read_capacity_qualification returned NULL).
+var ErrCapacityQualificationAbsent = errors.New("capacity root not initialized")
+
 // ReadCapacityQualification reads the stored qualification of a permission
-// root; cfg.ErrUnavailable when the root is not initialized.
+// root; ErrCapacityQualificationAbsent when the root is not initialized.
 func ReadCapacityQualification(ctx context.Context, pool *pgxpool.Pool, root string) (app.CapacityQualification, error) {
 	var zero app.CapacityQualification
 	if ctx == nil || ctx.Err() != nil || pool == nil || !authorization.UUID(root) {
@@ -83,8 +87,11 @@ func ReadCapacityQualification(ctx context.Context, pool *pgxpool.Pool, root str
 	call, end := context.WithTimeout(ctx, 5*time.Second)
 	defer end()
 	var raw []byte
-	if err := pool.QueryRow(call, `SELECT public.read_capacity_qualification($1)::text`, root).Scan(&raw); err != nil || raw == nil {
+	if err := pool.QueryRow(call, `SELECT public.read_capacity_qualification($1)::text`, root).Scan(&raw); err != nil {
 		return zero, cfg.ErrUnavailable
+	}
+	if raw == nil {
+		return zero, ErrCapacityQualificationAbsent
 	}
 	return decodeCapacityQualification(raw, root)
 }

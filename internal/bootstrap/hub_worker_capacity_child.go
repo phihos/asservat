@@ -28,11 +28,13 @@ var errHubWorkerCapacityConfig = errors.New("invalid hub-worker capacity section
 // never returns from the child.
 const capacityRetry = 5 * time.Second
 
-// capacityInitializationTime is the qualification's setup time. The capture
-// and processing lanes' ValidUntil start there, which keeps the root closed
-// until the reserve phase sets its planned date (SQL overwrites both); a
-// fixed value makes every retry and restart build the same qualification.
-var capacityInitializationTime = time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+// capacityInitializedAt is the setup time of a stored qualification: the
+// builder starts the capture lane's ValidUntil there (the reserve phase later
+// sets the planned date in SQL; the stored qualification keeps the original).
+// A restart rebuilds with it, so SQL finds the identical qualification.
+func capacityInitializedAt(q app.CapacityQualification) time.Time {
+	return q.RootBacking.Capture.Policy.ValidUntil
+}
 
 // capacityAccountVersion is the capture account MAC version, derived from
 // the generated role setup ID as the installer did.
@@ -51,7 +53,7 @@ func validateHubWorkerCapacity(c *contracts.HubWorkerCapacity, ids contracts.Ins
 		return errHubWorkerCapacityConfig
 	}
 	// The derived N values are placeholders here; only the settings decide.
-	if _, err := buildHubWorkerQualification(c, ids, namespace, ids.ClusterID, ids.ClusterID); err != nil {
+	if _, err := buildHubWorkerQualification(c, ids, namespace, ids.ClusterID, ids.ClusterID, time.Now()); err != nil {
 		return errHubWorkerCapacityConfig
 	}
 	return nil
@@ -73,8 +75,9 @@ func capacityNamespaceKeys(c *contracts.HubWorkerCapacity) []string {
 // buildHubWorkerQualification is the installer's capacity/qualification step
 // with Helm-native inputs: S values from ids, N values (pool and processing
 // source UIDs) read by name, deterministic source digests and identities
-// derived from RoleSetupID, so a retry builds the same qualification.
-func buildHubWorkerQualification(c *contracts.HubWorkerCapacity, ids contracts.InstallationIDs, namespace, poolUID, processingUID string) (app.CapacityQualification, error) {
+// derived from RoleSetupID and the first initialization time, so a retry
+// builds the same qualification.
+func buildHubWorkerQualification(c *contracts.HubWorkerCapacity, ids contracts.InstallationIDs, namespace, poolUID, processingUID string, initialized time.Time) (app.CapacityQualification, error) {
 	settings := c.InstallerCapacitySettings
 	// The CR specs are rendered by Helm and the workload keys belong to the
 	// permission child; neither is part of the qualified capacity input.
@@ -84,7 +87,7 @@ func buildHubWorkerQualification(c *contracts.HubWorkerCapacity, ids contracts.I
 		AccountVersion: capacityAccountVersion(ids), SystemPoolUID: poolUID, ProcessingSourceUID: processingUID,
 		ProcessingProtection: contracts.ConfigMapSourceDigest(ids.ClusterID, namespace, c.ProcessingSource),
 		NamespaceGuards:      []app.CapacityNamespaceQualification{{ClusterID: ids.ClusterID, Digest: contracts.NamespaceSourceDigest(ids.ClusterID, namespace), Keys: settings.NamespaceKeys}},
-		Now:                  capacityInitializationTime}, capacityIDs(ids.RoleSetupID))
+		Now:                  initialized}, capacityIDs(ids.RoleSetupID))
 }
 
 // capacityRootStore is the SQL root initialization port.
@@ -248,7 +251,17 @@ func (w *hubWorker) runCapacityOnce(ctx context.Context) (err error) {
 	if err != nil {
 		return err
 	}
-	q, err := buildHubWorkerQualification(c, w.ids, w.namespace.Name, poolUID, processingUID)
+	// The first initialization's time is persisted in the stored
+	// qualification; a retry or restart rebuilds with it.
+	at = "initialized-at"
+	initialized := time.Now()
+	switch stored, err := postgres.ReadCapacityQualification(startup, pools["capacity"], w.ids.PermissionRootID); {
+	case err == nil:
+		initialized = capacityInitializedAt(stored)
+	case !errors.Is(err, postgres.ErrCapacityQualificationAbsent):
+		return err
+	}
+	q, err := buildHubWorkerQualification(c, w.ids, w.namespace.Name, poolUID, processingUID, initialized)
 	if err != nil {
 		return errHubWorkerCapacityConfig
 	}

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"asservat.local/asservat/internal/adapters/postgres"
+	app "asservat.local/asservat/internal/application/capacity"
 	"asservat.local/asservat/internal/contracts"
 )
 
@@ -68,20 +69,22 @@ func TestHubWorkerCapacitySectionDecodes(t *testing.T) {
 	}
 }
 
+var capacityTestInitialized = time.Date(2026, 11, 14, 10, 0, 0, 123456789, time.UTC)
+
 // Every retry and restart builds the same qualification from the same
 // settings and IDs; CR specs and key order do not change it.
 func TestHubWorkerQualificationIsDeterministic(t *testing.T) {
 	ids := hubWorkerCapacityIDs()
-	a, err := buildHubWorkerQualification(hubWorkerCapacityFixture(), ids, "asservat", "30000000-0000-4000-8000-0000000000a1", "30000000-0000-4000-8000-0000000000a2")
+	a, err := buildHubWorkerQualification(hubWorkerCapacityFixture(), ids, "asservat", "30000000-0000-4000-8000-0000000000a1", "30000000-0000-4000-8000-0000000000a2", capacityTestInitialized)
 	if err != nil {
 		t.Fatal(err)
 	}
 	c := hubWorkerCapacityFixture()
 	c.NamespaceKeys = []string{"z", "team"}
-	b, _ := buildHubWorkerQualification(c, ids, "asservat", "30000000-0000-4000-8000-0000000000a1", "30000000-0000-4000-8000-0000000000a2")
+	b, _ := buildHubWorkerQualification(c, ids, "asservat", "30000000-0000-4000-8000-0000000000a1", "30000000-0000-4000-8000-0000000000a2", capacityTestInitialized)
 	c.NamespaceKeys = []string{"team", "z"}
-	d, _ := buildHubWorkerQualification(c, ids, "asservat", "30000000-0000-4000-8000-0000000000a1", "30000000-0000-4000-8000-0000000000a2")
-	again, _ := buildHubWorkerQualification(hubWorkerCapacityFixture(), ids, "asservat", "30000000-0000-4000-8000-0000000000a1", "30000000-0000-4000-8000-0000000000a2")
+	d, _ := buildHubWorkerQualification(c, ids, "asservat", "30000000-0000-4000-8000-0000000000a1", "30000000-0000-4000-8000-0000000000a2", capacityTestInitialized)
+	again, _ := buildHubWorkerQualification(hubWorkerCapacityFixture(), ids, "asservat", "30000000-0000-4000-8000-0000000000a1", "30000000-0000-4000-8000-0000000000a2", capacityTestInitialized)
 	x, _ := json.Marshal(a)
 	y, _ := json.Marshal(again)
 	if !bytes.Equal(x, y) || !reflect.DeepEqual(b, d) {
@@ -96,7 +99,7 @@ func TestHubWorkerQualificationIsDeterministic(t *testing.T) {
 	}
 	withSpec := hubWorkerCapacityFixture()
 	withSpec.WorkloadKeys = &contracts.InstallerWorkloadKeys{Labels: []string{"a"}}
-	z, _ := buildHubWorkerQualification(withSpec, ids, "asservat", "30000000-0000-4000-8000-0000000000a1", "30000000-0000-4000-8000-0000000000a2")
+	z, _ := buildHubWorkerQualification(withSpec, ids, "asservat", "30000000-0000-4000-8000-0000000000a1", "30000000-0000-4000-8000-0000000000a2", capacityTestInitialized)
 	if z.Digest != a.Digest {
 		t.Fatal("workload keys changed the qualification")
 	}
@@ -130,7 +133,7 @@ func (f *fakeCapacityRoots) InitializeCapacity(_ context.Context, in postgres.Ca
 func TestCapacityInitializationIsIdempotent(t *testing.T) {
 	ids := hubWorkerCapacityIDs()
 	input := func() postgres.CapacityInitialization {
-		q, err := buildHubWorkerQualification(hubWorkerCapacityFixture(), ids, "asservat", "30000000-0000-4000-8000-0000000000a1", "30000000-0000-4000-8000-0000000000a2")
+		q, err := buildHubWorkerQualification(hubWorkerCapacityFixture(), ids, "asservat", "30000000-0000-4000-8000-0000000000a1", "30000000-0000-4000-8000-0000000000a2", capacityTestInitialized)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -195,5 +198,32 @@ func TestHubWorkerPublishesEvidenceStoreIDForContextDeletion(t *testing.T) {
 	cancel()
 	if _, ok := w.EvidenceStoreID(); ok {
 		t.Fatal("evidence store ID returned after the process ended")
+	}
+}
+
+// The first initialization time is the qualification's setup time; a restart
+// reads it back from the stored qualification and rebuilds the identical
+// qualification, so SQL reports it present instead of different.
+func TestHubWorkerQualificationRebuildsFromStoredInitializationTime(t *testing.T) {
+	ids := hubWorkerCapacityIDs()
+	first := time.Now()
+	q, err := buildHubWorkerQualification(hubWorkerCapacityFixture(), ids, "asservat", "30000000-0000-4000-8000-0000000000a1", "30000000-0000-4000-8000-0000000000a2", first)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p := q.RootBacking.Capture.Policy; p.ValidUntil.Before(first.Add(-time.Microsecond)) || p.ValidUntil.After(first) || q.RootBacking.ProcessingState.RetireBy.Before(first) {
+		t.Fatal("qualification not built at its first initialization time", p.ValidUntil, q.RootBacking.ProcessingState.RetireBy)
+	}
+	raw, _ := json.Marshal(q)
+	var stored app.CapacityQualification
+	if err = json.Unmarshal(raw, &stored); err != nil {
+		t.Fatal(err)
+	}
+	again, err := buildHubWorkerQualification(hubWorkerCapacityFixture(), ids, "asservat", "30000000-0000-4000-8000-0000000000a1", "30000000-0000-4000-8000-0000000000a2", capacityInitializedAt(stored))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rebuilt, _ := json.Marshal(again); !bytes.Equal(raw, rebuilt) {
+		t.Fatal("restart did not rebuild the stored qualification")
 	}
 }
