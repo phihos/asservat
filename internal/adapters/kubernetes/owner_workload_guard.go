@@ -229,28 +229,6 @@ func NewOwnerWorkloadProtection(observer, probe *PermissionClient, plan cfg.Owne
 	return &OwnerWorkloadProtection{observer, probe, plan, pin, p.Spec, b.Spec, artifact.Digest(sha256.Sum256(raw))}, nil
 }
 
-// proveObject reads the pinned owner Deployment within the caller's original
-// five-second interval and checks its namespace, name and UID. Callers validate
-// its template and the live Pod chain; it confers no authority by itself.
-func (g *OwnerWorkloadProtection) proveObject(ctx context.Context, start time.Time) (apps.Deployment, error) {
-	var zero apps.Deployment
-	if g == nil || ctx == nil || g.observer == nil {
-		return zero, cfg.ErrInvalid
-	}
-	if g.observer.current(ctx, start, 5*time.Second) != nil {
-		return zero, configurationSourceError(configurationSourceProbeOriginalInterval, cfg.ErrUnavailable)
-	}
-	raw, err := g.observer.raw(ctx, "/apis/apps/v1/namespaces/"+g.plan.ControlNamespace.Name+"/deployments/"+g.plan.Deployment, nil)
-	if err != nil {
-		return zero, configurationSourceError(configurationSourceProbeObjectRead, cfg.ErrUnavailable)
-	}
-	var object apps.Deployment
-	if json.Unmarshal(raw, &object) != nil || object.APIVersion != "apps/v1" || object.Kind != "Deployment" || !ownerMetadata(object.ObjectMeta, g.plan.ControlNamespace.Name, g.plan.Deployment, g.plan.DeploymentUID) {
-		return zero, configurationSourceError(configurationSourceProbeObjectShape, cfg.ErrChanged)
-	}
-	return object, nil
-}
-
 // proveObjectIdentity and prove keep the former denied dry-run probe only for
 // configuration-source and projection callers outside this slice; owner and
 // connector authentication no longer call them. Remove with those callers.
