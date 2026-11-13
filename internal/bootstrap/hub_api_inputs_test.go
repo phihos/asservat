@@ -129,6 +129,12 @@ func TestHubAPIInputsMergeConfigIDsAndStartupReads(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// The provider effects clone the deployment through JSON.
+	if raw, err := json.Marshal(c); err != nil {
+		t.Fatal("deployment encode", err)
+	} else if err = json.Unmarshal(raw, new(contracts.OwnerDeployment)); err != nil {
+		t.Fatal("deployment decode", err)
+	}
 	if c.InstallationID != runtimeID || c.Namespace != (contracts.WorkerObjectReference{Name: "hub", UID: runtimeID}) || c.ConfigurationUID == "" || c.ProviderAuthentication == nil || c.ProviderAuthentication.ServiceAccount.UID != "" || c.ProviderAuthentication.RecipeSHA256 == "" {
 		t.Fatal("identity fields", c.InstallationID, c.Namespace, c.ProviderAuthentication)
 	}

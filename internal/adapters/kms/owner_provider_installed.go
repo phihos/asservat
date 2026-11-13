@@ -56,7 +56,19 @@ func NewInstalledOwnerProviderEffects(ctx context.Context, input contracts.Owner
 	raw, err := json.Marshal(input)
 	var cloned contracts.OwnerDeployment
 	if err != nil {
-		return nil, providerStep("clone-encode", ErrKeyService)
+		step := "clone-encode"
+		var m *json.MarshalerError
+		var u *json.UnsupportedValueError
+		var t *json.UnsupportedTypeError
+		switch {
+		case errors.As(err, &m):
+			step += ":" + m.Type.String()
+		case errors.As(err, &u):
+			step += ":unsupported-value"
+		case errors.As(err, &t):
+			step += ":" + t.Type.String()
+		}
+		return nil, providerStep(step, ErrKeyService)
 	}
 	if err = json.Unmarshal(raw, &cloned); err != nil {
 		return nil, providerStep("clone-decode", errors.Join(ErrKeyService, err))
