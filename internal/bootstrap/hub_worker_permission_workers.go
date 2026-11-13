@@ -110,7 +110,9 @@ func (w *workerConfigurationWorker) run(ctx context.Context) {
 	for ctx.Err() == nil {
 		w.read = ""
 		outcome := regionalOutcome(w.observer.Observe(ctx))
-		if outcome != "ok" && w.read != "" {
+		if outcome != "ok" && w.read == "ledger-or-audit" {
+			outcome = w.read + ": " + outcome
+		} else if outcome != "ok" && w.read != "" {
 			outcome = w.read
 		}
 		if outcome != last && ctx.Err() == nil {
@@ -134,6 +136,11 @@ func (s stagedWorkerConfigurationSource) ReadWorkerConfiguration(ctx context.Con
 	out, err := s.WorkerConfigurationSource.ReadWorkerConfiguration(ctx)
 	if err != nil {
 		*s.read = regionalOutcome(&fixedStepError{"source", err})
+	} else if !out.Valid(time.Now()) {
+		*s.read = "source/invalid-observation"
+	} else {
+		// A later failure is the SQL ledger, audit or acknowledgement.
+		*s.read = "ledger-or-audit"
 	}
 	return out, err
 }
