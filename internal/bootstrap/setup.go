@@ -88,7 +88,12 @@ func retryUnavailable(ctx context.Context, out io.Writer, f func(context.Context
 			return err
 		}
 		if out != nil {
-			_, _ = fmt.Fprintln(out, "retrying:", err)
+			cause := err
+			var step *SetupStepError
+			if errors.As(err, &step) && step.Err != nil {
+				cause = step.Err
+			}
+			_, _ = fmt.Fprintln(out, "retrying:", err, "cause:", cause)
 		}
 		select {
 		case <-ctx.Done():
