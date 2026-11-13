@@ -65,7 +65,7 @@ func NewOwnerObservationOperationReader(c *PermissionClient, guard *OwnerWorkloa
 	if err != nil || owned.digest != pin.ProtectionDigest {
 		return nil, cfg.ErrInvalid
 	}
-	return &OwnerObservationOperationReader{c, guard.share(owned), pin}, nil
+	return &OwnerObservationOperationReader{c, owned, pin}, nil
 }
 
 func (s *OwnerObservationOperationReader) Begin(ctx context.Context, r value.OwnerObservationRequest, peers []value.OwnerBinding) (*OwnerObservationOperation, error) {
