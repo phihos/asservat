@@ -29,11 +29,9 @@ const (
 
 const PublisherProviderAuthenticationFormat = "asservat-publisher-kubernetes-auth/v1"
 
-// PublisherProviderAudience derives the fixed audience of the publisher's
-// projected provider token; it grants no authority.
-func PublisherProviderAudience(installationID, clusterID string) string {
-	return "https://asservat." + installationID + "/publisher-provider/" + clusterID
-}
+// PublisherProviderAudience is the fixed (chart constant) audience of the
+// publisher's projected provider token; it grants no authority.
+func PublisherProviderAudience(string, string) string { return "asservat-publisher-provider" }
 
 // PublisherName is the publisher's Deployment and ServiceAccount name.
 func PublisherName(installationID string) string {

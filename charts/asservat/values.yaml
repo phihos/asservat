@@ -29,6 +29,11 @@ identity:
   browserAudience: ""
   # Public PEM roots of the issuer; empty uses the system roots.
   providerRootsPEM: ""
+  # External identity provider: existing Secret with the console client's
+  # OIDC secret. Bundled Keycloak uses `<name>-keycloak-state`.
+  clientSecret:
+    existingSecret: ""
+    key: client-secret
   clients: []
   eligibleSubjects: []
   eligibleGroups: []
@@ -99,29 +104,66 @@ fleet:
   maxBootstrapHistory: 16
   maxClusters: 1
 
-# Public context execution also needs capacity, retention and federation.
-# They keep the former installer DTO field names. Footprints and backend
-# envelopes must describe the actual services. No credentials belong here.
-# capacity: {...}
-# retention: {...}
+# Initial capacity sources (the former bootstrap.continuation.public.capacity,
+# same field names). Set to enable capacity; poolSpec and policySpec render
+# the EvidenceStoragePool `pool` and EvidenceBudgetPolicy `policy`.
+capacity: {}
+
+# The hub's baseline retention policy (the former
+# bootstrap.continuation.public.retentionBaseline: purposeRef, defaults,
+# maxima, deletionBudgetSeconds). Set to render `<name>-baseline`.
+retention: {}
+
+# Public context execution also needs federation (former installer DTO
+# field names). No credentials belong here.
 # federation: {...}
 
-# Regional connector settings (mode cluster or combined).
+# Regional connector (mode=cluster or mode=combined). Issue a cluster
+# bootstrap in the console (Fleet), then set clusterID and peerID from the
+# receipt and store the bootstrap record as `bootstrap.json` in an existing
+# Secret named by bootstrapSecret. The connector seeds its rotating cluster
+# credential from that record once, within the record's five minutes; after
+# enrollment the record Secret may be deleted.
 region:
-  namespace: asservat-connector
-  # Remote regions: the bootstrapID issued through /fleet.
-  bootstrapID: ""
-  offer: ""
+  enabled: false
+  clusterID: ""
+  peerID: ""
   bootstrapSecret: ""
-  # Existing Secret: evidence-storage.json and history-storage.json.
-  evidenceSecret: ""
-  # ADR-231: optional in-cluster Alertmanager base URL (http or https, no
-  # credentials) read by alert DebugPolicies on this cluster.
-  alertmanager: ""
-  # ADR-245: identity mapping records for decision-time PermissionSources.
-  identityMappings: []
-  # ADR-285: administrator Go pprof endpoint templates and profiles.
-  profileEndpoints: []
+  # mode=cluster only: the hub's public regional-offer.json
+  # (`--set-file region.offer=regional-offer.json`).
+  offer: ""
+  # mode=combined only: the hub's offer ConfigMap in the release namespace
+  # and the in-cluster addresses the connector dials. Empty values use the
+  # chart's Service names.
+  offerConfigMap: ""
+  hub:
+    federation: ""
+    owners: ""
+    keyService: ""
+  # Regional context start (ADR-171), used when the offer names the
+  # regional executor.
+  executor:
+    enabled: true
+    concurrency: 4
+    # Empty uses the API server's default token audience.
+    capacityAudience: ""
+    # mode=cluster: existing Secret with evidence-storage.json and
+    # history-storage.json (and profile-authorization.json with
+    # profileAuthorization). mode=combined uses `<name>-s3-regional-write`
+    # and `<name>-s3-regional-history` (key credentials.json).
+    evidenceSecret: ""
+    profileAuthorization: false
+    # ADR-231: in-cluster Alertmanager base URL for alert policies.
+    alertmanager: ""
+    # ADR-245: identity mapping records (adds SubjectAccessReview create).
+    identityMappings: []
+    # ADR-285: administrator Go pprof endpoint templates and profiles.
+    profileEndpoints: []
+  resources:
+    requests: {cpu: 100m, memory: 64Mi}
+    limits: {cpu: 500m, memory: 256Mi}
+  nodeSelector: {}
+  tolerations: []
 
 # ADR-246: the `asservat node` collector DaemonSet, with mode=cluster or
 # mode=combined. Its namespace is the only one with the privileged Pod
@@ -157,35 +199,147 @@ collector:
     enabled: false
     bytes: 1073741824
 
-# Placement of the hub workloads.
+# Hub workloads (mode hub or combined). Every hub component renders in the
+# release namespace; replicas: 0 stops one.
 hub:
   hub-api:
     replicas: 1
     connections: 4
     concurrency: 2
-    resources: {}
+    resources:
+      requests: {cpu: 100m, memory: 128Mi}
+      limits: {cpu: "1", memory: 512Mi}
     nodeSelector: {}
     tolerations: []
+    # Owner native/operation listener for connectors and download workers.
+    # ClusterIP for single-cluster installs; NodePort or LoadBalancer for
+    # remote regions.
+    nativeService:
+      type: ClusterIP
+      annotations: {}
+      nodePorts: {}
+      # nodePorts: {native: 31447, operation: 31449}
+    # Download-worker namespaces in the hub cluster; empty uses <name>-downloads.
+    workerNamespaces: []
+    retentionTopologies: []
+    # Remote regions' connector peers: {clusterID, peerID, rootsPEM}.
+    peers: []
+    public:
+      standby: 2
+      captures: 1
+      previewSeconds: 120
+      operationConcurrency: 8
+      mcpPerIdentity: 2
+      downloadConcurrency: 4
+      downloadsPerIdentity: 2
+      downloadMaxSeconds: 3600
+      # Retention comes from the capacity qualification.
+      operationAudit:
+        normalConcurrency: 8
+        resolutionConcurrency: 2
+        perPrincipalConcurrency: 2
+        normalPerSecond: 50
+        resolutionPerSecond: 10
+      downloadPlan:
+        outputLimit: 268435456
+        readLimit: 311164928
+        requestLimit: 4
+        durationSeconds: 300
+      # Read the capacity processing source <name>-processing-source.
+      processing: false
   hub-worker:
     replicas: 1
-    resources: {}
+    resources:
+      requests: {cpu: 100m, memory: 64Mi}
+      limits: {cpu: 500m, memory: 256Mi}
     nodeSelector: {}
     tolerations: []
+    # Audience of the projected cluster-observation token (with capacity).
+    clusterObservationAudience: asservat-cluster-observation
+    # Capture/operation audit cleanup; with capacity it runs unless
+    # enabled is false.
+    cleanup: {}
+    # The permission child (AccessBindings, PermissionSources and the hub
+    # retention source).
+    permission:
+      enabled: false
+      # Accounts that may write PermissionSource/AccessBinding status.
+      statusUsers: []
+      # Writer envelopes (the former public.permissionDelegations shape).
+      delegations: []
+      # Administrator-created initial review ConfigMap, needed only when
+      # bindings exist at the first acceptance.
+      # review: ""
+      # Runs the hub retention source; defaults to true when retention is set.
+      # retention: true
+      # Download worker configuration acceptance (ADR-204).
+      # workerConfiguration: {namespace: asservat-downloads, source: asservat-worker-profile}
+      # Expired context evidence deletion (ADR-205); the evidence store
+      # defaults to the audit store.
+      # contextDeletion: {evidenceStore: {endpoint: "", region: "", bucket: ""}}
+      # browser: {settings: asservat-browser-settings}
+      # identity: {settings: asservat-identity-settings, issuer: https://id.example/realms/org}
   federation:
     replicas: 1
+    concurrency: 4
     resources: {}
     nodeSelector: {}
     tolerations: []
+    # ClusterIP for single-cluster installs; NodePort or LoadBalancer when
+    # remote regions dial the federation directly.
+    service:
+      type: ClusterIP
+      nodePort: null
+      annotations: {}
+    tls:
+      # Existing kubernetes.io/tls Secret with ca.crt; empty issues the
+      # serving certificate from cert-manager (tls.issuerRef).
+      existingSecret: ""
+      # Extra serving names (the external endpoint regions dial).
+      dnsNames: []
+      issuerRef:
+        name: ""
+        kind: Issuer
+        group: cert-manager.io
   key-service:
     replicas: 1
+    concurrency: 8
     resources: {}
     nodeSelector: {}
     tolerations: []
+    service:
+      type: ClusterIP
+      nodePort: null
+      annotations: {}
+    tls:
+      existingSecret: ""
+      dnsNames: []
+      issuerRef:
+        name: ""
+        kind: Issuer
+        group: cert-manager.io
+    # Acquisition unwraps for native downloads (ADR-204).
+    downloads:
+      enabled: false
+      # Retention topology ConfigMaps by target cluster; the cluster catalog
+      # adds joined regions.
+      retentionTopologies: []
   publisher:
     replicas: 1
+    pollSeconds: 2
+    batch: 8
     resources: {}
     nodeSelector: {}
     tolerations: []
+    retentionTopologies: []
+  # Download workers (ADR-069) run as Jobs that hub-api dispatches into the
+  # dedicated `<name>-downloads` namespace; Helm renders the namespace,
+  # account, PriorityClass, the worker configuration and the dispatch Roles.
+  download-worker:
+    enabled: true
+    cpuMillis: 500
+    memoryBytes: 402653184
+    maxRuntimeSeconds: 3600
 
 # Generated Secrets (created once by the `secrets` hook, never rotated, kept
 # on uninstall). Override one with an existing Secret of the same keys:
@@ -236,10 +390,12 @@ services:
   objectStore:
     provider: external
     # Used with provider external; the operator creates the s3-* Secrets.
+    # bucket holds audit records; evidenceBucket (default: bucket) evidence.
     external:
       endpoint: ""
       region: ""
       bucket: ""
+      evidenceBucket: ""
       rootsPEM: ""
     seaweedfs:
       image: chrislusf/seaweedfs@sha256:ccad23e18639c8b98cee17e7100b95830a06077b56d8e5b006d6dcf8ec5e94a0
@@ -274,115 +430,3 @@ services:
       resources:
         requests: {cpu: 100m, memory: 256Mi}
         limits: {cpu: "2", memory: 1Gi}
-
-# Helm-native installation (docs/reviews/helm-native-install-plan.md). Object
-# names use the prefix installation.name; all hub objects live in the release
-# namespace. These keys render nothing until hub.<component>.enabled is set.
-installation:
-  name: asservat
-
-# One image for every runtime component: repository@digest.
-image:
-  repository: ""
-  digest: ""
-  pullPolicy: IfNotPresent
-
-# Public https origin of the console/MCP/download layer; empty renders no
-# public layer in the hub-api configuration.
-origin: ""
-
-identity:
-  # Access audience of browser login.
-  browserAudience: asservat-api
-  # CA bundle of the identity provider (Secret name/key), optional.
-  providerRootsSecret:
-    name: ""
-    key: ca.crt
-  # OIDC client secret of the console client.
-  clientSecret:
-    name: ""
-    key: client-secret
-
-exposure:
-  # pod: hub-api terminates TLS with tlsSecret; proxy: the operator's
-  # Ingress/Gateway terminates TLS and forwards plain HTTP (ADR-327).
-  tls: pod
-  # Secret with tls.crt/tls.key, used when tls is pod.
-  tlsSecret: ""
-
-# ADR-193 fleet bootstrap issuance through the hub-api.
-fleet:
-  enabled: false
-  settings: asservat-fleet
-  channelMount: fleet-bootstrap
-  deliveryProfile: regional-installer
-
-# Hub-cluster capacity observation served to the hub-worker; empty keys
-# disable it.
-capacity:
-  keys: []
-  labelKeys: []
-  annotationKeys: []
-
-hub:
-  hubApi:
-    enabled: false
-    replicas: 1
-    resources:
-      requests: {cpu: 100m, memory: 128Mi}
-      limits: {cpu: "1", memory: 512Mi}
-    nodeSelector: {}
-    tolerations: []
-    # Owner native/operation listener for connectors and download workers.
-    # ClusterIP for single-cluster installs; NodePort or LoadBalancer for
-    # remote regions.
-    nativeService:
-      type: ClusterIP
-      annotations: {}
-      nodePorts: {}
-      # nodePorts: {native: 31447, operation: 31449}
-    # Provider CA bundles; empty names use the bundled services' state Secret.
-    caSecrets:
-      postgres: {name: "", key: ca.crt}
-      auditStore: {name: "", key: ca.crt}
-      keyService: {name: "", key: ca.crt}
-    # Provider endpoints; empty values use the bundled in-namespace services.
-    postgres: {host: "", port: 5432, database: asservat, maxConnections: 1}
-    auditStore: {endpoint: "", region: us-east-1, bucket: asservat-audit}
-    keyService: {endpoint: "", auditMount: asservat-audit, auditKey: audit, pkiMount: owner-pki}
-    providerAuthMount: asservat-owner
-    connections: 4
-    concurrency: 2
-    connectorPKIMount: connector-pki
-    # Download-worker namespaces in the hub cluster; empty uses <name>-downloads.
-    workerNamespaces: []
-    retentionTopologies: []
-    # Remote regions' connector peers: {clusterID, peerID, rootsPEM}.
-    peers: []
-    public:
-      standby: 2
-      captures: 1
-      previewSeconds: 120
-      operationConcurrency: 8
-      mcpPerIdentity: 2
-      downloadConcurrency: 4
-      downloadsPerIdentity: 2
-      downloadMaxSeconds: 3600
-      # Retention comes from the capacity qualification.
-      operationAudit:
-        normalConcurrency: 8
-        resolutionConcurrency: 2
-        perPrincipalConcurrency: 2
-        normalPerSecond: 50
-        resolutionPerSecond: 10
-      downloadPlan:
-        outputLimit: 268435456
-        readLimit: 311164928
-        requestLimit: 4
-        durationSeconds: 300
-      transitMount: public-transit
-      workerPKIMount: worker-pki
-      # Read the capacity processing source <name>-processing-source.
-      processing: false
-      permissionDelegations: []
-      captureHistory: null

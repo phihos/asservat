@@ -140,19 +140,97 @@ checksum/config: {{ $sum | sha256sum | quote }}
 {{- end -}}
 
 {{/* Init container that waits until `asservat setup` has applied the
-     current schema. Call with (dict "root" $ "volumeMounts" (list ...)):
-     the component's own config and SQL credential mounts. */}}
+     current schema: `asservat setup --wait-schema`. Call with (dict "root" $
+     "config" "/run/.../config.json" "credential" "/run/.../sql-x.json"
+     "ca" "/run/.../postgres-ca.crt" "volumeMounts" (list ...)): the
+     component's config (top-level postgres{host,port,database}), one of its
+     SQL credentials and the PostgreSQL CA, all from its own mounts. */}}
 {{- define "asservat.waitSchema" -}}
 {{- $root := .root -}}
 - name: wait-schema
   image: {{ include "asservat.image" $root | quote }}
   imagePullPolicy: {{ $root.Values.image.pullPolicy }}
-  command: [/asservat, setup, --wait-schema]
+  command: [/asservat, setup, --wait-schema, --config, {{ .config | quote }}, --credential, {{ .credential | quote }}, --ca, {{ .ca | quote }}]
   securityContext: {{ include "asservat.securityContext" $root | nindent 4 }}
   resources: {{ include "asservat.jobResources" $root | nindent 4 }}
   {{- with .volumeMounts }}
   volumeMounts: {{ toYaml . | nindent 4 }}
   {{- end }}
+{{- end -}}
+
+{{/* Selected providers as JSON: postgres{host,port,database},
+     objectStore{endpoint,region,auditBucket,evidenceBucket},
+     openBao{endpoint}; bundled service addresses or services.*.external. */}}
+{{- define "asservat.providers" -}}
+{{- $n := include "asservat.name" . -}}
+{{- $ns := .Release.Namespace -}}
+{{- $s := .Values.services -}}
+{{- $out := dict -}}
+{{- if eq $s.postgres.provider "bundled" -}}
+{{- $_ := set $out "postgres" (dict "host" (printf "%s-postgres.%s.svc" $n $ns) "port" 5432 "database" "asservat") -}}
+{{- else -}}
+{{- $e := $s.postgres.external -}}
+{{- $_ := set $out "postgres" (dict "host" (required "services.postgres.external.host is required" $e.host) "port" (int (default 5432 $e.port)) "database" (default "asservat" $e.database)) -}}
+{{- end -}}
+{{- if eq $s.objectStore.provider "seaweedfs" -}}
+{{- $_ := set $out "objectStore" (dict "endpoint" (printf "https://%s-objectstore.%s.svc:8333" $n $ns) "region" "us-east-1" "auditBucket" (printf "%s-audit" $n) "evidenceBucket" (printf "%s-evidence" $n)) -}}
+{{- else -}}
+{{- $e := $s.objectStore.external -}}
+{{- $_ := set $out "objectStore" (dict "endpoint" (required "services.objectStore.external.endpoint is required" $e.endpoint) "region" (required "services.objectStore.external.region is required" $e.region) "auditBucket" (required "services.objectStore.external.bucket is required" $e.bucket) "evidenceBucket" (default $e.bucket $e.evidenceBucket)) -}}
+{{- end -}}
+{{- if eq $s.keyService.provider "openbao" -}}
+{{- $_ := set $out "openBao" (dict "endpoint" (printf "https://%s-openbao.%s.svc:8200" $n $ns)) -}}
+{{- else -}}
+{{- $_ := set $out "openBao" (dict "endpoint" (required "services.keyService.external.endpoint is required" $s.keyService.external.endpoint)) -}}
+{{- end -}}
+{{- toJson $out -}}
+{{- end -}}
+
+{{/* One projected-volume source with a provider's PEM CA at path. Call with
+     (dict "root" $ "provider" "postgres|objectStore|openBao" "path" "x.crt").
+     Bundled: the service's `<name>-<service>-state` Secret (ca.crt);
+     external: `<name>-provider-roots` (from services.*.external.rootsPEM). */}}
+{{- define "asservat.providerRoots" -}}
+{{- $root := .root -}}
+{{- $n := include "asservat.name" $root -}}
+{{- $s := $root.Values.services -}}
+{{- $bundled := dict "postgres" (eq $s.postgres.provider "bundled") "objectStore" (eq $s.objectStore.provider "seaweedfs") "openBao" (eq $s.keyService.provider "openbao") -}}
+{{- $state := dict "postgres" "postgres" "objectStore" "objectstore" "openBao" "openbao" -}}
+{{- if get $bundled .provider }}
+- secret:
+    name: {{ printf "%s-%s-state" $n (get $state .provider) | quote }}
+    items: [{key: ca.crt, path: {{ .path | quote }}}]
+{{- else }}
+- configMap:
+    name: {{ printf "%s-provider-roots" $n | quote }}
+    items: [{key: {{ printf "%s.crt" .provider | quote }}, path: {{ .path | quote }}}]
+{{- end }}
+{{- end -}}
+
+{{/* OpenBao chart constants shared with `asservat setup`
+     (contracts.SmallOpenBao*): auth mounts, the static provider token
+     audiences and the role name `<name>-<component>-<purpose>`. Key and PKI
+     role names derive from the installation ID at runtime
+     (providerconfig.OpenBaoNamesFor) and are not rendered. */}}
+{{- define "asservat.openBao" -}}
+{{- toJson (dict
+  "configurationAuthMount" "asservat-configuration"
+  "ownerAuthMount" "asservat-owner"
+  "auditMount" "asservat-audit"
+  "transitMount" "public-transit"
+  "ownerPKIMount" "owner-pki"
+  "connectorPKIMount" "connector-pki"
+  "workerPKIMount" "worker-pki"
+  "bootstrapMount" "fleet-bootstrap"
+  "hubWorkerAudience" "asservat-configuration-provider"
+  "hubAPIAudience" "asservat-owner-provider"
+  "federationAudience" "asservat-federation-provider"
+  "publisherAudience" "asservat-publisher-provider"
+) -}}
+{{- end -}}
+
+{{- define "asservat.openBaoRole" -}}
+{{- printf "%s-%s-%s" (include "asservat.name" (index . 0)) (index . 1) (index . 2) -}}
 {{- end -}}
 
 {{/* The origin's host without scheme; fails for an origin with a port when
