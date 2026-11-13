@@ -33,13 +33,13 @@ type retentionWorker struct {
 	lastLifecycleOutcome string
 }
 
-func newRetentionWorker(ctx context.Context, c contracts.PermissionDeployment, pools map[string]*pgxpool.Pool, observer, probe *kube.PermissionClient, writer *installedConfigurationAudit, deletionSection func() (contracts.ContextDeletionDeployment, string, bool)) (*retentionWorker, error) {
+func newRetentionWorker(ctx context.Context, c contracts.PermissionDeployment, pools map[string]*pgxpool.Pool, observer *kube.PermissionClient, writer *installedConfigurationAudit, deletionSection func() (contracts.ContextDeletionDeployment, string, bool)) (*retentionWorker, error) {
 	r := c.Retention
 	if r == nil || r.Guard.Name != contracts.RetentionGuardName(c.InstallationID) || writer == nil {
 		return nil, mounts.ErrUnavailable
 	}
 	g := r.Guard
-	guard, err := kube.NewRetentionGuard(observer, probe, kube.RetentionAdministrationOf(c.Control, g.Name), kube.GuardPin{PolicyUID: g.PolicyUID, PolicyGeneration: g.PolicyGeneration, BindingUID: g.BindingUID, BindingResourceVersion: g.BindingResourceVersion})
+	guard, err := kube.NewRetentionGuard(observer, kube.RetentionAdministrationOf(c.Control, g.Name), kube.GuardPin{PolicyUID: g.PolicyUID, PolicyGeneration: g.PolicyGeneration, BindingUID: g.BindingUID, BindingResourceVersion: g.BindingResourceVersion})
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}

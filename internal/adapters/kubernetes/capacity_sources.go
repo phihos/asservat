@@ -183,14 +183,15 @@ type CapacityProofs struct {
 }
 
 // ProveCapacitySources builds the three protections from the created
-// sources and proves each once. workerProbe authenticates as the hub-worker
-// account worker; selectorProbe as the dedicated capacity probe account.
-func ProveCapacitySources(ctx context.Context, observer, workerProbe, selectorProbe *PermissionClient, s CapacitySources, control cfg.NamespaceRef, admins []cfg.KubernetesActor, worker contracts.WorkerObjectReference, keys []string) (CapacityProofs, error) {
+// sources and observes each once. workerProbe authenticates as the hub-worker
+// account worker for the processing source; the capacity and selector
+// protections no longer use a probe (helm-native-install plan, slice 0).
+func ProveCapacitySources(ctx context.Context, observer, workerProbe, _ *PermissionClient, s CapacitySources, control cfg.NamespaceRef, admins []cfg.KubernetesActor, worker contracts.WorkerObjectReference, keys []string) (CapacityProofs, error) {
 	var out CapacityProofs
 	pin := func(g contracts.OwnerDeploymentGuard) GuardPin {
 		return GuardPin{PolicyUID: g.PolicyUID, PolicyGeneration: g.PolicyGeneration, BindingUID: g.BindingUID, BindingResourceVersion: g.BindingResourceVersion}
 	}
-	guard, err := NewCapacityGuard(observer, workerProbe, cfg.CapacityAdministration{Name: s.Guard.Name, ControlNamespace: control, Administrators: admins, StatusUsers: []string{}, ProbeAccount: cfg.NamespaceRef{Name: worker.Name, UID: worker.UID}}, pin(s.Guard))
+	guard, err := NewCapacityGuard(observer, cfg.CapacityAdministration{Name: s.Guard.Name, ControlNamespace: control, Administrators: admins, StatusUsers: []string{}, ProbeAccount: cfg.NamespaceRef{Name: worker.Name, UID: worker.UID}}, pin(s.Guard))
 	if err != nil {
 		return out, err
 	}
@@ -201,7 +202,7 @@ func ProveCapacitySources(ctx context.Context, observer, workerProbe, selectorPr
 	if err != nil {
 		return out, err
 	}
-	selector, err := NewCapacityNamespaceGuard(selectorRead, selectorProbe, cfg.CapacityNamespaceAdministration{Name: s.NamespaceGuard.Name, Administrators: admins, Keys: keys,
+	selector, err := NewCapacityNamespaceGuard(selectorRead, cfg.CapacityNamespaceAdministration{Name: s.NamespaceGuard.Name, Administrators: admins, Keys: keys,
 		ProbeNamespace: cfg.NamespaceRef{Name: s.ProbeNamespace.Name, UID: s.ProbeNamespace.UID}, ProbeAccount: cfg.NamespaceRef{Name: s.ProbeAccount.Name, UID: s.ProbeAccount.UID}}, pin(s.NamespaceGuard))
 	if err != nil {
 		return out, err

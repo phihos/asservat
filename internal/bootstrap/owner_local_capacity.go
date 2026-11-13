@@ -15,9 +15,8 @@ import (
 
 // ownerLocalCapacity returns the factory for the hub cluster's capacity
 // observation this owner serves to the installed hub-worker (ADR-190
-// decision 7). The probe account's tokens are minted in memory by this Pod's
-// own account and bound to this Pod; the caller admission accepts only the
-// original hub-worker caller pin.
+// decision 7). The caller admission accepts only the original hub-worker
+// caller pin.
 func ownerLocalCapacity(in *ownerInputs, observer *kube.PermissionClient, guard *kube.OwnerWorkloadProtection, c contracts.OwnerDeployment, podUID string, maximum int, closers *[]func()) func(context.Context, string) (*clusterobservation.LocalHandler, error) {
 	l := c.Observation.LocalCapacity
 	if l == nil {
@@ -29,21 +28,12 @@ func ownerLocalCapacity(in *ownerInputs, observer *kube.PermissionClient, guard 
 		if err != nil {
 			return nil, mounts.ErrUnavailable
 		}
-		tokens, err := kube.NewCapacityTokens(ctx, read, l.ProbeAccount.Name, l.ProbeAudience, podUID)
-		if err != nil {
-			return nil, mounts.ErrUnavailable
-		}
-		*closers = append(*closers, tokens.Close)
-		probe, err := kube.NewPermissionClient(in.kubernetesToken(tokens.Token), c.ClusterID, probeNS, time.Now)
-		if err != nil {
-			return nil, mounts.ErrUnavailable
-		}
 		admins := make([]cfg.KubernetesActor, 0, len(l.Guard.Administrators))
 		for _, a := range l.Guard.Administrators {
 			admins = append(admins, cfg.KubernetesActor{Kind: a.Kind, Name: a.Name})
 		}
 		g := l.Guard
-		selector, err := kube.NewCapacityNamespaceGuard(read, probe, cfg.CapacityNamespaceAdministration{Name: g.Name, Administrators: admins, Keys: l.Keys, ProbeNamespace: probeNS, ProbeAccount: cfg.NamespaceRef{Name: l.ProbeAccount.Name, UID: l.ProbeAccount.UID}},
+		selector, err := kube.NewCapacityNamespaceGuard(read, cfg.CapacityNamespaceAdministration{Name: g.Name, Administrators: admins, Keys: l.Keys, ProbeNamespace: probeNS, ProbeAccount: cfg.NamespaceRef{Name: l.ProbeAccount.Name, UID: l.ProbeAccount.UID}},
 			kube.GuardPin{PolicyUID: g.PolicyUID, PolicyGeneration: g.PolicyGeneration, BindingUID: g.BindingUID, BindingResourceVersion: g.BindingResourceVersion})
 		if err != nil {
 			return nil, mounts.ErrUnavailable
@@ -53,14 +43,14 @@ func ownerLocalCapacity(in *ownerInputs, observer *kube.PermissionClient, guard 
 			return nil, mounts.ErrUnavailable
 		}
 		// ADR-247: the hub cluster's permission workload journals and, when
-		// installed, its workload metadata guard proven by the same probe.
+		// installed, its workload metadata guard keys.
 		var workloadGuard *kube.WorkloadGuard
 		if w := l.WorkloadGuard; w != nil {
 			wa := make([]cfg.KubernetesActor, 0, len(w.Guard.Administrators))
 			for _, a := range w.Guard.Administrators {
 				wa = append(wa, cfg.KubernetesActor{Kind: a.Kind, Name: a.Name})
 			}
-			workloadGuard, err = kube.NewWorkloadGuard(read, probe, cfg.WorkloadAdministration{Name: w.Guard.Name, Administrators: wa, LabelKeys: w.LabelKeys, AnnotationKeys: w.AnnotationKeys, ProbeNamespace: probeNS, ProbeAccount: cfg.NamespaceRef{Name: l.ProbeAccount.Name, UID: l.ProbeAccount.UID}},
+			workloadGuard, err = kube.NewWorkloadGuard(read, cfg.WorkloadAdministration{Name: w.Guard.Name, Administrators: wa, LabelKeys: w.LabelKeys, AnnotationKeys: w.AnnotationKeys, ProbeNamespace: probeNS, ProbeAccount: cfg.NamespaceRef{Name: l.ProbeAccount.Name, UID: l.ProbeAccount.UID}},
 				kube.GuardPin{PolicyUID: w.Guard.PolicyUID, PolicyGeneration: w.Guard.PolicyGeneration, BindingUID: w.Guard.BindingUID, BindingResourceVersion: w.Guard.BindingResourceVersion})
 			if err != nil {
 				return nil, mounts.ErrUnavailable

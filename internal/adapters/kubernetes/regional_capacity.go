@@ -72,9 +72,9 @@ func regionalCapacityPlan(c contracts.RegionalCapacity, guard string, admins []c
 		ProbeNamespace: cfg.NamespaceRef{Name: c.ProbeNamespace.Name, UID: c.ProbeNamespace.UID}, ProbeAccount: cfg.NamespaceRef{Name: c.ProbeAccount.Name, UID: c.ProbeAccount.UID}}
 }
 
-// proveRegionalCapacity proves the selector guard as the connector process
-// will: the connector account reads it and the probe account's actual
-// dry-run is denied. It returns the digest the join record asserts.
+// proveRegionalCapacity observes the selector guard as the connector process
+// will: the connector account reads the probe namespace. It returns the
+// digest the join record asserts.
 func proveRegionalCapacity(ctx context.Context, config *rest.Config, api kubernetes.Interface, p RegionalInstallPlan, c contracts.RegionalCapacity, admins []cfg.KubernetesActor) (artifact.Digest, error) {
 	var zero artifact.Digest
 	sub := func(step string, err error) error { return &regionalInstallError{step: step, cause: err} }
@@ -94,14 +94,9 @@ func proveRegionalCapacity(ctx context.Context, config *rest.Config, api kuberne
 	if err != nil {
 		return zero, sub("capacity-clients", err)
 	}
-	probe, clearProbe, err := client(c.ProbeNamespace.Name, c.ProbeAccount.Name, scope)
-	defer clearProbe()
-	if err != nil {
-		return zero, sub("capacity-clients", err)
-	}
 	_, name := RegionalCapacityNames(p.Namespace)
 	g := c.NamespaceGuard
-	guard, err := NewCapacityNamespaceGuard(read, probe, regionalCapacityPlan(c, name, admins), GuardPin{PolicyUID: g.PolicyUID, PolicyGeneration: g.PolicyGeneration, BindingUID: g.BindingUID, BindingResourceVersion: g.BindingResourceVersion})
+	guard, err := NewCapacityNamespaceGuard(read, regionalCapacityPlan(c, name, admins), GuardPin{PolicyUID: g.PolicyUID, PolicyGeneration: g.PolicyGeneration, BindingUID: g.BindingUID, BindingResourceVersion: g.BindingResourceVersion})
 	if err != nil {
 		return zero, sub("capacity-guard", err)
 	}

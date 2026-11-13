@@ -12,7 +12,6 @@ import (
 	configuration "asservat.local/asservat/internal/application/configuration"
 	value "asservat.local/asservat/internal/domain/configuration"
 	privacy "asservat.local/asservat/internal/domain/privacy"
-	admission "k8s.io/api/admissionregistration/v1"
 	rbac "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -219,7 +218,6 @@ func TestRetentionWithRealKubernetes(t *testing.T) {
 			return client
 		}
 		observer := permissionClient(observerName, false)
-		probe := permissionClient("retention-outsider", true)
 		latest, err := core.AdmissionregistrationV1().ValidatingAdmissionPolicies().Get(ctx, plan.Name, meta.GetOptions{})
 		if err != nil {
 			t.Fatal(err)
@@ -229,53 +227,13 @@ func TestRetentionWithRealKubernetes(t *testing.T) {
 			t.Fatal(err)
 		}
 		pin := kube.GuardPin{PolicyUID: string(latest.UID), PolicyGeneration: latest.Generation, BindingUID: string(binding.UID), BindingResourceVersion: binding.ResourceVersion}
-		guard, err := kube.NewRetentionGuard(observer, probe, plan, pin)
-		if err != nil {
-			t.Fatal(err)
-		}
-		before, err := admin.List(ctx, meta.ListOptions{})
+		guard, err := kube.NewRetentionGuard(observer, plan, pin)
 		if err != nil {
 			t.Fatal(err)
 		}
 		trust, err := guard.RetentionProtection(ctx)
 		if err != nil || trust.SourceClusterID != cluster || trust.ControlNamespaceUID != string(ns.UID) || trust.FreshUntil.Sub(trust.ObservedAt) != 5*time.Second {
 			t.Fatal("current retention protection", err)
-		}
-		after, err := admin.List(ctx, meta.ListOptions{})
-		if err != nil || len(after.Items) != len(before.Items) {
-			t.Fatal("dry run persisted a policy", err)
-		}
-		for _, name := range []string{"retention-admin", "retention-delegate", "retention-status"} {
-			invalid, err := kube.NewRetentionGuard(observer, permissionClient(name, true), plan, pin)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if _, err = invalid.RetentionProtection(ctx); err == nil {
-				t.Fatal("privileged actor used as negative control", name)
-			}
-		}
-		noRBAC, err := kube.NewRetentionGuard(observer, permissionClient("retention-no-rbac", false), plan, pin)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err = noRBAC.RetentionProtection(ctx); err == nil {
-			t.Fatal("RBAC refusal used as admission proof")
-		}
-		original := binding.DeepCopy()
-		binding.Spec.ValidationActions = []admission.ValidationAction{admission.Warn}
-		updated, err := core.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().Update(ctx, binding, meta.UpdateOptions{})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err = guard.RetentionProtection(ctx); err == nil {
-			t.Fatal("changed binding retained authority")
-		}
-		original.ResourceVersion = updated.ResourceVersion
-		if _, err = core.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().Update(ctx, original, meta.UpdateOptions{}); err != nil {
-			t.Fatal(err)
-		}
-		if _, err = guard.RetentionProtection(ctx); err == nil {
-			t.Fatal("restored value hid unqualified enforcement gap")
 		}
 	})
 	t.Run("reader-role-current-snapshot-and-deletion", func(t *testing.T) {

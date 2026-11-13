@@ -211,12 +211,8 @@ func newCapacityWorkerDeployment(ctx context.Context, files *os.Root, installed 
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	probe, err := kube.NewPermissionClient(localInputs.kubernetes(probeToken), c.Control.ClusterID, control, time.Now)
-	if err != nil {
-		return nil, mounts.ErrUnavailable
-	}
 	admins, pin := capacityWorkerGuard(c.Control.Guard)
-	guard, err := kube.NewCapacityGuard(observer, probe, cfg.CapacityAdministration{Name: c.Control.Guard.Name, ControlNamespace: control, Administrators: admins, StatusUsers: c.Control.StatusUsers, ProbeAccount: capacityWorkerRef(c.Control.ProbeAccount)}, pin)
+	guard, err := kube.NewCapacityGuard(observer, cfg.CapacityAdministration{Name: c.Control.Guard.Name, ControlNamespace: control, Administrators: admins, StatusUsers: c.Control.StatusUsers, ProbeAccount: capacityWorkerRef(c.Control.ProbeAccount)}, pin)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
@@ -238,7 +234,7 @@ func newCapacityWorkerDeployment(ctx context.Context, files *os.Root, installed 
 	clusters := make([]app.CapacityClusterReaders, 0, len(c.Clusters))
 	var regional []app.CapacityNamespaceQualification
 	if installed != nil {
-		clusters, regional, err = d.installedClusterReaders(startup, installed, observer, probe, localInputs, pools["capacity"], observerToken, probeToken)
+		clusters, regional, err = d.installedClusterReaders(startup, installed, localInputs, pools["capacity"], observerToken, probeToken)
 		if err != nil {
 			return nil, err
 		}
@@ -252,12 +248,8 @@ func newCapacityWorkerDeployment(ctx context.Context, files *os.Root, installed 
 			if e != nil {
 				return nil, mounts.ErrUnavailable
 			}
-			deny, e := kube.NewPermissionClient(in.kubernetes(prefix+"-probe.token"), v.ClusterID, namespace, time.Now)
-			if e != nil {
-				return nil, mounts.ErrUnavailable
-			}
 			a, p := capacityWorkerGuard(v.Guard)
-			g, e := kube.NewCapacityNamespaceGuard(read, deny, cfg.CapacityNamespaceAdministration{Name: v.Guard.Name, Administrators: a, Keys: v.Keys, ProbeNamespace: namespace, ProbeAccount: capacityWorkerRef(v.ProbeAccount)}, p)
+			g, e := kube.NewCapacityNamespaceGuard(read, cfg.CapacityNamespaceAdministration{Name: v.Guard.Name, Administrators: a, Keys: v.Keys, ProbeNamespace: namespace, ProbeAccount: capacityWorkerRef(v.ProbeAccount)}, p)
 			if e != nil {
 				return nil, mounts.ErrUnavailable
 			}

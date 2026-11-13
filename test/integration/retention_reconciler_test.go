@@ -82,12 +82,6 @@ func testGuardedRetentionReconciliation(t *testing.T, ctx context.Context, c *re
 	if err != nil {
 		t.Fatal(err)
 	}
-	config = rest.CopyConfig(c)
-	config.Impersonate = rest.ImpersonationConfig{UserName: "retention-outsider", Groups: []string{"system:authenticated", "retention-fixture"}}
-	probe, err := kube.NewPermissionClient(config, cluster, plan.ControlNamespace, time.Now)
-	if err != nil {
-		t.Fatal(err)
-	}
 	p, err := native.AdmissionregistrationV1().ValidatingAdmissionPolicies().Get(ctx, plan.Name, meta.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
@@ -96,7 +90,7 @@ func testGuardedRetentionReconciliation(t *testing.T, ctx context.Context, c *re
 	if err != nil {
 		t.Fatal(err)
 	}
-	guard, err := kube.NewRetentionGuard(observer, probe, plan, kube.GuardPin{PolicyUID: string(p.UID), PolicyGeneration: p.Generation, BindingUID: string(binding.UID), BindingResourceVersion: binding.ResourceVersion})
+	guard, err := kube.NewRetentionGuard(observer, plan, kube.GuardPin{PolicyUID: string(p.UID), PolicyGeneration: p.Generation, BindingUID: string(binding.UID), BindingResourceVersion: binding.ResourceVersion})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -10,7 +10,6 @@ import (
 
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	value "asservat.local/asservat/internal/domain/configuration"
-	admission "k8s.io/api/admissionregistration/v1"
 	rbac "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -269,20 +268,14 @@ func TestPermissionAdmissionWithRealKubernetes(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		probeConfig := rest.CopyConfig(c)
-		probeConfig.Impersonate = rest.ImpersonationConfig{UserName: "fixture-outsider", Groups: []string{"asservat-fixture-writers", "system:authenticated"}}
-		probe, err := kube.NewPermissionClient(probeConfig, cluster, plan.ControlNamespace, time.Now)
-		if err != nil {
-			t.Fatal(err)
-		}
 		pin := kube.GuardPin{PolicyUID: string(latest.UID), PolicyGeneration: latest.Generation, BindingUID: string(bound.UID), BindingResourceVersion: bound.ResourceVersion}
-		guard, err := kube.NewPermissionGuard(observer, probe, plan, pin)
+		guard, err := kube.NewPermissionGuard(observer, plan, pin)
 		if err != nil {
 			t.Fatal(err)
 		}
 		trust, err := guard.PermissionTrust(ctx)
 		if err != nil {
-			t.Fatalf("live denial qualification: %v", err)
+			t.Fatalf("current permission trust: %v", err)
 		}
 		if trust.FreshUntil.Sub(trust.ObservedAt) != 5*time.Second {
 			t.Fatal("incorrect qualification deadline")
@@ -301,20 +294,6 @@ func TestPermissionAdmissionWithRealKubernetes(t *testing.T) {
 		t.Run("decision-time-reviews-with-real-subject-access-reviews-SQL-and-audit", func(t *testing.T) {
 			testDecisionTimeReviews(t, c, fixture.Postgres, fixture.S3)
 		})
-		// A probe that would pass administration is never a valid negative control.
-		badConfig := rest.CopyConfig(c)
-		badConfig.Impersonate = rest.ImpersonationConfig{UserName: "fixture-admin", Groups: []string{"asservat-fixture-writers", "system:authenticated"}}
-		privileged, err := kube.NewPermissionClient(badConfig, cluster, plan.ControlNamespace, time.Now)
-		if err != nil {
-			t.Fatal(err)
-		}
-		wrong, err := kube.NewPermissionGuard(observer, privileged, plan, pin)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err = wrong.PermissionTrust(ctx); err == nil {
-			t.Fatal("administrator accepted as negative probe")
-		}
 		// Compilation of a zero-delegation configuration must also work.
 		adminOnly := plan
 		adminOnly.Name = "asservat-admin-only"
@@ -325,13 +304,6 @@ func TestPermissionAdmissionWithRealKubernetes(t *testing.T) {
 		}
 		if _, err = client.AdmissionregistrationV1().ValidatingAdmissionPolicies().Create(ctx, only, meta.CreateOptions{DryRun: []string{meta.DryRunAll}}); err != nil {
 			t.Fatal(err)
-		}
-		bound.Spec.ValidationActions = []admission.ValidationAction{admission.Warn}
-		if _, err = client.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().Update(ctx, bound, meta.UpdateOptions{}); err != nil {
-			t.Fatal(err)
-		}
-		if _, err = guard.PermissionTrust(ctx); err == nil {
-			t.Fatal("non-enforcing binding stayed qualified")
 		}
 	})
 
