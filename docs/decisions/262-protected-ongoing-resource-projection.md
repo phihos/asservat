@@ -1,5 +1,10 @@
 # ADR-262 — Protected ongoing-source resource projection
 
+> Superseded in part by ADR-328 (2026-11-13): "protected" no longer includes a runtime proof
+> that the installed admission guard still protects the `EvidenceBudgetPolicy` source; the
+> source is read under RBAC. The resource sibling, its digest binding, the same-generation
+> enrichment rule and the permission/recovery checks remain valid.
+
 Date: 2026-10-29. Status: resource projection SQL component qualified; ongoing sources pending.
 Requirements: REQ-LIF-004, REQ-CAP-001/002, REQ-AUT-006.
 
@@ -31,7 +36,7 @@ Scope, Pool and the original eight-field Budget; new value minus SourceResources
 is identical, under the same original UID/Kind/Name/generation/full Spec/deleting
 checks. The value can only add resource ceilings. Existing typed values cannot
 be removed or changed at the same generation. All other parser mutation guards,
-negative watermarks, initial/epoch audit, current protection/permission/recovery
+negative watermarks, initial/epoch audit, current permission/recovery
 and after-lock original-time checks remain. No administrator spec churn or new
 consent repairs this agent compiler projection. Existing greater-generation
 configuration rules remain unchanged.

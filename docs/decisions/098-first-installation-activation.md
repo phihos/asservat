@@ -1,8 +1,8 @@
 # ADR-098 — Audited first-installation activation
 
-Status: accepted engineering refinement of REQ-DEP-005 and REQ-DB-005.
-Implementation and qualification are tracked in [progress](../implementation-progress.md).
-This is first installation only; restart/restore activation remains separate.
+> Superseded (2026-11-13): the pristine-table check, witness consumption, temporary MAINTAIN roles and credential retirement served installer self-verification. The idempotent Helm `setup` Job applies migrations, seeds the activation and trust rows and writes the first audit record.
+
+Status: superseded by ADR-328 (administrator-only namespaces); the mechanism is removed by the Helm-native installation plan.
 
 ## Decision
 

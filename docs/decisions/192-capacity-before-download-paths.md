@@ -1,5 +1,7 @@
 # ADR-192 — Capacity readiness before download paths
 
+> Superseded in part by ADR-328 (2026-11-13): decision 1's reason (a continuation replay inside the journal window) no longer applies; deriving capacity identities deterministically remains useful so that a re-run `setup` hook Job rebuilds the same input. The per-source guards named under Consequences are replaced by plain RBAC, and the context's "owner workload guard denies the hub-api's Job create" is no longer a constraint. Decisions 2 and 3 remain valid.
+
 Date: 2026-10-15. Status: accepted; steps 1–3 implemented and natively qualified
 ([continuation run 43](../../test/results/adr183-continuation-native-43/result.json):
 capacity root `ReadyAt` set). Runs 35–42 are retained failures, listed below.
@@ -48,7 +50,8 @@ input, fails the claim comparison, and can never complete.
    - The setup time is the role setup's `CreatedAt`. It is earlier than any
      capacity step, so the capture root still stays closed until the reserve
      phase.
-   - A replay rebuilds the identical input and recovers the committed claim.
+   - A rerun (formerly a continuation replay, now a re-run `setup` hook
+     Job) rebuilds the identical input and recovers the committed claim.
      These identities are not secrets. The role setup operation is unique per
      installation attempt.
 2. **Capacity becomes ready with zero download paths.**
@@ -80,8 +83,8 @@ Capacity readiness (ADR-190 steps 7 and 8) can be completed and qualified
 now. Downloads remain unavailable in the installed layout until regional
 provisioning adds a path.
 
-The duplicate download environment sources stay as they are, each with its
-own guard: the hub-api's `-download-environment` and capacity's
+The duplicate download environment sources stay as they are, each read
+under RBAC: the hub-api's `-download-environment` and capacity's
 `-processing-source`. When paths are added, both must carry the same
 settings.
 

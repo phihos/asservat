@@ -1,5 +1,7 @@
 # ADR-168 — Rotating cluster enrollment credential with outbound-only connectivity
 
+> Superseded in part by ADR-328 (2026-11-13): the delegated regional proof of the connector's Pod/ReplicaSet/Deployment chain no longer applies; the connector namespace is administrator-only. The rotating cluster credential itself, as the hub's authentication of an outbound-only cluster, remains valid.
+
 Date: 2026-10-14. Status: accepted by the maintainer; design recorded here,
 implementation pending. Requirements: REQ-FED-001 and REQ-FED-002; existing
 SC-FED-001 and TASK-03 / TASK-11 retain traceability ownership.
@@ -14,11 +16,9 @@ minutes and yields a client-only leaf; it cannot provide indefinite restart
 identity. REQ-FED-001 keeps connectivity outbound-only: the hub stores no workload
 cluster kubeconfig and does not call that cluster's API.
 
-ADR-126 and [ADR-153](153-operation-owned-connector-enrollment.md) prove the Pod,
-token and controller chain through reads that run in the workload cluster. In
-the outbound topology, the hub receives that only as a **delegated regional proof**.
-Without a cluster-held credential, it has no way to tell that proof came from that
-cluster's protected connector rather than from any client that learned its UUIDs.
+In the outbound topology the hub cannot call the workload cluster's API.
+Without a cluster-held credential, it has no way to tell that cluster's
+connector from any client that learned its UUIDs.
 
 The maintainer chose between (a) a narrowly scoped, automatically rotated
 enrollment credential in a protected Secret in each workload cluster, and
@@ -71,9 +71,9 @@ The exporter binding prevents replay on another connection or relay through
 another server. The hub rejects request times more than 30 seconds from its own
 clock, unknown or superseded generations, revoked or expired keys, profile
 mismatches and any signature failure. The proof is checked first. Then the
-existing delegated regional proof, recovery, source, slot, signing-spend, audit
-and original-deadline rules of ADR-126/153 apply unchanged. Possession alone
-admits nothing.
+existing recovery, slot, signing-spend, audit and original-deadline rules of
+ADR-126/153 apply. The connector's own Pod/controller chain is not re-proved
+(ADR-328).
 
 ### Lifetime and rotation
 
@@ -151,8 +151,8 @@ and revocation (administrator); none can issue leaves directly.
 
 A stolen Secret lets its holder impersonate that one cluster's connector for
 admission until the next legitimate rotation. Active misuse is detected as a fork
-and fences the profile. It never grants evidence access, because ADR-126/153
-proof, recovery and authorization checks still apply. Clusters remain
+and fences the profile. It never grants evidence access, because recovery and per-operation
+authorization checks still apply. Clusters remain
 outbound-only. The hub's API surface grows by one rotation operation on the
 existing private enrollment listener.
 
@@ -188,7 +188,7 @@ rotation, replay, fork fence, append-only guard, reenrollment and revocation.
 - Encrypted audit records for issuance, rotation, fork and revocation.
 - Hub private-listener composition, and consumption of a presentation by the
   ADR-126/153 admission path.
-- The installer step that creates the Secret and enrolls generation 1 under
+- The Helm hook step that creates the Secret and enrolls generation 1 under
   audited bootstrap.
 - Helm/RBAC resources (get/update on one Secret name).
 - Installed two-cluster native qualification, including restart and exporter

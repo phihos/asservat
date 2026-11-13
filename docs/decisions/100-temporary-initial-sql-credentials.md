@@ -1,7 +1,8 @@
 # ADR-100 — Temporary initial-installation SQL credentials
 
-Status: accepted engineering refinement under the ongoing implementation
-authorization. Measured qualification is recorded in [progress](../implementation-progress.md).
+> Superseded (2026-11-13): Temporary initial SQL logins, their guard-checked immutable Secret and their retirement proofs protected the installer Pod against namespace writers, which ADR-328 places inside the trust boundary. The Helm `secrets` hook Job creates fixed SQL role passwords once and never rotates them; the `setup` Job creates runtime roles and grants from the compiled grant plan. PostgreSQL's warning about plaintext passwords in role DDL still supports deriving SCRAM verifiers client-side.
+
+Status: superseded by ADR-328 (administrator-only namespaces); the mechanism is removed by the Helm-native installation plan.
 
 ## Decision
 

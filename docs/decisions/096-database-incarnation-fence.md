@@ -1,5 +1,7 @@
 # ADR-096 — Database incarnation fence before recovery activation
 
+> Superseded in part by ADR-328 (2026-11-13): the future activation coordinator with protected installation identity and independent witnesses no longer applies; the Helm `setup` Job seeds the first activation and trust rows. The `fleet_current_trust` view and its database-incarnation fence remain, observed by hub-worker.
+
 Status: accepted engineering refinement of REQ-DB-005. Initial/restore activation
 remains a separate, unfinished protocol. This decision does not authorize it.
 
@@ -49,13 +51,12 @@ Supported restore procedures must stop/fence service and restart PostgreSQL or
 create a new database. Arbitrary superuser rewrites inside the same running
 database, deliberate clock/identity forgery, or rollback of a complete running
 VM/process snapshot are not detected by this fence. A qualified deployment must
-control those operations and use independent recovery witnesses. A primary change
+control those operations. A primary change
 still needs old-primary fencing; this view is not a failover controller.
 
-The future activation coordinator must compare protected installation identity,
-independently retained revocation/deletion/accounting checkpoints and the current
-database, then complete REQ-DB-005's reconciliation before recording activation.
-It must distinguish a first installation from restored SQL with missing rows.
+The Helm `setup` Job records first activation. Restore activation must compare
+independently retained revocation/deletion/accounting checkpoints with the current
+database and complete REQ-DB-005's reconciliation before recording activation.
 It cannot simply copy the current server values or trust SQL's enabled flag.
 
 Lossless restarts should be reactivated automatically once the qualified durability

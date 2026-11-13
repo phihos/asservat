@@ -1,7 +1,8 @@
 # ADR-128: Original installation provider credentials and projection
 
-Status: implementation checkpoint; staged tests and native qualification must be
-recorded separately. Full preparation/activation/retirement remains in progress.
+> Superseded (2026-11-13): Installer-issued OpenBao child tokens, issuer-expiry checks and the seven-file activation projection served the installer Pod. The `setup` hook Job configures bundled OpenBao (mounts, policies, Kubernetes auth, PKI, transit); external providers follow the documented recipe.
+
+Status: superseded by ADR-328 (administrator-only namespaces); the mechanism is removed by the Helm-native installation plan.
 
 ## Decision
 

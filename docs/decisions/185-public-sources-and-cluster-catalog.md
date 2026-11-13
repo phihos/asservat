@@ -1,5 +1,7 @@
 # ADR-185 — Public sources and the cluster catalog
 
+> Superseded in part by ADR-328 (2026-11-13): the per-source admission guards, dry-run probes and probe cap, UID pins and the continuation's source journal no longer apply. The cluster catalog, fixed slot names and the owner Role's `get` rules remain valid; sources are rendered at installation and read under RBAC.
+
 Date: 2026-10-15. Status: accepted; steps 1–4 implemented with unit tests
 (catalog source, hub-api composition, fixed names, probes and RBAC, public
 sources step). The public sources step passed natively
@@ -40,48 +42,35 @@ is final.
 ## Decision
 
 1. **A cluster catalog instead of fixed clusters.**
-   - `Clusters` leaves the immutable owner input. The input instead pins one
-     guarded, administrator-written cluster catalog source by name, UID and
-     guard.
+   - `Clusters` leaves the immutable owner input. The input instead names one
+     administrator-written cluster catalog ConfigMap.
    - Each catalog entry names a regional cluster:
      - its connector peer;
      - its executor identities;
-     - its capability and work-trust sources with their guard pins.
+     - its capability and work-trust sources.
    - hub-api reads the catalog at process start. Each entry is accepted only
      after its connector peer matches the current SQL connector activation
-     (ADR-052) and its sources pass their own guards. Catalog membership is
-     not authority.
+     (ADR-052). Catalog membership is not authority.
    - Adding a cluster means writing the catalog and replacing the hub-api
-     Pod. The ReplicaSet, template and revision pins stay unchanged. Live
+     Pod. Live
      reload is later work.
 2. **Fixed slot names.** Per-cluster sources use installation-derived slot
    names (`asservat-<id>-cluster-<n>-capability`, `-work-trust`). The owner
    Role can then name them before any cluster exists. The first installed
-   profile has one regional slot. This matches the probe cap:
-
-   | Probes | Count |
-   | --- | --- |
-   | Existing | 3 |
-   | Worker configuration and download environment | 2 |
-   | One cluster's capability and work trust | 2 |
-   | **Total** | **7 of 8** |
-
-   More regional clusters need a larger probe list, decided with that work.
+   profile has one regional slot; ADR-196 later raises it to eight.
 3. **Owner RBAC at resource creation.** The owner Role gains:
-   - `get` on the six source names and the catalog;
-   - `get` on their policies and bindings.
+   - `get` on the six source names and the catalog.
 
-   Names are fixed, so the rules are part of the original template digest.
+   Names are fixed, so the Role can be rendered at installation.
 4. **A public sources phase in the continuation.** After the worker launch
-   and before the owner projection, the continuation creates or reopens a
-   journal of guarded sources with exact receipts, like the 19 runtime
-   resources:
+   and before the owner projection, the installation creates these
+   sources:
    - **Browser and identity settings**, generated from chart values: issuer,
      client IDs, origin, groups, limits. Installer-derived revision, root ID
      and session epoch.
    - **Worker configuration and download environment**, generated from the
      download worker infrastructure objects and their revisions.
-   - **The empty cluster catalog**, with its guard.
+   - **The empty cluster catalog**.
 
    Capability and work-trust sources are created per cluster when the
    cluster is added, with the work-signing public key and the release

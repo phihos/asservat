@@ -1,5 +1,13 @@
 # ADR-323 — Finite share metadata and public audit retirement
 
+> Superseded in part by ADR-328 (2026-11-13): Installer provisioning of the
+> protected cleanup projection, the provider recipe outbox and its input/image
+> pins, the capacity/cleanup journal comparison and the per-key native cleanup
+> brackets (journal, guard and owner Deployment reads) no longer apply. Cleanup
+> reads Helm-rendered configuration and Secrets under RBAC. Share retirement,
+> creating-operation binding, lock order, replay window, per-key SQL fences,
+> conservative charges and the WAL funding remain valid.
+
 Date: 2026-11-11. Status: implemented; bounded wide100 service and fresh installed manual/capture-time qualification pass at bc444f36; delivery tracked by the implementation PR.
 Requirements REQ-PRV-008, REQ-PRV-004 and REQ-SHR-001 through REQ-SHR-008.
 Scenario SC-PRV-015 binds the finite share and audit-retirement workflow.
@@ -9,8 +17,8 @@ Scenario SC-PRV-015 binds the finite share and audit-retirement workflow.
 Share expiry denies access, but `protect_evidence_share` rejects every DELETE.
 The 32-active-share limit does not bound revoked/expired rows. Public normal and
 resolution audits have a retirement implementation but no installed retirement
-runner. The capture cleanup component and projection builder also need actual
-installer provisioning; they are not evidence of an installed consumer.
+runner. The capture cleanup component also needs actual deployment
+configuration; it is not evidence of an installed consumer.
 
 Complete one workflow: create and use a share, end its access, retire its
 identifying row with its original audit obligation, verify managed audit-object
@@ -78,8 +86,8 @@ Extend the existing cleanup component to the closed capture/normal/resolution
 lane set. Share its three existing facet pools and provider clients across
 one scoped adapter, with one total page of at most 16 operations and a global
 UUID cursor that wraps after its final page. Do not add concurrent per-lane loops or a separate share
-cleaner. The installer must actually provision the protected projection and
-credential material and the supervisor must own and join its task.
+cleaner. The chart must render its configuration and credential Secrets,
+and the supervisor must own and join its task.
 
 Current writers use the owner audit provider, but historical equality is not
 implied. Pin the accepted store/key/signing associations and deduplicate only
@@ -196,6 +204,9 @@ These references support mechanism/precedent, not Asservat qualification.
 
 ## Combined provider recipe envelope
 
+Historical: the installer outbox described here is removed by the Helm-native
+installation plan.
+
 The fresh integrated installer at `4192e6bd` refuses its owner-provider outbox
 before public startup. A complete pure production reproduction with genuine
 installation-derived names encodes65,845 bytes, beyond the existing64KiB bound.
@@ -229,6 +240,9 @@ Cold regressions must cover the actual cleanup ticket and unseeded credential
 slots; healthy cached-token tests alone cannot establish cold startup.
 
 ## Independent projection completion during startup
+
+Historical: the journal comparison described here is removed with the
+installer journal (ADR-328).
 
 The installed `8ab7b9ae` worker rejects capacity startup when cleanup publishes
 a valid sibling claim/receipt between capacity's two native reads. The cleanup
@@ -295,6 +309,10 @@ original deadline and charge assertion retained.
 
 
 ## One original native proof for the bounded history page
+
+Historical: ADR-328 removes the native cleanup bracket (journal, guard and
+owner Deployment reads). The per-key SQL fences below remain; the batching
+of native proofs in this and the next section no longer has a purpose.
 
 The B30 run verifies the normal share's certificate with22.2s left in its
 original write window, but fails its original live-row cutoff. Normal live

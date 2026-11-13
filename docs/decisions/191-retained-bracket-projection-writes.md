@@ -1,6 +1,8 @@
 # ADR-191 — Worker projection writes under one retained bracket
 
-Date: 2026-10-15. Status: accepted; implemented for the permission
+> Superseded (2026-11-13): Worker projections, their journal claims and retained guard brackets existed to verify installer-created objects. Helm renders the credential Secrets and components mount them under RBAC.
+
+Date: 2026-10-15. Status: superseded by ADR-328 (administrator-only namespaces); the mechanism is removed by the Helm-native installation plan. Formerly accepted; implemented for the permission
 projection and natively qualified ([continuation run 26](../../test/results/adr183-continuation-native-26/result.json));
 the capacity and cleanup projections follow.
 Requirements: REQ-DEP-005, S-02; TASK-11.

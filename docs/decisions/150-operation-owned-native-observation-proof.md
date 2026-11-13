@@ -1,5 +1,7 @@
 # ADR-150 — Operation-owned native observation proof
 
+> Superseded in part by ADR-328 (2026-11-13): the native boundary observations (namespace guards, exact Pod/ReplicaSet/Deployment/template chains, installer receipt pins) and the regional source-value ordinals that reread the protected connector source no longer apply. The direct HWORK → holder → regional topology, real TLS with common/exact SNI, the dedicated-audience TokenReview of the HWORK token, current SQL registration checks, the original request bound and the joined active/retained slot accounting remain valid.
+
 Date: 2026-10-13. Status: accepted implementation direction; operation, SQL, framed-stream, pending-receiver and direct HWORK-to-holder components are integrated with passing component checks. Installed selection and complete native qualification remain pending. The source-backed amplification below is established from concrete adapters. The real receiver counterexample below is native-qualified. It establishes an availability defect, not a usable observation route.
 
 ## Problem and existing contract
@@ -38,7 +40,7 @@ Evidence: `test/results/regional-observation-native-cost.json`, `regional-observ
 
 Introduce a purpose-fixed, operation-owned proof composition for this closed observation conversation. It is a private process-local state machine, not a generic source cache, a new SQL authority root, a caller-supplied callback or a background observation service. Existing public owner authentication, ordinary connector source/attestation, enrollment, retirement, context and evidence ports keep their current full checks.
 
-Each participating process holds one original operation context and two actual independent complete native boundary observations: one before read-only routing/delegation and one before releasing its final result. Each boundary verifies the native guard and exact current object chain; a shared complete observation may support both authentication and installed-template assertions without rereading the same objects through nested standalone adapters. It is explicitly one observation, not two independent checks.
+Each participating process holds one original operation context. Under ADR-328 it no longer brackets the operation with native guard or object-chain observations; it trusts its mounted configuration and the platform's RBAC.
 
 Both boundaries retain all original source/workload/namespace/account/Pod/controller/template/image/Service/selected Ready identity checks. The first observation's dates stay visible and can only shorten the operation. The final observation must agree with those original identities and behavioral facts and suppress output on mutation, absence, incomplete discovery or native denial. A current native observation is not historical absence of unobserved A-to-B-to-A changes, nor a claim of instantaneous remote revocation.
 
@@ -66,11 +68,8 @@ Pod/controller/template/guard before H reads or sends its dedicated projected
 token. No unused SQL candidate is relabeled current or Ready without proof.
 
 A's initial native boundary covers its own owner workload and the distinct
-HWORK workload, with two online dedicated-audience TokenReviews. The caller pin
-comes from the original acknowledged account receipt 1, Deployment 11/full
-configuration template/image, guards 17/18, positive configuration launch and
-OwnerBootstrap PermissionRootID. The runtime observes actual Pod/ReplicaSet
-UIDs under that controller; an installer cannot preallocate or adopt them.
+HWORK workload, with two online dedicated-audience TokenReviews. The caller is the HWORK ServiceAccount named in mounted configuration, as
+reported by the online TokenReview.
 A trusted authorized Pod remains a Pod-wide bearer principal. This is not a
 proof against a compromised authorized observer or installation administrator.
 

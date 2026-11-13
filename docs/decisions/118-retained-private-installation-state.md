@@ -1,7 +1,8 @@
 # ADR-118: Retain initial private material and read historical completion
 
-Status: accepted continuation; SQL and native Kubernetes component qualification
-passed. Full preparation/activation supervisor composition remains pending.
+> Superseded (2026-11-13): The UID-pinned private material Secret and the guard-checked historical installation reader protected installer state against namespace writers. The Helm `secrets` hook Job creates missing Secrets with fixed names, never rotates them and keeps them on uninstall; the idempotent `setup` Job replaces the activation history.
+
+Status: superseded by ADR-328 (administrator-only namespaces); the mechanism is removed by the Helm-native installation plan.
 
 An interrupted preparation must not regenerate private bytes whose original
 write or issuance may have succeeded. A successful installation must also remain

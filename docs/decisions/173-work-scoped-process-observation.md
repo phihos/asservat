@@ -1,6 +1,8 @@
 # ADR-173 — Work-scoped regional process observation
 
-Date: 2026-10-14. Status: accepted; implemented; the connector executor's local start passes natively.
+> Superseded (2026-11-13): this ADR made the executor's complete self-observation (namespace, account, guard policies and bindings, settings ConfigMap, Deployment/ReplicaSet/Pod chain and inputs) affordable within one work. ADR-328 trusts those objects, so the executor reads its mounted settings, callers are authenticated by TokenReview and TLS, and RBAC protects the namespace; no per-work process observation is needed.
+
+Date: 2026-10-14. Status: superseded by ADR-328 (administrator-only namespaces); the mechanism is removed by the Helm-native installation plan.
 Requirements: REQ-EXE-002, S-02 regional context start; TASK-03 / TASK-11.
 
 [ADR-216](216-request-owned-context-start-observation.md) subsequently removes

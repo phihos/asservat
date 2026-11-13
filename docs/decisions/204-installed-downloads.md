@@ -1,5 +1,7 @@
 # ADR-204 — Installed native downloads
 
+> Superseded in part by ADR-328 (2026-11-13): the guarded profile source, its guard proof with the `native-kube-probe-*` token, per-read namespace UID checks, the hub namespace guard pairs and the resource-journal template pins no longer apply. The hub-api and hub-worker read the worker profile ConfigMap in the worker namespace under RBAC, and Helm creates the worker namespace and its objects. The separate worker namespace, path template from the catalog, separate read credential, SQL purposes, acquisition unwrap authority and downloads token audience remain valid.
+
 Date: 2026-10-18. Status: accepted; implemented; installed worker/profile provisioning and configuration acceptance pass.
 Requirements: S-02 (inspection and native download in the installed journey);
 REQ-DLD-001, REQ-DEP-003; TASK-03.
@@ -42,17 +44,15 @@ first profile's workers in the hub region instead.
 
 ## Decision
 
-1. **A hub-cluster worker namespace.** `installer-continue` creates
+1. **A hub-cluster worker namespace.** Helm creates
    `asservat-<id>-downloads` in the hub cluster with Pod Security `restricted`,
    the worker account, the zero-priority non-preempting PriorityClass, the
    immutable worker control ConfigMap and the immutable store Secret. Workers
    never run in the hub namespace. RBAC limits Job creation there to the
-   hub-api's worker API account; a namespace-wide admission guard like the hub
-   namespace's is deferred (*amended during implementation*: no reader
-   consumes one yet, and the profile source keeps its own guard).
-2. **The profile source lives with the workers.** The guarded worker profile
-   source moves into the worker namespace, and the hub-api reads it with its
-   pinned worker API client. The profile reader's same-namespace check stays
+   hub-api's worker API account. No admission guard is used.
+2. **The profile source lives with the workers.** The worker profile
+   ConfigMap moves into the worker namespace, and the hub-api reads it with its
+   worker API client under RBAC. The profile reader's same-namespace check stays
    as it is. The hub namespace's worker marker is removed.
 3. **One hub-local path.** The first download path names the hub cluster as
    acquisition and connector cluster (the hub-api serves the worker's native
@@ -64,12 +64,12 @@ first profile's workers in the hub region instead.
    except its ID and target cluster (store and regions, the hub as
    acquisition, connector and hub cluster, and the worker and hub
    configuration revisions). Regional clusters join after installation, so
-   the hub-api derives one path per joined cluster from the guarded cluster
+   the hub-api derives one path per joined cluster from the cluster
    catalog at startup, with an ID derived from the installation and the
    target cluster, exactly as it unions the catalog's topology pins
    (ADR-196 decision 7) and restarts when the catalog changes. The capacity
    hub-worker derives the same paths for its processing source, and
-   `installer-cluster-join` adds the joined cluster's path to the guarded
+   `installer-cluster-join` adds the joined cluster's path to the
    download environment and processing sources it already administers. A
    source path is still accepted only when it equals a derived path. *Amended
    during implementation:* the first draft pinned complete paths at

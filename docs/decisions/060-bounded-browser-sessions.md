@@ -1,5 +1,7 @@
 # ADR-060 — Bounded server-side browser sessions
 
+> Superseded in part by ADR-328 (2026-11-13): pinning the session root and epoch through a protected bootstrap no longer applies; Helm renders those settings and the generated Secrets. The session, refresh, CSRF and logout decisions remain.
+
 Date: 2026-10-10. Status: engineering refinement of the accepted ADR-059 and existing browser contract; initial runtime components and owned-service qualification, deployment composition pending.
 
 Use the existing Go OIDC/JOSE verification libraries and a confidential authorization-code client with S256 PKCE, state and nonce. This client registration has no directory-read or service-account privileges. Ordinary refresh credentials remain on the hub, encrypted with Tink AEAD and a separate operator-selected OpenBao Transit wrapping key. Never request `offline_access` or use these credentials for policy execution.
@@ -8,7 +10,7 @@ The browser receives a random, host-only Secure/HttpOnly/SameSite=Strict session
 
 PostgreSQL consumes a login challenge once and serializes refresh across hub replicas. A refresh claim lasts at most ten seconds and cannot be taken over. An ambiguous exchange/refresh result requires a new login; retrying a possibly rotated credential is unsafe. Session expiry stays fixed, and every operation resolves the access token against current protected identity policy. Refresh replaces group membership. Login/refresh never supplies approval step-up assurance.
 
-Signed back-channel logout targets issuer/client/session or subject. Durable event receipts make retries idempotent and fence a callback arriving after logout. Revocation and refresh completion serialize in SQL. Protected bootstrap must pin the session root and epoch, configure finite ceilings, and rotate the epoch after restoration or relevant identity configuration changes; the browser role cannot modify those settings. Expired credentials need operational cleanup independent of user activity.
+Signed back-channel logout targets issuer/client/session or subject. Durable event receipts make retries idempotent and fence a callback arriving after logout. Revocation and refresh completion serialize in SQL. Installation configures the session root, epoch and finite ceilings; the epoch rotates after restoration or relevant identity configuration changes. The browser role has no RBAC to modify those settings. Expired credentials need operational cleanup independent of user activity.
 
 Initial profile: pinned HTTPS issuer endpoints on the issuer origin, `client_secret_basic`, RS256, one audience, authorization response `iss`, an ID token on exchange/refresh, stable `sid`, and `auth_time`. Keycloak is the first tested provider. Another conformant provider may omit optional refresh ID tokens or use different signing/authentication methods; it needs an explicit qualified profile, not a permissive fallback. See [browser session architecture](../architecture/browser-sessions.md) for the implemented boundary and remaining work.
 

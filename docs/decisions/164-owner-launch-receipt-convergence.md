@@ -1,6 +1,8 @@
 # ADR-164 — Passive convergence of the original owner launch receipt
 
-Date: 2026-10-14. Status: accepted; implementation staged, qualification pending.
+> Superseded (2026-11-13): the launch receipt and the owner's startup re-verification of its Deployment/Pod chain, guards and journal assumed tampering inside the Asservat namespace. Under ADR-328 the owner starts from Helm-rendered objects and mounted configuration, with no launch receipt.
+
+Date: 2026-10-14. Status: superseded by ADR-328 (administrator-only namespaces); the mechanism is removed by the Helm-native installation plan.
 Requirements: REQ-DEP-003 and REQ-FED-001; existing SC-DEP-003 / SC-FED-001
 and TASK-03 / TASK-11 retain traceability ownership.
 

@@ -1,5 +1,7 @@
 # ADR-194 — Promoted owner inputs
 
+> Superseded in part by ADR-328 (2026-11-13): the continuation deriving and guarding inputs no longer applies: the guarded worker configuration and download environment sources (decisions 4 and 7) become ConfigMaps read under RBAC; the owner's startup check that the projection Secret is immutable with the same UID and annotations (decision 10) and the inspection-token readback of keys and roots (decision 3) are removed; the operator public Secret (decision 11) is an ordinary administrator- or Helm-managed Secret; and the order of decision 12 is replaced by Helm rendering plus the `setup` hook Job. Still valid: the fail-closed unconfigured worker configuration, empty worker API and topology lists, the limit defaults and the artifact key ID.
+
 Date: 2026-10-16. Status: accepted; implemented and natively qualified
 ([continuation run 9](../../test/results/adr194-continuation-native-9/environment.json):
 the promoted owner is Ready, capacity reaches `ReadyAt` through its 9444
@@ -92,14 +94,15 @@ Three inputs have no producer, and the hub-api cannot start without them:
     names the immutable public runtime projection. Admission requires the
     fixed name and a UUID. At startup the owner reads the Secret and requires
     it to be immutable, with the same UID and annotations, and with every key
-    equal to its mounted file. Native needs no reference: `routing` and
+    equal to its mounted file (removed by ADR-328: the owner mounts the
+    Secret and trusts it, like any other application). Native needs no reference: `routing` and
     `native-read` are identity purposes in the already bound identity
     projection, the observation Secret is mutable, and the operator Secret is
     excluded.
 11. **Operator public Secret.** The phase-3 inbox carries the OIDC client
     secret and the public TLS certificate and key. The continuation writes
-    them into `asservat-<id>-owner-public`. Operators cannot write the guarded
-    namespace themselves; later rotation is an administrator update.
+    them into `asservat-<id>-owner-public`. Under ADR-328 administrators
+    write this Secret directly or through Helm values.
 12. **Order (amends ADR-184 decision 9).** Public roles and the runtime
     projection stay before permission and capacity, since ADR-189 and ADR-190
     need them. The order is:

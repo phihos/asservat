@@ -1,7 +1,8 @@
 # ADR-120: Explicit gated installation preparation and original credential binding
 
-Status: accepted; integrated component and selected native qualification pass.
-Full installation and runtime enablement remain pending.
+> Superseded (2026-11-13): The scheduling-gated installer Pod, its continuity guard and its sixteen Pod CREATE records are removed with the installer Pod. Idempotent Helm hook Jobs (`secrets`, `setup`) replace it.
+
+Status: superseded by ADR-328 (administrator-only namespaces); the mechanism is removed by the Helm-native installation plan.
 
 ADR-117's continuously occupied declarative names remove the ambiguous first-POST
 recovery gap for nine specific setup objects. The executable installer Pod was

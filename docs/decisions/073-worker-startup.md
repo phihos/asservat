@@ -1,8 +1,10 @@
 # ADR-073 — Pinned worker startup and original-template cleanup
 
+> Superseded in part by ADR-328 (2026-11-13): binding the control ConfigMap by digest to an administrator-protected profile and treating foreign Pods in the worker namespace as a threat no longer apply. The control document is a mounted ConfigMap. The download-worker command, core-dump suppression and cleanup by stored Job UID remain.
+
 Date: 2026-10-10. Status: implemented component refinement; focused tests, owned Kubernetes/OpenBao startup and full SQL/S3 regression pass. Native transfer and protected runtime composition remain pending.
 
-Replace the opaque worker ConfigMap payload with the closed `asservat-worker-control/v1` contract. Bind exact immutable bytes, installation/cluster, a fixed HTTPS enrollment endpoint and separate server/issuer public CA sets to the existing administrator-protected worker profile. Dispatch supplies original worker/session/start/deadline pins and the control digest; the downward API supplies the actual Pod UID. No worker-selected callbacks, ambient roots, root keys, human credentials or public configuration surface are introduced.
+Replace the opaque worker ConfigMap payload with the closed `asservat-worker-control/v1` contract. It carries installation/cluster, a fixed HTTPS enrollment endpoint and separate server/issuer public CA sets, mounted from the worker profile's ConfigMap. Dispatch supplies original worker/session/start/deadline values; the downward API supplies the actual Pod UID. No worker-selected callbacks, ambient roots, root keys, human credentials or public configuration surface are introduced.
 
 Add the initial `asservat download-worker` composition root. It owns the process key, bounded initial enrollment and renewal supervisor. This implements the credential phase only: it neither transfers native evidence nor reports successful investigation/download completion. Missing issuer bootstrap, active requester routing and native transfer remain explicit blockers to deployment, not empty successful operations. Existing role separation and artifact formats remain unchanged.
 
@@ -10,6 +12,6 @@ Disable core dumping for this Linux process before loading credentials or creati
 
 Credential supervision retains original certificate periods and deadlines, allows at most eight enrollment attempts per finite phase, and never makes logging a dependency of renewal or shutdown. Readiness notifications are bounded, nonblocking and advisory. The single process-owned reporter emits only a fixed credential-phase message; a stalled writer cannot hold the supervisor or retained signer open. Certificate readiness grants no evidence authority.
 
-The startup-template change exposed a cleanup defect: reconstructing today's Job template can reject the original admitted worker after an upgrade. Cleanup now verifies the persisted original Job/Pod identities and spec digests instead. New launch and binding still require the current exact template. A foreign or additional Pod leaves capacity charged for separate orphan reconciliation. Known termination, persisted termination receipt, UID-preconditioned deletion and fresh confirmed absence remain mandatory.
+The startup-template change exposed a cleanup defect: reconstructing today's Job template can reject the original admitted worker after an upgrade. Cleanup now uses the persisted original Job/Pod identities instead. New launch uses the current template. An additional Pod from Job re-execution leaves capacity charged for separate orphan reconciliation. Known termination, persisted termination receipt, UID-preconditioned deletion and fresh confirmed absence remain mandatory.
 
 [The startup contract](../architecture/worker-startup.md) defines bounds, implementation ownership, test scope and remaining work. This is an internal refinement of REQ-DEP-003, REQ-DLD-003 and REQ-CAP-003, with no new developer approval, SQL migration or dependency.

@@ -1,5 +1,7 @@
 # ADR-208 — Opening limiter for context-start Kubernetes clients
 
+> Superseded in part by ADR-328 (2026-11-13): most of the bursts this limiter absorbs come from guard, probe, workload-protection and installed-identity proofs, which ADR-328 removes. The opening limiter stays only for clients that still burst after those proofs are gone; re-measure the call counts and return remaining clients to the default limiter where the burst disappears.
+
 Date: 2026-10-19. Status: implemented with a unit test; revised to 50 QPS after
 native 57; installed acquisition and publication observed. Sustained availability
 remains unqualified.

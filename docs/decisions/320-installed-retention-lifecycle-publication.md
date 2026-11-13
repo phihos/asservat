@@ -1,5 +1,10 @@
 # ADR-320 — Installed retention lifecycle publication
 
+> Superseded in part by ADR-328 (2026-11-13): The signing key name and version
+> no longer come from an installer pin verified through the guarded capacity
+> projection; they come from Helm-rendered configuration mounted under RBAC.
+> Lifecycle publication, purpose-separated JWS types and the SQL cutoff rules remain valid.
+
 Date: 2026-11-11. Status: implemented and installed-qualified.
 Requirements: REQ-PRV-002, REQ-PRV-004. This completes the runtime composition
 planned in ADR-195 step 5b and amends the signing purpose in ADR-205 decision 6.
@@ -22,9 +27,9 @@ follows a versioned object read, authenticated decryption and detached JWS
 verification for the exact decision.
 
 Reuse the worker's existing nonexportable, installation-bound Ed25519 Transit
-key and the verified version and key history from the capacity projection.
+key, named with its version in the worker's mounted configuration.
 The same audit-wrap principal already holds this exact signing path. The
-installer supplies the pin whenever it provisions a publisher. A complete
+chart supplies the key name whenever it renders a publisher. A complete
 publisher-backed regional offer is required for a joined capture capability,
 which in turn is required before any retained capture or capture history
 is admitted. A configured worker waits for its accepted capacity projection

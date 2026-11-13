@@ -1,6 +1,8 @@
 # ADR-095 — Protected hub workload garbage collection
 
-Date: 2026-10-11. Status: selected under continuing implementation authorization. Requirements: REQ-DEP-003/005, REQ-FED-001; part of TASK-02/11 and S-01/S-02.
+> Superseded (2026-11-13): these garbage-collector and kubelet exceptions existed only inside ADR-080's namespace admission policy. With that policy removed (ADR-328), the built-in controllers need no exception.
+
+Date: 2026-10-11. Status: superseded by ADR-328 (administrator-only namespaces); the mechanism is removed by the Helm-native installation plan.
 
 ## Evidence and problem
 

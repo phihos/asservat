@@ -1,5 +1,10 @@
 # ADR-302: Private authorization for named Go profile endpoints
 
+> Superseded in part by ADR-328 (2026-11-13): Protected input UID/version
+> checks and guarded installation no longer cover rotation. The connector reads
+> the mounted Secret under RBAC; rotation is a Helm upgrade that restarts the
+> connector. Per-work audience checks, transient delivery and the bounds remain valid.
+
 Status: implementation preparation; installed qualification pending.
 
 The profile contract requires authenticated named endpoints. Public approval
@@ -7,8 +12,8 @@ binds the protected endpoint definition, TLS peer and finite exact workload-root
 audiences. A private header value is not a public dependency digest.
 
 Use a dedicated bounded profile-authorization.json file in the existing immutable
-connector-only RegionalEvidence bundle. The existing protected input UID/version
-checks and guarded installation/restart cover rotation. No new Secret, metadata
+connector-only RegionalEvidence Secret, mounted under RBAC. Rotation is a Helm
+upgrade that restarts the connector. No new Secret, metadata
 GET, RBAC permission, watch, cache, service or Job is introduced. The connector
 checks exact admitted work/root/node/epoch and audience before reading the value;
 only final authenticated poll delivery carries it transiently to the node. It
@@ -35,7 +40,7 @@ local credential-map read at startup, no delivery file reads, at most 4096 selec
 bytes per delivery and 256 KiB retained immutable header material per connector, and no additional TLS handshake beyond the existing one per action.
 Application credentials newly reach the exact connector/node process and selected
 verified application TLS peer. Missing/invalid input and unsupported nodes refuse;
-rotation uses the existing immutable-input reinstall/restart, with no independent
+rotation uses a Helm upgrade and connector restart, with no independent
 credential expiry or refresh state machine. This is an engineering choice under
 the maintainer's standing proportionality guidance, not a new approval requirement.
 

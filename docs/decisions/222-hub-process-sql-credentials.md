@@ -1,5 +1,11 @@
 # ADR-222 — Consolidate SQL credentials within the hub process
 
+> Superseded in part by ADR-328 (2026-11-13): installer claims, protected-current
+> observations, receipts, the serialized verifier and the installer/projection
+> producers are removed with the installer Pod; Helm hook Jobs provision the roles
+> and hub Pods read their credentials from mounted Secrets. The credential
+> consolidation, grant unions and the 32-connection budget remain valid.
+
 Date: 2026-10-23. Status: implemented; integrated runtime qualification pending.
 Related: [ADR-177](177-hub-sql-connection-governor.md),
 [ADR-215](215-hub-metadata-reader-role.md),
@@ -47,9 +53,8 @@ The ordinary public group includes the current hub duties except:
 
 The owner group combines enrollment, audit acknowledgement, activation, registry,
 routing and native metadata reading. Its six-connection allowance remains
-separate from ordinary public work. The separate installer/projection producers
-remain: combining owner and public would save only one more credential while
-requiring broader composition changes.
+separate from ordinary public work. Owner and public stay separate: combining them would save only one more
+credential while requiring broader composition changes.
 
 Publisher, federation, key service, collector and deletion credentials stay in
 their existing processes. No evidence decryption key or administrator credential
@@ -75,14 +80,13 @@ keep their audit connections available during ordinary pool saturation. Other
 reads required by resolution still use the ordinary pool; this is not a guarantee
 that a whole resolution request completes under saturation. Cold readers retain their
 existing close-on-release behavior. Role connection limits cover the aggregate
-pool maxima across retained processes plus the existing serialized verifier.
+pool maxima across retained processes.
 Installation budgeting counts physical connections, not the number of passwords.
 No new scheduler, retry mechanism, configuration knob or pool framework is needed.
 
-Use new permanent role ordinals and a changed compiled layout digest. Never adopt
-or rewrite retained development credentials, their claims or receipts. Unsupported
-retained layouts keep the existing explicit refusal. Installer unknown outcomes
-remain uncertain; consolidation does not add replay or extend original deadlines.
+Use new permanent role ordinals and a changed compiled layout digest. Unsupported
+retained development layouts keep the existing explicit refusal; consolidation
+does not extend original deadlines.
 
 ## Accepted tradeoff and complexity assessment
 

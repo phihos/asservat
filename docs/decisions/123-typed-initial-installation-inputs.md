@@ -1,7 +1,8 @@
 # ADR-123: Typed initial installation inputs and one-use handover
 
-Status: accepted direction. Public-input production is implemented; native
-qualification and the later private-input/handover composition remain pending.
+> Superseded (2026-11-13): Typed installer inputs, receipt-derived pins and the one-use handover existed for the installer Pod and its guards. Helm renders configuration from values into ConfigMaps read by fixed name; no UIDs or guard pins are needed under ADR-328.
+
+Status: superseded by ADR-328 (administrator-only namespaces); the mechanism is removed by the Helm-native installation plan.
 
 The gated Pod and public credential interval from ADR-120 require actual final
 startup inputs. These inputs must be produced from the retained original resource

@@ -1,5 +1,13 @@
 # ADR-227 — Supported upgrade and image-only rollback
 
+> Superseded in part by ADR-328 (2026-11-13): the release record exists to map
+> live images back to install-time digests that runtime verifiers re-check inside
+> the hub workload guard. Runtime checks of Asservat's own Deployments, Pods and
+> image digests are removed, so the release record and its mapping go, and
+> `helm upgrade` changes images. The schema floor rule (decision 1), the migrator
+> (now a Helm pre-upgrade hook Job with the DDL credential) and image-only
+> rollback (decision 4) remain valid.
+
 Date: 2026-10-25. Status: accepted (maintainer chose to build the upgrade path now); phases 1
 and 2 implemented; phase 3 implemented for the key service, publisher and federation (download workers, regional connector and the chart hook deliberately not built). Implements the upgrade target in [operations](../operations.md#backup-recovery-and-upgrades)
 and [persistence](../../specs/persistence.md) (N/N-1, separate DDL role, expand/contract).
@@ -28,15 +36,15 @@ offer). Several of those are immutable, and none may be rewritten.
    runs both the N and the N+1 binary after an expand migration, which is image-only rollback; an N
    database refuses the N+1 binary until migrated. Refusals name their reason (older, newer than
    tolerated, unreadable).
-2. **Upgrade migrator.** A new one-shot `installer-upgrade` command, run by the installer's existing
-   runner account with the operator's DDL credential (the DDL role keeps its login and owns the
+2. **Upgrade migrator.** A one-shot migrator (originally the `installer-upgrade` command run by the
+   installer runner account; under ADR-328 a Helm pre-upgrade hook Job) uses the operator's DDL credential (the DDL role keeps its login and owns the
    schema; [initial schema](../architecture/initial-schema.md)). It requires the completed
    installation root, verifies the applied history is an exact prefix of its embedded migrations with
    nothing foreign, and applies the rest with the same advisory lock and step checks as
    InitialSchema. It never edits the completed InitialSchema record. Phase 1 migrations add no runtime
    grants, so the role layout digests and existing role receipts stay valid; grant changes need role
    re-production (later phase).
-3. **One release record (simplification).** One installation release record, a ConfigMap
+3. **One release record (simplification; superseded by ADR-328, historical).** One installation release record, a ConfigMap
    `asservat-release-<installation>` in the hub namespace (it holds no secret data), written only by
    the installer runner account (the sole principal the hub workload guard admits) with
    resourceVersion preconditions. It holds the original revision-1 image, the current and previous

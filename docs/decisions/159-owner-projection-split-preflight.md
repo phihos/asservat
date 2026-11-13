@@ -1,7 +1,9 @@
 # ADR-159 — Complete owner projection preflight across the SQL lock
 
-Status: implemented; component qualification passed, installed qualification
-pending. Requirements: REQ-FED-001, REQ-DB-005 and
+> Superseded (2026-11-13): this split preflight re-verified installer-created owner objects, source guards, journals and probes inside the Asservat namespace. Under ADR-328 those objects are trusted; Helm renders them and runtime reads mounted configuration under plain RBAC.
+
+Status: superseded by ADR-328 (administrator-only namespaces); the mechanism is removed by the Helm-native installation plan.
+Requirements: REQ-FED-001, REQ-DB-005 and
 REQ-DEP-003; existing implementation work remains under TASK-02/TASK-11.
 
 ## Observed failure

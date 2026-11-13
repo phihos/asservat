@@ -1,6 +1,8 @@
 # ADR-092 — Independent source admission probes in the private hub namespace
 
-Date: 2026-10-11. Status: selected under continuing implementation authorization. Requirements: REQ-DEP-005, REQ-FED-001, REQ-DB-005; part of TASK-02/07/11 and S-01/S-02.
+> Superseded (2026-11-13): the probe exceptions existed only to prove admission guards on hub ConfigMaps. ADR-328 removes those guards and their dry-run probes (including ADR-324's global metadata guards); ConfigMaps are read under RBAC.
+
+Date: 2026-10-11. Status: superseded by ADR-328 (administrator-only namespaces); the mechanism is removed by the Helm-native installation plan.
 
 ## Observed problem
 

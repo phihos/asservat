@@ -1,6 +1,8 @@
 # ADR-162 — Read-only finalization of original owner projection effects
 
-Date: 2026-10-14. Status: implemented; qualification pending. Requirements: REQ-DEP-003 and REQ-FED-001; existing
+> Superseded (2026-11-13): read-only finalization re-verified the installer's own projection and launch effects, guards and dry-run probes. Under ADR-328 installer-created objects are trusted; Helm renders them and idempotent hook Jobs replace the installer controller.
+
+Date: 2026-10-14. Status: superseded by ADR-328 (administrator-only namespaces); the mechanism is removed by the Helm-native installation plan. Requirements: REQ-DEP-003 and REQ-FED-001; existing
 SC-DEP-003 / SC-FED-001 and TASK-03 / TASK-11 remain the traceability owners.
 
 ## Problem

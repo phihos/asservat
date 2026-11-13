@@ -1,5 +1,7 @@
 # ADR-210 — Installed processing changes by a privacy operator
 
+> Superseded in part by ADR-328 (2026-11-13): decision 5's guarded source read with a denied dry-run probe and decision 6's UID check on the settings ConfigMap no longer apply; both sources are read by name under RBAC. The processing route, operator membership, audit lanes and SQL purpose remain valid.
+
 Date: 2026-10-20. Status: accepted; initialization/restriction route and browser-settings composition implemented; installed initialization passes.
 Requirements: REQ-CAP-005, REQ-EXE-002, S-02; ADR-127, ADR-146, ADR-192, ADR-194.
 
@@ -57,9 +59,7 @@ coverage verdict.
    runtime role layout digest; existing installations provision it with the
    next layout.
 5. Decisions bind the policy to `processing_root.source_uid`, the capacity
-   processing source. The hub-api reads that source through its own guard, with
-   the owner account's denied dry-run probe added to the owner's guarded
-   sources. The owner download environment remains the download path's policy.
+   processing source. The hub-api reads that source by name under RBAC. The owner download environment remains the download path's policy.
 
 6. Console login itself had no installed producer: nothing projected the
    protected browser settings into SQL, so `browser_session_root` never
@@ -67,7 +67,7 @@ coverage verdict.
    browser-settings role as an open gap; local hold 18). The hub-worker's
    permission projection gains a browser section: the existing
    `browser-settings` login and the existing ADR-061 observer, which reads the
-   settings ConfigMap by name and UID once per second and fences the
+   settings ConfigMap by name once per second and fences the
    projection when a read fails. The hub-worker's Role gets `get` on exactly
    that ConfigMap. Browser session cleanup (`browser-cleanup`) stays an open
    gap; expired logins and sessions are only pruned on new logins.

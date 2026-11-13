@@ -1,5 +1,7 @@
 # ADR-182 — Promoting the installed owner to native backend and public layers
 
+> Superseded in part by ADR-328 (2026-11-13): enabling layers by projection receipts in the resource journal no longer applies. The `Native` and `Public` sections of the mounted deployment input select the layers, and a missing projection root or file fails startup. Ordered layers, fixed roots and ports, and provider authentication remain valid.
+
 Date: 2026-10-15. Status: accepted; promoted composition and public provider purposes implemented with unit tests; installer producers and native qualification pending.
 Requirements: S-02, REQ-DEP-003, REQ-FED-001; TASK-03 / TASK-11.
 Builds on [ADR-140](140-installed-public-runtime-producers.md)/[144](144-cluster-local-observations.md),
@@ -40,11 +42,9 @@ presence does not count.
      ingress and download-peer proofs.
    - **Public layer:** ADR-180.
 
-   A layer is enabled only by a positive projection receipt for it in the
-   original resource journal. Startup verifies the receipt with the same
-   current journal read as the identity projection. A missing or
-   unacknowledged receipt keeps the layer off; there is no file-presence
-   fallback.
+   A layer is enabled only by its section in the mounted deployment input.
+   Volume presence alone enables nothing; a missing projection root or file
+   fails startup.
 2. **Inputs per layer from their fixed roots.**
    - The backend layer reads only `/run/asservat/owner-observation`: its SQL
      logins (`routing`, `native-read`), `worker-controls.json` and the pinned
@@ -52,7 +52,7 @@ presence does not count.
    - The public layer reads only `/run/asservat/public`: the ADR-180 files,
      the public runtime role projection and the public audit keys.
    - The deployment input stays in the identity ConfigMap, and its `Native`
-     and `Public` sections must match the receipts.
+     and `Public` sections select the layers.
 3. **Fixed ports.** Native and observation traffic use 9444 and are
    multiplexed by exact path on one listener. The public layer uses 9445. The
    `Public.Port` input must equal 9445 in the installed layout.
@@ -65,7 +65,7 @@ presence does not count.
      owner's Pod token.
 5. **The input rules change accordingly.** `Native` and `Public` become
    allowed together with `Observation` and `ProviderAuthentication`, but only
-   in the installed layout and only with their receipts. The legacy
+   in the installed layout. The legacy
    static-token full mode stays available for existing fixtures. It is never
    produced by the installer.
 
@@ -73,7 +73,7 @@ presence does not count.
 
 A promoted installed hub-api holds the identity, backend and public
 credentials of its layers in one process, as ADR-177 already accepts for one
-process. Promotion is a new installer step with its own receipts. Rolling back
+process. Promotion is an installation configuration change. Rolling back
 a layer means withdrawing its projection and restarting. The process never
 downgrades itself at runtime.
 

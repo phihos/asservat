@@ -1,5 +1,7 @@
 # ADR-151: Required versions for initial installation audit
 
+> Superseded in part by ADR-328 (2026-11-13): the installer format chain (bootstrap v4, preparation services v2, installer v2, credential binder, witness and recovery-fence wording) goes with the installer. The requirement that every audit writer obtain a nonempty immutable version and read back exactly that acknowledged version remains valid.
+
 Status: component implementation and original fresh-bootstrap native qualification pass. Applies to REQ-EVD-002, TASK-02/03 and the
 protected installation prerequisite of S-01/S-02. Qualification is recorded in
 [implementation progress](../implementation-progress.md); component checks do not
@@ -12,7 +14,7 @@ the initial installer previously constructed a version-optional store. Enabling
 bucket versioning in a fixture did not enforce the same requirement in product
 code. A missing or `null` version could therefore produce an initial receipt.
 
-Every active initial-installer storage adapter requires nonempty, non-`null`
+Every audit storage adapter requires nonempty, non-`null`
 immutable versions. This also applies when loading a recognized older input
 format. Retaining an older immutable plan must never select a weaker runtime
 backend. Missing versions fail after an uncertain write with no fallback,

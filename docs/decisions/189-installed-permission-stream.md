@@ -1,5 +1,7 @@
 # ADR-189 — Installed permission stream
 
+> Superseded in part by ADR-328 (2026-11-13): the installer-created permission guard with its recorded pin (decision 3), its dry-run probe and the workload-guard exception (decision 4) and the continuation's permission step no longer apply. Helm renders the hub-worker RBAC and the projection Secret. The hub-worker stream, its SQL purposes, audit, root, initial review and retention item remain valid.
+
 Date: 2026-10-15. Status: accepted; steps 1–7 implemented and natively qualified
 ([continuation run 26](../../test/results/adr183-continuation-native-26/result.json)):
 a fresh stream with acknowledged initial and epoch audits. Step 8 (retention)
@@ -45,13 +47,14 @@ already launched hub-worker.
      backoff that respects the 30-second SQL controller lease, and never
      returns early, because a returning child tears down its siblings.
    - A new epoch suspends the projection, as ADR-050 requires.
-2. **Root.** The stream root is the owner selection's `PermissionRootID`.
-   The continuation's permission step runs after the selection and before
-   capacity initialization, and does not mint a second root.
-3. **Guard.** The continuation applies `PermissionAdmission(plan)` and its
-   binding, create-only, with the fixed name
-   `asservat-<id>-permission-guard`, and records the pin from the
-   acknowledged objects.
+2. **Root.** The stream root is the installation's `PermissionRootID`,
+   seeded once by the `setup` hook Job before capacity initialization. No
+   second root is minted.
+3. **Guard (superseded by ADR-328).** The continuation applied
+   `PermissionAdmission(plan)` and its binding, create-only, with the fixed
+   name `asservat-<id>-permission-guard`, and recorded the pin from the
+   acknowledged objects. Under ADR-328 plain RBAC on the hub namespace
+   decides who may write permission objects.
    - Administrators are the installation administrators.
    - `StatusUsers` is the hub-worker account.
    - Delegations come from the new chart values `permissions.delegations`,
@@ -59,9 +62,10 @@ already launched hub-worker.
 
    Changing the plan later is a new guard revision that fences the stream
    (ADR-050). That procedure is out of scope here.
-4. **Probe.** The guard's non-administrator probe is the hub-worker's own
-   account, as for the source guards (ADR-092, ADR-094). Its dry-run
-   CREATE of an `AccessBinding` must reach the permission guard:
+4. **Probe (removed by ADR-328).** The guard's non-administrator probe
+   was the hub-worker's own account, as for the source guards (ADR-092,
+   ADR-094). Its dry-run CREATE of an `AccessBinding` had to reach the
+   permission guard:
    - RBAC grants `create` on `accessbindings` for that reason alone;
    - the namespace workload guard's existing worker dry-run CREATE
      exception (the capacity probe) also admits `accessbindings`, dry-run

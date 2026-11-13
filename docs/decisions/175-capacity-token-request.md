@@ -1,5 +1,7 @@
 # ADR-175 — Capacity account token by admitted, Pod-bound TokenRequest
 
+> Superseded in part by ADR-328 (2026-11-13): the UID-pinned admission branch for the TokenRequest and the SelfSubjectReview requester check no longer apply. RBAC limits the connector account to tokens for the capacity account; the in-memory 600-second token and its caching remain valid.
+
 Date: 2026-10-14. Status: accepted, amended after the first native run (Pod binding is impossible); implemented and natively qualified (installer RBAC and quota pending).
 Requirements: REQ-EXE-002, S-02 regional context start; TASK-03 / TASK-11. Resolves the open question in [ADR-174](174-regional-context-start-composition.md).
 
@@ -55,36 +57,28 @@ Pod-bound credential.
    `create`/`get` `capacityreservations` and `update`/`get`
    `capacityreservations/status` in the control namespace only. No Pod runs as
    the capacity account, and it has no automounted token.
-2. **Admission.** The connector workload guard's API context branch admits
-   exactly one shape of TokenRequest. It is a CREATE on `serviceaccounts/token`
-   for the capacity account by the execution account (exact name and UID) with
-   exactly one `authentication.kubernetes.io/pod-uid` extra, meaning a
-   Pod-bound credential. The audience must be exactly the installer-pinned API
-   audience, `expirationSeconds` must be 600, and there must be no
-   `boundObjectRef`. Every other TokenRequest in the namespace stays denied, as
-   before. The guard bytes change only when a capacity audience is pinned, so
-   existing pins without one are unchanged.
+2. **Request shape.** The process requests the configured API audience with
+   `expirationSeconds` 600 and no `boundObjectRef`. RBAC (decision 1) is the
+   only restriction; no admission policy is added.
 3. **Process.** The token is requested with the connector's own client and
    kept only in memory. It is cached until 60 seconds before expiry, so no
    TokenRequest lands on the five-second start path
    ([ADR-173](173-work-scoped-process-observation.md)). It is never written to
    disk or logged.
-4. **Requester check.** The token source refuses to start unless its own
-   client is this Pod's Pod-bound execution credential (SelfSubjectReview
-   `pod-uid`). `ConnectorAPIStartPreparer` keeps requiring the capacity
-   account's exact identity.
+4. **Requester.** The token source uses the Pod's own mounted execution
+   token; it does not re-verify its own identity.
 
 ## Consequences
 
 One process holds both identities, as ADR-135's regional runner already did.
-Admission still decides which identity may perform each start write. A
+RBAC still decides which identity may perform each start write. A
 compromised connector can forge, mark Ready and consume local records. It
 still cannot get evidence published without the hub's SQL binding, and the
 hub's checks remain the backstop. A ResourceQuota on
 `count/capacityreservations.asservat.io` bounds record flooding. A stolen
 capacity token lives at most 600 seconds. Because it cannot be Pod-bound, it
 also survives the Pod's deletion within those 600 seconds. Control over
-admission remains a trust boundary.
+the connector namespace remains a trust boundary.
 
 If authentic local start records are later required against an executor
 compromise, option (c) remains possible. It would need a new signed

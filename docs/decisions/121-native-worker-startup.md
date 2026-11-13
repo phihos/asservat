@@ -1,5 +1,7 @@
 # ADR-121: Explicit native acquisition worker startup
 
+> Superseded in part by ADR-328 (2026-11-13): Pinning the storage-credential Secret by UID and qualifying deletion/replacement prevention defended against Secret tampering in the worker namespace and no longer applies. The worker mounts the named Secret; control v2, the native conversation loop, credential expiry rules and joined shutdown remain valid.
+
 Status: accepted; runtime composition and selected native startup qualification
 pass. Installed evidence transfer and provider provisioning remain incomplete.
 
@@ -20,12 +22,10 @@ Retain the 64 KiB document limit and one combined 32 KiB CA DER budget. All publ
 pins are included in the accepted worker configuration and dispatch identity;
 none independently authorizes evidence or key access.
 
-An accepted v2 worker profile additionally pins one immutable storage-credential
-Secret by name and UID. The Restricted Job mounts its single private JSON file
-read-only at a fixed path. It has no endpoint, callback, arbitrary file path or
-identity-selector field. Kubernetes observation of a Secret UID is not atomic
-proof of its mounted incarnation: protected provisioning and deletion/replacement
-prevention must be qualified before enabling v2. No secret digest enters SQL or
+An accepted v2 worker profile additionally names one storage-credential Secret.
+The Restricted Job mounts its single private JSON file read-only at a fixed
+path. It has no endpoint, callback, arbitrary file path or identity-selector
+field. RBAC protects the Secret like any other application Secret (ADR-328). No secret digest enters SQL or
 public provenance. No ambient credentials, trust roots, proxy or metadata-service
 fallback is allowed.
 
@@ -94,8 +94,8 @@ with distinct nonces, and positive worker termination/foreground retirement.
 The fixture supplies dispatch/registry/audit roots and no dispatchable evidence
 command. It does not qualify timed renewal, full native delivery or the installer.
 
-Required native qualification includes actual protected v2 configuration, immutable
-mount identity, process-owned enrollment and renewal, the two-hop native exchange,
+Required native qualification includes actual v2 configuration, the mounted
+storage credential, process-owned enrollment and renewal, the two-hop native exchange,
 exact-byte download, current-identity loss, cancellation, uncertain acknowledgements
 and positive worker retirement. Secret/issuer producers and full hub/connector
 startup composition remain mandatory. Helm runtime services remain disabled

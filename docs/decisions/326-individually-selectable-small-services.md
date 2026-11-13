@@ -1,5 +1,15 @@
 # ADR-326 — Individually selectable small services
 
+> Superseded in part by ADR-328 (2026-11-13): The installer preparation and
+> continuation machinery described here (guard protocol, original-preparer and
+> pinned-source comparisons, phase inboxes/outboxes with UID/RV CAS, the
+> object-store provisioning record, namespace/account UID binding of the setup
+> issuer) no longer applies. A `secrets` hook Job creates missing Secrets and a
+> `setup` hook Job configures the selected providers idempotently. The independent
+> `services.*` choices, bundled PostgreSQL/pgBackRest, SeaweedFS, Keycloak and
+> OpenBao, retained private state across upgrade/uninstall and the Keycloak
+> connection validation remain valid.
+
 Status: context workflow qualified with all four bundled services; full operational lifecycle qualification pending.
 
 ## Decision and scope
@@ -22,13 +32,11 @@ an implementation choice to supply the missing service, leaves external defaults
 unchanged and does not replace the accepted static-key alternative.
 No database operator, message broker or provider controller is added.
 
-One finite pre-install/pre-upgrade preparation hook persists generated private
-state outside Helm release data before provider workloads initialize. It runs
-only in the existing explicitly trusted bootstrap namespace. Kubernetes RBAC
-cannot restrict Secret CREATE by name; its namespaced create grant and named
-read grants are limited to this finite installer account. It has no
-cluster-scoped runtime privileges. The existing installation/guard protocol
-still establishes application runtime authority separately.
+One finite pre-install/pre-upgrade `secrets` hook Job persists generated private
+state outside Helm release data before provider workloads initialize.
+Kubernetes RBAC cannot restrict Secret CREATE by name; its namespaced create
+grant and named read grants are limited to that Job's account. It has no
+cluster-scoped runtime privileges.
 
 Persist Keycloak identity before initial PostgreSQL state. Retained databases,
 provider workloads or volumes with missing original private state require
@@ -43,7 +51,7 @@ the actual PEM before the existing full compiler and immutable desired-state
 identity; no trust bytes are omitted from canonical identity. Initial SQL
 client pools remain2; the server budget is117, or122 with Keycloak's fixed5
 connections. PostgreSQL credentials remain a distinct selected Secret source
-from provider material. Helm and the native runner must generate the same Pod.
+from provider material.
 
 ## Complexity assessment
 
@@ -81,6 +89,9 @@ publication action follows merely from this candidate.
 
 ## Bundled regional provisioning
 
+Historical: describes the installer continuation that the Helm-native
+installation plan replaces (ADR-328).
+
 The first same-API small profile reuses the ordinary regional connector and
 catalog join. `combined` alone does not provide a local execution bypass.
 After the fleet operator issues an ordinary finite bootstrap, a second regional
@@ -115,6 +126,9 @@ remains required. Documentation alone cannot supply the missing credentials.
 
 ## Initial object-store provisioning join
 
+Historical: describes the installer continuation that the Helm-native
+installation plan replaces (ADR-328).
+
 The implementation consumes the original bootstrap state's installation/
 request IDs and its persisted initial audit credential. Generate raw key bytes
 before that state is created, then bind a typed initial-audit principal only to
@@ -144,6 +158,9 @@ manual intervention; a bounded original record is the smaller complete workflow.
 
 ## Runtime storage join
 
+Historical: describes the installer continuation that the Helm-native
+installation plan replaces (ADR-328).
+
 The continuation explicitly selects `objectStoreSource=bundledSeaweed` and reads
 the existing fixed public plan/CA files. It resolves actual roots before ordinary
 consumers, then compares namespace, preparation-root name, endpoint and DER roots
@@ -172,6 +189,11 @@ Complete hub-role provisioning and the automatic provider inbox are implemented
 below; focused checks are not installed runtime-storage qualification.
 
 ## Bundled OpenBao composition
+
+Superseded in part (ADR-328): the native API/root pins, original
+namespace/account UID records and the installer's single-use mint intent no
+longer apply; the `setup` Job configures OpenBao. The retained static seal key,
+refusal of partial initialization and the TokenReview-only reviewer remain.
 
 The optional exact2.7.2 backend uses native HCL self-initialization with a retained
 static seal key and encrypted persisted state. A partial initialization refuses
@@ -204,6 +226,9 @@ checks do not complete the required fresh installed workflow.
 
 ### Mixed-provider private input
 
+Historical: describes the installer continuation that the Helm-native
+installation plan replaces (ADR-328).
+
 `provider-material.json` is an operator fragment described by
 [`initial-bootstrap-provider-input.schema.json`](../../specs/contracts/initial-bootstrap-provider-input.schema.json).
 It keeps the existing material format and field names. Supply only the external
@@ -219,6 +244,9 @@ cannot supply `setupToken`, observed `bundledIdentity`, or registry configuratio
 No new mode flag or backend-selection fallback is introduced.
 
 ## Automatic continuation and private material
+
+Historical: describes the installer continuation that the Helm-native
+installation plan replaces (ADR-328).
 
 Selecting bundled key and object storage reuses the existing worker/owner provider
 recipes. Worker setup uses its original retained audit Secret; no phase-1 inbox
@@ -249,6 +277,9 @@ inbox TLS/client bytes must match the checked source before IAM enablement.
 This does not create browser certificate trust or qualify installed login.
 
 ## Independent continuation selections
+
+Historical: describes the installer continuation that the Helm-native
+installation plan replaces (ADR-328).
 
 The provider choices apply independently to continuation as well as initial
 preparation. The both-bundled and both-external paths retain their existing wire
@@ -285,6 +316,9 @@ Unknown state still refuses; original deadlines and provider inspection remain.
 Tests and installed qualification are recorded separately in the ledger.
 
 ## Initial issuer response compatibility
+
+The durable mint claim below belongs to the installer continuation that the
+Helm-native installation plan replaces (ADR-328).
 
 The pinned OpenBao implementation emits an informational notice whenever both
 role and request provide explicit maxima, reporting their smaller value

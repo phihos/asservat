@@ -1,5 +1,7 @@
 # ADR-179 — Outbound-only scope of the first installed investigation profile
 
+> Superseded in part by ADR-328 (2026-11-13): the capability ConfigMaps and namespace labels are no longer guarded; the hub reads them under RBAC. The outbound-only scope, delegated target resolution and selector-free retention remain valid.
+
 Date: 2026-10-15. Status: accepted; fences, hub-held capability and target queries implemented with unit and real-TLS tests; hub-api composition pending.
 Requirements: REQ-FED-001/003, REQ-DEP, S-02; TASK-03 / TASK-11.
 
@@ -48,7 +50,8 @@ cluster. Regional facts arrive only as delegated proof.
    needs a connector-side dispatch effect and delegated worker proofs, with a
    separate ADR.
 2. **Hub-held capability.** Each workload cluster's context capability is an
-   installer-managed, guarded ConfigMap in the hub control namespace. The hub
+   installer-managed ConfigMap in the hub control namespace, read
+   under RBAC. The hub
    reads its own cluster. The region still enforces its own installed
    settings independently: the executor's settings pin the collector image
    and projection, and the signed work binds both.
@@ -87,7 +90,7 @@ cluster. Regional facts arrive only as delegated proof.
    retention policies without workload or namespace selectors, hub-topology
    policy sources and explicit permission bindings. A selector-based policy or
    a local retention source fails closed (unavailable) until delegated label
-   facts exist. Those facts could reuse the guarded namespace labels of the
+   facts exist. Those facts could reuse the namespace labels of the
    `capacity-workload` observation. No present-day label is ever substituted.
 5. **Fences now.** `WorkerAPIs` and the legacy non-installed capacity observer
    accept only the hub's own cluster.

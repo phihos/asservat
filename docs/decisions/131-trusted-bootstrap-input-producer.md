@@ -1,6 +1,8 @@
 # ADR-131: Produce original installation pins from trusted static inputs
 
-Status: accepted implementation direction; native qualification and packaging remain pending.
+> Superseded (2026-11-13): The trusted producer of installer pins (UIDs, OIDs, seed IDs), its native guard and the temporary setup manager are not needed: ADR-328 removes UID and guard pins. Helm values and the `secrets` hook Job supply IDs and passwords.
+
+Status: superseded by ADR-328 (administrator-only namespaces); the mechanism is removed by the Helm-native installation plan.
 
 The official installation flow must not ask administrators to hand-author Kubernetes UIDs, SQL role OIDs or private random passwords. The existing preparation and schema commands correctly require those independent pins, but their native fixtures have supplied them manually.
 

@@ -1,6 +1,8 @@
 # ADR-080 — Protect the private hub workload namespace
 
-Status: accepted for component implementation; production installation and owner enrollment composition remain pending. Refines ADR-076–079 under REQ-FED-001 and REQ-DEP-003.
+> Superseded (2026-11-13): the namespace admission policy defended against non-administrator writers in the hub namespace. ADR-328 keeps such writers out with plain RBAC and Pod Security `restricted`; the policy and its dry-run proof are removed.
+
+Status: superseded by ADR-328 (administrator-only namespaces); the mechanism is removed by the Helm-native installation plan.
 
 ## Problem and decision
 

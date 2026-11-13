@@ -1,5 +1,7 @@
 # ADR-170 — Federation compartment for connector-facing hub duties
 
+> Superseded in part by ADR-328 (2026-11-13): pinning each peer by its original ConfigMap UID and regional guard digest, and the installer verifier, no longer apply; the federation process reads mounted configuration under RBAC. The separate federation process and its connection budget remain valid.
+
 Date: 2026-10-14. Status: accepted; role layout, `hub-federation` and regional `connector` processes implemented and natively qualified with synthetic setup roots; installer provisioning pending.
 Requirements: REQ-FED-001/002, specs/persistence.md connection budget; TASK-03 / TASK-11.
 
@@ -25,8 +27,8 @@ would exceed it.
    holds `connector-source`, `connector-journal`, `connector-ack`,
    `connector-read` (activated-leaf registry plus recovery state) and
    `cluster-credential`. It retains at most two processes, so each role has a
-   connection limit of three (two processes plus the serialized installer
-   verifier).
+   connection limit of three (two processes plus one serialized
+   installation-time connection).
 2. `connector-cleanup`, `connector-verifier` and `connector-finalizer` are
    created at installation so SQL49 can pin all six logins. They belong to the
    worker compartment and are projected nowhere until their maintenance

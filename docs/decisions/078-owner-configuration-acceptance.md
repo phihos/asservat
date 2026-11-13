@@ -1,6 +1,8 @@
 # ADR-078 — Durable owner configuration acceptance
 
-Date: 2026-10-10. Status: implementation refinement under the maintainer's continuation; Go/race/import/SQL/design gates and owned SQL/S3/Kubernetes suites pass. Exact qualification and remaining fixture inputs are tracked in [implementation progress](../implementation-progress.md).
+> Superseded (2026-11-13): durable acceptance existed to detect rollback or unaudited changes of the owner-configuration ConfigMap. Anyone who can write that ConfigMap is trusted under ADR-328; the hub reads the Helm-rendered ConfigMap under RBAC.
+
+Date: 2026-10-10. Status: superseded by ADR-328 (administrator-only namespaces); the mechanism is removed by the Helm-native installation plan.
 
 ADR-077 proves current Kubernetes protection and content, but a process-local observation cannot detect rollback after restart or prove that a trust change was durably audited. Extend the existing PostgreSQL and encrypted audit adapters with one owner-configuration head per installation/hub cluster and immutable source revisions. Keep the Kubernetes source, SQL observer, audit acknowledger and current reader as separate authority facets. No new service, dependency, public endpoint or developer approval is introduced.
 

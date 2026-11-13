@@ -1,7 +1,8 @@
 # ADR-137 — Package the fixed initial installer with Helm
 
-Status: accepted; packaged native Helm/private-registry component run passes;
-earlier unexplained hook failure and installed runtime qualification remain open.
+> Superseded (2026-11-13): Packaging the four-command installer Pod as a Helm hook, its `installer-resume` command and revision-named input snapshots are replaced by the idempotent `secrets` and `setup` hook Jobs. Helm remains the official installation method.
+
+Status: superseded by ADR-328 (administrator-only namespaces); the mechanism is removed by the Helm-native installation plan.
 
 ## Decision
 
