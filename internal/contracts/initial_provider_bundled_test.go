@@ -10,7 +10,7 @@ import (
 
 func TestBundledInitialIdentityPrivateMaterialRoundTrip(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Second)
-	selected := BundledInitialProviderIdentity{Format: BundledInitialProviderIdentityFormat, BackendName: "trial", Namespace: WorkerObjectReference{Name: "bootstrap", UID: "20000000-0000-4000-8000-000000000010"}, SetupAccount: WorkerObjectReference{Name: "trial-bootstrap-runner", UID: "20000000-0000-4000-8000-000000000011"}, EntityID: "20000000-0000-4000-8000-000000000012", SetupParent: InitialProviderParent{Accessor: "original-setup-accessor", IssuedAt: now, ExpiresAt: now.Add(300 * time.Second)}}
+	selected := BundledInitialProviderIdentity{Format: BundledInitialProviderIdentityFormat, BackendName: "trial", Namespace: WorkerObjectReference{Name: "bootstrap", UID: "20000000-0000-4000-8000-000000000010"}, SetupAccount: WorkerObjectReference{Name: "trial-setup", UID: "20000000-0000-4000-8000-000000000011"}, EntityID: "20000000-0000-4000-8000-000000000012", SetupParent: InitialProviderParent{Accessor: "original-setup-accessor", IssuedAt: now, ExpiresAt: now.Add(300 * time.Second)}}
 	equivalent := selected
 	equivalent.SetupParent.IssuedAt = selected.SetupParent.IssuedAt.In(time.FixedZone("same-instant", 3600))
 	equivalent.SetupParent.ExpiresAt = selected.SetupParent.ExpiresAt.In(time.FixedZone("same-instant", -7200))

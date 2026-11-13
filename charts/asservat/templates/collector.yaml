@@ -1,23 +1,21 @@
 {{- if .Values.collector.enabled }}
 {{- $c := .Values.collector }}
 {{- if eq .Values.mode "hub" }}{{ fail "collector.enabled requires mode=cluster or mode=combined" }}{{ end }}
-{{- if or (hasPrefix "kube-" $c.namespace) (eq $c.namespace "default") (eq $c.namespace .Release.Namespace) (eq $c.namespace .Values.cluster.namespace) }}{{ fail "collector.namespace must be a dedicated collector namespace distinct from the release and connector namespaces" }}{{ end }}
+{{- if or (hasPrefix "kube-" $c.namespace) (eq $c.namespace "default") (eq $c.namespace .Release.Namespace) (eq $c.namespace .Values.region.namespace) }}{{ fail "collector.namespace must be a dedicated collector namespace distinct from the release and connector namespaces" }}{{ end }}
 {{- if not (regexMatch "^[a-z0-9][a-z0-9./:_-]{0,383}@sha256:[a-f0-9]{64}$" $c.image) }}{{ fail "collector.image requires the exact verified product repository@sha256 digest" }}{{ end }}
 {{- range $id := list $c.installationID $c.clusterID }}{{ if not (regexMatch "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" $id) }}{{ fail "collector.installationID and collector.clusterID must be the installation's UUIDs" }}{{ end }}{{ end }}
-{{- /* ADR-246 decision 9: with cluster.enabled and collector.connector left
-  empty, the values come from the connector-nodes ConfigMap that this
-  release's cluster installer hook publishes. The hook runs after the first
-  render, so the first install creates only the namespace and account (the
-  installer needs the namespace); the next helm upgrade renders the
-  DaemonSet. helm template never sees the ConfigMap. */}}
+{{- /* ADR-246 decision 9: with collector.connector left empty, the values
+  come from the connector-nodes ConfigMap of this release's connector. The
+  first install creates only the namespace and account; the next helm
+  upgrade renders the DaemonSet. helm template never sees the ConfigMap. */}}
 {{- $conn := $c.connector }}
-{{- $published := and .Values.cluster.enabled (eq $conn.endpoint "") (eq $conn.serverName "") (eq $conn.rootsPEM "") }}
+{{- $published := and (eq $conn.endpoint "") (eq $conn.serverName "") (eq $conn.rootsPEM "") }}
 {{- if $published }}
-{{- $cm := lookup "v1" "ConfigMap" .Values.cluster.namespace "connector-nodes" }}
+{{- $cm := lookup "v1" "ConfigMap" .Values.region.namespace "connector-nodes" }}
 {{- $conn = dict "endpoint" (dig "data" "endpoint" "" $cm) "serverName" (dig "data" "serverName" "" $cm) "rootsPEM" (dig "data" "rootsPEM" "" $cm) }}
 {{- end }}
 {{- $ready := and (hasPrefix "https://" $conn.endpoint) (ne $conn.serverName "") (contains "-----BEGIN CERTIFICATE-----" $conn.rootsPEM) }}
-{{- if and (not $ready) (not $published) }}{{ fail "collector.connector requires the connector's https endpoint, certificate server name and issuing roots (or leave all three empty with cluster.enabled)" }}{{ end }}
+{{- if and (not $ready) (not $published) }}{{ fail "collector.connector requires the connector's https endpoint, certificate server name and issuing roots (or leave all three empty to use the release connector)" }}{{ end }}
 {{- $name := printf "%s-node" .Release.Name }}
 {{- $ceilings := dict "ringBytes" (int64 $c.ceilings.ringBytes) "frozenBytes" (int64 $c.ceilings.frozenBytes) "uploadBytesPerSecond" (int64 $c.ceilings.uploadBytesPerSecond) "uploadBurstBytes" (int64 $c.ceilings.uploadBurstBytes) }}
 {{- if $c.ringDisk.enabled }}

@@ -4,7 +4,7 @@
 {{- if not (regexMatch "^[a-z0-9][a-z0-9./:_-]{0,383}@sha256:[a-f0-9]{64}$" $p.image) }}
 {{- fail "services.postgres.bundled.image requires the verified PostgreSQL/pgBackRest image repository@sha256 digest" }}
 {{- end }}
-{{- $name := printf "%s-postgres" .Values.bootstrap.name }}
+{{- $name := printf "%s-postgres" (include "asservat.name" .) }}
 {{- $sameKeycloak := and (eq (dig "identity" "provider" "external" $services) "keycloak") (eq (dig "identity" "keycloak" "database" "host" "" $services) "") }}
 apiVersion: v1
 kind: Service

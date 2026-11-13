@@ -1,6 +1,26 @@
-# Candidate all-four-services overlay; see docs/installation/small-profile.md. Merge AFTER context-trial-profile.yaml.
-# Replace site placeholders, provide real TLS roots with the guide's --set-file,
-# and use the registry manifest digests of your source-built images.
+# All-four-services overlay; see docs/installation/small-profile.md. Merge AFTER context-trial-profile.yaml.
+# Replace site placeholders and use the registry manifest digests of your
+# source-built images. Generated Secrets are created by the `secrets` hook.
+image:
+  repository: registry.example.invalid/asservat
+  digest: sha256:REPLACE_PRODUCT_MANIFEST_DIGEST
+origin: https://asservat.lab.example.invalid:31450
+identity:
+  clientID: asservat-console
+  browserAudience: asservat-api
+  eligibleGroups: [] # Product adds the original generated users-group UUID.
+exposure:
+  tlsSecret: operator-console-tls
+fleet:
+  clients: [asservat-console, asservat-mcp]
+  groups: [] # Product adds its original generated users-group UUID.
+federation:
+  endpoint: https://federation.lab.example.invalid:31446
+  serverName: federation.lab.example.invalid
+  ownerAddress: owner.lab.example.invalid:31447
+  ownerOperationAddress: owner.lab.example.invalid:31449
+  keyServiceEndpoint: https://keys.lab.example.invalid:31448
+  evidenceStore: {} # Same bundled bucket, separate keys.
 services:
   postgres:
     provider: bundled
@@ -27,35 +47,3 @@ services:
       service: { type: NodePort, nodePort: 31451 }
       # The empty host selects the SAME generated PostgreSQL server.
       database: { host: "" }
-bootstrap:
-  image: registry.example.invalid/asservat@sha256:REPLACE_PRODUCT_MANIFEST_DIGEST
-  administrators:
-    - kind: User
-      name: REPLACE_KUBERNETES_AUTHENTICATED_USERNAME
-  kubernetes: { endpoint: https://api.lab.example.invalid:6443, rootsPEM: "" }
-  # All original SQL/provider setup material is generated in selected retained
-  # state. These are not references to operator-owned upstream Secrets.
-  secrets: { producer: "", schema: "", retirement: "" }
-  auditStore: { region: us-east-1, bucket: asservat-audit }
-  fleet:
-    clients: [asservat-console, asservat-mcp]
-    groups: [] # Product adds its original generated users-group UUID.
-  continuation:
-    materialSecretName: operator-serving-material
-    workerProvider: { authMount: "", authMountAccessor: "" }
-    ownerProvider: { authMount: "", authMountAccessor: "" }
-    ownerIssuerRootsPEM: ""
-    public:
-      origin: https://asservat.lab.example.invalid:31450
-      clientID: asservat-console
-      eligibleGroups: [] # Product adds the original generated users-group UUID.
-      federation:
-        connectorPKIMount: ""
-        connectorIssuerRootsPEM: ""
-        endpoint: https://federation.lab.example.invalid:31446
-        serverName: federation.lab.example.invalid
-        ownerAddress: owner.lab.example.invalid:31447
-        ownerOperationAddress: owner.lab.example.invalid:31449
-        keyServiceEndpoint: https://keys.lab.example.invalid:31448
-        evidenceStore: {} # Same original owned bundled bucket, separate keys.
-      promotion: { browserAudience: asservat-api, providerRootsPEM: "" }

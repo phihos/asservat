@@ -158,8 +158,8 @@ func TestHelmBundledPublicUsesActualClosedSourceInputs(t *testing.T) {
 		if object.Kind != "ConfigMap" {
 			continue
 		}
-		if content := object.Data["preparation.json"]; content != "" {
-			actual, err := contracts.DecodeSmallServicesPreparation(strings.NewReader(content))
+		if content := object.Data["secrets.json"]; content != "" {
+			actual, err := contracts.DecodeSecretsPlan(strings.NewReader(content))
 			if err != nil || !actual.Postgres || actual.Keycloak == nil || !reflect.DeepEqual(*actual.Keycloak, identity.settings) || actual.ObjectStore == nil || actual.OpenBao == nil {
 				t.Fatal("actual selected preparation lost original Keycloak or storage inputs", err)
 			}

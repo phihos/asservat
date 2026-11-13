@@ -2,16 +2,12 @@ package bootstrap
 
 import (
 	"bytes"
-	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"reflect"
-	"strings"
 	"testing"
 	"time"
 
@@ -19,8 +15,6 @@ import (
 	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/domain/privacy"
 	"github.com/google/uuid"
-	core "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/yaml"
 )
 
 func TestSmallKeycloakProcessingFalsePreservesOriginalPublicBytes(t *testing.T) {
@@ -175,86 +169,17 @@ func assertBundledProcessingGroupEligibility(t *testing.T, public *contracts.Ins
 	}
 }
 
-func TestSmallKeycloakProcessingHelmOptInPreservesDefaultRequirement(t *testing.T) {
-	helm, err := exec.LookPath("helm")
-	if err != nil {
-		t.Fatal("Helm is required for the actual producer regression")
-	}
-	profile, err := os.ReadFile("../../examples/helm/context-trial-profile.yaml")
-	if err != nil {
-		t.Fatal(err)
-	}
-	var reference struct {
-		Bootstrap struct {
-			Continuation struct {
-				Public struct{ Capacity json.RawMessage }
-			}
-		}
-	}
-	profileJSON, err := yaml.ToJSON(profile)
-	if err != nil || json.Unmarshal(profileJSON, &reference) != nil || len(reference.Bootstrap.Continuation.Public.Capacity) == 0 {
-		t.Fatal("reference capacity input missing")
-	}
-	for _, mode := range []string{"default", "false", "true", "external-true", "explicit", "true-empty"} {
+func TestSmallKeycloakProcessingHelmOptInReachesSecretsPlan(t *testing.T) {
+	for _, mode := range []string{"default", "false", "true"} {
 		t.Run(mode, func(t *testing.T) {
-			bootstrap := smallServicesHelmBootstrap()
-			public := bootstrap["continuation"].(map[string]any)["public"].(map[string]any)
-			public["capacity"] = reference.Bootstrap.Continuation.Public.Capacity
-			if mode == "explicit" {
-				public["processingOperators"] = []contracts.ProcessingOperator{{ClientID: "asservat-console", Issuer: "https://identity.example/realms/asservat", Kind: "User", ID: "declared-human"}}
-			}
-			if mode == "true-empty" {
-				public["processingOperators"] = []contracts.ProcessingOperator{}
-			}
-			kc := map[string]any{"hostname": "https://identity.example", "tlsSecretName": "identity-tls"}
+			values := secretsHelmValues("hub")
 			if mode != "default" {
-				kc["processingOperators"] = mode == "true" || mode == "true-empty" || mode == "external-true"
+				kc := values["services"].(map[string]any)["identity"].(map[string]any)["keycloak"].(map[string]any)
+				kc["processingOperators"] = mode == "true"
 			}
-			provider := "keycloak"
-			if mode == "external-true" {
-				provider = "external"
-			}
-			values := map[string]any{"bootstrap": bootstrap, "services": map[string]any{"identity": map[string]any{"provider": provider, "keycloak": kc}, "postgres": map[string]any{"provider": "bundled", "bundled": map[string]any{"image": "registry.example/postgres@sha256:" + strings.Repeat("b", 64)}}}}
-			body, err := json.Marshal(values)
-			if err != nil {
-				t.Fatal(err)
-			}
-			path := filepath.Join(t.TempDir(), "values.json")
-			if err = os.WriteFile(path, body, 0600); err != nil {
-				t.Fatal(err)
-			}
-			ctx, end := context.WithTimeout(t.Context(), 15*time.Second)
-			defer end()
-			raw, err := exec.CommandContext(ctx, helm, "template", "trial", "../../charts/asservat", "--namespace", "installation", "--kube-version", "1.35.0", "-f", path).CombinedOutput()
-			accepted := mode == "true" || mode == "explicit"
-			if !accepted {
-				if err == nil || !strings.Contains(string(raw), "processingOperators") {
-					t.Fatalf("missing/empty operators accepted or refused for an unrelated reason: %v\n%s", err, raw)
-				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("actual chart producer: %v\n%s", err, raw)
-			}
-			decoder := yaml.NewYAMLOrJSONDecoder(bytes.NewReader(raw), 4096)
-			for {
-				var config core.ConfigMap
-				if err := decoder.Decode(&config); err == io.EOF {
-					t.Fatal("preparation ConfigMap missing")
-				} else if err != nil {
-					t.Fatal(err)
-				}
-				if config.Kind != "ConfigMap" || config.Name != "trial-services-prepare" {
-					continue
-				}
-				plan, err := contracts.DecodeSmallServicesPreparation(strings.NewReader(config.Data["preparation.json"]))
-				if err != nil || plan.Keycloak == nil || plan.Keycloak.ProcessingOperators != (mode == "true") {
-					t.Fatal("actual closed preparation input lost explicit selection", err)
-				}
-				if mode == "explicit" && strings.Contains(config.Data["preparation.json"], "processingOperators") {
-					t.Fatal("default preparation wire gained a false field")
-				}
-				break
+			plan, _, _ := renderSecretsHook(t, values)
+			if plan.Keycloak == nil || plan.Keycloak.ProcessingOperators != (mode == "true") {
+				t.Fatal("secrets plan lost the explicit processing-operator selection")
 			}
 		})
 	}

@@ -28,7 +28,7 @@ func pendingBootstrapProvider(t *testing.T, d contracts.InitialBootstrap, state 
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	s.Material.IssuerToken = ""
 	s.Material.SetupToken = "original-private-setup-token"
-	s.Material.BundledIdentity = &contracts.BundledInitialProviderIdentity{Format: contracts.BundledInitialProviderIdentityFormat, BackendName: d.Name, Namespace: s.Prelude.Namespace, SetupAccount: contracts.WorkerObjectReference{Name: d.Name + "-bootstrap-runner", UID: ownerID(81)}, EntityID: ownerID(82), SetupParent: contracts.InitialProviderParent{Accessor: "original-setup-accessor", IssuedAt: now, ExpiresAt: now.Add(300 * time.Second)}}
+	s.Material.BundledIdentity = &contracts.BundledInitialProviderIdentity{Format: contracts.BundledInitialProviderIdentityFormat, BackendName: d.Name, Namespace: s.Prelude.Namespace, SetupAccount: contracts.WorkerObjectReference{Name: d.Name + "-setup", UID: ownerID(81)}, EntityID: ownerID(82), SetupParent: contracts.InitialProviderParent{Accessor: "original-setup-accessor", IssuedAt: now, ExpiresAt: now.Add(300 * time.Second)}}
 	if !bootstrapStateValid(d, s) {
 		t.Fatal("pending original provider state invalid")
 	}

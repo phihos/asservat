@@ -16,22 +16,22 @@ import (
 var withArguments = []string{"installer-cluster", "installer-cluster-join", "download-worker", "setup"}
 
 // One-shot commands report a cancellation as a failure.
-var oneShot = []string{"small-services-prepare", "installer-cluster", "installer-cluster-join", "setup"}
+var oneShot = []string{"secrets", "installer-cluster", "installer-cluster-join", "setup"}
 
-var commands = []string{"small-services-prepare", "setup", "installer-cluster", "installer-cluster-join", "download-worker", "hub-api", "hub-worker", "hub-federation", "connector", "key-service", "publisher", "node"}
+var commands = []string{"secrets", "setup", "installer-cluster", "installer-cluster-join", "download-worker", "hub-api", "hub-worker", "hub-federation", "connector", "key-service", "publisher", "node"}
 
 func main() { os.Exit(run()) }
 func run() int {
 	if len(os.Args) < 2 || !slices.Contains(commands, os.Args[1]) || !slices.Contains(withArguments, os.Args[1]) && len(os.Args) != 2 {
-		fmt.Fprintln(os.Stderr, "usage: asservat small-services-prepare | setup [--wait-schema --config file --credential file] | installer-cluster --offer file --bootstrap file [--evidence-credential file] [--kubeconfig file] [--context name] [--namespace name] [--in-cluster] | installer-cluster-join --namespace name --join file [--standby n] [--captures n] [--kubeconfig file] [--context name] | download-worker [protected startup arguments] | hub-api | hub-worker | hub-federation | connector | key-service | publisher | node")
+		fmt.Fprintln(os.Stderr, "usage: asservat secrets | setup [--wait-schema --config file --credential file] | installer-cluster --offer file --bootstrap file [--evidence-credential file] [--kubeconfig file] [--context name] [--namespace name] [--in-cluster] | installer-cluster-join --namespace name --join file [--standby n] [--captures n] [--kubeconfig file] [--context name] | download-worker [protected startup arguments] | hub-api | hub-worker | hub-federation | connector | key-service | publisher | node")
 		return 2
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer stop()
 	var err error
 	switch os.Args[1] {
-	case "small-services-prepare":
-		err = bootstrap.RunSmallServicesPreparation(ctx)
+	case "secrets":
+		err = bootstrap.RunSecrets(ctx)
 	case "setup":
 		err = bootstrap.RunSetup(ctx, os.Args[2:], os.Stdout)
 	case "installer-cluster":
@@ -62,8 +62,8 @@ func run() int {
 		return 0
 	}
 	switch os.Args[1] {
-	case "small-services-prepare":
-		fmt.Fprintln(os.Stderr, bootstrap.SmallServicesDiagnostic(err))
+	case "secrets":
+		fmt.Fprintln(os.Stderr, bootstrap.SecretsDiagnostic(err))
 	case "setup", "installer-cluster":
 		// A fixed step name and error class only, no provider response bodies.
 		fmt.Fprintln(os.Stderr, err)

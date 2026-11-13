@@ -87,7 +87,7 @@ func bundledKeycloakIssuer(s contracts.SmallKeycloakSettings) string {
 func readHelmBundledKeycloakMaterial(ctx context.Context, config *rest.Config, settings contracts.SmallKeycloakSettings) (*core.Secret, error) {
 	// The typed client intentionally clears GVK. Reuse the production bounded
 	// wire reader so the original validator can check the actual kind/version.
-	store, err := kube.NewSmallKeycloakStateStore(config, settings, "", strings.TrimSuffix(settings.SecretName, "-state"), nil)
+	store, err := kube.NewSmallKeycloakStateStore(config, settings, "")
 	if err != nil {
 		return nil, err
 	}

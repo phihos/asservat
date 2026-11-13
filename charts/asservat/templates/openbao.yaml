@@ -1,10 +1,9 @@
 {{- if eq .Values.services.keyService.provider "openbao" }}
-{{- $b := .Values.bootstrap }}
 {{- $p := .Values.services.keyService.openbao }}
 {{- if not (regexMatch "^[a-z0-9][a-z0-9./:_-]{0,383}@sha256:[a-f0-9]{64}$" $p.image) }}
 {{- fail "services.keyService.openbao.image requires the qualified repository@sha256 image" }}
 {{- end }}
-{{- $name := printf "%s-openbao" $b.name }}
+{{- $name := printf "%s-openbao" (include "asservat.name" .) }}
 {{- $reviewer := printf "%s-%s-reviewer" .Release.Namespace $name }}
 apiVersion: v1
 kind: ServiceAccount
@@ -79,9 +78,6 @@ spec:
       automountServiceAccountToken: false
       enableServiceLinks: false
       terminationGracePeriodSeconds: 30
-      {{- if $b.registrySecret }}
-      imagePullSecrets: [{name: {{ $b.registrySecret | quote }}}]
-      {{- end }}
       securityContext:
         runAsNonRoot: true
         runAsUser: 65532
@@ -101,8 +97,6 @@ spec:
             capabilities: {drop: [ALL]}
           ports: [{name: https, containerPort: 8200}]
           resources: {{ toYaml $p.resources | nindent 12 }}
-          # Infrastructure health grants no application readiness/authority.
-          # The installer separately verifies the exact final backend marker.
           readinessProbe:
             httpGet: {path: /v1/sys/health, port: https, scheme: HTTPS}
             periodSeconds: 5

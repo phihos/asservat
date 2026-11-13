@@ -62,37 +62,6 @@ func smallPostgresClear(d map[string][]byte) {
 	}
 }
 
-// A retained workload with missing data is recovery, not another initdb. If
-// Helm never reached workload/PVC creation, the original create-once state can
-// still complete its first installation. Absence or errors never prove loss
-// was recovered, and this check cannot detect historical replacement of a PVC.
-func (s *SmallPostgresPreparation) checkRetainedData(ctx context.Context) error {
-	base := "/api/v1/namespaces/" + s.plan.Namespace
-	raw, err := s.api.Get().AbsPath(base + "/persistentvolumeclaims/" + s.plan.DataPVCName()).MaxRetries(0).DoRaw(ctx)
-	clear(raw)
-	if ctx.Err() != nil {
-		return cfg.ErrUnavailable
-	}
-	if err == nil {
-		return nil
-	}
-	if !apierrors.IsNotFound(err) {
-		return cfg.ErrUnavailable
-	}
-	paths := []string{"/apis/apps/v1/namespaces/" + s.plan.Namespace + "/statefulsets/" + s.plan.ServiceName(), base + "/pods/" + s.plan.ServiceName() + "-0"}
-	if s.plan.Keycloak {
-		paths = append(paths, "/apis/apps/v1/namespaces/"+s.plan.Namespace+"/deployments/"+s.plan.Name+"-keycloak")
-	}
-	for _, path := range paths {
-		raw, err = s.api.Get().AbsPath(path).MaxRetries(0).DoRaw(ctx)
-		clear(raw)
-		if !apierrors.IsNotFound(err) || ctx.Err() != nil {
-			return cfg.ErrUnavailable
-		}
-	}
-	return nil
-}
-
 // Prepare performs no SQL effects. An unknown CREATE permits only one exact
 // readback; it never regenerates, overwrites or retries CREATE in this call.
 func (s *SmallPostgresPreparation) Prepare(ctx context.Context) (contracts.WorkerObjectReference, error) {
@@ -105,20 +74,13 @@ func (s *SmallPostgresPreparation) Prepare(ctx context.Context) (contracts.Worke
 	old, err := s.read(ctx)
 	if err == nil {
 		defer smallPostgresClear(old.Data)
-		if s.checkRetainedData(ctx) != nil || ctx.Err() != nil {
+		if ctx.Err() != nil {
 			return zero, cfg.ErrUnavailable
 		}
 		return contracts.WorkerObjectReference{Name: old.Name, UID: string(old.UID)}, nil
 	}
 	if !apierrors.IsNotFound(err) {
 		return zero, cfg.ErrUnavailable
-	}
-	for _, name := range []string{s.plan.DataPVCName(), s.plan.BackupPVCName()} {
-		raw, e := s.api.Get().AbsPath("/api/v1/namespaces/" + s.plan.Namespace + "/persistentvolumeclaims/" + name).MaxRetries(0).DoRaw(ctx)
-		clear(raw)
-		if !apierrors.IsNotFound(e) {
-			return zero, cfg.ErrUnavailable
-		}
 	}
 	data, err := BuildSmallPostgresMaterial(s.plan, s.now())
 	if err != nil {

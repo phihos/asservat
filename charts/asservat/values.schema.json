@@ -1,11 +1,17 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Asservat configuration and bounded initial installer values",
+  "title": "Asservat Helm values",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "mode",
-    "runtime",
+    "image",
+    "installation",
+    "exposure",
+    "region",
+    "collector",
+    "hub",
+    "secrets",
     "services"
   ],
   "properties": {
@@ -16,953 +22,688 @@
         "cluster",
         "combined"
       ],
-      "description": "Intended release topology; this development chart installs configuration foundations only."
+      "description": "Release topology: hub, cluster (one workload cluster) or combined (single cluster)."
     },
-    "runtime": {
+    "image": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "enabled"
-      ],
       "properties": {
-        "enabled": {
-          "type": "boolean",
-          "const": false,
-          "description": "Must remain false until the runtime roles and their installation qualification are implemented."
-        }
-      }
-    },
-    "bootstrap": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "enabled",
-        "name",
-        "targetNamespace",
-        "image",
-        "registrySecret",
-        "probeAudience",
-        "secrets",
-        "kubernetes",
-        "postgres",
-        "auditStore",
-        "keyService",
-        "fleet",
-        "providers"
-      ],
-      "properties": {
-        "enabled": {
-          "type": "boolean"
+        "repository": {
+          "type": "string",
+          "maxLength": 384,
+          "pattern": "^$|^[a-z0-9][a-z0-9./:_-]*$"
         },
+        "digest": {
+          "type": "string",
+          "pattern": "^$|^sha256:[a-f0-9]{64}$"
+        },
+        "pullPolicy": {
+          "enum": [
+            "IfNotPresent",
+            "Always",
+            "Never"
+          ]
+        },
+        "pullSecrets": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "type": "string",
+            "maxLength": 253,
+            "pattern": "^$|^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$"
+          }
+        }
+      },
+      "required": [
+        "repository",
+        "digest",
+        "pullPolicy",
+        "pullSecrets"
+      ]
+    },
+    "installation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
         "name": {
           "type": "string",
+          "minLength": 1,
           "maxLength": 30,
           "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
-        },
-        "targetNamespace": {
+        }
+      },
+      "required": [
+        "name"
+      ]
+    },
+    "origin": {
+      "type": "string",
+      "maxLength": 2048
+    },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "issuer": {
           "type": "string",
-          "maxLength": 63,
-          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+          "maxLength": 2048
         },
-        "image": {
+        "clientID": {
           "type": "string",
-          "maxLength": 456,
-          "pattern": "^$|^[a-z0-9][a-z0-9./:_-]{0,383}@sha256:[a-f0-9]{64}$"
+          "maxLength": 255
         },
-        "registrySecret": {
-          "type": "string",
-          "maxLength": 253,
-          "pattern": "^$|^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$"
-        },
-        "probeAudience": {
+        "browserAudience": {
           "type": "string",
           "maxLength": 256
         },
-        "secrets": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "producer",
-            "schema",
-            "retirement"
-          ],
-          "properties": {
-            "producer": {
-              "type": "string",
-              "maxLength": 253,
-              "pattern": "^$|^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$"
-            },
-            "schema": {
-              "type": "string",
-              "maxLength": 253,
-              "pattern": "^$|^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$"
-            },
-            "retirement": {
-              "type": "string",
-              "maxLength": 253,
-              "pattern": "^$|^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$"
-            }
-          }
+        "providerRootsPEM": {
+          "type": "string",
+          "maxLength": 32768
         },
-        "kubernetes": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "endpoint",
-            "rootsPEM"
-          ],
-          "properties": {
-            "endpoint": {
-              "type": "string",
-              "maxLength": 2048
-            },
-            "rootsPEM": {
-              "type": "string",
-              "maxLength": 32768
-            }
-          }
-        },
-        "postgres": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "host",
-            "port",
-            "database",
-            "maxConnections",
-            "rootsPEM"
-          ],
-          "properties": {
-            "host": {
-              "type": "string",
-              "maxLength": 253
-            },
-            "port": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 65535
-            },
-            "database": {
-              "type": "string",
-              "maxLength": 63
-            },
-            "maxConnections": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 4
-            },
-            "rootsPEM": {
-              "type": "string",
-              "maxLength": 32768
-            }
-          }
-        },
-        "auditStore": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "endpoint",
-            "region",
-            "bucket",
-            "rootsPEM"
-          ],
-          "properties": {
-            "endpoint": {
-              "type": "string",
-              "maxLength": 2048
-            },
-            "region": {
-              "type": "string",
-              "maxLength": 128
-            },
-            "bucket": {
-              "type": "string",
-              "maxLength": 63
-            },
-            "rootsPEM": {
-              "type": "string",
-              "maxLength": 32768
-            }
-          }
-        },
-        "keyService": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "endpoint",
-            "auditMount",
-            "auditKey",
-            "rootsPEM"
-          ],
-          "properties": {
-            "endpoint": {
-              "type": "string",
-              "maxLength": 2048
-            },
-            "auditMount": {
-              "type": "string",
-              "maxLength": 128
-            },
-            "auditKey": {
-              "type": "string",
-              "maxLength": 128
-            },
-            "rootsPEM": {
-              "type": "string",
-              "maxLength": 32768
-            }
-          }
-        },
-        "fleet": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "issuer",
-            "clients",
-            "subjects",
-            "groups",
-            "deliveryProfiles",
-            "maxActiveBootstraps",
-            "maxBootstrapHistory",
-            "maxClusters"
-          ],
-          "properties": {
-            "issuer": {
-              "type": "string",
-              "maxLength": 2048
-            },
-            "clients": {
-              "type": "array",
-              "maxItems": 64,
-              "uniqueItems": true,
-              "items": {
+        "clients": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "kind"
+            ],
+            "properties": {
+              "id": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 256
-              }
-            },
-            "subjects": {
-              "type": "array",
-              "maxItems": 256,
-              "uniqueItems": true,
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "properties": {
-                  "id": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 256
-                  },
-                  "kind": {
-                    "enum": [
-                      "human",
-                      "workload"
-                    ]
-                  }
-                },
-                "required": [
-                  "id",
-                  "kind"
+                "maxLength": 255
+              },
+              "kind": {
+                "enum": [
+                  "human",
+                  "workload"
                 ]
               }
-            },
-            "groups": {
-              "type": "array",
-              "maxItems": 256,
-              "uniqueItems": true,
-              "items": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 256
-              }
-            },
-            "deliveryProfiles": {
-              "type": "array",
-              "maxItems": 16,
-              "uniqueItems": true,
-              "items": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 64
-              }
-            },
-            "maxActiveBootstraps": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 128
-            },
-            "maxBootstrapHistory": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 65536
-            },
-            "maxClusters": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 1024
             }
           }
         },
-        "providers": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "issuerPolicy",
-            "wrapRole",
-            "wrapPolicy",
-            "unwrapRole",
-            "unwrapPolicy"
-          ],
-          "properties": {
-            "issuerPolicy": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 64,
-              "pattern": "^[a-zA-Z0-9_-]{1,64}$",
-              "not": {
+        "eligibleSubjects": {
+          "type": "array",
+          "maxItems": 256,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "kind"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 255
+              },
+              "kind": {
                 "enum": [
-                  "root",
-                  "default"
-                ]
-              }
-            },
-            "wrapRole": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 64,
-              "pattern": "^[a-zA-Z0-9_-]{1,64}$",
-              "not": {
-                "enum": [
-                  "root",
-                  "default"
-                ]
-              }
-            },
-            "wrapPolicy": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 64,
-              "pattern": "^[a-zA-Z0-9_-]{1,64}$",
-              "not": {
-                "enum": [
-                  "root",
-                  "default"
-                ]
-              }
-            },
-            "unwrapRole": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 64,
-              "pattern": "^[a-zA-Z0-9_-]{1,64}$",
-              "not": {
-                "enum": [
-                  "root",
-                  "default"
-                ]
-              }
-            },
-            "unwrapPolicy": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 64,
-              "pattern": "^[a-zA-Z0-9_-]{1,64}$",
-              "not": {
-                "enum": [
-                  "root",
-                  "default"
+                  "human",
+                  "workload"
                 ]
               }
             }
-          },
-          "description": "All five names must be distinct; runtime validation checks cross-field uniqueness before bootstrap effects."
+          }
         },
-        "continuation": {
+        "eligibleGroups": {
+          "type": "array",
+          "maxItems": 256,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          }
+        },
+        "groupMaxAgeSeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 300
+        },
+        "maxLifetimeSeconds": {
+          "type": "integer",
+          "minimum": 60,
+          "maximum": 86400
+        },
+        "maxLogins": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4096
+        },
+        "maxSessions": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65536
+        },
+        "maxLogoutEvents": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65536
+        },
+        "approvals": {
+          "description": "Protected installation approval settings (ADR-249). stepUp names the IdP acr values accepted as approval step-up and their maximum authentication age; without it no approval can be decided. requireRecordingApproval makes metadata packet/syscall recordings need the same individual approval as sensitive acquisitions (REQ-SYS-002).",
           "type": "object",
           "additionalProperties": false,
-          "required": [
-            "enabled",
-            "workerProvider",
-            "ownerProvider",
-            "ownerIssuerRootsPEM",
-            "ownerPKIMount",
-            "ownerConnections",
-            "ownerConcurrency",
-            "public"
-          ],
           "properties": {
-            "enabled": {
-              "type": "boolean"
-            },
-            "workerProvider": {
+            "stepUp": {
               "type": "object",
               "additionalProperties": false,
-              "required": [
-                "authMount",
-                "authMountAccessor"
-              ],
               "properties": {
-                "authMount": {
-                  "type": "string",
-                  "maxLength": 128,
-                  "pattern": "^([a-zA-Z0-9_-]{1,128})?$"
-                },
-                "authMountAccessor": {
-                  "type": "string",
-                  "maxLength": 128,
-                  "pattern": "^([a-zA-Z0-9_-]{1,128})?$"
-                }
-              }
-            },
-            "ownerProvider": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": [
-                "authMount",
-                "authMountAccessor"
-              ],
-              "properties": {
-                "authMount": {
-                  "type": "string",
-                  "maxLength": 128,
-                  "pattern": "^([a-zA-Z0-9_-]{1,128})?$"
-                },
-                "authMountAccessor": {
-                  "type": "string",
-                  "maxLength": 128,
-                  "pattern": "^([a-zA-Z0-9_-]{1,128})?$"
-                }
-              }
-            },
-            "ownerIssuerRootsPEM": {
-              "type": "string",
-              "maxLength": 32768
-            },
-            "ownerPKIMount": {
-              "type": "string",
-              "pattern": "^[a-zA-Z0-9_-]{1,128}$"
-            },
-            "ownerConnections": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 64
-            },
-            "ownerConcurrency": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 16
-            },
-            "public": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": [
-                "origin",
-                "issuer",
-                "clientID",
-                "maxLifetimeSeconds",
-                "maxLogins",
-                "maxSessions",
-                "maxLogoutEvents",
-                "clients",
-                "eligibleSubjects",
-                "eligibleGroups",
-                "groupMaxAgeSeconds"
-              ],
-              "properties": {
-                "processors": {
+                "acrValues": {
                   "type": "array",
-                  "maxItems": 16,
-                  "uniqueItems": true,
-                  "items": {
-                    "type": "object",
-                    "additionalProperties": false,
-                    "required": [
-                      "id",
-                      "name",
-                      "activities",
-                      "regions"
-                    ],
-                    "properties": {
-                      "id": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 64,
-                        "pattern": "^[^\\x00-\\x1f\\x7f-\\x9f]+$"
-                      },
-                      "name": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 160,
-                        "pattern": "^[^\\x00-\\x1f\\x7f-\\x9f]+$"
-                      },
-                      "activities": {
-                        "type": "array",
-                        "minItems": 1,
-                        "maxItems": 8,
-                        "uniqueItems": true,
-                        "items": {
-                          "type": "string",
-                          "minLength": 1,
-                          "maxLength": 128,
-                          "pattern": "^[^\\x00-\\x1f\\x7f-\\x9f]+$"
-                        }
-                      },
-                      "regions": {
-                        "type": "array",
-                        "maxItems": 16,
-                        "uniqueItems": true,
-                        "items": {
-                          "type": "string",
-                          "minLength": 1,
-                          "maxLength": 128,
-                          "pattern": "^[^\\x00-\\x1f\\x7f-\\x9f]+$"
-                        }
-                      }
-                    }
-                  }
-                },
-                "origin": {
-                  "type": "string",
-                  "maxLength": 2048
-                },
-                "issuer": {
-                  "type": "string",
-                  "maxLength": 2048
-                },
-                "clientID": {
-                  "type": "string",
-                  "maxLength": 255
-                },
-                "maxLifetimeSeconds": {
-                  "type": "integer",
-                  "minimum": 60,
-                  "maximum": 86400
-                },
-                "maxLogins": {
-                  "type": "integer",
-                  "minimum": 1,
-                  "maximum": 4096
-                },
-                "maxSessions": {
-                  "type": "integer",
-                  "minimum": 1,
-                  "maximum": 65536
-                },
-                "maxLogoutEvents": {
-                  "type": "integer",
-                  "minimum": 1,
-                  "maximum": 65536
-                },
-                "clients": {
-                  "type": "array",
-                  "maxItems": 64,
-                  "items": {
-                    "type": "object",
-                    "additionalProperties": false,
-                    "required": [
-                      "id",
-                      "kind"
-                    ],
-                    "properties": {
-                      "id": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 255
-                      },
-                      "kind": {
-                        "enum": [
-                          "human",
-                          "workload"
-                        ]
-                      }
-                    }
-                  }
-                },
-                "eligibleSubjects": {
-                  "type": "array",
-                  "maxItems": 256,
-                  "items": {
-                    "type": "object",
-                    "additionalProperties": false,
-                    "required": [
-                      "id",
-                      "kind"
-                    ],
-                    "properties": {
-                      "id": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 255
-                      },
-                      "kind": {
-                        "enum": [
-                          "human",
-                          "workload"
-                        ]
-                      }
-                    }
-                  }
-                },
-                "eligibleGroups": {
-                  "type": "array",
-                  "maxItems": 256,
                   "items": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 255
-                  }
-                },
-                "groupMaxAgeSeconds": {
-                  "type": "integer",
-                  "minimum": 1,
-                  "maximum": 300
-                },
-                "permissionDelegations": {
-                  "type": "array",
-                  "minItems": 0,
-                  "maxItems": 64,
-                  "uniqueItems": true,
-                  "items": {
-                    "type": "object",
-                    "additionalProperties": false,
-                    "required": [
-                      "writers",
-                      "clusterID",
-                      "namespace",
-                      "workloads",
-                      "roles",
-                      "issuers",
-                      "previewers"
-                    ],
-                    "properties": {
-                      "writers": {
-                        "type": "array",
-                        "minItems": 1,
-                        "maxItems": 32,
-                        "uniqueItems": true,
-                        "items": {
-                          "type": "object",
-                          "additionalProperties": false,
-                          "required": [
-                            "kind",
-                            "name"
-                          ],
-                          "properties": {
-                            "kind": {
-                              "enum": [
-                                "User",
-                                "Group"
-                              ]
-                            },
-                            "name": {
-                              "type": "string",
-                              "minLength": 1,
-                              "maxLength": 256,
-                              "pattern": "^[^\\x00-\\x1f\\x7f]+$"
-                            }
-                          }
-                        }
-                      },
-                      "clusterID": {
-                        "type": "string",
-                        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
-                        "not": {
-                          "const": "00000000-0000-0000-0000-000000000000"
-                        }
-                      },
-                      "namespace": {
-                        "type": "object",
-                        "additionalProperties": false,
-                        "required": [
-                          "name",
-                          "uid"
-                        ],
-                        "properties": {
-                          "name": {
-                            "type": "string",
-                            "minLength": 1,
-                            "maxLength": 63,
-                            "pattern": "^[^\\x00-\\x1f\\x7f]+$"
-                          },
-                          "uid": {
-                            "type": "string",
-                            "minLength": 1,
-                            "maxLength": 64,
-                            "pattern": "^[^\\x00-\\x1f\\x7f]+$"
-                          }
-                        }
-                      },
-                      "workloads": {
-                        "type": "array",
-                        "minItems": 0,
-                        "maxItems": 64,
-                        "uniqueItems": true,
-                        "items": {
-                          "type": "object",
-                          "additionalProperties": false,
-                          "required": [
-                            "kind",
-                            "name",
-                            "uid"
-                          ],
-                          "properties": {
-                            "kind": {
-                              "enum": [
-                                "Deployment",
-                                "StatefulSet"
-                              ]
-                            },
-                            "name": {
-                              "type": "string",
-                              "minLength": 1,
-                              "maxLength": 253,
-                              "pattern": "^[^\\x00-\\x1f\\x7f]+$"
-                            },
-                            "uid": {
-                              "type": "string",
-                              "minLength": 1,
-                              "maxLength": 64,
-                              "pattern": "^[^\\x00-\\x1f\\x7f]+$"
-                            }
-                          }
-                        }
-                      },
-                      "roles": {
-                        "type": "array",
-                        "minItems": 1,
-                        "maxItems": 4,
-                        "uniqueItems": true,
-                        "items": {
-                          "enum": [
-                            "workload-maintainer",
-                            "evidence-reader",
-                            "evidence-owner",
-                            "action-approver"
-                          ]
-                        }
-                      },
-                      "issuers": {
-                        "type": "array",
-                        "minItems": 1,
-                        "maxItems": 8,
-                        "uniqueItems": true,
-                        "items": {
-                          "type": "string",
-                          "minLength": 1,
-                          "maxLength": 2048,
-                          "pattern": "^[^\\x00-\\x1f\\x7f]+$"
-                        }
-                      },
-                      "previewers": {
-                        "type": "array",
-                        "minItems": 1,
-                        "maxItems": 64,
-                        "uniqueItems": true,
-                        "items": {
-                          "type": "object",
-                          "additionalProperties": false,
-                          "required": [
-                            "issuer",
-                            "kind",
-                            "id"
-                          ],
-                          "properties": {
-                            "issuer": {
-                              "type": "string",
-                              "minLength": 1,
-                              "maxLength": 2048,
-                              "pattern": "^[^\\x00-\\x1f\\x7f]+$"
-                            },
-                            "kind": {
-                              "enum": [
-                                "User",
-                                "Group"
-                              ]
-                            },
-                            "id": {
-                              "type": "string",
-                              "minLength": 1,
-                              "maxLength": 256,
-                              "pattern": "^[^\\x00-\\x1f\\x7f]+$"
-                            }
-                          }
-                        }
-                      }
-                    }
+                    "maxLength": 128,
+                    "pattern": "^[^\\x00-\\x1f\\x7f]+$"
                   },
-                  "description": "Trusted initial permission guard envelopes and matching browser previewers; empty grants no delegated authority."
+                  "minItems": 1,
+                  "maxItems": 8,
+                  "uniqueItems": true
                 },
-                "approvals": {
-                  "description": "Protected installation approval settings (ADR-249). stepUp names the IdP acr values accepted as approval step-up and their maximum authentication age; without it no approval can be decided. requireRecordingApproval makes metadata packet/syscall recordings need the same individual approval as sensitive acquisitions (REQ-SYS-002).",
-                  "type": "object",
-                  "additionalProperties": false,
-                  "properties": {
-                    "stepUp": {
-                      "type": "object",
-                      "additionalProperties": false,
-                      "properties": {
-                        "acrValues": {
-                          "type": "array",
-                          "items": {
-                            "type": "string",
-                            "minLength": 1,
-                            "maxLength": 128,
-                            "pattern": "^[^\\x00-\\x1f\\x7f]+$"
-                          },
-                          "minItems": 1,
-                          "maxItems": 8,
-                          "uniqueItems": true
-                        },
-                        "maxAgeSeconds": {
-                          "type": "integer",
-                          "minimum": 30,
-                          "maximum": 3600
-                        }
-                      },
-                      "required": [
-                        "acrValues",
-                        "maxAgeSeconds"
-                      ]
-                    },
-                    "requireRecordingApproval": {
-                      "type": "boolean"
-                    }
-                  }
-                },
-                "captureHistory": {
-                  "type": "object",
-                  "additionalProperties": false,
-                  "required": [
-                    "perSelector",
-                    "perInstallation"
-                  ],
-                  "properties": {
-                    "perSelector": {
-                      "type": "integer",
-                      "minimum": 1,
-                      "maximum": 1000
-                    },
-                    "perInstallation": {
-                      "type": "integer",
-                      "minimum": 1,
-                      "maximum": 100000
-                    }
-                  }
-                },
-                "capacity": {
-                  "$ref": "#/definitions/installerCapacity"
-                },
-                "processingOperators": {
-                  "$ref": "#/definitions/installerProcessingOperators"
-                },
-                "federation": {
-                  "$ref": "#/definitions/installerFederation"
-                },
-                "promotion": {
-                  "$ref": "#/definitions/installerPromotion"
-                },
-                "retentionBaseline": {
-                  "$ref": "#/definitions/installerRetentionBaseline"
+                "maxAgeSeconds": {
+                  "type": "integer",
+                  "minimum": 30,
+                  "maximum": 3600
                 }
               },
-              "dependencies": {
-                "promotion": [
-                  "capacity",
-                  "federation"
-                ],
-                "federation": [
-                  "capacity"
-                ]
-              }
+              "required": [
+                "acrValues",
+                "maxAgeSeconds"
+              ]
             },
-            "materialSecretName": {
-              "type": "string",
-              "maxLength": 253,
-              "pattern": "^([a-z0-9]([-a-z0-9.]*[a-z0-9])?)?$"
+            "requireRecordingApproval": {
+              "type": "boolean"
             }
           }
         },
-        "administrators": {
+        "processingOperators": {
+          "$ref": "#/definitions/installerProcessingOperators"
+        },
+        "permissionDelegations": {
           "type": "array",
-          "minItems": 1,
-          "maxItems": 31,
+          "minItems": 0,
+          "maxItems": 64,
           "uniqueItems": true,
           "items": {
             "type": "object",
             "additionalProperties": false,
             "required": [
-              "kind",
-              "name"
+              "writers",
+              "clusterID",
+              "namespace",
+              "workloads",
+              "roles",
+              "issuers",
+              "previewers"
             ],
             "properties": {
-              "kind": {
-                "enum": [
-                  "User",
-                  "Group"
-                ]
+              "writers": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 32,
+                "uniqueItems": true,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "kind",
+                    "name"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "enum": [
+                        "User",
+                        "Group"
+                      ]
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 256,
+                      "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+                    }
+                  }
+                }
               },
-              "name": {
+              "clusterID": {
                 "type": "string",
-                "minLength": 1,
-                "maxLength": 256
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                "not": {
+                  "const": "00000000-0000-0000-0000-000000000000"
+                }
+              },
+              "namespace": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "name",
+                  "uid"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 63,
+                    "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+                  },
+                  "uid": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64,
+                    "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+                  }
+                }
+              },
+              "workloads": {
+                "type": "array",
+                "minItems": 0,
+                "maxItems": 64,
+                "uniqueItems": true,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "kind",
+                    "name",
+                    "uid"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "enum": [
+                        "Deployment",
+                        "StatefulSet"
+                      ]
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 253,
+                      "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+                    },
+                    "uid": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64,
+                      "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+                    }
+                  }
+                }
+              },
+              "roles": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 4,
+                "uniqueItems": true,
+                "items": {
+                  "enum": [
+                    "workload-maintainer",
+                    "evidence-reader",
+                    "evidence-owner",
+                    "action-approver"
+                  ]
+                }
+              },
+              "issuers": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 8,
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 2048,
+                  "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+                }
+              },
+              "previewers": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 64,
+                "uniqueItems": true,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "issuer",
+                    "kind",
+                    "id"
+                  ],
+                  "properties": {
+                    "issuer": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2048,
+                      "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+                    },
+                    "kind": {
+                      "enum": [
+                        "User",
+                        "Group"
+                      ]
+                    },
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 256,
+                      "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+                    }
+                  }
+                }
               }
             }
           },
-          "description": "Explicit existing guard administrators in addition to the installer-derived runner; names are Kubernetes authenticated identities, not browser permission grants."
+          "description": "Trusted initial permission guard envelopes and matching browser previewers; empty grants no delegated authority."
         }
-      },
-      "allOf": [
-        {
-          "if": {
-            "properties": {
-              "enabled": {
-                "const": true
-              }
+      }
+    },
+    "processors": {
+      "type": "array",
+      "maxItems": 16,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "activities",
+          "regions"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[^\\x00-\\x1f\\x7f-\\x9f]+$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160,
+            "pattern": "^[^\\x00-\\x1f\\x7f-\\x9f]+$"
+          },
+          "activities": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 8,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[^\\x00-\\x1f\\x7f-\\x9f]+$"
             }
           },
-          "then": {
-            "properties": {
-              "image": {
-                "minLength": 73
-              }
+          "regions": {
+            "type": "array",
+            "maxItems": 16,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[^\\x00-\\x1f\\x7f-\\x9f]+$"
             }
           }
         }
-      ]
+      }
     },
-    "cluster": {
+    "captureHistory": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "enabled",
-        "namespace",
-        "image",
-        "registrySecret",
-        "offer",
-        "bootstrapSecret"
+        "perSelector",
+        "perInstallation"
       ],
-      "description": "ADR-193: mode=cluster installs one regional connector through installer-cluster as a post-install/post-upgrade hook.",
       "properties": {
-        "enabled": {
-          "type": "boolean"
+        "perSelector": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
         },
+        "perInstallation": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100000
+        }
+      }
+    },
+    "exposure": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "service": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "enum": [
+                "ClusterIP",
+                "NodePort",
+                "LoadBalancer"
+              ]
+            },
+            "nodePort": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 30000,
+              "maximum": 32767
+            },
+            "annotations": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "type"
+          ]
+        },
+        "tls": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "mode": {
+              "enum": [
+                "pod",
+                "proxy"
+              ]
+            }
+          },
+          "required": [
+            "mode"
+          ]
+        },
+        "tlsSecret": {
+          "type": "string",
+          "maxLength": 253,
+          "pattern": "^$|^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$"
+        },
+        "ingress": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "className": {
+              "type": "string",
+              "maxLength": 253
+            },
+            "annotations": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "tls": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            }
+          },
+          "required": [
+            "enabled"
+          ]
+        },
+        "httpRoute": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "parentRefs": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            },
+            "annotations": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "enabled"
+          ]
+        }
+      },
+      "required": [
+        "service",
+        "tls",
+        "ingress",
+        "httpRoute"
+      ]
+    },
+    "fleet": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "issuer",
+        "clients",
+        "subjects",
+        "groups",
+        "deliveryProfiles",
+        "maxActiveBootstraps",
+        "maxBootstrapHistory",
+        "maxClusters"
+      ],
+      "properties": {
+        "issuer": {
+          "type": "string",
+          "maxLength": 2048
+        },
+        "clients": {
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        },
+        "subjects": {
+          "type": "array",
+          "maxItems": 256,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "kind": {
+                "enum": [
+                  "human",
+                  "workload"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "kind"
+            ]
+          }
+        },
+        "groups": {
+          "type": "array",
+          "maxItems": 256,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        },
+        "deliveryProfiles": {
+          "type": "array",
+          "maxItems": 16,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          }
+        },
+        "maxActiveBootstraps": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 128
+        },
+        "maxBootstrapHistory": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65536
+        },
+        "maxClusters": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1024
+        }
+      }
+    },
+    "capacity": {
+      "$ref": "#/definitions/installerCapacity"
+    },
+    "retention": {
+      "$ref": "#/definitions/installerRetentionBaseline"
+    },
+    "federation": {
+      "$ref": "#/definitions/installerFederation"
+    },
+    "region": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
         "namespace": {
           "type": "string",
           "maxLength": 63,
           "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
           "description": "Connector namespace the installer creates; never kube-*."
         },
-        "image": {
+        "bootstrapID": {
           "type": "string",
-          "maxLength": 456,
-          "pattern": "^$|^[a-z0-9][a-z0-9./:_-]{0,383}@sha256:[a-f0-9]{64}$",
-          "description": "The exact product repository@sha256 digest of the installer Job; the connector image comes from the offer."
-        },
-        "registrySecret": {
-          "type": "string",
-          "maxLength": 253,
-          "pattern": "^$|^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$"
+          "pattern": "^$|^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}$",
+          "not": {
+            "const": "00000000-0000-0000-0000-000000000000"
+          },
+          "description": "Exact already-issued fleet bootstrap ID; only with bundledHub."
         },
         "offer": {
           "type": "string",
@@ -1239,58 +980,10 @@
               }
             ]
           }
-        },
-        "bundledHub": {
-          "type": "string",
-          "maxLength": 30,
-          "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
-          "description": "Explicit original bundled hub bootstrap name in the same release namespace; selects its existing trusted runner."
-        },
-        "bootstrapID": {
-          "type": "string",
-          "pattern": "^$|^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}$",
-          "not": {
-            "const": "00000000-0000-0000-0000-000000000000"
-          },
-          "description": "Exact already-issued fleet bootstrap ID; only with bundledHub."
         }
       },
-      "allOf": [
-        {
-          "if": {
-            "properties": {
-              "bundledHub": {
-                "minLength": 1
-              }
-            },
-            "required": [
-              "bundledHub"
-            ]
-          },
-          "then": {
-            "properties": {
-              "bootstrapID": {
-                "minLength": 36
-              },
-              "offer": {
-                "const": ""
-              },
-              "bootstrapSecret": {
-                "const": ""
-              },
-              "evidenceSecret": {
-                "const": ""
-              }
-            }
-          },
-          "else": {
-            "properties": {
-              "bootstrapID": {
-                "const": ""
-              }
-            }
-          }
-        }
+      "required": [
+        "namespace"
       ]
     },
     "collector": {
@@ -1501,6 +1194,173 @@
         }
       }
     },
+    "hub": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "hub-api": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "replicas": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 16
+            },
+            "resources": {
+              "type": "object"
+            },
+            "nodeSelector": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "tolerations": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            },
+            "connections": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 32
+            },
+            "concurrency": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 64
+            }
+          }
+        },
+        "hub-worker": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "replicas": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 16
+            },
+            "resources": {
+              "type": "object"
+            },
+            "nodeSelector": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "tolerations": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "federation": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "replicas": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 16
+            },
+            "resources": {
+              "type": "object"
+            },
+            "nodeSelector": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "tolerations": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "key-service": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "replicas": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 16
+            },
+            "resources": {
+              "type": "object"
+            },
+            "nodeSelector": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "tolerations": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "publisher": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "replicas": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 16
+            },
+            "resources": {
+              "type": "object"
+            },
+            "nodeSelector": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "tolerations": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "secrets": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^(ids|audit-mac|artifact-key|sql-(hub-api|hub-worker|federation|publisher|key-service)|s3-[a-z-]+)$": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "existingSecret": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 253,
+              "pattern": "^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$"
+            }
+          },
+          "required": [
+            "existingSecret"
+          ]
+        }
+      }
+    },
     "services": {
       "type": "object",
       "additionalProperties": false,
@@ -1615,6 +1475,34 @@
                 "resources",
                 "backupResources"
               ]
+            },
+            "external": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "host": {
+                  "type": "string",
+                  "maxLength": 253
+                },
+                "port": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 65535
+                },
+                "database": {
+                  "type": "string",
+                  "maxLength": 63
+                },
+                "rootsPEM": {
+                  "type": "string",
+                  "maxLength": 32768
+                },
+                "adminSecret": {
+                  "type": "string",
+                  "maxLength": 253,
+                  "pattern": "^$|^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$"
+                }
+              }
             }
           },
           "required": [
@@ -1699,6 +1587,28 @@
                 "persistence",
                 "resources"
               ]
+            },
+            "external": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "endpoint": {
+                  "type": "string",
+                  "maxLength": 2048
+                },
+                "region": {
+                  "type": "string",
+                  "maxLength": 128
+                },
+                "bucket": {
+                  "type": "string",
+                  "maxLength": 63
+                },
+                "rootsPEM": {
+                  "type": "string",
+                  "maxLength": 32768
+                }
+              }
             }
           },
           "required": [
@@ -1944,6 +1854,20 @@
                 "persistence",
                 "resources"
               ]
+            },
+            "external": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "endpoint": {
+                  "type": "string",
+                  "maxLength": 2048
+                },
+                "rootsPEM": {
+                  "type": "string",
+                  "maxLength": 32768
+                }
+              }
             }
           },
           "required": [
@@ -2492,15 +2416,6 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "connectorPKIMount": {
-          "type": "string",
-          "maxLength": 128,
-          "pattern": "^([a-zA-Z0-9_-]+)?$"
-        },
-        "connectorIssuerRootsPEM": {
-          "type": "string",
-          "maxLength": 32768
-        },
         "endpoint": {
           "type": "string",
           "minLength": 1,
@@ -2587,66 +2502,6 @@
         "serverName",
         "serviceType",
         "connector"
-      ]
-    },
-    "installerPromotion": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "browserAudience": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 256
-        },
-        "providerRootsPEM": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 32768
-        },
-        "transitMount": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 128,
-          "pattern": "^[a-zA-Z0-9_-]+$"
-        },
-        "workerPKIMount": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 128,
-          "pattern": "^[a-zA-Z0-9_-]+$"
-        },
-        "version": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 128
-        },
-        "exposure": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "serviceType": {
-              "enum": [
-                "NodePort",
-                "LoadBalancer"
-              ]
-            },
-            "nodePort": {
-              "type": "integer",
-              "minimum": 30000,
-              "maximum": 32767
-            }
-          },
-          "required": [
-            "serviceType"
-          ]
-        }
-      },
-      "required": [
-        "browserAudience",
-        "providerRootsPEM",
-        "transitMount",
-        "workerPKIMount",
-        "version"
       ]
     },
     "installerRetentionDurations": {
@@ -3263,61 +3118,6 @@
     {
       "if": {
         "properties": {
-          "bootstrap": {
-            "properties": {
-              "enabled": {
-                "const": true
-              }
-            }
-          },
-          "services": {
-            "properties": {
-              "postgres": {
-                "properties": {
-                  "provider": {
-                    "const": "external"
-                  }
-                }
-              }
-            }
-          }
-        }
-      },
-      "then": {
-        "properties": {
-          "bootstrap": {
-            "properties": {
-              "postgres": {
-                "properties": {
-                  "host": {
-                    "minLength": 1
-                  },
-                  "database": {
-                    "minLength": 1
-                  },
-                  "rootsPEM": {
-                    "minLength": 1
-                  }
-                }
-              },
-              "secrets": {
-                "properties": {
-                  "schema": {
-                    "minLength": 1
-                  },
-                  "retirement": {
-                    "minLength": 1
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    {
-      "if": {
-        "properties": {
           "services": {
             "properties": {
               "postgres": {
@@ -3343,49 +3143,6 @@
                         "minLength": 73
                       }
                     }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    {
-      "if": {
-        "properties": {
-          "bootstrap": {
-            "properties": {
-              "enabled": {
-                "const": true
-              }
-            }
-          },
-          "services": {
-            "properties": {
-              "identity": {
-                "properties": {
-                  "provider": {
-                    "const": "external"
-                  }
-                }
-              }
-            }
-          }
-        }
-      },
-      "then": {
-        "properties": {
-          "bootstrap": {
-            "properties": {
-              "fleet": {
-                "properties": {
-                  "issuer": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "clients": {
-                    "minItems": 1
                   }
                 }
               }
@@ -3469,19 +3226,12 @@
     {
       "if": {
         "properties": {
-          "bootstrap": {
-            "properties": {
-              "enabled": {
-                "const": true
-              }
-            }
-          },
           "services": {
             "properties": {
-              "objectStore": {
+              "keyService": {
                 "properties": {
                   "provider": {
-                    "const": "external"
+                    "const": "openbao"
                   }
                 }
               }
@@ -3491,89 +3241,14 @@
       },
       "then": {
         "properties": {
-          "bootstrap": {
-            "properties": {
-              "auditStore": {
-                "properties": {
-                  "endpoint": {
-                    "minLength": 1
-                  },
-                  "region": {
-                    "minLength": 1
-                  },
-                  "bucket": {
-                    "minLength": 1
-                  },
-                  "rootsPEM": {
-                    "minLength": 1
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    {
-      "if": {
-        "properties": {
           "services": {
             "properties": {
-              "objectStore": {
+              "keyService": {
                 "properties": {
-                  "provider": {
-                    "const": "external"
-                  }
-                }
-              }
-            }
-          }
-        }
-      },
-      "then": {
-        "properties": {
-          "bootstrap": {
-            "properties": {
-              "continuation": {
-                "properties": {
-                  "public": {
+                  "openbao": {
                     "properties": {
-                      "federation": {
-                        "properties": {
-                          "evidenceStore": {
-                            "type": "object",
-                            "additionalProperties": false,
-                            "properties": {
-                              "endpoint": {
-                                "type": "string",
-                                "minLength": 1,
-                                "maxLength": 2048,
-                                "pattern": "^https://[^/?#@]+/?$"
-                              },
-                              "rootsPEM": {
-                                "type": "string",
-                                "minLength": 1,
-                                "maxLength": 32768
-                              },
-                              "region": {
-                                "type": "string",
-                                "minLength": 1,
-                                "maxLength": 128
-                              },
-                              "bucket": {
-                                "type": "string",
-                                "minLength": 1,
-                                "maxLength": 63
-                              }
-                            },
-                            "required": [
-                              "endpoint",
-                              "rootsPEM",
-                              "region",
-                              "bucket"
-                            ]
-                          }
-                        }
+                      "image": {
+                        "minLength": 73
                       }
                     }
                   }
@@ -3602,263 +3277,11 @@
       },
       "then": {
         "properties": {
-          "bootstrap": {
-            "properties": {
-              "enabled": {
-                "const": true
-              }
-            }
-          },
           "mode": {
             "enum": [
               "hub",
               "combined"
             ]
-          },
-          "services": {
-            "properties": {
-              "keyService": {
-                "properties": {
-                  "openbao": {
-                    "properties": {
-                      "image": {
-                        "minLength": 1
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    {
-      "if": {
-        "properties": {
-          "bootstrap": {
-            "properties": {
-              "enabled": {
-                "const": true
-              }
-            }
-          },
-          "services": {
-            "properties": {
-              "keyService": {
-                "properties": {
-                  "provider": {
-                    "const": "external"
-                  }
-                }
-              }
-            }
-          }
-        }
-      },
-      "then": {
-        "properties": {
-          "bootstrap": {
-            "properties": {
-              "keyService": {
-                "properties": {
-                  "endpoint": {
-                    "minLength": 1
-                  },
-                  "auditMount": {
-                    "minLength": 1
-                  },
-                  "auditKey": {
-                    "minLength": 1
-                  },
-                  "rootsPEM": {
-                    "minLength": 1
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    {
-      "if": {
-        "allOf": [
-          {
-            "properties": {
-              "bootstrap": {
-                "properties": {
-                  "enabled": {
-                    "const": true
-                  }
-                }
-              }
-            }
-          },
-          {
-            "not": {
-              "properties": {
-                "services": {
-                  "properties": {
-                    "postgres": {
-                      "properties": {
-                        "provider": {
-                          "const": "bundled"
-                        }
-                      }
-                    },
-                    "objectStore": {
-                      "properties": {
-                        "provider": {
-                          "const": "seaweedfs"
-                        }
-                      }
-                    },
-                    "keyService": {
-                      "properties": {
-                        "provider": {
-                          "const": "openbao"
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        ]
-      },
-      "then": {
-        "properties": {
-          "bootstrap": {
-            "properties": {
-              "secrets": {
-                "properties": {
-                  "producer": {
-                    "minLength": 1
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    {
-      "if": {
-        "not": {
-          "required": [
-            "services"
-          ],
-          "properties": {
-            "services": {
-              "required": [
-                "identity"
-              ],
-              "properties": {
-                "identity": {
-                  "required": [
-                    "provider",
-                    "keycloak"
-                  ],
-                  "properties": {
-                    "provider": {
-                      "const": "keycloak"
-                    },
-                    "keycloak": {
-                      "required": [
-                        "processingOperators"
-                      ],
-                      "properties": {
-                        "processingOperators": {
-                          "const": true
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      },
-      "then": {
-        "properties": {
-          "bootstrap": {
-            "properties": {
-              "continuation": {
-                "properties": {
-                  "public": {
-                    "dependencies": {
-                      "capacity": [
-                        "processingOperators"
-                      ],
-                      "promotion": [
-                        "processingOperators"
-                      ]
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    {
-      "if": {
-        "not": {
-          "required": [
-            "services"
-          ],
-          "properties": {
-            "services": {
-              "required": [
-                "keyService"
-              ],
-              "properties": {
-                "keyService": {
-                  "required": [
-                    "provider"
-                  ],
-                  "properties": {
-                    "provider": {
-                      "const": "openbao"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      },
-      "then": {
-        "properties": {
-          "bootstrap": {
-            "properties": {
-              "continuation": {
-                "properties": {
-                  "public": {
-                    "properties": {
-                      "federation": {
-                        "required": [
-                          "connectorPKIMount",
-                          "connectorIssuerRootsPEM"
-                        ],
-                        "properties": {
-                          "connectorPKIMount": {
-                            "minLength": 1
-                          },
-                          "connectorIssuerRootsPEM": {
-                            "minLength": 1
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
           }
         }
       }

@@ -1,202 +1,132 @@
 # One hub release per installation; one cluster release per workload cluster.
-# combined is the single-cluster evaluation topology.
+# combined is the single-cluster topology (hub and region in one cluster).
 mode: hub
 
-# Runnable services are still being implemented. Enabling them is rejected,
-# including when Helm's schema validation is explicitly skipped.
-runtime:
-  enabled: false
+# The exact product image. Every product workload and hook Job uses it.
+image:
+  repository: ""
+  # sha256:<64 hex>; the chart references the image only by digest.
+  digest: ""
+  pullPolicy: IfNotPresent
+  # Existing dockerconfigjson Secrets in the release namespace.
+  pullSecrets: []
 
-# Optional initial-installation checkpoint only; this starts no runtime service.
-# The release namespace must already be a trusted Restricted bootstrap namespace.
-bootstrap:
-  enabled: false
+installation:
+  # Prefix of every object name; a DNS label of at most 30 characters.
   name: asservat
-  targetNamespace: asservat-system
-  # Keep this original verified image pin on later chart-only replays.
-  image: ""
-  registrySecret: ""
-  probeAudience: ""
-  # Optional explicit Kubernetes User/Group identities that may administer the
-  # existing protected configuration after install. The exact runner is always
-  # derived and added by the product. Omit for runner-only; this grants no
-  # browser/evidence permissions. An explicit list must contain 1..31 actors.
-  # administrators:
-  #   - kind: User
-  #     name: operator@example.org
-  secrets:
-    producer: ""
-    schema: ""
-    retirement: ""
-  kubernetes:
-    endpoint: https://kubernetes.default.svc
-    rootsPEM: ""
-  postgres:
-    host: ""
-    port: 5432
-    database: asservat
-    maxConnections: 2
-    rootsPEM: ""
-  auditStore:
-    endpoint: ""
-    region: ""
-    bucket: ""
-    rootsPEM: ""
-  keyService:
-    endpoint: ""
-    auditMount: asservat-audit
-    auditKey: audit
-    rootsPEM: ""
-  fleet:
-    issuer: ""
-    clients: []
-    subjects: []
-    groups: []
-    deliveryProfiles: []
-    maxActiveBootstraps: 1
-    maxBootstrapHistory: 16
-    maxClusters: 1
-  # ADR-183: the in-cluster continuation after first activation. It runs as
-  # the runner account, publishes provider recipes to a public outbox and
-  # waits for `asservat installer-provider-apply` to write the inbox.
-  continuation:
-    enabled: false
-    # Existing private TLS/OIDC material for automatic bundled-provider setup.
-    # With bundled Keycloak its console secret is generated independently.
-    materialSecretName: ""
-    workerProvider:
-      authMount: ""
-      authMountAccessor: ""
-    ownerProvider:
-      authMount: ""
-      authMountAccessor: ""
-    ownerIssuerRootsPEM: ""
-    ownerPKIMount: owner-pki
-    ownerConnections: 4
-    ownerConcurrency: 2
-    # ADR-185 browser identity for the promoted hub-api; empty origin keeps an
-    # observation-only owner. Clients, subjects and groups are stable IDs.
-    public:
-      origin: ""
-      issuer: ""
-      clientID: ""
-      maxLifetimeSeconds: 28800
-      maxLogins: 64
-      maxSessions: 256
-      maxLogoutEvents: 256
-      clients: []
-      eligibleSubjects: []
-      eligibleGroups: []
-      groupMaxAgeSeconds: 300
-      # Optional operator-declared organizations for privacy inventory reports.
-      # Omitted means undeclared; an explicit empty list declares none.
-      # processors:
-      #   - id: evidence-provider
-      #     name: Example organization
-      #     activities: ["Evidence storage"]
-      #     regions: []
-      # Public context execution also needs explicit capacity, processingOperators,
-      # federation, promotion and retentionBaseline objects. They use the existing
-      # installer DTO fields unchanged; omitted objects enable no additional role.
-      # Capacity footprints and backend envelopes must describe the actual trial
-      # services, not the synthetic installed-test profile. No credentials belong
-      # in any of these public objects; private inputs use the operator inbox.
-      # Optional protected manual-collection policy; without stepUp no
-      # independent approval can be decided. ACR values are provider-specific.
-      # approvals:
-      #   stepUp: { acrValues: ["2"], maxAgeSeconds: 300 }
-      #   requireRecordingApproval: true
-      # Trusted initial AccessBinding writer envelopes and their browser
-      # permission previewers (stable issuer subject/group IDs). These are
-      # independent identities; preview access never grants Kubernetes writes.
-      # Empty by default. Each envelope pins a cluster ID and namespace UID;
-      # workloads: [] covers that namespace, otherwise pin each workload UID.
-      # Changing a completed install's envelope needs a qualified guard revision,
-      # not a chart-only replay; see docs/installation/helm.md.
-      permissionDelegations: []
-      # Optional lower history view/cache ceilings. Both values are required.
-      # Omission retains 1,000 per selector and 100,000 per installation.
-      # captureHistory:
-      #   perSelector: 200
-      #   perInstallation: 10000
-  providers:
-    issuerPolicy: asservat-install-issuer
-    wrapRole: asservat-install-wrap
-    wrapPolicy: asservat-install-encrypt
-    unwrapRole: asservat-install-unwrap
-    unwrapPolicy: asservat-install-decrypt
 
-# ADR-193: with mode=cluster, a post-install/post-upgrade hook installs one
-# regional connector through `asservat installer-cluster --in-cluster`. The
-# external branch uses its release-scoped installer as trusted administrator.
-# The selected bundled branch reuses the original hub bootstrap account.
-cluster:
-  enabled: false
+# The browser origin of the console and API, for example
+# https://asservat.example.org. Ingress/HTTPRoute hosts are derived from it.
+origin: ""
+
+# Browser/MCP OpenID Connect identity of the hub (ADR-185). Clients, subjects
+# and groups are stable issuer IDs. With bundled Keycloak, issuer and the
+# console client are derived from services.identity.keycloak.
+identity:
+  issuer: ""
+  clientID: ""
+  # Audience of the console's access tokens; empty uses clientID.
+  browserAudience: ""
+  # Public PEM roots of the issuer; empty uses the system roots.
+  providerRootsPEM: ""
+  clients: []
+  eligibleSubjects: []
+  eligibleGroups: []
+  groupMaxAgeSeconds: 300
+  maxLifetimeSeconds: 28800
+  maxLogins: 64
+  maxSessions: 256
+  maxLogoutEvents: 256
+  # Optional protected manual-collection policy; without stepUp no
+  # independent approval can be decided. ACR values are provider-specific.
+  # approvals:
+  #   stepUp: { acrValues: ["2"], maxAgeSeconds: 300 }
+  #   requireRecordingApproval: true
+  # Stable identities allowed to run processing initialization.
+  # processingOperators:
+  #   - { clientID: asservat-console, issuer: https://id.example/realms/org, kind: Group, id: GROUP-ID }
+  # Trusted initial AccessBinding writer envelopes and their browser
+  # permission previewers (stable issuer subject/group IDs).
+  permissionDelegations: []
+
+# Optional operator-declared organizations for privacy inventory reports.
+# Omitted means undeclared; an explicit empty list declares none.
+# processors:
+#   - id: evidence-provider
+#     name: Example organization
+#     activities: ["Evidence storage"]
+#     regions: []
+
+# Optional lower history view/cache ceilings. Both values are required.
+# captureHistory:
+#   perSelector: 200
+#   perInstallation: 10000
+
+# How the console/API (hub-api, Service port 9445) is reached.
+exposure:
+  service:
+    type: ClusterIP
+    # Only with type NodePort.
+    nodePort: null
+    annotations: {}
+  # ADR-327: pod terminates browser TLS in hub-api with tlsSecret; proxy lets
+  # an Ingress/Gateway terminate it and forward to the Service.
+  tls:
+    mode: pod
+  # Existing kubernetes.io/tls Secret for the origin (pod mode), for example
+  # issued by cert-manager.
+  tlsSecret: ""
+  ingress:
+    enabled: false
+    className: ""
+    annotations: {}
+    # TLS blocks copied verbatim; hosts default to the origin host.
+    tls: []
+  httpRoute:
+    enabled: false
+    # Gateway parentRefs copied verbatim.
+    parentRefs: []
+    annotations: {}
+
+# Fleet enrollment identity and bounds.
+fleet:
+  issuer: ""
+  clients: []
+  subjects: []
+  groups: []
+  deliveryProfiles: []
+  maxActiveBootstraps: 1
+  maxBootstrapHistory: 16
+  maxClusters: 1
+
+# Public context execution also needs capacity, retention and federation.
+# They keep the former installer DTO field names. Footprints and backend
+# envelopes must describe the actual services. No credentials belong here.
+# capacity: {...}
+# retention: {...}
+# federation: {...}
+
+# Regional connector settings (mode cluster or combined).
+region:
   namespace: asservat-connector
-  image: ""
-  registrySecret: ""
-  # Explicit same-API enrollment with the original bundled hub's trusted runner.
-  # Use the exact bootstrapID issued through /fleet; this never issues one.
-  # Manual offer/bootstrapSecret/evidenceSecret must stay empty in this mode.
-  bundledHub: ""
+  # Remote regions: the bootstrapID issued through /fleet.
   bootstrapID: ""
   offer: ""
   bootstrapSecret: ""
-  # Existing operator Secret: evidence-storage.json is the write-only evidence
-  # capability; history-storage.json is separately restricted to history metadata
-  # read/write/inventory/delete. Both are required for a regional executor.
+  # Existing Secret: evidence-storage.json and history-storage.json.
   evidenceSecret: ""
   # ADR-231: optional in-cluster Alertmanager base URL (http or https, no
-  # credentials) that alert DebugPolicies on this cluster read, for example
-  # http://alertmanager-operated.monitoring.svc:9093. Regional executor only.
-  # It is a fixed regional input: changing it needs a connector reinstall.
+  # credentials) read by alert DebugPolicies on this cluster.
   alertmanager: ""
-  # ADR-245: identity mapping records for decision-time PermissionSources
-  # (kubernetesExec, kubernetesAccessReview) whose identityMappingRef names
-  # one. Each maps the hub's authenticated principal of `issuer` to this
-  # cluster's Kubernetes identity: user = usernamePrefix + the OIDC subject,
-  # groups = groupsPrefix + each current stable group ID (omit groupsPrefix to
-  # send no groups), uid = the subject when uid is true. Match the cluster's
-  # own OIDC authenticator; display names and e-mail are never used. With
-  # records the connector account gains SubjectAccessReview create.
-  # Regional executor only; changing them needs a connector reinstall.
+  # ADR-245: identity mapping records for decision-time PermissionSources.
   identityMappings: []
-  # - name: company-oidc-to-cluster
-  #   issuer: https://identity.example.invalid/realms/company
-  #   usernamePrefix: "oidc:"
-  #   groupsPrefix: "oidc:"
-  # ADR-285: administrator Go pprof endpoint templates and profiles. A
-  # template permits address modes and a port range; maintainers bind it to a
-  # declared Pod port by name in a capture profile's endpointBindings (the
-  # builtin go-cpu/v1 binds go-pprof-loopback to the port named diagnostics).
-  # A profile fixes one address mode and port. Paths are the fixed
-  # /debug/pprof allowlist; there is no URL, path, header or credential.
-  # namespaces limits an entry to those namespace names (empty: all).
-  # targetLoopback needs loopbackFamily. Previews resolve them without
-  # dialing. Regional executor only; changing them needs a connector reinstall.
-  # Optional tls: {serverName, rootsPEM} supplies explicit public certificate
-  # roots (8 KiB per entry; existing 64 KiB aggregate JSON cap still applies).
-  # Upgrade connectors before collectors; TLS needs a profileTLS-capable node.
-  # TLS installed qualification is pending; authentication stays unsupported.
-  # Optional credential: {audiences: [{clusterID, namespaceUID, workloadKind,
-  # workloadUID}]} requires TLS. Private header values go in the existing
-  # evidenceSecret's profile-authorization.json, never Helm values (ADR-302).
+  # ADR-285: administrator Go pprof endpoint templates and profiles.
   profileEndpoints: []
-  # - name: go-pprof-loopback
-  #   kind: template
-  #   addressModes: [targetLoopback]
-  #   loopbackFamily: ipv4
-  #   minPort: 6060
-  #   maxPort: 6060
 
-# ADR-246 (S-04 increment 3): the `asservat node` collector DaemonSet, with
-# mode=cluster or mode=combined. Its namespace is the only one created with
-# the privileged Pod Security exception; workload namespaces stay restricted.
-# Off by default. Until the collector is qualified, every collector Pod mounts
-# the host file /etc/asservat-disposable-host (hostPath type File) and the
-# process checks it again, so the collector cannot start on a host without it.
-# Only disposable CI runners and VM images create that file. In this version
-# the collector probes its node and reports status; it records nothing.
+# ADR-246: the `asservat node` collector DaemonSet, with mode=cluster or
+# mode=combined. Its namespace is the only one with the privileged Pod
+# Security exception. Until the collector is qualified, every collector Pod
+# mounts the host file /etc/asservat-disposable-host and checks it again.
 collector:
   enabled: false
   namespace: asservat-collector
@@ -206,21 +136,13 @@ collector:
   registrySecret: ""
   installationID: ""
   clusterID: ""
-  # The connector's node listener (port 8444), the name its server
-  # certificate carries and the PEM roots that issued it. With cluster.enabled
-  # leave all three empty: this release's cluster installer provisions the
-  # listener and publishes them in the connector-nodes ConfigMap, read on the
-  # next helm upgrade (the first install creates only namespace and account).
+  # The connector's node listener (port 8444), its server name and roots.
   connector:
     endpoint: ""
     serverName: ""
     rootsPEM: ""
-  # The local administrator's collector-wide ceilings per node (bytes):
-  # source rings, frozen snapshots awaiting upload, upload rate and burst. A
-  # budget policy's node limits can only lower them. The container memory
-  # limit is ringBytes + frozenBytes + 128 MiB.
+  # Collector-wide ceilings per node (bytes).
   ceilings:
-    # Development reference only; ongoing sources remain unqualified.
     maxActiveSources: 16
     inputBytesPerSecond: 16777216
     inputBurstBytes: 16777216
@@ -228,24 +150,60 @@ collector:
     frozenBytes: 268435456
     uploadBytesPerSecond: 33554432
     uploadBurstBytes: 67108864
-  # Existing node live-projection processing ceilings; null disables the
-  # mechanism. This is separate from hub delivery.liveRead viewer authority.
+  # Node live-projection processing ceilings; null disables the mechanism.
   live: null
-  # Optional encrypted-disk ring medium (ADR-278). When enabled, the collector
-  # gets a node-local emptyDir of exactly bytes; ring segments beyond the one
-  # being written are sealed there with a per-ring in-memory key, so a restart
-  # makes them unreadable. The collector admits disk rings only while they fit
-  # in bytes, so the emptyDir limit (which would evict the Pod) is never hit.
-  # Plans asking for ring.medium encryptedDisk get MediumUnavailable otherwise.
+  # Optional encrypted-disk ring medium (ADR-278).
   ringDisk:
     enabled: false
     bytes: 1073741824
 
-# Independently selectable dependencies. External choices use the existing
-# bootstrap provider inputs and are never provisioned or adopted by this chart.
+# Placement of the hub workloads.
+hub:
+  hub-api:
+    replicas: 1
+    connections: 4
+    concurrency: 2
+    resources: {}
+    nodeSelector: {}
+    tolerations: []
+  hub-worker:
+    replicas: 1
+    resources: {}
+    nodeSelector: {}
+    tolerations: []
+  federation:
+    replicas: 1
+    resources: {}
+    nodeSelector: {}
+    tolerations: []
+  key-service:
+    replicas: 1
+    resources: {}
+    nodeSelector: {}
+    tolerations: []
+  publisher:
+    replicas: 1
+    resources: {}
+    nodeSelector: {}
+    tolerations: []
+
+# Generated Secrets (created once by the `secrets` hook, never rotated, kept
+# on uninstall). Override one with an existing Secret of the same keys:
+#   secrets:
+#     ids: { existingSecret: my-ids }
+#     sql-hub-api: { existingSecret: my-hub-api-sql }
+# Keys: ids, audit-mac, artifact-key, sql-<component>, s3-<principal>.
+secrets: {}
+
+# Independently selectable dependencies. External choices are never
+# provisioned or adopted by this chart.
 services:
   keyService:
     provider: external
+    # Used with provider external.
+    external:
+      endpoint: ""
+      rootsPEM: ""
     openbao:
       image: ghcr.io/openbao/openbao@sha256:5046911075e137e154ce49ab051502f4ec7cf367d484ae4a4dce665d9b90561f
       persistence:
@@ -256,6 +214,14 @@ services:
         limits: {cpu: "2", memory: 512Mi}
   postgres:
     provider: external
+    # Used with provider external. adminSecret names an existing Secret with
+    # a `credentials.json` administrator login for `asservat setup`.
+    external:
+      host: ""
+      port: 5432
+      database: asservat
+      rootsPEM: ""
+      adminSecret: ""
     bundled:
       image: ""
       storageClass: ""
@@ -269,6 +235,12 @@ services:
         limits: {cpu: "1", memory: 256Mi}
   objectStore:
     provider: external
+    # Used with provider external; the operator creates the s3-* Secrets.
+    external:
+      endpoint: ""
+      region: ""
+      bucket: ""
+      rootsPEM: ""
     seaweedfs:
       image: chrislusf/seaweedfs@sha256:ccad23e18639c8b98cee17e7100b95830a06077b56d8e5b006d6dcf8ec5e94a0
       persistence:

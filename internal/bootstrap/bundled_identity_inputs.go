@@ -19,7 +19,7 @@ const bundledKeycloakSettingsFile = "keycloak-settings.json"
 // phases. The ordinary permission configuration still decides evidence rights.
 func readBundledIdentity(ctx context.Context, files *os.Root, namespace string) (contracts.SmallKeycloakSettings, string, error) {
 	var zero contracts.SmallKeycloakSettings
-	raw, err := mounts.Read(ctx, files, bundledKeycloakSettingsFile, contracts.SmallServicesMaxBytes)
+	raw, err := mounts.Read(ctx, files, bundledKeycloakSettingsFile, contracts.SecretsMaxBytes)
 	if err != nil {
 		return zero, "", mounts.ErrUnavailable
 	}
