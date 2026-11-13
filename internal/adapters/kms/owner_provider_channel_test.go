@@ -17,7 +17,7 @@ func TestOwnerProviderChannelTransportAdmitsOnlySingleRecords(t *testing.T) {
 		return ownerProviderLease{}, ErrKeyService
 	}}
 	endpoint, _ := url.Parse("https://keys.invalid")
-	transport := &ownerProviderEffectTransport{next: lease, endpoint: *endpoint, path: "/v1/fleet-kv/data/connector/10000000-0000-4000-8000-000000000001/", records: true}
+	transport := &ownerProviderEffectTransport{next: lease, endpoint: *endpoint, path: "/v1/fleet-kv/data/connector/10000000-0000-4000-8000-000000000001/", mode: providerPathRecords}
 	try := func(method, path string) {
 		r, _ := http.NewRequest(method, "https://keys.invalid"+path, nil)
 		_, _ = transport.RoundTrip(r)
