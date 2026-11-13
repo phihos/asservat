@@ -38,7 +38,7 @@ func newInitialBaoMintFixture(t *testing.T, mode string) *initialBaoMintFixture 
 	now := time.Now().UTC()
 	_, apiCA := smallServicesHookTLS(t)
 	block, _ := pem.Decode([]byte(apiCA))
-	plan := contracts.SmallOpenBaoPlan{Format: contracts.SmallOpenBaoFormat, Namespace: "bootstrap", Name: "trial", Image: contracts.SmallOpenBaoImage, Kubernetes: contracts.OwnerProviderEndpoint{Endpoint: "https://kubernetes.fixture", Roots: [][]byte{block.Bytes}}, SetupAccount: "trial-bootstrap-runner"}
+	plan := contracts.SmallOpenBaoPlan{Format: contracts.SmallOpenBaoFormat, Namespace: "bootstrap", Name: "trial", Image: contracts.SmallOpenBaoImage, Kubernetes: contracts.OwnerProviderEndpoint{Endpoint: "https://kubernetes.fixture", Roots: [][]byte{block.Bytes}}, SetupAccount: "trial-setup"}
 	data, err := kube.BuildSmallOpenBaoMaterial(plan, now)
 	if err != nil {
 		t.Fatal(err)

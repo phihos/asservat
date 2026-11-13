@@ -69,7 +69,7 @@ func TestInitialSeaweedDiagnosticNamesOwnedStageWithoutProviderDetails(t *testin
 }
 
 func initialSeaweedBundledIdentity(issued time.Time) contracts.BundledInitialProviderIdentity {
-	return contracts.BundledInitialProviderIdentity{Format: contracts.BundledInitialProviderIdentityFormat, BackendName: "trial", Namespace: contracts.WorkerObjectReference{Name: "bootstrap", UID: "10000000-0000-4000-8000-000000000003"}, SetupAccount: contracts.WorkerObjectReference{Name: "trial-bootstrap-runner", UID: "10000000-0000-4000-8000-000000000004"}, EntityID: "10000000-0000-4000-8000-000000000005", SetupParent: contracts.InitialProviderParent{Accessor: "synthetic-original-setup", IssuedAt: issued, ExpiresAt: issued.Add(5 * time.Minute)}}
+	return contracts.BundledInitialProviderIdentity{Format: contracts.BundledInitialProviderIdentityFormat, BackendName: "trial", Namespace: contracts.WorkerObjectReference{Name: "bootstrap", UID: "10000000-0000-4000-8000-000000000003"}, SetupAccount: contracts.WorkerObjectReference{Name: "trial-setup", UID: "10000000-0000-4000-8000-000000000004"}, EntityID: "10000000-0000-4000-8000-000000000005", SetupParent: contracts.InitialProviderParent{Accessor: "synthetic-original-setup", IssuedAt: issued, ExpiresAt: issued.Add(5 * time.Minute)}}
 }
 
 // Exercise the actual random-credential producer, closed retained-material

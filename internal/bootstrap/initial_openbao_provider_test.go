@@ -81,7 +81,7 @@ func newInitialBaoProviderFixture(t *testing.T, mode string) *initialBaoProvider
 	api.StartTLS()
 	t.Cleanup(api.Close)
 	block, _ := pem.Decode([]byte(apiCA))
-	f.plan = contracts.SmallOpenBaoPlan{Format: contracts.SmallOpenBaoFormat, Namespace: "bootstrap", Name: "trial", Image: contracts.SmallOpenBaoImage, Kubernetes: contracts.OwnerProviderEndpoint{Endpoint: api.URL, Roots: [][]byte{block.Bytes}}, SetupAccount: "trial-bootstrap-runner"}
+	f.plan = contracts.SmallOpenBaoPlan{Format: contracts.SmallOpenBaoFormat, Namespace: "bootstrap", Name: "trial", Image: contracts.SmallOpenBaoImage, Kubernetes: contracts.OwnerProviderEndpoint{Endpoint: api.URL, Roots: [][]byte{block.Bytes}}, SetupAccount: "trial-setup"}
 	material, err := kube.BuildSmallOpenBaoMaterial(f.plan, time.Now())
 	if err != nil {
 		t.Fatal(err)
@@ -297,7 +297,7 @@ func TestInitialOpenBaoProviderPinsNativeSetupIdentityAndReadyOnce(t *testing.T)
 	f.mu.Lock()
 	gets, patches, private, requests, ready := f.nativeGets, f.patches, f.privateGets, len(f.requests), f.ready
 	f.mu.Unlock()
-	if gets != 6 || patches != 1 || private != 0 || requests != 3 || ready != f.backend+"/"+initialBaoPVC {
+	if gets != 3 || patches != 0 || private != 0 || requests != 3 || ready != "" {
 		t.Fatalf("unexpected bounded effects: native GET=%d PATCH=%d private GET=%d provider paths=%d", gets, patches, private, requests)
 	}
 	token := p.Token
@@ -307,7 +307,7 @@ func TestInitialOpenBaoProviderPinsNativeSetupIdentityAndReadyOnce(t *testing.T)
 	}
 }
 func TestInitialOpenBaoProviderRefusesUnprovenSourcesWithoutReplay(t *testing.T) {
-	for _, mode := range []string{"plan", "api-source", "namespace", "account", "state", "marker-missing", "marker-backend", "marker-extra", "identity", "login-error", "login-malformed", "login-redirect", "provider-tls", "canceled", "unbounded", "cancel-login", "cancel-marker", "cancel-identity", "cancel-patch"} {
+	for _, mode := range []string{"plan", "api-source", "namespace", "account", "state", "marker-missing", "marker-backend", "marker-extra", "identity", "login-error", "login-malformed", "login-redirect", "provider-tls", "canceled", "unbounded", "cancel-login", "cancel-marker", "cancel-identity"} {
 		t.Run(mode, func(t *testing.T) {
 			f := newInitialBaoProviderFixture(t, mode)
 			ctx, end := context.WithTimeout(t.Context(), time.Minute)
@@ -325,9 +325,9 @@ func TestInitialOpenBaoProviderRefusesUnprovenSourcesWithoutReplay(t *testing.T)
 				end()
 			case "unbounded":
 				ctx = t.Context()
-			case "cancel-login", "cancel-marker", "cancel-identity", "cancel-patch":
+			case "cancel-login", "cancel-marker", "cancel-identity":
 				f.after = func(event string) {
-					if mode == "cancel-login" && event == "provider:/v1/auth/asservat-setup/login" || mode == "cancel-marker" && event == "provider:/v1/"+contracts.SmallOpenBaoBackendPolicyPath || mode == "cancel-identity" && event == "provider:/v1/auth/token/lookup-self" || mode == "cancel-patch" && event == "native:PATCH" {
+					if mode == "cancel-login" && event == "provider:/v1/auth/asservat-setup/login" || mode == "cancel-marker" && event == "provider:/v1/"+contracts.SmallOpenBaoBackendPolicyPath || mode == "cancel-identity" && event == "provider:/v1/auth/token/lookup-self" {
 						end()
 					}
 				}

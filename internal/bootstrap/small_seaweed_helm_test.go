@@ -31,7 +31,7 @@ func TestSmallSeaweedHelmUsesExactProviderAndRetainedStorage(t *testing.T) {
 			if mode == "external" {
 				provider = "external"
 			}
-			values := map[string]any{"bootstrap": smallServicesHelmBootstrap(), "services": map[string]any{"objectStore": map[string]any{"provider": provider}}}
+			values := smallServicesHelmValues(map[string]any{"objectStore": map[string]any{"provider": provider}})
 			raw, e := json.Marshal(values)
 			if e != nil {
 				t.Fatal(e)

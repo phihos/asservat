@@ -15,7 +15,7 @@ import (
 
 func TestObserveBundledInitialIdentityChecksActualSetupMetadata(t *testing.T) {
 	in, _, _, now := ownerProviderRecipeInput(t)
-	plan := contracts.SmallOpenBaoPlan{Format: contracts.SmallOpenBaoFormat, Namespace: "bootstrap", Name: "trial", Image: contracts.SmallOpenBaoImage, Kubernetes: in.Kubernetes, SetupAccount: "trial-bootstrap-runner"}
+	plan := contracts.SmallOpenBaoPlan{Format: contracts.SmallOpenBaoFormat, Namespace: "bootstrap", Name: "trial", Image: contracts.SmallOpenBaoImage, Kubernetes: in.Kubernetes, SetupAccount: "trial-setup"}
 	namespace := contracts.WorkerObjectReference{Name: plan.Namespace, UID: "20000000-0000-4000-8000-000000000010"}
 	account := contracts.WorkerObjectReference{Name: plan.SetupAccount, UID: "20000000-0000-4000-8000-000000000011"}
 	original := initialTokenLookup{Accessor: "original-setup", Type: "service", Policies: []string{contracts.SmallOpenBaoSetupPolicy}, Path: "auth/asservat-setup/login", Meta: map[string]string{"role": contracts.SmallOpenBaoSetupRole, "service_account_name": account.Name, "service_account_namespace": namespace.Name, "service_account_uid": account.UID}, Orphan: true, Renewable: true, CreationTTL: 300, MaxTTL: 900, Issued: now, Expire: now.Add(300 * time.Second), Entity: "20000000-0000-4000-8000-000000000012"}

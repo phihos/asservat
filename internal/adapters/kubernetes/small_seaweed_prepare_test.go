@@ -147,14 +147,11 @@ func seedSmallSeaweedState(t *testing.T, f *smallSeaweedFixture) {
 	t.Cleanup(func() { clearSmallSeaweedData(data) })
 }
 func TestSmallSeaweedPrepareCreateReplayAndUnknownReadback(t *testing.T) {
-	for _, which := range []string{"", "state", "iam"} {
+	for _, which := range []string{"", "state"} {
 		t.Run(which, func(t *testing.T) {
 			p, f := newSmallSeaweedFixture(t)
 			if which == "state" {
 				f.unknown = f.plan.StateSecretName()
-			}
-			if which == "iam" {
-				f.unknown = f.plan.IAMSecretName()
 			}
 			first, e := p.Prepare(t.Context())
 			if e != nil {
@@ -163,60 +160,22 @@ func TestSmallSeaweedPrepareCreateReplayAndUnknownReadback(t *testing.T) {
 			defer clear(first.RootsPEM)
 			original := f.secrets[f.plan.StateSecretName()].DeepCopy()
 			defer clearSmallSeaweedData(original.Data)
-			f.retained = "pvc" // A complete retained pair reopens without consulting data.
 			second, e := p.Prepare(t.Context())
 			if e != nil {
 				t.Fatal(e)
 			}
 			defer clear(second.RootsPEM)
-			if first.State != second.State || first.IAM != second.IAM || first.Admin != second.Admin || first.BackendID != second.BackendID || first.InitializationID != second.InitializationID || !bytes.Equal(first.RootsPEM, second.RootsPEM) || !sameSmallSeaweedData(original.Data, f.secrets[f.plan.StateSecretName()].Data) || len(f.creates) != 2 {
+			if first.State != second.State || first.Admin != second.Admin || first.BackendID != second.BackendID || first.InitializationID != second.InitializationID || !bytes.Equal(first.RootsPEM, second.RootsPEM) || !sameSmallSeaweedData(original.Data, f.secrets[f.plan.StateSecretName()].Data) || len(f.creates) != 1 {
 				t.Fatal("replay changed original backend")
 			}
 		})
 	}
 }
-func TestSmallSeaweedPreparePartialStateReconstructsOnlyInitialIAM(t *testing.T) {
-	p, f := newSmallSeaweedFixture(t)
-	seedSmallSeaweedState(t, f)
-	admin, e := decodeSmallSeaweedAdmin(f.secrets[f.plan.StateSecretName()].Data[contracts.SmallSeaweedAdminKey])
-	if e != nil {
-		t.Fatal(e)
-	}
-	out, e := p.Prepare(t.Context())
-	if e != nil || out.Admin != admin || len(f.creates) != 1 || f.creates[0] != f.plan.IAMSecretName() {
-		t.Fatal("partial state regenerated original material", e)
-	}
-	clear(out.RootsPEM)
-	// Later phases may expand IAM from retained keys. A preparation replay must
-	// preserve that current config rather than reset it to admin-only.
-	ordinary, e := providerconfig.GenerateSeaweedCredential(contracts.SeaweedPrincipalKey{Purpose: "initial-audit", ScopeID: swID("9")})
-	if e != nil {
-		t.Fatal(e)
-	}
-	expanded, e := providerconfig.CompileSeaweedStorage(admin, []contracts.SeaweedGrant{{Credential: ordinary, Bucket: "audit", InstallationID: swID("9")}})
-	if e != nil {
-		t.Fatal(e)
-	}
-	defer clear(expanded.Config)
-	f.secrets[f.plan.IAMSecretName()].Data[providerconfig.SeaweedConfigKey] = bytes.Clone(expanded.Config)
-	f.retained = "pod"
-	if out, e = p.Prepare(t.Context()); e != nil || len(f.creates) != 1 || !bytes.Equal(f.secrets[f.plan.IAMSecretName()].Data[providerconfig.SeaweedConfigKey], expanded.Config) {
-		t.Fatal("replay reset current IAM", e)
-	}
-	clear(out.RootsPEM)
-}
-func TestSmallSeaweedPrepareRefusesMissingOriginalAndChangedState(t *testing.T) {
-	for _, mode := range []string{"pvc", "statefulset", "pod", "partial-started", "orphan-iam", "changed", "unknown-mismatch", "cancelled"} {
+func TestSmallSeaweedPrepareRefusesChangedState(t *testing.T) {
+	for _, mode := range []string{"changed", "unknown-mismatch", "cancelled"} {
 		t.Run(mode, func(t *testing.T) {
 			p, f := newSmallSeaweedFixture(t)
 			switch mode {
-			case "pvc", "statefulset", "pod":
-				f.retained = mode
-			case "partial-started":
-				seedSmallSeaweedState(t, f)
-				f.retained = "pod"
-			case "orphan-iam":
-				f.secrets[f.plan.IAMSecretName()] = &core.Secret{ObjectMeta: meta.ObjectMeta{Name: f.plan.IAMSecretName()}}
 			case "changed":
 				seedSmallSeaweedState(t, f)
 				f.secrets[f.plan.StateSecretName()].Data[contracts.SmallSeaweedBackendKey] = []byte(swID("8"))

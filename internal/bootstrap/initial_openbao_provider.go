@@ -188,13 +188,6 @@ func openInitialOpenBaoProviderSource(ctx context.Context, files *os.Root, sourc
 	if err != nil || !initialOpenBaoCurrent(ctx) {
 		return nil, initialOpenBaoCheck("identity")
 	}
-	preparation, err := kube.NewSmallOpenBaoPreparation(config, source.plan)
-	if err != nil {
-		return nil, initialOpenBaoCheck("ready")
-	}
-	if _, err = preparation.MarkReady(ctx, contracts.WorkerObjectReference{Name: state.Name, UID: string(state.UID)}, source.backend); err != nil || !initialOpenBaoCurrent(ctx) {
-		return nil, initialOpenBaoCheck("ready")
-	}
 	complete = true
 	return p, nil
 }

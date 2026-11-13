@@ -1,7 +1,7 @@
 {{- $services := default dict .Values.services }}
 {{- if eq (dig "objectStore" "provider" "external" $services) "seaweedfs" }}
 {{- $p := .Values.services.objectStore.seaweedfs }}
-{{- $name := printf "%s-objectstore" .Values.bootstrap.name }}
+{{- $name := printf "%s-objectstore" (include "asservat.name" .) }}
 {{- if not (regexMatch "^[a-z0-9][a-z0-9./:_-]{0,383}@sha256:[a-f0-9]{64}$" .Values.services.objectStore.seaweedfs.image) }}
 {{- fail "services.objectStore.seaweedfs.image requires the verified SeaweedFS repository@sha256 digest" }}
 {{- end }}
@@ -97,8 +97,7 @@ spec:
             readOnlyRootFilesystem: true
             capabilities: {drop: [ALL]}
           resources: {{ toYaml $p.resources | nindent 12 }}
-          # TCP readiness is startup only. The installer independently checks
-          # authenticated versioned S3 and scoped policy before activation.
+          # TCP readiness is startup only; setup checks authenticated S3.
           readinessProbe:
             tcpSocket: {port: s3-tls}
             periodSeconds: 5

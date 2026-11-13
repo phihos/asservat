@@ -25,7 +25,7 @@ type BundledInitialProviderIdentity struct {
 }
 
 func (v BundledInitialProviderIdentity) Valid() bool {
-	if v.Format != BundledInitialProviderIdentityFormat || len(v.BackendName) < 1 || len(v.BackendName) > 30 || len(validation.IsDNS1123Label(v.BackendName)) != 0 || len(validation.IsDNS1123Label(v.Namespace.Name)) != 0 || !routingUUID(v.Namespace.UID) || v.SetupAccount.Name != v.BackendName+"-bootstrap-runner" || !routingUUID(v.SetupAccount.UID) || !routingUUID(v.EntityID) || !bundledInitialASCII(v.SetupParent.Accessor, 128) || v.SetupParent.IssuedAt.IsZero() || v.SetupParent.ExpiresAt.IsZero() || !v.SetupParent.IssuedAt.Before(v.SetupParent.ExpiresAt) || v.SetupParent.ExpiresAt.Sub(v.SetupParent.IssuedAt) > 301*time.Second {
+	if v.Format != BundledInitialProviderIdentityFormat || len(v.BackendName) < 1 || len(v.BackendName) > 30 || len(validation.IsDNS1123Label(v.BackendName)) != 0 || len(validation.IsDNS1123Label(v.Namespace.Name)) != 0 || !routingUUID(v.Namespace.UID) || v.SetupAccount.Name != v.BackendName+"-setup" || !routingUUID(v.SetupAccount.UID) || !routingUUID(v.EntityID) || !bundledInitialASCII(v.SetupParent.Accessor, 128) || v.SetupParent.IssuedAt.IsZero() || v.SetupParent.ExpiresAt.IsZero() || !v.SetupParent.IssuedAt.Before(v.SetupParent.ExpiresAt) || v.SetupParent.ExpiresAt.Sub(v.SetupParent.IssuedAt) > 301*time.Second {
 		return false
 	}
 	return true

@@ -42,15 +42,29 @@ func TestSmallServicesPersistIdentityBeforeDatabaseInitialization(t *testing.T) 
 
 // Values shared by actual chart regressions. Public placeholders are render
 // fixtures only; they are not admitted provider roots or runtime authority.
-func smallServicesHelmBootstrap() map[string]any {
+// External provider coordinates are filled in for services left external.
+func smallServicesHelmValues(services map[string]any) map[string]any {
+	external := map[string]map[string]any{
+		"postgres":    {"host": "external.example", "database": "asservat", "rootsPEM": "PUBLIC-CA", "adminSecret": "operator-postgres-admin"},
+		"objectStore": {"endpoint": "https://s3.example", "region": "test", "bucket": "audit", "rootsPEM": "PUBLIC-CA"},
+		"keyService":  {"endpoint": "https://bao.example", "rootsPEM": "PUBLIC-CA"},
+	}
+	for name, coordinates := range external {
+		selected, _ := services[name].(map[string]any)
+		if selected == nil {
+			selected = map[string]any{}
+			services[name] = selected
+		}
+		if _, ok := selected["external"]; !ok {
+			selected["external"] = coordinates
+		}
+	}
 	return map[string]any{
-		"enabled": true, "name": "trial",
-		"image":        "registry.example/asservat@sha256:" + strings.Repeat("a", 64),
-		"secrets":      map[string]any{"producer": "provider-material", "schema": "sql-ddl", "retirement": "sql-retire"},
-		"postgres":     map[string]any{"host": "external.example", "rootsPEM": "PUBLIC-CA"},
-		"auditStore":   map[string]any{"endpoint": "https://s3.example", "region": "test", "bucket": "audit", "rootsPEM": "PUBLIC-CA"},
-		"keyService":   map[string]any{"endpoint": "https://bao.example", "rootsPEM": "PUBLIC-CA"},
-		"fleet":        map[string]any{"issuer": "https://identity.example/realms/asservat", "clients": []string{"asservat-console"}},
-		"continuation": map[string]any{"public": map[string]any{"origin": "https://console.example"}},
+		"mode":         "hub",
+		"installation": map[string]any{"name": "trial"},
+		"image":        map[string]any{"repository": "registry.example/asservat", "digest": "sha256:" + strings.Repeat("a", 64)},
+		"origin":       "https://console.example",
+		"identity":     map[string]any{"issuer": "https://identity.example/realms/asservat", "clientID": "asservat-console"},
+		"services":     services,
 	}
 }

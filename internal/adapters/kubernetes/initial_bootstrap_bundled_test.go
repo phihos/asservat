@@ -14,7 +14,7 @@ import (
 func TestInitialBootstrapBundledIdentityRetainsOriginalPrivateProvenance(t *testing.T) {
 	d, s := bootstrapStateFixture(t)
 	at := time.Now().UTC()
-	b := contracts.BundledInitialProviderIdentity{Format: contracts.BundledInitialProviderIdentityFormat, BackendName: d.Name, Namespace: s.Prelude.Namespace, SetupAccount: contracts.WorkerObjectReference{Name: d.Name + "-bootstrap-runner", UID: ownerID(91)}, EntityID: ownerID(92), SetupParent: contracts.InitialProviderParent{Accessor: "synthetic-original-parent", IssuedAt: at, ExpiresAt: at.Add(300 * time.Second)}}
+	b := contracts.BundledInitialProviderIdentity{Format: contracts.BundledInitialProviderIdentityFormat, BackendName: d.Name, Namespace: s.Prelude.Namespace, SetupAccount: contracts.WorkerObjectReference{Name: d.Name + "-setup", UID: ownerID(91)}, EntityID: ownerID(92), SetupParent: contracts.InitialProviderParent{Accessor: "synthetic-original-parent", IssuedAt: at, ExpiresAt: at.Add(300 * time.Second)}}
 	d.KeyService.Endpoint = b.Endpoint()
 	s.DesiredDigest = bootstrapDigest(d)
 	s.Material.BundledIdentity = &b

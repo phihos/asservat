@@ -19,7 +19,7 @@ func smallOpenBaoFixturePlan(t *testing.T, now time.Time) contracts.SmallOpenBao
 	cert, _, ca := installerServingTLSFixture(t, "api.invalid", now)
 	_ = cert
 	block, _ := pem.Decode(ca)
-	return contracts.SmallOpenBaoPlan{Format: contracts.SmallOpenBaoFormat, Namespace: "bootstrap", Name: "trial", Image: contracts.SmallOpenBaoImage, Kubernetes: contracts.OwnerProviderEndpoint{Endpoint: "https://api.invalid", Roots: [][]byte{block.Bytes}}, SetupAccount: "trial-bootstrap-runner"}
+	return contracts.SmallOpenBaoPlan{Format: contracts.SmallOpenBaoFormat, Namespace: "bootstrap", Name: "trial", Image: contracts.SmallOpenBaoImage, Kubernetes: contracts.OwnerProviderEndpoint{Endpoint: "https://api.invalid", Roots: [][]byte{block.Bytes}}, SetupAccount: "trial-setup"}
 }
 
 func cloneSmallOpenBaoMaterial(m map[string][]byte) map[string][]byte {

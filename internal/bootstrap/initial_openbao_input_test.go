@@ -20,7 +20,7 @@ func TestInitialOpenBaoSourceResolvesBeforeCanonicalIdentity(t *testing.T) {
 		t.Fatal(err)
 	}
 	plan := contracts.SmallOpenBaoPlan{Format: contracts.SmallOpenBaoFormat, Namespace: v.BootstrapNamespace, Name: v.Name, Image: contracts.SmallOpenBaoImage,
-		Kubernetes: contracts.OwnerProviderEndpoint{Endpoint: v.Kubernetes.Endpoint, Roots: apiRoots}, SetupAccount: v.RunnerAccount}
+		Kubernetes: contracts.OwnerProviderEndpoint{Endpoint: v.Kubernetes.Endpoint, Roots: apiRoots}, SetupAccount: v.Name + "-setup"}
 	material, err := kube.BuildSmallOpenBaoMaterial(plan, time.Now())
 	if err != nil {
 		t.Fatal(err)

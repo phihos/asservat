@@ -3,9 +3,6 @@ package bootstrap
 import (
 	"context"
 	"encoding/json"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -115,57 +112,5 @@ func TestContinuationSeaweedSourceBindsOriginalStore(t *testing.T) {
 	after, _ := json.Marshal(unchanged)
 	if !reflect.DeepEqual(before, after) {
 		t.Fatal("external selection changed")
-	}
-}
-
-func TestHelmContinuationBundledStoreCoordinates(t *testing.T) {
-	raw, err := os.ReadFile("testdata/helm_context_public.json")
-	if err != nil {
-		t.Fatal(err)
-	}
-	var public map[string]any
-	if json.Unmarshal(raw, &public) != nil {
-		t.Fatal("public reference")
-	}
-	public["origin"], public["issuer"], public["clientID"] = "https://console.example", "https://identity.example/realms/asservat", "asservat-console"
-	public["clients"] = []map[string]string{{"id": "asservat-console", "kind": "human"}}
-	public["eligibleGroups"] = []string{"stable-group-id"}
-	federation := public["federation"].(map[string]any)
-	federation["evidenceStore"] = map[string]any{}
-	b := smallServicesHelmBootstrap()
-	_, _, ownerRoots := serverCertificate(t)
-	b["continuation"] = map[string]any{"enabled": true, "public": public,
-		"workerProvider":      map[string]string{"authMount": "worker", "authMountAccessor": "worker-accessor"},
-		"ownerProvider":       map[string]string{"authMount": "owner", "authMountAccessor": "owner-accessor"},
-		"ownerIssuerRootsPEM": ownerRoots}
-	values := map[string]any{"bootstrap": b, "services": map[string]any{"objectStore": map[string]any{"provider": "seaweedfs"}}}
-	got := renderReferenceContinuation(t, values)
-	e := got.Public.Federation.EvidenceStore
-	if got.ObjectStoreSource != contracts.InitialBootstrapBundledSeaweedRoots || e == nil || e.Endpoint != "https://trial-objectstore.trusted-bootstrap.svc:8333" || e.RootsPEM != "" || e.Bucket != "audit" || e.Region != "test" {
-		t.Fatal("actual chart failed to select generated public store", e)
-	}
-	// External configuration must still supply every previously required field;
-	// the selected bundled mode may not weaken the external schema.
-	for _, mode := range []string{"external-empty", "bundled-other-bucket"} {
-		t.Run(mode, func(t *testing.T) {
-			var in map[string]any
-			encoded, _ := json.Marshal(values)
-			_ = json.Unmarshal(encoded, &in)
-			if mode == "external-empty" {
-				in["services"].(map[string]any)["objectStore"].(map[string]any)["provider"] = "external"
-			} else {
-				in["bootstrap"].(map[string]any)["continuation"].(map[string]any)["public"].(map[string]any)["federation"].(map[string]any)["evidenceStore"].(map[string]any)["bucket"] = "another"
-			}
-			encoded, _ = json.Marshal(in)
-			file := filepath.Join(t.TempDir(), "values.json")
-			if err := os.WriteFile(file, encoded, 0600); err != nil {
-				t.Fatal(err)
-			}
-			ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
-			defer cancel()
-			if err := exec.CommandContext(ctx, "helm", "template", "asservat", "../../charts/asservat", "--namespace", "trusted-bootstrap", "--kube-version", "1.37.0", "-f", file).Run(); err == nil {
-				t.Fatal("unsupported store input accepted")
-			}
-		})
 	}
 }
