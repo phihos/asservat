@@ -47,8 +47,11 @@ type InstalledOwnerProviderEffects struct {
 // as Kubernetes delivers it; only the accepted owner configuration is
 // checked around provider logins and audit credential reads.
 func NewInstalledOwnerProviderEffects(ctx context.Context, input contracts.OwnerDeployment, files *os.Root, configuration *postgres.OwnerConfigurations, accepted fleet.OwnerConfiguration) (*InstalledOwnerProviderEffects, error) {
-	if ctx == nil || ctx.Err() != nil || files == nil || configuration == nil || input.ProviderAuthentication == nil || !accepted.Valid() || accepted.Suspended || accepted.Revision.UID != input.ConfigurationUID || accepted.Pool.NativeCandidateLimit != fleet.OwnerRegistrationsPerPool || ValidateOwnerProviderAuthentication(input, *input.ProviderAuthentication, time.Now()) != nil {
-		return nil, ErrKeyService
+	if ctx == nil || ctx.Err() != nil || files == nil || configuration == nil || input.ProviderAuthentication == nil || !accepted.Valid() || accepted.Suspended || accepted.Revision.UID != input.ConfigurationUID || accepted.Pool.NativeCandidateLimit != fleet.OwnerRegistrationsPerPool {
+		return nil, providerStep("accepted-configuration", ErrKeyService)
+	}
+	if err := ValidateOwnerProviderAuthentication(input, *input.ProviderAuthentication, time.Now()); err != nil {
+		return nil, providerStep("authentication", err)
 	}
 	raw, err := json.Marshal(input)
 	var cloned contracts.OwnerDeployment
@@ -58,7 +61,7 @@ func NewInstalledOwnerProviderEffects(ctx context.Context, input contracts.Owner
 	input = cloned
 	roots, _, err := mtls.OwnerTrustRoots(accepted.IssuerRoots, time.Now())
 	if err != nil {
-		return nil, ErrKeyService
+		return nil, providerStep("issuer-roots", ErrKeyService)
 	}
 	root, cancel := context.WithCancel(ctx)
 	s := &InstalledOwnerProviderEffects{input: input, files: files, configuration: configuration, original: accepted.Clone(), root: root, cancel: cancel, closeDone: make(chan struct{})}

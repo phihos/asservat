@@ -38,15 +38,15 @@ type ownerProviderEffects struct {
 
 func newOwnerProviderEffects(ctx context.Context, input contracts.OwnerDeployment, profile contracts.OwnerProviderAuthentication, pool value.OwnerPool, issuerRoots *x509.CertPool, jwt TokenSource, proof ownerProviderCurrent, client *http.Client, concurrency int, now func() time.Time) (*ownerProviderEffects, error) {
 	if now == nil || !pool.Valid() || pool.InstallationID != input.InstallationID || pool.ClusterID != input.ClusterID || pool.Namespace != input.Namespace.Name || pool.NamespaceUID != input.Namespace.UID || pool.ServiceAccount != profile.ServiceAccount.Name {
-		return nil, ErrKeyService
+		return nil, providerStep("pool", ErrKeyService)
 	}
 	verifier, err := mtls.NewOwnerPeerVerifierForPool(issuerRoots, pool, now)
 	if err != nil {
-		return nil, err
+		return nil, providerStep("peer-verifier", err)
 	}
 	slots, err := newOwnerProviderLifetimes(ctx, input, profile, jwt, proof, client, concurrency, now)
 	if err != nil {
-		return nil, err
+		return nil, providerStep("lifetimes", err)
 	}
 	out := &ownerProviderEffects{lifetimes: slots}
 	complete := false
@@ -57,12 +57,12 @@ func newOwnerProviderEffects(ctx context.Context, input contracts.OwnerDeploymen
 	}()
 	wrap, err := newOwnerProviderEffectClient(slots.auditWrap, input.KeyService.AuditMount+"/encrypt/"+input.KeyService.AuditKey)
 	if err != nil {
-		return nil, err
+		return nil, providerStep("audit-wrap", err)
 	}
 	out.seal = &Sealer{client: wrap, mount: input.KeyService.AuditMount, key: input.KeyService.AuditKey, reference: input.KeyService.AuditMount + "/" + input.KeyService.AuditKey}
 	unwrap, err := newOwnerProviderEffectClient(slots.auditUnwrap, input.KeyService.AuditMount+"/decrypt/"+input.KeyService.AuditKey)
 	if err != nil {
-		return nil, err
+		return nil, providerStep("audit-unwrap", err)
 	}
 	out.open = &Opener{client: unwrap, mount: input.KeyService.AuditMount, key: input.KeyService.AuditKey, reference: input.KeyService.AuditMount + "/" + input.KeyService.AuditKey}
 	for _, fixed := range []struct {
@@ -76,7 +76,7 @@ func newOwnerProviderEffects(ctx context.Context, input contracts.OwnerDeploymen
 		path := input.KeyService.PKIMount + "/sign/" + fixed.role
 		c, e := newOwnerProviderEffectClient(fixed.slot, path)
 		if e != nil {
-			return nil, e
+			return nil, providerStep(fixed.usage+"-sign", e)
 		}
 		issuer := &OwnerCertificateIssuer{client: c, path: path, installation: pool.InstallationID, cluster: pool.ClusterID, epoch: pool.IssuerEpoch, usage: fixed.usage, verify: verifier, now: now}
 		if pool.NativeBootstrap != "" {
@@ -86,7 +86,7 @@ func newOwnerProviderEffects(ctx context.Context, input contracts.OwnerDeploymen
 	}
 	if p := input.Public; p != nil && slots.public[0] != nil {
 		if err = out.public(p, pool); err != nil {
-			return nil, err
+			return nil, providerStep("public", err)
 		}
 	}
 	if f := input.Public; f != nil && f.Fleet != nil && slots.fleet != nil {
@@ -266,4 +266,22 @@ func (s *ownerProviderEffects) joinClosed() {
 	s.open.Close()
 	s.server.Close()
 	s.client.Close()
+}
+
+// providerStepError names the failed provider composition step; it keeps
+// a nested step, so diagnostics show where startup stopped.
+type providerStepError struct {
+	step string
+	err  error
+}
+
+func providerStep(step string, err error) error { return &providerStepError{step, err} }
+func (e *providerStepError) Error() string      { return "provider " + e.step }
+func (e *providerStepError) Unwrap() error      { return e.err }
+func (e *providerStepError) FixedStep() string {
+	var nested interface{ FixedStep() string }
+	if errors.As(e.err, &nested) {
+		return e.step + "/" + nested.FixedStep()
+	}
+	return e.step
 }
