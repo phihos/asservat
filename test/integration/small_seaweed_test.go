@@ -3,10 +3,8 @@ package integration
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"io"
@@ -232,11 +230,10 @@ func TestSmallSeaweedBackendWithRealS3(t *testing.T) {
 		t.Fatal("setup constructor", e)
 	}
 	defer setup.Close()
-	claim := contracts.SeaweedBucketInitialization{BackendID: string(material[contracts.SmallSeaweedBackendKey]), InstallationID: smallSeaweedInstallation, InitializationID: string(material[contracts.SmallSeaweedInitializationKey]), StateSecretUID: "66000000-0000-4000-8000-000000000005", PVCUID: "66000000-0000-4000-8000-000000000006", Endpoint: plan.Endpoint(), Image: smallSeaweedImage, Bucket: smallSeaweedBucket, Pending: true}
+	claim := contracts.SeaweedBucketInitialization{InstallationID: smallSeaweedInstallation, Bucket: smallSeaweedBucket}
 	if e = setup.ConfigureBucket(ctx, claim, first.Policies[smallSeaweedBucket]); e != nil {
 		t.Fatalf("initial owned bucket setup: %s", smallSeaweedFailureStep(e))
 	}
-	claim.Pending = false
 	if e = setup.ConfigureBucket(ctx, claim, first.Policies[smallSeaweedBucket]); e != nil {
 		t.Fatalf("exact owned bucket replay: %s", smallSeaweedFailureStep(e))
 	}
@@ -309,19 +306,8 @@ func TestSmallSeaweedBackendWithRealS3(t *testing.T) {
 	if e = setup.ConfigureBucket(ctx, claim, full.Policies[smallSeaweedBucket]); e != nil {
 		t.Fatalf("retained policy extension: %s", smallSeaweedFailureStep(e))
 	}
-	// Exercise the SAME command as production. It must wait while the mounted
-	// file is still old, then signal the actual weed PID1 after projection arrives.
-	digest := sha256.Sum256(full.Config)
-	privateInput := []byte(hex.EncodeToString(digest[:]) + "\n")
-	defer clear(privateInput)
-	reloadArgs := append([]string{"exec", "-i", name}, kube.SeaweedReloadCommand()...)
-	reloaded := make(chan error, 1)
-	go func() { raw, e := docker(privateInput, reloadArgs...); clear(raw); reloaded <- e }()
-	select {
-	case <-reloaded:
-		t.Fatal("reload did not wait for original projected configuration")
-	case <-time.After(200 * time.Millisecond):
-	}
+	// The chart restarts SeaweedFS on an IAM Secret change; the test signals
+	// the running process after replacing the mounted file.
 	next := filepath.Join(work, "iam", "next.json")
 	if e = os.WriteFile(next, full.Config, 0444); e != nil {
 		t.Fatal("next private IAM")
@@ -329,13 +315,9 @@ func TestSmallSeaweedBackendWithRealS3(t *testing.T) {
 	if e = os.Rename(next, filepath.Join(work, "iam", "s3.json")); e != nil {
 		t.Fatal("atomic private IAM projection")
 	}
-	select {
-	case e = <-reloaded:
-		if e != nil {
-			t.Fatal("actual projection reload failed")
-		}
-	case <-ctx.Done():
-		t.Fatal("actual projection reload deadline")
+	if raw, e := docker(nil, "exec", name, "/bin/kill", "-HUP", "1"); e != nil {
+		clear(raw)
+		t.Fatal("IAM reload signal failed")
 	}
 	// SIGHUP is asynchronous. Bounded read-only signed metadata requests confirm
 	// the new reader is loaded before issuing the one fixture-owned scoped write.

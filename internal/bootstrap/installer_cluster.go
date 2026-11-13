@@ -32,9 +32,6 @@ func RunInstallerCluster(ctx context.Context, args []string, out io.Writer) erro
 	offerFile := flags.String("offer", "", "the hub's regional-offer.json")
 	bootstrapFile := flags.String("bootstrap", "", "the bootstrap record read from the channel")
 	inCluster := flags.Bool("in-cluster", false, "Helm hook only: use the Pod's installer account as the guards' administrator")
-	bundledHub := flags.String("bundled-hub", "", "same-API Helm hook: original bundled hub installation name")
-	bootstrapID := flags.String("bootstrap-id", "", "original fleet-issued bootstrap ID for the bundled hub")
-	joinHub := flags.Bool("join-hub", false, "join the installed regional executor to its same-API bundled hub")
 	evidenceFile := flags.String("evidence-credential", "", "the operator's write-only regional evidence credential (required when the offer names the regional executor)")
 	historyFile := flags.String("history-credential", "", "the separate history-prefix storage capability (required with the regional executor; never the evidence writer)")
 	alertmanager := flags.String("alertmanager", "", "optional in-cluster Alertmanager base URL for alert policies (ADR-231; regional executor only)")
@@ -49,13 +46,6 @@ func RunInstallerCluster(ctx context.Context, args []string, out io.Writer) erro
 	var collector *kube.RegionalCollectorPlan
 	if *collectorNamespace != "" {
 		collector = &kube.RegionalCollectorPlan{Namespace: *collectorNamespace, Name: *collectorName}
-	}
-	if *bundledHub != "" || *bootstrapID != "" || *joinHub {
-		if !*inCluster || *bundledHub == "" || *bootstrapID == "" || *kubeconfig != "" || *selected != "" || *offerFile != "" || *bootstrapFile != "" || *evidenceFile != "" || *historyFile != "" {
-			return mounts.ErrUnavailable
-		}
-		return runSmallRegionalInstaller(ctx, smallRegionalOptions{Name: *bundledHub, BootstrapID: *bootstrapID, Namespace: *namespace, Join: *joinHub,
-			Alertmanager: *alertmanager, MappingsJSON: *mappingsJSON, EndpointsJSON: *endpointsJSON, AuthorizationFile: *authorizationFile, Collector: collector}, out)
 	}
 	if *offerFile == "" || *bootstrapFile == "" {
 		return mounts.ErrUnavailable

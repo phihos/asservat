@@ -50,34 +50,6 @@ func configurationSetupFixture(t *testing.T) (*setupFixture, contracts.HubWorker
 	return f, in, recipe
 }
 
-func TestConfigurationSetupUsesOnlyEightNamedReadPathsAndWholeInput(t *testing.T) {
-	f, in, recipe := configurationSetupFixture(t)
-	start := time.Now()
-	check, err := f.reader.VerifyConfiguration(context.Background(), in, recipe.Profile)
-	if err != nil || !check.Matches(in, recipe.Profile, time.Now()) || f.requests.Load() != 8 ||
-		check.ObservedAt().Before(start) || check.FreshUntil().After(check.ObservedAt().Add(5*time.Second)) {
-		t.Fatal("exact two-purpose readback failed", err, f.requests.Load())
-	}
-	changed := in
-	changed.LeaderLease.UID = "10000000-0000-4000-8000-000000000009"
-	if check.Matches(changed, recipe.Profile, time.Now()) || check.Matches(in, recipe.Profile, check.FreshUntil()) || (ConfigurationSetupCheck{}).Matches(in, recipe.Profile, time.Now()) {
-		t.Fatal("whole-input change, expiry or zero check accepted")
-	}
-	selection := contracts.ConfigurationProviderSelection{AuthMount: recipe.Profile.AuthMount, AuthMountAccessor: recipe.Profile.AuthMountAccessor, AuditCredentials: recipe.Profile.AuditCredentials}
-	raw, err := ConfigurationProviderSetupArtifact(in, selection, recipe.Profile.ServiceAccount, time.Now())
-	var artifact struct {
-		Inspect []string `json:"inspect"`
-	}
-	if err != nil || json.Unmarshal(raw, &artifact) != nil || len(artifact.Inspect) != 8 {
-		t.Fatal("artifact read scope", err)
-	}
-	for _, path := range artifact.Inspect {
-		if _, ok := f.responses[path]; !ok || strings.ContainsAny(path, "*+") || strings.HasPrefix(path, "sys/auth/") {
-			t.Fatal("artifact and actual verifier scope differ", path)
-		}
-	}
-}
-
 func TestConfigurationSetupRejectsEffectiveScopeChanges(t *testing.T) {
 	for _, mode := range []string{"mount-accessor", "reviewer-absent", "local-reviewer", "wrong-api", "key-export", "old-key-loss", "role-account", "role-audience", "extra-token-policy", "unbounded-token", "future-role-field", "expanded-policy", "forced-batch", "negative-mount-ttl"} {
 		t.Run(mode, func(t *testing.T) {

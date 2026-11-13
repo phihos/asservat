@@ -3,8 +3,11 @@ package objectstore
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"regexp"
@@ -20,11 +23,11 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
-// SeaweedSetup is finite trusted installer administration of a dedicated
-// backend. It is never an ordinary evidence or audit writer.
+// SeaweedSetup is bucket administration of the bundled store by the setup
+// Job. It is never an ordinary evidence or audit writer.
 type SeaweedSetup struct {
-	store             *Store
-	endpoint, backend string
+	store    *Store
+	endpoint string
 }
 
 func NewSeaweedSetup(endpoint, region string, admin contracts.SeaweedCredential, h *http.Client) (*SeaweedSetup, error) {
@@ -35,7 +38,7 @@ func NewSeaweedSetup(endpoint, region string, admin contracts.SeaweedCredential,
 	if e != nil {
 		return nil, e
 	}
-	return &SeaweedSetup{store: store, endpoint: endpoint, backend: admin.Principal.ScopeID}, nil
+	return &SeaweedSetup{store: store, endpoint: endpoint}, nil
 }
 func (s *SeaweedSetup) Close() {
 	if s != nil && s.store != nil {
@@ -50,35 +53,14 @@ func seaweedNamedError(e error, name string) bool {
 var seaweedSetupBucket = regexp.MustCompile(`^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$`)
 
 func (s *SeaweedSetup) validClaim(c contracts.SeaweedBucketInitialization) bool {
-	if s == nil || s.store == nil || c.BackendID != s.backend || c.Endpoint != s.endpoint || !seaweedSetupBucket.MatchString(c.Bucket) || strings.Contains(c.Bucket, "..") {
-		return false
-	}
-	for _, id := range []string{c.BackendID, c.InstallationID, c.InitializationID, c.StateSecretUID, c.PVCUID} {
-		if !authorization.UUID(id) {
-			return false
-		}
-	}
-	return len(c.Image) > len("@sha256:")+64 && strings.HasSuffix(c.Image, "@sha256:"+c.Image[len(c.Image)-64:]) && hexDigest(c.Image[len(c.Image)-64:])
+	return s != nil && s.store != nil && seaweedSetupBucket.MatchString(c.Bucket) && !strings.Contains(c.Bucket, "..") && authorization.UUID(c.InstallationID)
 }
-func hexDigest(s string) bool {
-	if len(s) != 64 {
-		return false
-	}
-	for _, c := range s {
-		if !(c >= '0' && c <= '9' || c >= 'a' && c <= 'f') {
-			return false
-		}
-	}
-	return true
-}
+
+// seaweedOwnership are the deterministic ownership tags of one bucket.
 func seaweedOwnership(c contracts.SeaweedBucketInitialization) []types.Tag {
 	return []types.Tag{
-		{Key: aws.String("asservat:backend"), Value: aws.String(c.BackendID)},
 		{Key: aws.String("asservat:installation"), Value: aws.String(c.InstallationID)},
-		{Key: aws.String("asservat:initialization"), Value: aws.String(c.InitializationID)},
-		{Key: aws.String("asservat:state"), Value: aws.String(c.StateSecretUID)},
-		{Key: aws.String("asservat:pvc"), Value: aws.String(c.PVCUID)},
-		{Key: aws.String("asservat:image"), Value: aws.String(c.Image)},
+		{Key: aws.String("asservat:bucket"), Value: aws.String(c.Bucket)},
 	}
 }
 func sameSeaweedTags(a, b []types.Tag) bool {
@@ -104,33 +86,32 @@ func sameSeaweedTags(a, b []types.Tag) bool {
 	return true
 }
 
-// ConfigureBucket resolves only the original dedicated backend's pending empty
-// bucket, including an unknown first Create reply. The common seed must still
-// prohibit ALL runtime grants/activation while Pending. Established tagged
-// replay may contain managed ciphertext and does not read its contents.
+// ConfigureBucket creates the bucket if missing (an unknown create reply is
+// resolved by reading the bucket back, never by a second create), tags an
+// empty untagged bucket with its ownership, enables versioning and, when
+// policy is non-empty, applies the bucket policy. A retained policy may only
+// be extended: existing statements keep their SIDs and contents. A bucket
+// tagged for another installation, or untagged with content, is refused.
 func (s *SeaweedSetup) ConfigureBucket(ctx context.Context, c contracts.SeaweedBucketInitialization, policy json.RawMessage) error {
-	if !s.validClaim(c) || ctx == nil || ctx.Err() != nil || len(policy) == 0 || len(policy) > providerconfig.SeaweedConfigLimit {
+	if !s.validClaim(c) || ctx == nil || ctx.Err() != nil || len(policy) > providerconfig.SeaweedConfigLimit {
 		return storageAnswer{"setup-input"}
 	}
-	if _, e := seaweedPolicyStatements(policy); e != nil {
-		return storageAnswer{"setup-policy"}
+	if len(policy) != 0 {
+		if _, e := seaweedPolicyStatements(policy); e != nil {
+			return storageAnswer{"setup-policy"}
+		}
 	}
 	client := s.store.client
 	tags, e := client.GetBucketTagging(ctx, &s3.GetBucketTaggingInput{Bucket: &c.Bucket})
-	if e != nil && seaweedNamedError(e, "NoSuchBucket") && c.Pending {
-		_, createErr := client.CreateBucket(ctx, &s3.CreateBucketInput{Bucket: &c.Bucket})
-		// Never retry create or mint another identity after an unknown response.
+	if e != nil && seaweedNamedError(e, "NoSuchBucket") {
+		_, _ = client.CreateBucket(ctx, &s3.CreateBucketInput{Bucket: &c.Bucket})
 		tags, e = client.GetBucketTagging(ctx, &s3.GetBucketTaggingInput{Bucket: &c.Bucket})
 		if e != nil && !seaweedNamedError(e, "NoSuchTagSet") {
-			_ = createErr
 			return storageAnswer{"setup-create"}
 		}
 	}
 	untagged := seaweedNamedError(e, "NoSuchTagSet") || e == nil && tags != nil && len(tags.TagSet) == 0
 	if untagged {
-		if !c.Pending {
-			return storageAnswer{"setup-unowned"}
-		}
 		if e = s.empty(ctx, c.Bucket); e != nil {
 			return e
 		}
@@ -147,12 +128,15 @@ func (s *SeaweedSetup) ConfigureBucket(ctx context.Context, c contracts.SeaweedB
 		return storageAnswer{"setup-version-read"}
 	}
 	if version.Status != types.BucketVersioningStatusEnabled {
-		if !c.Pending {
-			return storageAnswer{"setup-version-changed"}
-		}
 		if _, e = client.PutBucketVersioning(ctx, &s3.PutBucketVersioningInput{Bucket: &c.Bucket, VersioningConfiguration: &types.VersioningConfiguration{Status: types.BucketVersioningStatusEnabled}}); e != nil {
 			return storageAnswer{"setup-version-write"}
 		}
+		if version, e = client.GetBucketVersioning(ctx, &s3.GetBucketVersioningInput{Bucket: &c.Bucket}); e != nil || version.Status != types.BucketVersioningStatusEnabled {
+			return storageAnswer{"setup-version-final"}
+		}
+	}
+	if len(policy) == 0 {
+		return ctx.Err()
 	}
 	old, e := client.GetBucketPolicy(ctx, &s3.GetBucketPolicyInput{Bucket: &c.Bucket})
 	if e != nil && !seaweedNamedError(e, "NoSuchBucketPolicy") {
@@ -168,16 +152,12 @@ func (s *SeaweedSetup) ConfigureBucket(ctx context.Context, c contracts.SeaweedB
 		if _, e = client.PutBucketPolicy(ctx, &s3.PutBucketPolicyInput{Bucket: &c.Bucket, Policy: &text}); e != nil {
 			return storageAnswer{"setup-policy-write"}
 		}
+		actual, e := client.GetBucketPolicy(ctx, &s3.GetBucketPolicyInput{Bucket: &c.Bucket})
+		if e != nil || actual.Policy == nil || !sameSeaweedJSON([]byte(*actual.Policy), policy) {
+			return storageAnswer{"setup-policy-final"}
+		}
 	}
-	version, e = client.GetBucketVersioning(ctx, &s3.GetBucketVersioningInput{Bucket: &c.Bucket})
-	if e != nil || version.Status != types.BucketVersioningStatusEnabled {
-		return storageAnswer{"setup-version-final"}
-	}
-	actual, e := client.GetBucketPolicy(ctx, &s3.GetBucketPolicyInput{Bucket: &c.Bucket})
-	if e != nil || actual.Policy == nil || !sameSeaweedJSON([]byte(*actual.Policy), policy) || ctx.Err() != nil {
-		return storageAnswer{"setup-policy-final"}
-	}
-	return nil
+	return ctx.Err()
 }
 func (s *SeaweedSetup) empty(ctx context.Context, bucket string) error {
 	c := s.store.client
@@ -243,12 +223,41 @@ func seaweedPolicyExtends(old, next []byte) bool {
 	return true
 }
 
-// SeaweedBuckets gives callers deterministic setup order without exposing keys.
-func SeaweedBuckets(policies map[string]json.RawMessage) []string {
-	names := make([]string, 0, len(policies))
-	for name := range policies {
-		names = append(names, name)
+// EnsureSetupBuckets idempotently creates and configures the bundled store's
+// buckets with the bucket administrator credential, in name order. policies
+// optionally maps a bucket to its compiled bucket policy
+// (providerconfig.CompiledSeaweedStorage.Policies). rootsPEM are the store's
+// TLS roots. Each configured bucket is reported on out.
+func EnsureSetupBuckets(ctx context.Context, endpoint, region string, rootsPEM []byte, admin contracts.SeaweedCredential, installationID string, buckets []string, policies map[string]json.RawMessage, out io.Writer) error {
+	if ctx == nil || out == nil || len(buckets) == 0 || !authorization.UUID(installationID) {
+		return storageAnswer{"setup-input"}
 	}
-	slices.Sort(names)
-	return names
+	for bucket := range policies {
+		if !slices.Contains(buckets, bucket) {
+			return storageAnswer{"setup-input"}
+		}
+	}
+	roots := x509.NewCertPool()
+	if !roots.AppendCertsFromPEM(rootsPEM) {
+		return storageAnswer{"setup-roots"}
+	}
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.TLSClientConfig = &tls.Config{MinVersion: tls.VersionTLS12, RootCAs: roots}
+	setup, err := NewSeaweedSetup(endpoint, region, admin, &http.Client{Transport: transport})
+	if err != nil {
+		return storageAnswer{"setup-input"}
+	}
+	defer setup.Close()
+	ordered := slices.Clone(buckets)
+	slices.Sort(ordered)
+	for i, bucket := range ordered {
+		if i > 0 && ordered[i-1] == bucket {
+			return storageAnswer{"setup-input"}
+		}
+		if err = setup.ConfigureBucket(ctx, contracts.SeaweedBucketInitialization{InstallationID: installationID, Bucket: bucket}, policies[bucket]); err != nil {
+			return err
+		}
+		_, _ = fmt.Fprintf(out, "bucket ready: %s\n", bucket)
+	}
+	return nil
 }

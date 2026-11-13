@@ -52,19 +52,6 @@ func TestConfigurationProviderCleanupRecipeAndActualReadback(t *testing.T) {
 					f.responses["auth/"+selection.AuthMount+"/role/"+role.Name]["token_policies"] = json.RawMessage(`["default"]`)
 				}
 			}
-			artifact, err := ConfigurationProviderPairSetupArtifact(in, selection, original.Profile.ServiceAccount, contracts.HubWorkerProviderInstalledLayout, time.Now())
-			var applied struct {
-				Inspect []string                            `json:"inspect"`
-				Apply   []configurationProviderSetupRequest `json:"apply"`
-			}
-			if err != nil || json.Unmarshal(artifact, &applied) != nil || len(applied.Apply) != 13 {
-				t.Fatal("cleanup artifact", err)
-			}
-			for _, path := range applied.Inspect {
-				if f.responses[path] == nil {
-					t.Fatal("unverified artifact read", path)
-				}
-			}
 			check, err := f.reader.VerifyConfiguration(context.Background(), in, r.Profile)
 			if changed != "" {
 				if err == nil {

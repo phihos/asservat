@@ -1,11 +1,12 @@
 package providerconfig
 
 import (
-	"asservat.local/asservat/internal/contracts"
 	"bytes"
 	"encoding/json"
 	"strings"
 	"testing"
+
+	"asservat.local/asservat/internal/contracts"
 )
 
 const swInstall = "00000000-0000-4000-8000-000000000001"

@@ -7,7 +7,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
-	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -16,10 +15,8 @@ import (
 
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/adapters/providerconfig"
-	"asservat.local/asservat/internal/bootstrap"
 	"asservat.local/asservat/internal/contracts"
 	core "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -216,126 +213,6 @@ func installedUnifiedPoll(t *testing.T, ctx context.Context) {
 	}
 }
 
-// The interruption happens only after a published phase-1 outbox and before
-// any operator provider effect. The native run stops the exact owned process;
-// no journal, credential, Pod status or phase receipt is edited by the fixture.
-func (u *installedUnifiedRunner) interruptAndResume(t *testing.T, ctx context.Context, api kubernetes.Interface, config *rest.Config, kubeconfig string, desired contracts.InitialBootstrap, original contracts.InitialPreparer) *core.Pod {
-	t.Helper()
-	wait, end := context.WithTimeout(ctx, 3*time.Minute)
-	defer end()
-	installation := original.Plan.InstallationID
-	outboxName := contracts.InstallerRecipeOutboxName(installation)
-	var outbox *core.ConfigMap
-	for {
-		pod := u.current(t, wait, api)
-		if pod.Status.Phase == core.PodFailed || pod.Status.Phase == core.PodSucceeded {
-			t.Fatal("unified runner stopped before the first provider wait")
-		}
-		observed, err := kube.ReadInstallerOutbox(wait, config, desired.BootstrapNamespace, installation)
-		if err == nil {
-			if observed.Phase != 1 || observed.Purpose != "worker-provider" {
-				t.Fatal("unexpected first provider phase")
-			}
-			outbox, err = api.CoreV1().ConfigMaps(desired.BootstrapNamespace).Get(wait, outboxName, meta.GetOptions{})
-			if err != nil {
-				t.Fatal(err)
-			}
-			break
-		}
-		installedUnifiedPoll(t, wait)
-	}
-	if _, err := api.CoreV1().Secrets(desired.BootstrapNamespace).Get(wait, contracts.InstallerInboxName(installation), meta.GetOptions{}); !apierrors.IsNotFound(err) {
-		t.Fatal("first provider wait already has an inbox", err)
-	}
-	root, err := api.CoreV1().ConfigMaps(desired.BootstrapNamespace).Get(wait, original.Plan.RootName, meta.GetOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	journalName := "asservat-runtime-resources-" + strings.ReplaceAll(installation, "-", "")
-	journal, err := api.CoreV1().Secrets(desired.TargetNamespace).Get(wait, journalName, meta.GetOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		for _, data := range journal.Data {
-			clear(data)
-		}
-	}()
-	args := []string{"--kubeconfig", kubeconfig, "--namespace", desired.BootstrapNamespace, "--name", desired.Name}
-	var output bytes.Buffer
-	if err = bootstrap.RunInstallerResume(wait, args, &output); !errors.Is(err, kube.ErrInitialBootstrapRunnerActive) {
-		t.Fatal("live unified resume was not refused", err)
-	}
-	before := u.current(t, wait, api)
-	if before.Status.Phase != core.PodRunning || len(before.Status.ContainerStatuses) != 1 || before.Status.ContainerStatuses[0].Name != "continue" || before.Status.ContainerStatuses[0].State.Running == nil {
-		t.Fatal("first provider wait lacks a live exact continuation process")
-	}
-	installedUnifiedStop(t, wait, before, u.ownedNode)
-	for {
-		stopped := u.current(t, wait, api)
-		if stopped.Status.Phase == core.PodFailed {
-			u.checkPhases(t, stopped, false)
-			if len(stopped.Status.ContainerStatuses) != 1 || stopped.Status.ContainerStatuses[0].State.Terminated == nil || stopped.Status.ContainerStatuses[0].State.Terminated.ExitCode == 0 || stopped.Status.ContainerStatuses[0].RestartCount != 0 {
-				t.Fatal("interrupted continuation lacks a positive nonzero terminal receipt")
-			}
-			break
-		}
-		installedUnifiedPoll(t, wait)
-	}
-	// Preserve the failed process logs before terminal-only deletion removes it.
-	installerUnifiedLogs(t, wait, api, before)
-	output.Reset()
-	if err = bootstrap.RunInstallerResume(wait, args, &output); err != nil {
-		t.Fatal("actual positive-terminal unified resume", err)
-	}
-	if !strings.Contains(output.String(), string(before.UID)) {
-		t.Fatal("resume did not report the original removed UID")
-	}
-	if _, err = api.CoreV1().Pods(before.Namespace).Get(wait, before.Name, meta.GetOptions{}); !apierrors.IsNotFound(err) {
-		t.Fatal("resume absence not observed", err)
-	}
-	next := u.start(t, ctx, api)
-	u.waitRetired(t, ctx, api, next)
-	// An identical outbox UPDATE may keep its resource version. The new Pod
-	// must report the existing fixed outbox-completion line before readback.
-	for {
-		replay, e := api.CoreV1().ConfigMaps(desired.BootstrapNamespace).Get(wait, outboxName, meta.GetOptions{})
-		current := u.current(t, wait, api)
-		if current.Status.Phase == core.PodFailed {
-			t.Fatal("resumed unified continuation failed")
-		}
-		// This process-local progress comes from entering WorkerLaunch's inbox
-		// wait. The retained old outbox alone is insufficient after a restart.
-		if e == nil && replay.UID == outbox.UID && equalJSONForBootstrap(replay.Data, outbox.Data) && len(current.Status.ContainerStatuses) == 1 && current.Status.ContainerStatuses[0].State.Running != nil {
-			logs, logErr := api.CoreV1().Pods(next.Namespace).GetLogs(next.Name, &core.PodLogOptions{Container: "continue", LimitBytes: ptr.To(int64(8192)), TailLines: ptr.To(int64(40))}).DoRaw(wait)
-			if logErr == nil && bytes.Contains(logs, []byte("installer continuation: worker/outbox done in ")) {
-				// Bind the log read to the same live UID, not merely its fixed name.
-				u.current(t, wait, api)
-				break
-			}
-		}
-		installedUnifiedPoll(t, wait)
-	}
-
-	afterOutbox, e := api.CoreV1().ConfigMaps(desired.BootstrapNamespace).Get(wait, outboxName, meta.GetOptions{})
-	afterRoot, re := api.CoreV1().ConfigMaps(desired.BootstrapNamespace).Get(wait, root.Name, meta.GetOptions{})
-	afterJournal, je := api.CoreV1().Secrets(desired.TargetNamespace).Get(wait, journal.Name, meta.GetOptions{})
-	if e != nil || re != nil || je != nil {
-		t.Fatal("original progress readback after resume", e, re, je)
-	}
-	defer func() {
-		for _, data := range afterJournal.Data {
-			clear(data)
-		}
-	}()
-	if afterOutbox.UID != outbox.UID || !equalJSONForBootstrap(afterOutbox.Data, outbox.Data) || afterRoot.UID != root.UID || !equalJSONForBootstrap(afterRoot.Data, root.Data) || afterJournal.UID != journal.UID || !equalJSONForBootstrap(afterJournal.Data, journal.Data) {
-		t.Fatal("resume changed original outbox/root/journal identity or contents")
-	}
-	u.verifyReplay(t)
-	t.Log("unified runner resumed", before.UID, "to", next.UID, "with original installation", installation, "root", root.UID, "journal", journal.UID, "before first provider apply")
-	return next
-}
-
 // Same owned-node/container selection as installerCrashHubWorker, but the
 // RestartPolicyNever runner must become Failed instead of being restarted.
 func installedUnifiedStop(t *testing.T, ctx context.Context, pod *core.Pod, ownedNode string) {
@@ -368,41 +245,6 @@ func installerUnifiedLogs(t *testing.T, ctx context.Context, api kubernetes.Inte
 			continue
 		}
 		t.Log("unified runner", pod.UID, name, string(raw))
-	}
-}
-
-func (u *installedUnifiedRunner) replay(t *testing.T, ctx context.Context, api kubernetes.Interface, kubeconfig string, desired contracts.InitialBootstrap) {
-	t.Helper()
-	completed := u.current(t, ctx, api)
-	u.checkPhases(t, completed, true)
-	if u.helm != nil {
-		u.completeHelm(t, ctx, api)
-		u.start(t, ctx, api)
-		u.completeHelm(t, ctx, api)
-		u.verifyReplay(t)
-		return
-	}
-	var output bytes.Buffer
-	if err := bootstrap.RunInstallerResume(ctx, []string{"--kubeconfig", kubeconfig, "--namespace", desired.BootstrapNamespace, "--name", desired.Name}, &output); err != nil {
-		t.Fatal("completed unified runner resume", err)
-	}
-	if !strings.Contains(output.String(), string(completed.UID)) {
-		t.Fatal("completed resume omitted original UID")
-	}
-	u.start(t, ctx, api)
-	wait, end := context.WithTimeout(ctx, 3*time.Minute)
-	defer end()
-	for {
-		pod := u.current(t, wait, api)
-		if pod.Status.Phase == core.PodFailed {
-			t.Fatal("completed five-command replay failed")
-		}
-		if pod.Status.Phase == core.PodSucceeded {
-			u.checkPhases(t, pod, true)
-			u.verifyReplay(t)
-			return
-		}
-		installedUnifiedPoll(t, wait)
 	}
 }
 

@@ -17,17 +17,13 @@ import (
 	"time"
 
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
-	"asservat.local/asservat/internal/adapters/postgres"
 	"asservat.local/asservat/internal/adapters/providerconfig"
-	"asservat.local/asservat/internal/bootstrap"
 	"asservat.local/asservat/internal/contracts"
-	"asservat.local/asservat/internal/domain/audit"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/smithy-go"
-	"github.com/jackc/pgx/v5"
 	auth "k8s.io/api/authentication/v1"
 	core "k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
@@ -211,111 +207,6 @@ func (p *initialRuntimeNativeProviders) admin(t *testing.T, ctx context.Context,
 		t.Fatalf("owned provider %s status=%d want=%d read=%v", path, response.StatusCode, want, e)
 	}
 	return result
-}
-
-func qualifyProviderPairWorkerInputs(t *testing.T, ctx context.Context, api kubernetes.Interface, config *pgx.ConnConfig, record audit.InitialInstallation, original contracts.InitialPreparer, resources *kube.InitialRuntimeResources, originalResources contracts.InitialRuntimeResourceSnapshot, inventory kube.InitialRuntimeResourceInventory, source *kube.ConfigurationRoleSource, bridge *kube.InitialRuntimeBridge, providers *initialRuntimeNativeProviders, runtimeWorker bool) {
-	t.Helper()
-	configuration, e := api.CoreV1().ConfigMaps(inventory.Namespace.Name).Get(ctx, original.Plan.Workload.Configuration, meta.GetOptions{})
-	if e != nil {
-		t.Fatal(e)
-	}
-	initial, e := contracts.DecodeInitialInstaller(strings.NewReader(configuration.Data["deployment.json"]))
-	if e != nil || initial.InstallationID != record.Scope.InstallationID || initial.Namespace != inventory.Namespace {
-		t.Fatal("original immutable installer unavailable", e)
-	}
-	docs, e := bootstrap.BuildInitialConfigurationDocuments(initial, inventory, record.Claim.ID)
-	if e != nil {
-		t.Fatal("generate original configuration documents", e)
-	}
-	worker, e := contracts.DecodeHubWorkerDeployment(bytes.NewReader(docs.Worker))
-	if e != nil {
-		t.Fatal(e)
-	}
-	installer, e := contracts.DecodeConfigurationRoleInstaller(bytes.NewReader(docs.Roles))
-	if e != nil {
-		t.Fatal(e)
-	}
-	recipe, e := providerconfig.ConfigurationProviderRecipeFor(worker, providers.worker, inventory.WorkerAccount, time.Now())
-	if e != nil {
-		t.Fatal("exact original worker provider recipe", e)
-	}
-	inspector := providers.configureWorker(t, ctx, recipe, worker)
-	defer func() {
-		if e := inspector.Close(context.Background()); e != nil {
-			t.Error(e)
-		}
-	}()
-	providers.provisionAudit(t, ctx, api, inventory)
-	root, e := kube.NewConfigurationRuntimeRoleRoot(ctx, source, installer.Roles)
-	if e != nil {
-		t.Fatal("actual original configuration role root", e)
-	}
-	defer root.Close()
-	producer, e := postgres.NewConfigurationRuntimeSQLRoles(ctx, config, root, installer.Roles)
-	if e != nil {
-		t.Fatal("actual configuration SQL producer", e)
-	}
-	defer producer.Close()
-	started := time.Now()
-	provisionEnd := providers.trace.phase(t, "actual-three-role-provision")
-	if _, e = producer.Provision(ctx); e != nil {
-		t.Fatal("actual original three-role provisioning", e)
-	}
-	provisionEnd()
-	t.Logf("actual configuration role provisioning elapsed=%s", time.Since(started))
-	e = root.WithConfigurationRoleOperation(ctx, func(call context.Context) error {
-		verified, e := producer.VerifyConfigurationRuntimeRoles(call)
-		if e != nil {
-			return e
-		}
-		_, e = root.PublishConfigurationRuntimeProjection(call, verified)
-		return e
-	})
-	if e != nil {
-		t.Fatal("actual exact SQL credential projection", e)
-	}
-	// Pin the actual original completed resource receipts. The pre-handover
-	// reader cannot be reused after the retained bridge; each input phase makes
-	// its own current phase2 reads and derives no freshness from this history.
-	inputs, e := kube.NewConfigurationWorkerInputs(ctx, bridge, resources, root, producer, inspector, originalResources)
-	if e != nil {
-		t.Fatal("concrete worker input producer", e)
-	}
-	defer inputs.Close()
-	// One automatic finite driver; it owns all original per-phase bounds. There
-	// is no caller sleep, recreated client, write-on-read source or test retry.
-	started = time.Now()
-	completeEnd := providers.trace.phase(t, "actual-provider-pair-complete-inputs")
-	result, e := inputs.CompleteInputs(ctx)
-	completeEnd()
-	t.Logf("actual provider/bridge/SQL worker input driver elapsed=%s progress=%d", time.Since(started), result.Progress)
-	if e != nil || result.Progress != kube.ConfigurationWorkerInputAcknowledged || result.Snapshot.State.WorkerInputs == nil || result.Snapshot.State.WorkerInputs.Receipt == nil {
-		t.Fatal("actual original input phases did not acknowledge", e)
-	}
-	receipt := result.Snapshot.State.WorkerInputs.Receipt
-	object, e := api.CoreV1().ConfigMaps(inventory.Namespace.Name).Get(ctx, receipt.Configuration.Name, meta.GetOptions{})
-	if e != nil || string(object.UID) != receipt.Configuration.UID {
-		t.Fatal("read exact generated original input", e)
-	}
-	complete, e := contracts.DecodeHubWorkerDeployment(strings.NewReader(object.Data["deployment.json"]))
-	if e != nil || complete.ProviderAuthentication == nil || *complete.ProviderAuthentication != recipe.Profile || complete.ProviderInputs == nil || complete.Activation == nil {
-		t.Fatal("generated provider inputs lost original identities", e)
-	}
-	for _, ref := range []contracts.WorkerObjectReference{inventory.OwnerDeployment, inventory.WorkerDeployment} {
-		d, e := api.AppsV1().Deployments(inventory.Namespace.Name).Get(ctx, ref.Name, meta.GetOptions{})
-		if e != nil || string(d.UID) != ref.UID || d.Spec.Replicas == nil || *d.Spec.Replicas != 0 {
-			t.Fatal("input qualification unexpectedly launched/replaced workload", e)
-		}
-	}
-	if runtimeWorker {
-		var owner *initialRuntimeOwnerContinuation
-		if os.Getenv("ASSERVAT_INITIAL_RUNTIME_PROVIDER_OWNER") == "1" {
-			owner = &initialRuntimeOwnerContinuation{resources: resources, bridge: bridge}
-		}
-		qualifyProviderWorkerRuntime(t, ctx, api, config, inputs, inventory, complete, providers, owner)
-		return
-	}
-	t.Log("fresh original bootstrap/19-resource retained bridge, actual scoped versioned backend and eight-read provider inspection, original three-role SQL projection and finite worker2 inputs; no owner signing, runtime launch, accepted source availability, accounting or public workflow qualification")
 }
 
 func (p *initialRuntimeNativeProviders) configureWorker(t *testing.T, ctx context.Context, recipe providerconfig.ConfigurationProviderRecipe, worker contracts.HubWorkerDeployment) *providerconfig.SetupReader {

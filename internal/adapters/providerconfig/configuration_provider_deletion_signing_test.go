@@ -88,14 +88,6 @@ func TestConfigurationProviderBytesUnchangedWithoutDeletionSigning(t *testing.T)
 		if err != nil || bytes.Contains(raw, []byte("contextDeletionSigning")) {
 			t.Fatal("zero deletion signing key serialized")
 		}
-		b, err := ConfigurationProviderPairSetupArtifact(in, s, account, contracts.HubWorkerProviderInstalledLayout, now)
-		if err != nil || hexSHA256(b) != c.v3 || bytes.Contains(b, []byte("context-deletion")) || bytes.Contains(b, []byte("/sign/")) {
-			t.Fatal("installed artifact changed without a deletion signing key", err)
-		}
-		b, err = ConfigurationProviderSetupArtifact(in, s, account, now)
-		if c.legacy != "" && (err != nil || hexSHA256(b) != c.legacy) || c.legacy == "" && err == nil {
-			t.Fatal("legacy artifact changed without a deletion signing key", err)
-		}
 	}
 }
 
@@ -162,83 +154,6 @@ func TestConfigurationProviderRecipeLetsOnlyAuditWrapSignDeletions(t *testing.T)
 		if _, err := ConfigurationProviderRecipeFor(in, s, account, now); err == nil {
 			t.Fatal("invalid deletion signing key accepted", name)
 		}
-	}
-}
-
-func TestConfigurationPairArtifactCreatesDeletionSigningKeyAndPrefix(t *testing.T) {
-	in, selection, account, now := configurationProviderRecipeFixture(t)
-	signing := deletionSigningFixture(in.InstallationID)
-	for _, worker := range []contracts.OwnerPublicTransit{{}, workerAuditFixture} {
-		s := selection
-		s.WorkerConfigurationAudit = worker
-		before, err := ConfigurationProviderPairSetupArtifact(in, s, account, contracts.HubWorkerProviderInstalledLayout, now)
-		if err != nil {
-			t.Fatal(err)
-		}
-		s.ContextDeletionSigning = signing
-		r, err := ConfigurationProviderRecipeFor(in, s, account, now)
-		if err != nil {
-			t.Fatal(err)
-		}
-		b, err := ConfigurationProviderPairSetupArtifact(in, s, account, contracts.HubWorkerProviderInstalledLayout, now)
-		if err != nil {
-			t.Fatal(err)
-		}
-		type artifact struct {
-			Apply        []configurationProviderSetupRequest `json:"apply"`
-			Inspect      []string                            `json:"inspect"`
-			AuditStorage struct {
-				Prefixes   []string `json:"prefixes"`
-				Operations []string `json:"operations"`
-			} `json:"auditStorage"`
-		}
-		var v, old artifact
-		if json.Unmarshal(b, &v) != nil || json.Unmarshal(before, &old) != nil || len(v.Apply) != len(old.Apply)+1 {
-			t.Fatal("artifact shape", len(v.Apply), len(old.Apply))
-		}
-		var policy struct {
-			Policy string `json:"policy"`
-		}
-		if json.Unmarshal(v.Apply[0].Body, &policy) != nil || policy.Policy != string(r.Roles[0].Policy) || !bytes.Equal(v.Apply[2].Body, old.Apply[2].Body) {
-			t.Fatal("artifact policies are not the extended recipe")
-		}
-		key := v.Apply[len(v.Apply)-1]
-		body, err := ownerProviderCanonical(configurationSigningKey)
-		if err != nil || key.Method != "POST" || key.Path != "audit/keys/"+signing.Key || !bytes.Equal(key.Body, body) || !strings.Contains(string(body), `"type":"ed25519"`) || !strings.Contains(string(body), `"exportable":false`) || !strings.Contains(string(body), `"allow_plaintext_backup":false`) {
-			t.Fatal("deletion signing key is not created exactly", key.Path, string(key.Body))
-		}
-		if !slices.Equal(v.Inspect, append(old.Inspect, "audit/keys/"+signing.Key)) {
-			t.Fatal("inspection does not name the deletion signing key", v.Inspect)
-		}
-		if !slices.Equal(v.AuditStorage.Prefixes, append(old.AuditStorage.Prefixes, "context-deletion/v1/")) || !slices.Equal(v.AuditStorage.Operations, old.AuditStorage.Operations) {
-			t.Fatal("audit storage lacks the context deletion prefix", v.AuditStorage.Prefixes)
-		}
-		for _, request := range v.Apply {
-			if !setupApplyPath(request.Path) {
-				t.Fatal("applier refuses", request.Path)
-			}
-		}
-		if _, err := setupInspectionPolicy(v.Inspect); err != nil {
-			t.Fatal("inspection policy", err)
-		}
-	}
-	s := selection
-	s.ContextDeletionSigning = signing
-	if _, err := ConfigurationProviderSetupArtifact(in, s, account, now); err == nil {
-		t.Fatal("legacy artifact accepted a deletion signing key")
-	}
-	r, err := ConfigurationProviderRecipeFor(in, s, account, now)
-	if err != nil {
-		t.Fatal(err)
-	}
-	in.ProviderAuthentication = &r.Profile
-	in.ProviderInputs = &contracts.ConfigurationWorkerInputProvenance{OperationID: "70000000-0000-4000-8000-000000000001"}
-	in.Activation = &contracts.HubWorkerRuntimeActivation{WorkerLayout: contracts.HubWorkerProviderInstalledLayout}
-	if _, err := ConfigurationProviderInstalledSetupArtifact(in, s, account, now); err != nil {
-		t.Fatal("installed artifact", err)
-	}
-	if _, err := ConfigurationProviderInstalledSetupArtifact(in, selection, account, now); err == nil {
-		t.Fatal("installed artifact dropped the profile's deletion signing key")
 	}
 }
 
