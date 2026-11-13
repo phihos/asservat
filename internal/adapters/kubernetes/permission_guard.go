@@ -109,7 +109,16 @@ func checkAdmissionGuard(ctx context.Context, observer admissionGuardReader, nam
 	if err = strictGuardJSON(raw, &p); err != nil {
 		return "", configurationSourceError(configurationSourceGuardPolicyDecode, err)
 	}
-	if p.APIVersion != "admissionregistration.k8s.io/v1" || p.Kind != "ValidatingAdmissionPolicy" || p.Name != name || string(p.UID) != pin.PolicyUID || p.Generation != pin.PolicyGeneration || p.DeletionTimestamp != nil || p.Status.ObservedGeneration != p.Generation || p.Status.TypeChecking == nil || len(p.Status.TypeChecking.ExpressionWarnings) != 0 {
+	if p.APIVersion != "admissionregistration.k8s.io/v1" || p.Kind != "ValidatingAdmissionPolicy" || p.Name != name || string(p.UID) != pin.PolicyUID || p.Generation != pin.PolicyGeneration || p.DeletionTimestamp != nil || p.Status.ObservedGeneration > p.Generation {
+		return "", configurationSourceError(configurationSourceGuardPolicyIdentity, value.ErrChanged)
+	}
+	// The API server type-checks a policy asynchronously (HA control planes
+	// can answer before it has): until its status reaches this generation the
+	// guard is pending, which callers retry within their deadline.
+	if p.Status.ObservedGeneration != p.Generation || p.Status.TypeChecking == nil {
+		return "", configurationSourceError(configurationSourceGuardPolicyIdentity, value.ErrUnavailable)
+	}
+	if len(p.Status.TypeChecking.ExpressionWarnings) != 0 {
 		return "", configurationSourceError(configurationSourceGuardPolicyIdentity, value.ErrChanged)
 	}
 	normalizePermissionPolicy(&p.Spec)
