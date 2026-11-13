@@ -111,8 +111,9 @@ endpoint/region/bucket/CA PEM, OpenBao endpoint/CA PEM, and explicit fleet
 issuer/client/stable subject or group IDs and finite ceilings. The supplied
 services and bucket remain administrator-owned. PEM is normalized by the
 product; generated pins never become an operator chore. The API CA defaults to
-the native public projection. Leave `probeAudience` empty only when the current
-projected API token has one audience; set it explicitly for ambiguous profiles.
+the native public projection. An empty `probeAudience` uses the first audience
+of the projected API token, which is the API server's primary one (k3s and
+RKE2 tokens also carry their distribution name); set it to choose another.
 
 After the references and public values exist, the fresh operation is one Helm
 invocation (apply/upgrade the CRDs separately as documented):

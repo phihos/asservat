@@ -150,7 +150,9 @@ func initialBootstrapAudienceHint(token []byte, now time.Time) (string, error) {
 	var audience string
 	if json.Unmarshal(claims["aud"], &audience) != nil {
 		var all []string
-		if json.Unmarshal(claims["aud"], &all) != nil || len(all) != 1 {
+		// Default tokens list every API audience (k3s adds "k3s"); the first
+		// is the server's primary one, which TokenReview accepts.
+		if json.Unmarshal(claims["aud"], &all) != nil || len(all) == 0 {
 			return "", cfg.ErrInvalid
 		}
 		audience = all[0]
