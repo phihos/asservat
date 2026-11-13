@@ -58,10 +58,13 @@ func TestInitialBootstrapPublicCompilerNormalizesOnlyNonAuthorizingInput(t *test
 		t.Fatal("compiled original administrators alias caller input")
 	}
 	v.Administrators = nil
-	for _, aud := range []any{[]string{}, []string{"a", "b"}, 123, nil} {
+	for _, aud := range []any{[]string{}, 123, nil} {
 		if _, e := CompileInitialBootstrapInput(v, ca, bootstrapInputHint(now, aud), now); e == nil {
-			t.Fatal("ambiguous audience selected automatically")
+			t.Fatal("missing audience selected automatically")
 		}
+	}
+	if several, e := CompileInitialBootstrapInput(v, ca, bootstrapInputHint(now, []string{"a", "b"}), now); e != nil || several.ProbeAudience != "a" {
+		t.Fatal("primary API audience not selected from several", e)
 	}
 	v.ProbeAudience = "explicit-audience"
 	if _, e := CompileInitialBootstrapInput(v, ca, nil, now); e != nil {
@@ -125,5 +128,22 @@ func TestInitialBootstrapAudienceHintNeverAcceptsExpiredOrDuplicateClaims(t *tes
 		if _, e := initialBootstrapAudienceHint(token, now); e == nil {
 			t.Fatal("unsupported claim became default audience hint")
 		}
+	}
+}
+
+// k3s issues default service-account tokens for every configured API audience,
+// e.g. ["https://kubernetes.default.svc.cluster.local","k3s"]. The first one is
+// the API server's primary audience and is accepted by its TokenReview.
+func TestInitialBootstrapAudienceHintUsesFirstOfSeveralAPIAudiences(t *testing.T) {
+	now := time.Now().UTC()
+	payload := `{"aud":["https://kubernetes.default.svc.cluster.local","k3s"],"exp":9999999999}`
+	token := []byte("e30." + base64.RawURLEncoding.EncodeToString([]byte(payload)) + ".unsigned")
+	got, err := initialBootstrapAudienceHint(token, now)
+	if err != nil || got != "https://kubernetes.default.svc.cluster.local" {
+		t.Fatalf("audience hint = %q, %v", got, err)
+	}
+	empty := []byte("e30." + base64.RawURLEncoding.EncodeToString([]byte(`{"aud":[],"exp":9999999999}`)) + ".unsigned")
+	if _, err := initialBootstrapAudienceHint(empty, now); err == nil {
+		t.Fatal("empty audience list became a hint")
 	}
 }
