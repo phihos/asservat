@@ -3,7 +3,6 @@ package kubernetes
 import (
 	"context"
 	"encoding/json"
-	"slices"
 	"sync"
 	"time"
 
@@ -11,8 +10,6 @@ import (
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/identity"
 	apps "k8s.io/api/apps/v1"
-	auth "k8s.io/api/authentication/v1"
-	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type workerProjectionPurpose uint8
@@ -25,7 +22,6 @@ const (
 
 type workerProjectionNative struct {
 	state contracts.InitialRuntimeResourceState
-	guard string
 	owner apps.Deployment
 }
 
@@ -110,7 +106,7 @@ func (s *InstalledWorkerProjectionReader) beginProjectionOperation(ctx context.C
 	if err != nil {
 		return nil, err
 	}
-	p.initial, err = s.projectionNative(p.ctx, started, purpose, true)
+	p.initial, err = s.projectionNative(p.ctx, purpose, true)
 	if err == nil {
 		err = p.tokens.mountedCurrent(p.ctx)
 	}
@@ -185,7 +181,7 @@ func (p *WorkerProjectionOperation) Finish(ctx context.Context) error {
 		p.changed = make(chan struct{})
 		p.mu.Unlock()
 	}()
-	last, err := p.reader.projectionNative(call, p.started, p.purpose, false)
+	last, err := p.reader.projectionNative(call, p.purpose, false)
 	if err == nil {
 		err = p.tokens.mountedCurrent(call)
 	}
@@ -196,7 +192,7 @@ func (p *WorkerProjectionOperation) Finish(ctx context.Context) error {
 		// Compare copies so the original operation and selected claim stay intact.
 		initialState.CleanupProjection, lastState.CleanupProjection = nil, nil
 	}
-	if err == nil && (last.guard != p.initial.guard || !equalJSON(lastState, initialState) || !configurationProviderDeploymentEqual(last.owner, p.initial.owner)) {
+	if err == nil && (!equalJSON(lastState, initialState) || !configurationProviderDeploymentEqual(last.owner, p.initial.owner)) {
 		err = cfg.ErrChanged
 	}
 	p.mu.Lock()
@@ -227,10 +223,9 @@ func (p *WorkerProjectionOperation) Close() {
 	p.tokens.close()
 }
 
-// Initial11S/3P and final10S preserve two complete current value passes. Only
-// the actual initial denial/SSR interval is reused, under unchanged token bytes.
-// No nested Current call repeats the same mutable facts inside either phase.
-func (s *InstalledWorkerProjectionReader) projectionNative(ctx context.Context, started time.Time, purpose workerProjectionPurpose, initial bool) (workerProjectionNative, error) {
+// The initial and final passes are two complete current value passes under
+// ordinary RBAC and unchanged token bytes. No admission policy is read.
+func (s *InstalledWorkerProjectionReader) projectionNative(ctx context.Context, purpose workerProjectionPurpose, initial bool) (workerProjectionNative, error) {
 	var out workerProjectionNative
 	until, ok := ctx.Deadline()
 	if !ok {
@@ -247,34 +242,11 @@ func (s *InstalledWorkerProjectionReader) projectionNative(ctx context.Context, 
 	}
 	g := s.guard
 	var err error
-	out.guard, err = checkAdmissionGuard(ctx, s.client, g.plan.Name, g.pin, g.policy, g.binding)
-	if err != nil {
+	if err = s.get(ctx, "/apis/apps/v1/namespaces/"+s.input.Namespace.Name+"/deployments/"+g.plan.Deployment, &out.owner); err != nil {
 		return out, err
 	}
-	if initial {
-		var actor auth.UserInfo
-		out.owner, actor, err = g.proveObjectIdentity(ctx, started)
-		if err != nil {
-			return out, err
-		}
-		if !s.projectionActor(actor) {
-			return out, cfg.ErrDenied
-		}
-		raw, e := s.client.proofPost(ctx, "/apis/authentication.k8s.io/v1/selfsubjectreviews", auth.SelfSubjectReview{TypeMeta: meta.TypeMeta{APIVersion: "authentication.k8s.io/v1", Kind: "SelfSubjectReview"}}, nil)
-		var self auth.SelfSubjectReview
-		if e != nil {
-			return out, cfg.ErrUnavailable
-		}
-		if strictGuardJSON(raw, &self) != nil || !s.projectionActor(self.Status.UserInfo) {
-			return out, cfg.ErrDenied
-		}
-	} else {
-		if err = s.get(ctx, "/apis/apps/v1/namespaces/"+s.input.Namespace.Name+"/deployments/"+g.plan.Deployment, &out.owner); err != nil {
-			return out, err
-		}
-		if out.owner.APIVersion != "apps/v1" || out.owner.Kind != "Deployment" || !ownerMetadata(out.owner.ObjectMeta, s.input.Namespace.Name, g.plan.Deployment, g.plan.DeploymentUID) {
-			return out, cfg.ErrChanged
-		}
+	if out.owner.APIVersion != "apps/v1" || out.owner.Kind != "Deployment" || !ownerMetadata(out.owner.ObjectMeta, s.input.Namespace.Name, g.plan.Deployment, g.plan.DeploymentUID) {
+		return out, cfg.ErrChanged
 	}
 	out.state, err = s.journal(ctx)
 	if err != nil {
@@ -321,19 +293,4 @@ func (s *InstalledWorkerProjectionReader) projectionNative(ctx context.Context, 
 		return out, err
 	}
 	return out, nil
-}
-
-func (s *InstalledWorkerProjectionReader) projectionActor(actor auth.UserInfo) bool {
-	a := s.input.Activation.ServiceAccount
-	groups := slices.Clone(actor.Groups)
-	slices.Sort(groups)
-	if actor.Username != "system:serviceaccount:"+s.input.Namespace.Name+":"+a.Name || actor.UID != a.UID || !slices.Equal(groups, []string{"system:authenticated", "system:serviceaccounts", "system:serviceaccounts:" + s.input.Namespace.Name}) {
-		return false
-	}
-	for _, admin := range s.guard.plan.Administrators {
-		if actorMatches(admin, actor) {
-			return false
-		}
-	}
-	return true
 }

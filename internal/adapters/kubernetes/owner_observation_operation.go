@@ -224,15 +224,11 @@ func (s *OwnerObservationOperationReader) boundaryLocal(ctx context.Context, r v
 	if err != nil || ns.Deleting {
 		return zero, noDigest, cfg.ErrChanged
 	}
-	guard, err := checkAdmissionGuard(ctx, s.client, g.plan.Name, g.pin, g.policy, g.binding)
+	deployment, err := readPinnedDeployment(ctx, s.client, g.plan.ControlNamespace.Name, g.plan.Deployment, g.plan.DeploymentUID)
 	if err != nil {
 		return zero, noDigest, err
 	}
-	deployment, err := g.proveObject(ctx, start)
-	if err != nil {
-		return zero, noDigest, err
-	}
-	// ADR-227: read inside the guard bracket, like the proven Deployment.
+	// ADR-227: read inside the namespace bracket, like the Deployment.
 	release, err := s.client.releaseRecord(ctx, p.Namespace, p.InstallationID)
 	if err != nil {
 		return zero, noDigest, err
@@ -304,10 +300,6 @@ func (s *OwnerObservationOperationReader) boundaryLocal(ctx context.Context, r v
 	if err != nil || latest.ResourceVersion != service.ResourceVersion || !equalJSON(latest.Spec, service.Spec) {
 		return zero, noDigest, cfg.ErrChanged
 	}
-	current, err := checkAdmissionGuard(ctx, s.client, g.plan.Name, g.pin, g.policy, g.binding)
-	if err != nil || current != guard {
-		return zero, noDigest, cfg.ErrChanged
-	}
 	ns, err = s.client.namespace(ctx, s.client.control)
 	if err != nil || ns.Deleting || ctx.Err() != nil || !s.client.now().Before(until) {
 		return zero, noDigest, value.ErrUnavailable
@@ -317,6 +309,19 @@ func (s *OwnerObservationOperationReader) boundaryLocal(ctx context.Context, r v
 		return zero, noDigest, value.ErrUnavailable
 	}
 	return out, artifact.Digest(sha256.Sum256(raw)), nil
+}
+
+// readPinnedDeployment reads the exact installed Deployment under ordinary RBAC.
+// It is an observation of current workload facts, not an admission proof.
+func readPinnedDeployment(ctx context.Context, c *PermissionClient, namespace, name, uid string) (apps.Deployment, error) {
+	d, err := ownerResource[apps.Deployment](&OwnerEndpoints{client: c}, ctx, "/apis/apps/v1/namespaces/"+namespace+"/deployments/"+name, "apps/v1", "Deployment")
+	if err != nil {
+		return apps.Deployment{}, err
+	}
+	if !ownerMetadata(d.ObjectMeta, namespace, name, uid) {
+		return apps.Deployment{}, cfg.ErrChanged
+	}
+	return d, nil
 }
 
 func (s *OwnerObservationOperationReader) validateObjects(service core.Service, d apps.Deployment, rs apps.ReplicaSet, pod core.Pod, binding value.OwnerBinding, route ownerOperationRoute, release *contracts.ReleaseRecord) (artifact.Digest, error) {

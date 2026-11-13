@@ -63,7 +63,7 @@ func TestConnectorLifecycleNativeOwnsOriginalAndIndependentFinal(t *testing.T) {
 	r.Request.ClientCSRDER[0] ^= 1
 	r.Request.ServerCSRDER[0] ^= 1
 	first := lifecycleRead(t, op, ctx, value.ConnectorLifecycleInitial)
-	if first.Original.ClientKeyDigest != client || first.Original.ServerKeyDigest != server || f.base.observer.Load() != 22 || f.base.probe.Load() != 6 {
+	if first.Original.ClientKeyDigest != client || first.Original.ServerKeyDigest != server || f.base.observer.Load() != 15 || f.base.probe.Load() != 0 {
 		t.Fatalf("first actual key/bracket/count mismatch observer=%d probe=%d", f.base.observer.Load(), f.base.probe.Load())
 	}
 	prior := first
@@ -78,7 +78,7 @@ func TestConnectorLifecycleNativeOwnsOriginalAndIndependentFinal(t *testing.T) {
 		}
 		prior = next
 	}
-	if f.base.observer.Load() != 68 || f.base.probe.Load() != 12 || f.reviews.Load() != 6 {
+	if f.base.observer.Load() != 46 || f.base.probe.Load() != 0 || f.reviews.Load() != 6 {
 		t.Fatalf("complete actual count observer=%d probe=%d tokenreviews=%d", f.base.observer.Load(), f.base.probe.Load(), f.reviews.Load())
 	}
 	before := f.base.observer.Load()
@@ -88,7 +88,7 @@ func TestConnectorLifecycleNativeOwnsOriginalAndIndependentFinal(t *testing.T) {
 }
 
 func TestConnectorLifecycleNativeKnownChangePermanentlyCloses(t *testing.T) {
-	for _, mode := range []string{"source-roles", "source-backing", "source-revision", "source-guard", "workload-guard", "account", "pod", "replica", "deployment", "token", "cancel", "clock-rollback", "expiry"} {
+	for _, mode := range []string{"source-roles", "source-backing", "source-revision", "account", "pod", "replica", "deployment", "token", "cancel", "clock-rollback", "expiry"} {
 		t.Run(mode, func(t *testing.T) {
 			f, reader, r, ctx := lifecycleNativeFixture(t)
 			op, err := reader.BeginConnectorLifecycle(ctx, r)
@@ -108,10 +108,6 @@ func TestConnectorLifecycleNativeKnownChangePermanentlyCloses(t *testing.T) {
 				f.wire["backing"] = b
 			case "source-revision":
 				f.wire["revision"] = 2
-			case "source-guard":
-				f.missing = true
-			case "workload-guard":
-				f.base.policy.UID = types.UID(ownerID(91))
 			case "account":
 				f.base.v.sa.UID = types.UID(ownerID(91))
 			case "pod":
@@ -147,7 +143,7 @@ func TestConnectorLifecycleNativeKnownChangePermanentlyCloses(t *testing.T) {
 }
 
 func TestConnectorLifecycleNativeFinalDenialAndSourceMutation(t *testing.T) {
-	for _, mode := range []string{"source-denial", "workload-denial", "source-during-denial", "pod"} {
+	for _, mode := range []string{"source-during-final", "pod"} {
 		t.Run(mode, func(t *testing.T) {
 			f, reader, r, ctx := lifecycleNativeFixture(t)
 			op, err := reader.BeginConnectorLifecycle(ctx, r)
@@ -161,13 +157,9 @@ func TestConnectorLifecycleNativeFinalDenialAndSourceMutation(t *testing.T) {
 			f.mu.Lock()
 			f.base.mu.Lock()
 			switch mode {
-			case "source-denial":
-				f.accept = true
-			case "workload-denial":
-				f.base.accept = true
-			case "source-during-denial":
-				// This fixture changes after the fifth source GET, while the
-				// final denied UPDATE is returning its original old body.
+			case "source-during-final":
+				// The source changes during the final workload bracket; the
+				// final value read follows it and must observe the change.
 				f.mutateDuringFinalGuard = true
 			case "pod":
 				f.base.v.pod.Spec.Containers[0].Args = []string{"changed"}

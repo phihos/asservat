@@ -172,29 +172,27 @@ func (s *InstalledOwnerIdentityReader) deployment(ctx context.Context, state con
 	return workerOriginalObject(&account, want.Account, contracts.PublicRuntimeWorkerObject{Reference: in.ServiceAccount, OperationID: c.OperationID, TemplateDigest: c.TemplateDigest}, in.Namespace.Name)
 }
 
-// VerifyPublicProjection compares the immutable public runtime projection with
-// the mounted public root (ADR-184 decision 6, ADR-194): the referenced Secret
-// must be the immutable Opaque product projection of the mounted manifest's
-// role root and setup, and every one of its keys must equal the mounted file.
-// The mounted root also carries the operator Secret's keys, which this
-// projection never names.
+// VerifyPublicProjection compares the public runtime projection Secret with
+// the mounted public root (ADR-184 decision 6, ADR-194): the Secret named by
+// the deployment input must be an Opaque Secret whose every key equals the
+// mounted file, and the mounted root must carry a valid credential manifest.
+// It is matched by name and content only; installer-only UIDs, annotations
+// and immutability are not required. The mounted root also carries the
+// operator Secret's keys, which this projection never names.
 func (s *InstalledOwnerIdentityReader) VerifyPublicProjection(ctx context.Context, ref contracts.WorkerObjectReference, mounted map[string][]byte) error {
-	if s == nil || ctx == nil || s.input.Public == nil || ref != s.input.Public.RuntimeProjection || ref.Name != contracts.PublicRuntimeProjectionName(s.input.InstallationID) {
+	if s == nil || ctx == nil || s.input.Public == nil || ref.Name != s.input.Public.RuntimeProjection.Name || ref.Name != contracts.PublicRuntimeProjectionName(s.input.InstallationID) {
 		return cfg.ErrInvalid
 	}
-	manifest, err := contracts.DecodePublicRuntimeCredentialManifest(bytes.NewReader(mounted[contracts.PublicRuntimeCredentialManifestFile]))
-	if err != nil {
+	if _, err := contracts.DecodePublicRuntimeCredentialManifest(bytes.NewReader(mounted[contracts.PublicRuntimeCredentialManifestFile])); err != nil {
 		return cfg.ErrChanged
 	}
 	in := s.activation.Input
 	var secret core.Secret
-	if err = s.get(ctx, "/api/v1/namespaces/"+in.Namespace.Name+"/secrets/"+ref.Name, &secret); err != nil {
+	if err := s.get(ctx, "/api/v1/namespaces/"+in.Namespace.Name+"/secrets/"+ref.Name, &secret); err != nil {
 		return err
 	}
 	defer clearRuntimeProjection(secret.Data)
-	if secret.APIVersion != "v1" || secret.Kind != "Secret" || !ownerMetadata(secret.ObjectMeta, in.Namespace.Name, ref.Name, ref.UID) || secret.Immutable == nil || !*secret.Immutable || secret.Type != core.SecretTypeOpaque ||
-		len(secret.OwnerReferences) != 0 || len(secret.Finalizers) != 0 || len(secret.StringData) != 0 || len(secret.Data) == 0 ||
-		secret.Annotations["asservat.io/role-root-uid"] != manifest.RootUID || secret.Annotations["asservat.io/role-setup-id"] != manifest.SetupID {
+	if secret.APIVersion != "v1" || secret.Kind != "Secret" || secret.Name != ref.Name || secret.Namespace != in.Namespace.Name || secret.DeletionTimestamp != nil || secret.Type != core.SecretTypeOpaque || len(secret.StringData) != 0 || len(secret.Data) == 0 {
 		return cfg.ErrChanged
 	}
 	for key, value := range secret.Data {

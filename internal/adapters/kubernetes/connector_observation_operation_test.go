@@ -133,6 +133,8 @@ func newConnectorOperationFixture(t *testing.T) *connectorOperationFixture {
 
 func (f *connectorOperationFixture) serve(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
+	// The source guard endpoints remain for the separate attester path; the
+	// observation and lifecycle operations themselves never request them.
 	owned := path == "/apis/admissionregistration.k8s.io/v1/validatingadmissionpolicies/connector-source" || path == "/apis/admissionregistration.k8s.io/v1/validatingadmissionpolicybindings/connector-source" || path == "/api/v1/namespaces/owners/configmaps/connector-identity" || path == "/apis/authentication.k8s.io/v1/tokenreviews"
 	if !owned {
 		f.base.serve(w, r)
@@ -181,16 +183,17 @@ func (f *connectorOperationFixture) serve(w http.ResponseWriter, r *http.Request
 			permissionReply(w, cm)
 			return
 		}
-		if f.mutateDuringFinalGuard && f.gets.Load() == 5 {
-			// The final source guard has read the old body. Mutation occurs
-			// before its denial returns; ordinal four must decode afterward.
-			f.wire["revision"] = 2
-		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(403)
 		_ = json.NewEncoder(w).Encode(meta.Status{TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "Status"}, Status: meta.StatusFailure, Reason: meta.StatusReasonForbidden, Code: 403, Details: &meta.StatusDetails{Kind: "configmaps", Causes: []meta.StatusCause{{Message: "ValidatingAdmissionPolicy 'connector-source' with binding 'connector-source' denied request: " + connectorIdentityDenial}}}})
 	case "/apis/authentication.k8s.io/v1/tokenreviews":
 		f.reviews.Add(1)
+		if f.mutateDuringFinalGuard {
+			// The final native bracket is running; the final value read must
+			// decode the source afterward and observe this change.
+			f.mutateDuringFinalGuard = false
+			f.wire["revision"] = 2
+		}
 		var q auth.TokenReview
 		if json.NewDecoder(r.Body).Decode(&q) != nil || q.Spec.Token != string(f.token) || len(q.Spec.Audiences) != 1 || q.Spec.Audiences[0] != ConnectorEnrollmentAudience(f.process.Binding.InstallationID) {
 			f.base.t.Error("wrong native token review")
@@ -215,7 +218,7 @@ func (f *connectorOperationFixture) begin(t *testing.T) (*ConnectorObservationOp
 func TestConnectorObservationOperationFourActualValues(t *testing.T) {
 	f := newConnectorOperationFixture(t)
 	o, ctx := f.begin(t)
-	if f.base.observer.Load() != 19 || f.base.probe.Load() != 6 || f.reviews.Load() != 2 {
+	if f.base.observer.Load() != 9 || f.base.probe.Load() != 0 || f.reviews.Load() != 2 {
 		t.Fatalf("initial bracket count %d/%d reviews%d", f.base.observer.Load(), f.base.probe.Load(), f.reviews.Load())
 	}
 	for n := 1; n <= 4; n++ {
@@ -229,7 +232,7 @@ func TestConnectorObservationOperationFourActualValues(t *testing.T) {
 		}
 		v.Source.Observation.Profile.ClientIssuerRoots[0][0] ^= 1
 	}
-	if f.gets.Load() != 6 || f.reviews.Load() != 4 || f.base.observer.Load() != 50 || f.base.probe.Load() != 12 {
+	if f.gets.Load() != 4 || f.reviews.Load() != 4 || f.base.observer.Load() != 30 || f.base.probe.Load() != 0 {
 		t.Fatalf("four values plus two native brackets %d/%d gets%d reviews%d", f.base.observer.Load(), f.base.probe.Load(), f.gets.Load(), f.reviews.Load())
 	}
 	before := f.base.observer.Load()
@@ -280,7 +283,7 @@ func TestConnectorObservationOperationSourceMutationCloses(t *testing.T) {
 }
 
 func TestConnectorObservationOperationFinalNativeMutationCloses(t *testing.T) {
-	for _, mode := range []string{"source-guard", "source-denial", "workload-guard", "workload-denial", "account", "pod", "template", "review", "expiry"} {
+	for _, mode := range []string{"account", "pod", "template", "review", "expiry"} {
 		t.Run(mode, func(t *testing.T) {
 			f := newConnectorOperationFixture(t)
 			o, ctx := f.begin(t)
@@ -292,14 +295,6 @@ func TestConnectorObservationOperationFinalNativeMutationCloses(t *testing.T) {
 			f.mu.Lock()
 			f.base.mu.Lock()
 			switch mode {
-			case "source-guard":
-				f.missing = true
-			case "source-denial":
-				f.accept = true
-			case "workload-guard":
-				f.base.policy.UID = types.UID(ownerID(90))
-			case "workload-denial":
-				f.base.accept = true
 			case "account":
 				f.base.v.sa.UID = types.UID(ownerID(90))
 			case "pod":
@@ -363,8 +358,8 @@ func TestConnectorObservationOperationFinalValueFollowsNativeBracket(t *testing.
 	if _, err := o.Read(ctx, 4); err == nil {
 		t.Fatal("source mutation during final native bracket escaped the final full decode")
 	}
-	if f.gets.Load() != 6 || f.reviews.Load() != 4 {
-		t.Fatal("final actual source/native checks did not run")
+	if f.gets.Load() != 4 || f.reviews.Load() != 4 {
+		t.Fatal("final actual source/native checks did not run", f.gets.Load(), f.reviews.Load())
 	}
 }
 

@@ -6,34 +6,22 @@ import (
 	"encoding/json"
 
 	api "asservat.local/asservat/api/v1alpha1"
-	"asservat.local/asservat/internal/domain/configuration"
 	value "asservat.local/asservat/internal/domain/execution"
-	"asservat.local/asservat/internal/domain/identity"
-	admission "k8s.io/api/admissionregistration/v1"
 )
 
 // APIStartPreparer uses the capacity account, never the executing Pod's account.
 // The only create allowance is the first acknowledged SQL preparation. A lost
 // create reply recovers the original name and content, without another POST.
+// Plain RBAC limits who can write CapacityReservations; no admission policy is read.
 type APIStartPreparer struct {
-	guard     *APIExecutionProtection
-	startName string
-	startPin  GuardPin
-	policy    admission.ValidatingAdmissionPolicySpec
-	binding   admission.ValidatingAdmissionPolicyBindingSpec
+	guard *APIExecutionProtection
 }
 
-func NewAPIStartPreparer(g *APIExecutionProtection, name string, pin GuardPin) (*APIStartPreparer, error) {
-	if g == nil || !identity.Text(pin.PolicyUID, 64) || pin.PolicyGeneration < 1 || !identity.Text(pin.BindingUID, 64) || !identity.Text(pin.BindingResourceVersion, 128) {
+func NewAPIStartPreparer(g *APIExecutionProtection) (*APIStartPreparer, error) {
+	if g == nil {
 		return nil, value.ErrInvalid
 	}
-	p := g.plan
-	policy, binding, err := StartAdmission(configuration.LocalStartAdministration{Name: name, ControlNamespace: p.ControlNamespace, CapacityUser: "system:serviceaccount:" + p.ControlNamespace.Name + ":" + p.CapacityAccount, ExecutionUser: "system:serviceaccount:" + p.ControlNamespace.Name + ":" + p.Account})
-	if err != nil {
-		return nil, err
-	}
-	normalizePermissionPolicy(&policy.Spec)
-	return &APIStartPreparer{g, name, pin, policy.Spec, binding.Spec}, nil
+	return &APIStartPreparer{g}, nil
 }
 func (p *APIStartPreparer) check(ctx context.Context, c value.PreparationCheck) error {
 	if p == nil || !c.Valid(p.guard.observer.now()) || c.Binding.ClusterID != p.guard.plan.ClusterID || c.Binding.IssuerEpoch != p.guard.plan.IssuerEpoch || c.Binding.ExecutorPodUID != p.guard.plan.PodUID || c.Binding.ExecutorAccountUID != p.guard.plan.AccountUID {
@@ -43,10 +31,7 @@ func (p *APIStartPreparer) check(ctx context.Context, c value.PreparationCheck) 
 	if err != nil {
 		return err
 	}
-	if err = p.guard.account(ctx, p.guard.observer, p.guard.plan.CapacityAccount, p.guard.plan.CapacityAccountUID, false); err != nil {
-		return err
-	}
-	if _, err = checkAdmissionGuard(ctx, p.guard.observer, p.startName, p.startPin, p.policy, p.binding); err != nil {
+	if err = p.guard.account(ctx, p.guard.plan.CapacityAccount, p.guard.plan.CapacityAccountUID); err != nil {
 		return err
 	}
 	if ctx.Err() != nil {

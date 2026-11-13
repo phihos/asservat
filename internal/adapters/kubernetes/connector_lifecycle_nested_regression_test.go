@@ -188,12 +188,9 @@ func TestConnectorLifecycleEnrollmentWithinOriginalBound(t *testing.T) {
 	if !process.Valid() || f.prepares != 1 || f.begins != 1 || f.stores != 1 || f.finishes != 1 || f.accepts != 1 || ctx.Err() != nil || len(f.proofs) != 4 {
 		t.Fatal("enrollment result lacks original bounded effects/completion")
 	}
-	for i, count := range []int32{22, 12, 12, 22} {
-		probe := int32(0)
-		if i == 0 || i == 3 {
-			probe = 6
-		}
-		if f.proofs[i].failed || f.proofs[i].observer != count || f.proofs[i].probe != probe {
+	// Plain reads only: no admission policy, SelfSubjectReview or dry-run probe.
+	for i, count := range []int32{15, 8, 8, 15} {
+		if f.proofs[i].failed || f.proofs[i].observer != count || f.proofs[i].probe != 0 {
 			t.Fatal("actual enrollment native phase graph differs", i)
 		}
 	}

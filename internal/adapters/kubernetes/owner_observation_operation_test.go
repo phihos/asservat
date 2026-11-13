@@ -146,6 +146,8 @@ func (f *ownerOperationFixture) serve(w http.ResponseWriter, r *http.Request) {
 			f.clock.Store(f.start.Add(5 * time.Second).UnixNano())
 		}
 		permissionReply(w, v.ns)
+	// Guard endpoints remain for the separate attester path in shared
+	// fixtures; the operations under test never request them (see counts).
 	case "/apis/admissionregistration.k8s.io/v1/validatingadmissionpolicies/owner-operation":
 		permissionReply(w, f.policy)
 	case "/apis/admissionregistration.k8s.io/v1/validatingadmissionpolicybindings/owner-operation":
@@ -221,7 +223,8 @@ func TestOwnerObservationOperationRealBoundaries(t *testing.T) {
 		t.Fatal(e)
 	}
 	// Counts include one ADR-227 release record read per native boundary.
-	if f.observer.Load() != 15 || f.probe.Load() != 3 {
+	// No admission policy, SelfSubjectReview or dry-run probe: plain reads only.
+	if f.observer.Load() != 11 || f.probe.Load() != 0 {
 		t.Fatalf("first native boundary requests: %d/%d", f.observer.Load(), f.probe.Load())
 	}
 	initial.Peers[0].Addresses[0] = "10.9.8.7"
@@ -240,7 +243,7 @@ func TestOwnerObservationOperationRealBoundaries(t *testing.T) {
 	if !final.Final || !final.ObservedAt.Equal(again.ObservedAt) || !final.FreshUntil.Equal(again.FreshUntil) || !sameOwnerNativePeers(final.Peers, again.Peers) {
 		t.Fatal("final renewed or changed original facts")
 	}
-	if f.observer.Load() != 30 || f.probe.Load() != 6 {
+	if f.observer.Load() != 22 || f.probe.Load() != 0 {
 		t.Fatalf("two native boundaries: %d/%d", f.observer.Load(), f.probe.Load())
 	}
 	calls := f.observer.Load()
@@ -250,13 +253,7 @@ func TestOwnerObservationOperationRealBoundaries(t *testing.T) {
 }
 func TestOwnerObservationOperationFinalChangeIsTerminal(t *testing.T) {
 	cases := map[string]func(*ownerOperationFixture){
-		"namespace":     func(f *ownerOperationFixture) { f.v.ns.UID = types.UID(ownerID(90)) },
-		"guard":         func(f *ownerOperationFixture) { f.policy.Spec.Validations[0].Expression = "true" },
-		"guard-binding": func(f *ownerOperationFixture) { f.binding.UID = types.UID(ownerID(90)) },
-		"guard-warning": func(f *ownerOperationFixture) {
-			f.policy.Status.TypeChecking.ExpressionWarnings = []admission.ExpressionWarning{{FieldRef: "spec", Warning: "changed"}}
-		},
-		"guard-accepted":      func(f *ownerOperationFixture) { f.accept = true },
+		"namespace":           func(f *ownerOperationFixture) { f.v.ns.UID = types.UID(ownerID(90)) },
 		"service":             func(f *ownerOperationFixture) { f.v.svc.UID = types.UID(ownerID(90)) },
 		"service-port":        func(f *ownerOperationFixture) { f.v.svc.Spec.Ports[0].Port++ },
 		"account":             func(f *ownerOperationFixture) { f.v.sa.UID = types.UID(ownerID(90)) },
@@ -411,9 +408,9 @@ func TestOwnerObservationOperationTwoExactProcesses(t *testing.T) {
 			f := newOwnerOperationFixture(t)
 			first, second := f.v.binding, f.v.binding
 			second.ProcessEpoch = ownerID(92)
-			want := int32(30)
+			want := int32(22)
 			if !samePod {
-				want = 36
+				want = 28
 				second.PodUID = ownerID(93)
 				f.other = f.v.pod.DeepCopy()
 				f.other.Name = "hub-rs-other"
@@ -439,7 +436,7 @@ func TestOwnerObservationOperationTwoExactProcesses(t *testing.T) {
 			if e != nil {
 				t.Fatal(e)
 			}
-			if len(final.Peers) != 2 || final.Peers[0].Binding != first || final.Peers[1].Binding != second || f.observer.Load() != want || f.probe.Load() != 6 {
+			if len(final.Peers) != 2 || final.Peers[0].Binding != first || final.Peers[1].Binding != second || f.observer.Load() != want || f.probe.Load() != 0 {
 				t.Fatalf("lost exact process/input ownership or duplicated native graph: calls %d/%d", f.observer.Load(), f.probe.Load())
 			}
 		})
