@@ -148,7 +148,8 @@ func decodeAuditPolicy(raw json.RawMessage, lane, root, installation string) (au
 		return audit.OperationLifecyclePolicy{}, mounts.ErrUnavailable
 	}
 	b, e := json.Marshal(p)
-	a, z := jsontext.Value(raw), jsontext.Value(b)
+	// Canonicalize rewrites in place: never the caller's bytes.
+	a, z := jsontext.Value(bytes.Clone(raw)), jsontext.Value(b)
 	if e != nil || a.Canonicalize() != nil || z.Canonicalize() != nil || !bytes.Equal(a, z) {
 		return audit.OperationLifecyclePolicy{}, mounts.ErrUnavailable
 	}

@@ -91,7 +91,7 @@ func (s *ContextCapabilitySource) snapshot(ctx context.Context) (planning.Contex
 		return out, cfg.ErrInvalid
 	}
 	b, err := json.Marshal(w)
-	a, z := jsontext.Value(raw), jsontext.Value(b)
+	a, z := jsontext.Value(bytes.Clone(raw)), jsontext.Value(b)
 	if err != nil || a.Canonicalize() != nil || z.Canonicalize() != nil || !bytes.Equal(a, z) || w != s.installed || !w.Enabled {
 		return out, cfg.ErrChanged
 	}
