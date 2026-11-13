@@ -165,3 +165,7 @@ capacity:
       unhealthySamples: 3
       sampleIntervalSeconds: 5
       recoveryHealthySeconds: 60
+# The fake API of the hook tests serves only the release namespace.
+hub:
+  download-worker:
+    enabled: false

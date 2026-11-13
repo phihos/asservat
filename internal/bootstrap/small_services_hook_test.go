@@ -101,9 +101,10 @@ func renderSecretsHook(t *testing.T, values map[string]any) (contracts.SecretsPl
 		}
 		var head struct {
 			Kind     string
-			Metadata struct{ Name string }
+			Metadata struct{ Name, Namespace string }
 		}
-		if json.Unmarshal(doc, &head) != nil || head.Metadata.Name != "trial-secrets" {
+		// The fake API serves the release namespace only.
+		if json.Unmarshal(doc, &head) != nil || head.Metadata.Name != "trial-secrets" || head.Metadata.Namespace != "" && head.Metadata.Namespace != "installation" {
 			continue
 		}
 		switch head.Kind {

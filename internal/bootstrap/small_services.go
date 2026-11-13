@@ -491,7 +491,34 @@ func runSecrets(ctx context.Context, p contracts.SecretsPlan, config *rest.Confi
 			return err
 		}
 	}
+	if c := p.DownloadStore; c != nil {
+		if err := store.copyImmutable(ctx, client.CoreV1().Secrets(c.Namespace), *c); err != nil {
+			return err
+		}
+	}
 	return ctx.Err()
+}
+
+// copyImmutable creates an immutable copy of one credential.json Secret in
+// another namespace once; an existing copy is kept.
+func (s secretStore) copyImmutable(ctx context.Context, target typed.SecretInterface, c contracts.SecretsCopy) error {
+	if _, err := target.Get(ctx, c.Secret, meta.GetOptions{}); err == nil {
+		return nil
+	} else if !apierrors.IsNotFound(err) {
+		return secretsFailure("SecretUnavailable " + c.Namespace + "/" + c.Secret)
+	}
+	source, err := s.api.Get(ctx, c.Source, meta.GetOptions{})
+	if err != nil || len(source.Data[contracts.ObjectStoreCredentialFile]) == 0 {
+		return secretsFailure("SecretUnavailable " + c.Source)
+	}
+	defer clearData(source.Data)
+	immutable := true
+	object := &core.Secret{ObjectMeta: meta.ObjectMeta{Name: c.Secret, Namespace: c.Namespace, Labels: map[string]string{"app.kubernetes.io/part-of": "asservat", "app.kubernetes.io/created-by": "asservat-secrets"}}, Type: core.SecretTypeOpaque, Immutable: &immutable,
+		Data: map[string][]byte{contracts.ObjectStoreCredentialFile: source.Data[contracts.ObjectStoreCredentialFile]}}
+	if _, err = target.Create(ctx, object, meta.CreateOptions{FieldValidation: "Strict"}); err != nil && !apierrors.IsAlreadyExists(err) {
+		return secretsFailure("SecretUnavailable " + c.Namespace + "/" + c.Secret)
+	}
+	return nil
 }
 
 // servingTLS creates a peer listener's kubernetes.io/tls Secret once: an own

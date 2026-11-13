@@ -75,8 +75,8 @@ class Renderer:
         return [r for r in yaml.safe_load_all(result) if r]
 
 
-def named(docs, kind, name):
-    found = [r for r in docs if r["kind"] == kind and r["metadata"]["name"] == name]
+def named(docs, kind, name, namespace="asservat-system"):
+    found = [r for r in docs if r["kind"] == kind and r["metadata"]["name"] == name and r["metadata"].get("namespace", namespace) == namespace]
     assert len(found) == 1, (kind, name, [r["metadata"]["name"] for r in docs if r["kind"] == kind])
     return found[0]
 
@@ -106,6 +106,9 @@ def check_secrets(render):
             assert hooked["metadata"]["annotations"]["helm.sh/hook"] == "pre-install,pre-upgrade"
         plan = json.loads(named(docs, "ConfigMap", "asservat-secrets")["data"]["secrets.json"])
         assert plan["format"] == "asservat-secrets/v1" and plan["ids"] == {"secret": "asservat-ids", "generate": True}
+        # download-read is copied into the workers' namespace with its own Role.
+        assert plan["downloadStore"] == {"source": "asservat-s3-download-read", "namespace": "asservat-downloads", "secret": "asservat-s3-download-read"}
+        assert named(docs, "Role", "asservat-secrets", "asservat-downloads")["rules"][1]["resourceNames"] == ["asservat-s3-download-read"]
         assert [s["component"] for s in plan["sql"]] == COMPONENTS
     # existingSecret overrides leave the plan and stay readable.
     v = bundled_values("hub")

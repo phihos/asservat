@@ -30,6 +30,17 @@ type SecretsPlan struct {
 	// ServingTLS are the peer listener Secrets (kubernetes.io/tls with
 	// ca.crt) created once when no existing Secret or issuer is selected.
 	ServingTLS []SecretsServingTLS `json:"servingTLS,omitempty"`
+	// DownloadStore copies the download-read store credential into the
+	// download workers' namespace (Pods mount only their own namespace's
+	// Secrets), immutable, created once.
+	DownloadStore *SecretsCopy `json:"downloadStore,omitempty"`
+}
+
+// SecretsCopy names a Secret in the release namespace and its copy.
+type SecretsCopy struct {
+	Source    string `json:"source"`
+	Namespace string `json:"namespace"`
+	Secret    string `json:"secret"`
 }
 
 // SecretsServingTLS is one `<name>-<component>-tls` Secret and the DNS names
