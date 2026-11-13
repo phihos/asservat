@@ -255,6 +255,41 @@ The all four bundled services context sequence has fresh installed qualification
 The pinned Keycloak image is qualified for fresh login after the tested PostgreSQL restart using fixed idle connection validation. These raw Quarkus settings are outside Keycloak's first-class supported configuration. Requalify recovery before changing the Keycloak image; see the [decision and cost estimate](../decisions/326-individually-selectable-small-services.md#keycloak-idle-database-connections-after-postgresql-restart).
 
 
+## Use your Ingress or Gateway
+
+The browser/API listener can sit behind your Ingress controller or Gateway
+([ADR-327](../decisions/327-ingress-and-gateway-exposure.md)), so the console
+URL needs no port. Set the origin without a port and replace the profile's
+`exposure`:
+
+```yaml
+bootstrap:
+  continuation:
+    public:
+      origin: https://asservat.YOUR_DOMAIN
+      promotion:
+        exposure:
+          serviceType: ClusterIP
+          tls: proxy            # your proxy terminates TLS; or pod to re-encrypt
+          ingress:
+            className: nginx    # your IngressClass
+            annotations: {}     # e.g. timeouts for long downloads
+          # or, for Gateway API:
+          # httpRoute:
+          #   parentRefs: [{name: my-gateway, namespace: gateways}]
+```
+
+With `tls: proxy` you do not need the `public-tls.crt`/`public-tls.key` pair
+in `operator-serving-material`. The installer creates the route in the
+protected `asservat-system` namespace, where cert-manager cannot write, so
+serve the host with your controller's default or wildcard certificate, an
+administrator-created `tlsSecretName` Secret in that namespace, or the
+Gateway's listener certificate. Recommended, not required: restrict the
+hub-api Service to your proxy with a NetworkPolicy, or use `tls: pod` so the
+proxy re-encrypts. The federation, owner and key-service ports stay direct
+L4 (NodePort/LoadBalancer or TLS passthrough): their mutual TLS must reach
+Asservat unchanged.
+
 ## Replace one bundled service
 
 The four `services.*.provider` choices are independent and default to `external`. Make these choices before a fresh installation. Changing a completed installation's provider is not a supported migration or restore procedure. Keep the other selected services and their original inputs; do not copy the entire external-services example over this overlay.

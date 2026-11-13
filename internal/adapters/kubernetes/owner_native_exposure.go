@@ -28,7 +28,7 @@ func OwnerNativeServiceName(installation string) string {
 // connector, observation and bootstrap traffic apart (ADR-190 step 6).
 func EnsureOwnerNativeService(ctx context.Context, config *rest.Config, namespace, installation, deployment, serviceTypeName string, nodePort, operationNodePort int32) error {
 	serviceType := core.ServiceType(serviceTypeName)
-	if ctx == nil || config == nil || namespace == "" || deployment == "" || !authorization.UUID(installation) || (serviceType != core.ServiceTypeNodePort && serviceType != core.ServiceTypeLoadBalancer && serviceType != core.ServiceTypeClusterIP) ||
+	if ctx == nil || config == nil || namespace == "" || deployment == "" || !authorization.UUID(installation) || (serviceType != core.ServiceTypeNodePort && serviceType != core.ServiceTypeLoadBalancer) ||
 		nodePort != 0 && (serviceType != core.ServiceTypeNodePort || nodePort < 30000 || nodePort > 32767) ||
 		operationNodePort != 0 && (serviceType != core.ServiceTypeNodePort || operationNodePort < 30000 || operationNodePort > 32767 || operationNodePort == nodePort) {
 		return cfg.ErrInvalid
@@ -97,7 +97,7 @@ func OwnerPublicServiceName(installation string) string {
 // Gateway route (ADR-327); the hub-api trusts no forwarded headers either way.
 func EnsureOwnerPublicService(ctx context.Context, config *rest.Config, namespace, installation, deployment, serviceTypeName string, nodePort int32) error {
 	serviceType := core.ServiceType(serviceTypeName)
-	if ctx == nil || config == nil || namespace == "" || deployment == "" || !authorization.UUID(installation) || (serviceType != core.ServiceTypeNodePort && serviceType != core.ServiceTypeLoadBalancer) ||
+	if ctx == nil || config == nil || namespace == "" || deployment == "" || !authorization.UUID(installation) || (serviceType != core.ServiceTypeNodePort && serviceType != core.ServiceTypeLoadBalancer && serviceType != core.ServiceTypeClusterIP) ||
 		nodePort != 0 && (serviceType != core.ServiceTypeNodePort || nodePort < 30000 || nodePort > 32767) {
 		return cfg.ErrInvalid
 	}

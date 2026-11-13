@@ -1202,3 +1202,5 @@ The brief's domain-registration and trademark work remains a maintainer-owned pu
 - [ADR-320 — Installed retention lifecycle publication](320-installed-retention-lifecycle-publication.md) composes signed acknowledgement in the existing hub worker.
 
 - [ADR-321 — Exact early erasure](321-exact-early-erasure.md) binds an audited operator request to the existing signed retention and deletion lifecycle.
+
+- [ADR-327 — Ingress and Gateway API exposure](327-ingress-and-gateway-exposure.md) lets an Ingress or HTTPRoute front the public API, with TLS ending at the proxy or the hub-api.

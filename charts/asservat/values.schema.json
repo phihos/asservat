@@ -2633,9 +2633,13 @@
               ]
             },
             "nodePort": {
-              "type": "integer",
+              "type": [
+                "integer",
+                "null"
+              ],
               "minimum": 30000,
-              "maximum": 32767
+              "maximum": 32767,
+              "description": "null clears a NodePort inherited from another values file."
             },
             "tls": {
               "enum": [

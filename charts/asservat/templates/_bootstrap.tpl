@@ -201,6 +201,13 @@ limits:
 {{- range $field := list "processingOperators" "federation" "promotion" "retentionBaseline" -}}
 {{- if hasKey $p $field }}{{ $_ := set (get $v "public") $field (get $p $field) }}{{ end -}}
 {{- end -}}
+{{- /* ADR-327: a null in an overlay clears an inherited exposure field; the
+closed installer input carries no nulls. */ -}}
+{{- if and $p.promotion $p.promotion.exposure -}}
+{{- $promotion := deepCopy $p.promotion -}}
+{{- range $key, $value := $promotion.exposure }}{{ if eq $value nil }}{{ $_ := unset $promotion.exposure $key }}{{ end }}{{ end -}}
+{{- $_ := set (get $v "public") "promotion" $promotion -}}
+{{- end -}}
 {{- if and (eq .Values.services.keyService.provider "openbao") $p.federation -}}
 {{- $f := deepCopy (get (get $v "public") "federation") -}}
 {{/* Closed DTO fields stay explicit until the original provider resolves them. */}}

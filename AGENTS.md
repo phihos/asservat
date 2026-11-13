@@ -36,6 +36,11 @@ operation and reused for at most `identity.AuthorityRecheckInterval` (30 s; 60 s
 for the shared delivery-policy observation), never past an original deadline.
 Do not reintroduce stacked five-second authority windows.
 
+Maintainer decision (2026-11-13, ADR-327): support Ingress and Gateway API in
+front of the public API. Operators choose whether their proxy terminates TLS
+(`exposure.tls: proxy`); encrypted or mutually authenticated proxy-to-Asservat
+traffic is recommended, never required. Peer mTLS listeners stay direct L4.
+
 Do not let overzealous security requirements with unproven security benefits
 stall development or cause runtime performance problems. Additional security
 mechanisms must address a concrete risk and justify their implementation and
