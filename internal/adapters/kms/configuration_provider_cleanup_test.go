@@ -17,7 +17,7 @@ func TestConfigurationCleanupHealthyReuseDoesNotEnterNativeQueueOrRenew(t *testi
 	}
 	defer admission.Close()
 	now := time.Now()
-	s := &InstalledConfigurationProviderEffects{admission: admission, effects: &configurationProviderEffects{}, input: contracts.HubWorkerDeployment{ProviderAuthentication: &contracts.ConfigurationProviderAuthentication{CleanupAudit: contracts.OwnerPublicTransit{Mount: "audit", Key: "original"}}}}
+	s := &InstalledConfigurationProviderEffects{admission: admission, effects: &configurationProviderEffects{}, input: ConfigurationProviderInput{AuditMount: "audit", AuditKey: "original", Roles: contracts.HubWorkerProviderRoles{CleanupWrap: "cleanup-wrap"}}}
 	for i := range s.effects.cleanup {
 		s.effects.cleanup[i] = &ownerProviderLifetime{root: t.Context(), control: &ownerProviderControl{now: func() time.Time { return now }}, next: now.Add(time.Second), current: &ownerProviderHeldCredential{value: &ownerProviderCredential{until: now.Add(300 * time.Second), hardUntil: now.Add(900 * time.Second), jwtUntil: now.Add(600 * time.Second), observed: now}}}
 	}
@@ -37,11 +37,8 @@ func TestConfigurationCleanupHealthyReuseDoesNotEnterNativeQueueOrRenew(t *testi
 func TestConfigurationProviderCleanupUsesFourClosedIndependentLifetimes(t *testing.T) {
 	for n, purpose := range []string{"cleanup-wrap", "cleanup-open", "cleanup-verify", "cleanup-sign"} {
 		t.Run(purpose, func(t *testing.T) {
-			f, in, profile := configurationControlFixture(t, purpose, func(in contracts.HubWorkerDeployment, p *contracts.ConfigurationProviderSelection) {
-				p.CleanupAudit = contracts.OwnerPublicTransit{Mount: in.KeyService.AuditMount, Key: in.KeyService.AuditKey}
-				p.ContextDeletionSigning = contracts.OwnerPublicTransit{Mount: in.KeyService.AuditMount, Key: contracts.ContextDeletionSigningKeyName(in.InstallationID)}
-			})
-			effects, err := newConfigurationProviderEffects(t.Context(), in, profile,
+			f, in := configurationControlFixture(t, purpose, withConfigurationCleanup)
+			effects, err := newConfigurationProviderEffects(t.Context(), in,
 				func(context.Context) ([]byte, error) {
 					return ownerProviderTestJWT(time.Now().Add(600 * time.Second)), nil
 				},
@@ -66,9 +63,8 @@ func TestConfigurationProviderCleanupUsesFourClosedIndependentLifetimes(t *testi
 			if logins != 1 || lookups != 1 {
 				t.Fatal("cleanup login repeated or lacked readback", logins, lookups)
 			}
-			in.ProviderAuthentication = &profile
 			s := &InstalledConfigurationProviderEffects{input: in, effects: effects}
-			seal, open, verify, sign, err := s.CleanupKeys(profile.CleanupAudit.Mount, profile.CleanupAudit.Key, profile.ContextDeletionSigning.Mount, profile.ContextDeletionSigning.Key, 1, make(ed25519.PublicKey, 32))
+			seal, open, verify, sign, err := s.CleanupKeys(in.AuditMount, in.AuditKey, in.ContextDeletionSigning.Mount, in.ContextDeletionSigning.Key, 1, make(ed25519.PublicKey, 32))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -83,7 +79,7 @@ func TestConfigurationProviderCleanupUsesFourClosedIndependentLifetimes(t *testi
 					t.Fatal("alternate audit key reached")
 				}
 			}
-			if _, _, _, _, err := s.CleanupKeys("audit", "historical", profile.ContextDeletionSigning.Mount, profile.ContextDeletionSigning.Key, 1, make(ed25519.PublicKey, 32)); err == nil {
+			if _, _, _, _, err := s.CleanupKeys("audit", "historical", in.ContextDeletionSigning.Mount, in.ContextDeletionSigning.Key, 1, make(ed25519.PublicKey, 32)); err == nil {
 				t.Fatal("unselected key accepted")
 			}
 		})

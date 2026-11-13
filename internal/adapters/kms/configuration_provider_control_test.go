@@ -2,49 +2,49 @@ package kms
 
 import (
 	"context"
-	"strings"
 	"testing"
 	"time"
 
-	"asservat.local/asservat/internal/adapters/providerconfig"
 	"asservat.local/asservat/internal/contracts"
 )
 
-// change optionally extends the selection (for example with ADR-205's
-// context deletion signing key) before the recipe is derived.
-func configurationControlFixture(t *testing.T, purpose string, change ...func(contracts.HubWorkerDeployment, *contracts.ConfigurationProviderSelection)) (*ownerProviderControlFixture, contracts.HubWorkerDeployment, contracts.ConfigurationProviderAuthentication) {
+func configurationRole(purpose string) string { return "asservat-hub-worker-" + purpose }
+
+// withConfigurationCleanup enables the four cleanup roles and the deletion
+// signing key (ADR-205).
+func withConfigurationCleanup(in *ConfigurationProviderInput) {
+	in.Roles.CleanupWrap, in.Roles.CleanupOpen = configurationRole("cleanup-wrap"), configurationRole("cleanup-open")
+	in.Roles.CleanupVerify, in.Roles.CleanupSign = configurationRole("cleanup-verify"), configurationRole("cleanup-sign")
+	in.ContextDeletionSigning = contracts.OwnerPublicTransit{Mount: in.AuditMount, Key: contracts.ContextDeletionSigningKeyName(in.InstallationID)}
+}
+
+// change optionally extends the input (for example with ADR-205's context
+// deletion signing key) before the control is built.
+func configurationControlFixture(t *testing.T, purpose string, change ...func(*ConfigurationProviderInput)) (*ownerProviderControlFixture, ConfigurationProviderInput) {
 	t.Helper()
 	f := newOwnerProviderControlFixture(t)
-	owner, account, secret, now := ownerProviderRecipeInput(t)
-	prefix := "asservat-" + strings.ReplaceAll(owner.InstallationID, "-", "")
-	account.Name = prefix + "-worker"
-	secret.Name = prefix + "-worker-providers"
-	in := contracts.HubWorkerDeployment{Format: contracts.HubWorkerDeploymentFormat, InstallationID: owner.InstallationID, ClusterID: owner.ClusterID, Namespace: owner.Namespace,
-		FleetSource: contracts.WorkerObjectReference{Name: "fleet", UID: "10000000-0000-4000-8000-000000000006"}, OwnerSource: contracts.WorkerObjectReference{Name: prefix + "-owner-source", UID: "10000000-0000-4000-8000-000000000007"}, Kubernetes: owner.Kubernetes, Postgres: owner.Postgres, AuditStore: owner.AuditStore,
-		KeyService: contracts.ConfigurationKeyService{Endpoint: f.server.URL, Roots: [][]byte{f.server.Certificate().Raw}, AuditMount: "audit", AuditKey: "configuration"}}
-	// The fixture serves a fixed auth path. The worker still derives its own two
-	// role names/account/audience; no owner role or production setup is reused.
-	selection := contracts.ConfigurationProviderSelection{AuthMount: "owner-auth", AuthMountAccessor: "auth_kubernetes_original", AuditCredentials: secret}
+	owner, _, _, _ := ownerProviderRecipeInput(t)
+	in := ConfigurationProviderInput{InstallationID: owner.InstallationID, ClusterID: owner.ClusterID, NamespaceUID: owner.Namespace.UID, OwnerSourceUID: "10000000-0000-4000-8000-000000000007",
+		Namespace: owner.Namespace.Name, ServiceAccount: "asservat-hub-worker", Endpoint: f.server.URL, Roots: [][]byte{f.server.Certificate().Raw}, AuthMount: "owner-auth",
+		AuditMount: "audit", AuditKey: "configuration", Roles: contracts.HubWorkerProviderRoles{AuditWrap: configurationRole("audit-wrap"), AuditUnwrap: configurationRole("audit-unwrap")},
+		TokenFile: contracts.HubWorkerProviderTokenFile, AuditCredentialFile: contracts.HubWorkerAuditStorageFile}
 	for _, c := range change {
-		c(in, &selection)
+		c(&in)
 	}
-	recipe, err := providerconfig.ConfigurationProviderRecipeFor(in, selection, account, now)
-	if err != nil {
-		t.Fatal(err)
-	}
-	f.control, err = newConfigurationProviderControl(in, recipe.Profile, purpose, f.server.Client(), time.Now)
+	var err error
+	f.control, err = newConfigurationProviderControl(in, configurationRole(purpose), f.server.Client(), time.Now)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(f.control.close)
-	return f, in, recipe.Profile
+	return f, in
 }
 
 func TestConfigurationControlUsesOnlyItsExactWorkerRole(t *testing.T) {
 	for _, purpose := range []string{"audit-wrap", "audit-unwrap"} {
 		t.Run(purpose, func(t *testing.T) {
-			f, in, profile := configurationControlFixture(t, purpose)
-			if !strings.HasPrefix(f.control.role, "asservat-configuration-") || f.control.account != profile.ServiceAccount.Name || f.control.accountUID != profile.ServiceAccount.UID {
+			f, in := configurationControlFixture(t, purpose)
+			if f.control.role != configurationRole(purpose) || f.control.account != in.ServiceAccount || f.control.accountUID != "" {
 				t.Fatal("worker adopted owner/provider identity")
 			}
 			credential, err := f.control.login(context.Background(), ownerProviderTestJWT(time.Now().Add(600*time.Second)))
@@ -58,9 +58,9 @@ func TestConfigurationControlUsesOnlyItsExactWorkerRole(t *testing.T) {
 			if logins != 1 || lookups != 1 {
 				t.Fatal("worker login repeated or skipped independent lookup")
 			}
-			for _, other := range []string{"server-sign", "client-sign", "root", "audit"} {
-				if c, e := newConfigurationProviderControl(in, profile, other, f.server.Client(), time.Now); e == nil || c != nil {
-					t.Fatal("other purpose admitted", other)
+			for _, other := range []string{"", "bad/role", "role with space"} {
+				if c, e := newConfigurationProviderControl(in, other, f.server.Client(), time.Now); e == nil || c != nil {
+					t.Fatal("malformed role admitted", other)
 				}
 			}
 		})
@@ -70,13 +70,13 @@ func TestConfigurationControlUsesOnlyItsExactWorkerRole(t *testing.T) {
 func TestConfigurationControlRejectsAdditionalPolicyAndChangedAccount(t *testing.T) {
 	for _, mode := range []string{"policy", "account", "unknown-login"} {
 		t.Run(mode, func(t *testing.T) {
-			f, _, _ := configurationControlFixture(t, "audit-wrap")
+			f, _ := configurationControlFixture(t, "audit-wrap")
 			switch mode {
 			case "policy":
 				f.authChange = func(a *ownerProviderAuthReply) { a.Policies = append(a.Policies, "default") }
 			case "account":
 				f.authChange = func(a *ownerProviderAuthReply) {
-					a.Metadata["service_account_uid"] = "10000000-0000-4000-8000-000000000099"
+					a.Metadata["service_account_name"] = "another-account"
 				}
 			case "unknown-login":
 				f.mode = mode
