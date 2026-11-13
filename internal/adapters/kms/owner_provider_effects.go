@@ -92,14 +92,14 @@ func newOwnerProviderEffects(ctx context.Context, input contracts.OwnerDeploymen
 	if f := input.Public; f != nil && f.Fleet != nil && slots.fleet != nil {
 		c, e := newOwnerProviderChannelClient(slots.fleet, f.Fleet.ChannelMount+"/data/"+contracts.OwnerFleetChannelPrefix+"/"+input.InstallationID+"/")
 		if e != nil {
-			return nil, e
+			return nil, providerStep("fleet-channel", e)
 		}
 		if out.channel, e = newBootstrapChannelWithClient(c, f.Fleet.ChannelMount, contracts.OwnerFleetChannelPrefix, f.Fleet.DeliveryProfile, input.InstallationID, now); e != nil {
-			return nil, e
+			return nil, providerStep("fleet-channel", e)
 		}
 	}
 	if ctx.Err() != nil {
-		return nil, ErrKeyService
+		return nil, providerStep("canceled", ErrKeyService)
 	}
 	complete = true
 	return out, nil

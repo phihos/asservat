@@ -55,8 +55,11 @@ func NewInstalledOwnerProviderEffects(ctx context.Context, input contracts.Owner
 	}
 	raw, err := json.Marshal(input)
 	var cloned contracts.OwnerDeployment
-	if err != nil || json.Unmarshal(raw, &cloned) != nil {
-		return nil, ErrKeyService
+	if err != nil {
+		return nil, providerStep("clone-encode", ErrKeyService)
+	}
+	if err = json.Unmarshal(raw, &cloned); err != nil {
+		return nil, providerStep("clone-decode", errors.Join(ErrKeyService, err))
 	}
 	input = cloned
 	roots, _, err := mtls.OwnerTrustRoots(accepted.IssuerRoots, time.Now())
