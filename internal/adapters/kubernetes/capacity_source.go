@@ -2,6 +2,7 @@ package kubernetes
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	port "asservat.local/asservat/internal/application/capacity"
@@ -75,7 +76,7 @@ func (s *CapacitySource) ReadCapacitySource(ctx context.Context) (port.CapacityS
 		if e = appendVersion(p, bRefs[i]); e != nil {
 			return zero, e
 		}
-		out.Snapshot.Policies = append(out.Snapshot.Policies, s.validator.policyObservation(p, bRefs[i]))
+		out.Snapshot.Policies = append(out.Snapshot.Policies, s.validator.policyObservation(hubScopedPolicy(p, s.client.clusterID), bRefs[i]))
 	}
 	// Resource/list versions stay in the observation. Status-only revisions and
 	// unrelated API progress cannot create a new desired-state acceptance.
@@ -89,4 +90,36 @@ func (s *CapacitySource) ReadCapacitySource(ctx context.Context) (port.CapacityS
 		return zero, cfg.ErrUnavailable
 	}
 	return out, nil
+}
+
+// hubScopedPolicy reads an EvidenceBudgetPolicy whose scope.clusterID is
+// empty or absent as scoped to this (hub) cluster: Helm renders the policy
+// before the generated cluster ID exists. Malformed or duplicate-key specs
+// are left unchanged for the validator to reject.
+func hubScopedPolicy(o permissionObject, cluster string) permissionObject {
+	if permissionJSON(o.Spec, 64<<10, 16384) != nil {
+		return o
+	}
+	var spec map[string]json.RawMessage
+	if json.Unmarshal(o.Spec, &spec) != nil {
+		return o
+	}
+	var scope map[string]json.RawMessage
+	if json.Unmarshal(spec["scope"], &scope) != nil || scope == nil {
+		return o
+	}
+	if v, ok := scope["clusterID"]; ok && string(v) != `""` {
+		return o
+	}
+	scope["clusterID"], _ = json.Marshal(cluster)
+	var e error
+	if spec["scope"], e = json.Marshal(scope); e != nil {
+		return o
+	}
+	b, e := json.Marshal(spec)
+	if e != nil {
+		return o
+	}
+	o.Spec = b
+	return o
 }
