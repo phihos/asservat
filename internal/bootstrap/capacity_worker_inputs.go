@@ -1,21 +1,12 @@
 package bootstrap
 
 import (
-	"bytes"
-	"context"
 	"encoding/hex"
-	"encoding/json"
-	"encoding/json/jsontext"
-	"io"
-	"net/netip"
-	"os"
 	"slices"
 	"time"
 
-	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/adapters/mounts"
 	"asservat.local/asservat/internal/adapters/mtls"
-	"asservat.local/asservat/internal/adapters/postgres"
 	app "asservat.local/asservat/internal/application/capacity"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/authorization"
@@ -47,32 +38,6 @@ func capacityRuntimeEndpoint(p contracts.OwnerProviderEndpoint) bool {
 	}
 	_, _, err := mtls.OwnerTrustRoots(p.Roots, time.Now())
 	return err == nil
-}
-
-func capacityRuntimeQualification(raw []byte) (app.CapacityQualification, error) {
-	var out app.CapacityQualification
-	if len(raw) < 2 || len(raw) > 128<<10 {
-		return out, mounts.ErrUnavailable
-	}
-	a := jsontext.Value(bytes.Clone(raw))
-	if a.Canonicalize() != nil {
-		return out, mounts.ErrUnavailable
-	}
-	d := json.NewDecoder(bytes.NewReader(raw))
-	d.DisallowUnknownFields()
-	if d.Decode(&out) != nil {
-		return app.CapacityQualification{}, mounts.ErrUnavailable
-	}
-	var extra any
-	if d.Decode(&extra) != io.EOF || !out.Valid() || !app.ValidateRootBackingInput(out.RootBacking) {
-		return app.CapacityQualification{}, mounts.ErrUnavailable
-	}
-	b, err := json.Marshal(out)
-	z := jsontext.Value(b)
-	if err != nil || z.Canonicalize() != nil || !bytes.Equal(a, z) {
-		return app.CapacityQualification{}, mounts.ErrUnavailable
-	}
-	return out, nil
 }
 
 func downloadPathRevision(v contracts.DownloadEnvironmentRevision) (identity.Revision, error) {
@@ -169,94 +134,4 @@ func capacityRuntimeProcessingPaths(in []contracts.DownloadEnvironmentPath) ([]p
 		out = append(out, p)
 	}
 	return out, nil
-}
-
-func readCapacityWorkerInputs(ctx context.Context, files *os.Root) (contracts.CapacityDeployment, contracts.CapacityCredentialManifest, app.CapacityQualification, error) {
-	var c contracts.CapacityDeployment
-	var m contracts.CapacityCredentialManifest
-	var q app.CapacityQualification
-	fail := func() (contracts.CapacityDeployment, contracts.CapacityCredentialManifest, app.CapacityQualification, error) {
-		return contracts.CapacityDeployment{}, contracts.CapacityCredentialManifest{}, app.CapacityQualification{}, mounts.ErrUnavailable
-	}
-	b, err := mounts.Read(ctx, files, contracts.CapacityDeploymentFile, contracts.CapacityDeploymentMaxBytes)
-	if err != nil {
-		return fail()
-	}
-	c, err = contracts.DecodeCapacityDeployment(bytes.NewReader(b))
-	clear(b)
-	if err != nil || c.Format != contracts.CapacityDeploymentFormat || !authorization.UUID(c.InstallationID) || !authorization.UUID(c.PermissionRootID) ||
-		!authorization.UUID(c.RoleRootUID) || !authorization.UUID(c.RoleSetupID) || c.AccountVersion != c.RoleSetupID+"-account/v1" {
-		return fail()
-	}
-	q, err = capacityRuntimeQualification(c.Qualification)
-	if err != nil || q.RootBacking.RootID != c.PermissionRootID || q.RootBacking.InstallationID != c.InstallationID || q.RootBacking.AccountVersion != c.AccountVersion {
-		return fail()
-	}
-	if !kube.ContextDeletionSectionValid(c.ContextDeletion, time.Now()) || c.ContextDeletion != nil && len(q.Backends) != 1 {
-		return fail()
-	}
-	control := c.Control
-	if !authorization.UUID(control.ClusterID) || !capacityRuntimeReference(control.Namespace) || len(validation.IsDNS1123Label(control.Namespace.Name)) != 0 ||
-		!capacityRuntimeEndpoint(control.Kubernetes) || !capacityRuntimeGuard(control.Guard) || !capacityRuntimeReference(control.ProbeAccount) ||
-		control.StatusUsers == nil || !identity.Strings(control.StatusUsers, 16, 256) || len(c.Clusters) != len(q.NamespaceGuards) {
-		return fail()
-	}
-	seen := map[string]bool{}
-	for _, v := range c.Clusters {
-		if !authorization.UUID(v.ClusterID) || seen[v.ClusterID] || !capacityRuntimeReference(v.ProbeNamespace) || len(validation.IsDNS1123Label(v.ProbeNamespace.Name)) != 0 ||
-			!capacityRuntimeReference(v.ProbeAccount) || !capacityClusterEndpoint(c.LocalOwner != nil, control.ClusterID, v.ClusterID, v.Kubernetes) || !capacityRuntimeGuard(v.Guard) || !slices.IsSorted(v.Keys) {
-			return fail()
-		}
-		seen[v.ClusterID] = true
-		found := false
-		for _, pin := range q.NamespaceGuards {
-			if pin.ClusterID == v.ClusterID && slices.Equal(pin.Keys, v.Keys) {
-				found = true
-			}
-		}
-		if !found {
-			return fail()
-		}
-	}
-	if !capacityRuntimeReference(c.Processing.Source) || c.Processing.Source.UID != q.RootBacking.ProcessingSourceUID || !capacityRuntimeGuard(c.Processing.Guard) ||
-		c.Processing.Guard.Name == control.Guard.Name {
-		return fail()
-	}
-	// The regional targets are read at start; the template is checked here.
-	if _, err = downloadEnvironmentPaths(c.InstallationID, control.ClusterID, c.Processing.Paths, c.Processing.PathTemplate, nil); err != nil {
-		return fail()
-	}
-	p := c.Postgres
-	if p.MaxConnections != 1 || p.Port < 1 || p.Port > 65535 || !identity.Text(p.Database, 63) {
-		return fail()
-	}
-	if _, err = netip.ParseAddr(p.Host); err != nil && !ownerDNSName.MatchString(p.Host) {
-		return fail()
-	}
-	if _, _, err = mtls.OwnerTrustRoots(p.Roots, time.Now()); err != nil {
-		return fail()
-	}
-	b, err = mounts.Read(ctx, files, contracts.CapacityCredentialManifestFile, contracts.CapacityCredentialManifestMaxBytes)
-	if err != nil {
-		return fail()
-	}
-	m, err = contracts.DecodeCapacityCredentialManifest(bytes.NewReader(b))
-	clear(b)
-	if err != nil || postgres.ValidateCapacityCredentialManifest(m, time.Now()) != nil || m.Input.InstallationID != c.InstallationID ||
-		m.RootUID != c.RoleRootUID || m.SetupID != c.RoleSetupID || m.Capacity.PermissionRootID != c.PermissionRootID || ctx.Err() != nil {
-		return fail()
-	}
-	return c, m, q, nil
-}
-
-// Installed observation uses the authenticated local hop only. An endpoint in
-// that profile is rejected rather than ignored or used as a remote fallback.
-// Without the installed local owner this process reads a cluster API directly,
-// which outbound-only connectivity permits only for the hub's own cluster
-// (ADR-179).
-func capacityClusterEndpoint(installed bool, hub, cluster string, endpoint contracts.OwnerProviderEndpoint) bool {
-	if installed {
-		return endpoint.Endpoint == "" && len(endpoint.Roots) == 0
-	}
-	return cluster == hub && capacityRuntimeEndpoint(endpoint)
 }
