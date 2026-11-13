@@ -46,12 +46,6 @@ state (SQL schema/roles, key and object-store setup). Plain RBAC replaces
 UID-pinned admission guards and their proofs. See
 docs/reviews/helm-native-install-plan.md.
 
-Maintainer rule (2026-11-13): components trust the Kubernetes platform like
-other applications: configuration from mounted ConfigMaps and Secrets, callers
-authenticated by TokenReview and TLS, protection by RBAC and Pod Security. Do
-not add runtime re-verification of installer-created objects, UID pins,
-admission-policy proofs, journals or launch receipts.
-
 Do not let overzealous security requirements with unproven security benefits
 stall development or cause runtime performance problems. Additional security
 mechanisms must address a concrete risk and justify their implementation and
