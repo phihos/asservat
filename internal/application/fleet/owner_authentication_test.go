@@ -175,7 +175,7 @@ func testOwnerCurrentBoundaries(t *testing.T, kind string) {
 				"protection-missing":      "protection-before/read/other",
 				"protection-wrong-pool":   "protection-before/pool",
 				"protection-invalid":      "protection-before/invalid",
-				"protection-native-step":  "protection-before/read/source.guard-policy-read",
+				"protection-native-step":  "protection-before/read/other",
 				"protection-private-step": "protection-before/read/other",
 				"protection-deadline":     "protection-before/read/deadline",
 				"protection-canceled":     "protection-before/read/canceled",

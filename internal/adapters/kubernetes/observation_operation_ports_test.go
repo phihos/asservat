@@ -32,7 +32,7 @@ func TestObservationOperationPortsKeepConcreteNativeBrackets(t *testing.T) {
 			t.Fatal("Original changed or re-observed native facts")
 		}
 		final, err := op.Final(ctx)
-		if err != nil || !final.Final || !final.Valid(f.start) || !final.ObservedAt.Equal(again.ObservedAt) || final.FreshUntil.After(again.FreshUntil) || f.observer.Load() <= observer || f.probe.Load() <= probe {
+		if err != nil || !final.Final || !final.Valid(f.start) || !final.ObservedAt.Equal(again.ObservedAt) || final.FreshUntil.After(again.FreshUntil) || f.observer.Load() <= observer || f.probe.Load() != probe {
 			t.Fatal("final native bracket missing or renewed", err)
 		}
 		if _, err := op.Final(ctx); err == nil {

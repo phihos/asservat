@@ -168,6 +168,17 @@ func OwnerWorkloadAdmission(p cfg.OwnerWorkloadAdministration) (*admission.Valid
 	return policy, binding, nil
 }
 
+// OwnerWorkloadProtection names the hub's own pinned workload (namespace,
+// Deployment, administration plan) and its stable digest. Helm-native
+// installation (2026-11-13) replaces the admission-policy guard with plain
+// RBAC, so this type no longer reads the policy, its binding or a denied
+// dry-run probe. Owner authentication keeps its real checks elsewhere:
+// TokenReview of the Pod-bound token, the live Pod → ReplicaSet → Deployment
+// chain, SQL registration and exact TLS peers.
+//
+// The digest is computed exactly as before from the plan, pin and cluster so
+// persisted protection_digest values keep matching. policy and binding remain
+// only for callers outside this slice that still read them.
 type OwnerWorkloadProtection struct {
 	observer, probe *PermissionClient
 	plan            cfg.OwnerWorkloadAdministration
@@ -175,40 +186,15 @@ type OwnerWorkloadProtection struct {
 	policy          admission.ValidatingAdmissionPolicySpec
 	binding         admission.ValidatingAdmissionPolicyBindingSpec
 	digest          artifact.Digest
-	reuse           *ownerProtectionReuse
 }
 
-// OwnerProtectionReuse bounds how long one successful self-protection proof
-// serves every caller in this process (2026-10-23 revision of ADR-208/173).
-// The trust model trusts cluster administrators, so re-proving the hub's own
-// installed guard per request added API load without an integrity guarantee.
+// OwnerProtectionReuse bounds the validity Current reports and the reuse of
+// owner identity verification results.
 const OwnerProtectionReuse = 30 * time.Second
 
-// ownerProtectionRefresh is the remaining validity below which a stored proof
-// is renewed instead of reused, so callers keep the usual five-second window.
+// ownerProtectionRefresh is the remaining validity below which a stored
+// identity verification is renewed instead of reused.
 const ownerProtectionRefresh = 5 * time.Second
-
-// ownerProtectionReuse is the process-local last successful proof, shared by
-// all copies of one guard. The one-slot channel serializes proofs, so
-// concurrent callers share one in-flight proof while still honoring their own
-// cancellation. Failures are never stored.
-type ownerProtectionReuse struct {
-	slot  chan struct{}
-	until time.Time
-}
-
-func newOwnerProtectionReuse() *ownerProtectionReuse {
-	return &ownerProtectionReuse{slot: make(chan struct{}, 1)}
-}
-
-// share lets a guard rebuilt from the same plan and pin (equal digest) reuse
-// this guard's proof.
-func (g *OwnerWorkloadProtection) share(out *OwnerWorkloadProtection) *OwnerWorkloadProtection {
-	if out != nil && g != nil && out.digest == g.digest && out.observer.clusterID == g.observer.clusterID {
-		out.reuse = g.reuse
-	}
-	return out
-}
 
 func NewOwnerWorkloadProtection(observer, probe *PermissionClient, plan cfg.OwnerWorkloadAdministration, pin GuardPin) (*OwnerWorkloadProtection, error) {
 	if observer == nil || probe == nil || observer == probe || observer.clusterID != probe.clusterID || observer.control != plan.ControlNamespace || probe.control != plan.ControlNamespace || !identity.Text(pin.PolicyUID, 64) || !identity.Text(pin.BindingUID, 64) || !identity.Text(pin.BindingResourceVersion, 128) || pin.PolicyGeneration < 1 {
@@ -240,17 +226,35 @@ func NewOwnerWorkloadProtection(observer, probe *PermissionClient, plan cfg.Owne
 		Plan            cfg.OwnerWorkloadAdministration
 		Pin             GuardPin
 	}{"asservat-owner-workload-protection/v1", observer.clusterID, plan, pin})
-	return &OwnerWorkloadProtection{observer, probe, plan, pin, p.Spec, b.Spec, artifact.Digest(sha256.Sum256(raw)), newOwnerProtectionReuse()}, nil
+	return &OwnerWorkloadProtection{observer, probe, plan, pin, p.Spec, b.Spec, artifact.Digest(sha256.Sum256(raw))}, nil
 }
 
-// proveObject returns only the actual Deployment used by the successful denied
-// probe. ADR150's closed native boundary validates this same object against its
-// independently installed template. It supplies no authority outside that proof.
+// proveObject reads the pinned owner Deployment within the caller's original
+// five-second interval and checks its namespace, name and UID. Callers validate
+// its template and the live Pod chain; it confers no authority by itself.
 func (g *OwnerWorkloadProtection) proveObject(ctx context.Context, start time.Time) (apps.Deployment, error) {
-	object, _, err := g.proveObjectIdentity(ctx, start)
-	return object, err
+	var zero apps.Deployment
+	if g == nil || ctx == nil || g.observer == nil {
+		return zero, cfg.ErrInvalid
+	}
+	if g.observer.current(ctx, start, 5*time.Second) != nil {
+		return zero, configurationSourceError(configurationSourceProbeOriginalInterval, cfg.ErrUnavailable)
+	}
+	raw, err := g.observer.raw(ctx, "/apis/apps/v1/namespaces/"+g.plan.ControlNamespace.Name+"/deployments/"+g.plan.Deployment, nil)
+	if err != nil {
+		return zero, configurationSourceError(configurationSourceProbeObjectRead, cfg.ErrUnavailable)
+	}
+	var object apps.Deployment
+	if json.Unmarshal(raw, &object) != nil || object.APIVersion != "apps/v1" || object.Kind != "Deployment" || !ownerMetadata(object.ObjectMeta, g.plan.ControlNamespace.Name, g.plan.Deployment, g.plan.DeploymentUID) {
+		return zero, configurationSourceError(configurationSourceProbeObjectShape, cfg.ErrChanged)
+	}
+	return object, nil
 }
 
+// proveObjectIdentity and prove keep the former denied dry-run probe only for
+// configuration-source and projection callers outside this slice; owner and
+// connector authentication no longer call them. Remove with those callers.
+//
 // Only the exact SelfSubjectReview response from this actual denied probe is
 // returned. Purpose-specific same-operation callers still check its installed
 // account/client pins and a live account object; it creates no new authority.
@@ -343,95 +347,30 @@ func (g *OwnerWorkloadProtection) proveObjectIdentity(ctx context.Context, start
 }
 
 func (g *OwnerWorkloadProtection) prove(ctx context.Context, start time.Time) error {
-	_, err := g.proveObject(ctx, start)
+	_, _, err := g.proveObjectIdentity(ctx, start)
 	return err
 }
 
-// Current proves current enforcement only. It does not attest Pod creation
-// history, a process, a CSR, recovery or certificate activation. A successful
-// proof is reused for OwnerProtectionReuse; the returned time is its end.
+// Current returns the stable protection digest without Kubernetes I/O. It
+// attests nothing about Pods, processes, CSRs or certificates; the returned
+// time is bounded by OwnerProtectionReuse and the caller's deadline.
 func (g *OwnerWorkloadProtection) Current(ctx context.Context) (artifact.Digest, time.Time, error) {
-	digest, until, err := g.reused(ctx)
-	if err != nil {
-		return digest, until, err
-	}
-	return digest, callerBound(ctx, until), nil
-}
-
-// reused returns the stored proof's own end, not bound by the caller.
-func (g *OwnerWorkloadProtection) reused(ctx context.Context) (artifact.Digest, time.Time, error) {
 	var zero artifact.Digest
-	if g == nil || ctx == nil || g.observer == nil || g.probe == nil || g.reuse == nil {
+	if g == nil || ctx == nil || g.observer == nil {
 		return zero, time.Time{}, ownerProtectionError("entry", cfg.ErrInvalid, nil)
 	}
-	select {
-	case g.reuse.slot <- struct{}{}:
-	case <-ctx.Done():
-		return zero, time.Time{}, ownerProtectionError("reuse-wait", cfg.ErrUnavailable, ctx.Err())
-	}
-	defer func() { <-g.reuse.slot }()
 	if err := ctx.Err(); err != nil {
-		return zero, time.Time{}, ownerProtectionError("reuse-wait", cfg.ErrUnavailable, err)
+		return zero, time.Time{}, ownerProtectionError("entry", cfg.ErrUnavailable, err)
 	}
-	if !g.observer.now().Add(ownerProtectionRefresh).Before(g.reuse.until) {
-		until, err := g.current(ctx)
-		if err != nil {
-			return zero, time.Time{}, err
-		}
-		g.reuse.until = until
-	}
-	return g.digest, g.reuse.until, nil
+	return g.digest, callerBound(ctx, g.observer.now().Add(OwnerProtectionReuse)), nil
 }
 
-// callerBound never reports a reused proof past the caller's own deadline.
+// callerBound never reports a validity past the caller's own deadline.
 func callerBound(ctx context.Context, until time.Time) time.Time {
 	if d, ok := ctx.Deadline(); ok {
 		return identity.Earlier(until, d)
 	}
 	return until
-}
-
-func (g *OwnerWorkloadProtection) current(ctx context.Context) (time.Time, error) {
-	var zero time.Time
-	ctx, end := context.WithTimeout(ctx, 5*time.Second)
-	defer end()
-	start := g.observer.now()
-	ns, err := g.observer.namespace(ctx, g.plan.ControlNamespace)
-	if err != nil {
-		return zero, ownerProtectionError("namespace-first", cfg.ErrChanged, err)
-	}
-	if ns.Deleting {
-		return zero, ownerProtectionError("namespace-first-deleting", cfg.ErrChanged, nil)
-	}
-	before, err := checkAdmissionGuard(ctx, g.observer, g.plan.Name, g.pin, g.policy, g.binding)
-	if err != nil {
-		return zero, ownerProtectionError("guard-first", err, err)
-	}
-	if err = g.prove(ctx, start); err != nil {
-		return zero, ownerProtectionError("probe", err, err)
-	}
-	after, err := checkAdmissionGuard(ctx, g.observer, g.plan.Name, g.pin, g.policy, g.binding)
-	if err != nil {
-		return zero, ownerProtectionError("guard-last", cfg.ErrChanged, err)
-	}
-	if before != after {
-		return zero, ownerProtectionError("guard-changed", cfg.ErrChanged, nil)
-	}
-	if err = g.observer.current(ctx, start, 5*time.Second); err != nil {
-		return zero, ownerProtectionError("original-interval", cfg.ErrChanged, err)
-	}
-	// Namespace replacement/deletion during the proof cannot keep it current.
-	ns, err = g.observer.namespace(ctx, g.plan.ControlNamespace)
-	if err != nil {
-		return zero, ownerProtectionError("namespace-last", cfg.ErrChanged, err)
-	}
-	if ns.Deleting {
-		return zero, ownerProtectionError("namespace-last-deleting", cfg.ErrChanged, nil)
-	}
-	if err = g.observer.current(ctx, start, 5*time.Second); err != nil {
-		return zero, ownerProtectionError("final-interval", cfg.ErrChanged, err)
-	}
-	return start.Add(OwnerProtectionReuse), nil
 }
 
 // capacityTokenUnbound accepts the absent or empty boundObjectRef the API
@@ -445,8 +384,7 @@ const CapacityTokenUnboundCondition = capacityTokenUnbound
 
 // WithClients rebuilds this exact protection, from a fresh decoded copy of
 // its plan and the same pin, over other client instances of the same
-// identities. ADR-197: a purpose with its own API budget proves the same
-// guard without sharing another purpose's limiter.
+// identities (ADR-197: separate API budgets per purpose).
 func (g *OwnerWorkloadProtection) WithClients(observer, probe *PermissionClient) (*OwnerWorkloadProtection, error) {
 	if g == nil {
 		return nil, cfg.ErrInvalid
@@ -460,5 +398,5 @@ func (g *OwnerWorkloadProtection) WithClients(observer, probe *PermissionClient)
 	if err != nil || out.digest != g.digest {
 		return nil, cfg.ErrInvalid
 	}
-	return g.share(out), nil
+	return out, nil
 }

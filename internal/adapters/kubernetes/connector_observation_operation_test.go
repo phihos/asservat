@@ -215,7 +215,7 @@ func (f *connectorOperationFixture) begin(t *testing.T) (*ConnectorObservationOp
 func TestConnectorObservationOperationFourActualValues(t *testing.T) {
 	f := newConnectorOperationFixture(t)
 	o, ctx := f.begin(t)
-	if f.base.observer.Load() != 19 || f.base.probe.Load() != 6 || f.reviews.Load() != 2 {
+	if f.base.observer.Load() != 15 || f.base.probe.Load() != 3 || f.reviews.Load() != 2 {
 		t.Fatalf("initial bracket count %d/%d reviews%d", f.base.observer.Load(), f.base.probe.Load(), f.reviews.Load())
 	}
 	for n := 1; n <= 4; n++ {
@@ -229,7 +229,7 @@ func TestConnectorObservationOperationFourActualValues(t *testing.T) {
 		}
 		v.Source.Observation.Profile.ClientIssuerRoots[0][0] ^= 1
 	}
-	if f.gets.Load() != 6 || f.reviews.Load() != 4 || f.base.observer.Load() != 50 || f.base.probe.Load() != 12 {
+	if f.gets.Load() != 6 || f.reviews.Load() != 4 || f.base.observer.Load() != 42 || f.base.probe.Load() != 6 {
 		t.Fatalf("four values plus two native brackets %d/%d gets%d reviews%d", f.base.observer.Load(), f.base.probe.Load(), f.gets.Load(), f.reviews.Load())
 	}
 	before := f.base.observer.Load()
@@ -280,7 +280,7 @@ func TestConnectorObservationOperationSourceMutationCloses(t *testing.T) {
 }
 
 func TestConnectorObservationOperationFinalNativeMutationCloses(t *testing.T) {
-	for _, mode := range []string{"source-guard", "source-denial", "workload-guard", "workload-denial", "account", "pod", "template", "review", "expiry"} {
+	for _, mode := range []string{"source-guard", "source-denial", "account", "pod", "template", "review", "expiry"} {
 		t.Run(mode, func(t *testing.T) {
 			f := newConnectorOperationFixture(t)
 			o, ctx := f.begin(t)
@@ -296,10 +296,6 @@ func TestConnectorObservationOperationFinalNativeMutationCloses(t *testing.T) {
 				f.missing = true
 			case "source-denial":
 				f.accept = true
-			case "workload-guard":
-				f.base.policy.UID = types.UID(ownerID(90))
-			case "workload-denial":
-				f.base.accept = true
 			case "account":
 				f.base.v.sa.UID = types.UID(ownerID(90))
 			case "pod":

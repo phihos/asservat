@@ -36,10 +36,6 @@ func (s *ConnectorObservationOperationReader) nativeBoundary(ctx context.Context
 	if err != nil || ns.Deleting {
 		return zero, cfg.ErrChanged
 	}
-	guard, err := checkAdmissionGuard(call, s.client, g.plan.Name, g.pin, g.policy, g.binding)
-	if err != nil {
-		return zero, err
-	}
 	deployment, err := g.proveObject(call, originalStart)
 	if err != nil {
 		return zero, err
@@ -88,10 +84,6 @@ func (s *ConnectorObservationOperationReader) nativeBoundary(ctx context.Context
 	}
 	last, err := ownerResource[core.Pod](reader, bounded, base+"pods/"+name, "v1", "Pod")
 	if err != nil || last.ResourceVersion != pod.ResourceVersion || !equalJSON(last, pod) {
-		return zero, cfg.ErrChanged
-	}
-	finalGuard, err := checkAdmissionGuard(bounded, s.client, g.plan.Name, g.pin, g.policy, g.binding)
-	if err != nil || finalGuard != guard {
 		return zero, cfg.ErrChanged
 	}
 	ns, err = s.client.namespace(bounded, s.client.control)

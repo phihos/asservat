@@ -22,10 +22,11 @@ import (
 )
 
 // ownerProviderColdProofCalls is the native API cost of one unreused proof
-// (guard plus identity, without the Secret GET). Before the 2026-10-23 reuse
+// (identity only since Helm-native installation removed the guard proof;
+// without the Secret GET). Before the 2026-10-23 reuse
 // revision every credential read cost 51 calls (102 per audited request).
 // Includes the ADR-227 release record read of the owner Deployment check.
-const ownerProviderColdProofCalls = 22
+const ownerProviderColdProofCalls = 12
 
 // Real C08 coordinator, S3 SDK signing, and independently limited native
 // observer/probe clients. SQL/audit key authority, ciphertext and API responses
@@ -42,8 +43,8 @@ func exerciseProviderCredentialAuditBudget(t *testing.T, reader *InstalledOwnerI
 	}{{false, 5 * time.Second, false}, {false, 3 * time.Second, false}, {true, 3 * time.Second, false}, {false, 5 * time.Second, true}, {true, 5 * time.Second, true}} {
 		scoped := scenario.scoped
 		t.Run(fmt.Sprintf("operation-scoped-%t-original-tail-%s-outcome-%t", scoped, scenario.remaining, scenario.finish), func(t *testing.T) {
-			// Each scenario starts cold: no reused guard or identity proof.
-			reader.reuse.until, reader.protection.reuse.until = time.Time{}, time.Time{}
+			// Each scenario starts cold: no reused identity proof.
+			reader.reuse.until = time.Time{}
 			var api, proofs, puts, gets atomic.Int32
 			original := x.extra
 			x.extra = func(w http.ResponseWriter, r *http.Request) bool { api.Add(1); return original(w, r) }

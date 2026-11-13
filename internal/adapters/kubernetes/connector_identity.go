@@ -196,9 +196,6 @@ func (s *ConnectorIdentitySource) readConfiguration(ctx context.Context) (app.Co
 	if last.Source.Roles != first.Source.Roles || !last.Source.Observation.SameSource(first.Source.Observation) || !connectorBackingEqual(first.Backing, last.Backing) {
 		return out, connectorAPIStage("source-changed", value.ErrUnavailable)
 	}
-	if _, err = checkAdmissionGuard(ctx, s.client, s.protection.plan.Name, s.protection.pin, s.protection.policy, s.protection.binding); err != nil {
-		return out, connectorAPIStage("source-guard", err)
-	}
 	first.Source.Observation.Profile.ProtectionDigest = protection
 	first.Source.Observation.ObservedAt = start
 	first.Source.Observation.FreshUntil = identity.Earlier(start.Add(5*time.Second), identity.Earlier(until, identity.Earlier(rootsUntil, lastRootsUntil)))

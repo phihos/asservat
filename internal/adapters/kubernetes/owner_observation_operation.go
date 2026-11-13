@@ -65,7 +65,7 @@ func NewOwnerObservationOperationReader(c *PermissionClient, guard *OwnerWorkloa
 	if err != nil || owned.digest != pin.ProtectionDigest {
 		return nil, cfg.ErrInvalid
 	}
-	return &OwnerObservationOperationReader{c, guard.share(owned), pin}, nil
+	return &OwnerObservationOperationReader{c, owned, pin}, nil
 }
 
 func (s *OwnerObservationOperationReader) Begin(ctx context.Context, r value.OwnerObservationRequest, peers []value.OwnerBinding) (*OwnerObservationOperation, error) {
@@ -224,15 +224,11 @@ func (s *OwnerObservationOperationReader) boundaryLocal(ctx context.Context, r v
 	if err != nil || ns.Deleting {
 		return zero, noDigest, cfg.ErrChanged
 	}
-	guard, err := checkAdmissionGuard(ctx, s.client, g.plan.Name, g.pin, g.policy, g.binding)
-	if err != nil {
-		return zero, noDigest, err
-	}
 	deployment, err := g.proveObject(ctx, start)
 	if err != nil {
 		return zero, noDigest, err
 	}
-	// ADR-227: read inside the guard bracket, like the proven Deployment.
+	// ADR-227: read within the same bounded observation as the Deployment.
 	release, err := s.client.releaseRecord(ctx, p.Namespace, p.InstallationID)
 	if err != nil {
 		return zero, noDigest, err
@@ -302,10 +298,6 @@ func (s *OwnerObservationOperationReader) boundaryLocal(ctx context.Context, r v
 	}
 	latest, err := route.service(ctx)
 	if err != nil || latest.ResourceVersion != service.ResourceVersion || !equalJSON(latest.Spec, service.Spec) {
-		return zero, noDigest, cfg.ErrChanged
-	}
-	current, err := checkAdmissionGuard(ctx, s.client, g.plan.Name, g.pin, g.policy, g.binding)
-	if err != nil || current != guard {
 		return zero, noDigest, cfg.ErrChanged
 	}
 	ns, err = s.client.namespace(ctx, s.client.control)

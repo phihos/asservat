@@ -31,9 +31,8 @@ func (o *connectorLifecycleOperation) configuration(data map[string]string, obse
 	return c, until, nil
 }
 
-// sourceBoundary performs one independent denied source proof and retains the
-// exact ConfigMap it submitted. Decoding that actual response does not create
-// a second observation. A full value read still follows the complete boundary.
+// sourceBoundary reads the exact source ConfigMap once. Decoding that actual
+// response does not create a second observation. A full value read still follows the complete boundary.
 func (o *connectorLifecycleOperation) sourceBoundary(ctx context.Context, start, until time.Time) (app.ConnectorIdentityConfiguration, time.Time, error) {
 	s, g := o.reader, o.reader.source.protection
 	var zero app.ConnectorIdentityConfiguration
@@ -41,16 +40,11 @@ func (o *connectorLifecycleOperation) sourceBoundary(ctx context.Context, start,
 	if err != nil || ns.Deleting {
 		return zero, until, cfg.ErrChanged
 	}
-	before, err := checkAdmissionGuard(ctx, s.client, g.plan.Name, g.pin, g.policy, g.binding)
-	if err != nil {
-		return zero, until, err
-	}
 	cm, err := g.proveObject(ctx)
 	if err != nil {
 		return zero, until, err
 	}
-	after, err := checkAdmissionGuard(ctx, s.client, g.plan.Name, g.pin, g.policy, g.binding)
-	if err != nil || after != before || s.client.current(ctx, start, 5*time.Second) != nil {
+	if s.client.current(ctx, start, 5*time.Second) != nil {
 		return zero, until, cfg.ErrChanged
 	}
 	raw, err := json.Marshal(cm)
@@ -78,10 +72,6 @@ func (o *connectorLifecycleOperation) boundary(ctx context.Context, start, until
 	ns, err := s.client.namespace(call, s.client.control)
 	if err != nil || ns.Deleting {
 		return proof, zero, until, cfg.ErrChanged
-	}
-	guard, err := checkAdmissionGuard(call, s.client, g.plan.Name, g.pin, g.policy, g.binding)
-	if err != nil {
-		return proof, zero, until, err
 	}
 	deployment, err := g.proveObject(call, start)
 	if err != nil {
@@ -114,16 +104,12 @@ func (o *connectorLifecycleOperation) boundary(ctx context.Context, start, until
 	if err != nil || lastWork != work {
 		return proof, zero, until, cfg.ErrChanged
 	}
-	finalGuard, err := checkAdmissionGuard(lastCall, s.client, g.plan.Name, g.pin, g.policy, g.binding)
-	if err != nil || finalGuard != guard {
-		return proof, zero, until, cfg.ErrChanged
-	}
 	ns, err = s.client.namespace(lastCall, s.client.control)
 	if err != nil || ns.Deleting || s.client.current(lastCall, start, 5*time.Second) != nil {
 		return proof, zero, until, cfg.ErrChanged
 	}
-	// Always read after both complete guards, including the final denied probe.
-	// A change during its request cannot hide in the probe's earlier body.
+	// Re-read the source after the live workload checks so a change during
+	// them is detected.
 	observed := s.client.now()
 	data, _, err := s.client.installationConfig(lastCall, s.source.name, s.source.uid)
 	if err != nil {
@@ -140,9 +126,8 @@ func (o *connectorLifecycleOperation) boundary(ctx context.Context, start, until
 	return proof, configuration, until, nil
 }
 
-// currentValues performs twelve actual native requests. It rechecks both exact
-// policy/binding pairs, original token and complete live source/controller facts;
-// it does not claim another denied probe or renew original native enforcement.
+// currentValues rechecks the source, the original token and the complete live
+// source/controller facts without renewing the original observation.
 func (o *connectorLifecycleOperation) currentValues(ctx context.Context, start, until time.Time) (value.ConnectorProcessProof, app.ConnectorIdentityConfiguration, time.Time, error) {
 	var proof value.ConnectorProcessProof
 	var zero app.ConnectorIdentityConfiguration
@@ -150,14 +135,6 @@ func (o *connectorLifecycleOperation) currentValues(ctx context.Context, start, 
 	ns, err := s.client.namespace(ctx, s.client.control)
 	if err != nil || ns.Deleting {
 		return proof, zero, until, cfg.ErrChanged
-	}
-	sourceGuard := s.source.protection
-	if _, err = checkAdmissionGuard(ctx, s.client, sourceGuard.plan.Name, sourceGuard.pin, sourceGuard.policy, sourceGuard.binding); err != nil {
-		return proof, zero, until, err
-	}
-	g := s.guard
-	if _, err = checkAdmissionGuard(ctx, s.client, g.plan.Name, g.pin, g.policy, g.binding); err != nil {
-		return proof, zero, until, err
 	}
 	observed := s.client.now()
 	raw, err := s.client.raw(ctx, "/api/v1/namespaces/"+s.client.control.Name+"/configmaps/"+s.source.name, nil)

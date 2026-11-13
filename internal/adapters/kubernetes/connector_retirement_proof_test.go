@@ -32,7 +32,7 @@ import (
 )
 
 func TestConnectorRetirementProofPreservesLiveActorAndPurpose(t *testing.T) {
-	for _, mode := range []string{"valid", "pending", "status-change", "short-token", "cached-configuration", "ordinary-retiring", "ordinary-short-parent", "short-parent", "not-retiring", "not-suspended", "final-retirement-cleared", "final-backing-changed", "invalid-csr", "same-key", "foreign-binding", "configuration-unavailable", "configuration-changed", "configuration-expired", "missing-protection", "wrong-audience", "revoked-review", "wrong-account", "wrong-live-account", "wrong-deployment", "wrong-replica", "wrong-owner", "deleted-pod", "failed-pod", "scaled-down", "spec-changed", "late", "cancelled"} {
+	for _, mode := range []string{"valid", "pending", "status-change", "short-token", "cached-configuration", "ordinary-retiring", "ordinary-short-parent", "short-parent", "not-retiring", "not-suspended", "final-retirement-cleared", "final-backing-changed", "invalid-csr", "same-key", "foreign-binding", "configuration-unavailable", "configuration-changed", "configuration-expired", "wrong-audience", "revoked-review", "wrong-account", "wrong-live-account", "wrong-deployment", "wrong-replica", "wrong-owner", "deleted-pod", "failed-pod", "scaled-down", "spec-changed", "late", "cancelled"} {
 		t.Run(mode, func(t *testing.T) {
 			start := time.Now().UTC().Truncate(time.Second)
 			v := ownerFixtureObjects()

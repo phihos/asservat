@@ -31,8 +31,8 @@ type InstalledOwnerIdentityReader struct {
 }
 
 // ownerIdentityReuse holds the last successful Verify for one exact mounted
-// bundle. Like the guard proof it is reused for at most OwnerProtectionReuse,
-// never past its token or guard bound; failures are never stored.
+// bundle. It is reused for at most OwnerProtectionReuse, never past its token
+// bound; failures are never stored.
 type ownerIdentityReuse struct {
 	slot  chan struct{}
 	key   [32]byte
@@ -168,12 +168,6 @@ func (s *InstalledOwnerIdentityReader) verify(ctx context.Context, manifest cont
 	call, end := context.WithDeadline(ctx, started.Add(5*time.Second))
 	defer end()
 	until := started.Add(OwnerProtectionReuse)
-	check = ownerReadInitialGuard
-	_, bound, e := s.protection.reused(call)
-	if e != nil {
-		return time.Time{}, e
-	}
-	until = identity.Earlier(until, bound)
 	in := s.activation.Input
 	check = ownerReadTokenRead
 	token, e := s.tokens.ReadOwnerPodToken(call)

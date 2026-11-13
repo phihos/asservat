@@ -23,7 +23,7 @@ import (
 )
 
 func TestOwnerIdentityReaderRequiresCurrentPodAndOriginalGuard(t *testing.T) {
-	for _, mode := range []string{"valid", "guard-missing", "allowing-probe", "wrong-token-pod", "wrong-token-account", "token-read-error", "pod-owner-changed", "pod-unassigned", "cancelled", "startup-pending", "startup-token-revoked", "startup-launch-replaced", "startup-after-receipt-changed", "startup-receipt-replaced"} {
+	for _, mode := range []string{"valid", "wrong-token-pod", "wrong-token-account", "token-read-error", "pod-owner-changed", "pod-unassigned", "cancelled", "startup-pending", "startup-token-revoked", "startup-launch-replaced", "startup-after-receipt-changed", "startup-receipt-replaced"} {
 		t.Run(mode, func(t *testing.T) {
 			x := newOwnerIdentityObjectFixture(t)
 			in := x.reader.input
@@ -179,7 +179,7 @@ func TestOwnerIdentityReaderRequiresCurrentPodAndOriginalGuard(t *testing.T) {
 			}
 			if mode != "valid" && mode != "startup-pending" && mode != "startup-launch-replaced" {
 				expected := map[string]OwnerIdentityReadCheck{
-					"guard-missing": ownerReadInitialGuard, "allowing-probe": ownerReadInitialGuard,
+
 					"wrong-token-pod": ownerReadInitialTokenReview, "wrong-token-account": ownerReadInitialTokenReview,
 					"token-read-error": ownerReadTokenRead, "pod-owner-changed": ownerReadInitialPod, "pod-unassigned": ownerReadInitialPod,
 					"cancelled":             ownerReadInput,
