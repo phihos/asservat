@@ -50,6 +50,7 @@ def base(mode, **region):
     if mode == "combined":
         v["origin"], v["services"] = "https://asservat.example.invalid", BUNDLED
         v["exposure"] = {"tlsSecret": "console-tls"}
+        v["identity"] = {"processingOperators": [{"clientID": "asservat-console", "issuer": "https://login.example.org/realms/asservat", "kind": "User", "id": "0f03f92a-6920-47cd-85d5-26080d3571d5"}]}
         profile = yaml.safe_load((Path(__file__).resolve().parents[1] / "examples/helm/context-trial-profile.yaml").read_text())
         v["federation"], v["capacity"] = {"connector": profile["federation"]["connector"]}, profile["capacity"]
     return v

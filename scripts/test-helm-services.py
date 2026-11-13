@@ -21,6 +21,7 @@ BASE = {
     "image": {"repository": "registry.example/asservat", "digest": DIGEST},
     "origin": "https://asservat.example",
     "exposure": {"tlsSecret": "console-tls"},
+    "identity": {"processingOperators": [{"clientID": "asservat-console", "issuer": "https://login.example.org/realms/asservat", "kind": "User", "id": "0f03f92a-6920-47cd-85d5-26080d3571d5"}]},
     # The regional offer's connector limits (mode=combined).
     "federation": {"connector": yaml.safe_load((CHART.parents[1] / "examples/helm/context-trial-profile.yaml").read_text())["federation"]["connector"]},
     "capacity": yaml.safe_load((CHART.parents[1] / "examples/helm/context-trial-profile.yaml").read_text())["capacity"],

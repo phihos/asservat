@@ -27,7 +27,7 @@ BUNDLED = {
     "mode": "combined",
     "image": {"repository": "registry.example/asservat", "digest": "sha256:" + "a" * 64},
     "origin": "https://asservat.example.test",
-    "identity": {"eligibleGroups": ["00000000-0000-4000-8000-000000000001"]},
+    "identity": {"eligibleGroups": ["00000000-0000-4000-8000-000000000001"], "processingOperators": [{"clientID": "asservat-console", "issuer": "https://login.example.org/realms/asservat", "kind": "User", "id": "0f03f92a-6920-47cd-85d5-26080d3571d5"}]},
     "exposure": {"tlsSecret": "asservat-public-tls"},
     "fleet": {"issuer": "https://id.example.test/realms/asservat", "clients": ["asservat-console"], "deliveryProfiles": ["regional-installer"]},
     "capacity": {"namespaceKeys": ["asservat-trial"], "backup": BACKUP},

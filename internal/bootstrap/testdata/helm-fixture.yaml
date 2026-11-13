@@ -3,6 +3,8 @@
 exposure:
   tlsSecret: console-tls
 identity:
+  processingOperators:
+  - {clientID: asservat-console, issuer: "https://login.example.org/realms/asservat", kind: User, id: 0f03f92a-6920-47cd-85d5-26080d3571d5}
   eligibleSubjects:
   - id: 00000000-0000-4000-8000-0000000000aa
     kind: human

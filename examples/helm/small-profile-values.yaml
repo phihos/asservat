@@ -9,6 +9,9 @@ identity:
   clientID: asservat-console
   browserAudience: asservat-api
   eligibleGroups: [] # Product adds the original generated users-group UUID.
+  # At least one stable identity that may run processing initialization.
+  processingOperators:
+    - { clientID: asservat-console, issuer: https://login.lab.example.invalid:31451/realms/asservat, kind: User, id: REPLACE_OPERATOR_SUBJECT_ID }
 exposure:
   tlsSecret: operator-console-tls
 fleet:
