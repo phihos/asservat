@@ -68,8 +68,10 @@ func TestSmallOpenBaoSetupMountsMatchBundledConsumers(t *testing.T) {
 		}
 	}
 	for _, mount := range []string{"asservat-audit", "public-transit"} {
-		if !slices.Equal(paths[mount+"/keys/*"], []string{"create", "read"}) {
-			t.Fatal("transit keys must be create-only", mount)
+		// Transit key creation is an update (no existence check); there is
+		// still no delete, export or backup capability.
+		if !slices.Equal(paths[mount+"/keys/*"], []string{"create", "read", "update"}) {
+			t.Fatal("transit keys must be create/read/update only", mount)
 		}
 	}
 	if _, ok := paths[contracts.SmallOpenBaoBootstrapMount+"/data/*"]; ok {

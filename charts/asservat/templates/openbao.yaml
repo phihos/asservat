@@ -128,6 +128,8 @@ spec:
             defaultMode: 0444
             sources:
               - serviceAccountToken: {path: token, expirationSeconds: 600}
+              # The API server CA OpenBao's Kubernetes auth uses to review tokens.
+              - configMap: {name: kube-root-ca.crt, items: [{key: ca.crt, path: ca.crt}]}
         - name: tmp
           emptyDir: {medium: Memory, sizeLimit: 64Mi}
 {{- end }}
