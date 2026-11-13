@@ -271,6 +271,15 @@ func (w *hubWorker) runCapacityOnce(ctx context.Context) (err error) {
 	if q.RootBacking.InstallationID != w.ids.InstallationID || q.RootBacking.AccountVersion != capacityAccountVersion(w.ids) {
 		return errHubWorkerCapacityConfig
 	}
+	// Context deletion purges the one evidence store this qualification
+	// names (the hub-worker qualifies exactly one backend).
+	at = "evidence-store-id"
+	if len(q.Backends) != 1 {
+		return errHubWorkerCapacityConfig
+	}
+	if err = w.publishEvidenceStoreID(q.Backends[0].EvidenceStoreID); err != nil {
+		return err
+	}
 	at = "accounts"
 	key, err := w.inputs.read(startup, contracts.HubWorkerCaptureAccountKeyFile, 64)
 	if err != nil {

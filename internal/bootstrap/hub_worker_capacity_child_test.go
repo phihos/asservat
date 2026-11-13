@@ -170,3 +170,30 @@ func TestPlatformCapacityProtectionIsFresh(t *testing.T) {
 		t.Fatal("namespace protection", err, n)
 	}
 }
+
+// Context deletion waits for the evidence store ID that the capacity child
+// publishes from its stored qualification; a later different ID is refused.
+func TestHubWorkerPublishesEvidenceStoreIDForContextDeletion(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	w := &hubWorker{root: ctx}
+	if _, ok := w.EvidenceStoreID(); ok {
+		t.Fatal("evidence store ID available before the capacity child read it")
+	}
+	const store = "30000000-0000-4000-8000-000000000007"
+	if err := w.publishEvidenceStoreID(store); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.publishEvidenceStoreID(store); err != nil {
+		t.Fatal("same ID refused on a capacity restart", err)
+	}
+	if err := w.publishEvidenceStoreID("30000000-0000-4000-8000-000000000008"); err == nil {
+		t.Fatal("different evidence store ID replaced the published one")
+	}
+	if got, ok := w.EvidenceStoreID(); !ok || got != store {
+		t.Fatal("published evidence store ID not returned", got)
+	}
+	cancel()
+	if _, ok := w.EvidenceStoreID(); ok {
+		t.Fatal("evidence store ID returned after the process ended")
+	}
+}

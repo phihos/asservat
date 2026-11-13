@@ -58,11 +58,11 @@ type hubWorker struct {
 	running bool
 	owners  sync.WaitGroup
 
-	// Shared between children: the capacity child publishes the context
-	// deletion pins (ADR-205) and lends its namespace guard readers to the
-	// permission reconciler (ADR-247).
+	// Shared between children: the capacity child publishes the evidence
+	// store ID of its stored qualification for context deletion (ADR-205)
+	// and lends its namespace guard readers to the permission reconciler
+	// (ADR-247).
 	deletionMu      sync.Mutex
-	contextDeletion *contracts.ContextDeletionDeployment
 	evidenceStoreID string
 	guards          sharedNamespaceGuards
 }
@@ -498,36 +498,32 @@ func (w *hubWorker) Close() {
 	})
 }
 
-// ContextDeletion returns the capacity child's context deletion section and
-// evidence store ID, or false before the capacity child has published them.
-func (w *hubWorker) ContextDeletion() (contracts.ContextDeletionDeployment, string, bool) {
+// EvidenceStoreID returns the evidence store ID of the capacity child's
+// stored qualification, or false before the capacity child has read it.
+func (w *hubWorker) EvidenceStoreID() (string, bool) {
 	if w == nil {
-		return contracts.ContextDeletionDeployment{}, "", false
+		return "", false
 	}
 	w.deletionMu.Lock()
 	defer w.deletionMu.Unlock()
-	if w.contextDeletion == nil || w.evidenceStoreID == "" || w.root == nil || w.root.Err() != nil {
-		return contracts.ContextDeletionDeployment{}, "", false
+	if w.evidenceStoreID == "" || w.root == nil || w.root.Err() != nil {
+		return "", false
 	}
-	return cloneContextDeletion(*w.contextDeletion), w.evidenceStoreID, true
+	return w.evidenceStoreID, true
 }
 
-// publishContextDeletion records the deletion section and evidence store ID
-// once; a different later value is refused.
-func (w *hubWorker) publishContextDeletion(section contracts.ContextDeletionDeployment, store string) error {
+// publishEvidenceStoreID records the evidence store ID once; a different
+// later value is refused (the stored qualification never changes it).
+func (w *hubWorker) publishEvidenceStoreID(store string) error {
 	if w == nil || !authorization.UUID(store) {
 		return mounts.ErrUnavailable
 	}
 	w.deletionMu.Lock()
 	defer w.deletionMu.Unlock()
-	if w.contextDeletion != nil {
-		if w.evidenceStoreID != store {
-			return mounts.ErrUnavailable
-		}
-		return nil
+	if w.evidenceStoreID != "" && w.evidenceStoreID != store {
+		return mounts.ErrUnavailable
 	}
-	v := cloneContextDeletion(section)
-	w.contextDeletion, w.evidenceStoreID = &v, store
+	w.evidenceStoreID = store
 	return nil
 }
 

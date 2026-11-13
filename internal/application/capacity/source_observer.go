@@ -86,8 +86,14 @@ func (s *CapacitySourceObserver) Observe(ctx context.Context) (AcceptedCapacityS
 		return failed("protection", e)
 	}
 	observation, e := s.Source.ReadCapacitySource(live)
-	if e != nil || !observation.Valid(s.Now()) || !narrow(observation.Snapshot.FreshUntil) {
+	if e != nil {
 		return failed("read", e)
+	}
+	if !observation.Valid(s.Now()) {
+		return failed("read-invalid", nil)
+	}
+	if !narrow(observation.Snapshot.FreshUntil) {
+		return failed("read-expired", nil)
 	}
 	input := CapacitySourceAcceptance{RootID: s.RootID, InstallationID: s.InstallationID, QualificationID: s.QualificationID, QualificationDigest: s.QualificationDigest, ExpectedRevision: revision, Observation: observation, Protection: protection, Recovery: r}
 	if !input.Valid(s.Now()) || live.Err() != nil {

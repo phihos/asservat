@@ -269,9 +269,9 @@ func (w *hubWorker) openContextDeletion(ctx context.Context, v contracts.HubWork
 	}
 	store := contracts.OwnerAuditStore{Endpoint: v.EvidenceStore.Endpoint, Roots: roots, Region: v.EvidenceStore.Region, Bucket: v.EvidenceStore.Bucket}
 	d.prepare = func(ctx context.Context) (*privacyapp.ContextCleaner, []func(), error) {
-		// The capacity child publishes the evidence store ID of its current
-		// qualification; the section it publishes is not used here.
-		_, storeID, ok := w.ContextDeletion()
+		// The capacity child publishes the evidence store ID of its stored
+		// qualification.
+		storeID, ok := w.EvidenceStoreID()
 		if !ok {
 			return nil, nil, &fixedStepError{"evidence-store-id", mounts.ErrUnavailable}
 		}
