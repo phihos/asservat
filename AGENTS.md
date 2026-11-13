@@ -34,6 +34,10 @@ TokenReview and TLS, protection by RBAC and Pod Security. Do not add runtime
 re-verification of installer-created objects, UID pins, admission-policy
 proofs, journals or launch receipts.
 
+Maintainer decision (2026-11-13): AccessBindings move to the application
+namespaces they grant, managed by ordinary namespace RBAC and observed by each
+region's connector (ADR-329).
+
 Every security measure must be backed by research first: cite external
 sources (standards, vendor guidance, incident reports, comparable projects)
 that describe its benefit. If nobody outside this project tells a positive
