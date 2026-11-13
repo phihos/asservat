@@ -5,6 +5,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import subprocess
 import tempfile
 import unittest
 
@@ -138,6 +139,60 @@ class HubWorkerChart(unittest.TestCase):
         del capacity["policySpec"]["scope"]["clusterID"]
         policy, = [d for d in self.render(values) if d["kind"] == "EvidenceBudgetPolicy"]
         self.assertNotIn("clusterID", policy["spec"]["scope"])
+
+    def test_all_sections_decode_and_mount(self):
+        values = copy.deepcopy(self.bundled)
+        values["capacity"] = context_public()["capacity"]
+        values["permission"] = {"enabled": True, "statusUsers": ["system:serviceaccount:asservat-system:asservat-hub-worker"],
+                                "review": "asservat-review", "workerConfiguration": {"namespace": "asservat-downloads", "source": "asservat-worker-profile"},
+                                "contextDeletion": {}, "browser": {"settings": "asservat-browser-settings"},
+                                "identity": {"settings": "asservat-identity-settings", "issuer": "https://id.example/realms/org"}}
+        docs = self.render(values)
+        w = self.worker(docs)
+        raw = w["ConfigMap"]["data"]["config.json"]
+        config = json.loads(raw)
+        self.assertEqual(set(config), CONFIG_KEYS | {"capacity", "cleanup", "permission"})
+        self.assertEqual(config["cleanup"], {})
+        self.assertEqual(config["capacity"]["processingSource"], "asservat-processing-source")
+        self.assertEqual((config["capacity"]["paths"], config["capacity"]["sharedQueries"]), ([], False))
+        self.assertTrue(config["permission"]["retention"])
+        self.assertEqual(config["permission"]["contextDeletion"]["evidenceStore"], config["auditStore"])
+        self.assertEqual(config["provider"]["contextDeletionSigning"], {"mount": "asservat-audit", "key": "asservat-context-deletion"})
+        self.assertEqual(config["provider"]["workerConfigurationAudit"], {"mount": "asservat-audit", "key": "asservat-worker-configuration-audit"})
+        self.assertEqual(set(config["provider"]["roles"]), {"auditWrap", "auditUnwrap", "cleanupWrap", "cleanupOpen", "cleanupVerify", "cleanupSign"})
+        path = Path(self.directory.name) / "config.json"
+        path.write_text(raw)
+        env = dict(os.environ, ASSERVAT_HUB_WORKER_CONFIG=str(path), TMPDIR=str(Path.home() / ".cache/go-tmp"))
+        go = subprocess.run(["go", "test", "-count=1", "-run", "^TestHubWorkerConfigRendered$", "-v", "./internal/contracts"], cwd=helm.ROOT, env=env, text=True, capture_output=True, timeout=300)
+        self.assertEqual(go.returncode, 0, go.stdout + go.stderr)
+        self.assertIn("--- PASS: TestHubWorkerConfigRendered", go.stdout)
+        sources = w["Deployment"]["spec"]["template"]["spec"]["volumes"][0]["projected"]["sources"]
+        files = {item["path"]: s[kind].get("name") for s in sources for kind in s for item in s[kind].get("items", [])}
+        self.assertEqual(files["capture-account.key"], "asservat-audit-mac")
+        self.assertEqual(files["cleanup-storage.json"], "asservat-s3-hub-worker-cleanup")
+        self.assertEqual(files["verify-storage.json"], "asservat-s3-hub-worker-verify")
+        self.assertEqual(files["evidence-delete-storage.json"], "asservat-s3-hub-worker-evidence-delete")
+        self.assertEqual(files["roots/evidence-store.crt"], "asservat-objectstore-state")
+        rules = w["ClusterRole"]["rules"]
+        self.assertIn({"apiGroups": [""], "resources": ["pods"], "verbs": ["get", "list", "watch"]}, rules)
+        self.assertIn({"apiGroups": ["apps"], "resources": ["deployments", "statefulsets"], "verbs": ["get", "list", "watch"]}, rules)
+        role, = [d for d in docs if d["kind"] == "Role" and d["metadata"]["namespace"] == "asservat-downloads"]
+        self.assertEqual(role["rules"], [{"apiGroups": [""], "resources": ["configmaps", "secrets"], "verbs": ["get"]}])
+        self.assertTrue(any(d["kind"] == "RoleBinding" and d["metadata"]["namespace"] == "asservat-downloads" for d in docs))
+        values["cleanup"] = {"enabled": False}
+        config = json.loads(self.worker(self.render(values))["ConfigMap"]["data"]["config.json"])
+        self.assertNotIn("cleanup", config)
+        self.assertNotIn("cleanupWrap", config["provider"]["roles"])
+        external = copy.deepcopy(self.external)
+        external["permission"] = {"enabled": True, "contextDeletion": {"evidenceStore": {"bucket": "evidence"}}}
+        w = self.worker(self.render(external))
+        config = json.loads(w["ConfigMap"]["data"]["config.json"])
+        self.assertEqual(config["permission"]["contextDeletion"]["evidenceStore"], {"endpoint": "https://s3.example", "region": "eu-1", "bucket": "evidence"})
+        self.assertNotIn("retention", config["permission"])
+        items = w["Deployment"]["spec"]["template"]["spec"]["volumes"][0]["projected"]["sources"][0]["configMap"]["items"]
+        self.assertIn({"key": "roots-audit-store.crt", "path": "roots/evidence-store.crt"}, items)
+        external["cleanup"] = {"enabled": True}
+        self.assertIn("cleanup.enabled requires capacity", self.render(external, ok=False))
 
     def test_not_rendered_by_default_or_for_cluster_mode(self):
         values = copy.deepcopy(self.external)

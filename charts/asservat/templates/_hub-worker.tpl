@@ -117,13 +117,72 @@ app.kubernetes.io/component: hub-worker
 {{- toJson (dict "endpoint" $endpoint "auditMount" (include "asservat.hubWorker.auditMount" .) "auditKey" (include "asservat.hubWorker.auditKey" .)) -}}
 {{- end -}}
 
-{{/* Capacity, cleanup and permission sections, each omitted when disabled.
-     TODO(hub-worker capacity/cleanup/permission streams): return
-     {"capacity": ..., "cleanup": ..., "permission": ...} here. An optional
-     "provider" entry ({"workerConfigurationAudit": {"mount","key"},
-     "contextDeletionSigning": {"mount","key"}}) is merged into provider. */}}
+{{/* "true" when the cleanup child runs: cleanup.enabled, default true with
+     capacity; it requires capacity. */}}
+{{- define "asservat.hubWorker.cleanupEnabled" -}}
+{{- $on := dig "enabled" (not (empty .Values.capacity)) (default dict .Values.cleanup) -}}
+{{- if and $on (not .Values.capacity) }}{{ fail "cleanup.enabled requires capacity" }}{{ end -}}
+{{- if $on }}true{{ end -}}
+{{- end -}}
+
+{{- define "asservat.hubWorker.permissionEnabled" -}}
+{{- if dig "enabled" false (default dict .Values.permission) }}true{{ end -}}
+{{- end -}}
+
+{{/* "true" when the permission child deletes expired context evidence. */}}
+{{- define "asservat.hubWorker.contextDeletionEnabled" -}}
+{{- if and (include "asservat.hubWorker.permissionEnabled" .) (hasKey .Values.permission "contextDeletion") }}true{{ end -}}
+{{- end -}}
+
+{{/* Transit key names on the audit mount; chart constants shared with setup. */}}
+{{- define "asservat.hubWorker.contextDeletionKey" -}}
+{{- printf "%s-context-deletion" (include "asservat.hubWorker.prefix" .) -}}
+{{- end -}}
+{{- define "asservat.hubWorker.workerConfigurationAuditKey" -}}
+{{- printf "%s-worker-configuration-audit" (include "asservat.hubWorker.prefix" .) -}}
+{{- end -}}
+
+{{/* Capacity, cleanup and permission sections (contracts.HubWorkerCapacity,
+     HubWorkerCleanup, HubWorkerPermission), each omitted when disabled, and
+     a "provider" entry merged into the provider section. */}}
 {{- define "asservat.hubWorker.sections" -}}
-{{- toJson dict -}}
+{{- $out := dict -}}
+{{- $provider := dict -}}
+{{- $mount := include "asservat.hubWorker.auditMount" . -}}
+{{- $signing := dict "mount" $mount "key" (include "asservat.hubWorker.contextDeletionKey" .) -}}
+{{- if include "asservat.hubWorker.capacityEnabled" . -}}
+{{- $c := deepCopy .Values.capacity -}}
+{{/* TODO: no chart template renders the processing source ConfigMap yet. */}}
+{{- $_ := set $c "processingSource" (printf "%s-processing-source" (include "asservat.hubWorker.prefix" .)) -}}
+{{- $_ := set $c "paths" list -}}
+{{- $_ := set $c "sharedQueries" (dig "publisher" "enabled" false (default dict .Values.hub)) -}}
+{{- $_ := set $out "capacity" $c -}}
+{{- end -}}
+{{- if include "asservat.hubWorker.cleanupEnabled" . -}}
+{{- $_ := set $out "cleanup" dict -}}
+{{- $_ := set $provider "contextDeletionSigning" $signing -}}
+{{- end -}}
+{{- if include "asservat.hubWorker.permissionEnabled" . -}}
+{{- $p := .Values.permission -}}
+{{- $v := dict "statusUsers" (default list $p.statusUsers) "delegations" (default list $p.delegations) -}}
+{{- if $p.review }}{{ $_ := set $v "review" $p.review }}{{ end -}}
+{{- if dig "retention" (not (empty .Values.retention)) $p }}{{ $_ := set $v "retention" true }}{{ end -}}
+{{- with $p.workerConfiguration -}}
+{{- $_ := set $v "workerConfiguration" (dict "namespace" (required "permission.workerConfiguration.namespace is required" .namespace) "source" (required "permission.workerConfiguration.source is required" .source)) -}}
+{{- $_ := set $provider "workerConfigurationAudit" (dict "mount" $mount "key" (include "asservat.hubWorker.workerConfigurationAuditKey" $)) -}}
+{{- end -}}
+{{- if include "asservat.hubWorker.contextDeletionEnabled" . -}}
+{{/* Defaults to the audit store: bundled object storage holds one bucket. */}}
+{{- $store := merge (deepCopy (default dict (dig "contextDeletion" "evidenceStore" dict $p))) (fromJson (include "asservat.hubWorker.auditStore" .)) -}}
+{{- $_ := set $v "contextDeletion" (dict "evidenceStore" $store) -}}
+{{- $_ := set $provider "contextDeletionSigning" $signing -}}
+{{- end -}}
+{{- with $p.browser }}{{ $_ := set $v "browser" (dict "settings" (required "permission.browser.settings is required" .settings)) }}{{ end -}}
+{{- with $p.identity }}{{ $_ := set $v "identity" (dict "settings" (required "permission.identity.settings is required" .settings) "issuer" (required "permission.identity.issuer is required" .issuer)) }}{{ end -}}
+{{- $_ := set $out "permission" $v -}}
+{{- end -}}
+{{- if $provider }}{{ $_ := set $out "provider" $provider }}{{ end -}}
+{{- toJson $out -}}
 {{- end -}}
 
 {{/* The rendered config.json (contracts.HubWorkerConfig). */}}

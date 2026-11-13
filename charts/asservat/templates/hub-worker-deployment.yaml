@@ -1,6 +1,7 @@
 {{- if include "asservat.hubWorker.enabled" . }}
 {{- $name := include "asservat.hubWorker.fullname" . }}
 {{- $w := index .Values.hub "hub-worker" }}
+{{- $deletion := include "asservat.hubWorker.contextDeletionEnabled" . }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -77,6 +78,9 @@ spec:
                     {{- range $root, $_ := fromJson (include "asservat.hubWorker.externalRoots" .) }}
                     - {key: {{ printf "roots-%s.crt" $root }}, path: {{ printf "roots/%s.crt" $root }}}
                     {{- end }}
+                    {{- if and $deletion (ne .Values.services.objectStore.provider "seaweedfs") }}
+                    - {key: roots-audit-store.crt, path: roots/evidence-store.crt}
+                    {{- end }}
               - serviceAccountToken:
                   path: kube.token
                   expirationSeconds: 600
@@ -104,6 +108,36 @@ spec:
                   optional: false
                   items:
                     - {key: credentials.json, path: audit-storage.json}
+              {{- if include "asservat.hubWorker.capacityEnabled" . }}
+              - secret:
+                  name: {{ include "asservat.hubWorker.secretName" (list . "audit-mac") | quote }}
+                  optional: false
+                  items:
+                    - {key: accountKey, path: capture-account.key}
+              {{- end }}
+              {{- if include "asservat.hubWorker.cleanupEnabled" . }}
+              {{- range $principal, $file := dict "cleanup" "cleanup-storage.json" "verify" "verify-storage.json" }}
+              - secret:
+                  name: {{ include "asservat.hubWorker.secretName" (list $ (printf "s3-hub-worker-%s" $principal)) | quote }}
+                  optional: false
+                  items:
+                    - {key: credentials.json, path: {{ $file }}}
+              {{- end }}
+              {{- end }}
+              {{- if $deletion }}
+              - secret:
+                  name: {{ include "asservat.hubWorker.secretName" (list . "s3-hub-worker-evidence-delete") | quote }}
+                  optional: false
+                  items:
+                    - {key: credentials.json, path: evidence-delete-storage.json}
+              {{- if eq .Values.services.objectStore.provider "seaweedfs" }}
+              - secret:
+                  name: {{ printf "%s-objectstore-state" (include "asservat.hubWorker.prefix" .) | quote }}
+                  optional: false
+                  items:
+                    - {key: ca.crt, path: roots/evidence-store.crt}
+              {{- end }}
+              {{- end }}
               {{- with include "asservat.hubWorker.rootsProjection" . | trim }}
               {{- . | nindent 14 }}
               {{- end }}

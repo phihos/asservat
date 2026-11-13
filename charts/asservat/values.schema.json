@@ -2124,6 +2124,123 @@
           "$ref": "#/definitions/installerRetentionBaseline"
         }
       ]
+    },
+    "cleanup": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        }
+      }
+    },
+    "permission": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "statusUsers": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 253
+          }
+        },
+        "delegations": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "review": {
+          "type": "string",
+          "maxLength": 253
+        },
+        "retention": {
+          "type": "boolean"
+        },
+        "workerConfiguration": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "namespace",
+            "source"
+          ],
+          "properties": {
+            "namespace": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 253
+            },
+            "source": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 253
+            }
+          }
+        },
+        "contextDeletion": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "evidenceStore": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "endpoint": {
+                  "type": "string",
+                  "maxLength": 2048
+                },
+                "region": {
+                  "type": "string",
+                  "maxLength": 64
+                },
+                "bucket": {
+                  "type": "string",
+                  "maxLength": 63
+                }
+              }
+            }
+          }
+        },
+        "browser": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "settings"
+          ],
+          "properties": {
+            "settings": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 253
+            }
+          }
+        },
+        "identity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "settings",
+            "issuer"
+          ],
+          "properties": {
+            "settings": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 253
+            },
+            "issuer": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            }
+          }
+        }
+      }
     }
   },
   "definitions": {

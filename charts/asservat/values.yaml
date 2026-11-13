@@ -46,6 +46,31 @@ capacity: {}
 # maxima, deletionBudgetSeconds). Set to render `<name>-baseline`.
 retention: {}
 
+# The hub-worker's capture/operation audit cleanup; with capacity it runs
+# unless enabled is false.
+cleanup: {}
+
+# The hub-worker's permission child (AccessBindings, PermissionSources and
+# the hub retention source).
+permission:
+  enabled: false
+  # Accounts that may write PermissionSource/AccessBinding status.
+  statusUsers: []
+  # Writer envelopes (the former public.permissionDelegations shape).
+  delegations: []
+  # Administrator-created initial review ConfigMap, needed only when
+  # bindings exist at the first acceptance.
+  # review: ""
+  # Runs the hub retention source; defaults to true when retention is set.
+  # retention: true
+  # Download worker configuration acceptance (ADR-204).
+  # workerConfiguration: {namespace: asservat-downloads, source: asservat-worker-profile}
+  # Expired context evidence deletion (ADR-205); the evidence store
+  # defaults to the audit store.
+  # contextDeletion: {evidenceStore: {endpoint: "", region: "", bucket: ""}}
+  # browser: {settings: asservat-browser-settings}
+  # identity: {settings: asservat-identity-settings, issuer: https://id.example/realms/org}
+
 # Optional initial-installation checkpoint only; this starts no runtime service.
 # The release namespace must already be a trusted Restricted bootstrap namespace.
 bootstrap:
