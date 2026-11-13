@@ -16,7 +16,7 @@ import (
 
 func (c *ownerProviderControl) metadata(v map[string]string) bool {
 	_, hasSecretName := v["service_account_secret_name"]
-	return hasSecretName && len(v) == 5 && v["role"] == c.role && v["service_account_uid"] == c.accountUID && v["service_account_name"] == c.account && v["service_account_namespace"] == c.namespace && v["service_account_secret_name"] == ""
+	return hasSecretName && len(v) == 5 && v["role"] == c.role && (c.accountUID == "" || v["service_account_uid"] == c.accountUID) && v["service_account_name"] == c.account && v["service_account_namespace"] == c.namespace && v["service_account_secret_name"] == ""
 }
 
 func (c *ownerProviderControl) validAuth(reply ownerProviderControlReply, old *ownerProviderCredential) bool {

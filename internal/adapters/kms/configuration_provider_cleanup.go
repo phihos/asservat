@@ -11,10 +11,10 @@ import (
 
 // RefreshCleanup is called only by the existing serial cleanup child, before
 // entering its effect operation. Healthy credentials cost no native admission.
-// Each login/renewal uses the same original native/recovery brackets as the
+// Each login/renewal uses the same recovery brackets as the
 // configuration purposes; no periodic cleanup credential task is introduced.
 func (s *InstalledConfigurationProviderEffects) RefreshCleanup(ctx context.Context) error {
-	if s == nil || s.effects == nil || s.admission == nil || s.input.ProviderAuthentication == nil || s.input.ProviderAuthentication.CleanupAudit == (contracts.OwnerPublicTransit{}) {
+	if s == nil || s.effects == nil || s.admission == nil || !s.input.cleanup() {
 		return ErrKeyService
 	}
 	for _, slot := range s.effects.cleanup {
@@ -52,9 +52,8 @@ func (s *InstalledConfigurationProviderEffects) RefreshCleanup(ctx context.Conte
 // CleanupKeys accepts only the original selected audit and signer. The two
 // decrypt clients borrow different credentials, preserving independent proof.
 func (s *InstalledConfigurationProviderEffects) CleanupKeys(mount, key, signMount, signKey string, version int, public ed25519.PublicKey) (*Sealer, *Opener, *Opener, *SigningKey, error) {
-	if s == nil || s.effects == nil || s.input.ProviderAuthentication == nil ||
-		s.input.ProviderAuthentication.CleanupAudit != (contracts.OwnerPublicTransit{Mount: mount, Key: key}) ||
-		s.input.ProviderAuthentication.ContextDeletionSigning != (contracts.OwnerPublicTransit{Mount: signMount, Key: signKey}) ||
+	if s == nil || s.effects == nil || !s.input.cleanup() || mount != s.input.AuditMount || key != s.input.AuditKey ||
+		s.input.ContextDeletionSigning != (contracts.OwnerPublicTransit{Mount: signMount, Key: signKey}) ||
 		version < 1 || version > 2147483647 || len(public) != ed25519.PublicKeySize {
 		return nil, nil, nil, nil, ErrKeyService
 	}

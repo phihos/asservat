@@ -4,8 +4,6 @@ import (
 	"context"
 	"net/http"
 	"time"
-
-	"asservat.local/asservat/internal/contracts"
 )
 
 // The fixed pair shares the existing lease transport, never an owner credential
@@ -18,7 +16,7 @@ type configurationProviderEffects struct {
 	cancel       context.CancelFunc
 }
 
-func newConfigurationProviderEffects(ctx context.Context, in contracts.HubWorkerDeployment, profile contracts.ConfigurationProviderAuthentication, jwt TokenSource, proof ownerProviderCurrent, client *http.Client, now func() time.Time) (*configurationProviderEffects, error) {
+func newConfigurationProviderEffects(ctx context.Context, in ConfigurationProviderInput, jwt TokenSource, proof ownerProviderCurrent, client *http.Client, now func() time.Time) (*configurationProviderEffects, error) {
 	if ctx == nil || ctx.Err() != nil || jwt == nil || proof == nil || now == nil {
 		return nil, ErrKeyService
 	}
@@ -35,8 +33,9 @@ func newConfigurationProviderEffects(ctx context.Context, in contracts.HubWorker
 	for _, fixed := range []struct {
 		purpose string
 		target  **ownerProviderLifetime
-	}{{"audit-wrap", &out.wrap}, {"audit-unwrap", &out.unwrap}} {
-		control, err := newConfigurationProviderControl(in, profile, fixed.purpose, client, now)
+		role    string
+	}{{"audit-wrap", &out.wrap, in.Roles.AuditWrap}, {"audit-unwrap", &out.unwrap, in.Roles.AuditUnwrap}} {
+		control, err := newConfigurationProviderControl(in, fixed.role, client, now)
 		if err != nil {
 			return nil, err
 		}
@@ -47,9 +46,9 @@ func newConfigurationProviderEffects(ctx context.Context, in contracts.HubWorker
 		}
 		*fixed.target = slot
 	}
-	if profile.CleanupAudit != (contracts.OwnerPublicTransit{}) {
-		for i, purpose := range []string{"cleanup-wrap", "cleanup-open", "cleanup-verify", "cleanup-sign"} {
-			control, err := newConfigurationProviderControl(in, profile, purpose, client, now)
+	if in.cleanup() {
+		for i, role := range []string{in.Roles.CleanupWrap, in.Roles.CleanupOpen, in.Roles.CleanupVerify, in.Roles.CleanupSign} {
+			control, err := newConfigurationProviderControl(in, role, client, now)
 			if err != nil {
 				return nil, err
 			}
@@ -61,16 +60,16 @@ func newConfigurationProviderEffects(ctx context.Context, in contracts.HubWorker
 			out.cleanup[i] = slot
 		}
 	}
-	wrap, err := newOwnerProviderEffectClient(out.wrap, in.KeyService.AuditMount+"/encrypt/"+in.KeyService.AuditKey)
+	wrap, err := newOwnerProviderEffectClient(out.wrap, in.AuditMount+"/encrypt/"+in.AuditKey)
 	if err != nil {
 		return nil, err
 	}
-	out.seal = &Sealer{client: wrap, mount: in.KeyService.AuditMount, key: in.KeyService.AuditKey, reference: in.KeyService.AuditMount + "/" + in.KeyService.AuditKey}
-	unwrap, err := newOwnerProviderEffectClient(out.unwrap, in.KeyService.AuditMount+"/decrypt/"+in.KeyService.AuditKey)
+	out.seal = &Sealer{client: wrap, mount: in.AuditMount, key: in.AuditKey, reference: in.AuditMount + "/" + in.AuditKey}
+	unwrap, err := newOwnerProviderEffectClient(out.unwrap, in.AuditMount+"/decrypt/"+in.AuditKey)
 	if err != nil {
 		return nil, err
 	}
-	out.open = &Opener{client: unwrap, mount: in.KeyService.AuditMount, key: in.KeyService.AuditKey, reference: in.KeyService.AuditMount + "/" + in.KeyService.AuditKey}
+	out.open = &Opener{client: unwrap, mount: in.AuditMount, key: in.AuditKey, reference: in.AuditMount + "/" + in.AuditKey}
 	complete = true
 	return out, nil
 }

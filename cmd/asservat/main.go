@@ -65,7 +65,7 @@ func run() int {
 	} else if os.Args[1] == "node" {
 		err = bootstrap.RunNode(ctx, os.Getenv(contracts.NodePodUIDEnvironment))
 	} else if os.Args[1] == "hub-worker" {
-		err = bootstrap.RunHubWorker(ctx, os.Getenv(contracts.OwnerPodUIDEnvironment))
+		err = bootstrap.RunHubWorker(ctx)
 	} else {
 		err = bootstrap.RunDownloadWorker(ctx, os.Args[2:], os.Getenv(contracts.WorkerPodUIDEnvironment), os.Stdout)
 	}
