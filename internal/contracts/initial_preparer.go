@@ -143,12 +143,14 @@ const InitialPreparationServicesFormat = "asservat-initial-preparation-services/
 
 // Closed public desired input. Private replies and credentials remain separate.
 type InitialPreparationServices struct {
-	Format     string                  `json:"format"`
-	Fleet      FleetSettings           `json:"fleet"`
-	Kubernetes OwnerProviderEndpoint   `json:"kubernetes"`
-	Postgres   OwnerPostgresEndpoint   `json:"postgres"`
-	AuditStore OwnerAuditStore         `json:"auditStore"`
-	KeyService ConfigurationKeyService `json:"keyService"`
+	Format string        `json:"format"`
+	Fleet  FleetSettings `json:"fleet"`
+	// IssuerEpoch accompanies Fleet; fleet.json no longer carries it.
+	IssuerEpoch string                  `json:"issuerEpoch"`
+	Kubernetes  OwnerProviderEndpoint   `json:"kubernetes"`
+	Postgres    OwnerPostgresEndpoint   `json:"postgres"`
+	AuditStore  OwnerAuditStore         `json:"auditStore"`
+	KeyService  ConfigurationKeyService `json:"keyService"`
 }
 type InitialPreparationPublicInputs struct {
 	IntentDigest string                     `json:"intentDigest"`

@@ -83,7 +83,7 @@ func renderSecretsHook(t *testing.T, values map[string]any) (contracts.SecretsPl
 	}
 	ctx, stop := context.WithTimeout(t.Context(), 15*time.Second)
 	defer stop()
-	rendered, e := exec.CommandContext(ctx, helm, "template", "trial", "../../charts/asservat", "--namespace", "installation", "--kube-version", "1.35.0", "-f", path).CombinedOutput()
+	rendered, e := exec.CommandContext(ctx, helm, "template", "trial", "../../charts/asservat", "--namespace", "installation", "--kube-version", "1.35.0", "-f", "testdata/helm-fixture.yaml", "-f", path).CombinedOutput()
 	if e != nil {
 		t.Fatalf("actual Helm producer: %v\n%s", e, rendered)
 	}
@@ -282,7 +282,8 @@ func TestSecretsHookUsesRenderedPlanAndExactRole(t *testing.T) {
 			for _, p := range contracts.ObjectStorePrincipals(mode) {
 				want = append(want, "trial-s3-"+p)
 			}
-			want = append(want, "trial-objectstore-iam")
+			// The peer listeners' serving TLS (no existing Secret or issuer).
+			want = append(want, "trial-objectstore-iam", "trial-federation-tls", "trial-key-service-tls")
 			if !slices.Equal(api.creates, want) || len(api.patches) != 0 {
 				t.Fatalf("creates=%v patches=%v", api.creates, api.patches)
 			}
@@ -305,8 +306,19 @@ func TestSecretsHookUsesRenderedPlanAndExactRole(t *testing.T) {
 					}
 				}
 			}
-			if len(first["trial-audit-mac"][contracts.AuditMACInputKey]) != 32 || !strings.Contains(first["trial-artifact-key"][contracts.ArtifactKeySecretKey], `"purpose":"artifact"`) {
+			mac := first["trial-audit-mac"]
+			if len(mac[contracts.AuditMACInputKey]) != 32 || mac[contracts.AuditMACAccountVersion] != ids["roleSetupID"]+"-account/v1" || mac[contracts.AuditMACInputVersion] != ids["roleSetupID"]+"-input/v1" || !strings.Contains(first["trial-artifact-key"][contracts.ArtifactKeySecretKey], `"purpose":"artifact"`) {
 				t.Fatal("audit MAC or artifact key material")
+			}
+			// hub-api's projection carries the same stored keys and setup ID.
+			projection, e := contracts.DecodePublicAuditKeys(strings.NewReader(mac[contracts.PublicAuditKeysFile]))
+			if e != nil || projection.Format != contracts.PublicAuditKeysFormat || projection.InstallationID != ids["installationID"] || projection.SetupID != ids["roleSetupID"] ||
+				string(projection.Material.AccountKey) != mac[contracts.AuditMACAccountKey] || string(projection.Material.InputKey) != mac[contracts.AuditMACInputKey] || projection.Material.AccountVersion != mac[contracts.AuditMACAccountVersion] {
+				t.Fatal("public audit keys projection", e)
+			}
+			var policies map[string]json.RawMessage
+			if json.Unmarshal([]byte(first["trial-objectstore-iam"][SeaweedBucketPoliciesKey]), &policies) != nil || len(policies) != 2 || policies["trial-audit"] == nil || policies["trial-evidence"] == nil {
+				t.Fatal("bucket policies", first["trial-objectstore-iam"][SeaweedBucketPoliciesKey])
 			}
 			iam := first["trial-objectstore-iam"][providerconfig.SeaweedConfigKey]
 			for _, p := range contracts.ObjectStorePrincipals(mode) {

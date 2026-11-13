@@ -17,5 +17,5 @@ func VerifyConfigurationRuntimeCredential(ctx context.Context, pool *pgxpool.Poo
 	if !known {
 		return cfg.ErrInvalid
 	}
-	return VerifyRuntimeLogin(ctx, pool, name)
+	return VerifySessionRole(ctx, pool, name)
 }

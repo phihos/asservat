@@ -61,18 +61,9 @@ func OwnerProviderRecipeFor(in contracts.OwnerDeployment, mount, accessor string
 		return out, cfg.ErrInvalid
 	}
 	out.Profile = contracts.OwnerProviderAuthentication{Format: contracts.OwnerProviderAuthenticationFormat, AuthMount: mount, AuthMountAccessor: accessor, ServiceAccount: account, AuditCredentials: auditCredentials}
-	scope, e := ownerProviderCanonical(struct {
-		Format         string                          `json:"format"`
-		InstallationID string                          `json:"installationID"`
-		ClusterID      string                          `json:"clusterID"`
-		Namespace      contracts.WorkerObjectReference `json:"namespace"`
-		ServiceAccount contracts.WorkerObjectReference `json:"serviceAccount"`
-	}{"asservat-owner-provider-name/v1", in.InstallationID, in.ClusterID, contracts.WorkerObjectReference{Name: in.Namespace.Name}, contracts.WorkerObjectReference{Name: account.Name}})
-	if e != nil {
-		return OwnerProviderRecipe{}, e
-	}
-	nameDigest := sha256.Sum256(scope)
-	prefix := "asservat-owner-" + hex.EncodeToString(nameDigest[:]) + "-"
+	// Role and policy: "<name>-hub-api-<purpose>" (OpenBaoRoleName), the
+	// ServiceAccount name plus the purpose; setup creates the same names.
+	prefix := account.Name + "-"
 	audience := contracts.OwnerProviderAudience(in.InstallationID, in.ClusterID)
 	purposes := [4]string{"audit-wrap", "audit-unwrap", "server-sign", "client-sign"}
 	paths := [4]string{in.KeyService.AuditMount + "/encrypt/" + in.KeyService.AuditKey, in.KeyService.AuditMount + "/decrypt/" + in.KeyService.AuditKey, in.KeyService.PKIMount + "/sign/" + in.KeyService.ServerRole, in.KeyService.PKIMount + "/sign/" + in.KeyService.ClientRole}

@@ -8,16 +8,20 @@ import (
 )
 
 func TestDecodeHubWorkerConfigIgnoresKeyOrderAndRejectsUnknownFields(t *testing.T) {
-	valid := `{"provider":{"roles":{"auditUnwrap":"u","auditWrap":"w"},"authMount":"m","audience":"a"},"format":"asservat-hub-worker-config/v1","namespace":"asservat"}`
+	valid := `{"provider":{"roles":{"auditUnwrap":"u","auditWrap":"w"}},"format":"asservat-hub-worker-config/v1","namespace":"asservat"}`
 	c, err := DecodeHubWorkerConfig(strings.NewReader(valid))
 	if err != nil || c.Namespace != "asservat" || c.Provider.Roles.AuditWrap != "w" || c.Capacity != nil {
 		t.Fatal("Helm-rendered config refused", err)
 	}
 	for name, raw := range map[string]string{
-		"unknown":  `{"format":"asservat-hub-worker-config/v1","activation":{}}`,
-		"format":   `{"format":"asservat-hub-worker-deployment/v1"}`,
-		"trailing": `{"format":"asservat-hub-worker-config/v1"} {}`,
-		"empty":    ``,
+		"unknown": `{"format":"asservat-hub-worker-config/v1","activation":{}}`,
+		// OpenBao names derive from the installation ID; Helm must not render them.
+		"auth-mount":   `{"format":"asservat-hub-worker-config/v1","provider":{"authMount":"m"}}`,
+		"audit-key":    `{"format":"asservat-hub-worker-config/v1","keyService":{"auditKey":"audit"}}`,
+		"deletion-key": `{"format":"asservat-hub-worker-config/v1","provider":{"contextDeletionSigning":{"mount":"m","key":"k"}}}`,
+		"format":       `{"format":"asservat-hub-worker-deployment/v1"}`,
+		"trailing":     `{"format":"asservat-hub-worker-config/v1"} {}`,
+		"empty":        ``,
 	} {
 		if _, err := DecodeHubWorkerConfig(strings.NewReader(raw)); err == nil {
 			t.Fatal("accepted", name)

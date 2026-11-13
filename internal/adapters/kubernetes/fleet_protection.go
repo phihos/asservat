@@ -43,11 +43,11 @@ func (s *ProtectedFleetSettings) note(stage string) {
 
 var _ app.AdministrationReader = (*ProtectedFleetSettings)(nil)
 
-func NewProtectedFleetSettings(c *PermissionClient, p *FleetConfigurationProtection, name, uid, installation string) (*ProtectedFleetSettings, error) {
+func NewProtectedFleetSettings(c *PermissionClient, p *FleetConfigurationProtection, name, uid, installation, issuerEpoch string) (*ProtectedFleetSettings, error) {
 	if c == nil || p == nil || p.configMapProtection == nil || p.observer != c || p.plan.SourceName != name {
 		return nil, value.ErrInvalid
 	}
-	s, err := NewFleetSettingsClient(c, name, uid, installation)
+	s, err := NewFleetSettingsClient(c, name, uid, installation, issuerEpoch)
 	if err != nil {
 		return nil, err
 	}

@@ -70,9 +70,9 @@ func TestConfigurationProviderBytesUnchangedWithoutDeletionSigning(t *testing.T)
 		recipe, wrap, unwrap, v3 string
 		legacy                   string
 	}{
-		{contracts.OwnerPublicTransit{}, "250e2db6ad380be5398c3e12ef7ad6d5d834df96b967d916912cf50ba16033a0", "d1401d769753873e1f8f38e1f9eb7c2c57b0c6c9eda019c6611ad130de8c2e53",
+		{contracts.OwnerPublicTransit{}, "1abf528a464dbe78eba2cfa99947178aa89a09f9161c39b3ed9fbe8083b743ba", "d1401d769753873e1f8f38e1f9eb7c2c57b0c6c9eda019c6611ad130de8c2e53",
 			"a59d7b4e1b685f7feda1a6519ef5d69429408d5fa7d8ffcba87e78261dcab321", "6daa32e89be933cf4b688d462ef47bd696289c84054af28d86f8f8be30af68fd", "cb27e075e4e18c0fbe5e659f087c94d2d45e4abacc112c95947634a29c60e48b"},
-		{contracts.OwnerPublicTransit{Mount: "audit", Key: contracts.WorkerConfigurationAuditKeyName(in.InstallationID)}, "ebe401670c853087478ded250b2a05d0518ab927a78068e9c34a589bc2989b19", "3ad93dc2d52ed0ff2370514826bf5e5ef6054a75c7befc667354928525937123",
+		{contracts.OwnerPublicTransit{Mount: "audit", Key: contracts.WorkerConfigurationAuditKeyName(in.InstallationID)}, "b409af1f2640cf9dac267610ea477f53605c675dbf9b87c654d9ded9645a706a", "3ad93dc2d52ed0ff2370514826bf5e5ef6054a75c7befc667354928525937123",
 			"8396b514558c1c2f12dc8956a84cb599f1a29034e5b57a7fda946430d6651d5b", "45927f7dece3408f284d2364f35c3ab32f503c2c215a17cafd6df88fb4d7d5c0", ""},
 	} {
 		s := selection

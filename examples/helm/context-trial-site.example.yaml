@@ -10,7 +10,8 @@ identity:
   issuer: https://id.example.invalid/realms/homelab
   clientID: asservat-console
   browserAudience: asservat-api
-  providerRootsPEM: ""
+  providerRootsPEM: REPLACE_WITH_ISSUER_CA_PEM
+  clientSecret: {existingSecret: operator-oidc-client}
   clients: [ { id: asservat-console, kind: human } ]
   eligibleGroups: [REPLACE_WITH_STABLE_TRIAL_USERS_GROUP_ID]
   processingOperators:

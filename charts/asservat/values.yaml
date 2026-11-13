@@ -27,7 +27,9 @@ identity:
   clientID: ""
   # Audience of the console's access tokens; empty uses clientID.
   browserAudience: ""
-  # Public PEM roots of the issuer; empty uses the system roots.
+  # Public PEM roots of the issuer (hub-api verifies its TLS and keys with
+  # them). Required with an external provider; bundled Keycloak uses the
+  # ca.crt of services.identity.keycloak.tlsSecretName.
   providerRootsPEM: ""
   # External identity provider: existing Secret with the console client's
   # OIDC secret. Bundled Keycloak uses `<name>-keycloak-state`.
@@ -118,12 +120,16 @@ retention: {}
 # field names). No credentials belong here.
 # federation: {...}
 
-# Regional connector (mode=cluster or mode=combined). Issue a cluster
-# bootstrap in the console (Fleet), then set clusterID and peerID from the
-# receipt and store the bootstrap record as `bootstrap.json` in an existing
-# Secret named by bootstrapSecret. The connector seeds its rotating cluster
-# credential from that record once, within the record's five minutes; after
-# enrollment the record Secret may be deleted.
+# Regional connector (mode=cluster or mode=combined).
+# mode=cluster: issue a cluster bootstrap in the console (Fleet), set clusterID
+# and peerID from the receipt and store the bootstrap record as
+# `bootstrap.json` in an existing Secret named by bootstrapSecret. The
+# connector seeds its rotating cluster credential from that record once,
+# within the record's five minutes; afterwards the record Secret may be
+# deleted.
+# mode=combined: leave clusterID and peerID empty; the connector uses the
+# generated `<name>-ids` clusterID and peerID and reads its bootstrap record
+# from bootstrapSecret (default `<name>-region-bootstrap`).
 region:
   enabled: false
   clusterID: ""
@@ -172,17 +178,6 @@ region:
 collector:
   enabled: false
   namespace: asservat-collector
-  # The exact product repository@sha256 digest of the collector image (built
-  # with the gadget tag).
-  image: ""
-  registrySecret: ""
-  installationID: ""
-  clusterID: ""
-  # The connector's node listener (port 8444), its server name and roots.
-  connector:
-    endpoint: ""
-    serverName: ""
-    rootsPEM: ""
   # Collector-wide ceilings per node (bytes).
   ceilings:
     maxActiveSources: 16
@@ -256,33 +251,24 @@ hub:
     tolerations: []
     # Audience of the projected cluster-observation token (with capacity).
     clusterObservationAudience: asservat-cluster-observation
-    # Capture/operation audit cleanup; with capacity it runs unless
-    # enabled is false.
-    cleanup: {}
-    # The permission child (AccessBindings, PermissionSources and the hub
-    # retention source).
+    # The permission child always runs: AccessBindings, PermissionSources,
+    # the browser/identity settings projections and, with `retention`, the
+    # hub retention source. Writer envelopes are identity.permissionDelegations.
+    # Capacity, operation audit cleanup and expired context evidence deletion
+    # run with `capacity`.
     permission:
-      enabled: false
-      # Accounts that may write PermissionSource/AccessBinding status.
+      # Accounts that may write PermissionSource/AccessBinding status; empty
+      # is the hub-worker's own account.
       statusUsers: []
-      # Writer envelopes (the former public.permissionDelegations shape).
-      delegations: []
       # Administrator-created initial review ConfigMap, needed only when
       # bindings exist at the first acceptance.
-      # review: ""
-      # Runs the hub retention source; defaults to true when retention is set.
-      # retention: true
-      # Download worker configuration acceptance (ADR-204).
-      # workerConfiguration: {namespace: asservat-downloads, source: asservat-worker-profile}
-      # Expired context evidence deletion (ADR-205); the evidence store
-      # defaults to the audit store.
-      # contextDeletion: {evidenceStore: {endpoint: "", region: "", bucket: ""}}
-      # browser: {settings: asservat-browser-settings}
-      # identity: {settings: asservat-identity-settings, issuer: https://id.example/realms/org}
+      review: ""
   federation:
     replicas: 1
     concurrency: 4
-    resources: {}
+    resources:
+      requests: {cpu: 100m, memory: 128Mi}
+      limits: {cpu: "1", memory: 512Mi}
     nodeSelector: {}
     tolerations: []
     # ClusterIP for single-cluster installs; NodePort or LoadBalancer when
@@ -291,9 +277,11 @@ hub:
       type: ClusterIP
       nodePort: null
       annotations: {}
+    # Serving certificate (Secret `<name>-federation-tls`, keys tls.crt,
+    # tls.key, ca.crt). existingSecret wins; else cert-manager issues it
+    # when issuerRef.name is set; else the chart generates a CA and
+    # certificate once and keeps them on upgrade.
     tls:
-      # Existing kubernetes.io/tls Secret with ca.crt; empty issues the
-      # serving certificate from cert-manager (tls.issuerRef).
       existingSecret: ""
       # Extra serving names (the external endpoint regions dial).
       dnsNames: []
@@ -301,16 +289,20 @@ hub:
         name: ""
         kind: Issuer
         group: cert-manager.io
+  # Artifact key service (9447); the only Pod with `<name>-artifact-key`.
   key-service:
     replicas: 1
     concurrency: 8
-    resources: {}
+    resources:
+      requests: {cpu: 50m, memory: 64Mi}
+      limits: {cpu: 500m, memory: 256Mi}
     nodeSelector: {}
     tolerations: []
     service:
       type: ClusterIP
       nodePort: null
       annotations: {}
+    # As hub.federation.tls (Secret `<name>-key-service-tls`).
     tls:
       existingSecret: ""
       dnsNames: []
@@ -324,17 +316,23 @@ hub:
       # Retention topology ConfigMaps by target cluster; the cluster catalog
       # adds joined regions.
       retentionTopologies: []
+  # Asynchronous publication verifier (no listener).
   publisher:
     replicas: 1
     pollSeconds: 2
     batch: 8
-    resources: {}
+    resources:
+      requests: {cpu: 50m, memory: 128Mi}
+      limits: {cpu: "1", memory: 512Mi}
     nodeSelector: {}
     tolerations: []
     retentionTopologies: []
   # Download workers (ADR-069) run as Jobs that hub-api dispatches into the
   # dedicated `<name>-downloads` namespace; Helm renders the namespace,
   # account, PriorityClass, the worker configuration and the dispatch Roles.
+  # Their store capability is the Secret `<name>-s3-download-read` (key
+  # credentials.json) in that namespace: generated with bundled SeaweedFS,
+  # created by the operator for an external object store.
   download-worker:
     enabled: true
     cpuMillis: 500

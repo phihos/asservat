@@ -31,11 +31,11 @@ const (
 	// HubWorkerProvider.Audience, for the OpenBao Kubernetes auth login.
 	HubWorkerProviderTokenFile = "provider.token"
 	// HubWorkerAuditStorageFile is the configuration/authority audit
-	// object-store principal (`<name>-s3-hub-worker-audit`, credentials.json).
+	// object-store principal (`<name>-s3-configuration-audit`,
+	// credentials.json).
 	HubWorkerAuditStorageFile = "audit-storage.json"
-	// Trust roots (PEM) of the selected PostgreSQL, audit object store and
-	// OpenBao: the bundled services' state Secrets' ca.crt, or an
-	// operator-supplied Secret for external providers.
+	// Trust roots (PEM) of the selected PostgreSQL, object store (audit and
+	// evidence buckets) and OpenBao (chart helper asservat.providerRoots).
 	HubWorkerPostgresRootsFile   = "roots/postgres.crt"
 	HubWorkerAuditStoreRootsFile = "roots/audit-store.crt"
 	HubWorkerKeyServiceRootsFile = "roots/key-service.crt"
@@ -75,25 +75,29 @@ type HubWorkerObjectStore struct {
 	Bucket   string `json:"bucket"`
 }
 
+// HubWorkerKeyService is the OpenBao endpoint. The audit mount and key are
+// not rendered: the loader sets them from the fixed names.
 type HubWorkerKeyService struct {
 	Endpoint   string `json:"endpoint"`
-	AuditMount string `json:"auditMount"`
-	AuditKey   string `json:"auditKey"`
+	AuditMount string `json:"-"`
+	AuditKey   string `json:"-"`
 }
 
 // HubWorkerProvider is the OpenBao Kubernetes auth configuration that
-// `setup` applies with the same values: one auth role (and its policy of the
-// same name) per purpose.
+// `setup` applies: one auth role (and its policy of the same name,
+// `<name>-hub-worker-<purpose>`) per purpose. The auth mount, token audience
+// and transit key names are fixed or derive from the installation ID; they
+// are not rendered; the loader sets them (providerconfig.OpenBaoNamesFor).
 type HubWorkerProvider struct {
-	AuthMount string                 `json:"authMount"`
-	Audience  string                 `json:"audience"`
+	AuthMount string                 `json:"-"`
+	Audience  string                 `json:"-"`
 	Roles     HubWorkerProviderRoles `json:"roles"`
 	// WorkerConfigurationAudit is the worker configuration audit Transit key
 	// (ADR-204); zero without the permission workerConfiguration section.
-	WorkerConfigurationAudit OwnerPublicTransit `json:"workerConfigurationAudit,omitzero"`
+	WorkerConfigurationAudit OwnerPublicTransit `json:"-"`
 	// ContextDeletionSigning is the context deletion signing key (ADR-205),
-	// on the audit mount; zero without deletion.
-	ContextDeletionSigning OwnerPublicTransit `json:"contextDeletionSigning,omitzero"`
+	// on the audit mount; zero without cleanup or context deletion.
+	ContextDeletionSigning OwnerPublicTransit `json:"-"`
 }
 
 // HubWorkerProviderRoles names the auth roles. The cleanup roles are empty

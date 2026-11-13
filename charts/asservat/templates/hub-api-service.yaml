@@ -1,63 +1,69 @@
-{{- if .Values.hub.hubApi.enabled }}
-{{- $name := include "asservat.hubApi.name" . }}
-{{- $n := .Values.hub.hubApi.nativeService }}
+{{- if include "asservat.hub" . }}
+{{- $name := include "asservat.fullname" (list . "hub-api") }}
+{{- $s := .Values.exposure.service }}
+{{- $n := (index .Values.hub "hub-api").nativeService }}
+# The console/API origin (exposure.service).
 apiVersion: v1
 kind: Service
 metadata:
   name: {{ $name }}
   namespace: {{ .Release.Namespace }}
-  labels:
-    {{- include "asservat.hubApi.labels" . | nindent 4 }}
+  labels: {{ include "asservat.labels" (list . "hub-api") | nindent 4 }}
+  {{- with $s.annotations }}
+  annotations: {{ toYaml . | nindent 4 }}
+  {{- end }}
 spec:
-  type: ClusterIP
-  selector:
-    {{- include "asservat.hubApi.selector" . | nindent 4 }}
+  type: {{ $s.type }}
+  selector: {{ include "asservat.selectorLabels" (list . "hub-api") | nindent 4 }}
   ports:
-    - {name: public, port: 9445, targetPort: public, protocol: TCP}
+    - name: public
+      port: 9445
+      targetPort: 9445
+      protocol: TCP
+      {{- if and (eq $s.type "NodePort") $s.nodePort }}
+      nodePort: {{ $s.nodePort }}
+      {{- end }}
 ---
-# Headless replica discovery for owner routing between hub-api replicas.
+# Headless replica discovery for owner routing (the accepted owner pool's
+# Service): exactly these three numeric ports.
 apiVersion: v1
 kind: Service
 metadata:
   name: {{ printf "%s-owner" $name }}
   namespace: {{ .Release.Namespace }}
-  labels:
-    {{- include "asservat.hubApi.labels" . | nindent 4 }}
+  labels: {{ include "asservat.labels" (list . "hub-api") | nindent 4 }}
 spec:
   clusterIP: None
-  selector:
-    {{- include "asservat.hubApi.selector" . | nindent 4 }}
+  selector: {{ include "asservat.selectorLabels" (list . "hub-api") | nindent 4 }}
   ports:
-    - {name: owner, port: 9443, targetPort: owner, protocol: TCP}
-    - {name: observation, port: 9444, targetPort: observation, protocol: TCP}
-    - {name: public, port: 9445, targetPort: public, protocol: TCP}
+    - {name: owner, port: 9443, targetPort: 9443, protocol: TCP}
+    - {name: observation, port: 9444, targetPort: 9444, protocol: TCP}
+    - {name: public, port: 9445, targetPort: 9445, protocol: TCP}
 ---
+# Native and operation listeners for connectors and download workers.
 apiVersion: v1
 kind: Service
 metadata:
   name: {{ printf "%s-native" $name }}
   namespace: {{ .Release.Namespace }}
-  labels:
-    {{- include "asservat.hubApi.labels" . | nindent 4 }}
+  labels: {{ include "asservat.labels" (list . "hub-api") | nindent 4 }}
   {{- with $n.annotations }}
-  annotations:
-    {{- toYaml . | nindent 4 }}
+  annotations: {{ toYaml . | nindent 4 }}
   {{- end }}
 spec:
   type: {{ $n.type }}
-  selector:
-    {{- include "asservat.hubApi.selector" . | nindent 4 }}
+  selector: {{ include "asservat.selectorLabels" (list . "hub-api") | nindent 4 }}
   ports:
     - name: native
       port: 9444
-      targetPort: observation
+      targetPort: 9444
       protocol: TCP
       {{- if and (ne $n.type "ClusterIP") (dig "native" 0 $n.nodePorts) }}
       nodePort: {{ $n.nodePorts.native }}
       {{- end }}
     - name: operation
       port: 9448
-      targetPort: operation
+      targetPort: 9448
       protocol: TCP
       {{- if and (ne $n.type "ClusterIP") (dig "operation" 0 $n.nodePorts) }}
       nodePort: {{ $n.nodePorts.operation }}

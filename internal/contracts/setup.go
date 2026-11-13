@@ -26,8 +26,8 @@ const (
 	SetupOpenBaoRoot = SetupRoot + "/openbao"
 	// SetupObjectStoreRoot holds `ca.crt` and the bucket administrator's
 	// `credentials.json` (SeaweedCredential for the bundled store, key
-	// `administrator.json` of `<name>-objectstore-state`) and the optional
-	// `bucket-policies.json` (bucket name -> policy) compiled by `secrets`.
+	// `administrator.json` of `<name>-objectstore-state`) and
+	// `bucket-policies.json` (bucket name -> policy) of `<name>-objectstore-iam`.
 	SetupObjectStoreRoot = SetupRoot + "/objectstore"
 )
 

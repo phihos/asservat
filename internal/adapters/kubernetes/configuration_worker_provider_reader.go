@@ -37,7 +37,7 @@ func NewConfigurationWorkerProviderReader(worker *InstalledWorkerProjectionReade
 	if err != nil {
 		return nil, err
 	}
-	fleet, err := NewProtectedFleetSettings(client, fleetGuard, in.FleetSource.Name, in.FleetSource.UID, in.InstallationID)
+	fleet, err := NewProtectedFleetSettings(client, fleetGuard, in.FleetSource.Name, in.FleetSource.UID, in.InstallationID, in.IssuerEpoch)
 	if err != nil {
 		return nil, err
 	}

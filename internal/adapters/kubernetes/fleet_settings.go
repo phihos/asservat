@@ -13,21 +13,22 @@ import (
 	"asservat.local/asservat/internal/domain/identity"
 )
 
-// FleetSettingsClient pins one installation-owned ConfigMap. Protection and
-// observation continuity are established by runtime bootstrap, never by this
-// JSON document or a request selecting another name/issuer/installation.
+// FleetSettingsClient reads the Helm-rendered fleet ConfigMap by name and UID
+// under ordinary RBAC. fleet.json holds only chart values; the installation ID
+// and issuer epoch are the reader's generated IDs (InstallationIDs). Setup and
+// the hub-worker use this one decoder.
 type FleetSettingsClient struct {
-	client                  *PermissionClient
-	name, uid, installation string
+	client                         *PermissionClient
+	name, uid, installation, epoch string
 }
 
 var _ port.AdministrationReader = (*FleetSettingsClient)(nil)
 
-func NewFleetSettingsClient(client *PermissionClient, name, uid, installation string) (*FleetSettingsClient, error) {
-	if client == nil || !installationRefValid(name, uid) || !authorization.UUID(installation) {
+func NewFleetSettingsClient(client *PermissionClient, name, uid, installation, issuerEpoch string) (*FleetSettingsClient, error) {
+	if client == nil || !installationRefValid(name, uid) || !authorization.UUID(installation) || !authorization.UUID(issuerEpoch) {
 		return nil, value.ErrInvalid
 	}
-	return &FleetSettingsClient{client, name, uid, installation}, nil
+	return &FleetSettingsClient{client, name, uid, installation, issuerEpoch}, nil
 }
 func (c *FleetSettingsClient) FleetAdministration(ctx context.Context) (value.Administration, error) {
 	var out value.Administration
@@ -57,14 +58,14 @@ func (c *FleetSettingsClient) decodeFleetAdministration(data map[string]string, 
 	}
 	var wire contracts.FleetSettings
 	digest, err := decodePermissionSpec([]byte(data["fleet.json"]), c.client.validator.fleetSchema, &wire)
-	if err != nil || wire.InstallationID != c.installation {
+	if err != nil {
 		return out, value.ErrDenied
 	}
 	issuer, err := url.Parse(wire.Issuer)
 	if err != nil || issuer.Scheme != "https" || issuer.Host == "" || issuer.User != nil || issuer.RawQuery != "" || issuer.Fragment != "" || issuer.Opaque != "" {
 		return out, value.ErrInvalid
 	}
-	out = value.Administration{InstallationID: wire.InstallationID, IssuerEpoch: wire.IssuerEpoch, Issuer: wire.Issuer, Revision: identity.Revision{UID: ref.UID, Generation: wire.Revision, Digest: digest}, Suspended: wire.Suspended, ObservedAt: start, FreshUntil: start.Add(5 * time.Second), Clients: wire.Clients, Groups: wire.Groups, DeliveryProfiles: wire.DeliveryProfiles, MaxActiveBootstraps: wire.MaxActiveBootstraps, MaxBootstrapHistory: wire.MaxBootstrapHistory, MaxClusters: wire.MaxClusters}
+	out = value.Administration{InstallationID: c.installation, IssuerEpoch: c.epoch, Issuer: wire.Issuer, Revision: identity.Revision{UID: ref.UID, Generation: wire.Revision, Digest: digest}, Suspended: wire.Suspended, ObservedAt: start, FreshUntil: start.Add(5 * time.Second), Clients: wire.Clients, Groups: wire.Groups, DeliveryProfiles: wire.DeliveryProfiles, MaxActiveBootstraps: wire.MaxActiveBootstraps, MaxBootstrapHistory: wire.MaxBootstrapHistory, MaxClusters: wire.MaxClusters}
 	for _, s := range wire.Subjects {
 		out.Subjects = append(out.Subjects, identity.Subject{ID: s.ID, Kind: identity.Kind(s.Kind)})
 	}

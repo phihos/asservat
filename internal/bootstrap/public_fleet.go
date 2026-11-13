@@ -31,7 +31,7 @@ func newPublicFleet(ctx context.Context, c contracts.OwnerDeployment, providers 
 	if err != nil {
 		return nil, &fixedStepError{"fleet-protection", mounts.ErrUnavailable}
 	}
-	settings, err := kube.NewProtectedFleetSettings(observer, protection, f.Settings.Name, f.Settings.UID, c.InstallationID)
+	settings, err := kube.NewProtectedFleetSettings(observer, protection, f.Settings.Name, f.Settings.UID, c.InstallationID, c.Public.WorkerPKI.IssuerEpoch)
 	if err != nil {
 		return nil, &fixedStepError{"fleet-settings", mounts.ErrUnavailable}
 	}

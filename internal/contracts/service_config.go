@@ -2,8 +2,6 @@ package contracts
 
 import (
 	"bytes"
-	"crypto/sha256"
-	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"io"
@@ -46,81 +44,57 @@ type ServiceObjectStore struct {
 	Bucket   string `json:"bucket"`
 }
 
-// ServiceProviderLogin names one component's OpenBao Kubernetes-auth roles.
-// Audience is the projected token's audience; setup binds the roles to it.
-type ServiceProviderLogin struct {
-	AuthMount      string            `json:"authMount"`
-	Audience       string            `json:"audience"`
-	ServiceAccount string            `json:"serviceAccount"`
-	Roles          map[string]string `json:"roles"`
-}
-
 // ServiceTopology names a retention topology ConfigMap of one target cluster.
 type ServiceTopology struct {
 	TargetClusterID string `json:"targetClusterID"`
 	Name            string `json:"name"`
 }
 
+// FederationConfig, KeyServiceConfig and PublisherConfig carry only values
+// Helm knows. Name is installation.name: object names (`<name>-<component>`,
+// `<name>-owner-source`, `<name>-cluster-catalog`, ...) and the OpenBao role
+// names (`<name>-<component>-<purpose>`) derive from it. OpenBao mounts are
+// the contracts.SmallOpenBao* constants; key and PKI role names derive from
+// the installation ID (providerconfig.OpenBaoNamesFor).
 type FederationConfig struct {
-	Port        int    `json:"port"`
-	Concurrency int    `json:"concurrency"`
-	Namespace   string `json:"namespace"`
-	// OwnerConfiguration is the hub-api's owner configuration ConfigMap; its
-	// UID keys the owner rows the federation answers region reads from.
-	OwnerConfiguration string             `json:"ownerConfiguration"`
-	Postgres           ServicePostgres    `json:"postgres"`
-	AuditStore         ServiceObjectStore `json:"auditStore"`
-	OpenBao            string             `json:"openBao"`
-	AuditMount         string             `json:"auditMount"`
-	AuditKey           string             `json:"auditKey"`
-	PKIMount           string             `json:"pkiMount"`
-	ClientRole         string             `json:"clientRole"`
-	ServerRole         string             `json:"serverRole"`
-	// Provider roles: audit-wrap, audit-unwrap, client-sign, server-sign.
-	Provider ServiceProviderLogin `json:"provider"`
+	Name        string             `json:"name"`
+	Namespace   string             `json:"namespace"`
+	Port        int                `json:"port"`
+	Concurrency int                `json:"concurrency"`
+	Postgres    ServicePostgres    `json:"postgres"`
+	AuditStore  ServiceObjectStore `json:"auditStore"`
+	OpenBao     string             `json:"openBao"`
 }
 
 type KeyServiceConfig struct {
+	Name        string          `json:"name"`
+	Namespace   string          `json:"namespace"`
 	Port        int             `json:"port"`
 	Concurrency int             `json:"concurrency"`
-	Namespace   string          `json:"namespace"`
-	KeyID       string          `json:"keyID"`
 	Postgres    ServicePostgres `json:"postgres"`
 	// OpenBao serves the worker and connector PKI CAs the key service trusts
 	// for client certificates (unauthenticated ca/pem reads).
-	OpenBao           string                     `json:"openBao"`
-	WorkerPKIMount    string                     `json:"workerPKIMount"`
-	ConnectorPKIMount string                     `json:"connectorPKIMount"`
-	Downloads         *KeyServiceDownloadsConfig `json:"downloads,omitempty"`
+	OpenBao   string                     `json:"openBao"`
+	Downloads *KeyServiceDownloadsConfig `json:"downloads,omitempty"`
 }
 
 // KeyServiceDownloadsConfig enables acquisition unwraps (ADR-204): the worker
 // configuration ConfigMap selects the profile SQL must currently audit, and
 // the topologies (plus the catalog's joined slots) bound retention.
 type KeyServiceDownloadsConfig struct {
-	WorkerConfiguration string            `json:"workerConfiguration"`
-	ClusterCatalog      string            `json:"clusterCatalog"`
 	RetentionTopologies []ServiceTopology `json:"retentionTopologies"`
 }
 
 type PublisherConfig struct {
-	Namespace        string             `json:"namespace"`
-	PollSeconds      int                `json:"pollSeconds"`
-	Batch            int                `json:"batch"`
-	Postgres         ServicePostgres    `json:"postgres"`
-	AuditStore       ServiceObjectStore `json:"auditStore"`
-	Evidence         ServiceObjectStore `json:"evidence"`
-	OpenBao          string             `json:"openBao"`
-	AuditMount       string             `json:"auditMount"`
-	AuditKey         string             `json:"auditKey"`
-	VerifierPKIMount string             `json:"verifierPKIMount"`
-	VerifierRole     string             `json:"verifierRole"`
-	KeyService       string             `json:"keyService"`
-	KeyID            string             `json:"keyID"`
-	// Provider roles: audit-wrap, audit-unwrap, verifier-sign.
-	Provider            ServiceProviderLogin `json:"provider"`
-	ClusterCatalog      string               `json:"clusterCatalog"`
-	RetentionTopologies []ServiceTopology    `json:"retentionTopologies"`
+	Name                string             `json:"name"`
+	Namespace           string             `json:"namespace"`
+	PollSeconds         int                `json:"pollSeconds"`
+	Batch               int                `json:"batch"`
+	Postgres            ServicePostgres    `json:"postgres"`
+	AuditStore          ServiceObjectStore `json:"auditStore"`
+	Evidence            ServiceObjectStore `json:"evidence"`
+	OpenBao             string             `json:"openBao"`
+	RetentionTopologies []ServiceTopology  `json:"retentionTopologies"`
 }
 
 // decodeServiceConfig is a closed decode (no unknown fields, one value) that,
@@ -151,18 +125,4 @@ func DecodeKeyServiceConfig(r io.Reader) (KeyServiceConfig, error) {
 }
 func DecodePublisherConfig(r io.Reader) (PublisherConfig, error) {
 	return decodeServiceConfig[PublisherConfig](r)
-}
-
-// PlatformWorkloadDigest is the deterministic protection digest of a hub
-// workload protected by Kubernetes RBAC instead of a pinned admission guard:
-// sha256 over the length-prefixed domain, cluster ID, namespace and name.
-func PlatformWorkloadDigest(clusterID, namespace, name string) [32]byte {
-	h := sha256.New()
-	for _, v := range []string{"asservat-platform-workload/v1", clusterID, namespace, name} {
-		_ = binary.Write(h, binary.BigEndian, uint32(len(v)))
-		_, _ = h.Write([]byte(v))
-	}
-	var out [32]byte
-	copy(out[:], h.Sum(nil))
-	return out
 }

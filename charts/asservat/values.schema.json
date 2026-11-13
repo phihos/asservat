@@ -67,18 +67,13 @@
       "properties": {
         "name": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 30,
-          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+          "pattern": "^[a-z0-9]([-a-z0-9]{0,30}[a-z0-9])?$"
         }
-      },
-      "required": [
-        "name"
-      ]
+      }
     },
     "origin": {
       "type": "string",
-      "maxLength": 2048
+      "pattern": "^(https://[^/\\s]+)?$"
     },
     "identity": {
       "type": "object",
@@ -86,77 +81,49 @@
       "properties": {
         "issuer": {
           "type": "string",
-          "maxLength": 2048
+          "pattern": "^(https://\\S+)?$"
         },
         "clientID": {
-          "type": "string",
-          "maxLength": 255
+          "type": "string"
         },
         "browserAudience": {
-          "type": "string",
-          "maxLength": 256
+          "type": "string"
         },
         "providerRootsPEM": {
-          "type": "string",
-          "maxLength": 32768
+          "type": "string"
+        },
+        "clientSecret": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "existingSecret": {
+              "type": "string",
+              "maxLength": 253,
+              "pattern": "^$|^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$"
+            },
+            "key": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 253
+            }
+          }
         },
         "clients": {
           "type": "array",
-          "maxItems": 64,
           "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": [
-              "id",
-              "kind"
-            ],
-            "properties": {
-              "id": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 255
-              },
-              "kind": {
-                "enum": [
-                  "human",
-                  "workload"
-                ]
-              }
-            }
+            "type": "object"
           }
         },
         "eligibleSubjects": {
           "type": "array",
-          "maxItems": 256,
           "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": [
-              "id",
-              "kind"
-            ],
-            "properties": {
-              "id": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 255
-              },
-              "kind": {
-                "enum": [
-                  "human",
-                  "workload"
-                ]
-              }
-            }
+            "type": "object"
           }
         },
         "eligibleGroups": {
           "type": "array",
-          "maxItems": 256,
           "items": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 255
+            "type": "string"
           }
         },
         "groupMaxAgeSeconds": {
@@ -172,232 +139,29 @@
         "maxLogins": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 4096
+          "maximum": 10000
         },
         "maxSessions": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 65536
+          "maximum": 100000
         },
         "maxLogoutEvents": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 65536
+          "maximum": 100000
         },
         "approvals": {
-          "description": "Protected installation approval settings (ADR-249). stepUp names the IdP acr values accepted as approval step-up and their maximum authentication age; without it no approval can be decided. requireRecordingApproval makes metadata packet/syscall recordings need the same individual approval as sensitive acquisitions (REQ-SYS-002).",
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "stepUp": {
-              "type": "object",
-              "additionalProperties": false,
-              "properties": {
-                "acrValues": {
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 128,
-                    "pattern": "^[^\\x00-\\x1f\\x7f]+$"
-                  },
-                  "minItems": 1,
-                  "maxItems": 8,
-                  "uniqueItems": true
-                },
-                "maxAgeSeconds": {
-                  "type": "integer",
-                  "minimum": 30,
-                  "maximum": 3600
-                }
-              },
-              "required": [
-                "acrValues",
-                "maxAgeSeconds"
-              ]
-            },
-            "requireRecordingApproval": {
-              "type": "boolean"
-            }
-          }
+          "type": "object"
         },
         "processingOperators": {
-          "$ref": "#/definitions/installerProcessingOperators"
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
         },
         "permissionDelegations": {
-          "type": "array",
-          "minItems": 0,
-          "maxItems": 64,
-          "uniqueItems": true,
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": [
-              "writers",
-              "clusterID",
-              "namespace",
-              "workloads",
-              "roles",
-              "issuers",
-              "previewers"
-            ],
-            "properties": {
-              "writers": {
-                "type": "array",
-                "minItems": 1,
-                "maxItems": 32,
-                "uniqueItems": true,
-                "items": {
-                  "type": "object",
-                  "additionalProperties": false,
-                  "required": [
-                    "kind",
-                    "name"
-                  ],
-                  "properties": {
-                    "kind": {
-                      "enum": [
-                        "User",
-                        "Group"
-                      ]
-                    },
-                    "name": {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 256,
-                      "pattern": "^[^\\x00-\\x1f\\x7f]+$"
-                    }
-                  }
-                }
-              },
-              "clusterID": {
-                "type": "string",
-                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
-                "not": {
-                  "const": "00000000-0000-0000-0000-000000000000"
-                }
-              },
-              "namespace": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": [
-                  "name",
-                  "uid"
-                ],
-                "properties": {
-                  "name": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 63,
-                    "pattern": "^[^\\x00-\\x1f\\x7f]+$"
-                  },
-                  "uid": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 64,
-                    "pattern": "^[^\\x00-\\x1f\\x7f]+$"
-                  }
-                }
-              },
-              "workloads": {
-                "type": "array",
-                "minItems": 0,
-                "maxItems": 64,
-                "uniqueItems": true,
-                "items": {
-                  "type": "object",
-                  "additionalProperties": false,
-                  "required": [
-                    "kind",
-                    "name",
-                    "uid"
-                  ],
-                  "properties": {
-                    "kind": {
-                      "enum": [
-                        "Deployment",
-                        "StatefulSet"
-                      ]
-                    },
-                    "name": {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 253,
-                      "pattern": "^[^\\x00-\\x1f\\x7f]+$"
-                    },
-                    "uid": {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 64,
-                      "pattern": "^[^\\x00-\\x1f\\x7f]+$"
-                    }
-                  }
-                }
-              },
-              "roles": {
-                "type": "array",
-                "minItems": 1,
-                "maxItems": 4,
-                "uniqueItems": true,
-                "items": {
-                  "enum": [
-                    "workload-maintainer",
-                    "evidence-reader",
-                    "evidence-owner",
-                    "action-approver"
-                  ]
-                }
-              },
-              "issuers": {
-                "type": "array",
-                "minItems": 1,
-                "maxItems": 8,
-                "uniqueItems": true,
-                "items": {
-                  "type": "string",
-                  "minLength": 1,
-                  "maxLength": 2048,
-                  "pattern": "^[^\\x00-\\x1f\\x7f]+$"
-                }
-              },
-              "previewers": {
-                "type": "array",
-                "minItems": 1,
-                "maxItems": 64,
-                "uniqueItems": true,
-                "items": {
-                  "type": "object",
-                  "additionalProperties": false,
-                  "required": [
-                    "issuer",
-                    "kind",
-                    "id"
-                  ],
-                  "properties": {
-                    "issuer": {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 2048,
-                      "pattern": "^[^\\x00-\\x1f\\x7f]+$"
-                    },
-                    "kind": {
-                      "enum": [
-                        "User",
-                        "Group"
-                      ]
-                    },
-                    "id": {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 256,
-                      "pattern": "^[^\\x00-\\x1f\\x7f]+$"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "description": "Trusted initial permission guard envelopes and matching browser previewers; empty grants no delegated authority."
+          "type": "array"
         }
       }
     },
@@ -492,9 +256,7 @@
               "type": [
                 "integer",
                 "null"
-              ],
-              "minimum": 30000,
-              "maximum": 32767
+              ]
             },
             "annotations": {
               "type": "object",
@@ -502,10 +264,7 @@
                 "type": "string"
               }
             }
-          },
-          "required": [
-            "type"
-          ]
+          }
         },
         "tls": {
           "type": "object",
@@ -517,15 +276,10 @@
                 "proxy"
               ]
             }
-          },
-          "required": [
-            "mode"
-          ]
+          }
         },
         "tlsSecret": {
-          "type": "string",
-          "maxLength": 253,
-          "pattern": "^$|^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$"
+          "type": "string"
         },
         "ingress": {
           "type": "object",
@@ -535,25 +289,15 @@
               "type": "boolean"
             },
             "className": {
-              "type": "string",
-              "maxLength": 253
+              "type": "string"
             },
             "annotations": {
-              "type": "object",
-              "additionalProperties": {
-                "type": "string"
-              }
+              "type": "object"
             },
             "tls": {
-              "type": "array",
-              "items": {
-                "type": "object"
-              }
+              "type": "array"
             }
-          },
-          "required": [
-            "enabled"
-          ]
+          }
         },
         "httpRoute": {
           "type": "object",
@@ -563,47 +307,23 @@
               "type": "boolean"
             },
             "parentRefs": {
-              "type": "array",
-              "items": {
-                "type": "object"
-              }
+              "type": "array"
             },
             "annotations": {
-              "type": "object",
-              "additionalProperties": {
-                "type": "string"
-              }
+              "type": "object"
             }
-          },
-          "required": [
-            "enabled"
-          ]
+          }
         }
-      },
-      "required": [
-        "service",
-        "tls",
-        "ingress",
-        "httpRoute"
-      ]
+      }
     },
     "fleet": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "issuer",
-        "clients",
-        "subjects",
-        "groups",
-        "deliveryProfiles",
-        "maxActiveBootstraps",
-        "maxBootstrapHistory",
-        "maxClusters"
-      ],
       "properties": {
         "issuer": {
           "type": "string",
-          "maxLength": 2048
+          "maxLength": 2048,
+          "pattern": "^$|^https://"
         },
         "clients": {
           "type": "array",
@@ -622,6 +342,10 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
+            "required": [
+              "id",
+              "kind"
+            ],
             "properties": {
               "id": {
                 "type": "string",
@@ -634,11 +358,7 @@
                   "workload"
                 ]
               }
-            },
-            "required": [
-              "id",
-              "kind"
-            ]
+            }
           }
         },
         "groups": {
@@ -679,10 +399,26 @@
       }
     },
     "capacity": {
-      "$ref": "#/definitions/installerCapacity"
+      "anyOf": [
+        {
+          "type": "object",
+          "maxProperties": 0
+        },
+        {
+          "$ref": "#/definitions/installerCapacity"
+        }
+      ]
     },
     "retention": {
-      "$ref": "#/definitions/installerRetentionBaseline"
+      "anyOf": [
+        {
+          "type": "object",
+          "maxProperties": 0
+        },
+        {
+          "$ref": "#/definitions/installerRetentionBaseline"
+        }
+      ]
     },
     "federation": {
       "$ref": "#/definitions/installerFederation"
@@ -690,301 +426,103 @@
     "region": {
       "type": "object",
       "additionalProperties": false,
+      "description": "Regional connector for mode=cluster or mode=combined.",
       "properties": {
-        "namespace": {
-          "type": "string",
-          "maxLength": 63,
-          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
-          "description": "Connector namespace the installer creates; never kube-*."
+        "enabled": {
+          "type": "boolean"
         },
-        "bootstrapID": {
+        "clusterID": {
           "type": "string",
-          "pattern": "^$|^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}$",
-          "not": {
-            "const": "00000000-0000-0000-0000-000000000000"
-          },
-          "description": "Exact already-issued fleet bootstrap ID; only with bundledHub."
+          "pattern": "^$|^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+          "description": "mode=cluster: the console bootstrap receipt's cluster ID. mode=combined uses the generated <name>-ids clusterID."
         },
-        "offer": {
+        "peerID": {
           "type": "string",
-          "maxLength": 1048576,
-          "description": "The hub's public regional-offer.json."
+          "pattern": "^$|^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+          "description": "mode=cluster: the receipt's peer ID. mode=combined uses the generated <name>-ids peerID."
         },
         "bootstrapSecret": {
           "type": "string",
           "maxLength": 253,
           "pattern": "^$|^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$",
-          "description": "Existing operator Secret with bootstrap.json, the record read from the bootstrap channel. Never a chart value."
+          "description": "Existing Secret with bootstrap.json; mode=combined defaults to <name>-region-bootstrap."
         },
-        "evidenceSecret": {
+        "offer": {
+          "type": "string",
+          "maxLength": 1048576
+        },
+        "offerConfigMap": {
           "type": "string",
           "maxLength": 253,
-          "pattern": "^$|^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$",
-          "description": "ADR-196: existing operator Secret with evidence-storage.json and separately scoped history-storage.json, the write-only regional evidence credential; required exactly when the offer names the regional executor. Never a chart value."
+          "pattern": "^$|^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$"
         },
-        "alertmanager": {
-          "type": "string",
-          "maxLength": 512,
-          "pattern": "^$|^https?://[^/@?#\\s]+(/[^?#\\s]*)?$",
-          "description": "ADR-231: optional in-cluster Alertmanager base URL that alert DebugPolicies on this cluster read (v2 API, no credentials). Regional executor only."
-        },
-        "identityMappings": {
-          "type": "array",
-          "maxItems": 16,
-          "description": "ADR-245: connector-local identity mapping records referenced by kubernetesExec/kubernetesAccessReview PermissionSources (identityMappingRef). Regional executor only.",
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": [
-              "name",
-              "issuer",
-              "usernamePrefix"
-            ],
-            "properties": {
-              "name": {
-                "type": "string",
-                "pattern": "^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$"
-              },
-              "issuer": {
-                "type": "string",
-                "maxLength": 2048,
-                "pattern": "^https://[^\\s]+$"
-              },
-              "usernamePrefix": {
-                "type": "string",
-                "maxLength": 256,
-                "pattern": "^[!-~]*$"
-              },
-              "groupsPrefix": {
-                "type": "string",
-                "maxLength": 256,
-                "pattern": "^[!-~]*$"
-              },
-              "uid": {
-                "type": "boolean"
-              }
+        "hub": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "federation": {
+              "type": "string",
+              "maxLength": 512,
+              "pattern": "^$|^https://[^/@?#\\s]+/?$"
+            },
+            "owners": {
+              "type": "string",
+              "maxLength": 512,
+              "pattern": "^$|^[^/@?#\\s:]+:[0-9]{1,5}$"
+            },
+            "keyService": {
+              "type": "string",
+              "maxLength": 512,
+              "pattern": "^$|^https://[^/@?#\\s]+/?$"
             }
           }
         },
-        "profileEndpoints": {
-          "type": "array",
-          "maxItems": 64,
-          "description": "ADR-285: administrator Go profile endpoint templates (kind template: addressModes and a port range that maintainers bind to a declared Pod port) and profiles (kind profile: one addressMode and port). Fixed go-pprof/v1 paths; no URL, path or header values. Optional credential specifies only public exact workload audiences. Regional executor only.",
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": [
-              "name",
-              "kind"
-            ],
-            "properties": {
-              "name": {
-                "type": "string",
-                "pattern": "^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$"
-              },
-              "kind": {
-                "enum": [
-                  "template",
-                  "profile"
-                ]
-              },
-              "namespaces": {
-                "type": "array",
-                "maxItems": 64,
-                "uniqueItems": true,
-                "items": {
-                  "type": "string",
-                  "pattern": "^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$"
-                }
-              },
-              "addressModes": {
-                "type": "array",
-                "minItems": 1,
-                "maxItems": 2,
-                "uniqueItems": true,
-                "items": {
-                  "enum": [
-                    "targetLoopback",
-                    "podIP"
-                  ]
-                }
-              },
-              "minPort": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 65535
-              },
-              "maxPort": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 65535
-              },
-              "addressMode": {
-                "enum": [
-                  "targetLoopback",
-                  "podIP"
-                ]
-              },
-              "port": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 65535
-              },
-              "loopbackFamily": {
-                "enum": [
-                  "ipv4",
-                  "ipv6"
-                ]
-              },
-              "host": {
-                "type": "string",
-                "maxLength": 253,
-                "pattern": "^[a-z0-9.:\\[\\]-]+$"
-              },
-              "credential": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": [
-                  "audiences"
-                ],
-                "description": "ADR-302: public exact workload audiences; private values belong only in profile-authorization.json in the existing evidenceSecret.",
-                "properties": {
-                  "audiences": {
-                    "type": "array",
-                    "minItems": 1,
-                    "maxItems": 64,
-                    "uniqueItems": true,
-                    "items": {
-                      "type": "object",
-                      "additionalProperties": false,
-                      "required": [
-                        "clusterID",
-                        "namespaceUID",
-                        "workloadKind",
-                        "workloadUID"
-                      ],
-                      "properties": {
-                        "clusterID": {
-                          "type": "string",
-                          "format": "uuid"
-                        },
-                        "namespaceUID": {
-                          "type": "string",
-                          "format": "uuid"
-                        },
-                        "workloadKind": {
-                          "enum": [
-                            "Deployment",
-                            "StatefulSet",
-                            "Pod"
-                          ]
-                        },
-                        "workloadUID": {
-                          "type": "string",
-                          "format": "uuid"
-                        }
-                      }
-                    }
-                  }
-                }
-              },
-              "tls": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": [
-                  "serverName",
-                  "rootsPEM"
-                ],
-                "description": "ADR-299: explicit public certificate roots, never credentials. The installer checks canonical certificate syntax and the 8 KiB byte cap. Connector-first rollout; TLS-capable collectors required.",
-                "properties": {
-                  "serverName": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 253
-                  },
-                  "rootsPEM": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 8192
-                  }
-                }
-              }
+        "executor": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
             },
-            "allOf": [
-              {
-                "if": {
-                  "required": [
-                    "credential"
-                  ]
-                },
-                "then": {
-                  "required": [
-                    "tls"
-                  ]
-                }
-              },
-              {
-                "if": {
-                  "properties": {
-                    "kind": {
-                      "const": "template"
-                    }
-                  }
-                },
-                "then": {
-                  "required": [
-                    "addressModes",
-                    "minPort",
-                    "maxPort"
-                  ],
-                  "not": {
-                    "anyOf": [
-                      {
-                        "required": [
-                          "addressMode"
-                        ]
-                      },
-                      {
-                        "required": [
-                          "port"
-                        ]
-                      }
-                    ]
-                  }
-                },
-                "else": {
-                  "required": [
-                    "addressMode",
-                    "port"
-                  ],
-                  "not": {
-                    "anyOf": [
-                      {
-                        "required": [
-                          "addressModes"
-                        ]
-                      },
-                      {
-                        "required": [
-                          "minPort"
-                        ]
-                      },
-                      {
-                        "required": [
-                          "maxPort"
-                        ]
-                      }
-                    ]
-                  }
-                }
-              }
-            ]
+            "concurrency": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 16
+            },
+            "capacityAudience": {
+              "type": "string",
+              "maxLength": 512
+            },
+            "evidenceSecret": {
+              "type": "string",
+              "maxLength": 253,
+              "pattern": "^$|^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$"
+            },
+            "profileAuthorization": {
+              "type": "boolean"
+            },
+            "alertmanager": {
+              "type": "string",
+              "maxLength": 2048
+            },
+            "identityMappings": {
+              "type": "array"
+            },
+            "profileEndpoints": {
+              "type": "array"
+            }
           }
+        },
+        "resources": {
+          "type": "object"
+        },
+        "nodeSelector": {
+          "type": "object"
+        },
+        "tolerations": {
+          "type": "array"
         }
-      },
-      "required": [
-        "namespace"
-      ]
+      }
     },
     "collector": {
       "type": "object",
@@ -992,11 +530,6 @@
       "required": [
         "enabled",
         "namespace",
-        "image",
-        "registrySecret",
-        "installationID",
-        "clusterID",
-        "connector",
         "ceilings",
         "ringDisk"
       ],
@@ -1010,49 +543,6 @@
           "maxLength": 63,
           "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
           "description": "The collector namespace, the only one with the privileged Pod Security exception; never kube-*, default, the release or connector namespace."
-        },
-        "image": {
-          "type": "string",
-          "maxLength": 456,
-          "pattern": "^$|^[a-z0-9][a-z0-9./:_-]{0,383}@sha256:[a-f0-9]{64}$"
-        },
-        "registrySecret": {
-          "type": "string",
-          "maxLength": 253,
-          "pattern": "^$|^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$"
-        },
-        "installationID": {
-          "type": "string",
-          "pattern": "^$|^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
-        },
-        "clusterID": {
-          "type": "string",
-          "pattern": "^$|^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
-        },
-        "connector": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "endpoint",
-            "serverName",
-            "rootsPEM"
-          ],
-          "properties": {
-            "endpoint": {
-              "type": "string",
-              "maxLength": 512,
-              "pattern": "^$|^https://[^/@?#\\s]+/?$"
-            },
-            "serverName": {
-              "type": "string",
-              "maxLength": 253,
-              "pattern": "^$|^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$"
-            },
-            "rootsPEM": {
-              "type": "string",
-              "maxLength": 65536
-            }
-          }
         },
         "ceilings": {
           "type": "object",
@@ -1198,68 +688,6 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "hub-api": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "replicas": {
-              "type": "integer",
-              "minimum": 0,
-              "maximum": 16
-            },
-            "resources": {
-              "type": "object"
-            },
-            "nodeSelector": {
-              "type": "object",
-              "additionalProperties": {
-                "type": "string"
-              }
-            },
-            "tolerations": {
-              "type": "array",
-              "items": {
-                "type": "object"
-              }
-            },
-            "connections": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 32
-            },
-            "concurrency": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 64
-            }
-          }
-        },
-        "hub-worker": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "replicas": {
-              "type": "integer",
-              "minimum": 0,
-              "maximum": 16
-            },
-            "resources": {
-              "type": "object"
-            },
-            "nodeSelector": {
-              "type": "object",
-              "additionalProperties": {
-                "type": "string"
-              }
-            },
-            "tolerations": {
-              "type": "array",
-              "items": {
-                "type": "object"
-              }
-            }
-          }
-        },
         "federation": {
           "type": "object",
           "additionalProperties": false,
@@ -1282,6 +710,67 @@
               "type": "array",
               "items": {
                 "type": "object"
+              }
+            },
+            "concurrency": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 16
+            },
+            "service": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "type": {
+                  "enum": [
+                    "ClusterIP",
+                    "NodePort",
+                    "LoadBalancer"
+                  ]
+                },
+                "nodePort": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "minimum": 0
+                },
+                "annotations": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "tls": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "existingSecret": {
+                  "type": "string"
+                },
+                "dnsNames": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "issuerRef": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string"
+                    },
+                    "group": {
+                      "type": "string"
+                    }
+                  }
+                }
               }
             }
           }
@@ -1309,6 +798,95 @@
               "items": {
                 "type": "object"
               }
+            },
+            "concurrency": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 64
+            },
+            "service": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "type": {
+                  "enum": [
+                    "ClusterIP",
+                    "NodePort",
+                    "LoadBalancer"
+                  ]
+                },
+                "nodePort": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "minimum": 0
+                },
+                "annotations": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "tls": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "existingSecret": {
+                  "type": "string"
+                },
+                "dnsNames": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "issuerRef": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string"
+                    },
+                    "group": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            },
+            "downloads": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "retentionTopologies": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "targetClusterID",
+                      "name"
+                    ],
+                    "properties": {
+                      "targetClusterID": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
             }
           }
         },
@@ -1334,6 +912,307 @@
               "type": "array",
               "items": {
                 "type": "object"
+              }
+            },
+            "pollSeconds": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 300
+            },
+            "batch": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 64
+            },
+            "retentionTopologies": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "targetClusterID",
+                  "name"
+                ],
+                "properties": {
+                  "targetClusterID": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "download-worker": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "cpuMillis": {
+              "type": "integer",
+              "minimum": 50,
+              "maximum": 8000
+            },
+            "memoryBytes": {
+              "type": "integer",
+              "minimum": 67108864,
+              "maximum": 17179869184
+            },
+            "maxRuntimeSeconds": {
+              "type": "integer",
+              "minimum": 60,
+              "maximum": 86400
+            }
+          }
+        },
+        "hub-worker": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "replicas": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "resources": {
+              "type": "object"
+            },
+            "nodeSelector": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "tolerations": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            },
+            "clusterObservationAudience": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "permission": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "statusUsers": {
+                  "type": "array",
+                  "maxItems": 16,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 317
+                  }
+                },
+                "review": {
+                  "type": "string",
+                  "maxLength": 253,
+                  "pattern": "^$|^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$"
+                }
+              }
+            }
+          }
+        },
+        "hub-api": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "replicas": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 16
+            },
+            "connections": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 64
+            },
+            "concurrency": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 16
+            },
+            "resources": {
+              "type": "object"
+            },
+            "nodeSelector": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "tolerations": {
+              "type": "array"
+            },
+            "nativeService": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "type": {
+                  "enum": [
+                    "ClusterIP",
+                    "NodePort",
+                    "LoadBalancer"
+                  ]
+                },
+                "annotations": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                },
+                "nodePorts": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "native": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "operation": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  }
+                }
+              }
+            },
+            "workerNamespaces": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+                "maxLength": 63
+              }
+            },
+            "retentionTopologies": {
+              "type": "array",
+              "maxItems": 0
+            },
+            "peers": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "clusterID",
+                  "peerID",
+                  "rootsPEM"
+                ],
+                "properties": {
+                  "clusterID": {
+                    "type": "string"
+                  },
+                  "peerID": {
+                    "type": "string"
+                  },
+                  "rootsPEM": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "public": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "standby": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "captures": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "previewSeconds": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 3600
+                },
+                "operationConcurrency": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 64
+                },
+                "mcpPerIdentity": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 64
+                },
+                "downloadConcurrency": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 64
+                },
+                "downloadsPerIdentity": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 64
+                },
+                "downloadMaxSeconds": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 86400
+                },
+                "operationAudit": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "normalConcurrency": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "resolutionConcurrency": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "perPrincipalConcurrency": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "normalPerSecond": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "resolutionPerSecond": {
+                      "type": "integer",
+                      "minimum": 1
+                    }
+                  }
+                },
+                "downloadPlan": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "outputLimit": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "readLimit": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "requestLimit": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "durationSeconds": {
+                      "type": "integer",
+                      "minimum": 1
+                    }
+                  }
+                },
+                "processing": {
+                  "type": "boolean"
+                }
               }
             }
           }
@@ -1601,6 +1480,10 @@
                   "maxLength": 128
                 },
                 "bucket": {
+                  "type": "string",
+                  "maxLength": 63
+                },
+                "evidenceBucket": {
                   "type": "string",
                   "maxLength": 63
                 },
@@ -1882,462 +1765,6 @@
         "identity",
         "keyService"
       ]
-    },
-    "installation": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "name": {
-          "type": "string",
-          "pattern": "^[a-z0-9]([-a-z0-9]{0,30}[a-z0-9])?$"
-        }
-      }
-    },
-    "image": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "repository": {
-          "type": "string"
-        },
-        "digest": {
-          "type": "string",
-          "pattern": "^(sha256:[a-f0-9]{64})?$"
-        },
-        "pullPolicy": {
-          "enum": [
-            "Always",
-            "IfNotPresent",
-            "Never"
-          ]
-        }
-      }
-    },
-    "origin": {
-      "type": "string",
-      "pattern": "^(https://[^/\\s]+)?$"
-    },
-    "identity": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "browserAudience": {
-          "type": "string"
-        },
-        "providerRootsSecret": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "name": {
-              "type": "string"
-            },
-            "key": {
-              "type": "string"
-            }
-          }
-        },
-        "clientSecret": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "name": {
-              "type": "string"
-            },
-            "key": {
-              "type": "string"
-            }
-          }
-        }
-      }
-    },
-    "exposure": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "tls": {
-          "enum": [
-            "pod",
-            "proxy"
-          ]
-        },
-        "tlsSecret": {
-          "type": "string"
-        }
-      }
-    },
-    "fleet": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
-        "settings": {
-          "type": "string"
-        },
-        "channelMount": {
-          "type": "string"
-        },
-        "deliveryProfile": {
-          "type": "string"
-        }
-      }
-    },
-    "capacity": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "keys": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "labelKeys": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "annotationKeys": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        }
-      }
-    },
-    "hub": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "hubApi": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "enabled": {
-              "type": "boolean"
-            },
-            "replicas": {
-              "type": "integer",
-              "minimum": 0,
-              "maximum": 16
-            },
-            "resources": {
-              "type": "object"
-            },
-            "nodeSelector": {
-              "type": "object",
-              "additionalProperties": {
-                "type": "string"
-              }
-            },
-            "tolerations": {
-              "type": "array"
-            },
-            "nativeService": {
-              "type": "object",
-              "additionalProperties": false,
-              "properties": {
-                "type": {
-                  "enum": [
-                    "ClusterIP",
-                    "NodePort",
-                    "LoadBalancer"
-                  ]
-                },
-                "annotations": {
-                  "type": "object",
-                  "additionalProperties": {
-                    "type": "string"
-                  }
-                },
-                "nodePorts": {
-                  "type": "object",
-                  "additionalProperties": false,
-                  "properties": {
-                    "native": {
-                      "type": "integer",
-                      "minimum": 0
-                    },
-                    "operation": {
-                      "type": "integer",
-                      "minimum": 0
-                    }
-                  }
-                }
-              }
-            },
-            "caSecrets": {
-              "type": "object",
-              "additionalProperties": false,
-              "properties": {
-                "postgres": {
-                  "type": "object",
-                  "additionalProperties": false,
-                  "properties": {
-                    "name": {
-                      "type": "string"
-                    },
-                    "key": {
-                      "type": "string"
-                    }
-                  }
-                },
-                "auditStore": {
-                  "type": "object",
-                  "additionalProperties": false,
-                  "properties": {
-                    "name": {
-                      "type": "string"
-                    },
-                    "key": {
-                      "type": "string"
-                    }
-                  }
-                },
-                "keyService": {
-                  "type": "object",
-                  "additionalProperties": false,
-                  "properties": {
-                    "name": {
-                      "type": "string"
-                    },
-                    "key": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            },
-            "postgres": {
-              "type": "object",
-              "additionalProperties": false,
-              "properties": {
-                "host": {
-                  "type": "string"
-                },
-                "port": {
-                  "type": "integer",
-                  "minimum": 0
-                },
-                "database": {
-                  "type": "string"
-                },
-                "maxConnections": {
-                  "type": "integer",
-                  "minimum": 1,
-                  "maximum": 4
-                }
-              }
-            },
-            "auditStore": {
-              "type": "object",
-              "additionalProperties": false,
-              "properties": {
-                "endpoint": {
-                  "type": "string"
-                },
-                "region": {
-                  "type": "string"
-                },
-                "bucket": {
-                  "type": "string"
-                }
-              }
-            },
-            "keyService": {
-              "type": "object",
-              "additionalProperties": false,
-              "properties": {
-                "endpoint": {
-                  "type": "string"
-                },
-                "auditMount": {
-                  "type": "string"
-                },
-                "auditKey": {
-                  "type": "string"
-                },
-                "pkiMount": {
-                  "type": "string"
-                }
-              }
-            },
-            "providerAuthMount": {
-              "type": "string"
-            },
-            "connections": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 64
-            },
-            "concurrency": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 16
-            },
-            "connectorPKIMount": {
-              "type": "string"
-            },
-            "workerNamespaces": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
-            "retentionTopologies": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "properties": {
-                  "targetClusterID": {
-                    "type": "string"
-                  },
-                  "name": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "targetClusterID",
-                  "name"
-                ]
-              }
-            },
-            "peers": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "properties": {
-                  "clusterID": {
-                    "type": "string"
-                  },
-                  "peerID": {
-                    "type": "string"
-                  },
-                  "rootsPEM": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "clusterID",
-                  "peerID",
-                  "rootsPEM"
-                ]
-              }
-            },
-            "public": {
-              "type": "object",
-              "additionalProperties": false,
-              "properties": {
-                "standby": {
-                  "type": "integer",
-                  "minimum": 0
-                },
-                "captures": {
-                  "type": "integer",
-                  "minimum": 0
-                },
-                "previewSeconds": {
-                  "type": "integer",
-                  "minimum": 0
-                },
-                "operationConcurrency": {
-                  "type": "integer",
-                  "minimum": 0
-                },
-                "mcpPerIdentity": {
-                  "type": "integer",
-                  "minimum": 0
-                },
-                "downloadConcurrency": {
-                  "type": "integer",
-                  "minimum": 0
-                },
-                "downloadsPerIdentity": {
-                  "type": "integer",
-                  "minimum": 0
-                },
-                "downloadMaxSeconds": {
-                  "type": "integer",
-                  "minimum": 0
-                },
-                "operationAudit": {
-                  "type": "object",
-                  "additionalProperties": false,
-                  "properties": {
-                    "normalConcurrency": {
-                      "type": "integer",
-                      "minimum": 0
-                    },
-                    "resolutionConcurrency": {
-                      "type": "integer",
-                      "minimum": 0
-                    },
-                    "perPrincipalConcurrency": {
-                      "type": "integer",
-                      "minimum": 0
-                    },
-                    "normalPerSecond": {
-                      "type": "integer",
-                      "minimum": 0
-                    },
-                    "resolutionPerSecond": {
-                      "type": "integer",
-                      "minimum": 0
-                    }
-                  }
-                },
-                "downloadPlan": {
-                  "type": "object",
-                  "additionalProperties": false,
-                  "properties": {
-                    "outputLimit": {
-                      "type": "integer",
-                      "minimum": 0
-                    },
-                    "readLimit": {
-                      "type": "integer",
-                      "minimum": 0
-                    },
-                    "requestLimit": {
-                      "type": "integer",
-                      "minimum": 0
-                    },
-                    "durationSeconds": {
-                      "type": "integer",
-                      "minimum": 0
-                    }
-                  }
-                },
-                "transitMount": {
-                  "type": "string"
-                },
-                "workerPKIMount": {
-                  "type": "string"
-                },
-                "permissionDelegations": {
-                  "type": "array",
-                  "items": {
-                    "type": "object"
-                  }
-                },
-                "captureHistory": {
-                  "type": [
-                    "object",
-                    "null"
-                  ]
-                },
-                "processing": {
-                  "type": "boolean"
-                }
-              }
-            }
-          }
-        }
-      }
     }
   },
   "definitions": {
@@ -2954,9 +2381,6 @@
         }
       },
       "required": [
-        "endpoint",
-        "serverName",
-        "serviceType",
         "connector"
       ]
     },

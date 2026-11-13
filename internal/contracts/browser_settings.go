@@ -5,8 +5,8 @@ package contracts
 type BrowserSettings struct {
 	SchemaVersion      string `json:"schemaVersion"`
 	Revision           int64  `json:"revision"`
-	RootID             string `json:"rootID"`
-	SessionEpoch       string `json:"sessionEpoch"`
+	RootID             string `json:"rootID,omitempty"`
+	SessionEpoch       string `json:"sessionEpoch,omitempty"`
 	Issuer             string `json:"issuer"`
 	ClientID           string `json:"clientID"`
 	Origin             string `json:"origin"`

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	port "asservat.local/asservat/internal/application/capacity"
+	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/identity"
@@ -48,7 +49,7 @@ func newCapacityGuard(observer *PermissionClient, namespace cfg.NamespaceRef, pi
 	}
 	// The digest names the cluster and observed namespace only (field map
 	// coupling 3); plan and pin no longer enter it.
-	return &capacityGuard{observer: observer, namespace: namespace, digest: namedDigest("asservat-capacity-protection/v2", observer.clusterID, namespace.Name)}, nil
+	return &capacityGuard{observer: observer, namespace: namespace, digest: artifact.Digest(contracts.NamespaceSourceDigest(observer.clusterID, namespace.Name))}, nil
 }
 func NewCapacityGuard(observer *PermissionClient, plan cfg.CapacityAdministration, pin GuardPin) (*CapacityGuard, error) {
 	g, err := newCapacityGuard(observer, plan.ControlNamespace, pin, plan)

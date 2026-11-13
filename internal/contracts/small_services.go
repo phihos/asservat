@@ -27,6 +27,16 @@ type SecretsPlan struct {
 	OpenBao     *SmallOpenBaoSelection `json:"openBao,omitempty"`
 	// Its password and roots remain separate selected operator Secrets.
 	KeycloakExternalDatabase bool `json:"keycloakExternalDatabase,omitempty"`
+	// ServingTLS are the peer listener Secrets (kubernetes.io/tls with
+	// ca.crt) created once when no existing Secret or issuer is selected.
+	ServingTLS []SecretsServingTLS `json:"servingTLS,omitempty"`
+}
+
+// SecretsServingTLS is one `<name>-<component>-tls` Secret and the DNS names
+// of its leaf certificate.
+type SecretsServingTLS struct {
+	Secret   string   `json:"secret"`
+	DNSNames []string `json:"dnsNames"`
 }
 
 // SecretsIDs names the `<name>-ids` Secret; Generate is false for an

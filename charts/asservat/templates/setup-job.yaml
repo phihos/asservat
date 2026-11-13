@@ -5,27 +5,19 @@
 {{- $pg := eq $s.postgres.provider "bundled" }}
 {{- $s3 := eq $s.objectStore.provider "seaweedfs" }}
 {{- $bao := eq $s.keyService.provider "openbao" }}
-{{- $kc := eq $s.identity.provider "keycloak" }}
+{{- $p := include "asservat.providers" . | fromJson }}
+{{- $fleet := printf "%s-fleet" $n }}
 {{- $components := list "hub-api" "hub-worker" "federation" "key-service" "publisher" }}
-{{- $postgres := dict "provider" $s.postgres.provider "host" (printf "%s-postgres.%s.svc" $n .Release.Namespace) "port" 5432 "database" "asservat" }}
-{{- if not $pg }}
-{{- $e := $s.postgres.external }}
-{{- if not (and $e.host $e.database $e.rootsPEM $e.adminSecret) }}{{ fail "services.postgres.external requires host, database, rootsPEM and adminSecret" }}{{ end }}
-{{- $postgres = dict "provider" "external" "host" $e.host "port" (int $e.port) "database" $e.database "rootsPEM" $e.rootsPEM }}
+{{- $accounts := dict }}
+{{- range list "hub-api" "hub-worker" "federation" "publisher" }}
+{{- $_ := set $accounts . (printf "%s-%s" $n .) }}
 {{- end }}
-{{- $store := dict "provider" "seaweedfs" "endpoint" (printf "https://%s-objectstore.%s.svc:8333" $n .Release.Namespace) "region" "us-east-1" "bucket" (printf "%s-audit" $n) }}
-{{- if not $s3 }}
-{{- $e := $s.objectStore.external }}
-{{- if not (and $e.endpoint $e.region $e.bucket $e.rootsPEM) }}{{ fail "services.objectStore.external requires endpoint, region, bucket and rootsPEM" }}{{ end }}
-{{- $store = dict "provider" "external" "endpoint" $e.endpoint "region" $e.region "bucket" $e.bucket "rootsPEM" $e.rootsPEM }}
-{{- end }}
-{{- $keys := dict "provider" "openbao" "endpoint" (printf "https://%s-openbao.%s.svc:8200" $n .Release.Namespace) }}
-{{- if not $bao }}
-{{- $e := $s.keyService.external }}
-{{- if not (and $e.endpoint $e.rootsPEM) }}{{ fail "services.keyService.external requires endpoint and rootsPEM" }}{{ end }}
-{{- $keys = dict "provider" "external" "endpoint" $e.endpoint "rootsPEM" $e.rootsPEM }}
-{{- end }}
-{{- $config := dict "format" "asservat-setup/v1" "namespace" .Release.Namespace "name" $n "mode" .Values.mode "components" $components "postgres" $postgres "objectStore" $store "keyService" $keys "identity" (dict "provider" $s.identity.provider) }}
+{{- if and (not $pg) (not $s.postgres.external.adminSecret) }}{{ fail "services.postgres.external.adminSecret is required" }}{{ end }}
+{{- /* contracts.SetupConfiguration (asservat-setup/v1). */}}
+{{- $config := dict "format" "asservat-setup/v1" "name" $n "namespace" .Release.Namespace "fleetSource" $fleet
+  "postgres" $p.postgres
+  "openBao" (dict "endpoint" $p.openBao.endpoint "bundled" $bao "accounts" $accounts)
+  "objectStore" (dict "endpoint" $p.objectStore.endpoint "region" $p.objectStore.region "bundled" $s3 "auditBucket" $p.objectStore.auditBucket "evidenceBucket" $p.objectStore.evidenceBucket) }}
 {{- $configJSON := toJson $config }}
 {{- $hash := printf "%s\n%s\n%s" .Chart.Version (include "asservat.image" .) (toJson .Values) | sha256sum | trunc 10 }}
 apiVersion: v1
@@ -36,6 +28,7 @@ metadata:
   labels: {{ include "asservat.labels" (list . "setup") | nindent 4 }}
 automountServiceAccountToken: false
 ---
+# setup reads the fleet ConfigMap (SeedInstallation) and nothing else.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
@@ -45,6 +38,7 @@ metadata:
 rules:
   - apiGroups: [""]
     resources: [configmaps]
+    resourceNames: [{{ $fleet | quote }}]
     verbs: [get]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -101,7 +95,7 @@ spec:
       labels: {{ include "asservat.labels" (list . "setup") | nindent 8 }}
     spec:
       serviceAccountName: {{ $setup }}
-      automountServiceAccountToken: false
+      automountServiceAccountToken: true
       enableServiceLinks: false
       restartPolicy: Never
       {{- include "asservat.imagePullSecrets" . | nindent 6 }}
@@ -115,21 +109,16 @@ spec:
           resources: {{ include "asservat.jobResources" . | nindent 12 }}
           volumeMounts:
             {{- include "asservat.idsMount" . | nindent 12 }}
-            - {name: config, mountPath: /run/asservat/setup/config, readOnly: true}
-            - {name: kube, mountPath: /var/run/secrets/kubernetes.io/serviceaccount, readOnly: true}
+            - {name: config, mountPath: /run/asservat/setup/config.json, subPath: config.json, readOnly: true}
             {{- range $components }}
             - {name: {{ printf "sql-%s" . }}, mountPath: {{ printf "/run/asservat/setup/sql/%s" . }}, readOnly: true}
-            - {name: {{ printf "config-%s" . }}, mountPath: {{ printf "/run/asservat/setup/components/%s" . }}, readOnly: true}
             {{- end }}
             - {name: postgres, mountPath: /run/asservat/setup/postgres, readOnly: true}
-            {{- if $s3 }}
-            - {name: objectstore, mountPath: /run/asservat/setup/objectstore, readOnly: true}
-            {{- end }}
             {{- if $bao }}
             - {name: openbao, mountPath: /run/asservat/setup/openbao, readOnly: true}
             {{- end }}
-            {{- if $kc }}
-            - {name: keycloak, mountPath: /run/asservat/setup/keycloak, readOnly: true}
+            {{- if $s3 }}
+            - {name: objectstore, mountPath: /run/asservat/setup/objectstore, readOnly: true}
             {{- end }}
       volumes:
         {{- include "asservat.idsVolume" . | nindent 8 }}
@@ -137,69 +126,48 @@ spec:
           configMap:
             name: {{ printf "%s-config" $setup }}
             defaultMode: 0440
-        - name: kube
-          projected:
-            defaultMode: 0440
-            sources:
-              - serviceAccountToken: {path: token, expirationSeconds: 3600}
-              - configMap: {name: kube-root-ca.crt, items: [{key: ca.crt, path: ca.crt}]}
-              - downwardAPI: {items: [{path: namespace, fieldRef: {fieldPath: metadata.namespace}}]}
-              {{- if $bao }}
-              # OpenBao setup login (SmallOpenBaoSetupAudience).
-              - serviceAccountToken: {path: openbao-setup.token, audience: "https://asservat.io/openbao/setup", expirationSeconds: 600}
-              {{- end }}
         {{- range $components }}
         - name: {{ printf "sql-%s" . }}
           secret:
             secretName: {{ include "asservat.secretName" (list $ (printf "sql-%s" .)) | quote }}
             defaultMode: 0440
-        - name: {{ printf "config-%s" . }}
-          configMap:
-            name: {{ printf "%s-%s-config" $n . }}
-            optional: true
-            defaultMode: 0440
         {{- end }}
         - name: postgres
-          secret:
-            {{- if $pg }}
-            secretName: {{ printf "%s-postgres-state" $n | quote }}
-            items:
-              - {key: postgres-administrator.json, path: credentials.json}
-              - {key: postgres-ddl.json, path: ddl.json}
-              - {key: ca.crt, path: ca.crt}
-            {{- else }}
-            secretName: {{ $s.postgres.external.adminSecret | quote }}
-            items:
-              - {key: credentials.json, path: credentials.json}
-            {{- end }}
+          projected:
             defaultMode: 0440
-        {{- if $s3 }}
-        - name: objectstore
-          secret:
-            secretName: {{ printf "%s-objectstore-state" $n | quote }}
-            items:
-              - {key: administrator.json, path: administrator.json}
-              - {key: ca.crt, path: ca.crt}
-              - {key: plan.json, path: plan.json}
-            defaultMode: 0440
-        {{- end }}
+            sources:
+              {{- if $pg }}
+              - secret:
+                  name: {{ printf "%s-postgres-state" $n | quote }}
+                  items:
+                    - {key: postgres-administrator.json, path: administrator.json}
+                    - {key: postgres-ddl.json, path: ddl.json}
+              {{- else }}
+              - secret:
+                  name: {{ $s.postgres.external.adminSecret | quote }}
+                  items: [{key: credentials.json, path: administrator.json}]
+              {{- end }}
+              {{- include "asservat.providerRoots" (dict "root" . "provider" "postgres" "path" "ca.crt") | nindent 14 }}
         {{- if $bao }}
         - name: openbao
-          secret:
-            secretName: {{ printf "%s-openbao-state" $n | quote }}
-            items:
-              - {key: plan.json, path: plan.json}
-              - {key: ca.crt, path: ca.crt}
-              - {key: backend-id, path: backend-id}
+          projected:
             defaultMode: 0440
+            sources:
+              {{- include "asservat.providerRoots" (dict "root" . "provider" "openBao" "path" "ca.crt") | nindent 14 }}
+              # contracts.SmallOpenBaoSetupAudience; read for every login.
+              - serviceAccountToken: {path: token, audience: "https://asservat.io/openbao/setup", expirationSeconds: 600}
         {{- end }}
-        {{- if $kc }}
-        - name: keycloak
-          secret:
-            secretName: {{ printf "%s-keycloak-state" $n | quote }}
-            items:
-              - {key: settings.json, path: settings.json}
-              - {key: users-group-id, path: users-group-id}
+        {{- if $s3 }}
+        - name: objectstore
+          projected:
             defaultMode: 0440
+            sources:
+              {{- include "asservat.providerRoots" (dict "root" . "provider" "objectStore" "path" "ca.crt") | nindent 14 }}
+              - secret:
+                  name: {{ printf "%s-objectstore-state" $n | quote }}
+                  items: [{key: administrator.json, path: credentials.json}]
+              - secret:
+                  name: {{ printf "%s-objectstore-iam" $n | quote }}
+                  items: [{key: bucket-policies.json, path: bucket-policies.json}]
         {{- end }}
 {{- end }}

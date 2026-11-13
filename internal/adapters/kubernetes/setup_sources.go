@@ -14,7 +14,7 @@ import (
 // ReadSetupFleetSource reads the release namespace and the fleet ConfigMap by
 // name with two plain GETs and decodes the fleet settings with the runtime's
 // own decoder. The namespace and ConfigMap UIDs are taken from the reads.
-func ReadSetupFleetSource(ctx context.Context, config *rest.Config, clusterID, namespace, configMap, installation string) (fleet.Administration, value.NamespaceRef, error) {
+func ReadSetupFleetSource(ctx context.Context, config *rest.Config, clusterID, namespace, configMap, installation, issuerEpoch string) (fleet.Administration, value.NamespaceRef, error) {
 	var zero fleet.Administration
 	if ctx == nil || config == nil || !authorization.UUID(clusterID) || len(validation.IsDNS1123Label(namespace)) != 0 || len(validation.IsDNS1123Subdomain(configMap)) != 0 || !authorization.UUID(installation) {
 		return zero, value.NamespaceRef{}, value.ErrInvalid
@@ -51,7 +51,7 @@ func ReadSetupFleetSource(ctx context.Context, config *rest.Config, clusterID, n
 	if err != nil {
 		return zero, control, err
 	}
-	settings, err := NewFleetSettingsClient(client, configMap, sourceUID, installation)
+	settings, err := NewFleetSettingsClient(client, configMap, sourceUID, installation, issuerEpoch)
 	if err != nil {
 		return zero, control, err
 	}

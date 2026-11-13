@@ -67,6 +67,7 @@ func TestConnectorConfigIsClosed(t *testing.T) {
 	}
 	combined := connectorTestConfig(offer)
 	combined.Mode, combined.Offer, combined.OfferConfigMap = contracts.ConnectorModeCombined, nil, "asservat-regional-offer"
+	combined.ClusterID, combined.PeerID = "", "" // read from the IDs Secret
 	combined.Hub = &contracts.ConnectorHubAddresses{Federation: "https://asservat-federation.asservat.svc:8443", Owners: "asservat-hub-api.asservat.svc:9444", KeyService: "https://asservat-key-service.asservat.svc:8448"}
 	if err := validConnectorConfig(combined); err != nil {
 		t.Fatal("combined mode", err)
@@ -100,6 +101,33 @@ func TestConnectorConfigIsClosed(t *testing.T) {
 	bad.Hub = &contracts.ConnectorHubAddresses{Federation: "http://asservat-federation.asservat.svc:8443"}
 	if validConnectorConfig(bad) == nil {
 		t.Error("plain HTTP federation accepted")
+	}
+	bad = combined
+	bad.ClusterID = connectorTestID("02")
+	if validConnectorConfig(bad) == nil {
+		t.Error("combined mode with a values cluster ID accepted")
+	}
+}
+
+// Combined mode takes the cluster and peer from the IDs Secret; the hub's
+// offer must name the same installation, issuer epoch and permission root.
+func TestCombinedOfferMatchesInstallationIDs(t *testing.T) {
+	id := connectorTestID
+	offer := contracts.RegionalOffer{InstallationID: id("01"), PermissionRootID: id("03"), IssuerEpoch: id("04")}
+	ids := contracts.InstallationIDs{InstallationID: id("01"), ClusterID: id("02"), IssuerEpoch: id("04"), PermissionRootID: id("03"), PeerID: id("05")}
+	if !combinedOfferMatches(offer, ids) {
+		t.Fatal("matching offer refused")
+	}
+	for name, mutate := range map[string]func(*contracts.InstallationIDs){
+		"installation": func(i *contracts.InstallationIDs) { i.InstallationID = id("09") },
+		"epoch":        func(i *contracts.InstallationIDs) { i.IssuerEpoch = id("09") },
+		"root":         func(i *contracts.InstallationIDs) { i.PermissionRootID = id("09") },
+	} {
+		other := ids
+		mutate(&other)
+		if combinedOfferMatches(offer, other) {
+			t.Errorf("%s mismatch accepted", name)
+		}
 	}
 }
 

@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"time"
 
-	"asservat.local/asservat/internal/adapters/providerconfig"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/authorization"
 	cfg "asservat.local/asservat/internal/domain/configuration"
@@ -61,13 +60,6 @@ func (s *SmallSeaweedPreparation) validState(secret *core.Secret) bool {
 	return s.metadata(secret, s.plan.StateSecretName(), "small-seaweed") && secret.Immutable != nil && *secret.Immutable && len(secret.Annotations) == 0 && ValidateSmallSeaweedMaterial(s.plan, secret.Data, s.now()) == nil
 }
 
-// smallSeaweedStateAnnotation binds an IAM Secret to the state of the
-// installer-era binder (small_seaweed_binding.go), removed in slice 4.
-const smallSeaweedStateAnnotation = "asservat.io/backend-state-uid"
-
-func (s *SmallSeaweedPreparation) validIAM(secret, state *core.Secret, original []byte) bool {
-	return s.metadata(secret, s.plan.IAMSecretName(), "small-seaweed-iam") && (secret.Immutable == nil || !*secret.Immutable) && len(secret.Annotations) == 1 && secret.Annotations[smallSeaweedStateAnnotation] == string(state.UID) && len(secret.Data) == 1 && providerconfig.ValidateSeaweedConfigTransition(original, secret.Data[providerconfig.SeaweedConfigKey]) == nil
-}
 func sameSmallSeaweedData(a, b map[string][]byte) bool {
 	if len(a) != len(b) {
 		return false

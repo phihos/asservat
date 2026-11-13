@@ -42,7 +42,7 @@ func TestSmallSeaweedHelmUsesExactProviderAndRetainedStorage(t *testing.T) {
 			}
 			ctx, end := context.WithTimeout(t.Context(), 15*time.Second)
 			defer end()
-			output, e := exec.CommandContext(ctx, helm, "template", "trial", "../../charts/asservat", "--namespace", "installation", "--kube-version", "1.35.0", "-f", path).CombinedOutput()
+			output, e := exec.CommandContext(ctx, helm, "template", "trial", "../../charts/asservat", "--namespace", "installation", "--kube-version", "1.35.0", "-f", "testdata/helm-fixture.yaml", "-f", path).CombinedOutput()
 			if e != nil {
 				t.Fatalf("actual chart render: %v\n%s", e, output)
 			}

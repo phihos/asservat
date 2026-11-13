@@ -51,5 +51,5 @@ func VerifyOwnerIdentityCredential(ctx context.Context, pool *pgxpool.Pool, m co
 	if !known {
 		return cfg.ErrInvalid
 	}
-	return VerifyRuntimeLogin(ctx, pool, name)
+	return VerifySessionRole(ctx, pool, name)
 }

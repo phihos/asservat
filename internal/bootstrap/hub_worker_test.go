@@ -16,7 +16,9 @@ import (
 	"testing"
 	"time"
 
+	"asservat.local/asservat/internal/adapters/providerconfig"
 	"asservat.local/asservat/internal/contracts"
+	cfg "asservat.local/asservat/internal/domain/configuration"
 )
 
 func hubWorkerTestConfig() contracts.HubWorkerConfig {
@@ -24,9 +26,12 @@ func hubWorkerTestConfig() contracts.HubWorkerConfig {
 		FleetSource: "asservat-fleet", OwnerSource: "asservat-owner-source", LeaderLease: "asservat-hub-worker-leader",
 		Postgres:   contracts.HubWorkerPostgres{Host: "asservat-postgres.asservat.svc", Port: 5432, Database: "asservat"},
 		AuditStore: contracts.HubWorkerObjectStore{Endpoint: "https://asservat-objectstore.asservat.svc:8333", Region: "us-east-1", Bucket: "asservat-audit"},
-		KeyService: contracts.HubWorkerKeyService{Endpoint: "https://asservat-openbao.asservat.svc:8200", AuditMount: "asservat-audit", AuditKey: "audit"},
-		Provider: contracts.HubWorkerProvider{AuthMount: "asservat-configuration", Audience: "asservat-hub-worker",
-			Roles: contracts.HubWorkerProviderRoles{AuditWrap: "asservat-hub-worker-audit-wrap", AuditUnwrap: "asservat-hub-worker-audit-unwrap"}}}
+		KeyService: contracts.HubWorkerKeyService{Endpoint: "https://asservat-openbao.asservat.svc:8200"},
+		Provider:   contracts.HubWorkerProvider{Roles: contracts.HubWorkerProviderRoles{AuditWrap: "asservat-hub-worker-audit-wrap", AuditUnwrap: "asservat-hub-worker-audit-unwrap"}}}
+}
+
+func hubWorkerTestIDs() contracts.InstallationIDs {
+	return contracts.InstallationIDs{InstallationID: runtimeID, ClusterID: runtimeID, IssuerEpoch: runtimeID, PermissionRootID: runtimeID, BrowserRootID: runtimeID, SessionEpoch: runtimeID, RoleSetupID: runtimeID, PeerID: runtimeID}
 }
 
 // hubWorkerFiles writes a complete mount for config c with the PEM roots of
@@ -76,7 +81,6 @@ func TestHubWorkerConfigValidation(t *testing.T) {
 		"http-provider":  func(c *contracts.HubWorkerConfig) { c.KeyService.Endpoint = "http://openbao.invalid" },
 		"port":           func(c *contracts.HubWorkerConfig) { c.Postgres.Port = 0 },
 		"role":           func(c *contracts.HubWorkerConfig) { c.Provider.Roles.AuditWrap = "bad/role" },
-		"no-audience":    func(c *contracts.HubWorkerConfig) { c.Provider.Audience = "" },
 		"lease":          func(c *contracts.HubWorkerConfig) { c.LeaderLease = "" },
 		"service-acount": func(c *contracts.HubWorkerConfig) { c.ServiceAccount = "" },
 	} {
@@ -84,10 +88,11 @@ func TestHubWorkerConfigValidation(t *testing.T) {
 			c := hubWorkerTestConfig()
 			change(&c)
 			files, _ := hubWorkerFiles(t, c, server)
-			got, err := readHubWorkerConfig(context.Background(), files)
+			got, err := readHubWorkerConfig(context.Background(), files, hubWorkerTestIDs())
 			if name == "valid" {
-				if err != nil || got.FleetSource != c.FleetSource {
-					t.Fatal(err)
+				if err != nil || got.FleetSource != c.FleetSource || got.Provider.AuthMount != "asservat-configuration" || got.Provider.Audience != "asservat-configuration-provider" ||
+					got.KeyService.AuditMount != "asservat-audit" || got.KeyService.AuditKey != "audit" || got.Provider.ContextDeletionSigning.Key != "" {
+					t.Fatal(err, got.Provider, got.KeyService)
 				}
 			} else if err == nil {
 				t.Fatal("invalid config accepted")
@@ -201,4 +206,56 @@ func TestHubWorkerChildrenJoinBeforeReturn(t *testing.T) {
 	if HubWorkerDiagnostic(err) == "" {
 		t.Fatal("empty diagnostic")
 	}
+}
+
+// The loader derives the OpenBao key names that `asservat setup` creates from
+// the installation ID; Helm renders none of them.
+func TestHubWorkerConfigCompletesDerivedNames(t *testing.T) {
+	c := hubWorkerTestConfig()
+	c.Cleanup = &contracts.HubWorkerCleanup{}
+	c.Permission = &contracts.HubWorkerPermission{WorkerConfiguration: &contracts.HubWorkerWorkerConfiguration{Namespace: "asservat-downloads", Source: "asservat-worker-profile"}}
+	ids := hubWorkerTestIDs()
+	completeHubWorkerConfig(&c, ids)
+	n := providerconfig.OpenBaoNamesFor(ids.InstallationID)
+	if c.Provider.ContextDeletionSigning != (contracts.OwnerPublicTransit{Mount: contracts.SmallOpenBaoAuditMount, Key: n.DeletionSigningKey}) ||
+		c.Provider.WorkerConfigurationAudit != (contracts.OwnerPublicTransit{Mount: contracts.SmallOpenBaoAuditMount, Key: n.WorkerConfigurationAuditKey}) || c.KeyService.AuditKey != n.AuditKey {
+		t.Fatal("derived names", c.Provider, c.KeyService)
+	}
+}
+
+// TestHubWorkerConfigRendered loads the config.json that
+// scripts/test-helm-hub-worker.py renders (path in ASSERVAT_HUB_WORKER_CONFIG)
+// through the loader's own decode, completion and section checks.
+func TestHubWorkerConfigRendered(t *testing.T) {
+	path := os.Getenv("ASSERVAT_HUB_WORKER_CONFIG")
+	if path == "" {
+		t.Skip("set by scripts/test-helm-hub-worker.py")
+	}
+	dir, file := filepath.Split(path)
+	if file != contracts.HubWorkerConfigFile {
+		t.Fatal("rendered file must be named", contracts.HubWorkerConfigFile)
+	}
+	files, err := os.OpenRoot(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer files.Close()
+	c, err := readHubWorkerConfig(context.Background(), files, hubWorkerTestIDs())
+	if err != nil {
+		t.Fatal(err)
+	}
+	ns := cfg.NamespaceRef{Name: c.Namespace, UID: runtimeID}
+	if c.Permission == nil || validateHubWorkerPermission(c, ns) != nil {
+		t.Fatal("permission section refused", c.Permission)
+	}
+	if c.Capacity != nil {
+		if err := validateHubWorkerCapacity(c.Capacity, hubWorkerTestIDs(), c.Namespace); err != nil {
+			t.Fatal("capacity section refused", err)
+		}
+		w := &hubWorker{config: c, ids: hubWorkerTestIDs()}
+		if err := w.validCleanupConfig(); c.Cleanup == nil || err != nil {
+			t.Fatal("cleanup section refused", err)
+		}
+	}
+	t.Logf("sections capacity=%t cleanup=%t permission=%t", c.Capacity != nil, c.Cleanup != nil, c.Permission != nil)
 }

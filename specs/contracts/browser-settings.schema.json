@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://asservat.io/spec/v1/browser-settings.schema.json",
   "title": "Protected browser session settings v1",
-  "description": "Content of browser.json in a pinned administrator-protected ConfigMap. No credentials or public configuration API. Epoch changes invalidate existing browser credentials; current user permissions remain independently required.",
+  "description": "Content of browser.json in a pinned administrator-protected ConfigMap. No credentials or public configuration API. A Helm-rendered document omits rootID and sessionEpoch; the reader supplies them from the installation IDs. Epoch changes invalidate existing browser credentials; current user permissions remain independently required.",
   "type": "object",
   "additionalProperties": false,
   "properties": {
@@ -75,8 +75,6 @@
   "required": [
     "schemaVersion",
     "revision",
-    "rootID",
-    "sessionEpoch",
     "issuer",
     "clientID",
     "origin",

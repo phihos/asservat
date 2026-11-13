@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -46,13 +47,17 @@ func TestReadRuntimeLoginsFollowsSecretVolumeLayout(t *testing.T) {
 
 func TestReadSetupIDsRequiresUUIDs(t *testing.T) {
 	dir := t.TempDir()
-	for key, v := range map[string]string{"installationID": "10000000-0000-4000-8000-000000000001", "clusterID": "10000000-0000-4000-8000-000000000002", "issuerEpoch": "10000000-0000-4000-8000-000000000003\n"} {
+	for i, key := range contracts.InstallationIDKeys() {
+		v := fmt.Sprintf("10000000-0000-4000-8000-%012d", i+1)
+		if key == "issuerEpoch" {
+			v = "10000000-0000-4000-8000-000000000099\n"
+		}
 		if err := os.WriteFile(filepath.Join(dir, key), []byte(v), 0o600); err != nil {
 			t.Fatal(err)
 		}
 	}
 	ids, err := readSetupIDs(dir)
-	if err != nil || ids.IssuerEpoch != "10000000-0000-4000-8000-000000000003" {
+	if err != nil || ids.IssuerEpoch != "10000000-0000-4000-8000-000000000099" {
 		t.Fatal(ids, err)
 	}
 	if err = os.WriteFile(filepath.Join(dir, "clusterID"), []byte("cluster"), 0o600); err != nil {

@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
+	"os"
 	"time"
 
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
@@ -71,7 +72,8 @@ func validConnectorConfig(c contracts.ConnectorConfig) error {
 	default:
 		return bad("mode")
 	}
-	if !authorization.UUID(c.ClusterID) || !authorization.UUID(c.PeerID) || len(validation.IsDNS1123Label(c.Namespace)) != 0 {
+	if c.Mode == contracts.ConnectorModeCluster && (!authorization.UUID(c.ClusterID) || !authorization.UUID(c.PeerID)) ||
+		c.Mode == contracts.ConnectorModeCombined && (c.ClusterID != "" || c.PeerID != "") || len(validation.IsDNS1123Label(c.Namespace)) != 0 {
 		return bad("binding")
 	}
 	for _, name := range []string{c.Deployment, c.ServiceAccount, c.ClusterCredential} {
@@ -95,6 +97,26 @@ func validConnectorConfig(c contracts.ConnectorConfig) error {
 		}
 	}
 	return nil
+}
+
+// combinedOfferMatches reports whether the hub's combined-mode offer names
+// the installation, issuer epoch and permission root of the IDs Secret.
+func combinedOfferMatches(o contracts.RegionalOffer, ids contracts.InstallationIDs) bool {
+	return o.InstallationID == ids.InstallationID && o.IssuerEpoch == ids.IssuerEpoch && o.PermissionRootID == ids.PermissionRootID
+}
+
+// readCombinedIDs reads the mounted `<name>-ids` Secret.
+func readCombinedIDs() (contracts.InstallationIDs, error) {
+	root, err := os.OpenRoot(contracts.InstallationIDsRoot)
+	if err != nil {
+		return contracts.InstallationIDs{}, &fixedStepError{"ids", mounts.ErrUnavailable}
+	}
+	defer root.Close()
+	ids, err := contracts.ReadInstallationIDs(root)
+	if err != nil {
+		return ids, &fixedStepError{"ids", err}
+	}
+	return ids, nil
 }
 
 // kubernetesRoots reads the projected kube-root-ca.crt bundle.

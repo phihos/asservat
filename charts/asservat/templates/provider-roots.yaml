@@ -1,0 +1,18 @@
+{{- /* Public PEM roots of the external providers, one key per provider
+     (asservat.providerRoots). Bundled providers use their state Secret. */}}
+{{- if include "asservat.hub" . }}
+{{- $s := .Values.services }}
+{{- $roots := dict }}
+{{- if ne $s.postgres.provider "bundled" }}{{ $_ := set $roots "postgres.crt" (required "services.postgres.external.rootsPEM is required" $s.postgres.external.rootsPEM) }}{{ end }}
+{{- if ne $s.objectStore.provider "seaweedfs" }}{{ $_ := set $roots "objectStore.crt" (required "services.objectStore.external.rootsPEM is required" $s.objectStore.external.rootsPEM) }}{{ end }}
+{{- if ne $s.keyService.provider "openbao" }}{{ $_ := set $roots "openBao.crt" (required "services.keyService.external.rootsPEM is required" $s.keyService.external.rootsPEM) }}{{ end }}
+{{- if $roots }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ printf "%s-provider-roots" (include "asservat.name" .) }}
+  namespace: {{ .Release.Namespace }}
+  labels: {{ include "asservat.labels" (list . "provider-roots") | nindent 4 }}
+data: {{ toYaml $roots | nindent 2 }}
+{{- end }}
+{{- end }}

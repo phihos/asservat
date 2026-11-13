@@ -12,20 +12,32 @@ import (
 	value "asservat.local/asservat/internal/domain/identity"
 )
 
-// Bootstrap pins an administrator-protected ConfigMap UID and the installation
-// root. Public input cannot select a different configuration or credential.
+// Bootstrap pins the Helm-rendered ConfigMap UID, the installation root and
+// session epoch (the <name>-ids Secret). A Helm-rendered document omits
+// rootID and sessionEpoch; the reader supplies them. Public input cannot
+// select a different configuration or credential.
 type BrowserSettingsClient struct {
-	client          *PermissionClient
-	name, uid, root string
+	client                 *PermissionClient
+	name, uid, root, epoch string
 }
 
 var _ app.BrowserSettingsReader = (*BrowserSettingsClient)(nil)
 
+// NewBrowserSettingsClient reads a document that carries its own session
+// epoch (sessionEpoch present).
+//
+// Deprecated: use NewBrowserSettingsReader with the IDs Secret's epoch.
 func NewBrowserSettingsClient(client *PermissionClient, name, uid, root string) (*BrowserSettingsClient, error) {
-	if client == nil || !installationRefValid(name, uid) || !authorization.UUID(root) {
+	return NewBrowserSettingsReader(client, name, uid, root, "")
+}
+
+// NewBrowserSettingsReader fills an omitted rootID and sessionEpoch from root
+// and epoch; a present value must equal them.
+func NewBrowserSettingsReader(client *PermissionClient, name, uid, root, epoch string) (*BrowserSettingsClient, error) {
+	if client == nil || !installationRefValid(name, uid) || !authorization.UUID(root) || epoch != "" && !authorization.UUID(epoch) {
 		return nil, value.ErrInvalid
 	}
-	return &BrowserSettingsClient{client, name, uid, root}, nil
+	return &BrowserSettingsClient{client, name, uid, root, epoch}, nil
 }
 func canonicalBrowserOrigin(s string) bool {
 	u, e := url.Parse(s)
@@ -42,7 +54,13 @@ func (c *BrowserSettingsClient) BrowserSettings(ctx context.Context) (value.Brow
 	}
 	var wire contracts.BrowserSettings
 	digest, err := decodePermissionSpec([]byte(data["browser.json"]), c.client.validator.browserSchema, &wire)
-	if err != nil || wire.RootID != c.root || !canonicalBrowserOrigin(wire.Origin) {
+	if wire.RootID == "" {
+		wire.RootID = c.root
+	}
+	if wire.SessionEpoch == "" {
+		wire.SessionEpoch = c.epoch
+	}
+	if err != nil || wire.RootID != c.root || c.epoch != "" && wire.SessionEpoch != c.epoch || !canonicalBrowserOrigin(wire.Origin) {
 		return zero, value.ErrUnavailable
 	}
 	u, e := url.Parse(wire.Issuer)

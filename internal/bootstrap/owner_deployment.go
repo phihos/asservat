@@ -523,6 +523,14 @@ func (d *OwnerDeployment) RunPublic(listener net.Listener) error {
 			_ = d.recordingCollect.Run(d.root)
 		}()
 	}
+	if d.inputs.offer != nil {
+		// Decision 11: the combined-mode connector reads the offer.
+		d.owners.Add(1)
+		go func() {
+			defer d.owners.Done()
+			_ = d.inputs.offer.publish(d.root, d.inputs.providerInputs)
+		}()
+	}
 	if d.history != nil {
 		d.owners.Add(1)
 		go func() {

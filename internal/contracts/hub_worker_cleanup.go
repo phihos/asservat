@@ -13,9 +13,9 @@ type HubWorkerCleanup struct {
 // Fixed files under HubWorkerDeploymentRoot for the cleanup child.
 const (
 	// HubWorkerCleanupStorageFile is the cleanup object-store principal
-	// (`<name>-s3-hub-worker-cleanup`, key credentials.json).
+	// (`<name>-s3-operation-cleanup`, key credentials.json).
 	HubWorkerCleanupStorageFile = "cleanup-storage.json"
 	// HubWorkerCleanupVerifyStorageFile is the independent verification
-	// principal (`<name>-s3-hub-worker-verify`, key credentials.json).
+	// principal (`<name>-s3-operation-verify`, key credentials.json).
 	HubWorkerCleanupVerifyStorageFile = "verify-storage.json"
 )

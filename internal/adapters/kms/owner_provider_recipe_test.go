@@ -171,28 +171,25 @@ func TestOwnerProviderRecipeRejectsUnsafeInputBeforeGeneration(t *testing.T) {
 	}
 }
 
-// Provider policy names are global within a mount/provider namespace; one
-// control cluster may contain more than one owner. Names derive from names
-// only (Helm-native installation), so a recreated object keeps its roles.
+// Provider role and policy names are "<name>-hub-api-<purpose>": the owner
+// ServiceAccount name plus the purpose (providerconfig.OpenBaoRoleName), as
+// setup creates them. One OpenBao serves one installation; a recreated
+// object keeps its roles, and another owner account gets its own names.
 func TestOwnerProviderRecipeNamesSeparateCompleteOriginalScopes(t *testing.T) {
 	in, account, secret, now := ownerProviderRecipeInput(t)
 	original, e := OwnerProviderRecipeFor(in, "owner-auth", "auth_kubernetes_original", account, secret, now)
 	if e != nil {
 		t.Fatal(e)
 	}
+	for _, role := range original.Roles {
+		if role.Name != account.Name+"-"+role.Purpose {
+			t.Fatal("role name is not the account name plus the purpose", role.Name)
+		}
+	}
 	for name, change := range map[string]func(*contracts.OwnerDeployment, *contracts.WorkerObjectReference){
-		"namespace": func(v *contracts.OwnerDeployment, _ *contracts.WorkerObjectReference) {
-			v.Namespace = contracts.WorkerObjectReference{Name: "another-hub", UID: "20000000-0000-4000-8000-000000000003"}
-		},
 		"account": func(_ *contracts.OwnerDeployment, a *contracts.WorkerObjectReference) {
 			a.Name = "another-owner"
 			a.UID = "20000000-0000-4000-8000-000000000004"
-		},
-		"cluster": func(v *contracts.OwnerDeployment, _ *contracts.WorkerObjectReference) {
-			v.ClusterID = "20000000-0000-4000-8000-000000000002"
-		},
-		"installation": func(v *contracts.OwnerDeployment, _ *contracts.WorkerObjectReference) {
-			v.InstallationID = "20000000-0000-4000-8000-000000000001"
 		},
 	} {
 		t.Run(name, func(t *testing.T) {

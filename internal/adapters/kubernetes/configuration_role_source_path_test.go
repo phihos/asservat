@@ -86,7 +86,7 @@ func newConfigurationSourcePathFixtureLimiter(t *testing.T, limiter flowcontrol.
 	add(OwnerWorkloadAdmission(workload))
 	add(FleetConfigurationAdmission(fleetPlan))
 	add(OwnerConfigurationAdmission(ownerPlan))
-	fleetRaw, e := json.Marshal(contracts.FleetSettings{SchemaVersion: "fleet-settings/v1", Revision: 1, InstallationID: in.InstallationID, IssuerEpoch: ownerID(9), Issuer: "https://id.example.test", Clients: []string{"console"}, Subjects: []contracts.IdentitySubject{}, Groups: []string{"operators"}, DeliveryProfiles: []string{"ops"}, MaxActiveBootstraps: 8, MaxBootstrapHistory: 16, MaxClusters: 16})
+	fleetRaw, e := json.Marshal(contracts.FleetSettings{SchemaVersion: "fleet-settings/v1", Revision: 1, Issuer: "https://id.example.test", Clients: []string{"console"}, Subjects: []contracts.IdentitySubject{}, Groups: []string{"operators"}, DeliveryProfiles: []string{"ops"}, MaxActiveBootstraps: 8, MaxBootstrapHistory: 16, MaxClusters: 16})
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -277,7 +277,7 @@ func newConfigurationSourcePathFixtureLimiter(t *testing.T, limiter flowcontrol.
 	if e != nil {
 		t.Fatal(e)
 	}
-	fs, e := NewProtectedFleetSettings(observer, fp, in.FleetSource.Name, in.FleetSource.UID, in.InstallationID)
+	fs, e := NewProtectedFleetSettings(observer, fp, in.FleetSource.Name, in.FleetSource.UID, in.InstallationID, ownerID(9))
 	if e != nil {
 		t.Fatal(e)
 	}

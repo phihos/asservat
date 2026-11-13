@@ -68,18 +68,15 @@ func newPublicDownloads(ctx context.Context, d *OwnerDeployment, observer, probe
 	control := cfg.NamespaceRef{Name: c.Namespace.Name, UID: c.Namespace.UID}
 
 	// The download environment and the worker configuration are hub-held.
-	ea, ep := capacityWorkerGuard(p.DownloadEnvironment.Guard)
-	envGuard, err := kube.NewDownloadEnvironmentProtection(observer, probe, cfg.ConfigMapAdministration{Name: p.DownloadEnvironment.Guard.Name, SourceName: p.DownloadEnvironment.Source.Name, ControlNamespace: control, Administrators: ea}, ep)
-	if err != nil {
-		return nil, mounts.ErrUnavailable
-	}
 	// ADR-204 decision 4: one derived path per cluster in the guarded catalog
 	// read at start; a catalog change restarts the process (ADR-196).
 	paths, err := downloadEnvironmentPaths(installation, c.ClusterID, p.DownloadEnvironment.Paths, p.DownloadEnvironment.PathTemplate, catalogTargets(catalog.catalog))
 	if err != nil {
 		return nil, err
 	}
-	environment, err := kube.NewDownloadEnvironmentSource(observer, envGuard, p.DownloadEnvironment.Source.Name, p.DownloadEnvironment.Source.UID, root, installation, paths)
+	// Helm renders the environment; its recovery epoch is the IDs Secret's
+	// issuer epoch (WorkerPKI.IssuerEpoch).
+	environment, err := kube.NewPlainDownloadEnvironmentReader(observer, p.DownloadEnvironment.Source.Name, p.DownloadEnvironment.Source.UID, root, installation, p.WorkerPKI.IssuerEpoch, paths)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}

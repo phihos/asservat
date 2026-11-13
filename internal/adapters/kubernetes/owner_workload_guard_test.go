@@ -12,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/artifact"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	"k8s.io/client-go/rest"
 )
@@ -43,7 +45,7 @@ func TestOwnerWorkloadProtectionCurrentIsStableWithoutAdmissionRequests(t *testi
 	if e != nil {
 		t.Fatal(e)
 	}
-	if guard.digest != WorkloadProtectionDigest(permissionCluster, plan.ControlNamespace.Name, plan.Deployment) {
+	if guard.digest != artifact.Digest(contracts.WorkloadSourceDigest(permissionCluster, plan.ControlNamespace.Name, plan.Deployment)) {
 		t.Fatal("protection digest changed its derivation")
 	}
 	digest, until, e := guard.Current(context.Background())

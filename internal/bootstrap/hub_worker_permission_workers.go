@@ -207,7 +207,7 @@ func (w *hubWorker) openContextDeletion(ctx context.Context, v contracts.HubWork
 		return nil, mounts.ErrUnavailable
 	}
 	root, installation := w.ids.PermissionRootID, w.ids.InstallationID
-	roots, err := readPEMRoots(ctx, w.files, contracts.HubWorkerEvidenceStoreRootsFile)
+	roots, err := readPEMRoots(ctx, w.files, contracts.HubWorkerAuditStoreRootsFile)
 	if err != nil {
 		return nil, &fixedStepError{"evidence-roots", err}
 	}

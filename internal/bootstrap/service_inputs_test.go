@@ -13,19 +13,22 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"asservat.local/asservat/internal/contracts"
 )
 
-var serviceTestIDs = contracts.ServiceIDs{InstallationID: "10000000-0000-4000-8000-000000000001", ClusterID: "10000000-0000-4000-8000-000000000002", PermissionRootID: "10000000-0000-4000-8000-000000000003", IssuerEpoch: "10000000-0000-4000-8000-000000000004"}
+var serviceTestIDs = contracts.ServiceIDs{InstallationID: "10000000-0000-4000-8000-000000000001", ClusterID: "10000000-0000-4000-8000-000000000002", PermissionRootID: "10000000-0000-4000-8000-000000000003", IssuerEpoch: "10000000-0000-4000-8000-000000000004",
+	BrowserRootID: "10000000-0000-4000-8000-000000000005", SessionEpoch: "10000000-0000-4000-8000-000000000006", RoleSetupID: "10000000-0000-4000-8000-000000000007", PeerID: "10000000-0000-4000-8000-000000000008"}
 
 // serviceTestRoots writes the mounted ids directory and returns it opened.
 func serviceTestIDsRoot(t *testing.T, ids contracts.ServiceIDs) *os.Root {
 	t.Helper()
 	dir := t.TempDir()
-	for name, v := range map[string]string{"installationID": ids.InstallationID, "clusterID": ids.ClusterID, "permissionRootID": ids.PermissionRootID, "issuerEpoch": ids.IssuerEpoch, "browserRootID": "unused"} {
+	for name, v := range map[string]string{"installationID": ids.InstallationID, "clusterID": ids.ClusterID, "permissionRootID": ids.PermissionRootID, "issuerEpoch": ids.IssuerEpoch,
+		"browserRootID": ids.BrowserRootID, "sessionEpoch": ids.SessionEpoch, "roleSetupID": ids.RoleSetupID, "peerID": ids.PeerID} {
 		if err := os.WriteFile(filepath.Join(dir, name), []byte(v), 0o400); err != nil {
 			t.Fatal(err)
 		}
@@ -80,6 +83,60 @@ func TestServiceIDsAreGeneratedUUIDs(t *testing.T) {
 	bad.IssuerEpoch = "epoch"
 	if _, err = readServiceIDs(context.Background(), serviceTestIDsRoot(t, bad)); err == nil {
 		t.Fatal("non-UUID issuer epoch accepted")
+	}
+}
+
+// The `<name>-audit-mac` keys are four files written once by the secrets Job;
+// both versions carry the same setup ID and the keys are 32 bytes.
+func TestAuditMACReadsTheSecretKeys(t *testing.T) {
+	write := func(files map[string]string) *os.Root {
+		dir := t.TempDir()
+		for name, v := range files {
+			if err := os.WriteFile(filepath.Join(dir, name), []byte(v), 0o400); err != nil {
+				t.Fatal(err)
+			}
+		}
+		root, err := os.OpenRoot(dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { root.Close() })
+		return root
+	}
+	setup := "10000000-0000-4000-8000-0000000000aa"
+	valid := func() map[string]string {
+		return map[string]string{contracts.AuditMACInputVersion: setup + "-input/v1", contracts.AuditMACInputKey: strings.Repeat("i", 32),
+			contracts.AuditMACAccountVersion: setup + "-account/v1", contracts.AuditMACAccountKey: strings.Repeat("a", 32)}
+	}
+	mac, version, err := readAuditMAC(context.Background(), write(valid()))
+	if err != nil || mac == nil || version != setup+"-account/v1" {
+		t.Fatal("audit MAC", version, err)
+	}
+	mac.Close()
+	for name, mutate := range map[string]func(map[string]string){
+		"missing account key": func(m map[string]string) { delete(m, contracts.AuditMACAccountKey) },
+		"short input key":     func(m map[string]string) { m[contracts.AuditMACInputKey] = "short" },
+		"different setup IDs": func(m map[string]string) {
+			m[contracts.AuditMACAccountVersion] = "10000000-0000-4000-8000-0000000000bb-account/v1"
+		},
+		"non-UUID version":    func(m map[string]string) { m[contracts.AuditMACInputVersion] = "v1-input/v1" },
+		"equal input/account": func(m map[string]string) { m[contracts.AuditMACAccountKey] = m[contracts.AuditMACInputKey] },
+	} {
+		files := valid()
+		mutate(files)
+		if _, _, err := readAuditMAC(context.Background(), write(files)); err == nil {
+			t.Fatal("accepted:", name)
+		}
+	}
+}
+
+// Role names are exactly setup's `<name>-<component>-<purpose>` on the owner
+// auth mount, for the `<name>-<component>` account.
+func TestServiceLoginUsesSetupRoleNames(t *testing.T) {
+	l := serviceLogin("asservat", "hub", "publisher", contracts.OwnerProviderEndpoint{}, "audit-wrap", "verifier-sign")
+	if l.AuthMount != contracts.SmallOpenBaoOwnerAuthMount || l.ServiceAccount != "asservat-publisher" || l.Namespace != "hub" || len(l.Roles) != 2 ||
+		l.Roles["audit-wrap"] != "asservat-publisher-audit-wrap" || l.Roles["verifier-sign"] != "asservat-publisher-verifier-sign" {
+		t.Fatal("login", l)
 	}
 }
 
@@ -149,12 +206,5 @@ func TestServiceTopologyPinsUnionCatalogSlots(t *testing.T) {
 		if _, err = serviceTopologyPins(fixed, []contracts.OwnerPublicCluster{changed}); err == nil {
 			t.Fatal("accepted:", name)
 		}
-	}
-}
-
-func TestPlatformWorkloadDigestSeparatesFields(t *testing.T) {
-	a := contracts.PlatformWorkloadDigest("c", "ns", "hub-api")
-	if a == contracts.PlatformWorkloadDigest("c", "nsh", "ub-api") || a == contracts.PlatformWorkloadDigest("c", "ns", "hub-api2") || a != contracts.PlatformWorkloadDigest("c", "ns", "hub-api") {
-		t.Fatal("digest is not a deterministic field-separated value")
 	}
 }

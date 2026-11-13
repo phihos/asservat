@@ -41,7 +41,8 @@ type HubWorkerWorkerConfiguration struct {
 }
 
 // HubWorkerContextDeletion is the evidence store the deletion child purges.
-// Its trust roots are HubWorkerEvidenceStoreRootsFile and its list-and-delete
+// It is the selected object store's evidence bucket: its trust roots are
+// HubWorkerAuditStoreRootsFile and its list-and-delete
 // credential HubWorkerEvidenceDeleteStorageFile.
 type HubWorkerContextDeletion struct {
 	EvidenceStore HubWorkerObjectStore `json:"evidenceStore"`
@@ -59,10 +60,8 @@ type HubWorkerIdentitySettings struct {
 // Fixed files under HubWorkerDeploymentRoot for the context deletion child.
 const (
 	// HubWorkerEvidenceDeleteStorageFile is the evidence list-and-delete
-	// principal (`<name>-s3-hub-worker-evidence-delete`, credentials.json).
+	// principal (`<name>-s3-evidence-delete`, credentials.json).
 	HubWorkerEvidenceDeleteStorageFile = "evidence-delete-storage.json"
-	// HubWorkerEvidenceStoreRootsFile is the evidence store's trust roots.
-	HubWorkerEvidenceStoreRootsFile = "roots/evidence-store.crt"
 )
 
 // RetentionSourceResource names the hub retention source in its digest.

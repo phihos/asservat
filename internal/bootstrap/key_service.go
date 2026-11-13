@@ -84,21 +84,22 @@ func readKeyServiceInputs(ctx context.Context, files, ids *os.Root) (keyServiceI
 	if err != nil {
 		return keyServiceInputs{}, err
 	}
-	scope := authorization.KeyScope{InstallationID: v.InstallationID, Purpose: "artifact", KeyID: c.KeyID}
 	_, pg := servicePostgres(c.Postgres, nil)
-	if !scope.Valid() || c.Port < 1 || c.Port > 65535 || c.Concurrency < 1 || c.Concurrency > 64 || len(validation.IsDNS1123Label(c.Namespace)) != 0 || !pg || !ownerEndpoint(c.OpenBao) ||
-		!ownerProviderName.MatchString(c.WorkerPKIMount) || !ownerProviderName.MatchString(c.ConnectorPKIMount) || c.WorkerPKIMount == c.ConnectorPKIMount {
+	if !validServiceScope(c.Name, c.Namespace) || !artifactScope(v.InstallationID).Valid() || c.Port < 1 || c.Port > 65535 || c.Concurrency < 1 || c.Concurrency > 64 || !pg || !ownerEndpoint(c.OpenBao) {
 		return keyServiceInputs{}, &fixedStepError{"config", mounts.ErrUnavailable}
 	}
 	if d := c.Downloads; d != nil {
-		if len(validation.IsDNS1123Subdomain(d.WorkerConfiguration)) != 0 || len(validation.IsDNS1123Subdomain(d.ClusterCatalog)) != 0 {
-			return keyServiceInputs{}, &fixedStepError{"config", mounts.ErrUnavailable}
-		}
 		if _, err = serviceTopologyPins(d.RetentionTopologies, nil); err != nil {
 			return keyServiceInputs{}, &fixedStepError{"config", err}
 		}
 	}
 	return keyServiceInputs{c, v}, nil
+}
+
+// artifactScope is the artifact key scope; its key ID is the one the secrets
+// Job writes into `<name>-artifact-key` (artifactKeyID).
+func artifactScope(installation string) authorization.KeyScope {
+	return authorization.KeyScope{InstallationID: installation, Purpose: "artifact", KeyID: artifactKeyID(installation)}
 }
 
 // serviceTopologyPins unions the configured topologies with each joined
@@ -170,12 +171,12 @@ func keyServiceAcquisition(ctx context.Context, c keyServiceInputs, api *rest.Co
 	if d == nil || pool == nil {
 		return nil, none, mounts.ErrUnavailable
 	}
-	profile, err := kube.ReadWorkerProfile(ctx, observer, d.WorkerConfiguration, c.InstallationID)
+	profile, err := kube.ReadWorkerProfile(ctx, observer, c.Name+"-worker-profile", c.InstallationID)
 	// The workers' namespace is never the key service's (ADR-204 decision 1).
 	if err != nil || profile.Namespace == c.Namespace {
 		return nil, none, &fixedStepError{"key-service/worker-configuration", mounts.ErrUnavailable}
 	}
-	catalog, err := readServiceCatalog(ctx, observer, api, c.Namespace, d.ClusterCatalog)
+	catalog, err := readServiceCatalog(ctx, observer, api, c.Namespace, c.Name+"-cluster-catalog")
 	if err != nil {
 		return nil, none, &fixedStepError{"key-service/catalog", err}
 	}
@@ -265,7 +266,7 @@ func NewKeyService(ctx context.Context, files, ids *os.Root) (k *KeyService, err
 		pools[purpose] = pool
 		k.closers = append(k.closers, pool.Close)
 	}
-	scope := authorization.KeyScope{InstallationID: c.InstallationID, Purpose: "artifact", KeyID: c.KeyID}
+	scope := artifactScope(c.InstallationID)
 	api, err := serviceKubernetes()
 	if err != nil {
 		return k, &fixedStepError{"kubernetes", mounts.ErrUnavailable}
@@ -295,11 +296,11 @@ func NewKeyService(ctx context.Context, files, ids *os.Root) (k *KeyService, err
 		return k, mounts.ErrUnavailable
 	}
 	// Client CAs are the worker and connector PKI issuers (field class J).
-	keyClientRoots, err := readPKIRoots(startup, c.OpenBao, baoRoots, c.WorkerPKIMount)
+	keyClientRoots, err := readPKIRoots(startup, c.OpenBao, baoRoots, contracts.SmallOpenBaoWorkerPKIMount)
 	if err != nil {
 		return k, err
 	}
-	connectorClientRoots, err := readPKIRoots(startup, c.OpenBao, baoRoots, c.ConnectorPKIMount)
+	connectorClientRoots, err := readPKIRoots(startup, c.OpenBao, baoRoots, contracts.SmallOpenBaoConnectorPKIMount)
 	if err != nil {
 		return k, err
 	}

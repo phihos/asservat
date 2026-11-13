@@ -19,6 +19,7 @@ import (
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/packets"
 	"asservat.local/asservat/internal/adapters/postgres"
+	"asservat.local/asservat/internal/adapters/providerconfig"
 	"asservat.local/asservat/internal/application/evidence"
 	privacyapp "asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/contracts"
@@ -28,7 +29,6 @@ import (
 	"asservat.local/asservat/internal/domain/identity"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"k8s.io/apimachinery/pkg/util/validation"
 )
 
 // Publisher is the ADR-181 asynchronous publication verifier. It publishes
@@ -65,6 +65,11 @@ type publisherInputs struct {
 	contracts.ServiceIDs
 }
 
+// keyService is the hub-local key service's Service address.
+func (c publisherInputs) keyService() string {
+	return "https://" + c.Name + "-key-service." + c.Namespace + ".svc:9447"
+}
+
 func readPublisherInputs(ctx context.Context, files, ids *os.Root) (publisherInputs, error) {
 	c, err := readServiceConfig(ctx, files, contracts.DecodePublisherConfig)
 	if err != nil {
@@ -75,10 +80,8 @@ func readPublisherInputs(ctx context.Context, files, ids *os.Root) (publisherInp
 		return publisherInputs{}, err
 	}
 	_, pg := servicePostgres(c.Postgres, nil)
-	scope := authorization.KeyScope{InstallationID: v.InstallationID, Purpose: "artifact", KeyID: c.KeyID}
-	if len(validation.IsDNS1123Label(c.Namespace)) != 0 || c.PollSeconds < 1 || c.PollSeconds > 300 || c.Batch < 1 || c.Batch > 64 || !pg || !validServiceStore(c.AuditStore) || !validServiceStore(c.Evidence) ||
-		!ownerEndpoint(c.OpenBao) || !ownerEndpoint(c.KeyService) || !scope.Valid() || len(validation.IsDNS1123Subdomain(c.ClusterCatalog)) != 0 ||
-		!ownerProviderName.MatchString(c.AuditMount) || !ownerProviderName.MatchString(c.AuditKey) || !ownerProviderName.MatchString(c.VerifierPKIMount) || !ownerProviderName.MatchString(c.VerifierRole) || c.AuditMount == c.VerifierPKIMount {
+	if !validServiceScope(c.Name, c.Namespace) || c.PollSeconds < 1 || c.PollSeconds > 300 || c.Batch < 1 || c.Batch > 64 || !pg || !validServiceStore(c.AuditStore) || !validServiceStore(c.Evidence) ||
+		!ownerEndpoint(c.OpenBao) || !artifactScope(v.InstallationID).Valid() {
 		return publisherInputs{}, &fixedStepError{"config", mounts.ErrUnavailable}
 	}
 	if _, err = serviceTopologyPins(c.RetentionTopologies, nil); err != nil {
@@ -142,7 +145,7 @@ func NewPublisher(ctx context.Context, files, ids *os.Root) (_ *Publisher, err e
 		phase = "sql/" + purpose
 		// The login is the derived role name; nothing else is verified.
 		name, known := postgres.PublicRuntimeRoleName(installation, purpose)
-		config, err := in.sqlConfig(startup, "sql-public-"+purpose+".json")
+		config, err := in.sqlConfig(startup, "sql-"+purpose+".json")
 		if !known || err != nil || config == nil || config.ConnConfig.User != name {
 			return nil, mounts.ErrUnavailable
 		}
@@ -169,7 +172,7 @@ func NewPublisher(ctx context.Context, files, ids *os.Root) (_ *Publisher, err e
 	}
 	phase = "catalog"
 	// ADR-203 decision 6: the catalog adds the joined slots' topologies.
-	if out.catalog, err = readServiceCatalog(startup, observer, api, c.Namespace, c.ClusterCatalog); err != nil {
+	if out.catalog, err = readServiceCatalog(startup, observer, api, c.Namespace, c.Name+"-cluster-catalog"); err != nil {
 		return nil, err
 	}
 	phase = "topology"
@@ -227,8 +230,9 @@ func NewPublisher(ctx context.Context, files, ids *os.Root) (_ *Publisher, err e
 	phase = "providers"
 	// ADR-203 decision 3: every provider login and renewal needs a current
 	// recovery observation.
-	login := kms.ProviderLogin{Provider: contracts.OwnerProviderEndpoint{Endpoint: c.OpenBao, Roots: roots[contracts.OpenBaoRootsFile]}, AuthMount: c.Provider.AuthMount, Namespace: c.Namespace, ServiceAccount: c.Provider.ServiceAccount, Roles: c.Provider.Roles}
-	keys := kms.PublisherProviderKeys{AuditMount: c.AuditMount, AuditKey: c.AuditKey, PKIMount: c.VerifierPKIMount, VerifierRole: c.VerifierRole}
+	login := serviceLogin(c.Name, c.Namespace, "publisher", contracts.OwnerProviderEndpoint{Endpoint: c.OpenBao, Roots: roots[contracts.OpenBaoRootsFile]}, "audit-wrap", "audit-unwrap", "verifier-sign")
+	names := providerconfig.OpenBaoNamesFor(installation)
+	keys := kms.PublisherProviderKeys{AuditMount: contracts.SmallOpenBaoAuditMount, AuditKey: names.PublisherAuditKey, PKIMount: contracts.SmallOpenBaoWorkerPKIMount, VerifierRole: names.VerifierRole}
 	if out.providers, err = kms.NewInstalledPublisherProviderEffects(ctx, installation, login, keys, files, recoveryProof(recovery)); err != nil {
 		return nil, mounts.ErrUnavailable
 	}
@@ -261,7 +265,7 @@ func NewPublisher(ctx context.Context, files, ids *os.Root) (_ *Publisher, err e
 	// ADR-203 decision 4: the verifier key is created here, after core dumps
 	// are disabled, and signed only through the verifier-sign lifetime. The
 	// returned chain must verify against the worker PKI CA (field class J).
-	issuerRoots, err := readPKIRoots(startup, c.OpenBao, roots[contracts.OpenBaoRootsFile], c.VerifierPKIMount)
+	issuerRoots, err := readPKIRoots(startup, c.OpenBao, roots[contracts.OpenBaoRootsFile], contracts.SmallOpenBaoWorkerPKIMount)
 	if err != nil {
 		return nil, err
 	}
@@ -277,7 +281,7 @@ func NewPublisher(ctx context.Context, files, ids *os.Root) (_ *Publisher, err e
 		return nil, err
 	}
 	out.closers = append(out.closers, out.keys.CloseIdleConnections)
-	out.scope = authorization.KeyScope{InstallationID: installation, Purpose: "artifact", KeyID: c.KeyID}
+	out.scope = artifactScope(installation)
 	if !out.scope.Valid() || startup.Err() != nil {
 		return nil, mounts.ErrUnavailable
 	}
@@ -288,7 +292,7 @@ func NewPublisher(ctx context.Context, files, ids *os.Root) (_ *Publisher, err e
 // publish verifies and publishes one stored capture. Each attempt has its own
 // remote opener bound to that attempt; the key service decides every unwrap.
 func (p *Publisher) publish(ctx context.Context, item postgres.PendingContextPublication) error {
-	opener, err := kms.NewRemoteOpener(p.config.KeyService, p.scope, item.AttemptID, p.keys)
+	opener, err := kms.NewRemoteOpener(p.config.keyService(), p.scope, item.AttemptID, p.keys)
 	if err != nil {
 		return err
 	}

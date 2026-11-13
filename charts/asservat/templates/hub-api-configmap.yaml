@@ -1,11 +1,14 @@
-{{- if .Values.hub.hubApi.enabled }}
+{{- if include "asservat.hub" . }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ printf "%s-hub-api-config" .Values.installation.name }}
+  name: {{ printf "%s-config" (include "asservat.fullname" (list . "hub-api")) }}
   namespace: {{ .Release.Namespace }}
-  labels:
-    {{- include "asservat.hubApi.labels" . | nindent 4 }}
+  labels: {{ include "asservat.labels" (list . "hub-api") | nindent 4 }}
 data:
   config.json: {{ include "asservat.hubApi.config" . | quote }}
+  worker-controls.json: {{ include "asservat.hubApi.workerControls" . | quote }}
+  {{- with .Values.identity.providerRootsPEM }}
+  identity-ca.crt: {{ . | quote }}
+  {{- end }}
 {{- end }}

@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
 	value "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/privacy"
@@ -38,7 +39,7 @@ func TestSourceGuardsObserveNamespaceWithoutAdmissionPolicy(t *testing.T) {
 	}
 	// The capacity digests name the cluster and observed namespace only.
 	capacityDigest := func(any) artifact.Digest {
-		return namedDigest("asservat-capacity-protection/v2", permissionCluster, permissionControl.Name)
+		return artifact.Digest(contracts.NamespaceSourceDigest(permissionCluster, permissionControl.Name))
 	}
 	wantPermission := digest(struct {
 		ClusterID string

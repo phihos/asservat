@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/identity"
@@ -176,7 +177,7 @@ func OwnerWorkloadAdmission(p cfg.OwnerWorkloadAdministration) (*admission.Valid
 // chain, SQL registration and exact TLS peers.
 //
 // The digest names only the cluster, namespace and Deployment
-// (WorkloadProtectionDigest). policy and binding remain only for callers
+// (contracts.WorkloadSourceDigest). policy and binding remain only for callers
 // outside the hub-api that still read them.
 type OwnerWorkloadProtection struct {
 	observer, probe *PermissionClient
@@ -217,7 +218,7 @@ func NewOwnerWorkloadProtection(observer, probe *PermissionClient, plan cfg.Owne
 	plan.ConfigurationProbes = append([]cfg.OwnerConfigurationProbe(nil), plan.ConfigurationProbes...)
 	plan.SchedulingLeases = append([]cfg.OwnerSchedulingLease(nil), plan.SchedulingLeases...)
 	plan.CredentialSecrets = append([]cfg.OwnerCredentialSecret(nil), plan.CredentialSecrets...)
-	out := &OwnerWorkloadProtection{observer: observer, probe: probe, plan: plan, pin: pin, digest: WorkloadProtectionDigest(observer.clusterID, plan.ControlNamespace.Name, plan.Deployment)}
+	out := &OwnerWorkloadProtection{observer: observer, probe: probe, plan: plan, pin: pin, digest: artifact.Digest(contracts.WorkloadSourceDigest(observer.clusterID, plan.ControlNamespace.Name, plan.Deployment))}
 	if probe == nil {
 		if len(validation.IsDNS1123Subdomain(plan.Deployment)) != 0 || len(validation.IsDNS1123Label(plan.ControlNamespace.Name)) != 0 {
 			return nil, cfg.ErrInvalid

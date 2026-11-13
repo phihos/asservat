@@ -135,7 +135,7 @@ func seaweedGrant(g contracts.SeaweedGrant) ([]string, []map[string]any, error) 
 	if ValidateSeaweedCredential(g.Credential) != nil || g.Credential.Principal.Purpose == "admin" || !authorization.UUID(g.InstallationID) || !seaweedBucket.MatchString(g.Bucket) || strings.Contains(g.Bucket, "..") || len(g.Prefixes) > 32 {
 		return nil, nil, ErrSeaweedStorage
 	}
-	for _, id := range []string{g.ClusterID, g.RootID, g.SourceUID} {
+	for _, id := range []string{g.ClusterID, g.RootID} {
 		if id != "" && !authorization.UUID(id) {
 			return nil, nil, ErrSeaweedStorage
 		}
@@ -269,12 +269,14 @@ func seaweedScope(g contracts.SeaweedGrant) (prefixes []string, read, write, lis
 	return prefixes, read, write, list, nil
 }
 func seaweedAuditPrefixes(g contracts.SeaweedGrant) []string {
-	i, c, r, s := g.InstallationID, g.ClusterID, g.RootID, g.SourceUID
+	i, c, r := g.InstallationID, g.ClusterID, g.RootID
 	switch g.Credential.Principal.Purpose {
 	case "configuration-audit":
 		p := []string{"authority/v1/", "retention-acceptance/v1/", "lifecycle/v1/", "context-deletion/v1/", "download-worker-configuration/v1/" + i + "/"}
-		if c != "" && s != "" {
-			p = append(p, "hub-owner-configuration/v1/"+i+"/"+c+"/"+s+"/")
+		// The hub cluster's owner configuration audit, whatever ConfigMap
+		// identifies the revision: IAM is compiled before the ConfigMap exists.
+		if c != "" {
+			p = append(p, "hub-owner-configuration/v1/"+i+"/"+c+"/")
 		}
 		return p
 	case "owner-audit":

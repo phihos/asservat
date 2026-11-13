@@ -46,6 +46,11 @@ spec:
       labels:
         app.kubernetes.io/name: asservat-objectstore
         asservat.io/objectstore: {{ $name }}
+      annotations:
+        # SeaweedFS reads s3.json at start. The secrets hook recompiles the
+        # IAM Secret from the principal set (mode) with this image's
+        # compiler; a change of either restarts the store.
+        checksum/iam: {{ printf "%s\n%s" .Values.mode (include "asservat.image" .) | sha256sum | quote }}
     spec:
       automountServiceAccountToken: false
       enableServiceLinks: false

@@ -4,15 +4,21 @@ import "io"
 
 // Helm-native hub-api inputs (docs/reviews/helm-native-field-map.md). The
 // chart renders HubAPIConfig into ConfigMap <name>-hub-api-config, key
-// config.json. It carries only values Helm knows at render time; generated
-// IDs come from the <name>-ids Secret, Kubernetes UIDs are read by name at
-// startup and provider-produced keys and roots are read from OpenBao, the
-// mounted CA files and SQL.
+// config.json. It carries only values Helm knows at render time. Object
+// names derive from Name (HubAPIName), OpenBao mounts are the chart
+// constants (SmallOpenBao*Mount) and key and PKI role names derive from the
+// installation ID; generated IDs come from the <name>-ids Secret, Kubernetes
+// UIDs are read by name at startup and provider-produced keys and roots are
+// read from OpenBao, the mounted CA files and SQL.
 const (
 	HubAPIConfigFormat   = "asservat-hub-api-config/v1"
 	HubAPIConfigRoot     = "/run/asservat/hub-api"
 	HubAPIConfigFile     = "config.json"
 	HubAPIConfigMaxBytes = 128 << 10
+	// HubAPIWorkerControlsFile is the hub-api config ConfigMap's second key,
+	// mounted into OwnerObservationProjectionRoot: the download-worker control
+	// catalog (OwnerWorkerTrust), empty in a Helm-rendered install.
+	HubAPIWorkerControlsFile = "worker-controls.json"
 )
 
 // Fixed CA files in OwnerDeploymentRoot. Bundled providers mount their
@@ -32,60 +38,46 @@ const (
 // certificate always carries this SAN.
 const HubAPIKubernetesEndpoint = "https://kubernetes.default.svc"
 
+// HubAPIPostgresConnections is the owner pool's per-purpose connection count.
+const HubAPIPostgresConnections = 1
+
 type HubAPIConfig struct {
 	Format string `json:"format"`
-	// Namespace is the release namespace; Deployment and ServiceAccount
-	// name this hub-api workload, OwnerConfiguration the owner pool
-	// ConfigMap the hub-worker accepts.
-	Namespace          string `json:"namespace"`
-	Deployment         string `json:"deployment"`
-	ServiceAccount     string `json:"serviceAccount"`
-	OwnerConfiguration string `json:"ownerConfiguration"`
-	// AuditCredentials names the Secret mounted as provider-audit-storage.json.
-	AuditCredentials  string            `json:"auditCredentials"`
-	ProviderAuthMount string            `json:"providerAuthMount"`
-	Postgres          HubAPIPostgres    `json:"postgres"`
-	AuditStore        HubAPIAuditStore  `json:"auditStore"`
-	KeyService        HubAPIKeyService  `json:"keyService"`
-	Connections       int               `json:"connections"`
-	Concurrency       int               `json:"concurrency"`
-	APIContextStarts  *HubAPIStarts     `json:"apiContextStarts,omitempty"`
-	Observation       HubAPIObservation `json:"observation"`
-	Native            HubAPINative      `json:"native"`
-	Public            *HubAPIPublic     `json:"public,omitempty"`
+	// Name is installation.name; Namespace the release namespace.
+	Name        string            `json:"name"`
+	Namespace   string            `json:"namespace"`
+	Postgres    HubAPIPostgres    `json:"postgres"`
+	ObjectStore HubAPIObjectStore `json:"objectStore"`
+	OpenBao     HubAPIOpenBao     `json:"openBao"`
+	Connections int               `json:"connections"`
+	Concurrency int               `json:"concurrency"`
+	Observation HubAPIObservation `json:"observation"`
+	Native      HubAPINative      `json:"native"`
+	Public      *HubAPIPublic     `json:"public,omitempty"`
 }
 
 type HubAPIPostgres struct {
-	Host           string `json:"host"`
-	Port           int    `json:"port"`
-	Database       string `json:"database"`
-	MaxConnections int32  `json:"maxConnections"`
-}
-type HubAPIAuditStore struct {
-	Endpoint string `json:"endpoint"`
-	Region   string `json:"region"`
-	Bucket   string `json:"bucket"`
-}
-type HubAPIKeyService struct {
-	Endpoint   string `json:"endpoint"`
-	AuditMount string `json:"auditMount"`
-	AuditKey   string `json:"auditKey"`
-	PKIMount   string `json:"pkiMount"`
-	ServerRole string `json:"serverRole"`
-	ClientRole string `json:"clientRole"`
+	Host     string `json:"host"`
+	Port     int    `json:"port"`
+	Database string `json:"database"`
 }
 
-// HubAPIStarts names the context-start accounts the hub-api admits.
-type HubAPIStarts struct {
-	CapacityAccount  string `json:"capacityAccount"`
-	ExecutionAccount string `json:"executionAccount"`
-	CapacityAudience string `json:"capacityAudience,omitempty"`
+// HubAPIObjectStore is the chart's selected object store; the hub-api writes
+// its audit records to AuditBucket.
+type HubAPIObjectStore struct {
+	Endpoint       string `json:"endpoint"`
+	Region         string `json:"region"`
+	AuditBucket    string `json:"auditBucket"`
+	EvidenceBucket string `json:"evidenceBucket"`
+}
+type HubAPIOpenBao struct {
+	Endpoint string `json:"endpoint"`
 }
 
 // HubAPIObservation: Peers are remote regions' connector peers; in
 // combined mode the local connector peer is derived from the IDs Secret.
 // LocalCapacity serves the hub cluster's capacity observation to the
-// hub-worker, which is admitted by its ServiceAccount (TokenReview).
+// hub-worker (`<name>-hub-worker`), admitted by its ServiceAccount.
 type HubAPIObservation struct {
 	Peers         []HubAPIPeer         `json:"peers,omitempty"`
 	LocalCapacity *HubAPILocalCapacity `json:"localCapacity,omitempty"`
@@ -100,53 +92,32 @@ type HubAPILocalCapacity struct {
 	Keys           []string `json:"keys"`
 	LabelKeys      []string `json:"labelKeys,omitempty"`
 	AnnotationKeys []string `json:"annotationKeys,omitempty"`
-	// CallerAccount and CallerDeployment name the hub-worker.
-	CallerAccount    string `json:"callerAccount"`
-	CallerDeployment string `json:"callerDeployment"`
 }
 
+// HubAPINative: WorkerNamespaces are download-worker namespaces in the hub
+// cluster.
 type HubAPINative struct {
-	// ConnectorPKIMount is the OpenBao PKI mount whose CA issues connector
-	// certificates.
-	ConnectorPKIMount   string            `json:"connectorPKIMount"`
-	WorkerAPIs          []HubAPIWorkerAPI `json:"workerAPIs"`
-	RetentionTopologies []HubAPITopology  `json:"retentionTopologies"`
-	Connections         int               `json:"connections"`
-	Concurrency         int               `json:"concurrency"`
-}
-
-// HubAPIWorkerAPI is a download-worker namespace in the hub cluster.
-type HubAPIWorkerAPI struct {
-	Namespace string `json:"namespace"`
+	WorkerNamespaces    []string         `json:"workerNamespaces"`
+	RetentionTopologies []HubAPITopology `json:"retentionTopologies"`
 }
 type HubAPITopology struct {
 	TargetClusterID string `json:"targetClusterID"`
 	Name            string `json:"name"`
 }
 
-// HubAPIPublic enables the browser/MCP/download layer. Source fields name
-// ConfigMaps in the release namespace.
+// HubAPIPublic enables the browser/MCP/download layer. Its sources are the
+// Helm-rendered ConfigMaps named by HubAPIName in the release namespace.
 type HubAPIPublic struct {
-	Origin              string             `json:"origin"`
-	BrowserAudience     string             `json:"browserAudience"`
-	BrowserSettings     string             `json:"browserSettings"`
-	IdentitySettings    string             `json:"identitySettings"`
-	SessionTransit      OwnerPublicTransit `json:"sessionTransit"`
-	ClusterCatalog      string             `json:"clusterCatalog"`
-	WorkSigning         HubAPISigning      `json:"workSigning"`
-	WorkerConfiguration string             `json:"workerConfiguration"`
-	WorkerPKI           HubAPIWorkerPKI    `json:"workerPKI"`
-	DownloadEnvironment string             `json:"downloadEnvironment"`
-	// Processing names the capacity processing source, when configured.
-	Processing           string                  `json:"processing,omitempty"`
-	ArtifactKeyID        string                  `json:"artifactKeyID"`
+	Origin          string `json:"origin"`
+	BrowserAudience string `json:"browserAudience"`
+	// Processing reads the capacity processing source <name>-processing-source.
+	Processing           bool                    `json:"processing,omitempty"`
 	CaptureHistory       *CaptureHistoryLimits   `json:"captureHistory,omitempty"`
 	Standby              int                     `json:"standby"`
 	Captures             int                     `json:"captures"`
 	PreviewSeconds       int                     `json:"previewSeconds"`
 	DownloadPlan         OwnerPublicDownloadPlan `json:"downloadPlan"`
 	ProxyTLS             bool                    `json:"proxyTLS,omitempty"`
-	Port                 int                     `json:"port"`
 	Version              string                  `json:"version"`
 	OperationConcurrency int                     `json:"operationConcurrency"`
 	MCPPerIdentity       int                     `json:"mcpPerIdentity"`
@@ -158,20 +129,35 @@ type HubAPIPublic struct {
 	OperationAudit        OwnerPublicOperationAudit `json:"operationAudit"`
 	Fleet                 *HubAPIFleet              `json:"fleet,omitempty"`
 	PermissionDelegations []PermissionDelegation    `json:"permissionDelegations,omitempty"`
+	// RegionalOffer publishes ConfigMap <name>-regional-offer for the
+	// combined-mode connector (mode=combined).
+	RegionalOffer *HubAPIRegionalOffer `json:"regionalOffer,omitempty"`
 }
-type HubAPISigning struct {
-	Mount string `json:"mount"`
-	Name  string `json:"name"`
-}
-type HubAPIWorkerPKI struct {
-	Mount string `json:"mount"`
-	Role  string `json:"role"`
-}
+
+// HubAPIFleet enables bootstrap issuance (fleet.issuer set); the settings
+// ConfigMap is <name>-fleet and the channel mount SmallOpenBaoBootstrapMount.
 type HubAPIFleet struct {
-	Settings        string `json:"settings"`
-	ChannelMount    string `json:"channelMount"`
 	DeliveryProfile string `json:"deliveryProfile"`
 }
+
+// HubAPIRegionalOffer holds the offer's Helm-known values: the in-cluster
+// federation endpoint and serving name, the image and the operator's
+// connector limits and backup profile (values federation.connector and
+// capacity.backup), from which the hub-api derives the connector backing.
+type HubAPIRegionalOffer struct {
+	Federation string                     `json:"federation"`
+	ServerName string                     `json:"serverName"`
+	Image      string                     `json:"image"`
+	Connector  InstallerConnectorSettings `json:"connector"`
+	Backup     InstallerCapacityBackup    `json:"backup"`
+}
+
+// HubAPIFederationCAFile is the federation serving CA (combined mode) in
+// OwnerDeploymentRoot; the offer publishes it as the federation roots.
+const HubAPIFederationCAFile = "federation-ca.crt"
+
+// HubAPIName is "<name>-<suffix>": the chart's object name scheme.
+func HubAPIName(name, suffix string) string { return name + "-" + suffix }
 
 func DecodeHubAPIConfig(r io.Reader) (HubAPIConfig, error) {
 	return decodeClosedRPC[HubAPIConfig](r, HubAPIConfigMaxBytes)

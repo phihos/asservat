@@ -43,13 +43,13 @@ const RegionalSource = "connector-identity"
 // Helm-native installation (field map, persisted couplings 1): it names the
 // cluster, namespace and source, not an admission policy.
 func ConnectorSourceDigest(clusterID, namespace, name string) artifact.Digest {
-	return sha256.Sum256([]byte("asservat-configmap-source/v2\x00" + clusterID + "\x00" + namespace + "\x00" + name))
+	return contracts.ConfigMapSourceDigest(clusterID, namespace, name)
 }
 
 // ConnectorWorkloadDigest is the deterministic workload protection digest of
 // one Helm-rendered Deployment (field map, persisted couplings 2).
 func ConnectorWorkloadDigest(clusterID, namespace, deployment string) artifact.Digest {
-	return sha256.Sum256([]byte("asservat-workload-source/v2\x00" + clusterID + "\x00" + namespace + "\x00" + deployment))
+	return contracts.WorkloadSourceDigest(clusterID, namespace, deployment)
 }
 
 // ConnectorIdentityDocument is the canonical identity document of one

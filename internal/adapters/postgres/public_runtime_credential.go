@@ -31,7 +31,7 @@ func verifyRuntimeCredential(ctx context.Context, pool *pgxpool.Pool, m contract
 	if !known {
 		return cfg.ErrInvalid
 	}
-	return VerifyRuntimeLogin(ctx, pool, name)
+	return VerifySessionRole(ctx, pool, name)
 }
 
 // VerifyPermissionRuntimeCredential checks one hub-worker permission login

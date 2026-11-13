@@ -489,18 +489,13 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	// ADR-210: the processing source has no download paths; it is read only
 	// as the policy that names the processing operators.
 	if e := p.Processing; e != nil {
-		pa, pp := capacityWorkerGuard(e.Guard)
-		guard, err := kube.NewDownloadEnvironmentProtection(observer, probe, cfg.ConfigMapAdministration{Name: e.Guard.Name, SourceName: e.Source.Name, ControlNamespace: control, Administrators: pa}, pp)
-		if err != nil {
-			return nil, mounts.ErrUnavailable
-		}
 		// The join adds each cluster's derived path to both sources (ADR-192,
 		// ADR-204), so the reader pins the same derived paths.
 		paths, err := downloadEnvironmentPaths(installation, c.ClusterID, p.DownloadEnvironment.Paths, p.DownloadEnvironment.PathTemplate, catalogTargets(catalog.catalog))
 		if err != nil {
 			return nil, err
 		}
-		if out.processingPolicy, err = kube.NewDownloadEnvironmentSource(observer, guard, e.Source.Name, e.Source.UID, root, installation, paths); err != nil {
+		if out.processingPolicy, err = kube.NewPlainDownloadEnvironmentReader(observer, e.Source.Name, e.Source.UID, root, installation, p.WorkerPKI.IssuerEpoch, paths); err != nil {
 			return nil, mounts.ErrUnavailable
 		}
 	}

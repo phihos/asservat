@@ -1,157 +1,36 @@
-{{- $v := dig "federation" dict (default dict .Values.hub) }}
-{{- if and (has .Values.mode (list "hub" "combined")) $v.enabled }}
-{{- $name := include "asservat.svc.name" . }}
-{{- $full := printf "%s-federation" $name }}
-{{- $p := include "asservat.svc.providers" . | fromJson }}
-{{- $k := include "asservat.svc.constants" . | fromJson }}
-{{- $root := "/run/asservat/federation" }}
-{{- $config := dict
-  "port" 9446
-  "concurrency" (default 4 $v.concurrency | int)
+{{- if include "asservat.hub" . }}
+{{- $v := .Values.hub.federation }}
+{{- $n := include "asservat.name" . }}
+{{- $p := include "asservat.providers" . | fromJson }}
+{{- $dir := "/run/asservat/federation" }}
+{{- $purposes := list "connector-source" "connector-journal" "connector-ack" "connector-read" "cluster-credential" "connector-owner-read" }}
+{{- $config := toJson (dict
+  "name" $n
   "namespace" .Release.Namespace
-  "ownerConfiguration" $k.ownerConfiguration
-  "postgres" (dict "host" $p.postgres.host "port" ($p.postgres.port | int) "database" $p.postgres.database)
+  "port" 9446
+  "concurrency" (int (default 4 $v.concurrency))
+  "postgres" $p.postgres
   "auditStore" (dict "endpoint" $p.objectStore.endpoint "region" $p.objectStore.region "bucket" $p.objectStore.auditBucket)
-  "openBao" $p.openBao.endpoint
-  "auditMount" $k.auditMount
-  "auditKey" $k.federationAuditKey
-  "pkiMount" $k.connectorPKIMount
-  "clientRole" $k.connectorClientRole
-  "serverRole" $k.connectorServerRole
-  "provider" (dict "authMount" $k.authMount "audience" $k.federationAudience "serviceAccount" $full
-    "roles" (dict "audit-wrap" (printf "%s-audit-wrap" $full) "audit-unwrap" (printf "%s-audit-unwrap" $full) "client-sign" (printf "%s-client-sign" $full) "server-sign" (printf "%s-server-sign" $full)))
-}}
-{{- $configJSON := toJson $config }}
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: {{ $full }}
-  namespace: {{ .Release.Namespace }}
-  labels: {{ include "asservat.svc.labels" (dict "root" . "component" "federation") | nindent 4 }}
+  "openBao" $p.openBao.endpoint) }}
+{{- $rules := list
+  (dict "apiGroups" (list "") "resources" (list "configmaps") "resourceNames" (list (printf "%s-owner-source" $n)) "verbs" (list "get"))
+  (dict "apiGroups" (list "") "resources" (list "pods" "services") "verbs" (list "get"))
+  (dict "apiGroups" (list "apps") "resources" (list "replicasets" "deployments") "verbs" (list "get"))
+  (dict "apiGroups" (list "discovery.k8s.io") "resources" (list "endpointslices") "verbs" (list "list")) }}
+{{- $tls := include "asservat.svc.tlsSecret" (list . "federation") }}
+{{- $sources := list }}
+{{- $sources = append $sources (include "asservat.svc.sql" (list . "federation" $purposes)) }}
+{{- $sources = append $sources (include "asservat.svc.auditMAC" .) }}
+{{- $sources = append $sources (include "asservat.svc.s3" (list . "federation-audit" "audit-storage.json")) }}
+{{- $sources = append $sources (printf "- secret:\n    name: %s\n    items: [{key: tls.crt, path: tls.crt}, {key: tls.key, path: tls.key}]" ($tls | quote)) }}
+{{- $sources = append $sources (include "asservat.providerRoots" (dict "root" . "provider" "postgres" "path" "postgres-ca.crt") | trim) }}
+{{- $sources = append $sources (include "asservat.providerRoots" (dict "root" . "provider" "objectStore" "path" "objectstore-ca.crt") | trim) }}
+{{- $sources = append $sources (include "asservat.providerRoots" (dict "root" . "provider" "openBao" "path" "openbao-ca.crt") | trim) }}
+{{- $sources = append $sources (printf "- serviceAccountToken:\n    audience: %s\n    expirationSeconds: 600\n    path: provider-auth.token" (include "asservat.openBao" . | fromJson).federationAudience) }}
+{{ include "asservat.svc.account" (list . "federation" $rules) }}
 ---
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: {{ $full }}
-  namespace: {{ .Release.Namespace }}
-  labels: {{ include "asservat.svc.labels" (dict "root" . "component" "federation") | nindent 4 }}
-rules:
-  # Owner configuration UID (by name) and owner route reads (ADR-172).
-  - apiGroups: [""]
-    resources: [configmaps]
-    resourceNames: [{{ $k.ownerConfiguration | quote }}]
-    verbs: [get]
-  - apiGroups: [""]
-    resources: [pods, services]
-    verbs: [get]
-  - apiGroups: [apps]
-    resources: [replicasets, deployments]
-    verbs: [get]
-  - apiGroups: [discovery.k8s.io]
-    resources: [endpointslices]
-    verbs: [list]
+{{ include "asservat.svc.service" (list . "federation" 9446) }}
+{{- include "asservat.svc.tlsObjects" (list . "federation") }}
 ---
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: {{ $full }}
-  namespace: {{ .Release.Namespace }}
-  labels: {{ include "asservat.svc.labels" (dict "root" . "component" "federation") | nindent 4 }}
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: {{ $full }}
-subjects:
-  - kind: ServiceAccount
-    name: {{ $full }}
-    namespace: {{ .Release.Namespace }}
----
-{{ include "asservat.svc.namespaceReader" (dict "root" . "component" "federation") }}
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: {{ printf "%s-config" $full }}
-  namespace: {{ .Release.Namespace }}
-  labels: {{ include "asservat.svc.labels" (dict "root" . "component" "federation") | nindent 4 }}
-data:
-  config.json: {{ $configJSON | quote }}
----
-{{ include "asservat.svc.service" (dict "root" . "component" "federation" "key" "federation" "values" $v "port" 9446) }}
-{{- include "asservat.svc.certificate" (dict "root" . "component" "federation" "values" $v) }}
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: {{ $full }}
-  namespace: {{ .Release.Namespace }}
-  labels: {{ include "asservat.svc.labels" (dict "root" . "component" "federation") | nindent 4 }}
-spec:
-  replicas: 1
-  revisionHistoryLimit: 2
-  strategy: {type: Recreate}
-  selector:
-    matchLabels: {{ include "asservat.svc.selector" (dict "root" . "component" "federation") | nindent 6 }}
-  template:
-    metadata:
-      labels: {{ include "asservat.svc.labels" (dict "root" . "component" "federation") | nindent 8 }}
-      annotations:
-        checksum/config: {{ sha256sum $configJSON }}
-    spec:
-      serviceAccountName: {{ $full }}
-      # The in-cluster API token reads the namespace/owner configuration UIDs
-      # and owner routes under the Role above.
-      automountServiceAccountToken: true
-      enableServiceLinks: false
-      terminationGracePeriodSeconds: 40
-      securityContext: {{ include "asservat.svc.podSecurity" . | nindent 8 }}
-      {{- include "asservat.svc.scheduling" $v | nindent 6 }}
-      initContainers:
-        {{- include "asservat.svc.schemaWait" (dict "root" . "root_dir" $root) | nindent 8 }}
-      containers:
-        - name: federation
-          image: {{ include "asservat.svc.image" . | quote }}
-          imagePullPolicy: {{ dig "pullPolicy" "IfNotPresent" (default dict .Values.image) }}
-          command: [/asservat, hub-federation]
-          ports: [{name: federation, containerPort: 9446, protocol: TCP}]
-          securityContext: {{ include "asservat.svc.containerSecurity" . | nindent 12 }}
-          resources: {{ toYaml (default (dict "requests" (dict "cpu" "100m" "memory" "128Mi") "limits" (dict "cpu" "1" "memory" "512Mi")) $v.resources) | nindent 12 }}
-          volumeMounts:
-            - {name: inputs, mountPath: {{ $root }}, readOnly: true}
-            - {name: ids, mountPath: /run/asservat/ids, readOnly: true}
-      volumes:
-        - name: inputs
-          projected:
-            defaultMode: 0440
-            sources:
-              - configMap:
-                  name: {{ printf "%s-config" $full }}
-                  items: [{key: config.json, path: config.json}]
-              - secret:
-                  name: {{ include "asservat.svc.secret" (dict "root" . "key" "sqlFederation" "default" (printf "%s-sql-federation" $name)) | quote }}
-                  optional: false
-                  items:
-                    {{- range list "connector-source" "connector-journal" "connector-ack" "connector-read" "cluster-credential" "connector-owner-read" }}
-                    - {key: {{ printf "sql-federation-%s.json" . }}, path: {{ printf "sql-federation-%s.json" . }}}
-                    {{- end }}
-              - secret:
-                  name: {{ include "asservat.svc.secret" (dict "root" . "key" "auditMac" "default" (printf "%s-audit-mac" $name)) | quote }}
-                  optional: false
-                  items: [{key: federation-audit-keys.json, path: federation-audit-keys.json}]
-              - secret:
-                  name: {{ include "asservat.svc.secret" (dict "root" . "key" "s3FederationAudit" "default" (printf "%s-s3-federation-audit" $name)) | quote }}
-                  optional: false
-                  items: [{key: credentials.json, path: audit-storage.json}]
-              - secret:
-                  name: {{ include "asservat.svc.tlsSecret" (dict "root" . "component" "federation" "key" "federation" "values" $v) | quote }}
-                  optional: false
-                  items: [{key: tls.crt, path: tls.crt}, {key: tls.key, path: tls.key}]
-              {{- include "asservat.svc.caSource" (dict "secret" $p.postgres.caSecret "path" "postgres-ca.crt") | nindent 14 }}
-              {{- include "asservat.svc.caSource" (dict "secret" $p.objectStore.caSecret "path" "objectstore-ca.crt") | nindent 14 }}
-              {{- include "asservat.svc.caSource" (dict "secret" $p.openBao.caSecret "path" "openbao-ca.crt") | nindent 14 }}
-              - serviceAccountToken:
-                  audience: {{ $k.federationAudience | quote }}
-                  expirationSeconds: 600
-                  path: provider-auth.token
-        {{- include "asservat.svc.idsVolume" . | nindent 8 }}
+{{ include "asservat.svc.deployment" (dict "root" . "component" "federation" "command" "hub-federation" "dir" $dir "port" 9446 "grace" 40 "config" $config "sqlFile" "sql-connector-read.json" "sources" (join "\n" $sources)) }}
 {{- end }}

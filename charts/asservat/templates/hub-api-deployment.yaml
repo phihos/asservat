@@ -1,71 +1,46 @@
-{{- if .Values.hub.hubApi.enabled }}
-{{- $p := .Values.installation.name }}
-{{- $b := .Values.bootstrap.name }}
-{{- $name := include "asservat.hubApi.name" . }}
-{{- $h := .Values.hub.hubApi }}
-{{- $image := include "asservat.hubApi.image" . }}
-{{- $sql := printf "%s-sql-hub-api" $p }}
-{{- $ca := $h.caSecrets }}
-{{- if and .Values.origin (eq .Values.exposure.tls "pod") (not .Values.exposure.tlsSecret) }}
-{{- fail "exposure.tlsSecret is required when origin is set and exposure.tls is pod" }}
+{{- if include "asservat.hub" . }}
+{{- $name := include "asservat.fullname" (list . "hub-api") }}
+{{- $h := index .Values.hub "hub-api" }}
+{{- $bao := fromJson (include "asservat.openBao" .) }}
+{{- $sql := include "asservat.secretName" (list . "sql-hub-api") }}
+{{- $public := not (empty .Values.origin) }}
+{{- $podTLS := eq .Values.exposure.tls.mode "pod" }}
+{{- if and $public $podTLS (not .Values.exposure.tlsSecret) }}
+{{- fail "exposure.tlsSecret is required when origin is set and exposure.tls.mode is pod" }}
 {{- end }}
-{{- if and .Values.origin (not .Values.identity.clientSecret.name) }}
-{{- fail "identity.clientSecret.name is required when origin is set" }}
+{{- $keycloak := eq .Values.services.identity.provider "keycloak" }}
+{{- if and $public (not .Values.identity.providerRootsPEM) (not $keycloak) }}
+{{- fail "identity.providerRootsPEM (the identity provider's CA bundle) is required when origin is set" }}
 {{- end }}
-{{- $security := dict "allowPrivilegeEscalation" false "readOnlyRootFilesystem" true "capabilities" (dict "drop" (list "ALL")) }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ $name }}
   namespace: {{ .Release.Namespace }}
-  labels:
-    {{- include "asservat.hubApi.labels" . | nindent 4 }}
+  labels: {{ include "asservat.labels" (list . "hub-api") | nindent 4 }}
 spec:
-  replicas: {{ $h.replicas }}
+  replicas: {{ int $h.replicas }}
   strategy: {type: Recreate}
   selector:
-    matchLabels:
-      {{- include "asservat.hubApi.selector" . | nindent 6 }}
+    matchLabels: {{ include "asservat.selectorLabels" (list . "hub-api") | nindent 6 }}
   template:
     metadata:
-      labels:
-        app.kubernetes.io/name: asservat
-        {{- include "asservat.hubApi.selector" . | nindent 8 }}
+      labels: {{ include "asservat.labels" (list . "hub-api") | nindent 8 }}
       annotations:
-        checksum/config: {{ include "asservat.hubApi.config" . | sha256sum }}
+        {{- include "asservat.checksum" (list . "hub-api-configmap.yaml" "hub-api-sources.yaml") | nindent 8 }}
     spec:
       serviceAccountName: {{ $name }}
       automountServiceAccountToken: false
       enableServiceLinks: false
       terminationGracePeriodSeconds: 15
-      securityContext:
-        runAsNonRoot: true
-        runAsUser: 65532
-        runAsGroup: 65532
-        fsGroup: 65532
-        seccompProfile: {type: RuntimeDefault}
-      {{- with $h.nodeSelector }}
-      nodeSelector:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with $h.tolerations }}
-      tolerations:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
+      securityContext: {{ include "asservat.podSecurityContext" . | nindent 8 }}
+      {{- include "asservat.imagePullSecrets" . | nindent 6 }}
+      {{- include "asservat.placement" (list . "hub-api") | nindent 6 }}
       initContainers:
-        # Waits until setup has applied the compiled schema version.
-        - name: wait-schema
-          image: {{ $image }}
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
-          command: [/asservat, schema-wait]
-          securityContext: {{- toYaml $security | nindent 12 }}
-          resources: {requests: {cpu: 10m, memory: 32Mi}, limits: {cpu: 200m, memory: 128Mi}}
-          volumeMounts:
-            - {name: config, mountPath: /run/asservat/hub-api, readOnly: true}
-            - {name: inputs, mountPath: /run/asservat/hub, readOnly: true}
+        {{- include "asservat.waitSchema" (dict "root" . "config" "/run/asservat/hub-api/config.json" "credential" "/run/asservat/hub/sql-owner-runtime.json" "ca" "/run/asservat/hub/postgres-ca.crt" "volumeMounts" (list (dict "name" "config" "mountPath" "/run/asservat/hub-api" "readOnly" true) (dict "name" "inputs" "mountPath" "/run/asservat/hub" "readOnly" true))) | nindent 8 }}
       containers:
         - name: hub
-          image: {{ $image }}
+          image: {{ include "asservat.image" . | quote }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           command: [/asservat, hub-api]
           env:
@@ -76,77 +51,94 @@ spec:
             - {name: observation, containerPort: 9444, protocol: TCP}
             - {name: public, containerPort: 9445, protocol: TCP}
             - {name: operation, containerPort: 9448, protocol: TCP}
-          resources: {{- toYaml $h.resources | nindent 12 }}
-          securityContext: {{- toYaml $security | nindent 12 }}
+          securityContext: {{ include "asservat.securityContext" . | nindent 12 }}
+          resources: {{ include "asservat.resources" (list . "hub-api") | nindent 12 }}
           volumeMounts:
             - {name: config, mountPath: /run/asservat/hub-api, readOnly: true}
-            - {name: ids, mountPath: /run/asservat/ids, readOnly: true}
+            {{- include "asservat.idsMount" . | nindent 12 }}
             - {name: inputs, mountPath: /run/asservat/hub, readOnly: true}
             - {name: observation, mountPath: /run/asservat/owner-observation, readOnly: true}
-            {{- if .Values.origin }}
+            {{- if $public }}
             - {name: public, mountPath: /run/asservat/public, readOnly: true}
             {{- end }}
       volumes:
         - name: config
-          configMap: {name: {{ printf "%s-hub-api-config" $p }}, defaultMode: 0444}
-        - name: ids
-          secret: {secretName: {{ printf "%s-ids" $p }}, defaultMode: 0440}
+          configMap:
+            name: {{ printf "%s-config" $name }}
+            items: [{key: config.json, path: config.json}]
+            defaultMode: 0444
+        {{- include "asservat.idsVolume" . | nindent 8 }}
+        # /run/asservat/hub: the owner credential, tokens and provider CAs.
         - name: inputs
           projected:
             defaultMode: 0440
             sources:
               - secret:
-                  name: {{ $sql }}
+                  name: {{ $sql | quote }}
                   items: [{key: sql-owner-runtime.json, path: sql-owner-runtime.json}]
               - serviceAccountToken: {audience: asservat-hub-owner-enrollment, expirationSeconds: 600, path: owner-pod.token}
               - serviceAccountToken: {expirationSeconds: 600, path: kube-observer.token}
-              - serviceAccountToken: {audience: asservat-owner-provider, expirationSeconds: 600, path: provider-auth.token}
+              - serviceAccountToken: {audience: {{ $bao.hubAPIAudience | quote }}, expirationSeconds: 600, path: provider-auth.token}
               - secret:
-                  name: {{ printf "%s-s3-hub-api" $p }}
+                  name: {{ include "asservat.secretName" (list . "s3-owner-audit") | quote }}
                   items: [{key: credentials.json, path: provider-audit-storage.json}]
               - configMap:
                   name: kube-root-ca.crt
                   items: [{key: ca.crt, path: kube-ca.crt}]
+              {{- include "asservat.providerRoots" (dict "root" . "provider" "postgres" "path" "postgres-ca.crt") | nindent 14 }}
+              {{- include "asservat.providerRoots" (dict "root" . "provider" "objectStore" "path" "audit-store-ca.crt") | nindent 14 }}
+              {{- include "asservat.providerRoots" (dict "root" . "provider" "openBao" "path" "key-service-ca.crt") | nindent 14 }}
+              {{- if and $public (include "asservat.hubApi.combined" .) }}
               - secret:
-                  name: {{ $ca.postgres.name | default (printf "%s-postgres-state" $b) }}
-                  items: [{key: {{ $ca.postgres.key }}, path: postgres-ca.crt}]
-              - secret:
-                  name: {{ $ca.auditStore.name | default (printf "%s-objectstore-state" $b) }}
-                  items: [{key: {{ $ca.auditStore.key }}, path: audit-store-ca.crt}]
-              - secret:
-                  name: {{ $ca.keyService.name | default (printf "%s-openbao-state" $b) }}
-                  items: [{key: {{ $ca.keyService.key }}, path: key-service-ca.crt}]
-              {{- if .Values.origin }}
-              {{- if not .Values.identity.providerRootsSecret.name }}{{ fail "origin requires identity.providerRootsSecret (the identity provider's CA bundle)" }}{{ end }}
-              - secret:
-                  name: {{ .Values.identity.providerRootsSecret.name }}
-                  items: [{key: {{ .Values.identity.providerRootsSecret.key }}, path: identity-ca.crt}]
+                  name: {{ include "asservat.svc.tlsSecret" (list . "federation") | quote }}
+                  items: [{key: ca.crt, path: federation-ca.crt}]
               {{- end }}
+              {{- if $public }}
+              {{- if .Values.identity.providerRootsPEM }}
+              - configMap:
+                  name: {{ printf "%s-config" $name }}
+                  items: [{key: identity-ca.crt, path: identity-ca.crt}]
+              {{- else }}
+              - secret:
+                  name: {{ required "services.identity.keycloak.tlsSecretName is required" .Values.services.identity.keycloak.tlsSecretName | quote }}
+                  items: [{key: ca.crt, path: identity-ca.crt}]
+              {{- end }}
+              {{- end }}
+        # /run/asservat/owner-observation: the worker control catalog and one
+        # API token per download-worker namespace.
         - name: observation
           projected:
             defaultMode: 0440
             sources:
+              - configMap:
+                  name: {{ printf "%s-config" $name }}
+                  items: [{key: worker-controls.json, path: worker-controls.json}]
               {{- range (include "asservat.hubApi.workerNamespaces" . | fromJsonArray) }}
-              - serviceAccountToken: {expirationSeconds: 600, path: {{ printf "native-kube-%s.token" . }}}
+              - serviceAccountToken: {expirationSeconds: 600, path: {{ printf "native-kube-%s.token" . | quote }}}
               {{- end }}
-        {{- if .Values.origin }}
+        {{- if $public }}
+        # /run/asservat/public: the public SQL logins, audit MAC keys, OIDC
+        # client secret and, in pod TLS mode, the origin certificate.
         - name: public
           projected:
             defaultMode: 0440
             sources:
               - secret:
-                  name: {{ $sql }}
+                  name: {{ $sql | quote }}
                   items:
                     {{- range list "hub-runtime" "capture-intent-read" "worker-config-read" "capacity-profile-read" "capture-admit" "capture-journal" "capture-ack" }}
-                    - {key: {{ printf "sql-public-%s.json" . }}, path: {{ printf "sql-public-%s.json" . }}}
+                    - {key: {{ printf "sql-%s.json" . }}, path: {{ printf "sql-public-%s.json" . }}}
                     {{- end }}
-              - secret: {name: {{ printf "%s-audit-mac" $p }}}
               - secret:
-                  name: {{ .Values.identity.clientSecret.name }}
-                  items: [{key: {{ .Values.identity.clientSecret.key }}, path: oidc-client-secret}]
-              {{- if eq .Values.exposure.tls "pod" }}
+                  name: {{ include "asservat.secretName" (list . "audit-mac") | quote }}
+                  items: [{key: public-audit-keys.json, path: public-audit-keys.json}]
+              {{- $client := fromJson (include "asservat.hubApi.clientSecret" .) }}
               - secret:
-                  name: {{ .Values.exposure.tlsSecret }}
+                  name: {{ $client.name | quote }}
+                  items: [{key: {{ $client.key | quote }}, path: oidc-client-secret}]
+              {{- if $podTLS }}
+              - secret:
+                  name: {{ .Values.exposure.tlsSecret | quote }}
                   items: [{key: tls.crt, path: public-tls.crt}, {key: tls.key, path: public-tls.key}]
               {{- end }}
         {{- end }}

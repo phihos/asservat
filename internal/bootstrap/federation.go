@@ -21,6 +21,7 @@ import (
 	"asservat.local/asservat/internal/adapters/mtls"
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
+	"asservat.local/asservat/internal/adapters/providerconfig"
 	auditapp "asservat.local/asservat/internal/application/audit"
 	fleetapp "asservat.local/asservat/internal/application/fleet"
 	"asservat.local/asservat/internal/contracts"
@@ -30,7 +31,6 @@ import (
 	"asservat.local/asservat/internal/transport/clustercredential"
 	"asservat.local/asservat/internal/transport/connectorlifecycle"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"k8s.io/apimachinery/pkg/util/validation"
 )
 
 // Federation is the ADR-170 hub process for connector-facing duties. It serves
@@ -108,10 +108,7 @@ func readFederationInputs(ctx context.Context, files, ids *os.Root) (federationI
 
 func validFederationConfig(c contracts.FederationConfig) bool {
 	_, pg := servicePostgres(c.Postgres, nil)
-	return c.Port >= 1 && c.Port <= 65535 && c.Concurrency >= 1 && c.Concurrency <= 16 && pg && validServiceStore(c.AuditStore) && ownerEndpoint(c.OpenBao) &&
-		len(validation.IsDNS1123Label(c.Namespace)) == 0 && len(validation.IsDNS1123Subdomain(c.OwnerConfiguration)) == 0 &&
-		ownerProviderName.MatchString(c.AuditMount) && ownerProviderName.MatchString(c.AuditKey) && ownerProviderName.MatchString(c.PKIMount) &&
-		ownerProviderName.MatchString(c.ClientRole) && ownerProviderName.MatchString(c.ServerRole) && c.ClientRole != c.ServerRole && c.AuditMount != c.PKIMount
+	return validServiceScope(c.Name, c.Namespace) && c.Port >= 1 && c.Port <= 65535 && c.Concurrency >= 1 && c.Concurrency <= 16 && pg && validServiceStore(c.AuditStore) && ownerEndpoint(c.OpenBao)
 }
 
 func NewFederation(ctx context.Context, files, ids *os.Root) (f *Federation, err error) {
@@ -142,7 +139,7 @@ func NewFederation(ctx context.Context, files, ids *os.Root) (f *Federation, err
 	pools := map[string]*pgxpool.Pool{}
 	users := map[string]bool{}
 	for _, purpose := range contracts.PublicRuntimeFederationPurposes() {
-		config, err := in.sqlConfig(startup, "sql-federation-"+purpose+".json")
+		config, err := in.sqlConfig(startup, "sql-"+purpose+".json")
 		if err != nil || users[config.ConnConfig.User] {
 			return f, &fixedStepError{"sql/" + purpose, mounts.ErrUnavailable}
 		}
@@ -155,7 +152,7 @@ func NewFederation(ctx context.Context, files, ids *os.Root) (f *Federation, err
 		pools[purpose] = pool
 		f.closers = append(f.closers, pool.Close)
 	}
-	mac, accountVersion, err := readFederationMAC(startup, files, c.ServiceIDs)
+	mac, accountVersion, err := readAuditMAC(startup, files)
 	if err != nil {
 		return f, err
 	}
@@ -178,8 +175,9 @@ func NewFederation(ctx context.Context, files, ids *os.Root) (f *Federation, err
 	if err != nil {
 		return f, err
 	}
-	login := kms.ProviderLogin{Provider: contracts.OwnerProviderEndpoint{Endpoint: c.OpenBao, Roots: roots[contracts.OpenBaoRootsFile]}, AuthMount: c.Provider.AuthMount, Namespace: c.Namespace, ServiceAccount: c.Provider.ServiceAccount, Roles: c.Provider.Roles}
-	keys := kms.FederationProviderKeys{AuditMount: c.AuditMount, AuditKey: c.AuditKey, PKIMount: c.PKIMount, ClientRole: c.ClientRole, ServerRole: c.ServerRole}
+	login := serviceLogin(c.Name, c.Namespace, "federation", contracts.OwnerProviderEndpoint{Endpoint: c.OpenBao, Roots: roots[contracts.OpenBaoRootsFile]}, "audit-wrap", "audit-unwrap", "client-sign", "server-sign")
+	names := providerconfig.OpenBaoNamesFor(c.InstallationID)
+	keys := kms.FederationProviderKeys{AuditMount: contracts.SmallOpenBaoAuditMount, AuditKey: names.FederationAuditKey, PKIMount: contracts.SmallOpenBaoConnectorPKIMount, ClientRole: names.ConnectorClientRole, ServerRole: names.ConnectorServerRole}
 	if f.providers, err = kms.NewInstalledFederationProviderEffects(ctx, login, keys, c.Concurrency, files, recoveryProof(recovery)); err != nil {
 		return f, &fixedStepError{"providers", mounts.ErrUnavailable}
 	}
@@ -215,8 +213,8 @@ func NewFederation(ctx context.Context, files, ids *os.Root) (f *Federation, err
 	return f, nil
 }
 
-// readServingPair reads the mounted serving certificate (cert-manager or an
-// existing kubernetes.io/tls Secret).
+// readServingPair reads the mounted serving certificate: a cert-manager,
+// existing or chart-generated kubernetes.io/tls Secret.
 func readServingPair(ctx context.Context, files *os.Root) (tls.Certificate, error) {
 	certificate, err := mounts.Read(ctx, files, "tls.crt", 64<<10)
 	if err != nil {
@@ -255,25 +253,6 @@ func federationBootstrap(ctx context.Context, installation string, pools map[str
 	peers.bootstrap = &fleetapp.ClusterBootstrapActivation{Claims: claims, ClaimAudits: audits, ClaimObjects: &objectstore.EnrollmentClaimObjects{Store: store, Seal: seal, Open: open},
 		Bootstraps: ledger, Audit: &objectstore.ClusterBootstrapAuditObjects{Store: store, Seal: seal, Open: open}, Policy: value.DefaultClusterCredentialPolicy(), Now: time.Now}
 	return nil
-}
-
-func readFederationMAC(ctx context.Context, files *os.Root, c contracts.ServiceIDs) (*auditapp.OperationMAC, string, error) {
-	b, err := mounts.Read(ctx, files, "federation-audit-keys.json", 16<<10)
-	if err != nil {
-		return nil, "", mounts.ErrUnavailable
-	}
-	defer clear(b)
-	v, err := contracts.DecodeFederationAuditKeys(bytes.NewReader(b))
-	defer clear(v.InputKey)
-	defer clear(v.AccountKey)
-	if err != nil || v.Format != contracts.FederationAuditKeysFormat || v.InstallationID != c.InstallationID || v.RootID != c.PermissionRootID {
-		return nil, "", mounts.ErrUnavailable
-	}
-	mac, err := auditapp.NewOperationMAC(v.InputVersion, v.InputKey, v.AccountVersion, v.AccountKey)
-	if err != nil {
-		return nil, "", mounts.ErrUnavailable
-	}
-	return mac, v.AccountVersion, nil
 }
 
 // federationPeers resolves each presented peer from its staged SQL profile
@@ -586,7 +565,7 @@ func federationOwnerReads(ctx context.Context, c federationInputs, pool *pgxpool
 	if err != nil {
 		return zero, &fixedStepError{"kubernetes/namespace", mounts.ErrUnavailable}
 	}
-	configurationUID, err := kube.ConfigMapUID(ctx, api, c.Namespace, c.OwnerConfiguration)
+	configurationUID, err := kube.ConfigMapUID(ctx, api, c.Namespace, c.Name+"-owner-source")
 	if err != nil {
 		return zero, &fixedStepError{"kubernetes/owner-configuration", mounts.ErrUnavailable}
 	}
@@ -645,5 +624,5 @@ func (p platformOwnerProtection) ReadOwnerProtection(ctx context.Context, pool v
 		return value.OwnerProtection{}, value.ErrUnavailable
 	}
 	start := p.now()
-	return value.OwnerProtection{Pool: pool, Digest: artifact.Digest(contracts.PlatformWorkloadDigest(pool.ClusterID, pool.Namespace, pool.Deployment)), ObservedAt: start, FreshUntil: start.Add(5 * time.Second)}, nil
+	return value.OwnerProtection{Pool: pool, Digest: artifact.Digest(contracts.WorkloadSourceDigest(pool.ClusterID, pool.Namespace, pool.Deployment)), ObservedAt: start, FreshUntil: start.Add(5 * time.Second)}, nil
 }

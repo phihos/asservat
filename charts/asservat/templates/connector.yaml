@@ -1,13 +1,20 @@
 {{- if .Values.region.enabled }}
 {{- $r := .Values.region }}
-{{- $n := include "asservat.region.name" . }}
+{{- $n := include "asservat.name" . }}
 {{- $ns := .Release.Namespace }}
 {{- $mode := .Values.mode }}
 {{- if not (has $mode (list "cluster" "combined")) }}{{ fail "region.enabled requires mode=cluster or mode=combined" }}{{ end }}
-{{- $image := include "asservat.region.image" . }}
-{{- $clusterID := include "asservat.region.uuid" (dict "value" $r.clusterID "field" "region.clusterID") }}
-{{- $peerID := include "asservat.region.uuid" (dict "value" $r.peerID "field" "region.peerID") }}
-{{- if not $r.bootstrapSecret }}{{ fail "region.bootstrapSecret names the existing Secret with the console-issued bootstrap.json" }}{{ end }}
+{{- $image := include "asservat.image" . }}
+{{- /* mode=cluster: the console's bootstrap receipt names the cluster and
+  peer. mode=combined: the connector reads clusterID and peerID from the
+  `<name>-ids` Secret, the hub's own cluster and local connector peer. */}}
+{{- $bootstrap := $r.bootstrapSecret }}
+{{- if eq $mode "cluster" }}
+{{- if not $bootstrap }}{{ fail "region.bootstrapSecret names the existing Secret with the console-issued bootstrap.json" }}{{ end }}
+{{- else }}
+{{- if or $r.clusterID $r.peerID }}{{ fail "region.clusterID and region.peerID are for mode=cluster; mode=combined uses the generated IDs" }}{{ end }}
+{{- $bootstrap = $bootstrap | default (printf "%s-region-bootstrap" $n) }}
+{{- end }}
 {{- $account := printf "%s-connector" $n }}
 {{- $capacity := printf "%s-connector-capacity" $n }}
 {{- $credential := printf "%s-cluster-credential" $n }}
@@ -15,9 +22,11 @@
 {{- $collector := .Values.collector.enabled }}
 {{- $x := $r.executor }}
 {{- $executor := $x.enabled }}
-{{- $cfg := dict "format" "asservat-connector-config/v1" "mode" $mode "clusterID" $clusterID "peerID" $peerID "namespace" $ns "deployment" $account "serviceAccount" $account "clusterCredential" $credential "imageDigest" (trimPrefix "sha256:" .Values.image.digest) }}
+{{- $cfg := dict "format" "asservat-connector-config/v1" "mode" $mode "namespace" $ns "deployment" $account "serviceAccount" $account "clusterCredential" $credential "imageDigest" (trimPrefix "sha256:" .Values.image.digest) }}
 {{- $offer := "" }}
 {{- if eq $mode "cluster" }}
+{{- $_ := set $cfg "clusterID" (include "asservat.region.uuid" (dict "value" $r.clusterID "field" "region.clusterID")) }}
+{{- $_ := set $cfg "peerID" (include "asservat.region.uuid" (dict "value" $r.peerID "field" "region.peerID")) }}
 {{- $offer = $r.offer | trim }}
 {{- $parsed := fromJson $offer }}
 {{- if or (hasKey $parsed "Error") (ne (get $parsed "format") "asservat-regional-offer/v1") }}{{ fail "region.offer must be the hub's regional-offer.json (mode=cluster)" }}{{ end }}
@@ -34,7 +43,7 @@
 {{- with $x.alertmanager }}{{ $_ := set $xc "alertmanager" . }}{{ end }}
 {{- with $x.identityMappings }}{{ $_ := set $xc "identityMappings" . }}{{ end }}
 {{- with $x.profileEndpoints }}{{ $_ := set $xc "profileEndpoints" . }}{{ end }}
-{{- if $x.profileAuthorization }}{{ $_ := set $xc "profileAuthorization" true }}{{ end }}
+{{- if $x.profileAuthorization }}{{ if eq $mode "combined" }}{{ fail "region.executor.profileAuthorization needs region.executor.evidenceSecret (mode=cluster)" }}{{ end }}{{ $_ := set $xc "profileAuthorization" true }}{{ end }}
 {{- $_ := set $cfg "executor" $xc }}
 {{- end }}
 {{- if $collector }}
@@ -47,7 +56,7 @@ kind: ServiceAccount
 metadata:
   name: {{ $account }}
   namespace: {{ $ns }}
-  labels: {{- include "asservat.region.labels" . | nindent 4 }}
+  labels: {{- include "asservat.labels" (list $ "connector") | nindent 4 }}
 automountServiceAccountToken: false
 ---
 # The rotating cluster credential (ADR-168). Helm renders it empty and keeps
@@ -58,7 +67,7 @@ kind: Secret
 metadata:
   name: {{ $credential }}
   namespace: {{ $ns }}
-  labels: {{- include "asservat.region.labels" . | nindent 4 }}
+  labels: {{- include "asservat.labels" (list $ "connector") | nindent 4 }}
   annotations:
     helm.sh/resource-policy: keep
 type: Opaque
@@ -68,7 +77,7 @@ kind: ConfigMap
 metadata:
   name: {{ printf "%s-connector-config" $n }}
   namespace: {{ $ns }}
-  labels: {{- include "asservat.region.labels" . | nindent 4 }}
+  labels: {{- include "asservat.labels" (list $ "connector") | nindent 4 }}
 data:
   config.json: {{ $json | quote }}
 ---
@@ -77,7 +86,7 @@ kind: Role
 metadata:
   name: {{ $account }}
   namespace: {{ $ns }}
-  labels: {{- include "asservat.region.labels" . | nindent 4 }}
+  labels: {{- include "asservat.labels" (list $ "connector") | nindent 4 }}
 rules:
   # Its own credential (and node listener pair): read and CAS update only.
   - apiGroups: [""]
@@ -118,7 +127,7 @@ kind: RoleBinding
 metadata:
   name: {{ $account }}
   namespace: {{ $ns }}
-  labels: {{- include "asservat.region.labels" . | nindent 4 }}
+  labels: {{- include "asservat.labels" (list $ "connector") | nindent 4 }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
@@ -132,7 +141,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: {{ printf "%s-%s" $ns $account }}
-  labels: {{- include "asservat.region.labels" . | nindent 4 }}
+  labels: {{- include "asservat.labels" (list $ "connector") | nindent 4 }}
 rules:
   - apiGroups: [authentication.k8s.io]
     resources: [tokenreviews, selfsubjectreviews]
@@ -188,7 +197,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   name: {{ printf "%s-%s" $ns $account }}
-  labels: {{- include "asservat.region.labels" . | nindent 4 }}
+  labels: {{- include "asservat.labels" (list $ "connector") | nindent 4 }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -205,7 +214,7 @@ kind: ServiceAccount
 metadata:
   name: {{ $capacity }}
   namespace: {{ $ns }}
-  labels: {{- include "asservat.region.labels" . | nindent 4 }}
+  labels: {{- include "asservat.labels" (list $ "connector") | nindent 4 }}
 automountServiceAccountToken: false
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -213,7 +222,7 @@ kind: Role
 metadata:
   name: {{ $capacity }}
   namespace: {{ $ns }}
-  labels: {{- include "asservat.region.labels" . | nindent 4 }}
+  labels: {{- include "asservat.labels" (list $ "connector") | nindent 4 }}
 rules:
   - apiGroups: [asservat.io]
     resources: [capacityreservations]
@@ -227,7 +236,7 @@ kind: RoleBinding
 metadata:
   name: {{ $capacity }}
   namespace: {{ $ns }}
-  labels: {{- include "asservat.region.labels" . | nindent 4 }}
+  labels: {{- include "asservat.labels" (list $ "connector") | nindent 4 }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
@@ -245,7 +254,7 @@ kind: Secret
 metadata:
   name: {{ $nodes }}
   namespace: {{ $ns }}
-  labels: {{- include "asservat.region.labels" . | nindent 4 }}
+  labels: {{- include "asservat.labels" (list $ "connector") | nindent 4 }}
   annotations:
     helm.sh/resource-policy: keep
 type: Opaque
@@ -255,12 +264,10 @@ kind: Service
 metadata:
   name: {{ $nodes }}
   namespace: {{ $ns }}
-  labels: {{- include "asservat.region.labels" . | nindent 4 }}
+  labels: {{- include "asservat.labels" (list $ "connector") | nindent 4 }}
 spec:
   type: ClusterIP
-  selector:
-    app.kubernetes.io/name: asservat-connector
-    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+  selector: {{- include "asservat.selectorLabels" (list $ "connector") | nindent 4 }}
   ports:
     - name: nodes
       port: 8444
@@ -273,22 +280,17 @@ kind: Deployment
 metadata:
   name: {{ $account }}
   namespace: {{ $ns }}
-  labels: {{- include "asservat.region.labels" . | nindent 4 }}
-    app.kubernetes.io/name: asservat-connector
+  labels: {{- include "asservat.labels" (list $ "connector") | nindent 4 }}
 spec:
   replicas: 1
   # One serving process at a time; a replacement enrolls after the old one stops.
   strategy:
     type: Recreate
   selector:
-    matchLabels:
-      app.kubernetes.io/name: asservat-connector
-      app.kubernetes.io/instance: {{ .Release.Name | quote }}
+    matchLabels: {{- include "asservat.selectorLabels" (list $ "connector") | nindent 6 }}
   template:
     metadata:
-      labels:
-        app.kubernetes.io/name: asservat-connector
-        app.kubernetes.io/instance: {{ .Release.Name | quote }}
+      labels: {{- include "asservat.selectorLabels" (list $ "connector") | nindent 8 }}
       annotations:
         checksum/config: {{ sha256sum $json }}
     spec:
@@ -296,20 +298,14 @@ spec:
       automountServiceAccountToken: false
       enableServiceLinks: false
       terminationGracePeriodSeconds: 10
-      {{- include "asservat.region.pullSecrets" . | nindent 6 }}
+      {{- include "asservat.imagePullSecrets" . | nindent 6 }}
       {{- with $r.nodeSelector }}
       nodeSelector: {{- toYaml . | nindent 8 }}
       {{- end }}
       {{- with $r.tolerations }}
       tolerations: {{- toYaml . | nindent 8 }}
       {{- end }}
-      securityContext:
-        runAsNonRoot: true
-        runAsUser: 65532
-        runAsGroup: 65532
-        fsGroup: 65532
-        seccompProfile:
-          type: RuntimeDefault
+      securityContext: {{- include "asservat.podSecurityContext" . | nindent 8 }}
       containers:
         - name: connector
           image: {{ $image }}
@@ -322,17 +318,19 @@ spec:
           ports:
             - { name: nodes, containerPort: 8444, protocol: TCP }
           {{- end }}
-          securityContext:
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
-            capabilities:
-              drop: [ALL]
+          securityContext: {{- include "asservat.securityContext" . | nindent 12 }}
           resources: {{- toYaml $r.resources | nindent 12 }}
           volumeMounts:
             - name: inputs
               mountPath: /run/asservat/connector
               readOnly: true
+            {{- if eq $mode "combined" }}
+            {{- include "asservat.idsMount" . | nindent 12 }}
+            {{- end }}
       volumes:
+        {{- if eq $mode "combined" }}
+        {{- include "asservat.idsVolume" . | nindent 8 }}
+        {{- end }}
         - name: inputs
           projected:
             defaultMode: 0440
@@ -348,11 +346,11 @@ spec:
                   expirationSeconds: 3600
               - serviceAccountToken:
                   path: connector-pod.token
-                  audience: {{ printf "https://asservat.%s/connector-process-enrollment" $clusterID }}
+                  audience: asservat-connector-process-enrollment
                   expirationSeconds: 600
               # Read only while the cluster credential Secret is empty.
               - secret:
-                  name: {{ $r.bootstrapSecret }}
+                  name: {{ $bootstrap }}
                   optional: true
                   items: [{ key: bootstrap.json, path: bootstrap.json }]
               {{- if $executor }}
@@ -367,10 +365,10 @@ spec:
                     {{- end }}
               {{- else }}
               - secret:
-                  name: {{ printf "%s-s3-regional-write" $n }}
+                  name: {{ include "asservat.secretName" (list $ "s3-regional-write") }}
                   items: [{ key: credentials.json, path: evidence-storage.json }]
               - secret:
-                  name: {{ printf "%s-s3-regional-history" $n }}
+                  name: {{ include "asservat.secretName" (list $ "s3-regional-history") }}
                   items: [{ key: credentials.json, path: history-storage.json }]
               {{- end }}
               {{- end }}

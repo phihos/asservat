@@ -36,7 +36,7 @@ func (s *InitialRuntimeResources) configurationWorkerInputMaterial(resources con
 	sql := s.initial.Postgres
 	sql.MaxConnections = 1
 	in := contracts.HubWorkerDeployment{Format: contracts.HubWorkerDeploymentFormat,
-		InstallationID: s.initial.InstallationID, ClusterID: s.initial.ClusterID, Namespace: inventory.Namespace,
+		InstallationID: s.initial.InstallationID, ClusterID: s.initial.ClusterID, IssuerEpoch: s.initial.IssuerEpoch, Namespace: inventory.Namespace,
 		FleetSource: inventory.FleetSource, OwnerSource: inventory.OwnerSource, FleetGuard: inventory.FleetGuard,
 		OwnerGuard: inventory.OwnerSourceGuard, LeaderLease: inventory.LeaderLease,
 		Kubernetes: s.initial.Kubernetes, Postgres: sql, AuditStore: s.initial.AuditStore, KeyService: s.initial.KeyService, Activation: activation,

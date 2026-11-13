@@ -17,9 +17,9 @@ type DownloadEnvironmentSettings struct {
 	Processors       []ProcessingOrganization    `json:"processors,omitzero"`
 	LiveRead         *LiveReadSettings           `json:"liveRead,omitempty"`
 	Format           string                      `json:"format"`
-	RootID           string                      `json:"rootID"`
-	InstallationID   string                      `json:"installationID"`
-	RecoveryEpoch    string                      `json:"recoveryEpoch"`
+	RootID           string                      `json:"rootID,omitempty"`
+	InstallationID   string                      `json:"installationID,omitempty"`
+	RecoveryEpoch    string                      `json:"recoveryEpoch,omitempty"`
 	Revision         int64                       `json:"revision"`
 	Suspended        bool                        `json:"suspended"`
 	PermittedRegions []string                    `json:"permittedRegions"`

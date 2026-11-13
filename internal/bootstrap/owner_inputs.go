@@ -66,6 +66,8 @@ func (s *providerInputs) read(ctx context.Context, name string, limit int64) ([]
 type ownerInputs struct {
 	*providerInputs
 	config contracts.OwnerDeployment
+	// offer is the combined-mode regional offer the public layer publishes.
+	offer *hubAPIRegionalOffer
 }
 
 func ownerEndpoint(endpoint string) bool {

@@ -39,7 +39,7 @@ func NewNodeAttester(c *PermissionClient, daemonSet, serviceAccount string) (*No
 	if c == nil || c.clusterID == "" || len(validation.IsDNS1123Subdomain(daemonSet)) != 0 || len(validation.IsDNS1123Subdomain(serviceAccount)) != 0 {
 		return nil, delivery.ErrNodeInvalid
 	}
-	return &NodeAttester{client: c, audience: contracts.NodeTokenAudience(c.clusterID), namespace: c.control.Name, daemonSet: daemonSet, serviceAccount: serviceAccount}, nil
+	return &NodeAttester{client: c, audience: contracts.NodeTokenAudience, namespace: c.control.Name, daemonSet: daemonSet, serviceAccount: serviceAccount}, nil
 }
 
 type nodeTokenUser struct {

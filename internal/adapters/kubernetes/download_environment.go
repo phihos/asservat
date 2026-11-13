@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/identity"
@@ -40,14 +41,16 @@ type DownloadEnvironmentSource struct {
 	client                        *PermissionClient
 	protection                    *DownloadEnvironmentProtection
 	name, uid, root, installation string
-	paths                         map[string]privacy.DownloadPath
+	// epoch fills an omitted recoveryEpoch (the IDs Secret's issuerEpoch).
+	epoch string
+	paths map[string]privacy.DownloadPath
 }
 
 func NewDownloadEnvironmentSource(c *PermissionClient, p *DownloadEnvironmentProtection, name, uid, root, installation string, installed []privacy.DownloadPath) (*DownloadEnvironmentSource, error) {
 	if c == nil || p == nil || p.configMapProtection == nil || p.observer != c || p.plan.SourceName != name || !installationRefValid(name, uid) || !authorization.UUID(uid) || !authorization.UUID(root) || !authorization.UUID(installation) || installed == nil || len(installed) > 32 {
 		return nil, privacy.ErrInvalid
 	}
-	s := &DownloadEnvironmentSource{c, p, name, uid, root, installation, make(map[string]privacy.DownloadPath, len(installed))}
+	s := &DownloadEnvironmentSource{client: c, protection: p, name: name, uid: uid, root: root, installation: installation, paths: make(map[string]privacy.DownloadPath, len(installed))}
 	for _, path := range installed {
 		if !path.Valid() {
 			return nil, privacy.ErrInvalid
@@ -67,8 +70,24 @@ func NewPlainDownloadEnvironmentSource(c *PermissionClient, name, uid, root, ins
 	if c == nil {
 		return nil, privacy.ErrInvalid
 	}
-	p := &DownloadEnvironmentProtection{&configMapProtection{observer: c, plan: cfg.ConfigMapAdministration{SourceName: name, ControlNamespace: c.control}, digest: contracts.ConfigMapSourceDigest(c.clusterID, c.control.Name, name)}}
+	p := &DownloadEnvironmentProtection{&configMapProtection{observer: c, plan: cfg.ConfigMapAdministration{SourceName: name, ControlNamespace: c.control}, digest: artifact.Digest(contracts.ConfigMapSourceDigest(c.clusterID, c.control.Name, name))}}
 	return NewDownloadEnvironmentSource(c, p, name, uid, root, installation, installed)
+}
+
+// NewPlainDownloadEnvironmentReader is NewPlainDownloadEnvironmentSource for
+// a Helm-rendered document: an omitted rootID, installationID and
+// recoveryEpoch are root, installation and epoch (the IDs Secret's
+// issuerEpoch); a present value must equal them.
+func NewPlainDownloadEnvironmentReader(c *PermissionClient, name, uid, root, installation, epoch string, installed []privacy.DownloadPath) (*DownloadEnvironmentSource, error) {
+	if !authorization.UUID(epoch) {
+		return nil, privacy.ErrInvalid
+	}
+	s, err := NewPlainDownloadEnvironmentSource(c, name, uid, root, installation, installed)
+	if err != nil {
+		return nil, err
+	}
+	s.epoch = epoch
+	return s, nil
 }
 
 func validProcessingIssuer(s string) bool {
@@ -104,7 +123,19 @@ func (s *DownloadEnvironmentSource) snapshot(ctx context.Context) (privacy.Downl
 	}
 	encoded, e := json.Marshal(w)
 	a, z := jsontext.Value(b), jsontext.Value(encoded)
-	if e != nil || a.Canonicalize() != nil || z.Canonicalize() != nil || !bytes.Equal(a, z) || w.Format != contracts.DownloadEnvironmentFormat || w.RootID != s.root || w.InstallationID != s.installation || w.Paths == nil || w.Clients == nil || w.Operators == nil || w.PermittedRegions == nil {
+	if e != nil || a.Canonicalize() != nil || z.Canonicalize() != nil || !bytes.Equal(a, z) {
+		return out, privacy.ErrInvalid
+	}
+	if w.RootID == "" {
+		w.RootID = s.root
+	}
+	if w.InstallationID == "" {
+		w.InstallationID = s.installation
+	}
+	if w.RecoveryEpoch == "" {
+		w.RecoveryEpoch = s.epoch
+	}
+	if w.Format != contracts.DownloadEnvironmentFormat || w.RootID != s.root || w.InstallationID != s.installation || s.epoch != "" && w.RecoveryEpoch != s.epoch || w.Paths == nil || w.Clients == nil || w.Operators == nil || w.PermittedRegions == nil {
 		return out, privacy.ErrInvalid
 	}
 	out = privacy.DownloadPolicy{RootID: w.RootID, InstallationID: w.InstallationID, RecoveryEpoch: w.RecoveryEpoch, Revision: identity.Revision{UID: s.uid, Generation: w.Revision, Digest: sha256.Sum256(a)}, Suspended: w.Suspended, PermittedRegions: w.PermittedRegions, Paths: make([]privacy.DownloadPath, 0, len(w.Paths)), Clients: make([]privacy.DownloadClient, 0, len(w.Clients)), Operators: make([]privacy.ProcessingOperator, 0, len(w.Operators))}

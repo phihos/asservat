@@ -213,7 +213,7 @@ func TestConnectorProcessProofBeforeReadinessAndCurrentProtection(t *testing.T) 
 				case "/apis/authentication.k8s.io/v1/tokenreviews":
 					n = reviews.Add(1)
 					var req auth.TokenReview
-					if json.NewDecoder(r.Body).Decode(&req) != nil || req.Spec.Token != string(token) || len(req.Spec.Audiences) != 1 || req.Spec.Audiences[0] != ConnectorEnrollmentAudience(v.pool.ClusterID) {
+					if json.NewDecoder(r.Body).Decode(&req) != nil || req.Spec.Token != string(token) || len(req.Spec.Audiences) != 1 || req.Spec.Audiences[0] != ConnectorEnrollmentAudience {
 						t.Error("wrong enrollment token audience/request")
 					}
 					if mode == "token-error-redaction" {

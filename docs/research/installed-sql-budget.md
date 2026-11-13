@@ -84,10 +84,10 @@ has `MaxConns=1`; limits on runtime pools and the hub governor are unchanged.
 | Ordinary accepted owner source | `acceptedOwnerSource` opens the scoped configuration-source pool; `Owner` closes it only after its remaining steps return | 1 |
 
 The construction and close points are in
-[`installer_continue.go`](../../internal/bootstrap/installer_continue.go) and
-[`installer_downloads.go`](../../internal/bootstrap/installer_downloads.go).
+`installer_continue.go` (removed with the installer) and
+`installer_downloads.go` (removed with the installer).
 The bridge and role-producer constructors fix their one-connection limits in
-[`initial_runtime_bridge.go`](../../internal/adapters/postgres/initial_runtime_bridge.go),
+`initial_runtime_bridge.go` (removed with the installer),
 [`public_runtime_roles.go`](../../internal/adapters/postgres/public_runtime_roles.go),
 [`owner_identity_roles.go`](../../internal/adapters/postgres/owner_identity_roles.go)
 and [`configuration_runtime_roles.go`](../../internal/adapters/postgres/configuration_runtime_roles.go).

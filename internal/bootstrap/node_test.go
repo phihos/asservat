@@ -392,7 +392,7 @@ func TestNodeReenrollsWhenConnectorForgetsIt(t *testing.T) {
 
 func TestNodeDeploymentValidation(t *testing.T) {
 	_, _, rootsPEM := serverCertificate(t)
-	good := contracts.NodeDeployment{Format: contracts.NodeDeploymentFormat, ClusterID: "50000000-0000-4000-8000-000000000001",
+	good := contracts.NodeDeployment{Format: contracts.NodeDeploymentFormat,
 		Connector: contracts.NodeConnectorEndpoint{Endpoint: "https://asservat-connector-nodes.asservat-connector.svc:8444", ServerName: "asservat-connector-nodes", RootsPEM: rootsPEM},
 		Ceilings:  contracts.NodeCeilings{RingBytes: 256 << 20, FrozenBytes: 256 << 20, UploadBytesPerSecond: 32 << 20, UploadBurstBytes: 64 << 20}}
 	if _, err := validNodeDeployment(good); err != nil {
@@ -405,7 +405,6 @@ func TestNodeDeploymentValidation(t *testing.T) {
 	}
 	for name, edit := range map[string]func(*contracts.NodeDeployment){
 		"format":   func(d *contracts.NodeDeployment) { d.Format = "other" },
-		"cluster":  func(d *contracts.NodeDeployment) { d.ClusterID = "x" },
 		"http":     func(d *contracts.NodeDeployment) { d.Connector.Endpoint = "http://connector:8444" },
 		"path":     func(d *contracts.NodeDeployment) { d.Connector.Endpoint = "https://connector:8444/other" },
 		"user":     func(d *contracts.NodeDeployment) { d.Connector.Endpoint = "https://u:p@connector:8444" },

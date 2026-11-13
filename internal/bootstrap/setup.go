@@ -309,7 +309,7 @@ func setupDatabase(ctx context.Context, c contracts.SetupConfiguration, ids setu
 		return setupStep("kubernetes", cfg.ErrUnavailable)
 	}
 	err = retryUnavailable(ctx, func(ctx context.Context) error {
-		a, _, err := kube.ReadSetupFleetSource(ctx, kubernetes, ids.ClusterID, c.Namespace, c.FleetSource, ids.InstallationID)
+		a, _, err := kube.ReadSetupFleetSource(ctx, kubernetes, ids.ClusterID, c.Namespace, c.FleetSource, ids.InstallationID, ids.IssuerEpoch)
 		if err != nil {
 			return setupStep("fleet-source", err)
 		}
@@ -367,14 +367,14 @@ func setupObjectStore(ctx context.Context, c contracts.SetupConfiguration, ids s
 		return setupStep("objectstore/credentials", cfg.ErrInvalid)
 	}
 	// Bucket policies (Deny statements) are compiled with the IAM Secret by
-	// `asservat secrets`; the file is optional.
+	// `asservat secrets` (key bucket-policies.json of `<name>-objectstore-iam`).
 	var policies map[string]json.RawMessage
-	if raw, err := readSetupFile(filepath.Join(contracts.SetupObjectStoreRoot, "bucket-policies.json"), 256<<10); err == nil {
-		if json.Unmarshal(raw, &policies) != nil {
-			return setupStep("objectstore/policies", cfg.ErrInvalid)
-		}
-	} else if _, statErr := os.Stat(filepath.Join(contracts.SetupObjectStoreRoot, "bucket-policies.json")); statErr == nil {
+	raw, err = readSetupFile(filepath.Join(contracts.SetupObjectStoreRoot, "bucket-policies.json"), 256<<10)
+	if err != nil {
 		return setupStep("objectstore/policies", err)
+	}
+	if json.Unmarshal(raw, &policies) != nil {
+		return setupStep("objectstore/policies", cfg.ErrInvalid)
 	}
 	buckets := []string{c.ObjectStore.AuditBucket, c.ObjectStore.EvidenceBucket}
 	err = retryUnavailable(ctx, func(ctx context.Context) error {

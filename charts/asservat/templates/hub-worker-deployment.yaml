@@ -1,148 +1,88 @@
-{{- if include "asservat.hubWorker.enabled" . }}
-{{- $name := include "asservat.hubWorker.fullname" . }}
+{{- if include "asservat.hub" . }}
+{{- $name := include "asservat.fullname" (list . "hub-worker") }}
 {{- $w := index .Values.hub "hub-worker" }}
-{{- $deletion := include "asservat.hubWorker.contextDeletionEnabled" . }}
+{{- $bao := fromJson (include "asservat.openBao" .) }}
+{{- $root := "/run/asservat/hub-worker" }}
+{{- $capacity := not (empty .Values.capacity) }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ $name }}
   namespace: {{ .Release.Namespace }}
-  labels:
-    {{- include "asservat.hubWorker.labels" . | nindent 4 }}
+  labels: {{ include "asservat.labels" (list . "hub-worker") | nindent 4 }}
 spec:
   replicas: {{ int (default 1 $w.replicas) }}
   # One leader at a time; a rollout replaces the old Pod first.
   strategy:
     type: Recreate
   selector:
-    matchLabels:
-      {{- include "asservat.hubWorker.selectorLabels" . | nindent 6 }}
+    matchLabels: {{ include "asservat.selectorLabels" (list . "hub-worker") | nindent 6 }}
   template:
     metadata:
-      labels:
-        {{- include "asservat.hubWorker.labels" . | nindent 8 }}
+      labels: {{ include "asservat.labels" (list . "hub-worker") | nindent 8 }}
       annotations:
-        checksum/config: {{ include (print $.Template.BasePath "/hub-worker-configmap.yaml") . | sha256sum | quote }}
+        {{- include "asservat.checksum" (list . "hub-worker-configmap.yaml") | nindent 8 }}
     spec:
       serviceAccountName: {{ $name }}
       automountServiceAccountToken: false
       enableServiceLinks: false
       terminationGracePeriodSeconds: 15
-      securityContext:
-        {{- include "asservat.hubWorker.podSecurityContext" . | nindent 8 }}
-      {{- with .Values.image.pullSecrets }}
-      imagePullSecrets:
-        {{- range . }}
-        - name: {{ . | quote }}
-        {{- end }}
-      {{- end }}
-      {{- with $w.nodeSelector }}
-      nodeSelector:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with $w.tolerations }}
-      tolerations:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
+      securityContext: {{ include "asservat.podSecurityContext" . | nindent 8 }}
+      {{- include "asservat.imagePullSecrets" . | nindent 6 }}
+      {{- include "asservat.placement" (list . "hub-worker") | nindent 6 }}
       initContainers:
-        {{- include "asservat.hubWorker.waitSchema" . | nindent 8 }}
+        {{- include "asservat.waitSchema" (dict "root" . "config" (printf "%s/config.json" $root) "credential" (printf "%s/sql-configuration-fleet.json" $root) "ca" (printf "%s/roots/postgres.crt" $root) "volumeMounts" (list (dict "name" "inputs" "mountPath" $root "readOnly" true))) | nindent 8 }}
       containers:
         - name: hub-worker
-          image: {{ include "asservat.hubWorker.image" . | quote }}
-          imagePullPolicy: {{ default "IfNotPresent" .Values.image.pullPolicy }}
+          image: {{ include "asservat.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
           command: [/asservat, hub-worker]
-          env:
-            - name: ASSERVAT_HUB_POD_UID
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.uid
-          securityContext:
-            {{- include "asservat.hubWorker.securityContext" . | nindent 12 }}
-          {{- with $w.resources }}
-          resources:
-            {{- toYaml . | nindent 12 }}
-          {{- end }}
+          securityContext: {{ include "asservat.securityContext" . | nindent 12 }}
+          resources: {{ include "asservat.resources" (list . "hub-worker") | nindent 12 }}
           volumeMounts:
-            - {name: inputs, mountPath: /run/asservat/hub-worker, readOnly: true}
-            - {name: ids, mountPath: /run/asservat/ids, readOnly: true}
+            - {name: inputs, mountPath: {{ $root }}, readOnly: true}
+            {{- include "asservat.idsMount" . | nindent 12 }}
       volumes:
+        {{- include "asservat.idsVolume" . | nindent 8 }}
         - name: inputs
           projected:
             defaultMode: 0440
             sources:
               - configMap:
                   name: {{ printf "%s-config" $name }}
-                  optional: false
-                  items:
-                    - {key: config.json, path: config.json}
-                    {{- range $root, $_ := fromJson (include "asservat.hubWorker.externalRoots" .) }}
-                    - {key: {{ printf "roots-%s.crt" $root }}, path: {{ printf "roots/%s.crt" $root }}}
-                    {{- end }}
-                    {{- if and $deletion (ne .Values.services.objectStore.provider "seaweedfs") }}
-                    - {key: roots-audit-store.crt, path: roots/evidence-store.crt}
-                    {{- end }}
+                  items: [{key: config.json, path: config.json}]
               - serviceAccountToken:
                   path: kube.token
                   expirationSeconds: 600
               - configMap:
                   name: kube-root-ca.crt
-                  optional: false
-                  items:
-                    - {key: ca.crt, path: kube-ca.crt}
+                  items: [{key: ca.crt, path: kube-ca.crt}]
               - serviceAccountToken:
                   path: provider.token
-                  audience: {{ include "asservat.hubWorker.audience" . | quote }}
+                  audience: {{ $bao.hubWorkerAudience | quote }}
                   expirationSeconds: 600
-              {{- if include "asservat.hubWorker.capacityEnabled" . }}
+              # Every sql-<purpose>.json key (contracts.SQLComponentPurposes)
+              # lands at the volume root under its own name.
+              - secret:
+                  name: {{ include "asservat.secretName" (list . "sql-hub-worker") | quote }}
+              - secret:
+                  name: {{ include "asservat.secretName" (list . "s3-configuration-audit") | quote }}
+                  items: [{key: credentials.json, path: audit-storage.json}]
+              {{- if $capacity }}
               - serviceAccountToken:
                   path: cluster-observation.token
                   audience: {{ default "asservat-cluster-observation" $w.clusterObservationAudience | quote }}
                   expirationSeconds: 600
-              {{- end }}
-              # Every sql-<purpose>.json key lands at the volume root.
               - secret:
-                  name: {{ include "asservat.hubWorker.secretName" (list . "sql-hub-worker") | quote }}
-                  optional: false
+                  name: {{ include "asservat.secretName" (list . "audit-mac") | quote }}
+                  items: [{key: accountKey, path: capture-account.key}]
+              {{- range $principal, $file := dict "operation-cleanup" "cleanup-storage.json" "operation-verify" "verify-storage.json" "evidence-delete" "evidence-delete-storage.json" }}
               - secret:
-                  name: {{ include "asservat.hubWorker.secretName" (list . "s3-hub-worker-audit") | quote }}
-                  optional: false
-                  items:
-                    - {key: credentials.json, path: audit-storage.json}
-              {{- if include "asservat.hubWorker.capacityEnabled" . }}
-              - secret:
-                  name: {{ include "asservat.hubWorker.secretName" (list . "audit-mac") | quote }}
-                  optional: false
-                  items:
-                    - {key: accountKey, path: capture-account.key}
-              {{- end }}
-              {{- if include "asservat.hubWorker.cleanupEnabled" . }}
-              {{- range $principal, $file := dict "cleanup" "cleanup-storage.json" "verify" "verify-storage.json" }}
-              - secret:
-                  name: {{ include "asservat.hubWorker.secretName" (list $ (printf "s3-hub-worker-%s" $principal)) | quote }}
-                  optional: false
-                  items:
-                    - {key: credentials.json, path: {{ $file }}}
+                  name: {{ include "asservat.secretName" (list $ (printf "s3-%s" $principal)) | quote }}
+                  items: [{key: credentials.json, path: {{ $file }}}]
               {{- end }}
               {{- end }}
-              {{- if $deletion }}
-              - secret:
-                  name: {{ include "asservat.hubWorker.secretName" (list . "s3-hub-worker-evidence-delete") | quote }}
-                  optional: false
-                  items:
-                    - {key: credentials.json, path: evidence-delete-storage.json}
-              {{- if eq .Values.services.objectStore.provider "seaweedfs" }}
-              - secret:
-                  name: {{ printf "%s-objectstore-state" (include "asservat.hubWorker.prefix" .) | quote }}
-                  optional: false
-                  items:
-                    - {key: ca.crt, path: roots/evidence-store.crt}
-              {{- end }}
-              {{- end }}
-              {{- with include "asservat.hubWorker.rootsProjection" . | trim }}
-              {{- . | nindent 14 }}
-              {{- end }}
-        - name: ids
-          secret:
-            secretName: {{ include "asservat.hubWorker.secretName" (list . "ids") | quote }}
-            defaultMode: 0440
+              {{- include "asservat.providerRoots" (dict "root" . "provider" "postgres" "path" "roots/postgres.crt") | nindent 14 }}
+              {{- include "asservat.providerRoots" (dict "root" . "provider" "objectStore" "path" "roots/audit-store.crt") | nindent 14 }}
+              {{- include "asservat.providerRoots" (dict "root" . "provider" "openBao" "path" "roots/key-service.crt") | nindent 14 }}
 {{- end }}

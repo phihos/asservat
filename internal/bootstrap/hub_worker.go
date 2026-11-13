@@ -14,6 +14,7 @@ import (
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/adapters/mounts"
 	"asservat.local/asservat/internal/adapters/postgres"
+	"asservat.local/asservat/internal/adapters/providerconfig"
 	app "asservat.local/asservat/internal/application/fleet"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/authorization"
@@ -88,18 +89,41 @@ func RunHubWorker(ctx context.Context) error {
 	return w.Run()
 }
 
-// readHubWorkerConfig reads and checks the Helm-rendered config.
-func readHubWorkerConfig(ctx context.Context, files *os.Root) (contracts.HubWorkerConfig, error) {
+// readHubWorkerConfig reads the Helm-rendered config, completes the OpenBao
+// names Helm does not render and checks it.
+func readHubWorkerConfig(ctx context.Context, files *os.Root, ids contracts.InstallationIDs) (contracts.HubWorkerConfig, error) {
 	b, err := mounts.Read(ctx, files, contracts.HubWorkerConfigFile, contracts.HubWorkerConfigMaxBytes)
 	if err != nil {
 		return contracts.HubWorkerConfig{}, mounts.ErrUnavailable
 	}
 	defer clear(b)
 	c, err := contracts.DecodeHubWorkerConfig(bytes.NewReader(b))
-	if err != nil || validateHubWorkerConfig(c) != nil {
+	if err != nil {
+		return contracts.HubWorkerConfig{}, mounts.ErrUnavailable
+	}
+	completeHubWorkerConfig(&c, ids)
+	if validateHubWorkerConfig(c) != nil {
 		return contracts.HubWorkerConfig{}, mounts.ErrUnavailable
 	}
 	return c, nil
+}
+
+// completeHubWorkerConfig sets the OpenBao names that Helm does not render:
+// the configuration auth mount and token audience, the audit mount and key,
+// and the installation's worker configuration audit and context deletion
+// signing keys, exactly as `asservat setup` creates them.
+func completeHubWorkerConfig(c *contracts.HubWorkerConfig, ids contracts.InstallationIDs) {
+	n := providerconfig.OpenBaoNamesFor(ids.InstallationID)
+	audit := contracts.SmallOpenBaoAuditMount
+	c.Provider.AuthMount = contracts.SmallOpenBaoConfigurationAuthMount
+	c.Provider.Audience = contracts.ConfigurationProviderAudience(ids.InstallationID, ids.ClusterID)
+	c.KeyService.AuditMount, c.KeyService.AuditKey = audit, n.AuditKey
+	if c.Permission != nil && c.Permission.WorkerConfiguration != nil {
+		c.Provider.WorkerConfigurationAudit = contracts.OwnerPublicTransit{Mount: audit, Key: n.WorkerConfigurationAuditKey}
+	}
+	if c.Cleanup != nil || c.Permission != nil && c.Permission.ContextDeletion != nil {
+		c.Provider.ContextDeletionSigning = contracts.OwnerPublicTransit{Mount: audit, Key: n.DeletionSigningKey}
+	}
 }
 
 func validateHubWorkerConfig(c contracts.HubWorkerConfig) error {
@@ -178,13 +202,13 @@ func newHubWorker(ctx context.Context, files, idFiles *os.Root) (_ *hubWorker, e
 	}()
 	startup, end := context.WithTimeout(root, 30*time.Second)
 	defer end()
-	at = "config"
-	if w.config, err = readHubWorkerConfig(startup, files); err != nil {
-		return nil, err
-	}
 	at = "ids"
 	if w.ids, err = contracts.ReadInstallationIDs(idFiles); err != nil {
 		return nil, mounts.ErrUnavailable
+	}
+	at = "config"
+	if w.config, err = readHubWorkerConfig(startup, files, w.ids); err != nil {
+		return nil, err
 	}
 	at = "roots"
 	kubernetes, err := inClusterKubernetes(startup, files)
@@ -229,12 +253,11 @@ func newHubWorker(ctx context.Context, files, idFiles *os.Root) (_ *hubWorker, e
 	at = "sql"
 	var pools [3]*pgxpool.Pool
 	for i, purpose := range contracts.ConfigurationRuntimeRolePurposes() {
-		file := map[string]string{"configuration-fleet": "sql-fleet.json", "configuration-source": "sql-configuration.json", "configuration-audit": "sql-audit.json"}[purpose]
 		name, known := postgres.ConfigurationRuntimeRoleName(w.ids.InstallationID, purpose)
-		if file == "" || !known {
+		if !known {
 			return nil, mounts.ErrUnavailable
 		}
-		if pools[i], err = w.pool(startup, file, name, "asservat-hub-worker"); err != nil {
+		if pools[i], err = w.pool(startup, "sql-"+purpose+".json", name, "asservat-hub-worker"); err != nil {
 			return nil, err
 		}
 		w.closers = append(w.closers, pools[i].Close)
@@ -278,11 +301,15 @@ func newHubWorker(ctx context.Context, files, idFiles *os.Root) (_ *hubWorker, e
 	}
 	w.closers = append(w.closers, w.audit.Close)
 	at = "sources"
-	fleetSource, err := kube.NewFleetSettingsClient(observer, c.FleetSource, w.fleetUID, w.ids.InstallationID)
+	fleetSource, err := kube.NewFleetSettingsClient(observer, c.FleetSource, w.fleetUID, w.ids.InstallationID, w.ids.IssuerEpoch)
 	if err != nil {
 		return nil, err
 	}
-	ownerSource, err := kube.NewPlainOwnerConfigurationSource(observer, c.OwnerSource, w.ownerUID, w.ids.InstallationID)
+	// The owner issuer roots are the owner PKI CA (unauthenticated read).
+	ownerRoots := func(ctx context.Context) ([][]byte, error) {
+		return kms.ReadPKIRoots(ctx, c.KeyService.Endpoint, w.keyRoots, contracts.SmallOpenBaoOwnerPKIMount)
+	}
+	ownerSource, err := kube.NewOwnerSourceReader(observer, c.OwnerSource, w.ownerUID, w.ids.InstallationID, w.ids.IssuerEpoch, ownerRoots)
 	if err != nil {
 		return nil, err
 	}
@@ -343,7 +370,7 @@ func (w *hubWorker) pool(ctx context.Context, file, role, application string) (*
 	if err != nil {
 		return nil, &fixedStepError{"sql/" + file, mounts.ErrUnavailable}
 	}
-	if err = postgres.VerifySessionUser(ctx, pool, role); err != nil {
+	if err = postgres.VerifySessionRole(ctx, pool, role); err != nil {
 		pool.Close()
 		return nil, &fixedStepError{"sql/" + file, err}
 	}

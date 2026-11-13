@@ -57,10 +57,9 @@ const (
 
 var ErrNodeChannel = errors.New("node channel message rejected")
 
-// NodeTokenAudience is the dedicated projected-token audience of one
-// cluster's node collectors; no other component accepts it. The cluster ID is
-// a Helm value in both topologies, so the chart renders the audience.
-func NodeTokenAudience(clusterID string) string { return "asservat-node:" + clusterID }
+// NodeTokenAudience is the dedicated projected-token audience of the node
+// collectors, a chart constant; only the cluster's own connector reviews it.
+const NodeTokenAudience = "asservat-node"
 
 // NodeConnectorRootFile is the collector's file, next to node.json, holding
 // the connector listener's issuing root when node.json carries no rootsPEM.
@@ -73,7 +72,6 @@ const NodeConnectorRootFile = "connector-ca.crt"
 // collector-wide budgets (specs/capacity.md).
 type NodeDeployment struct {
 	Format    string                `json:"format"`
-	ClusterID string                `json:"clusterID"`
 	Connector NodeConnectorEndpoint `json:"connector"`
 	Ceilings  NodeCeilings          `json:"ceilings"`
 	Live      *NodeLiveProcessing   `json:"live,omitempty"`

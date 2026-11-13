@@ -39,7 +39,7 @@ func TestSmallKeycloakHelmUsesPreparedMaterialAndIndependentDatabase(t *testing.
 		}
 		ctx, end := context.WithTimeout(t.Context(), 15*time.Second)
 		defer end()
-		return exec.CommandContext(ctx, helm, "template", "trial", "../../charts/asservat", "--namespace", "installation", "--kube-version", "1.35.0", "-f", path).CombinedOutput()
+		return exec.CommandContext(ctx, helm, "template", "trial", "../../charts/asservat", "--namespace", "installation", "--kube-version", "1.35.0", "-f", "testdata/helm-fixture.yaml", "-f", path).CombinedOutput()
 	}
 	read := func(raw []byte) (*apps.Deployment, *core.Service) {
 		t.Helper()

@@ -37,7 +37,7 @@ type ownerProviderEffects struct {
 }
 
 func newOwnerProviderEffects(ctx context.Context, input contracts.OwnerDeployment, profile contracts.OwnerProviderAuthentication, pool value.OwnerPool, issuerRoots *x509.CertPool, jwt TokenSource, proof ownerProviderCurrent, client *http.Client, concurrency int, now func() time.Time) (*ownerProviderEffects, error) {
-	if now == nil || !pool.Valid() || pool.InstallationID != input.InstallationID || pool.ClusterID != input.ClusterID || pool.Namespace != input.Namespace.Name || pool.NamespaceUID != input.Namespace.UID || pool.ServiceAccount != profile.ServiceAccount.Name || pool.AccountUID != profile.ServiceAccount.UID {
+	if now == nil || !pool.Valid() || pool.InstallationID != input.InstallationID || pool.ClusterID != input.ClusterID || pool.Namespace != input.Namespace.Name || pool.NamespaceUID != input.Namespace.UID || pool.ServiceAccount != profile.ServiceAccount.Name {
 		return nil, ErrKeyService
 	}
 	verifier, err := mtls.NewOwnerPeerVerifierForPool(issuerRoots, pool, now)

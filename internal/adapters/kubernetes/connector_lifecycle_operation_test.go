@@ -74,7 +74,7 @@ func newConnectorLifecycleFixture(t *testing.T) (*connectorLifecycleFixture, con
 		case "/apis/authentication.k8s.io/v1/tokenreviews":
 			f.reviews.Add(1)
 			var q auth.TokenReview
-			if json.NewDecoder(r.Body).Decode(&q) != nil || q.Spec.Token != string(token) || len(q.Spec.Audiences) != 1 || q.Spec.Audiences[0] != ConnectorEnrollmentAudience(peer.ClusterID) {
+			if json.NewDecoder(r.Body).Decode(&q) != nil || q.Spec.Token != string(token) || len(q.Spec.Audiences) != 1 || q.Spec.Audiences[0] != ConnectorEnrollmentAudience {
 				t.Error("wrong native token review")
 			}
 			permissionReply(w, auth.TokenReview{TypeMeta: meta.TypeMeta{APIVersion: "authentication.k8s.io/v1", Kind: "TokenReview"}, Status: auth.TokenReviewStatus{Authenticated: !f.revoke.Load(), Audiences: q.Spec.Audiences,

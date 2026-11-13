@@ -38,12 +38,11 @@ func NewConnectorProcessAttester(c *PermissionClient, source app.ConnectorIdenti
 	return &ConnectorProcessAttester{c, source, workload, tokens}, nil
 }
 
-// ConnectorEnrollmentAudience is the connector Pod token's dedicated audience.
-// It names the cluster ID, a Helm value in both topologies, so the chart can
-// render the projection; only this connector reviews the token.
-func ConnectorEnrollmentAudience(clusterID string) string {
-	return "https://asservat." + clusterID + "/connector-process-enrollment"
-}
+// ConnectorEnrollmentAudience is the connector Pod token's dedicated audience,
+// a chart constant: only this connector reviews the token, against its own
+// cluster's API server.
+const ConnectorEnrollmentAudience = "asservat-connector-process-enrollment"
+
 func (s *ConnectorProcessAttester) live(ctx context.Context, p value.ConnectorDeployment, b value.ConnectorProcessIdentity, name string) (ownerEnrollmentWorkload, error) {
 	var out ownerEnrollmentWorkload
 	ns, err := s.client.namespace(ctx, s.client.control)
@@ -177,7 +176,7 @@ func (s *ConnectorProcessAttester) readConnectorProcessSourceAttestationWith(ctx
 	if e != nil || len(token) < 1 || len(token) > 16<<10 || !bytes.Equal(bytes.TrimSpace(token), token) {
 		return zero, noSource, connectorAPIStage("attest-pod-token", value.ErrDenied)
 	}
-	audience := ConnectorEnrollmentAudience(b.Binding.ClusterID)
+	audience := ConnectorEnrollmentAudience
 	name, e := reviewBoundPodToken(ctx, s.client, token, audience, p.Namespace, p.ServiceAccount, s.workload.AccountUID, b.PodUID)
 	if e != nil {
 		return zero, noSource, connectorAPIStage("attest-token-review", value.ErrDenied)

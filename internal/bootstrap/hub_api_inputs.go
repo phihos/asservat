@@ -89,7 +89,7 @@ func buildHubAPIDeployment(ctx context.Context, files *os.Root, h contracts.HubA
 	if ctx == nil || files == nil || r == nil {
 		return zero, mounts.ErrUnavailable
 	}
-	for _, v := range []struct{ name, value string }{{"namespace", h.Namespace}, {"deployment", h.Deployment}, {"serviceAccount", h.ServiceAccount}, {"ownerConfiguration", h.OwnerConfiguration}, {"auditCredentials", h.AuditCredentials}, {"providerAuthMount", h.ProviderAuthMount}} {
+	for _, v := range []struct{ name, value string }{{"name", h.Name}, {"namespace", h.Namespace}, {"openBao", h.OpenBao.Endpoint}, {"objectStore", h.ObjectStore.Endpoint}} {
 		if v.value == "" {
 			return zero, hubAPIInputError(v.name)
 		}
@@ -113,23 +113,25 @@ func buildHubAPIDeployment(ctx context.Context, files *os.Root, h contracts.HubA
 		}
 		return contracts.WorkerObjectReference{Name: name, UID: uid}, nil
 	}
-	owner, err := configMapUID(h.Namespace, h.OwnerConfiguration, "owner-configuration")
+	self := contracts.HubAPIName(h.Name, "hub-api")
+	owner, err := configMapUID(h.Namespace, contracts.HubAPIName(h.Name, "owner-source"), "owner-configuration")
 	if err != nil {
 		return zero, err
 	}
+	names := providerconfig.OpenBaoNamesFor(ids.InstallationID)
 	kubernetes := contracts.OwnerProviderEndpoint{Endpoint: contracts.HubAPIKubernetesEndpoint, Roots: cas[contracts.HubAPIKubernetesCAFile]}
-	k := h.KeyService
 	c := contracts.OwnerDeployment{Format: contracts.OwnerDeploymentFormat, InstallationID: ids.InstallationID, ClusterID: ids.ClusterID, PermissionRootID: ids.PermissionRootID,
 		Namespace: contracts.WorkerObjectReference{Name: h.Namespace, UID: namespaceUID}, ConfigurationUID: owner.UID, Kubernetes: kubernetes,
 		ConfigurationProbes: []contracts.OwnerConfigurationProbe{}, SchedulingLeases: []contracts.OwnerSchedulingLease{},
-		Postgres:    contracts.OwnerPostgresEndpoint{Host: h.Postgres.Host, Port: h.Postgres.Port, Database: h.Postgres.Database, Roots: cas[contracts.HubAPIPostgresCAFile], MaxConnections: h.Postgres.MaxConnections},
-		AuditStore:  contracts.OwnerAuditStore{Endpoint: h.AuditStore.Endpoint, Roots: cas[contracts.HubAPIAuditStoreCAFile], Region: h.AuditStore.Region, Bucket: h.AuditStore.Bucket},
-		KeyService:  contracts.OwnerKeyService{Endpoint: k.Endpoint, Roots: cas[contracts.HubAPIKeyServiceCAFile], AuditMount: k.AuditMount, AuditKey: k.AuditKey, PKIMount: k.PKIMount, ServerRole: k.ServerRole, ClientRole: k.ClientRole},
+		Postgres:   contracts.OwnerPostgresEndpoint{Host: h.Postgres.Host, Port: h.Postgres.Port, Database: h.Postgres.Database, Roots: cas[contracts.HubAPIPostgresCAFile], MaxConnections: contracts.HubAPIPostgresConnections},
+		AuditStore: contracts.OwnerAuditStore{Endpoint: h.ObjectStore.Endpoint, Roots: cas[contracts.HubAPIAuditStoreCAFile], Region: h.ObjectStore.Region, Bucket: h.ObjectStore.AuditBucket},
+		KeyService: contracts.OwnerKeyService{Endpoint: h.OpenBao.Endpoint, Roots: cas[contracts.HubAPIKeyServiceCAFile], AuditMount: contracts.SmallOpenBaoAuditMount, AuditKey: names.AuditKey,
+			PKIMount: contracts.SmallOpenBaoOwnerPKIMount, ServerRole: names.OwnerServerRole, ClientRole: names.OwnerClientRole},
 		Connections: h.Connections, Concurrency: h.Concurrency}
-	if s := h.APIContextStarts; s != nil {
-		c.APIContextStarts = &contracts.OwnerDeploymentAPIContextStarts{CapacityAccount: contracts.WorkerObjectReference{Name: s.CapacityAccount}, ExecutionAccount: contracts.WorkerObjectReference{Name: s.ExecutionAccount}, CapacityAudience: s.CapacityAudience}
-	}
-	profile := contracts.OwnerProviderAuthentication{Format: contracts.OwnerProviderAuthenticationFormat, AuthMount: h.ProviderAuthMount, ServiceAccount: contracts.WorkerObjectReference{Name: h.ServiceAccount}, AuditCredentials: contracts.WorkerObjectReference{Name: h.AuditCredentials}}
+	// The provider roles are "<name>-hub-api-<purpose>" (the ServiceAccount
+	// name plus the purpose; providerconfig.OpenBaoRoleName).
+	profile := contracts.OwnerProviderAuthentication{Format: contracts.OwnerProviderAuthenticationFormat, AuthMount: contracts.SmallOpenBaoOwnerAuthMount, ServiceAccount: contracts.WorkerObjectReference{Name: self},
+		AuditCredentials: contracts.WorkerObjectReference{Name: contracts.HubAPIName(h.Name, "s3-owner-audit")}}
 	recipe, err := providerconfig.OwnerProviderRecipeFor(c, profile.AuthMount, "", profile.ServiceAccount, profile.AuditCredentials, now)
 	if err != nil {
 		return zero, hubAPIInputError("provider-recipe")
@@ -139,17 +141,17 @@ func buildHubAPIDeployment(ctx context.Context, files *os.Root, h contracts.HubA
 
 	// Native: connector roots from the connector PKI; worker namespaces by name.
 	n := h.Native
-	connectorRoots, err := r.PKIRoots(ctx, n.ConnectorPKIMount)
+	connectorRoots, err := r.PKIRoots(ctx, contracts.SmallOpenBaoConnectorPKIMount)
 	if err != nil {
 		return zero, hubAPIInputError("connector-roots")
 	}
-	c.Native = &contracts.OwnerNativeDeployment{ConnectorRoots: connectorRoots, WorkerAPIs: []contracts.OwnerNativeWorkerAPI{}, RetentionTopologies: []contracts.OwnerNativeTopology{}, Connections: n.Connections, Concurrency: n.Concurrency}
-	for _, w := range n.WorkerAPIs {
-		uid, err := r.NamespaceUID(ctx, w.Namespace)
+	c.Native = &contracts.OwnerNativeDeployment{ConnectorRoots: connectorRoots, WorkerAPIs: []contracts.OwnerNativeWorkerAPI{}, RetentionTopologies: []contracts.OwnerNativeTopology{}, Connections: h.Connections, Concurrency: h.Concurrency}
+	for _, namespace := range n.WorkerNamespaces {
+		uid, err := r.NamespaceUID(ctx, namespace)
 		if err != nil {
 			return zero, hubAPIInputError("worker-namespace-uid")
 		}
-		c.Native.WorkerAPIs = append(c.Native.WorkerAPIs, contracts.OwnerNativeWorkerAPI{ClusterID: ids.ClusterID, Namespace: contracts.WorkerObjectReference{Name: w.Namespace, UID: uid}, Kubernetes: kubernetes})
+		c.Native.WorkerAPIs = append(c.Native.WorkerAPIs, contracts.OwnerNativeWorkerAPI{ClusterID: ids.ClusterID, Namespace: contracts.WorkerObjectReference{Name: namespace, UID: uid}, Kubernetes: kubernetes})
 	}
 	// Remote retention topologies are pinned by content (ADR-196) and arrive
 	// with the remote-region slice; the hub cluster needs none.
@@ -159,7 +161,7 @@ func buildHubAPIDeployment(ctx context.Context, files *os.Root, h contracts.HubA
 
 	// Observation: the owner pin names this workload; the local connector
 	// peer comes from the IDs, remote peers from values.
-	protection := kube.WorkloadProtectionDigest(ids.ClusterID, h.Namespace, h.Deployment)
+	protection := contracts.WorkloadSourceDigest(ids.ClusterID, h.Namespace, self)
 	protectionHex := hex.EncodeToString(protection[:])
 	o := &contracts.OwnerObservationBootstrap{Format: contracts.OwnerObservationFormat, TemplateDigest: protectionHex, ImageDigest: protectionHex, ProtectionDigest: protectionHex,
 		Peers: []contracts.OwnerObservationPeer{{InstallationID: ids.InstallationID, ClusterID: ids.ClusterID, IssuerEpoch: ids.IssuerEpoch, PeerID: ids.PeerID, Roots: connectorRoots}}}
@@ -171,18 +173,20 @@ func buildHubAPIDeployment(ctx context.Context, files *os.Root, h contracts.HubA
 		o.Peers = append(o.Peers, contracts.OwnerObservationPeer{InstallationID: ids.InstallationID, ClusterID: p.ClusterID, IssuerEpoch: ids.IssuerEpoch, PeerID: p.PeerID, Roots: roots})
 	}
 	if l := h.Observation.LocalCapacity; l != nil {
-		accountUID, err := r.ObjectUID(ctx, "", "serviceaccounts", h.Namespace, l.CallerAccount)
+		// The hub-worker is the caller of the local capacity observation.
+		worker := contracts.HubAPIName(h.Name, "hub-worker")
+		accountUID, err := r.ObjectUID(ctx, "", "serviceaccounts", h.Namespace, worker)
 		if err != nil {
 			return zero, hubAPIInputError("caller-account-uid")
 		}
-		deploymentUID, err := r.ObjectUID(ctx, "apps", "deployments", h.Namespace, l.CallerDeployment)
+		deploymentUID, err := r.ObjectUID(ctx, "apps", "deployments", h.Namespace, worker)
 		if err != nil {
 			return zero, hubAPIInputError("caller-deployment-uid")
 		}
-		caller := kube.WorkloadProtectionDigest(ids.ClusterID, h.Namespace, l.CallerDeployment)
+		caller := contracts.WorkloadSourceDigest(ids.ClusterID, h.Namespace, worker)
 		callerHex := hex.EncodeToString(caller[:])
 		local := &contracts.OwnerLocalCapacityObservation{Keys: l.Keys, ProbeNamespace: c.Namespace,
-			Caller: contracts.OwnerObservationCaller{Account: l.CallerAccount, AccountUID: accountUID, Deployment: l.CallerDeployment, DeploymentUID: deploymentUID, TemplateDigest: callerHex, ImageDigest: callerHex, ProtectionDigest: protectionHex}}
+			Caller: contracts.OwnerObservationCaller{Account: worker, AccountUID: accountUID, Deployment: worker, DeploymentUID: deploymentUID, TemplateDigest: callerHex, ImageDigest: callerHex, ProtectionDigest: protectionHex}}
 		if len(l.LabelKeys)+len(l.AnnotationKeys) > 0 {
 			local.WorkloadGuard = &contracts.WorkloadMetadataGuard{LabelKeys: l.LabelKeys, AnnotationKeys: l.AnnotationKeys}
 		}
@@ -191,7 +195,7 @@ func buildHubAPIDeployment(ctx context.Context, files *os.Root, h contracts.HubA
 	c.Observation = o
 
 	if h.Public != nil {
-		if c.Public, err = buildHubAPIPublic(ctx, files, c, *h.Public, ids, r, configMapUID, now); err != nil {
+		if c.Public, err = buildHubAPIPublic(ctx, files, c, h, ids, r, configMapUID, now); err != nil {
 			return zero, err
 		}
 	}
@@ -201,21 +205,24 @@ func buildHubAPIDeployment(ctx context.Context, files *os.Root, h contracts.HubA
 	return c, nil
 }
 
-func buildHubAPIPublic(ctx context.Context, files *os.Root, c contracts.OwnerDeployment, p contracts.HubAPIPublic, ids hubAPIIDs, r hubAPIResolver, configMapUID func(string, string, string) (contracts.WorkerObjectReference, error), now time.Time) (*contracts.OwnerPublicDeployment, error) {
-	ns := c.Namespace.Name
+func buildHubAPIPublic(ctx context.Context, files *os.Root, c contracts.OwnerDeployment, h contracts.HubAPIConfig, ids hubAPIIDs, r hubAPIResolver, configMapUID func(string, string, string) (contracts.WorkerObjectReference, error), now time.Time) (*contracts.OwnerPublicDeployment, error) {
+	ns, p := c.Namespace.Name, *h.Public
+	name := func(suffix string) string { return contracts.HubAPIName(h.Name, suffix) }
 	providerRoots, err := readCA(ctx, files, contracts.HubAPIIdentityCAFile, now)
 	if err != nil {
 		return nil, err
 	}
-	out := &contracts.OwnerPublicDeployment{Format: contracts.OwnerPublicDeploymentFormat, Origin: p.Origin, BrowserRootID: ids.BrowserRootID, BrowserAudience: p.BrowserAudience, ProviderRoots: providerRoots,
-		SessionTransit: p.SessionTransit, CaptureHistory: p.CaptureHistory, Standby: p.Standby, Captures: p.Captures, PreviewSeconds: p.PreviewSeconds, ArtifactKeyID: p.ArtifactKeyID,
-		DownloadPlan: p.DownloadPlan, ProxyTLS: p.ProxyTLS, Port: p.Port, Version: p.Version, OperationConcurrency: p.OperationConcurrency, MCPPerIdentity: p.MCPPerIdentity,
+	names := providerconfig.OpenBaoNamesFor(ids.InstallationID)
+	transit := contracts.SmallOpenBaoTransitMount
+	out := &contracts.OwnerPublicDeployment{Format: contracts.OwnerPublicDeploymentFormat, Origin: p.Origin, BrowserRootID: ids.BrowserRootID, BrowserSessionEpoch: ids.SessionEpoch, BrowserAudience: p.BrowserAudience, ProviderRoots: providerRoots,
+		SessionTransit: contracts.OwnerPublicTransit{Mount: transit, Key: names.BrowserSessionKey}, CaptureHistory: p.CaptureHistory, Standby: p.Standby, Captures: p.Captures, PreviewSeconds: p.PreviewSeconds, ArtifactKeyID: artifactKeyID(ids.InstallationID),
+		DownloadPlan: p.DownloadPlan, ProxyTLS: p.ProxyTLS, Port: contracts.OwnerInstalledPublicPort, Version: p.Version, OperationConcurrency: p.OperationConcurrency, MCPPerIdentity: p.MCPPerIdentity,
 		DownloadConcurrency: p.DownloadConcurrency, DownloadsPerIdentity: p.DownloadsPerIdentity, DownloadMaxSeconds: p.DownloadMaxSeconds, OperationAudit: p.OperationAudit, PermissionDelegations: p.PermissionDelegations,
-		WorkSigning: contracts.OwnerPublicSigning{Mount: p.WorkSigning.Mount, Name: p.WorkSigning.Name}, WorkerPKI: contracts.OwnerPublicWorkerPKI{Mount: p.WorkerPKI.Mount, Role: p.WorkerPKI.Role, IssuerEpoch: ids.IssuerEpoch}}
+		WorkSigning: contracts.OwnerPublicSigning{Mount: transit, Name: names.WorkSigningKey}, WorkerPKI: contracts.OwnerPublicWorkerPKI{Mount: contracts.SmallOpenBaoWorkerPKIMount, Role: names.DownloadWorkerRole, IssuerEpoch: ids.IssuerEpoch}}
 	for _, v := range []struct {
 		name, step string
 		target     *contracts.WorkerObjectReference
-	}{{p.BrowserSettings, "browser-settings", &out.BrowserSettings}, {p.IdentitySettings, "identity-settings", &out.IdentitySettings}, {p.ClusterCatalog, "cluster-catalog", &out.ClusterCatalog.Source}, {p.DownloadEnvironment, "download-environment", &out.DownloadEnvironment.Source}} {
+	}{{name("browser-settings"), "browser-settings", &out.BrowserSettings}, {name("identity-settings"), "identity-settings", &out.IdentitySettings}, {name("cluster-catalog"), "cluster-catalog", &out.ClusterCatalog.Source}, {name("download-environment"), "download-environment", &out.DownloadEnvironment.Source}} {
 		if *v.target, err = configMapUID(ns, v.name, v.step); err != nil {
 			return nil, err
 		}
@@ -227,17 +234,17 @@ func buildHubAPIPublic(ctx context.Context, files *os.Root, c contracts.OwnerDep
 	if w := c.Native.WorkerAPIs; len(w) == 1 {
 		workerNamespace = w[0].Namespace.Name
 	}
-	if out.WorkerConfiguration.Source, err = configMapUID(workerNamespace, p.WorkerConfiguration, "worker-configuration"); err != nil {
+	if out.WorkerConfiguration.Source, err = configMapUID(workerNamespace, name("worker-profile"), "worker-configuration"); err != nil {
 		return nil, err
 	}
-	if p.Processing != "" {
-		source, err := configMapUID(ns, p.Processing, "processing")
+	if p.Processing {
+		source, err := configMapUID(ns, name("processing-source"), "processing")
 		if err != nil {
 			return nil, err
 		}
 		out.Processing = &contracts.OwnerPublicEnvironment{Source: source, Paths: []contracts.DownloadEnvironmentPath{}}
 	}
-	if out.WorkerPKI.Roots, err = r.PKIRoots(ctx, p.WorkerPKI.Mount); err != nil {
+	if out.WorkerPKI.Roots, err = r.PKIRoots(ctx, out.WorkerPKI.Mount); err != nil {
 		return nil, hubAPIInputError("worker-roots")
 	}
 	pin, err := r.CapacityPin(ctx, c.PermissionRootID, c.InstallationID)
@@ -252,11 +259,11 @@ func buildHubAPIPublic(ctx context.Context, files *os.Root, c contracts.OwnerDep
 	out.OperationAudit.RetentionSeconds = int(pin.OperationRetentionSeconds)
 	out.Capacity = contracts.OwnerPublicCapacity{QualificationID: pin.QualificationID, QualificationDigest: pin.QualificationDigest, AccountVersion: pin.AccountVersion}
 	if f := p.Fleet; f != nil {
-		settings, err := configMapUID(ns, f.Settings, "fleet-settings")
+		settings, err := configMapUID(ns, name("fleet"), "fleet-settings")
 		if err != nil {
 			return nil, err
 		}
-		out.Fleet = &contracts.OwnerFleetIssuance{Settings: settings, ChannelMount: f.ChannelMount, DeliveryProfile: f.DeliveryProfile}
+		out.Fleet = &contracts.OwnerFleetIssuance{Settings: settings, ChannelMount: contracts.SmallOpenBaoBootstrapMount, DeliveryProfile: f.DeliveryProfile}
 	}
 	// The work-signing key is read with the work-sign provider role; its role
 	// name does not depend on the key version.
@@ -265,12 +272,12 @@ func buildHubAPIPublic(ctx context.Context, files *os.Root, c contracts.OwnerDep
 	if err != nil {
 		return nil, hubAPIInputError("public-recipe")
 	}
-	version, public, err := r.SigningKey(ctx, roles[2].Name, p.WorkSigning.Mount, p.WorkSigning.Name)
+	version, public, err := r.SigningKey(ctx, roles[2].Name, out.WorkSigning.Mount, out.WorkSigning.Name)
 	if err != nil {
 		return nil, hubAPIInputError("work-signing-key")
 	}
 	out.WorkSigning.Version, out.WorkSigning.PublicKey = version, public
-	out.WorkSigning.KeyID = p.WorkSigning.Name + "-v" + strconv.Itoa(version)
+	out.WorkSigning.KeyID = out.WorkSigning.Name + "-v" + strconv.Itoa(version)
 	if _, out.ProviderRecipeSHA256, err = providerconfig.OwnerPublicProviderRecipeFor(c, *c.ProviderAuthentication, now); err != nil {
 		return nil, hubAPIInputError("public-recipe")
 	}
@@ -286,9 +293,8 @@ func buildHubAPIPublic(ctx context.Context, files *os.Root, c contracts.OwnerDep
 // token, OpenBao's unauthenticated CA endpoints and one provider login, and
 // the capacity profile reader's SQL login.
 type liveHubAPIResolver struct {
-	files  *providerInputs
-	uids   *kube.UIDReader
-	config contracts.HubAPIConfig
+	files *providerInputs
+	uids  *kube.UIDReader
 	// keyService and roots are known once the CA files are read.
 	keyService string
 	roots      [][]byte
@@ -310,7 +316,7 @@ func (r *liveHubAPIResolver) SigningKey(ctx context.Context, role, mount, name s
 		return 0, nil, err
 	}
 	defer clear(jwt)
-	return kms.ReadSigningPublicKey(ctx, r.keyService, r.roots, r.config.ProviderAuthMount, role, jwt, mount, name)
+	return kms.ReadSigningPublicKey(ctx, r.keyService, r.roots, contracts.SmallOpenBaoOwnerAuthMount, role, jwt, mount, name)
 }
 func (r *liveHubAPIResolver) CapacityPin(ctx context.Context, root, installation string) (postgres.CapacityQualificationPin, error) {
 	role := "capacity-profile-read"
@@ -357,13 +363,13 @@ func loadHubAPIInputs(ctx context.Context, files, configRoot, idsRoot, public *o
 		return nil, err
 	}
 	base := &providerInputs{files: files, kubernetesEndpoint: contracts.OwnerProviderEndpoint{Endpoint: contracts.HubAPIKubernetesEndpoint, Roots: kubeRoots},
-		postgresEndpoint: contracts.OwnerPostgresEndpoint{Host: h.Postgres.Host, Port: h.Postgres.Port, Database: h.Postgres.Database, Roots: pgRoots, MaxConnections: h.Postgres.MaxConnections}}
+		postgresEndpoint: contracts.OwnerPostgresEndpoint{Host: h.Postgres.Host, Port: h.Postgres.Port, Database: h.Postgres.Database, Roots: pgRoots, MaxConnections: contracts.HubAPIPostgresConnections}}
 	defer base.closeHTTP()
 	uids, err := kube.NewUIDReader(base.kubernetes(contracts.HubAPIKubernetesTokenFile))
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	resolver := &liveHubAPIResolver{files: base, uids: uids, config: h, keyService: h.KeyService.Endpoint, roots: keyRoots}
+	resolver := &liveHubAPIResolver{files: base, uids: uids, keyService: h.OpenBao.Endpoint, roots: keyRoots}
 	if public != nil {
 		resolver.public = &providerInputs{files: public, postgresEndpoint: base.postgresEndpoint}
 		defer resolver.public.closeHTTP()
@@ -374,5 +380,9 @@ func loadHubAPIInputs(ctx context.Context, files, configRoot, idsRoot, public *o
 	if err != nil {
 		return nil, err
 	}
-	return &ownerInputs{providerInputs: &providerInputs{files: files, kubernetesEndpoint: c.Kubernetes, postgresEndpoint: c.Postgres}, config: c}, nil
+	offer, err := buildHubAPIRegionalOffer(call, files, h, ids, c.Native.ConnectorRoots, now)
+	if err != nil {
+		return nil, err
+	}
+	return &ownerInputs{providerInputs: &providerInputs{files: files, kubernetesEndpoint: c.Kubernetes, postgresEndpoint: c.Postgres}, config: c, offer: offer}, nil
 }

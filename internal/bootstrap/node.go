@@ -73,7 +73,7 @@ func validNodeDeployment(d contracts.NodeDeployment) (*x509.CertPool, error) {
 		return nil, mounts.ErrUnavailable
 	}
 
-	if d.Format != contracts.NodeDeploymentFormat || !authorization.UUID(d.ClusterID) ||
+	if d.Format != contracts.NodeDeploymentFormat ||
 		!node.DomainCeilings(d.Ceilings).Valid() || d.Connector.ServerName == "" || len(d.Connector.ServerName) > 253 {
 		return nil, mounts.ErrUnavailable
 	}

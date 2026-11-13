@@ -142,7 +142,7 @@ func (o *connectorLifecycleOperation) currentValues(ctx context.Context, start, 
 
 func (o *connectorLifecycleOperation) review(ctx context.Context, p value.ConnectorDeployment) (string, time.Time, error) {
 	process, s := o.request.Binding.Process, o.reader
-	name, err := reviewBoundPodToken(ctx, s.client, o.token, ConnectorEnrollmentAudience(process.Binding.ClusterID), p.Namespace, p.ServiceAccount, s.workload.AccountUID, process.PodUID)
+	name, err := reviewBoundPodToken(ctx, s.client, o.token, ConnectorEnrollmentAudience, p.Namespace, p.ServiceAccount, s.workload.AccountUID, process.PodUID)
 	if err != nil {
 		return "", time.Time{}, value.ErrDenied
 	}

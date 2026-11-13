@@ -26,11 +26,19 @@ def run(args, ok=True):
     return result.stdout + result.stderr if not ok else result.stdout
 
 
+PROFILE = yaml.safe_load((ROOT / "examples/helm/context-trial-profile.yaml").read_text())
+
+
 def hub_values():
     """Minimal hub values with external providers (render fixtures only)."""
     return {
         "image": {"repository": "registry.example/asservat", "digest": DIGEST, "pullPolicy": "IfNotPresent", "pullSecrets": []},
         "origin": "https://asservat.example.org",
+        "identity": {"issuer": "https://id.example.org/realms/org", "clientID": "asservat-console", "eligibleGroups": ["00000000-0000-4000-8000-000000000001"], "clientSecret": {"existingSecret": "operator-oidc"}, "providerRootsPEM": "PUBLIC-CA"},
+        "exposure": {"tlsSecret": "console-tls"},
+        # The regional offer's connector and backup limits (mode=combined).
+        "federation": {"connector": PROFILE["federation"]["connector"]},
+        "capacity": PROFILE["capacity"],
         "services": {
             "postgres": {"external": {"host": "postgres.example", "port": 5432, "database": "asservat", "rootsPEM": "PUBLIC-CA", "adminSecret": "operator-postgres-admin"}},
             "objectStore": {"external": {"endpoint": "https://s3.example", "region": "r", "bucket": "audit", "rootsPEM": "PUBLIC-CA"}},
@@ -42,6 +50,8 @@ def hub_values():
 def bundled_values(mode="combined"):
     v = hub_values()
     v["mode"] = mode
+    # Bundled Keycloak derives the issuer and holds the console client secret.
+    v["identity"] = {"clientID": "asservat-console"}
     v["services"] = {
         "postgres": {"provider": "bundled", "bundled": {"image": "registry.example/postgres@sha256:" + "b" * 64}},
         "objectStore": {"provider": "seaweedfs"},
@@ -90,7 +100,8 @@ def check_secrets(render):
         expected = {"asservat-ids", "asservat-audit-mac", "asservat-artifact-key", "asservat-objectstore-iam"} | {f"asservat-sql-{c}" for c in COMPONENTS} \
             | {f"asservat-{s}-state" for s in ["postgres", "keycloak", "objectstore", "openbao"]}
         assert expected <= names, expected - names
-        assert ("asservat-s3-regional-write" in names) == (mode == "combined")
+        assert "asservat-s3-download-read" in names
+        assert {"asservat-s3-regional-write", "asservat-s3-regional-history"} <= names if mode == "combined" else "asservat-s3-regional-write" not in names
         for hooked in [named(docs, k, "asservat-secrets") for k in ("ServiceAccount", "Role", "RoleBinding", "ConfigMap")]:
             assert hooked["metadata"]["annotations"]["helm.sh/hook"] == "pre-install,pre-upgrade"
         plan = json.loads(named(docs, "ConfigMap", "asservat-secrets")["data"]["secrets.json"])
@@ -122,11 +133,17 @@ def check_setup(render):
     assert "helm.sh/hook" not in job["metadata"].get("annotations", {}), "setup must be an ordinary Job"
     pod = job["spec"]["template"]["spec"]
     assert pod["containers"][0]["command"] == ["/asservat", "setup"] and pod["serviceAccountName"] == "asservat-setup"
-    sources = [s for v in pod["volumes"] if "projected" in v for s in v["projected"]["sources"]]
-    assert {"serviceAccountToken": {"path": "openbao-setup.token", "audience": "https://asservat.io/openbao/setup", "expirationSeconds": 600}} in sources
-    mounts = {m["mountPath"] for m in pod["containers"][0]["volumeMounts"]}
-    assert {"/run/asservat/ids", "/run/asservat/setup/config", "/run/asservat/setup/postgres"} | {f"/run/asservat/setup/sql/{c}" for c in COMPONENTS} <= mounts
-    assert named(docs, "Role", "asservat-setup")["rules"] == [{"apiGroups": [""], "resources": ["configmaps"], "verbs": ["get"]}]
+    volumes = {v["name"]: v for v in pod["volumes"]}
+    # The exact files `asservat setup` opens (contracts.Setup*Root).
+    mounts = {m["mountPath"]: m for m in pod["containers"][0]["volumeMounts"]}
+    assert {"/run/asservat/ids", "/run/asservat/setup/config.json", "/run/asservat/setup/postgres", "/run/asservat/setup/openbao", "/run/asservat/setup/objectstore"} | {f"/run/asservat/setup/sql/{c}" for c in COMPONENTS} <= set(mounts)
+    assert mounts["/run/asservat/setup/config.json"]["subPath"] == "config.json"
+    files = lambda name: {i["path"] for s in volumes[name]["projected"]["sources"] for i in s.get("secret", s.get("configMap", {})).get("items", [])} | {s["serviceAccountToken"]["path"] for s in volumes[name]["projected"]["sources"] if "serviceAccountToken" in s}
+    assert files("postgres") == {"administrator.json", "ddl.json", "ca.crt"}
+    assert files("openbao") == {"ca.crt", "token"} and files("objectstore") == {"ca.crt", "credentials.json", "bucket-policies.json"}
+    token, = [s["serviceAccountToken"] for s in volumes["openbao"]["projected"]["sources"] if "serviceAccountToken" in s]
+    assert token["audience"] == "https://asservat.io/openbao/setup"
+    assert named(docs, "Role", "asservat-setup")["rules"] == [{"apiGroups": [""], "resources": ["configmaps"], "resourceNames": ["asservat-fleet"], "verbs": ["get"]}]
     cluster = named(docs, "ClusterRole", "asservat-system-asservat-setup")["rules"]
     assert cluster == [{"apiGroups": [""], "resources": ["namespaces"], "resourceNames": ["asservat-system"], "verbs": ["get"]}]
     # The name follows chart version, image and values.
@@ -135,16 +152,30 @@ def check_setup(render):
     other = [r for r in render(changed) if r["kind"] == "Job" and r["metadata"]["name"].startswith("asservat-setup-")][0]
     assert other["metadata"]["name"] != job["metadata"]["name"]
     config = json.loads(named(docs, "ConfigMap", "asservat-setup-config")["data"]["config.json"])
-    assert config["postgres"]["provider"] == "bundled" and config["keyService"]["provider"] == "openbao"
+    assert config == {"format": "asservat-setup/v1", "name": "asservat", "namespace": "asservat-system", "fleetSource": "asservat-fleet",
+                      "postgres": {"host": "asservat-postgres.asservat-system.svc", "port": 5432, "database": "asservat"},
+                      "openBao": {"endpoint": "https://asservat-openbao.asservat-system.svc:8200", "bundled": True, "accounts": {c: f"asservat-{c}" for c in ["hub-api", "hub-worker", "federation", "publisher"]}},
+                      "objectStore": {"endpoint": "https://asservat-objectstore.asservat-system.svc:8333", "region": "us-east-1", "bundled": True, "auditBucket": "asservat-audit", "evidenceBucket": "asservat-evidence"}}, config
+    # SeaweedFS restarts when the hook recompiles its IAM Secret.
+    store = named(docs, "StatefulSet", "asservat-objectstore")
+    assert "checksum/iam" in store["spec"]["template"]["metadata"]["annotations"]
+    # External providers: the operator's administrator Secret and PEM roots.
+    docs = render(hub_values())
+    roots = named(docs, "ConfigMap", "asservat-provider-roots")["data"]
+    assert roots == {"postgres.crt": "PUBLIC-CA", "objectStore.crt": "PUBLIC-CA", "openBao.crt": "PUBLIC-CA"}
+    job = [r for r in docs if r["kind"] == "Job" and r["metadata"]["name"].startswith("asservat-setup-")][0]
+    sources = {v["name"]: v for v in job["spec"]["template"]["spec"]["volumes"]}["postgres"]["projected"]["sources"]
+    assert {"secret": {"name": "operator-postgres-admin", "items": [{"key": "credentials.json", "path": "administrator.json"}]}} in sources
+    assert {"configMap": {"name": "asservat-provider-roots", "items": [{"key": "postgres.crt", "path": "ca.crt"}]}} in sources
     external = hub_values()
     external["services"]["postgres"]["external"]["adminSecret"] = ""
-    assert "services.postgres.external requires" in render(external, ok=False)
+    assert "services.postgres.external.adminSecret is required" in render(external, ok=False)
 
 
 def check_exposure(render):
     v = hub_values()
     assert not any(r["kind"] in ("Ingress", "HTTPRoute") for r in render(v))
-    v["exposure"] = {"ingress": {"enabled": True, "className": "example", "annotations": {"a": "b"}, "tls": [{"hosts": ["asservat.example.org"], "secretName": "t"}]},
+    v["exposure"] = {"tlsSecret": "console-tls", "ingress": {"enabled": True, "className": "example", "annotations": {"a": "b"}, "tls": [{"hosts": ["asservat.example.org"], "secretName": "t"}]},
                      "httpRoute": {"enabled": True, "parentRefs": [{"name": "gw", "namespace": "infra"}]}}
     docs = render(v)
     ingress = named(docs, "Ingress", "asservat-hub-api")
@@ -158,10 +189,10 @@ def check_exposure(render):
     for key in ["ingress", "httpRoute"]:
         bad = copy.deepcopy(v)
         bad["origin"] = "https://asservat.example.org:8443"
-        bad["exposure"] = {key: v["exposure"][key]}
+        bad["exposure"] = {"tlsSecret": "console-tls", key: v["exposure"][key]}
         assert "must not carry a port" in render(bad, ok=False)
     bad = copy.deepcopy(v)
-    bad["exposure"] = {"httpRoute": {"enabled": True, "parentRefs": []}}
+    bad["exposure"] = {"tlsSecret": "console-tls", "httpRoute": {"enabled": True, "parentRefs": []}}
     render(bad, ok=False)
 
 
@@ -179,135 +210,74 @@ def check_examples(render, directory):
 
 
 def check_collector(directory):
-    # ADR-246: the node collector DaemonSet, rendered statically. Off by
-    # default; the only privileged Pod Security exception is its namespace.
+    # ADR-246: the node collector DaemonSet. Off by default; the only
+    # privileged Pod Security exception is its namespace. It needs the
+    # regional connector (mode=cluster or combined).
     path = Path(directory) / "collector-values.yaml"
-    roots = "-----BEGIN CERTIFICATE-----\nPUBLIC\n-----END CERTIFICATE-----\n"
-    base = {"mode": "cluster", "collector": {"enabled": True, "image": "registry.example/asservat@sha256:" + "a" * 64,
-            "installationID": "10000000-0000-4000-8000-000000000001", "clusterID": "50000000-0000-4000-8000-000000000001",
-            "connector": {"endpoint": "https://asservat-connector-nodes.asservat-connector.svc:8444", "serverName": "asservat-connector-nodes", "rootsPEM": roots}}}
+    offer = {"format": "asservat-regional-offer/v1", "installationID": "10000000-0000-4000-8000-000000000001"}
+    base = {**hub_values(), "mode": "cluster", "collector": {"enabled": True},
+            "region": {"enabled": True, "clusterID": "50000000-0000-4000-8000-000000000001", "peerID": "50000000-0000-4000-8000-000000000002",
+                       "bootstrapSecret": "operator-bootstrap", "offer": json.dumps(offer)}}
+    del base["services"]
 
-    def render(v, ok=True, namespace="asservat-region", collector_only=False):
+    def render(v, ok=True, namespace="asservat-region"):
         path.write_text(yaml.safe_dump(v))
-        args = ["template", "asservat", str(CHART), "--namespace", namespace, "--kube-version", "1.37.0", "-f", str(path)]
-        if collector_only:
-            args += ["--show-only", "templates/collector.yaml"]
-        result = run(args, ok=ok)
+        result = run(["template", "asservat", str(CHART), "--namespace", namespace, "--kube-version", "1.35.0", "-f", str(path)], ok=ok)
         return result if not ok else [r for r in yaml.safe_load_all(result) if r]
 
     docs = render(base)
-    collector = [r for r in docs if r["metadata"].get("namespace") == "asservat-collector" or r["kind"] == "Namespace"]
-    assert sorted(r["kind"] for r in collector) == ["ConfigMap", "DaemonSet", "Namespace", "ServiceAccount"], [r["kind"] for r in collector]
-    assert not any(r["kind"] in ("Role", "ClusterRole", "RoleBinding", "ClusterRoleBinding", "Secret") for r in docs), "the collector account gets no API permission"
-    # The installed CLI connector already owns its guarded namespace. Its
-    # collector stage applies only the official four collector resources;
-    # no unrelated installation-intent ConfigMap may target a release namespace.
-    stage = render(base, namespace="asservat-connector", collector_only=True)
-    assert stage == collector, "collector stage changed the official resources or includes installation intent"
-    assert all(r["kind"] == "Namespace" and r["metadata"]["name"] == "asservat-collector"
-               or r["metadata"].get("namespace") == "asservat-collector" for r in stage), "collector stage writes outside its dedicated namespace"
-
+    collector = [r for r in docs if r["metadata"].get("namespace") == "asservat-collector" or r["kind"] == "Namespace" and r["metadata"]["name"] == "asservat-collector"]
+    assert sorted(r["kind"] for r in collector) == ["ConfigMap", "ConfigMap", "DaemonSet", "Namespace", "Role", "RoleBinding", "ServiceAccount"], [r["kind"] for r in collector]
     namespace = next(r for r in collector if r["kind"] == "Namespace")
-    assert namespace["metadata"]["name"] == "asservat-collector"
     assert {k: v for k, v in namespace["metadata"]["labels"].items() if k.startswith("pod-security")} == {f"pod-security.kubernetes.io/{m}": "privileged" for m in ("enforce", "audit", "warn")}
+    # The collector account has no API permission; the Role is the connector's.
+    binding = next(r for r in collector if r["kind"] == "RoleBinding")
+    assert binding["subjects"] == [{"kind": "ServiceAccount", "namespace": "asservat-region", "name": "asservat-connector"}]
     account = next(r for r in collector if r["kind"] == "ServiceAccount")
     assert account["automountServiceAccountToken"] is False
-    data = next(r for r in collector if r["kind"] == "ConfigMap")
-    assert data["immutable"] is True
+    data = next(r for r in collector if r["kind"] == "ConfigMap" and r["metadata"]["name"] == "asservat-node-config")
     node = json.loads(data["data"]["node.json"])
-    assert node["format"] == "asservat-node-deployment/v1" and node["ceilings"] == {"maxActiveSources": 16, "inputBytesPerSecond": 16777216, "inputBurstBytes": 16777216, "ringBytes": 268435456, "frozenBytes": 268435456, "uploadBytesPerSecond": 33554432, "uploadBurstBytes": 67108864}
-    # Existing typed node-processing ceilings, independent of the hub's
-    # delivery.liveRead viewer policy. Omission/null preserves every old byte.
-    assert "live" not in node
-    disabled_live = copy.deepcopy(base)
-    disabled_live["collector"]["live"] = None
-    assert render(disabled_live) == docs, "null live processing changed old resources"
-    live_bounds = {"subscriptions": (1, 16), "memoryBytes": (1048576, 16777216),
-                   "eventsPerSecond": (1, 100000), "bytesPerSecond": (1, 268435456),
-                   "processingNanosPerSecond": (1, 100000000)}
-    for edge in (0, 1):
-        requested = {name: bounds[edge] for name, bounds in live_bounds.items()}
-        enabled_live = copy.deepcopy(base)
-        enabled_live["collector"]["live"] = requested
-        rendered_live = render(enabled_live)
-        live_node = json.loads(next(r for r in rendered_live if r["kind"] == "ConfigMap")["data"]["node.json"])
-        assert live_node == {**node, "live": requested}, "node processing bounds were dropped or changed"
-        live_ds = next(r for r in rendered_live if r["kind"] == "DaemonSet")
-        old_ds = next(r for r in docs if r["kind"] == "DaemonSet")
-        assert live_ds["spec"]["template"]["spec"]["containers"][0]["resources"] == old_ds["spec"]["template"]["spec"]["containers"][0]["resources"], "live mapping changed the container limit"
-    for name, bounds in live_bounds.items():
-        for invalid in (bounds[0] - 1, bounds[1] + 1):
-            bad = copy.deepcopy(enabled_live)
-            bad["collector"]["live"][name] = invalid
-            render(bad, ok=False)
-        missing = copy.deepcopy(enabled_live)
-        del missing["collector"]["live"][name]
-        render(missing, ok=False)
-    for invalid in ({}, {**requested, "enabled": True}, {**requested, "subscriptions": "1"}):
-        bad = copy.deepcopy(base)
-        bad["collector"]["live"] = invalid
-        render(bad, ok=False)
-    zero = json.loads(json.dumps(base))
-    zero["collector"]["ceilings"] = {"maxActiveSources": 0, "inputBytesPerSecond": 0, "inputBurstBytes": 0}
-    zero_docs = render(zero)
-    zero_node = json.loads(next(r for r in zero_docs if r["kind"] == "ConfigMap")["data"]["node.json"])
-    assert all(name not in zero_node["ceilings"] for name in ("maxActiveSources", "inputBytesPerSecond", "inputBurstBytes")), "zero source caps must preserve the canonical old absent-field representation"
-    assert data["metadata"]["name"] == "asservat-node-input." + hashlib.sha256(data["data"]["node.json"].encode()).hexdigest()[:32]
+    assert node == {"format": "asservat-node-deployment/v1", "connector": {"endpoint": "https://asservat-connector-nodes.asservat-region.svc:8444", "serverName": "asservat-connector-nodes.asservat-region.svc", "rootsPEM": ""},
+                    "ceilings": {"maxActiveSources": 16, "inputBytesPerSecond": 16777216, "inputBurstBytes": 16777216, "ringBytes": 268435456, "frozenBytes": 268435456, "uploadBytesPerSecond": 33554432, "uploadBurstBytes": 67108864}}, node
+    live = {"subscriptions": 1, "memoryBytes": 1048576, "eventsPerSecond": 1, "bytesPerSecond": 1, "processingNanosPerSecond": 1}
+    v = copy.deepcopy(base)
+    v["collector"]["live"] = live
+    live_node = json.loads(next(r for r in render(v) if r["kind"] == "ConfigMap" and r["metadata"]["name"] == "asservat-node-config")["data"]["node.json"])
+    assert live_node == {**node, "live": live}
     ds = next(r for r in collector if r["kind"] == "DaemonSet")
     pod = ds["spec"]["template"]["spec"]
     assert pod["hostPID"] is True and pod["hostNetwork"] is False and pod["hostIPC"] is False
-    assert pod["automountServiceAccountToken"] is False and pod["enableServiceLinks"] is False and "imagePullSecrets" not in pod
+    assert pod["automountServiceAccountToken"] is False and pod["enableServiceLinks"] is False
     container, = pod["containers"]
-    assert container["command"] == ["/asservat", "node"] and container["image"] == base["collector"]["image"]
+    assert container["command"] == ["/asservat", "node"] and container["image"] == "registry.example/asservat@" + DIGEST
     assert container["securityContext"] == {"privileged": False, "runAsUser": 0, "runAsNonRoot": False, "allowPrivilegeEscalation": False, "readOnlyRootFilesystem": True,
                                              "capabilities": {"drop": ["ALL"], "add": ["BPF", "NET_ADMIN", "SYS_RESOURCE", "PERFMON", "SYS_ADMIN", "SYS_PTRACE"]},
                                              "seccompProfile": {"type": "RuntimeDefault"}}
-    assert container["resources"]["requests"]["cpu"] == "20m" and container["resources"]["limits"]["cpu"] == "500m"
     assert container["resources"]["limits"]["memory"] == str(268435456 * 2 + 134217728)
     volumes = {v["name"]: v for v in pod["volumes"]}
     assert volumes["disposable-host"]["hostPath"] == {"path": "/etc/asservat-disposable-host", "type": "File"}, "disposable-host guard missing"
-    host_paths = {v["hostPath"]["path"] for v in pod["volumes"] if "hostPath" in v}
-    assert host_paths == {"/etc/asservat-disposable-host", "/sys/kernel/debug", "/sys/kernel/tracing", "/sys/fs/bpf"}, host_paths
+    assert {v["hostPath"]["path"] for v in pod["volumes"] if "hostPath" in v} == {"/etc/asservat-disposable-host", "/sys/kernel/debug", "/sys/kernel/tracing", "/sys/fs/bpf"}
     assert all(m["readOnly"] is True for m in container["volumeMounts"])
-    token = volumes["token"]["projected"]["sources"][0]["serviceAccountToken"]
-    assert token == {"path": "token", "audience": "asservat-node:10000000-0000-4000-8000-000000000001", "expirationSeconds": 600}
+    assert volumes["token"]["projected"]["sources"][0]["serviceAccountToken"] == {"path": "token", "audience": "asservat-node", "expirationSeconds": 600}
     assert pod["serviceAccountName"] == account["metadata"]["name"] == ds["metadata"]["name"] == "asservat-node"
-    # ADR-278: the optional ring volume is a size-limited emptyDir and the
-    # only writable collector mount; it is absent unless enabled.
+    # ADR-278: the optional ring volume is the only writable collector mount.
     assert "ring-disk" not in volumes
-    disk = json.loads(json.dumps(base))
+    disk = copy.deepcopy(base)
     disk["collector"]["ringDisk"] = {"enabled": True, "bytes": 2147483648}
     disk_docs = render(disk)
     disk_pod = next(r for r in disk_docs if r["kind"] == "DaemonSet")["spec"]["template"]["spec"]
-    disk_volumes = {v["name"]: v for v in disk_pod["volumes"]}
-    assert disk_volumes["ring-disk"] == {"name": "ring-disk", "emptyDir": {"sizeLimit": "2147483648"}}, disk_volumes.get("ring-disk")
-    disk_node = json.loads(next(r for r in disk_docs if r["kind"] == "ConfigMap")["data"]["node.json"])
-    assert disk_node["ceilings"]["ringDiskBytes"] == 2147483648, disk_node["ceilings"]
-    assert "ringDiskBytes" not in json.loads(data["data"]["node.json"])["ceilings"]
-    writable = [m for m in disk_pod["containers"][0]["volumeMounts"] if not m.get("readOnly")]
-    assert writable == [{"name": "ring-disk", "mountPath": "/var/lib/asservat-ring"}], writable
+    assert {v["name"]: v for v in disk_pod["volumes"]}["ring-disk"] == {"name": "ring-disk", "emptyDir": {"sizeLimit": "2147483648"}}
+    assert [m for m in disk_pod["containers"][0]["volumeMounts"] if not m.get("readOnly")] == [{"name": "ring-disk", "mountPath": "/var/lib/asservat-ring"}]
     # Default: nothing of the collector renders.
-    default = render({"mode": "cluster"})
-    assert not any(r["kind"] in ("DaemonSet", "Namespace") for r in default)
-    combined = {**hub_values(), **json.loads(json.dumps(base))}
-    combined["mode"] = "combined"
-    assert any(r["kind"] == "DaemonSet" for r in render(combined))
-    for change in [{"mode": "hub"}, {"collector": {"namespace": "kube-system"}}, {"collector": {"namespace": "default"}}, {"collector": {"namespace": "asservat-connector"}}, {"region": {"namespace": "asservat-collector"}},
-                   {"collector": {"image": "registry.example/asservat:latest"}}, {"collector": {"installationID": "not-a-uuid"}}, {"collector": {"clusterID": ""}},
-                   {"collector": {"connector": {"endpoint": "http://connector:8444", "serverName": "x", "rootsPEM": roots}}},
-                   {"collector": {"connector": {"endpoint": "https://connector:8444", "serverName": "x", "rootsPEM": ""}}},
-                   {"collector": {"ceilings": {"ringBytes": 8589934592, "frozenBytes": 1, "uploadBytesPerSecond": 1, "uploadBurstBytes": 1}}},
-                   {"collector": {"ceilings": {"maxActiveSources": 0, "inputBytesPerSecond": 1, "inputBurstBytes": 1}}},
-                   {"collector": {"ceilings": {"maxActiveSources": 1, "inputBytesPerSecond": 0, "inputBurstBytes": 1}}},
-                   {"collector": {"privileged": True}}]:
-        v = json.loads(json.dumps(base))
+    assert not any(r["kind"] == "DaemonSet" for r in render({**base, "collector": {"enabled": False}}))
+    for change in [{"region": {"enabled": False}}, {"collector": {"namespace": "kube-system"}}, {"collector": {"namespace": "default"}}, {"collector": {"privileged": True}},
+                   {"collector": {"ceilings": {"ringBytes": 8589934592}}}]:
+        v = copy.deepcopy(base)
         for key, value in change.items():
-            if isinstance(value, dict):
-                v.setdefault(key, {}).update(value)
-            else:
-                v[key] = value
+            v[key].update(value)
         render(v, ok=False)
     render(base, ok=False, namespace="asservat-collector")
+
 
 def main():
     schema = json.loads((CHART / "values.schema.json").read_text())

@@ -202,9 +202,21 @@ func NewRegional(ctx context.Context, files *os.Root, podUID string) (r *Regiona
 		return r, err
 	}
 	in.kubernetesEndpoint = contracts.OwnerProviderEndpoint{Endpoint: "https://kubernetes.default.svc", Roots: apiRoots}
+	// Combined mode: the hub's own cluster and local connector peer come
+	// from the IDs Secret (field map class S), not from values.
+	var ids contracts.InstallationIDs
+	if raw.Mode == contracts.ConnectorModeCombined {
+		if ids, err = readCombinedIDs(); err != nil {
+			return r, err
+		}
+		raw.ClusterID, raw.PeerID = ids.ClusterID, ids.PeerID
+	}
 	c, err := resolveRegionalConfig(startup, in, raw)
 	if err != nil {
 		return r, err
+	}
+	if raw.Mode == contracts.ConnectorModeCombined && !combinedOfferMatches(c.offer, ids) {
+		return r, &fixedStepError{"offer-ids", mounts.ErrUnavailable}
 	}
 	// N values: the connector's own namespace, account and Deployment UIDs,
 	// read by name once.

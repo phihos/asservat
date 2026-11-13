@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/adapters/postgres"
+	"asservat.local/asservat/internal/adapters/providerconfig"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/audit"
@@ -61,19 +61,16 @@ const workerNamespaceUIDFixture = "33333333-3333-4333-8333-333333333333"
 var hubAPICAFixture [][]byte
 
 func hubAPIConfigFixture() contracts.HubAPIConfig {
-	return contracts.HubAPIConfig{Format: contracts.HubAPIConfigFormat, Namespace: "hub", Deployment: "asservat-hub-api", ServiceAccount: "asservat-hub-api", OwnerConfiguration: "asservat-owner-source", AuditCredentials: "asservat-s3-hub-api", ProviderAuthMount: "asservat-owner",
-		Postgres:    contracts.HubAPIPostgres{Host: "asservat-postgres.hub.svc", Port: 5432, Database: "asservat", MaxConnections: 1},
-		AuditStore:  contracts.HubAPIAuditStore{Endpoint: "https://asservat-objectstore.hub.svc:8333", Region: "us-east-1", Bucket: "asservat-audit"},
-		KeyService:  contracts.HubAPIKeyService{Endpoint: "https://asservat-openbao.hub.svc:8200", AuditMount: "asservat-audit", AuditKey: "audit", PKIMount: "owner-pki", ServerRole: "asservat-owner-server", ClientRole: "asservat-owner-client"},
+	return contracts.HubAPIConfig{Format: contracts.HubAPIConfigFormat, Name: "asservat", Namespace: "hub",
+		Postgres:    contracts.HubAPIPostgres{Host: "asservat-postgres.hub.svc", Port: 5432, Database: "asservat"},
+		ObjectStore: contracts.HubAPIObjectStore{Endpoint: "https://asservat-objectstore.hub.svc:8333", Region: "us-east-1", AuditBucket: "asservat-audit", EvidenceBucket: "asservat-evidence"},
+		OpenBao:     contracts.HubAPIOpenBao{Endpoint: "https://asservat-openbao.hub.svc:8200"},
 		Connections: 4, Concurrency: 2,
-		Observation: contracts.HubAPIObservation{LocalCapacity: &contracts.HubAPILocalCapacity{Keys: []string{"asservat-trial"}, CallerAccount: "asservat-hub-worker", CallerDeployment: "asservat-hub-worker"}},
-		Native:      contracts.HubAPINative{ConnectorPKIMount: "connector-pki", WorkerAPIs: []contracts.HubAPIWorkerAPI{{Namespace: "asservat-downloads"}}, RetentionTopologies: []contracts.HubAPITopology{}, Connections: 4, Concurrency: 2},
-		Public: &contracts.HubAPIPublic{Origin: "https://asservat.example.test", BrowserAudience: "asservat-api", BrowserSettings: "asservat-browser-settings", IdentitySettings: "asservat-identity-settings",
-			SessionTransit: contracts.OwnerPublicTransit{Mount: "public-transit", Key: "asservat-browser-sessions"}, ClusterCatalog: "asservat-cluster-catalog",
-			WorkSigning: contracts.HubAPISigning{Mount: "public-transit", Name: "asservat-work-signing"}, WorkerConfiguration: "asservat-worker-profile",
-			WorkerPKI: contracts.HubAPIWorkerPKI{Mount: "worker-pki", Role: "asservat-download-worker"}, DownloadEnvironment: "asservat-download-environment", ArtifactKeyID: "asservat-artifact",
+		Observation: contracts.HubAPIObservation{LocalCapacity: &contracts.HubAPILocalCapacity{Keys: []string{"asservat-trial"}}},
+		Native:      contracts.HubAPINative{WorkerNamespaces: []string{"asservat-downloads"}, RetentionTopologies: []contracts.HubAPITopology{}},
+		Public: &contracts.HubAPIPublic{Origin: "https://asservat.example.test", BrowserAudience: "asservat-api",
 			Standby: 2, Captures: 1, PreviewSeconds: 120, DownloadPlan: contracts.OwnerPublicDownloadPlan{OutputLimit: 1 << 28, ReadLimit: 1 << 28, RequestLimit: 4, DurationSeconds: 300},
-			ProxyTLS: true, Port: contracts.OwnerInstalledPublicPort, Version: "test", OperationConcurrency: 8, MCPPerIdentity: 2, DownloadConcurrency: 4, DownloadsPerIdentity: 2, DownloadMaxSeconds: 3600,
+			ProxyTLS: true, Version: "test", OperationConcurrency: 8, MCPPerIdentity: 2, DownloadConcurrency: 4, DownloadsPerIdentity: 2, DownloadMaxSeconds: 3600,
 			OperationAudit: contracts.OwnerPublicOperationAudit{NormalConcurrency: 8, ResolutionConcurrency: 2, PerPrincipalConcurrency: 2, NormalPerSecond: 50, ResolutionPerSecond: 10}}}
 }
 
@@ -138,7 +135,7 @@ func TestHubAPIInputsMergeConfigIDsAndStartupReads(t *testing.T) {
 	if c.WorkloadGuard.PolicyUID != "" || c.Observation == nil || c.Observation.Activation != nil || c.Public.RuntimeProjection != (contracts.WorkerObjectReference{}) {
 		t.Fatal("installer pins entered the composed input")
 	}
-	want := kube.WorkloadProtectionDigest(runtimeID, "hub", "asservat-hub-api")
+	want := artifact.Digest(contracts.WorkloadSourceDigest(runtimeID, "hub", "asservat-hub-api"))
 	if c.Observation.ProtectionDigest != hubAPIDigestHex(want) || len(c.Observation.Peers) != 1 || c.Observation.Peers[0].PeerID != runtimeID {
 		t.Fatal("observation pin or local peer", c.Observation)
 	}
@@ -150,8 +147,21 @@ func TestHubAPIInputsMergeConfigIDsAndStartupReads(t *testing.T) {
 		t.Fatal("native worker APIs", c.Native)
 	}
 	p := c.Public
-	if p.WorkSigning.Version != 3 || p.WorkSigning.KeyID != "asservat-work-signing-v3" || p.AuditStoreID != runtimeID || p.OperationAudit.RetentionSeconds != 10000 || p.Capacity.QualificationID != runtimeID || !p.ProxyTLS || p.ProviderRecipeSHA256 == "" || p.WorkerPKI.IssuerEpoch != runtimeID || len(p.WorkerPKI.Roots) != 1 {
+	names := providerconfig.OpenBaoNamesFor(runtimeID)
+	if p.WorkSigning.Version != 3 || p.WorkSigning.KeyID != names.WorkSigningKey+"-v3" || p.SessionTransit.Key != names.BrowserSessionKey || p.ArtifactKeyID != artifactKeyID(runtimeID) || c.KeyService.ServerRole != names.OwnerServerRole || p.AuditStoreID != runtimeID || p.OperationAudit.RetentionSeconds != 10000 || p.Capacity.QualificationID != runtimeID || !p.ProxyTLS || p.ProviderRecipeSHA256 == "" || p.WorkerPKI.IssuerEpoch != runtimeID || len(p.WorkerPKI.Roots) != 1 {
 		t.Fatal("public J values", p.WorkSigning, p.AuditStoreID, p.Capacity)
+	}
+	// The provider roles are the ones setup creates: <name>-hub-api-<purpose>.
+	a := *c.ProviderAuthentication
+	recipe, err := providerconfig.OwnerProviderRecipeFor(c, a.AuthMount, "", a.ServiceAccount, a.AuditCredentials, time.Now())
+	public, _, perr := providerconfig.OwnerPublicProviderRecipeFor(c, a, time.Now())
+	if err != nil || perr != nil || a.AuthMount != contracts.SmallOpenBaoOwnerAuthMount {
+		t.Fatal("recipes", err, perr)
+	}
+	for _, role := range append(recipe.Roles[:], public[:]...) {
+		if role.Name != providerconfig.OpenBaoRoleName("asservat", "hub-api", role.Purpose) {
+			t.Fatal("provider role name", role.Name)
+		}
 	}
 	// The worker profile is read in the download-worker namespace.
 	found := false
@@ -171,13 +181,13 @@ func TestHubAPIInputsNameTheMissingInput(t *testing.T) {
 		want         string
 	}{
 		"namespace":           {mutate: func(c *contracts.HubAPIConfig) { c.Namespace = "" }, want: "input-namespace"},
-		"owner-config":        {mutate: func(c *contracts.HubAPIConfig) { c.OwnerConfiguration = "" }, want: "input-ownerConfiguration"},
+		"name":                {mutate: func(c *contracts.HubAPIConfig) { c.Name = "" }, want: "input-name"},
 		"postgres-ca":         {skipCA: contracts.HubAPIPostgresCAFile, want: "input-ca-postgres-ca.crt"},
 		"identity-ca":         {skipCA: contracts.HubAPIIdentityCAFile, want: "input-ca-identity-ca.crt"},
 		"namespace-uid":       {fail: "namespace/hub", want: "input-namespace-uid"},
 		"capacity":            {fail: "capacity", want: "input-capacity-qualification"},
 		"connector-roots":     {fail: "pki/connector-pki", want: "input-connector-roots"},
-		"work-signing":        {fail: "signing/public-transit/asservat-work-signing", want: "input-work-signing-key"},
+		"work-signing":        {fail: "signing/public-transit/" + providerconfig.OpenBaoNamesFor(runtimeID).WorkSigningKey, want: "input-work-signing-key"},
 		"invalid-composition": {mutate: func(c *contracts.HubAPIConfig) { c.Connections = 0 }, want: "identity"},
 	} {
 		t.Run(name, func(t *testing.T) {

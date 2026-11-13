@@ -14,11 +14,16 @@ import (
 
 	"k8s.io/client-go/rest"
 
+	"asservat.local/asservat/internal/adapters/kms"
 	"asservat.local/asservat/internal/adapters/mounts"
 	"asservat.local/asservat/internal/adapters/mtls"
 	"asservat.local/asservat/internal/adapters/postgres"
+	"asservat.local/asservat/internal/adapters/providerconfig"
+	auditapp "asservat.local/asservat/internal/application/audit"
 	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/identity"
+	"k8s.io/apimachinery/pkg/util/validation"
 )
 
 // Helm-native service inputs shared by the federation, key service and
@@ -37,6 +42,50 @@ func readServiceIDs(_ context.Context, ids *os.Root) (contracts.ServiceIDs, erro
 		return contracts.ServiceIDs{}, &fixedStepError{"ids/" + string(key), mounts.ErrUnavailable}
 	}
 	return v, nil
+}
+
+// validServiceScope checks installation.name and the release namespace.
+// The name is at most 30 characters, as setup requires for derived names.
+func validServiceScope(name, namespace string) bool {
+	return len(name) <= 30 && len(validation.IsDNS1123Label(name)) == 0 && len(validation.IsDNS1123Label(namespace)) == 0
+}
+
+// serviceLogin is one component's OpenBao Kubernetes login on the owner auth
+// mount: service account `<name>-<component>` and one role per purpose,
+// `<name>-<component>-<purpose>`, exactly as `asservat setup` creates them.
+func serviceLogin(name, namespace, component string, provider contracts.OwnerProviderEndpoint, purposes ...string) kms.ProviderLogin {
+	roles := make(map[string]string, len(purposes))
+	for _, p := range purposes {
+		roles[p] = providerconfig.OpenBaoRoleName(name, component, p)
+	}
+	return kms.ProviderLogin{Provider: provider, AuthMount: contracts.SmallOpenBaoOwnerAuthMount, Namespace: namespace, ServiceAccount: name + "-" + component, Roles: roles}
+}
+
+// readAuditMAC reads the four mounted keys of the `<name>-audit-mac` Secret
+// (contracts.AuditMAC*, one file per key). The versions share the secrets
+// Job's setup ID: `<id>-input/v1` and `<id>-account/v1`. It returns the MAC
+// and its account version.
+func readAuditMAC(ctx context.Context, files *os.Root) (*auditapp.OperationMAC, string, error) {
+	read := func(name string, limit int64) []byte {
+		b, err := mounts.Read(ctx, files, name, limit)
+		if err != nil {
+			return nil
+		}
+		return b
+	}
+	inputVersion, accountVersion := string(read(contracts.AuditMACInputVersion, 128)), string(read(contracts.AuditMACAccountVersion, 128))
+	inputKey, accountKey := read(contracts.AuditMACInputKey, 64), read(contracts.AuditMACAccountKey, 64)
+	defer clear(inputKey)
+	defer clear(accountKey)
+	setup, ok := strings.CutSuffix(inputVersion, "-input/v1")
+	if !ok || !authorization.UUID(setup) || accountVersion != setup+"-account/v1" || len(inputKey) != 32 || len(accountKey) != 32 {
+		return nil, "", &fixedStepError{"audit-mac", mounts.ErrUnavailable}
+	}
+	mac, err := auditapp.NewOperationMAC(inputVersion, inputKey, accountVersion, accountKey)
+	if err != nil {
+		return nil, "", &fixedStepError{"audit-mac", mounts.ErrUnavailable}
+	}
+	return mac, accountVersion, nil
 }
 
 // readServiceConfig reads config.json with the component's closed decoder.

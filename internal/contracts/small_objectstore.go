@@ -23,7 +23,6 @@ type SeaweedGrant struct {
 	InstallationID string            `json:"installationID"`
 	ClusterID      string            `json:"clusterID,omitempty"`
 	RootID         string            `json:"rootID,omitempty"`
-	SourceUID      string            `json:"sourceUID,omitempty"`
 	// Prefixes are the selected existing provider recipe's audit prefixes.
 	// The compiler independently permits only this purpose's exact families.
 	Prefixes []string `json:"prefixes,omitempty"`

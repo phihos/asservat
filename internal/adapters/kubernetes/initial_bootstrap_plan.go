@@ -107,7 +107,7 @@ func validateBootstrap(d contracts.InitialBootstrap) error {
 
 func bootstrapFleet(d contracts.InitialBootstrap, installation, epoch string) contracts.FleetSettings {
 	f := d.Fleet
-	return contracts.FleetSettings{SchemaVersion: "fleet-settings/v1", Revision: 1, InstallationID: installation, IssuerEpoch: epoch, Issuer: f.Issuer, Clients: f.Clients, Subjects: f.Subjects, Groups: f.Groups, DeliveryProfiles: f.DeliveryProfiles, MaxActiveBootstraps: f.MaxActiveBootstraps, MaxBootstrapHistory: f.MaxBootstrapHistory, MaxClusters: f.MaxClusters}
+	return contracts.FleetSettings{SchemaVersion: "fleet-settings/v1", Revision: 1, Issuer: f.Issuer, Clients: f.Clients, Subjects: f.Subjects, Groups: f.Groups, DeliveryProfiles: f.DeliveryProfiles, MaxActiveBootstraps: f.MaxActiveBootstraps, MaxBootstrapHistory: f.MaxBootstrapHistory, MaxClusters: f.MaxClusters}
 }
 
 func bootstrapWorkload(d contracts.InitialBootstrap) InitialInstallerWorkloadPlan {

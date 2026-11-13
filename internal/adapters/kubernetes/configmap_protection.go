@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
 	value "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/identity"
@@ -56,7 +57,7 @@ func newConfigMapProtection(observer, probe *PermissionClient, plan value.Config
 		return nil, value.ErrInvalid
 	}
 	plan.Administrators = append([]value.KubernetesActor(nil), plan.Administrators...)
-	out := &configMapProtection{observer: observer, probe: probe, plan: plan, pin: pin, digest: ConfigMapSourceDigest(observer.clusterID, plan.ControlNamespace.Name, plan.SourceName), denial: denial}
+	out := &configMapProtection{observer: observer, probe: probe, plan: plan, pin: pin, digest: artifact.Digest(contracts.ConfigMapSourceDigest(observer.clusterID, plan.ControlNamespace.Name, plan.SourceName)), denial: denial}
 	if probe == nil {
 		if len(validation.IsDNS1123Subdomain(plan.SourceName)) != 0 || len(validation.IsDNS1123Label(plan.ControlNamespace.Name)) != 0 {
 			return nil, value.ErrInvalid

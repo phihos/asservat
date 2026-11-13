@@ -3,11 +3,18 @@ package bootstrap
 import (
 	"bytes"
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/base64"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
+	"math/big"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -220,7 +227,12 @@ func (s secretStore) sql(ctx context.Context, installation string, entry contrac
 	return nil
 }
 
-func (s secretStore) auditMAC(ctx context.Context, name string) error {
+// auditMAC creates the operation/account MAC keys once. Their versions use
+// the roleSetupID: `<id>-input/v1` and `<id>-account/v1`, the capacity
+// account version the hub-worker derives. The Secret holds the four raw keys
+// (hub-worker, federation) and their public-audit-keys.json projection
+// (hub-api), always derived from the stored keys.
+func (s secretStore) auditMAC(ctx context.Context, name string, ids installationIDs) error {
 	input, err := randomKey()
 	account, err2 := randomKey()
 	defer clear(input)
@@ -228,14 +240,29 @@ func (s secretStore) auditMAC(ctx context.Context, name string) error {
 	if err != nil || err2 != nil {
 		return secretsFailure("RandomUnavailable")
 	}
-	version := uuid.NewString()
-	data, err := s.ensure(ctx, name, map[string][]byte{contracts.AuditMACInputVersion: []byte(version + "-input/v1"), contracts.AuditMACInputKey: input, contracts.AuditMACAccountVersion: []byte(version + "-account/v1"), contracts.AuditMACAccountKey: account})
+	setup := ids["roleSetupID"]
+	projection := func(input, account []byte) []byte {
+		b, _ := json.Marshal(contracts.PublicAuditKeys{Format: contracts.PublicAuditKeysFormat, InstallationID: ids["installationID"], RootUID: ids["permissionRootID"], SetupID: setup,
+			Material: contracts.PublicAuditKeyMaterial{InputVersion: setup + "-input/v1", AccountVersion: setup + "-account/v1", InputKey: input, AccountKey: account}})
+		return b
+	}
+	want := map[string][]byte{contracts.AuditMACInputVersion: []byte(setup + "-input/v1"), contracts.AuditMACInputKey: input, contracts.AuditMACAccountVersion: []byte(setup + "-account/v1"), contracts.AuditMACAccountKey: account, contracts.PublicAuditKeysFile: projection(input, account)}
+	defer clear(want[contracts.PublicAuditKeysFile])
+	data, err := s.ensure(ctx, name, want)
 	if err != nil {
 		return err
 	}
 	defer clearData(data)
-	if len(data[contracts.AuditMACInputKey]) != 32 || len(data[contracts.AuditMACAccountKey]) != 32 || len(data[contracts.AuditMACInputVersion]) == 0 || len(data[contracts.AuditMACAccountVersion]) == 0 {
+	if len(data[contracts.AuditMACInputKey]) != 32 || len(data[contracts.AuditMACAccountKey]) != 32 || string(data[contracts.AuditMACInputVersion]) != setup+"-input/v1" || string(data[contracts.AuditMACAccountVersion]) != setup+"-account/v1" {
 		return secretsFailure("InvalidAuditMAC " + name)
+	}
+	stored := projection(data[contracts.AuditMACInputKey], data[contracts.AuditMACAccountKey])
+	defer clear(stored)
+	if !bytes.Equal(data[contracts.PublicAuditKeysFile], stored) {
+		// The projection was added to older raw keys: derive it from them.
+		patched, err := s.patch(ctx, name, map[string][]byte{contracts.PublicAuditKeysFile: stored})
+		clearData(patched)
+		return err
 	}
 	return nil
 }
@@ -265,11 +292,18 @@ func (s secretStore) artifactKey(ctx context.Context, name, installation string)
 	return nil
 }
 
+// SeaweedBucketPoliciesKey is the IAM Secret key holding the compiled bucket
+// policies (bucket name -> policy) that `asservat setup` applies.
+const SeaweedBucketPoliciesKey = "bucket-policies.json"
+
+// seaweedEvidencePurposes use the evidence bucket; every other principal
+// uses the audit bucket. Regional history shares the evidence bucket.
+var seaweedEvidencePurposes = []string{"publisher-read", "download-read", "evidence-delete", "regional-write", "regional-history"}
+
 // objectStore creates one credential Secret per bundled SeaweedFS principal
-// and compiles the complete IAM configuration from them.
+// and compiles the complete IAM configuration and bucket policies from them.
 func (s secretStore) objectStore(ctx context.Context, p contracts.SecretsPlan, ids installationIDs, admin contracts.SeaweedCredential) error {
 	installation, cluster, root := ids["installationID"], ids["clusterID"], ids["permissionRootID"]
-	bucket := p.Name + "-audit"
 	var grants []contracts.SeaweedGrant
 	defer func() {
 		for i := range grants {
@@ -299,6 +333,10 @@ func (s secretStore) objectStore(ctx context.Context, p contracts.SecretsPlan, i
 		if err != nil || providerconfig.ValidateSeaweedCredential(credential) != nil {
 			return secretsFailure("InvalidObjectStoreCredential " + name)
 		}
+		bucket := p.Name + "-audit"
+		if slices.Contains(seaweedEvidencePurposes, purpose) {
+			bucket = p.Name + "-evidence"
+		}
 		grant := contracts.SeaweedGrant{Credential: credential, Bucket: bucket, InstallationID: installation, ClusterID: cluster, RootID: root}
 		if strings.HasSuffix(purpose, "-audit") {
 			grant.Prefixes = providerconfig.SeaweedAuditPrefixes(grant)
@@ -310,17 +348,30 @@ func (s secretStore) objectStore(ctx context.Context, p contracts.SecretsPlan, i
 		return secretsFailure("ObjectStoreIAMUnavailable")
 	}
 	defer clear(compiled.Config)
+	policies, err := json.Marshal(compiled.Policies)
+	if err != nil {
+		return secretsFailure("ObjectStoreIAMUnavailable")
+	}
+	want := map[string][]byte{providerconfig.SeaweedConfigKey: compiled.Config, SeaweedBucketPoliciesKey: policies}
 	name := p.ObjectStore.IAMSecretName()
-	data, err := s.ensure(ctx, name, map[string][]byte{providerconfig.SeaweedConfigKey: compiled.Config})
+	data, err := s.ensure(ctx, name, want)
 	if err != nil {
 		return err
 	}
 	defer clearData(data)
-	if !bytes.Equal(data[providerconfig.SeaweedConfigKey], compiled.Config) {
-		// A new principal set (chart upgrade) replaces the compiled document.
-		_, err = s.patch(ctx, name, map[string][]byte{providerconfig.SeaweedConfigKey: compiled.Config})
+	changed := map[string][]byte{}
+	for k, v := range want {
+		if !bytes.Equal(data[k], v) {
+			changed[k] = v
+		}
 	}
-	return err
+	if len(changed) > 0 {
+		// A new principal set (chart upgrade) replaces the compiled documents.
+		patched, err := s.patch(ctx, name, changed)
+		clearData(patched)
+		return err
+	}
+	return nil
 }
 
 func runSecrets(ctx context.Context, p contracts.SecretsPlan, config *rest.Config, kubeAPI contracts.OwnerProviderEndpoint) error {
@@ -421,7 +472,7 @@ func runSecrets(ctx context.Context, p contracts.SecretsPlan, config *rest.Confi
 		}
 	}
 	if p.AuditMAC != "" {
-		if err := store.auditMAC(ctx, p.AuditMAC); err != nil {
+		if err := store.auditMAC(ctx, p.AuditMAC, ids); err != nil {
 			return err
 		}
 	}
@@ -435,7 +486,71 @@ func runSecrets(ctx context.Context, p contracts.SecretsPlan, config *rest.Confi
 			return err
 		}
 	}
+	for _, entry := range p.ServingTLS {
+		if err := store.servingTLS(ctx, entry); err != nil {
+			return err
+		}
+	}
 	return ctx.Err()
+}
+
+// servingTLS creates a peer listener's kubernetes.io/tls Secret once: an own
+// ECDSA P-256 CA and a leaf for the Service names. An existing Secret is kept.
+func (s secretStore) servingTLS(ctx context.Context, entry contracts.SecretsServingTLS) error {
+	if _, err := s.api.Get(ctx, entry.Secret, meta.GetOptions{}); err == nil {
+		return nil
+	} else if !apierrors.IsNotFound(err) {
+		return secretsFailure("SecretUnavailable " + entry.Secret)
+	}
+	data, err := servingTLSMaterial(entry.Secret, entry.DNSNames, time.Now())
+	if err != nil {
+		return secretsFailure("ServingTLSUnavailable " + entry.Secret)
+	}
+	defer clearData(data)
+	object := &core.Secret{ObjectMeta: meta.ObjectMeta{Name: entry.Secret, Namespace: s.namespace, Labels: map[string]string{"app.kubernetes.io/part-of": "asservat", "app.kubernetes.io/created-by": "asservat-secrets"}}, Type: core.SecretTypeTLS, Data: data}
+	if _, err = s.api.Create(ctx, object, meta.CreateOptions{FieldValidation: "Strict"}); err != nil && !apierrors.IsAlreadyExists(err) {
+		return secretsFailure("SecretUnavailable " + entry.Secret)
+	}
+	return nil
+}
+
+func servingTLSMaterial(name string, dns []string, now time.Time) (map[string][]byte, error) {
+	if len(dns) == 0 {
+		return nil, errors.New("no DNS names")
+	}
+	caKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		return nil, err
+	}
+	serial := func() *big.Int { n, _ := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 127)); return n }
+	ca := &x509.Certificate{SerialNumber: serial(), Subject: pkix.Name{CommonName: name + " CA"}, NotBefore: now.Add(-time.Minute), NotAfter: now.AddDate(10, 0, 0),
+		KeyUsage: x509.KeyUsageCertSign | x509.KeyUsageCRLSign, BasicConstraintsValid: true, IsCA: true, MaxPathLenZero: true}
+	caDER, err := x509.CreateCertificate(rand.Reader, ca, ca, &caKey.PublicKey, caKey)
+	if err != nil {
+		return nil, err
+	}
+	if ca, err = x509.ParseCertificate(caDER); err != nil {
+		return nil, err
+	}
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		return nil, err
+	}
+	leaf := &x509.Certificate{SerialNumber: serial(), Subject: pkix.Name{CommonName: dns[0]}, DNSNames: dns, NotBefore: now.Add(-time.Minute), NotAfter: now.AddDate(10, 0, 0),
+		KeyUsage: x509.KeyUsageDigitalSignature, ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}}
+	leafDER, err := x509.CreateCertificate(rand.Reader, leaf, ca, &key.PublicKey, caKey)
+	if err != nil {
+		return nil, err
+	}
+	keyDER, err := x509.MarshalPKCS8PrivateKey(key)
+	if err != nil {
+		return nil, err
+	}
+	return map[string][]byte{
+		"ca.crt":  pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: caDER}),
+		"tls.crt": pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: leafDER}),
+		"tls.key": pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: keyDER}),
+	}, nil
 }
 
 // RunSecrets runs in the pre-install/pre-upgrade `secrets` hook Job.

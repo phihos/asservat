@@ -1,4 +1,4 @@
-{{- if and (include "asservat.hubWorker.hub" .) (include "asservat.hubWorker.capacityEnabled" .) .Values.capacity.poolSpec .Values.capacity.policySpec }}
+{{- if and (include "asservat.hub" .) .Values.capacity .Values.capacity.poolSpec .Values.capacity.policySpec }}
 {{- $c := .Values.capacity }}
 {{- if ne $c.policySpec.poolRef $c.pool }}{{ fail "capacity.policySpec.poolRef must equal capacity.pool" }}{{ end }}
 apiVersion: asservat.io/v1alpha1
@@ -6,11 +6,7 @@ kind: EvidenceStoragePool
 metadata:
   name: {{ $c.pool }}
   namespace: {{ .Release.Namespace }}
-  labels:
-    app.kubernetes.io/name: asservat
-    app.kubernetes.io/instance: {{ .Release.Name | quote }}
-    app.kubernetes.io/component: capacity
-    app.kubernetes.io/managed-by: {{ .Release.Service | quote }}
+  labels: {{ include "asservat.labels" (list . "capacity") | nindent 4 }}
 # JSON keeps large integer quantities exact (toYaml would use exponents).
 spec: {{ toJson $c.poolSpec }}
 ---
@@ -19,10 +15,6 @@ kind: EvidenceBudgetPolicy
 metadata:
   name: {{ $c.policy }}
   namespace: {{ .Release.Namespace }}
-  labels:
-    app.kubernetes.io/name: asservat
-    app.kubernetes.io/instance: {{ .Release.Name | quote }}
-    app.kubernetes.io/component: capacity
-    app.kubernetes.io/managed-by: {{ .Release.Service | quote }}
+  labels: {{ include "asservat.labels" (list . "capacity") | nindent 4 }}
 spec: {{ toJson $c.policySpec }}
 {{- end }}

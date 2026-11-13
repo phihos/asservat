@@ -16,13 +16,13 @@ import (
 )
 
 func keyServiceTestConfig() contracts.KeyServiceConfig {
-	return contracts.KeyServiceConfig{Port: 9447, Concurrency: 4, Namespace: "asservat", KeyID: "artifact",
+	return contracts.KeyServiceConfig{Name: "asservat", Namespace: "asservat", Port: 9447, Concurrency: 4,
 		Postgres: contracts.ServicePostgres{Host: "postgres.asservat.svc", Port: 5432, Database: "asservat"},
-		OpenBao:  "https://bao.example", WorkerPKIMount: "worker-pki", ConnectorPKIMount: "connector-pki"}
+		OpenBao:  "https://bao.example"}
 }
 
-// The Downloads section is optional; its names are closed and the configured
-// topologies may not name a cluster or ConfigMap twice.
+// The Downloads section is optional; the configured topologies may not name
+// a cluster or ConfigMap twice. The key ID is the secrets Job's.
 func TestKeyServiceInputsAreClosed(t *testing.T) {
 	read := func(c contracts.KeyServiceConfig) (keyServiceInputs, error) {
 		return readKeyServiceInputs(context.Background(), serviceTestConfigRoot(t, c), serviceTestIDsRoot(t, serviceTestIDs))
@@ -30,22 +30,21 @@ func TestKeyServiceInputsAreClosed(t *testing.T) {
 	if got, err := read(keyServiceTestConfig()); err != nil || got.Downloads != nil || got.IssuerEpoch != serviceTestIDs.IssuerEpoch {
 		t.Fatal("key service without downloads", err)
 	}
+	if s := artifactScope(serviceTestIDs.InstallationID); s.KeyID != "asservat-10000000000040008000000000000001-artifact" || !s.Valid() {
+		t.Fatal("artifact scope", s)
+	}
 	withDownloads := func() contracts.KeyServiceConfig {
 		c := keyServiceTestConfig()
-		c.Downloads = &contracts.KeyServiceDownloadsConfig{WorkerConfiguration: "asservat-worker-configuration", ClusterCatalog: "asservat-cluster-catalog",
-			RetentionTopologies: []contracts.ServiceTopology{{TargetClusterID: serviceTestIDs.ClusterID, Name: "asservat-topology"}}}
+		c.Downloads = &contracts.KeyServiceDownloadsConfig{RetentionTopologies: []contracts.ServiceTopology{{TargetClusterID: serviceTestIDs.ClusterID, Name: "asservat-topology"}}}
 		return c
 	}
 	if got, err := read(withDownloads()); err != nil || got.Downloads == nil {
 		t.Fatal("key service with downloads", err)
 	}
 	for name, mutate := range map[string]func(*contracts.KeyServiceConfig){
-		"unsafe key ID":           func(c *contracts.KeyServiceConfig) { c.KeyID = "../root" },
-		"plain HTTP provider":     func(c *contracts.KeyServiceConfig) { c.OpenBao = "http://bao.example" },
-		"one PKI for both roles":  func(c *contracts.KeyServiceConfig) { c.ConnectorPKIMount = c.WorkerPKIMount },
-		"unbounded concurrency":   func(c *contracts.KeyServiceConfig) { c.Concurrency = 65 },
-		"no worker configuration": func(c *contracts.KeyServiceConfig) { c.Downloads.WorkerConfiguration = "" },
-		"no cluster catalog":      func(c *contracts.KeyServiceConfig) { c.Downloads.ClusterCatalog = "" },
+		"plain HTTP provider":   func(c *contracts.KeyServiceConfig) { c.OpenBao = "http://bao.example" },
+		"unbounded concurrency": func(c *contracts.KeyServiceConfig) { c.Concurrency = 65 },
+		"no name":               func(c *contracts.KeyServiceConfig) { c.Name = "" },
 		"duplicate topology cluster": func(c *contracts.KeyServiceConfig) {
 			c.Downloads.RetentionTopologies = append(c.Downloads.RetentionTopologies, contracts.ServiceTopology{TargetClusterID: serviceTestIDs.ClusterID, Name: "second"})
 		},

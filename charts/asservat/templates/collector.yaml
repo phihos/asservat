@@ -1,10 +1,9 @@
 {{- if .Values.collector.enabled }}
 {{- $c := .Values.collector }}
-{{- $n := include "asservat.region.name" . }}
+{{- $n := include "asservat.name" . }}
 {{- if not .Values.region.enabled }}{{ fail "collector.enabled requires region.enabled (mode=cluster or mode=combined)" }}{{ end }}
 {{- if or (hasPrefix "kube-" $c.namespace) (eq $c.namespace "default") (eq $c.namespace .Release.Namespace) }}{{ fail "collector.namespace must be a dedicated collector namespace distinct from the release namespace" }}{{ end }}
-{{- $image := include "asservat.region.image" . }}
-{{- $clusterID := include "asservat.region.uuid" (dict "value" .Values.region.clusterID "field" "region.clusterID") }}
+{{- $image := include "asservat.image" . }}
 {{- $name := printf "%s-node" $n }}
 {{- $root := printf "%s-node-connector-ca" $n }}
 {{- $listener := printf "%s-connector-nodes.%s.svc" $n .Release.Namespace }}
@@ -19,7 +18,7 @@
 {{- end }}
 {{- /* The connector publishes its node listener root into $root; node.json
   carries no rootsPEM and the collector reads connector-ca.crt beside it. */}}
-{{- $input := dict "format" "asservat-node-deployment/v1" "clusterID" $clusterID "connector" (dict "endpoint" (printf "https://%s:8444" $listener) "serverName" $listener "rootsPEM" "") "ceilings" $ceilings }}
+{{- $input := dict "format" "asservat-node-deployment/v1" "connector" (dict "endpoint" (printf "https://%s:8444" $listener) "serverName" $listener "rootsPEM" "") "ceilings" $ceilings }}
 {{- if $c.live }}
 {{- $_ := set $input "live" $c.live }}
 {{- end }}
@@ -31,7 +30,7 @@ kind: Namespace
 metadata:
   name: {{ $c.namespace }}
   labels:
-    app.kubernetes.io/part-of: asservat
+    {{- include "asservat.labels" (list $ "node") | nindent 4 }}
     pod-security.kubernetes.io/enforce: privileged
     pod-security.kubernetes.io/audit: privileged
     pod-security.kubernetes.io/warn: privileged
@@ -43,6 +42,7 @@ kind: ServiceAccount
 metadata:
   name: {{ $name }}
   namespace: {{ $c.namespace }}
+  labels: {{- include "asservat.labels" (list $ "node") | nindent 4 }}
 automountServiceAccountToken: false
 ---
 apiVersion: v1
@@ -50,6 +50,7 @@ kind: ConfigMap
 metadata:
   name: {{ printf "%s-config" $name }}
   namespace: {{ $c.namespace }}
+  labels: {{- include "asservat.labels" (list $ "node") | nindent 4 }}
 data:
   node.json: {{ $json | quote }}
 ---
@@ -59,6 +60,7 @@ kind: ConfigMap
 metadata:
   name: {{ $root }}
   namespace: {{ $c.namespace }}
+  labels: {{- include "asservat.labels" (list $ "node") | nindent 4 }}
   annotations:
     helm.sh/resource-policy: keep
 ---
@@ -69,6 +71,7 @@ kind: Role
 metadata:
   name: {{ printf "%s-connector" $name }}
   namespace: {{ $c.namespace }}
+  labels: {{- include "asservat.labels" (list $ "node") | nindent 4 }}
 rules:
   - apiGroups: [""]
     resources: [pods]
@@ -87,6 +90,7 @@ kind: RoleBinding
 metadata:
   name: {{ printf "%s-connector" $name }}
   namespace: {{ $c.namespace }}
+  labels: {{- include "asservat.labels" (list $ "node") | nindent 4 }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
@@ -101,14 +105,10 @@ kind: DaemonSet
 metadata:
   name: {{ $name }}
   namespace: {{ $c.namespace }}
-  labels:
-    app.kubernetes.io/name: asservat-node
-    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+  labels: {{- include "asservat.labels" (list $ "node") | nindent 4 }}
 spec:
   selector:
-    matchLabels:
-      app.kubernetes.io/name: asservat-node
-      app.kubernetes.io/instance: {{ .Release.Name | quote }}
+    matchLabels: {{- include "asservat.selectorLabels" (list $ "node") | nindent 6 }}
   updateStrategy:
     type: RollingUpdate
     rollingUpdate:
@@ -116,9 +116,7 @@ spec:
       maxSurge: 0
   template:
     metadata:
-      labels:
-        app.kubernetes.io/name: asservat-node
-        app.kubernetes.io/instance: {{ .Release.Name | quote }}
+      labels: {{- include "asservat.selectorLabels" (list $ "node") | nindent 8 }}
       annotations:
         checksum/config: {{ sha256sum $json }}
     spec:
@@ -130,7 +128,7 @@ spec:
       hostPID: true
       hostNetwork: false
       hostIPC: false
-      {{- include "asservat.region.pullSecrets" . | nindent 6 }}
+      {{- include "asservat.imagePullSecrets" . | nindent 6 }}
       terminationGracePeriodSeconds: 10
       tolerations:
         - operator: Exists
@@ -207,7 +205,7 @@ spec:
             sources:
               - serviceAccountToken:
                   path: token
-                  audience: {{ printf "asservat-node:%s" $clusterID }}
+                  audience: asservat-node
                   expirationSeconds: 600
         # Accidental-use barrier (S-04 plan §5.2): the kubelet refuses to
         # start the Pod unless this host file exists. Only disposable CI

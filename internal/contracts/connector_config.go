@@ -27,7 +27,6 @@ const (
 	ConnectorKubeRootsFile        = "kube-ca.crt"
 	ConnectorBootstrapFile        = "bootstrap.json"
 	ConnectorEvidenceFile         = "evidence-storage.json"
-	ConnectorIDsRoot              = "/run/asservat/ids"
 	ConnectorModeCluster          = "cluster"
 	ConnectorModeCombined         = "combined"
 	RegionalHistoryCredentialFile = "history-storage.json"
@@ -37,13 +36,16 @@ const (
 // class H). In cluster mode Offer is the hub's public regional offer copied
 // into values; in combined mode the connector reads the hub's offer ConfigMap
 // OfferConfigMap in its own (the release) namespace and dials the in-cluster
-// Service addresses in Hub. ClusterID and PeerID are the browser-issued bootstrap receipt's;
-// the bootstrap record itself is a Secret file, never a value.
+// Service addresses in Hub. In cluster mode ClusterID and PeerID are the
+// browser-issued bootstrap receipt's; in combined mode they are absent and
+// the connector reads the generated clusterID and peerID from the IDs Secret
+// (InstallationIDsRoot). The bootstrap record itself is a Secret file, never
+// a value.
 type ConnectorConfig struct {
 	Format            string                   `json:"format"`
 	Mode              string                   `json:"mode"`
-	ClusterID         string                   `json:"clusterID"`
-	PeerID            string                   `json:"peerID"`
+	ClusterID         string                   `json:"clusterID,omitempty"`
+	PeerID            string                   `json:"peerID,omitempty"`
 	Namespace         string                   `json:"namespace"`
 	Deployment        string                   `json:"deployment"`
 	ServiceAccount    string                   `json:"serviceAccount"`

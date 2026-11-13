@@ -10,7 +10,7 @@ import (
 
 func TestNodeLiveDeploymentTypedCeilings(t *testing.T) {
 	_, _, roots := serverCertificate(t)
-	base := contracts.NodeDeployment{Format: contracts.NodeDeploymentFormat, ClusterID: "50000000-0000-4000-8000-000000000001", Connector: contracts.NodeConnectorEndpoint{Endpoint: "https://asservat-connector-nodes.asservat-connector.svc:8444", ServerName: "asservat-connector-nodes", RootsPEM: roots}, Ceilings: contracts.NodeCeilings{RingBytes: 256 << 20, FrozenBytes: 256 << 20, UploadBytesPerSecond: 32 << 20, UploadBurstBytes: 64 << 20}}
+	base := contracts.NodeDeployment{Format: contracts.NodeDeploymentFormat, Connector: contracts.NodeConnectorEndpoint{Endpoint: "https://asservat-connector-nodes.asservat-connector.svc:8444", ServerName: "asservat-connector-nodes", RootsPEM: roots}, Ceilings: contracts.NodeCeilings{RingBytes: 256 << 20, FrozenBytes: 256 << 20, UploadBytesPerSecond: 32 << 20, UploadBurstBytes: 64 << 20}}
 	decode := func(d contracts.NodeDeployment) (contracts.NodeDeployment, error) {
 		t.Helper()
 		b, err := json.Marshal(d)
