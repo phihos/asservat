@@ -123,26 +123,31 @@ Per component (details in the research map):
 
 ## Slices
 
-Each slice ends in a fresh `helm install` that works, qualified on kind and
-on the homelab, with its own PR.
+Each slice ends in a fresh install that works, qualified on kind and on the
+homelab, with its own PR.
 
-1. **Hub console.** `secrets` and `setup` Jobs; Helm-rendered hub-api and
-   hub-worker with plain config and RBAC; generic Ingress/HTTPRoute. Done
-   when: fresh install, login through external or bundled Keycloak,
-   processing initialization, `helm upgrade` of the origin without a
-   reinstall.
-2. **Capture path.** federation, key-service, publisher rendered by Helm;
-   single-cluster region via the chart's `combined` mode with in-cluster
+0. **Runtime stops depending on installer machinery.** Remove guard
+   re-verification, journal/launch-receipt, activation and projection
+   identity checks from hub-api, hub-worker, federation, key-service,
+   publisher and connector; inputs lose `GuardPin`/UID pins (fields become
+   unused, then removed). The current installer still runs, so every step is
+   testable with today's install; its guards become inert.
+1. **Hub console from Helm.** `secrets` and `setup` Jobs; Helm-rendered
+   hub-api and hub-worker with plain config and RBAC; generic Ingress and
+   HTTPRoute templates. Done when: fresh install, login through external or
+   bundled Keycloak, processing initialization, `helm upgrade` of the origin
+   without a reinstall.
+2. **Capture path from Helm.** federation, key-service, publisher rendered by
+   Helm; single-cluster region via `mode: combined` with in-cluster
    addresses, no NodePorts. Done when: pod-status capture, inspection and
    native download.
-3. **Remote regions.** `mode: cluster` connector chart, enrollment through
-   the `setup`-style Job with the browser-issued bootstrap ID; peer Services
-   as NodePort/LoadBalancer/passthrough. Done when: two-cluster capture.
+3. **Remote regions.** `mode: cluster` connector templates and an enrollment
+   Job using the browser-issued bootstrap ID; peer Services as
+   NodePort/LoadBalancer/passthrough. Done when: two-cluster capture.
 4. **Deletion.** Remove the installer commands, continuation, guards,
-   journals, witness, temporary roles and their tests and ADR text; migrate
-   or drop `protection_digest`; update architecture docs, specs and gates.
-5. **Bundled Keycloak and collector** move to the same templates; ADR-327's
-   installer-created routes are replaced by chart templates.
+   journals, witness, temporary roles, their tests and ADR text; migrate or
+   drop `protection_digest`; update architecture docs, specs and gates.
+5. **Bundled Keycloak and collector** move to the same templates.
 
 ## Open questions decided here
 
