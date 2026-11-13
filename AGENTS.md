@@ -20,6 +20,25 @@ unchanged-source evidence, preserve required final checks, and inspect producer
 and consumer boundaries before expensive dispatches. Keep one concise current
 feature ledger; prefer measured simplifications over added infrastructure.
 
+## Threat model and security evidence (maintainer, 2026-11-13)
+
+Operators keep every non-Asservat-administrator completely out of the Asservat
+namespaces. Anyone who can write there, and any cluster administrator, is
+trusted. Do not design mechanisms that defend against namespace writers,
+forged Pods or owner references, tampered ConfigMaps or Secrets in those
+namespaces, or a cluster administrator. ADR-328 records this threat model.
+
+Components trust the Kubernetes platform like other applications:
+configuration from mounted ConfigMaps and Secrets, callers authenticated by
+TokenReview and TLS, protection by RBAC and Pod Security. Do not add runtime
+re-verification of installer-created objects, UID pins, admission-policy
+proofs, journals or launch receipts.
+
+Every security measure must be backed by research first: cite external
+sources (standards, vendor guidance, incident reports, comparable projects)
+that describe its benefit. If nobody outside this project tells a positive
+story about a measure, remove it. Agent-authored ADRs are not evidence.
+
 ## Security proportionality and delivery
 
 Maintainer clarification (2026-10-20): the maintainer did not require permission
