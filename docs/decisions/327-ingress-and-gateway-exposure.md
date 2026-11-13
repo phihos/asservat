@@ -70,4 +70,5 @@ on Ingresses and HTTPRoutes for the installer only.
 - Unit: `internal/transport/edge` (TLS, marked proxy listener, forwarded
   header ignored), route create/rerun/change and input validation for both
   kinds, the public file shapes, ClusterIP exposure.
-- Installed: see `docs/implementation-progress.md` for the homelab Ingress run.
+- Installed: the homelab Ingress run in `docs/implementation-progress.md`
+  (2026-11-13); Gateway API installed qualification is pending.

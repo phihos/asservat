@@ -1,5 +1,32 @@
 # Sustained implementation progress
 
+## Ingress and Gateway API exposure (2026-11-13, ADR-327)
+
+Scope: `exposure.tls: proxy`, ClusterIP, installer-created Ingress/HTTPRoute,
+optional public serving pair, null overlay fields; the reference profile now
+defaults to an Ingress (maintainer: no NodePort by default for the console).
+
+Verification:
+- Unit: `internal/transport/edge`, console proxy listener, route
+  create/rerun/change for Ingress and HTTPRoute, route validation, public file
+  shapes, ClusterIP exposure; `make go-affected-test` passed (402 s).
+- Installed, maintainer homelab (k3s v1.37.2, 3 control-plane nodes, HAPTIC
+  IngressClass `haproxy`, external Keycloak): a fresh install of local
+  integration `22cf85a8` (this branch plus #227 and #228) completed all five
+  bootstrap stages; the installer created the ClusterIP Service and Ingress;
+  through HAPTIC with TLS at the proxy, `/` and `/processing` answered 200 and
+  `/auth/login` redirected to Keycloak with a `Secure` `__Host-` cookie. No
+  console NodePort exists; the peer listeners keep theirs.
+- Failures found on the way and fixed here: the ClusterIP allowance first
+  landed on the peer-native Service (unit test caught it, the installed run
+  stopped at `public/exposure (invalid)`); the console handler was a seventh
+  direct-TLS check (404 through the proxy); a `nodePort: null` overlay failed
+  the closed installer input (`open/input`).
+
+Remaining: Gateway API installed qualification (no Gateway in the homelab);
+bundled Keycloak still uses its NodePort Service; a human login, capture and
+download through the Ingress are not yet recorded.
+
 ## Qualified bundled PostgreSQL restart workflow (2026-11-12)
 
 Candidate: `feature/bundled-postgres-restart` in `asservat-small-restart`, based

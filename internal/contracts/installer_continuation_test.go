@@ -55,7 +55,6 @@ func TestInstallerProcessingOrganizationsPreserveOptionalWireShape(t *testing.T)
 	}
 }
 
-
 func TestInstallerPublicFilesShape(t *testing.T) {
 	secret, crt, key := []byte("s"), []byte("c"), []byte("k")
 	for _, tc := range []struct {
