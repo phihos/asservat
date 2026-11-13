@@ -1,24 +1,13 @@
 {{- if .Values.collector.enabled }}
 {{- $c := .Values.collector }}
-{{- if eq .Values.mode "hub" }}{{ fail "collector.enabled requires mode=cluster or mode=combined" }}{{ end }}
-{{- if or (hasPrefix "kube-" $c.namespace) (eq $c.namespace "default") (eq $c.namespace .Release.Namespace) (eq $c.namespace .Values.cluster.namespace) }}{{ fail "collector.namespace must be a dedicated collector namespace distinct from the release and connector namespaces" }}{{ end }}
-{{- if not (regexMatch "^[a-z0-9][a-z0-9./:_-]{0,383}@sha256:[a-f0-9]{64}$" $c.image) }}{{ fail "collector.image requires the exact verified product repository@sha256 digest" }}{{ end }}
-{{- range $id := list $c.installationID $c.clusterID }}{{ if not (regexMatch "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" $id) }}{{ fail "collector.installationID and collector.clusterID must be the installation's UUIDs" }}{{ end }}{{ end }}
-{{- /* ADR-246 decision 9: with cluster.enabled and collector.connector left
-  empty, the values come from the connector-nodes ConfigMap that this
-  release's cluster installer hook publishes. The hook runs after the first
-  render, so the first install creates only the namespace and account (the
-  installer needs the namespace); the next helm upgrade renders the
-  DaemonSet. helm template never sees the ConfigMap. */}}
-{{- $conn := $c.connector }}
-{{- $published := and .Values.cluster.enabled (eq $conn.endpoint "") (eq $conn.serverName "") (eq $conn.rootsPEM "") }}
-{{- if $published }}
-{{- $cm := lookup "v1" "ConfigMap" .Values.cluster.namespace "connector-nodes" }}
-{{- $conn = dict "endpoint" (dig "data" "endpoint" "" $cm) "serverName" (dig "data" "serverName" "" $cm) "rootsPEM" (dig "data" "rootsPEM" "" $cm) }}
-{{- end }}
-{{- $ready := and (hasPrefix "https://" $conn.endpoint) (ne $conn.serverName "") (contains "-----BEGIN CERTIFICATE-----" $conn.rootsPEM) }}
-{{- if and (not $ready) (not $published) }}{{ fail "collector.connector requires the connector's https endpoint, certificate server name and issuing roots (or leave all three empty with cluster.enabled)" }}{{ end }}
-{{- $name := printf "%s-node" .Release.Name }}
+{{- $n := include "asservat.region.name" . }}
+{{- if not .Values.region.enabled }}{{ fail "collector.enabled requires region.enabled (mode=cluster or mode=combined)" }}{{ end }}
+{{- if or (hasPrefix "kube-" $c.namespace) (eq $c.namespace "default") (eq $c.namespace .Release.Namespace) }}{{ fail "collector.namespace must be a dedicated collector namespace distinct from the release namespace" }}{{ end }}
+{{- $image := include "asservat.region.image" . }}
+{{- $clusterID := include "asservat.region.uuid" (dict "value" .Values.region.clusterID "field" "region.clusterID") }}
+{{- $name := printf "%s-node" $n }}
+{{- $root := printf "%s-node-connector-ca" $n }}
+{{- $listener := printf "%s-connector-nodes.%s.svc" $n .Release.Namespace }}
 {{- $ceilings := dict "ringBytes" (int64 $c.ceilings.ringBytes) "frozenBytes" (int64 $c.ceilings.frozenBytes) "uploadBytesPerSecond" (int64 $c.ceilings.uploadBytesPerSecond) "uploadBurstBytes" (int64 $c.ceilings.uploadBurstBytes) }}
 {{- if $c.ringDisk.enabled }}
 {{- $_ := set $ceilings "ringDiskBytes" (int64 $c.ringDisk.bytes) }}
@@ -28,12 +17,13 @@
 {{- $_ := set $ceilings "inputBytesPerSecond" (int64 $c.ceilings.inputBytesPerSecond) }}
 {{- $_ := set $ceilings "inputBurstBytes" (int64 $c.ceilings.inputBurstBytes) }}
 {{- end }}
-{{- $input := dict "format" "asservat-node-deployment/v1" "installationID" $c.installationID "clusterID" $c.clusterID "connector" (dict "endpoint" $conn.endpoint "serverName" $conn.serverName "rootsPEM" $conn.rootsPEM) "ceilings" $ceilings }}
+{{- /* The connector publishes its node listener root into $root; node.json
+  carries no rootsPEM and the collector reads connector-ca.crt beside it. */}}
+{{- $input := dict "format" "asservat-node-deployment/v1" "clusterID" $clusterID "connector" (dict "endpoint" (printf "https://%s:8444" $listener) "serverName" $listener "rootsPEM" "") "ceilings" $ceilings }}
 {{- if $c.live }}
 {{- $_ := set $input "live" $c.live }}
 {{- end }}
 {{- $json := toJson $input }}
-{{- $digest := sha256sum $json }}
 # ADR-246: the collector namespace is the only namespace with the privileged
 # Pod Security exception. Workload namespaces keep `restricted`.
 apiVersion: v1
@@ -54,16 +44,57 @@ metadata:
   name: {{ $name }}
   namespace: {{ $c.namespace }}
 automountServiceAccountToken: false
-{{- if $ready }}
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ printf "%s-input.%s" $name (trunc 32 $digest) }}
+  name: {{ printf "%s-config" $name }}
   namespace: {{ $c.namespace }}
-immutable: true
 data:
   node.json: {{ $json | quote }}
+---
+# The connector writes its node listener root here (key connector-ca.crt).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $root }}
+  namespace: {{ $c.namespace }}
+  annotations:
+    helm.sh/resource-policy: keep
+---
+# The connector's attestation reads of the collector Pods and DaemonSet and
+# its publication of the listener root.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ printf "%s-connector" $name }}
+  namespace: {{ $c.namespace }}
+rules:
+  - apiGroups: [""]
+    resources: [pods]
+    verbs: [get]
+  - apiGroups: [apps]
+    resources: [daemonsets]
+    resourceNames: [{{ $name }}]
+    verbs: [get]
+  - apiGroups: [""]
+    resources: [configmaps]
+    resourceNames: [{{ $root }}]
+    verbs: [get, update]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ printf "%s-connector" $name }}
+  namespace: {{ $c.namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ printf "%s-connector" $name }}
+subjects:
+  - kind: ServiceAccount
+    namespace: {{ .Release.Namespace }}
+    name: {{ printf "%s-connector" $n }}
 ---
 apiVersion: apps/v1
 kind: DaemonSet
@@ -89,7 +120,7 @@ spec:
         app.kubernetes.io/name: asservat-node
         app.kubernetes.io/instance: {{ .Release.Name | quote }}
       annotations:
-        asservat.io/node-input: {{ $digest }}
+        checksum/config: {{ sha256sum $json }}
     spec:
       serviceAccountName: {{ $name }}
       automountServiceAccountToken: false
@@ -99,17 +130,14 @@ spec:
       hostPID: true
       hostNetwork: false
       hostIPC: false
-      {{- if $c.registrySecret }}
-      imagePullSecrets:
-        - name: {{ $c.registrySecret }}
-      {{- end }}
+      {{- include "asservat.region.pullSecrets" . | nindent 6 }}
       terminationGracePeriodSeconds: 10
       tolerations:
         - operator: Exists
       containers:
         - name: node
-          image: {{ $c.image }}
-          imagePullPolicy: IfNotPresent
+          image: {{ $image }}
+          imagePullPolicy: {{ .Values.image.pullPolicy | default "IfNotPresent" }}
           command: ["/asservat", "node"]
           env:
             - name: ASSERVAT_NODE_POD_UID
@@ -165,15 +193,21 @@ spec:
           emptyDir: { sizeLimit: {{ int64 $c.ringDisk.bytes | quote }} }
         {{- end }}
         - name: input
-          configMap:
-            name: {{ printf "%s-input.%s" $name (trunc 32 $digest) }}
-            items: [{ key: node.json, path: node.json }]
+          projected:
+            sources:
+              - configMap:
+                  name: {{ printf "%s-config" $name }}
+                  items: [{ key: node.json, path: node.json }]
+              - configMap:
+                  name: {{ $root }}
+                  optional: true
+                  items: [{ key: connector-ca.crt, path: connector-ca.crt }]
         - name: token
           projected:
             sources:
               - serviceAccountToken:
                   path: token
-                  audience: {{ printf "asservat-node:%s" $c.installationID }}
+                  audience: {{ printf "asservat-node:%s" $clusterID }}
                   expirationSeconds: 600
         # Accidental-use barrier (S-04 plan §5.2): the kubelet refuses to
         # start the Pod unless this host file exists. Only disposable CI
@@ -186,5 +220,4 @@ spec:
           hostPath: { path: /sys/kernel/tracing, type: "" }
         - name: bpffs
           hostPath: { path: /sys/fs/bpf, type: "" }
-{{- end }}
 {{- end }}

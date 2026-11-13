@@ -203,7 +203,7 @@ func newConnectorSQLFixtureWithOptions(t *testing.T, ctx context.Context, admin 
 	binding := value.PeerBinding{InstallationID: s.recovery.installation, ClusterID: cluster, IssuerEpoch: recovery.IssuerEpoch, PeerID: custodyID(), Role: value.ConnectorPeer}
 	f.clientCA, f.clientCAKey = connectorSQLCA(t)
 	f.serverCA, f.serverCAKey = connectorSQLCA(t)
-	profile := value.ConnectorCredentialProfile{RootID: s.a.RootID, Binding: binding, Revision: identity.Revision{UID: custodyID(), Generation: 1, Digest: artifact.Digest{21}}, ProtectionDigest: artifact.Digest{22}, ServerName: "connector.invalid", ClientIssuerRoots: [][]byte{f.clientCA.Raw}, ServerIssuerRoots: [][]byte{f.serverCA.Raw}, Deployment: value.ConnectorDeployment{Namespace: "connector", NamespaceUID: custodyID(), ServiceAccount: "connector", AccountUID: custodyID(), Deployment: "connector", DeploymentUID: custodyID(), ServingSlots: 2, RetainedProcesses: 8}}
+	profile := value.ConnectorCredentialProfile{RootID: s.a.RootID, Binding: binding, Revision: identity.Revision{UID: custodyID(), Generation: 1, Digest: artifact.Digest{21}}, ProtectionDigest: artifact.Digest{22}, ServerName: "connector.invalid", ClientIssuerRoots: [][]byte{f.clientCA.Raw}, ServerIssuerRoots: [][]byte{f.serverCA.Raw}, Deployment: value.ConnectorDeployment{Namespace: "connector", ServiceAccount: "connector", Deployment: "connector", ServingSlots: 2, RetainedProcesses: 8}}
 	q := audit.OperationHistoryQualification{ID: custodyID(), Digest: artifact.Digest{23}, Layout: audit.ConnectorOperationHistoryLayout, MaximumRowFootprintBytes: 1 << 20, MaximumTransitionWALBytes: 1 << 20, BackupCopies: 1, WALCopies: 1}
 	policy := audit.OperationLifecyclePolicy{RootID: s.a.RootID, Lane: "identity", InstallationID: binding.InstallationID, StoreID: custodyID(), PolicyID: custodyID(), BackupProfileID: custodyID(), PolicyDigest: artifact.Digest{24}, BackupProfileDigest: artifact.Digest{25}, BackingRevision: 1, MetadataSlots: 512, MaxPurgeLeases: 2, CleanupBudgetSeconds: 60, ProofWindowSeconds: 60, ValidUntil: n.Add(40 * time.Minute), History: &q, OverdueTerminal: audit.OperationOverdueTerminal}
 	if retirement.Enabled {
@@ -373,7 +373,7 @@ func (f *connectorSQLFixture) ReadConnectorProcessProof(ctx context.Context, r v
 	if e != nil {
 		return value.ConnectorProcessProof{}, e
 	}
-	return value.ConnectorProcessProof{Process: r.Process, Configuration: c.Source.Observation, Pod: "synthetic-connector", ReplicaSet: "synthetic-rs", ReplicaSetUID: c.Source.Observation.Profile.Deployment.DeploymentUID, ClientKeyDigest: a, ServerKeyDigest: b, TokenDigest: artifact.Digest{33}, WorkloadDigest: artifact.Digest{34}, ProtectionDigest: c.Source.Observation.Profile.ProtectionDigest, ObservedAt: c.Source.Observation.ObservedAt, FreshUntil: c.Source.Observation.FreshUntil}, nil
+	return value.ConnectorProcessProof{Process: r.Process, Configuration: c.Source.Observation, Pod: "synthetic-connector", ReplicaSet: "synthetic-rs", ReplicaSetUID: "70000000-0000-4000-8000-000000000071", ClientKeyDigest: a, ServerKeyDigest: b, TokenDigest: artifact.Digest{33}, WorkloadDigest: artifact.Digest{34}, ProtectionDigest: c.Source.Observation.Profile.ProtectionDigest, ObservedAt: c.Source.Observation.ObservedAt, FreshUntil: c.Source.Observation.FreshUntil}, nil
 }
 func (f *connectorSQLFixture) SignConnectorCredential(ctx context.Context, p value.ConnectorCredentialPermit, csr []byte) (value.IssuedConnectorCredential, error) {
 	if ctx.Err() != nil || !p.Valid(time.Now()) {

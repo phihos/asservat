@@ -119,7 +119,7 @@ func newContextStartTLSFixture(t *testing.T) *contextStartTLSFixture {
 		return value.OwnerProtection{Pool: pool, Digest: artifact.Digest{3}, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}, nil
 	})
 	owners := &app.OwnerAuthenticator{Registry: source, Routes: routes, Protection: guard, Now: time.Now}
-	api := execution.APIProcessBinding{InstallationID: cf.profile.Binding.InstallationID, ClusterID: cf.profile.Binding.ClusterID, IssuerEpoch: cf.profile.Binding.IssuerEpoch, NamespaceUID: cf.profile.Deployment.NamespaceUID, AccountUID: cf.profile.Deployment.AccountUID, PodUID: ownerTestID, ProcessEpoch: "55000000-0000-4000-8000-000000000099", StartupDigest: artifact.Digest{8}, ImageDigest: artifact.Digest{9}}
+	api := execution.APIProcessBinding{InstallationID: cf.profile.Binding.InstallationID, ClusterID: cf.profile.Binding.ClusterID, IssuerEpoch: cf.profile.Binding.IssuerEpoch, NamespaceUID: "56000000-0000-4000-8000-000000000001", AccountUID: "56000000-0000-4000-8000-000000000002", PodUID: ownerTestID, ProcessEpoch: "55000000-0000-4000-8000-000000000099", StartupDigest: artifact.Digest{8}, ImageDigest: artifact.Digest{9}}
 	process := contextStartAPIProcess(func(ctx context.Context) (execution.APIProcessObservation, error) {
 		now := time.Now().UTC()
 		if ctx.Err() != nil {

@@ -33,7 +33,7 @@ type CapacityTokens struct {
 // NewCapacityTokens requires the client to be this Pod's own Pod-bound
 // execution credential (SelfSubjectReview pod-uid extra).
 func NewCapacityTokens(ctx context.Context, client *PermissionClient, account, audience, podUID string) (*CapacityTokens, error) {
-	if ctx == nil || client == nil || !identity.Text(account, 253) || !identity.Text(audience, 256) || !installationRefValid(account, podUID) {
+	if ctx == nil || client == nil || !identity.Text(account, 253) || audience != "" && !identity.Text(audience, 256) || !installationRefValid(account, podUID) {
 		return nil, cfg.ErrInvalid
 	}
 	raw, err := client.proofPost(ctx, "/apis/authentication.k8s.io/v1/selfsubjectreviews", auth.SelfSubjectReview{TypeMeta: meta.TypeMeta{APIVersion: "authentication.k8s.io/v1", Kind: "SelfSubjectReview"}}, nil)
@@ -60,7 +60,11 @@ func (c *CapacityTokens) Token(ctx context.Context) ([]byte, error) {
 	clear(c.token)
 	c.token = nil
 	seconds := int64(capacityTokenSeconds)
-	request := auth.TokenRequest{TypeMeta: meta.TypeMeta{APIVersion: "authentication.k8s.io/v1", Kind: "TokenRequest"}, Spec: auth.TokenRequestSpec{Audiences: []string{c.audience}, ExpirationSeconds: &seconds}}
+	// An empty audience requests the API server's own default audience.
+	request := auth.TokenRequest{TypeMeta: meta.TypeMeta{APIVersion: "authentication.k8s.io/v1", Kind: "TokenRequest"}, Spec: auth.TokenRequestSpec{ExpirationSeconds: &seconds}}
+	if c.audience != "" {
+		request.Spec.Audiences = []string{c.audience}
+	}
 	started := c.client.now()
 	raw, err := c.client.proofPost(ctx, "/api/v1/namespaces/"+c.client.control.Name+"/serviceaccounts/"+c.account+"/token", request, nil)
 	defer clear(raw)

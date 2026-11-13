@@ -6,7 +6,6 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"encoding/json/jsontext"
-	"errors"
 	"time"
 
 	"asservat.local/asservat/internal/adapters/mtls"
@@ -19,26 +18,31 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// ConnectorProcessAttester uses the pinned workload protection digest and
-// bounded Kubernetes resource/token readers. It never constructs an
-// OwnerBinding or treats Pod proof as process-registration/signing authority.
+// ConnectorProcessAttester uses the connector's own workload, its
+// deterministic protection digest and bounded Kubernetes resource/token
+// readers. It never constructs an OwnerBinding or treats Pod proof as
+// process-registration/signing authority.
 type ConnectorProcessAttester struct {
-	client     *PermissionClient
-	source     app.ConnectorIdentitySourceReader
-	protection *OwnerWorkloadProtection
-	tokens     app.ConnectorPodToken
+	client   *PermissionClient
+	source   app.ConnectorIdentitySourceReader
+	workload ConnectorWorkload
+	tokens   app.ConnectorPodToken
 }
 
 var _ app.ConnectorProcessProofReader = (*ConnectorProcessAttester)(nil)
 
-func NewConnectorProcessAttester(c *PermissionClient, source app.ConnectorIdentitySourceReader, protection *OwnerWorkloadProtection, tokens app.ConnectorPodToken) (*ConnectorProcessAttester, error) {
-	if c == nil || source == nil || protection == nil || protection.observer != c || tokens == nil {
+func NewConnectorProcessAttester(c *PermissionClient, source app.ConnectorIdentitySourceReader, workload ConnectorWorkload, tokens app.ConnectorPodToken) (*ConnectorProcessAttester, error) {
+	if c == nil || source == nil || !workload.matches(c, workload.Namespace, workload.Account, workload.Deployment) || tokens == nil {
 		return nil, value.ErrInvalid
 	}
-	return &ConnectorProcessAttester{c, source, protection, tokens}, nil
+	return &ConnectorProcessAttester{c, source, workload, tokens}, nil
 }
-func ConnectorEnrollmentAudience(installation string) string {
-	return "https://asservat." + installation + "/connector-process-enrollment"
+
+// ConnectorEnrollmentAudience is the connector Pod token's dedicated audience.
+// It names the cluster ID, a Helm value in both topologies, so the chart can
+// render the projection; only this connector reviews the token.
+func ConnectorEnrollmentAudience(clusterID string) string {
+	return "https://asservat." + clusterID + "/connector-process-enrollment"
 }
 func (s *ConnectorProcessAttester) live(ctx context.Context, p value.ConnectorDeployment, b value.ConnectorProcessIdentity, name string) (ownerEnrollmentWorkload, error) {
 	var out ownerEnrollmentWorkload
@@ -48,11 +52,11 @@ func (s *ConnectorProcessAttester) live(ctx context.Context, p value.ConnectorDe
 	}
 	reader := &OwnerEndpoints{client: s.client} // Resource reader only; never Ready endpoint discovery.
 	account, err := ownerResource[core.ServiceAccount](reader, ctx, "/api/v1/namespaces/"+p.Namespace+"/serviceaccounts/"+p.ServiceAccount, "v1", "ServiceAccount")
-	if err != nil || !ownerMetadata(account.ObjectMeta, p.Namespace, p.ServiceAccount, p.AccountUID) {
+	if err != nil || !ownerMetadata(account.ObjectMeta, p.Namespace, p.ServiceAccount, s.workload.AccountUID) {
 		return out, value.ErrUnavailable
 	}
 	deployment, err := ownerResource[apps.Deployment](reader, ctx, "/apis/apps/v1/namespaces/"+p.Namespace+"/deployments/"+p.Deployment, "apps/v1", "Deployment")
-	if err != nil || !ownerMetadata(deployment.ObjectMeta, p.Namespace, p.Deployment, p.DeploymentUID) || deployment.Spec.Template.Spec.ServiceAccountName != p.ServiceAccount || deployment.Spec.Replicas == nil || *deployment.Spec.Replicas < 1 {
+	if err != nil || !ownerMetadata(deployment.ObjectMeta, p.Namespace, p.Deployment, s.workload.DeploymentUID) || deployment.Spec.Template.Spec.ServiceAccountName != p.ServiceAccount || deployment.Spec.Replicas == nil || *deployment.Spec.Replicas < 1 {
 		return out, value.ErrUnavailable
 	}
 	pod, err := ownerResource[core.Pod](reader, ctx, "/api/v1/namespaces/"+p.Namespace+"/pods/"+name, "v1", "Pod")
@@ -68,7 +72,7 @@ func (s *ConnectorProcessAttester) live(ctx context.Context, p value.ConnectorDe
 		return out, value.ErrUnavailable
 	}
 	owner, ok := ownerController(replica.OwnerReferences, "Deployment", "apps/v1")
-	if !ok || owner.Name != p.Deployment || string(owner.UID) != p.DeploymentUID {
+	if !ok || owner.Name != p.Deployment || string(owner.UID) != s.workload.DeploymentUID {
 		return out, value.ErrUnavailable
 	}
 	return connectorProcessWorkload(p, b, name, deployment, replica, pod)
@@ -164,21 +168,17 @@ func (s *ConnectorProcessAttester) readConnectorProcessSourceAttestationWith(ctx
 	first.Observation.Profile = first.Observation.Profile.Clone()
 	p := first.Observation.Profile.Deployment
 	b := r.Process
-	plan := s.protection.plan
-	if b.Binding != first.Observation.Profile.Binding || b.Binding.ClusterID != s.client.clusterID || p.Namespace != s.client.control.Name || p.NamespaceUID != s.client.control.UID || p.Deployment != plan.Deployment || p.DeploymentUID != plan.DeploymentUID {
+	if b.Binding != first.Observation.Profile.Binding || b.Binding.ClusterID != s.client.clusterID || !s.workload.matches(s.client, p.Namespace, p.ServiceAccount, p.Deployment) {
 		return zero, noSource, connectorAPIStage("attest-binding", value.ErrDenied)
 	}
-	guard, guardUntil, e := s.protection.Current(ctx)
-	if e != nil {
-		return zero, noSource, connectorAPIStage("attest-workload-guard", errors.Join(value.ErrUnavailable, e))
-	}
+	guard := s.workload.Digest
 	token, e := s.tokens.ReadConnectorPodToken(ctx)
 	defer clear(token)
 	if e != nil || len(token) < 1 || len(token) > 16<<10 || !bytes.Equal(bytes.TrimSpace(token), token) {
 		return zero, noSource, connectorAPIStage("attest-pod-token", value.ErrDenied)
 	}
-	audience := ConnectorEnrollmentAudience(b.Binding.InstallationID)
-	name, e := reviewBoundPodToken(ctx, s.client, token, audience, p.Namespace, p.ServiceAccount, p.AccountUID, b.PodUID)
+	audience := ConnectorEnrollmentAudience(b.Binding.ClusterID)
+	name, e := reviewBoundPodToken(ctx, s.client, token, audience, p.Namespace, p.ServiceAccount, s.workload.AccountUID, b.PodUID)
 	if e != nil {
 		return zero, noSource, connectorAPIStage("attest-token-review", value.ErrDenied)
 	}
@@ -190,7 +190,7 @@ func (s *ConnectorProcessAttester) readConnectorProcessSourceAttestationWith(ctx
 	if e != nil {
 		return zero, noSource, connectorAPIStage("attest-live", value.ErrUnavailable)
 	}
-	again, e := reviewBoundPodToken(ctx, s.client, token, audience, p.Namespace, p.ServiceAccount, p.AccountUID, b.PodUID)
+	again, e := reviewBoundPodToken(ctx, s.client, token, audience, p.Namespace, p.ServiceAccount, s.workload.AccountUID, b.PodUID)
 	if e != nil || again != name {
 		return zero, noSource, connectorAPIStage("attest-token-review-after", value.ErrDenied)
 	}
@@ -206,7 +206,7 @@ func (s *ConnectorProcessAttester) readConnectorProcessSourceAttestationWith(ctx
 	if deadline, ok := ctx.Deadline(); ok {
 		until = identity.Earlier(until, deadline)
 	}
-	for _, bound := range []time.Time{first.Observation.FreshUntil, last.Observation.FreshUntil, guardUntil, expires} {
+	for _, bound := range []time.Time{first.Observation.FreshUntil, last.Observation.FreshUntil, expires} {
 		until = identity.Earlier(until, bound)
 	}
 	out := value.ConnectorProcessProof{Process: b, Configuration: first.Observation, Pod: name, ReplicaSet: before.ReplicaSet, ReplicaSetUID: before.ReplicaSetUID, ClientKeyDigest: clientKey, ServerKeyDigest: serverKey, TokenDigest: artifact.Digest(sha256.Sum256(token)), WorkloadDigest: before.Digest, ProtectionDigest: guard, ObservedAt: start, FreshUntil: until}

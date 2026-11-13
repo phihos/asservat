@@ -69,14 +69,14 @@ func TestRegionalProfileAuthorizationPrivateFileAndPublicSource(t *testing.T) {
 
 func TestRegionalProfileAuthorizationStartupBindingAndLegacyZeroRead(t *testing.T) {
 	cluster := "00000000-0000-4000-8000-000000000001"
-	empty := contracts.RegionalDeployment{ClusterID: cluster, APIContext: &contracts.RegionalAPIContext{}}
+	empty := regionalConfig{ConnectorConfig: contracts.ConnectorConfig{ClusterID: cluster, Executor: &contracts.ConnectorExecutorConfig{}}}
 	if r, err := newRegionalProfileAuthorizationReader(t.Context(), &providerInputs{}, empty); err != nil || r != nil {
 		t.Fatal("legacy startup required a credential file", err)
 	}
 	server := httptest.NewTLSServer(http.NotFoundHandler())
 	defer server.Close()
 	roots := string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: server.Certificate().Raw}))
-	empty.APIContext.ProfileEndpoints = []contracts.RegionalProfileEndpoint{{Name: "pprof", Kind: "profile", AddressMode: "targetLoopback", Port: 6060, LoopbackFamily: "ipv4", TLS: &contracts.RegionalProfileEndpointTLS{ServerName: "localhost", RootsPEM: roots}, Credential: &contracts.RegionalProfileEndpointCredential{Audiences: []contracts.RegionalProfileEndpointAudience{{ClusterID: cluster, NamespaceUID: "00000000-0000-4000-8000-000000000002", WorkloadKind: "Pod", WorkloadUID: "00000000-0000-4000-8000-000000000003"}}}}}
+	empty.Executor.ProfileEndpoints = []contracts.RegionalProfileEndpoint{{Name: "pprof", Kind: "profile", AddressMode: "targetLoopback", Port: 6060, LoopbackFamily: "ipv4", TLS: &contracts.RegionalProfileEndpointTLS{ServerName: "localhost", RootsPEM: roots}, Credential: &contracts.RegionalProfileEndpointCredential{Audiences: []contracts.RegionalProfileEndpointAudience{{ClusterID: cluster, NamespaceUID: "00000000-0000-4000-8000-000000000002", WorkloadKind: "Pod", WorkloadUID: "00000000-0000-4000-8000-000000000003"}}}}}
 	dir := t.TempDir()
 	root, err := os.OpenRoot(dir)
 	if err != nil {

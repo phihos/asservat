@@ -26,7 +26,7 @@ func TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO(t *tes
 	id, other := "00000000-0000-4000-8000-000000000001", "00000000-0000-4000-8000-000000000002"
 	now := time.Now().UTC()
 	b := value.PeerBinding{InstallationID: id, ClusterID: id, PeerID: id, IssuerEpoch: id, Role: value.ConnectorPeer}
-	profile := value.ConnectorCredentialProfile{RootID: id, Binding: b, Revision: identity.Revision{UID: id, Generation: 1, Digest: artifact.Digest{1}}, ProtectionDigest: artifact.Digest{2}, ServerName: "connector.invalid", ClientIssuerRoots: [][]byte{{1}}, ServerIssuerRoots: [][]byte{{2}}, Deployment: value.ConnectorDeployment{Namespace: "connector", NamespaceUID: id, ServiceAccount: "connector", AccountUID: id, Deployment: "connector", DeploymentUID: id, ServingSlots: 2, RetainedProcesses: 8}}
+	profile := value.ConnectorCredentialProfile{RootID: id, Binding: b, Revision: identity.Revision{UID: id, Generation: 1, Digest: artifact.Digest{1}}, ProtectionDigest: artifact.Digest{2}, ServerName: "connector.invalid", ClientIssuerRoots: [][]byte{{1}}, ServerIssuerRoots: [][]byte{{2}}, Deployment: value.ConnectorDeployment{Namespace: "connector", ServiceAccount: "connector", Deployment: "connector", ServingSlots: 2, RetainedProcesses: 8}}
 	leaf := value.ConnectorCredentialCertificate{Binding: b, Usage: "client", Digest: artifact.Digest{3}, PublicKeyDigest: artifact.Digest{4}, NotBefore: now.Add(-time.Second), NotAfter: now.Add(time.Minute)}
 	if !profile.Valid() || !leaf.Valid(now) {
 		t.Fatal("invalid fixture")
@@ -55,7 +55,7 @@ func TestConnectorObservationRegistryRejectsMismatchedOriginalBeforeAnyIO(t *tes
 			case "roots":
 				original.ClientIssuerRoots[0][0]++
 			case "controller":
-				original.Deployment.DeploymentUID = other
+				original.Deployment.Deployment = "replacement"
 			case "suspended":
 				original.Suspended = true
 			case "leaf-binding":

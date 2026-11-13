@@ -16,7 +16,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -45,147 +44,6 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/utils/ptr"
 )
-
-// TestFederationRegionalProductWithRealKubernetes runs the actual product
-// `hub-federation` (ADR-170) and `connector` (ADR-169) processes as
-// Restricted Pods in two owned clusters. The hub duties run under the product
-// connector role grants, real OpenBao PKI/transit and encrypted S3 audit; the
-// regional Pod holds only its cluster credential Secret and in-cluster reads.
-// Synthetic setup roots remain explicit: the fixture creates the roles, PKI,
-// owner/fleet trust and the fleet operator's authority, not a product
-// installer. Generation 1 comes from a BootstrapIssuer slot (ADR-193).
-func TestFederationRegionalProductWithRealKubernetes(t *testing.T) {
-	path := os.Getenv("ASSERVAT_CONTEXT_FIXTURES")
-	if path == "" {
-		t.Skip("owned two-cluster context fixture required")
-	}
-	raw, e := os.ReadFile(path)
-	var f fixture
-	var selection struct{ TwoClusterPods bool }
-	if e == nil && json.Unmarshal(raw, &selection) == nil && !selection.TwoClusterPods {
-		// Only the exact --run selection loads the product image into the regional cluster.
-		t.Skip("run scripts/test-context-storage.py --run '^TestFederationRegionalProductWithRealKubernetes$'")
-	}
-	if e != nil || json.Unmarshal(raw, &f) != nil || len(f.Clusters) != 2 || f.WorkerImage == "" {
-		t.Fatal("owned product fixture unavailable")
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Minute)
-	defer cancel()
-	installation, epoch, root := custodyID(), custodyID(), custodyID()
-	r := newDirectNativeCluster(t, ctx, f, 1, installation, productRegionalSpec(f.WorkerImage, installation))
-	hub := newFederationHub(t, ctx, f)
-	// The SQL lab needs an accepted owner configuration only for its fleet
-	// trust and observation loop; no owner process runs in this test.
-	ownerCA := directNativeCA(t)
-	pool := value.OwnerPool{InstallationID: installation, ClusterID: hub.id, IssuerEpoch: epoch, Namespace: hub.namespace, NamespaceUID: hub.namespaceUID, Service: "owner", ServiceUID: custodyID(), Deployment: "owner", DeploymentUID: custodyID(), ServiceAccount: "owner", AccountUID: custodyID(), Port: 9443, NativePort: 9444, NativeBootstrap: value.OwnerBootstrapProfile, NativeCandidateLimit: value.OwnerRegistrationsPerPool}
-	accepted := value.OwnerConfiguration{Pool: pool, Revision: identity.Revision{UID: custodyID(), Generation: 1, Digest: artifact.Digest{41}}, ProtectionDigest: artifact.Digest{42}, IssuerRoots: [][]byte{ownerCA.DER}}
-	sql := newDirectNativeSQL(t, ctx, f, accepted, root)
-	sql.startSources(t, ctx, cancel, accepted)
-	credentials := sql.productConnectorRoles(t, ctx)
-	sql.retirementBacking(t)
-	pki := newFederationPKI(t, f)
-	// ADR-193 step 3f: the fleet operator issues one audited slot for this
-	// cluster; the hub stages the source and enrolls generation 1 in-band.
-	envelope := issueRegionalBootstrap(t, ctx, f, sql, pki, installation, r.id)
-	source := r.regionalSource(t, ctx, sql, root, installation, epoch, envelope.Binding.PeerID, false, CA{DER: pki.root}, CA{DER: pki.root})
-	profile := source.configuration.Source.Observation.Profile
-	pki.roles(t, profile)
-	credential := r.bootstrapCredential(t, ctx, envelope, value.ClusterCredentialProfile{RootID: root, PeerID: profile.Binding.PeerID, InstallationID: installation, ClusterID: r.id}, hub.dial)
-	// The regional input is materialized first: the Pod has been waiting
-	// since cluster setup, and the product retries enrollment until the hub
-	// serves. Kubelet mount backoff can still delay its start.
-	in := contracts.RegionalDeployment{Format: contracts.RegionalDeploymentFormat, InstallationID: installation, ClusterID: r.id, PermissionRootID: root, IssuerEpoch: epoch, PeerID: profile.Binding.PeerID,
-		Namespace: contracts.WorkerObjectReference{Name: r.namespace.Name, UID: string(r.namespace.UID)}, Kubernetes: contracts.OwnerProviderEndpoint{Endpoint: "https://kubernetes.default.svc", Roots: r.apiRoots(t)},
-		Deployment: contracts.WorkerObjectReference{Name: "regional", UID: string(r.deployments["regional"].UID)}, WorkloadGuard: federationGuard(r.plan.Name, r.guard, r.plan.Administrators), ConfigurationProbes: federationProbes(r.plan.ConfigurationProbes),
-		Source: contracts.WorkerObjectReference{Name: source.name, UID: source.uid}, SourceGuard: federationGuard(source.plan.Name, source.pin, source.plan.Administrators),
-		ClusterCredential: contracts.WorkerObjectReference{Name: credential.secret, UID: credential.uid}, ClusterCredentialAccount: "regional", Hub: contracts.RegionalHubEndpoint{Endpoint: "https://" + hub.dial, ServerName: federationServerName, Roots: [][]byte{hub.ca}}}
-	encoded, e := json.Marshal(in)
-	if e != nil {
-		t.Fatal(e)
-	}
-	if _, e = r.api.CoreV1().ConfigMaps(r.namespace.Name).Create(ctx, &core.ConfigMap{ObjectMeta: meta.ObjectMeta{Name: "regional-inputs"}, Data: map[string]string{"regional.json": string(encoded)}}, meta.CreateOptions{}); e != nil {
-		t.Fatal("regional input", e)
-	}
-	r.inputUntil["regional"] = time.Now().Add(4 * time.Minute)
-	// ADR-193: no peer list; the federation resolves the staged profile.
-	hub.start(t, ctx, f, sql, pki, credentials, root, installation)
-
-	r.waitProductRunning(t, ctx)
-	pod := r.pods["regional"]
-	for _, v := range pod.Spec.Volumes {
-		if v.Secret != nil || v.Projected != nil && slicesContainSecret(v.Projected.Sources) {
-			t.Fatal("regional Pod mounts a Secret")
-		}
-	}
-	// Success is the hub's own SQL record: an accepted process for exactly
-	// this regional Pod with both leaves activated, then the product's single
-	// readiness line after the delegated registry checks.
-	deadline := time.Now().Add(90 * time.Second)
-	var active bool
-	for time.Now().Before(deadline) && !active {
-		e = sql.lab.admin.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM connector_identity_process p WHERE p.root_id=$1 AND p.peer_id=$2 AND p.pod_uid=$3 AND p.accepted_at IS NOT NULL
- AND EXISTS(SELECT 1 FROM connector_credential_attempt c WHERE c.id=p.client_current_id AND c.activated_at IS NOT NULL)
- AND EXISTS(SELECT 1 FROM connector_credential_attempt c WHERE c.id=p.server_current_id AND c.activated_at IS NOT NULL))`, root, profile.Binding.PeerID, string(pod.UID)).Scan(&active)
-		if e != nil {
-			t.Fatal(e)
-		}
-		if !active {
-			time.Sleep(time.Second)
-		}
-	}
-	if !active {
-		hub.logs(t, ctx)
-		r.productLogs(t, ctx)
-		var claimed, acknowledged, staged, reserved, activated bool
-		_ = sql.lab.admin.QueryRow(ctx, `SELECT b.claimed_at IS NOT NULL, b.claim_acknowledged_at IS NOT NULL,
- EXISTS(SELECT 1 FROM connector_identity_profile p WHERE p.root_id=$3 AND p.peer_id=$4),
- EXISTS(SELECT 1 FROM cluster_bootstrap_activation a WHERE a.installation_id=b.installation_id AND a.bootstrap_id=b.id),
- EXISTS(SELECT 1 FROM cluster_bootstrap_activation a WHERE a.installation_id=b.installation_id AND a.bootstrap_id=b.id AND a.activated_at IS NOT NULL)
- FROM fleet_bootstrap b WHERE b.installation_id=$1 AND b.id=$2`, installation, envelope.BootstrapID, root, profile.Binding.PeerID).Scan(&claimed, &acknowledged, &staged, &reserved, &activated)
-		t.Logf("bootstrap state: claimed=%v claim-acknowledged=%v staged=%v reserved=%v activated=%v", claimed, acknowledged, staged, reserved, activated)
-		t.Fatal("regional process not enrolled with both leaves")
-	}
-	for time.Now().Before(deadline) {
-		if strings.Contains(r.productLog(t, ctx), "connector process credentials active") {
-			break
-		}
-		time.Sleep(time.Second)
-	}
-	if !strings.Contains(r.productLog(t, ctx), "connector process credentials active") {
-		hub.logs(t, ctx)
-		r.productLogs(t, ctx)
-		t.Fatal("regional credentials never became active after registry checks")
-	}
-	// Generation 1 came from the bootstrap: an activated, audited bootstrap
-	// row and lineage, and the Secret promoted with its envelope erased.
-	var activated bool
-	if e = sql.lab.admin.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM cluster_bootstrap_activation a JOIN cluster_enrollment_lineage l ON l.lineage_id=a.lineage_id
- WHERE a.installation_id=$1 AND a.bootstrap_id=$2 AND a.activated_at IS NOT NULL AND a.audit_acknowledged_at IS NOT NULL AND l.root_id=$3 AND l.peer_id=$4 AND l.fenced IS NULL)`,
-		installation, envelope.BootstrapID, root, profile.Binding.PeerID).Scan(&activated); e != nil || !activated {
-		t.Fatal("generation 1 not bootstrap-activated", e)
-	}
-	stored, e := r.api.CoreV1().Secrets(r.namespace.Name).Get(ctx, credential.secret, meta.GetOptions{})
-	var promoted app.ClusterCredentialSecret
-	if e != nil || json.Unmarshal(stored.Data["cluster-credential.json"], &promoted) != nil || promoted.Generation < 1 || promoted.Bootstrap != nil || promoted.PendingSeed != nil {
-		t.Fatal("cluster credential Secret not promoted", e)
-	}
-	for _, x := range []struct {
-		api       kubernetes.Interface
-		namespace string
-		selector  string
-	}{{hub.api, hub.namespace, "app=federation"}, {r.api, r.namespace.Name, "fixture-role=regional"}} {
-		list, e := x.api.CoreV1().Pods(x.namespace).List(ctx, meta.ListOptions{LabelSelector: x.selector})
-		if e != nil || len(list.Items) != 1 {
-			t.Fatal("product Pod lookup", e)
-		}
-		for _, s := range list.Items[0].Status.ContainerStatuses {
-			if s.RestartCount != 0 {
-				t.Fatal("product process restarted", x.selector)
-			}
-		}
-	}
-	t.Logf("product federation/regional enrollment: hub roles=%d bootstrap=product-issuer synthetic-setup-roots=true installer=false", len(credentials))
-}
 
 // waitProductRunning waits for the original regional Pod to run without a
 // restart and reports its waiting reasons and events if it never does.
@@ -253,18 +111,6 @@ func federationProbes(in []cfg.OwnerConfigurationProbe) []contracts.OwnerConfigu
 		out[i] = contracts.OwnerConfigurationProbe{ConfigMap: p.ConfigMap, ServiceAccount: p.ServiceAccount}
 	}
 	return out
-}
-
-func productRegionalSpec(image, installation string) func(string) core.PodSpec {
-	return func(mode string) core.PodSpec {
-		projection := []core.VolumeProjection{
-			{ConfigMap: &core.ConfigMapProjection{LocalObjectReference: core.LocalObjectReference{Name: "regional-inputs"}, Items: []core.KeyToPath{{Key: "regional.json", Path: "regional.json"}}, Optional: ptr.To(false)}},
-			{ServiceAccountToken: &core.ServiceAccountTokenProjection{Audience: kube.ConnectorEnrollmentAudience(installation), Path: "connector-pod.token", ExpirationSeconds: ptr.To(int64(600))}},
-			{ServiceAccountToken: &core.ServiceAccountTokenProjection{Path: "kube-observer.token", ExpirationSeconds: ptr.To(int64(600))}},
-			{ServiceAccountToken: &core.ServiceAccountTokenProjection{Path: "kube-probe.token", ExpirationSeconds: ptr.To(int64(600))}},
-		}
-		return productPodSpec(mode, image, []string{"/asservat", "connector"}, contracts.RegionalDeploymentRoot, projection, []core.EnvVar{{Name: contracts.RegionalPodUIDEnvironment, ValueFrom: &core.EnvVarSource{FieldRef: &core.ObjectFieldSelector{APIVersion: "v1", FieldPath: "metadata.uid"}}}})
-	}
 }
 
 func productPodSpec(account, image string, command []string, root string, projection []core.VolumeProjection, env []core.EnvVar) core.PodSpec {

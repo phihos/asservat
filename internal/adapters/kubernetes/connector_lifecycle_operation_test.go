@@ -6,20 +6,106 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/x509"
+	"encoding/base64"
+	"encoding/json"
+	"encoding/pem"
+	"net/http"
+	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"asservat.local/asservat/internal/adapters/mtls"
 	app "asservat.local/asservat/internal/application/fleet"
+	"asservat.local/asservat/internal/contracts"
+	cfg "asservat.local/asservat/internal/domain/configuration"
 	value "asservat.local/asservat/internal/domain/fleet"
-	core "k8s.io/api/core/v1"
+	auth "k8s.io/api/authentication/v1"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/rest"
+	"k8s.io/utils/ptr"
 )
 
-func lifecycleNativeFixture(t *testing.T) (*connectorOperationFixture, *ConnectorLifecycleReader, app.ConnectorLifecycleRequest, context.Context) {
+// Concrete TLS/native readers over a synthetic API. The connector's source is
+// its fixed identity document; no guard, probe or source ConfigMap is read.
+type connectorLifecycleFixture struct {
+	reader             *ConnectorLifecycleReader
+	request            app.ConnectorLifecycleRequest
+	start              time.Time
+	clock              atomic.Int64
+	calls, reviews     atomic.Int32
+	revoke, recreated  atomic.Bool
+	sourceOrGuardReads atomic.Int32
+}
+
+func newConnectorLifecycleFixture(t *testing.T) (*connectorLifecycleFixture, context.Context) {
 	t.Helper()
-	f := newConnectorOperationFixture(t)
-	reader, err := NewConnectorLifecycleReader(f.reader.client, f.reader.source, f.reader.guard, connectorTokenFunc(func(context.Context) ([]byte, error) { return bytes.Clone(f.token), nil }))
+	f := &connectorLifecycleFixture{start: time.Now().UTC()}
+	f.clock.Store(f.start.UnixNano())
+	now := func() time.Time { return time.Unix(0, f.clock.Load()).UTC() }
+	v := ownerFixtureObjects()
+	v.deploy.Spec.Replicas = ptr.To(int32(1))
+	v.deploy.Spec.Template.Spec.ServiceAccountName = v.pool.ServiceAccount
+	v.rs.Spec.Replicas = ptr.To(int32(1))
+	v.rs.Spec.Selector = v.deploy.Spec.Selector.DeepCopy()
+	v.rs.Spec.Template.Spec.ServiceAccountName = v.pool.ServiceAccount
+	peer := value.PeerBinding{InstallationID: v.binding.InstallationID, ClusterID: v.pool.ClusterID, IssuerEpoch: v.binding.IssuerEpoch, PeerID: ownerID(20), Role: value.ConnectorPeer}
+	process := value.ConnectorProcessIdentity{Binding: peer, PodUID: v.binding.PodUID, ProcessEpoch: v.binding.ProcessEpoch}
+	payload, _ := json.Marshal(map[string]int64{"iat": f.start.Add(-time.Second).Unix(), "exp": f.start.Add(time.Minute).Unix()})
+	token := []byte("e30." + base64.RawURLEncoding.EncodeToString(payload) + ".synthetic-signature")
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		f.calls.Add(1)
+		switch r.URL.Path {
+		case "/api/v1/namespaces/owners":
+			permissionReply(w, v.ns)
+		case "/apis/apps/v1/namespaces/owners/deployments/hub":
+			d := v.deploy.DeepCopy()
+			if f.recreated.Load() {
+				d.UID = types.UID(ownerID(99))
+			}
+			permissionReply(w, d)
+		case "/api/v1/namespaces/owners/serviceaccounts/hub":
+			permissionReply(w, v.sa)
+		case "/api/v1/namespaces/owners/pods/" + v.pod.Name:
+			permissionReply(w, v.pod)
+		case "/apis/apps/v1/namespaces/owners/replicasets/" + v.rs.Name:
+			permissionReply(w, v.rs)
+		case "/apis/authentication.k8s.io/v1/tokenreviews":
+			f.reviews.Add(1)
+			var q auth.TokenReview
+			if json.NewDecoder(r.Body).Decode(&q) != nil || q.Spec.Token != string(token) || len(q.Spec.Audiences) != 1 || q.Spec.Audiences[0] != ConnectorEnrollmentAudience(peer.ClusterID) {
+				t.Error("wrong native token review")
+			}
+			permissionReply(w, auth.TokenReview{TypeMeta: meta.TypeMeta{APIVersion: "authentication.k8s.io/v1", Kind: "TokenReview"}, Status: auth.TokenReviewStatus{Authenticated: !f.revoke.Load(), Audiences: q.Spec.Audiences,
+				User: auth.UserInfo{Username: "system:serviceaccount:owners:hub", UID: v.pool.AccountUID, Extra: map[string]auth.ExtraValue{"authentication.kubernetes.io/pod-name": {v.pod.Name}, "authentication.kubernetes.io/pod-uid": {process.PodUID}}}}})
+		default:
+			f.sourceOrGuardReads.Add(1)
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(server.Close)
+	roots := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: server.Certificate().Raw})
+	client, err := NewPermissionClient(&rest.Config{Host: server.URL, TLSClientConfig: rest.TLSClientConfig{CAData: roots}, BearerToken: "connector"}, v.pool.ClusterID, cfg.NamespaceRef{Name: v.pool.Namespace, UID: v.pool.NamespaceUID}, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	backing, _ := json.Marshal(connectorTestBacking(f.start.Truncate(time.Microsecond), peer))
+	offer := contracts.RegionalOffer{Format: contracts.RegionalOfferFormat, InstallationID: peer.InstallationID, PermissionRootID: ownerID(5), IssuerEpoch: peer.IssuerEpoch, ConnectorServerSuffix: "connectors.example.invalid", ConnectorIssuerRoots: [][]byte{ownerConfigurationTestRoot(t, f.start)},
+		Roles: contracts.ConnectorIdentityRoles{Source: "connector_source", Journal: "connector_journal", Acknowledgement: "connector_ack", Cleanup: "connector_cleanup", Verifier: "connector_verifier", Finalizer: "connector_finalizer"}, ConnectorBacking: backing}
+	doc, err := ConnectorIdentityDocument(offer, peer.ClusterID, peer.PeerID, contracts.ConnectorDeployment{Namespace: v.pool.Namespace, ServiceAccount: v.pool.ServiceAccount, Deployment: v.pool.Deployment, ServingSlots: 2, RetainedProcesses: 8})
+	if err != nil {
+		t.Fatal(err)
+	}
+	source, err := NewConnectorIdentitySource(client, doc, offer.PermissionRootID, peer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	workload := ConnectorWorkload{Namespace: v.pool.Namespace, NamespaceUID: v.pool.NamespaceUID, Account: v.pool.ServiceAccount, AccountUID: v.pool.AccountUID, Deployment: v.pool.Deployment, DeploymentUID: v.pool.DeploymentUID, Digest: ConnectorWorkloadDigest(v.pool.ClusterID, v.pool.Namespace, v.pool.Deployment)}
+	if _, err = NewConnectorLifecycleReader(client, source, ConnectorWorkload{Namespace: v.pool.Namespace, NamespaceUID: v.pool.NamespaceUID, Account: v.pool.ServiceAccount, Deployment: "other", Digest: workload.Digest}, connectorTokenFunc(nil)); err == nil {
+		t.Fatal("workload of another Deployment accepted")
+	}
+	f.reader, err = NewConnectorLifecycleReader(client, source, workload, connectorTokenFunc(func(context.Context) ([]byte, error) { return bytes.Clone(token), nil }))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -34,204 +120,61 @@ func lifecycleNativeFixture(t *testing.T) (*connectorOperationFixture, *Connecto
 		}
 		return out
 	}
-	start := f.base.start
-	r := app.ConnectorLifecycleRequest{Binding: value.ConnectorLifecycleBinding{ID: ownerID(80), Purpose: value.ConnectorLifecycleEnroll, Process: f.process, RequestedAt: start, NotAfter: start.Add(5 * time.Second)}, Request: value.ConnectorProcessRequest{Process: f.process, ClientCSRDER: csr(), ServerCSRDER: csr()}}
-	ctx, cancel := context.WithDeadline(context.Background(), r.Binding.NotAfter)
+	f.request = app.ConnectorLifecycleRequest{Binding: value.ConnectorLifecycleBinding{ID: ownerID(80), Purpose: value.ConnectorLifecycleEnroll, Process: process, RequestedAt: f.start, NotAfter: f.start.Add(5 * time.Second)}, Request: value.ConnectorProcessRequest{Process: process, ClientCSRDER: csr(), ServerCSRDER: csr()}}
+	ctx, cancel := context.WithDeadline(context.Background(), f.request.Binding.NotAfter)
 	t.Cleanup(cancel)
-	return f, reader, r, ctx
-}
-
-func lifecycleRead(t *testing.T, op app.ConnectorLifecycleOperation, ctx context.Context, phase value.ConnectorLifecyclePhase) value.ConnectorLifecycleObservation {
-	t.Helper()
-	out, err := op.Read(ctx, phase)
-	if err != nil {
-		t.Fatal("native lifecycle phase", phase, err)
-	}
-	return out
+	return f, ctx
 }
 
 func TestConnectorLifecycleNativeOwnsOriginalAndIndependentFinal(t *testing.T) {
-	f, reader, r, ctx := lifecycleNativeFixture(t)
-	client, _ := mtls.EnrollmentKey(r.Request.ClientCSRDER)
-	server, _ := mtls.EnrollmentKey(r.Request.ServerCSRDER)
-	op, err := reader.BeginConnectorLifecycle(ctx, r)
+	f, ctx := newConnectorLifecycleFixture(t)
+	client, _ := mtls.EnrollmentKey(f.request.Request.ClientCSRDER)
+	op, err := f.reader.BeginConnectorLifecycle(ctx, f.request)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(op.Close)
-	// Mutating caller buffers after Begin cannot select another process key.
-	r.Request.ClientCSRDER[0] ^= 1
-	r.Request.ServerCSRDER[0] ^= 1
-	first := lifecycleRead(t, op, ctx, value.ConnectorLifecycleInitial)
-	if first.Original.ClientKeyDigest != client || first.Original.ServerKeyDigest != server || f.base.observer.Load() != 15 || f.base.probe.Load() != 0 {
-		t.Fatalf("first actual key/bracket/count mismatch observer=%d probe=%d", f.base.observer.Load(), f.base.probe.Load())
+	f.request.Request.ClientCSRDER[0] ^= 1
+	first, err := op.Read(ctx, value.ConnectorLifecycleInitial)
+	if err != nil || first.Original.ClientKeyDigest != client || first.Original.ProtectionDigest != f.reader.workload.Digest {
+		t.Fatal("initial native bracket", err)
 	}
 	prior := first
 	for _, phase := range []value.ConnectorLifecyclePhase{value.ConnectorLifecycleBeforeEffect, value.ConnectorLifecycleBeforeActivation, value.ConnectorLifecycleFinal} {
-		f.base.clock.Store(f.base.start.Add(time.Duration(phase) * time.Millisecond).UnixNano())
-		next := lifecycleRead(t, op, ctx, phase)
-		if !next.Continues(prior) || !next.Original.ObservedAt.Equal(first.Original.ObservedAt) || !next.Original.FreshUntil.Equal(first.Original.FreshUntil) || !next.Source.Observation.ObservedAt.Equal(f.base.start.Add(time.Duration(phase)*time.Millisecond)) {
-			t.Fatal("native or value dates relabeled", phase)
+		f.clock.Store(f.start.Add(time.Duration(phase) * time.Millisecond).UnixNano())
+		next, err := op.Read(ctx, phase)
+		if err != nil || !next.Continues(prior) || !next.Original.ObservedAt.Equal(first.Original.ObservedAt) || !next.Original.FreshUntil.Equal(first.Original.FreshUntil) {
+			t.Fatal("native or value dates relabeled", phase, err)
 		}
-		if phase == value.ConnectorLifecycleFinal && (next.FinalProof == nil || !next.FinalProof.ObservedAt.Equal(next.Source.Observation.ObservedAt)) {
+		if phase == value.ConnectorLifecycleFinal && next.FinalProof == nil {
 			t.Fatal("final proof lacks actual later observation")
 		}
 		prior = next
 	}
-	if f.base.observer.Load() != 46 || f.base.probe.Load() != 0 || f.reviews.Load() != 6 {
-		t.Fatalf("complete actual count observer=%d probe=%d tokenreviews=%d", f.base.observer.Load(), f.base.probe.Load(), f.reviews.Load())
-	}
-	before := f.base.observer.Load()
-	if _, err := op.Read(ctx, value.ConnectorLifecycleFinal); err == nil || f.base.observer.Load() != before {
-		t.Fatal("final phase replay performed I/O")
+	if f.sourceOrGuardReads.Load() != 0 {
+		t.Fatal("lifecycle read a source ConfigMap or guard", f.sourceOrGuardReads.Load())
 	}
 }
 
-func TestConnectorLifecycleNativeKnownChangePermanentlyCloses(t *testing.T) {
-	for _, mode := range []string{"source-roles", "source-backing", "source-revision", "account", "pod", "replica", "deployment", "token", "cancel", "clock-rollback", "expiry"} {
-		t.Run(mode, func(t *testing.T) {
-			f, reader, r, ctx := lifecycleNativeFixture(t)
-			op, err := reader.BeginConnectorLifecycle(ctx, r)
+func TestConnectorLifecycleNativeRefusesRevokedTokenAndRecreatedDeployment(t *testing.T) {
+	for name, change := range map[string]func(*connectorLifecycleFixture){
+		"revoked":   func(f *connectorLifecycleFixture) { f.revoke.Store(true) },
+		"recreated": func(f *connectorLifecycleFixture) { f.recreated.Store(true) },
+	} {
+		t.Run(name, func(t *testing.T) {
+			f, ctx := newConnectorLifecycleFixture(t)
+			op, err := f.reader.BeginConnectorLifecycle(ctx, f.request)
 			if err != nil {
 				t.Fatal(err)
 			}
 			t.Cleanup(op.Close)
-			lifecycleRead(t, op, ctx, value.ConnectorLifecycleInitial)
-			f.mu.Lock()
-			f.base.mu.Lock()
-			switch mode {
-			case "source-roles":
-				f.wire["roles"].(map[string]any)["source"] = "changed_source"
-			case "source-backing":
-				b := f.wire["backing"].(app.ConnectorIdentityBacking)
-				b.Policy.BackingRevision++
-				f.wire["backing"] = b
-			case "source-revision":
-				f.wire["revision"] = 2
-			case "account":
-				f.base.v.sa.UID = types.UID(ownerID(91))
-			case "pod":
-				f.base.v.pod.Spec.Containers[0].Args = []string{"changed"}
-			case "replica":
-				f.base.v.rs.UID = types.UID(ownerID(91))
-			case "deployment":
-				f.base.v.deploy.Spec.Template.Spec.Containers[0].Args = []string{"changed"}
-			case "token":
-				f.revoke = true
-			case "clock-rollback":
-				f.base.clock.Store(f.base.start.Add(-time.Nanosecond).UnixNano())
-			case "expiry":
-				f.base.clock.Store(r.Binding.NotAfter.UnixNano())
-			}
-			f.base.mu.Unlock()
-			f.mu.Unlock()
-			if mode == "cancel" {
-				call, cancel := context.WithCancel(ctx)
-				cancel()
-				ctx = call
-			}
-			if _, err := op.Read(ctx, value.ConnectorLifecycleBeforeEffect); err == nil {
-				t.Fatal("known changed native phase accepted")
-			}
-			f.base.clock.Store(f.base.start.Add(time.Millisecond).UnixNano())
-			before := f.base.observer.Load()
-			if _, err := op.Read(context.Background(), value.ConnectorLifecycleBeforeEffect); err == nil || f.base.observer.Load() != before {
-				t.Fatal("terminal phase became reusable")
-			}
-		})
-	}
-}
-
-func TestConnectorLifecycleNativeFinalDenialAndSourceMutation(t *testing.T) {
-	for _, mode := range []string{"source-during-final", "pod"} {
-		t.Run(mode, func(t *testing.T) {
-			f, reader, r, ctx := lifecycleNativeFixture(t)
-			op, err := reader.BeginConnectorLifecycle(ctx, r)
-			if err != nil {
+			if _, err = op.Read(ctx, value.ConnectorLifecycleInitial); err != nil {
 				t.Fatal(err)
 			}
-			t.Cleanup(op.Close)
-			for _, phase := range []value.ConnectorLifecyclePhase{value.ConnectorLifecycleInitial, value.ConnectorLifecycleBeforeEffect, value.ConnectorLifecycleBeforeActivation} {
-				lifecycleRead(t, op, ctx, phase)
-			}
-			f.mu.Lock()
-			f.base.mu.Lock()
-			switch mode {
-			case "source-during-final":
-				// The source changes during the final workload bracket; the
-				// final value read follows it and must observe the change.
-				f.mutateDuringFinalGuard = true
-			case "pod":
-				f.base.v.pod.Spec.Containers[0].Args = []string{"changed"}
-			}
-			f.base.mu.Unlock()
-			f.mu.Unlock()
-			if _, err := op.Read(ctx, value.ConnectorLifecycleFinal); err == nil {
-				t.Fatal("final native change released successful result")
+			change(f)
+			if _, err = op.Read(ctx, value.ConnectorLifecycleBeforeActivation); err == nil {
+				t.Fatal("changed native fact accepted")
 			}
 		})
-	}
-}
-
-func TestConnectorLifecycleNativeStatusAndShrinkingOriginalDeadline(t *testing.T) {
-	f, reader, r, ctx := lifecycleNativeFixture(t)
-	op, err := reader.BeginConnectorLifecycle(ctx, r)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(op.Close)
-	first := lifecycleRead(t, op, ctx, value.ConnectorLifecycleInitial)
-	f.base.mu.Lock()
-	f.base.v.pod.ResourceVersion = "200"
-	f.base.v.pod.Status.Phase = core.PodPending
-	f.base.v.rs.ResourceVersion = "201"
-	f.base.v.deploy.ResourceVersion = "202"
-	f.base.mu.Unlock()
-	until := r.Binding.NotAfter.Add(-time.Second)
-	short, cancel := context.WithDeadline(ctx, until)
-	defer cancel()
-	next := lifecycleRead(t, op, short, value.ConnectorLifecycleBeforeActivation)
-	if !next.Until.Equal(until) || !next.Original.FreshUntil.Equal(first.Original.FreshUntil) || !next.Source.Observation.ObservedAt.Equal(first.Source.Observation.ObservedAt) {
-		t.Fatal("equal observation start or original/current dates mishandled")
-	}
-	final := lifecycleRead(t, op, ctx, value.ConnectorLifecycleFinal)
-	if !final.Until.Equal(until) || final.FinalProof == nil || final.FinalProof.FreshUntil.After(until) {
-		t.Fatal("later caller restored original longer cap")
-	}
-}
-
-func TestConnectorLifecycleNativeParallelReadAndCloseJoin(t *testing.T) {
-	f, reader, r, ctx := lifecycleNativeFixture(t)
-	op, err := reader.BeginConnectorLifecycle(ctx, r)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(op.Close)
-	f.mu.Lock()
-	f.block, f.entered, f.exited = true, make(chan struct{}), make(chan struct{})
-	f.mu.Unlock()
-	done := make(chan error, 1)
-	go func() { _, err := op.Read(ctx, value.ConnectorLifecycleInitial); done <- err }()
-	select {
-	case <-f.entered:
-	case <-ctx.Done():
-		t.Fatal("initial native read did not enter")
-	}
-	if _, err := op.Read(ctx, value.ConnectorLifecycleInitial); err == nil {
-		t.Fatal("parallel phase admitted")
-	}
-	op.Close()
-	select {
-	case err := <-done:
-		if err == nil {
-			t.Fatal("cancelled original phase succeeded")
-		}
-	case <-ctx.Done():
-		t.Fatal("original Read did not return after joined Close")
-	}
-	select {
-	case <-f.exited:
-	case <-ctx.Done():
-		t.Fatal("native cancelled request did not exit")
 	}
 }

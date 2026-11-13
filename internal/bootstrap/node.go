@@ -56,6 +56,14 @@ func readNodeDeployment(ctx context.Context) (contracts.NodeDeployment, *x509.Ce
 	if err != nil {
 		return contracts.NodeDeployment{}, nil, mounts.ErrUnavailable
 	}
+	if d.Connector.RootsPEM == "" {
+		// The connector publishes its listener root next to node.json.
+		pem, err := mounts.Read(ctx, root, contracts.NodeConnectorRootFile, 16<<10)
+		if err != nil {
+			return contracts.NodeDeployment{}, nil, mounts.ErrUnavailable
+		}
+		d.Connector.RootsPEM = string(pem)
+	}
 	roots, err := validNodeDeployment(d)
 	return d, roots, err
 }
@@ -65,7 +73,7 @@ func validNodeDeployment(d contracts.NodeDeployment) (*x509.CertPool, error) {
 		return nil, mounts.ErrUnavailable
 	}
 
-	if d.Format != contracts.NodeDeploymentFormat || !authorization.UUID(d.InstallationID) || !authorization.UUID(d.ClusterID) ||
+	if d.Format != contracts.NodeDeploymentFormat || !authorization.UUID(d.ClusterID) ||
 		!node.DomainCeilings(d.Ceilings).Valid() || d.Connector.ServerName == "" || len(d.Connector.ServerName) > 253 {
 		return nil, mounts.ErrUnavailable
 	}

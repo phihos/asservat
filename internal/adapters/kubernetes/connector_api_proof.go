@@ -225,9 +225,6 @@ func (g *ConnectorAPIExecutionProtection) recheckNative(call context.Context, p 
 	if e != nil || !ownerMetadata(account.ObjectMeta, s.Namespace, s.Account, s.AccountUID) {
 		return cfg.ErrChanged
 	}
-	if e = g.snapshot(call); e != nil {
-		return e
-	}
 	if e = g.workload(call, p.proof); e != nil {
 		return e
 	}

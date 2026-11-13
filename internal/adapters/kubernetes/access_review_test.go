@@ -191,17 +191,3 @@ func TestIdentityMappingsAreBoundedLocalRecords(t *testing.T) {
 		t.Error("duplicate name accepted")
 	}
 }
-
-// Only a cluster with identity mappings grants its connector review create.
-func TestRegionalReviewRBACIsSubjectAccessReviewCreateOnly(t *testing.T) {
-	r := regionalReviewRBAC()
-	if !slices.Equal(r.APIGroups, []string{"authorization.k8s.io"}) || !slices.Equal(r.Resources, []string{"subjectaccessreviews"}) || !slices.Equal(r.Verbs, []string{"create"}) || len(r.ResourceNames) != 0 {
-		t.Fatalf("review rule %+v", r)
-	}
-	cluster, connector, _ := regionalExecutorRBAC("region")
-	for _, rule := range append(cluster, connector...) {
-		if slices.Contains(rule.Resources, "subjectaccessreviews") {
-			t.Fatal("executor RBAC grants review create without identity mappings")
-		}
-	}
-}

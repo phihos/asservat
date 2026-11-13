@@ -34,7 +34,7 @@ func TestConnectorCredentialIssuerPinsProviderPurposeBeforeRequest(t *testing.T)
 			digest, _ := mtls.EnrollmentKey(csr)
 			binding := value.PeerBinding{InstallationID: id, ClusterID: id, IssuerEpoch: id, PeerID: id, Role: value.ConnectorPeer}
 			uri, _ := mtls.PeerURI(binding)
-			profile := value.ConnectorCredentialProfile{Deployment: value.ConnectorDeployment{Namespace: "connector", NamespaceUID: id, ServiceAccount: "connector", AccountUID: id, Deployment: "connector", DeploymentUID: id, ServingSlots: 2, RetainedProcesses: 8}, RootID: id, Binding: binding, Revision: identity.Revision{UID: id, Generation: 1, Digest: [32]byte{1}}, ProtectionDigest: artifact.Digest{1}, ServerName: "connector.example.invalid", ClientIssuerRoots: [][]byte{der}, ServerIssuerRoots: [][]byte{der}}
+			profile := value.ConnectorCredentialProfile{Deployment: value.ConnectorDeployment{Namespace: "connector", ServiceAccount: "connector", Deployment: "connector", ServingSlots: 2, RetainedProcesses: 8}, RootID: id, Binding: binding, Revision: identity.Revision{UID: id, Generation: 1, Digest: [32]byte{1}}, ProtectionDigest: artifact.Digest{1}, ServerName: "connector.example.invalid", ClientIssuerRoots: [][]byte{der}, ServerIssuerRoots: [][]byte{der}}
 			claimed := n
 			if usage == "client" {
 				claimed = n.Add(-29 * time.Minute)

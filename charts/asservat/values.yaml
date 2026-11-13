@@ -126,101 +126,75 @@ bootstrap:
     unwrapRole: asservat-install-unwrap
     unwrapPolicy: asservat-install-decrypt
 
-# ADR-193: with mode=cluster, a post-install/post-upgrade hook installs one
-# regional connector through `asservat installer-cluster --in-cluster`. The
-# external branch uses its release-scoped installer as trusted administrator.
-# The selected bundled branch reuses the original hub bootstrap account.
-cluster:
-  enabled: false
-  namespace: asservat-connector
-  image: ""
-  registrySecret: ""
-  # Explicit same-API enrollment with the original bundled hub's trusted runner.
-  # Use the exact bootstrapID issued through /fleet; this never issues one.
-  # Manual offer/bootstrapSecret/evidenceSecret must stay empty in this mode.
-  bundledHub: ""
-  bootstrapID: ""
-  offer: ""
-  bootstrapSecret: ""
-  # Existing operator Secret: evidence-storage.json is the write-only evidence
-  # capability; history-storage.json is separately restricted to history metadata
-  # read/write/inventory/delete. Both are required for a regional executor.
-  evidenceSecret: ""
-  # ADR-231: optional in-cluster Alertmanager base URL (http or https, no
-  # credentials) that alert DebugPolicies on this cluster read, for example
-  # http://alertmanager-operated.monitoring.svc:9093. Regional executor only.
-  # It is a fixed regional input: changing it needs a connector reinstall.
-  alertmanager: ""
-  # ADR-245: identity mapping records for decision-time PermissionSources
-  # (kubernetesExec, kubernetesAccessReview) whose identityMappingRef names
-  # one. Each maps the hub's authenticated principal of `issuer` to this
-  # cluster's Kubernetes identity: user = usernamePrefix + the OIDC subject,
-  # groups = groupsPrefix + each current stable group ID (omit groupsPrefix to
-  # send no groups), uid = the subject when uid is true. Match the cluster's
-  # own OIDC authenticator; display names and e-mail are never used. With
-  # records the connector account gains SubjectAccessReview create.
-  # Regional executor only; changing them needs a connector reinstall.
-  identityMappings: []
-  # - name: company-oidc-to-cluster
-  #   issuer: https://identity.example.invalid/realms/company
-  #   usernamePrefix: "oidc:"
-  #   groupsPrefix: "oidc:"
-  # ADR-285: administrator Go pprof endpoint templates and profiles. A
-  # template permits address modes and a port range; maintainers bind it to a
-  # declared Pod port by name in a capture profile's endpointBindings (the
-  # builtin go-cpu/v1 binds go-pprof-loopback to the port named diagnostics).
-  # A profile fixes one address mode and port. Paths are the fixed
-  # /debug/pprof allowlist; there is no URL, path, header or credential.
-  # namespaces limits an entry to those namespace names (empty: all).
-  # targetLoopback needs loopbackFamily. Previews resolve them without
-  # dialing. Regional executor only; changing them needs a connector reinstall.
-  # Optional tls: {serverName, rootsPEM} supplies explicit public certificate
-  # roots (8 KiB per entry; existing 64 KiB aggregate JSON cap still applies).
-  # Upgrade connectors before collectors; TLS needs a profileTLS-capable node.
-  # TLS installed qualification is pending; authentication stays unsupported.
-  # Optional credential: {audiences: [{clusterID, namespaceUID, workloadKind,
-  # workloadUID}]} requires TLS. Private header values go in the existing
-  # evidenceSecret's profile-authorization.json, never Helm values (ADR-302).
-  profileEndpoints: []
-  # - name: go-pprof-loopback
-  #   kind: template
-  #   addressModes: [targetLoopback]
-  #   loopbackFamily: ipv4
-  #   minPort: 6060
-  #   maxPort: 6060
+# Object name prefix shared by every component (`<name>-<component>`).
+installation:
+  name: asservat
 
-# ADR-246 (S-04 increment 3): the `asservat node` collector DaemonSet, with
-# mode=cluster or mode=combined. Its namespace is the only one created with
-# the privileged Pod Security exception; workload namespaces stay restricted.
-# Off by default. Until the collector is qualified, every collector Pod mounts
-# the host file /etc/asservat-disposable-host (hostPath type File) and the
-# process checks it again, so the collector cannot start on a host without it.
-# Only disposable CI runners and VM images create that file. In this version
-# the collector probes its node and reports status; it records nothing.
+# The product image, pinned by digest (repository@digest).
+image:
+  repository: ""
+  digest: ""
+  pullPolicy: IfNotPresent
+  pullSecrets: []
+
+# Regional connector (mode=cluster or mode=combined). Issue a cluster
+# bootstrap in the console (Fleet), then set clusterID and peerID from the
+# receipt and store the bootstrap record as `bootstrap.json` in an existing
+# Secret named by bootstrapSecret. The connector seeds its rotating cluster
+# credential from that record once, within the record's five minutes; after
+# enrollment the record Secret may be deleted.
+region:
+  enabled: false
+  clusterID: ""
+  peerID: ""
+  bootstrapSecret: ""
+  # mode=cluster only: the hub's public regional-offer.json
+  # (`--set-file region.offer=regional-offer.json`).
+  offer: ""
+  # mode=combined only: the hub's offer ConfigMap in the release namespace
+  # and the in-cluster addresses the connector dials. Empty values use the
+  # chart's Service names.
+  offerConfigMap: ""
+  hub:
+    federation: ""
+    owners: ""
+    keyService: ""
+  # Regional context start (ADR-171), used when the offer names the
+  # regional executor.
+  executor:
+    enabled: true
+    concurrency: 4
+    # Empty uses the API server's default token audience.
+    capacityAudience: ""
+    # mode=cluster: existing Secret with evidence-storage.json and
+    # history-storage.json (and profile-authorization.json with
+    # profileAuthorization). mode=combined uses `<name>-s3-regional-write`
+    # and `<name>-s3-regional-history` (key credentials.json).
+    evidenceSecret: ""
+    profileAuthorization: false
+    # ADR-231: in-cluster Alertmanager base URL for alert policies.
+    alertmanager: ""
+    # ADR-245: identity mapping records (adds SubjectAccessReview create).
+    identityMappings: []
+    # ADR-285: administrator Go pprof endpoint templates and profiles.
+    profileEndpoints: []
+  resources:
+    requests: {cpu: 100m, memory: 64Mi}
+    limits: {cpu: 500m, memory: 256Mi}
+  nodeSelector: {}
+  tolerations: []
+
+# ADR-246: the `asservat node` collector DaemonSet, with mode=cluster or
+# mode=combined and region.enabled. Its namespace is the only one created
+# with the privileged Pod Security exception. Until the collector is
+# qualified, every collector Pod mounts the host file
+# /etc/asservat-disposable-host and the process checks it again.
 collector:
   enabled: false
   namespace: asservat-collector
-  # The exact product repository@sha256 digest of the collector image (built
-  # with the gadget tag).
-  image: ""
-  registrySecret: ""
-  installationID: ""
-  clusterID: ""
-  # The connector's node listener (port 8444), the name its server
-  # certificate carries and the PEM roots that issued it. With cluster.enabled
-  # leave all three empty: this release's cluster installer provisions the
-  # listener and publishes them in the connector-nodes ConfigMap, read on the
-  # next helm upgrade (the first install creates only namespace and account).
-  connector:
-    endpoint: ""
-    serverName: ""
-    rootsPEM: ""
-  # The local administrator's collector-wide ceilings per node (bytes):
-  # source rings, frozen snapshots awaiting upload, upload rate and burst. A
-  # budget policy's node limits can only lower them. The container memory
-  # limit is ringBytes + frozenBytes + 128 MiB.
+  # Collector-wide ceilings per node (bytes); a budget policy can only lower
+  # them. The container memory limit is ringBytes + frozenBytes + 128 MiB.
   ceilings:
-    # Development reference only; ongoing sources remain unqualified.
     maxActiveSources: 16
     inputBytesPerSecond: 16777216
     inputBurstBytes: 16777216
@@ -228,18 +202,21 @@ collector:
     frozenBytes: 268435456
     uploadBytesPerSecond: 33554432
     uploadBurstBytes: 67108864
-  # Existing node live-projection processing ceilings; null disables the
-  # mechanism. This is separate from hub delivery.liveRead viewer authority.
   live: null
-  # Optional encrypted-disk ring medium (ADR-278). When enabled, the collector
-  # gets a node-local emptyDir of exactly bytes; ring segments beyond the one
-  # being written are sealed there with a per-ring in-memory key, so a restart
-  # makes them unreadable. The collector admits disk rings only while they fit
-  # in bytes, so the emptyDir limit (which would evict the Pod) is never hit.
-  # Plans asking for ring.medium encryptedDisk get MediumUnavailable otherwise.
   ringDisk:
     enabled: false
     bytes: 1073741824
+
+hub:
+  # Download workers (ADR-069) run as Jobs that hub-api dispatches into the
+  # dedicated `<name>-downloads` namespace; Helm renders the namespace,
+  # account, PriorityClass, the worker configuration and the dispatch Roles.
+  # Enable together with the Helm-rendered hub-api (it needs image.*).
+  downloadWorker:
+    enabled: false
+    cpuMillis: 500
+    memoryBytes: 402653184
+    maxRuntimeSeconds: 3600
 
 # Independently selectable dependencies. External choices use the existing
 # bootstrap provider inputs and are never provisioned or adopted by this chart.

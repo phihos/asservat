@@ -165,7 +165,7 @@ func TestNodeCollectorWithRealKubernetes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	attester, err := kube.NewNodeAttester(client, f.InstallationID, f.DaemonSet, f.ServiceAccount)
+	attester, err := kube.NewNodeAttester(client, f.DaemonSet, f.ServiceAccount)
 	if err != nil {
 		t.Fatal(err)
 	}

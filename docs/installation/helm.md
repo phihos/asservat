@@ -334,141 +334,91 @@ finite bounds. Leaving the field unavailable would require hand-editing the
 installer input outside the official Helm path. No new runtime mechanism or
 configuration for tuning machinery is introduced.
 
-## Add a regional cluster (`mode=cluster`)
+## Add a regional cluster (`mode=cluster` or `mode=combined`)
 
-[ADR-193](../decisions/193-installed-federation-and-regional-enrollment.md)
-installs one regional connector per workload cluster. It needs three inputs:
+Helm renders the regional connector: its account, RBAC, configuration,
+Deployment and an empty cluster credential Secret. There is no installer Job.
 
-1. **The hub's offer.** Copy `regional-offer.json` from the hub's
-   `asservat-<installation>-regional-offer` ConfigMap. It is public.
-2. **A bootstrap record.** A fleet operator issues a bootstrap slot. Read its
-   record from the bootstrap KV channel with your own OpenBao access, and
-   store it as `bootstrap.json` in a Secret in the release namespace. The
-   record is valid for five minutes and works once; never put it in values.
-3. **The product image**, pinned by digest.
-
-```sh
-kubectl --context REGION create secret generic operator-bootstrap   --namespace asservat-region --from-file=bootstrap.json
-helm upgrade --install asservat oci-or-path/asservat --kube-context REGION   --namespace asservat-region --set mode=cluster --set cluster.enabled=true   --set cluster.image=REGISTRY/asservat@sha256:DIGEST   --set cluster.bootstrapSecret=operator-bootstrap   --set-file cluster.offer=regional-offer.json
-```
-
-The post-install hook runs `asservat installer-cluster --in-cluster`. It
-creates the connector namespace (default `asservat-connector`), the account,
-its RBAC, the Deployment at zero replicas, both guards, the source, the
-generation-0 credential Secret and `regional-inputs`. The release's installer
-account becomes the guards' administrator. The connector is ungated only
-after both guards are proven with its own token. It then enrolls in-band with
-the hub. Upgrades rerun the hook, which reopens identical objects and changes
-nothing. A failed hook prints its installer step and a closed cause. The
-installer account is the only administrator of the connector objects; even a
-cluster administrator's writes there are denied, so change them with
-`helm upgrade`.
-
-Without Helm, run the same command from a workstation, where the guard
-administrator is your own identity. Apply the matching chart's CRDs in the
-regional cluster before issuing the five-minute bootstrap record, using the
-[existing administrator-owned CRD workflow](../../charts/asservat/README.md#install-the-current-foundation).
-From this source checkout:
+1. In the console, issue a cluster bootstrap (Fleet). Note the receipt's
+   cluster ID and peer ID.
+2. Read the bootstrap record from the bootstrap KV channel with your own
+   OpenBao access and store it as `bootstrap.json` in a Secret in the release
+   namespace. The record is valid for five minutes and works once.
+3. Install or upgrade the release in the workload cluster.
 
 ```sh
-kubectl --context REGION apply --server-side \
-  --field-manager=asservat-crd-upgrade -f ./charts/asservat/crds
-kubectl --context REGION wait --for=condition=Established --timeout=60s \
-  crd/capacityreservations.asservat.io
+kubectl --context REGION -n asservat-region create secret generic operator-bootstrap --from-file=bootstrap.json
+helm upgrade --install asservat ./charts/asservat --kube-context REGION -n asservat-region \
+  --set mode=cluster --set region.enabled=true \
+  --set image.repository=REGISTRY/asservat --set image.digest=sha256:DIGEST \
+  --set region.clusterID=CLUSTER_ID --set region.peerID=PEER_ID \
+  --set region.bootstrapSecret=operator-bootstrap \
+  --set-file region.offer=regional-offer.json \
+  --set region.executor.evidenceSecret=operator-evidence
 ```
 
-After obtaining the bootstrap record:
+`regional-offer.json` is the hub's public regional offer. With an offer that
+names the regional executor, `region.executor.evidenceSecret` names an existing
+Secret with `evidence-storage.json` (write-only evidence capability) and
+`history-storage.json` (history-prefix capability).
 
-```sh
-asservat installer-cluster --context REGION --offer regional-offer.json   --bootstrap bootstrap.json
-```
+The connector seeds `<name>-cluster-credential` from the record once and then
+rotates the credential itself; Helm keeps that Secret on upgrade and
+uninstall. Exclude its data from GitOps diffs. After enrollment the bootstrap
+record Secret can be deleted. If the record expires first, issue a new
+bootstrap, replace the record, empty the credential Secret and restart the
+connector.
 
-An offer containing context execution requires the namespaced
-`CapacityReservation` API and its status subresource. The installer checks
-that the API is served before creating installation resources and reports
-`start-api` if the prerequisite is unavailable. This bounded discovery check
-does not validate the CRD schema or confer runtime authority. The operator
-or Helm retains CRD ownership; the installer creates or adopts no CRDs.
+With `mode=combined` (one cluster for hub and workloads, for example a
+homelab) the connector runs in the hub's release namespace, reads the hub's
+offer ConfigMap (`region.offerConfigMap`, default `<name>-regional-offer`) and
+dials the in-cluster Services of federation, hub-api and key service
+(`region.hub.*` override the defaults). It uses the generated
+`<name>-s3-regional-write` and `<name>-s3-regional-history` Secrets. Steps 1
+and 2 are the same; `region.offer` stays empty.
 
-Alert DebugPolicies ([ADR-231](../decisions/231-alert-detector.md)) read the
-cluster's own Alertmanager. To enable them, add
-`--set cluster.alertmanager=http://alertmanager-operated.monitoring.svc:9093`
-(or `installer-cluster --alertmanager URL`) with an executor offer. The
-connector sends unauthenticated `GET /api/v2/alerts` requests to that address;
-it follows no redirect and sends no credential. Alert rules must label alerts
-with the Pod's `namespace` and `pod`. The address is a fixed regional input:
-choose it at installation. Without it, activating an alert policy on that
-cluster is refused with `DetectorUnavailable`.
+Regional options under `region.executor`:
 
-Log and resource DebugPolicies ([ADR-241](../decisions/241-log-resource-detectors.md))
-need no installer option. The connector's ClusterRole includes `get` on
-`pods/log` and `list` on `pods.metrics.k8s.io` (the cluster-installer role holds
-both so that it may grant them). A log policy reads the container logs of its
-own workload's Pods only while it is active, and only match counts and times
-leave the cluster. A resource policy needs the Kubernetes metrics API, normally
-served by [metrics-server](https://github.com/kubernetes-sigs/metrics-server):
-without it, activation is refused with `DetectorUnavailable`. A connector
-installed by an earlier release lacks these permissions until it is installed
-again, and its log and resource polls stay Unknown.
+- `alertmanager` ([ADR-231](../decisions/231-alert-detector.md)): the cluster's
+  Alertmanager base URL for alert policies, for example
+  `http://alertmanager-operated.monitoring.svc:9093`. The connector sends
+  unauthenticated `GET /api/v2/alerts` requests and follows no redirect.
+- `identityMappings` ([ADR-245](../decisions/245-decision-time-permission-sources.md)):
+  records mapping the hub's principal to this cluster's OIDC identity
+  (`usernamePrefix` + OIDC `sub`, optional `groupsPrefix` + stable group IDs).
+  With records the connector account gets `create subjectaccessreviews`.
+- `profileEndpoints` ([ADR-285](../decisions/285-profile-preview-plans.md)) and
+  `profileAuthorization` (adds `profile-authorization.json` from the evidence
+  Secret).
 
-Exec and access-review inheritance ([ADR-245](../decisions/245-decision-time-permission-sources.md))
-needs an identity mapping record on the workload cluster, named by the
-PermissionSource's `identityMappingRef`:
-
-```yaml
-cluster:
-  identityMappings:
-    - name: company-oidc-to-cluster
-      issuer: https://identity.example.invalid/realms/company
-      usernamePrefix: "oidc:"   # the cluster's --oidc-username-prefix; the user is prefix + OIDC sub
-      groupsPrefix: "oidc:"     # omit to send no groups; groups are the stable group IDs
-```
-
-The record must match the cluster's own OIDC authenticator (username from the
-`sub` claim, groups from the stable group IDs Asservat receives). Display names
-and e-mail are never used. With records configured the connector account gets
-`create subjectaccessreviews`; it reviews only the authenticated user of a
-request for the exact Pod (or the configured workload/namespace check) and
-returns only the outcome. Like the Alertmanager address it is a fixed regional
-input (executor offer only). Without a matching record, decision-time sources
-of that cluster grant nothing.
-
-The regional cluster needs outbound HTTPS to the federation endpoint in the
-offer. The hub operator can pin the federation's node port with
-`federation.nodePort` so the endpoint is known before installation. If the
-bootstrap expires before the connector enrolls, issue a new one, delete the
-connector namespace and install again.
+Log and resource DebugPolicies
+([ADR-241](../decisions/241-log-resource-detectors.md)) use the connector's
+`get pods/log` and `list pods.metrics.k8s.io`; resource policies need the
+metrics API.
 
 ## Node collector (test hosts only)
 
-[ADR-246](../decisions/246-node-collector-role.md) adds the `collector` values (S-04 increment 3).
-They are off by default and are for the disposable S-04 test environment only:
+[ADR-246](../decisions/246-node-collector-role.md) adds the `collector` values.
+They are off by default, require `region.enabled` and are for disposable test
+environments only:
 
 - `collector.namespace` (default `asservat-collector`) is created with
-  `pod-security.kubernetes.io/enforce|audit|warn: privileged`. It must differ from the release,
-  connector, `default` and `kube-*` namespaces. Workload namespaces are not touched.
-- The DaemonSet runs `/asservat node` from the exact `collector.image` digest (built with the
-  `gadget` tag) as root without `privileged`, with `BPF`, `NET_ADMIN` and `SYS_RESOURCE`, host PID,
-  runtime-default seccomp/AppArmor and read-only mounts of the guard file, debugfs, tracefs and
-  bpffs. The collector account has no RBAC binding; its projected token has the audience
-  `asservat-node:<installationID>`.
-- `collector.connector` names the connector's node listener (port 8444), its certificate server
-  name and PEM roots. With `mode=cluster` and `cluster.enabled` in the same release, leave all
-  three empty: the cluster installer hook then provisions the listener (Secret, Service and the
-  attestation reads) and publishes the values in the ConfigMap `connector-nodes` of
-  `cluster.namespace`, which the chart reads through `lookup`. The hook runs after the first
-  render, so `helm install` creates only the collector namespace and account; run the same
-  `helm upgrade` once afterwards to start the DaemonSet. Enable the collector together with the
-  connector: adding it later changes the connector's fixed inputs and needs a connector
-  reinstall. With the operator CLI (`installer-cluster --collector-namespace <ns>
-  --collector-name <release>-node`, collector namespace created first) or `mode=combined`, copy
-  `.Nodes` from the installer output (or the ConfigMap's `endpoint`, `serverName`, `rootsPEM`)
-  into these values.
-- `collector.ceilings` are the per-node ring, frozen, upload-rate and burst ceilings; the
-  container memory limit is ring + frozen + 128 MiB.
+  `pod-security.kubernetes.io/enforce|audit|warn: privileged`. Workload
+  namespaces are not touched.
+- The DaemonSet runs `/asservat node` from `image` (built with the `gadget`
+  tag) as root without `privileged`, with the capabilities listed in the
+  template, host PID and read-only mounts of the guard file, debugfs, tracefs
+  and bpffs. Its projected token has the audience `asservat-node:<clusterID>`.
+- The connector generates its node listener pair once into
+  `<name>-connector-nodes` and publishes the issuing root into
+  `<name>-node-connector-ca` in the collector namespace; collector Pods start
+  once that root exists.
+- `collector.ceilings` are the per-node ring, frozen, upload-rate and burst
+  ceilings; the container memory limit is ring + frozen + 128 MiB.
 
-The kubelet starts a collector Pod only on a host with `/etc/asservat-disposable-host`. Never
-create that file on a workstation or shared cluster node; kind nodes share their host's kernel.
+The kubelet starts a collector Pod only on a host with
+`/etc/asservat-disposable-host`. Never create that file on a workstation or
+shared cluster node; kind nodes share their host's kernel.
 
 ## Production packaging contract
 

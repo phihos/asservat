@@ -2,7 +2,6 @@ package bootstrap
 
 import (
 	"context"
-	"crypto/tls"
 	"net"
 	"os"
 	"time"
@@ -10,43 +9,33 @@ import (
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/adapters/mounts"
 	"asservat.local/asservat/internal/contracts"
-	"asservat.local/asservat/internal/domain/authorization"
-	cfg "asservat.local/asservat/internal/domain/configuration"
-	"asservat.local/asservat/internal/domain/identity"
 )
 
 // regionalNodes is the connector's optional ADR-246 node listener. Its
-// Kubernetes reads (TokenReview, collector Pods/DaemonSet, Nodes) use the
-// observer account; the installer grants exactly those reads.
+// Kubernetes reads (TokenReview, collector Pods/DaemonSet, Nodes) and the
+// listener objects' get/update use the connector account; the chart grants
+// exactly those.
 type regionalNodes struct {
 	server   *NodeChannelServer
 	listener net.Listener
 }
 
-func validRegionalCollector(c contracts.RegionalDeployment) bool {
+func newRegionalNodes(ctx context.Context, c regionalConfig, in *providerInputs) (*regionalNodes, error) {
 	n := c.Collector
-	return n == nil || (identity.Text(n.Namespace.Name, 63) && authorization.UUID(n.Namespace.UID) && identity.Text(n.DaemonSet, 253) && identity.Text(n.ServiceAccount, 253))
-}
-
-func newRegionalNodes(ctx context.Context, c contracts.RegionalDeployment, in *providerInputs) (*regionalNodes, error) {
-	certPEM, err := in.read(ctx, contracts.RegionalNodeServerFile, 64<<10)
+	config := in.kubernetes(contracts.ConnectorKubeTokenFile)
+	server, err := kube.NodeListener{Namespace: c.Namespace, Secret: n.ListenerSecret, RootNamespace: n.Namespace, RootConfig: n.RootConfigMap, ServerName: n.ServerName}.Ensure(ctx, config)
 	if err != nil {
-		return nil, err
+		return nil, &fixedStepError{"node-listener", err}
 	}
-	keyPEM, err := in.read(ctx, contracts.RegionalNodeServerKeyFile, 16<<10)
-	defer clear(keyPEM)
+	workload, err := kube.ReadCollectorNamespace(ctx, config, n.Namespace)
 	if err != nil {
-		return nil, err
+		return nil, &fixedStepError{"node-namespace", err}
 	}
-	server, err := tls.X509KeyPair(certPEM, keyPEM)
+	client, err := kube.NewPermissionClient(config, c.ClusterID, workload, time.Now)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	client, err := kube.NewPermissionClient(in.kubernetes("kube-observer.token"), c.ClusterID, cfg.NamespaceRef{Name: c.Collector.Namespace.Name, UID: c.Collector.Namespace.UID}, time.Now)
-	if err != nil {
-		return nil, mounts.ErrUnavailable
-	}
-	attester, err := kube.NewNodeAttester(client, c.InstallationID, c.Collector.DaemonSet, c.Collector.ServiceAccount)
+	attester, err := kube.NewNodeAttester(client, n.DaemonSet, n.ServiceAccount)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}

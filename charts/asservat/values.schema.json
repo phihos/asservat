@@ -931,379 +931,12 @@
         }
       ]
     },
-    "cluster": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "enabled",
-        "namespace",
-        "image",
-        "registrySecret",
-        "offer",
-        "bootstrapSecret"
-      ],
-      "description": "ADR-193: mode=cluster installs one regional connector through installer-cluster as a post-install/post-upgrade hook.",
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
-        "namespace": {
-          "type": "string",
-          "maxLength": 63,
-          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
-          "description": "Connector namespace the installer creates; never kube-*."
-        },
-        "image": {
-          "type": "string",
-          "maxLength": 456,
-          "pattern": "^$|^[a-z0-9][a-z0-9./:_-]{0,383}@sha256:[a-f0-9]{64}$",
-          "description": "The exact product repository@sha256 digest of the installer Job; the connector image comes from the offer."
-        },
-        "registrySecret": {
-          "type": "string",
-          "maxLength": 253,
-          "pattern": "^$|^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$"
-        },
-        "offer": {
-          "type": "string",
-          "maxLength": 1048576,
-          "description": "The hub's public regional-offer.json."
-        },
-        "bootstrapSecret": {
-          "type": "string",
-          "maxLength": 253,
-          "pattern": "^$|^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$",
-          "description": "Existing operator Secret with bootstrap.json, the record read from the bootstrap channel. Never a chart value."
-        },
-        "evidenceSecret": {
-          "type": "string",
-          "maxLength": 253,
-          "pattern": "^$|^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$",
-          "description": "ADR-196: existing operator Secret with evidence-storage.json and separately scoped history-storage.json, the write-only regional evidence credential; required exactly when the offer names the regional executor. Never a chart value."
-        },
-        "alertmanager": {
-          "type": "string",
-          "maxLength": 512,
-          "pattern": "^$|^https?://[^/@?#\\s]+(/[^?#\\s]*)?$",
-          "description": "ADR-231: optional in-cluster Alertmanager base URL that alert DebugPolicies on this cluster read (v2 API, no credentials). Regional executor only."
-        },
-        "identityMappings": {
-          "type": "array",
-          "maxItems": 16,
-          "description": "ADR-245: connector-local identity mapping records referenced by kubernetesExec/kubernetesAccessReview PermissionSources (identityMappingRef). Regional executor only.",
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": [
-              "name",
-              "issuer",
-              "usernamePrefix"
-            ],
-            "properties": {
-              "name": {
-                "type": "string",
-                "pattern": "^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$"
-              },
-              "issuer": {
-                "type": "string",
-                "maxLength": 2048,
-                "pattern": "^https://[^\\s]+$"
-              },
-              "usernamePrefix": {
-                "type": "string",
-                "maxLength": 256,
-                "pattern": "^[!-~]*$"
-              },
-              "groupsPrefix": {
-                "type": "string",
-                "maxLength": 256,
-                "pattern": "^[!-~]*$"
-              },
-              "uid": {
-                "type": "boolean"
-              }
-            }
-          }
-        },
-        "profileEndpoints": {
-          "type": "array",
-          "maxItems": 64,
-          "description": "ADR-285: administrator Go profile endpoint templates (kind template: addressModes and a port range that maintainers bind to a declared Pod port) and profiles (kind profile: one addressMode and port). Fixed go-pprof/v1 paths; no URL, path or header values. Optional credential specifies only public exact workload audiences. Regional executor only.",
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": [
-              "name",
-              "kind"
-            ],
-            "properties": {
-              "name": {
-                "type": "string",
-                "pattern": "^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$"
-              },
-              "kind": {
-                "enum": [
-                  "template",
-                  "profile"
-                ]
-              },
-              "namespaces": {
-                "type": "array",
-                "maxItems": 64,
-                "uniqueItems": true,
-                "items": {
-                  "type": "string",
-                  "pattern": "^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$"
-                }
-              },
-              "addressModes": {
-                "type": "array",
-                "minItems": 1,
-                "maxItems": 2,
-                "uniqueItems": true,
-                "items": {
-                  "enum": [
-                    "targetLoopback",
-                    "podIP"
-                  ]
-                }
-              },
-              "minPort": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 65535
-              },
-              "maxPort": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 65535
-              },
-              "addressMode": {
-                "enum": [
-                  "targetLoopback",
-                  "podIP"
-                ]
-              },
-              "port": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 65535
-              },
-              "loopbackFamily": {
-                "enum": [
-                  "ipv4",
-                  "ipv6"
-                ]
-              },
-              "host": {
-                "type": "string",
-                "maxLength": 253,
-                "pattern": "^[a-z0-9.:\\[\\]-]+$"
-              },
-              "credential": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": [
-                  "audiences"
-                ],
-                "description": "ADR-302: public exact workload audiences; private values belong only in profile-authorization.json in the existing evidenceSecret.",
-                "properties": {
-                  "audiences": {
-                    "type": "array",
-                    "minItems": 1,
-                    "maxItems": 64,
-                    "uniqueItems": true,
-                    "items": {
-                      "type": "object",
-                      "additionalProperties": false,
-                      "required": [
-                        "clusterID",
-                        "namespaceUID",
-                        "workloadKind",
-                        "workloadUID"
-                      ],
-                      "properties": {
-                        "clusterID": {
-                          "type": "string",
-                          "format": "uuid"
-                        },
-                        "namespaceUID": {
-                          "type": "string",
-                          "format": "uuid"
-                        },
-                        "workloadKind": {
-                          "enum": [
-                            "Deployment",
-                            "StatefulSet",
-                            "Pod"
-                          ]
-                        },
-                        "workloadUID": {
-                          "type": "string",
-                          "format": "uuid"
-                        }
-                      }
-                    }
-                  }
-                }
-              },
-              "tls": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": [
-                  "serverName",
-                  "rootsPEM"
-                ],
-                "description": "ADR-299: explicit public certificate roots, never credentials. The installer checks canonical certificate syntax and the 8 KiB byte cap. Connector-first rollout; TLS-capable collectors required.",
-                "properties": {
-                  "serverName": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 253
-                  },
-                  "rootsPEM": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 8192
-                  }
-                }
-              }
-            },
-            "allOf": [
-              {
-                "if": {
-                  "required": [
-                    "credential"
-                  ]
-                },
-                "then": {
-                  "required": [
-                    "tls"
-                  ]
-                }
-              },
-              {
-                "if": {
-                  "properties": {
-                    "kind": {
-                      "const": "template"
-                    }
-                  }
-                },
-                "then": {
-                  "required": [
-                    "addressModes",
-                    "minPort",
-                    "maxPort"
-                  ],
-                  "not": {
-                    "anyOf": [
-                      {
-                        "required": [
-                          "addressMode"
-                        ]
-                      },
-                      {
-                        "required": [
-                          "port"
-                        ]
-                      }
-                    ]
-                  }
-                },
-                "else": {
-                  "required": [
-                    "addressMode",
-                    "port"
-                  ],
-                  "not": {
-                    "anyOf": [
-                      {
-                        "required": [
-                          "addressModes"
-                        ]
-                      },
-                      {
-                        "required": [
-                          "minPort"
-                        ]
-                      },
-                      {
-                        "required": [
-                          "maxPort"
-                        ]
-                      }
-                    ]
-                  }
-                }
-              }
-            ]
-          }
-        },
-        "bundledHub": {
-          "type": "string",
-          "maxLength": 30,
-          "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
-          "description": "Explicit original bundled hub bootstrap name in the same release namespace; selects its existing trusted runner."
-        },
-        "bootstrapID": {
-          "type": "string",
-          "pattern": "^$|^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}$",
-          "not": {
-            "const": "00000000-0000-0000-0000-000000000000"
-          },
-          "description": "Exact already-issued fleet bootstrap ID; only with bundledHub."
-        }
-      },
-      "allOf": [
-        {
-          "if": {
-            "properties": {
-              "bundledHub": {
-                "minLength": 1
-              }
-            },
-            "required": [
-              "bundledHub"
-            ]
-          },
-          "then": {
-            "properties": {
-              "bootstrapID": {
-                "minLength": 36
-              },
-              "offer": {
-                "const": ""
-              },
-              "bootstrapSecret": {
-                "const": ""
-              },
-              "evidenceSecret": {
-                "const": ""
-              }
-            }
-          },
-          "else": {
-            "properties": {
-              "bootstrapID": {
-                "const": ""
-              }
-            }
-          }
-        }
-      ]
-    },
     "collector": {
       "type": "object",
       "additionalProperties": false,
       "required": [
         "enabled",
         "namespace",
-        "image",
-        "registrySecret",
-        "installationID",
-        "clusterID",
-        "connector",
         "ceilings",
         "ringDisk"
       ],
@@ -1317,49 +950,6 @@
           "maxLength": 63,
           "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
           "description": "The collector namespace, the only one with the privileged Pod Security exception; never kube-*, default, the release or connector namespace."
-        },
-        "image": {
-          "type": "string",
-          "maxLength": 456,
-          "pattern": "^$|^[a-z0-9][a-z0-9./:_-]{0,383}@sha256:[a-f0-9]{64}$"
-        },
-        "registrySecret": {
-          "type": "string",
-          "maxLength": 253,
-          "pattern": "^$|^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$"
-        },
-        "installationID": {
-          "type": "string",
-          "pattern": "^$|^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
-        },
-        "clusterID": {
-          "type": "string",
-          "pattern": "^$|^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
-        },
-        "connector": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "endpoint",
-            "serverName",
-            "rootsPEM"
-          ],
-          "properties": {
-            "endpoint": {
-              "type": "string",
-              "maxLength": 512,
-              "pattern": "^$|^https://[^/@?#\\s]+/?$"
-            },
-            "serverName": {
-              "type": "string",
-              "maxLength": 253,
-              "pattern": "^$|^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$"
-            },
-            "rootsPEM": {
-              "type": "string",
-              "maxLength": 65536
-            }
-          }
         },
         "ceilings": {
           "type": "object",
@@ -1958,6 +1548,174 @@
         "identity",
         "keyService"
       ]
+    },
+    "installation": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "name": {
+          "type": "string",
+          "maxLength": 30,
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+        }
+      }
+    },
+    "image": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "repository": {
+          "type": "string",
+          "maxLength": 384
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^$|^sha256:[a-f0-9]{64}$"
+        },
+        "pullPolicy": {
+          "enum": [
+            "IfNotPresent",
+            "Always",
+            "Never"
+          ]
+        },
+        "pullSecrets": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 253,
+            "pattern": "^$|^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$"
+          }
+        }
+      }
+    },
+    "region": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Regional connector for mode=cluster or mode=combined.",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "clusterID": {
+          "type": "string",
+          "pattern": "^$|^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "peerID": {
+          "type": "string",
+          "pattern": "^$|^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "bootstrapSecret": {
+          "type": "string",
+          "maxLength": 253,
+          "pattern": "^$|^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$"
+        },
+        "offer": {
+          "type": "string",
+          "maxLength": 1048576
+        },
+        "offerConfigMap": {
+          "type": "string",
+          "maxLength": 253,
+          "pattern": "^$|^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$"
+        },
+        "hub": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "federation": {
+              "type": "string",
+              "maxLength": 512,
+              "pattern": "^$|^https://[^/@?#\\s]+/?$"
+            },
+            "owners": {
+              "type": "string",
+              "maxLength": 512,
+              "pattern": "^$|^[^/@?#\\s:]+:[0-9]{1,5}$"
+            },
+            "keyService": {
+              "type": "string",
+              "maxLength": 512,
+              "pattern": "^$|^https://[^/@?#\\s]+/?$"
+            }
+          }
+        },
+        "executor": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "concurrency": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 16
+            },
+            "capacityAudience": {
+              "type": "string",
+              "maxLength": 512
+            },
+            "evidenceSecret": {
+              "type": "string",
+              "maxLength": 253,
+              "pattern": "^$|^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$"
+            },
+            "profileAuthorization": {
+              "type": "boolean"
+            },
+            "alertmanager": {
+              "type": "string",
+              "maxLength": 2048
+            },
+            "identityMappings": {
+              "type": "array"
+            },
+            "profileEndpoints": {
+              "type": "array"
+            }
+          }
+        },
+        "resources": {
+          "type": "object"
+        },
+        "nodeSelector": {
+          "type": "object"
+        },
+        "tolerations": {
+          "type": "array"
+        }
+      }
+    },
+    "hub": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "downloadWorker": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "cpuMillis": {
+              "type": "integer",
+              "minimum": 50,
+              "maximum": 8000
+            },
+            "memoryBytes": {
+              "type": "integer",
+              "minimum": 67108864,
+              "maximum": 17179869184
+            },
+            "maxRuntimeSeconds": {
+              "type": "integer",
+              "minimum": 60,
+              "maximum": 86400
+            }
+          }
+        }
+      }
     }
   },
   "definitions": {
