@@ -64,7 +64,7 @@ func validRegionalCapacity(c contracts.RegionalDeployment) bool {
 
 // newRegionalCapacity builds the standby's inputs: its own observer and probe
 // clients with fresh guards over the same pinned plans, the selector guard
-// with the probe account's in-memory Pod-bound tokens, and the owner pin.
+// and the owner pin.
 func newRegionalCapacity(ctx context.Context, c contracts.RegionalDeployment, in *providerInputs, podUID string, workload cfg.OwnerWorkloadAdministration, sourcePlan cfg.ConfigMapAdministration, binding value.PeerBinding, lifecycle *RegionalLifecycle) (*regionalCapacity, []func(), error) {
 	var closers []func()
 	k := *c.Capacity
@@ -90,20 +90,11 @@ func newRegionalCapacity(ctx context.Context, c contracts.RegionalDeployment, in
 	if out.source, err = kube.NewConnectorIdentitySource(out.observer, protection, c.Source.Name, c.Source.UID, c.PermissionRootID, binding); err != nil {
 		return nil, closers, mounts.ErrUnavailable
 	}
-	tokens, err := kube.NewCapacityTokens(ctx, read, k.ProbeAccount.Name, k.ProbeAudience, podUID)
-	if err != nil {
-		return nil, closers, mounts.ErrUnavailable
-	}
-	closers = append(closers, tokens.Close)
-	selectorProbe, err := kube.NewPermissionClient(in.kubernetesToken(tokens.Token), c.ClusterID, probeNS, time.Now)
-	if err != nil {
-		return nil, closers, mounts.ErrUnavailable
-	}
 	_, name := kube.RegionalCapacityNames(c.Namespace.Name)
 	if name != k.NamespaceGuard.Name {
 		return nil, closers, mounts.ErrUnavailable
 	}
-	selector, err := kube.NewCapacityNamespaceGuard(read, selectorProbe, cfg.CapacityNamespaceAdministration{Name: name, Administrators: regionalActors(k.NamespaceGuard.Administrators), Keys: k.Keys,
+	selector, err := kube.NewCapacityNamespaceGuard(read, cfg.CapacityNamespaceAdministration{Name: name, Administrators: regionalActors(k.NamespaceGuard.Administrators), Keys: k.Keys,
 		ProbeNamespace: probeNS, ProbeAccount: cfg.NamespaceRef{Name: k.ProbeAccount.Name, UID: k.ProbeAccount.UID}}, regionalPin(k.NamespaceGuard))
 	if err != nil {
 		return nil, closers, mounts.ErrUnavailable
@@ -121,7 +112,7 @@ func newRegionalCapacity(ctx context.Context, c contracts.RegionalDeployment, in
 		if w.Guard.Name != kube.RegionalWorkloadGuardName(c.Namespace.Name) {
 			return nil, closers, mounts.ErrUnavailable
 		}
-		if workloadGuard, err = kube.NewWorkloadGuard(read, selectorProbe, cfg.WorkloadAdministration{Name: w.Guard.Name, Administrators: regionalActors(w.Guard.Administrators), LabelKeys: w.LabelKeys, AnnotationKeys: w.AnnotationKeys,
+		if workloadGuard, err = kube.NewWorkloadGuard(read, cfg.WorkloadAdministration{Name: w.Guard.Name, Administrators: regionalActors(w.Guard.Administrators), LabelKeys: w.LabelKeys, AnnotationKeys: w.AnnotationKeys,
 			ProbeNamespace: probeNS, ProbeAccount: cfg.NamespaceRef{Name: k.ProbeAccount.Name, UID: k.ProbeAccount.UID}}, regionalPin(w.Guard)); err != nil {
 			return nil, closers, mounts.ErrUnavailable
 		}

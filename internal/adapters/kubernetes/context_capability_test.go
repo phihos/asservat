@@ -18,9 +18,6 @@ import (
 	"asservat.local/asservat/internal/domain/authorization"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/identity"
-	admission "k8s.io/api/admissionregistration/v1"
-	authn "k8s.io/api/authentication/v1"
-	authz "k8s.io/api/authorization/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
 )
@@ -133,10 +130,11 @@ func (r *capabilityRecovery) RecoveryState(ctx context.Context) (artifact.Recove
 	return p, ctx.Err()
 }
 
-// Real loopback TLS and concrete protection/source adapters; recovery, server
-// admission replies and clock are synthetic. This is not native VAP proof.
+// Real loopback TLS and concrete protection/source adapters; recovery and
+// clock are synthetic. The server has no admission policy, review or dry-run
+// endpoint: the source is a plain ConfigMap read under ordinary RBAC.
 func TestContextCapabilityPreservesAllOriginalBounds(t *testing.T) {
-	for _, mode := range []string{"valid", "hub-held", "wrong-target", "wrong-epoch", "wrong-policy", "wrong-denial", "probe-admin", "rbac-denied", "guard-changed", "source-changed", "expired-final-guard", "short-recovery", "recovery-change", "cancelled"} {
+	for _, mode := range []string{"valid", "hub-held", "wrong-target", "wrong-epoch", "source-changed", "rbac-denied", "short-recovery", "recovery-change", "cancelled"} {
 		t.Run(mode, func(t *testing.T) {
 			installed := capabilityTestSettings()
 			if mode == "hub-held" { // ADR-179: the hub's own cluster holds a workload cluster's capability
@@ -144,72 +142,30 @@ func TestContextCapabilityPreservesAllOriginalBounds(t *testing.T) {
 			}
 			raw, _ := json.Marshal(installed)
 			plan := cfg.ConfigMapAdministration{Name: "capability-guard", ControlNamespace: permissionControl, SourceName: "context-capability", Administrators: []cfg.KubernetesActor{{Kind: "User", Name: "admin"}}}
-			p, b, err := ContextCapabilityAdmission(plan)
-			if err != nil {
-				t.Fatal(err)
-			}
-			p.UID = "policy"
-			p.Generation = 1
-			p.ResourceVersion = "1"
-			p.Status.ObservedGeneration = 1
-			p.Status.TypeChecking = &admission.TypeChecking{}
-			b.UID = "binding"
-			b.ResourceVersion = "1"
 			pin := GuardPin{PolicyUID: "policy", PolicyGeneration: 1, BindingUID: "binding", BindingResourceVersion: "1"}
 			clock := &atomic.Int64{}
 			start := time.Now().UTC()
 			clock.Store(start.UnixNano())
-			probes := 0
 			reads := 0
 			server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				if r.Header.Get("Authorization") != "Bearer synthetic-only" {
 					t.Error("wrong synthetic credential")
 				}
 				switch {
-				case strings.Contains(r.URL.Path, "/validatingadmissionpolicies/"):
-					obj := p.DeepCopy()
-					if mode == "wrong-policy" {
-						obj.UID = "other"
-					}
-					if mode == "guard-changed" && probes > 0 {
-						obj.ResourceVersion = "2"
-					}
-					permissionReply(w, obj)
-				case strings.Contains(r.URL.Path, "/validatingadmissionpolicybindings/"):
-					permissionReply(w, b)
-				case strings.HasSuffix(r.URL.Path, "/selfsubjectreviews"):
-					user := "outsider"
-					if mode == "probe-admin" {
-						user = "admin"
-					}
-					permissionReply(w, authn.SelfSubjectReview{TypeMeta: meta.TypeMeta{APIVersion: "authentication.k8s.io/v1", Kind: "SelfSubjectReview"}, Status: authn.SelfSubjectReviewStatus{UserInfo: authn.UserInfo{Username: user, Groups: []string{"authenticated"}}}})
-				case strings.HasSuffix(r.URL.Path, "/selfsubjectaccessreviews"):
-					permissionReply(w, authz.SelfSubjectAccessReview{TypeMeta: meta.TypeMeta{APIVersion: "authorization.k8s.io/v1", Kind: "SelfSubjectAccessReview"}, Status: authz.SubjectAccessReviewStatus{Allowed: mode != "rbac-denied"}})
-				case strings.HasSuffix(r.URL.Path, "/configmaps/context-capability"):
-					if r.Method == "PUT" {
-						probes++
-						if r.URL.Query().Get("dryRun") != "All" {
-							t.Error("persistent probe")
-						}
-						cause := "ValidatingAdmissionPolicy 'capability-guard' with binding 'capability-guard' denied request: " + contextCapabilityDenial
-						if mode == "wrong-denial" {
-							cause = "unrelated denial"
-						}
+				case strings.HasSuffix(r.URL.Path, "/configmaps/context-capability") && r.Method == http.MethodGet:
+					if mode == "rbac-denied" {
 						w.Header().Set("Content-Type", "application/json")
-						w.WriteHeader(422)
-						permissionReply(w, meta.Status{TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "Status"}, Status: meta.StatusFailure, Reason: meta.StatusReasonInvalid, Code: 422, Details: &meta.StatusDetails{Kind: "configmaps", Causes: []meta.StatusCause{{Message: cause}}}})
-						if probes == 2 && mode == "expired-final-guard" {
-							clock.Add(int64(6 * time.Second))
-						}
-						if probes == 2 && mode == "short-recovery" {
-							clock.Add(int64(2 * time.Second))
-						}
+						w.WriteHeader(http.StatusForbidden)
+						permissionReply(w, meta.Status{TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "Status"}, Status: meta.StatusFailure, Reason: meta.StatusReasonForbidden, Code: 403})
 						return
 					}
 					reads++
 					uid := ownerID(7)
-					if mode == "source-changed" && reads >= 3 {
+					if mode == "source-changed" {
 						uid = ownerID(8)
+					}
+					if mode == "short-recovery" {
+						clock.Add(int64(2 * time.Second))
 					}
 					permissionReply(w, map[string]any{"apiVersion": "v1", "kind": "ConfigMap", "immutable": true, "metadata": map[string]any{"name": "context-capability", "namespace": permissionControl.Name, "uid": uid, "resourceVersion": "1"}, "data": map[string]string{"context-capability.json": string(raw)}})
 				case r.URL.Path == "/api/v1/namespaces/"+permissionControl.Name:
@@ -255,8 +211,8 @@ func TestContextCapabilityPreservesAllOriginalBounds(t *testing.T) {
 				}
 				return
 			}
-			if err != nil || !got.Valid(now()) || !got.ObservedAt.Equal(start) || !got.FreshUntil.Equal(start.Add(5*time.Second)) || probes != 2 {
-				t.Fatal("capability lost original observation", err, probes)
+			if err != nil || !got.Valid(now()) || !got.ObservedAt.Equal(start) || !got.FreshUntil.Equal(start.Add(5*time.Second)) || reads != 1 {
+				t.Fatal("capability lost original observation", err, reads)
 			}
 		})
 	}

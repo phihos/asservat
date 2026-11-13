@@ -10,7 +10,6 @@ import (
 	configapp "asservat.local/asservat/internal/application/configuration"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	apps "k8s.io/api/apps/v1"
-	authenticationv1 "k8s.io/api/authentication/v1"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -83,22 +82,11 @@ func newWorkloadFixture(t *testing.T, ctx context.Context, c *rest.Config, nativ
 	if err != nil {
 		t.Fatal(err)
 	}
-	expiry := int64(600)
-	token, err := native.CoreV1().ServiceAccounts(probeNS.Name).CreateToken(ctx, account.Name, &authenticationv1.TokenRequest{Spec: authenticationv1.TokenRequestSpec{ExpirationSeconds: &expiry}}, meta.CreateOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	probeConfig := rest.AnonymousClientConfig(c)
-	probeConfig.BearerToken = token.Status.Token
-	probe, err := kube.NewPermissionClient(probeConfig, cluster, probeRef, time.Now)
-	if err != nil {
-		t.Fatal(err)
-	}
 	observer, err := kube.NewPermissionClient(c, cluster, probeRef, time.Now)
 	if err != nil {
 		t.Fatal(err)
 	}
-	g, err := kube.NewWorkloadGuard(observer, probe, plan, kube.GuardPin{PolicyUID: pin.PolicyUID, PolicyGeneration: pin.PolicyGeneration, BindingUID: pin.BindingUID, BindingResourceVersion: pin.BindingResourceVersion})
+	g, err := kube.NewWorkloadGuard(observer, plan, kube.GuardPin{PolicyUID: pin.PolicyUID, PolicyGeneration: pin.PolicyGeneration, BindingUID: pin.BindingUID, BindingResourceVersion: pin.BindingResourceVersion})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -112,18 +100,7 @@ func newWorkloadFixture(t *testing.T, ctx context.Context, c *rest.Config, nativ
 		time.Sleep(100 * time.Millisecond)
 	}
 	if !proven {
-		t.Fatal("workload guard never proved enforcement", err)
-	}
-	// The probe's create right cannot run anything: the quota admits no
-	// Deployment, so an unkeyed real create is refused too.
-	probeNative, err := kubernetes.NewForConfig(probeConfig)
-	if err != nil {
-		t.Fatal(err)
-	}
-	unkeyed := workloadDeployment("probe-escape", "x")
-	unkeyed.Labels = nil
-	if _, err = probeNative.AppsV1().Deployments(probeNS.Name).Create(ctx, unkeyed, meta.CreateOptions{}); err == nil || !strings.Contains(err.Error(), "quota") {
-		t.Fatal("probe account created a real Deployment", err)
+		t.Fatal("workload guard never became current", err)
 	}
 	if f.namespace, err = adminNative.CoreV1().Namespaces().Create(ctx, &core.Namespace{ObjectMeta: meta.ObjectMeta{Name: "shared-apps"}}, meta.CreateOptions{}); err != nil {
 		t.Fatal(err)

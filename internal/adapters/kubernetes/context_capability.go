@@ -124,27 +124,9 @@ func (s *ContextCapabilitySource) ContextCapability(ctx context.Context, target 
 	valid = identity.Earlier(valid, r.FreshUntil)
 	call, stopRecovery := context.WithDeadline(call, until)
 	defer stopRecovery()
-	guard, guardUntil, err := s.protection.current(call)
-	if err != nil {
-		return zero, err
-	}
-	until = identity.Earlier(until, guardUntil)
-	call, stopGuard := context.WithDeadline(call, until)
-	defer stopGuard()
 	out, err := s.snapshot(call)
 	if err != nil {
 		return zero, err
-	}
-	last, lastUntil, err := s.protection.current(call)
-	if err != nil || last != guard {
-		return zero, cfg.ErrChanged
-	}
-	until = identity.Earlier(until, lastUntil)
-	call, stopFinal := context.WithDeadline(call, until)
-	defer stopFinal()
-	again, err := s.snapshot(call)
-	if err != nil || out != again {
-		return zero, cfg.ErrChanged
 	}
 	lastRecovery, err := s.recovery.RecoveryState(call)
 	if err != nil || !lastRecovery.Valid(s.client.now()) || lastRecovery.InstallationID != r.InstallationID || lastRecovery.IssuerEpoch != r.IssuerEpoch || lastRecovery.Revision != r.Revision {

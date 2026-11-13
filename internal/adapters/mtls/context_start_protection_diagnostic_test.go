@@ -16,7 +16,7 @@ type contextProtectionDiagnosticError struct{}
 
 func (contextProtectionDiagnosticError) Error() string { panic("private native error text inspected") }
 func (contextProtectionDiagnosticError) FixedStep() string {
-	return "protection.guard-last/source.guard-policy-read"
+	return "protection.result/deadline"
 }
 
 // This composes the successful attachment check and the separate work-send
@@ -132,7 +132,7 @@ func TestContextStartActualHTTP2DispatchProtectionDiagnostic(t *testing.T) {
 			if proofDeadline.IsZero() || proofDeadline.After(parentUntil) {
 				t.Fatal("closing proof escaped the inherited deadline", proofDeadline, parentUntil)
 			}
-			want := "local/protection-before/read/protection.guard-last/source.guard-policy-read@"
+			want := "local/protection-before/read/protection.result/deadline@"
 			if mode == "cancellation" {
 				want = "local/protection-before/read/canceled@"
 			}

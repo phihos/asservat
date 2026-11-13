@@ -142,7 +142,7 @@ func TestOwnerCapacityProbeWithRealKubernetes(t *testing.T) {
 		}
 		return c, d, k
 	}
-	workerConfig, worker, workerCore := actor(account.Name)
+	_, worker, workerCore := actor(account.Name)
 	_, foreign, _ := actor(outsider.Name)
 	// Test-only administrator impersonation proves the UID condition independently
 	// of the username-based ServiceAccount RBAC binding.
@@ -300,11 +300,7 @@ func TestOwnerCapacityProbeWithRealKubernetes(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	probe, e := kube.NewPermissionClient(workerConfig, cluster, control, time.Now)
-	if e != nil {
-		t.Fatal(e)
-	}
-	guard, e := kube.NewCapacityGuard(observer, probe, cp, kube.GuardPin{PolicyUID: string(policy.UID), PolicyGeneration: policy.Generation, BindingUID: string(binding.UID), BindingResourceVersion: binding.ResourceVersion})
+	guard, e := kube.NewCapacityGuard(observer, cp, kube.GuardPin{PolicyUID: string(policy.UID), PolicyGeneration: policy.Generation, BindingUID: string(binding.UID), BindingResourceVersion: binding.ResourceVersion})
 	if e != nil {
 		t.Fatal(e)
 	}

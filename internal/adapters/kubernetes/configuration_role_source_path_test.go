@@ -298,6 +298,16 @@ func newConfigurationSourcePathFixtureLimiter(t *testing.T, limiter flowcontrol.
 
 func TestConfigurationRoleSourceOriginalFiveSecondPath(t *testing.T) {
 	f := newConfigurationSourcePathFixture(t)
+	// The fleet and owner sources are plain reads under ordinary RBAC: their
+	// admission policies and bindings are never consulted.
+	f.extraHandler = func(w http.ResponseWriter, r *http.Request) bool {
+		if strings.HasSuffix(r.URL.Path, "/cfg-fleet") || strings.HasSuffix(r.URL.Path, "/cfg-owner") {
+			t.Error("plain source read consulted its admission guard", r.URL.Path)
+			http.Error(w, "unexpected", http.StatusForbidden)
+			return true
+		}
+		return false
+	}
 	start := time.Now()
 	ctx, end := context.WithDeadline(context.Background(), start.Add(5*time.Second))
 	defer end()
@@ -306,8 +316,8 @@ func TestConfigurationRoleSourceOriginalFiveSecondPath(t *testing.T) {
 	if e != nil || !configurationRoleSourceMatches(f.source.input, p, time.Now()) {
 		t.Fatal("original five-second source graph unavailable", e)
 	}
-	if p.FreshUntil.After(start.Add(5*time.Second)) || f.purposeProbes[0].Load() == 0 || f.purposeProbes[1].Load() == 0 || f.purposeProbes[2].Load() == 0 {
-		t.Fatal("original interval or current negative proof omitted")
+	if p.FreshUntil.After(start.Add(5*time.Second)) || f.purposeProbes[0].Load() == 0 || f.purposeProbes[1].Load() != 0 || f.purposeProbes[2].Load() != 0 {
+		t.Fatal("original interval or workload negative proof omitted, or a source was probed", f.purposeProbes[0].Load(), f.purposeProbes[1].Load(), f.purposeProbes[2].Load())
 	}
 }
 

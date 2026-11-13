@@ -11,17 +11,14 @@ func TestOwnerProtectionDiagnosticsRejectUnknownAndCompoundProviderText(t *testi
 		step string
 		want string
 	}{
-		{"protection.guard-last/source.guard-policy-read", "protection.guard-last/source.guard-policy-read"},
-		{"protection.namespace-last", "protection.namespace-last"},
-		{"protection.namespace-last/canceled", "protection.namespace-last/canceled"},
-		{"protection.original-interval/deadline", "protection.original-interval/deadline"},
-		{"protection.probe/source.probe-conflicts-exhausted", "protection.probe/source.probe-conflicts-exhausted"},
-		{"source.guard-policy-read", "source.guard-policy-read"},
-		{"protection.guard-last/private-token-host", "other"},
-		{"protection.guard-last/source.guard-policy-read: private-token-host", "other"},
-		{"protection.guard-last/source.guard-policy-read/private-token-host", "other"},
-		{"protection.namespace-last/source.guard-policy-read", "other"},
-		{"protection.namespace-last/canceled/private-token-host", "other"},
+		{"protection.entry", "protection.entry"},
+		{"protection.result/canceled", "protection.result/canceled"},
+		{"protection.result-context/deadline", "protection.result-context/deadline"},
+		{"protection.guard-last/source.guard-policy-read", "other"},
+		{"protection.probe", "other"},
+		{"source.guard-policy-read", "other"},
+		{"protection.result/private-token-host", "other"},
+		{"protection.result/canceled/private-token-host", "other"},
 		{"private-token-host", "other"},
 		{strings.Repeat("source.guard-policy-read", 1000), "other"},
 	} {

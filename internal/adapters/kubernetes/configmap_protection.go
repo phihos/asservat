@@ -170,3 +170,38 @@ func (g *configMapProtection) current(ctx context.Context) (artifact.Digest, tim
 	}
 	return g.digest, start.Add(5 * time.Second), nil
 }
+
+// observe is the runtime's view of a source (Helm-native install plan, slice
+// 0): ordinary Kubernetes RBAC protects the named ConfigMap, so the runtime no
+// longer re-verifies admission guards, probe identities or denied dry-runs.
+// Callers read the source with plain bounded GETs within the returned original
+// five-second window. The digest is the unchanged configuration digest that
+// observations persist; it no longer attests a proven admission guard. The
+// probing methods above remain only for the installer until it is removed.
+func (g *configMapProtection) observe(ctx context.Context) (artifact.Digest, time.Time, error) {
+	if g == nil || ctx == nil {
+		return artifact.Digest{}, time.Time{}, value.ErrInvalid
+	}
+	if ctx.Err() != nil {
+		return artifact.Digest{}, time.Time{}, value.ErrUnavailable
+	}
+	return g.digest, g.observer.now().Add(5 * time.Second), nil
+}
+
+// read is one plain bounded GET of the named source ConfigMap by the runtime's
+// own client. Purpose-specific callers validate the complete body.
+func (g *configMapProtection) read(ctx context.Context) (core.ConfigMap, error) {
+	var zero core.ConfigMap
+	if g == nil || ctx == nil {
+		return zero, value.ErrInvalid
+	}
+	raw, e := g.observer.raw(ctx, "/api/v1/namespaces/"+g.plan.ControlNamespace.Name+"/configmaps/"+g.plan.SourceName, nil)
+	if e != nil {
+		return zero, configurationSourceError(configurationSourceProbeObjectRead, e)
+	}
+	var object core.ConfigMap
+	if json.Unmarshal(raw, &object) != nil || object.Name != g.plan.SourceName || object.Namespace != g.plan.ControlNamespace.Name || object.DeletionTimestamp != nil {
+		return zero, configurationSourceError(configurationSourceProbeObjectShape, value.ErrUnavailable)
+	}
+	return object, nil
+}

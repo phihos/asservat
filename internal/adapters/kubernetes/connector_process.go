@@ -19,8 +19,8 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// ConnectorProcessAttester reuses the concrete private namespace admission
-// guard and bounded Kubernetes resource/token readers. It never constructs an
+// ConnectorProcessAttester uses the pinned workload protection digest and
+// bounded Kubernetes resource/token readers. It never constructs an
 // OwnerBinding or treats Pod proof as process-registration/signing authority.
 type ConnectorProcessAttester struct {
 	client     *PermissionClient

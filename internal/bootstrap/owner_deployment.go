@@ -707,24 +707,17 @@ func (d *OwnerDeployment) clusterCatalogChanged(ctx context.Context) bool {
 }
 
 // contextStartOwnerAuthenticator gives the context-start ingress self-checks
-// their own observer/probe clients with the same guard plan and pins: on the
-// owner's shared clients they queued behind other request paths and overran
-// the original five seconds (installed native 54). The guard proof is reused
-// for kube.OwnerProtectionReuse, so they keep the default client limiter.
+// their own observer client for route reads: on the owner's shared clients
+// they queued behind other request paths and overran the original five
+// seconds (installed native 54). The protection digest needs no API request.
 func contextStartOwnerAuthenticator(in *ownerInputs, c contracts.OwnerDeployment, guard *kube.OwnerWorkloadProtection, pool value.OwnerPool, configs *postgres.OwnerConfigurations, registry *postgres.OwnerEnrollments, stats *regionalAPIStats) (*app.OwnerAuthenticator, error) {
+	if guard == nil {
+		return nil, mounts.ErrUnavailable
+	}
 	control := configuration.NamespaceRef{Name: c.Namespace.Name, UID: c.Namespace.UID}
-	observerConfig, probeConfig := in.kubernetes("kube-observer.token"), in.kubernetes("kube-probe.token")
+	observerConfig := in.kubernetes("kube-observer.token")
 	observerConfig.Wrap(stats.wrap)
-	probeConfig.Wrap(stats.wrap)
 	observer, err := kube.NewPermissionClient(observerConfig, c.ClusterID, control, time.Now)
-	if err != nil {
-		return nil, err
-	}
-	probe, err := kube.NewPermissionClient(probeConfig, c.ClusterID, control, time.Now)
-	if err != nil {
-		return nil, err
-	}
-	own, err := guard.WithClients(observer, probe)
 	if err != nil {
 		return nil, err
 	}
@@ -732,5 +725,5 @@ func contextStartOwnerAuthenticator(in *ownerInputs, c contracts.OwnerDeployment
 	if err != nil {
 		return nil, err
 	}
-	return &app.OwnerAuthenticator{Registry: registry, Routes: &app.OwnerRoutes{Configurations: configs, Endpoints: endpoints, Now: time.Now}, Protection: own, Now: time.Now}, nil
+	return &app.OwnerAuthenticator{Registry: registry, Routes: &app.OwnerRoutes{Configurations: configs, Endpoints: endpoints, Now: time.Now}, Protection: guard, Now: time.Now}, nil
 }

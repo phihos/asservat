@@ -2,7 +2,6 @@ package kubernetes
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	app "asservat.local/asservat/internal/application/fleet"
@@ -28,9 +27,8 @@ func NewFleetConfigurationProtection(observer, probe *PermissionClient, plan cfg
 	return &FleetConfigurationProtection{g}, nil
 }
 
-// ProtectedFleetSettings checks independently installed admission before and
-// after reading the exact pinned source. Plain FleetSettingsClient observations
-// alone never establish that the writers are administrators.
+// ProtectedFleetSettings reads the exact named fleet source once under
+// ordinary RBAC within its original five-second window.
 type ProtectedFleetSettings struct {
 	settings   *FleetSettingsClient
 	protection *FleetConfigurationProtection
@@ -41,24 +39,6 @@ func (s *ProtectedFleetSettings) note(stage string) {
 	if s.Report != nil {
 		s.Report(stage)
 	}
-}
-
-func fleetSettingsStep(err error) string {
-	var fixed interface{ FixedStep() string }
-	if errors.As(err, &fixed) {
-		step := fixed.FixedStep()
-		switch {
-		case errors.Is(err, cfg.ErrDenied):
-			return step + "/denied"
-		case errors.Is(err, cfg.ErrChanged):
-			return step + "/changed"
-		case errors.Is(err, cfg.ErrUnavailable):
-			return step + "/unavailable"
-		default:
-			return step
-		}
-	}
-	return "other"
 }
 
 var _ app.AdministrationReader = (*ProtectedFleetSettings)(nil)
@@ -82,32 +62,13 @@ func (s *ProtectedFleetSettings) FleetAdministration(ctx context.Context) (value
 	ctx, end := context.WithTimeout(ctx, 5*time.Second)
 	defer end()
 	start := s.settings.client.now()
-	_, until, err := s.protection.current(ctx)
-	if err != nil {
-		s.note("protection/" + fleetSettingsStep(err))
-		return zero, err
-	}
 	first, err := s.settings.FleetAdministration(ctx)
 	if err != nil {
 		s.note("first-source")
 		return zero, err
 	}
-	last, err := s.settings.FleetAdministration(ctx)
-	if err != nil {
-		s.note("second-source")
-		return zero, value.ErrUnavailable
-	}
-	if first.Revision != last.Revision || first.InstallationID != last.InstallationID || first.IssuerEpoch != last.IssuerEpoch {
-		s.note("revision")
-		return zero, value.ErrUnavailable
-	}
-	g := s.protection.configMapProtection
-	if _, err = checkAdmissionGuard(ctx, g.observer, g.plan.Name, g.pin, g.policy, g.binding); err != nil {
-		s.note("admission")
-		return zero, err
-	}
 	first.ObservedAt = start
-	first.FreshUntil = identity.Earlier(start.Add(5*time.Second), identity.Earlier(until, identity.Earlier(first.FreshUntil, last.FreshUntil)))
+	first.FreshUntil = identity.Earlier(start.Add(5*time.Second), first.FreshUntil)
 	if ctx.Err() != nil || !first.Valid(s.settings.client.now()) {
 		s.note("valid")
 		return zero, value.ErrUnavailable

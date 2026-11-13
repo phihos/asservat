@@ -172,9 +172,9 @@ func (g *ConnectorAPIExecutionProtection) current(ctx context.Context) (connecto
 	return g.reuse.read(ctx, g.attester.client.now, g.produceProof, g.recheckProof)
 }
 
-// Reuse only the expensive independent denial/TokenReview proof, under its
-// unchanged original interval. Read the exact current owned process, source,
-// full live workload, mounted input metadata, account, namespace and guard pins.
+// Reuse only the expensive TokenReview proof, under its unchanged original
+// interval. Read the exact current owned process, source, full live workload,
+// mounted input metadata, account and namespace.
 // A positive GET does not synthesize either original proof.
 func (g *ConnectorAPIExecutionProtection) recheckProof(ctx context.Context, p connectorAPIProof) (connectorAPIProof, error) {
 	fail := func(e error) (connectorAPIProof, error) { g.reuse.invalidate(); return connectorAPIProof{}, e }
@@ -213,8 +213,7 @@ func (g *ConnectorAPIExecutionProtection) recheckProof(ctx context.Context, p co
 }
 
 // Native current-value checks shared by an ordinary recheck and the explicit
-// setup close. Neither caller can replace the original denial/TokenReview
-// interval. The setup close separately performs its full source proof and
+// setup close. Neither caller can replace the original TokenReview interval. The setup close separately performs its full source proof and
 // local owned-credential confirmation after this work.
 func (g *ConnectorAPIExecutionProtection) recheckNative(call context.Context, p connectorAPIProof) error {
 	ns, e := g.attester.client.namespace(call, g.attester.client.control)
@@ -225,15 +224,6 @@ func (g *ConnectorAPIExecutionProtection) recheckNative(call context.Context, p 
 	account, e := ownerResource[core.ServiceAccount](&OwnerEndpoints{client: g.attester.client}, call, "/api/v1/namespaces/"+s.Namespace+"/serviceaccounts/"+s.Account, "v1", "ServiceAccount")
 	if e != nil || !ownerMetadata(account.ObjectMeta, s.Namespace, s.Account, s.AccountUID) {
 		return cfg.ErrChanged
-	}
-	if e = g.executionAccount(call, p.proof); e != nil {
-		return e
-	}
-	if _, e = checkAdmissionGuard(call, g.attester.client, g.attester.protection.plan.Name, g.attester.protection.pin, g.attester.protection.policy, g.attester.protection.binding); e != nil {
-		return e
-	}
-	if _, e = checkAdmissionGuard(call, g.attester.client, g.settings.plan.Name, g.settings.pin, g.settings.policy, g.settings.binding); e != nil {
-		return e
 	}
 	if e = g.snapshot(call); e != nil {
 		return e

@@ -55,14 +55,14 @@ func TestOwnerProjectionFinalizationExactGraphsAndReadOnlyResults(t *testing.T) 
 		execute, final int32
 		status         OwnerProjectionAdvanceStatus
 	}{
-		{"parent", 53, 52, OwnerProjectionAdvanceAcknowledged},
-		{"credentials-create", 54, 54, OwnerProjectionAdvancePending},
-		{"credentials-receipt", 54, 54, OwnerProjectionAdvanceAcknowledged},
-		{"configuration-create", 56, 56, OwnerProjectionAdvancePending},
-		{"configuration-receipt", 55, 56, OwnerProjectionAdvanceAcknowledged},
-		{"joint", 55, 56, OwnerProjectionAdvanceComplete},
-		{"launch", 56, 56, OwnerProjectionAdvancePending},
-		{"launch-receipt", 55, 56, OwnerProjectionAdvanceComplete},
+		{"parent", 41, 40, OwnerProjectionAdvanceAcknowledged},
+		{"credentials-create", 42, 42, OwnerProjectionAdvancePending},
+		{"credentials-receipt", 42, 42, OwnerProjectionAdvanceAcknowledged},
+		{"configuration-create", 44, 44, OwnerProjectionAdvancePending},
+		{"configuration-receipt", 43, 44, OwnerProjectionAdvanceAcknowledged},
+		{"joint", 43, 44, OwnerProjectionAdvanceComplete},
+		{"launch", 44, 44, OwnerProjectionAdvancePending},
+		{"launch-receipt", 43, 44, OwnerProjectionAdvanceComplete},
 	}
 	for index, step := range steps {
 		t.Run(step.name, func(t *testing.T) {
@@ -75,7 +75,7 @@ func TestOwnerProjectionFinalizationExactGraphsAndReadOnlyResults(t *testing.T) 
 			if err := execute(context.Background()); err != nil {
 				t.Fatal("execution", err)
 			}
-			want := [6]int32{20, 13, 7, step.execute, 4, 9}
+			want := [6]int32{20, 13, 7, step.execute, 4, 3}
 			if got := projectionSplitDifference(counts.snapshot(), before); got != want || f.provider.requests.Load()-provider != 16 || private.Load()-reads != 2 || unlocked.Load() != 0 || !reflect.DeepEqual(accepted, []bool{false, true, true}) {
 				t.Fatal("execution graph", got, want, accepted, private.Load()-reads)
 			}
@@ -90,7 +90,7 @@ func TestOwnerProjectionFinalizationExactGraphsAndReadOnlyResults(t *testing.T) 
 			if err != nil || out.Status != step.status || out.Snapshot.UID != snapshot.UID || !equalJSON(out.Snapshot.State, snapshot.State) {
 				t.Fatal("original-result finalization", out.Status, err)
 			}
-			want = [6]int32{20, 13, 7, step.final, 4, 9}
+			want = [6]int32{20, 13, 7, step.final, 4, 3}
 			if got := projectionSplitDifference(counts.snapshot(), before); got != want || f.provider.requests.Load()-provider != 16 || private.Load()-reads != 2 || unlocked.Load() != 0 || !reflect.DeepEqual(accepted, []bool{false, true, true}) {
 				t.Fatal("finalization graph", got, want, accepted, private.Load()-reads)
 			}

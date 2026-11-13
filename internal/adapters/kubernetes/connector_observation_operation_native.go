@@ -22,13 +22,6 @@ func (s *ConnectorObservationOperationReader) nativeBoundary(ctx context.Context
 	if ctx.Err() != nil || !s.client.now().Before(until) {
 		return zero, value.ErrUnavailable
 	}
-	// Distinct source and workload guards remain independently proved. This is
-	// one real source guard observation, not a full source-value observation.
-	sourceGuard, sourceUntil, err := s.source.protection.current(ctx)
-	if err != nil || sourceGuard != s.pin.Profile.ProtectionDigest {
-		return zero, value.ErrUnavailable
-	}
-	until = identity.Earlier(until, sourceUntil)
 	call, cancel := context.WithDeadline(ctx, until)
 	defer cancel()
 	g, p := s.guard, s.pin.Profile.Deployment
@@ -36,11 +29,7 @@ func (s *ConnectorObservationOperationReader) nativeBoundary(ctx context.Context
 	if err != nil || ns.Deleting {
 		return zero, cfg.ErrChanged
 	}
-	guard, err := checkAdmissionGuard(call, s.client, g.plan.Name, g.pin, g.policy, g.binding)
-	if err != nil {
-		return zero, err
-	}
-	deployment, err := g.proveObject(call, originalStart)
+	deployment, err := readPinnedDeployment(call, s.client, g.plan.ControlNamespace.Name, g.plan.Deployment, g.plan.DeploymentUID)
 	if err != nil {
 		return zero, err
 	}
@@ -88,10 +77,6 @@ func (s *ConnectorObservationOperationReader) nativeBoundary(ctx context.Context
 	}
 	last, err := ownerResource[core.Pod](reader, bounded, base+"pods/"+name, "v1", "Pod")
 	if err != nil || last.ResourceVersion != pod.ResourceVersion || !equalJSON(last, pod) {
-		return zero, cfg.ErrChanged
-	}
-	finalGuard, err := checkAdmissionGuard(bounded, s.client, g.plan.Name, g.pin, g.policy, g.binding)
-	if err != nil || finalGuard != guard {
 		return zero, cfg.ErrChanged
 	}
 	ns, err = s.client.namespace(bounded, s.client.control)

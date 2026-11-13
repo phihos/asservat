@@ -23,7 +23,7 @@ type configurationRoleNativeResponses struct {
 func (n *configurationRoleNativeResponses) matches(s *ConfigurationRoleSource, a cfg.InitialRuntimeBridgeAdministration, owner core.ServiceAccount) bool {
 	if n == nil || s == nil || s.protection == nil || s.fleet == nil || s.fleet.protection == nil || s.owner == nil || s.owner.protection == nil ||
 		n.clients != ([3]*PermissionClient{s.protection.probe, s.fleet.protection.probe, s.owner.protection.probe}) ||
-		a.Owner.CapacityProbe == nil || len(a.SourceProbes) != 3 ||
+		a.Owner.CapacityProbe == nil ||
 		a.Owner.CapacityProbe.ServiceAccount != s.input.ServiceAccount.Name || a.Owner.CapacityProbe.ServiceAccountUID != s.input.ServiceAccount.UID {
 		return false
 	}
@@ -47,26 +47,7 @@ func (n *configurationRoleNativeResponses) matches(s *ConfigurationRoleSource, a
 		!identity(n.identities[0], a.OwnerProbe.ServiceAccount, a.OwnerProbe.ServiceAccountUID) {
 		return false
 	}
-	seen := map[string]bool{}
-	for _, p := range a.SourceProbes {
-		if seen[p.ConfigMap] || p.ServiceAccount != s.input.ServiceAccount.Name || p.ServiceAccountUID != s.input.ServiceAccount.UID {
-			return false
-		}
-		seen[p.ConfigMap] = true
-		native := n.identities[2]
-		switch p.ConfigMap {
-		case s.input.FleetSource.Name:
-			native = n.identities[1]
-		case s.input.OwnerSource.Name, installedProcessingSource(s.input.InstallationID):
-			// currentProbeAccounts uses this same concrete owner-source client
-			// for processing. Neither a fresh token reader nor another client is
-			// substituted merely because it names the same service account.
-		default:
-			return false
-		}
-		if !identity(native, p.ServiceAccount, p.ServiceAccountUID) {
-			return false
-		}
-	}
-	return seen[s.input.FleetSource.Name] && seen[s.input.OwnerSource.Name] && seen[installedProcessingSource(s.input.InstallationID)]
+	// The fleet and owner sources are plain reads under ordinary RBAC
+	// (Helm-native plan, slice 0): no source probe identity is retained.
+	return true
 }

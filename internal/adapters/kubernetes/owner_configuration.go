@@ -93,23 +93,12 @@ func (s *OwnerConfigurationSource) ReadOwnerConfiguration(ctx context.Context) (
 	ctx, end := context.WithTimeout(ctx, 5*time.Second)
 	defer end()
 	start := s.client.now()
-	protection, until, err := s.protection.current(ctx)
-	if err != nil {
-		return out, err
-	}
 	c, rootsUntil, err := s.snapshot(ctx)
 	if err != nil {
 		return out, err
 	}
-	last, lastRootsUntil, err := s.snapshot(ctx)
-	if err != nil || !last.Equal(c) {
-		return out, value.ErrUnavailable
-	}
-	if _, err = checkAdmissionGuard(ctx, s.client, s.protection.plan.Name, s.protection.pin, s.protection.policy, s.protection.binding); err != nil {
-		return out, err
-	}
-	c.ProtectionDigest = protection
-	out = value.OwnerConfigurationObservation{Configuration: c, ObservedAt: start, FreshUntil: identity.Earlier(start.Add(5*time.Second), identity.Earlier(until, identity.Earlier(rootsUntil, lastRootsUntil)))}
+	c.ProtectionDigest = s.protection.digest
+	out = value.OwnerConfigurationObservation{Configuration: c, ObservedAt: start, FreshUntil: identity.Earlier(start.Add(5*time.Second), rootsUntil)}
 	if !out.Valid(s.client.now()) || ctx.Err() != nil {
 		return value.OwnerConfigurationObservation{}, value.ErrUnavailable
 	}

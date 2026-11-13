@@ -3,9 +3,6 @@ package kubernetes
 import (
 	"context"
 	"encoding/json"
-	"net/http"
-	"strings"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -13,7 +10,7 @@ import (
 	core "k8s.io/api/core/v1"
 )
 
-func TestConfigurationWorkerSourceReadersUseActualEightReadBrackets(t *testing.T) {
+func TestConfigurationWorkerSourceReadersArePlainReads(t *testing.T) {
 	f := newConfigurationProviderRuntimeFixture(t)
 	fleet, owner, err := NewConfigurationWorkerSourceReaders(f.reader)
 	if err != nil {
@@ -29,23 +26,24 @@ func TestConfigurationWorkerSourceReadersUseActualEightReadBrackets(t *testing.T
 	if err != nil || !o.Valid(time.Now()) || o.ObservedAt.Before(started) || !o.FreshUntil.Equal(o.ObservedAt.Add(5*time.Second)) {
 		t.Fatal("owner original source interval", err)
 	}
-	if f.observer.Load() != 16 || f.probe.Load() != 6 || f.denials[0].Load() != 0 || f.denials[1].Load() != 1 || f.denials[2].Load() != 1 {
+	// One plain GET per source by the worker's own client; no probe.
+	if f.observer.Load() != 2 || f.probe.Load() != 0 || f.denials[0].Load() != 0 || f.denials[1].Load() != 0 || f.denials[2].Load() != 0 {
 		t.Fatal("independent fixed source request graph changed", f.observer.Load(), f.probe.Load())
 	}
 }
 
 func TestConfigurationWorkerSourceReadersRetainCurrentValuesAndSuspension(t *testing.T) {
 	for _, source := range []string{"fleet", "owner"} {
-		for _, mode := range []string{"suspended", "changed during final guard", "probe account", "cancelled"} {
+		for _, mode := range []string{"suspended", "cancelled"} {
 			t.Run(source+"/"+mode, func(t *testing.T) {
 				f := newConfigurationProviderRuntimeFixture(t)
 				fleet, owner, err := NewConfigurationWorkerSourceReaders(f.reader)
 				if err != nil {
 					t.Fatal(err)
 				}
-				name, guard := f.input.OwnerSource.Name, f.input.OwnerGuard.Name
+				name := f.input.OwnerSource.Name
 				if source == "fleet" {
-					name, guard = f.input.FleetSource.Name, f.input.FleetGuard.Name
+					name = f.input.FleetSource.Name
 				}
 				mutate := func() {
 					f.mu.Lock()
@@ -79,16 +77,6 @@ func TestConfigurationWorkerSourceReadersRetainCurrentValuesAndSuspension(t *tes
 				switch mode {
 				case "suspended":
 					mutate()
-				case "changed during final guard":
-					var reads atomic.Int32
-					f.setExtra(func(_ http.ResponseWriter, r *http.Request) bool {
-						if strings.HasSuffix(r.URL.Path, "/validatingadmissionpolicybindings/"+guard) && reads.Add(1) == 2 {
-							mutate()
-						}
-						return false
-					})
-				case "probe account":
-					f.fault.Store(3)
 				case "cancelled":
 					end()
 				}

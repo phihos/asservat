@@ -54,7 +54,7 @@ func newWorkerProjectionOperationFixture(t *testing.T) *configurationProviderRun
 	return f
 }
 
-func TestWorkerProjectionOperationCountsBothCurrentPassesAndOneDenial(t *testing.T) {
+func TestWorkerProjectionOperationCountsBothCurrentPassesWithoutDenialProbe(t *testing.T) {
 	for _, purpose := range []string{"capacity", "cleanup"} {
 		t.Run(purpose, func(t *testing.T) {
 			f := newWorkerProjectionOperationFixture(t)
@@ -73,11 +73,11 @@ func TestWorkerProjectionOperationCountsBothCurrentPassesAndOneDenial(t *testing
 			if err = op.Finish(op.Context()); err != nil {
 				t.Fatal(err)
 			}
-			if s, p := f.observer.Load()-beforeS, f.probe.Load()-beforeP; s != 23 || p != 3 { // two passes, each with one ADR-227 release record read
-				t.Fatalf("actual native request count S=%d P=%d want23/3", s, p)
+			if s, p := f.observer.Load()-beforeS, f.probe.Load()-beforeP; s != 18 || p != 0 { // two plain passes, each with one ADR-227 release record read
+				t.Fatalf("actual native request count S=%d P=%d want18/0", s, p)
 			}
-			if f.denials[0].Load() != 1 || f.denials[1].Load() != 0 || f.denials[2].Load() != 0 {
-				t.Fatal("projection borrowed unrelated source denial or repeated final proof")
+			if f.denials[0].Load() != 0 || f.denials[1].Load() != 0 || f.denials[2].Load() != 0 {
+				t.Fatal("projection performed an admission denial probe")
 			}
 			if op.Finish(op.Context()) == nil {
 				t.Fatal("one-use final repeated")
@@ -250,8 +250,8 @@ func TestWorkerCleanupProjectionOperationCoversBoundedSequentialHistoryPage(t *t
 	if calls != 16 || !op.FreshUntil().Equal(originalUntil) || !equalJSON(claim, op.initial.state.CleanupProjection) {
 		t.Fatal("page changed original cleanup claim or deadline")
 	}
-	if reads, posts := f.observer.Load()-beforeS, f.probe.Load()-beforeP; reads != 23 || posts != 3 {
-		t.Fatalf("history page repeated native proof: reads=%d posts=%d want23/3", reads, posts)
+	if reads, posts := f.observer.Load()-beforeS, f.probe.Load()-beforeP; reads != 18 || posts != 0 {
+		t.Fatalf("history page repeated native proof: reads=%d posts=%d want18/0", reads, posts)
 	}
 	if op.Finish(original) == nil {
 		t.Fatal("page repeated its one final proof")

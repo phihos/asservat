@@ -14,11 +14,13 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-// ADR-194: the promoted owner starts only when the referenced public runtime
-// projection is the immutable product Secret of the mounted manifest and its
-// every key equals the mounted file; operator keys in the root are ignored.
+// ADR-194: the promoted owner starts only when the named public runtime
+// projection Secret's every key equals the mounted file; operator keys in the
+// root are ignored. It is matched by name and content: a Helm-rendered Secret
+// without installer UIDs, annotations or immutability is accepted.
 func TestOwnerPublicProjectionMatchesMountedRoot(t *testing.T) {
-	for _, mode := range []string{"valid", "mutable", "other-uid", "changed-bytes", "other-root", "missing-file", "wrong-reference"} {
+	accepted := map[string]bool{"valid": true, "mutable": true, "other-uid": true, "no-annotations": true, "other-reference-uid": true}
+	for _, mode := range []string{"valid", "mutable", "other-uid", "no-annotations", "other-reference-uid", "changed-bytes", "missing-file", "bad-manifest", "other-name", "not-opaque"} {
 		t.Run(mode, func(t *testing.T) {
 			x := newOwnerIdentityObjectFixture(t)
 			in := x.reader.activation.Input
@@ -39,8 +41,12 @@ func TestOwnerPublicProjectionMatchesMountedRoot(t *testing.T) {
 				secret.UID = types.UID(ownerID(3699))
 			case "changed-bytes":
 				mounted["sql-public-hub-runtime.json"] = []byte("replaced-login")
-			case "other-root":
-				secret.Annotations["asservat.io/role-root-uid"] = ownerID(3698)
+			case "no-annotations":
+				secret.Annotations = nil
+			case "bad-manifest":
+				mounted[contracts.PublicRuntimeCredentialManifestFile] = []byte("{")
+			case "not-opaque":
+				secret.Type = core.SecretTypeTLS
 			case "missing-file":
 				delete(mounted, contracts.PublicAuditKeysFile)
 			}
@@ -52,13 +58,16 @@ func TestOwnerPublicProjectionMatchesMountedRoot(t *testing.T) {
 				return true
 			}
 			check := ref
-			if mode == "wrong-reference" {
+			switch mode {
+			case "other-reference-uid":
 				check.UID = ownerID(3697)
+			case "other-name":
+				check.Name = "other-projection"
 			}
 			ctx, end := context.WithTimeout(context.Background(), 5*time.Second)
 			defer end()
 			err := x.reader.VerifyPublicProjection(ctx, check, mounted)
-			if (err == nil) != (mode == "valid") {
+			if (err == nil) != accepted[mode] {
 				t.Fatal(mode, err)
 			}
 		})

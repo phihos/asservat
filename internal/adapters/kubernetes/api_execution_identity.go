@@ -15,7 +15,6 @@ import (
 	value "asservat.local/asservat/internal/domain/execution"
 	"asservat.local/asservat/internal/domain/identity"
 	admission "k8s.io/api/admissionregistration/v1"
-	auth "k8s.io/api/authentication/v1"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -72,51 +71,32 @@ func APIExecutionAdmission(p cfg.APIExecutionAdministration) (*admission.Validat
 	return policy, binding, nil
 }
 
+// APIExecutionProtection reads the exact executing Pod and its accounts under
+// ordinary RBAC. It holds no admission-policy pin and performs no denial probe;
+// current human/worker authority and SQL effect fences stay with the consumers.
 type APIExecutionProtection struct {
-	observer, probe *PermissionClient
-	plan            cfg.APIExecutionAdministration
-	pin             GuardPin
-	policy          admission.ValidatingAdmissionPolicySpec
-	binding         admission.ValidatingAdmissionPolicyBindingSpec
-	digest          artifact.Digest
+	observer *PermissionClient
+	plan     cfg.APIExecutionAdministration
+	digest   artifact.Digest
 }
 
-func NewAPIExecutionProtection(observer, probe *PermissionClient, p cfg.APIExecutionAdministration, pin GuardPin) (*APIExecutionProtection, error) {
-	if observer == nil || probe == nil || observer == probe || observer.clusterID != p.ClusterID || probe.clusterID != p.ClusterID || observer.control != p.ControlNamespace || probe.control != p.ControlNamespace || !identity.Text(pin.PolicyUID, 64) || !identity.Text(pin.BindingUID, 64) || !identity.Text(pin.BindingResourceVersion, 128) || pin.PolicyGeneration < 1 {
+func NewAPIExecutionProtection(observer *PermissionClient, p cfg.APIExecutionAdministration) (*APIExecutionProtection, error) {
+	if observer == nil || observer.clusterID != p.ClusterID || observer.control != p.ControlNamespace || !p.Valid() || len(validation.IsDNS1123Label(p.ControlNamespace.Name)) != 0 {
 		return nil, cfg.ErrInvalid
 	}
-	policy, binding, err := APIExecutionAdmission(p)
-	if err != nil {
-		return nil, err
+	for _, name := range []string{p.PodName, p.Account, p.CapacityAccount} {
+		if len(validation.IsDNS1123Subdomain(name)) != 0 {
+			return nil, cfg.ErrInvalid
+		}
 	}
 	p.Administrators = append([]cfg.KubernetesActor(nil), p.Administrators...)
-	normalizePermissionPolicy(&policy.Spec)
 	raw, _ := json.Marshal(struct {
 		Plan cfg.APIExecutionAdministration
-		Pin  GuardPin
-	}{p, pin})
-	return &APIExecutionProtection{observer, probe, p, pin, policy.Spec, binding.Spec, artifact.Digest(sha256.Sum256(raw))}, nil
+	}{p})
+	return &APIExecutionProtection{observer, p, artifact.Digest(sha256.Sum256(raw))}, nil
 }
-func (g *APIExecutionProtection) account(ctx context.Context, c *PermissionClient, name, uid string, bound bool) error {
-	raw, err := c.proofPost(ctx, "/apis/authentication.k8s.io/v1/selfsubjectreviews", auth.SelfSubjectReview{TypeMeta: meta.TypeMeta{APIVersion: "authentication.k8s.io/v1", Kind: "SelfSubjectReview"}}, nil)
-	var who auth.SelfSubjectReview
-	if err != nil || strictGuardJSON(raw, &who) != nil || who.Status.UserInfo.Username != "system:serviceaccount:"+g.plan.ControlNamespace.Name+":"+name || who.Status.UserInfo.UID != uid {
-		return cfg.ErrUnavailable
-	}
-	for _, a := range g.plan.Administrators {
-		if actorMatches(a, who.Status.UserInfo) {
-			return cfg.ErrInvalid
-		}
-	}
-	if bound {
-		for k, v := range map[string]string{"authentication.kubernetes.io/pod-name": g.plan.PodName, "authentication.kubernetes.io/pod-uid": g.plan.PodUID} {
-			values := who.Status.UserInfo.Extra[k]
-			if len(values) != 1 || values[0] != v {
-				return cfg.ErrUnavailable
-			}
-		}
-	}
-	raw, err = g.observer.raw(ctx, "/api/v1/namespaces/"+g.plan.ControlNamespace.Name+"/serviceaccounts/"+name, nil)
+func (g *APIExecutionProtection) account(ctx context.Context, name, uid string) error {
+	raw, err := g.observer.raw(ctx, "/api/v1/namespaces/"+g.plan.ControlNamespace.Name+"/serviceaccounts/"+name, nil)
 	var account core.ServiceAccount
 	if err != nil || json.Unmarshal(raw, &account) != nil || account.APIVersion != "v1" || account.Kind != "ServiceAccount" || !ownerMetadata(account.ObjectMeta, g.plan.ControlNamespace.Name, name, uid) {
 		return cfg.ErrChanged
@@ -131,53 +111,17 @@ func (g *APIExecutionProtection) current(ctx context.Context) (time.Time, error)
 	defer cancel()
 	start := g.observer.now()
 	until := start.Add(5 * time.Second)
-	if err := g.account(ctx, g.probe, g.plan.ProbeAccount, g.plan.ProbeAccountUID, false); err != nil {
-		return time.Time{}, err
-	}
 	ns, err := g.observer.namespace(ctx, g.plan.ControlNamespace)
 	if err != nil || ns.Deleting {
 		return time.Time{}, cfg.ErrChanged
 	}
-	first, err := checkAdmissionGuard(ctx, g.observer, g.plan.Name, g.pin, g.policy, g.binding)
-	if err != nil {
-		return time.Time{}, err
-	}
-	path := "/api/v1/namespaces/" + g.plan.ControlNamespace.Name + "/pods/" + g.plan.PodName
-	denied := false
-	for attempt := 0; attempt < 3; attempt++ {
-		if g.observer.current(ctx, start, 5*time.Second) != nil {
-			return time.Time{}, cfg.ErrUnavailable
-		}
-		raw, err := g.observer.raw(ctx, path, nil)
-		var pod core.Pod
-		if err != nil || json.Unmarshal(raw, &pod) != nil || pod.APIVersion != "v1" || pod.Kind != "Pod" || !ownerMetadata(pod.ObjectMeta, g.plan.ControlNamespace.Name, g.plan.PodName, g.plan.PodUID) || len(pod.OwnerReferences) != 0 || pod.Spec.ServiceAccountName != g.plan.Account || pod.Spec.HostPID || pod.Spec.HostIPC || pod.Spec.HostNetwork || len(pod.Spec.EphemeralContainers) != 0 || len(pod.Spec.InitContainers) != 0 || len(pod.Spec.Containers) != 1 || pod.Spec.NodeName == "" || (pod.Status.Phase != core.PodPending && pod.Status.Phase != core.PodRunning) || APIExecutionPodDigest(pod.Spec) != g.plan.PodSpecDigest {
-			return time.Time{}, cfg.ErrChanged
-		}
-		if !restrictedAPIExecutionPod(pod.Spec) || !digestPinnedAPIImage(pod.Spec.Containers[0].Image) || !strings.HasSuffix(pod.Spec.Containers[0].Image, "@sha256:"+hex.EncodeToString(g.plan.ImageDigest[:])) {
-			return time.Time{}, cfg.ErrInvalid
-		}
-		// Independent dry-run denial proves this exact policy, not a successful GET.
-		response := g.probe.api.Put().AbsPath(path).Param("dryRun", "All").Param("fieldValidation", "Strict").Body(raw).MaxRetries(0).Do(ctx)
-		body, _ := response.Raw()
-		if exactAPIExecutionConflict(response.Error(), body, g.plan.PodName, g.plan.PodUID) {
-			continue
-		}
-		if !exactAPIExecutionDenial(response.Error(), body, g.plan.Name) {
-			return time.Time{}, cfg.ErrUnavailable
-		}
-		denied = true
-		break
-	}
-	if !denied {
-		return time.Time{}, cfg.ErrUnavailable
-	}
-	last, err := checkAdmissionGuard(ctx, g.observer, g.plan.Name, g.pin, g.policy, g.binding)
-	if err != nil || first != last {
+	raw, err := g.observer.raw(ctx, "/api/v1/namespaces/"+g.plan.ControlNamespace.Name+"/pods/"+g.plan.PodName, nil)
+	var pod core.Pod
+	if err != nil || json.Unmarshal(raw, &pod) != nil || pod.APIVersion != "v1" || pod.Kind != "Pod" || !ownerMetadata(pod.ObjectMeta, g.plan.ControlNamespace.Name, g.plan.PodName, g.plan.PodUID) || len(pod.OwnerReferences) != 0 || pod.Spec.ServiceAccountName != g.plan.Account || pod.Spec.HostPID || pod.Spec.HostIPC || pod.Spec.HostNetwork || len(pod.Spec.EphemeralContainers) != 0 || len(pod.Spec.InitContainers) != 0 || len(pod.Spec.Containers) != 1 || pod.Spec.NodeName == "" || (pod.Status.Phase != core.PodPending && pod.Status.Phase != core.PodRunning) || APIExecutionPodDigest(pod.Spec) != g.plan.PodSpecDigest {
 		return time.Time{}, cfg.ErrChanged
 	}
-	ns, err = g.observer.namespace(ctx, g.plan.ControlNamespace)
-	if err != nil || ns.Deleting {
-		return time.Time{}, cfg.ErrChanged
+	if !restrictedAPIExecutionPod(pod.Spec) || !digestPinnedAPIImage(pod.Spec.Containers[0].Image) || !strings.HasSuffix(pod.Spec.Containers[0].Image, "@sha256:"+hex.EncodeToString(g.plan.ImageDigest[:])) {
+		return time.Time{}, cfg.ErrInvalid
 	}
 	if d, ok := ctx.Deadline(); ok {
 		until = identity.Earlier(until, d)
@@ -240,7 +184,7 @@ func (p *APIExecutionProcess) ReadAPIProcess(ctx context.Context) (value.APIProc
 	if err != nil {
 		return zero, err
 	}
-	if err = p.guard.account(ctx, p.guard.observer, p.guard.plan.Account, p.guard.plan.AccountUID, true); err != nil {
+	if err = p.guard.account(ctx, p.guard.plan.Account, p.guard.plan.AccountUID); err != nil {
 		return zero, err
 	}
 	until = identity.Earlier(until, start.Add(5*time.Second))

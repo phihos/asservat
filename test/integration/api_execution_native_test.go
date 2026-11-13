@@ -278,12 +278,11 @@ func (n *nativeAPIEnvironment) protect(t *testing.T, ctx context.Context, recove
 		}
 		return r
 	}
-	probe := client(n.probe)
-	guard, err := kube.NewAPIExecutionProtection(client(n.executor), probe, n.plan, n.protectionPin)
+	guard, err := kube.NewAPIExecutionProtection(client(n.executor), n.plan)
 	if err != nil {
 		t.Fatal(err)
 	}
-	n.capacityGuard, err = kube.NewAPIExecutionProtection(client(n.capacity), probe, n.plan, n.protectionPin)
+	n.capacityGuard, err = kube.NewAPIExecutionProtection(client(n.capacity), n.plan)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -308,17 +307,6 @@ func (n *nativeAPIEnvironment) protect(t *testing.T, ctx context.Context, recove
 		if e != nil {
 			t.Fatal("native policy not type checked", e)
 		}
-	}
-	unbound, err := kube.NewAPIExecutionProtection(client(n.unboundExecutor), probe, n.plan, n.protectionPin)
-	if err != nil {
-		t.Fatal(err)
-	}
-	unboundProcess, err := kube.NewAPIExecutionProcess(ctx, unbound)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err = unboundProcess.ReadAPIProcess(ctx); err == nil {
-		t.Fatal("unbound executor token accepted")
 	}
 	// Actual API/RBAC, not an assertion about planned role YAML.
 	runtime, err := kubernetes.NewForConfig(n.executor)
@@ -469,7 +457,7 @@ func qualifyNativeAPIExecution(t *testing.T, ctx context.Context, f fixture, adm
 		return v
 	}
 	prepare, execute, read := x("api_execution_prepare_runtime", "synthetic-api-execution-prepare"), x("api_execution_runtime", "synthetic-api-execution"), x("api_execution_read_runtime", "synthetic-api-execution-read")
-	local, err := kube.NewAPIStartPreparer(n.capacityGuard, "api-execution-start", n.startPin)
+	local, err := kube.NewAPIStartPreparer(n.capacityGuard)
 	if err != nil {
 		t.Fatal(err)
 	}

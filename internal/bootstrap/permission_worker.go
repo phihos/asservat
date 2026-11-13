@@ -172,12 +172,8 @@ func (d *InstalledHubWorkerDeployment) openPermission(ctx context.Context) (*per
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	probe, err := kube.NewPermissionClient(local.kubernetes("kube-probe.token"), c.Control.ClusterID, control, time.Now)
-	if err != nil {
-		return nil, mounts.ErrUnavailable
-	}
 	g := c.Control.Guard
-	guard, err := kube.NewPermissionGuard(observer, probe, kube.PermissionAdministrationOf(c.Control), kube.GuardPin{PolicyUID: g.PolicyUID, PolicyGeneration: g.PolicyGeneration, BindingUID: g.BindingUID, BindingResourceVersion: g.BindingResourceVersion})
+	guard, err := kube.NewPermissionGuard(observer, kube.PermissionAdministrationOf(c.Control), kube.GuardPin{PolicyUID: g.PolicyUID, PolicyGeneration: g.PolicyGeneration, BindingUID: g.BindingUID, BindingResourceVersion: g.BindingResourceVersion})
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
@@ -248,11 +244,7 @@ func (d *InstalledHubWorkerDeployment) openPermission(ctx context.Context) (*per
 		if e != nil {
 			return nil, &fixedStepError{"retention/clients", e}
 		}
-		retentionProbe, e := kube.NewPermissionClient(kube.WithOpeningBurst(local.kubernetes("kube-probe.token")), c.Control.ClusterID, control, time.Now)
-		if e != nil {
-			return nil, &fixedStepError{"retention/clients", e}
-		}
-		if w.retention, err = newRetentionWorker(startup, c, pools, retentionObserver, retentionProbe, writer, b.ContextDeletion); err != nil {
+		if w.retention, err = newRetentionWorker(startup, c, pools, retentionObserver, writer, b.ContextDeletion); err != nil {
 			return nil, &fixedStepError{"retention/open", err}
 		}
 	}

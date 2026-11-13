@@ -2,7 +2,6 @@ package kubernetes
 
 import (
 	"context"
-	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"net/http"
@@ -16,9 +15,6 @@ import (
 	app "asservat.local/asservat/internal/application/fleet"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/fleet"
-	admission "k8s.io/api/admissionregistration/v1"
-	authentication "k8s.io/api/authentication/v1"
-	authorization "k8s.io/api/authorization/v1"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -33,7 +29,6 @@ type observationMetadataFixture struct {
 	start                    time.Time
 	tick                     atomic.Int64
 	calls, namespaces, lists atomic.Int64
-	probes                   atomic.Int64
 	entered, release         chan struct{}
 	releaseOnce              sync.Once
 }
@@ -41,20 +36,13 @@ type observationMetadataFixture struct {
 func (f *observationMetadataFixture) now() time.Time { return time.Unix(0, f.tick.Load()).UTC() }
 func (f *observationMetadataFixture) unblock()       { f.releaseOnce.Do(func() { close(f.release) }) }
 
-// Real client/TLS protocol tests with explicitly synthetic API objects and
-// admission responses. They confer no installed or native guard authority.
+// Real client/TLS protocol tests with explicitly synthetic API objects. They
+// confer no installed or native authority.
 func observationMetadataTestFixture(t *testing.T, mode string) *observationMetadataFixture {
 	t.Helper()
 	f := &observationMetadataFixture{start: time.Now().UTC().Truncate(time.Microsecond), entered: make(chan struct{}), release: make(chan struct{})}
 	f.tick.Store(f.start.UnixNano())
 	plan := cfg.CapacityNamespaceAdministration{Name: "metadata-guard", Administrators: []cfg.KubernetesActor{{Kind: "Group", Name: "capacity-administrators"}}, Keys: []string{"capacity.example/team"}, ProbeNamespace: permissionControl, ProbeAccount: cfg.NamespaceRef{Name: "capacity-probe", UID: "probe-uid"}}
-	p, b, err := CapacityNamespaceAdmission(plan)
-	if err != nil {
-		t.Fatal(err)
-	}
-	p.UID, p.Generation, p.ResourceVersion = "policy", 1, "policy-one"
-	p.Status = admission.ValidatingAdmissionPolicyStatus{ObservedGeneration: 1, TypeChecking: &admission.TypeChecking{}}
-	b.UID, b.ResourceVersion = "binding", "binding-one"
 	var entered sync.Once
 	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		f.calls.Add(1)
@@ -64,31 +52,6 @@ func observationMetadataTestFixture(t *testing.T, mode string) *observationMetad
 			<-f.release
 		}
 		switch {
-		case strings.Contains(r.URL.Path, "/validatingadmissionpolicies/"):
-			permissionReply(w, p)
-		case strings.Contains(r.URL.Path, "/validatingadmissionpolicybindings/"):
-			value := b.DeepCopy()
-			if mode == "changed-guard" && f.probes.Load() != 0 {
-				value.UID = "replacement"
-			}
-			permissionReply(w, value)
-		case strings.HasSuffix(r.URL.Path, "/serviceaccounts/"+plan.ProbeAccount.Name):
-			permissionReply(w, core.ServiceAccount{TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "ServiceAccount"}, ObjectMeta: meta.ObjectMeta{Name: plan.ProbeAccount.Name, Namespace: permissionControl.Name, UID: types.UID(plan.ProbeAccount.UID)}})
-		case strings.HasSuffix(r.URL.Path, "/selfsubjectreviews"):
-			permissionReply(w, authentication.SelfSubjectReview{Status: authentication.SelfSubjectReviewStatus{UserInfo: authentication.UserInfo{Username: "system:serviceaccount:" + permissionControl.Name + ":" + plan.ProbeAccount.Name, UID: plan.ProbeAccount.UID, Groups: []string{"system:authenticated"}}}})
-		case strings.HasSuffix(r.URL.Path, "/selfsubjectaccessreviews"):
-			permissionReply(w, authorization.SelfSubjectAccessReview{Status: authorization.SubjectAccessReviewStatus{Allowed: true}})
-		case r.Method == http.MethodPut:
-			if r.URL.Path != "/api/v1/namespaces/"+permissionControl.Name || r.URL.Query().Get("dryRun") != "All" || r.URL.Query().Get("fieldValidation") != "Strict" || r.Header.Get("Authorization") != "Bearer synthetic-probe" {
-				t.Error("unexpected mutation outside exact independent dry-run probe")
-			}
-			var request core.Namespace
-			if json.NewDecoder(r.Body).Decode(&request) != nil || string(request.UID) != permissionControl.UID || request.Labels[plan.Keys[0]] == "core" {
-				t.Error("unbound namespace guard probe")
-			}
-			f.probes.Add(1)
-			w.WriteHeader(http.StatusUnprocessableEntity)
-			permissionReply(w, meta.Status{TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "Status"}, Status: meta.StatusFailure, Reason: meta.StatusReasonInvalid, Code: 422, Details: &meta.StatusDetails{Kind: "namespaces", Causes: []meta.StatusCause{{Message: "ValidatingAdmissionPolicy 'metadata-guard' with binding 'metadata-guard' denied request: " + capacityNamespaceDenial}}}})
 		case r.Method != http.MethodGet:
 			t.Errorf("unexpected method %s", r.Method)
 			w.WriteHeader(http.StatusMethodNotAllowed)
@@ -158,12 +121,7 @@ func observationMetadataTestFixture(t *testing.T, mode string) *observationMetad
 	if err != nil {
 		t.Fatal(err)
 	}
-	config.BearerToken = "synthetic-probe"
-	probe, err := NewPermissionClient(config, permissionCluster, permissionControl, f.now)
-	if err != nil {
-		t.Fatal(err)
-	}
-	guard, err := NewCapacityNamespaceGuard(observer, probe, plan, GuardPin{PolicyUID: "policy", PolicyGeneration: 1, BindingUID: "binding", BindingResourceVersion: "binding-one"})
+	guard, err := NewCapacityNamespaceGuard(observer, plan, GuardPin{PolicyUID: "policy", PolicyGeneration: 1, BindingUID: "binding", BindingResourceVersion: "binding-one"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -207,8 +165,9 @@ func TestClusterObservationMetadataPurposesPreserveOriginalBounds(t *testing.T) 
 				}
 				switch purpose {
 				case fleet.ObserveCapacityNamespaceGuard:
-					if f.probes.Load() != 1 || out.Guard.Digest != f.reader.guard.guard.digest || !out.Guard.Interval.FreshUntil.Equal(want) {
-						t.Fatal("independent exact guard proof not used")
+					// One namespace read; no admission policy or probe request.
+					if f.calls.Load() != 1 || out.Guard.Digest != f.reader.guard.guard.digest || !out.Guard.Interval.FreshUntil.Equal(want) {
+						t.Fatalf("namespace guard observation changed: calls=%d", f.calls.Load())
 					}
 				case fleet.ObserveCapacityNamespaces:
 					if f.calls.Load() != 1 || len(out.Namespaces.Items) != 1 || out.Namespaces.ResourceVersion != "page-rv" || out.Namespaces.Continue != "next-cursor" {
@@ -222,8 +181,8 @@ func TestClusterObservationMetadataPurposesPreserveOriginalBounds(t *testing.T) 
 					// ADR-197: one combined observation. Its exact call count is
 					// part of the regional exchange's limiter budget (CI run 10);
 					// a new call must be weighed against that budget, not slipped in.
-					if f.calls.Load() != 16 || f.probes.Load() != 1 || f.namespaces.Load() != 2 {
-						t.Fatalf("guarded observation call budget changed: calls=%d probes=%d namespaces=%d", f.calls.Load(), f.probes.Load(), f.namespaces.Load())
+					if f.calls.Load() != 5 || f.namespaces.Load() != 2 {
+						t.Fatalf("guarded observation call budget changed: calls=%d namespaces=%d", f.calls.Load(), f.namespaces.Load())
 					}
 					if out.Guard.Digest != f.reader.guard.guard.digest || len(out.Workload.Labels) != 1 || out.Workload.Labels["capacity.example/team"] != "core" || !out.Guard.Interval.FreshUntil.Equal(want) || !out.Workload.Interval.FreshUntil.Equal(want) {
 						t.Fatal("combined guard and workload observation lost its exact proof or scope")
@@ -327,16 +286,7 @@ func TestClusterObservationMetadataCandidatesDoNotReplaceExactNamespaceChecks(t 
 	}
 }
 
-func TestClusterObservationMetadataGuardChangeAndCancellation(t *testing.T) {
-	t.Run("guard-change", func(t *testing.T) {
-		f := observationMetadataTestFixture(t, "changed-guard")
-		r := f.request(fleet.ObserveCapacityNamespaceGuard)
-		ctx, cancel := context.WithDeadline(context.Background(), r.NotAfter)
-		defer cancel()
-		if out, err := f.reader.ObserveCluster(ctx, r); err == nil || out.Guard != nil || f.probes.Load() != 1 {
-			t.Fatal("changed guard returned a current metadata proof")
-		}
-	})
+func TestClusterObservationMetadataCancellation(t *testing.T) {
 	for _, purpose := range []fleet.ClusterObservationPurpose{fleet.ObserveCapacityNamespaces, fleet.ObserveCapacityWorkloads} {
 		t.Run("cancel-blocked-read/"+string(purpose), func(t *testing.T) {
 			f := observationMetadataTestFixture(t, "blocked")
@@ -373,7 +323,7 @@ func TestClusterObservationMetadataConstructorRequiresExactClients(t *testing.T)
 		client *PermissionClient
 		guard  *CapacityNamespaceGuard
 		root   string
-	}{{nil, f.reader.guard, observationMetadataRoot}, {f.reader.client, nil, observationMetadataRoot}, {f.reader.guard.guard.probe, f.reader.guard, observationMetadataRoot}, {f.reader.client, &CapacityNamespaceGuard{}, observationMetadataRoot}, {f.reader.client, f.reader.guard, "invalid"}} {
+	}{{nil, f.reader.guard, observationMetadataRoot}, {f.reader.client, nil, observationMetadataRoot}, {f.reader.client, &CapacityNamespaceGuard{}, observationMetadataRoot}, {f.reader.client, f.reader.guard, "invalid"}} {
 		if _, err := NewClusterObservationMetadata(input.client, input.guard, input.root); err == nil {
 			t.Fatal("unbound regional metadata constructor accepted")
 		}

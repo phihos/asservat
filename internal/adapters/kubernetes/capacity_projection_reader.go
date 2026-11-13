@@ -109,15 +109,12 @@ func (s *InstalledWorkerProjectionReader) beginObservation(ctx context.Context) 
 			end()
 		}
 	}()
+	// The owner workload admission guard is no longer re-verified here:
+	// Kubernetes RBAC protects the hub namespace (helm-native plan, slice 0).
 	until, _ := call.Deadline()
-	_, bound, err := s.guard.Current(call)
-	if err != nil {
-		return nil, nil, zero, time.Time{}, err
-	}
-	until = identity.Earlier(until, bound)
 	live, narrow := context.WithDeadline(call, until)
 	finish := func() { narrow(); end() }
-	if err = s.identity(live); err != nil {
+	if err := s.identity(live); err != nil {
 		narrow()
 		return nil, nil, zero, time.Time{}, err
 	}
@@ -142,14 +139,6 @@ func (s *InstalledWorkerProjectionReader) finishObservation(ctx context.Context,
 	live, end := context.WithDeadline(ctx, until)
 	defer end()
 	if err := initialHandoverDeadline(live, s.client.now, until); err != nil {
-		return time.Time{}, err
-	}
-	_, bound, err := s.guard.Current(live)
-	if err != nil {
-		return time.Time{}, err
-	}
-	until = identity.Earlier(until, bound)
-	if err = initialHandoverDeadline(live, s.client.now, until); err != nil {
 		return time.Time{}, err
 	}
 	return until, nil

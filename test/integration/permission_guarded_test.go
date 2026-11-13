@@ -27,7 +27,6 @@ import (
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/jackc/pgx/v5/pgxpool"
 	apps "k8s.io/api/apps/v1"
-	authenticationv1 "k8s.io/api/authentication/v1"
 	core "k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -124,22 +123,11 @@ func testGuardedAndGroupInheritance(t *testing.T, c *rest.Config, reader *kube.P
 	if binding, err = native.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().Create(ctx, binding, meta.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
-	expiry := int64(600)
-	token, err := native.CoreV1().ServiceAccounts(control.Name).CreateToken(ctx, probeAccount.Name, &authenticationv1.TokenRequest{Spec: authenticationv1.TokenRequestSpec{ExpirationSeconds: &expiry}}, meta.CreateOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	probeConfig := rest.AnonymousClientConfig(c)
-	probeConfig.BearerToken = token.Status.Token
-	probe, err := kube.NewPermissionClient(probeConfig, cluster, control, time.Now)
-	if err != nil {
-		t.Fatal(err)
-	}
 	observer, err := kube.NewPermissionClient(c, cluster, control, time.Now)
 	if err != nil {
 		t.Fatal(err)
 	}
-	namespaceGuard, err := kube.NewCapacityNamespaceGuard(observer, probe, guardPlan, kube.GuardPin{PolicyUID: string(policy.UID), PolicyGeneration: policy.Generation, BindingUID: string(binding.UID), BindingResourceVersion: binding.ResourceVersion})
+	namespaceGuard, err := kube.NewCapacityNamespaceGuard(observer, guardPlan, kube.GuardPin{PolicyUID: string(policy.UID), PolicyGeneration: policy.Generation, BindingUID: string(binding.UID), BindingResourceVersion: binding.ResourceVersion})
 	if err != nil {
 		t.Fatal(err)
 	}

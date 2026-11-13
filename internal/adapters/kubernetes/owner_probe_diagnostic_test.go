@@ -12,6 +12,8 @@ import (
 
 // Actual HTTPS/client-go response handling: a valid403 also has a StatusError.
 // Diagnostic categories cannot turn that expected denial into a failed proof.
+// prove keeps the denied probe only for not-yet-migrated configuration and
+// projection callers; remove this test with them.
 func TestOwnerProbeFailureDiagnosticRealHTTPS(t *testing.T) {
 	for _, mode := range []string{"valid403", "body", "deadline", "canceled", "transport"} {
 		t.Run(mode, func(t *testing.T) {
@@ -49,7 +51,7 @@ func TestOwnerProbeFailureDiagnosticRealHTTPS(t *testing.T) {
 				}
 				return false
 			}
-			_, err := f.guard.proveObject(ctx, f.start)
+			err := f.guard.prove(ctx, f.start)
 			if mode == "valid403" {
 				if err != nil {
 					t.Fatal("valid forbidden StatusError refused", err)

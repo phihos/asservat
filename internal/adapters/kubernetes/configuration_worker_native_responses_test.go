@@ -11,8 +11,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
+// Source probes are gone (Helm-native plan, slice 0): fleet and owner sources
+// are plain reads, so only the workload probe identity is retained.
 func TestConfigurationWorkerNativeResponsesRequireEveryOriginalProbe(t *testing.T) {
-	for _, mode := range []string{"valid", "processing-uid", "processing-account", "processing-source", "duplicate-source", "worker-uid", "owner-uid", "owner-identity", "fleet-identity", "processing-identity", "different-client", "missing-capacity", "deleted-worker", "administrator"} {
+	for _, mode := range []string{"valid", "worker-uid", "owner-uid", "owner-identity", "different-client", "missing-capacity", "deleted-worker", "administrator"} {
 		t.Run(mode, func(t *testing.T) {
 			clients := [3]*PermissionClient{{}, {}, {}}
 			s := &ConfigurationRoleSource{protection: &OwnerWorkloadProtection{probe: clients[0]},
@@ -32,24 +34,12 @@ func TestConfigurationWorkerNativeResponsesRequireEveryOriginalProbe(t *testing.
 				SourceProbes: []cfg.InitialRuntimeSourceProbe{{ConfigMap: "fleet", ServiceAccount: "worker", ServiceAccountUID: ownerID(3)}, {ConfigMap: "owner-source", ServiceAccount: "worker", ServiceAccountUID: ownerID(3)}, {ConfigMap: installedProcessingSource(ownerID(1)), ServiceAccount: "worker", ServiceAccountUID: ownerID(3)}}}
 			n := configurationRoleNativeResponses{clients: clients, identities: [3]auth.UserInfo{who("owner", ownerID(6)), who("worker", ownerID(3)), who("worker", ownerID(3))}, worker: account("worker", ownerID(3))}
 			switch mode {
-			case "processing-uid":
-				p.SourceProbes[2].ServiceAccountUID = ownerID(99)
-			case "processing-account":
-				p.SourceProbes[2].ServiceAccount = "other"
-			case "processing-source":
-				p.SourceProbes[2].ConfigMap = "other"
-			case "duplicate-source":
-				p.SourceProbes[2].ConfigMap = "fleet"
 			case "worker-uid":
 				n.worker.UID = types.UID(ownerID(99))
 			case "owner-uid":
 				owner.UID = types.UID(ownerID(99))
 			case "owner-identity":
 				n.identities[0].UID = ownerID(99)
-			case "fleet-identity":
-				n.identities[1].UID = ownerID(99)
-			case "processing-identity":
-				n.identities[2].UID = ownerID(99)
 			case "different-client":
 				n.clients[2] = &PermissionClient{}
 			case "missing-capacity":
@@ -60,7 +50,7 @@ func TestConfigurationWorkerNativeResponsesRequireEveryOriginalProbe(t *testing.
 				p.Owner.Administrators = append(p.Owner.Administrators, cfg.KubernetesActor{Kind: "Group", Name: "system:authenticated"})
 			}
 			if got := n.matches(s, p, owner); got != (mode == "valid") {
-				t.Fatalf("four original probe bindings: accepted=%t", got)
+				t.Fatalf("original workload probe binding: accepted=%t", got)
 			}
 		})
 	}

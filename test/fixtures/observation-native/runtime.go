@@ -323,7 +323,7 @@ func (r *fixtureRuntime) startRegional(ownerRoots *x509.CertPool) (err error) {
 	if err != nil {
 		return err
 	}
-	guard, err := kube.NewCapacityNamespaceGuard(r.observer, r.probe, r.input.CapacityPlan, r.input.CapacityPin)
+	guard, err := kube.NewCapacityNamespaceGuard(r.observer, r.input.CapacityPlan, r.input.CapacityPin)
 	if err != nil {
 		return err
 	}

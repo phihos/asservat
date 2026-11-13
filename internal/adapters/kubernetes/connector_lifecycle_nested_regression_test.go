@@ -158,7 +158,9 @@ func TestConnectorLifecycleLegacyStandaloneNativeCounts(t *testing.T) {
 	}
 	// The proof's repeated connector source read reuses the observation within
 	// its original interval (sourceReuseMargin): 47/9 reads became 33/6.
-	if len(f.proofs) != 1 || f.proofs[0].observer != 33 || f.proofs[0].probe != 6 || f.api.reviews.Load() != 2 {
+	// Helm-native installation removed the workload guard reads and its
+	// denied probe: 24/3.
+	if len(f.proofs) != 1 || f.proofs[0].observer != 24 || f.proofs[0].probe != 3 || f.api.reviews.Load() != 2 {
 		t.Fatal("standalone actual native read count differs from source graph")
 	}
 }
@@ -188,12 +190,9 @@ func TestConnectorLifecycleEnrollmentWithinOriginalBound(t *testing.T) {
 	if !process.Valid() || f.prepares != 1 || f.begins != 1 || f.stores != 1 || f.finishes != 1 || f.accepts != 1 || ctx.Err() != nil || len(f.proofs) != 4 {
 		t.Fatal("enrollment result lacks original bounded effects/completion")
 	}
-	for i, count := range []int32{22, 12, 12, 22} {
-		probe := int32(0)
-		if i == 0 || i == 3 {
-			probe = 6
-		}
-		if f.proofs[i].failed || f.proofs[i].observer != count || f.proofs[i].probe != probe {
+	// Slice 0: plain reads only; no probe requests remain in any phase.
+	for i, count := range []int32{15, 8, 8, 15} {
+		if f.proofs[i].failed || f.proofs[i].observer != count || f.proofs[i].probe != 0 {
 			t.Fatal("actual enrollment native phase graph differs", i)
 		}
 	}

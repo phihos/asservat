@@ -13,16 +13,13 @@ import (
 
 	"asservat.local/asservat/internal/contracts"
 	cfg "asservat.local/asservat/internal/domain/configuration"
-	admission "k8s.io/api/admissionregistration/v1"
-	authn "k8s.io/api/authentication/v1"
-	authz "k8s.io/api/authorization/v1"
-	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
 )
 
 // ADR-180: the hub reads a workload cluster's work trust from its own control
 // namespace; the trust names that cluster and its keys, never the reader's.
-// Real loopback TLS; admission replies, recovery and clock are synthetic.
+// Real loopback TLS; recovery and clock are synthetic. The server has no
+// admission policy, review or dry-run endpoint: plain read under RBAC.
 func TestAPIContextWorkTrustIsHubHeldForAWorkloadCluster(t *testing.T) {
 	for _, mode := range []string{"hub-held", "changed"} {
 		t.Run(mode, func(t *testing.T) {
@@ -41,33 +38,11 @@ func TestAPIContextWorkTrustIsHubHeldForAWorkloadCluster(t *testing.T) {
 				served = string(b)
 			}
 			plan := cfg.ConfigMapAdministration{Name: "trust-guard", ControlNamespace: permissionControl, SourceName: "api-context-work-trust", Administrators: []cfg.KubernetesActor{{Kind: "User", Name: "admin"}}}
-			p, b, err := APIContextWorkTrustAdmission(plan)
-			if err != nil {
-				t.Fatal(err)
-			}
-			p.UID, p.Generation, p.ResourceVersion = "policy", 1, "1"
-			p.Status.ObservedGeneration = 1
-			p.Status.TypeChecking = &admission.TypeChecking{}
-			b.UID, b.ResourceVersion = "binding", "1"
 			clock := &atomic.Int64{}
 			clock.Store(now.UnixNano())
 			server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				switch {
-				case strings.Contains(r.URL.Path, "/validatingadmissionpolicies/"):
-					permissionReply(w, p.DeepCopy())
-				case strings.Contains(r.URL.Path, "/validatingadmissionpolicybindings/"):
-					permissionReply(w, b)
-				case strings.HasSuffix(r.URL.Path, "/selfsubjectreviews"):
-					permissionReply(w, authn.SelfSubjectReview{TypeMeta: meta.TypeMeta{APIVersion: "authentication.k8s.io/v1", Kind: "SelfSubjectReview"}, Status: authn.SelfSubjectReviewStatus{UserInfo: authn.UserInfo{Username: "outsider", Groups: []string{"authenticated"}}}})
-				case strings.HasSuffix(r.URL.Path, "/selfsubjectaccessreviews"):
-					permissionReply(w, authz.SelfSubjectAccessReview{TypeMeta: meta.TypeMeta{APIVersion: "authorization.k8s.io/v1", Kind: "SelfSubjectAccessReview"}, Status: authz.SubjectAccessReviewStatus{Allowed: true}})
-				case strings.HasSuffix(r.URL.Path, "/configmaps/api-context-work-trust"):
-					if r.Method == "PUT" {
-						w.Header().Set("Content-Type", "application/json")
-						w.WriteHeader(422)
-						permissionReply(w, meta.Status{TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "Status"}, Status: meta.StatusFailure, Reason: meta.StatusReasonInvalid, Code: 422, Details: &meta.StatusDetails{Kind: "configmaps", Causes: []meta.StatusCause{{Message: "ValidatingAdmissionPolicy 'trust-guard' with binding 'trust-guard' denied request: " + apiContextTrustDenial}}}})
-						return
-					}
+				case strings.HasSuffix(r.URL.Path, "/configmaps/api-context-work-trust") && r.Method == http.MethodGet:
 					permissionReply(w, map[string]any{"apiVersion": "v1", "kind": "ConfigMap", "immutable": true, "metadata": map[string]any{"name": "api-context-work-trust", "namespace": permissionControl.Name, "uid": ownerID(7), "resourceVersion": "1"}, "data": map[string]string{"api-context-work-trust.json": served}})
 				case r.URL.Path == "/api/v1/namespaces/"+permissionControl.Name:
 					permissionReply(w, permissionNamespace(permissionControl.Name, permissionControl.UID))

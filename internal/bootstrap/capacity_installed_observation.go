@@ -33,7 +33,7 @@ func (s mountedCapacityObservationToken) ReadClusterObservationToken(ctx context
 	return b, nil
 }
 
-func (d *CapacityWorkerDeployment) installedClusterReaders(ctx context.Context, s *installedCapacityWorkerInputs, observer, probe *kube.PermissionClient, in *providerInputs, pool *pgxpool.Pool, observerToken, probeToken string) ([]app.CapacityClusterReaders, []app.CapacityNamespaceQualification, error) {
+func (d *CapacityWorkerDeployment) installedClusterReaders(ctx context.Context, s *installedCapacityWorkerInputs, in *providerInputs, pool *pgxpool.Pool, observerToken, probeToken string) ([]app.CapacityClusterReaders, []app.CapacityNamespaceQualification, error) {
 	c, m := d.input, d.manifest
 	if !s.matches(c, m) || pool == nil {
 		return nil, nil, mounts.ErrUnavailable

@@ -32,9 +32,6 @@ import (
 	"asservat.local/asservat/internal/domain/privacy"
 	"asservat.local/asservat/internal/domain/targets"
 	"asservat.local/asservat/internal/transport/contextstart"
-	admission "k8s.io/api/admissionregistration/v1"
-	authn "k8s.io/api/authentication/v1"
-	authz "k8s.io/api/authorization/v1"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -215,17 +212,6 @@ func regionalObservationCapability(t *testing.T, f *regionalObservationFixture, 
 	id := regionalObservationID
 	control := cfg.NamespaceRef{Name: "control", UID: id(57)}
 	plan := cfg.ConfigMapAdministration{Name: "capability-guard", ControlNamespace: control, SourceName: "context-capability", Administrators: []cfg.KubernetesActor{{Kind: "User", Name: "admin"}}}
-	p, b, err := kube.ContextCapabilityAdmission(plan)
-	if err != nil {
-		t.Fatal(err)
-	}
-	p.UID = "policy"
-	p.Generation = 1
-	p.ResourceVersion = "1"
-	p.Status.ObservedGeneration = 1
-	p.Status.TypeChecking = &admission.TypeChecking{}
-	b.UID = "binding"
-	b.ResourceVersion = "1"
 	raw, _ := json.Marshal(settings)
 	observerCalls, probeCalls := &atomic.Int64{}, &atomic.Int64{}
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -239,23 +225,7 @@ func regionalObservationCapability(t *testing.T, f *regionalObservationFixture, 
 			t.Error("unexpected fixture credential")
 		}
 		switch {
-		case strings.Contains(r.URL.Path, "/validatingadmissionpolicies/"):
-			reply(p)
-		case strings.Contains(r.URL.Path, "/validatingadmissionpolicybindings/"):
-			reply(b)
-		case strings.HasSuffix(r.URL.Path, "/selfsubjectreviews"):
-			reply(authn.SelfSubjectReview{TypeMeta: meta.TypeMeta{APIVersion: "authentication.k8s.io/v1", Kind: "SelfSubjectReview"}, Status: authn.SelfSubjectReviewStatus{UserInfo: authn.UserInfo{Username: "outsider", Groups: []string{"authenticated"}}}})
-		case strings.HasSuffix(r.URL.Path, "/selfsubjectaccessreviews"):
-			reply(authz.SelfSubjectAccessReview{TypeMeta: meta.TypeMeta{APIVersion: "authorization.k8s.io/v1", Kind: "SelfSubjectAccessReview"}, Status: authz.SubjectAccessReviewStatus{Allowed: true}})
-		case strings.HasSuffix(r.URL.Path, "/configmaps/context-capability"):
-			if r.Method == "PUT" {
-				if r.URL.Query().Get("dryRun") != "All" {
-					t.Error("persistent fixture probe")
-				}
-				w.WriteHeader(422)
-				reply(meta.Status{TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "Status"}, Status: meta.StatusFailure, Reason: meta.StatusReasonInvalid, Code: 422, Details: &meta.StatusDetails{Kind: "configmaps", Causes: []meta.StatusCause{{Message: "ValidatingAdmissionPolicy 'capability-guard' with binding 'capability-guard' denied request: Asservat context capability administrator is required."}}}})
-				return
-			}
+		case strings.HasSuffix(r.URL.Path, "/configmaps/context-capability") && r.Method == http.MethodGet:
 			immutable := true
 			reply(core.ConfigMap{TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "ConfigMap"}, ObjectMeta: meta.ObjectMeta{Name: plan.SourceName, Namespace: control.Name, UID: types.UID(id(49)), ResourceVersion: "1"}, Immutable: &immutable, Data: map[string]string{"context-capability.json": string(raw)}})
 		case r.URL.Path == "/api/v1/namespaces/"+control.Name:
@@ -344,7 +314,7 @@ func TestRegionalStartReusesPreludeBeforeFirstPreparation(t *testing.T) {
 		t.Fatal("composed path did not reach the intended first SQL boundary", err, f.preparations)
 	}
 	t.Logf("actual StartContext -> runner first preparation: work reads=%d, TLS observer=%d probe=%d, elapsed=%s, opening QPS=%v burst=%d", f.workReads, observer.Load(), probe.Load(), elapsed, kube.OpeningQPS, kube.OpeningBurst)
-	if f.workReads != 1 || observer.Load() != 18 || probe.Load() != 6 {
+	if f.workReads != 1 || observer.Load() != 3 || probe.Load() != 0 {
 		t.Fatal("preparation repeated its already observed prelude", f.workReads, observer.Load(), probe.Load())
 	}
 	if f.check.Work.Actor != f.identity.Principal || f.check.Work.Accepted.CaptureID != f.work.Accepted.CaptureID || f.check.ValidUntil.After(f.identity.ValidUntil) || f.check.ValidUntil.After(f.receiver.Window.Until()) {

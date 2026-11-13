@@ -10,7 +10,6 @@ import (
 	"asservat.local/asservat/internal/contracts"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	admission "k8s.io/api/admissionregistration/v1"
-	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -19,7 +18,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"k8s.io/utils/ptr"
 )
 
 const workloadMetadataDenial = "Asservat workload ownership administrator is required."
@@ -73,48 +71,33 @@ func WorkloadAdmission(p cfg.WorkloadAdministration) (*admission.ValidatingAdmis
 	return policy, binding, nil
 }
 
-// WorkloadGuard proves the workload metadata guard: the pinned policy and
-// binding are exactly the generated ones and the unprivileged probe
-// account's dry-run CREATE of a keyed Deployment in its empty probe
-// namespace is denied by exactly this guard.
+// WorkloadGuard reports the cluster's protected workload metadata keys
+// while the probe namespace still exists with its UID. Kubernetes RBAC
+// decides who may write workload metadata; the runtime no longer re-verifies
+// an admission policy or a dry-run denial (helm-native-install plan, slice 0).
 type WorkloadGuard struct {
 	guard *capacityGuard
 	plan  cfg.WorkloadAdministration
 }
 
-func NewWorkloadGuard(observer, probe *PermissionClient, plan cfg.WorkloadAdministration, pin GuardPin) (*WorkloadGuard, error) {
-	p, b, err := WorkloadAdmission(plan)
-	if err != nil {
-		return nil, err
+func NewWorkloadGuard(observer *PermissionClient, plan cfg.WorkloadAdministration, pin GuardPin) (*WorkloadGuard, error) {
+	if !(cfg.NamespaceKeys{Labels: plan.LabelKeys, Annotations: plan.AnnotationKeys}).Valid() || len(plan.LabelKeys)+len(plan.AnnotationKeys) == 0 {
+		return nil, cfg.ErrInvalid
 	}
-	g, err := newCapacityGuard(observer, probe, plan.ProbeNamespace, plan.ProbeAccount, plan.Name, plan.Administrators, nil, pin, p, b, plan)
+	g, err := newCapacityGuard(observer, plan.ProbeNamespace, pin, plan)
 	if err != nil {
 		return nil, err
 	}
 	return &WorkloadGuard{guard: g, plan: plan}, nil
 }
 
-// WorkloadGuardProof is one current proof within the original interval.
+// WorkloadGuardProof is one current observation within the original interval.
 func (g *WorkloadGuard) WorkloadGuardProof(ctx context.Context) (cfg.NamespaceGuardProof, error) {
 	if g == nil || g.guard == nil {
 		return cfg.NamespaceGuardProof{}, cfg.ErrUnavailable
 	}
 	s := g.guard
-	start, until, err := s.current(ctx, func(call context.Context) error {
-		if err := s.probeAllowed(call, "create", "apps", "deployments", s.namespace.Name, ""); err != nil {
-			return err
-		}
-		probeLabels := map[string]string{"app.kubernetes.io/name": "asservat-workload-probe"}
-		d := apps.Deployment{TypeMeta: meta.TypeMeta{APIVersion: "apps/v1", Kind: "Deployment"}, ObjectMeta: meta.ObjectMeta{GenerateName: "asservat-workload-probe-", Namespace: s.namespace.Name, Labels: map[string]string{}, Annotations: map[string]string{}},
-			Spec: apps.DeploymentSpec{Replicas: ptr.To(int32(0)), Selector: &meta.LabelSelector{MatchLabels: probeLabels}, Template: core.PodTemplateSpec{ObjectMeta: meta.ObjectMeta{Labels: probeLabels}, Spec: core.PodSpec{Containers: []core.Container{{Name: "probe", Image: "registry.invalid/asservat-workload-probe:0"}}}}}}
-		if len(g.plan.LabelKeys) > 0 {
-			d.Labels[g.plan.LabelKeys[0]] = "asservat-probe"
-		} else {
-			d.Annotations[g.plan.AnnotationKeys[0]] = "asservat-probe"
-		}
-		_, err := s.probe.proofPost(call, "/apis/apps/v1/namespaces/"+s.namespace.Name+"/deployments", d, map[string]string{"dryRun": "All", "fieldValidation": "Strict"})
-		return capacityExactDenial(err, s.name, "apps", "deployments", workloadMetadataDenial)
-	})
+	start, until, err := s.current(ctx)
 	if err != nil {
 		return cfg.NamespaceGuardProof{}, err
 	}
