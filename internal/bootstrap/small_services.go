@@ -257,7 +257,7 @@ func (s secretStore) artifactKey(ctx context.Context, name, installation string)
 		return secretsFailure("RandomUnavailable")
 	}
 	defer clear(payload)
-	data, err := s.ensure(ctx, name, map[string][]byte{contracts.ArtifactKeyFile: payload})
+	data, err := s.ensure(ctx, name, map[string][]byte{contracts.ArtifactKeySecretKey: payload})
 	if err != nil {
 		return err
 	}

@@ -305,7 +305,7 @@ func TestSecretsHookUsesRenderedPlanAndExactRole(t *testing.T) {
 					}
 				}
 			}
-			if len(first["trial-audit-mac"][contracts.AuditMACInputKey]) != 32 || !strings.Contains(first["trial-artifact-key"][contracts.ArtifactKeyFile], `"purpose":"artifact"`) {
+			if len(first["trial-audit-mac"][contracts.AuditMACInputKey]) != 32 || !strings.Contains(first["trial-artifact-key"][contracts.ArtifactKeySecretKey], `"purpose":"artifact"`) {
 				t.Fatal("audit MAC or artifact key material")
 			}
 			iam := first["trial-objectstore-iam"][providerconfig.SeaweedConfigKey]

@@ -55,9 +55,9 @@ const (
 	AuditMACAccountKey     = "accountKey"
 )
 
-// ArtifactKeyFile is the `<name>-artifact-key` Secret key holding the local
+// ArtifactKeySecretKey is the `<name>-artifact-key` Secret key holding the local
 // artifact root keyset (asservat-local-keys/v1).
-const ArtifactKeyFile = "keys.json"
+const ArtifactKeySecretKey = "keys.json"
 
 // ObjectStoreCredentialFile is the key of each `<name>-s3-<principal>` Secret
 // (OwnerStorageCredential JSON).

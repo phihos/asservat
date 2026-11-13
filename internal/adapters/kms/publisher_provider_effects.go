@@ -30,7 +30,6 @@ const publisherProviderBorrows = 4
 // renewal runs only under the composition's current proof; effects borrow a
 // token and never trigger a login.
 type InstalledPublisherProviderEffects struct {
-	input              contracts.PublisherDeployment
 	files              *os.Root
 	wrap, unwrap, sign *ownerProviderLifetime
 	seal               *Sealer
@@ -45,38 +44,32 @@ type InstalledPublisherProviderEffects struct {
 	closeDone          chan struct{}
 }
 
+// PublisherProviderKeys are the publisher's audit Transit key and verifier
+// PKI role on the login's provider.
+type PublisherProviderKeys struct {
+	AuditMount, AuditKey, PKIMount, VerifierRole string
+}
+
 // NewInstalledPublisherProviderEffects composes the three lifetimes. proof is
-// the publisher's current native proof (hub workload guard and recovery); its
-// returned time bounds every login, renewal and borrowed effect.
-func NewInstalledPublisherProviderEffects(ctx context.Context, input contracts.PublisherDeployment, files *os.Root, proof func(context.Context) (time.Time, error)) (*InstalledPublisherProviderEffects, error) {
-	if ctx == nil || ctx.Err() != nil || files == nil || proof == nil || providerconfig.ValidatePublisherProviderAuthentication(input, input.ProviderAuthentication, time.Now()) != nil {
-		return nil, ErrKeyService
-	}
-	raw, err := json.Marshal(input)
-	var cloned contracts.PublisherDeployment
-	if err != nil || json.Unmarshal(raw, &cloned) != nil {
+// the publisher's current recovery observation; its returned time bounds
+// every login, renewal and borrowed effect.
+func NewInstalledPublisherProviderEffects(ctx context.Context, installation string, login ProviderLogin, k PublisherProviderKeys, files *os.Root, proof func(context.Context) (time.Time, error)) (*InstalledPublisherProviderEffects, error) {
+	if ctx == nil || ctx.Err() != nil || files == nil || proof == nil || !value.UUID(installation) || !login.valid(providerconfig.PublisherProviderPurposes[:]...) ||
+		!keyName.MatchString(k.AuditMount) || !keyName.MatchString(k.AuditKey) || !keyName.MatchString(k.PKIMount) || !keyName.MatchString(k.VerifierRole) || k.AuditMount == k.PKIMount {
 		return nil, ErrKeyService
 	}
 	root, cancel := context.WithCancel(ctx)
-	s := &InstalledPublisherProviderEffects{input: cloned, files: files, root: root, cancel: cancel, closeDone: make(chan struct{})}
+	s := &InstalledPublisherProviderEffects{files: files, root: root, cancel: cancel, closeDone: make(chan struct{})}
 	complete := false
 	defer func() {
 		if !complete {
 			_ = s.Close(context.Background())
 		}
 	}()
-	recipe, err := providerconfig.PublisherProviderRecipeFor(cloned, cloned.ProviderAuthentication)
-	if err != nil || recipe.Profile != cloned.ProviderAuthentication {
-		return nil, ErrKeyService
-	}
-	// The recipe requires one provider for the audit key and the verifier
-	// PKI, which also holds the shared auth mount.
-	provider := contracts.OwnerProviderEndpoint{Endpoint: cloned.AuditKeys.Endpoint, Roots: cloned.AuditKeys.Roots}
-	p := cloned.ProviderAuthentication
 	base := &http.Client{Transport: &http.Transport{}, Timeout: 5 * time.Second}
 	targets := [3]**ownerProviderLifetime{&s.wrap, &s.unwrap, &s.sign}
-	for i, role := range recipe.Roles {
-		control, err := newKubernetesProviderControl(provider, p.AuthMount, role.Name, p.Namespace.Name, p.ServiceAccount, base, time.Now)
+	for i, purpose := range providerconfig.PublisherProviderPurposes {
+		control, err := newKubernetesProviderControl(login.Provider, login.AuthMount, login.Roles[purpose], login.Namespace, login.ServiceAccount, base, time.Now)
 		if err != nil {
 			return nil, err
 		}
@@ -87,22 +80,21 @@ func NewInstalledPublisherProviderEffects(ctx context.Context, input contracts.P
 		}
 		*targets[i] = slot
 	}
-	a, v := cloned.AuditKeys, cloned.Verifier
-	wrap, err := newOwnerProviderEffectClient(s.wrap, a.Mount+"/encrypt/"+a.Key)
+	wrap, err := newOwnerProviderEffectClient(s.wrap, k.AuditMount+"/encrypt/"+k.AuditKey)
 	if err != nil {
 		return nil, err
 	}
-	s.seal = &Sealer{client: wrap, mount: a.Mount, key: a.Key, reference: a.Mount + "/" + a.Key}
-	unwrap, err := newOwnerProviderEffectClient(s.unwrap, a.Mount+"/decrypt/"+a.Key)
+	s.seal = &Sealer{client: wrap, mount: k.AuditMount, key: k.AuditKey, reference: k.AuditMount + "/" + k.AuditKey}
+	unwrap, err := newOwnerProviderEffectClient(s.unwrap, k.AuditMount+"/decrypt/"+k.AuditKey)
 	if err != nil {
 		return nil, err
 	}
-	s.open = &Opener{client: unwrap, mount: a.Mount, key: a.Key, reference: a.Mount + "/" + a.Key}
-	sign, err := newOwnerProviderEffectClient(s.sign, v.PKIMount+"/sign/"+v.Role)
+	s.open = &Opener{client: unwrap, mount: k.AuditMount, key: k.AuditKey, reference: k.AuditMount + "/" + k.AuditKey}
+	sign, err := newOwnerProviderEffectClient(s.sign, k.PKIMount+"/sign/"+k.VerifierRole)
 	if err != nil {
 		return nil, err
 	}
-	s.verifier = &VerifierCertificateSigner{client: sign, path: v.PKIMount + "/sign/" + v.Role, installation: cloned.InstallationID}
+	s.verifier = &VerifierCertificateSigner{client: sign, path: k.PKIMount + "/sign/" + k.VerifierRole, installation: installation}
 	complete = true
 	return s, nil
 }
