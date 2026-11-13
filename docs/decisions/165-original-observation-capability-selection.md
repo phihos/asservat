@@ -1,7 +1,8 @@
 # ADR-165 — Original observation capability selection
 
-Date: 2026-10-14. Status: accepted; component qualification passes; no runtime
-selection. Requirements: REQ-FED-001/003 and REQ-DEP-003; existing scenarios and
+> Superseded (2026-11-13): the format was pinned into installer resource journals and bootstrap claims so an installation could not be upgraded or downgraded by a changed file. Under ADR-328 mounted configuration is trusted; the protocol version is plain Helm-provided configuration.
+
+Date: 2026-10-14. Status: superseded by ADR-328 (administrator-only namespaces); the mechanism is removed by the Helm-native installation plan. Requirements: REQ-FED-001/003 and REQ-DEP-003; existing scenarios and
 TASK-03 / TASK-11 retain traceability ownership.
 
 ## Problem

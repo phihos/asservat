@@ -1,7 +1,8 @@
 # ADR-099 — Protected initial-installer execution
 
-Status: accepted engineering refinement under the maintainer's implementation
-continuation. Qualification is recorded in [progress](../implementation-progress.md).
+> Superseded (2026-11-13): the scheduling-gated installer Pod, SelfSubjectReview, probe principal and namespace admission exceptions defended against tampering inside Asservat namespaces. Helm renders all objects and an idempotent `setup` hook Job performs live initialization (docs/reviews/helm-native-install-plan.md).
+
+Status: superseded by ADR-328 (administrator-only namespaces); the mechanism is removed by the Helm-native installation plan.
 
 ## Decision
 

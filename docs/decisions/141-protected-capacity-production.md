@@ -1,5 +1,7 @@
 # ADR-141 — Protected capacity production and managed renewal
 
+> Superseded in part by ADR-328 (2026-11-13): CRD-status-versus-source-protection checks, guard authority, installer receipts/journals, the installer verifier and denial-probe RBAC defended against writers in Asservat namespaces or served the installer Pod; they no longer apply. Budget derivation, purpose-separated capacity credentials, SQL accounting and managed renewal remain valid.
+
 Status: accepted implementation direction; actual SQL54 component matrix passed.
 Installed projection/local-observation composition and multi-cluster runtime
 qualification remain pending. This decision enables no runtime or public route.
@@ -8,15 +10,13 @@ Automatically enroll exact workloads from accepted permission scopes and the
 administrator's protected `EvidenceStoragePool`/`EvidenceBudgetPolicy` inputs.
 Derive pool, cluster, namespace and workload budgets from the same complete
 plan. Shared burst is serialized globally; unused protected commitments are
-never lent. A caller cannot choose an account or substitute CRD status for
-current source protection. Backend/history qualification is a separate protected
-installer input, not an assurance string accepted from a workload administrator.
+never lent. A caller cannot choose an account or use CRD status as input. Backend/history
+qualification is installation configuration, not an assurance string accepted
+from a workload administrator.
 
 Migration 00054 adds bounded retained source and enrollment state to existing
-custody machinery. A post-activation administrator producer initializes the
-paired capacity/capture roots using original role receipts and database
-incarnation. It cannot adopt existing unrelated roots or revive the retired
-initial manager. Runtime uses two separate purpose credentials: capacity
+custody machinery. The `setup` Job initializes the paired capacity/capture roots
+for the current database incarnation. It cannot adopt existing unrelated roots. Runtime uses two separate purpose credentials: capacity
 ordinal70 reserves and publishes; capacity-capture ordinal71 provides the
 SQL52 capture backing. Neither may impersonate the other's phase. Original
 ordinal34 is a separate read-only accepted audit-profile credential.
@@ -29,8 +29,8 @@ remaining at creation and neither paired row; subsequent attempts could never
 finish. The exact first postclaim failure was not retained, so this does not
 establish which loaded operation consumed that interval.
 
-A later invocation may finish the first atomic pair under fresh protected role,
-permission, recovery and guard authority only when the original exact claim has
+A later invocation may finish the first atomic pair under fresh role,
+permission and recovery authority only when the original exact claim has
 no acknowledged receipt and both rows remain absent under the existing locks.
 The claim's identifiers, input digest, database incarnation and timestamps stay
 unchanged and supply no fresh authority. A committed pair is exact lookup-only;
@@ -70,8 +70,7 @@ deadline, at most five seconds. Legacy rows are not silently promoted.
 
 The existing A-HWORK application owns serial capacity reconciliation beside
 configuration reconciliation. One desired worker and two retained processes
-bound rollout/closing work; each purpose uses MaxConns1 and SQL LIMIT3 including
-one serialized installer verifier. Lease loss cancels and joins every child
+bound rollout/closing work; each purpose uses MaxConns1 and SQL LIMIT3. Lease loss cancels and joins every child
 before resources close. Scheduling is not authority. The provisional sixteen
 account S02 envelope requires measured worst-case lock qualification; it is not
 a universal workload limit or measured safe operating size.
@@ -88,14 +87,11 @@ Remote cluster observation requires a concrete authenticated local-producer
 path; static remote service-account token files are not an installed solution.
 No capacity credentials enter hub-api, collector or a public request.
 
-The installed capacity projection also binds the complete original public owner
-source/input to its original resource-journal and setup receipt. It uses the
+The installed capacity configuration is Helm-rendered and read by fixed name. It uses the
 existing fixed private observation listener and local kubelet token after current
 owner authentication, not remote service-account files or a public-listener
 startup dependency. The original source revision establishes provenance while
 compatible independently accepted same-pool revisions may advance; every request
 holds its exact revision through delivery. Role70 receives only the existing
-owner registry read/lock graph, never owner issuance or activation. Fresh worker
-RBAC templates grant only fixed source reads and independent denial probes,
-protected by the original ADR145 namespace branch. Combined installed native
+owner registry read/lock graph, never owner issuance or activation. Worker RBAC grants only fixed source reads. Combined installed native
 qualification remains mandatory before selecting this composition.

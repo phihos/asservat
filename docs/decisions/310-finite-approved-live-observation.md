@@ -1,5 +1,10 @@
 # ADR-310: Finite approved live observation
 
+> Superseded in part by ADR-328 (2026-11-13): The delivery policy is mounted
+> configuration read under RBAC, not a guarded protected source; changing its
+> root numeric settings needs an ordinary restart. Viewer authority, source
+> bounds, minimized SQL accounting and the live delivery design remain valid.
+
 Status: implemented; component, real-service and installed policy/manual qualification passed. Wider environment and sustained-operation qualification remains open.
 
 ## Decision
@@ -131,7 +136,7 @@ observation grant. A source ring has no selected evidence store yet; one
 unambiguous installed path for the source cluster and explicit live client is
 required, with the existing actual acquisition/connector/hub region pins. No
 caller store or alternate placement is accepted. Root numeric settings are
-pinned for the process's SQL accounting; changing them requires a guarded restart.
+fixed for the process's SQL accounting; changing them requires a restart.
 Scoped lowerings are checked on each phase and can end an existing view.
 
 There is no second startup numeric block, new ConfigMap, role or watcher. The

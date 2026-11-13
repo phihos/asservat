@@ -1,5 +1,7 @@
 # ADR-203 — Installed publisher
 
+> Superseded in part by ADR-328 (2026-11-13): the owner workload guard proof that gated OpenBao logins, the guarded catalog read with its dry-run UPDATE probe, the hub namespace guard pairs and the bridge exemption no longer apply. The publisher reads the catalog ConfigMap under RBAC and logs in with its projected token; Helm deploys it instead of `installer-continue`. The separate process, OpenBao purpose roles, verifier certificate, separate storage credentials and per-attempt SQL unwrap grants remain valid.
+
 Date: 2026-10-18. Status: accepted; implemented; installed verification, audit acknowledgement and catalog publication observed.
 Requirements: S-02 (encrypted publication in the installed journey); REQ-DEP-003,
 REQ-FED-002; TASK-03.
@@ -60,9 +62,9 @@ that the installed layout cannot supply:
 
 ## Decision
 
-1. **Workload.** `installer-continue` deploys `asservat-<id>-publisher` in the
-   hub namespace after the key service: steps `publisher/projection`,
-   `publisher/identity`, `publisher/workload` and `publisher/settle`. One
+1. **Workload.** Helm deploys `asservat-<id>-publisher` in the hub namespace
+   (originally `installer-continue` steps `publisher/projection`,
+   `publisher/identity`, `publisher/workload` and `publisher/settle`). One
    replica, Pod Security `restricted`, no Service and no route.
 2. **SQL.** A projection Secret carries the six existing publisher logins and
    `publisher-roles.json`, claimed as `PublisherProjection` in the public role
@@ -79,11 +81,8 @@ that the installed layout cannot supply:
    own Transit key, created by the provider setup artifact like the
    federation's.
 
-   Logins and renewals are gated by the owner workload guard's current proof
-   and the recovery state, as the federation's are. The input names the
-   hub-api Deployment the guard proof probes, because the publisher's SQL
-   logins cannot read the owner configuration. The static token files are
-   removed.
+   Logins and renewals are gated by the recovery state. The static token
+   files are removed.
 4. **Verifier certificate.** The worker PKI mount gains the role
    `asservat-<id>-verifier`, which allows only the URI SAN
    `spiffe://asservat.<inst>/key-client/verifier/*` and a 20-minute TTL. The
@@ -105,18 +104,12 @@ that the installed layout cannot supply:
    setup artifact lists both credentials and their permissions. Separate
    credentials keep evidence reads out of every other hub workload and give
    each audit writer its own prefix.
-6. **Topology pins from the catalog.** The publisher reads the guarded cluster
-   catalog at startup with the same guard and probe proof as the hub-api, and
+6. **Topology pins from the catalog.** The publisher reads the cluster
+   catalog ConfigMap at startup under RBAC, as the hub-api does, and
    unions the joined slots' pins with its fixed list, which may now be empty.
    When the catalog digest changes it exits and the kubelet restarts it, as
    the hub-api does. A regional capture is therefore published once its
    region has joined.
-   The catalog proof's dry-run UPDATE must be denied by the catalog's own
-   guard, so the hub namespace guard admits one more exact pair (the catalog
-   and the publisher's account). The guard's pair bound rises from eight to
-   twelve; each pair stays one named dry-run UPDATE. The initial runtime
-   bridge treats the publisher's pair like the hub-api's: its source does not
-   exist at bridge time and the publisher proves it at read time.
 7. **No readiness route.** The publisher serves nothing. The installer waits
    for the Deployment to settle; the native test qualifies the publisher by
    publishing the installed journey's capture.

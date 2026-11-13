@@ -1,5 +1,12 @@
 # ADR-324: Install the existing context workflow through Helm
 
+> Superseded in part by ADR-328 (2026-11-13): The installer-created capacity
+> objects with marked replay, the provider inbox for serving certificates, the
+> 32-actor administrator guard and the same-API dry-run probe exemptions no
+> longer apply. Helm renders the capacity objects, operator-supplied serving
+> certificates come from named Secrets, and administrators are RBAC subjects.
+> Passing public settings through the chart and `make image` remain valid.
+
 Status: implementation candidate, 2026-11-11. The short actual Helm context
 journey passes with separate hub/workload APIs and a shared API, with preloaded
 images. A homelab trial remains pending. This does not mark the
@@ -16,28 +23,21 @@ guarded installation after enrollment. These are observed packaging defects.
 
 ## Decision
 
-Complete one collector-free context trial using the existing runtime and
-installer. Pass the supported public settings through the chart and decode the
-rendered projection through the real typed consumer. Declare optional pool and
-budget specs in the existing capacity input; the installer creates their exact
-objects after its generated cluster identity is known. Exact marked replay is
-allowed; conflicting or unmarked retained objects are refused.
+Complete one collector-free context trial using the existing runtime. Pass
+the supported public settings through the chart and decode the rendered
+configuration through the real typed consumer. Optional pool and budget specs
+are rendered by the chart. (Superseded: the installer created these objects
+with marked replay.)
 
-Use the existing provider inbox for operator-supplied federation/key-service
-serving certificate, key and CA bundles. The public recipe states the expected
-hostnames. Validate both bundles before effects, then create the fixed Secrets
-or reopen their exact contents. Do not generate a CA, change existing keys or
-put private material in values or the public outbox.
+Operator-supplied federation/key-service serving certificate, key and CA
+bundles come from named Secrets. The documentation states the expected
+hostnames. Do not generate a CA, change existing keys or put private material
+in values. (Superseded: the installer provider inbox validated and copied them.)
 
-Expose the existing explicit installation-administrator choice through public
-bootstrap input. Omission preserves the runner-only contract. At most31 unique
-Kubernetes User/Group actors may be selected, in addition to the derived runner,
-within the existing32-actor guard bound. They use the existing administrator
-branches for installation management and initial AccessBindings after actual
-enrollment. This is broad installation trust and must be selected explicitly;
-it supplies no browser identity, implicit evidence grant or new admission
-exception. Original input remains immutable; this does not migrate completed
-installation guards or enable later delegation-envelope revisions.
+Installation administrators are explicit Kubernetes RBAC subjects. Their role
+is broad installation trust and must be selected explicitly; it supplies no
+browser identity or implicit evidence grant. (Superseded: up to 31 actors were
+added to the installer's 32-actor guard bound.)
 
 Provide `make image` for the existing static application and freshly compiled
 console. It builds locally, includes no fixture helpers and neither pushes nor
@@ -45,6 +45,9 @@ deploys. A registry reference must use the actual published digest when an
 operator separately chooses to distribute that image.
 
 ## Same-API independent probes
+
+Historical: ADR-328 removes the global namespace-label guards and their
+dry-run probes, so the exemption below no longer applies.
 
 The fresh actual Helm same-API run at `9a55d5de` installs and enrolls but
 cannot ready its workload: the hub and regional global namespace-label guards

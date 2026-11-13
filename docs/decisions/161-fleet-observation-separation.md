@@ -1,5 +1,7 @@
 # ADR-161 — Separate fleet freshness from restrictive authority locks
 
+> Superseded in part by ADR-328 (2026-11-13): the migration's hostile-role inventory, credential-retirement wait and trigger/reference refusals, the witness check before first activation, and the native guard part of the source read no longer apply. The split between the semantic authority row and the positive observation row, its version/ABA rule and the fixed producer functions remain valid.
+
 Status: implemented; focused component and production SQL qualification pass. Installed availability and broad regression remain pending. Requirements: REQ-FED-001 and REQ-DB-005.
 
 ## Problem
@@ -79,26 +81,18 @@ roles receive only their required functions and reads. Remove prior direct
 source/date-write privileges so the protocol cannot be bypassed. Runtime
 observation cannot change recovery activation or issuer ownership.
 
-Existing generated role names/OIDs are recorded outside SQL in protected
-installation state. The migration must not treat role-name patterns or SQL
-comments as a trustworthy inventory for revocation. It refuses an existing
-effective legacy source/date writer outside the table owner, including inherited
-or PUBLIC privileges, until exact credential retirement has been established.
-Inherited or SET-role access to pg_write_all_data also rejects migration outside
-the trusted table-owner/superuser boundary. Trigger/reference privileges and
-surviving noninternal triggers or foreign-owned referencing constraints are
-rejected before migration writes; revoking a credential does not remove hooks it
-installed. Named default grants on the new table/functions are checked before
-commit. Fresh installation migrates before granting its temporary manager rights.
-Automated upgrade retirement remains a separate installer obligation; the
-migration cannot silently preserve a legacy bypass.
+The migration revokes the former direct source/date-write grants from the
+Asservat runtime roles. Roles created by the installation and database
+administrators are trusted (ADR-328), so the migration does not inventory role
+OIDs, wait for credential retirement or reject triggers, references and default
+grants left by earlier credentials.
 
 ## Initial installation and recovery
 
 Before activation, ordinary observation can retain the blocked root and ordering
 watermark but cannot insert a positive observation. The pristine inventory includes
-the new table. The already qualified first activation transaction explicitly seeds
-its first positive observation after exact source/witness/audit checks. Completed
+the new table. The first activation transaction explicitly seeds its first positive
+observation. Completed
 activation replay remains read-only. No trigger automatically makes an existing or
 restored root fresh, and no source observer supplies restart/restore authority.
 
@@ -132,10 +126,9 @@ includes the independent archive/cleanup verification. This
 synthetic schema experiment does not qualify the production migration, producer
 functions, first activation or installed owner startup.
 
-PostgreSQL also documents privileged function execution hazards for REFERENCES
-and TRIGGER. The migration therefore rejects these extra privileges and retained
-hooks rather than assuming prior credential revocation removed them.
-[PostgreSQL privileges](https://www.postgresql.org/docs/18/ddl-priv.html).
+PostgreSQL documents privileged function execution hazards for REFERENCES and
+TRIGGER ([PostgreSQL privileges](https://www.postgresql.org/docs/18/ddl-priv.html)).
+They apply to untrusted roles; installation roles are trusted under ADR-328.
 
 The [production SQL qualification](../../test/results/fleet-freshness-native-1/result.json)
 passes all 31 named cases using the actual 58→59 migration, separate scoped roles,

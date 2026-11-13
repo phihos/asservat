@@ -1,6 +1,8 @@
 # ADR-129: Original installation handover and healthy retirement
 
-Status: implementation checkpoint. Native command/image qualification is recorded separately; this decision does not enable the Helm runtime or public evidence collection.
+> Superseded (2026-11-13): The handover, staging-policy retirement, gate-removal claims, pinned history manager and eight cleanup steps existed for the installer Pod and its temporary credentials. There is no installer Pod to hand over; the `setup` Job seeds the activation, trust and capacity rows idempotently.
+
+Status: superseded by ADR-328 (administrator-only namespaces); the mechanism is removed by the Helm-native installation plan.
 
 ## Decision
 

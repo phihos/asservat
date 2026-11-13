@@ -1,7 +1,8 @@
 # ADR-140 — Protected producers for installed public runtime
 
-Status: accepted direction; configuration-role and one-use launch components. Complete
-installed public composition and its acceptance journey remain in progress.
+> Superseded (2026-11-13): The configuration-role bootstrap with guarded fleet/owner/workload proofs, enforcement probes, one-use launch claims, guard generations and the guard-pinned owner identity projection existed for installer self-verification. The `setup` Job creates runtime roles from the compiled grant plan and Helm renders the Deployments and their config. Still valid: role names and limits come from product contracts, the total PostgreSQL connection budget is validated, multi-cluster serving selects exact profiles without unioned roots, and one normal-lane audit lifecycle per permission root is shared.
+
+Status: superseded by ADR-328 (administrator-only namespaces); the mechanism is removed by the Helm-native installation plan.
 
 The existing public endpoint constructor composes browser, session, MCP and
 native-content handlers, but it does not produce their installed inputs or

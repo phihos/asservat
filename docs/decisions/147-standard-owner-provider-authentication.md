@@ -1,5 +1,7 @@
 # ADR-147 — Standard owner provider authentication
 
+> Superseded in part by ADR-328 (2026-11-13): the native workload checks, the receipt-bound installer projection and the installation-only provider verifier tied to installer receipts no longer apply. Standard OpenBao Kubernetes authentication with purpose-scoped generated roles/policies, finite leases, serialized renewal, joined retirement and the operator-managed scoped S3 Secret remain valid; the owner reads its provider settings from mounted configuration.
+
 Status: selected under continued implementation authorization. Requirements:
 REQ-DEP-001, REQ-DEP-003 and REQ-DEP-005. This source-stage component fixes the
 public profile and generated authentication recipes; actual provider setup,
@@ -11,7 +13,7 @@ parent-revocation and lifetime rules. Keep it unchanged. Select standard OpenBao
 Kubernetes authentication for ongoing owner credentials, with four generated
 roles/policies for those exact effects. Bind the original account/namespace,
 dedicated projected audience, verified auth mount and original provider recipes.
-Keep all native workload, accepted source/recovery, SQL and signing-attempt checks
+Keep the current SQL, recovery and signing-attempt checks
 independent and current. A provider credential does not activate a process.
 
 The new closed [public profile](../../specs/contracts/owner-provider-auth.schema.json)

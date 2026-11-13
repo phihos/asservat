@@ -1,5 +1,7 @@
 # ADR-163: original-work transport observation lease
 
+> Superseded in part by ADR-328 (2026-11-13): the local process observation no longer re-reads the connector's own Pod/ReplicaSet/Deployment chain and namespace guard, which this lease amortized. One lease per frame stream, frame ordering and the current peer registration checks remain valid.
+
 Status: accepted for implementation; component and native qualification pending.
 [ADR-171](171-hub-run-context-execution.md) later removed the identity frames.
 The lease now covers the ordered regional operation request/response frames

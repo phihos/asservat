@@ -1,5 +1,7 @@
 # ADR-197 — Regional capacity
 
+> Superseded in part by ADR-328 (2026-11-13): the regional probe namespace and `capacity-probe` account, the local guard proof and its coverage by the staged protection digest (decision 4), and the guard pin, digest and probe references carried by the join record and the SQL qualification row (decision 5) no longer apply. The region's capacity objects are Helm-rendered under RBAC. Still valid: append-only cluster qualifications, the additive pool revision, the v2 path with its own port, the combined observation purpose, the read-only lifecycle owner reads and the hub-worker's cluster set.
+
 Date: 2026-10-17. Status: accepted; implemented; installed regional capacity checks pass.
 Requirements: REQ-CAP-001/002/003, REQ-FED-001/002, REQ-DEP-003, S-02; TASK-03.
 Gap 4 of [ADR-196](196-regional-cluster-join.md). Builds on
@@ -55,28 +57,26 @@ composition. Its handlers and clients are fixture-only.
 3. **v2 for regional clusters only.** The hub cluster keeps its qualified v1
    local path. Regional clusters use the v2 path, on the promoted owner's
    own operation port 9448 (amended in decision 7).
-4. **The region installs before ungating.** `installer-cluster` creates:
-   - a restricted probe namespace with a `capacity-probe` account;
-   - the namespace selector guard with the hub's keys (a new offer field);
-   - the connector's metadata reads, the guard reads and the probe account's
-     TokenRequest right;
-   - a local proof of the guard.
-
-   The staged protection digest then covers them (ADR-196 decision 4).
+4. **The region installs before ungating.** `installer-cluster` created
+   a probe namespace with a `capacity-probe` account, the namespace selector
+   guard with the hub's keys, the guard and metadata reads, the probe
+   account's TokenRequest right and a local guard proof, covered by the
+   staged protection digest. Under ADR-328 the probe namespace, the proof
+   and the digest go: Helm `mode=cluster` renders the connector's metadata
+   read RBAC and the offer carries the hub's selector keys.
 5. **The join command writes the extension.** `installer-cluster-join`
    writes the region's capacity assertion into the guarded catalog entry;
    the hub-api inserts the write-once qualification row through a narrow
    SECURITY DEFINER function (amended under Progress: the join command has
    no SQL access). The join record
-   carries the guard pin, digest and keys, the probe references and the
-   connector template digest.
+   carries the selector keys (the guard pin, digest, probe references and
+   connector template digest are dropped by ADR-328).
 6. **The hub-worker's cluster set** is the projection's hub cluster plus the
    extension rows. A change stops the child with a fixed message, and the
    restart reads the new set.
 
-The hub cannot prove the regional guard live: its digest is the region's
-assertion, checked against SQL at runtime. That is weaker than for the hub
-cluster (ADR-144), and is stated here. The five-second deadlines are fixed.
+The regional capacity settings are the region administrator's assertion,
+as ADR-328 accepts for every administrator. The five-second deadlines are fixed.
 If regional observation does not fit them, it fails closed; no deadline is
 extended.
 

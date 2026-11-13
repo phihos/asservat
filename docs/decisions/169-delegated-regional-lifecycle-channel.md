@@ -1,5 +1,7 @@
 # ADR-169 — Delegated regional lifecycle channel
 
+> Superseded in part by ADR-328 (2026-11-13): phase observations of the connector's own controller chain and namespace guard no longer apply. The single outbound channel, credential presentation, CSR binding, Pod-token review and hub-only effects remain valid.
+
 Date: 2026-10-14. Status: accepted design (follows ADR-168); channel, both adapters and a two-cluster native fixture qualified; production process composition pending.
 Requirements: REQ-FED-001/002; TASK-03 / TASK-11.
 
@@ -7,8 +9,8 @@ Requirements: REQ-FED-001/002; TASK-03 / TASK-11.
 
 [ADR-153](153-operation-owned-connector-enrollment.md) drives connector process
 admission and leaf signing through four phases (Initial, BeforeEffect,
-BeforeActivation, Final). Each phase needs a native observation: Pod-token
-review and the live Pod/ReplicaSet/Deployment chain, source and guard. The
+BeforeActivation, Final). Each phase needs the connector Pod's token review. Under ADR-328 the live
+Pod/ReplicaSet/Deployment chain and namespace guard are no longer observed. The
 existing `kubernetes.ConnectorLifecycleReader` performs those reads against the
 workload cluster's API. With outbound-only connectivity
 ([ADR-168](168-rotating-cluster-enrollment-credential.md)) the hub has no such
@@ -62,7 +64,7 @@ observation. It trusts the holder of that cluster's credential Secret, which is
 the trade-off ADR-168 accepted. A compromised Secret lets its holder obtain leaves
 for that profile until rotation or fork fencing, never for another cluster. It
 never obtains evidence or key access without the separate ADR-126/153 and
-download checks. The installer limits Secret access to the connector account.
+download checks. Helm-rendered RBAC limits Secret access to the connector account.
 
 ## Implementation status
 

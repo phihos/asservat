@@ -1,5 +1,11 @@
 # ADR-221 — Enroll the identity of an admitted worker independently
 
+> Superseded in part by ADR-328 (2026-11-13): the extra live namespace, service
+> account, Job and Pod reads behind TokenReview no longer apply, because the
+> download-worker namespace is administrator-only. TokenReview of the bound Pod
+> token, matched to the worker's stored Job/Pod, remains; the identity-only SQL
+> transaction, immutable key and signing limits remain valid.
+
 Date: 2026-10-23. Status: components implemented; integrated qualification in progress.
 Related: [ADR-071](071-download-worker-enrollment.md),
 [ADR-072](072-worker-credential-channel.md),
@@ -51,8 +57,8 @@ replaced configuration, terminated/retired/replaced worker, or mismatching
 identity refuses claim, signing preparation and activation. It cannot create,
 adopt, replace, renew or refund the worker or parent.
 
-The existing TokenReview and exact live namespace, service account, Job and Pod
-checks still bind the presented Pod token and identity-free CSR to that worker.
+TokenReview of the presented Pod token, whose bound Pod name and UID must match
+the worker's stored Job/Pod, binds the token and identity-free CSR to that worker.
 The first accepted public key is immutable. Keep encrypted create-only enrollment
 and certificate audit, separate audit acknowledgement and activation, one winning
 signing claim, at most two spent signing attempts per original certificate period,
@@ -81,7 +87,7 @@ authority; approved inspection cannot impersonate a native-download session.
 An eligible admitted Pod token can claim or renew its identity after the human
 preparation socket closes, within the unchanged worker/parent lifetime. This
 widens the time in which a stolen eligible token could race to claim the first
-CSR key. Exact live workload/configuration proof, one immutable key and finite
+CSR key. TokenReview, current SQL configuration, one immutable key and finite
 signing attempts remain, but the design does not claim to eliminate that race.
 This is an accepted engineering tradeoff: the certificate alone cannot bypass
 current evidence/key authority, and keeping a human socket open is disproportionate

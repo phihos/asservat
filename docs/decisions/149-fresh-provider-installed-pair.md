@@ -1,5 +1,7 @@
 # ADR-149 — Fresh provider-installed worker and owner pair
 
+> Superseded in part by ADR-328 (2026-11-13): the profile-pair selection by installer journal, the nineteen resource receipts, the bootstrap order, protected-installer provider setup, UID/byte re-verification of mounted Secrets, the installer's operation-owned native brackets and the `ownerBootstrap` journal continuation no longer apply; Helm renders these objects. What remains: Kubernetes-auth provider tokens with purpose-separated policies and finite leases, the operator-selected scoped audit Secret, required immutable audit versions with conditional writes and exact-version readback, and the bounded five-purpose worker FIFO (without its native checks).
+
 Status: selected under continued implementation authorization; versioned audit storage is an explicit maintainer requirement. Requirements: REQ-DEP-001, REQ-DEP-003 and REQ-DEP-005. Component implementation is integrated; complete installed qualification remains pending.
 
 ## Original profile selection
@@ -33,7 +35,7 @@ Protected installation emits an automation-ready exact recipe for the separately
 
 Runtime uses standard Kubernetes-auth service tokens, with purpose-separated generated policies and four owner/two configuration single-flight token owners. Protected setup verifies mount and role recipes; login, positive renewal and bounded reconciliation verify each token's effective policy identity and finite lease. Crypto effects only borrow an acknowledged original lease and preserve existing native/SQL/certificate/permit gates. No per-effect recipe GET, implicit authentication, unknown-login token adoption, or instantaneous detection of provider-administrator policy changes is claimed. A rotated projected JWT is read for fresh login; it does not replace the JWT retained by the provider for an existing token's renewal. Unknown issuance remains bounded by the retained replica/process profile, finite backoff and configured external provider policy, without a new global token ledger.
 
-Current storage material is a dedicated explicit operator-selected scoped Secret. The producer publishes the required exact policy/capability recipe from actual acknowledged source identities; external IAM creation/rotation stays provider/operator owned. Runtime independently verifies native original Secret UID, one-key construction, current guard and equality of the actual mounted bytes before using material. Filesystem timestamps or metadata-only API access do not prove credential authority. Local-key/small deployment profiles remain separate supported design requirements; selecting this explicit OpenBao profile does not silently replace them.
+Current storage material is a dedicated explicit operator-selected scoped Secret. The producer publishes the required exact policy/capability recipe from actual acknowledged source identities; external IAM creation/rotation stays provider/operator owned. Runtime reads the mounted Secret and requires one-key construction before using material. Filesystem timestamps or metadata-only API access do not prove credential authority. Local-key/small deployment profiles remain separate supported design requirements; selecting this explicit OpenBao profile does not silently replace them.
 
 ## Intrinsic audit version semantics
 
@@ -139,9 +141,8 @@ spend or rewrites the selected record. A later exact recovery uses the existing
 versioned audit protocol and its original semantic identity.
 
 Missing capacity and cleanup projections are observed with non-authorizing
-fixed-journal hints. No optional file can select authority. A positive original
-receipt starts its purpose-specific native operation before opening scoped
-credentials, followed by a genuine final check before starting the child. Fresh
+fixed-journal hints. No optional file can select authority. A present mounted
+projection starts its purpose-specific operation with scoped credentials. Fresh
 capacity observation acquires its ticket before the original source observer,
 uses one private per-call observer copy, and performs its final native check
 before actual SQL acceptance. Failure uses the same original recovery/CAS

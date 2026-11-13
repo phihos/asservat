@@ -1,5 +1,13 @@
 # ADR-247 — Guarded, group-ID, remote-cluster and workload permission sources
 
+> Superseded in part by ADR-328 (2026-11-13): the runtime guard proofs no longer apply: the
+> pinned policy/binding checks, the unprivileged probe account and probe namespace, the dry-run
+> denials, the probe's `create deployments` right and `GuardUnavailable` from a lost proof. Helm
+> installs the namespace and workload ValidatingAdmissionPolicies; RBAC keeps everyone but
+> cluster administrators from changing them, and cluster administrators are trusted. The guards
+> themselves remain valid, because they protect ownership labels in application namespaces
+> against writers outside Asservat. So do `groupID`, joined-cluster journals and workload sources.
+
 Date: 2026-10-27. Status: accepted; implemented; qualification below.
 Requirements: REQ-PER-003 (namespace metadata inheritance: `admissionEnforced`, `groupID`, every
 cluster), REQ-PER-005 (workload ownership), REQ-PER-006 (freshness), REQ-PER-008 (assignment
@@ -24,17 +32,13 @@ AccessBindings by hand.
 
 1. **`admissionEnforced` reuses the capacity namespace selector guard.** The guard each cluster
    already has for capacity (ADR-190/197: a ValidatingAdmissionPolicy over namespace CREATE/UPDATE
-   protecting the installer-selected label keys, an unprivileged probe in an empty probe
-   namespace, a live dry-run proof) is the only guard profile: `guardRef: namespace-guard`. The
-   hub-worker's capacity cluster readers — the owner's local observation for the hub cluster, each
-   regional connector for its cluster — are shared with the permission reconciler; before each
-   one-second refresh it obtains a proof when the last one has less than two seconds left. A
-   source grants only while the proof is current and its label keys cover every selector and
-   mapping key. That guard protects labels only; a source mapping an annotation key is
-   `SourceUnsupported` under it (extending the capacity guard to annotations would change the
-   capacity qualification digest and the regional join record for a case no requirement names).
-   A lost proof, removed binding or changed policy makes the source `GuardUnavailable`: kept,
-   granting nothing (tested with the real guard).
+   protecting the installer-selected label keys, now rendered by Helm) is the only guard profile:
+   `guardRef: namespace-guard`. A source grants only while that guard is configured for the
+   cluster and its label keys cover every selector and mapping key. No runtime proof of the
+   installed policy is taken (ADR-328). That guard protects labels only; a source mapping an
+   annotation key is `SourceUnsupported` under it (extending the capacity guard to annotations
+   would change the capacity qualification digest and the regional join record for a case no
+   requirement names).
 2. **`groupID` validates against the configured directory, not a directory reader.** The protected
    identity settings' administrator-configured `eligibleGroups` of the source's issuer (ADR-059
    allows exactly this) are the directory: a value maps to the stable group ID it names only when
@@ -58,33 +62,31 @@ AccessBindings by hand.
    audit (`RemoteNamespaces`) and serve the impact preview. Connector RBAC gains `watch` on
    namespaces.
 4. **`workloadMetadata` over single workloads under a workload metadata guard.** A new
-   ValidatingAdmissionPolicy (`<prefix>-workload-guard`, installed by the hub continuation and the
-   regional cluster installer only when the operator's capacity profile names `workloadKeys`)
-   denies, for every Deployment and StatefulSet CREATE/UPDATE by a writer other than its
-   administrators, creating a workload that carries a protected label/annotation key and changing
-   such a key's presence or value; DELETE only removes grants, replacement is a CREATE. Its proof
-   reuses the capacity probe account: the pinned policy/binding are unchanged and a dry-run keyed
-   Deployment creation in the empty probe namespace is denied by exactly this guard. The probe
-   gains `create deployments` in its own namespace only, whose ResourceQuota admits no Pod,
-   Deployment or StatefulSet, so the right serves nothing but the dry-run (tested: a real unkeyed
-   creation is refused by the quota). A source needs `guardRef: workload-guard`, a non-empty
+   ValidatingAdmissionPolicy (`<prefix>-workload-guard`, rendered by Helm only when the
+   operator's capacity profile names `workloadKeys`) denies, for every Deployment and StatefulSet
+   CREATE/UPDATE by a writer other than its administrators, creating a workload that carries a
+   protected label/annotation key and changing such a key's presence or value; DELETE only
+   removes grants, replacement is a CREATE. The installed policy is trusted like any other
+   Helm-rendered object; there is no probe or dry-run proof (ADR-328). A source needs
+   `guardRef: workload-guard`, a non-empty
    `workloadSelector` (server-side label selector, at most 16 equality terms) and no
    `namespaceSelector` (scope is the selector plus `excludedNamespaces`; a namespace selector
    would need both guards for one decision — reported `SourceUnsupported`). Each connector keeps a
    metadata-only LIST+watch journal per selection over both kinds (`WorkloadJournalService`, at
    most four selections, idle after two minutes) with the same value-change versions, resolving
-   namespace UIDs from a namespace LIST at most every 30 seconds; purposes
-   `permission-workload-metadata` and `permission-workload-guard` serve the journal and the proof.
+   namespace UIDs from a namespace LIST at most every 30 seconds; purpose
+   `permission-workload-metadata` serves the journal (the former `permission-workload-guard`
+   proof purpose is removed by ADR-328).
    The hub-worker reads them like remote namespace journals — for the hub cluster through the
    owner's local observation — and accepts one allow basis per granted workload, scoped to that
    workload's UID in its namespace UID (basis key includes the workload UID). Pods are never
    matched by labels: request-time target resolution derives the workload through the validated
    controller chain and the projection matches the workload UID (SC-PER-005).
-5. **Unavailable is never broader.** Every new evidence — guard proof, directory, remote or
+5. **Unavailable is never broader.** Every new evidence — directory, remote or
    workload journal — that is missing or older than its bound makes the source unavailable
    (assignments kept, nothing granted) and never falls back to another mapping or role. The
    preview evaluates proposed guarded, group-ID and workload sources as `Indeterminate`
-   (`MetadataUnavailable`): it reads no proof or directory.
+   (`MetadataUnavailable`): it reads no directory.
 
 ## Complexity gate (AGENTS.md), per form
 

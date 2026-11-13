@@ -1,8 +1,15 @@
 # ADR-315: Batched initial schema brackets
 
-Status: accepted (agent decision under the maintainer's 2026-10-20 proportionality
+> Superseded (2026-11-13): The brackets existed to space out protected root
+> proofs (administrator, staging-guard and namespace-protection observations)
+> during installer DDL. Those proofs are removed. The `setup` hook Job applies
+> the embedded migrations forward-only in order under an advisory lock, as
+> Goose does, with one transaction per version.
+
+Status: superseded by ADR-328 (administrator-only namespaces); the mechanism is removed by the Helm-native installation plan.
+Previously: accepted (agent decision under the maintainer's 2026-10-20 proportionality
 rule and the merged [test runtime plan](../reviews/test-runtime-plan-2026-11-08.md),
-option 3). Amends the per-step lease of [ADR-130](130-bounded-initial-schema.md).
+option 3). Amended the per-step lease of [ADR-130](130-bounded-initial-schema.md).
 
 ## Context
 

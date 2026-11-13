@@ -1,5 +1,7 @@
 # ADR-127: Current processing decisions and complete native placement
 
+> Superseded in part by ADR-328 (2026-11-13): The independently guarded ConfigMap and independently pinned processing paths defended against configuration tampering and no longer apply; the policy is a ConfigMap read under RBAC. SQL-retained restrictions, lineage and processing decisions remain valid.
+
 Status: accepted design; implementation and qualification tracked separately.
 
 Requirements: REQ-PRV-006/007, REQ-AUT-005 and the native-download requirements in [artifact downloads](../../specs/artifact-downloads.md).
@@ -10,7 +12,7 @@ A registration's store ID or S3 signing region does not approve processing or id
 
 ## Decision
 
-Use two sources with different responsibilities. A closed, independently guarded installation ConfigMap permits exact clients, purposes, data classes and complete independently pinned storage/acquisition/connector/hub paths. PostgreSQL retains separately initialized completeness, exact published lineage and bounded artifact/workload-time restrictions. Missing, stale, replaced or unknown restored sources deny. Migration alone creates no allowing root and never declares existing history complete.
+Use two sources with different responsibilities. A closed installation ConfigMap, read under RBAC, permits exact clients, purposes, data classes and complete storage/acquisition/connector/hub paths. PostgreSQL retains separately initialized completeness, exact published lineage and bounded artifact/workload-time restrictions. Missing, stale or unknown restored sources deny. Migration alone creates no allowing root and never declares existing history complete.
 
 A current privacy operator performs explicit initialization/restrict/release decisions. Initialization requires an empty catalog both before encrypted audit and under final locks. Release names the exact restricted revision, requires current independent privacy authority and an acknowledged immutable encrypted decision. The audit records prepared/effect-unknown before the business CAS; only its recorded SQL result proves the change. Same-key recovery preserves original identity, dates and spend.
 
@@ -26,4 +28,4 @@ Only eligibility-changing decisions advance the sequence. Unrelated publication 
 
 The initial implementation covers ordinary context evidence, with exact verified pod-status root lineage. Unsupported derivatives deny until their producer provides complete independently accepted lineage. The policy is installation configuration; it adds no end-user consent step or second ordinary authorization evaluator.
 
-Protected configuration/backing provisioning, supported restore reconciliation, full business-history retirement and operator UI remain separate work. Retained uncertain rows remain charged; configured retirement dates alone do not establish deletion or permit capacity reuse. Broad analysis/share paths must consume the same processing gate when implemented. No public runtime is enabled by this decision. See [the concrete contract](../architecture/download-environment.md) and the implementation progress record for actual qualification.
+Configuration/backing provisioning, supported restore reconciliation, full business-history retirement and operator UI remain separate work. Retained uncertain rows remain charged; configured retirement dates alone do not establish deletion or permit capacity reuse. Broad analysis/share paths must consume the same processing gate when implemented. No public runtime is enabled by this decision. See [the concrete contract](../architecture/download-environment.md) and the implementation progress record for actual qualification.

@@ -1,5 +1,11 @@
 # ADR-246 — Node collector role and work channel (S-04 increment 3)
 
+> Superseded in part by ADR-328 (2026-11-13): the collector namespace is administrator-only, so
+> the connector no longer reads the token's controlling DaemonSet by UID to rule out forged Pods,
+> and drops `get daemonsets`. The regional installer's provisioning in decision 9 moves to the
+> Helm chart. TokenReview of the bound token, the Pod/Node and boot-ID binding, the in-memory
+> issuer, the channel, the bounds and the disposable-host guard remain valid.
+
 Date: 2026-10-27. Status: accepted; implemented; qualification below.
 Requirements: REQ-ARC-003/004 (A-NODE, I-02), REQ-CAP-002/004 (node limits), REQ-NET-001 and
 REQ-SYS-001 (capability truthfulness only; no recorder). Plan:
@@ -12,7 +18,7 @@ REQ-SYS-001 (capability truthfulness only; no recorder). Plan:
 Every packet and syscall recorder of S-04 runs on the node. No node process exists: the connector
 reads pod status through the Kubernetes API, and every product Pod is Restricted. Before any
 recorder can be built (increment 4), the node needs an identity the connector can verify, a
-private channel for work and status, an honest statement of what its kernel supports, and node
+private channel for work and status, an accurate statement of what its kernel supports, and node
 budgets for rings, frozen snapshots and uploads. None of these may run on a developer
 workstation: kind shares the host kernel, so a privileged collector there would be a kernel-global
 experiment (AGENTS.md).
@@ -35,8 +41,7 @@ experiment (AGENTS.md).
    applied to a DaemonSet instead of an admitted Job: a projected token with the dedicated
    audience `asservat-node:<installation>` (600 s), an in-memory P-256 key per process, the
    shared strict CSR check (`mtls.EnrollmentKey`) and a random epoch per process start. The
-   connector reviews the token and reads the token's Pod, its controlling DaemonSet (by its
-   current UID) and its Node (UID and kubelet `bootID`, which must equal the boot ID the process
+   connector reviews the token (TokenReview) and reads the token's Pod and its Node (UID and kubelet `bootID`, which must equal the boot ID the process
    read from its kernel). It signs a 20-minute client leaf (URI
    `urn:asservat:node:<cluster>:<node UID>:<pod UID>:<epoch>`) with a P-256 issuer held only in
    the connector process's memory. A connector restart therefore invalidates every node
@@ -54,7 +59,7 @@ experiment (AGENTS.md).
    boot or epoch enrolling for the node replaces the earlier process, whose certificates stop
    authenticating, whose queue is dropped and whose open poll ends.
    **Enrollment bounds (PR #87 review).** Enrollment needs no client certificate and costs one
-   TokenReview plus three GETs, so before any API call the connector rejects tokens whose
+   TokenReview plus two GETs, so before any API call the connector rejects tokens whose
    unverified claims cannot pass (not a three-part JWT, another audience or subject, expired, no
    bound Pod) and then admits at most 5 enrollments per second (burst 20: at most 20 API calls/s,
    the attestation client's fixed QPS, above the 4.4/s a 5,000-node fleet needs for renewals),
@@ -101,7 +106,7 @@ experiment (AGENTS.md).
    (2026-10-27) when given the collector namespace and name (`installer-cluster
    --collector-namespace <ns> --collector-name <release>-node`; the chart passes both with
    `collector.enabled`): a Role/RoleBinding `<connector ns>-connector-nodes` in the collector
-   namespace (get pods, get the named DaemonSet), `get nodes` in the connector ClusterRole, and in
+   namespace (get pods), `get nodes` in the connector ClusterRole, and in
    the connector namespace the immutable Secret `connector-nodes` (P-256 leaf for
    `connector-nodes.<connector ns>.svc` plus its CA root, ten years, the root's key discarded; a
    rerun reopens it, rotation is a reinstall), the ClusterIP Service `connector-nodes` (8444) and
@@ -118,7 +123,7 @@ experiment (AGENTS.md).
 | --- | --- | --- |
 | Each node | 1 Pod; root (uid 0) container that is **not** `privileged`; capabilities `BPF`, `NET_ADMIN`, `SYS_RESOURCE` (all others dropped); host PID namespace; 4 read-only hostPath mounts (the guard file, `/sys/kernel/debug`, `/sys/kernel/tracing`, `/sys/fs/bpf`); runtime-default seccomp and AppArmor; read-only root filesystem; process core dumps disabled | No host network or IPC, no container-runtime socket, no host root filesystem, no Kubernetes API permission, no SQL/evidence/key credential, no `SYS_ADMIN`/`SYS_PTRACE`/`PERFMON` (increments 4 and 10 add what attaching needs, with their measurements) |
 | Cluster | 1 namespace with the privileged Pod Security exception | No change to any workload namespace |
-| Connector | 1 in-cluster TLS listener (8444); reads: `create tokenreviews`, `get nodes`, `get pods` and `get daemonsets` in the collector namespace; an in-memory issuer key | No write permission, no new SQL role, no hub-facing change |
+| Connector | 1 in-cluster TLS listener (8444); reads: `create tokenreviews`, `get nodes`, `get pods` in the collector namespace; an in-memory issuer key | No write permission, no new SQL role, no hub-facing change |
 | Network | Per node 1 kept-alive TLS connection (long poll) plus a status request every 15 s, both node → connector | No inbound connection to nodes |
 
 ## Complexity gate (AGENTS.md)
@@ -129,11 +134,11 @@ experiment (AGENTS.md).
 | 2 | Risk accepted | Yes: plan §2 P1/P2 (maintainer decision 2026-10-26 that all specification features ship) and the architecture's A-NODE privileged DaemonSet. |
 | 3 | Typical deployments | Yes: every cluster that records packets or syscalls runs one collector per node. |
 | 4 | Precedent | Cilium, Falco, Tetragon, Inspektor Gadget and Retina all run one privileged agent per node; Gadget documents embedding its runtime through a Go API (S1). Bound service-account tokens with Pod/Node claims are the Kubernetes mechanism for workload identity (ADR-071/221 reuse). |
-| 5 | Privileges added | See the table: per node 3 capabilities, host PID, 4 read-only hostPaths, no API permission; per cluster 1 privileged namespace; per connector 4 reads and 1 listener. |
+| 5 | Privileges added | See the table: per node 3 capabilities, host PID, 4 read-only hostPaths, no API permission; per cluster 1 privileged namespace; per connector 3 reads and 1 listener. |
 | 6 | Failure/degraded states | 2, as the plan's gate row: `NotEnrolled` (no current process for a node; derived, not stored) and `AdapterUnavailable` per mechanism. The current/not-current report flag is derived at read time. |
 | 7 | Self-configuration | No knob tunes the channel itself (all timings are constants). The ceilings are the local administrator's resource limits required by specs/capacity.md. |
 | 8 | External dependencies | Kernel features (BTF, cgroup v2, TCX ≥ 6.6 or tc), Kubernetes ≥ 1.30 bound-token node claims, kubelet `bootID`, Inspektor Gadget v0.57.0 and cilium/ebpf v0.22.0 (both pinned). |
-| 9 | Cost at scale | Per node: 1 Pod (64 MiB request, idle Go process with the engine linked), 1 TLS connection, 4 small requests per minute (one status ≈ 1–2 KiB). Per connector at 5,000 nodes: ≈ 333 status writes/s into memory, ≤ 10,016 connections, 1 TokenReview + 3 GETs per enrollment (once per process start and every ≈ 19 minutes per node: ≈ 4.4 enrollments/s at 5,000 nodes, ≈ 17.5 API calls/s). No watch, no SQL, no hub traffic. Binary: the gadget-tagged collector binary is 131.4 MB vs 91.4 MB without (+40 MB, 17 more linked modules; go.mod gains Inspektor Gadget and 25 indirect modules, cilium/ebpf directly). The full gadget runtime (ebpf operator, OCI handler, gadget context) measured 169 indirect modules, two forked `replace` directives and a 92 MB binary on its own, which is why it is deferred to increment 4. |
+| 9 | Cost at scale | Per node: 1 Pod (64 MiB request, idle Go process with the engine linked), 1 TLS connection, 4 small requests per minute (one status ≈ 1–2 KiB). Per connector at 5,000 nodes: ≈ 333 status writes/s into memory, ≤ 10,016 connections, 1 TokenReview + 2 GETs per enrollment (once per process start and every ≈ 19 minutes per node: ≈ 4.4 enrollments/s at 5,000 nodes, ≈ 13 API calls/s). No watch, no SQL, no hub traffic. Binary: the gadget-tagged collector binary is 131.4 MB vs 91.4 MB without (+40 MB, 17 more linked modules; go.mod gains Inspektor Gadget and 25 indirect modules, cilium/ebpf directly). The full gadget runtime (ebpf operator, OCI handler, gadget context) measured 169 indirect modules, two forked `replace` directives and a 92 MB binary on its own, which is why it is deferred to increment 4. |
 | 10 | Upgrade/rollback | Helm toggle off removes the namespace and DaemonSet; no workload object changes (tested natively). No migration; the budget-policy fields are optional. The connector input section is optional and absent by default. |
 | 11 | Smaller fix | A per-capture privileged Job cannot hold a ring and re-attaches for every capture (plan P1). Reusing the download-worker SQL enrollment would add an audit object, signing budget and SQL state per node process for a certificate that unlocks no evidence. Polling status without long-poll work delivery would add up to 15 s to every trigger. |
 

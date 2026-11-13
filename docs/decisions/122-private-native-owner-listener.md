@@ -1,5 +1,7 @@
 # ADR-122: Separate private native owner listener
 
+> Superseded in part by ADR-328 (2026-11-13): The protected `deployment.json` with worker-cluster/control-namespace API pins and retention-topology pins becomes Helm-rendered configuration read by fixed name. The separate listener, connector mTLS, the narrow native-read SQL credential and socket bounds remain valid.
+
 Status: accepted; component implementation and selected native qualification
 recorded in [implementation progress](../implementation-progress.md).
 
@@ -7,7 +9,7 @@ The credential enrollment channel and native evidence exchange have different pr
 
 The owner presents its existing process-owned **server-purpose** certificate. The native listener authenticates connector client certificates using protected connector roots and current fleet registration. A connector's clientAuth certificate cannot act as its worker-facing server certificate. The concrete producer and supervisor for that separate connector server identity remain required; neither a test issuer nor a fixture callback fills that boundary.
 
-Protected `deployment.json` optionally supplies connector public roots, exact worker-cluster/control-namespace API pins and immutable retention-topology pins. A separate `sql-native-read.json` credential provides native locator/worker/certificate/current-authority reads and necessary narrow row locks. It exposes no admission, key binding, slot consumption, source acceptance, enrollment signing or retirement writes. Fixed per-cluster/namespace API-token projections provide independent current Pod proof; no forwarded human token or serialized identity is accepted.
+Mounted Helm-rendered configuration optionally supplies connector public roots and the worker-cluster/control-namespace API endpoints. A separate `sql-native-read.json` credential provides native locator/worker/certificate/current-authority reads and necessary narrow row locks. It exposes no admission, key binding, slot consumption, source acceptance, enrollment signing or retirement writes. Fixed per-cluster/namespace API-token projections provide independent current Pod proof; no forwarded human token or serialized identity is accepted.
 
 The listener bounds sockets before TLS, allows h2 only, one conversation per accepted socket, at most one simultaneous h2 stream, bounded headers/flow-control buffers and an original ten-second socket lifetime. Native operation/proof authority still expires within its original five seconds and may shorten. Stop closes both directions and joins actual request work. Installed native input absence is not inferred from an unavailable provider; it is an explicit disabled configuration.
 

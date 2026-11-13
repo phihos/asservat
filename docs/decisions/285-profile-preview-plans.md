@@ -1,5 +1,10 @@
 # ADR-285 — Profile actions in manual preview
 
+> Superseded in part by ADR-328 (2026-11-13): Endpoint definitions no longer
+> travel through the installer's protected regional deployment projection; the
+> connector reads them from Helm-rendered configuration under RBAC. Endpoint
+> resolution, review freezing and the acquisition-time recheck remain valid.
+
 Date: 2026-11-03. Status: accepted (agent decision).
 Requirements: REQ-PRF-001/002, REQ-CPR-001/003, REQ-ASM-001/003.
 S-05 increment 2; acquisition and policy execution remain subsequent increments.
@@ -29,8 +34,8 @@ authority. Acquisition must independently recheck the route and definition.
 
 `cluster.profileEndpoints` supplies at most 64 administrator definitions on
 regional executors: templates constrain address modes and port ranges; complete
-profiles fix an address mode and port. It uses the existing installer and
-protected regional deployment projection, adding no watches, credentials,
+profiles fix an address mode and port. The connector reads it from its
+mounted, Helm-rendered regional configuration, adding no watches, credentials,
 permissions or deployments. TLS/credential entries remain for increment 4.
 No URL, path or caller-chosen host is accepted in a recipe binding.
 

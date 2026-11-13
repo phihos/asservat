@@ -1,7 +1,8 @@
 # ADR-102 — Persist bounded installation creation intent
 
-Status: accepted engineering continuation of ADR-101. Actual qualification is
-recorded in [implementation progress](../implementation-progress.md).
+> Superseded (2026-11-13): The ConfigMap creation journal recorded installer-Pod creates so they could not be repeated or adopted. Helm renders every Kubernetes object and hook Jobs are idempotent, so no creation journal is needed.
+
+Status: superseded by ADR-328 (administrator-only namespaces); the mechanism is removed by the Helm-native installation plan.
 
 ## Decision
 

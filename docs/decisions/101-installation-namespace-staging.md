@@ -1,7 +1,8 @@
 # ADR-101 — Protect installation staging before workload identities exist
 
-Status: accepted engineering refinement of ADR-099/100. Native qualification
-and remaining provisioning work are tracked in [progress](../implementation-progress.md).
+> Superseded (2026-11-13): The staging admission policy and its dry-run probes defended the setup namespace against non-administrator writers. ADR-328 keeps such writers out with plain RBAC and Pod Security; Helm renders the namespace and its objects.
+
+Status: superseded by ADR-328 (administrator-only namespaces); the mechanism is removed by the Helm-native installation plan.
 
 ## Decision
 

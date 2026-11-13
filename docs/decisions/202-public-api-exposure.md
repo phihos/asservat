@@ -1,5 +1,7 @@
 # ADR-202 — Public API exposure
 
+> Superseded in part by ADR-328 (2026-11-13): the installer step and its rerun check that refuses a changed Service no longer apply; Helm renders the public Service from chart values. The separate L4 Service, plain TCP and TLS passthrough remain valid.
+
 Date: 2026-10-18. Status: accepted; implemented, unit-tested; native
 qualification with the installed journey pending.
 Requirements: S-02 (installed browser and MCP access); REQ-DEP-003.
@@ -21,10 +23,10 @@ its own qualified adapter.
 ## Decision
 
 - An optional `Promotion.Exposure` (`serviceType` `NodePort` with an optional
-  fixed node port, or `LoadBalancer`) makes the installer create the public
+  fixed node port, or `LoadBalancer`) makes Helm render the public
   API's own L4 Service, `asservat-<installation>-owner-public`, on port 9445,
-  selecting the owner Deployment's Pods (step `public/exposure`, after the owner
-  installation). A rerun accepts an unchanged Service and refuses a changed one.
+  selecting the owner Deployment's Pods. Changing the values changes the Service
+  on the next upgrade.
 - It is a separate Service, not a port on the native Service: the native
   Service's port set is pinned by ADR-196, and the public API's audience and
   exposure choice differ from the connectors'.

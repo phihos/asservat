@@ -1,5 +1,7 @@
 # ADR-174 — Regional context-start composition in the connector process
 
+> Superseded in part by ADR-328 (2026-11-13): the guards on the settings and work-trust ConfigMaps, the connector attester's self-verification and the regional workload guard plan no longer apply; those ConfigMaps are mounted and read under RBAC. Delegated recovery, the pinned hub owner configuration and the capacity token file remain valid.
+
 Date: 2026-10-14. Status: accepted; composed with component tests; native qualification of the product binary pending. Decision 2 is superseded by [ADR-176](176-artifact-keys-local-key-service.md); the open capacity question is decided by [ADR-175](175-capacity-token-request.md).
 Requirements: REQ-FED-001/002, S-02 regional context start; TASK-03 / TASK-11.
 

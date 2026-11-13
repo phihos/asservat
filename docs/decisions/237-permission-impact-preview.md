@@ -1,5 +1,10 @@
 # ADR-237 — Permission impact preview (S-06 increment 10)
 
+> Superseded in part by ADR-328 (2026-11-13): the enrolled clusters come from the cluster
+> catalog ConfigMap read under RBAC, not from a guarded catalog, and the delegations with
+> `previewers` come from Helm values rather than an installer copy. The preview itself, its
+> authority checks, envelope matching and bounds remain valid.
+
 Date: 2026-10-26. Status: accepted; implemented; qualification below.
 Requirements: REQ-PER-002 (bounded configuration impact preview using the real evaluator), S-06
 (TASK-07). Plan: `docs/reviews/s06-plan-2026-10-26.md` increment 10 (feature F12), first-release
@@ -30,13 +35,13 @@ only by reading every binding.
    proposal is decoded or permission data read, and again on the final identity check:
    - A current **fleet operator** (ADR-193 protected fleet administration: configured issuer,
      client and subjects/groups, not suspended) is the installation-wide administrator. The
-     targets are limited to the enrolled clusters (the hub and the guarded cluster catalog read at
+     targets are limited to the enrolled clusters (the hub and the cluster catalog read at
      process start); cells in any other cluster are `Indeterminate`/`ClusterUnavailable`.
    - A **delegation previewer** previews within a delegation envelope of the installed permission
      guard (ADR-189: exact cluster, namespace name/UID, optional workloads, roles, subject issuers).
      The guard's writers are Kubernetes users/groups, which have no mapping to browser identities,
-     so each installer-configured delegation names its browser `previewers` (issuer + `User`
-     subject or stable `Group` ID). The installer copies delegations with previewers into the
+     so each configured delegation names its browser `previewers` (issuer + `User`
+     subject or stable `Group` ID). Helm renders delegations with previewers into the
      owner deployment (`public.permissionDelegations`); previewers are not part of the guard and
      grant no Kubernetes write. As the native guard does, every proposed object must fit one of the
      caller's envelopes (cluster, namespace, workloads within the envelope, allowed roles and

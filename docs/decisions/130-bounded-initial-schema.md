@@ -1,6 +1,8 @@
 # ADR-130: Separate bounded first-installation schema administration
 
-Status: accepted implementation direction; qualification tracked in the implementation checkpoint.
+> Superseded (2026-11-13): The separate `initial-schema` command, its claims and its pinned setup manager protected the installer's DDL step. The `setup` hook Job applies the embedded migrations forward-only with its own credential; Deployments wait until it reports the current schema version.
+
+Status: superseded by ADR-328 (administrator-only namespaces); the mechanism is removed by the Helm-native installation plan.
 
 The supported installer needs to prepare its database before the existing first-activation coordinator can inspect the exact pristine schema. Passing administrator credentials to the preparation or activation workload would erase the established separation between DDL, role preparation, audit and activation.
 

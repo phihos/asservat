@@ -1,5 +1,7 @@
 # ADR-178 — Delegated connector source on the context-start exchange
 
+> Superseded in part by ADR-328 (2026-11-13): the guard proof taken per observation bracket, the pinned source ConfigMap UID and protection digest, and the live namespace/account/Job/Pod chain in the download-peer proofs no longer apply. The source document is read under RBAC, worker callers are authenticated by TokenReview, and the leaf, SQL49 registration, fencing, recovery and owner checks remain valid.
+
 Date: 2026-10-14. Status: accepted; source frames implemented, tested over real TLS 1.3/h2 and passing the native public journey; hub-api composition, `native-read` grant and the `WorkerAPIs` fence pending.
 Requirements: REQ-FED-001/003, S-02 regional context start; TASK-03 / TASK-11.
 
@@ -51,14 +53,12 @@ Options rejected:
      observation source, spends each probe before I/O, compares the first and
      last replies (`SameSource`, `Roles`) and only narrows deadlines.
 2. **Cheap reads inside a bracket.** As in ADR-150, the region answers probes
-   within an exchange-owned observation bracket. The expensive guard proof is
-   taken once per bracket, within its original five-second interval, and each
-   probe is a fresh source-value read. A captured value is never returned as a
-   fresh read.
+   within an exchange-owned observation bracket. Each probe is a fresh
+   source-value read under RBAC; no guard proof is taken. A captured value is
+   never returned as a fresh read.
 3. **Pinned expected profile.** The installer pins each connector peer's
-   exact installed source document, ConfigMap UID, protection digest and
-   executor in hub-api's native input. These are the same values the
-   federation pins (`FederationDeployment.Peers`). Hub-api derives the expected
+   exact installed source document and executor in hub-api's native input.
+   These are the same values the federation pins (`FederationDeployment.Peers`). Hub-api derives the expected
    profile with the shared decoder.
 4. **Registry on hub-api's `native-read` login.** The activated-leaf registry
    runs on that login, which gains EXECUTE on

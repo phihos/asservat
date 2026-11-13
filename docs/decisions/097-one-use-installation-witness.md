@@ -1,8 +1,8 @@
 # ADR-097 — One-use installation witness
 
-Status: accepted engineering refinement of REQ-DEP-005 and REQ-DB-005. The
-witness component is implemented; the initial/restore activation coordinator
-and its production installer are not.
+> Superseded (2026-11-13): the witness defended against an installer or namespace writer re-running first activation against empty SQL. ADR-328 trusts installation actors; the idempotent Helm `setup` Job seeds activation, and the database-incarnation fence (ADR-096) still blocks restored SQL.
+
+Status: superseded by ADR-328 (administrator-only namespaces); the mechanism is removed by the Helm-native installation plan.
 
 Subsequent [ADR-098](098-first-installation-activation.md) implements the separate
 first-installation SQL/audit coordinator. Production provisioning and restore
