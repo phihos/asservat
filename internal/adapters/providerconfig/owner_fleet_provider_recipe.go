@@ -31,7 +31,7 @@ func OwnerFleetProviderRecipeFor(in contracts.OwnerDeployment, profile contracts
 		ClusterID      string                          `json:"clusterID"`
 		Namespace      contracts.WorkerObjectReference `json:"namespace"`
 		ServiceAccount contracts.WorkerObjectReference `json:"serviceAccount"`
-	}{"asservat-owner-fleet-provider-name/v1", in.InstallationID, in.ClusterID, in.Namespace, profile.ServiceAccount})
+	}{"asservat-owner-fleet-provider-name/v1", in.InstallationID, in.ClusterID, contracts.WorkerObjectReference{Name: in.Namespace.Name}, contracts.WorkerObjectReference{Name: profile.ServiceAccount.Name}})
 	if err != nil {
 		return role, "", err
 	}

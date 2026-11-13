@@ -236,6 +236,7 @@ helm-check: permission-crd-check policy-crd-check start-crd-check retention-crd-
 	$(PYTHON) scripts/check-helm.py
 	$(PYTHON) scripts/test-helm-bundled-cluster.py
 	$(PYTHON) scripts/test-helm-runtime-node-access.py
+	$(PYTHON) scripts/test-helm-hub-api.py
 
 helm-integration: helm-check
 	$(PYTHON) scripts/test-helm.py

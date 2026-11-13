@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"asservat.local/asservat/internal/contracts"
+	value "asservat.local/asservat/internal/domain/fleet"
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 )
@@ -46,7 +47,7 @@ func TestInstalledWorkerOriginalTemplateSeparatesPendingProjections(t *testing.T
 		t.Fatal("evidence delete credential projection", sources[9])
 	}
 	token := sources[10].ServiceAccountToken
-	if token == nil || token.Path != contracts.HubWorkerClusterObservationTokenFile || token.Audience != "https://asservat."+s.initial.InstallationID+"/cluster-observation" || token.ExpirationSeconds == nil || *token.ExpirationSeconds != 600 || len(d.Spec.Template.Spec.Containers[0].Env) != 1 || d.Spec.Template.Spec.Containers[0].Env[0].Name != contracts.OwnerPodUIDEnvironment || d.Spec.Template.Spec.Containers[0].Env[0].ValueFrom == nil || d.Spec.Template.Spec.Containers[0].Env[0].ValueFrom.FieldRef == nil || d.Spec.Template.Spec.Containers[0].Env[0].ValueFrom.FieldRef.FieldPath != "metadata.uid" {
+	if token == nil || token.Path != contracts.HubWorkerClusterObservationTokenFile || token.Audience != value.ClusterObservationAudience(s.initial.InstallationID) || token.ExpirationSeconds == nil || *token.ExpirationSeconds != 600 || len(d.Spec.Template.Spec.Containers[0].Env) != 1 || d.Spec.Template.Spec.Containers[0].Env[0].Name != contracts.OwnerPodUIDEnvironment || d.Spec.Template.Spec.Containers[0].Env[0].ValueFrom == nil || d.Spec.Template.Spec.Containers[0].Env[0].ValueFrom.FieldRef == nil || d.Spec.Template.Spec.Containers[0].Env[0].ValueFrom.FieldRef.FieldPath != "metadata.uid" {
 		t.Fatal("local observation projection changed audience or native Pod provenance")
 	}
 	for i, name := range []string{contracts.CapacityRuntimeProjectionName(s.initial.InstallationID), contracts.HubWorkerCleanupProjectionName(s.initial.InstallationID), contracts.PermissionRuntimeProjectionName(s.initial.InstallationID)} {

@@ -29,9 +29,9 @@ func (p ClusterObservationCallerPin) Valid() bool {
 	return identity.Text(p.Namespace.Name, 63) && identity.Text(p.Account, 253) && identity.Text(p.Deployment, 253) && p.TemplateDigest != (artifact.Digest{}) && p.ImageDigest != (artifact.Digest{}) && p.ProtectionDigest != (artifact.Digest{})
 }
 
-func ClusterObservationAudience(installation string) string {
-	return "https://asservat." + installation + "/cluster-observation"
-}
+// ClusterObservationAudience is fixed: Helm renders the projected token
+// before the installation ID exists. TokenReview still binds account and Pod.
+func ClusterObservationAudience(string) string { return "asservat-cluster-observation" }
 
 // ClusterObservationCaller is transient exact local workload evidence. Only
 // the installed Kubernetes adapter produces it in the runtime composition.

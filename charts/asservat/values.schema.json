@@ -1958,6 +1958,462 @@
         "identity",
         "keyService"
       ]
+    },
+    "installation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z0-9]([-a-z0-9]{0,30}[a-z0-9])?$"
+        }
+      }
+    },
+    "image": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "repository": {
+          "type": "string"
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^(sha256:[a-f0-9]{64})?$"
+        },
+        "pullPolicy": {
+          "enum": [
+            "Always",
+            "IfNotPresent",
+            "Never"
+          ]
+        }
+      }
+    },
+    "origin": {
+      "type": "string",
+      "pattern": "^(https://[^/\\s]+)?$"
+    },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "browserAudience": {
+          "type": "string"
+        },
+        "providerRootsSecret": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "key": {
+              "type": "string"
+            }
+          }
+        },
+        "clientSecret": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "key": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "exposure": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tls": {
+          "enum": [
+            "pod",
+            "proxy"
+          ]
+        },
+        "tlsSecret": {
+          "type": "string"
+        }
+      }
+    },
+    "fleet": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "settings": {
+          "type": "string"
+        },
+        "channelMount": {
+          "type": "string"
+        },
+        "deliveryProfile": {
+          "type": "string"
+        }
+      }
+    },
+    "capacity": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "keys": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "labelKeys": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "annotationKeys": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "hub": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "hubApi": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "replicas": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 16
+            },
+            "resources": {
+              "type": "object"
+            },
+            "nodeSelector": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "tolerations": {
+              "type": "array"
+            },
+            "nativeService": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "type": {
+                  "enum": [
+                    "ClusterIP",
+                    "NodePort",
+                    "LoadBalancer"
+                  ]
+                },
+                "annotations": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                },
+                "nodePorts": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "native": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "operation": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  }
+                }
+              }
+            },
+            "caSecrets": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "postgres": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "key": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "auditStore": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "key": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "keyService": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "key": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            },
+            "postgres": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "host": {
+                  "type": "string"
+                },
+                "port": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "database": {
+                  "type": "string"
+                },
+                "maxConnections": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 4
+                }
+              }
+            },
+            "auditStore": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "endpoint": {
+                  "type": "string"
+                },
+                "region": {
+                  "type": "string"
+                },
+                "bucket": {
+                  "type": "string"
+                }
+              }
+            },
+            "keyService": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "endpoint": {
+                  "type": "string"
+                },
+                "auditMount": {
+                  "type": "string"
+                },
+                "auditKey": {
+                  "type": "string"
+                },
+                "pkiMount": {
+                  "type": "string"
+                }
+              }
+            },
+            "providerAuthMount": {
+              "type": "string"
+            },
+            "connections": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 64
+            },
+            "concurrency": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 16
+            },
+            "connectorPKIMount": {
+              "type": "string"
+            },
+            "workerNamespaces": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "retentionTopologies": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "targetClusterID": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "targetClusterID",
+                  "name"
+                ]
+              }
+            },
+            "peers": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "clusterID": {
+                    "type": "string"
+                  },
+                  "peerID": {
+                    "type": "string"
+                  },
+                  "rootsPEM": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "clusterID",
+                  "peerID",
+                  "rootsPEM"
+                ]
+              }
+            },
+            "public": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "standby": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "captures": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "previewSeconds": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "operationConcurrency": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "mcpPerIdentity": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "downloadConcurrency": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "downloadsPerIdentity": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "downloadMaxSeconds": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "operationAudit": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "normalConcurrency": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "resolutionConcurrency": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "perPrincipalConcurrency": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "normalPerSecond": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "resolutionPerSecond": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  }
+                },
+                "downloadPlan": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "outputLimit": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "readLimit": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "requestLimit": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "durationSeconds": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  }
+                },
+                "transitMount": {
+                  "type": "string"
+                },
+                "workerPKIMount": {
+                  "type": "string"
+                },
+                "permissionDelegations": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                },
+                "captureHistory": {
+                  "type": [
+                    "object",
+                    "null"
+                  ]
+                },
+                "processing": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "definitions": {

@@ -76,8 +76,8 @@ func TestOwnerObservationFinalPodStatusOnlyUpdate(t *testing.T) {
 				if mode == "status-within-final" {
 					f.mu.Lock()
 					route := ownerOperationRoute{pod: first.Name, node: first.Spec.NodeName, addresses: original.Peers[0].Addresses}
-					a, ea := f.reader.validateObjects(f.v.svc, f.v.deploy, f.v.rs, *first, f.v.binding, route, nil)
-					b, eb := f.reader.validateObjects(f.v.svc, f.v.deploy, f.v.rs, *last, f.v.binding, route, nil)
+					a, ea := f.reader.validateObjects(f.v.svc, f.v.deploy, f.v.rs, *first, f.v.binding, route)
+					b, eb := f.reader.validateObjects(f.v.svc, f.v.deploy, f.v.rs, *last, f.v.binding, route)
 					f.mu.Unlock()
 					if ea != nil || eb != nil || a != b || first.UID != last.UID || first.ResourceVersion == last.ResourceVersion {
 						t.Fatal("fixture changed actual native identity or behavioral projection", ea, eb)
@@ -122,7 +122,7 @@ func TestOwnerObservationInitialPodStatusOnlyUpdate(t *testing.T) {
 	if err != nil || !final.Final || !sameOwnerNativePeers(original.Peers, final.Peers) || !final.ObservedAt.Equal(original.ObservedAt) || !final.FreshUntil.Equal(original.FreshUntil) {
 		t.Fatal("initial status-only update changed protected facts or dates", err)
 	}
-	if f.observer.Load() != 22 || f.probe.Load() != 0 {
+	if f.observer.Load() != 20 || f.probe.Load() != 0 {
 		t.Fatal("status update added API reads", f.observer.Load(), f.probe.Load())
 	}
 }

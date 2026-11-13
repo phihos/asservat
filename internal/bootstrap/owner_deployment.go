@@ -15,6 +15,7 @@ import (
 
 	"asservat.local/asservat/internal/domain/authorization"
 	cfg "asservat.local/asservat/internal/domain/configuration"
+	"asservat.local/asservat/internal/transport/edge"
 
 	"asservat.local/asservat/internal/adapters/kms"
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
@@ -64,6 +65,8 @@ type OwnerDeployment struct {
 	publicContext   *publicContext
 	publicDownloads *publicDownloads
 	publicHandler   http.Handler
+	// publicProxyTLS: the operator's proxy terminates public TLS (ADR-327).
+	publicProxyTLS bool
 	// policyTrigger is the ADR-228 restart trigger; RunPublic supervises it.
 	policyTrigger *captureapp.PolicyTrigger
 	// recordingCollect is the ADR-248 collect loop; RunPublic supervises it.
@@ -88,17 +91,24 @@ func ownerRandomID() string {
 
 // NewOwnerDeployment borrows an installation-owned mount root. The caller
 // retains it until Run/Close has stopped all use. No path comes from a request.
-func NewOwnerDeployment(ctx context.Context, files *os.Root, podUID string) (result *OwnerDeployment, err error) {
+func NewOwnerDeployment(ctx context.Context, files *os.Root, podUID string) (*OwnerDeployment, error) {
+	if ctx == nil || files == nil {
+		return nil, mounts.ErrUnavailable
+	}
+	in, err := readOwnerInputs(ctx, files)
+	if err != nil {
+		return nil, ownerStartupError(startupInputs, "none", err)
+	}
+	return newOwnerDeployment(ctx, files, podUID, in)
+}
+
+// newOwnerDeployment composes the deployment from already loaded inputs.
+func newOwnerDeployment(ctx context.Context, files *os.Root, podUID string, in *ownerInputs) (result *OwnerDeployment, err error) {
 	// The innermost phase names a startup failure (ADR-194 qualification).
 	phase, purpose := startupProcessPreconditions, "none"
 	defer ownerStartupAnnotate(&phase, &purpose, &err)
-	if ctx == nil || ctx.Err() != nil || files == nil || !authorization.UUID(podUID) || disableWorkerCoreDumps() != nil {
+	if ctx == nil || ctx.Err() != nil || files == nil || in == nil || !authorization.UUID(podUID) || disableWorkerCoreDumps() != nil {
 		return nil, mounts.ErrUnavailable
-	}
-	phase = startupInputs
-	in, err := readOwnerInputs(ctx, files)
-	if err != nil {
-		return nil, err
 	}
 	// ADR-182: an identity-only installed owner is the observation deployment;
 	// only a promoted installed input (with Native) reaches this composition.
@@ -151,11 +161,7 @@ func NewOwnerDeployment(ctx context.Context, files *os.Root, podUID string) (res
 	}
 	if in.config.Public != nil {
 		phase = startupPublicPools
-		manifest, err := readPublicRuntimeManifest(startup, in, d.publicFiles)
-		if err != nil {
-			return nil, err
-		}
-		d.public = &publicPools{in: d.publicFiles, manifest: manifest, governor: governor}
+		d.public = &publicPools{in: d.publicFiles, installation: in.config.InstallationID, governor: governor}
 		d.closers = append(d.closers, d.public.Close)
 	}
 	var parts *ownerIdentityParts
@@ -255,11 +261,7 @@ func NewOwnerDeployment(ctx context.Context, files *os.Root, podUID string) (res
 		if e != nil {
 			return nil, mounts.ErrUnavailable
 		}
-		publicProbe, e := kube.NewPermissionClient(kube.WithOpeningBurst(in.kubernetes("kube-probe.token")), c.ClusterID, control, time.Now)
-		if e != nil {
-			return nil, mounts.ErrUnavailable
-		}
-		d.publicContext, err = newPublicContext(startup, in, d.publicFiles, d.providers, d.public, publicObserver, publicProbe, d.shared, catalog, parts.audit, &closers)
+		d.publicContext, err = newPublicContext(startup, in, d.publicFiles, d.providers, d.public, publicObserver, nil, d.shared, catalog, parts.audit, &closers)
 		d.closers = append(d.closers, closers...)
 		if err != nil {
 			return nil, &fixedStepError{"public-context", err}
@@ -310,6 +312,7 @@ func NewOwnerDeployment(ctx context.Context, files *os.Root, podUID string) (res
 		if err == nil {
 			phase = startupPublicHandler
 			d.publicHandler, err = newPublicHandler(startup, d, a)
+			d.publicProxyTLS = c.Public.ProxyTLS
 		}
 		d.closers = append(d.closers, closers...)
 		if err != nil {
@@ -486,7 +489,16 @@ func (d *OwnerDeployment) RunPublic(listener net.Listener) error {
 	d.owners.Add(1)
 	d.mu.Unlock()
 	defer d.owners.Done()
-	server := &http.Server{Handler: d.publicHandler, TLSConfig: publicTLS(d.publicFiles), ReadHeaderTimeout: 5 * time.Second, IdleTimeout: time.Minute, MaxHeaderBytes: 32 << 10, BaseContext: func(net.Listener) context.Context { return d.root }}
+	base := d.root
+	server := &http.Server{Handler: d.publicHandler, ReadHeaderTimeout: 5 * time.Second, IdleTimeout: time.Minute, MaxHeaderBytes: 32 << 10}
+	if d.publicProxyTLS {
+		// ADR-327: TLS ended at the operator's Ingress/Gateway; requests
+		// on this listener count as secure, forwarded headers still do not.
+		base = edge.WithTLSProxy(d.root)
+	} else {
+		server.TLSConfig = publicTLS(d.publicFiles)
+	}
+	server.BaseContext = func(net.Listener) context.Context { return base }
 	shutdown := func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		_ = server.Shutdown(ctx)
@@ -518,7 +530,12 @@ func (d *OwnerDeployment) RunPublic(listener net.Listener) error {
 			_ = d.history.Run(d.root, eventLog(os.Stderr, "history retirement refused"))
 		}()
 	}
-	err := server.ServeTLS(listener, "", "")
+	var err error
+	if d.publicProxyTLS {
+		err = server.Serve(listener)
+	} else {
+		err = server.ServeTLS(listener, "", "")
+	}
 	if stop() {
 		d.cancel()
 		shutdown()

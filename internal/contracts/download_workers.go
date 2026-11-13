@@ -59,8 +59,10 @@ func WorkerConfigurationAuditKeyName(installationID string) string {
 // the installed owner template, pinned before the worker namespace is
 // created, can project them; every client still checks the pinned namespace
 // UID on each read.
-func NativeKubernetesTokenFile(clusterID, namespace string) string {
-	return "native-kube-" + clusterID + "-" + namespace + ".token"
+// NativeKubernetesTokenFile names the projected token for a worker
+// namespace; Helm renders it, so it carries no generated ID.
+func NativeKubernetesTokenFile(_, namespace string) string {
+	return "native-kube-" + namespace + ".token"
 }
 func NativeKubernetesProbeTokenFile(clusterID, namespace string) string {
 	return "native-kube-probe-" + clusterID + "-" + namespace + ".token"

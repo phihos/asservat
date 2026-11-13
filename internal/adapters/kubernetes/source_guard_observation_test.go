@@ -36,12 +36,9 @@ func TestSourceGuardsObserveNamespaceWithoutAdmissionPolicy(t *testing.T) {
 		}
 		return sha256.Sum256(b)
 	}
-	capacityDigest := func(plan any) artifact.Digest {
-		return digest(struct {
-			Format, ClusterID string
-			Plan              any
-			Pin               GuardPin
-		}{"capacity-protection/v1", permissionCluster, plan, pin})
+	// The capacity digests name the cluster and observed namespace only.
+	capacityDigest := func(any) artifact.Digest {
+		return namedDigest("asservat-capacity-protection/v2", permissionCluster, permissionControl.Name)
 	}
 	wantPermission := digest(struct {
 		ClusterID string

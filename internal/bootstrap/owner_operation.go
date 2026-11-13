@@ -177,11 +177,7 @@ func (d *OwnerDeployment) ownerOperationConfig(ctx context.Context, in *ownerInp
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	probe, err := kube.NewPermissionClient(in.kubernetes("kube-probe.token"), c.ClusterID, control, time.Now)
-	if err != nil {
-		return nil, mounts.ErrUnavailable
-	}
-	own, err := guard.WithClients(observer, probe)
+	own, err := guard.WithClients(observer, nil)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}

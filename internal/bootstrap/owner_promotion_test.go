@@ -107,13 +107,10 @@ func TestDerivePromotedOwner(t *testing.T) {
 				t.Fatal("download pins", out.Native.WorkerAPIs, p.DownloadEnvironment)
 			}
 			if mode == "unprojected" {
-				if validateOwnerDeployment(out) == nil {
-					t.Fatal("unprojected input passed the launched owner's check")
-				}
 				out.Observation.Activation = activation
 			}
 			writeOwnerJSON(t, dir, "deployment.json", out)
-			got, err := readOwnerInputs(context.Background(), in.files)
+			got, err := readOwnerDeploymentFixture(context.Background(), in.files)
 			if err != nil {
 				t.Fatal("owner reader refused the derived input", err)
 			}

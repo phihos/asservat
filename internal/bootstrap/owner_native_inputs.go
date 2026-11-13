@@ -31,13 +31,6 @@ func nativeKubernetesTokenName(c contracts.OwnerNativeWorkerAPI) string {
 	return contracts.NativeKubernetesTokenFile(c.ClusterID, c.Namespace.Name)
 }
 
-// nativeKubernetesProbeTokenName is the worker namespace's separate probe
-// credential (ADR-204 decision 2): it proves the worker profile source's guard
-// by a denied dry-run update, as kube-probe.token does in the hub namespace.
-func nativeKubernetesProbeTokenName(c contracts.OwnerNativeWorkerAPI) string {
-	return contracts.NativeKubernetesProbeTokenFile(c.ClusterID, c.Namespace.Name)
-}
-
 // workerAPIClient is one pinned worker API's client for one fixed token file
 // of the backend projection; the returned func closes its HTTP transport.
 func (d *OwnerDeployment) workerAPIClient(a contracts.OwnerNativeWorkerAPI, token string) (*kube.PermissionClient, func(), error) {

@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"asservat.local/asservat/internal/transport/edge"
 )
 
 // HTTPDownloadDestination is an authenticated route's final bounded sink, not
@@ -76,7 +78,7 @@ func (s *HTTPDownloadDestination) HeadersSent() bool { return s != nil && s.head
 // An error after HeadersSent requires aborting the response/stream. Never append
 // a JSON problem or HTML login page to a partly emitted native evidence file.
 func (s *HTTPDownloadDestination) Send(ctx context.Context, m artifact.NativeDownloadMetadata, r artifact.DownloadSelection, p []byte) (int64, error) {
-	if s == nil || s.Writer == nil || s.Request == nil || s.Request.Method != http.MethodGet || s.Request.TLS == nil || s.headersSent {
+	if s == nil || s.Writer == nil || s.Request == nil || s.Request.Method != http.MethodGet || !edge.Secure(s.Request) || s.headersSent {
 		return 0, artifact.ErrInvalid
 	}
 	deadline, ok := ctx.Deadline()

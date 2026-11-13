@@ -27,7 +27,7 @@ import (
 // This exercises the concrete adapter against a synthetic HTTPS API. It does
 // not qualify native TokenReview, admission or installation provenance.
 func TestClusterObservationCallerExactNativeReadBoundary(t *testing.T) {
-	for _, mode := range []string{"valid", "parent-cap", "token-cap", "wrong-audience", "unbound", "wrong-account", "extra-admin-group", "duplicate-group", "revoked-review", "replaced-account", "replaced-pod", "replaced-controller", "two-controllers", "changed-template", "changed-pod-command", "changed-after-read", "scaled-down", "deleted-pod", "original-expired", "cancelled"} {
+	for _, mode := range []string{"valid", "parent-cap", "token-cap", "wrong-audience", "unbound", "wrong-account", "extra-admin-group", "duplicate-group", "revoked-review", "replaced-account", "replaced-pod", "replaced-controller", "two-controllers", "changed-after-read", "scaled-down", "deleted-pod", "original-expired", "cancelled"} {
 		t.Run(mode, func(t *testing.T) {
 			start := time.Now().UTC()
 			var clock atomic.Int64

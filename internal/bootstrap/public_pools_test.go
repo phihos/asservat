@@ -55,33 +55,11 @@ func TestOwnerPublicInputsRequireNativeOriginAndBudget(t *testing.T) {
 				c.Postgres.MaxConnections = 4
 			}
 			writeOwnerJSON(t, dir, "deployment.json", c)
-			_, e := readOwnerInputs(context.Background(), in.files)
+			_, e := readOwnerDeploymentFixture(context.Background(), in.files)
 			if (mode == "valid") != (e == nil) {
 				t.Fatal("public input decision", mode, e)
 			}
 		})
-	}
-}
-
-func publicManifestFixture(c contracts.OwnerDeployment) contracts.PublicRuntimeCredentialManifest {
-	return contracts.PublicRuntimeCredentialManifest{Format: contracts.PublicRuntimeCredentialManifestFormat, Input: contracts.PublicRuntimeRoles{InstallationID: c.InstallationID, ClusterID: c.ClusterID, Namespace: c.Namespace, OwnerConfigurationUID: c.ConfigurationUID, LayoutDigest: postgres.PublicRuntimeRoleLayoutDigest()}}
-}
-
-func TestPublicRuntimeManifestBindsTheOwnerInstallation(t *testing.T) {
-	in, dir, c := ownerInputFixture(t)
-	ctx := context.Background()
-	if _, e := readPublicRuntimeManifest(ctx, in, in.providerInputs); e == nil {
-		t.Fatal("missing manifest accepted")
-	}
-	writeOwnerJSON(t, dir, contracts.PublicRuntimeCredentialManifestFile, publicManifestFixture(c))
-	if _, e := readPublicRuntimeManifest(ctx, in, in.providerInputs); e != nil {
-		t.Fatal("exact manifest", e)
-	}
-	foreign := publicManifestFixture(c)
-	foreign.Input.OwnerConfigurationUID = "10000000-0000-4000-8000-0000000000aa"
-	writeOwnerJSON(t, dir, contracts.PublicRuntimeCredentialManifestFile, foreign)
-	if _, e := readPublicRuntimeManifest(ctx, in, in.providerInputs); e == nil {
-		t.Fatal("manifest of another owner configuration accepted")
 	}
 }
 
@@ -93,7 +71,7 @@ func TestPublicPoolsOpenOnlyVerifiedOwnPurposeLogins(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	p := &publicPools{in: in.providerInputs, manifest: publicManifestFixture(c), governor: governor}
+	p := &publicPools{in: in.providerInputs, installation: c.InstallationID, governor: governor}
 	defer p.Close()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

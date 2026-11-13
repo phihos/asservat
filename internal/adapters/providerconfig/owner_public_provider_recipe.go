@@ -33,7 +33,7 @@ func OwnerPublicProviderRecipeFor(in contracts.OwnerDeployment, profile contract
 		ClusterID      string                          `json:"clusterID"`
 		Namespace      contracts.WorkerObjectReference `json:"namespace"`
 		ServiceAccount contracts.WorkerObjectReference `json:"serviceAccount"`
-	}{"asservat-owner-public-provider-name/v1", in.InstallationID, in.ClusterID, in.Namespace, profile.ServiceAccount})
+	}{"asservat-owner-public-provider-name/v1", in.InstallationID, in.ClusterID, contracts.WorkerObjectReference{Name: in.Namespace.Name}, contracts.WorkerObjectReference{Name: profile.ServiceAccount.Name}})
 	if err != nil {
 		return roles, "", err
 	}
@@ -50,6 +50,11 @@ func OwnerPublicProviderRecipeFor(in contracts.OwnerDeployment, profile contract
 			"auth/token/revoke-self": {Capabilities: []string{"update"}},
 			paths[i]:                 {Capabilities: []string{"update"}},
 		}}
+		if purpose == "work-sign" {
+			// The hub-api reads its signing key's version and public key at
+			// startup (Helm-native installation).
+			acl.Path[p.WorkSigning.Mount+"/keys/"+p.WorkSigning.Name] = ownerProviderACLRule{Capabilities: []string{"read"}}
+		}
 		r, e := ownerProviderCanonical(role)
 		if e != nil {
 			return roles, "", e

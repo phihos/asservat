@@ -302,3 +302,115 @@ services:
       resources:
         requests: {cpu: 100m, memory: 256Mi}
         limits: {cpu: "2", memory: 1Gi}
+
+# Helm-native installation (docs/reviews/helm-native-install-plan.md). Object
+# names use the prefix installation.name; all hub objects live in the release
+# namespace. These keys render nothing until hub.<component>.enabled is set.
+installation:
+  name: asservat
+
+# One image for every runtime component: repository@digest.
+image:
+  repository: ""
+  digest: ""
+  pullPolicy: IfNotPresent
+
+# Public https origin of the console/MCP/download layer; empty renders no
+# public layer in the hub-api configuration.
+origin: ""
+
+identity:
+  # Access audience of browser login.
+  browserAudience: asservat-api
+  # CA bundle of the identity provider (Secret name/key), optional.
+  providerRootsSecret:
+    name: ""
+    key: ca.crt
+  # OIDC client secret of the console client.
+  clientSecret:
+    name: ""
+    key: client-secret
+
+exposure:
+  # pod: hub-api terminates TLS with tlsSecret; proxy: the operator's
+  # Ingress/Gateway terminates TLS and forwards plain HTTP (ADR-327).
+  tls: pod
+  # Secret with tls.crt/tls.key, used when tls is pod.
+  tlsSecret: ""
+
+# ADR-193 fleet bootstrap issuance through the hub-api.
+fleet:
+  enabled: false
+  settings: asservat-fleet
+  channelMount: fleet-bootstrap
+  deliveryProfile: regional-installer
+
+# Hub-cluster capacity observation served to the hub-worker; empty keys
+# disable it.
+capacity:
+  keys: []
+  labelKeys: []
+  annotationKeys: []
+
+hub:
+  hubApi:
+    enabled: false
+    replicas: 1
+    resources:
+      requests: {cpu: 100m, memory: 128Mi}
+      limits: {cpu: "1", memory: 512Mi}
+    nodeSelector: {}
+    tolerations: []
+    # Owner native/operation listener for connectors and download workers.
+    # ClusterIP for single-cluster installs; NodePort or LoadBalancer for
+    # remote regions.
+    nativeService:
+      type: ClusterIP
+      annotations: {}
+      nodePorts: {}
+      # nodePorts: {native: 31447, operation: 31449}
+    # Provider CA bundles; empty names use the bundled services' state Secret.
+    caSecrets:
+      postgres: {name: "", key: ca.crt}
+      auditStore: {name: "", key: ca.crt}
+      keyService: {name: "", key: ca.crt}
+    # Provider endpoints; empty values use the bundled in-namespace services.
+    postgres: {host: "", port: 5432, database: asservat, maxConnections: 1}
+    auditStore: {endpoint: "", region: us-east-1, bucket: asservat-audit}
+    keyService: {endpoint: "", auditMount: asservat-audit, auditKey: audit, pkiMount: owner-pki}
+    providerAuthMount: asservat-owner
+    connections: 4
+    concurrency: 2
+    connectorPKIMount: connector-pki
+    # Download-worker namespaces in the hub cluster; empty uses <name>-downloads.
+    workerNamespaces: []
+    retentionTopologies: []
+    # Remote regions' connector peers: {clusterID, peerID, rootsPEM}.
+    peers: []
+    public:
+      standby: 2
+      captures: 1
+      previewSeconds: 120
+      operationConcurrency: 8
+      mcpPerIdentity: 2
+      downloadConcurrency: 4
+      downloadsPerIdentity: 2
+      downloadMaxSeconds: 3600
+      # Retention comes from the capacity qualification.
+      operationAudit:
+        normalConcurrency: 8
+        resolutionConcurrency: 2
+        perPrincipalConcurrency: 2
+        normalPerSecond: 50
+        resolutionPerSecond: 10
+      downloadPlan:
+        outputLimit: 268435456
+        readLimit: 311164928
+        requestLimit: 4
+        durationSeconds: 300
+      transitMount: public-transit
+      workerPKIMount: worker-pki
+      # Read the capacity processing source <name>-processing-source.
+      processing: false
+      permissionDelegations: []
+      captureHistory: null

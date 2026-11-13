@@ -76,7 +76,7 @@ func TestConfigurationControlRejectsAdditionalPolicyAndChangedAccount(t *testing
 				f.authChange = func(a *ownerProviderAuthReply) { a.Policies = append(a.Policies, "default") }
 			case "account":
 				f.authChange = func(a *ownerProviderAuthReply) {
-					a.Metadata["service_account_uid"] = "10000000-0000-4000-8000-000000000099"
+					a.Metadata["service_account_name"] = "another-account"
 				}
 			case "unknown-login":
 				f.mode = mode

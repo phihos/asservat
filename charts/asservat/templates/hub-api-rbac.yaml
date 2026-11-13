@@ -1,0 +1,122 @@
+{{- if .Values.hub.hubApi.enabled }}
+{{- $p := .Values.installation.name }}
+{{- $name := include "asservat.hubApi.name" . }}
+{{- $workers := include "asservat.hubApi.workerNamespaces" . | fromJsonArray }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "asservat.hubApi.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: [pods, serviceaccounts, services]
+    verbs: [get]
+  - apiGroups: [apps]
+    resources: [replicasets, deployments]
+    verbs: [get]
+  - apiGroups: [discovery.k8s.io]
+    resources: [endpointslices]
+    verbs: [list]
+  - apiGroups: [""]
+    resources: [configmaps]
+    resourceNames:
+      - {{ printf "%s-owner-source" $p }}
+      - {{ printf "%s-browser-settings" $p }}
+      - {{ printf "%s-identity-settings" $p }}
+      - {{ printf "%s-cluster-catalog" $p }}
+      - {{ printf "%s-download-environment" $p }}
+      - {{ printf "%s-processing-source" $p }}
+      - {{ .Values.fleet.settings }}
+    verbs: [get]
+  - apiGroups: [asservat.io]
+    resources: [debugpolicies]
+    verbs: [get]
+  - apiGroups: [asservat.io]
+    resources: [captureprofiles]
+    verbs: [get, list]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "asservat.hubApi.labels" . | nindent 4 }}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: {{ $name }}}
+subjects: [{kind: ServiceAccount, name: {{ $name }}, namespace: {{ .Release.Namespace }}}]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ printf "asservat.%s.%s" .Release.Namespace $name }}
+  labels:
+    {{- include "asservat.hubApi.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: [namespaces]
+    resourceNames:
+      - {{ .Release.Namespace }}
+      {{- range $workers }}
+      - {{ . }}
+      {{- end }}
+    verbs: [get]
+  - apiGroups: [authentication.k8s.io]
+    resources: [tokenreviews]
+    verbs: [create]
+  - apiGroups: [scheduling.k8s.io]
+    resources: [priorityclasses]
+    resourceNames: [{{ printf "%s-download-worker" $p }}]
+    verbs: [get]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ printf "asservat.%s.%s" .Release.Namespace $name }}
+  labels:
+    {{- include "asservat.hubApi.labels" . | nindent 4 }}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: {{ printf "asservat.%s.%s" .Release.Namespace $name }}}
+subjects: [{kind: ServiceAccount, name: {{ $name }}, namespace: {{ .Release.Namespace }}}]
+{{- range $workers }}
+---
+# Download-worker namespace: the hub-api reads the worker profile and control,
+# and creates, reads and deletes download-worker Jobs.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $name }}
+  namespace: {{ . }}
+  labels:
+    {{- include "asservat.hubApi.labels" $ | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: [configmaps]
+    resourceNames: [{{ printf "%s-worker-profile" $p }}, {{ printf "%s-download-worker-control" $p }}]
+    verbs: [get]
+  - apiGroups: [""]
+    resources: [secrets]
+    resourceNames: [{{ printf "%s-download-worker-store" $p }}]
+    verbs: [get]
+  - apiGroups: [""]
+    resources: [serviceaccounts]
+    resourceNames: [{{ printf "%s-download-worker" $p }}]
+    verbs: [get]
+  - apiGroups: [batch]
+    resources: [jobs]
+    verbs: [create, get, delete]
+  - apiGroups: [""]
+    resources: [pods]
+    verbs: [get, list]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $name }}
+  namespace: {{ . }}
+  labels:
+    {{- include "asservat.hubApi.labels" $ | nindent 4 }}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: {{ $name }}}
+subjects: [{kind: ServiceAccount, name: {{ $name }}, namespace: {{ $.Release.Namespace }}}]
+{{- end }}
+{{- end }}

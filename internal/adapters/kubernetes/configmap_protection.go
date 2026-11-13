@@ -2,7 +2,6 @@ package kubernetes
 
 import (
 	"context"
-	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"strings"
@@ -50,21 +49,27 @@ type configMapProtection struct {
 }
 
 func newConfigMapProtection(observer, probe *PermissionClient, plan value.ConfigMapAdministration, pin GuardPin, condition, denial string) (*configMapProtection, error) {
-	if observer == nil || probe == nil || observer == probe || observer.clusterID != probe.clusterID || observer.control != plan.ControlNamespace || probe.control != plan.ControlNamespace || !identity.Text(pin.PolicyUID, 64) || !identity.Text(pin.BindingUID, 64) || !identity.Text(pin.BindingResourceVersion, 128) || pin.PolicyGeneration < 1 {
+	// Helm-native installation (ADR-328): the probe and pin are optional
+	// leftovers of the admission guard; callers outside the hub-api may
+	// still pass them for their remaining proofs.
+	if observer == nil || observer == probe || probe != nil && (observer.clusterID != probe.clusterID || probe.control != plan.ControlNamespace) || observer.control != plan.ControlNamespace {
 		return nil, value.ErrInvalid
 	}
 	plan.Administrators = append([]value.KubernetesActor(nil), plan.Administrators...)
+	out := &configMapProtection{observer: observer, probe: probe, plan: plan, pin: pin, digest: ConfigMapSourceDigest(observer.clusterID, plan.ControlNamespace.Name, plan.SourceName), denial: denial}
+	if probe == nil {
+		if len(validation.IsDNS1123Subdomain(plan.SourceName)) != 0 || len(validation.IsDNS1123Label(plan.ControlNamespace.Name)) != 0 {
+			return nil, value.ErrInvalid
+		}
+		return out, nil
+	}
 	p, b, e := configMapAdmission(plan, condition, denial)
 	if e != nil {
 		return nil, e
 	}
 	normalizePermissionPolicy(&p.Spec)
-	bound, _ := json.Marshal(struct {
-		Cluster string
-		Plan    value.ConfigMapAdministration
-		Pin     GuardPin
-	}{observer.clusterID, plan, pin})
-	return &configMapProtection{observer, probe, plan, pin, p.Spec, b.Spec, artifact.Digest(sha256.Sum256(bound)), denial}, nil
+	out.policy, out.binding = p.Spec, b.Spec
+	return out, nil
 }
 func (g *configMapProtection) prove(ctx context.Context) error {
 	_, err := g.proveObject(ctx)
@@ -83,6 +88,9 @@ func (g *configMapProtection) proveObject(ctx context.Context) (core.ConfigMap, 
 // It is not a credential and cannot replace a live account/body predicate.
 func (g *configMapProtection) proveObjectIdentity(ctx context.Context) (core.ConfigMap, authentication.UserInfo, error) {
 	var zero core.ConfigMap
+	if g.probe == nil {
+		return zero, authentication.UserInfo{}, value.ErrUnavailable
+	}
 	raw, e := g.probe.proofPost(ctx, "/apis/authentication.k8s.io/v1/selfsubjectreviews", authentication.SelfSubjectReview{TypeMeta: meta.TypeMeta{APIVersion: "authentication.k8s.io/v1", Kind: "SelfSubjectReview"}}, nil)
 	if e != nil {
 		return zero, authentication.UserInfo{}, configurationSourceError(configurationSourceProbeIdentityRead, value.ErrUnavailable)
@@ -149,7 +157,7 @@ func (g *configMapProtection) Proven(ctx context.Context) (artifact.Digest, erro
 
 func (g *configMapProtection) current(ctx context.Context) (artifact.Digest, time.Time, error) {
 	var zero artifact.Digest
-	if g == nil {
+	if g == nil || g.probe == nil {
 		return zero, time.Time{}, value.ErrInvalid
 	}
 	start := g.observer.now()

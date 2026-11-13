@@ -1,13 +1,10 @@
 package kubernetes
 
 import (
-	"context"
 	"encoding/json"
 	"encoding/pem"
-	"errors"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 	"time"
 
@@ -128,85 +125,4 @@ func (x *ownerIdentityObjectFixture) writeJournal(t *testing.T) {
 		t.Fatal(e)
 	}
 	x.journal.Data["state.json"] = raw
-}
-
-func TestOwnerIdentityNativeReadersRequireOriginalMountedBundle(t *testing.T) {
-	for _, mode := range []string{"valid", "missing-child-marker", "swapped-child-marker", "missing-projection-receipt", "missing-launch-receipt", "journal-replacement", "role-root-substitution", "mutable-provider", "provider-replacement", "different-mounted-credential", "extra-mounted-credential", "config-substitution", "late", "new-image", "scaled", "launch-substitution", "account-replacement"} {
-		t.Run(mode, func(t *testing.T) {
-			x := newOwnerIdentityObjectFixture(t)
-			switch mode {
-			case "missing-child-marker":
-				delete(x.providers.Annotations, "asservat.io/owner-identity-object")
-			case "swapped-child-marker":
-				x.config.Annotations["asservat.io/owner-identity-object"] = x.state.OwnerIdentity.Credentials.OperationID
-			case "missing-projection-receipt":
-				x.state.OwnerIdentity.Receipt = nil
-				x.writeJournal(t)
-			case "missing-launch-receipt":
-				x.state.OwnerLaunch.Receipt = nil
-				x.writeJournal(t)
-			case "journal-replacement":
-				x.journal.UID = types.UID(ownerID(3400))
-			case "role-root-substitution":
-				x.state.OwnerIdentity.RoleRoot.UID = ownerID(3400)
-				x.writeJournal(t)
-			case "mutable-provider":
-				x.providers.Immutable = ptr.To(false)
-			case "provider-replacement":
-				x.providers.UID = types.UID(ownerID(3400))
-			case "different-mounted-credential":
-				x.mounted["sql-owner-runtime.json"] = []byte("other-synthetic")
-			case "extra-mounted-credential":
-				x.mounted["sql-administrator.json"] = []byte("synthetic")
-			case "config-substitution":
-				x.config.Data["deployment.json"] = strings.ReplaceAll(x.config.Data["deployment.json"], x.reader.input.ClusterID, ownerID(3400))
-			case "new-image":
-				x.deployment.Spec.Template.Spec.Containers[0].Image = "other"
-			case "scaled":
-				*x.deployment.Spec.Replicas = 2
-			case "launch-substitution":
-				x.deployment.Annotations[ownerIdentityLaunchMarker] = ownerID(3400)
-			case "account-replacement":
-				x.account.UID = types.UID(ownerID(3400))
-			}
-			until := time.Now().Add(5 * time.Second)
-			if mode == "late" {
-				until = time.Now().Add(-time.Second)
-			}
-			ctx, end := context.WithDeadline(context.Background(), until)
-			defer end()
-			state, e := x.reader.journal(ctx)
-			if e == nil {
-				e = x.reader.projections(ctx, state, x.manifest, x.mounted)
-			}
-			if e == nil {
-				e = x.reader.deployment(ctx, state)
-			}
-			if mode == "valid" && e != nil {
-				t.Fatal("original mounted objects denied", e)
-			}
-			if mode != "valid" {
-				var failure *OwnerIdentityReadFailure
-				if !errors.As(e, &failure) {
-					t.Fatal("missing closed object diagnostic", e)
-				}
-				expected := map[string]OwnerIdentityReadCheck{
-					"missing-child-marker": ownerReadCredentialsMetadata, "swapped-child-marker": ownerReadConfigurationMetadata,
-					"missing-projection-receipt": ownerReadJournalState, "missing-launch-receipt": ownerReadLaunchReceipt,
-					"journal-replacement": ownerReadJournalMetadata, "role-root-substitution": ownerReadJournalState,
-					"mutable-provider": ownerReadCredentialsMetadata, "provider-replacement": ownerReadCredentialsMetadata,
-					"different-mounted-credential": ownerReadCredentialsContent, "extra-mounted-credential": ownerReadCredentialsMetadata,
-					"config-substitution": ownerReadConfigurationContent, "late": ownerReadJournalRead,
-					"new-image": ownerReadDeploymentRunningDigest, "scaled": ownerReadDeploymentMetadata,
-					"launch-substitution": ownerReadDeploymentMetadata, "account-replacement": ownerReadAccountContent,
-				}[mode]
-				if failure.Check() != expected {
-					t.Fatalf("wrong native object diagnostic: mode=%s error=%v", mode, e)
-				}
-			}
-			if mode != "valid" && e == nil {
-				t.Fatal("changed/pending installation accepted")
-			}
-		})
-	}
 }

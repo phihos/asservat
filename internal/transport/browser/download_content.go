@@ -18,6 +18,7 @@ import (
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/identity"
+	"asservat.local/asservat/internal/transport/edge"
 	"asservat.local/asservat/internal/transport/presentation"
 )
 
@@ -146,7 +147,7 @@ func (h *DownloadContentHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'")
 	origin, _ := url.Parse(h.config.PublicOrigin)
-	if r.TLS == nil || r.Host != origin.Host || r.URL.IsAbs() || r.URL.RawQuery != "" || r.URL.RawPath != "" || len(r.RequestURI) > 4096 || len(r.Header.Values("Origin")) > 1 || r.Header.Get("Origin") != "" && r.Header.Get("Origin") != h.config.PublicOrigin || len(r.Header.Values("Sec-Fetch-Site")) > 1 || r.Header.Get("Sec-Fetch-Site") == "cross-site" {
+	if !edge.Secure(r) || r.Host != origin.Host || r.URL.IsAbs() || r.URL.RawQuery != "" || r.URL.RawPath != "" || len(r.RequestURI) > 4096 || len(r.Header.Values("Origin")) > 1 || r.Header.Get("Origin") != "" && r.Header.Get("Origin") != h.config.PublicOrigin || len(r.Header.Values("Sec-Fetch-Site")) > 1 || r.Header.Get("Sec-Fetch-Site") == "cross-site" {
 		sessionProblem(w, 403)
 		return
 	}

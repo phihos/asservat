@@ -13,6 +13,7 @@ import (
 
 	app "asservat.local/asservat/internal/application/identity"
 	"asservat.local/asservat/internal/domain/identity"
+	"asservat.local/asservat/internal/transport/edge"
 )
 
 const SessionCookie = "__Host-asservat-session"
@@ -51,7 +52,7 @@ func (h SessionHandler) base(w http.ResponseWriter, r *http.Request) bool {
 		return false
 	}
 	u, _ := url.Parse(h.Origin)
-	if r.TLS == nil || r.Host != u.Host || r.URL.IsAbs() || len(r.RequestURI) > 8192 || r.Header.Get("Authorization") != "" {
+	if !edge.Secure(r) || r.Host != u.Host || r.URL.IsAbs() || len(r.RequestURI) > 8192 || r.Header.Get("Authorization") != "" {
 		sessionProblem(w, 400)
 		return false
 	}
