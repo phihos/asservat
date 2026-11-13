@@ -24,7 +24,6 @@ type RetentionReconciler struct {
 	Reader     RetentionListReader
 	Watcher    RetentionWatcher
 	Protection RetentionProtectionReader
-	Review     RetentionBootstrapReviewReader
 	Store      RetentionCheckpointStore
 	Now        func() time.Time
 	NewID      func() string
@@ -50,7 +49,7 @@ func (s *retentionRun) protection(ctx context.Context) (privacy.SourceProtection
 	}
 	return p, nil
 }
-func (s *retentionRun) persist(ctx context.Context, event *PolicyEvent, review *value.RetentionBootstrapReview, until time.Time) error {
+func (s *retentionRun) persist(ctx context.Context, event *PolicyEvent, until time.Time) error {
 	if !s.r.Now().Before(until) {
 		return value.ErrUnavailable
 	}
@@ -60,7 +59,7 @@ func (s *retentionRun) persist(ctx context.Context, event *PolicyEvent, review *
 	}
 	f := s.fence
 	f.LeaseUntil = identity.Earlier(f.LeaseUntil, until)
-	t := RetentionTransition{ID: s.r.NewID(), Fence: f, List: list, Event: event, Review: review}
+	t := RetentionTransition{ID: s.r.NewID(), Fence: f, List: list, Event: event}
 	accepted, err := s.r.Store.AcceptRetention(ctx, t)
 	if err != nil {
 		return err
@@ -118,17 +117,6 @@ func (s *retentionRun) start(ctx context.Context) error {
 	if list.Snapshot.SourceClusterID != s.r.Source.ClusterID || list.Snapshot.ControlNamespaceUID != s.r.Source.ControlNamespaceUID || list.Snapshot.Hub != s.r.Source.Hub {
 		return reconcileStep("list/source", value.ErrChanged)
 	}
-	var review *value.RetentionBootstrapReview
-	if len(list.Snapshot.Policies) > 0 {
-		if s.r.Review == nil {
-			return reconcileStep("review/absent", value.ErrDenied)
-		}
-		r, err := s.r.Review.InitialRetentionReview(ctx)
-		if err != nil {
-			return reconcileStep("review", err)
-		}
-		review = &r
-	}
 	last, err := s.protection(ctx)
 	if err != nil {
 		return reconcileStep("protection", err)
@@ -138,17 +126,14 @@ func (s *retentionRun) start(ctx context.Context) error {
 		return reconcileStep("protection/expired", value.ErrUnavailable)
 	}
 	list.Snapshot.FreshUntil = identity.Earlier(list.Snapshot.FreshUntil, until)
-	if review != nil {
-		list.Snapshot.FreshUntil = identity.Earlier(list.Snapshot.FreshUntil, review.FreshUntil)
-	}
-	if err = CheckInitialRetention(list.Snapshot, s.r.Source.ProtectionDigest, review, s.r.Now()); err != nil {
+	if err = CheckInitialRetention(list.Snapshot, s.r.Source.ProtectionDigest, s.r.Now()); err != nil {
 		return reconcileStep("initial", err)
 	}
 	s.journal, err = NewRetentionJournal(list, s.r.Now())
 	if err != nil {
 		return reconcileStep("journal", err)
 	}
-	if err = s.persist(ctx, nil, review, until); err != nil {
+	if err = s.persist(ctx, nil, until); err != nil {
 		return reconcileStep("accept", err)
 	}
 	return nil
@@ -328,7 +313,7 @@ func (s *retentionRun) consume(ctx context.Context, watch RetentionWatch) error 
 				}
 				continue
 			}
-			if err = s.persist(ctx, &got.event, nil, proof.FreshUntil); err != nil {
+			if err = s.persist(ctx, &got.event, proof.FreshUntil); err != nil {
 				return reconcileStep("accept", err)
 			}
 			if err = s.observe(ctx); err != nil {

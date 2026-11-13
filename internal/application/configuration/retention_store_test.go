@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"asservat.local/asservat/internal/domain/artifact"
-	value "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/privacy"
 )
 
@@ -15,9 +14,8 @@ func retentionTransitionFixture(t *testing.T) (RetentionTransition, RetentionChe
 	now := l.Snapshot.ObservedAt
 	guard := artifact.Digest{4}
 	id := "33333333-3333-4333-8333-333333333333"
-	r := value.RetentionBootstrapReview{Resource: value.Resource{Kind: "ConfigMap", Name: "review", UID: "review", Namespace: "control", NamespaceUID: l.Snapshot.ControlNamespaceUID, ClusterID: l.Snapshot.SourceClusterID, ResourceVersion: "review:1", SpecDigest: artifact.Digest{6}}, Reviewer: "installer", PoliciesDigest: RetentionSnapshotDigest(l.Snapshot), ProtectionDigest: guard, ReviewedAt: now, ExpiresAt: now.Add(time.Hour), ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
 	f := RetentionFence{RootID: id, Epoch: id, Source: privacy.PolicySourceRef{ClusterID: l.Snapshot.SourceClusterID, ControlNamespaceUID: l.Snapshot.ControlNamespaceUID, Hub: true, ProtectionDigest: guard}, LeaseUntil: now.Add(30 * time.Second)}
-	x := RetentionTransition{ID: id, Fence: f, List: l, Review: &r}
+	x := RetentionTransition{ID: id, Fence: f, List: l}
 	record, err := ValidateRetentionTransition(x, nil, now)
 	if err != nil {
 		t.Fatal(err)
@@ -50,14 +48,13 @@ func TestRetentionTransitionRequiresExactHistoryAndPreservesExpiredObligations(t
 	x.Fence.LeaseUntil = later.Add(30 * time.Second)
 	x.Fence.Epoch = "44444444-4444-4444-8444-444444444444"
 	x.ID = x.Fence.Epoch
-	x.Review = nil
 	x.Event = &e
 	x.List = l
 	r, err := ValidateRetentionTransition(x, &previous, later)
 	if err != nil || r.PreviousDigest != previous.Record.CheckpointDigest {
 		t.Fatal("historical shortening lost", err)
 	}
-	for _, mode := range []string{"skip", "relist", "review", "source", "sequence", "missing-event", "lease"} {
+	for _, mode := range []string{"skip", "relist", "source", "sequence", "missing-event", "lease"} {
 		t.Run(mode, func(t *testing.T) {
 			bad := x
 			bad.List = clonePolicyList(x.List)
@@ -71,8 +68,6 @@ func TestRetentionTransitionRequiresExactHistoryAndPreservesExpiredObligations(t
 			case "relist":
 				bad.List.Snapshot.ObservedAt = later
 				bad.List.Snapshot.FreshUntil = later.Add(5 * time.Second)
-			case "review":
-				bad.Review = previous.Transition.Review
 			case "source":
 				bad.Fence.Source.Hub = false
 			case "sequence":

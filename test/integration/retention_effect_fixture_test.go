@@ -12,7 +12,6 @@ import (
 	privacyapp "asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
-	cfg "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/domain/privacy"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -121,8 +120,7 @@ func newRetentionEffectFixturesWithPolicy(t *testing.T, ctx context.Context, poo
 			snapshot := privacy.PolicySnapshot{SourceClusterID: ref.ClusterID, ControlNamespaceUID: ref.ControlNamespaceUID, Hub: true, ObservedAt: now, FreshUntil: now.Add(5 * time.Second), Policies: append([]privacy.ScopedPolicy{policy}, additional...)}
 			snapshot.Revision = identity.Revision{UID: ref.ControlNamespaceUID, Generation: 1, Digest: app.RetentionSnapshotDigest(snapshot)}
 			list := retentionFixturePolicyList(snapshot)
-			review := cfg.RetentionBootstrapReview{Resource: cfg.Resource{Kind: "ConfigMap", Name: "review", UID: "review", ClusterID: ref.ClusterID, Namespace: "control", NamespaceUID: ref.ControlNamespaceUID, ResourceVersion: "review:1", SpecDigest: artifact.Digest{2}}, Reviewer: "synthetic-installer", PoliciesDigest: snapshot.Revision.Digest, ProtectionDigest: ref.ProtectionDigest, ReviewedAt: now, ExpiresAt: now.Add(time.Hour), ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
-			cp, err := source.AcceptRetention(ctx, app.RetentionTransition{ID: custodyID(), Fence: start.Fence, List: list, Review: &review})
+			cp, err := source.AcceptRetention(ctx, app.RetentionTransition{ID: custodyID(), Fence: start.Fence, List: list})
 			if err != nil {
 				t.Fatal(err)
 			}

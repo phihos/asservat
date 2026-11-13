@@ -10,7 +10,6 @@ import (
 	"asservat.local/asservat/internal/adapters/postgres"
 	app "asservat.local/asservat/internal/application/configuration"
 	"asservat.local/asservat/internal/domain/artifact"
-	value "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/domain/privacy"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -63,8 +62,7 @@ func qualifyRetentionSources(t *testing.T, ctx context.Context, admin *pgxpool.P
 		snapshot := privacy.PolicySnapshot{SourceClusterID: cluster, ControlNamespaceUID: ref.ControlNamespaceUID, Hub: true, ObservedAt: now, FreshUntil: now.Add(5 * time.Second), Policies: []privacy.ScopedPolicy{policy}}
 		snapshot.Revision = identity.Revision{UID: ref.ControlNamespaceUID, Generation: 1, Digest: app.RetentionSnapshotDigest(snapshot)}
 		list := app.PolicyList{Snapshot: snapshot, ResourceVersion: "100", Versions: map[string]string{"baseline-uid": "90"}}
-		review := value.RetentionBootstrapReview{Resource: value.Resource{Kind: "ConfigMap", Name: "retention-bootstrap", UID: "bootstrap-uid", ClusterID: cluster, Namespace: "asservat-system", NamespaceUID: ref.ControlNamespaceUID, ResourceVersion: "review:1", SpecDigest: artifact.Digest{9}}, Reviewer: "synthetic-installer", PoliciesDigest: app.RetentionSnapshotDigest(snapshot), ProtectionDigest: ref.ProtectionDigest, ReviewedAt: now, ExpiresAt: now.Add(time.Hour), ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
-		return s, a, app.RetentionTransition{ID: custodyID(), Fence: start.Fence, List: list, Review: &review}
+		return s, a, app.RetentionTransition{ID: custodyID(), Fence: start.Fence, List: list}
 	}
 	qualifyRetentionObservation(t, ctx, admin, poolFor, store, keys, setup)
 	advance := func(t *testing.T, s *postgres.RetentionSources, prior app.RetentionCheckpoint, maximum int64, version string) (app.RetentionTransition, app.RetentionCheckpoint) {
@@ -98,16 +96,9 @@ func qualifyRetentionSources(t *testing.T, ctx context.Context, admin *pgxpool.P
 	t.Run("retention-source-bootstrap-and-eight-way-idempotency", func(t *testing.T) {
 		s, a, request := setup(t)
 		bad := request
-		review := *request.Review
-		review.ProtectionDigest = artifact.Digest{99}
-		bad.Review = &review
+		bad.Fence.Source.ProtectionDigest = artifact.Digest{99}
 		if _, err := s.AcceptRetention(ctx, bad); err == nil {
 			t.Fatal("wrong guard accepted")
-		}
-		bad = request
-		bad.Review = nil
-		if _, err := s.AcceptRetention(ctx, bad); err == nil {
-			t.Fatal("historical values self-accepted")
 		}
 		var wg sync.WaitGroup
 		results := make(chan error, 8)

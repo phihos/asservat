@@ -5,7 +5,6 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -27,8 +26,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	admission "k8s.io/api/admissionregistration/v1"
 	core "k8s.io/api/core/v1"
-	rbac "k8s.io/api/rbac/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
@@ -98,36 +95,11 @@ func testGuardedRetentionReconciliation(t *testing.T, ctx context.Context, c *re
 	if err != nil {
 		t.Fatal(err)
 	}
-	initial, err := reader.RetentionPolicyList(ctx)
-	if err != nil {
+	if _, err = reader.RetentionPolicyList(ctx); err != nil {
 		t.Fatal(err)
 	}
-	hash := app.RetentionSnapshotDigest(initial.Snapshot)
-	now := time.Now().UTC()
-	cm, err := native.CoreV1().ConfigMaps(plan.ControlNamespace.Name).Create(ctx, &core.ConfigMap{ObjectMeta: meta.ObjectMeta{Name: "retention-bootstrap"}, Data: map[string]string{"format": "asservat-retention-bootstrap/v1", "reviewer": "synthetic-installer", "policiesSHA256": hex.EncodeToString(hash[:]), "protectionSHA256": hex.EncodeToString(proof.Digest[:]), "reviewedAt": now.Format(time.RFC3339Nano), "expiresAt": now.Add(time.Hour).Format(time.RFC3339Nano)}}, meta.CreateOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	role, err := native.RbacV1().Roles(plan.ControlNamespace.Name).Get(ctx, "retention-reader", meta.GetOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	role.Rules = append(role.Rules, rbac.PolicyRule{APIGroups: []string{""}, Resources: []string{"configmaps"}, ResourceNames: []string{cm.Name}, Verbs: []string{"get"}})
-	if _, err = native.RbacV1().Roles(plan.ControlNamespace.Name).Update(ctx, role, meta.UpdateOptions{}); err != nil {
-		t.Fatal(err)
-	}
-	for _, actor := range []string{"retention-delegate", "retention-status", "retention-reader"} {
-		config := rest.CopyConfig(c)
-		config.Impersonate = rest.ImpersonationConfig{UserName: actor, Groups: []string{"retention-fixture"}}
-		api, err := kubernetes.NewForConfig(config)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err = api.CoreV1().ConfigMaps(plan.ControlNamespace.Name).Patch(ctx, cm.Name, types.MergePatchType, []byte(`{"data":{"reviewer":"forged"}}`), meta.PatchOptions{}); !apierrors.IsForbidden(err) {
-			t.Fatal("untrusted role altered initial review", actor, err)
-		}
-	}
-	review, err := kube.NewRetentionBootstrapReviewClient(client, cm.Name, string(cm.UID))
+	// An unrelated object for routine API writes during steady observation.
+	cm, err := native.CoreV1().ConfigMaps(plan.ControlNamespace.Name).Create(ctx, &core.ConfigMap{ObjectMeta: meta.ObjectMeta{Name: "unrelated-activity"}}, meta.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -215,7 +187,7 @@ func testGuardedRetentionReconciliation(t *testing.T, ctx context.Context, c *re
 			}
 		}
 	})
-	r := app.RetentionReconciler{RootID: root, Source: privacy.PolicySourceRef{ClusterID: cluster, ControlNamespaceUID: plan.ControlNamespace.UID, Hub: true, ProtectionDigest: proof.Digest}, Reader: reader, Watcher: reader, Protection: guard, Review: review, Store: traced, Now: time.Now, NewID: custodyID}
+	r := app.RetentionReconciler{RootID: root, Source: privacy.PolicySourceRef{ClusterID: cluster, ControlNamespaceUID: plan.ControlNamespace.UID, Hub: true, ProtectionDigest: proof.Digest}, Reader: reader, Watcher: reader, Protection: guard, Store: traced, Now: time.Now, NewID: custodyID}
 	sourceReader, err := postgres.NewRetentionSources(ctx, readPool, root)
 	if err != nil {
 		t.Fatal(err)
@@ -323,7 +295,6 @@ func testGuardedRetentionReconciliation(t *testing.T, ctx context.Context, c *re
 	if _, err = sourceReader.AcceptedRetentionSource(ctx, root, r.Source); err == nil {
 		t.Fatal("suspended source remained Ready")
 	}
-	// The review is required once, not on every controller restart.
 	if err = native.CoreV1().ConfigMaps(plan.ControlNamespace.Name).Delete(ctx, cm.Name, meta.DeleteOptions{}); err != nil {
 		t.Fatal(err)
 	}
