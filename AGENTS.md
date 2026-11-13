@@ -36,6 +36,16 @@ operation and reused for at most `identity.AuthorityRecheckInterval` (30 s; 60 s
 for the shared delivery-policy observation), never past an original deadline.
 Do not reintroduce stacked five-second authority windows.
 
+Maintainer decision (2026-11-13, verbatim): "Yes please make installation
+best-practice. The installer pod goes against all best practices. And I can
+really not see any security benefit. You could even argue that a compromised
+installer or installer service account does way more harm." Replace the
+installer Pod/continuation with Helm-native installation: Helm renders all
+Kubernetes objects; idempotent hook Jobs only do work that needs live external
+state (SQL schema/roles, key and object-store setup). Plain RBAC replaces
+UID-pinned admission guards and their proofs. See
+docs/reviews/helm-native-install-plan.md.
+
 Do not let overzealous security requirements with unproven security benefits
 stall development or cause runtime performance problems. Additional security
 mechanisms must address a concrete risk and justify their implementation and
