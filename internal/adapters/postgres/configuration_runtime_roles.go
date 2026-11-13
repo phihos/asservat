@@ -504,7 +504,7 @@ func (s *ConfigurationRuntimeSQLRoles) role(ctx context.Context, snapshot contra
 			return zero, cfg.ErrUnavailable
 		}
 		at = "create"
-		verifier, err := initialPasswordVerifier(InitialSQLLogin{Username: name, Password: material.Password})
+		verifier, err := sqlPasswordVerifier(SQLLogin{Username: name, Password: material.Password})
 		if err != nil {
 			return zero, err
 		}

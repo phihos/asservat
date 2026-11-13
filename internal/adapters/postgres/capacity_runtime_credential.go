@@ -3,11 +3,10 @@ package postgres
 import (
 	"context"
 	"encoding/hex"
-	"encoding/json"
+	"slices"
 	"strings"
 	"time"
 
-	"asservat.local/asservat/internal/adapters/postgres/custodydb"
 	app "asservat.local/asservat/internal/application/capacity"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/authorization"
@@ -67,79 +66,12 @@ func ValidateCapacityCredentialManifest(v contracts.CapacityCredentialManifest, 
 // Historical role claims are compared by identity; all current effect and
 // recovery observations retain their own independent original intervals.
 func VerifyCapacityRuntimeCredential(ctx context.Context, pool *pgxpool.Pool, manifest contracts.CapacityCredentialManifest, purpose string, qualification app.CapacityQualification) error {
-	if ctx == nil || ctx.Err() != nil || pool == nil || ValidateCapacityCredentialManifest(manifest, time.Now()) != nil ||
-		manifest.Input.LayoutDigest != PublicRuntimeRoleLayoutDigest() || !qualification.Valid() ||
-		qualification.RootBacking.RootID != manifest.Capacity.PermissionRootID || qualification.RootBacking.InstallationID != manifest.Input.InstallationID ||
-		qualification.RootBacking.AccountVersion != manifest.SetupID+"-account/v1" || !app.ValidateRootBackingInput(qualification.RootBacking) {
+	if !slices.Contains(contracts.CapacityRuntimePurposes(), purpose) {
 		return cfg.ErrInvalid
 	}
-	index := -1
-	for i, p := range contracts.CapacityRuntimePurposes() {
-		if p == purpose {
-			index = i
-		}
-	}
-	if index < 0 {
-		return cfg.ErrInvalid
-	}
-	selected := manifest.Roles[index]
 	name, known := PublicRuntimeRoleName(manifest.Input.InstallationID, purpose)
-	grants, fixed := publicRuntimeRoleGrants(purpose)
-	if !known || !fixed || name != selected.Receipt.RoleName || pool.Config().ConnConfig.User != name || pool.Config().MaxConns != 1 || pool.Config().MinConns != 0 {
-		return cfg.ErrDenied
-	}
-	started := capacityObservedMicro(time.Now().UTC())
-	until := started.Add(5 * time.Second)
-	if d, ok := ctx.Deadline(); ok && d.Before(until) {
-		until = d
-	}
-	until = until.Truncate(time.Microsecond)
-	call, end := context.WithDeadline(ctx, until)
-	defer end()
-	var exact bool
-	if err := pool.QueryRow(call, `SELECT current_user=session_user AND oid=$1 FROM pg_roles WHERE rolname=session_user`, selected.Receipt.RoleOID).Scan(&exact); err != nil || !exact {
-		return cfg.ErrDenied
-	}
-	verifier := &PublicRuntimeSQLRoles{input: manifest.Input}
-	snapshot := contracts.PublicRuntimeRoleSnapshot{UID: manifest.RootUID, State: contracts.PublicRuntimeRoleState{Input: manifest.Input, OperationID: manifest.SetupID}}
-	provenance, err := json.Marshal(verifier.provenance(snapshot, purpose, selected.Claim))
-	if err != nil {
+	if !known {
 		return cfg.ErrInvalid
 	}
-	if _, err = verifyFixedRuntimeRole(call, pool, name, 3, manifest.Input.LayoutDigest, &selected.Receipt, provenance, grants); err != nil {
-		return err
-	}
-	receipt, err := json.Marshal(manifest.Capacity)
-	if err != nil {
-		return cfg.ErrInvalid
-	}
-	qualified, err := json.Marshal(qualification)
-	if err != nil {
-		return cfg.ErrInvalid
-	}
-	ledger, err := New(call, pool)
-	if err != nil {
-		return cfg.ErrUnavailable
-	}
-	var narrow *time.Timer
-	var joined chan struct{}
-	defer func() {
-		if narrow != nil && !narrow.Stop() {
-			<-joined
-		}
-	}()
-	err = ledger.transaction(call, func(q *custodydb.Queries) error {
-		untilSQL, err := q.ReadCapacityRuntimeScope(call, custodydb.ReadCapacityRuntimeScopeParams{RootID: id(manifest.Capacity.PermissionRootID), ExpectedValue: receipt, QualificationValue: qualified, ObservedAt: ts(started), FreshUntil: ts(until)})
-		if err != nil || !untilSQL.Valid || untilSQL.Time.After(until) || !time.Now().Before(untilSQL.Time) {
-			return cfg.ErrUnavailable
-		}
-		until = untilSQL.Time
-		joined = make(chan struct{})
-		narrow = time.AfterFunc(time.Until(until), func() { end(); close(joined) })
-		return call.Err()
-	})
-	if err != nil || call.Err() != nil || !time.Now().Before(until) {
-		return cfg.ErrUnavailable
-	}
-	return nil
+	return VerifyRuntimeLogin(ctx, pool, name)
 }

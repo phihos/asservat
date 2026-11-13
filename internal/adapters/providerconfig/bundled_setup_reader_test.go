@@ -34,7 +34,7 @@ func (t bundledSetupFixtureTransport) CloseIdleConnections() {
 }
 func selectBundledSetupFixture(t *testing.T, f *setupFixture, kubernetes contracts.OwnerProviderEndpoint) contracts.SmallOpenBaoPlan {
 	t.Helper()
-	plan := contracts.SmallOpenBaoPlan{Format: contracts.SmallOpenBaoFormat, Namespace: "hub", Name: "trial", Image: contracts.SmallOpenBaoImage, Kubernetes: kubernetes, SetupAccount: "trial-bootstrap-runner"}
+	plan := contracts.SmallOpenBaoPlan{Format: contracts.SmallOpenBaoFormat, Namespace: "hub", Name: "trial", Image: contracts.SmallOpenBaoImage, Kubernetes: kubernetes, SetupAccount: "trial-setup"}
 	plan.Kubernetes.Roots = cloneSetupRoots(kubernetes.Roots)
 	original, err := url.Parse(f.in.KeyService.Endpoint)
 	if err != nil {
@@ -105,7 +105,7 @@ func TestBundledSetupReaderSelectsOnlyExactProtectedPlan(t *testing.T) {
 
 func TestBundledSetupReaderRejectsInvalidPlanOrProviderURL(t *testing.T) {
 	f := newSetupFixture(t)
-	plan := contracts.SmallOpenBaoPlan{Format: contracts.SmallOpenBaoFormat, Namespace: "hub", Name: "trial", Image: contracts.SmallOpenBaoImage, Kubernetes: f.in.Kubernetes, SetupAccount: "trial-bootstrap-runner"}
+	plan := contracts.SmallOpenBaoPlan{Format: contracts.SmallOpenBaoFormat, Namespace: "hub", Name: "trial", Image: contracts.SmallOpenBaoImage, Kubernetes: f.in.Kubernetes, SetupAccount: "trial-setup"}
 	endpoint := contracts.OwnerProviderEndpoint{Endpoint: plan.Endpoint(), Roots: f.roots}
 	foreign := endpoint
 	foreign.Endpoint = "https://foreign.invalid"

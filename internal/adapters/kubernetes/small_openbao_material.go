@@ -121,46 +121,20 @@ func SmallOpenBaoConfiguration(p contracts.SmallOpenBaoPlan, backend string) ([]
 	request := func(name, path string, data any) map[string]any {
 		return map[string]any{name: map[string]any{"operation": "update", "path": path, "data": data}}
 	}
-	policy := smallOpenBaoSetupPolicy()
+	policy := SmallOpenBaoSetupPolicy(p.Name)
 	marker, err := SmallOpenBaoBackendPolicy(backend)
 	if err != nil {
 		return nil, err
 	}
+	// Only the setup login and the completion marker. `asservat setup`
+	// ensures every mount, key, PKI root and role with this login.
 	init := []any{
 		request("setup-auth", "sys/auth/"+contracts.SmallOpenBaoSetupMount, map[string]any{"type": "kubernetes"}),
 		request("setup-api", "auth/"+contracts.SmallOpenBaoSetupMount+"/config", map[string]any{"kubernetes_host": p.Kubernetes.Endpoint, "kubernetes_ca_cert": ca.String(), "disable_local_ca_jwt": false, "disable_iss_validation": true}),
 		request("setup-policy", "sys/policies/acl/"+contracts.SmallOpenBaoSetupPolicy, map[string]any{"policy": policy}),
 		request("setup-role", "auth/"+contracts.SmallOpenBaoSetupMount+"/role/"+contracts.SmallOpenBaoSetupRole, map[string]any{"bound_service_account_names": []string{p.SetupAccount}, "bound_service_account_namespaces": []string{p.Namespace}, "alias_name_source": "serviceaccount_uid", "audience": p.SetupAudience(), "token_policies": []string{contracts.SmallOpenBaoSetupPolicy}, "token_no_default_policy": true, "token_ttl": 300, "token_max_ttl": 900, "token_explicit_max_ttl": 900, "token_num_uses": 0, "token_period": 0, "token_type": "service"}),
-		request("inspection-role", "auth/token/roles/"+providerconfig.BundledSetupInspectionRole, map[string]any{"allowed_policies_glob": []string{"asservat-*-inspection"}, "disallowed_policies": []string{"root", "default"}, "orphan": false, "renewable": false, "token_no_default_policy": true, "token_type": "service", "token_explicit_max_ttl": 600, "token_num_uses": 0, "token_period": 0}),
+		request("backend-identity", contracts.SmallOpenBaoBackendPolicyPath, map[string]any{"policy": marker}),
 	}
-	// These are installation infrastructure prerequisites, not runtime grants.
-	// Persist them under native first-initialization semantics before the final
-	// marker; a partial failure cannot become a replacement-key retry.
-	for _, mount := range []string{contracts.SmallOpenBaoConfigurationAuthMount, contracts.SmallOpenBaoOwnerAuthMount} {
-		init = append(init, request(mount+"-mount", "sys/auth/"+mount, map[string]any{"type": "kubernetes"}),
-			request(mount+"-api", "auth/"+mount+"/config", map[string]any{"kubernetes_host": p.Kubernetes.Endpoint, "kubernetes_ca_cert": ca.String(), "disable_local_ca_jwt": false, "disable_iss_validation": true}))
-	}
-	for _, mount := range []string{contracts.SmallOpenBaoAuditMount, contracts.SmallOpenBaoTransitMount} {
-		init = append(init, request(mount+"-mount", "sys/mounts/"+mount, map[string]any{"type": "transit"}))
-	}
-	init = append(init, request("initial-audit-key", contracts.SmallOpenBaoAuditMount+"/keys/audit", map[string]any{"type": "aes256-gcm96", "exportable": false, "allow_plaintext_backup": false}))
-	names := contracts.SmallOpenBaoInitialProviders()
-	policies, err := providerconfig.InitialProviderPolicyBodies(names.IssuerPolicy, names.WrapRole, names.WrapPolicy, names.UnwrapRole, names.UnwrapPolicy, contracts.SmallOpenBaoAuditMount, "audit")
-	if err != nil {
-		return nil, cfg.ErrInvalid
-	}
-	for _, name := range []string{names.IssuerPolicy, names.WrapPolicy, names.UnwrapPolicy} {
-		init = append(init, request(name+"-policy", "sys/policies/acl/"+name, map[string]any{"policy": policies[name]}))
-	}
-	for _, role := range []struct{ name, policy string }{{names.WrapRole, names.WrapPolicy}, {names.UnwrapRole, names.UnwrapPolicy}, {contracts.SmallOpenBaoInitialIssuerRole, names.IssuerPolicy}} {
-		init = append(init, request(role.name+"-role", "auth/token/roles/"+role.name, map[string]any{"allowed_policies": []string{role.policy}, "orphan": false, "renewable": false, "token_no_default_policy": true, "token_type": "service", "token_explicit_max_ttl": 900, "token_num_uses": 0, "token_period": 0}))
-	}
-	for _, mount := range []string{contracts.SmallOpenBaoOwnerPKIMount, contracts.SmallOpenBaoConnectorPKIMount, contracts.SmallOpenBaoWorkerPKIMount} {
-		init = append(init, request(mount+"-mount", "sys/mounts/"+mount, map[string]any{"type": "pki", "config": map[string]any{"max_lease_ttl": "87600h"}}),
-			request(mount+"-root", mount+"/root/generate/internal", map[string]any{"common_name": p.ServiceName() + " " + mount, "ttl": "87600h", "key_type": "ec", "key_bits": 256}))
-	}
-	init = append(init, request("bootstrap-mount", "sys/mounts/"+contracts.SmallOpenBaoBootstrapMount, map[string]any{"type": "kv", "options": map[string]any{"version": "2"}}),
-		request("backend-identity", contracts.SmallOpenBaoBackendPolicyPath, map[string]any{"policy": marker}))
 	// The pinned 2.7.2 parser does not accept the documentation's labeled
 	// self-init JSON example. Native HCL is validated against that binary.
 	var config bytes.Buffer
@@ -209,39 +183,41 @@ func smallOpenBaoHCLValue(value any) string {
 	}
 }
 
-func smallOpenBaoSetupPolicy() string {
-	// Dedicated provider management, never an ordinary runtime capability.
-	// No global root, raw storage, audit-device or seal administration rights.
-	// Only two exact root-protected auth mounts receive API-scoped sudo;
-	// wildcard/tune/delete administration is deliberately absent.
-	paths := map[string]any{}
-	for _, path := range []string{"auth/+/config", "auth/+/role/+", "sys/policies/acl/asservat-*", "auth/token/roles/asservat-*"} {
-		paths[path] = map[string]any{"capabilities": []string{"create", "read", "update"}}
+// SmallOpenBaoSetupPolicy is the setup login's policy: create and update the
+// fixed mounts, Kubernetes auth configuration, transit keys, PKI roots and
+// roles, and the installation's component policies and auth roles. No root,
+// raw storage, audit-device, seal, token-creation or delete rights, and no
+// write to its own policy or the backend marker.
+func SmallOpenBaoSetupPolicy(name string) string {
+	write := []string{"create", "read", "update"}
+	paths := map[string]any{
+		"sys/mounts":             map[string]any{"capabilities": []string{"read"}},
+		"sys/auth":               map[string]any{"capabilities": []string{"read"}},
+		"auth/token/lookup-self": map[string]any{"capabilities": []string{"read"}},
+		"auth/token/revoke-self": map[string]any{"capabilities": []string{"update"}},
 	}
-	for _, mount := range []string{contracts.SmallOpenBaoAuditMount, contracts.SmallOpenBaoTransitMount} {
-		paths[mount+"/keys/*"] = map[string]any{"capabilities": []string{"create", "read", "update"}}
+	for _, component := range providerconfig.OpenBaoComponents {
+		paths["sys/policies/acl/"+name+"-"+component+"-*"] = map[string]any{"capabilities": write}
 	}
 	for _, mount := range []string{contracts.SmallOpenBaoConfigurationAuthMount, contracts.SmallOpenBaoOwnerAuthMount} {
 		paths["sys/auth/"+mount] = map[string]any{"capabilities": []string{"create", "read", "update", "sudo"}}
-	}
-	for _, mount := range []string{contracts.SmallOpenBaoAuditMount, contracts.SmallOpenBaoTransitMount, contracts.SmallOpenBaoOwnerPKIMount, contracts.SmallOpenBaoConnectorPKIMount, contracts.SmallOpenBaoWorkerPKIMount, contracts.SmallOpenBaoBootstrapMount} {
-		paths["sys/mounts/"+mount] = map[string]any{"capabilities": []string{"create", "read", "update"}}
-	}
-	for _, mount := range []string{contracts.SmallOpenBaoOwnerPKIMount, contracts.SmallOpenBaoConnectorPKIMount, contracts.SmallOpenBaoWorkerPKIMount} {
-		for _, path := range []string{"root/generate/internal", "roles/*", "config/*", "issuers/*"} {
-			paths[mount+"/"+path] = map[string]any{"capabilities": []string{"create", "read", "update"}}
+		paths["auth/"+mount+"/config"] = map[string]any{"capabilities": write}
+		for _, component := range providerconfig.OpenBaoComponents {
+			paths["auth/"+mount+"/role/"+name+"-"+component+"-*"] = map[string]any{"capabilities": write}
 		}
+	}
+	for _, mount := range []string{contracts.SmallOpenBaoAuditMount, contracts.SmallOpenBaoTransitMount} {
+		paths["sys/mounts/"+mount] = map[string]any{"capabilities": write}
+		paths[mount+"/keys/*"] = map[string]any{"capabilities": []string{"create", "read"}}
+	}
+	paths["sys/mounts/"+contracts.SmallOpenBaoBootstrapMount] = map[string]any{"capabilities": write}
+	for _, mount := range []string{contracts.SmallOpenBaoOwnerPKIMount, contracts.SmallOpenBaoConnectorPKIMount, contracts.SmallOpenBaoWorkerPKIMount} {
+		paths["sys/mounts/"+mount] = map[string]any{"capabilities": write}
+		paths[mount+"/issuers"] = map[string]any{"capabilities": []string{"list"}}
+		paths[mount+"/root/generate/internal"] = map[string]any{"capabilities": []string{"update"}}
+		paths[mount+"/roles/*"] = map[string]any{"capabilities": write}
 		paths[mount+"/cert/ca"] = map[string]any{"capabilities": []string{"read"}}
 	}
-	for _, path := range []string{"auth/token/create/asservat-*", "auth/token/lookup-accessor", "auth/token/revoke-accessor", "auth/token/revoke-self"} {
-		paths[path] = map[string]any{"capabilities": []string{"update"}}
-	}
-	for _, path := range []string{"auth/token/lookup-self", "sys/mounts/auth/asservat-*", contracts.SmallOpenBaoBackendPolicyPath} {
-		paths[path] = map[string]any{"capabilities": []string{"read"}}
-	}
-	// The finite trusted installer delivers an existing fleet-issued credential
-	// to the regional installer; it cannot create, replace or list channel data.
-	paths[contracts.SmallOpenBaoBootstrapMount+"/data/connector/*"] = map[string]any{"capabilities": []string{"read"}}
 	raw, _ := json.Marshal(map[string]any{"path": paths})
 	return string(raw)
 }

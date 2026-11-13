@@ -1,11 +1,12 @@
 package providerconfig
 
 import (
-	"asservat.local/asservat/internal/contracts"
 	"crypto/x509"
 	"encoding/json"
 	"testing"
 	"time"
+
+	"asservat.local/asservat/internal/contracts"
 )
 
 // Actual public responses from the owned pinned OpenBao 2.7.1 read-shape probe.

@@ -3,7 +3,6 @@ package postgres
 import (
 	"context"
 	"encoding/hex"
-	"encoding/json"
 	"strings"
 	"time"
 
@@ -65,39 +64,18 @@ func ValidateCaptureCleanupCredentialManifest(m contracts.CaptureCleanupCredenti
 // comment, direct and ambient privileges and checks its private root pin.
 // Current recovery is read independently by the lifecycle facet before effects.
 func VerifyCaptureCleanupCredential(ctx context.Context, pool *pgxpool.Pool, m contracts.CaptureCleanupCredentialManifest, purpose string) error {
-	if ctx == nil || ctx.Err() != nil || pool == nil || ValidateCaptureCleanupCredentialManifest(m, time.Now()) != nil ||
-		m.Input.LayoutDigest != PublicRuntimeRoleLayoutDigest() {
+	name, known := PublicRuntimeRoleName(m.Input.InstallationID, purpose)
+	private := map[string]string{"capture-cleanup": "cleanup", "capture-verifier": "verifier", "capture-finalizer": "finalizer"}[purpose]
+	if !known || private == "" {
 		return cfg.ErrInvalid
 	}
-	var selected *contracts.PublicRuntimeCredentialProof
-	for n := range m.Roles {
-		if m.Roles[n].Purpose == purpose {
-			selected = &m.Roles[n]
-		}
-	}
-	limit, known := contracts.PublicRuntimeRoleConnectionLimit(purpose)
-	grants, fixed := publicRuntimeCaptureCleanupGrants(purpose)
-	if selected == nil || !known || !fixed || limit != 3 || pool.Config().MaxConns != 1 || pool.Config().MinConns != 0 ||
-		pool.Config().ConnConfig.User != selected.Receipt.RoleName {
-		return cfg.ErrDenied
+	if err := VerifyRuntimeLogin(ctx, pool, name); err != nil {
+		return err
 	}
 	call, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	var exact bool
-	if err := pool.QueryRow(call, `SELECT current_user=session_user AND oid=$1 FROM pg_roles WHERE rolname=session_user`, selected.Receipt.RoleOID).Scan(&exact); err != nil || !exact {
-		return cfg.ErrDenied
-	}
-	v := &PublicRuntimeSQLRoles{input: m.Input}
-	snapshot := contracts.PublicRuntimeRoleSnapshot{UID: m.RootUID, State: contracts.PublicRuntimeRoleState{Input: m.Input, OperationID: m.SetupID}}
-	provenance, err := json.Marshal(v.provenance(snapshot, purpose, selected.Claim))
-	if err != nil {
-		return cfg.ErrInvalid
-	}
-	if _, err = verifyFixedRuntimeRole(call, pool, selected.Receipt.RoleName, limit, m.Input.LayoutDigest, &selected.Receipt, provenance, grants); err != nil {
-		return cfg.ErrDenied
-	}
-	private := map[string]string{"capture-cleanup": "cleanup", "capture-verifier": "verifier", "capture-finalizer": "finalizer"}[purpose]
-	if private == "" || pool.QueryRow(call, `SELECT public.capture_audit_role_ok($1::uuid,$2::text)`, m.CaptureSetup.PermissionRootID, private).Scan(&exact) != nil || !exact || call.Err() != nil {
+	if pool.QueryRow(call, `SELECT public.capture_audit_role_ok($1::uuid,$2::text)`, m.CaptureSetup.PermissionRootID, private).Scan(&exact) != nil || !exact || call.Err() != nil {
 		return cfg.ErrDenied
 	}
 	return nil

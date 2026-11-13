@@ -55,20 +55,7 @@ The external database must be empty for a fresh initial installation. Existing
 state is resumed only through the original protected installation; this is not
 a restore or migration adoption tool.
 
-Generate the exact nonsecret OpenBao prerequisites using the matching local
-product binary:
-
-```sh
-asservat installer-provider-recipe > provider-prerequisites.json
-```
-
-This prints the transit mount/key/type, exact three ACL policy bodies, two
-bounded token-role bodies and finite issuer-token request. It makes no provider
-request and loads no credential. The provider administrator reviews/applies
-those prerequisites with their existing tooling and places only the returned
-limited issuer credential into the private producer input. Do not overwrite an
-existing key or substitute provider-root credentials. Flags match the chart's
-`bootstrap.providers` and `bootstrap.keyService.auditMount/auditKey` values.
+OpenBao prerequisites are described in [External key service](#external-key-service).
 
 Regional executors also require a separate metadata-only storage capability in
 `history-storage.json`, alongside the evidence writer's `evidence-storage.json`
@@ -263,6 +250,48 @@ It never overwrites an existing object, and refuses any other path. It then
 writes a ten-minute read-only inspection token and your credential to the
 inbox Secret. The continuation verifies the provider through that token
 before it publishes or launches anything, then deletes the inbox.
+
+## External key service
+
+`asservat setup` configures OpenBao with one login: a Kubernetes auth role
+`asservat-setup` on mount `auth/asservat-setup`, bound to service account
+`<name>-setup` in the release namespace and audience
+`https://asservat.io/openbao/setup`. The bundled OpenBao creates that login on
+first start (self-initialization); nothing else is created there. On every run
+setup then ensures, idempotently:
+
+| Kind | Path | Notes |
+|---|---|---|
+| transit | `asservat-audit`, `public-transit` | keys created if missing, never replaced or exported |
+| pki | `owner-pki`, `connector-pki`, `worker-pki` | `max_lease_ttl=87600h`; an internal EC P-256 root only when the mount has no issuer |
+| kv v2 | `fleet-bootstrap` | |
+| kubernetes auth | `asservat-configuration`, `asservat-owner` | `kubernetes_host=https://kubernetes.default.svc`, OpenBao's own service account reviews tokens |
+
+Transit keys (the hex form of the installation ID is `<inst>`):
+`asservat-audit/audit`, `asservat-<inst>-worker-configuration-audit`,
+`asservat-<inst>-context-deletion` (ed25519), `asservat-<inst>-federation-audit`,
+`asservat-<inst>-publisher-audit`; `public-transit/asservat-<inst>-browser-sessions`,
+`asservat-<inst>-work-signing` (ed25519). PKI roles: `owner-pki` server/client
+`asservat-<inst>-owner-server|-owner-client`, `connector-pki`
+`asservat-<inst>-connector-client|-connector-server`, `worker-pki`
+`asservat-<inst>-download-worker|-verifier`.
+
+Each hub component purpose gets an ACL policy and a Kubernetes auth role, both
+named `<name>-<component>-<purpose>`, written on every run: `hub-worker`
+(`audit-wrap`, `audit-unwrap`, `cleanup-wrap|open|verify|sign`) on
+`asservat-configuration`; `hub-api` (`audit-wrap`, `audit-unwrap`,
+`server-sign`, `client-sign`, `browser-seal`, `browser-open`, `work-sign`,
+`worker-issue`, `bootstrap-channel`), `federation` (`audit-wrap`,
+`audit-unwrap`, `client-sign`, `server-sign`) and `publisher` (`audit-wrap`,
+`audit-unwrap`, `verifier-sign`) on `asservat-owner`. Each policy grants token
+self-management plus the one transit or PKI operation of its purpose.
+
+For an external OpenBao, either create the same setup login and give it the
+policy printed by `SmallOpenBaoSetupPolicy` (create/read/update on the mounts
+above and their keys, roles and roots, `sudo` only on the two component auth
+mounts, and policies/roles only under the `<name>-<component>-` prefixes), or
+create the objects above with your own tooling. Configure the two component
+auth mounts with a reviewer that can reach the hub cluster's TokenReview API.
 
 ## Delegate permission management
 

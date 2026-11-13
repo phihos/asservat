@@ -216,3 +216,13 @@ func (r *SetupReader) ReadContextDeletionSigning(ctx context.Context, endpoint c
 	}
 	return ContextDeletionSigningReadback{Mount: mount, Key: key, Version: version, PublicKeys: keys}, nil
 }
+
+// configurationWorkerAuditReads are the named reads of the worker
+// configuration audit key: its mount, unless it is the configuration audit
+// mount already read, then the key.
+func configurationWorkerAuditReads(in contracts.HubWorkerDeployment, worker contracts.OwnerPublicTransit) []string {
+	if worker.Mount == in.KeyService.AuditMount {
+		return []string{worker.Mount + "/keys/" + worker.Key}
+	}
+	return []string{"sys/mounts/" + worker.Mount, worker.Mount + "/keys/" + worker.Key}
+}

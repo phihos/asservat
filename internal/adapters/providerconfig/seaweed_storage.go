@@ -357,29 +357,6 @@ func decodeSeaweedIdentities(raw []byte) (map[string]seaweedIdentity, error) {
 	return out, nil
 }
 
-// ReadSeaweedInitialAuditCredential reads only the exact original installation's
-// initial-audit entry from private retained IAM. The caller must independently
-// pin that IAM source and installation; these bytes grant no principal authority.
-func ReadSeaweedInitialAuditCredential(raw []byte, installationID string) (contracts.SeaweedCredential, error) {
-	var zero contracts.SeaweedCredential
-	principal := contracts.SeaweedPrincipalKey{Purpose: "initial-audit", ScopeID: installationID}
-	name, err := SeaweedPrincipalName(principal)
-	if err != nil {
-		return zero, ErrSeaweedStorage
-	}
-	identities, err := decodeSeaweedIdentities(raw)
-	if err != nil {
-		return zero, ErrSeaweedStorage
-	}
-	defer clear(identities)
-	identity, ok := identities[name]
-	if !ok {
-		return zero, ErrSeaweedStorage
-	}
-	key := identity.Credentials[0]
-	return contracts.SeaweedCredential{Principal: principal, AccessKeyID: key.Access, SecretAccessKey: key.Secret}, nil
-}
-
 // ValidateSeaweedConfigTransition prevents later installer phases from replacing
 // or dropping a retained principal/key/capability. Inputs remain private. It is
 // not a replacement for CompileSeaweedStorage's purpose/recipe checks.

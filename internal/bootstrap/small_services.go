@@ -172,7 +172,7 @@ func runSmallServicesPreparation(ctx context.Context, files *os.Root) error {
 	}
 	if p.OpenBao != nil {
 		plan := contracts.SmallOpenBaoPlan{Format: contracts.SmallOpenBaoFormat, Namespace: p.Namespace, Name: p.Name, Image: p.OpenBao.Image,
-			Kubernetes: in.kubernetesEndpoint, SetupAccount: p.Name + "-bootstrap-runner"}
+			Kubernetes: in.kubernetesEndpoint, SetupAccount: p.Name + "-setup"}
 		service, err := kube.NewSmallOpenBaoPreparation(config, plan)
 		if err != nil {
 			return mounts.ErrUnavailable

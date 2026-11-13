@@ -1,8 +1,10 @@
 package objectstore
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"encoding/pem"
 	"encoding/xml"
 	"io"
 	"net/http"
@@ -17,167 +19,181 @@ import (
 )
 
 func swSetupID(n string) string { return "10000000-0000-4000-8000-00000000000" + n }
-func TestSeaweedSetupPendingReopenAndRetainedRefusal(t *testing.T) {
-	for _, mode := range []string{"empty-pending", "unknown-create", "foreign", "nonempty", "not-pending", "suspended", "policy-replacement", "wrong-backend", "wrong-installation", "normalized-policy"} {
-		t.Run(mode, func(t *testing.T) {
-			admin, e := providerconfig.GenerateSeaweedCredential(contracts.SeaweedPrincipalKey{Purpose: "admin", ScopeID: swSetupID("1")})
-			if e != nil {
-				t.Fatal(e)
-			}
-			key, e := providerconfig.GenerateSeaweedCredential(contracts.SeaweedPrincipalKey{Purpose: "initial-audit", ScopeID: swSetupID("9")})
-			if e != nil {
-				t.Fatal(e)
-			}
-			compiled, e := providerconfig.CompileSeaweedStorage(admin, []contracts.SeaweedGrant{{Credential: key, Bucket: "audit", InstallationID: swSetupID("9")}})
-			if e != nil {
-				t.Fatal(e)
-			}
 
-			if mode == "normalized-policy" {
-				extra, e := providerconfig.GenerateSeaweedCredential(contracts.SeaweedPrincipalKey{Purpose: "evidence-delete", ScopeID: swSetupID("9")})
-				if e != nil {
-					t.Fatal(e)
-				}
-				clear(compiled.Config)
-				compiled, e = providerconfig.CompileSeaweedStorage(admin, []contracts.SeaweedGrant{{Credential: key, Bucket: "audit", InstallationID: swSetupID("9")}, {Credential: extra, Bucket: "audit", InstallationID: swSetupID("9")}})
-				if e != nil {
-					t.Fatal(e)
-				}
+// fakeSeaweedBucket is one bucket of the in-memory S3 fake.
+type fakeSeaweedBucket struct {
+	tags            []types.Tag
+	version, policy string
+	objects         bool
+}
+
+// fakeSeaweed serves the bucket administration subset setup uses. It counts
+// mutating requests and can fail the first create with an unknown reply.
+type fakeSeaweed struct {
+	t             *testing.T
+	buckets       map[string]*fakeSeaweedBucket
+	writes        int
+	unknownCreate bool
+	normalize     bool
+}
+
+func (f *fakeSeaweed) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/xml")
+	q := r.URL.Query()
+	name := strings.Trim(r.URL.Path, "/")
+	fail := func(code string) {
+		w.WriteHeader(404)
+		_, _ = io.WriteString(w, "<Error><Code>"+code+"</Code></Error>")
+	}
+	b := f.buckets[name]
+	if r.Method == http.MethodPut && len(q) == 0 {
+		f.writes++
+		if b == nil {
+			f.buckets[name] = &fakeSeaweedBucket{}
+		}
+		if f.unknownCreate {
+			f.unknownCreate = false
+			w.WriteHeader(500)
+			_, _ = io.WriteString(w, "<Error><Code>InternalError</Code></Error>")
+		}
+		return
+	}
+	if b == nil {
+		fail("NoSuchBucket")
+		return
+	}
+	switch {
+	case q.Has("tagging"):
+		if r.Method == http.MethodPut {
+			f.writes++
+			var doc struct {
+				TagSet []struct {
+					Key   string `xml:"Key"`
+					Value string `xml:"Value"`
+				} `xml:"TagSet>Tag"`
 			}
-			defer clear(compiled.Config)
-			claim := contracts.SeaweedBucketInitialization{BackendID: swSetupID("1"), InstallationID: swSetupID("9"), InitializationID: swSetupID("2"), StateSecretUID: swSetupID("3"), PVCUID: swSetupID("4"), Image: "chrislusf/seaweedfs@sha256:" + strings.Repeat("a", 64), Bucket: "audit", Pending: true}
-			var tags []types.Tag
-			version := ""
-			policy := ""
-			writes, emptyReads := 0, 0
-			missing := mode == "unknown-create"
-			if mode == "wrong-backend" {
-				claim.BackendID = swSetupID("8")
+			if xml.NewDecoder(r.Body).Decode(&doc) != nil {
+				f.t.Error("tag body")
 			}
-			if mode == "wrong-installation" {
-				tags = seaweedOwnership(claim)
-				claim.InstallationID = swSetupID("8")
-				claim.Pending = false
+			b.tags = nil
+			for _, tag := range doc.TagSet {
+				b.tags = append(b.tags, types.Tag{Key: aws.String(tag.Key), Value: aws.String(tag.Value)})
 			}
-			if mode == "foreign" {
-				tags = []types.Tag{{Key: aws.String("foreign"), Value: aws.String("other")}}
+			return
+		}
+		if len(b.tags) == 0 {
+			fail("NoSuchTagSet")
+			return
+		}
+		_, _ = io.WriteString(w, "<Tagging><TagSet>")
+		for _, tag := range b.tags {
+			_, _ = io.WriteString(w, "<Tag><Key>"+aws.ToString(tag.Key)+"</Key><Value>"+aws.ToString(tag.Value)+"</Value></Tag>")
+		}
+		_, _ = io.WriteString(w, "</TagSet></Tagging>")
+	case q.Has("versioning"):
+		if r.Method == http.MethodPut {
+			f.writes++
+			b.version = "Enabled"
+			return
+		}
+		_, _ = io.WriteString(w, "<VersioningConfiguration><Status>"+b.version+"</Status></VersioningConfiguration>")
+	case q.Has("policy"):
+		if r.Method == http.MethodPut {
+			f.writes++
+			raw, _ := io.ReadAll(io.LimitReader(r.Body, providerconfig.SeaweedConfigLimit+1))
+			b.policy = string(raw)
+			w.WriteHeader(204)
+			return
+		}
+		if b.policy == "" {
+			fail("NoSuchBucketPolicy")
+			return
+		}
+		if f.normalize {
+			_, _ = io.WriteString(w, seaweedProviderPolicyRoundTrip(f.t, b.policy))
+		} else {
+			_, _ = io.WriteString(w, b.policy)
+		}
+	case q.Has("versions"):
+		_, _ = io.WriteString(w, "<ListVersionsResult><IsTruncated>false</IsTruncated></ListVersionsResult>")
+	case q.Has("uploads"):
+		_, _ = io.WriteString(w, "<ListMultipartUploadsResult><IsTruncated>false</IsTruncated></ListMultipartUploadsResult>")
+	case q.Get("list-type") == "2":
+		body := "<ListBucketResult><IsTruncated>false</IsTruncated>"
+		if b.objects {
+			body += "<Contents><Key>managed</Key><Size>1</Size></Contents>"
+		}
+		_, _ = io.WriteString(w, body+"</ListBucketResult>")
+	default:
+		f.t.Errorf("unexpected setup operation %s %s", r.Method, r.URL)
+		w.WriteHeader(500)
+	}
+}
+
+func TestEnsureSetupBuckets(t *testing.T) {
+	installation := swSetupID("9")
+	admin, e := providerconfig.GenerateSeaweedCredential(contracts.SeaweedPrincipalKey{Purpose: "admin", ScopeID: swSetupID("1")})
+	if e != nil {
+		t.Fatal(e)
+	}
+	key, e := providerconfig.GenerateSeaweedCredential(contracts.SeaweedPrincipalKey{Purpose: "initial-audit", ScopeID: installation})
+	if e != nil {
+		t.Fatal(e)
+	}
+	compiled, e := providerconfig.CompileSeaweedStorage(admin, []contracts.SeaweedGrant{{Credential: key, Bucket: "audit", InstallationID: installation}})
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer clear(compiled.Config)
+	owned := func(bucket string) []types.Tag {
+		return seaweedOwnership(contracts.SeaweedBucketInitialization{InstallationID: installation, Bucket: bucket})
+	}
+	for _, mode := range []string{"fresh", "unknown-create", "normalized-policy", "untagged-empty", "foreign-installation", "untagged-nonempty", "policy-replacement"} {
+		t.Run(mode, func(t *testing.T) {
+			f := &fakeSeaweed{t: t, buckets: map[string]*fakeSeaweedBucket{}, unknownCreate: mode == "unknown-create", normalize: mode == "normalized-policy"}
+			switch mode {
+			case "untagged-empty":
+				f.buckets["audit"] = &fakeSeaweedBucket{}
+			case "foreign-installation":
+				f.buckets["audit"] = &fakeSeaweedBucket{tags: seaweedOwnership(contracts.SeaweedBucketInitialization{InstallationID: swSetupID("8"), Bucket: "audit"}), version: "Enabled"}
+			case "untagged-nonempty":
+				f.buckets["audit"] = &fakeSeaweedBucket{objects: true}
+			case "policy-replacement":
+				f.buckets["audit"] = &fakeSeaweedBucket{tags: owned("audit"), version: "Enabled", policy: `{"Version":"2012-10-17","Statement":[{"Sid":"AsservatForeign","Effect":"Deny","Resource":"*"}]}`}
 			}
-			if mode == "not-pending" {
-				claim.Pending = false
-			}
-			if mode == "suspended" || mode == "policy-replacement" {
-				tags = seaweedOwnership(claim)
-				claim.Pending = false
-			}
-			if mode == "policy-replacement" {
-				version = "Enabled"
-				policy = `{"Version":"2012-10-17","Statement":[{"Sid":"AsservatForeign","Effect":"Deny","Resource":"*"}]}`
-			}
-			server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				w.Header().Set("Content-Type", "application/xml")
-				q := r.URL.Query()
-				if r.URL.Path != "/audit" && r.URL.Path != "/audit/" {
-					t.Errorf("unexpected bucket path %s", r.URL.Path)
-				}
-				fail := func(code string) {
-					w.WriteHeader(404)
-					_, _ = io.WriteString(w, "<Error><Code>"+code+"</Code></Error>")
-				}
-				switch {
-				case q.Has("tagging"):
-					if r.Method == http.MethodPut {
-						writes++
-						var doc struct {
-							TagSet []struct {
-								Key   string `xml:"Key"`
-								Value string `xml:"Value"`
-							} `xml:"TagSet>Tag"`
-						}
-						if xml.NewDecoder(r.Body).Decode(&doc) != nil {
-							t.Error("tag body")
-						}
-						tags = nil
-						for _, tag := range doc.TagSet {
-							tags = append(tags, types.Tag{Key: aws.String(tag.Key), Value: aws.String(tag.Value)})
-						}
-					}
-					if missing {
-						fail("NoSuchBucket")
-						return
-					}
-					if len(tags) == 0 {
-						fail("NoSuchTagSet")
-						return
-					}
-					_, _ = io.WriteString(w, "<Tagging><TagSet>")
-					for _, tag := range tags {
-						_, _ = io.WriteString(w, "<Tag><Key>"+aws.ToString(tag.Key)+"</Key><Value>"+aws.ToString(tag.Value)+"</Value></Tag>")
-					}
-					_, _ = io.WriteString(w, "</TagSet></Tagging>")
-				case q.Has("versioning"):
-					if r.Method == http.MethodPut {
-						writes++
-						version = "Enabled"
-					}
-					_, _ = io.WriteString(w, "<VersioningConfiguration><Status>"+version+"</Status></VersioningConfiguration>")
-				case q.Has("policy"):
-					if r.Method == http.MethodPut {
-						writes++
-						raw, _ := io.ReadAll(io.LimitReader(r.Body, providerconfig.SeaweedConfigLimit+1))
-						policy = string(raw)
-					}
-					if policy == "" {
-						fail("NoSuchBucketPolicy")
-						return
-					}
-					if mode == "normalized-policy" {
-						_, _ = io.WriteString(w, seaweedProviderPolicyRoundTrip(t, policy))
-					} else {
-						_, _ = io.WriteString(w, policy)
-					}
-				case q.Has("list-type"):
-					emptyReads++
-					body := "<ListBucketResult><IsTruncated>false</IsTruncated>"
-					if mode == "nonempty" {
-						body += "<Contents><Key>managed</Key><Size>1</Size></Contents>"
-					}
-					_, _ = io.WriteString(w, body+"</ListBucketResult>")
-				case q.Has("versions"):
-					emptyReads++
-					_, _ = io.WriteString(w, "<ListVersionsResult><IsTruncated>false</IsTruncated></ListVersionsResult>")
-				case q.Has("uploads"):
-					emptyReads++
-					_, _ = io.WriteString(w, "<ListMultipartUploadsResult><IsTruncated>false</IsTruncated></ListMultipartUploadsResult>")
-				case r.Method == http.MethodPut && mode == "unknown-create":
-					writes++
-					missing = false
-					w.WriteHeader(500)
-					_, _ = io.WriteString(w, "<Error><Code>InternalError</Code></Error>")
-				default:
-					t.Error("unexpected setup operation")
-					w.WriteHeader(500)
-				}
-			}))
+			server := httptest.NewTLSServer(f)
 			defer server.Close()
-			claim.Endpoint = server.URL
-			setup, e := NewSeaweedSetup(server.URL, "test", admin, server.Client())
+			roots := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: server.Certificate().Raw})
+			run := func() error {
+				var out bytes.Buffer
+				return EnsureSetupBuckets(context.Background(), server.URL, "test", roots, admin, installation, []string{"evidence", "audit"}, compiled.Policies, &out)
+			}
+			e := run()
+			refused := mode == "foreign-installation" || mode == "untagged-nonempty" || mode == "policy-replacement"
+			if refused {
+				if e == nil {
+					t.Fatal("foreign or nonempty bucket accepted")
+				}
+				if mode != "policy-replacement" && f.writes != 0 {
+					t.Fatalf("refused bucket mutated: writes=%d", f.writes)
+				}
+				return
+			}
 			if e != nil {
 				t.Fatal(e)
 			}
-			defer setup.Close()
-			e = setup.ConfigureBucket(context.Background(), claim, compiled.Policies["audit"])
-			success := mode == "empty-pending" || mode == "unknown-create" || mode == "normalized-policy"
-			if success {
-				if e != nil || emptyReads != 3 {
-					t.Fatalf("empty owned first-init failed: err=%v scans=%d", e, emptyReads)
+			for _, name := range []string{"audit", "evidence"} {
+				b := f.buckets[name]
+				if b == nil || !sameSeaweedTags(b.tags, owned(name)) || b.version != "Enabled" {
+					t.Fatalf("bucket %s not configured: %+v", name, b)
 				}
-				previous := writes
-				claim.Pending = false
-				if e = setup.ConfigureBucket(context.Background(), claim, compiled.Policies["audit"]); e != nil || writes != previous || emptyReads != 3 {
-					t.Fatalf("retained replay wrote or inventoried data: err=%v writes=%d", e, writes)
-				}
-			} else if e == nil || writes != 0 {
-				t.Fatalf("foreign/nonempty/changed setup accepted or mutated: err=%v writes=%d", e, writes)
+			}
+			if !sameSeaweedJSON([]byte(f.buckets["audit"].policy), compiled.Policies["audit"]) || f.buckets["evidence"].policy != "" {
+				t.Fatal("bucket policies not applied as compiled")
+			}
+			previous := f.writes
+			if e = run(); e != nil || f.writes != previous {
+				t.Fatalf("rerun not idempotent: err=%v writes=%d->%d", e, previous, f.writes)
 			}
 		})
 	}

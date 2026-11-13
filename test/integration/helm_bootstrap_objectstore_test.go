@@ -3,23 +3,13 @@ package integration
 import (
 	"bytes"
 	"context"
-	"crypto/tls"
-	"crypto/x509"
-	"encoding/json"
 	"errors"
-	"net"
-	"net/http"
 	"os/exec"
-	"strconv"
 	"testing"
 	"time"
 
-	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/adapters/providerconfig"
 	"asservat.local/asservat/internal/contracts"
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/credentials"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
 	core "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -27,7 +17,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 )
 
 type helmOriginalStorage struct {
@@ -153,130 +142,4 @@ func (b *helmBundledObjectStore) Values(values map[string]any) {
 		values["services"] = services
 	}
 	services["objectStore"] = map[string]any{"provider": "seaweedfs", "seaweedfs": map[string]any{"image": b.plan.Image, "persistence": map[string]any{"storageClass": "asservat-owned-local", "size": "32Gi"}}}
-}
-
-// Verify using the exact credential observed from the acknowledged original
-// bootstrap state. It never regenerates a candidate or uses the backend admin
-// to read the activation audit. Host transport keeps the real TLS/SigV4 origin.
-func (b *helmBundledObjectStore) VerifiedStore(t *testing.T, ctx context.Context, api kubernetes.Interface, kc *rest.Config, input contracts.InitialBootstrapInput, token []byte, node *core.Node) (contracts.InitialBootstrap, *s3.Client) {
-	t.Helper()
-	var original helmOriginalStorage
-	select {
-	case original = <-b.storage:
-	case <-ctx.Done():
-		t.Fatal("original stored generated credential missing")
-	}
-	if original.err != nil {
-		t.Fatal(original.err)
-	}
-	b.seedUID, b.installation = original.seedUID, original.installation
-	state, err := api.CoreV1().Secrets(b.plan.Namespace).Get(ctx, b.plan.StateSecretName(), meta.GetOptions{})
-	if err != nil || kube.ValidateSmallSeaweedMaterial(b.plan, state.Data, time.Now()) != nil {
-		t.Fatal("actual bundled provider state", err)
-	}
-	defer func() {
-		for _, v := range state.Data {
-			clear(v)
-		}
-	}()
-	b.stateUID = state.UID
-	input.AuditStore.RootsPEM = string(state.Data["ca.crt"])
-	input.AuditStore.RootsSource = ""
-	desired, err := providerconfig.CompileInitialBootstrapInput(input, kc.CAData, token, time.Now())
-	if err != nil {
-		t.Fatal("full canonical bundled trust compilation", err)
-	}
-	iam, err := api.CoreV1().Secrets(b.plan.Namespace).Get(ctx, b.plan.IAMSecretName(), meta.GetOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		for _, v := range iam.Data {
-			clear(v)
-		}
-	}()
-	var database struct {
-		Identities []struct {
-			Name        string `json:"name"`
-			Credentials []struct {
-				Access string `json:"accessKey"`
-				Secret string `json:"secretKey"`
-			} `json:"credentials"`
-		} `json:"identities"`
-	}
-	if json.Unmarshal(iam.Data[providerconfig.SeaweedConfigKey], &database) != nil {
-		t.Fatal("actual IAM database")
-	}
-	name, _ := providerconfig.SeaweedPrincipalName(contracts.SeaweedPrincipalKey{Purpose: "initial-audit", ScopeID: original.installation})
-	matched := 0
-	for _, identity := range database.Identities {
-		if identity.Name == name && len(identity.Credentials) == 1 && identity.Credentials[0].Access == original.credential.AccessKeyID && identity.Credentials[0].Secret == original.credential.SecretAccessKey {
-			matched++
-		}
-	}
-	if matched != 1 {
-		t.Fatal("provider did not bind the exact original stored generated credential")
-	}
-	b.iamUID, b.iamVersion, b.iamData = iam.UID, iam.ResourceVersion, bytes.Clone(iam.Data[providerconfig.SeaweedConfigKey])
-	binding, err := api.CoreV1().ConfigMaps(b.plan.Namespace).Get(ctx, b.plan.ServiceName()+"-binding", meta.GetOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	var receipt contracts.SmallSeaweedBinding
-	if json.Unmarshal([]byte(binding.Data[contracts.SmallSeaweedBindingFile]), &receipt) != nil || receipt.Initialization.Pending || receipt.Initialization.InstallationID != original.installation || receipt.RequestID != original.request {
-		t.Fatal("original bucket readiness binding")
-	}
-	b.bindingUID, b.bindingVersion, b.bindingData = binding.UID, binding.ResourceVersion, binding.Data[contracts.SmallSeaweedBindingFile]
-	pvc, err := api.CoreV1().PersistentVolumeClaims(b.plan.Namespace).Get(ctx, b.plan.DataPVCName(), meta.GetOptions{})
-	if err != nil || pvc.Status.Phase != core.ClaimBound || pvc.Spec.VolumeName != b.plan.Namespace+"-objectstore" {
-		t.Fatal("actual chart PVC did not bind owned local PV", err)
-	}
-	service, err := api.CoreV1().Services(b.plan.Namespace).Create(ctx, &core.Service{ObjectMeta: meta.ObjectMeta{Name: b.plan.ServiceName() + "-inspection"}, Spec: core.ServiceSpec{Type: core.ServiceTypeNodePort, Selector: map[string]string{"asservat.io/objectstore": b.plan.ServiceName()}, Ports: []core.ServicePort{{Port: 8333}}}}, meta.CreateOptions{})
-	if err != nil {
-		t.Fatal("owned independent S3 inspection route", err)
-	}
-	address := ""
-	for _, entry := range node.Status.Addresses {
-		if entry.Type == core.NodeInternalIP {
-			address = net.JoinHostPort(entry.Address, strconv.Itoa(int(service.Spec.Ports[0].NodePort)))
-		}
-	}
-	if address == "" {
-		t.Fatal("owned inspection node address")
-	}
-	roots := x509.NewCertPool()
-	if !roots.AppendCertsFromPEM(state.Data["ca.crt"]) {
-		t.Fatal("actual backend roots")
-	}
-	transport := &http.Transport{Proxy: nil, TLSClientConfig: &tls.Config{RootCAs: roots, MinVersion: tls.VersionTLS13}, DialContext: func(call context.Context, network, target string) (net.Conn, error) {
-		if target != b.plan.Host()+":8333" {
-			return nil, errors.New("foreign inspection destination")
-		}
-		return (&net.Dialer{Timeout: 5 * time.Second}).DialContext(call, network, address)
-	}}
-	t.Cleanup(transport.CloseIdleConnections)
-	client := s3.New(s3.Options{Region: desired.AuditStore.Region, BaseEndpoint: aws.String(b.plan.Endpoint()), UsePathStyle: true, Credentials: credentials.NewStaticCredentialsProvider(original.credential.AccessKeyID, original.credential.SecretAccessKey, ""), HTTPClient: &http.Client{Transport: transport, Timeout: 5 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}})
-	return desired, client
-}
-
-func (b *helmBundledObjectStore) VerifyReplay(t *testing.T, ctx context.Context, api kubernetes.Interface) {
-	t.Helper()
-	state, e := api.CoreV1().Secrets(b.plan.Namespace).Get(ctx, b.plan.StateSecretName(), meta.GetOptions{})
-	if e != nil || state.UID != b.stateUID {
-		t.Fatal("replay replaced original object-store state", e)
-	}
-	for _, v := range state.Data {
-		clear(v)
-	}
-	iam, e := api.CoreV1().Secrets(b.plan.Namespace).Get(ctx, b.plan.IAMSecretName(), meta.GetOptions{})
-	if e != nil || iam.UID != b.iamUID || iam.ResourceVersion != b.iamVersion || !bytes.Equal(iam.Data[providerconfig.SeaweedConfigKey], b.iamData) {
-		t.Fatal("replay regenerated original provider credentials", e)
-	}
-	for _, v := range iam.Data {
-		clear(v)
-	}
-	binding, e := api.CoreV1().ConfigMaps(b.plan.Namespace).Get(ctx, b.plan.ServiceName()+"-binding", meta.GetOptions{})
-	if e != nil || binding.UID != b.bindingUID || binding.ResourceVersion != b.bindingVersion || binding.Data[contracts.SmallSeaweedBindingFile] != b.bindingData {
-		t.Fatal("replay changed original bucket binding", e)
-	}
 }

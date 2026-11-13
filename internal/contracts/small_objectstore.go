@@ -29,29 +29,9 @@ type SeaweedGrant struct {
 	Prefixes []string `json:"prefixes,omitempty"`
 }
 
-// SeaweedProviderTarget names already-created objects. Initialization belongs
-// to the common create-once producer; this target authorizes no adoption.
-type SeaweedProviderTarget struct {
-	InstallationID string                `json:"installationID"`
-	Namespace      string                `json:"namespace"`
-	StatefulSet    WorkerObjectReference `json:"statefulSet"`
-	Pod            WorkerObjectReference `json:"pod"`
-	Config         WorkerObjectReference `json:"config"`
-	Image          string                `json:"image"`
-	ExpectedArgs   []string              `json:"expectedArgs"`
-}
-
-// SeaweedBucketInitialization is supplied ONLY from the common retained private
-// backend seed. Pending is valid solely before any runtime writers/activation.
-// It is not a public claim, external-bucket adoption switch or minted authority.
+// SeaweedBucketInitialization names one bucket of one installation. Its
+// ownership tags derive from these two values only.
 type SeaweedBucketInitialization struct {
-	BackendID        string `json:"backendID"`
-	InstallationID   string `json:"installationID"`
-	InitializationID string `json:"initializationID"`
-	StateSecretUID   string `json:"stateSecretUID"`
-	PVCUID           string `json:"pvcUID"`
-	Endpoint         string `json:"endpoint"`
-	Image            string `json:"image"`
-	Bucket           string `json:"bucket"`
-	Pending          bool   `json:"pending"`
+	InstallationID string `json:"installationID"`
+	Bucket         string `json:"bucket"`
 }
