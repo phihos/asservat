@@ -158,9 +158,7 @@ func (d *OwnerDeployment) nativeConfiguration(ctx context.Context, pool *pgxpool
 	}
 	pins := make([]kube.RetentionTopologyPin, len(all))
 	for i, p := range all {
-		b, _ := hex.DecodeString(p.SHA256)
-		pins[i] = kube.RetentionTopologyPin{TargetClusterID: p.TargetClusterID, Name: p.Name, UID: p.UID}
-		copy(pins[i].ContentDigest[:], b)
+		pins[i] = kube.RetentionTopologyPin{TargetClusterID: p.TargetClusterID, Name: p.Name}
 	}
 	topologies, err := kube.NewRetentionTopologies(observer, c.PermissionRootID, pins)
 	if err != nil {

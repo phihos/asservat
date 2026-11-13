@@ -302,3 +302,77 @@ services:
       resources:
         requests: {cpu: 100m, memory: 256Mi}
         limits: {cpu: "2", memory: 1Gi}
+
+# Helm-native installation (docs/reviews/helm-native-field-map.md). Object
+# names use installation.name as prefix; every hub object lives in the
+# release namespace.
+installation:
+  name: asservat
+
+# The product image for Helm-rendered services (repository plus digest).
+image:
+  repository: ""
+  digest: ""
+  pullPolicy: IfNotPresent
+
+# Existing Secret overrides of the generated Secrets, e.g.
+#   secrets: {ids: {existingSecret: my-ids}, artifactKey: {existingSecret: k}}
+# Keys: ids, sqlFederation, sqlKeyService, sqlPublisher, auditMac,
+# artifactKey, s3FederationAudit, s3PublisherAudit, s3PublisherEvidence.
+secrets: {}
+
+# Peer listeners that regional connectors dial (federation, key service).
+federation:
+  tls:
+    # A cert-manager issuer for the federation and key-service serving
+    # certificates; without one each listener needs hub.<component>.tls.existingSecret
+    # (kubernetes.io/tls with ca.crt).
+    issuerRef:
+      name: ""
+      kind: Issuer
+      group: cert-manager.io
+
+hub:
+  federation:
+    enabled: false
+    concurrency: 4
+    resources: {}
+    nodeSelector: {}
+    tolerations: []
+    # ClusterIP for single-cluster installs; NodePort or LoadBalancer when
+    # remote regions dial the federation directly.
+    service:
+      type: ClusterIP
+      nodePort: null
+      annotations: {}
+    tls:
+      existingSecret: ""
+      # Extra serving names (the external endpoint regions dial).
+      dnsNames: []
+  keyService:
+    enabled: false
+    concurrency: 8
+    resources: {}
+    nodeSelector: {}
+    tolerations: []
+    service:
+      type: ClusterIP
+      nodePort: null
+      annotations: {}
+    tls:
+      existingSecret: ""
+      dnsNames: []
+    # Acquisition unwraps for native downloads (ADR-204).
+    downloads:
+      enabled: false
+      # Retention topology ConfigMaps by target cluster; the cluster catalog
+      # adds joined regions.
+      retentionTopologies: []
+  publisher:
+    enabled: false
+    pollSeconds: 2
+    batch: 8
+    resources: {}
+    nodeSelector: {}
+    tolerations: []
+    retentionTopologies: []

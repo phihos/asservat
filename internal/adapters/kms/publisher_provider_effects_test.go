@@ -14,13 +14,11 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"asservat.local/asservat/internal/adapters/mtls"
-	"asservat.local/asservat/internal/adapters/providerconfig"
 	"asservat.local/asservat/internal/contracts"
 )
 
@@ -31,19 +29,9 @@ import (
 func TestPublisherProviderEffectsAreProofBoundAndPurposeSeparated(t *testing.T) {
 	tlsFixture := newOwnerProviderControlFixture(t)
 	installation := "10000000-0000-4000-8000-000000002040"
-	provider := tlsFixture.server.URL
-	roots := [][]byte{tlsFixture.server.Certificate().Raw}
-	namespace := contracts.WorkerObjectReference{Name: "asservat", UID: "10000000-0000-4000-8000-000000002042"}
-	in := contracts.PublisherDeployment{Format: contracts.PublisherDeploymentFormat, InstallationID: installation, ClusterID: "10000000-0000-4000-8000-000000002041", Namespace: namespace,
-		AuditKeys: contracts.PublisherTransit{Endpoint: provider, Roots: roots, Mount: "audit", Key: providerconfig.PublisherAuditKey(installation)},
-		Verifier:  contracts.PublisherVerifier{Endpoint: provider, Roots: roots, PKIMount: "worker-pki", Role: contracts.PublisherVerifierRole(installation)}}
-	selection := contracts.PublisherProviderAuthentication{AuthMount: "publisher-auth", AuthMountAccessor: "auth_kubernetes_1", Namespace: namespace,
-		ServiceAccount: contracts.WorkerObjectReference{Name: contracts.PublisherName(installation), UID: "10000000-0000-4000-8000-000000002043"}}
-	recipe, err := providerconfig.PublisherProviderRecipeFor(in, selection)
-	if err != nil {
-		t.Fatal(err)
-	}
-	in.ProviderAuthentication = recipe.Profile
+	login := ProviderLogin{Provider: contracts.OwnerProviderEndpoint{Endpoint: tlsFixture.server.URL, Roots: [][]byte{tlsFixture.server.Certificate().Raw}}, AuthMount: "publisher-auth", Namespace: "asservat", ServiceAccount: "asservat-publisher",
+		Roles: map[string]string{"audit-wrap": "pub-audit-wrap", "audit-unwrap": "pub-audit-unwrap", "verifier-sign": "pub-verifier-sign"}}
+	keys := PublisherProviderKeys{AuditMount: "audit", AuditKey: "publisher-audit", PKIMount: "worker-pki", VerifierRole: "verifier"}
 	caKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		t.Fatal(err)
@@ -56,8 +44,8 @@ func TestPublisherProviderEffectsAreProofBoundAndPurposeSeparated(t *testing.T) 
 	ca, _ := x509.ParseCertificate(caDER)
 	jwt := ownerProviderTestJWT(time.Now().Add(600 * time.Second))
 	purpose := map[string]string{}
-	for _, role := range recipe.Roles {
-		purpose[role.Name] = role.Purpose
+	for p, name := range login.Roles {
+		purpose[name] = p
 	}
 	var mu sync.Mutex
 	var logins, signs int
@@ -65,7 +53,7 @@ func TestPublisherProviderEffectsAreProofBoundAndPurposeSeparated(t *testing.T) 
 	issue := map[string]time.Time{}
 	const entity = "10000000-0000-4000-8000-000000002048"
 	meta := func(role string) map[string]string {
-		return map[string]string{"role": role, "service_account_name": selection.ServiceAccount.Name, "service_account_uid": selection.ServiceAccount.UID, "service_account_namespace": selection.Namespace.Name, "service_account_secret_name": ""}
+		return map[string]string{"role": role, "service_account_name": login.ServiceAccount, "service_account_uid": "10000000-0000-4000-8000-000000002043", "service_account_namespace": login.Namespace, "service_account_secret_name": ""}
 	}
 	tlsFixture.server.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		mu.Lock()
@@ -94,7 +82,7 @@ func TestPublisherProviderEffectsAreProofBoundAndPurposeSeparated(t *testing.T) 
 		case "POST /v1/auth/token/revoke-self":
 			w.WriteHeader(204)
 		default:
-			want := map[string]string{"audit-wrap": "/v1/audit/encrypt/" + in.AuditKeys.Key, "audit-unwrap": "/v1/audit/decrypt/" + in.AuditKeys.Key, "verifier-sign": "/v1/worker-pki/sign/" + in.Verifier.Role}[purpose[token]]
+			want := map[string]string{"audit-wrap": "/v1/audit/encrypt/" + keys.AuditKey, "audit-unwrap": "/v1/audit/decrypt/" + keys.AuditKey, "verifier-sign": "/v1/worker-pki/sign/" + keys.VerifierRole}[purpose[token]]
 			if want == "" || r.URL.Path != want {
 				t.Error("cross-purpose credential reached the provider", r.URL.Path)
 				w.WriteHeader(403)
@@ -155,12 +143,12 @@ func TestPublisherProviderEffectsAreProofBoundAndPurposeSeparated(t *testing.T) 
 		}
 		return time.Now().Add(5 * time.Second), nil
 	}
-	unbound := in
-	unbound.ProviderAuthentication.RecipeSHA256 = strings.Repeat("0", 64)
-	if _, err = NewInstalledPublisherProviderEffects(context.Background(), unbound, files, proof); err == nil {
-		t.Fatal("effects composed from an unbound profile")
+	unbound := login
+	unbound.Roles = map[string]string{"audit-wrap": "a", "audit-unwrap": "b"}
+	if _, err = NewInstalledPublisherProviderEffects(context.Background(), installation, unbound, keys, files, proof); err == nil {
+		t.Fatal("effects composed without every purpose role")
 	}
-	s, err := NewInstalledPublisherProviderEffects(context.Background(), in, files, proof)
+	s, err := NewInstalledPublisherProviderEffects(context.Background(), installation, login, keys, files, proof)
 	if err != nil {
 		t.Fatal(err)
 	}

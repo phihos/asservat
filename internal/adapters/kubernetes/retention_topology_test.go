@@ -17,8 +17,8 @@ import (
 	"asservat.local/asservat/internal/domain/identity"
 )
 
-func TestRetentionTopologyRequiresIndependentExactImmutablePin(t *testing.T) {
-	for _, mode := range []string{"hub-local", "hub-only-explicit", "missing-local", "wrong-local-cluster", "duplicate-source", "missing-hub", "wrong-root", "wrong-content-pin", "replaced-object", "replaced-namespace", "mutable", "extra-data", "unknown", "case-alias", "zero-digest", "bad-hex", "expired", "different-target", "missing-object"} {
+func TestRetentionTopologyReadsNamedImmutableConfiguration(t *testing.T) {
+	for _, mode := range []string{"hub-local", "hub-only-explicit", "missing-local", "wrong-local-cluster", "duplicate-source", "missing-hub", "wrong-root", "replaced-namespace", "mutable", "extra-data", "unknown", "case-alias", "zero-digest", "bad-hex", "expired", "different-target", "missing-object"} {
 		t.Run(mode, func(t *testing.T) {
 			b, err := os.ReadFile("../../../examples/retention-topology.json")
 			if err != nil {
@@ -60,17 +60,11 @@ func TestRetentionTopologyRequiresIndependentExactImmutablePin(t *testing.T) {
 				t.Fatal(err)
 			}
 			pin := artifact.Digest(sha256.Sum256(canonical))
-			if mode == "wrong-content-pin" {
-				pin[0]++
-			}
 			data := map[string]string{"topology.json": string(b)}
 			if mode == "extra-data" {
 				data["other"] = "data"
 			}
-			uid := "topology-uid"
-			if mode == "replaced-object" {
-				uid = "replacement"
-			}
+			uid := "10000000-0000-4000-8000-0000000000aa"
 			var clock *atomic.Int64
 			var unavailable atomic.Bool
 			requests := atomic.Int64{}
@@ -98,7 +92,7 @@ func TestRetentionTopologyRequiresIndependentExactImmutablePin(t *testing.T) {
 				return true
 			})
 			clock = f.clock
-			reader, err := NewRetentionTopologyClient(f.client, "topology", "topology-uid", root, target, pin)
+			reader, err := NewRetentionTopologyClient(f.client, "topology", root, target)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -142,13 +136,12 @@ func TestRetentionTopologyRequiresIndependentExactImmutablePin(t *testing.T) {
 				if err != nil || fresh.FreshUntil.Sub(time.Unix(0, clock.Load())) < identity.EvidenceReadRequestWindow {
 					t.Fatal("topology near its end was not re-read", err)
 				}
-				pins := []RetentionTopologyPin{{TargetClusterID: target, Name: "topology", UID: "topology-uid", ContentDigest: pin}}
+				pins := []RetentionTopologyPin{{TargetClusterID: target, Name: "topology"}}
 				router, err := NewRetentionTopologies(f.client, root, pins)
 				if err != nil {
 					t.Fatal(err)
 				}
 				pins[0].TargetClusterID = root // caller mutation cannot change installed routing
-				pins[0].ContentDigest = artifact.Digest{99}
 				if got, err := router.RetentionTopology(context.Background(), target); err != nil || len(got.Sources) != 2 {
 					t.Fatal("route lost local policy source", err)
 				}

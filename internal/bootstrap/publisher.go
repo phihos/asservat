@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
-	"encoding/hex"
 	"errors"
 	"net/http"
 	"os"
@@ -20,146 +19,72 @@ import (
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/packets"
 	"asservat.local/asservat/internal/adapters/postgres"
-	"asservat.local/asservat/internal/adapters/providerconfig"
 	"asservat.local/asservat/internal/application/evidence"
 	privacyapp "asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	cfg "asservat.local/asservat/internal/domain/configuration"
-	fleetvalue "asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"k8s.io/apimachinery/pkg/util/validation"
 )
 
 // Publisher is the ADR-181 asynchronous publication verifier. It publishes
 // stored, unpublished API context captures through the unchanged
 // ContextPublisher, unwrapping only under its attempt-scoped verifier
 // authority. It serves no route and performs no collection. ADR-203: its
-// provider credentials are Kubernetes-auth lifetimes gated by the hub
-// workload guard and recovery state, and its verifier key exists only in
-// this process.
+// provider credentials are Kubernetes-auth lifetimes gated by the recovery
+// state, and its verifier key exists only in this process.
 type Publisher struct {
 	argumentSources argumentSourceReader
-	config          contracts.PublisherDeployment
+	config          publisherInputs
 	queue           *postgres.ContextPublicationQueue
 	ledger          evidence.ContextPublicationFacets
 	gate            *postgres.APIContextPublicationGate
 	audit           *objectstore.ContextVerificationObjects
-	custody         *objectstore.CustodyStore
-	keys            *http.Client
-	scope           authorization.KeyScope
-	providers       *kms.InstalledPublisherProviderEffects
-	verifier        *mtls.VerifierCredentials
-	// catalog is the guarded cluster catalog as read at start; a changed
-	// digest restarts the process (ADR-203 decision 6).
+	// evidence is the read-only evidence store; each capture is verified in
+	// the store its accepted SQL registration names.
+	evidence  *objectstore.Store
+	keys      *http.Client
+	scope     authorization.KeyScope
+	providers *kms.InstalledPublisherProviderEffects
+	verifier  *mtls.VerifierCredentials
+	// catalog is the cluster catalog as read at start; a changed digest
+	// restarts the process (ADR-203 decision 6).
 	catalog publicCatalog
 	closers []func()
 	once    sync.Once
 }
 
-func readPublisherInputs(ctx context.Context, files *os.Root) (*providerInputs, contracts.PublisherDeployment, contracts.PublicRuntimeCredentialManifest, error) {
-	var c contracts.PublisherDeployment
-	var m contracts.PublicRuntimeCredentialManifest
-	fail := func() (*providerInputs, contracts.PublisherDeployment, contracts.PublicRuntimeCredentialManifest, error) {
-		return nil, contracts.PublisherDeployment{}, contracts.PublicRuntimeCredentialManifest{}, mounts.ErrUnavailable
-	}
-	b, err := mounts.Read(ctx, files, contracts.PublisherDeploymentFile, contracts.PublisherDeploymentMaxBytes)
-	if err != nil {
-		return fail()
-	}
-	c, err = contracts.DecodePublisherDeployment(bytes.NewReader(b))
-	clear(b)
-	if err != nil || c.Format != contracts.PublisherDeploymentFormat || !authorization.UUID(c.InstallationID) || !authorization.UUID(c.ClusterID) || !authorization.UUID(c.PermissionRootID) || !capacityRuntimeReference(c.Namespace) ||
-		c.PollSeconds < 1 || c.PollSeconds > 300 || c.Batch < 1 || c.Batch > 64 || c.RetentionTopologies == nil || len(c.RetentionTopologies) > 1024 ||
-		!authorization.UUID(c.Evidence.StoreID) || !identity.Text(c.Evidence.Region, 128) || !identity.Text(c.Evidence.Bucket, 63) || !identity.Text(c.Artifact.KeyID, 128) ||
-		!ownerProviderName.MatchString(c.AuditKeys.Mount) || !ownerProviderName.MatchString(c.AuditKeys.Key) || !identity.Text(c.AuditStore.Region, 128) || !identity.Text(c.AuditStore.Bucket, 63) {
-		return fail()
-	}
-	for _, ep := range []contracts.OwnerProviderEndpoint{c.Kubernetes, {Endpoint: c.AuditStore.Endpoint, Roots: c.AuditStore.Roots}, {Endpoint: c.AuditKeys.Endpoint, Roots: c.AuditKeys.Roots}, {Endpoint: c.Verifier.Endpoint, Roots: c.Verifier.Roots}, {Endpoint: c.Evidence.Endpoint, Roots: c.Evidence.Roots}, {Endpoint: c.Artifact.Endpoint, Roots: c.Artifact.Roots}} {
-		if !capacityRuntimeEndpoint(ep) {
-			return fail()
-		}
-	}
-	clusters, names := map[string]bool{}, map[string]bool{}
-	for _, p := range c.RetentionTopologies {
-		if !validOwnerNativeTopology(p) || clusters[p.TargetClusterID] || names[p.Name] {
-			return fail()
-		}
-		clusters[p.TargetClusterID], names[p.Name] = true, true
-	}
-	// ADR-203: the hub workload guard must cover the publisher's own
-	// namespace through the same API endpoint, and the provider roles must
-	// be exactly the recipe of this input.
-	if !validOwnerGuard(c.Owner) || c.Owner.Namespace != c.Namespace || !samePublisherEndpoint(c.Owner.Kubernetes, c.Kubernetes) || !capacityRuntimeReference(c.OwnerWorkload) ||
-		!capacityRuntimeReference(c.ClusterCatalog.Source) || !capacityRuntimeGuard(c.ClusterCatalog.Guard) ||
-		!ownerProviderName.MatchString(c.Verifier.PKIMount) || !ownerProviderName.MatchString(c.Verifier.Role) ||
-		providerconfig.ValidatePublisherProviderAuthentication(c, c.ProviderAuthentication, time.Now()) != nil {
-		return fail()
-	}
-	if _, _, err = mtls.OwnerTrustRoots(c.Verifier.IssuerRoots, time.Now()); err != nil {
-		return fail()
-	}
-	p := c.Postgres
-	if p.Port < 1 || p.Port > 65535 || !identity.Text(p.Database, 63) || !identity.Text(p.Host, 253) {
-		return fail()
-	}
-	if _, _, err = mtls.OwnerTrustRoots(p.Roots, time.Now()); err != nil {
-		return fail()
-	}
-	b, err = mounts.Read(ctx, files, contracts.PublisherCredentialManifestFile, contracts.PublicRuntimeCredentialManifestMaxBytes)
-	if err != nil {
-		return fail()
-	}
-	m, err = contracts.DecodePublicRuntimeCredentialManifest(bytes.NewReader(b))
-	clear(b)
-	if err != nil || m.Input.InstallationID != c.InstallationID || m.Input.ClusterID != c.ClusterID || m.Input.Namespace != c.Namespace {
-		return fail()
-	}
-	return &providerInputs{files: files, kubernetesEndpoint: c.Kubernetes, postgresEndpoint: c.Postgres}, c, m, nil
+// publisherInputs are the Helm-rendered configuration plus the generated
+// installation IDs.
+type publisherInputs struct {
+	contracts.PublisherConfig
+	contracts.ServiceIDs
 }
 
-func samePublisherEndpoint(a, b contracts.OwnerProviderEndpoint) bool {
-	if a.Endpoint != b.Endpoint || len(a.Roots) != len(b.Roots) {
-		return false
+func readPublisherInputs(ctx context.Context, files, ids *os.Root) (publisherInputs, error) {
+	c, err := readServiceConfig(ctx, files, contracts.DecodePublisherConfig)
+	if err != nil {
+		return publisherInputs{}, err
 	}
-	for i := range a.Roots {
-		if !bytes.Equal(a.Roots[i], b.Roots[i]) {
-			return false
-		}
+	v, err := readServiceIDs(ctx, ids)
+	if err != nil {
+		return publisherInputs{}, err
 	}
-	return true
-}
-
-// publisherTopologyPins unions the fixed pins with each joined catalog slot's
-// pin as the hub-api's native configuration does (ADR-196 decision 7): a
-// slot's pin must name its own cluster and fixed slot topology, and a
-// cluster or topology named twice is refused. Both sets may be empty.
-func publisherTopologyPins(c contracts.PublisherDeployment, catalog []contracts.OwnerPublicCluster) ([]kube.RetentionTopologyPin, error) {
-	all := append([]contracts.OwnerNativeTopology{}, c.RetentionTopologies...)
-	for i, v := range catalog {
-		t := v.Topology
-		if t.TargetClusterID != v.ClusterID || t.Name != contracts.OwnerClusterSourceName(c.InstallationID, i+1, "topology") || !validOwnerNativeTopology(t) {
-			return nil, mounts.ErrUnavailable
-		}
-		all = append(all, t)
+	_, pg := servicePostgres(c.Postgres, nil)
+	scope := authorization.KeyScope{InstallationID: v.InstallationID, Purpose: "artifact", KeyID: c.KeyID}
+	if len(validation.IsDNS1123Label(c.Namespace)) != 0 || c.PollSeconds < 1 || c.PollSeconds > 300 || c.Batch < 1 || c.Batch > 64 || !pg || !validServiceStore(c.AuditStore) || !validServiceStore(c.Evidence) ||
+		!ownerEndpoint(c.OpenBao) || !ownerEndpoint(c.KeyService) || !scope.Valid() || len(validation.IsDNS1123Subdomain(c.ClusterCatalog)) != 0 ||
+		!ownerProviderName.MatchString(c.AuditMount) || !ownerProviderName.MatchString(c.AuditKey) || !ownerProviderName.MatchString(c.VerifierPKIMount) || !ownerProviderName.MatchString(c.VerifierRole) || c.AuditMount == c.VerifierPKIMount {
+		return publisherInputs{}, &fixedStepError{"config", mounts.ErrUnavailable}
 	}
-	if len(all) > 1024 {
-		return nil, mounts.ErrUnavailable
+	if _, err = serviceTopologyPins(c.RetentionTopologies, nil); err != nil {
+		return publisherInputs{}, &fixedStepError{"config", err}
 	}
-	pins := make([]kube.RetentionTopologyPin, len(all))
-	clusters, names := map[string]bool{}, map[string]bool{}
-	for i, p := range all {
-		b, err := hex.DecodeString(p.SHA256)
-		if err != nil || len(b) != 32 || clusters[p.TargetClusterID] || names[p.Name] {
-			return nil, mounts.ErrUnavailable
-		}
-		clusters[p.TargetClusterID], names[p.Name] = true, true
-		pins[i] = kube.RetentionTopologyPin{TargetClusterID: p.TargetClusterID, Name: p.Name, UID: p.UID}
-		copy(pins[i].ContentDigest[:], b)
-	}
-	return pins, nil
+	return publisherInputs{c, v}, nil
 }
 
 // verifierTLS presents the in-process verifier key-client certificate to the
@@ -176,7 +101,7 @@ func verifierTLS(credentials *mtls.VerifierCredentials, roots [][]byte) (*http.C
 // mountedEvidence is the read-only evidence credential's fixed projection.
 type mountedEvidence struct{ inputs *providerInputs }
 
-func NewPublisher(ctx context.Context, files *os.Root) (_ *Publisher, err error) {
+func NewPublisher(ctx context.Context, files, ids *os.Root) (_ *Publisher, err error) {
 	// The phase names where startup stopped; causes stay out of the message.
 	phase := "inputs"
 	defer func() {
@@ -184,28 +109,38 @@ func NewPublisher(ctx context.Context, files *os.Root) (_ *Publisher, err error)
 			err = &fixedStepError{"publisher/" + phase, err}
 		}
 	}()
-	if ctx == nil || ctx.Err() != nil || files == nil || disableWorkerCoreDumps() != nil {
+	if ctx == nil || ctx.Err() != nil || files == nil || ids == nil || disableWorkerCoreDumps() != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	in, c, manifest, err := readPublisherInputs(ctx, files)
+	c, err := readPublisherInputs(ctx, files, ids)
 	if err != nil {
 		return nil, err
 	}
 	out := &Publisher{config: c}
-	out.closers = append(out.closers, in.closeHTTP)
 	complete := false
 	defer func() {
 		if !complete {
 			out.Close()
 		}
 	}()
-	phase = "sql"
 	startup, end := context.WithTimeout(ctx, 30*time.Second)
 	defer end()
+	phase = "roots"
+	roots := map[string][][]byte{}
+	for _, name := range []string{contracts.PostgresRootsFile, contracts.ObjectStoreRootsFile, contracts.OpenBaoRootsFile, contracts.KeyServiceRootsFile} {
+		if roots[name], err = readServiceRoots(startup, files, name); err != nil {
+			return nil, err
+		}
+	}
+	endpoint, _ := servicePostgres(c.Postgres, roots[contracts.PostgresRootsFile])
+	in := &providerInputs{files: files, postgresEndpoint: endpoint}
+	out.closers = append(out.closers, in.closeHTTP)
+	phase = "sql"
 	root, installation := c.PermissionRootID, c.InstallationID
 	pools := map[string]*pgxpool.Pool{}
 	for _, purpose := range contracts.PublicRuntimePublisherPurposes() {
 		phase = "sql/" + purpose
+		// The login is the derived role name; nothing else is verified.
 		name, known := postgres.PublicRuntimeRoleName(installation, purpose)
 		config, err := in.sqlConfig(startup, "sql-public-"+purpose+".json")
 		if !known || err != nil || config == nil || config.ConnConfig.User != name {
@@ -217,29 +152,28 @@ func NewPublisher(ctx context.Context, files *os.Root) (_ *Publisher, err error)
 			return nil, mounts.ErrUnavailable
 		}
 		out.closers = append(out.closers, pool.Close)
-		if postgres.VerifyPublisherRuntimeCredential(startup, pool, manifest, purpose) != nil {
-			return nil, mounts.ErrUnavailable
-		}
 		pools[purpose] = pool
 	}
 	phase = "kubernetes"
-	control := cfg.NamespaceRef{Name: c.Namespace.Name, UID: c.Namespace.UID}
-	observer, err := kube.NewPermissionClient(in.kubernetes(contracts.PublisherKubernetesToken), c.ClusterID, control, time.Now)
+	api, err := serviceKubernetes()
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	probe, err := kube.NewPermissionClient(in.kubernetes(contracts.PublisherProbeToken), c.ClusterID, control, time.Now)
+	namespaceUID, err := kube.NamespaceUID(startup, api, c.Namespace)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	observer, err := kube.NewPermissionClient(api, c.ClusterID, cfg.NamespaceRef{Name: c.Namespace, UID: namespaceUID}, time.Now)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
 	phase = "catalog"
-	// ADR-203 decision 6: the guarded catalog, read with the hub-api's own
-	// guard and probe proof, adds the joined slots' topology pins.
-	if out.catalog, err = readPublicClusterCatalog(startup, contracts.OwnerDeployment{Namespace: c.Namespace, Public: &contracts.OwnerPublicDeployment{ClusterCatalog: c.ClusterCatalog}}, observer, probe); err != nil {
+	// ADR-203 decision 6: the catalog adds the joined slots' topologies.
+	if out.catalog, err = readServiceCatalog(startup, observer, api, c.Namespace, c.ClusterCatalog); err != nil {
 		return nil, err
 	}
 	phase = "topology"
-	pins, err := publisherTopologyPins(c, out.catalog.catalog.Clusters)
+	pins, err := serviceTopologyPins(c.RetentionTopologies, out.catalog.catalog.Clusters)
 	if err != nil {
 		return nil, err
 	}
@@ -290,34 +224,18 @@ func NewPublisher(ctx context.Context, files *os.Root) (_ *Publisher, err error)
 	if out.queue, err = postgres.NewContextPublicationQueue(startup, pools["context-verify"], root); err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-
-	phase = "guard"
-	// ADR-203 decision 3: every provider login and renewal needs the hub
-	// workload guard's current proof and a current recovery observation, as
-	// the federation's do. The guard plan names the hub-api Deployment.
-	guard, err := ownerWorkloadGuard(observer, probe, fleetvalue.OwnerPool{Deployment: c.OwnerWorkload.Name, DeploymentUID: c.OwnerWorkload.UID}, c.Owner)
-	if err != nil {
-		return nil, mounts.ErrUnavailable
-	}
-	proof := func(ctx context.Context) (time.Time, error) {
-		_, until, err := guard.Current(ctx)
-		if err != nil {
-			return time.Time{}, err
-		}
-		r, err := recovery.RecoveryState(ctx)
-		if err != nil || !r.Valid(time.Now()) {
-			return time.Time{}, mounts.ErrUnavailable
-		}
-		return identity.Earlier(until, r.FreshUntil), nil
-	}
 	phase = "providers"
-	if out.providers, err = kms.NewInstalledPublisherProviderEffects(ctx, c, files, proof); err != nil {
+	// ADR-203 decision 3: every provider login and renewal needs a current
+	// recovery observation.
+	login := kms.ProviderLogin{Provider: contracts.OwnerProviderEndpoint{Endpoint: c.OpenBao, Roots: roots[contracts.OpenBaoRootsFile]}, AuthMount: c.Provider.AuthMount, Namespace: c.Namespace, ServiceAccount: c.Provider.ServiceAccount, Roles: c.Provider.Roles}
+	keys := kms.PublisherProviderKeys{AuditMount: c.AuditMount, AuditKey: c.AuditKey, PKIMount: c.VerifierPKIMount, VerifierRole: c.VerifierRole}
+	if out.providers, err = kms.NewInstalledPublisherProviderEffects(ctx, installation, login, keys, files, recoveryProof(recovery)); err != nil {
 		return nil, mounts.ErrUnavailable
 	}
 	providers := out.providers
 	out.closers = append(out.closers, func() { _ = providers.CloseAndJoin(context.Background()) })
 	phase = "audit-store"
-	auditHTTP, err := ownerHTTP(c.AuditStore.Endpoint, c.AuditStore.Roots)
+	auditHTTP, err := ownerHTTP(c.AuditStore.Endpoint, roots[contracts.ObjectStoreRootsFile])
 	if err != nil {
 		return nil, err
 	}
@@ -330,23 +248,24 @@ func NewPublisher(ctx context.Context, files *os.Root) (_ *Publisher, err error)
 	out.audit = &objectstore.ContextVerificationObjects{Store: auditStore, Seal: providers.Sealer(), Open: providers.Opener()}
 
 	phase = "evidence-store"
-	evidenceHTTP, err := ownerHTTP(c.Evidence.Endpoint, c.Evidence.Roots)
+	evidenceHTTP, err := ownerHTTP(c.Evidence.Endpoint, roots[contracts.ObjectStoreRootsFile])
 	if err != nil {
 		return nil, err
 	}
 	out.closers = append(out.closers, evidenceHTTP.CloseIdleConnections)
-	store, err := objectstore.New(c.Evidence.Endpoint, c.Evidence.Region, c.Evidence.Bucket, mountedEvidence{in}, evidenceHTTP)
-	if err != nil {
+	if out.evidence, err = objectstore.New(c.Evidence.Endpoint, c.Evidence.Region, c.Evidence.Bucket, mountedEvidence{in}, evidenceHTTP); err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	out.closers = append(out.closers, store.Close)
-	if out.custody, err = store.ForCustody(c.Evidence.StoreID); err != nil {
-		return nil, mounts.ErrUnavailable
-	}
+	out.closers = append(out.closers, out.evidence.Close)
 	phase = "verifier"
 	// ADR-203 decision 4: the verifier key is created here, after core dumps
-	// are disabled, and signed only through the verifier-sign lifetime.
-	issuer, _, err := mtls.OwnerTrustRoots(c.Verifier.IssuerRoots, time.Now())
+	// are disabled, and signed only through the verifier-sign lifetime. The
+	// returned chain must verify against the worker PKI CA (field class J).
+	issuerRoots, err := readPKIRoots(startup, c.OpenBao, roots[contracts.OpenBaoRootsFile], c.VerifierPKIMount)
+	if err != nil {
+		return nil, err
+	}
+	issuer, _, err := mtls.OwnerTrustRoots(issuerRoots, time.Now())
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
@@ -354,11 +273,11 @@ func NewPublisher(ctx context.Context, files *os.Root) (_ *Publisher, err error)
 		return nil, mounts.ErrUnavailable
 	}
 	out.closers = append(out.closers, out.verifier.Close)
-	if out.keys, err = verifierTLS(out.verifier, c.Artifact.Roots); err != nil {
+	if out.keys, err = verifierTLS(out.verifier, roots[contracts.KeyServiceRootsFile]); err != nil {
 		return nil, err
 	}
 	out.closers = append(out.closers, out.keys.CloseIdleConnections)
-	out.scope = authorization.KeyScope{InstallationID: installation, Purpose: "artifact", KeyID: c.Artifact.KeyID}
+	out.scope = authorization.KeyScope{InstallationID: installation, Purpose: "artifact", KeyID: c.KeyID}
 	if !out.scope.Valid() || startup.Err() != nil {
 		return nil, mounts.ErrUnavailable
 	}
@@ -369,11 +288,21 @@ func NewPublisher(ctx context.Context, files *os.Root) (_ *Publisher, err error)
 // publish verifies and publishes one stored capture. Each attempt has its own
 // remote opener bound to that attempt; the key service decides every unwrap.
 func (p *Publisher) publish(ctx context.Context, item postgres.PendingContextPublication) error {
-	opener, err := kms.NewRemoteOpener(p.config.Artifact.Endpoint, p.scope, item.AttemptID, p.keys)
+	opener, err := kms.NewRemoteOpener(p.config.KeyService, p.scope, item.AttemptID, p.keys)
 	if err != nil {
 		return err
 	}
-	verifier, err := objectstore.NewContextVerifier(p.custody, opener)
+	// The evidence store ID is the accepted SQL registration's (field class
+	// J); the publisher reads exactly one evidence bucket.
+	accepted, err := p.ledger.ContextAcceptanceReader.AcceptedContextForPublication(ctx, item.CaptureID)
+	if err != nil {
+		return err
+	}
+	custody, err := p.evidence.ForCustody(accepted.Registration.StoreID)
+	if err != nil {
+		return err
+	}
+	verifier, err := objectstore.NewContextVerifier(custody, opener)
 	if err != nil {
 		return err
 	}
@@ -513,7 +442,12 @@ func RunPublisher(ctx context.Context) error {
 		return errors.Join(mounts.ErrUnavailable, err)
 	}
 	defer files.Close()
-	p, err := NewPublisher(ctx, files)
+	ids, err := os.OpenRoot(contracts.IDsRoot)
+	if err != nil {
+		return errors.Join(mounts.ErrUnavailable, err)
+	}
+	defer ids.Close()
+	p, err := NewPublisher(ctx, files, ids)
 	if err != nil {
 		return err
 	}

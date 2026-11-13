@@ -1,0 +1,170 @@
+package contracts
+
+import (
+	"bytes"
+	"crypto/sha256"
+	"encoding/binary"
+	"encoding/json"
+	"errors"
+	"io"
+)
+
+// Helm-native service inputs (federation, key service, publisher). Each
+// component reads only Helm-rendered values from config.json under its fixed
+// root, the generated installation IDs from the <name>-ids Secret mounted at
+// IDsRoot, PEM CA bundles beside config.json and credentials from fixed
+// projected files. Kubernetes UIDs are read by name at startup; nothing here
+// carries a UID, guard pin, recipe digest or activation record.
+const (
+	IDsRoot               = "/run/asservat/ids"
+	ServiceConfigFile     = "config.json"
+	ServiceConfigMaxBytes = 64 << 10
+
+	// PEM CA bundles of the providers each component dials.
+	PostgresRootsFile    = "postgres-ca.crt"
+	ObjectStoreRootsFile = "objectstore-ca.crt"
+	OpenBaoRootsFile     = "openbao-ca.crt"
+	KeyServiceRootsFile  = "key-service-ca.crt"
+
+	// ArtifactKeyFile is the key service's mounted <name>-artifact-key
+	// Secret (key keys.json, the local key secret format).
+	ArtifactKeyFile = "artifact-key.json"
+)
+
+// ServiceIDs are the generated installation identities (<name>-ids keys).
+type ServiceIDs struct {
+	InstallationID, ClusterID, PermissionRootID, IssuerEpoch string
+}
+
+type ServicePostgres struct {
+	Host     string `json:"host"`
+	Port     int    `json:"port"`
+	Database string `json:"database"`
+}
+
+type ServiceObjectStore struct {
+	Endpoint string `json:"endpoint"`
+	Region   string `json:"region"`
+	Bucket   string `json:"bucket"`
+}
+
+// ServiceProviderLogin names one component's OpenBao Kubernetes-auth roles.
+// Audience is the projected token's audience; setup binds the roles to it.
+type ServiceProviderLogin struct {
+	AuthMount      string            `json:"authMount"`
+	Audience       string            `json:"audience"`
+	ServiceAccount string            `json:"serviceAccount"`
+	Roles          map[string]string `json:"roles"`
+}
+
+// ServiceTopology names a retention topology ConfigMap of one target cluster.
+type ServiceTopology struct {
+	TargetClusterID string `json:"targetClusterID"`
+	Name            string `json:"name"`
+}
+
+type FederationConfig struct {
+	Port        int    `json:"port"`
+	Concurrency int    `json:"concurrency"`
+	Namespace   string `json:"namespace"`
+	// OwnerConfiguration is the hub-api's owner configuration ConfigMap; its
+	// UID keys the owner rows the federation answers region reads from.
+	OwnerConfiguration string             `json:"ownerConfiguration"`
+	Postgres           ServicePostgres    `json:"postgres"`
+	AuditStore         ServiceObjectStore `json:"auditStore"`
+	OpenBao            string             `json:"openBao"`
+	AuditMount         string             `json:"auditMount"`
+	AuditKey           string             `json:"auditKey"`
+	PKIMount           string             `json:"pkiMount"`
+	ClientRole         string             `json:"clientRole"`
+	ServerRole         string             `json:"serverRole"`
+	// Provider roles: audit-wrap, audit-unwrap, client-sign, server-sign.
+	Provider ServiceProviderLogin `json:"provider"`
+}
+
+type KeyServiceConfig struct {
+	Port        int             `json:"port"`
+	Concurrency int             `json:"concurrency"`
+	Namespace   string          `json:"namespace"`
+	KeyID       string          `json:"keyID"`
+	Postgres    ServicePostgres `json:"postgres"`
+	// OpenBao serves the worker and connector PKI CAs the key service trusts
+	// for client certificates (unauthenticated ca/pem reads).
+	OpenBao           string                     `json:"openBao"`
+	WorkerPKIMount    string                     `json:"workerPKIMount"`
+	ConnectorPKIMount string                     `json:"connectorPKIMount"`
+	Downloads         *KeyServiceDownloadsConfig `json:"downloads,omitempty"`
+}
+
+// KeyServiceDownloadsConfig enables acquisition unwraps (ADR-204): the worker
+// configuration ConfigMap selects the profile SQL must currently audit, and
+// the topologies (plus the catalog's joined slots) bound retention.
+type KeyServiceDownloadsConfig struct {
+	WorkerConfiguration string            `json:"workerConfiguration"`
+	ClusterCatalog      string            `json:"clusterCatalog"`
+	RetentionTopologies []ServiceTopology `json:"retentionTopologies"`
+}
+
+type PublisherConfig struct {
+	Namespace        string             `json:"namespace"`
+	PollSeconds      int                `json:"pollSeconds"`
+	Batch            int                `json:"batch"`
+	Postgres         ServicePostgres    `json:"postgres"`
+	AuditStore       ServiceObjectStore `json:"auditStore"`
+	Evidence         ServiceObjectStore `json:"evidence"`
+	OpenBao          string             `json:"openBao"`
+	AuditMount       string             `json:"auditMount"`
+	AuditKey         string             `json:"auditKey"`
+	VerifierPKIMount string             `json:"verifierPKIMount"`
+	VerifierRole     string             `json:"verifierRole"`
+	KeyService       string             `json:"keyService"`
+	KeyID            string             `json:"keyID"`
+	// Provider roles: audit-wrap, audit-unwrap, verifier-sign.
+	Provider            ServiceProviderLogin `json:"provider"`
+	ClusterCatalog      string               `json:"clusterCatalog"`
+	RetentionTopologies []ServiceTopology    `json:"retentionTopologies"`
+}
+
+// decodeServiceConfig is a closed decode (no unknown fields, one value) that,
+// unlike the RPC codec, accepts Helm's rendering of omitted or reordered keys.
+func decodeServiceConfig[T any](r io.Reader) (T, error) {
+	var out T
+	if r == nil {
+		return out, errors.New("service config unavailable")
+	}
+	b, err := io.ReadAll(io.LimitReader(r, ServiceConfigMaxBytes+1))
+	if err != nil || len(b) == 0 || len(b) > ServiceConfigMaxBytes {
+		return out, errors.New("service config unavailable")
+	}
+	d := json.NewDecoder(bytes.NewReader(b))
+	d.DisallowUnknownFields()
+	if d.Decode(&out) != nil || d.Decode(new(any)) != io.EOF {
+		var zero T
+		return zero, errors.New("service config invalid")
+	}
+	return out, nil
+}
+
+func DecodeFederationConfig(r io.Reader) (FederationConfig, error) {
+	return decodeServiceConfig[FederationConfig](r)
+}
+func DecodeKeyServiceConfig(r io.Reader) (KeyServiceConfig, error) {
+	return decodeServiceConfig[KeyServiceConfig](r)
+}
+func DecodePublisherConfig(r io.Reader) (PublisherConfig, error) {
+	return decodeServiceConfig[PublisherConfig](r)
+}
+
+// PlatformWorkloadDigest is the deterministic protection digest of a hub
+// workload protected by Kubernetes RBAC instead of a pinned admission guard:
+// sha256 over the length-prefixed domain, cluster ID, namespace and name.
+func PlatformWorkloadDigest(clusterID, namespace, name string) [32]byte {
+	h := sha256.New()
+	for _, v := range []string{"asservat-platform-workload/v1", clusterID, namespace, name} {
+		_ = binary.Write(h, binary.BigEndian, uint32(len(v)))
+		_, _ = h.Write([]byte(v))
+	}
+	var out [32]byte
+	copy(out[:], h.Sum(nil))
+	return out
+}
