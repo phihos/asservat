@@ -92,11 +92,12 @@ func TestOwnerPreflightActualGraphsAndLockOrder(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			// Full C12/B13/H7/S26/W4/T9 twice; added current C4/S16.
+			// Full graphs twice plus current reads; the fleet and owner sources
+			// are plain reads (no guard or probe requests) since slice 0.
 			// Role mode adds exactly one S request to each of the three graphs.
-			want := [3]int32{71, 20, 71}
+			want := [3]int32{57, 16, 57}
 			if withRoles {
-				want = [3]int32{72, 21, 72}
+				want = [3]int32{58, 17, 58}
 			}
 			got := [3]int32{counts[0].Load(), counts[1].Load(), counts[2].Load()}
 			if got != want || !reflect.DeepEqual(reads, []bool{false, true, true}) || effects.calls.Load() != 1 {

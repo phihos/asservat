@@ -230,10 +230,10 @@ func TestConfigurationRoleOperationDoesNotEscapeOrRenew(t *testing.T) {
 	if !second.ObservedAt.After(first.ObservedAt) {
 		t.Fatal("independent operation borrowed original observation")
 	}
-	for n, c := range counts {
-		if f.purposeProbes[n].Load() <= c {
-			t.Fatal("independent operation omitted current purpose proof", n)
-		}
+	// Only the workload guard is still probed; fleet and owner sources are
+	// plain reads under ordinary RBAC.
+	if f.purposeProbes[0].Load() <= counts[0] || f.purposeProbes[1].Load() != counts[1] || f.purposeProbes[2].Load() != counts[2] {
+		t.Fatal("independent operation omitted the workload proof or probed a source")
 	}
 }
 

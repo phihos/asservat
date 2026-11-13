@@ -7,12 +7,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"encoding/json/jsontext"
-	"errors"
 	"net/url"
 	"time"
 
 	"asservat.local/asservat/internal/contracts"
-	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/identity"
@@ -165,24 +163,13 @@ func (s *DownloadEnvironmentSource) DownloadPolicy(ctx context.Context) (privacy
 	call, stop := context.WithTimeout(ctx, 5*time.Second)
 	defer stop()
 	// Fixed stage names for diagnostics; the classes are unchanged.
-	guard, until, e := s.protection.current(call)
-	if e != nil {
-		return zero, connectorAPIStage("protection", errors.Join(privacy.ErrUnavailable, e))
-	}
 	p, e := s.snapshot(call)
 	if e != nil {
 		return zero, connectorAPIStage("snapshot", e)
 	}
-	again, e := s.snapshot(call)
-	if e != nil || again.Revision != p.Revision {
-		return zero, connectorAPIStage("snapshot-again", privacy.ErrUnavailable)
-	}
-	if _, e = checkAdmissionGuard(call, s.client, s.protection.plan.Name, s.protection.pin, s.protection.policy, s.protection.binding); e != nil {
-		return zero, connectorAPIStage("guard", errors.Join(privacy.ErrUnavailable, e))
-	}
-	p.ProtectionDigest = artifact.Digest(guard)
+	p.ProtectionDigest = s.protection.digest
 	p.ObservedAt = start
-	p.FreshUntil = identity.Earlier(until, start.Add(5*time.Second))
+	p.FreshUntil = start.Add(5 * time.Second)
 	if end, ok := call.Deadline(); ok {
 		p.FreshUntil = identity.Earlier(p.FreshUntil, end)
 	}

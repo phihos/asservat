@@ -79,14 +79,14 @@ func (s *ConfigurationRoleSource) readConfigurationWorkerNative(ctx context.Cont
 	}()
 	go func() {
 		defer probe.Done()
-		sources[0], actors[1], errors[1] = s.fleet.protection.proveObjectIdentity(probeCall)
+		sources[0], errors[1] = s.fleet.protection.read(probeCall)
 		if errors[1] != nil {
 			stopProbes()
 		}
 	}()
 	go func() {
 		defer probe.Done()
-		sources[1], actors[2], errors[2] = s.owner.protection.proveObjectIdentity(probeCall)
+		sources[1], errors[2] = s.owner.protection.read(probeCall)
 		if errors[2] != nil {
 			stopProbes()
 		}

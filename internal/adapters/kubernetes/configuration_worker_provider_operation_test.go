@@ -17,7 +17,6 @@ import (
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
-	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -49,20 +48,19 @@ func TestConfigurationProviderRuntimeSharedLimiterFitsOriginalBound(t *testing.T
 		if err != nil {
 			t.Fatalf("pair%d failed original bound after%s observer%d probe%d: %v", i, time.Since(started), f.observer.Load()-beforeS, f.probe.Load()-beforeP, err)
 		}
-		// 40 reads plus one ADR-227 release record read per operation.
-		if f.observer.Load()-beforeS != 42 || f.probe.Load()-beforeP != 9 {
+		// Plain source reads plus one ADR-227 release record read per
+		// operation; only the workload guard is still probed.
+		if f.observer.Load()-beforeS != 34 || f.probe.Load()-beforeP != 3 {
 			t.Fatal("native count changed", f.observer.Load()-beforeS, f.probe.Load()-beforeP)
 		}
 	}
-	for _, n := range []int{0, 1, 2} {
-		if f.denials[n].Load() != 3 {
-			t.Fatal("a genuine initial denial was omitted or repeated", n)
-		}
+	if f.denials[0].Load() != 3 || f.denials[1].Load() != 0 || f.denials[2].Load() != 0 {
+		t.Fatal("the workload initial denial was omitted or repeated, or a source was probed")
 	}
 }
 
 func TestConfigurationProviderRuntimeFinalRejectsCurrentMutation(t *testing.T) {
-	for _, mode := range []string{"source", "source during final guard", "account", "Pod", "ReplicaSet", "worker input", "journal", "SQL material", "audit material", "guard"} {
+	for _, mode := range []string{"source", "account", "Pod", "ReplicaSet", "worker input", "journal", "SQL material", "audit material"} {
 		t.Run(mode, func(t *testing.T) {
 			f := newConfigurationProviderRuntimeFixture(t)
 			call, end := context.WithTimeout(t.Context(), 5*time.Second)
@@ -88,16 +86,6 @@ func TestConfigurationProviderRuntimeFinalRejectsCurrentMutation(t *testing.T) {
 			switch mode {
 			case "source":
 				changeSource()
-			case "source during final guard":
-				var reads atomic.Int32
-				f.extra = func(_ http.ResponseWriter, r *http.Request) bool {
-					if strings.HasSuffix(r.URL.Path, "/validatingadmissionpolicybindings/"+f.input.OwnerGuard.Name) && reads.Add(1) == 1 {
-						f.mu.Lock()
-						changeSource()
-						f.mu.Unlock()
-					}
-					return false
-				}
 			case "account":
 				f.fault.Store(1)
 			case "Pod":
@@ -124,10 +112,6 @@ func TestConfigurationProviderRuntimeFinalRejectsCurrentMutation(t *testing.T) {
 			case "audit material":
 				obj := f.objects[base+"/secrets/"+f.input.ProviderAuthentication.AuditCredentials.Name].(*core.Secret)
 				obj.Data[contracts.ConfigurationProviderAuditCredentialFile] = []byte(`{"accessKeyID":"changed","secretAccessKey":"changed"}`)
-			case "guard":
-				path := "/apis/admissionregistration.k8s.io/v1/validatingadmissionpolicybindings/" + f.input.OwnerGuard.Name
-				obj := f.objects[path].(meta.Object)
-				obj.SetResourceVersion("changed")
 			}
 			f.mu.Unlock()
 			if _, err = f.reader.FinishConfigurationProviderOperation(call, op); err == nil {
@@ -277,10 +261,8 @@ func TestConfigurationProviderRuntimeDenialBelongsOnlyToOriginalOperation(t *tes
 	if _, err = f.reader.FinishConfigurationProviderOperation(call, op); err != nil {
 		t.Fatal("original denial interval was not retained", err)
 	}
-	for i := range f.denials {
-		if f.denials[i].Load() != 1 {
-			t.Fatal("final repeated denial", i)
-		}
+	if f.denials[0].Load() != 1 || f.denials[1].Load() != 0 || f.denials[2].Load() != 0 {
+		t.Fatal("final repeated the workload denial or probed a source")
 	}
 	next, err := f.reader.BeginConfigurationProviderOperation(call, f.manifest.Roles[0].Claim.Sources.IssuerEpoch, f.manifest, f.mounted)
 	if next != nil {

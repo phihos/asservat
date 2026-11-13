@@ -97,18 +97,18 @@ func TestOwnerProjectionSplitExactGraphsAndPrivateAdmission(t *testing.T) {
 		status OwnerProjectionAdvanceStatus
 		s      int32
 	}{
-		{"parent", f.projection.Advance, OwnerProjectionAdvanceAcknowledged, 105},
-		{"credentials-create", f.projection.Advance, OwnerProjectionAdvancePending, 108},
-		{"credentials-receipt", f.projection.Advance, OwnerProjectionAdvanceAcknowledged, 108},
-		{"configuration-create", f.projection.Advance, OwnerProjectionAdvancePending, 112},
-		{"configuration-receipt", f.projection.Advance, OwnerProjectionAdvanceAcknowledged, 111},
-		{"joint", f.projection.Advance, OwnerProjectionAdvanceComplete, 111},
-		{"complete-read", f.projection.Advance, OwnerProjectionAdvanceComplete, 110},
-		{"inspect-complete", f.projection.Inspect, OwnerProjectionAdvanceComplete, 56},
-		{"launch", f.projection.Launch, OwnerProjectionAdvancePending, 112},
-		{"launch-receipt", f.projection.Launch, OwnerProjectionAdvanceComplete, 111},
-		{"launch-read", f.projection.Launch, OwnerProjectionAdvanceComplete, 110},
-		{"inspect-launch", f.projection.InspectLaunch, OwnerProjectionAdvanceComplete, 56},
+		{"parent", f.projection.Advance, OwnerProjectionAdvanceAcknowledged, 81},
+		{"credentials-create", f.projection.Advance, OwnerProjectionAdvancePending, 84},
+		{"credentials-receipt", f.projection.Advance, OwnerProjectionAdvanceAcknowledged, 84},
+		{"configuration-create", f.projection.Advance, OwnerProjectionAdvancePending, 88},
+		{"configuration-receipt", f.projection.Advance, OwnerProjectionAdvanceAcknowledged, 87},
+		{"joint", f.projection.Advance, OwnerProjectionAdvanceComplete, 87},
+		{"complete-read", f.projection.Advance, OwnerProjectionAdvanceComplete, 86},
+		{"inspect-complete", f.projection.Inspect, OwnerProjectionAdvanceComplete, 44},
+		{"launch", f.projection.Launch, OwnerProjectionAdvancePending, 88},
+		{"launch-receipt", f.projection.Launch, OwnerProjectionAdvanceComplete, 87},
+		{"launch-read", f.projection.Launch, OwnerProjectionAdvanceComplete, 86},
+		{"inspect-launch", f.projection.InspectLaunch, OwnerProjectionAdvanceComplete, 44},
 	}
 	for _, step := range steps {
 		t.Run(step.name, func(t *testing.T) {
@@ -118,12 +118,12 @@ func TestOwnerProjectionSplitExactGraphsAndPrivateAdmission(t *testing.T) {
 			if err != nil || out.Status != step.status {
 				t.Fatal("original phase failed", out.Status, err)
 			}
-			got, want := projectionSplitDifference(counts.snapshot(), before), [6]int32{40, 26, 14, step.s, 8, 18}
+			got, want := projectionSplitDifference(counts.snapshot(), before), [6]int32{40, 26, 14, step.s, 8, 6}
 			phases := int32(2)
 			accepted := []bool{false, true, true, false, true, true}
 			if strings.HasPrefix(step.name, "inspect-") {
 				phases = 1
-				want = [6]int32{20, 13, 7, step.s, 4, 9}
+				want = [6]int32{20, 13, 7, step.s, 4, 3}
 				accepted = []bool{false, true, true}
 			}
 			if got != want || f.provider.requests.Load()-provider != phases*16 || private.Load()-secrets != phases*2 || unlocked.Load() != 0 || effects.calls.Load()-bridges != phases || !reflect.DeepEqual(reads, accepted) {
@@ -242,7 +242,7 @@ func projectionSplitNoParentEffect(t *testing.T, f *ownerProjectionOperationFixt
 	}
 }
 func TestOwnerProjectionSplitBridgeWaitChangesDenyBeforeFirstClaim(t *testing.T) {
-	names := []string{"namespace", "fleet-source", "owner-source", "workload-policy", "fleet-policy", "owner-policy", "workload-binding", "fleet-binding", "owner-binding", "bridge-journal", "resource-journal", "worker-deployment", "worker-deployment-spec", "worker-account", "worker-account-body", "owner-deployment", "owner-account", "owner-service", "administrator", "accepted-configuration"}
+	names := []string{"namespace", "fleet-source", "owner-source", "workload-policy", "workload-binding", "bridge-journal", "resource-journal", "worker-deployment", "worker-deployment-spec", "worker-account", "worker-account-body", "owner-deployment", "owner-account", "owner-service", "administrator", "accepted-configuration"}
 	for _, name := range names {
 		t.Run(name, func(t *testing.T) {
 			f := newOwnerProjectionOperationFixture(t)
@@ -271,7 +271,7 @@ func TestOwnerProjectionSplitBridgeWaitChangesDenyBeforeFirstClaim(t *testing.T)
 		})
 	}
 }
-func TestOwnerProjectionSplitSourceChangeDuringFinalGuardIsCompared(t *testing.T) {
+func TestOwnerProjectionSplitSourceChangeAfterLockIsCompared(t *testing.T) {
 	f := newOwnerProjectionOperationFixture(t)
 	effects := &ownerPreflightBridgeFixture{rootPinEffectFixture: f.effects}
 	f.bridge.effects = effects
@@ -280,9 +280,10 @@ func TestOwnerProjectionSplitSourceChangeDuringFinalGuardIsCompared(t *testing.T
 	f.api.mu.Lock()
 	previous := f.api.extra
 	f.api.extra = func(w http.ResponseWriter, r *http.Request) bool {
-		path := "/apis/admissionregistration.k8s.io/v1/validatingadmissionpolicybindings/" + f.source.owner.protection.plan.Name
-		if effects.held.Load() && r.Method == http.MethodGet && r.URL.Path == path && changed.CompareAndSwap(false, true) {
-			source := "/api/v1/namespaces/" + f.root.input.Namespace.Name + "/configmaps/" + f.source.input.OwnerSource.Name
+		// The owner source is a plain read: change it at its first read
+		// after the bridge lock; the post-lock values must be compared.
+		source := "/api/v1/namespaces/" + f.root.input.Namespace.Name + "/configmaps/" + f.source.input.OwnerSource.Name
+		if effects.held.Load() && r.Method == http.MethodGet && r.URL.Path == source && changed.CompareAndSwap(false, true) {
 			f.api.objects[source]["metadata"].(map[string]any)["resourceVersion"] = "997"
 		}
 		return previous(w, r)
@@ -290,7 +291,7 @@ func TestOwnerProjectionSplitSourceChangeDuringFinalGuardIsCompared(t *testing.T
 	f.api.mu.Unlock()
 	_, err := f.projection.Advance(context.Background())
 	if !errors.Is(err, cfg.ErrChanged) || !changed.Load() || private.Load() != 0 {
-		t.Fatal("source changed during final guard was hidden", err, changed.Load(), private.Load())
+		t.Fatal("source changed after the bridge lock was hidden", err, changed.Load(), private.Load())
 	}
 	projectionSplitNoParentEffect(t, f)
 }

@@ -185,25 +185,8 @@ func (s *APIContextWorkTrustSource) readTrust(ctx context.Context) (fleet.APICon
 	valid = identity.Earlier(valid, recovery.FreshUntil)
 	call, stopRecovery := context.WithDeadline(call, until)
 	defer stopRecovery()
-	guard, guardUntil, e := s.protection.current(call)
-	if e != nil {
-		return zero, trustStep{"guard", e}
-	}
-	until = identity.Earlier(until, guardUntil)
-	call, stopGuard := context.WithDeadline(call, until)
-	defer stopGuard()
 	if e = s.snapshot(call); e != nil {
 		return zero, trustStep{"snapshot", e}
-	}
-	final, finalUntil, e := s.protection.current(call)
-	if e != nil || guard != final {
-		return zero, trustStep{"guard-final", cfg.ErrChanged}
-	}
-	until = identity.Earlier(until, finalUntil)
-	call, stopFinal := context.WithDeadline(call, until)
-	defer stopFinal()
-	if e = s.snapshot(call); e != nil {
-		return zero, trustStep{"snapshot-final", e}
 	}
 	last, e := s.recovery.RecoveryState(call)
 	if e != nil || !last.Valid(s.client.now()) || last.InstallationID != recovery.InstallationID || last.IssuerEpoch != recovery.IssuerEpoch || last.Revision != recovery.Revision {
