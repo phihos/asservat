@@ -77,7 +77,7 @@ func initialRuntimeNativeSource(t *testing.T, ctx context.Context, api kubernete
 	if err != nil {
 		t.Fatal(err)
 	}
-	fleetSource, err := kube.NewProtectedFleetSettings(observer, fleetGuard, inventory.FleetSource.Name, inventory.FleetSource.UID, record.Scope.InstallationID)
+	fleetSource, err := kube.NewProtectedFleetSettings(observer, fleetGuard, inventory.FleetSource.Name, inventory.FleetSource.UID, record.Scope.InstallationID, "22222222-2222-4222-8222-222222222222")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -132,10 +132,10 @@ func TestCustodySetupDatabaseWithRealPostgres(t *testing.T) {
 		t.Fatal(e)
 	}
 	defer pool.Close()
-	if e = postgres.VerifyRuntimeLogin(ctx, pool, hub); e != nil {
+	if e = postgres.VerifySessionRole(ctx, pool, hub); e != nil {
 		t.Fatal("runtime login", e)
 	}
-	if e = postgres.VerifyRuntimeLogin(ctx, pool, fleetRole); !errors.Is(e, cfg.ErrDenied) {
+	if e = postgres.VerifySessionRole(ctx, pool, fleetRole); !errors.Is(e, cfg.ErrDenied) {
 		t.Fatal("another role name accepted", e)
 	}
 	if state, e := postgres.ReadSchemaState(ctx, pool); e != nil || !state.Compatible(postgres.CompiledSchemaVersion) {

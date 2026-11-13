@@ -435,7 +435,7 @@ func TestLocalStartWithRealKubernetes(t *testing.T) {
 		if e != nil {
 			t.Fatal(e)
 		}
-		reader, e := kube.NewFleetSettingsClient(client, cm.Name, string(cm.UID), cluster)
+		reader, e := kube.NewFleetSettingsClient(client, cm.Name, string(cm.UID), cluster, "22222222-2222-4222-8222-222222222222")
 		if e != nil {
 			t.Fatal(e)
 		}

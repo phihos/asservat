@@ -119,7 +119,7 @@ func newDirectNativeCluster(t *testing.T, ctx context.Context, f fixture, index 
 			audience = value.ClusterObservationAudience(installation)
 			tokenFile = "caller.token"
 		case "regional":
-			audience = kube.ConnectorEnrollmentAudience(installation)
+			audience = kube.ConnectorEnrollmentAudience
 			tokenFile = "connector.token"
 		}
 		projection := []core.VolumeProjection{{Secret: &core.SecretProjection{LocalObjectReference: core.LocalObjectReference{Name: mode + "-inputs"}, Optional: ptr.To(false)}}, {ServiceAccountToken: &core.ServiceAccountTokenProjection{Path: "observer.token", ExpirationSeconds: ptr.To(int64(600))}}, {ServiceAccountToken: &core.ServiceAccountTokenProjection{Audience: audience, Path: tokenFile, ExpirationSeconds: ptr.To(int64(600))}}}

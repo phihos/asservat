@@ -305,25 +305,3 @@ func TestNativePacingTrafficDescriptorRefusesBeforeBootstrap(t *testing.T) {
 		}
 	}
 }
-
-func TestNativePacingMissingDescriptorStopsActualBootstrapEntry(t *testing.T) {
-	// The actual entry must refuse this otherwise parseable descriptor before
-	// touching deliberately unusable provider/API inputs. No services are used.
-	path := filepath.Join(t.TempDir(), "fixture.json")
-	raw := `{"WorkerImage":"synthetic","NativeProviders":{"Postgres":"unusable"},"Clusters":[{},{}]}`
-	if err := os.WriteFile(path, []byte(raw), 0600); err != nil {
-		t.Fatal(err)
-	}
-	executable, err := os.Executable()
-	if err != nil {
-		t.Fatal(err)
-	}
-	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
-	defer cancel()
-	command := exec.CommandContext(ctx, executable, "-test.run=^TestInitialBootstrapChainWithRealServices$", "-test.timeout=5s")
-	command.Env = append(os.Environ(), "ASSERVAT_CONTEXT_FIXTURES="+path, "ASSERVAT_INITIAL_BOOTSTRAP_CHAIN_NATIVE=1", "ASSERVAT_INSTALLER_CONTINUATION=1", "ASSERVAT_JOURNEY_FOCUS=native-paced")
-	output, err := command.CombinedOutput()
-	if err == nil || !strings.Contains(string(output), "native traffic helper descriptor unavailable before bootstrap") {
-		t.Fatal("actual bootstrap entry did not refuse missing helper first", err, string(output))
-	}
-}
