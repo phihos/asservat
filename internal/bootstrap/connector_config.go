@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"os"
+	"strconv"
 	"time"
 
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
@@ -16,6 +17,7 @@ import (
 	value "asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
 	core "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/kubernetes"
@@ -157,7 +159,7 @@ func resolveRegionalConfig(ctx context.Context, in *providerInputs, c contracts.
 	}
 	o := out.offer
 	if o.Format != contracts.RegionalOfferFormat || !authorization.UUID(o.InstallationID) || !authorization.UUID(o.PermissionRootID) || !authorization.UUID(o.IssuerEpoch) || len(o.ConnectorIssuerRoots) == 0 || len(o.ConnectorBacking) == 0 {
-		return out, &fixedStepError{"offer", mounts.ErrUnavailable}
+		return out, &fixedStepError{"offer/fields", mounts.ErrUnavailable}
 	}
 	out.binding = value.PeerBinding{InstallationID: o.InstallationID, ClusterID: c.ClusterID, IssuerEpoch: o.IssuerEpoch, PeerID: c.PeerID, Role: value.ConnectorPeer}
 	out.hub = o.Federation
@@ -200,14 +202,18 @@ func readCombinedOffer(ctx context.Context, in *providerInputs, namespace, name 
 	defer end()
 	var object *core.ConfigMap
 	if object, err = api.CoreV1().ConfigMaps(namespace).Get(call, name, meta.GetOptions{}); err != nil {
-		return zero, mounts.ErrUnavailable
+		step := "get"
+		if status, ok := err.(apierrors.APIStatus); ok {
+			step += "/" + strconv.Itoa(int(status.Status().Code))
+		}
+		return zero, &fixedStepError{step, mounts.ErrUnavailable}
 	}
 	raw := object.Data[contracts.RegionalOfferFile]
 	d := json.NewDecoder(bytes.NewReader([]byte(raw)))
 	d.DisallowUnknownFields()
 	var offer contracts.RegionalOffer
 	if len(raw) > 1<<20 || d.Decode(&offer) != nil || d.More() {
-		return zero, mounts.ErrUnavailable
+		return zero, &fixedStepError{"decode", mounts.ErrUnavailable}
 	}
 	return offer, nil
 }
