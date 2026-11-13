@@ -41,6 +41,11 @@ func ValidOwnerPublicRoute(e contracts.InstallerPublicExposure, origin string) b
 	if e.TLS != "" && e.TLS != contracts.InstallerPublicTLSPod && e.TLS != contracts.InstallerPublicTLSProxy {
 		return false
 	}
+	// Proxy TLS serves plain HTTP, and a route targets the Service from
+	// inside the cluster: neither may sit on a directly reachable Service.
+	if (e.TLS == contracts.InstallerPublicTLSProxy || e.Ingress != nil || e.HTTPRoute != nil) && e.ServiceType != "ClusterIP" {
+		return false
+	}
 	if e.Ingress == nil && e.HTTPRoute == nil {
 		return true
 	}
@@ -124,7 +129,11 @@ func ensureOwnerPublicIngress(ctx context.Context, config *rest.Config, namespac
 	if err != nil {
 		return cfg.ErrUnavailable
 	}
-	if !equalJSON(got.Spec, want.Spec) || !annotationsKept(got.Annotations, want.Annotations) {
+	// Compare only what Asservat sets: admission may default the class.
+	class := want.Spec.IngressClassName
+	if !equalJSON(got.Spec.Rules, want.Spec.Rules) || !equalJSON(got.Spec.TLS, want.Spec.TLS) ||
+		class != nil && (got.Spec.IngressClassName == nil || *got.Spec.IngressClassName != *class) ||
+		!annotationsKept(got.Annotations, want.Annotations) {
 		return cfg.ErrChanged
 	}
 	return nil

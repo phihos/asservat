@@ -74,6 +74,11 @@ func TestOwnerPublicIngressCreateAndExactReopen(t *testing.T) {
 	if err := EnsureOwnerPublicRoute(context.Background(), config, "hub", ownerID(1), e, "https://asservat.example"); err != nil {
 		t.Fatal("controller annotation refused", err)
 	}
+	// An admission-defaulted class on an unclassed Ingress is not a change.
+	unclassed := contracts.InstallerPublicExposure{ServiceType: "ClusterIP", TLS: contracts.InstallerPublicTLSProxy, Ingress: &contracts.InstallerPublicIngress{Annotations: e.Ingress.Annotations}}
+	if err := EnsureOwnerPublicRoute(context.Background(), config, "hub", ownerID(1), unclassed, "https://asservat.example"); err != nil {
+		t.Fatal("defaulted ingress class refused", err)
+	}
 	if err := EnsureOwnerPublicRoute(context.Background(), config, "hub", ownerID(1), e, "https://other.example"); !errors.Is(err, cfg.ErrChanged) {
 		t.Fatal("changed host accepted", err)
 	}
@@ -124,6 +129,9 @@ func TestValidOwnerPublicRoute(t *testing.T) {
 		{"both routes", contracts.InstallerPublicExposure{ServiceType: "ClusterIP", Ingress: ingress, HTTPRoute: route}, "https://a.example", false},
 		{"bad class", contracts.InstallerPublicExposure{ServiceType: "ClusterIP", Ingress: &contracts.InstallerPublicIngress{ClassName: "Bad_Class"}}, "https://a.example", false},
 		{"bad annotation", contracts.InstallerPublicExposure{ServiceType: "ClusterIP", Ingress: &contracts.InstallerPublicIngress{Annotations: map[string]string{"bad key": "x"}}}, "https://a.example", false},
+		{"proxy tls on a node port", contracts.InstallerPublicExposure{ServiceType: "NodePort", TLS: "proxy"}, "https://a.example", false},
+		{"route to a load balancer", contracts.InstallerPublicExposure{ServiceType: "LoadBalancer", Ingress: ingress}, "https://a.example", false},
+		{"proxy tls behind an external route", contracts.InstallerPublicExposure{ServiceType: "ClusterIP", TLS: "proxy"}, "https://a.example", true},
 		{"no parents", contracts.InstallerPublicExposure{ServiceType: "ClusterIP", HTTPRoute: &contracts.InstallerPublicHTTPRoute{}}, "https://a.example", false},
 		{"bad parent namespace", contracts.InstallerPublicExposure{ServiceType: "ClusterIP", HTTPRoute: &contracts.InstallerPublicHTTPRoute{ParentRefs: []contracts.InstallerGatewayParent{{Name: "edge", Namespace: "Not.A.Label"}}}}, "https://a.example", false},
 	} {
