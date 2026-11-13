@@ -234,6 +234,7 @@ identity-integration:
 .PHONY: helm-check helm-integration
 helm-check: permission-crd-check policy-crd-check start-crd-check retention-crd-check profile-crd-check
 	$(PYTHON) scripts/check-helm.py
+	$(PYTHON) scripts/check-helm-region.py
 	$(PYTHON) scripts/test-helm-runtime-node-access.py
 	$(PYTHON) scripts/test-helm-services.py
 	$(PYTHON) scripts/test-helm-hub-api.py

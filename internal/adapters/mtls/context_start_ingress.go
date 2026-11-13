@@ -92,7 +92,7 @@ func NewContextStartIngress(rootID string, local *OwnerCredentials, owners *app.
 	c := &ContextStartIngress{rootID: rootID, local: local, owners: owners, clusters: make(map[string]contextStartConnectorAdmission, len(inputs)), now: now}
 	for _, input := range inputs {
 		p := input.Profile
-		if !p.Valid() || p.Suspended || p.RootID != rootID || !input.Executor.valid() || input.Executor.NamespaceUID != p.Deployment.NamespaceUID || input.Executor.AccountUID != p.Deployment.AccountUID || input.Registry == nil {
+		if !p.Valid() || p.Suspended || p.RootID != rootID || !input.Executor.valid() || input.Registry == nil {
 			return nil, value.ErrInvalid
 		}
 		if _, exists := c.clusters[p.Binding.ClusterID]; exists {

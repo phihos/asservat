@@ -8,8 +8,11 @@ import (
 	"errors"
 	"time"
 
+	"asservat.local/asservat/internal/adapters/kms"
+	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/adapters/mtls"
 	fleetapp "asservat.local/asservat/internal/application/fleet"
+	"asservat.local/asservat/internal/contracts"
 	value "asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/transport/connectorlifecycle"
 )
@@ -19,9 +22,37 @@ type regionalChannel interface {
 	Run(context.Context, func([]byte) (connectorlifecycle.Opening, error), connectorlifecycle.Local) (connectorlifecycle.HubFrame, error)
 }
 
-// errRegionalBootstrapExpired: the operator issues a new bootstrap and the
-// installer rewrites the Secret; this process never reuses an expired one.
+// errRegionalBootstrapExpired: the operator issues a new bootstrap, empties
+// the cluster credential Secret and replaces the bootstrap record Secret; this
+// process never reuses an expired one.
 var errRegionalBootstrapExpired = errors.New("cluster bootstrap expired")
+
+// errRegionalBootstrapMissing: the cluster credential Secret is empty and no
+// valid bootstrap record for this cluster binding is mounted.
+var errRegionalBootstrapMissing = errors.New("cluster bootstrap record missing")
+
+// regionalCredentialSeed writes the generation-0 envelope into the empty
+// Helm-rendered cluster credential Secret.
+type regionalCredentialSeed interface {
+	SeedClusterCredential(context.Context, value.BootstrapEnvelope) error
+}
+
+// regionalRecord reads the operator's bootstrap record (bootstrap.json from
+// the existing Secret named in values).
+type regionalRecord interface {
+	ReadBootstrapRecord(context.Context) (value.BootstrapEnvelope, error)
+}
+
+type regionalBootstrapRecord struct{ inputs *providerInputs }
+
+func (r regionalBootstrapRecord) ReadBootstrapRecord(ctx context.Context) (value.BootstrapEnvelope, error) {
+	b, err := r.inputs.read(ctx, contracts.ConnectorBootstrapFile, 16<<10)
+	defer clear(b)
+	if err != nil {
+		return value.BootstrapEnvelope{}, errRegionalBootstrapMissing
+	}
+	return kms.DecodeBootstrapRecord(b)
+}
 
 // errRegionalCredentialWrite separates a refused Secret CAS write (RBAC,
 // admission or a concurrent writer) from an unreadable Secret.
@@ -33,6 +64,8 @@ var errRegionalCredentialWrite = errors.New("cluster credential write refused")
 // promotion to generation 1.
 type regionalBootstrap struct {
 	store   fleetapp.ClusterCredentialSecretStore
+	seed    regionalCredentialSeed
+	record  regionalRecord
 	channel regionalChannel
 	local   connectorlifecycle.Local
 	binding value.PeerBinding
@@ -40,9 +73,24 @@ type regionalBootstrap struct {
 	now     func() time.Time
 }
 
-// Reconcile returns nil once generation 1 or later is stored.
+// Reconcile returns nil once generation 1 or later is stored. An empty
+// Secret is first seeded from the mounted bootstrap record of this exact
+// binding; the record is never read again once the Secret holds a credential.
 func (b regionalBootstrap) Reconcile(ctx context.Context) error {
 	state, version, err := b.store.ReadClusterCredential(ctx)
+	if errors.Is(err, kube.ErrClusterCredentialEmpty) {
+		envelope, rerr := b.record.ReadBootstrapRecord(ctx)
+		if rerr != nil || envelope.Binding != b.binding {
+			return errRegionalBootstrapMissing
+		}
+		if !b.now().Before(envelope.NotAfter) {
+			return errRegionalBootstrapExpired
+		}
+		if err = b.seed.SeedClusterCredential(ctx, envelope); err != nil {
+			return errors.Join(err, errRegionalCredentialWrite)
+		}
+		state, version, err = b.store.ReadClusterCredential(ctx)
+	}
 	if err != nil {
 		return errors.Join(err, errRegionalCredential)
 	}

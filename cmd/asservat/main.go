@@ -13,17 +13,17 @@ import (
 )
 
 // Commands taking arguments; all others take none.
-var withArguments = []string{"installer-cluster", "installer-cluster-join", "download-worker", "setup"}
+var withArguments = []string{"download-worker", "setup"}
 
 // One-shot commands report a cancellation as a failure.
-var oneShot = []string{"secrets", "installer-cluster", "installer-cluster-join", "setup"}
+var oneShot = []string{"secrets", "setup"}
 
-var commands = []string{"secrets", "setup", "installer-cluster", "installer-cluster-join", "download-worker", "hub-api", "hub-worker", "hub-federation", "connector", "key-service", "publisher", "node"}
+var commands = []string{"secrets", "setup", "download-worker", "hub-api", "hub-worker", "hub-federation", "connector", "key-service", "publisher", "node"}
 
 func main() { os.Exit(run()) }
 func run() int {
 	if len(os.Args) < 2 || !slices.Contains(commands, os.Args[1]) || !slices.Contains(withArguments, os.Args[1]) && len(os.Args) != 2 {
-		fmt.Fprintln(os.Stderr, "usage: asservat secrets | setup [--wait-schema --config file --credential file] | installer-cluster --offer file --bootstrap file [--evidence-credential file] [--kubeconfig file] [--context name] [--namespace name] [--in-cluster] | installer-cluster-join --namespace name --join file [--standby n] [--captures n] [--kubeconfig file] [--context name] | download-worker [protected startup arguments] | hub-api | hub-worker | hub-federation | connector | key-service | publisher | node")
+		fmt.Fprintln(os.Stderr, "usage: asservat secrets | setup [--wait-schema --config file --credential file] | download-worker [protected startup arguments] | hub-api | hub-worker | hub-federation | connector | key-service | publisher | node")
 		return 2
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
@@ -34,10 +34,6 @@ func run() int {
 		err = bootstrap.RunSecrets(ctx)
 	case "setup":
 		err = bootstrap.RunSetup(ctx, os.Args[2:], os.Stdout)
-	case "installer-cluster":
-		err = bootstrap.RunInstallerCluster(ctx, os.Args[2:], os.Stdout)
-	case "installer-cluster-join":
-		err = bootstrap.RunInstallerClusterJoin(ctx, os.Args[2:], os.Stdout)
 	case "hub-api":
 		err = bootstrap.RunHubAPI(ctx, os.Getenv(contracts.OwnerPodUIDEnvironment))
 	case "connector":
@@ -64,7 +60,7 @@ func run() int {
 	switch os.Args[1] {
 	case "secrets":
 		fmt.Fprintln(os.Stderr, bootstrap.SecretsDiagnostic(err))
-	case "setup", "installer-cluster":
+	case "setup":
 		// A fixed step name and error class only, no provider response bodies.
 		fmt.Fprintln(os.Stderr, err)
 	case "hub-api":

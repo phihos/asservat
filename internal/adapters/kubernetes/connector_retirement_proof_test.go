@@ -202,7 +202,7 @@ func TestConnectorRetirementProofPreservesLiveActorAndPurpose(t *testing.T) {
 				case "/apis/authentication.k8s.io/v1/tokenreviews":
 					n = reviews.Add(1)
 					var req auth.TokenReview
-					if json.NewDecoder(r.Body).Decode(&req) != nil || req.Spec.Token != string(token) || len(req.Spec.Audiences) != 1 || req.Spec.Audiences[0] != ConnectorEnrollmentAudience(v.pool.InstallationID) {
+					if json.NewDecoder(r.Body).Decode(&req) != nil || req.Spec.Token != string(token) || len(req.Spec.Audiences) != 1 || req.Spec.Audiences[0] != ConnectorEnrollmentAudience(v.pool.ClusterID) {
 						t.Error("wrong enrollment token audience/request")
 					}
 					if mode == "token-error-redaction" {
@@ -250,15 +250,8 @@ func TestConnectorRetirementProofPreservesLiveActorAndPurpose(t *testing.T) {
 			if e != nil {
 				t.Fatal(e)
 			}
-			probe, e := NewPermissionClient(clientConfig, v.pool.ClusterID, plan.ControlNamespace, now)
-			if e != nil {
-				t.Fatal(e)
-			}
-			guard, e := NewOwnerWorkloadProtection(reader, probe, plan, pin)
-			if e != nil {
-				t.Fatal(e)
-			}
-			configuration := value.ConnectorCredentialProfile{RootID: ownerID(21), Binding: peer, Revision: identity.Revision{UID: ownerID(13), Generation: 1, Digest: artifact.Digest{1}}, ProtectionDigest: artifact.Digest{2}, ServerName: "connector.invalid", ClientIssuerRoots: [][]byte{{1, 2, 3}}, ServerIssuerRoots: [][]byte{{4, 5, 6}}, Deployment: value.ConnectorDeployment{Namespace: v.pool.Namespace, NamespaceUID: v.pool.NamespaceUID, ServiceAccount: v.pool.ServiceAccount, AccountUID: v.pool.AccountUID, Deployment: v.pool.Deployment, DeploymentUID: v.pool.DeploymentUID, ServingSlots: 2, RetainedProcesses: 8}}
+			guard := ConnectorWorkload{Namespace: v.pool.Namespace, NamespaceUID: v.pool.NamespaceUID, Account: v.pool.ServiceAccount, AccountUID: v.pool.AccountUID, Deployment: v.pool.Deployment, DeploymentUID: v.pool.DeploymentUID, Digest: ConnectorWorkloadDigest(v.pool.ClusterID, v.pool.Namespace, v.pool.Deployment)}
+			configuration := value.ConnectorCredentialProfile{RootID: ownerID(21), Binding: peer, Revision: identity.Revision{UID: ownerID(13), Generation: 1, Digest: artifact.Digest{1}}, ProtectionDigest: artifact.Digest{2}, ServerName: "connector.invalid", ClientIssuerRoots: [][]byte{{1, 2, 3}}, ServerIssuerRoots: [][]byte{{4, 5, 6}}, Deployment: value.ConnectorDeployment{Namespace: v.pool.Namespace, ServiceAccount: v.pool.ServiceAccount, Deployment: v.pool.Deployment, ServingSlots: 2, RetainedProcesses: 8}}
 			configCalls := 0
 			configurations := connectorSourceFunc(func(context.Context) (value.ConnectorIdentitySource, error) {
 				configCalls++

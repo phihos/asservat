@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"encoding/json/jsontext"
 	"errors"
-	"slices"
 	"strings"
 	"time"
 
@@ -22,40 +21,22 @@ import (
 	"asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
 	"github.com/google/uuid"
-	admission "k8s.io/api/admissionregistration/v1"
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation"
 )
 
-const connectorAPISettingsDenial = "Asservat connector API context profile administrator is required."
-
-type ConnectorAPISettingsProtection struct{ *configMapProtection }
-
-func ConnectorAPISettingsAdmission(p cfg.ConfigMapAdministration) (*admission.ValidatingAdmissionPolicy, *admission.ValidatingAdmissionPolicyBinding, error) {
-	return configMapAdmission(p, "protected-connector-api-context", connectorAPISettingsDenial)
-}
-func NewConnectorAPISettingsProtection(observer, probe *PermissionClient, p cfg.ConfigMapAdministration, pin GuardPin) (*ConnectorAPISettingsProtection, error) {
-	g, e := newConfigMapProtection(observer, probe, p, pin, "protected-connector-api-context", connectorAPISettingsDenial)
-	if e != nil {
-		return nil, e
-	}
-	return &ConnectorAPISettingsProtection{g}, nil
-}
-
 // ConnectorAPIExecutionProtection is a concrete composition, not an arbitrary
-// process-reader callback. The installed settings, read under ordinary RBAC,
-// add API capability to the exact current connector-owned Pod and public CSR.
+// process-reader callback. The executor's startup facts (its Helm-rendered
+// workload, capacity account and image) add API capability to the exact
+// current connector-owned Pod and public CSR.
 type ConnectorAPIExecutionProtection struct {
-	attester                             *ConnectorProcessAttester
-	credentials                          *mtls.ConnectorProcessCredentials
-	settings                             *ConnectorAPISettingsProtection
-	name, uid, rv                        string
-	installed                            contracts.ConnectorAPIContextSettings
-	canonical                            []byte
-	startup, image, template, projection artifact.Digest
-	reuse                                connectorAPIProofState
+	attester       *ConnectorProcessAttester
+	credentials    *mtls.ConnectorProcessCredentials
+	installed      contracts.ConnectorAPIContextSettings
+	startup, image artifact.Digest
+	reuse          connectorAPIProofState
 }
 
 func connectorAPIDigest(s string) (artifact.Digest, error) {
@@ -70,131 +51,77 @@ func connectorAPIDigest(s string) (artifact.Digest, error) {
 	}
 	return d, nil
 }
+
+// ConnectorAPISettings derives the executor's startup facts from the
+// connector's own workload (UIDs read by name at start), the capacity account
+// and the image digest of its Helm values. Template, input and guard pins of
+// the former installer are gone; Kubernetes RBAC protects the objects.
+func ConnectorAPISettings(rootID string, binding fleet.PeerBinding, workload ConnectorWorkload, capacityAccount, capacityAccountUID, imageDigest string) (contracts.ConnectorAPIContextSettings, error) {
+	projection := compiler.ProjectionDigest()
+	s := contracts.ConnectorAPIContextSettings{Format: contracts.ConnectorAPIContextFormat, RootID: rootID, InstallationID: binding.InstallationID, ClusterID: binding.ClusterID, IssuerEpoch: binding.IssuerEpoch,
+		Namespace: workload.Namespace, NamespaceUID: workload.NamespaceUID, Account: workload.Account, AccountUID: workload.AccountUID, Deployment: workload.Deployment, DeploymentUID: workload.DeploymentUID,
+		ImageDigest: imageDigest, ProjectionDigest: hex.EncodeToString(projection[:]), WorkloadProtectionDigest: hex.EncodeToString(workload.Digest[:]), CapacityAccount: capacityAccount, CapacityAccountUID: capacityAccountUID}
+	if !connectorAPISettingsValid(s) {
+		return contracts.ConnectorAPIContextSettings{}, cfg.ErrInvalid
+	}
+	return s, nil
+}
+
 func connectorAPISettingsValid(p contracts.ConnectorAPIContextSettings) bool {
-	if p.Format != contracts.ConnectorAPIContextFormat {
+	if p.Format != contracts.ConnectorAPIContextFormat || len(p.Inputs) != 0 || p.StartGuard != (contracts.ConnectorAPIStartGuard{}) || p.TemplateDigest != "" || p.ConnectorRevision != (contracts.APIContextRevision{}) {
 		return false
 	}
-	for _, id := range []string{p.RootID, p.InstallationID, p.ClusterID, p.IssuerEpoch, p.NamespaceUID, p.AccountUID, p.DeploymentUID, p.ConnectorRevision.UID, p.CapacityAccountUID, p.StartGuard.PolicyUID, p.StartGuard.BindingUID} {
+	for _, id := range []string{p.RootID, p.InstallationID, p.ClusterID, p.IssuerEpoch, p.NamespaceUID, p.AccountUID, p.DeploymentUID, p.CapacityAccountUID} {
 		if !authorization.UUID(id) {
 			return false
 		}
 	}
-	for _, name := range []string{p.Account, p.Deployment, p.CapacityAccount, p.StartGuard.Name} {
+	for _, name := range []string{p.Account, p.Deployment, p.CapacityAccount} {
 		if len(validation.IsDNS1123Subdomain(name)) != 0 {
 			return false
 		}
 	}
-	if len(validation.IsDNS1123Label(p.Namespace)) != 0 || p.Account == p.CapacityAccount || p.AccountUID == p.CapacityAccountUID || p.ConnectorRevision.Generation < 1 || p.ConnectorRevision.Generation > 2147483647 || p.StartGuard.PolicyGeneration < 1 || !identity.Text(p.StartGuard.BindingResourceVersion, 128) {
+	if len(validation.IsDNS1123Label(p.Namespace)) != 0 || p.Account == p.CapacityAccount || p.AccountUID == p.CapacityAccountUID {
 		return false
 	}
-	for _, s := range []string{p.ImageDigest, p.TemplateDigest, p.ProjectionDigest, p.WorkloadProtectionDigest, p.ConnectorRevision.Digest} {
+	for _, s := range []string{p.ImageDigest, p.ProjectionDigest, p.WorkloadProtectionDigest} {
 		if _, e := connectorAPIDigest(s); e != nil {
 			return false
 		}
 	}
 	projection, e := connectorAPIDigest(p.ProjectionDigest)
-	if e != nil || projection != compiler.ProjectionDigest() {
-		return false
-	}
-	if len(p.Inputs) > 16 {
-		return false
-	}
-	seen := map[string]bool{}
-	for _, in := range p.Inputs {
-		key := in.Kind + "/" + in.Name
-		if in.Kind != "ConfigMap" && in.Kind != "Secret" || len(validation.IsDNS1123Subdomain(in.Name)) != 0 || !authorization.UUID(in.UID) || !identity.Text(in.ResourceVersion, 128) || seen[key] || (in.Kind == "Secret") != in.DedicatedToAPI {
-			return false
-		}
-		seen[key] = true
-	}
-	return true
+	return e == nil && projection == compiler.ProjectionDigest()
 }
-func NewConnectorAPIExecutionProtection(a *ConnectorProcessAttester, credentials *mtls.ConnectorProcessCredentials, settings *ConnectorAPISettingsProtection, name, uid, rv string, installed contracts.ConnectorAPIContextSettings) (*ConnectorAPIExecutionProtection, error) {
-	if a == nil || a.client == nil || a.protection == nil || credentials == nil || settings == nil || settings.configMapProtection == nil || settings.observer != a.client || settings.plan.SourceName != name || !installationRefValid(name, uid) || !identity.Text(rv, 128) || !connectorAPISettingsValid(installed) {
+
+func NewConnectorAPIExecutionProtection(a *ConnectorProcessAttester, credentials *mtls.ConnectorProcessCredentials, installed contracts.ConnectorAPIContextSettings) (*ConnectorAPIExecutionProtection, error) {
+	if a == nil || a.client == nil || credentials == nil || !connectorAPISettingsValid(installed) {
 		return nil, cfg.ErrInvalid
 	}
-	p := a.protection.plan
-	s := installed
-	if s.ClusterID != a.client.clusterID || s.Namespace != a.client.control.Name || s.NamespaceUID != a.client.control.UID || p.Deployment != s.Deployment || p.DeploymentUID != s.DeploymentUID || p.APIContextStarts == nil || p.APIContextStarts.CapacityAccount != s.CapacityAccount || p.APIContextStarts.CapacityAccountUID != s.CapacityAccountUID || p.APIContextStarts.ExecutionAccount != s.Account || p.APIContextStarts.ExecutionAccountUID != s.AccountUID || hex.EncodeToString(a.protection.digest[:]) != s.WorkloadProtectionDigest {
+	w, s := a.workload, installed
+	if s.ClusterID != a.client.clusterID || s.Namespace != w.Namespace || s.NamespaceUID != w.NamespaceUID || s.Deployment != w.Deployment || s.DeploymentUID != w.DeploymentUID || s.Account != w.Account || s.AccountUID != w.AccountUID || hex.EncodeToString(w.Digest[:]) != s.WorkloadProtectionDigest {
 		return nil, cfg.ErrInvalid
-	}
-	s.Inputs = slices.Clone(s.Inputs)
-	startup, canonical, e := ConnectorAPIStartupDigest(settings.digest, uid, rv, s)
-	if e != nil {
-		return nil, e
 	}
 	image, _ := connectorAPIDigest(s.ImageDigest)
-	template, _ := connectorAPIDigest(s.TemplateDigest)
-	projection, _ := connectorAPIDigest(s.ProjectionDigest)
-	return &ConnectorAPIExecutionProtection{attester: a, credentials: credentials, settings: settings, name: name, uid: uid, rv: rv, installed: s, canonical: canonical, startup: startup, image: image, template: template, projection: projection}, nil
+	return &ConnectorAPIExecutionProtection{attester: a, credentials: credentials, installed: s, startup: ConnectorAPIStartupDigest(s), image: image}, nil
 }
 
 // ConnectorAPIStartupDigest is the executor's startup pin, which the hub's
-// catalog entry names: the settings ConfigMap's UID and version, its guard
-// digest and the canonical settings. The regional installer prints the same
-// value in its join record (ADR-196 decision 7). The guard digest is computed
-// from the installed plan and pin alone, so the persisted value stays stable
-// while the runtime no longer reads or probes that guard.
-func ConnectorAPIStartupDigest(guard artifact.Digest, uid, rv string, installed contracts.ConnectorAPIContextSettings) (artifact.Digest, []byte, error) {
-	canonical, e := contracts.EncodeConnectorAPIContextSettings(installed)
-	if e != nil {
-		return artifact.Digest{}, nil, e
-	}
+// catalog entry names. It binds only values both sides know from Helm: the
+// cluster binding, the workload and capacity account names and the image.
+func ConnectorAPIStartupDigest(s contracts.ConnectorAPIContextSettings) artifact.Digest {
 	bound, _ := json.Marshal(struct {
-		Format, SourceUID, SourceVersion string
-		SourceProtection                 artifact.Digest
-		Settings                         json.RawMessage
-	}{"asservat-connector-api-startup/v1", uid, rv, guard, canonical})
-	return sha256.Sum256(bound), canonical, nil
+		Format, RootID, InstallationID, ClusterID, IssuerEpoch string
+		Namespace, Account, Deployment, CapacityAccount        string
+		ImageDigest, ProjectionDigest                          string
+	}{"asservat-connector-api-startup/v2", s.RootID, s.InstallationID, s.ClusterID, s.IssuerEpoch, s.Namespace, s.Account, s.Deployment, s.CapacityAccount, s.ImageDigest, s.ProjectionDigest})
+	return sha256.Sum256(bound)
 }
 
-// ReadSettings returns the immutable settings ConfigMap's settings, UID and
-// version, read by name at process start under ordinary RBAC (ADR-196
-// decision 7). The execution protection then rechecks the exact object on
-// every start. No admission policy is read or probed.
-func (g *ConnectorAPISettingsProtection) ReadSettings(ctx context.Context) (contracts.ConnectorAPIContextSettings, string, string, error) {
-	var zero contracts.ConnectorAPIContextSettings
-	if g == nil || g.configMapProtection == nil || ctx == nil {
-		return zero, "", "", cfg.ErrInvalid
-	}
-	raw, e := g.observer.raw(ctx, "/api/v1/namespaces/"+g.plan.ControlNamespace.Name+"/configmaps/"+g.plan.SourceName, nil)
-	if e != nil {
-		return zero, "", "", e
-	}
-	var object core.ConfigMap
-	if json.Unmarshal(raw, &object) != nil || object.APIVersion != "v1" || object.Kind != "ConfigMap" || object.Name != g.plan.SourceName || object.Namespace != g.plan.ControlNamespace.Name || object.DeletionTimestamp != nil {
-		return zero, "", "", cfg.ErrUnavailable
-	}
-	if object.Immutable == nil || !*object.Immutable || len(object.Data) != 1 || len(object.BinaryData) != 0 || !authorization.UUID(string(object.UID)) || !identity.Text(object.ResourceVersion, 128) {
-		return zero, "", "", cfg.ErrChanged
-	}
-	s, e := contracts.DecodeConnectorAPIContextSettings([]byte(object.Data["connector-api-context.json"]))
-	if e != nil {
-		return zero, "", "", cfg.ErrChanged
-	}
-	return s, string(object.UID), object.ResourceVersion, nil
-}
-func (g *ConnectorAPIExecutionProtection) snapshot(ctx context.Context) error {
-	data, ref, e := g.attester.client.installationConfigMode(ctx, g.name, g.uid, true)
-	if e != nil || len(data) != 1 || ref.UID != g.uid || ref.ResourceVersion != g.rv {
-		return cfg.ErrUnavailable
-	}
-	p, e := contracts.DecodeConnectorAPIContextSettings([]byte(data["connector-api-context.json"]))
-	if e != nil {
-		return cfg.ErrChanged
-	}
-	b, e := contracts.EncodeConnectorAPIContextSettings(p)
-	if e != nil || !bytes.Equal(b, g.canonical) {
-		return cfg.ErrChanged
-	}
-	return nil
-}
 func (g *ConnectorAPIExecutionProtection) matchesProof(p fleet.ConnectorProcessProof) bool {
 	s := g.installed
 	c := p.Configuration.Profile
 	b := p.Process.Binding
-	rev, _ := connectorAPIDigest(s.ConnectorRevision.Digest)
-	return c.RootID == s.RootID && b.InstallationID == s.InstallationID && b.ClusterID == s.ClusterID && b.IssuerEpoch == s.IssuerEpoch && c.Revision == (identity.Revision{UID: s.ConnectorRevision.UID, Generation: s.ConnectorRevision.Generation, Digest: rev}) && p.ProtectionDigest == g.attester.protection.digest && c.Deployment.Namespace == s.Namespace && c.Deployment.NamespaceUID == s.NamespaceUID && c.Deployment.ServiceAccount == s.Account && c.Deployment.AccountUID == s.AccountUID && c.Deployment.Deployment == s.Deployment && c.Deployment.DeploymentUID == s.DeploymentUID
+	return c.RootID == s.RootID && b.InstallationID == s.InstallationID && b.ClusterID == s.ClusterID && b.IssuerEpoch == s.IssuerEpoch && p.ProtectionDigest == g.attester.workload.Digest && c.Deployment.Namespace == s.Namespace && c.Deployment.ServiceAccount == s.Account && c.Deployment.Deployment == s.Deployment
 }
 
 // Read the exact objects named by the independently attested chain. Recompute
@@ -239,10 +166,7 @@ func (g *ConnectorAPIExecutionProtection) workload(ctx context.Context, p fleet.
 	if digest != p.WorkloadDigest {
 		return connectorAPIStage("workload-digest", cfg.ErrChanged)
 	}
-	if e = connectorAPITemplateMatch(&d, &rs, &pod, g.template, g.image, nil, 0); e != nil {
-		return connectorAPIStage("template", e)
-	}
-	return connectorAPIStage("inputs", g.inputs(ctx, pod.Spec))
+	return nil
 }
 
 // connectorAPIStage names the executor check that failed, for the regional
@@ -330,18 +254,10 @@ func (g *ConnectorAPIExecutionProtection) produceProof(ctx context.Context) (con
 	call, c2 := context.WithDeadline(call, until)
 	defer c2()
 	mark("process-proof")
-	if e = g.snapshot(call); e != nil {
-		return connectorAPIProof{}, stage("settings-snapshot", e)
-	}
-	mark("settings-snapshot")
 	if e = g.workload(call, proof); e != nil {
 		return connectorAPIProof{}, stage("workload", e)
 	}
 	mark("workload")
-	if e = g.snapshot(call); e != nil {
-		return connectorAPIProof{}, stage("settings-snapshot-after", e)
-	}
-	mark("settings-snapshot-after")
 	closed, e := g.attester.source.ReadConnectorIdentitySource(call)
 	if e != nil || !closed.Valid(g.attester.client.now()) || closed.Roles != open.Roles || !closed.Observation.SameSource(open.Observation) {
 		return connectorAPIProof{}, stage("source-close", cfg.ErrChanged)

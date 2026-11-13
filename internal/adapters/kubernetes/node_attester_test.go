@@ -22,9 +22,8 @@ import (
 )
 
 const (
-	nodeInstallation = "10000000-0000-4000-8000-000000000001"
-	nodeCluster      = "50000000-0000-4000-8000-000000000001"
-	nodeBoot         = "22222222-2222-4222-8222-222222222222"
+	nodeCluster = "50000000-0000-4000-8000-000000000001"
+	nodeBoot    = "22222222-2222-4222-8222-222222222222"
 )
 
 type nodeAPI struct {
@@ -44,7 +43,7 @@ func (f *nodeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case r.Method == http.MethodPost && r.URL.Path == "/apis/authentication.k8s.io/v1/tokenreviews":
 		b, _ := io.ReadAll(r.Body)
 		var in struct{ Spec struct{ Audiences []string } }
-		if json.Unmarshal(b, &in) != nil || len(in.Spec.Audiences) != 1 || in.Spec.Audiences[0] != contracts.NodeTokenAudience(nodeInstallation) {
+		if json.Unmarshal(b, &in) != nil || len(in.Spec.Audiences) != 1 || in.Spec.Audiences[0] != contracts.NodeTokenAudience(nodeCluster) {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
@@ -67,7 +66,7 @@ func (f *nodeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func goodNodeAPI() *nodeAPI {
 	return &nodeAPI{
-		review: map[string]any{"apiVersion": "authentication.k8s.io/v1", "kind": "TokenReview", "status": map[string]any{"authenticated": true, "audiences": []string{contracts.NodeTokenAudience(nodeInstallation)},
+		review: map[string]any{"apiVersion": "authentication.k8s.io/v1", "kind": "TokenReview", "status": map[string]any{"authenticated": true, "audiences": []string{contracts.NodeTokenAudience(nodeCluster)},
 			"user": map[string]any{"username": "system:serviceaccount:collector:asservat-node", "uid": "sa-uid", "extra": map[string][]string{
 				"authentication.kubernetes.io/pod-name": {"collector-abc"}, "authentication.kubernetes.io/pod-uid": {"pod-uid"},
 				"authentication.kubernetes.io/node-name": {"worker-1"}, "authentication.kubernetes.io/node-uid": {"node-uid"}}}}},
@@ -100,7 +99,7 @@ func nodeAttester(t *testing.T, api *nodeAPI) *NodeAttester {
 	if err != nil {
 		t.Fatal(err)
 	}
-	a, err := NewNodeAttester(c, nodeInstallation, "asservat-node", "asservat-node")
+	a, err := NewNodeAttester(c, "asservat-node", "asservat-node")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -166,14 +165,14 @@ func TestNodeAttesterPrecheckNeedsNoAPI(t *testing.T) {
 	api := goodNodeAPI()
 	a := nodeAttester(t, api)
 	good := func() map[string]any {
-		return map[string]any{"aud": []string{contracts.NodeTokenAudience(nodeInstallation)}, "sub": "system:serviceaccount:collector:asservat-node",
+		return map[string]any{"aud": []string{contracts.NodeTokenAudience(nodeCluster)}, "sub": "system:serviceaccount:collector:asservat-node",
 			"exp": time.Now().Add(5 * time.Minute).Unix(), "kubernetes.io": map[string]any{"pod": map[string]any{"name": "collector-abc", "uid": "pod-uid"}}}
 	}
 	if err := a.PrecheckNode(nodeJWT(good())); err != nil {
 		t.Fatal(err)
 	}
 	single := good()
-	single["aud"] = contracts.NodeTokenAudience(nodeInstallation)
+	single["aud"] = contracts.NodeTokenAudience(nodeCluster)
 	if err := a.PrecheckNode(nodeJWT(single)); err != nil {
 		t.Fatal("a single-string audience is valid JWT")
 	}

@@ -4,6 +4,7 @@ import (
 	"crypto/ed25519"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -13,6 +14,8 @@ import (
 	"time"
 
 	fleetapp "asservat.local/asservat/internal/application/fleet"
+	"asservat.local/asservat/internal/domain/artifact"
+	value "asservat.local/asservat/internal/domain/fleet"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -59,7 +62,7 @@ func TestClusterCredentialSecretCompareAndSwap(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	store, err := NewClusterCredentialSecret(client, "connector", "cluster-credential", "10000000-0000-4000-8000-000000000001")
+	store, err := NewClusterCredentialSecret(client, "connector", "cluster-credential")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,13 +79,44 @@ func TestClusterCredentialSecretCompareAndSwap(t *testing.T) {
 	if _, err = store.WriteClusterCredential(t.Context(), version, state); err == nil || api.puts != 1 {
 		t.Fatal("stale compare-and-swap accepted", err)
 	}
-	other, _ := NewClusterCredentialSecret(client, "connector", "cluster-credential", "10000000-0000-4000-8000-000000000099")
-	if _, _, err = other.ReadClusterCredential(t.Context()); err == nil {
-		t.Fatal("replaced Secret UID accepted")
-	}
 	invalid := state
 	invalid.Seed = nil
 	if _, err = store.WriteClusterCredential(t.Context(), next, invalid); err == nil || api.puts != 1 {
 		t.Fatal("invalid state written", err)
+	}
+}
+
+// The Helm-rendered Secret starts empty: reads report it, the bootstrap
+// envelope seeds it once, and a stored credential is never replaced.
+func TestClusterCredentialSecretSeedsOnlyEmptySecret(t *testing.T) {
+	api := &secretAPI{object: core.Secret{TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "Secret"}, ObjectMeta: meta.ObjectMeta{Name: "cluster-credential", Namespace: "connector", UID: types.UID("10000000-0000-4000-8000-000000000001"), ResourceVersion: "1"}}}
+	server := httptest.NewTLSServer(api)
+	defer server.Close()
+	client, err := newBoundedAPI(&rest.Config{Host: server.URL, TLSClientConfig: rest.TLSClientConfig{CAData: pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: server.Certificate().Raw})}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	store, err := NewClusterCredentialSecret(client, "connector", "cluster-credential")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err = store.ReadClusterCredential(t.Context()); !errors.Is(err, ErrClusterCredentialEmpty) {
+		t.Fatal("empty Secret not reported", err)
+	}
+	now := time.Now().UTC()
+	e := value.BootstrapEnvelope{BootstrapID: "10000000-0000-4000-8000-000000000010", Binding: value.PeerBinding{InstallationID: "10000000-0000-4000-8000-000000000011", ClusterID: "10000000-0000-4000-8000-000000000012", IssuerEpoch: "10000000-0000-4000-8000-000000000013", PeerID: "10000000-0000-4000-8000-000000000014", Role: value.ConnectorPeer},
+		DeliveryProfile: "synthetic", RequestDigest: artifact.Digest{1}, NotBefore: now.Add(-time.Minute), NotAfter: now.Add(4 * time.Minute), Secret: "synthetic-bootstrap-secret"}
+	if !e.Valid() {
+		t.Fatal("synthetic envelope invalid")
+	}
+	if err = store.SeedClusterCredential(t.Context(), e); err != nil || api.puts != 1 {
+		t.Fatal("seed", err)
+	}
+	state, _, err := store.ReadClusterCredential(t.Context())
+	if err != nil || state.Generation != 0 || state.Bootstrap == nil || state.Bootstrap.BootstrapID != e.BootstrapID {
+		t.Fatal("seeded state", err)
+	}
+	if err = store.SeedClusterCredential(t.Context(), e); err != nil || api.puts != 1 {
+		t.Fatal("a stored credential was rewritten", err)
 	}
 }

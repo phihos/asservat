@@ -12,7 +12,7 @@ func connectorObservationFixture() (ConnectorObservationPin, ConnectorObservatio
 	now := time.Date(2026, 10, 13, 12, 0, 0, 0, time.UTC)
 	id := "00000000-0000-4000-8000-000000000001"
 	b := PeerBinding{InstallationID: id, ClusterID: id, IssuerEpoch: id, PeerID: id, Role: ConnectorPeer}
-	d := ConnectorDeployment{Namespace: "connector", NamespaceUID: id, ServiceAccount: "connector", AccountUID: id, Deployment: "connector", DeploymentUID: id, ServingSlots: 2, RetainedProcesses: 8}
+	d := ConnectorDeployment{Namespace: "connector", ServiceAccount: "connector", Deployment: "connector", ServingSlots: 2, RetainedProcesses: 8}
 	p := ConnectorObservationPin{Profile: ConnectorCredentialProfile{RootID: id, Binding: b, Revision: identity.Revision{UID: id, Generation: 1, Digest: artifact.Digest{1}}, ProtectionDigest: artifact.Digest{2}, ServerName: "connector.invalid", Deployment: d, ClientIssuerRoots: [][]byte{{1}}, ServerIssuerRoots: [][]byte{{2}}}, Roles: ConnectorIdentityRoles{Source: "src", Journal: "journal", Acknowledgement: "ack", Cleanup: "clean", Verifier: "verify", Finalizer: "final"}, TemplateDigest: artifact.Digest{3}, ImageDigest: artifact.Digest{4}, ProtectionDigest: artifact.Digest{17}}
 	s := ConnectorIdentitySource{Roles: p.Roles, Observation: ConnectorCredentialObservation{Profile: p.Profile.Clone(), Backing: ConnectorBackingObservation{Revision: 1, Digest: artifact.Digest{5}, SourceDigest: artifact.Digest{6}}, ObservedAt: now, FreshUntil: now.Add(4 * time.Second)}}
 	w := ConnectorObservationWorkload{Process: ConnectorProcessIdentity{Binding: b, PodUID: id, ProcessEpoch: id}, Pod: "connector-1", ReplicaSetUID: id, TemplateDigest: p.TemplateDigest, ImageDigest: p.ImageDigest, ProtectionDigest: p.ProtectionDigest, WorkloadDigest: artifact.Digest{7}, ObservedAt: now, FreshUntil: now.Add(3 * time.Second)}
@@ -64,7 +64,7 @@ func TestConnectorObservationCompatibleRevisionDoesNotAcceptOrRenewSource(t *tes
 	for name, change := range map[string]func(*ConnectorIdentitySource){
 		"roots": func(s *ConnectorIdentitySource) { s.Observation.Profile.ClientIssuerRoots[0][0]++ },
 		"deployment": func(s *ConnectorIdentitySource) {
-			s.Observation.Profile.Deployment.DeploymentUID = "00000000-0000-4000-8000-000000000002"
+			s.Observation.Profile.Deployment.Deployment = "replacement"
 		},
 		"roles":          func(s *ConnectorIdentitySource) { s.Roles.Source = "new_source" },
 		"serving-budget": func(s *ConnectorIdentitySource) { s.Observation.Profile.Deployment.ServingSlots++ },

@@ -8,18 +8,19 @@ import (
 	"time"
 )
 
-// ConnectorDeployment is independently protected installation configuration.
+// ConnectorDeployment names the Helm-rendered connector workload. Objects are
+// matched by name under RBAC; the platform keeps UIDs (helm-native plan).
 // ServingSlots permits a bounded rolling overlap. RetainedProcesses counts all
 // pending, uncertain and replaced children until separately verified retirement.
 type ConnectorDeployment struct {
-	Namespace, NamespaceUID         string
-	ServiceAccount, AccountUID      string
-	Deployment, DeploymentUID       string
+	Namespace                       string
+	ServiceAccount                  string
+	Deployment                      string
 	ServingSlots, RetainedProcesses int
 }
 
 func (p ConnectorDeployment) Valid() bool {
-	return !strings.Contains(p.Namespace, ".") && connectorDNSName(p.Namespace) && len(p.Namespace) <= 63 && authorization.UUID(p.NamespaceUID) && connectorDNSName(p.ServiceAccount) && authorization.UUID(p.AccountUID) && connectorDNSName(p.Deployment) && authorization.UUID(p.DeploymentUID) && p.ServingSlots >= 1 && p.ServingSlots <= 16 && p.RetainedProcesses >= p.ServingSlots+1 && p.RetainedProcesses <= 256
+	return !strings.Contains(p.Namespace, ".") && connectorDNSName(p.Namespace) && len(p.Namespace) <= 63 && connectorDNSName(p.ServiceAccount) && connectorDNSName(p.Deployment) && p.ServingSlots >= 1 && p.ServingSlots <= 16 && p.RetainedProcesses >= p.ServingSlots+1 && p.RetainedProcesses <= 256
 }
 
 // ConnectorProcessIdentity is not a new logical peer/account. The Pod and epoch

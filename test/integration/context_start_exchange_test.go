@@ -246,7 +246,7 @@ func newRegionalAPIStartFixture(t *testing.T, ctx context.Context, f fixture, n 
 		t.Fatal("real local process before standby", e)
 	}
 	b := observed.Binding
-	profile := fleet.ConnectorCredentialProfile{RootID: s.a.RootID, Binding: fleet.PeerBinding{InstallationID: pool.InstallationID, ClusterID: b.ClusterID, IssuerEpoch: pool.IssuerEpoch, PeerID: custodyID(), Role: fleet.ConnectorPeer}, Revision: identity.Revision{UID: custodyID(), Generation: 1, Digest: artifact.Digest{23}}, ProtectionDigest: artifact.Digest{24}, ServerName: "regional.fixture.invalid", Deployment: fleet.ConnectorDeployment{Namespace: n.control.Name, NamespaceUID: b.NamespaceUID, ServiceAccount: n.plan.Account, AccountUID: b.AccountUID, Deployment: "synthetic-connector", DeploymentUID: custodyID(), ServingSlots: 1, RetainedProcesses: 2}, ClientIssuerRoots: [][]byte{clientCA.Raw}, ServerIssuerRoots: [][]byte{serverCA.Raw}}
+	profile := fleet.ConnectorCredentialProfile{RootID: s.a.RootID, Binding: fleet.PeerBinding{InstallationID: pool.InstallationID, ClusterID: b.ClusterID, IssuerEpoch: pool.IssuerEpoch, PeerID: custodyID(), Role: fleet.ConnectorPeer}, Revision: identity.Revision{UID: custodyID(), Generation: 1, Digest: artifact.Digest{23}}, ProtectionDigest: artifact.Digest{24}, ServerName: "regional.fixture.invalid", Deployment: fleet.ConnectorDeployment{Namespace: n.control.Name, ServiceAccount: n.plan.Account, Deployment: "synthetic-connector", ServingSlots: 1, RetainedProcesses: 2}, ClientIssuerRoots: [][]byte{clientCA.Raw}, ServerIssuerRoots: [][]byte{serverCA.Raw}}
 	source := &contextStartConnectorFixture{profile: profile, clientCA: clientCA, serverCA: serverCA, clientKey: clientKey, serverKey: serverKey, issued: map[string]fleet.IssuedConnectorCredential{}, origins: map[artifact.Digest]fleet.ConnectorProcessIdentity{}}
 	source.proof = contextStartTestProof(func(c context.Context, r fleet.ConnectorProcessRequest) (fleet.ConnectorProcessProof, error) {
 		started := time.Now().UTC()
@@ -267,7 +267,7 @@ func newRegionalAPIStartFixture(t *testing.T, ctx context.Context, f fixture, n 
 			return fleet.ConnectorProcessProof{}, e
 		}
 		until := identity.Earlier(started.Add(5*time.Second), identity.Earlier(p.ValidUntil, config.Observation.FreshUntil))
-		return fleet.ConnectorProcessProof{Process: r.Process, Configuration: config.Observation, Pod: n.pod.Name, ReplicaSet: "synthetic-connector-rs", ReplicaSetUID: profile.Deployment.DeploymentUID, ClientKeyDigest: client, ServerKeyDigest: server, TokenDigest: artifact.Digest{25}, WorkloadDigest: artifact.Digest{26}, ProtectionDigest: artifact.Digest{27}, ObservedAt: started, FreshUntil: until}, nil
+		return fleet.ConnectorProcessProof{Process: r.Process, Configuration: config.Observation, Pod: n.pod.Name, ReplicaSet: "synthetic-connector-rs", ReplicaSetUID: "70000000-0000-4000-8000-000000000071", ClientKeyDigest: client, ServerKeyDigest: server, TokenDigest: artifact.Digest{25}, WorkloadDigest: artifact.Digest{26}, ProtectionDigest: artifact.Digest{27}, ObservedAt: started, FreshUntil: until}, nil
 	})
 	connector, e := mtls.NewConnectorProcessCredentials(ctx, profile, b.PodUID, source, source, source, source, time.Now)
 	if e != nil {

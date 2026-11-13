@@ -39,36 +39,11 @@ func TestObservationOperationPortsKeepConcreteNativeBrackets(t *testing.T) {
 			t.Fatal("final bracket repeated")
 		}
 	})
-	t.Run("regional", func(t *testing.T) {
-		f := newConnectorOperationFixture(t)
-		ctx, cancel := context.WithDeadline(context.Background(), f.base.start.Add(5*time.Second))
-		defer cancel()
-		r := value.OwnerObservationRequest{RootID: f.reader.pin.Profile.RootID, ID: ownerID(80), Challenge: ownerID(81), RequestedAt: f.base.start, NotAfter: f.base.start.Add(5 * time.Second)}
-		var reader app.ConnectorNativeObservationOperations = f.reader
-		op, err := reader.OpenConnectorObservationOperation(ctx, r, f.process)
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer op.Close()
-		for ordinal := 1; ordinal <= 4; ordinal++ {
-			v, err := op.Read(ctx, ordinal)
-			if err != nil || !v.Matches(f.reader.pin, r, ordinal, f.base.start) || v.Final != (ordinal == 4) {
-				t.Fatal("source phase/observation lost", ordinal, err)
-			}
-		}
-		if f.gets.Load() != 4 || f.reviews.Load() != 4 {
-			t.Fatal("four real values without guard probe reads changed", f.gets.Load(), f.reviews.Load())
-		}
-	})
 }
 
 func TestObservationOperationPortsInvalidOpenReturnsNil(t *testing.T) {
 	var owner *OwnerObservationOperationReader
-	var connector *ConnectorObservationOperationReader
 	if op, err := owner.OpenOwnerObservationOperation(context.Background(), value.OwnerObservationRequest{}, nil); err == nil || op != nil {
 		t.Fatal("invalid owner open returned typed nil operation")
-	}
-	if op, err := connector.OpenConnectorObservationOperation(context.Background(), value.OwnerObservationRequest{}, value.ConnectorProcessIdentity{}); err == nil || op != nil {
-		t.Fatal("invalid connector open returned typed nil operation")
 	}
 }

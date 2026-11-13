@@ -2,15 +2,16 @@ package kubernetes
 
 import (
 	app "asservat.local/asservat/internal/application/fleet"
+	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/audit"
 	value "asservat.local/asservat/internal/domain/fleet"
 	"context"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"strings"
-	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -22,7 +23,7 @@ func TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority(t *testing.T) {
 	for _, mode := range []string{"valid", "suspended", "retiring", "retiring-live", "missing-retiring", "missing-overdue", "missing-backing", "unknown-backing", "missing-budget", "public-layout", "short-backing", "unknown", "missing-suspended", "duplicate", "trailing", "foreign-root", "foreign-cluster", "foreign-peer", "invalid-role", "same-role", "empty-roots", "wrong-root", "wildcard", "ip-name", "mixed-case-name"} {
 		t.Run(mode, func(t *testing.T) {
 			roles := map[string]any{"source": "connector_source", "journal": "connector_journal", "acknowledgement": "connector_ack", "cleanup": "connector_cleanup", "verifier": "connector_verifier", "finalizer": "connector_finalizer"}
-			wire := map[string]any{"format": "asservat-connector-identity/v1", "rootID": ownerID(5), "installationID": binding.InstallationID, "clusterID": binding.ClusterID, "issuerEpoch": binding.IssuerEpoch, "peerID": binding.PeerID, "revision": 1, "retiring": false, "suspended": false, "serverName": "connector.example.invalid", "clientIssuerRoots": []string{root}, "serverIssuerRoots": []string{root}, "roles": roles, "backing": connectorTestBacking(now, binding), "deployment": map[string]any{"namespace": "owners", "namespaceUID": ownerID(6), "serviceAccount": "connector", "accountUID": ownerID(12), "deployment": "connector", "deploymentUID": ownerID(13), "servingSlots": 2, "retainedProcesses": 8}}
+			wire := map[string]any{"format": "asservat-connector-identity/v1", "rootID": ownerID(5), "installationID": binding.InstallationID, "clusterID": binding.ClusterID, "issuerEpoch": binding.IssuerEpoch, "peerID": binding.PeerID, "revision": 1, "retiring": false, "suspended": false, "serverName": "connector.example.invalid", "clientIssuerRoots": []string{root}, "serverIssuerRoots": []string{root}, "roles": roles, "backing": connectorTestBacking(now, binding), "deployment": map[string]any{"namespace": "owners", "serviceAccount": "connector", "deployment": "connector", "servingSlots": 2, "retainedProcesses": 8}}
 			switch mode {
 			case "retiring":
 				wire["retiring"], wire["suspended"] = true, true
@@ -91,20 +92,8 @@ func TestConnectorIdentitySnapshotIsClosedPinnedAndNotAuthority(t *testing.T) {
 			if mode == "trailing" {
 				text += "{}"
 			}
-			fixture := newPermissionFixture(t, func(w http.ResponseWriter, r *http.Request) bool {
-				switch r.URL.Path {
-				case "/api/v1/namespaces/" + permissionControl.Name:
-					permissionReply(w, permissionNamespace(permissionControl.Name, ownerID(6)))
-					return true
-				case "/api/v1/namespaces/" + permissionControl.Name + "/configmaps/connector-identity":
-					permissionReply(w, map[string]any{"apiVersion": "v1", "kind": "ConfigMap", "metadata": map[string]any{"name": "connector-identity", "namespace": permissionControl.Name, "uid": ownerID(7), "resourceVersion": "1"}, "data": map[string]string{"connector-identity.json": text}})
-					return true
-				}
-				return false
-			})
-			fixture.client.control.UID = ownerID(6)
-			source := &ConnectorIdentitySource{client: fixture.client, name: "connector-identity", uid: ownerID(7), installation: binding.InstallationID, root: ownerID(5), binding: binding}
-			got, until, e := source.snapshot(context.Background())
+			config, until, e := DecodeConnectorIdentityConfiguration([]byte(text), ownerID(7), ownerID(5), binding, now)
+			got := config.Source
 			if mode != "valid" && mode != "suspended" && mode != "retiring" {
 				if e == nil {
 					t.Fatal("invalid source accepted")
@@ -138,26 +127,13 @@ func TestConnectorBackingOnlyEditPreservesBehavioralProcessIdentity(t *testing.T
 	root := base64.StdEncoding.EncodeToString(ownerConfigurationTestRoot(t, now))
 	binding := value.PeerBinding{InstallationID: ownerID(1), ClusterID: ownerID(2), IssuerEpoch: ownerID(3), PeerID: ownerID(4), Role: value.ConnectorPeer}
 	backing := connectorTestBacking(now, binding)
-	wire := map[string]any{"format": "asservat-connector-identity/v1", "rootID": ownerID(5), "installationID": binding.InstallationID, "clusterID": binding.ClusterID, "issuerEpoch": binding.IssuerEpoch, "peerID": binding.PeerID, "revision": 1, "retiring": false, "suspended": false, "serverName": "connector.example.invalid", "clientIssuerRoots": []string{root}, "serverIssuerRoots": []string{root}, "roles": map[string]any{"source": "connector_source", "journal": "connector_journal", "acknowledgement": "connector_ack", "cleanup": "connector_cleanup", "verifier": "connector_verifier", "finalizer": "connector_finalizer"}, "backing": backing, "deployment": map[string]any{"namespace": "owners", "namespaceUID": ownerID(6), "serviceAccount": "connector", "accountUID": ownerID(12), "deployment": "connector", "deploymentUID": ownerID(13), "servingSlots": 2, "retainedProcesses": 8}}
-	var body atomic.Value
-	var version atomic.Value
-	version.Store("1")
-	raw, _ := json.Marshal(wire)
-	body.Store(string(raw))
-	fixture := newPermissionFixture(t, func(w http.ResponseWriter, r *http.Request) bool {
-		switch r.URL.Path {
-		case "/api/v1/namespaces/" + permissionControl.Name:
-			permissionReply(w, permissionNamespace(permissionControl.Name, ownerID(6)))
-			return true
-		case "/api/v1/namespaces/" + permissionControl.Name + "/configmaps/connector-identity":
-			permissionReply(w, map[string]any{"apiVersion": "v1", "kind": "ConfigMap", "metadata": map[string]any{"name": "connector-identity", "namespace": permissionControl.Name, "uid": ownerID(7), "resourceVersion": version.Load().(string)}, "data": map[string]string{"connector-identity.json": body.Load().(string)}})
-			return true
-		}
-		return false
-	})
-	fixture.client.control.UID = ownerID(6)
-	source := &ConnectorIdentitySource{client: fixture.client, name: "connector-identity", uid: ownerID(7), installation: binding.InstallationID, root: ownerID(5), binding: binding}
-	first, _, err := source.snapshotConfiguration(context.Background())
+	wire := map[string]any{"format": "asservat-connector-identity/v1", "rootID": ownerID(5), "installationID": binding.InstallationID, "clusterID": binding.ClusterID, "issuerEpoch": binding.IssuerEpoch, "peerID": binding.PeerID, "revision": 1, "retiring": false, "suspended": false, "serverName": "connector.example.invalid", "clientIssuerRoots": []string{root}, "serverIssuerRoots": []string{root}, "roles": map[string]any{"source": "connector_source", "journal": "connector_journal", "acknowledgement": "connector_ack", "cleanup": "connector_cleanup", "verifier": "connector_verifier", "finalizer": "connector_finalizer"}, "backing": backing, "deployment": map[string]any{"namespace": "owners", "serviceAccount": "connector", "deployment": "connector", "servingSlots": 2, "retainedProcesses": 8}}
+	decode := func() (app.ConnectorIdentityConfiguration, error) {
+		raw, _ := json.Marshal(wire)
+		c, _, err := DecodeConnectorIdentityConfiguration(raw, ownerID(7), ownerID(5), binding, now)
+		return c, err
+	}
+	first, err := decode()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -165,10 +141,7 @@ func TestConnectorBackingOnlyEditPreservesBehavioralProcessIdentity(t *testing.T
 	backing.Policy.ValidUntil = backing.Policy.ValidUntil.Add(time.Hour)
 	backing.Policy.PolicyDigest[0]++
 	wire["backing"] = backing
-	version.Store("2")
-	raw, _ = json.Marshal(wire)
-	body.Store(string(raw))
-	renewed, _, err := source.snapshotConfiguration(context.Background())
+	renewed, err := decode()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -182,15 +155,44 @@ func TestConnectorBackingOnlyEditPreservesBehavioralProcessIdentity(t *testing.T
 		t.Fatal("complete protected backing change lost")
 	}
 	wire["roles"].(map[string]any)["verifier"] = "changed_verifier"
-	version.Store("3")
 	wire["serverName"] = "changed.example.invalid"
-	raw, _ = json.Marshal(wire)
-	body.Store(string(raw))
-	changed, _, err := source.snapshotConfiguration(context.Background())
+	changed, err := decode()
 	if err != nil {
 		t.Fatal(err)
 	}
 	if changed.Source.Observation.Profile.Revision.Digest == first.Source.Observation.Profile.Revision.Digest {
 		t.Fatal("behavioral mutation did not change the scope digest")
+	}
+}
+
+// The connector and the hub derive the same document, source UID and
+// deterministic protection digest from the same public inputs.
+func TestConnectorCatalogPeerMatchesServedSource(t *testing.T) {
+	fixture := newPermissionFixture(t, func(http.ResponseWriter, *http.Request) bool { return false })
+	now := fixture.client.now()
+	binding := value.PeerBinding{InstallationID: ownerID(1), ClusterID: permissionCluster, IssuerEpoch: ownerID(3), PeerID: ownerID(4), Role: value.ConnectorPeer}
+	backing, _ := json.Marshal(connectorTestBacking(now, binding))
+	offer := contracts.RegionalOffer{Format: contracts.RegionalOfferFormat, InstallationID: binding.InstallationID, PermissionRootID: ownerID(5), IssuerEpoch: binding.IssuerEpoch, ConnectorServerSuffix: "connectors.example.invalid", ConnectorIssuerRoots: [][]byte{ownerConfigurationTestRoot(t, now)},
+		Roles: contracts.ConnectorIdentityRoles{Source: "connector_source", Journal: "connector_journal", Acknowledgement: "connector_ack", Cleanup: "connector_cleanup", Verifier: "connector_verifier", Finalizer: "connector_finalizer"}, ConnectorBacking: backing}
+	d := contracts.ConnectorDeployment{Namespace: permissionControl.Name, ServiceAccount: "connector", Deployment: "connector", ServingSlots: contracts.RegionalServingSlots, RetainedProcesses: contracts.RegionalRetainedProcesses}
+	doc, err := ConnectorIdentityDocument(offer, binding.ClusterID, binding.PeerID, d)
+	if err != nil {
+		t.Fatal(err)
+	}
+	peer, err := ConnectorCatalogPeer(offer, binding.ClusterID, binding.PeerID, d)
+	if err != nil || string(peer.Source) != string(doc) || peer.SourceUID != binding.PeerID {
+		t.Fatal("catalog peer", err)
+	}
+	source, err := NewConnectorIdentitySource(fixture.client, doc, offer.PermissionRootID, binding)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := source.ReadConnectorIdentityConfiguration(context.Background())
+	digest := ConnectorSourceDigest(binding.ClusterID, permissionControl.Name, RegionalSource)
+	if err != nil || got.Source.Observation.Profile.ProtectionDigest != digest || hex.EncodeToString(digest[:]) != peer.ProtectionDigest || !got.Source.Observation.Profile.Valid() {
+		t.Fatal("served source differs from the catalog pin", err)
+	}
+	if !got.Source.Observation.FreshUntil.After(got.Source.Observation.ObservedAt) || got.Source.Observation.FreshUntil.After(got.Source.Observation.ObservedAt.Add(5*time.Second)) {
+		t.Fatal("observation window")
 	}
 }

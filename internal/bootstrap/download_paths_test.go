@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	app "asservat.local/asservat/internal/application/capacity"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/privacy"
@@ -66,13 +65,6 @@ func TestDownloadPathsDerivedIdenticallyByHubAPIAndCapacity(t *testing.T) {
 	if _, ok := x[pinned.ID]; !ok {
 		t.Fatal("pinned path dropped")
 	}
-	// The join derives the same path for the joined cluster.
-	owner := contracts.OwnerDeployment{InstallationID: installation, ClusterID: hub, PermissionRootID: pathID(5),
-		Public: &contracts.OwnerPublicDeployment{DownloadEnvironment: contracts.OwnerPublicEnvironment{Source: contracts.WorkerObjectReference{Name: "synthetic-download-environment", UID: pathID(6)}, Paths: []contracts.DownloadEnvironmentPath{}, PathTemplate: &tmpl}}}
-	joined, err := regionalJoinDownloads(owner, contracts.OwnerPublicCluster{ClusterID: a})
-	if err != nil || joined == nil || joined.Path.ID != contracts.DownloadPathFor(installation, tmpl, a).ID || x[joined.Path.ID].ID != joined.Path.ID {
-		t.Fatal("join path differs from the derived path", err)
-	}
 }
 
 // Without a template the pinned paths are used as before and no target adds
@@ -93,10 +85,6 @@ func TestDownloadPathsWithoutTemplateAreUnchanged(t *testing.T) {
 	}
 	if _, err := downloadEnvironmentPaths(installation, hub, nil, nil, nil); err == nil {
 		t.Fatal("missing pinned paths accepted")
-	}
-	owner := contracts.OwnerDeployment{InstallationID: installation, ClusterID: hub, Public: &contracts.OwnerPublicDeployment{}}
-	if d, err := regionalJoinDownloads(owner, contracts.OwnerPublicCluster{ClusterID: pathID(4), Capacity: &contracts.OwnerPublicClusterCapacity{}}); err != nil || d != nil {
-		t.Fatal("a join without a template adds a path", err)
 	}
 }
 
@@ -130,11 +118,6 @@ func TestDownloadPathTemplateRejects(t *testing.T) {
 					t.Fatal("invalid template accepted", targets)
 				}
 			}
-			owner := contracts.OwnerDeployment{InstallationID: installation, ClusterID: hub, PermissionRootID: pathID(5),
-				Public: &contracts.OwnerPublicDeployment{DownloadEnvironment: contracts.OwnerPublicEnvironment{Source: contracts.WorkerObjectReference{Name: "synthetic-download-environment", UID: pathID(6)}, Paths: []contracts.DownloadEnvironmentPath{}, PathTemplate: &tmpl}}}
-			if _, err := regionalJoinDownloads(owner, contracts.OwnerPublicCluster{ClusterID: target}); err == nil {
-				t.Fatal("join accepted an invalid template")
-			}
 		})
 	}
 	tmpl := syntheticPathTemplate(hub)
@@ -161,29 +144,5 @@ func TestDownloadPathTemplateRejects(t *testing.T) {
 	}
 	if _, err := downloadEnvironmentPaths(installation, hub, []contracts.DownloadEnvironmentPath{}, &tmpl, many); err == nil {
 		t.Fatal("more than 32 paths accepted")
-	}
-}
-
-// The join adds the path to the hub-api's source always and to the capacity
-// processing source only with a capacity section, the clusters the capacity
-// hub-worker derives paths for.
-func TestRegionalJoinDownloadSources(t *testing.T) {
-	installation, hub, cluster := pathID(1), pathID(2), pathID(3)
-	tmpl := syntheticPathTemplate(hub)
-	source := contracts.WorkerObjectReference{Name: "synthetic-download-environment", UID: pathID(6)}
-	owner := contracts.OwnerDeployment{InstallationID: installation, ClusterID: hub, PermissionRootID: pathID(5),
-		Public: &contracts.OwnerPublicDeployment{DownloadEnvironment: contracts.OwnerPublicEnvironment{Source: source, Paths: []contracts.DownloadEnvironmentPath{}, PathTemplate: &tmpl}}}
-	_, _, _, processing, _ := kube.CapacitySourceNames(installation)
-	plain, err := regionalJoinDownloads(owner, contracts.OwnerPublicCluster{ClusterID: cluster})
-	if err != nil || plain.RootID != owner.PermissionRootID || plain.Path != contracts.DownloadPathFor(installation, tmpl, cluster) || !slices.Equal(plain.Sources, []contracts.WorkerObjectReference{source}) {
-		t.Fatal("join without capacity", err, plain)
-	}
-	withCapacity, err := regionalJoinDownloads(owner, contracts.OwnerPublicCluster{ClusterID: cluster, Capacity: &contracts.OwnerPublicClusterCapacity{}})
-	if err != nil || withCapacity.Path != plain.Path || !slices.Equal(withCapacity.Sources, []contracts.WorkerObjectReference{source, {Name: processing}}) {
-		t.Fatal("join with capacity", err, withCapacity)
-	}
-	owner.Public.DownloadEnvironment.Source = contracts.WorkerObjectReference{}
-	if _, err = regionalJoinDownloads(owner, contracts.OwnerPublicCluster{ClusterID: cluster}); err == nil {
-		t.Fatal("template without a pinned download environment accepted")
 	}
 }

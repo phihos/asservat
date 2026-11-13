@@ -96,7 +96,7 @@ func TestConnectorProcessEnrollmentRequiresCurrentProofAndBothAuditAcknowledgeme
 		"controller changes after intent": func(f *connectorProcessFixture) {
 			f.proofHook = func(f *connectorProcessFixture) {
 				if f.proofReads == 2 {
-					f.profile.Deployment.DeploymentUID = "20000000-0000-4000-8000-000000000001"
+					f.profile.Deployment.Deployment = "replacement"
 				}
 			}
 		},

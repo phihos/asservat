@@ -131,7 +131,7 @@ func TestConnectorProcessAuditDoesNotInventTLSOrHumanActor(t *testing.T) {
 	in.Peer = nil
 	in.Name = "connector_process_enrollment"
 	in.InputFormat = "connector-process/v1"
-	in.Process = &OperationConnectorProcessActor{Process: fleet.ConnectorProcessIdentity{Binding: b, PodUID: b.PeerID, ProcessEpoch: in.ID}, Deployment: fleet.ConnectorDeployment{Namespace: "connector", NamespaceUID: b.InstallationID, ServiceAccount: "connector", AccountUID: b.ClusterID, Deployment: "connector", DeploymentUID: b.PeerID, ServingSlots: 2, RetainedProcesses: 4}, ClientKeyDigest: artifact.Digest{1}, ServerKeyDigest: artifact.Digest{2}}
+	in.Process = &OperationConnectorProcessActor{Process: fleet.ConnectorProcessIdentity{Binding: b, PodUID: b.PeerID, ProcessEpoch: in.ID}, Deployment: fleet.ConnectorDeployment{Namespace: "connector", ServiceAccount: "connector", Deployment: "connector", ServingSlots: 2, RetainedProcesses: 4}, ClientKeyDigest: artifact.Digest{1}, ServerKeyDigest: artifact.Digest{2}}
 	if !in.Valid() {
 		t.Fatal("explicit initial process actor rejected")
 	}

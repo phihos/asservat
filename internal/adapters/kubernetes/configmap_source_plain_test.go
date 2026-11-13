@@ -2,14 +2,12 @@ package kubernetes
 
 import (
 	"context"
-	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"strings"
 	"testing"
 	"time"
 
-	compiler "asservat.local/asservat/internal/application/planning"
 	"asservat.local/asservat/internal/contracts"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 )
@@ -61,16 +59,9 @@ func TestRuntimeSourcesArePlainReadsWithoutAdmissionGuards(t *testing.T) {
 		"image":          "synthetic.invalid/worker@sha256:" + strings.Repeat("1", 64), "imagePullSecrets": []string{},
 		"cpuMillis": 100, "memoryBytes": 64 << 20, "maxRuntimeSeconds": 60,
 	})
-	id, digest, projection := ownerID(1), strings.Repeat("a", 64), compiler.ProjectionDigest()
-	settings := contracts.ConnectorAPIContextSettings{Format: contracts.ConnectorAPIContextFormat, RootID: id, InstallationID: id, ClusterID: id, IssuerEpoch: id, ConnectorRevision: contracts.APIContextRevision{UID: id, Generation: 1, Digest: digest}, Namespace: "asservat-connector", NamespaceUID: id, Account: "connector", AccountUID: id, Deployment: "connector", DeploymentUID: id, ImageDigest: digest, TemplateDigest: digest, ProjectionDigest: hex.EncodeToString(projection[:]), WorkloadProtectionDigest: digest, CapacityAccount: "capacity", CapacityAccountUID: ownerID(2), Inputs: []contracts.ConnectorAPIInput{}, StartGuard: contracts.ConnectorAPIStartGuard{Name: "start", PolicyUID: id, PolicyGeneration: 1, BindingUID: id, BindingResourceVersion: "1"}}
-	encoded, err := contracts.EncodeConnectorAPIContextSettings(settings)
-	if err != nil {
-		t.Fatal(err)
-	}
 	observer, probe := plainSourceClients(t, map[string]map[string]any{
-		"cluster-catalog":       plainSourceObject("cluster-catalog", catalogUID, false, map[string]string{contracts.OwnerClusterCatalogFile: `{"format":"` + contracts.OwnerClusterCatalogFormat + `","clusters":[]}`}),
-		"worker-profile":        plainSourceObject("worker-profile", workerUID, false, map[string]string{"worker-profile.json": string(worker)}),
-		"connector-api-context": plainSourceObject("connector-api-context", settingsUID, true, map[string]string{"connector-api-context.json": string(encoded)}),
+		"cluster-catalog": plainSourceObject("cluster-catalog", catalogUID, false, map[string]string{contracts.OwnerClusterCatalogFile: `{"format":"` + contracts.OwnerClusterCatalogFormat + `","clusters":[]}`}),
+		"worker-profile":  plainSourceObject("worker-profile", workerUID, false, map[string]string{"worker-profile.json": string(worker)}),
 	})
 
 	t.Run("cluster-catalog", func(t *testing.T) {
@@ -99,16 +90,6 @@ func TestRuntimeSourcesArePlainReadsWithoutAdmissionGuards(t *testing.T) {
 		o, err := s.ReadWorkerConfiguration(context.Background())
 		if err != nil || o.Configuration.ProtectionDigest != g.digest || !o.FreshUntil.Equal(start.Add(5*time.Second)) {
 			t.Fatal("plain worker configuration read lost its digest or original window", err)
-		}
-	})
-	t.Run("connector-api-settings", func(t *testing.T) {
-		g, err := NewConnectorAPISettingsProtection(observer, probe, plainSourcePlan("connector-api-context"), plainSourcePin)
-		if err != nil {
-			t.Fatal(err)
-		}
-		got, uid, rv, err := g.ReadSettings(context.Background())
-		if err != nil || uid != settingsUID || rv != "1" || got.Deployment != settings.Deployment {
-			t.Fatal("plain settings read", err)
 		}
 	})
 }
