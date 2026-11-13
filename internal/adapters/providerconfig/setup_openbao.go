@@ -165,6 +165,13 @@ func openBaoSetupPlanFor(in OpenBaoSetupInput) (openBaoSetupPlan, error) {
 		}
 		return out
 	}
+	// read adds the public key read a signer needs to publish its keys.
+	read := func(paths map[string][]string, more ...string) map[string][]string {
+		for _, path := range more {
+			paths[path] = []string{"read"}
+		}
+		return paths
+	}
 	cfgMount, ownerMount := contracts.SmallOpenBaoConfigurationAuthMount, contracts.SmallOpenBaoOwnerAuthMount
 	worker := func(purpose string, paths map[string][]string) openBaoRole {
 		return openBaoRole{"hub-worker", purpose, cfgMount, contracts.ConfigurationProviderAudience(in.InstallationID, in.ClusterID), contracts.ConfigurationProviderTokenTTLSeconds, contracts.ConfigurationProviderTokenMaxTTLSeconds, paths}
@@ -178,13 +185,13 @@ func openBaoSetupPlanFor(in OpenBaoSetupInput) (openBaoSetupPlan, error) {
 	publisher := contracts.PublisherProviderAudience(in.InstallationID, in.ClusterID)
 	channel := map[string][]string{contracts.SmallOpenBaoBootstrapMount + "/data/" + contracts.OwnerFleetChannelPrefix + "/" + in.InstallationID + "/*": {"create", "read"}}
 	p.roles = []openBaoRole{
-		worker("audit-wrap", use(encrypt, key(audit, n.WorkerConfigurationAuditKey, "encrypt"), sign)),
+		worker("audit-wrap", read(use(encrypt, key(audit, n.WorkerConfigurationAuditKey, "encrypt"), sign), audit+"/keys/"+n.DeletionSigningKey)),
 		worker("audit-unwrap", use(decrypt, key(audit, n.WorkerConfigurationAuditKey, "decrypt"))),
-		worker("cleanup-wrap", use(encrypt)), worker("cleanup-open", use(decrypt)), worker("cleanup-verify", use(decrypt)), worker("cleanup-sign", use(sign)),
+		worker("cleanup-wrap", use(encrypt)), worker("cleanup-open", use(decrypt)), worker("cleanup-verify", use(decrypt)), worker("cleanup-sign", read(use(sign), audit+"/keys/"+n.DeletionSigningKey)),
 		owner("hub-api", hub, "audit-wrap", use(encrypt)), owner("hub-api", hub, "audit-unwrap", use(decrypt)),
 		owner("hub-api", hub, "server-sign", use(ownerPKI+"/sign/"+n.OwnerServerRole)), owner("hub-api", hub, "client-sign", use(ownerPKI+"/sign/"+n.OwnerClientRole)),
 		owner("hub-api", hub, "browser-seal", use(key(transit, n.BrowserSessionKey, "encrypt"))), owner("hub-api", hub, "browser-open", use(key(transit, n.BrowserSessionKey, "decrypt"))),
-		owner("hub-api", hub, "work-sign", use(key(transit, n.WorkSigningKey, "sign"))), owner("hub-api", hub, "worker-issue", use(workerPKI+"/sign/"+n.DownloadWorkerRole)),
+		owner("hub-api", hub, "work-sign", read(use(key(transit, n.WorkSigningKey, "sign")), transit+"/keys/"+n.WorkSigningKey)), owner("hub-api", hub, "worker-issue", use(workerPKI+"/sign/"+n.DownloadWorkerRole)),
 		owner("hub-api", hub, OwnerFleetProviderPurpose, channel),
 		owner("federation", federation, "audit-wrap", use(key(audit, n.FederationAuditKey, "encrypt"))), owner("federation", federation, "audit-unwrap", use(key(audit, n.FederationAuditKey, "decrypt"))),
 		owner("federation", federation, "client-sign", use(connectorPKI+"/sign/"+n.ConnectorClientRole)), owner("federation", federation, "server-sign", use(connectorPKI+"/sign/"+n.ConnectorServerRole)),
