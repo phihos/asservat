@@ -22,10 +22,10 @@ import (
 func configurationSigningFixture(t *testing.T, selected bool) (*InstalledConfigurationProviderEffects, contracts.OwnerPublicTransit, ed25519.PublicKey, *int) {
 	t.Helper()
 	var signing contracts.OwnerPublicTransit
-	f, in, profile := configurationControlFixture(t, "audit-wrap", func(in contracts.HubWorkerDeployment, s *contracts.ConfigurationProviderSelection) {
-		signing = contracts.OwnerPublicTransit{Mount: in.KeyService.AuditMount, Key: contracts.ContextDeletionSigningKeyName(in.InstallationID)}
+	f, in := configurationControlFixture(t, "audit-wrap", func(in *ConfigurationProviderInput) {
+		signing = contracts.OwnerPublicTransit{Mount: in.AuditMount, Key: contracts.ContextDeletionSigningKeyName(in.InstallationID)}
 		if selected {
-			s.ContextDeletionSigning = signing
+			in.ContextDeletionSigning = signing
 		}
 	})
 	public, private, err := ed25519.GenerateKey(rand.Reader)
@@ -61,7 +61,7 @@ func configurationSigningFixture(t *testing.T, selected bool) (*InstalledConfigu
 		_ = json.NewEncoder(w).Encode(map[string]any{"data": map[string]string{"signature": "vault:v1:" + base64.StdEncoding.EncodeToString(ed25519.Sign(private, input))}})
 	})
 	root, cancel := context.WithCancel(context.Background())
-	effects, err := newConfigurationProviderEffects(root, in, profile,
+	effects, err := newConfigurationProviderEffects(root, in,
 		func(context.Context) ([]byte, error) {
 			return ownerProviderTestJWT(time.Now().Add(600 * time.Second)), nil
 		},
@@ -70,7 +70,6 @@ func configurationSigningFixture(t *testing.T, selected bool) (*InstalledConfigu
 		cancel()
 		t.Fatal(err)
 	}
-	in.ProviderAuthentication = &profile
 	s := &InstalledConfigurationProviderEffects{input: in, effects: effects, root: root, cancel: cancel, closeDone: make(chan struct{})}
 	t.Cleanup(func() { _ = s.CloseAndJoin(context.Background()) })
 	return s, signing, public, signs
@@ -117,7 +116,7 @@ func TestConfigurationProviderSignsContextDeletionThroughAuditWrap(t *testing.T)
 		version    int
 		public     ed25519.PublicKey
 	}{
-		"configuration-audit-key": {s.input.KeyService.AuditMount, s.input.KeyService.AuditKey, 1, public},
+		"configuration-audit-key": {s.input.AuditMount, s.input.AuditKey, 1, public},
 		"unselected-key":          {signing.Mount, "other", 1, public},
 		"other-mount":             {"other", signing.Key, 1, public},
 		"path-mount":              {signing.Mount + "/sign", signing.Key, 1, public},

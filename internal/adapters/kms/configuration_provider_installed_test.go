@@ -12,7 +12,7 @@ import (
 // The synthetic legacy proof is invoked directly under a real native borrow;
 // the fresh Run path is separately required never to fall back to this hook.
 func TestConfigurationProviderCloseRetainsBlockedControlOwnership(t *testing.T) {
-	f, in, profile := configurationControlFixture(t, "audit-wrap")
+	f, in := configurationControlFixture(t, "audit-wrap")
 	root, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	entered, release := make(chan struct{}), make(chan struct{})
@@ -23,7 +23,7 @@ func TestConfigurationProviderCloseRetainsBlockedControlOwnership(t *testing.T) 
 		return nil, ErrKeyService
 	}
 	proof := func(ctx context.Context) (time.Time, error) { close(entered); <-release; return time.Time{}, ctx.Err() }
-	effects, err := newConfigurationProviderEffects(root, in, profile, jwt, proof, f.server.Client(), time.Now)
+	effects, err := newConfigurationProviderEffects(root, in, jwt, proof, f.server.Client(), time.Now)
 	if err != nil {
 		t.Fatal(err)
 	}

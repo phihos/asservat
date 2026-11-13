@@ -7,7 +7,6 @@ import (
 	"time"
 
 	fleetapp "asservat.local/asservat/internal/application/fleet"
-	"asservat.local/asservat/internal/contracts"
 	fleetvalue "asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
 )
@@ -16,16 +15,13 @@ import (
 // proof. This component deliberately lacks that proof: it must reach its refusal
 // without borrowing seeded credentials, requesting a JWT or calling the provider.
 func TestConfigurationCleanupColdRefreshReachesRequiredNativeProof(t *testing.T) {
-	f, in, profile := configurationControlFixture(t, "cleanup-wrap", func(in contracts.HubWorkerDeployment, p *contracts.ConfigurationProviderSelection) {
-		p.CleanupAudit = contracts.OwnerPublicTransit{Mount: in.KeyService.AuditMount, Key: in.KeyService.AuditKey}
-		p.ContextDeletionSigning = contracts.OwnerPublicTransit{Mount: in.KeyService.AuditMount, Key: contracts.ContextDeletionSigningKeyName(in.InstallationID)}
-	})
+	f, in := configurationControlFixture(t, "cleanup-wrap", withConfigurationCleanup)
 	gate, err := fleetapp.NewWorkerRuntimeAdmission(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer gate.Close()
-	effects, err := newConfigurationProviderEffects(t.Context(), in, profile, func(context.Context) ([]byte, error) {
+	effects, err := newConfigurationProviderEffects(t.Context(), in, func(context.Context) ([]byte, error) {
 		t.Error("cold refresh requested JWT before native proof")
 		return nil, ErrKeyService
 	}, func(context.Context) (time.Time, error) {
@@ -36,7 +32,6 @@ func TestConfigurationCleanupColdRefreshReachesRequiredNativeProof(t *testing.T)
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = effects.close(context.Background()); effects.joinClosed() })
-	in.ProviderAuthentication = &profile
 	worker := &InstalledConfigurationProviderEffects{input: in, effects: effects, admission: gate, root: t.Context()}
 	call, cancel := context.WithTimeout(t.Context(), time.Second)
 	defer cancel()

@@ -1,0 +1,21 @@
+{{- if and (include "asservat.hubWorker.hub" .) .Values.retention }}
+{{- $r := .Values.retention }}
+apiVersion: asservat.io/v1alpha1
+kind: EvidenceRetentionPolicy
+metadata:
+  name: {{ printf "%s-baseline" (include "asservat.hubWorker.prefix" .) }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: asservat
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+    app.kubernetes.io/component: retention
+    app.kubernetes.io/managed-by: {{ .Release.Service | quote }}
+spec:
+  purposeRef: {{ $r.purposeRef | quote }}
+  defaults: {{ toJson $r.defaults }}
+  maxima: {{ toJson $r.maxima }}
+  deletionBudgetSeconds: {{ int64 $r.deletionBudgetSeconds }}
+  legalExceptions: disabled
+  rules: []
+  scope: {}
+{{- end }}

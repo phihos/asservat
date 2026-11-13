@@ -59,6 +59,18 @@ func NewDownloadEnvironmentSource(c *PermissionClient, p *DownloadEnvironmentPro
 	}
 	return s, nil
 }
+
+// NewPlainDownloadEnvironmentSource reads a Helm-rendered processing source
+// protected by Kubernetes RBAC. Its protection digest is the deterministic
+// contracts.ConfigMapSourceDigest of the client's cluster and namespace.
+func NewPlainDownloadEnvironmentSource(c *PermissionClient, name, uid, root, installation string, installed []privacy.DownloadPath) (*DownloadEnvironmentSource, error) {
+	if c == nil {
+		return nil, privacy.ErrInvalid
+	}
+	p := &DownloadEnvironmentProtection{&configMapProtection{observer: c, plan: cfg.ConfigMapAdministration{SourceName: name, ControlNamespace: c.control}, digest: contracts.ConfigMapSourceDigest(c.clusterID, c.control.Name, name)}}
+	return NewDownloadEnvironmentSource(c, p, name, uid, root, installation, installed)
+}
+
 func validProcessingIssuer(s string) bool {
 	u, e := url.Parse(s)
 	return e == nil && u.Scheme == "https" && u.Host != "" && u.User == nil && u.RawQuery == "" && u.Fragment == "" && u.Opaque == "" && identity.Text(s, 2048)

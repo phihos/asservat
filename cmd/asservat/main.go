@@ -51,7 +51,7 @@ func run() int {
 	case "node":
 		err = bootstrap.RunNode(ctx, os.Getenv(contracts.NodePodUIDEnvironment))
 	case "hub-worker":
-		err = bootstrap.RunHubWorker(ctx, os.Getenv(contracts.OwnerPodUIDEnvironment))
+		err = bootstrap.RunHubWorker(ctx)
 	default:
 		err = bootstrap.RunDownloadWorker(ctx, os.Args[2:], os.Getenv(contracts.WorkerPodUIDEnvironment), os.Stdout)
 	}

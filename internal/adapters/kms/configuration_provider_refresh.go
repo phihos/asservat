@@ -1,26 +1,22 @@
 package kms
 
 import (
-	"bytes"
 	"context"
 	"time"
 
-	"asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
 )
 
 // This private operation is made only for one of the enclosing concrete
-// worker's closed credential slots. It is never selected by a callback or
-// exposed as a current-reader implementation. Native and SQL are both real;
-// no SQL transaction is held over native/provider I/O.
+// worker's closed credential slots. Two committed recovery observations of
+// the same revision bracket each provider effect; no SQL transaction is held
+// over provider I/O.
 type configurationProviderRefreshOperation struct {
 	worker   *InstalledConfigurationProviderEffects
-	native   *kubernetes.ConfigurationWorkerProviderOperation
 	recovery fleet.RecoveryState
-	manifest contracts.ConfigurationRuntimeCredentialManifest
-	mounted  map[string][]byte
+	material contracts.OwnerStorageCredential
 	until    time.Time
 	finished bool
 	stops    []context.CancelFunc
@@ -30,14 +26,13 @@ func (s *InstalledConfigurationProviderEffects) beginRefresh(ctx context.Context
 	if s == nil || s.effects == nil || (slot != s.effects.wrap && slot != s.effects.unwrap && !s.effects.cleanupSlot(slot)) {
 		return nil, time.Time{}, ErrKeyService
 	}
-	return s.beginConfigurationNative(ctx)
+	return s.beginConfigurationOperation(ctx)
 }
 
 // Shared private mechanics for fixed configuration/cleanup purposes and owner
 // configuration audit. Public callers cannot supply phases or proof callbacks.
-func (s *InstalledConfigurationProviderEffects) beginConfigurationNative(ctx context.Context) (*configurationProviderRefreshOperation, time.Time, error) {
-	if s == nil || ctx == nil || ctx.Err() != nil || s.root.Err() != nil || s.effects == nil ||
-		s.reader == nil || s.recovery == nil {
+func (s *InstalledConfigurationProviderEffects) beginConfigurationOperation(ctx context.Context) (*configurationProviderRefreshOperation, time.Time, error) {
+	if s == nil || ctx == nil || ctx.Err() != nil || s.root.Err() != nil || s.effects == nil || s.recovery == nil {
 		return nil, time.Time{}, ErrKeyService
 	}
 	until, ok := ctx.Deadline()
@@ -52,25 +47,17 @@ func (s *InstalledConfigurationProviderEffects) beginConfigurationNative(ctx con
 		}
 	}()
 	var err error
-	p.recovery, err = s.recovery.RecoveryState(ctx)
-	if err != nil || !p.recovery.Valid(time.Now()) || p.recovery.InstallationID != s.input.InstallationID {
-		return nil, time.Time{}, ErrKeyService
+	p.recovery, err = s.recoveryCurrent(ctx)
+	if err != nil {
+		return nil, time.Time{}, err
 	}
 	p.until = identity.Earlier(p.until, p.recovery.FreshUntil)
 	call, end := context.WithDeadline(ctx, p.until)
 	p.stops = append(p.stops, end)
-	p.manifest, p.mounted, err = s.mounted(call)
-	if err != nil {
-		return nil, time.Time{}, ErrKeyService
+	if p.material, err = s.auditCredential(call); err != nil {
+		return nil, time.Time{}, err
 	}
-	p.native, err = s.reader.BeginConfigurationProviderOperation(call, p.recovery.IssuerEpoch, p.manifest, p.mounted)
-	if err != nil {
-		return nil, time.Time{}, ErrKeyService
-	}
-	p.until = identity.Earlier(p.until, p.native.FreshUntil())
-	call, narrow := context.WithDeadline(call, p.until)
-	p.stops = append(p.stops, narrow)
-	last, err := s.recovery.RecoveryState(call)
+	last, err := s.recoveryCurrent(call)
 	if err != nil || !configurationProviderSameRecovery(p.recovery, last, time.Now()) {
 		return nil, time.Time{}, ErrKeyService
 	}
@@ -82,8 +69,9 @@ func (s *InstalledConfigurationProviderEffects) beginConfigurationNative(ctx con
 	return p, p.until, nil
 }
 
+// finish confirms the same recovery revision after the effect.
 func (p *configurationProviderRefreshOperation) finish(ctx context.Context) (time.Time, error) {
-	if p == nil || p.finished || p.native == nil || p.worker == nil || ctx == nil || ctx.Err() != nil || p.worker.root.Err() != nil {
+	if p == nil || p.finished || p.worker == nil || ctx == nil || ctx.Err() != nil || p.worker.root.Err() != nil {
 		return time.Time{}, ErrKeyService
 	}
 	p.finished = true // a failed/unknown final read is never retried in this refresh
@@ -92,41 +80,7 @@ func (p *configurationProviderRefreshOperation) finish(ctx context.Context) (tim
 	}
 	call, end := context.WithDeadline(ctx, p.until)
 	defer end()
-	first, err := p.worker.recovery.RecoveryState(call)
-	if err != nil || !configurationProviderSameRecovery(p.recovery, first, time.Now()) {
-		return time.Time{}, ErrKeyService
-	}
-	p.until = identity.Earlier(p.until, first.FreshUntil)
-	call, narrow := context.WithDeadline(call, p.until)
-	defer narrow()
-	manifest, mounted, err := p.worker.mounted(call)
-	if err != nil {
-		return time.Time{}, ErrKeyService
-	}
-	defer func() {
-		for _, value := range mounted {
-			clear(value)
-		}
-	}()
-	// Manifest bytes are among the compared mounted files. The native handle
-	// independently compares the actual immutable SQL3 and selected Secret to
-	// its own cloned original bytes; a same-UID rotation cannot be adopted here.
-	if manifest.RootUID != p.manifest.RootUID || manifest.SetupID != p.manifest.SetupID || len(mounted) != len(p.mounted) {
-		return time.Time{}, ErrKeyService
-	}
-	for name, value := range p.mounted {
-		if !bytes.Equal(mounted[name], value) {
-			return time.Time{}, ErrKeyService
-		}
-	}
-	until, err := p.worker.reader.FinishConfigurationProviderOperation(call, p.native)
-	if err != nil {
-		return time.Time{}, ErrKeyService
-	}
-	p.until = identity.Earlier(p.until, until)
-	call, finalEnd := context.WithDeadline(call, p.until)
-	defer finalEnd()
-	last, err := p.worker.recovery.RecoveryState(call)
+	last, err := p.worker.recoveryCurrent(call)
 	if err != nil || !configurationProviderSameRecovery(p.recovery, last, time.Now()) {
 		return time.Time{}, ErrKeyService
 	}
@@ -149,11 +103,5 @@ func (p *configurationProviderRefreshOperation) close() {
 		p.stops[i]()
 	}
 	p.stops = nil
-	if p.native != nil {
-		p.native.Close()
-	}
-	for _, value := range p.mounted {
-		clear(value)
-	}
-	p.mounted = nil
+	p.material = contracts.OwnerStorageCredential{}
 }

@@ -18,14 +18,14 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-func TestReconciliationLeasePinsAndNoCreation(t *testing.T) {
-	for _, mode := range []string{"valid", "replacement", "deleting", "excess-duration", "coordinated", "bad-resource-version"} {
+func TestReconciliationLeaseByNameAndCreation(t *testing.T) {
+	for _, mode := range []string{"valid", "no-uid", "deleting", "excess-duration", "coordinated", "bad-resource-version"} {
 		t.Run(mode, func(t *testing.T) {
 			var writes atomic.Int32
 			lease := coordination.Lease{TypeMeta: meta.TypeMeta{APIVersion: "coordination.k8s.io/v1", Kind: "Lease"}, ObjectMeta: meta.ObjectMeta{Name: "reconcile", Namespace: permissionControl.Name, UID: types.UID(ownerID(1)), ResourceVersion: "1"}}
 			switch mode {
-			case "replacement":
-				lease.UID = types.UID(ownerID(2))
+			case "no-uid":
+				lease.UID = ""
 			case "deleting":
 				now := meta.Now()
 				lease.DeletionTimestamp = &now
@@ -42,6 +42,16 @@ func TestReconciliationLeasePinsAndNoCreation(t *testing.T) {
 				}
 				if r.Method == "GET" && r.URL.Path == "/api/v1/namespaces/"+permissionControl.Name {
 					permissionReply(w, permissionNamespace(permissionControl.Name, permissionControl.UID))
+					return
+				}
+				if r.Method == "POST" && r.URL.Path == "/apis/coordination.k8s.io/v1/namespaces/"+permissionControl.Name+"/leases" {
+					writes.Add(1)
+					var v coordination.Lease
+					if r.URL.Query().Get("fieldValidation") != "Strict" || json.NewDecoder(r.Body).Decode(&v) != nil || v.Name != "reconcile" || v.UID != "" || v.Spec.HolderIdentity == nil || *v.Spec.HolderIdentity != ownerID(3) {
+						t.Error("lease create lost its name or holder")
+					}
+					v.UID, v.ResourceVersion = types.UID(ownerID(2)), "1"
+					permissionReply(w, v)
 					return
 				}
 				if r.URL.Path != "/apis/coordination.k8s.io/v1/namespaces/"+permissionControl.Name+"/leases/reconcile" {
@@ -69,7 +79,7 @@ func TestReconciliationLeasePinsAndNoCreation(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			s, err := NewReconciliationLeader(client, "reconcile", ownerID(1), ownerID(3))
+			s, err := NewReconciliationLeader(client, "reconcile", ownerID(3))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -92,7 +102,10 @@ func TestReconciliationLeasePinsAndNoCreation(t *testing.T) {
 				t.Fatal("missing CAS update")
 			}
 			if err = s.lock.Create(context.Background(), resourcelock.LeaderElectionRecord{}); err == nil {
-				t.Fatal("runtime can create scheduling identity")
+				t.Fatal("lease created for another holder")
+			}
+			if err = s.lock.Create(context.Background(), resourcelock.LeaderElectionRecord{HolderIdentity: ownerID(3), LeaseDurationSeconds: 15}); err != nil || writes.Load() != 2 {
+				t.Fatal("missing lease creation", err)
 			}
 		})
 	}

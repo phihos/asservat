@@ -17,12 +17,12 @@ func configurationJoinFixture(t *testing.T) (*InstalledConfigurationProviderEffe
 
 func configurationJoinFixtureWithClock(t *testing.T, now func() time.Time) (*InstalledConfigurationProviderEffects, *ownerProviderControlFixture) {
 	t.Helper()
-	f, in, profile := configurationControlFixture(t, "audit-wrap")
+	f, in := configurationControlFixture(t, "audit-wrap")
 	f.mu.Lock()
 	f.clock = now
 	f.mu.Unlock()
 	root, cancel := context.WithCancel(context.Background())
-	effects, err := newConfigurationProviderEffects(root, in, profile,
+	effects, err := newConfigurationProviderEffects(root, in,
 		func(context.Context) ([]byte, error) {
 			return ownerProviderTestJWT(now().Add(600 * time.Second)), nil
 		},

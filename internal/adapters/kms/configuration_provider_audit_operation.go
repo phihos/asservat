@@ -1,7 +1,6 @@
 package kms
 
 import (
-	"bytes"
 	"context"
 	"sync"
 	"time"
@@ -52,7 +51,7 @@ func (s *InstalledConfigurationProviderEffects) configurationAuditAvailable() bo
 func (s *InstalledConfigurationProviderEffects) BeginOwnerConfigurationAudit(ctx context.Context, c fleet.OwnerConfiguration) (*ConfigurationProviderAuditOperation, error) {
 	if s == nil || s.admission == nil || ctx == nil || ctx.Err() != nil || !c.Valid() ||
 		c.Pool.InstallationID != s.input.InstallationID || c.Pool.ClusterID != s.input.ClusterID ||
-		c.Pool.NamespaceUID != s.input.Namespace.UID || c.Revision.UID != s.input.OwnerSource.UID || !s.configurationAuditAvailable() || !s.admission.ClaimOwnerAudit(ctx) {
+		c.Pool.NamespaceUID != s.input.NamespaceUID || c.Revision.UID != s.input.OwnerSourceUID || !s.configurationAuditAvailable() || !s.admission.ClaimOwnerAudit(ctx) {
 		return nil, ErrKeyService
 	}
 	return s.beginAudit(ctx, &ConfigurationProviderAuditOperation{configuration: c.Clone()})
@@ -85,16 +84,12 @@ func (s *InstalledConfigurationProviderEffects) beginAudit(ctx context.Context, 
 			p.Close()
 		}
 	}()
-	p.native, _, err = s.beginConfigurationNative(call)
-	if err != nil || !p.authority && !p.native.native.MatchesOwnerConfiguration(p.configuration) {
-		return nil, ErrKeyService
-	}
-	material, err := contracts.DecodeOwnerStorageCredential(bytes.NewReader(p.native.mounted[contracts.ConfigurationProviderAuditCredentialFile]))
+	p.native, _, err = s.beginConfigurationOperation(call)
 	if err != nil || call.Err() != nil || !time.Now().Before(p.native.until) {
 		return nil, ErrKeyService
 	}
-	p.material = material
-	// Keep the initial native/recovery end visible to the actual S3/KMS I/O.
+	p.material = p.native.material
+	// Keep the initial recovery end visible to the actual S3/KMS I/O.
 	// Close also cancels the parent call owned by endBorrow.
 	parentCancel := p.cancel
 	narrowed, narrowCancel := context.WithDeadline(call, p.native.until)
@@ -142,7 +137,7 @@ func (p *ConfigurationProviderAuditOperation) Finish() error {
 	p.busy = false
 	close(p.changed)
 	p.changed = make(chan struct{})
-	if p.closed || p.ctx.Err() != nil || !p.authority && !p.native.native.MatchesOwnerConfiguration(p.configuration) {
+	if p.closed || p.ctx.Err() != nil {
 		err = ErrKeyService
 	}
 	if err != nil {
