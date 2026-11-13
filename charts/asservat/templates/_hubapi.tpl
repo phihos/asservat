@@ -100,7 +100,7 @@
 {{- define "asservat.hubApi.browserSettings" -}}
 {{- $i := .Values.identity -}}
 {{- $id := fromJson (include "asservat.hubApi.identity" .) -}}
-{{- toJson (dict "schemaVersion" "browser-settings/v1" "revision" 1 "issuer" (required "identity.issuer is required" $id.issuer) "clientID" (required "identity.clientID is required" $id.clientID) "origin" .Values.origin "suspended" false
+{{- toJson (dict "schemaVersion" "browser-settings/v1" "revision" (int .Release.Revision) "issuer" (required "identity.issuer is required" $id.issuer) "clientID" (required "identity.clientID is required" $id.clientID) "origin" .Values.origin "suspended" false
   "maxLifetimeSeconds" (int $i.maxLifetimeSeconds) "maxLogins" (int $i.maxLogins) "maxSessions" (int $i.maxSessions) "maxLogoutEvents" (int $i.maxLogoutEvents)) -}}
 {{- end -}}
 
@@ -111,7 +111,7 @@
 {{- $id := fromJson (include "asservat.hubApi.identity" .) -}}
 {{- if and (empty $i.eligibleSubjects) (empty $i.eligibleGroups) (ne .Values.services.identity.provider "keycloak") }}{{ fail "identity.eligibleSubjects or identity.eligibleGroups is required when origin is set" }}{{ end -}}
 {{- $clients := default (list (dict "id" $id.clientID "kind" "human" "classQualified" true)) $i.clients -}}
-{{- $out := dict "schemaVersion" "identity-settings/v1" "revision" 1 "issuer" $id.issuer "clients" $clients "eligibleSubjects" (default list $i.eligibleSubjects) "eligibleGroups" (default list $i.eligibleGroups) "groupsAtIssueQualified" true "groupMaxAgeSeconds" (int $i.groupMaxAgeSeconds) -}}
+{{- $out := dict "schemaVersion" "identity-settings/v1" "revision" (int .Release.Revision) "issuer" $id.issuer "clients" $clients "eligibleSubjects" (default list $i.eligibleSubjects) "eligibleGroups" (default list $i.eligibleGroups) "groupsAtIssueQualified" true "groupMaxAgeSeconds" (int $i.groupMaxAgeSeconds) -}}
 {{- with $i.approvals }}{{ $_ := set $out "approvals" . }}{{ end -}}
 {{- toJson $out -}}
 {{- end -}}
@@ -138,7 +138,7 @@
 {{- end -}}
 {{- end -}}
 {{- end -}}
-{{- $out := dict "format" "asservat-download-environment/v1" "revision" 1 "suspended" false "permittedRegions" $regions "paths" list "clients" $clients "operators" (default list $i.processingOperators) -}}
+{{- $out := dict "format" "asservat-download-environment/v1" "revision" (int .Release.Revision) "suspended" false "permittedRegions" $regions "paths" list "clients" $clients "operators" (default list $i.processingOperators) -}}
 {{- if hasKey .Values "processors" }}{{ $_ := set $out "processors" (default list .Values.processors) }}{{ end -}}
 {{- toJson $out -}}
 {{- end -}}

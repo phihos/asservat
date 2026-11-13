@@ -73,7 +73,7 @@ installation ID in Go, object UIDs are read by name.
 {{- $f := .Values.fleet -}}
 {{- $clients := $f.clients -}}
 {{- if not $clients }}{{ $clients = list (default "asservat-console" .Values.identity.clientID) }}{{ end -}}
-{{- toJson (dict "schemaVersion" "fleet-settings/v1" "revision" 1 "suspended" false
+{{- toJson (dict "schemaVersion" "fleet-settings/v1" "revision" (int .Release.Revision) "suspended" false
   "issuer" (default (include "asservat.hubWorker.identityIssuer" .) $f.issuer)
   "clients" $clients "subjects" (default list $f.subjects) "groups" (default list $f.groups) "deliveryProfiles" (default list $f.deliveryProfiles)
   "maxActiveBootstraps" (int $f.maxActiveBootstraps) "maxBootstrapHistory" (int $f.maxBootstrapHistory) "maxClusters" (int $f.maxClusters)) -}}
@@ -85,7 +85,7 @@ installation ID in Go, object UIDs are read by name.
      operation 9448). */}}
 {{- define "asservat.hubWorker.ownerSource" -}}
 {{- $api := include "asservat.fullname" (list . "hub-api") -}}
-{{- toJson (dict "format" "asservat-hub-owner-source/v1" "revision" 1 "suspended" false
+{{- toJson (dict "format" "asservat-hub-owner-source/v1" "revision" (int .Release.Revision) "suspended" false
   "service" (printf "%s-owner" $api) "deployment" $api "serviceAccount" $api
   "port" 9443 "nativePort" 9444 "nativeBootstrap" "owner-bootstrap/v1" "nativeCandidateLimit" 1024 "operationPort" 9448) -}}
 {{- end -}}

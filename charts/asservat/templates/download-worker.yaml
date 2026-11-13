@@ -18,7 +18,7 @@
   UIDs by GETs by name. The control ConfigMap is written by hub-api with the
   J values (owner and worker PKI roots, store ID); no digest of it is pinned:
   each dispatch reads and parses the current control. */}}
-{{- $profileJSON := toJson (dict "format" "asservat-worker-configuration/v3" "revision" 1 "suspended" false "namespace" $ns "serviceAccount" $worker "priorityClass" $worker "controlConfig" $control "image" $image "imagePullSecrets" (.Values.image.pullSecrets | default list) "cpuMillis" (int $d.cpuMillis) "memoryBytes" (int64 $d.memoryBytes) "maxRuntimeSeconds" (int $d.maxRuntimeSeconds) "storeCredentials" $store) }}
+{{- $profileJSON := toJson (dict "format" "asservat-worker-configuration/v3" "revision" (int .Release.Revision) "suspended" false "namespace" $ns "serviceAccount" $worker "priorityClass" $worker "controlConfig" $control "image" $image "imagePullSecrets" (.Values.image.pullSecrets | default list) "cpuMillis" (int $d.cpuMillis) "memoryBytes" (int64 $d.memoryBytes) "maxRuntimeSeconds" (int $d.maxRuntimeSeconds) "storeCredentials" $store) }}
 # Download workers are Jobs in their own Restricted namespace (ADR-069).
 # A pre-install hook: the secrets hook writes the workers' store Secret into
 # it before the release's resources exist. It is kept on uninstall.
