@@ -3,7 +3,6 @@ package bootstrap
 import (
 	"context"
 	"crypto/x509"
-	"errors"
 	"os"
 	"strings"
 	"time"
@@ -141,27 +140,27 @@ func newPublicDownloads(ctx context.Context, d *OwnerDeployment, observer, probe
 	coordinator := evidence.ContextDownloadCoordinator{RootID: root, InstallationID: installation, Routes: sources, Sources: sources, Authority: gate, Sessions: downloads,
 		Refused: downloadRefusalReport(timedEventLog(os.Stderr, "download refused"), time.Now)}
 
-	wa, wp := capacityWorkerGuard(p.WorkerConfiguration.Guard)
-	sourceObserver, sourceProbe, sourceControl, err := d.workerSourceClients(observer, probe, control, closers)
+	if n := d.inputs.config.Native; n == nil || len(n.WorkerAPIs) == 0 {
+		// ADR-194 D1: no worker is configured (hub.download-worker.enabled
+		// false). Downloads have no native runtime, so prepare fails closed
+		// before any reservation; existing sessions are still readable and
+		// stoppable. Configuring a worker takes a new process.
+		coordinator.Plans = unconfiguredDownloadPlans{}
+		return &publicDownloads{environment: environment, policies: policies, native: ContextNativeDownloadServices{Stop: stop}, downloads: downloads, gate: gate, coordinator: coordinator}, nil
+	}
+	sourceObserver, err := d.workerSourceClient(observer, control)
 	if err != nil {
 		return nil, &fixedStepError{"downloads/sourceObserver", mounts.ErrUnavailable}
 	}
-	workerGuard, err := kube.NewWorkerConfigurationProtection(sourceObserver, sourceProbe, cfg.WorkerAdministration{Name: p.WorkerConfiguration.Guard.Name, SourceName: p.WorkerConfiguration.Source.Name, ControlNamespace: sourceControl, Administrators: wa}, wp)
+	workerGuard, err := kube.NewPlainWorkerConfigurationProtection(sourceObserver, p.WorkerConfiguration.Source.Name)
 	if err != nil {
 		return nil, &fixedStepError{"downloads/workerGuard", mounts.ErrUnavailable}
 	}
-	workerSource, err := kube.NewWorkerConfigurationSource(sourceObserver, workerGuard, p.WorkerConfiguration.Source.Name, p.WorkerConfiguration.Source.UID, installation)
+	workerSource, err := kube.NewWorkerConfigurationSource(sourceObserver, workerGuard, p.WorkerConfiguration.Source.Name, p.WorkerConfiguration.Source.UID, installation, p.WorkerPKI.IssuerEpoch)
 	if err != nil {
 		return nil, &fixedStepError{"downloads/workerSource", mounts.ErrUnavailable}
 	}
 	observed, err := workerSource.ReadWorkerConfiguration(ctx)
-	if errors.Is(err, kube.ErrWorkerUnconfigured) {
-		// ADR-194 D1: no worker is configured. Downloads have no native runtime,
-		// so prepare fails closed before any reservation; existing sessions are
-		// still readable and stoppable. Configuring a worker takes a new process.
-		coordinator.Plans = unconfiguredDownloadPlans{}
-		return &publicDownloads{environment: environment, policies: policies, native: ContextNativeDownloadServices{Stop: stop}, downloads: downloads, gate: gate, coordinator: coordinator}, nil
-	}
 	if err != nil || !observed.Valid(time.Now()) {
 		return nil, &fixedStepError{"downloads/observed", mounts.ErrUnavailable}
 	}
@@ -309,32 +308,24 @@ func newPublicDownloads(ctx context.Context, d *OwnerDeployment, observer, probe
 	return out, nil
 }
 
-// workerSourceClients selects the clients that read the guarded worker
-// profile source (ADR-204 decision 2). With exactly one pinned worker API in
-// its own namespace, the source and guard live there: that API's client reads
-// them and the namespace's separate probe token proves the guard. Without a
-// worker API (the unconfigured installed layout), or with one pinned to the
-// hub namespace itself, the hub namespace clients read it as before. More
-// than one worker API names no single source namespace and is refused.
-func (d *OwnerDeployment) workerSourceClients(observer, probe *kube.PermissionClient, control cfg.NamespaceRef, closers *[]func()) (*kube.PermissionClient, *kube.PermissionClient, cfg.NamespaceRef, error) {
+// workerSourceClient selects the client that reads the worker profile
+// (ADR-204 decision 2): the one worker API's client in its own namespace, or
+// the hub namespace client when that API is pinned to the hub namespace.
+// More than one worker API names no single source namespace and is refused.
+func (d *OwnerDeployment) workerSourceClient(observer *kube.PermissionClient, control cfg.NamespaceRef) (*kube.PermissionClient, error) {
 	n := d.inputs.config.Native
-	if n == nil || len(n.WorkerAPIs) == 0 {
-		return observer, nil, control, nil
-	}
-	if len(n.WorkerAPIs) != 1 {
-		return nil, nil, control, mounts.ErrUnavailable
+	if n == nil || len(n.WorkerAPIs) != 1 {
+		return nil, mounts.ErrUnavailable
 	}
 	a := n.WorkerAPIs[0]
 	if a.Namespace.UID == control.UID {
-		return observer, nil, control, nil
+		return observer, nil
 	}
 	client := d.shared.workers[ownerNativeAPIKey{a.ClusterID, a.Namespace.UID}]
 	if client == nil {
-		return nil, nil, control, mounts.ErrUnavailable
+		return nil, mounts.ErrUnavailable
 	}
-	// ADR-328: the worker namespace's sources are plain RBAC reads; no
-	// probe credential.
-	return client, nil, cfg.NamespaceRef{Name: a.Namespace.Name, UID: a.Namespace.UID}, nil
+	return client, nil
 }
 
 // unconfiguredDownloadPlans plans nothing: without a configured worker no

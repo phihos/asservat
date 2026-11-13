@@ -118,7 +118,7 @@ func TestComparisonNativeRecordRequiresBothOriginalSourcePins(t *testing.T) {
 
 func TestComparisonFullWorkerIntentCleanupUsesPurposeBound(t *testing.T) {
 	q, a, _, _ := comparisonLedgerFixture(t)
-	profile := authorization.DownloadWorkerProfile{Configuration: q.Plan.Profile.Path.WorkerConfiguration, InstallationID: q.Plan.InstallationID, ClusterID: q.Plan.Profile.Path.AcquisitionClusterID, Namespace: "workers", NamespaceUID: "namespace", ServiceAccount: "acquisition", ServiceAccountUID: "account", Image: "synthetic.invalid/worker@sha256:" + strings.Repeat("1", 64), ControlConfig: "control", ControlConfigUID: "config", PriorityClass: "workers", PriorityClassUID: "priority", ControlDigest: artifact.Digest{1}, CPUMillis: q.Plan.Profile.Worker.CPUMilli, MemoryBytes: q.Plan.Profile.Worker.MemoryBytes, MaxRuntime: 8 * time.Hour}
+	profile := authorization.DownloadWorkerProfile{Configuration: q.Plan.Profile.Path.WorkerConfiguration, InstallationID: q.Plan.InstallationID, ClusterID: q.Plan.Profile.Path.AcquisitionClusterID, Namespace: "workers", NamespaceUID: "namespace", ServiceAccount: "acquisition", ServiceAccountUID: "account", Image: "synthetic.invalid/worker@sha256:" + strings.Repeat("1", 64), ControlConfig: "control", ControlConfigUID: "config", PriorityClass: "workers", PriorityClassUID: "priority", CPUMillis: q.Plan.Profile.Worker.CPUMilli, MemoryBytes: q.Plan.Profile.Worker.MemoryBytes, MaxRuntime: 8 * time.Hour}
 	for _, legacy := range []bool{false, true} {
 		selected := q
 		if legacy {

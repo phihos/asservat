@@ -13,7 +13,6 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
-	"encoding/hex"
 	"encoding/json"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials"
@@ -25,7 +24,6 @@ import (
 	rbac "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"net/url"
@@ -50,96 +48,56 @@ func (f refreshedWorkerConfiguration) CurrentWorkerConfiguration(c context.Conte
 func qualifiedWorkerConfiguration(t *testing.T, ctx context.Context, f fixture, admin kubernetes.Interface, config *rest.Config, p value.DownloadWorkerProfile) (value.DownloadWorkerProfile, evidence.WorkerConfigurationGuard) {
 	t.Helper()
 	epoch := custodyID()
-	wire := contracts.WorkerConfiguration{Format: "asservat-worker-configuration/v1", InstallationID: p.InstallationID, ClusterID: p.ClusterID, RecoveryEpoch: epoch, Revision: 1, Namespace: contracts.WorkerObjectReference{Name: p.Namespace, UID: p.NamespaceUID}, ServiceAccount: contracts.WorkerObjectReference{Name: p.ServiceAccount, UID: p.ServiceAccountUID}, PriorityClass: contracts.WorkerObjectReference{Name: p.PriorityClass, UID: p.PriorityClassUID}, ControlConfig: contracts.LocalKeySecretReference{Name: p.ControlConfig, UID: p.ControlConfigUID, SHA256: hex.EncodeToString(p.ControlDigest[:])}, Image: p.Image, ImagePullSecrets: []string{}, CPUMillis: p.CPUMillis, MemoryBytes: p.MemoryBytes, MaxRuntimeSeconds: int64(p.MaxRuntime / time.Second)}
-	if p.StoreCredentialSecret != "" {
-		wire.Format = "asservat-worker-configuration/v2"
-		wire.StoreCredentials = &contracts.WorkerObjectReference{Name: p.StoreCredentialSecret, UID: p.StoreCredentialSecretUID}
-	}
+	// The Helm-rendered v3 document: names only. The reader fills the IDs
+	// and reads each object's UID by name.
+	wire := contracts.WorkerConfiguration{Format: contracts.WorkerConfigurationFormat, Revision: 1, Namespace: p.Namespace, ServiceAccount: p.ServiceAccount, PriorityClass: p.PriorityClass, ControlConfig: p.ControlConfig, Image: p.Image, ImagePullSecrets: []string{}, CPUMillis: p.CPUMillis, MemoryBytes: p.MemoryBytes, MaxRuntimeSeconds: int64(p.MaxRuntime / time.Second), StoreCredentials: p.StoreCredentialSecret}
 	raw, _ := json.Marshal(wire)
 	object, e := admin.CoreV1().ConfigMaps(p.Namespace).Create(ctx, &core.ConfigMap{ObjectMeta: meta.ObjectMeta{Name: "worker-profile"}, Data: map[string]string{"worker-profile.json": string(raw)}}, meta.CreateOptions{})
 	if e != nil {
 		t.Fatal(e)
 	}
-	who, e := admin.AuthenticationV1().SelfSubjectReviews().Create(ctx, &auth.SelfSubjectReview{}, meta.CreateOptions{})
-	if e != nil || who.Status.UserInfo.Username == "" {
-		t.Fatal("fixture administrator identity", e)
-	}
-	plan := cfg.WorkerAdministration{Name: "asservat-worker-" + p.Namespace, SourceName: object.Name, ControlNamespace: cfg.NamespaceRef{Name: p.Namespace, UID: p.NamespaceUID}, Administrators: []cfg.KubernetesActor{{Kind: "User", Name: who.Status.UserInfo.Username}}}
-	policy, binding, e := kube.WorkerConfigurationAdmission(plan)
-	if e != nil {
-		t.Fatal(e)
-	}
-	policy, e = admin.AdmissionregistrationV1().ValidatingAdmissionPolicies().Create(ctx, policy, meta.CreateOptions{})
-	if e != nil {
-		t.Fatal(e)
-	}
-	binding, e = admin.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().Create(ctx, binding, meta.CreateOptions{})
-	if e != nil {
-		t.Fatal(e)
-	}
+	// The hub-worker's named reads (download-worker.yaml), nothing more.
 	readerSA := "worker-profile-reader"
-	probeSA := "worker-profile-probe"
-	makeClient := func(name string) (*kube.PermissionClient, kubernetes.Interface) {
-		t.Helper()
-		if _, e := admin.CoreV1().ServiceAccounts(p.Namespace).Create(ctx, &core.ServiceAccount{ObjectMeta: meta.ObjectMeta{Name: name}}, meta.CreateOptions{}); e != nil {
-			t.Fatal(e)
-		}
-		token, e := admin.CoreV1().ServiceAccounts(p.Namespace).CreateToken(ctx, name, &auth.TokenRequest{}, meta.CreateOptions{})
-		if e != nil {
-			t.Fatal(e)
-		}
-		c := &rest.Config{Host: config.Host, BearerToken: token.Status.Token, TLSClientConfig: config.TLSClientConfig}
-		c.TLSClientConfig.CertData = nil
-		c.TLSClientConfig.KeyData = nil
-		c.TLSClientConfig.CertFile = ""
-		c.TLSClientConfig.KeyFile = ""
-		client, e := kube.NewPermissionClient(c, p.ClusterID, plan.ControlNamespace, time.Now)
-		if e != nil {
-			t.Fatal(e)
-		}
-		api, e := kubernetes.NewForConfig(c)
-		if e != nil {
-			t.Fatal(e)
-		}
-		return client, api
-	}
-	reader, limited := makeClient(readerSA)
-	probe, probeAPI := makeClient(probeSA)
-	role := &rbac.ClusterRole{ObjectMeta: meta.ObjectMeta{Name: plan.Name}, Rules: []rbac.PolicyRule{{APIGroups: []string{""}, Resources: []string{"namespaces"}, ResourceNames: []string{p.Namespace}, Verbs: []string{"get"}}, {APIGroups: []string{"admissionregistration.k8s.io"}, Resources: []string{"validatingadmissionpolicies", "validatingadmissionpolicybindings"}, ResourceNames: []string{plan.Name}, Verbs: []string{"get"}}}}
-	if _, e = admin.RbacV1().ClusterRoles().Create(ctx, role, meta.CreateOptions{}); e != nil {
+	if _, e = admin.CoreV1().ServiceAccounts(p.Namespace).Create(ctx, &core.ServiceAccount{ObjectMeta: meta.ObjectMeta{Name: readerSA}}, meta.CreateOptions{}); e != nil {
 		t.Fatal(e)
 	}
-	if _, e = admin.RbacV1().ClusterRoleBindings().Create(ctx, &rbac.ClusterRoleBinding{ObjectMeta: meta.ObjectMeta{Name: plan.Name}, Subjects: []rbac.Subject{{Kind: "ServiceAccount", Name: readerSA, Namespace: p.Namespace}}, RoleRef: rbac.RoleRef{APIGroup: rbac.GroupName, Kind: "ClusterRole", Name: plan.Name}}, meta.CreateOptions{}); e != nil {
-		t.Fatal(e)
-	}
-	for _, name := range []string{readerSA, probeSA} {
-		verbs := []string{"get"}
-		if name == probeSA {
-			verbs = append(verbs, "update", "patch", "delete")
-		}
-		if _, e = admin.RbacV1().Roles(p.Namespace).Create(ctx, &rbac.Role{ObjectMeta: meta.ObjectMeta{Name: name}, Rules: []rbac.PolicyRule{{APIGroups: []string{""}, Resources: []string{"configmaps"}, ResourceNames: []string{object.Name}, Verbs: verbs}}}, meta.CreateOptions{}); e != nil {
-			t.Fatal(e)
-		}
-		if _, e = admin.RbacV1().RoleBindings(p.Namespace).Create(ctx, &rbac.RoleBinding{ObjectMeta: meta.ObjectMeta{Name: name}, Subjects: []rbac.Subject{{Kind: "ServiceAccount", Name: name, Namespace: p.Namespace}}, RoleRef: rbac.RoleRef{APIGroup: rbac.GroupName, Kind: "Role", Name: name}}, meta.CreateOptions{}); e != nil {
-			t.Fatal(e)
-		}
-	}
-	if p.StoreCredentialSecret != "" {
-		role, err := admin.RbacV1().Roles(p.Namespace).Get(ctx, readerSA, meta.GetOptions{})
-		if err != nil {
-			t.Fatal(err)
-		}
-		role.Rules = append(role.Rules, rbac.PolicyRule{APIGroups: []string{""}, Resources: []string{"secrets"}, ResourceNames: []string{p.StoreCredentialSecret}, Verbs: []string{"get"}})
-		if _, err = admin.RbacV1().Roles(p.Namespace).Update(ctx, role, meta.UpdateOptions{}); err != nil {
-			t.Fatal(err)
-		}
-	}
-	pin := kube.GuardPin{PolicyUID: string(policy.UID), PolicyGeneration: policy.Generation, BindingUID: string(binding.UID), BindingResourceVersion: binding.ResourceVersion}
-	guard, e := kube.NewWorkerConfigurationProtection(reader, probe, plan, pin)
+	token, e := admin.CoreV1().ServiceAccounts(p.Namespace).CreateToken(ctx, readerSA, &auth.TokenRequest{}, meta.CreateOptions{})
 	if e != nil {
 		t.Fatal(e)
 	}
-	source, e := kube.NewWorkerConfigurationSource(reader, guard, object.Name, string(object.UID), p.InstallationID)
+	c := &rest.Config{Host: config.Host, BearerToken: token.Status.Token, TLSClientConfig: config.TLSClientConfig}
+	c.TLSClientConfig.CertData, c.TLSClientConfig.KeyData, c.TLSClientConfig.CertFile, c.TLSClientConfig.KeyFile = nil, nil, "", ""
+	namespace := cfg.NamespaceRef{Name: p.Namespace, UID: p.NamespaceUID}
+	reader, e := kube.NewPermissionClient(c, p.ClusterID, namespace, time.Now)
+	if e != nil {
+		t.Fatal(e)
+	}
+	limited, e := kubernetes.NewForConfig(c)
+	if e != nil {
+		t.Fatal(e)
+	}
+	clusterRole := "asservat-worker-" + p.Namespace
+	if _, e = admin.RbacV1().ClusterRoles().Create(ctx, &rbac.ClusterRole{ObjectMeta: meta.ObjectMeta{Name: clusterRole}, Rules: []rbac.PolicyRule{{APIGroups: []string{""}, Resources: []string{"namespaces"}, ResourceNames: []string{p.Namespace}, Verbs: []string{"get"}}, {APIGroups: []string{"scheduling.k8s.io"}, Resources: []string{"priorityclasses"}, ResourceNames: []string{p.PriorityClass}, Verbs: []string{"get"}}}}, meta.CreateOptions{}); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = admin.RbacV1().ClusterRoleBindings().Create(ctx, &rbac.ClusterRoleBinding{ObjectMeta: meta.ObjectMeta{Name: clusterRole}, Subjects: []rbac.Subject{{Kind: "ServiceAccount", Name: readerSA, Namespace: p.Namespace}}, RoleRef: rbac.RoleRef{APIGroup: rbac.GroupName, Kind: "ClusterRole", Name: clusterRole}}, meta.CreateOptions{}); e != nil {
+		t.Fatal(e)
+	}
+	rules := []rbac.PolicyRule{{APIGroups: []string{""}, Resources: []string{"configmaps"}, ResourceNames: []string{object.Name, p.ControlConfig}, Verbs: []string{"get"}}, {APIGroups: []string{""}, Resources: []string{"serviceaccounts"}, ResourceNames: []string{p.ServiceAccount}, Verbs: []string{"get"}}}
+	if p.StoreCredentialSecret != "" {
+		rules = append(rules, rbac.PolicyRule{APIGroups: []string{""}, Resources: []string{"secrets"}, ResourceNames: []string{p.StoreCredentialSecret}, Verbs: []string{"get"}})
+	}
+	if _, e = admin.RbacV1().Roles(p.Namespace).Create(ctx, &rbac.Role{ObjectMeta: meta.ObjectMeta{Name: readerSA}, Rules: rules}, meta.CreateOptions{}); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = admin.RbacV1().RoleBindings(p.Namespace).Create(ctx, &rbac.RoleBinding{ObjectMeta: meta.ObjectMeta{Name: readerSA}, Subjects: []rbac.Subject{{Kind: "ServiceAccount", Name: readerSA, Namespace: p.Namespace}}, RoleRef: rbac.RoleRef{APIGroup: rbac.GroupName, Kind: "Role", Name: readerSA}}, meta.CreateOptions{}); e != nil {
+		t.Fatal(e)
+	}
+	guard, e := kube.NewPlainWorkerConfigurationProtection(reader, object.Name)
+	if e != nil {
+		t.Fatal(e)
+	}
+	source, e := kube.NewWorkerConfigurationSource(reader, guard, object.Name, string(object.UID), p.InstallationID, epoch)
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -153,20 +111,11 @@ func qualifiedWorkerConfiguration(t *testing.T, ctx context.Context, f fixture, 
 		time.Sleep(100 * time.Millisecond)
 	}
 	if e != nil {
-		if latest, readErr := admin.AdmissionregistrationV1().ValidatingAdmissionPolicies().Get(ctx, plan.Name, meta.GetOptions{}); readErr == nil {
-			t.Logf("synthetic admission status: %+v", latest.Status)
-		}
-		t.Fatal("qualified worker configuration source", e)
+		t.Fatal("worker configuration source", e)
 	}
 	p = observation.Configuration.Profile
 	if _, e = limited.CoreV1().ConfigMaps(p.Namespace).Update(ctx, object, meta.UpdateOptions{}); !apierrors.IsForbidden(e) {
 		t.Fatal("source reader gained mutation", e)
-	}
-	if _, e = probeAPI.CoreV1().ConfigMaps(p.Namespace).Patch(ctx, object.Name, types.MergePatchType, []byte(`{"data":{"worker-profile.json":"forged"}}`), meta.PatchOptions{}); e == nil {
-		t.Fatal("non-administrator replaced profile")
-	}
-	if e = probeAPI.CoreV1().ConfigMaps(p.Namespace).Delete(ctx, object.Name, meta.DeleteOptions{}); e == nil {
-		t.Fatal("non-administrator deleted profile")
 	}
 	// Real PostgreSQL/S3 with synthetic recovery root and audit wrapping keys.
 	sqlAdmin, e := pgxpool.New(ctx, f.Postgres)
@@ -245,43 +194,12 @@ func qualifiedWorkerConfiguration(t *testing.T, ctx context.Context, f fixture, 
 	if e = observer.Observe(ctx); e != nil {
 		t.Fatal(e)
 	}
-	// Removing protection denies the next source read and fences the projection.
-	if e = admin.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().Delete(ctx, binding.Name, meta.DeleteOptions{}); e != nil {
-		t.Fatal(e)
-	}
-	if e = observer.Observe(ctx); e == nil {
-		t.Fatal("missing protection accepted")
-	}
-	if _, e = current.CurrentWorkerConfiguration(ctx, p); e == nil {
-		t.Fatal("missing protection left profile active")
-	}
-	// Reinstalling protection is an explicit new bootstrap pin. Its digest
-	// requires a fresh administrator revision and a new encrypted audit record.
-	binding.ResourceVersion = ""
-	binding.UID = ""
-	binding.CreationTimestamp = meta.Time{}
-	binding.ManagedFields = nil
-	binding, e = admin.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().Create(ctx, binding, meta.CreateOptions{})
-	if e != nil {
-		t.Fatal(e)
-	}
-	pin.BindingUID = string(binding.UID)
-	pin.BindingResourceVersion = binding.ResourceVersion
-	guard, e = kube.NewWorkerConfigurationProtection(reader, probe, plan, pin)
-	if e != nil {
-		t.Fatal(e)
-	}
-	source, e = kube.NewWorkerConfigurationSource(reader, guard, object.Name, string(object.UID), p.InstallationID)
-	if e != nil {
-		t.Fatal(e)
-	}
 	wire.Revision++
 	raw, _ = json.Marshal(wire)
 	object.Data["worker-profile.json"] = string(raw)
 	if _, e = admin.CoreV1().ConfigMaps(p.Namespace).Update(ctx, object, meta.UpdateOptions{}); e != nil {
 		t.Fatal(e)
 	}
-	observer.Reader = source
 	deadline = time.Now().Add(10 * time.Second)
 	for time.Now().Before(deadline) {
 		e = observer.Observe(ctx)
@@ -301,6 +219,6 @@ func qualifiedWorkerConfiguration(t *testing.T, ctx context.Context, f fixture, 
 		t.Fatal("old profile survived rollout")
 	}
 	p = observation.Configuration.Profile
-	t.Log("actual ConfigMap admission/update/delete protection, named reader RBAC, fail-closed missing guard, audited SQL projection and revision rollover passed; installation recovery and audit keys are fixture inputs")
+	t.Log("named reader RBAC, v3 UID resolution, audited SQL projection and revision rollover passed; installation recovery and audit keys are fixture inputs")
 	return p, refreshedWorkerConfiguration{observer, current}
 }

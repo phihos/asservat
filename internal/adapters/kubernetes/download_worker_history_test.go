@@ -130,7 +130,7 @@ func historicalWorkerFixture(t *testing.T) (value.DownloadWorker, *batch.Job, co
 		Configuration: revision, InstallationID: id, ClusterID: id,
 		Namespace: "workers", NamespaceUID: "workers-uid", ServiceAccount: "acquisition", ServiceAccountUID: "acquisition-uid",
 		Image: "synthetic.invalid/worker@sha256:" + strings.Repeat("1", 64), ControlConfig: "control", ControlConfigUID: "control-uid",
-		PriorityClass: "workers", PriorityClassUID: "priority-uid", ControlDigest: artifact.Digest{2},
+		PriorityClass: "workers", PriorityClassUID: "priority-uid",
 		CPUMillis: 100, MemoryBytes: 64 << 20, MaxRuntime: time.Minute,
 	}
 	scope := artifact.DownloadScope{RootID: id, ArtifactID: id, CaptureID: id, ClusterID: id, NamespaceUID: "target-namespace", WorkloadUID: "target-workload", PodUID: "target-pod", Version: artifact.Digest{3}, Principal: principal}

@@ -25,7 +25,7 @@ func TestPlainPermissionSourcesUseDeterministicDigests(t *testing.T) {
 	if err != nil || worker.digest != artifact.Digest(contracts.ConfigMapSourceDigest(cluster, ns.Name, "asservat-worker-profile")) {
 		t.Fatal("worker configuration digest is not the shared deterministic digest", err)
 	}
-	if _, err = NewWorkerConfigurationSource(c, worker, "asservat-worker-profile", "44444444-4444-4444-8444-444444444444", cluster); err != nil {
+	if _, err = NewWorkerConfigurationSource(c, worker, "asservat-worker-profile", "44444444-4444-4444-8444-444444444444", cluster, cluster); err != nil {
 		t.Fatal("plain protection refused by the source reader", err)
 	}
 	if _, err = NewPlainWorkerConfigurationProtection(c, "Bad_Name"); err == nil {

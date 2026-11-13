@@ -79,7 +79,7 @@ func (w *hubWorker) openWorkerConfiguration(ctx context.Context, v contracts.Hub
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	source, err := kube.NewWorkerConfigurationSource(observer, protection, v.Source, sourceUID, w.ids.InstallationID)
+	source, err := kube.NewWorkerConfigurationSource(observer, protection, v.Source, sourceUID, w.ids.InstallationID, w.ids.IssuerEpoch)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}

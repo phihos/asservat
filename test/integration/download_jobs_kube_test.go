@@ -183,10 +183,6 @@ func qualifyDownloadWorkerPod(t *testing.T, nativeMode bool) {
 	}
 	p.PriorityClass, p.PriorityClassUID = priority.Name, string(priority.UID)
 	p.Namespace, p.NamespaceUID, p.ServiceAccount, p.ServiceAccountUID, p.Image, p.ControlConfig, p.ControlConfigUID = ns.Name, string(ns.UID), sa.Name, string(sa.UID), image, cm.Name, string(cm.UID)
-	p.ControlDigest, e = kube.WorkerControlDigest(cm.Data)
-	if e != nil {
-		t.Fatal(e)
-	}
 	p, configuration := qualifiedWorkerConfiguration(t, ctx, f, admin, config, p)
 	now := time.Now().UTC()
 	u := custodyID()

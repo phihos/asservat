@@ -11,10 +11,13 @@
   object store the operator creates it (secrets.s3-download-read). */}}
 {{- $store := include "asservat.secretName" (list . "s3-download-read") }}
 {{- $image := include "asservat.image" . }}
-{{- /* H fields only: hub-api merges installationID, clusterID and
-  recoveryEpoch from `<name>-ids` and takes the ConfigMap's UID from its read.
-  The control ConfigMap is written by hub-api with the J values (owner and
-  worker PKI roots, store ID) before a dispatch; its digest is not pinned. */}}
+{{- /* contracts.WorkerConfiguration (v3), H fields only. Readers (hub-worker,
+  hub-api, key-service) take installationID, clusterID and recoveryEpoch
+  (issuerEpoch) from `<name>-ids`, the namespace UID from their namespace
+  read and the account, PriorityClass, control ConfigMap and store Secret
+  UIDs by GETs by name. The control ConfigMap is written by hub-api with the
+  J values (owner and worker PKI roots, store ID); no digest of it is pinned:
+  each dispatch reads and parses the current control. */}}
 {{- $profileJSON := toJson (dict "format" "asservat-worker-configuration/v3" "revision" 1 "suspended" false "namespace" $ns "serviceAccount" $worker "priorityClass" $worker "controlConfig" $control "image" $image "imagePullSecrets" (.Values.image.pullSecrets | default list) "cpuMillis" (int $d.cpuMillis) "memoryBytes" (int64 $d.memoryBytes) "maxRuntimeSeconds" (int $d.maxRuntimeSeconds) "storeCredentials" $store) }}
 # Download workers are Jobs in their own Restricted namespace (ADR-069).
 # A pre-install hook: the secrets hook writes the workers' store Secret into
@@ -117,8 +120,8 @@ subjects:
     namespace: {{ .Release.Namespace }}
     name: {{ printf "%s-hub-api" $n }}
 ---
-# hub-worker reads the worker configuration and the store capability for
-# capacity and cleanup.
+# hub-worker observes the worker configuration and reads the UIDs of the
+# objects it names (the PriorityClass through its ClusterRole below).
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
@@ -128,11 +131,15 @@ metadata:
 rules:
   - apiGroups: [""]
     resources: [configmaps]
-    resourceNames: [{{ $profile }}]
+    resourceNames: [{{ $profile }}, {{ $control }}]
     verbs: [get]
   - apiGroups: [""]
     resources: [secrets]
     resourceNames: [{{ $store }}]
+    verbs: [get]
+  - apiGroups: [""]
+    resources: [serviceaccounts]
+    resourceNames: [{{ $worker }}]
     verbs: [get]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -149,4 +156,98 @@ subjects:
   - kind: ServiceAccount
     namespace: {{ .Release.Namespace }}
     name: {{ printf "%s-hub-worker" $n }}
+---
+# The worker profile's PriorityClass UID, read by name.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ printf "%s-%s-hub-worker-downloads" .Release.Namespace $n }}
+  labels: {{- include "asservat.labels" (list $ "download-worker") | nindent 4 }}
+rules:
+  - apiGroups: [scheduling.k8s.io]
+    resources: [priorityclasses]
+    resourceNames: [{{ $worker }}]
+    verbs: [get]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ printf "%s-%s-hub-worker-downloads" .Release.Namespace $n }}
+  labels: {{- include "asservat.labels" (list $ "download-worker") | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ printf "%s-%s-hub-worker-downloads" .Release.Namespace $n }}
+subjects:
+  - kind: ServiceAccount
+    namespace: {{ .Release.Namespace }}
+    name: {{ printf "%s-hub-worker" $n }}
+{{- if (index .Values.hub "key-service").downloads.enabled }}
+---
+# The key service reads the worker profile and its objects' UIDs for the
+# acquisition unwrap authority (ADR-204 decision 8).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ printf "%s-key-service" $ns }}
+  namespace: {{ $ns }}
+  labels: {{- include "asservat.labels" (list $ "download-worker") | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: [configmaps]
+    resourceNames: [{{ $profile }}, {{ $control }}]
+    verbs: [get]
+  - apiGroups: [""]
+    resources: [secrets]
+    resourceNames: [{{ $store }}]
+    verbs: [get]
+  - apiGroups: [""]
+    resources: [serviceaccounts]
+    resourceNames: [{{ $worker }}]
+    verbs: [get]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ printf "%s-key-service" $ns }}
+  namespace: {{ $ns }}
+  labels: {{- include "asservat.labels" (list $ "download-worker") | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ printf "%s-key-service" $ns }}
+subjects:
+  - kind: ServiceAccount
+    namespace: {{ .Release.Namespace }}
+    name: {{ printf "%s-key-service" $n }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ printf "%s-%s-key-service-downloads" .Release.Namespace $n }}
+  labels: {{- include "asservat.labels" (list $ "download-worker") | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: [namespaces]
+    resourceNames: [{{ $ns }}]
+    verbs: [get]
+  - apiGroups: [scheduling.k8s.io]
+    resources: [priorityclasses]
+    resourceNames: [{{ $worker }}]
+    verbs: [get]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ printf "%s-%s-key-service-downloads" .Release.Namespace $n }}
+  labels: {{- include "asservat.labels" (list $ "download-worker") | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ printf "%s-%s-key-service-downloads" .Release.Namespace $n }}
+subjects:
+  - kind: ServiceAccount
+    namespace: {{ .Release.Namespace }}
+    name: {{ printf "%s-key-service" $n }}
+{{- end }}
 {{- end }}

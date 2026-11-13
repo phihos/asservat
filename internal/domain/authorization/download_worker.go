@@ -21,7 +21,6 @@ type DownloadWorkerProfile struct {
 	Image, ControlConfig, ControlConfigUID string
 	PriorityClass, PriorityClassUID        string
 	ImagePullSecrets                       [4]string
-	ControlDigest                          artifact.Digest
 	CPUMillis, MemoryBytes                 int64
 	MaxRuntime                             time.Duration
 	StoreCredentialSecret                  string `json:",omitempty"`
@@ -59,7 +58,7 @@ func (p DownloadWorkerProfile) Valid() bool {
 			return false
 		}
 	}
-	return UUID(p.InstallationID) && UUID(p.ClusterID) && identity.Text(p.Namespace, 63) && identity.Text(p.NamespaceUID, 64) && identity.Text(p.ServiceAccount, 253) && identity.Text(p.ServiceAccountUID, 64) && identity.Text(p.ControlConfig, 253) && identity.Text(p.ControlConfigUID, 64) && p.ControlDigest != (artifact.Digest{}) && p.CPUMillis >= 10 && p.CPUMillis <= 4000 && p.MemoryBytes >= 16<<20 && p.MemoryBytes <= 8<<30 && p.MaxRuntime >= 30*time.Second && p.MaxRuntime <= 8*time.Hour && p.MaxRuntime%time.Second == 0
+	return UUID(p.InstallationID) && UUID(p.ClusterID) && identity.Text(p.Namespace, 63) && identity.Text(p.NamespaceUID, 64) && identity.Text(p.ServiceAccount, 253) && identity.Text(p.ServiceAccountUID, 64) && identity.Text(p.ControlConfig, 253) && identity.Text(p.ControlConfigUID, 64) && p.CPUMillis >= 10 && p.CPUMillis <= 4000 && p.MemoryBytes >= 16<<20 && p.MemoryBytes <= 8<<30 && p.MaxRuntime >= 30*time.Second && p.MaxRuntime <= 8*time.Hour && p.MaxRuntime%time.Second == 0
 }
 
 // WorkerIntent is frozen before audit or launch. Unknown launches remain paid.

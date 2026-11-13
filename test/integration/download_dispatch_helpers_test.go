@@ -69,7 +69,7 @@ func (a *countedWorkerAudit) WriteDownloadWorkerIntent(ctx context.Context, i va
 }
 
 func syntheticWorkerProfile(installation string) value.DownloadWorkerProfile {
-	return value.DownloadWorkerProfile{Configuration: identity.Revision{UID: custodyID(), Generation: 1, Digest: [32]byte{11}}, InstallationID: installation, ClusterID: custodyID(), Namespace: "workers", NamespaceUID: "namespace-uid", ServiceAccount: "acquisition", ServiceAccountUID: "account-uid", Image: "synthetic.invalid/worker@sha256:" + strings.Repeat("1", 64), ControlConfig: "control", ControlConfigUID: "config-uid", PriorityClass: "download-workers", PriorityClassUID: "priority-uid", ControlDigest: artifact.Digest{3}, CPUMillis: 100, MemoryBytes: 64 << 20, MaxRuntime: time.Minute}
+	return value.DownloadWorkerProfile{Configuration: identity.Revision{UID: custodyID(), Generation: 1, Digest: [32]byte{11}}, InstallationID: installation, ClusterID: custodyID(), Namespace: "workers", NamespaceUID: "namespace-uid", ServiceAccount: "acquisition", ServiceAccountUID: "account-uid", Image: "synthetic.invalid/worker@sha256:" + strings.Repeat("1", 64), ControlConfig: "control", ControlConfigUID: "config-uid", PriorityClass: "download-workers", PriorityClassUID: "priority-uid", CPUMillis: 100, MemoryBytes: 64 << 20, MaxRuntime: time.Minute}
 }
 
 // SQL/audit coordinator fixture only. Real Kubernetes creation and termination

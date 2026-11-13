@@ -7,7 +7,6 @@ import (
 	"crypto/rand"
 	"crypto/x509"
 	"crypto/x509/pkix"
-	"encoding/hex"
 	"encoding/json"
 	"math/big"
 	"testing"
@@ -15,7 +14,6 @@ import (
 
 	"asservat.local/asservat/internal/adapters/mtls"
 	"asservat.local/asservat/internal/contracts"
-	"asservat.local/asservat/internal/domain/artifact"
 	value "asservat.local/asservat/internal/domain/authorization"
 )
 
@@ -37,12 +35,8 @@ func startupFixture(t *testing.T) (WorkerStartup, []byte, []string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	digest, err := mtls.WorkerControlDigest(map[string]string{"worker.json": string(raw)})
-	if err != nil {
-		t.Fatal(err)
-	}
-	input := WorkerStartup{Target: value.WorkerCredentialTarget{InstallationID: id, SessionID: id, WorkerID: id, PodUID: id, CreatedAt: now, RunUntil: now.Add(time.Minute)}, ClusterID: id, ControlDigest: digest}
-	args := []string{"--installation", id, "--cluster", id, "--dispatch", id, "--session", id, "--created-at", now.Format(time.RFC3339Nano), "--until", input.Target.RunUntil.Format(time.RFC3339Nano), "--control-sha256", hex.EncodeToString(digest[:]), "--control", contracts.WorkerControlPath, "--token", contracts.WorkerTokenPath}
+	input := WorkerStartup{Target: value.WorkerCredentialTarget{InstallationID: id, SessionID: id, WorkerID: id, PodUID: id, CreatedAt: now, RunUntil: now.Add(time.Minute)}, ClusterID: id}
+	args := []string{"--installation", id, "--cluster", id, "--dispatch", id, "--session", id, "--created-at", now.Format(time.RFC3339Nano), "--until", input.Target.RunUntil.Format(time.RFC3339Nano), "--control", contracts.WorkerControlPath, "--token", contracts.WorkerTokenPath}
 	return input, raw, args
 }
 func TestWorkerStartupExactArgumentsAndConfigPin(t *testing.T) {
@@ -54,7 +48,7 @@ func TestWorkerStartupExactArgumentsAndConfigPin(t *testing.T) {
 	if _, err := LoadWorkerTrust(got, raw, time.Now()); err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"missing-pod", "duplicate", "path", "alternate-flag", "positional", "date", "unknown", "digest"} {
+	for _, name := range []string{"missing-pod", "duplicate", "path", "alternate-flag", "positional", "date", "unknown"} {
 		t.Run(name, func(t *testing.T) {
 			a := append([]string(nil), args...)
 			pod := input.Target.PodUID
@@ -73,30 +67,24 @@ func TestWorkerStartupExactArgumentsAndConfigPin(t *testing.T) {
 				a[9] = "2026-10-10T12:00:00+00:00"
 			case "unknown":
 				a[0] = "--credential"
-			case "digest":
-				a[13] = "0"
 			}
 			if _, err := ParseWorkerStartup(a, pod); err == nil {
 				t.Fatal("invalid startup accepted")
 			}
 		})
 	}
-	for _, name := range []string{"digest", "installation", "cluster", "expired-root", "changed-bytes"} {
+	for _, name := range []string{"installation", "cluster", "expired-root"} {
 		t.Run(name, func(t *testing.T) {
 			in := input
 			b := append([]byte(nil), raw...)
 			now := time.Now()
 			switch name {
-			case "digest":
-				in.ControlDigest = artifact.Digest{1}
 			case "installation":
 				in.Target.InstallationID = "20000000-0000-4000-8000-000000000002"
 			case "cluster":
 				in.ClusterID = "20000000-0000-4000-8000-000000000002"
 			case "expired-root":
 				now = now.Add(2 * time.Hour)
-			case "changed-bytes":
-				b = append(b, ' ')
 			}
 			if _, err := LoadWorkerTrust(in, b, now); err == nil {
 				t.Fatal("changed/expired config accepted")
@@ -158,7 +146,7 @@ func TestWorkerControlRejectsUntrustedPayloads(t *testing.T) {
 				}
 				b, _ = json.Marshal(wire)
 			}
-			if _, err := mtls.WorkerControlDigest(map[string]string{"worker.json": string(b)}); err == nil {
+			if _, err := mtls.ParseWorkerControl(b); err == nil {
 				t.Fatal("invalid control payload admitted")
 			}
 			if _, err := LoadWorkerTrust(input, b, time.Now()); err == nil {

@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"asservat.local/asservat/internal/contracts"
-	"asservat.local/asservat/internal/domain/artifact"
 	value "asservat.local/asservat/internal/domain/authorization"
 )
 
@@ -29,16 +28,12 @@ func TestWorkerTrustCatalogExactSelection(t *testing.T) {
 		t.Fatal(err)
 	}
 	p := forwardTestWorker(t).Intent.Profile
-	p.ControlDigest, _ = WorkerControlDigest(map[string]string{"worker.json": string(first)})
+	p.ClusterID = ownerTestID
 	roots, err := catalog.IssuerRoots(p, now)
 	if err != nil || !roots.Equal(a.roots) {
 		t.Fatal("first cluster", err)
 	}
 	p.ClusterID = ownerOtherID
-	if _, err = catalog.IssuerRoots(p, now); err == nil {
-		t.Fatal("accepted another cluster's digest")
-	}
-	p.ControlDigest, _ = WorkerControlDigest(map[string]string{"worker.json": string(second)})
 	roots, err = catalog.IssuerRoots(p, now)
 	if err != nil || !roots.Equal(b.roots) {
 		t.Fatal("second cluster", err)
@@ -53,7 +48,7 @@ func TestWorkerTrustCatalogExactSelection(t *testing.T) {
 		t.Fatal("input retained by reference", err)
 	}
 	if err = catalog.Replace([][]byte{first, first}); err == nil {
-		t.Fatal("duplicate control accepted")
+		t.Fatal("two controls of one cluster accepted")
 	}
 	if _, err = catalog.IssuerRoots(p, now); err != nil {
 		t.Fatal("failed replacement erased current catalog", err)
@@ -66,14 +61,16 @@ func TestWorkerTrustCatalogExactSelection(t *testing.T) {
 		t.Fatal("foreign installation accepted")
 	}
 	p.InstallationID = ownerTestID
-	p.ControlDigest = artifact.Digest{9}
+	p.ClusterID = ownerOtherID
+	if err = catalog.Replace([][]byte{first}); err != nil {
+		t.Fatal(err)
+	}
 	if _, err = catalog.IssuerRoots(p, now); err == nil {
-		t.Fatal("unknown control accepted")
+		t.Fatal("cluster without a control accepted")
 	}
 	if err = catalog.Replace(nil); err != nil {
 		t.Fatal(err)
 	}
-	p.ControlDigest, _ = WorkerControlDigest(map[string]string{"worker.json": string(first)})
 	p.ClusterID = ownerTestID
 	if _, err = catalog.IssuerRoots(p, now); err == nil {
 		t.Fatal("removed trust accepted")
@@ -101,12 +98,9 @@ func TestOwnerForwarderMultipleWorkerClusters(t *testing.T) {
 		}
 		f.worker.Intent.Profile.ClusterID = cluster
 		f.worker.Binding.ClusterID = cluster
-		raw := first
 		if i > 0 {
-			raw = second
 			f.workerCA = secondCA
 		}
-		f.worker.Intent.Profile.ControlDigest, _ = WorkerControlDigest(map[string]string{"worker.json": string(raw)})
 		out, err := f.forwarder.ForwardWorkerEnrollment(context.Background(), ownerTestID, f.worker.Intent.SessionID, f.worker.Intent.ID, []byte("synthetic.pod.token"), f.csr)
 		if err != nil || !out.Peer.Valid(time.Now()) {
 			t.Fatal("cluster forwarding", cluster, err)
@@ -148,7 +142,7 @@ func TestOwnerForwarderRejectsChangedWorkerTrust(t *testing.T) {
 						}
 					}
 					if mode == "profile-after" {
-						o.Worker.Intent.Profile.ControlDigest = artifact.Digest{11}
+						o.Worker.Intent.Profile.ClusterID = ownerOtherID
 					}
 				}
 				return o, err

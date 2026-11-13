@@ -1,12 +1,10 @@
 package kubernetes
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"time"
 
-	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/configuration"
@@ -51,10 +49,11 @@ func NewNamedClusterCatalogSource(client *PermissionClient, name, uid string) (*
 	return &ClusterCatalogSource{client: client, name: name, uid: uid}, nil
 }
 
-// ReadWorkerProfile reads the worker configuration ConfigMap by name with the
-// guarded source's own closed parse. The profile only selects; consumers
-// still require SQL's current audited revision to equal it (ADR-070).
-func ReadWorkerProfile(ctx context.Context, client *PermissionClient, name, installation string) (authorization.DownloadWorkerProfile, error) {
+// ReadWorkerProfile reads the worker profile ConfigMap name of the client's
+// namespace with the worker configuration source's own parse; installation
+// and epoch are the IDs Secret's. The profile only selects; consumers still
+// require SQL's current audited revision to equal it (ADR-070).
+func ReadWorkerProfile(ctx context.Context, client *PermissionClient, name, installation, epoch string) (authorization.DownloadWorkerProfile, error) {
 	var zero authorization.DownloadWorkerProfile
 	if client == nil || ctx == nil || len(validation.IsDNS1123Subdomain(name)) != 0 {
 		return zero, artifact.ErrInvalid
@@ -66,15 +65,10 @@ func ReadWorkerProfile(ctx context.Context, client *PermissionClient, name, inst
 		return zero, err
 	}
 	data, _, err := client.installationConfig(ctx, name, uid)
-	raw := []byte(data["worker-profile.json"])
-	if err != nil || len(data) != 1 || len(raw) == 0 || len(raw) > 16384 {
+	if err != nil || len(data) != 1 {
 		return zero, artifact.ErrInvalid
 	}
-	var w contracts.WorkerConfiguration
-	if json.NewDecoder(bytes.NewReader(raw)).Decode(&w) != nil {
-		return zero, artifact.ErrInvalid
-	}
-	out, err := parseWorkerConfiguration(raw, uid, installation, client.clusterID, value.NamespaceRef{Name: w.Namespace.Name, UID: w.Namespace.UID})
+	out, err := workerConfiguration(ctx, client, []byte(data["worker-profile.json"]), uid, installation, epoch)
 	if err != nil {
 		return zero, err
 	}
@@ -90,6 +84,7 @@ func ObjectUIDFrom(ctx context.Context, client *PermissionClient, path string) (
 	if err != nil {
 		return "", err
 	}
+	defer clear(b)
 	var object struct {
 		Metadata struct {
 			UID string `json:"uid"`

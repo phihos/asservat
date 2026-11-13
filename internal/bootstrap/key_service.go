@@ -171,8 +171,18 @@ func keyServiceAcquisition(ctx context.Context, c keyServiceInputs, api *rest.Co
 	if d == nil || pool == nil {
 		return nil, none, mounts.ErrUnavailable
 	}
-	profile, err := kube.ReadWorkerProfile(ctx, observer, c.Name+"-worker-profile", c.InstallationID)
-	// The workers' namespace is never the key service's (ADR-204 decision 1).
+	// The worker profile lives in the download-worker namespace, never the
+	// key service's (ADR-204 decision 1).
+	workers := c.Name + "-downloads"
+	workersUID, err := kube.NamespaceUID(ctx, api, workers)
+	if err != nil {
+		return nil, none, &fixedStepError{"key-service/worker-namespace", mounts.ErrUnavailable}
+	}
+	workerClient, err := kube.NewPermissionClient(api, c.ClusterID, cfg.NamespaceRef{Name: workers, UID: workersUID}, time.Now)
+	if err != nil {
+		return nil, none, mounts.ErrUnavailable
+	}
+	profile, err := kube.ReadWorkerProfile(ctx, workerClient, c.Name+"-worker-profile", c.InstallationID, c.IssuerEpoch)
 	if err != nil || profile.Namespace == c.Namespace {
 		return nil, none, &fixedStepError{"key-service/worker-configuration", mounts.ErrUnavailable}
 	}

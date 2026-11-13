@@ -45,7 +45,7 @@ func TestRawSyscallQueryCompleteBindingKeeps48KiBBound(t *testing.T) {
 		if !op.CurrentValid(now) {
 			t.Fatal("native operation invalid")
 		}
-		profile := authorization.DownloadWorkerProfile{Configuration: q.Plan.Profile.Path.WorkerConfiguration, InstallationID: q.Plan.InstallationID, ClusterID: q.Plan.Profile.Path.AcquisitionClusterID, Namespace: "workers", NamespaceUID: "namespace", ServiceAccount: "acquisition", ServiceAccountUID: "account", Image: "synthetic.invalid/worker@sha256:" + strings.Repeat("1", 64), ControlConfig: "control", ControlConfigUID: "config", PriorityClass: "workers", PriorityClassUID: "priority", ControlDigest: digest, CPUMillis: q.Plan.Profile.Worker.CPUMilli, MemoryBytes: q.Plan.Profile.Worker.MemoryBytes, MaxRuntime: 8 * time.Hour}
+		profile := authorization.DownloadWorkerProfile{Configuration: q.Plan.Profile.Path.WorkerConfiguration, InstallationID: q.Plan.InstallationID, ClusterID: q.Plan.Profile.Path.AcquisitionClusterID, Namespace: "workers", NamespaceUID: "namespace", ServiceAccount: "acquisition", ServiceAccountUID: "account", Image: "synthetic.invalid/worker@sha256:" + strings.Repeat("1", 64), ControlConfig: "control", ControlConfigUID: "config", PriorityClass: "workers", PriorityClassUID: "priority", CPUMillis: q.Plan.Profile.Worker.CPUMilli, MemoryBytes: q.Plan.Profile.Worker.MemoryBytes, MaxRuntime: 8 * time.Hour}
 		intent := query.ContextProjectionWorkerIntent{Query: q, Worker: authorization.AcquisitionWorkerIntent{ID: q.WorkerID, Parent: authorization.AcquisitionParent{Purpose: authorization.AcquisitionProjection, ID: q.ID}, Profile: profile, CreatedAt: q.CreatedAt, RunUntil: q.WorkerUntil}}
 		if !intent.Valid() {
 			t.Fatal("worker intent invalid")

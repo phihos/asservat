@@ -3,9 +3,7 @@ package mtls
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
 	"crypto/x509"
-	"encoding/json"
 	"net"
 	"net/url"
 	"strconv"
@@ -124,21 +122,4 @@ func (t *WorkerControlTrust) Roots(now time.Time) (*x509.CertPool, *x509.CertPoo
 		}
 	}
 	return server, issuer, nil
-}
-
-// WorkerControlDigest pins the exact immutable ConfigMap data bytes. Whitespace
-// changes require a new protected profile; parsing alone never normalizes away
-// a changed startup source.
-func WorkerControlDigest(data map[string]string) (artifact.Digest, error) {
-	if len(data) != 1 {
-		return artifact.Digest{}, artifact.ErrInvalid
-	}
-	if _, err := ParseWorkerControl([]byte(data["worker.json"])); err != nil {
-		return artifact.Digest{}, artifact.ErrInvalid
-	}
-	b, err := json.Marshal(data)
-	if err != nil {
-		return artifact.Digest{}, artifact.ErrInvalid
-	}
-	return artifact.Digest(sha256.Sum256(b)), nil
 }

@@ -2,7 +2,6 @@ package kubernetes
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"strings"
 	"testing"
@@ -48,20 +47,9 @@ func plainSourcePlan(name string) cfg.ConfigMapAdministration {
 var plainSourcePin = GuardPin{PolicyUID: "policy", PolicyGeneration: 1, BindingUID: "binding", BindingResourceVersion: "1"}
 
 func TestRuntimeSourcesArePlainReadsWithoutAdmissionGuards(t *testing.T) {
-	const installation, catalogUID, workerUID, settingsUID = "11111111-1111-4111-8111-111111111112", "11111111-1111-4111-8111-111111111114", "11111111-1111-4111-8111-111111111113", "11111111-1111-4111-8111-111111111115"
-	worker, _ := json.Marshal(map[string]any{
-		"format": "asservat-worker-configuration/v1", "installationID": installation,
-		"clusterID": permissionCluster, "recoveryEpoch": installation, "revision": 1, "suspended": false,
-		"namespace":      map[string]any{"name": permissionControl.Name, "uid": permissionControl.UID},
-		"serviceAccount": map[string]any{"name": "acquisition", "uid": "account-uid"},
-		"priorityClass":  map[string]any{"name": "acquisition", "uid": "priority-uid"},
-		"controlConfig":  map[string]any{"name": "worker-control", "uid": "control-uid", "sha256": strings.Repeat("1", 64)},
-		"image":          "synthetic.invalid/worker@sha256:" + strings.Repeat("1", 64), "imagePullSecrets": []string{},
-		"cpuMillis": 100, "memoryBytes": 64 << 20, "maxRuntimeSeconds": 60,
-	})
+	const catalogUID = "11111111-1111-4111-8111-111111111114"
 	observer, probe := plainSourceClients(t, map[string]map[string]any{
 		"cluster-catalog": plainSourceObject("cluster-catalog", catalogUID, false, map[string]string{contracts.OwnerClusterCatalogFile: `{"format":"` + contracts.OwnerClusterCatalogFormat + `","clusters":[]}`}),
-		"worker-profile":  plainSourceObject("worker-profile", workerUID, false, map[string]string{"worker-profile.json": string(worker)}),
 	})
 
 	t.Run("cluster-catalog", func(t *testing.T) {
@@ -75,21 +63,6 @@ func TestRuntimeSourcesArePlainReadsWithoutAdmissionGuards(t *testing.T) {
 		}
 		if c, err := s.ReadClusterCatalog(context.Background()); err != nil || c.Clusters == nil {
 			t.Fatal("plain catalog read", err)
-		}
-	})
-	t.Run("worker-configuration", func(t *testing.T) {
-		g, err := NewWorkerConfigurationProtection(observer, probe, plainSourcePlan("worker-profile"), plainSourcePin)
-		if err != nil {
-			t.Fatal(err)
-		}
-		s, err := NewWorkerConfigurationSource(observer, g, "worker-profile", workerUID, installation)
-		if err != nil {
-			t.Fatal(err)
-		}
-		start := observer.now()
-		o, err := s.ReadWorkerConfiguration(context.Background())
-		if err != nil || o.Configuration.ProtectionDigest != g.digest || !o.FreshUntil.Equal(start.Add(5*time.Second)) {
-			t.Fatal("plain worker configuration read lost its digest or original window", err)
 		}
 	})
 }

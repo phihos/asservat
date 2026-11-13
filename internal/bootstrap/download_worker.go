@@ -4,7 +4,6 @@ package bootstrap
 import (
 	"asservat.local/asservat/internal/adapters/mounts"
 	"context"
-	"encoding/hex"
 	"flag"
 	"io"
 	"math/rand/v2"
@@ -20,16 +19,15 @@ import (
 )
 
 type WorkerStartup struct {
-	Target        value.WorkerCredentialTarget
-	ClusterID     string
-	ControlDigest artifact.Digest
+	Target    value.WorkerCredentialTarget
+	ClusterID string
 }
 
 // Arguments come only from the protected dispatch template. Fixed mount paths
 // cannot be redirected through the CLI or a public download request.
 func ParseWorkerStartup(args []string, podUID string) (WorkerStartup, error) {
 	var out WorkerStartup
-	var created, until, digest, control, token string
+	var created, until, control, token string
 	set := flag.NewFlagSet("download-worker", flag.ContinueOnError)
 	set.SetOutput(io.Discard)
 	set.StringVar(&out.Target.InstallationID, "installation", "", "")
@@ -39,11 +37,10 @@ func ParseWorkerStartup(args []string, podUID string) (WorkerStartup, error) {
 	set.StringVar(&out.Target.QueryID, "query", "", "")
 	set.StringVar(&created, "created-at", "", "")
 	set.StringVar(&until, "until", "", "")
-	set.StringVar(&digest, "control-sha256", "", "")
 	set.StringVar(&control, "control", "", "")
 	set.StringVar(&token, "token", "", "")
 	// Reject duplicates and alternative flag spellings, not just last-value-wins.
-	if len(args) != 18 {
+	if len(args) != 16 {
 		return out, artifact.ErrInvalid
 	}
 	seen := map[string]bool{}
@@ -65,13 +62,8 @@ func ParseWorkerStartup(args []string, podUID string) (WorkerStartup, error) {
 	if err != nil || until != out.Target.RunUntil.UTC().Format(time.RFC3339Nano) {
 		return out, artifact.ErrInvalid
 	}
-	b, err := hex.DecodeString(digest)
-	if err != nil || len(b) != 32 || hex.EncodeToString(b) != digest {
-		return out, artifact.ErrInvalid
-	}
-	copy(out.ControlDigest[:], b)
 	out.Target.PodUID = podUID
-	if !out.Target.Valid() || !value.UUID(out.ClusterID) || out.ControlDigest == (artifact.Digest{}) {
+	if !out.Target.Valid() || !value.UUID(out.ClusterID) {
 		return out, artifact.ErrInvalid
 	}
 	return out, nil
@@ -79,10 +71,6 @@ func ParseWorkerStartup(args []string, podUID string) (WorkerStartup, error) {
 
 func LoadWorkerTrust(input WorkerStartup, raw []byte, now time.Time) (*mtls.WorkerControlTrust, error) {
 	if !input.Target.Valid() || !value.UUID(input.ClusterID) || len(raw) > contracts.WorkerControlMaxBytes {
-		return nil, artifact.ErrInvalid
-	}
-	d, err := mtls.WorkerControlDigest(map[string]string{"worker.json": string(raw)})
-	if err != nil || d != input.ControlDigest {
 		return nil, artifact.ErrInvalid
 	}
 	trust, err := mtls.ParseWorkerControl(raw)

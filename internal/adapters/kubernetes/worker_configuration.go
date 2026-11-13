@@ -4,114 +4,101 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"encoding/json/jsontext"
-	"errors"
+	"io"
 	"time"
 
 	"asservat.local/asservat/internal/application/evidence"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
 	value "asservat.local/asservat/internal/domain/authorization"
-	"asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/identity"
 	"k8s.io/apimachinery/pkg/util/validation"
 )
 
-// ErrWorkerUnconfigured is a protected source holding exactly the installed
-// unconfigured document (ADR-194 D1): the process serves no downloads.
-var ErrWorkerUnconfigured = errors.New("worker configuration unconfigured")
-
+// WorkerConfigurationSource reads the Helm-rendered worker profile of its
+// client's namespace (the download-worker namespace).
 type WorkerConfigurationSource struct {
-	client                  *PermissionClient
-	protection              *WorkerConfigurationProtection
-	name, uid, installation string
+	client                         *PermissionClient
+	protection                     *WorkerConfigurationProtection
+	name, uid, installation, epoch string
 }
 
 var _ evidence.WorkerConfigurationReader = (*WorkerConfigurationSource)(nil)
 
-func NewWorkerConfigurationSource(client *PermissionClient, protection *WorkerConfigurationProtection, name, uid, installation string) (*WorkerConfigurationSource, error) {
-	if client == nil || protection == nil || protection.configMapProtection == nil || protection.observer != client || protection.plan.SourceName != name || !installationRefValid(name, uid) || !value.UUID(uid) || !value.UUID(installation) {
+// NewWorkerConfigurationSource reads the profile ConfigMap name (UID uid, as
+// read by name at startup). installation and epoch are the IDs Secret's
+// installationID and issuerEpoch.
+func NewWorkerConfigurationSource(client *PermissionClient, protection *WorkerConfigurationProtection, name, uid, installation, epoch string) (*WorkerConfigurationSource, error) {
+	if client == nil || protection == nil || protection.configMapProtection == nil || protection.observer != client || protection.plan.SourceName != name || !installationRefValid(name, uid) || !value.UUID(uid) || !value.UUID(installation) || !value.UUID(epoch) {
 		return nil, artifact.ErrInvalid
 	}
-	return &WorkerConfigurationSource{client, protection, name, uid, installation}, nil
+	return &WorkerConfigurationSource{client, protection, name, uid, installation, epoch}, nil
 }
+
 func (s *WorkerConfigurationSource) snapshot(ctx context.Context) (value.DownloadWorkerConfiguration, error) {
-	var out value.DownloadWorkerConfiguration
 	data, _, e := s.client.installationConfig(ctx, s.name, s.uid)
-	if e == nil && len(data) == 1 && data["worker-profile.json"] == contracts.UnconfiguredWorkerConfiguration(s.installation) {
-		return out, ErrWorkerUnconfigured
-	}
-	if e != nil || len(data) != 1 || len(data["worker-profile.json"]) == 0 || len(data["worker-profile.json"]) > 16384 {
-		return out, artifact.ErrInvalid
-	}
-	out, e = parseWorkerConfiguration([]byte(data["worker-profile.json"]), s.uid, s.installation, s.client.clusterID, s.client.control)
-	if e != nil {
-		return value.DownloadWorkerConfiguration{}, e
-	}
-	if e = checkWorkerStoreSecret(ctx, s.client, out.Profile); e != nil {
-		return value.DownloadWorkerConfiguration{}, e
-	}
-	return out, nil
-}
-
-// PinnedWorkerConfiguration derives the profile of an installer-pinned copy
-// of the source's document with the source reader's own closed parse
-// (ADR-204 decision 8). The copy proves nothing about the source: a consumer
-// still needs SQL's current audited revision to equal the profile (ADR-070).
-func PinnedWorkerConfiguration(w contracts.WorkerConfiguration, sourceUID, installation, cluster string) (value.DownloadWorkerConfiguration, error) {
-	b, e := json.Marshal(w)
-	if e != nil || len(b) > 16384 || !value.UUID(sourceUID) || !value.UUID(cluster) {
+	if e != nil || len(data) != 1 {
 		return value.DownloadWorkerConfiguration{}, artifact.ErrInvalid
 	}
-	return parseWorkerConfiguration(b, sourceUID, installation, cluster, configuration.NamespaceRef{Name: w.Namespace.Name, UID: w.Namespace.UID})
+	return workerConfiguration(ctx, s.client, []byte(data["worker-profile.json"]), s.uid, s.installation, s.epoch)
 }
 
-// parseWorkerConfiguration is the closed, canonical worker-profile.json parse.
-// The document must name exactly this installation, cluster and namespace.
-func parseWorkerConfiguration(b []byte, uid, installation, cluster string, namespace configuration.NamespaceRef) (value.DownloadWorkerConfiguration, error) {
-	var out value.DownloadWorkerConfiguration
+// workerConfiguration resolves a v3 worker-profile.json document of the
+// client's namespace. The generated IDs are the caller's; the namespace UID
+// is the client's namespace reference; the service account, PriorityClass,
+// control ConfigMap and store Secret UIDs are read by name. The revision
+// digest covers the canonical document only.
+func workerConfiguration(ctx context.Context, client *PermissionClient, raw []byte, sourceUID, installation, epoch string) (value.DownloadWorkerConfiguration, error) {
+	var zero value.DownloadWorkerConfiguration
 	var w contracts.WorkerConfiguration
-	d := json.NewDecoder(bytes.NewReader(b))
+	if len(raw) == 0 || len(raw) > 16384 {
+		return zero, artifact.ErrInvalid
+	}
+	d := json.NewDecoder(bytes.NewReader(raw))
 	d.DisallowUnknownFields()
-	if d.Decode(&w) != nil {
-		return out, artifact.ErrInvalid
+	if d.Decode(&w) != nil || d.Decode(&struct{}{}) != io.EOF || w.Format != contracts.WorkerConfigurationFormat || w.Namespace != client.control.Name || w.Revision < 1 || w.Revision > 2147483647 || w.MaxRuntimeSeconds < 30 || w.MaxRuntimeSeconds > 28800 || w.ImagePullSecrets == nil || len(w.ImagePullSecrets) > 4 {
+		return zero, artifact.ErrInvalid
 	}
-	encoded, e := json.Marshal(w)
-	a, z := jsontext.Value(b), jsontext.Value(encoded)
-	if e != nil || a.Canonicalize() != nil || z.Canonicalize() != nil || !bytes.Equal(a, z) || !(w.Format == "asservat-worker-configuration/v1" && w.StoreCredentials == nil || w.Format == "asservat-worker-configuration/v2" && w.StoreCredentials != nil) || w.InstallationID != installation || w.ClusterID != cluster || w.Namespace.Name != namespace.Name || w.Namespace.UID != namespace.UID || w.Revision < 1 || w.Revision > 2147483647 || w.MaxRuntimeSeconds < 30 || w.MaxRuntimeSeconds > 28800 || w.ImagePullSecrets == nil || len(w.ImagePullSecrets) > 4 {
-		return out, artifact.ErrInvalid
+	names := append([]string{w.ServiceAccount, w.PriorityClass, w.ControlConfig}, w.ImagePullSecrets...)
+	if w.StoreCredentials != "" {
+		names = append(names, w.StoreCredentials)
 	}
-	h, e := hex.DecodeString(w.ControlConfig.SHA256)
-	if e != nil || len(h) != 32 || hex.EncodeToString(h) != w.ControlConfig.SHA256 {
-		return out, artifact.ErrInvalid
-	}
-	p := value.DownloadWorkerProfile{Configuration: identity.Revision{UID: uid, Generation: w.Revision, Digest: sha256.Sum256(a)}, InstallationID: w.InstallationID, ClusterID: w.ClusterID, Namespace: w.Namespace.Name, NamespaceUID: w.Namespace.UID, ServiceAccount: w.ServiceAccount.Name, ServiceAccountUID: w.ServiceAccount.UID, PriorityClass: w.PriorityClass.Name, PriorityClassUID: w.PriorityClass.UID, ControlConfig: w.ControlConfig.Name, ControlConfigUID: w.ControlConfig.UID, Image: w.Image, CPUMillis: w.CPUMillis, MemoryBytes: w.MemoryBytes, MaxRuntime: time.Duration(w.MaxRuntimeSeconds) * time.Second}
-	copy(p.ControlDigest[:], h)
-	if w.StoreCredentials != nil {
-		p.StoreCredentialSecret, p.StoreCredentialSecretUID = w.StoreCredentials.Name, w.StoreCredentials.UID
-		if len(validation.IsDNS1123Subdomain(p.StoreCredentialSecret)) != 0 || !value.UUID(p.StoreCredentialSecretUID) {
-			return out, artifact.ErrInvalid
+	for _, name := range names {
+		if len(validation.IsDNS1123Subdomain(name)) != 0 {
+			return zero, artifact.ErrInvalid
 		}
 	}
+	canonical := jsontext.Value(bytes.Clone(raw))
+	if canonical.Canonicalize() != nil {
+		return zero, artifact.ErrInvalid
+	}
+	ns := "/api/v1/namespaces/" + w.Namespace
+	p := value.DownloadWorkerProfile{Configuration: identity.Revision{UID: sourceUID, Generation: w.Revision, Digest: sha256.Sum256(canonical)}, InstallationID: installation, ClusterID: client.clusterID, Namespace: w.Namespace, NamespaceUID: client.control.UID, ServiceAccount: w.ServiceAccount, PriorityClass: w.PriorityClass, ControlConfig: w.ControlConfig, Image: w.Image, CPUMillis: w.CPUMillis, MemoryBytes: w.MemoryBytes, MaxRuntime: time.Duration(w.MaxRuntimeSeconds) * time.Second, StoreCredentialSecret: w.StoreCredentials}
 	copy(p.ImagePullSecrets[:], w.ImagePullSecrets)
-	for _, name := range []string{p.ServiceAccount, p.PriorityClass, p.ControlConfig} {
-		if len(validation.IsDNS1123Subdomain(name)) != 0 {
-			return out, artifact.ErrInvalid
-		}
+	type ref struct {
+		path string
+		uid  *string
 	}
-	for _, name := range w.ImagePullSecrets {
-		if len(validation.IsDNS1123Subdomain(name)) != 0 {
-			return out, artifact.ErrInvalid
-		}
+	refs := []ref{{ns + "/serviceaccounts/" + p.ServiceAccount, &p.ServiceAccountUID}, {"/apis/scheduling.k8s.io/v1/priorityclasses/" + p.PriorityClass, &p.PriorityClassUID}, {ns + "/configmaps/" + p.ControlConfig, &p.ControlConfigUID}}
+	if p.StoreCredentialSecret != "" {
+		refs = append(refs, ref{ns + "/secrets/" + p.StoreCredentialSecret, &p.StoreCredentialSecretUID})
 	}
-	out = value.DownloadWorkerConfiguration{Profile: p, RecoveryEpoch: w.RecoveryEpoch, Suspended: w.Suspended}
-	if !p.Valid() || !value.UUID(w.RecoveryEpoch) {
-		return value.DownloadWorkerConfiguration{}, artifact.ErrInvalid
+	for _, v := range refs {
+		uid, e := ObjectUIDFrom(ctx, client, v.path)
+		if e != nil {
+			return zero, artifact.ErrDownloadUnavailable
+		}
+		*v.uid = uid
+	}
+	out := value.DownloadWorkerConfiguration{Profile: p, RecoveryEpoch: epoch, Suspended: w.Suspended}
+	if !p.Valid() || !value.UUID(epoch) {
+		return zero, artifact.ErrInvalid
 	}
 	return out, nil
 }
+
 func (s *WorkerConfigurationSource) ReadWorkerConfiguration(ctx context.Context) (value.DownloadWorkerObservation, error) {
 	var out value.DownloadWorkerObservation
 	if s == nil || ctx == nil {
