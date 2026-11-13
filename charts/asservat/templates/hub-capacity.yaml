@@ -1,0 +1,29 @@
+{{- if and (include "asservat.hubWorker.hub" .) (include "asservat.hubWorker.capacityEnabled" .) .Values.capacity.poolSpec .Values.capacity.policySpec }}
+{{- $c := .Values.capacity }}
+{{- if ne $c.policySpec.poolRef $c.pool }}{{ fail "capacity.policySpec.poolRef must equal capacity.pool" }}{{ end }}
+{{- if not (dig "scope" "clusterID" "" $c.policySpec) }}{{ fail "capacity.policySpec.scope.clusterID is required: use the clusterID of the <name>-ids Secret" }}{{ end }}
+apiVersion: asservat.io/v1alpha1
+kind: EvidenceStoragePool
+metadata:
+  name: {{ $c.pool }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: asservat
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+    app.kubernetes.io/component: capacity
+    app.kubernetes.io/managed-by: {{ .Release.Service | quote }}
+# JSON keeps large integer quantities exact (toYaml would use exponents).
+spec: {{ toJson $c.poolSpec }}
+---
+apiVersion: asservat.io/v1alpha1
+kind: EvidenceBudgetPolicy
+metadata:
+  name: {{ $c.policy }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: asservat
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+    app.kubernetes.io/component: capacity
+    app.kubernetes.io/managed-by: {{ .Release.Service | quote }}
+spec: {{ toJson $c.policySpec }}
+{{- end }}

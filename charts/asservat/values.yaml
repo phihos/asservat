@@ -7,6 +7,45 @@ mode: hub
 runtime:
   enabled: false
 
+# Helm-native installation (docs/reviews/helm-native-install-plan.md).
+installation:
+  # Prefix of every object name; a DNS label of at most 30 characters.
+  name: asservat
+
+# The exact product image, referenced only by digest.
+image:
+  repository: ""
+  # sha256:<64 hex>
+  digest: ""
+  pullPolicy: IfNotPresent
+  # Existing dockerconfigjson Secrets in the release namespace.
+  pullSecrets: []
+
+# Hub workloads (mode hub or combined).
+hub:
+  hub-worker:
+    # Off until the Helm-native hub replaces the installer path.
+    enabled: false
+    replicas: 1
+    resources:
+      requests: {cpu: 100m, memory: 64Mi}
+      limits: {cpu: 500m, memory: 256Mi}
+    nodeSelector: {}
+    tolerations: []
+    # Audience of the projected cluster-observation token (with capacity).
+    clusterObservationAudience: asservat-cluster-observation
+
+# Initial capacity sources (the former bootstrap.continuation.public.capacity,
+# same field names). Set to enable capacity; poolSpec and policySpec render
+# the EvidenceStoragePool `pool` and EvidenceBudgetPolicy `policy`. The
+# policy scope needs the clusterID of the `<name>-ids` Secret.
+capacity: {}
+
+# The hub's baseline retention policy (the former
+# bootstrap.continuation.public.retentionBaseline: purposeRef, defaults,
+# maxima, deletionBudgetSeconds). Set to render `<name>-baseline`.
+retention: {}
+
 # Optional initial-installation checkpoint only; this starts no runtime service.
 # The release namespace must already be a trusted Restricted bootstrap namespace.
 bootstrap:
@@ -246,6 +285,10 @@ collector:
 services:
   keyService:
     provider: external
+    # Used with provider external.
+    external:
+      endpoint: ""
+      rootsPEM: ""
     openbao:
       image: ghcr.io/openbao/openbao@sha256:5046911075e137e154ce49ab051502f4ec7cf367d484ae4a4dce665d9b90561f
       persistence:
@@ -256,6 +299,12 @@ services:
         limits: {cpu: "2", memory: 512Mi}
   postgres:
     provider: external
+    # Used with provider external.
+    external:
+      host: ""
+      port: 5432
+      database: asservat
+      rootsPEM: ""
     bundled:
       image: ""
       storageClass: ""
@@ -269,6 +318,12 @@ services:
         limits: {cpu: "1", memory: 256Mi}
   objectStore:
     provider: external
+    # Used with provider external; the operator creates the s3-* Secrets.
+    external:
+      endpoint: ""
+      region: ""
+      bucket: ""
+      rootsPEM: ""
     seaweedfs:
       image: chrislusf/seaweedfs@sha256:ccad23e18639c8b98cee17e7100b95830a06077b56d8e5b006d6dcf8ec5e94a0
       persistence:

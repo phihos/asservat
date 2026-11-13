@@ -1615,6 +1615,29 @@
                 "resources",
                 "backupResources"
               ]
+            },
+            "external": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "host": {
+                  "type": "string",
+                  "maxLength": 253
+                },
+                "port": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 65535
+                },
+                "database": {
+                  "type": "string",
+                  "maxLength": 63
+                },
+                "rootsPEM": {
+                  "type": "string",
+                  "maxLength": 65536
+                }
+              }
             }
           },
           "required": [
@@ -1699,6 +1722,28 @@
                 "persistence",
                 "resources"
               ]
+            },
+            "external": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "endpoint": {
+                  "type": "string",
+                  "maxLength": 2048
+                },
+                "region": {
+                  "type": "string",
+                  "maxLength": 64
+                },
+                "bucket": {
+                  "type": "string",
+                  "maxLength": 63
+                },
+                "rootsPEM": {
+                  "type": "string",
+                  "maxLength": 65536
+                }
+              }
             }
           },
           "required": [
@@ -1944,6 +1989,20 @@
                 "persistence",
                 "resources"
               ]
+            },
+            "external": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "endpoint": {
+                  "type": "string",
+                  "maxLength": 2048
+                },
+                "rootsPEM": {
+                  "type": "string",
+                  "maxLength": 65536
+                }
+              }
             }
           },
           "required": [
@@ -1957,6 +2016,113 @@
         "objectStore",
         "identity",
         "keyService"
+      ]
+    },
+    "installation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 30,
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+        }
+      }
+    },
+    "image": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "repository": {
+          "type": "string",
+          "maxLength": 384
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^(sha256:[a-f0-9]{64})?$"
+        },
+        "pullPolicy": {
+          "type": "string",
+          "enum": [
+            "Always",
+            "IfNotPresent",
+            "Never"
+          ]
+        },
+        "pullSecrets": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 253
+          }
+        }
+      }
+    },
+    "hub": {
+      "type": "object",
+      "properties": {
+        "hub-worker": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "replicas": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "resources": {
+              "type": "object"
+            },
+            "nodeSelector": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "tolerations": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            },
+            "clusterObservationAudience": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 253
+            }
+          }
+        }
+      }
+    },
+    "capacity": {
+      "description": "Empty, or the former bootstrap.continuation.public.capacity object.",
+      "anyOf": [
+        {
+          "type": "object",
+          "maxProperties": 0
+        },
+        {
+          "$ref": "#/definitions/installerCapacity"
+        }
+      ]
+    },
+    "retention": {
+      "description": "Empty, or the former bootstrap.continuation.public.retentionBaseline object.",
+      "anyOf": [
+        {
+          "type": "object",
+          "maxProperties": 0
+        },
+        {
+          "$ref": "#/definitions/installerRetentionBaseline"
+        }
       ]
     }
   },
