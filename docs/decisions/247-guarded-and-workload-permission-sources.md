@@ -1,12 +1,13 @@
 # ADR-247 — Guarded, group-ID, remote-cluster and workload permission sources
 
-> Superseded in part by ADR-328 (2026-11-13): the runtime guard proofs no longer apply: the
-> pinned policy/binding checks, the unprivileged probe account and probe namespace, the dry-run
-> denials, the probe's `create deployments` right and `GuardUnavailable` from a lost proof. Helm
-> installs the namespace and workload ValidatingAdmissionPolicies; RBAC keeps everyone but
-> cluster administrators from changing them, and cluster administrators are trusted. The guards
-> themselves remain valid, because they protect ownership labels in application namespaces
-> against writers outside Asservat. So do `groupID`, joined-cluster journals and workload sources.
+> Superseded in part by ADR-328 (2026-11-13): the application-namespace label guards stay.
+> They protect the ownership labels that sources derive grants from against writers in
+> application namespaces, who are outside Asservat and in scope (precedent: Capsule and Kyverno,
+> row 4). Helm installs both ValidatingAdmissionPolicies, and a source relies on the configured
+> policy. The runtime proof of the guards no longer applies: the pinned policy/binding checks,
+> the probe account and namespace, the dry-run denials, the probe's `create deployments` right
+> and `GuardUnavailable`. `groupID`, joined-cluster journals and workload sources are unchanged.
+> Status: target state; the code removal is tracked under TASK-11 in the implementation plan.
 
 Date: 2026-10-27. Status: accepted; implemented; qualification below.
 Requirements: REQ-PER-003 (namespace metadata inheritance: `admissionEnforced`, `groupID`, every
@@ -97,10 +98,10 @@ AccessBindings by hand.
 | 3 | Typical deployments | Clusters with Kyverno/VAP label protection; opt-in per source. | Common where namespaces carry an owner group ID. | Yes: every multi-cluster installation using sources. | Uncommon path: shared multi-team namespaces. |
 | 4 | Precedent | Capsule/Kyverno protect owner labels by admission; reuses the existing ADR-190 guard and proof. | ADR-059 eligibleGroups; group-claim-to-role mapping as in Argo CD RBAC. | Agent-side watches relaying reduced state to a hub, the pattern of multi-cluster agents such as Open Cluster Management's work agent; the hub never watches member API servers directly. | Same label-ownership pattern on workloads (Capsule tenant labels, Backstage owner labels under admission). |
 | 5 | Privileges added | Hub-worker reads existing guard proofs via the existing channel; none new. | Hub-worker `get` on one pinned ConfigMap. | Connector `watch namespaces` (metadata digests only leave the cluster). | Connector/owner `watch deployments,statefulsets` (metadata only); probe `create deployments` in its quota-zero probe namespace; one cluster-wide VAP on workload writes (failurePolicy Fail, CEL in the API server); `get` on that VAP. |
-| 6 | Failure states | 1 (`GuardUnavailable`, same handling as `MetadataUnavailable`). | 1 (`DirectoryUnavailable`, same handling). | 0 new reasons; journal restarts re-mint (fail safe). | 0 new reasons beyond the two above. |
+| 6 | Failure states | 0 (`GuardUnavailable` went with the runtime proof, ADR-328). | 1 (`DirectoryUnavailable`, same handling). | 0 new reasons; journal restarts re-mint (fail safe). | 0 new reasons beyond the two above. |
 | 7 | Self-configuration | None. | None. | None (refresh 10 s, idle 2 min, bounds are constants). | `workloadKeys` in the capacity profile: semantic (which keys are protected), not tuning. |
 | 8 | External dependencies | ValidatingAdmissionPolicy (GA 1.30), already required. | None new. | None new (existing mTLS observation channel). | Same VAP API; ResourceQuota object counts. |
-| 9 | Cost at scale | Per cluster with a guarded source: one proof (about a dozen API calls) every ~3 s while such a source exists — the capacity guard's existing cadence. | One ConfigMap read per ~5 min per issuer. | Per joined cluster with sources: one connector watch (bounded 4,096 namespaces with keys, ~1 MiB journal) and one hub read every 10 s (≤ 64 namespaces per page, ≤ 64 pages); 0 API calls per read on the connector. | Per selection: two metadata watches on the connector (≤ 4,096 workloads), one namespace LIST per 30 s, one hub read per 10 s; per cluster one guard proof every ~3 s. Admission: one CEL evaluation per Deployment/StatefulSet write in the cluster. |
+| 9 | Cost at scale | No runtime proof calls; the Helm-configured policy is trusted (ADR-328). | One ConfigMap read per ~5 min per issuer. | Per joined cluster with sources: one connector watch (bounded 4,096 namespaces with keys, ~1 MiB journal) and one hub read every 10 s (≤ 64 namespaces per page, ≤ 64 pages); 0 API calls per read on the connector. | Per selection: two metadata watches on the connector (≤ 4,096 workloads), one namespace LIST per 30 s, one hub read per 10 s; per cluster one guard proof every ~3 s. Admission: one CEL evaluation per Deployment/StatefulSet write in the cluster. |
 | 10 | Upgrade/rollback/disable | Additive; disable by `administratorManaged`, disabling or deleting the source; an older reconciler grants nothing from the source and retires its assignments at its next acceptance (fail closed). | Same. | Additive purpose; an older connector refuses it (source unavailable). RBAC templates change: existing regional installs re-run the cluster installer (marker template digest). | Additive; guard only with `workloadKeys`; rollback leaves the VAP in place (it only restricts keyed workload writes; the operator can delete it); an older reconciler grants nothing from workload sources and retires their assignments. |
 | 11 | Smaller fix | Document `administratorManaged` only: does not satisfy the spec's guarded mode. | Value maps only: spec names groupID. | Hub-polled LISTs: unrelated writes would re-mint (every resourceVersion change) or A → B → A would be missed; connector-side versions are the smallest correct form. | Workload-scoped AccessBindings via GitOps cover the need today; the spec still requires the source type, so it ships behind the opt-in guard. |
 

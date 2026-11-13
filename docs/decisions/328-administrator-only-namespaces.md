@@ -28,7 +28,29 @@ with TokenReview and TLS.
 Users and workloads outside the Asservat namespaces: per-operation checks of
 the current human or workload identity, permissions, retention and sharing;
 encrypted evidence and audit; SQL effect fences; key material confined to the
-key service; peer authentication between clusters over mutual TLS.
+key service; peer authentication between clusters over mutual TLS. Writers in
+application namespaces are outside Asservat: where permission sources derive
+grants from their labels, Helm-installed admission policies protect those
+labels (ADR-247), with no runtime proof of the policies.
+
+## External evidence
+
+- Kubernetes RBAC good practices: restrict who can write workloads, Secrets
+  and ConfigMaps in a namespace, because those writers can act as any
+  service account there:
+  https://kubernetes.io/docs/concepts/security/rbac-good-practices/
+- Kubernetes multi-tenancy: the namespace is the unit of isolation, with
+  RBAC, Pod Security and network policy per namespace:
+  https://kubernetes.io/docs/concepts/security/multi-tenancy/
+- Comparable operators run in a dedicated namespace and trust its contents
+  (cert-manager, Vault, Argo CD installation guides); none verifies its own
+  objects at runtime. See docs/reviews/security-evidence-2026-11-13.md.
+
+## Implementation status
+
+The superseded notes describe the target state. The code still contains the
+mechanisms until the Helm-native installation and guard removal land
+(docs/reviews/helm-native-install-plan.md, TASK-11).
 
 ## Evidence rule
 
