@@ -134,8 +134,10 @@ class HubWorkerChart(unittest.TestCase):
         self.assertNotIn("annotations", pool["metadata"])
         tokens = {s["serviceAccountToken"]["path"]: s["serviceAccountToken"].get("audience") for s in self.worker(docs)["Deployment"]["spec"]["template"]["spec"]["volumes"][0]["projected"]["sources"] if "serviceAccountToken" in s}
         self.assertEqual(tokens["cluster-observation.token"], "asservat-cluster-observation")
-        capacity["policySpec"]["scope"]["clusterID"] = ""
-        self.assertIn("clusterID is required", self.render(values, ok=False))
+        # An absent clusterID scopes the policy to the hub's own cluster.
+        del capacity["policySpec"]["scope"]["clusterID"]
+        policy, = [d for d in self.render(values) if d["kind"] == "EvidenceBudgetPolicy"]
+        self.assertNotIn("clusterID", policy["spec"]["scope"])
 
     def test_not_rendered_by_default_or_for_cluster_mode(self):
         values = copy.deepcopy(self.external)
