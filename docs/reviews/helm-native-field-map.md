@@ -166,3 +166,39 @@ blocking on each other.
 8. `secrets` extends today's small-services-prepare hook: create-once
    Secrets, `existingSecret` overrides, no workload/PVC reads.
 9. No first-installation audit record, witness or activation receipt.
+
+## Shared contract for implementation streams
+
+Object names use the prefix `<name>` = `.Values.installation.name`
+(default `asservat`); all hub objects live in the release namespace.
+
+Secrets created by `asservat secrets` (create once, never rotate, each with an
+`existingSecret` override under `secrets.<key>`):
+
+| Secret | Keys | Mounted at |
+|---|---|---|
+| `<name>-ids` | `installationID`, `clusterID`, `issuerEpoch`, `permissionRootID`, `browserRootID`, `sessionEpoch`, `roleSetupID`, `peerID` | `/run/asservat/ids/<key>` (every hub component) |
+| `<name>-sql-<component>` | `sql-<purpose>.json` in the existing `OwnerSQLCredential` JSON format, one per runtime role the component uses | the component's existing credential paths |
+| `<name>-audit-mac` | input/account MAC keys and versions | hub-api, federation, publisher |
+| `<name>-artifact-key` | the local artifact root key | key-service only |
+| `<name>-s3-<principal>` | `credentials.json` per object-store principal | the consuming component |
+| bundled service state | unchanged `<name>-postgres-state`, `-openbao-state`, `-objectstore-state`, `-keycloak-state` | unchanged |
+
+`setup` mounts all `<name>-sql-*` Secrets (to create roles and set
+passwords), `<name>-ids`, the admin credentials of the selected providers and
+the component ConfigMaps, and may GET (not write) ConfigMaps and the
+namespace in its own namespace.
+
+Component config: ConfigMap `<name>-<component>-config`, key `config.json`,
+mounted at `/run/asservat/<component>/config.json`, with only H fields;
+components: `hub-api`, `hub-worker`, `federation`, `key-service`,
+`publisher`, `connector`, `node`. Pods carry `checksum/config` annotations.
+
+Values layout (top level): `mode`, `image` (`repository`, `digest`,
+`pullPolicy`), `installation.name`, `origin`, `identity`, `exposure`
+(`service`, `tls`, `ingress`, `httpRoute`, `tlsSecret`), `fleet`,
+`capacity`, `retention`, `federation`, `region`, `collector`, `hub.<component>`
+(`replicas`, `resources`, `nodeSelector`, `tolerations`), `secrets`,
+`services` (bundled providers, unchanged). The former
+`bootstrap.continuation.public.*` groups move to these top-level keys with
+their existing field names.
