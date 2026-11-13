@@ -16,5 +16,8 @@ metadata:
   name: {{ $c.policy }}
   namespace: {{ .Release.Namespace }}
   labels: {{ include "asservat.labels" (list . "capacity") | nindent 4 }}
-spec: {{ toJson $c.policySpec }}
+{{- /* An absent scope.clusterID means the hub cluster (its ID is generated). */}}
+{{- $policy := deepCopy $c.policySpec }}
+{{- if and $policy.scope (not $policy.scope.clusterID) }}{{ $_ := unset $policy.scope "clusterID" }}{{ end }}
+spec: {{ toJson $policy }}
 {{- end }}

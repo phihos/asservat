@@ -69,10 +69,9 @@ func run() int {
 		fmt.Fprintln(os.Stderr, bootstrap.DownloadWorkerDiagnostic(err))
 	case "node":
 		fmt.Fprintln(os.Stderr, bootstrap.NodeDiagnostic(err))
-	case "hub-worker", "publisher":
-		fmt.Fprintln(os.Stderr, bootstrap.HubWorkerDiagnostic(err))
 	default:
-		fmt.Fprintln(os.Stderr, "service stopped: protected configuration, credentials or original deadline unavailable")
+		// The fixed failing step and error class, never provider bodies.
+		fmt.Fprintln(os.Stderr, bootstrap.HubWorkerDiagnostic(err))
 	}
 	return 1
 }

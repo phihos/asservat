@@ -160,5 +160,5 @@ const HubAPIFederationCAFile = "federation-ca.crt"
 func HubAPIName(name, suffix string) string { return name + "-" + suffix }
 
 func DecodeHubAPIConfig(r io.Reader) (HubAPIConfig, error) {
-	return decodeClosedRPC[HubAPIConfig](r, HubAPIConfigMaxBytes)
+	return decodeServiceConfig[HubAPIConfig](r)
 }

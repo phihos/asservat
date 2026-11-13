@@ -11,6 +11,7 @@ import (
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/configuration"
 	coordination "k8s.io/api/coordination/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/tools/leaderelection"
@@ -63,7 +64,11 @@ func (l *reconciliationLock) Get(ctx context.Context) (*resourcelock.LeaderElect
 	if err := l.namespace(ctx); err != nil {
 		return nil, nil, err
 	}
-	b, err := l.client.raw(ctx, l.path(), nil)
+	b, err := l.client.api.Get().AbsPath(l.path()).MaxRetries(0).DoRaw(ctx)
+	if apierrors.IsNotFound(err) {
+		// client-go creates the Lease only after a NotFound status.
+		return nil, nil, apierrors.NewNotFound(coordination.Resource("leases"), l.name)
+	}
 	var v coordination.Lease
 	if err != nil || len(b) > 64<<10 || json.Unmarshal(b, &v) != nil || !l.valid(&v) {
 		return nil, nil, value.ErrUnavailable

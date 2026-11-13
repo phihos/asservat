@@ -76,14 +76,19 @@ func setupStep(step string, err error) error {
 }
 
 // retryUnavailable repeats f while it reports an unavailable provider, up to
-// setupRetry; invalid input, changed state and denials stop at once.
-func retryUnavailable(ctx context.Context, f func(context.Context) error) error {
+// setupRetry; invalid input, changed state and denials stop at once. Each
+// failed attempt prints its error (provider path and status, no bodies of
+// secrets) so a stuck step names its cause in the Job log.
+func retryUnavailable(ctx context.Context, out io.Writer, f func(context.Context) error) error {
 	ctx, cancel := context.WithTimeout(ctx, setupRetry)
 	defer cancel()
 	for {
 		err := f(ctx)
 		if err == nil || errors.Is(err, cfg.ErrInvalid) || errors.Is(err, cfg.ErrChanged) || errors.Is(err, cfg.ErrDenied) {
 			return err
+		}
+		if out != nil {
+			_, _ = fmt.Fprintln(out, "retrying:", err)
 		}
 		select {
 		case <-ctx.Done():
@@ -269,7 +274,7 @@ func setupDatabase(ctx context.Context, c contracts.SetupConfiguration, ids setu
 		return setupStep("postgres/runtime-credentials", err)
 	}
 	// P0: wait for the database before the first effect.
-	if err = retryUnavailable(ctx, func(ctx context.Context) error {
+	if err = retryUnavailable(ctx, out, func(ctx context.Context) error {
 		conn, err := pgx.ConnectConfig(ctx, ddlConfig)
 		if err != nil {
 			return cfg.ErrUnavailable
@@ -308,7 +313,7 @@ func setupDatabase(ctx context.Context, c contracts.SetupConfiguration, ids setu
 	if err != nil {
 		return setupStep("kubernetes", cfg.ErrUnavailable)
 	}
-	err = retryUnavailable(ctx, func(ctx context.Context) error {
+	err = retryUnavailable(ctx, out, func(ctx context.Context) error {
 		a, _, err := kube.ReadSetupFleetSource(ctx, kubernetes, ids.ClusterID, c.Namespace, c.FleetSource, ids.InstallationID, ids.IssuerEpoch)
 		if err != nil {
 			return setupStep("fleet-source", err)
@@ -331,7 +336,7 @@ func setupOpenBao(ctx context.Context, c contracts.SetupConfiguration, ids setup
 		return setupStep("openbao/ca", err)
 	}
 	in := providerconfig.OpenBaoSetupInput{Name: c.Name, Namespace: c.Namespace, InstallationID: ids.InstallationID, ClusterID: ids.ClusterID, IssuerEpoch: ids.IssuerEpoch, Accounts: c.OpenBao.Accounts}
-	err = retryUnavailable(ctx, func(ctx context.Context) error {
+	err = retryUnavailable(ctx, out, func(ctx context.Context) error {
 		// The projected token rotates; read it for each attempt.
 		token, err := readSetupFile(filepath.Join(contracts.SetupOpenBaoRoot, "token"), 16<<10)
 		if err != nil {
@@ -377,7 +382,7 @@ func setupObjectStore(ctx context.Context, c contracts.SetupConfiguration, ids s
 		return setupStep("objectstore/policies", cfg.ErrInvalid)
 	}
 	buckets := []string{c.ObjectStore.AuditBucket, c.ObjectStore.EvidenceBucket}
-	err = retryUnavailable(ctx, func(ctx context.Context) error {
+	err = retryUnavailable(ctx, out, func(ctx context.Context) error {
 		return setupStep("objectstore/buckets", objectstore.EnsureSetupBuckets(ctx, c.ObjectStore.Endpoint, c.ObjectStore.Region, ca, admin, ids.InstallationID, buckets, policies, out))
 	})
 	if err != nil {

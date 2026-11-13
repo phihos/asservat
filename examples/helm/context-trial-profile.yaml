@@ -7,7 +7,7 @@
 # 32GiB root WAL is a logical prepaid maximum, NOT immediate disk allocation.
 # Dedicated backing and capacityAssurance require actual operator qualification.
 # processors: [] is an explicit declaration: no third-party processors.
-# capacity.policySpec.scope.clusterID "" selects this hub's generated cluster ID.
+# An empty capacity.policySpec.scope.clusterID selects this hub's generated cluster ID.
 mode: hub
 collector: {enabled: false}
 identity:
