@@ -57,7 +57,7 @@ func TestOwnerProviderRecipeHasOnlyFourSeparatedEffects(t *testing.T) {
 			}
 		}
 		var role ownerKubernetesAuthRole
-		if json.Unmarshal(entry.Role, &role) != nil || !reflect.DeepEqual(role.Accounts, []string{account.Name}) || !reflect.DeepEqual(role.Namespaces, []string{in.Namespace.Name}) || role.NamespaceSelector != "" || role.Audience != "https://asservat."+in.InstallationID+"/owner-provider/"+in.ClusterID || role.AliasSource != "serviceaccount_uid" || !role.NoDefault || role.Type != "service" || role.TTL != 300 || role.MaxTTL != 900 || role.ExplicitMaxTTL != 900 || role.Period != 0 || role.Uses != 0 || len(role.BoundCIDRs) != 0 || !reflect.DeepEqual(role.Policies, []string{entry.Name}) {
+		if json.Unmarshal(entry.Role, &role) != nil || !reflect.DeepEqual(role.Accounts, []string{account.Name}) || !reflect.DeepEqual(role.Namespaces, []string{in.Namespace.Name}) || role.NamespaceSelector != "" || role.Audience != contracts.OwnerProviderAudience(in.InstallationID, in.ClusterID) || role.AliasSource != "serviceaccount_uid" || !role.NoDefault || role.Type != "service" || role.TTL != 300 || role.MaxTTL != 900 || role.ExplicitMaxTTL != 900 || role.Period != 0 || role.Uses != 0 || len(role.BoundCIDRs) != 0 || !reflect.DeepEqual(role.Policies, []string{entry.Name}) {
 			t.Fatal("role can widen identity, policies or lifetime", entry.Purpose)
 		}
 	}
@@ -144,13 +144,10 @@ func TestOwnerProviderRecipePinsPublicIdentitiesAndEndpointScope(t *testing.T) {
 func TestOwnerProviderRecipeRejectsUnsafeInputBeforeGeneration(t *testing.T) {
 	in, account, secret, now := ownerProviderRecipeInput(t)
 	for name, change := range map[string]func(*contracts.OwnerDeployment, *string, *string, *contracts.WorkerObjectReference, *contracts.WorkerObjectReference){
-		"wildcard-account":    func(_ *contracts.OwnerDeployment, _, _ *string, a, _ *contracts.WorkerObjectReference) { a.Name = "*" },
-		"missing-account-uid": func(_ *contracts.OwnerDeployment, _, _ *string, a, _ *contracts.WorkerObjectReference) { a.UID = "" },
-		"same-object-uid":     func(_ *contracts.OwnerDeployment, _, _ *string, a, s *contracts.WorkerObjectReference) { s.UID = a.UID },
-		"missing-secret":      func(_ *contracts.OwnerDeployment, _, _ *string, _, s *contracts.WorkerObjectReference) { s.Name = "" },
-		"auth-path":           func(_ *contracts.OwnerDeployment, m, _ *string, _, _ *contracts.WorkerObjectReference) { *m = "a/b" },
-		"token-auth":          func(_ *contracts.OwnerDeployment, m, _ *string, _, _ *contracts.WorkerObjectReference) { *m = "token" },
-		"missing-accessor":    func(_ *contracts.OwnerDeployment, _, a *string, _, _ *contracts.WorkerObjectReference) { *a = "" },
+		"wildcard-account": func(_ *contracts.OwnerDeployment, _, _ *string, a, _ *contracts.WorkerObjectReference) { a.Name = "*" },
+		"missing-secret":   func(_ *contracts.OwnerDeployment, _, _ *string, _, s *contracts.WorkerObjectReference) { s.Name = "" },
+		"auth-path":        func(_ *contracts.OwnerDeployment, m, _ *string, _, _ *contracts.WorkerObjectReference) { *m = "a/b" },
+		"token-auth":       func(_ *contracts.OwnerDeployment, m, _ *string, _, _ *contracts.WorkerObjectReference) { *m = "token" },
 		"same-pki-role": func(v *contracts.OwnerDeployment, _, _ *string, _, _ *contracts.WorkerObjectReference) {
 			v.KeyService.ClientRole = v.KeyService.ServerRole
 		},
@@ -175,7 +172,8 @@ func TestOwnerProviderRecipeRejectsUnsafeInputBeforeGeneration(t *testing.T) {
 }
 
 // Provider policy names are global within a mount/provider namespace; one
-// control cluster may contain more than one independently protected owner.
+// control cluster may contain more than one owner. Names derive from names
+// only (Helm-native installation), so a recreated object keeps its roles.
 func TestOwnerProviderRecipeNamesSeparateCompleteOriginalScopes(t *testing.T) {
 	in, account, secret, now := ownerProviderRecipeInput(t)
 	original, e := OwnerProviderRecipeFor(in, "owner-auth", "auth_kubernetes_original", account, secret, now)
@@ -186,14 +184,8 @@ func TestOwnerProviderRecipeNamesSeparateCompleteOriginalScopes(t *testing.T) {
 		"namespace": func(v *contracts.OwnerDeployment, _ *contracts.WorkerObjectReference) {
 			v.Namespace = contracts.WorkerObjectReference{Name: "another-hub", UID: "20000000-0000-4000-8000-000000000003"}
 		},
-		"namespace-recreated": func(v *contracts.OwnerDeployment, _ *contracts.WorkerObjectReference) {
-			v.Namespace.UID = "20000000-0000-4000-8000-000000000003"
-		},
 		"account": func(_ *contracts.OwnerDeployment, a *contracts.WorkerObjectReference) {
 			a.Name = "another-owner"
-			a.UID = "20000000-0000-4000-8000-000000000004"
-		},
-		"account-recreated": func(_ *contracts.OwnerDeployment, a *contracts.WorkerObjectReference) {
 			a.UID = "20000000-0000-4000-8000-000000000004"
 		},
 		"cluster": func(v *contracts.OwnerDeployment, _ *contracts.WorkerObjectReference) {

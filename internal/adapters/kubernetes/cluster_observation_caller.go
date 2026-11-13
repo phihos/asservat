@@ -10,7 +10,6 @@ import (
 	"time"
 
 	app "asservat.local/asservat/internal/application/fleet"
-	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	cfg "asservat.local/asservat/internal/domain/configuration"
@@ -139,15 +138,9 @@ func (s *ClusterObservationCallerAdmission) liveObjects(ctx context.Context, nam
 	if !ok || owner.Name != p.Deployment || string(owner.UID) != p.DeploymentUID {
 		return zero, value.ErrUnavailable
 	}
-	// Reuse the existing exact API-defaulted template comparison, including all
-	// projections, command, image, labels and annotations. Its digest format is
-	// explicitly pinned by the installer; it grants no API-execution capability.
-	// ADR-227: a hub caller's Deployment may run a release-record image.
-	release, workload, e := s.callerRelease(ctx)
-	if e != nil {
-		return zero, e
-	}
-	out, e := s.validateCallerPod(name, uid, d, rs, pod, release, workload)
+	// ADR-328: the caller's template is not pinned; its account, Pod-bound
+	// token and live Deployment chain identify it.
+	out, e := s.validateCallerPod(name, uid, d, rs, pod)
 	if e != nil {
 		return zero, e
 	}
@@ -156,7 +149,7 @@ func (s *ClusterObservationCallerAdmission) liveObjects(ctx context.Context, nam
 		if err != nil {
 			return zero, cfg.ErrChanged
 		}
-		final, err := s.validateCallerPod(name, uid, d, rs, last, release, workload)
+		final, err := s.validateCallerPod(name, uid, d, rs, last)
 		if err != nil || final != out || !slices.Equal(last.Finalizers, pod.Finalizers) {
 			return zero, cfg.ErrChanged
 		}
@@ -167,7 +160,7 @@ func (s *ClusterObservationCallerAdmission) liveObjects(ctx context.Context, nam
 // validateCallerPod uses the caller's existing protected projection, not the
 // owner's additional Ready/address/Service rules. Both API responses must pass
 // independently; informational status and resourceVersion are not digest data.
-func (s *ClusterObservationCallerAdmission) validateCallerPod(name, uid string, d apps.Deployment, rs apps.ReplicaSet, pod core.Pod, release *contracts.ReleaseRecord, workload releaseWorkload) (clusterObservationWorkload, error) {
+func (s *ClusterObservationCallerAdmission) validateCallerPod(name, uid string, d apps.Deployment, rs apps.ReplicaSet, pod core.Pod) (clusterObservationWorkload, error) {
 	var zero clusterObservationWorkload
 	p := s.pin
 	if !ownerMetadata(pod.ObjectMeta, p.Namespace.Name, name, uid) || pod.Spec.ServiceAccountName != p.Account || pod.Spec.NodeName == "" || pod.Status.Phase != core.PodRunning || !ownerEnrollmentSelector(d.Spec.Selector, pod.Labels) || !ownerEnrollmentSelector(rs.Spec.Selector, pod.Labels) {
@@ -176,9 +169,6 @@ func (s *ClusterObservationCallerAdmission) validateCallerPod(name, uid string, 
 	ref, ok := ownerController(pod.OwnerReferences, "ReplicaSet", "apps/v1")
 	if !ok || ref.Name != rs.Name || ref.UID != rs.UID {
 		return zero, value.ErrUnavailable
-	}
-	if connectorAPITemplateMatch(&d, &rs, &pod, p.TemplateDigest, p.ImageDigest, release, workload) != nil {
-		return zero, cfg.ErrChanged
 	}
 	raw, e := json.Marshal(struct {
 		Pin                      value.ClusterObservationCallerPin
@@ -266,25 +256,4 @@ func (s *ClusterObservationCallerAdmission) ObserveClusterObservationCaller(ctx 
 		return zero, value.ErrUnavailable
 	}
 	return out, nil
-}
-
-// callerRelease reads the release record for the two hub Deployments; any
-// other caller (a connector) has none.
-func (s *ClusterObservationCallerAdmission) callerRelease(ctx context.Context) (*contracts.ReleaseRecord, releaseWorkload, error) {
-	p := s.pin
-	hubAPI, hubWorker := HubDeploymentNames(p.InstallationID)
-	var w releaseWorkload
-	switch p.Deployment {
-	case hubAPI:
-		w = releaseHubAPI
-	case hubWorker:
-		w = releaseHubWorker
-	default:
-		return nil, 0, nil
-	}
-	r, err := s.client.releaseRecord(ctx, p.Namespace.Name, p.InstallationID)
-	if err != nil {
-		return nil, 0, value.ErrUnavailable
-	}
-	return r, w, nil
 }

@@ -53,11 +53,7 @@ func TestInstalledOwnerProviderConstructorRetainsOriginalInput(t *testing.T) {
 	}
 	probe := *client
 	plan := cfg.OwnerWorkloadAdministration{Name: in.WorkloadGuard.Name, ControlNamespace: namespace, Deployment: ownerName, DeploymentUID: a.Input.Deployment.UID, Administrators: []cfg.KubernetesActor{{Kind: "User", Name: "synthetic-installer"}}, ConfigurationProbes: []cfg.OwnerConfigurationProbe{{ConfigMap: "original-owner-source", ServiceAccount: "source-probe"}}}
-	protection, err := kubernetes.NewOwnerWorkloadProtection(client, &probe, plan, kubernetes.GuardPin{PolicyUID: in.WorkloadGuard.PolicyUID, PolicyGeneration: 1, BindingUID: in.WorkloadGuard.BindingUID, BindingResourceVersion: "1"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	reader, err := kubernetes.NewInstalledOwnerIdentityReader(client, protection, in, a, installedConstructorUnusedToken{t}, id(17))
+	_, err = kubernetes.NewOwnerWorkloadProtection(client, &probe, plan, kubernetes.GuardPin{PolicyUID: in.WorkloadGuard.PolicyUID, PolicyGeneration: 1, BindingUID: in.WorkloadGuard.BindingUID, BindingResourceVersion: "1"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,10 +64,10 @@ func TestInstalledOwnerProviderConstructorRetainsOriginalInput(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer files.Close()
-	if _, err = NewInstalledOwnerProviderEffects(context.Background(), in, files, reader, nil, &postgres.OwnerConfigurations{}, accepted); err == nil {
-		t.Fatal("installed provider effects accepted no audit credential reader")
+	if _, err = NewInstalledOwnerProviderEffects(context.Background(), in, files, nil, accepted); err == nil {
+		t.Fatal("installed provider effects accepted no configuration reader")
 	}
-	s, err := NewInstalledOwnerProviderEffects(context.Background(), in, files, reader, reader, &postgres.OwnerConfigurations{}, accepted)
+	s, err := NewInstalledOwnerProviderEffects(context.Background(), in, files, &postgres.OwnerConfigurations{}, accepted)
 	if err != nil {
 		t.Fatal(err)
 	}

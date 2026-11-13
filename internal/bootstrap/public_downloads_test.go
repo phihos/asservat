@@ -35,8 +35,8 @@ func TestWorkerSourceClientsFollowTheWorkerNamespace(t *testing.T) {
 		return contracts.OwnerNativeWorkerAPI{ClusterID: runtimeID, Namespace: contracts.WorkerObjectReference{Name: name, UID: uid}, Kubernetes: contracts.OwnerProviderEndpoint{Endpoint: "https://api.synthetic.invalid"}}
 	}
 	workers := api("asservat-downloads", workerNamespaceID)
-	if got := nativeKubernetesProbeTokenName(workers); got != "native-kube-probe-"+runtimeID+"-asservat-downloads.token" || got == nativeKubernetesTokenName(workers) {
-		t.Fatal("probe token name", got)
+	if got := nativeKubernetesTokenName(workers); got != "native-kube-asservat-downloads.token" {
+		t.Fatal("token name", got)
 	}
 	workerClient := newClient(cfg.NamespaceRef{Name: workers.Namespace.Name, UID: workers.Namespace.UID})
 	for _, mode := range []string{"unconfigured", "no-native", "worker-namespace", "hub-namespace", "two-apis", "missing-client"} {
@@ -64,11 +64,11 @@ func TestWorkerSourceClientsFollowTheWorkerNamespace(t *testing.T) {
 			}
 			switch mode {
 			case "unconfigured", "no-native", "hub-namespace":
-				if err != nil || o != observer || p != probe || control != hub || len(closers) != 0 {
+				if err != nil || o != observer || p != nil || control != hub || len(closers) != 0 {
 					t.Fatal("hub namespace source clients changed", err)
 				}
 			case "worker-namespace":
-				if err != nil || o != workerClient || p == nil || p == observer || p == probe || p == workerClient || control != (cfg.NamespaceRef{Name: "asservat-downloads", UID: workerNamespaceID}) || len(closers) != 1 {
+				if err != nil || o != workerClient || p != nil || control != (cfg.NamespaceRef{Name: "asservat-downloads", UID: workerNamespaceID}) || len(closers) != 0 {
 					t.Fatal("worker namespace source not read with its own pinned clients", err)
 				}
 			default:

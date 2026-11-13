@@ -2,8 +2,6 @@ package kubernetes
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"net/http"
@@ -45,12 +43,7 @@ func TestOwnerWorkloadProtectionCurrentIsStableWithoutAdmissionRequests(t *testi
 	if e != nil {
 		t.Fatal(e)
 	}
-	raw, _ := json.Marshal(struct {
-		Format, Cluster string
-		Plan            cfg.OwnerWorkloadAdministration
-		Pin             GuardPin
-	}{"asservat-owner-workload-protection/v1", permissionCluster, guard.plan, pin})
-	if guard.digest != sha256.Sum256(raw) {
+	if guard.digest != WorkloadProtectionDigest(permissionCluster, plan.ControlNamespace.Name, plan.Deployment) {
 		t.Fatal("protection digest changed its derivation")
 	}
 	digest, until, e := guard.Current(context.Background())

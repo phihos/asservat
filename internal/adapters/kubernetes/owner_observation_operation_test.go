@@ -222,9 +222,9 @@ func TestOwnerObservationOperationRealBoundaries(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	// Counts include one ADR-227 release record read per native boundary.
-	// No admission policy, SelfSubjectReview or dry-run probe: plain reads only.
-	if f.observer.Load() != 11 || f.probe.Load() != 0 {
+	// No admission policy, SelfSubjectReview, dry-run probe or release record:
+	// plain reads only.
+	if f.observer.Load() != 10 || f.probe.Load() != 0 {
 		t.Fatalf("first native boundary requests: %d/%d", f.observer.Load(), f.probe.Load())
 	}
 	initial.Peers[0].Addresses[0] = "10.9.8.7"
@@ -243,7 +243,7 @@ func TestOwnerObservationOperationRealBoundaries(t *testing.T) {
 	if !final.Final || !final.ObservedAt.Equal(again.ObservedAt) || !final.FreshUntil.Equal(again.FreshUntil) || !sameOwnerNativePeers(final.Peers, again.Peers) {
 		t.Fatal("final renewed or changed original facts")
 	}
-	if f.observer.Load() != 22 || f.probe.Load() != 0 {
+	if f.observer.Load() != 20 || f.probe.Load() != 0 {
 		t.Fatalf("two native boundaries: %d/%d", f.observer.Load(), f.probe.Load())
 	}
 	calls := f.observer.Load()
@@ -408,9 +408,9 @@ func TestOwnerObservationOperationTwoExactProcesses(t *testing.T) {
 			f := newOwnerOperationFixture(t)
 			first, second := f.v.binding, f.v.binding
 			second.ProcessEpoch = ownerID(92)
-			want := int32(22)
+			want := int32(20)
 			if !samePod {
-				want = 28
+				want = 26
 				second.PodUID = ownerID(93)
 				f.other = f.v.pod.DeepCopy()
 				f.other.Name = "hub-rs-other"

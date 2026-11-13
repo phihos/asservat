@@ -16,16 +16,16 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5"
+	"k8s.io/apimachinery/pkg/util/validation"
+	"k8s.io/client-go/rest"
+
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
 	"asservat.local/asservat/internal/adapters/providerconfig"
 	"asservat.local/asservat/internal/contracts"
-	"asservat.local/asservat/internal/domain/authorization"
 	cfg "asservat.local/asservat/internal/domain/configuration"
-	"github.com/jackc/pgx/v5"
-	"k8s.io/apimachinery/pkg/util/validation"
-	"k8s.io/client-go/rest"
 )
 
 // SetupStepError names the failed setup step and its error class only; it
@@ -94,23 +94,17 @@ func retryUnavailable(ctx context.Context, f func(context.Context) error) error 
 }
 
 // setupIDs are the generated installation identities of `<name>-ids`.
-type setupIDs struct{ InstallationID, ClusterID, IssuerEpoch string }
+type setupIDs = contracts.InstallationIDs
 
 func readSetupIDs(dir string) (setupIDs, error) {
-	read := func(key string) (string, error) {
-		b, err := readSetupFile(filepath.Join(dir, key), 256)
-		v := strings.TrimSpace(string(b))
-		if err != nil || !authorization.UUID(v) {
-			return "", cfg.ErrInvalid
-		}
-		return v, nil
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		return setupIDs{}, cfg.ErrInvalid
 	}
-	var ids setupIDs
-	var err error
-	for key, dst := range map[string]*string{"installationID": &ids.InstallationID, "clusterID": &ids.ClusterID, "issuerEpoch": &ids.IssuerEpoch} {
-		if *dst, err = read(key); err != nil {
-			return setupIDs{}, err
-		}
+	defer root.Close()
+	ids, err := contracts.ReadInstallationIDs(root)
+	if err != nil {
+		return setupIDs{}, cfg.ErrInvalid
 	}
 	return ids, nil
 }

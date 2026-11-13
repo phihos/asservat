@@ -192,7 +192,7 @@ type publicShared struct {
 func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInputs, providers *kms.InstalledOwnerProviderEffects, pools *publicPools, observer, probe *kube.PermissionClient, shared publicShared, catalog publicCatalog, a publicAuditStore, closers *[]func()) (*publicContext, error) {
 	c, p := in.config, in.config.Public
 	root, installation := c.PermissionRootID, c.InstallationID
-	if p == nil || c.Native == nil || pools == nil || observer == nil || probe == nil || shared.topologies == nil || shared.nativeRead == nil || !a.storageConfigured() || a.seal == nil || a.open == nil || a.keys == nil ||
+	if p == nil || c.Native == nil || pools == nil || observer == nil || shared.topologies == nil || shared.nativeRead == nil || !a.storageConfigured() || a.seal == nil || a.open == nil || a.keys == nil ||
 		!authorization.UUID(p.ClusterCatalog.Source.UID) || p.Standby < 1 || p.Standby > 64 || p.Captures < 1 || p.Captures > 16 || c.Native.Connections+p.Standby > 64 || p.PreviewSeconds < 1 || p.PreviewSeconds > 300 {
 		return nil, mounts.ErrUnavailable
 	}
@@ -220,7 +220,7 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	if out.recovery, err = postgres.NewRecoveryReader(ctx, sql["identity-read"], installation); err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	if out.mac, err = newPublicOperationMAC(ctx, files, in.config.InstallationID, pools.manifest); err != nil {
+	if out.mac, err = newPublicOperationMAC(ctx, files, in.config.InstallationID); err != nil {
 		return nil, mounts.ErrUnavailable
 	}
 	capture, err := decodeAuditPolicy(p.CaptureAuditPolicy, "capture", root, installation)

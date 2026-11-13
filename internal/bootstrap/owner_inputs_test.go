@@ -30,7 +30,7 @@ func ownerInputFixture(t *testing.T) (*ownerInputs, string, contracts.OwnerDeplo
 	roots := [][]byte{f.ca.Raw}
 	c := contracts.OwnerDeployment{SchedulingLeases: []contracts.OwnerSchedulingLease{{Lease: "reconcile", ServiceAccount: "reconciler"}}, ConfigurationProbes: []contracts.OwnerConfigurationProbe{{ConfigMap: "owner-pool", ServiceAccount: "owner-config-probe"}}, Format: contracts.OwnerDeploymentFormat, InstallationID: runtimeID, ClusterID: runtimeID, PermissionRootID: runtimeID, Namespace: contracts.WorkerObjectReference{Name: "hub", UID: runtimeID}, ConfigurationUID: runtimeID, Kubernetes: contracts.OwnerProviderEndpoint{Endpoint: "https://api.synthetic.invalid", Roots: roots}, WorkloadGuard: contracts.OwnerDeploymentGuard{Name: "owner-guard", PolicyUID: runtimeID, PolicyGeneration: 1, BindingUID: runtimeID, BindingResourceVersion: "1", Administrators: []contracts.OwnerDeploymentActor{{Kind: "User", Name: "installer"}}}, Postgres: contracts.OwnerPostgresEndpoint{Host: "database.synthetic.invalid", Port: 5432, Database: "asservat", Roots: roots, MaxConnections: 2}, AuditStore: contracts.OwnerAuditStore{Endpoint: "https://storage.synthetic.invalid", Roots: roots, Region: "local", Bucket: "audit"}, KeyService: contracts.OwnerKeyService{Endpoint: "https://keys.synthetic.invalid", Roots: roots, AuditMount: "audit", AuditKey: "records", PKIMount: "owner", ServerRole: "server", ClientRole: "client"}, Connections: 2, Concurrency: 1}
 	writeOwnerJSON(t, dir, "deployment.json", c)
-	in, err := readOwnerInputs(context.Background(), r)
+	in, err := readOwnerDeploymentFixture(context.Background(), r)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -78,7 +78,7 @@ func TestOwnerMountedInputsAndSQLRotation(t *testing.T) {
 	}
 }
 func TestOwnerInputRejections(t *testing.T) {
-	for _, mode := range []string{"unknown", "alias", "provider-http", "provider-query", "postgres-socket", "shared-sign-role", "unknown-format", "duplicate-administrator", "nil-roots", "bad-root", "excess-concurrency", "foreign-file", "null-probes", "duplicate-probe", "wildcard-probe", "foreign-probe", "too-many-probes", "null-leases", "duplicate-lease", "wildcard-lease", "foreign-lease-account", "too-many-leases"} {
+	for _, mode := range []string{"unknown", "alias", "provider-http", "provider-query", "postgres-socket", "shared-sign-role", "unknown-format", "nil-roots", "bad-root", "excess-concurrency", "foreign-file"} {
 		t.Run(mode, func(t *testing.T) {
 			in, dir, c := ownerInputFixture(t)
 			switch mode {
@@ -143,7 +143,7 @@ func TestOwnerInputRejections(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			if _, err := readOwnerInputs(context.Background(), in.files); err == nil || strings.Contains(err.Error(), "must-not-leak") {
+			if _, err := readOwnerDeploymentFixture(context.Background(), in.files); err == nil || strings.Contains(err.Error(), "must-not-leak") {
 				t.Fatal("invalid deployment accepted or disclosed", err)
 			}
 		})

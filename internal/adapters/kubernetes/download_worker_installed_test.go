@@ -326,7 +326,7 @@ func TestProviderOwnerProjectsDownloadWorkerTokens(t *testing.T) {
 			t.Fatal("worker API token", path, token)
 		}
 	}
-	if path := contracts.NativeKubernetesTokenFile(cluster, ns); path != "native-kube-"+cluster+"-"+ns+".token" || contracts.NativeKubernetesProbeTokenFile(cluster, ns) == path {
+	if path := contracts.NativeKubernetesTokenFile(cluster, ns); path != "native-kube-"+ns+".token" || contracts.NativeKubernetesProbeTokenFile(cluster, ns) == path {
 		t.Fatal("token file names", path)
 	}
 	mounted := false

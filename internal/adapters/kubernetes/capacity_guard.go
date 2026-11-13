@@ -2,8 +2,6 @@ package kubernetes
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/json"
 	"slices"
 	"time"
 
@@ -19,8 +17,8 @@ import (
 // Kubernetes RBAC decides who may write the capacity sources and namespace
 // labels. The runtime no longer re-verifies an admission policy, the probe
 // account or a dry-run denial (helm-native-install plan, slice 0). The
-// digest binds the cluster, plan and installer pin unchanged, so the SQL
-// capacity setup and regional qualifications stay comparable.
+// digest names the cluster and namespace, so the SQL capacity setup and
+// regional qualifications stay comparable without installer pins.
 type capacityGuard struct {
 	observer  *PermissionClient
 	namespace cfg.NamespaceRef
@@ -48,15 +46,9 @@ func newCapacityGuard(observer *PermissionClient, namespace cfg.NamespaceRef, pi
 	if observer == nil || observer.control != namespace {
 		return nil, cfg.ErrInvalid
 	}
-	bound, err := json.Marshal(struct {
-		Format, ClusterID string
-		Plan              any
-		Pin               GuardPin
-	}{"capacity-protection/v1", observer.clusterID, plan, pin})
-	if err != nil {
-		return nil, cfg.ErrInvalid
-	}
-	return &capacityGuard{observer: observer, namespace: namespace, digest: sha256.Sum256(bound)}, nil
+	// The digest names the cluster and observed namespace only (field map
+	// coupling 3); plan and pin no longer enter it.
+	return &capacityGuard{observer: observer, namespace: namespace, digest: namedDigest("asservat-capacity-protection/v2", observer.clusterID, namespace.Name)}, nil
 }
 func NewCapacityGuard(observer *PermissionClient, plan cfg.CapacityAdministration, pin GuardPin) (*CapacityGuard, error) {
 	g, err := newCapacityGuard(observer, plan.ControlNamespace, pin, plan)

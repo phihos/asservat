@@ -15,6 +15,8 @@ import (
 	"strings"
 	"testing"
 	"testing/fstest"
+
+	"asservat.local/asservat/internal/transport/edge"
 )
 
 const testOrigin = "https://console.example.test"
@@ -297,5 +299,26 @@ func TestBuiltConsolePackage(t *testing.T) {
 	h.ServeHTTP(w, request("GET", "/"))
 	if w.Code != 200 || !strings.Contains(w.Body.String(), `id="root"`) {
 		t.Fatal("built shell not served")
+	}
+}
+
+// ADR-327: behind a TLS-terminating proxy the listener marks its requests;
+// a plain request without that mark, or with only forwarded headers, refuses.
+func TestProxyTLSListenerServesConsole(t *testing.T) {
+	h, err := New(testOrigin, packageFiles())
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := request("GET", "/processing")
+	r.TLS = nil
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	if w.Code != 404 {
+		t.Fatalf("unmarked plain request = %d", w.Code)
+	}
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r.WithContext(edge.WithTLSProxy(r.Context())))
+	if w.Code != 200 || w.Body.String() != testHTML {
+		t.Fatalf("proxy-marked request = %d", w.Code)
 	}
 }

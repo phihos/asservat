@@ -40,9 +40,10 @@ func NewOwnerEnrollmentAttester(c *PermissionClient, configurations app.OwnerCon
 	return &OwnerEnrollmentAttester{c, configurations, protection, tokens}, nil
 }
 
-func OwnerEnrollmentAudience(installation string) string {
-	return "https://asservat." + installation + "/hub-owner-enrollment"
-}
+// OwnerEnrollmentAudience is a fixed audience: Helm renders the projected
+// token before the installation ID exists (Helm-native installation). The
+// token is Pod-bound and reviewed by this cluster's API server.
+func OwnerEnrollmentAudience(string) string { return "asservat-hub-owner-enrollment" }
 
 type ownerEnrollmentWorkload struct {
 	Pod, ReplicaSet, ReplicaSetUID string

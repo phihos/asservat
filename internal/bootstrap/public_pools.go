@@ -1,9 +1,7 @@
 package bootstrap
 
 import (
-	"bytes"
 	"context"
-	"errors"
 	"slices"
 	"sync"
 
@@ -35,38 +33,20 @@ func publicPoolPlan(duty string) (role, key string, limit int, hot, ok bool) {
 	}
 }
 
-// publicPools opens the fixed hub pools on first use and verifies their actual
-// credential against the immutable installer manifest. Typed adapter duties
+// publicPools opens the fixed hub pools on first use and checks that each
+// connects as its derived role name. Typed adapter duties
 // share a pool unless they have an explicit reservation above.
 type publicPools struct {
-	in       *providerInputs
-	manifest contracts.PublicRuntimeCredentialManifest
-	governor *postgres.SQLConnectionGovernor
-	mu       sync.Mutex
-	closed   bool
-	pools    map[string]*pgxpool.Pool
+	in           *providerInputs
+	installation string
+	governor     *postgres.SQLConnectionGovernor
+	mu           sync.Mutex
+	closed       bool
+	pools        map[string]*pgxpool.Pool
 }
 
 // files is the public root: the owner root in the legacy layout, the public
 // projection in the installed layout (ADR-182).
-func readPublicRuntimeManifest(ctx context.Context, in *ownerInputs, files *providerInputs) (contracts.PublicRuntimeCredentialManifest, error) {
-	var zero contracts.PublicRuntimeCredentialManifest
-	b, e := mounts.Read(ctx, files.files, contracts.PublicRuntimeCredentialManifestFile, contracts.PublicRuntimeCredentialManifestMaxBytes)
-	if e != nil {
-		return zero, mounts.ErrUnavailable
-	}
-	defer clear(b)
-	m, e := contracts.DecodePublicRuntimeCredentialManifest(bytes.NewReader(b))
-	c := in.config
-	if e != nil || m.Format != contracts.PublicRuntimeCredentialManifestFormat || m.Input.InstallationID != c.InstallationID || m.Input.ClusterID != c.ClusterID || m.Input.Namespace != c.Namespace || m.Input.OwnerConfigurationUID != c.ConfigurationUID {
-		return zero, mounts.ErrUnavailable
-	}
-	if m.Input.LayoutDigest != postgres.PublicRuntimeRoleLayoutDigest() {
-		return zero, errors.Join(mounts.ErrUnavailable, contracts.ErrPublicRuntimeLayout)
-	}
-	return m, nil
-}
-
 func (p *publicPools) open(ctx context.Context, purpose string) (*pgxpool.Pool, error) {
 	if p == nil || ctx == nil || ctx.Err() != nil {
 		return nil, mounts.ErrUnavailable
@@ -83,7 +63,7 @@ func (p *publicPools) open(ctx context.Context, purpose string) (*pgxpool.Pool, 
 	if pool := p.pools[key]; pool != nil {
 		return pool, nil
 	}
-	name, known := postgres.PublicRuntimeRoleName(p.manifest.Input.InstallationID, role)
+	name, known := postgres.PublicRuntimeRoleName(p.installation, role)
 	if !known {
 		return nil, mounts.ErrUnavailable
 	}
@@ -99,7 +79,7 @@ func (p *publicPools) open(ctx context.Context, purpose string) (*pgxpool.Pool, 
 	if e != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	if postgres.VerifyPublicRuntimeCredential(ctx, pool, p.manifest, role) != nil {
+	if postgres.VerifySessionRole(ctx, pool, name) != nil {
 		pool.Close()
 		return nil, mounts.ErrUnavailable
 	}

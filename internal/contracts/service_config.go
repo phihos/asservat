@@ -32,9 +32,7 @@ const (
 )
 
 // ServiceIDs are the generated installation identities (<name>-ids keys).
-type ServiceIDs struct {
-	InstallationID, ClusterID, PermissionRootID, IssuerEpoch string
-}
+type ServiceIDs = InstallationIDs
 
 type ServicePostgres struct {
 	Host     string `json:"host"`

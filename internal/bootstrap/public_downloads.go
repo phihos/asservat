@@ -322,25 +322,22 @@ func newPublicDownloads(ctx context.Context, d *OwnerDeployment, observer, probe
 func (d *OwnerDeployment) workerSourceClients(observer, probe *kube.PermissionClient, control cfg.NamespaceRef, closers *[]func()) (*kube.PermissionClient, *kube.PermissionClient, cfg.NamespaceRef, error) {
 	n := d.inputs.config.Native
 	if n == nil || len(n.WorkerAPIs) == 0 {
-		return observer, probe, control, nil
+		return observer, nil, control, nil
 	}
 	if len(n.WorkerAPIs) != 1 {
 		return nil, nil, control, mounts.ErrUnavailable
 	}
 	a := n.WorkerAPIs[0]
 	if a.Namespace.UID == control.UID {
-		return observer, probe, control, nil
+		return observer, nil, control, nil
 	}
 	client := d.shared.workers[ownerNativeAPIKey{a.ClusterID, a.Namespace.UID}]
 	if client == nil {
 		return nil, nil, control, mounts.ErrUnavailable
 	}
-	workerProbe, closeHTTP, err := d.workerAPIClient(a, nativeKubernetesProbeTokenName(a))
-	if err != nil {
-		return nil, nil, control, mounts.ErrUnavailable
-	}
-	*closers = append(*closers, closeHTTP)
-	return client, workerProbe, cfg.NamespaceRef{Name: a.Namespace.Name, UID: a.Namespace.UID}, nil
+	// ADR-328: the worker namespace's sources are plain RBAC reads; no
+	// probe credential.
+	return client, nil, cfg.NamespaceRef{Name: a.Namespace.Name, UID: a.Namespace.UID}, nil
 }
 
 // unconfiguredDownloadPlans plans nothing: without a configured worker no

@@ -28,20 +28,28 @@ type InstallationIDs struct {
 
 var ErrInstallationIDs = errors.New("installation IDs unavailable")
 
+// InstallationIDError names the missing or invalid key of the IDs Secret.
+type InstallationIDError string
+
+func (e InstallationIDError) Error() string { return "installation ID " + string(e) + " unavailable" }
+func (e InstallationIDError) Unwrap() error { return ErrInstallationIDs }
+
 // ReadInstallationIDs reads every key of the IDs Secret from root. Each value
-// is one canonical lowercase UUID; surrounding whitespace is ignored.
+// is one canonical lowercase UUID; surrounding whitespace is ignored. All
+// components use this one reader.
 func ReadInstallationIDs(root *os.Root) (InstallationIDs, error) {
 	var out InstallationIDs
 	if root == nil {
 		return out, ErrInstallationIDs
 	}
-	for key, target := range map[string]*string{"installationID": &out.InstallationID, "clusterID": &out.ClusterID, "issuerEpoch": &out.IssuerEpoch,
-		"permissionRootID": &out.PermissionRootID, "browserRootID": &out.BrowserRootID, "sessionEpoch": &out.SessionEpoch, "roleSetupID": &out.RoleSetupID, "peerID": &out.PeerID} {
+	targets := map[string]*string{"installationID": &out.InstallationID, "clusterID": &out.ClusterID, "issuerEpoch": &out.IssuerEpoch,
+		"permissionRootID": &out.PermissionRootID, "browserRootID": &out.BrowserRootID, "sessionEpoch": &out.SessionEpoch, "roleSetupID": &out.RoleSetupID, "peerID": &out.PeerID}
+	for _, key := range InstallationIDKeys() {
 		v, err := readInstallationID(root, key)
 		if err != nil {
-			return InstallationIDs{}, err
+			return InstallationIDs{}, InstallationIDError(key)
 		}
-		*target = v
+		*targets[key] = v
 	}
 	return out, nil
 }
@@ -49,7 +57,7 @@ func ReadInstallationIDs(root *os.Root) (InstallationIDs, error) {
 func readInstallationID(root *os.Root, key string) (string, error) {
 	f, err := root.Open(key)
 	if err != nil {
-		return "", errors.Join(ErrInstallationIDs, err)
+		return "", err
 	}
 	defer f.Close()
 	b, err := io.ReadAll(io.LimitReader(f, 129))

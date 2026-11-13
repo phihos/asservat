@@ -23,7 +23,7 @@ func newPublicFleet(ctx context.Context, c contracts.OwnerDeployment, providers 
 		return nil, nil
 	}
 	f := c.Public.Fleet
-	if providers == nil || providers.BootstrapChannel() == nil || pools == nil || observer == nil || probe == nil || !a.storageConfigured() || a.seal == nil || a.open == nil {
+	if providers == nil || providers.BootstrapChannel() == nil || pools == nil || observer == nil || !a.storageConfigured() || a.seal == nil || a.open == nil {
 		return nil, &fixedStepError{"fleet-inputs", mounts.ErrUnavailable}
 	}
 	admins, pin := capacityWorkerGuard(f.SettingsGuard)

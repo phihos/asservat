@@ -9,11 +9,9 @@ const OwnerProviderAuditCredentialFile = "provider-audit-storage.json"
 const OwnerProviderTokenTTLSeconds = 300
 const OwnerProviderTokenMaxTTLSeconds = 900
 
-// OwnerProviderAudience derives a fixed audience from separately validated
-// installation and cluster UUIDs; the returned string grants no authority.
-func OwnerProviderAudience(installationID, clusterID string) string {
-	return "https://asservat." + installationID + "/owner-provider/" + clusterID
-}
+// OwnerProviderAudience is fixed for the same reason as the enrollment
+// audience; the OpenBao role also binds the account and namespace.
+func OwnerProviderAudience(string, string) string { return "asservat-owner-provider" }
 
 // Public, installation-owned selection. It contains no JWT, provider token,
 // reviewer credential, secret-payload digest or caller-selectable purpose. This

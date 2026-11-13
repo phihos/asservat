@@ -154,6 +154,7 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		// SQL54 independently pins this actual session_user OID and original
 		// provenance. Root/qualification arguments are not a role boundary.
 		out = append(out, publicRuntimeGrant{"function", "read_capacity_audit_profiles(uuid,uuid,uuid,bytea,text,timestamptz,timestamptz)", "", "EXECUTE"})
+		out = append(out, publicRuntimeGrant{"function", "read_capacity_qualification_pin(uuid,uuid)", "", "EXECUTE"})
 	case "capture-history":
 		read("recording_save_group")
 		// ADR-255: encrypted metadata shares ordinary hub SQL custody, without

@@ -90,17 +90,27 @@ func ownerHTTP(endpoint string, raw [][]byte) (*http.Client, error) {
 	return &http.Client{Timeout: 5 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return mounts.ErrUnavailable }, Transport: &http.Transport{Proxy: nil, TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS13, RootCAs: roots}, DialContext: (&net.Dialer{Timeout: 2 * time.Second, KeepAlive: -1}).DialContext, TLSHandshakeTimeout: 2 * time.Second, ResponseHeaderTimeout: 5 * time.Second, IdleConnTimeout: 5 * time.Second, MaxIdleConns: 4, MaxIdleConnsPerHost: 4, MaxConnsPerHost: 16, DisableCompression: true}}, nil
 }
 
+// readOwnerInputs loads the Helm-native hub-api inputs from their fixed
+// mounts (contracts.HubAPIConfigRoot, contracts.InstallationIDsRoot and the
+// optional public projection).
 func readOwnerInputs(ctx context.Context, files *os.Root) (*ownerInputs, error) {
-	b, err := mounts.Read(ctx, files, "deployment.json", contracts.OwnerDeploymentMaxBytes)
+	config, err := os.OpenRoot(contracts.HubAPIConfigRoot)
 	if err != nil {
-		return nil, mounts.ErrUnavailable
+		return nil, hubAPIInputError("config")
 	}
-	defer clear(b)
-	c, err := contracts.DecodeOwnerDeployment(bytes.NewReader(b))
-	if err != nil || validateOwnerDeployment(c) != nil {
-		return nil, mounts.ErrUnavailable
+	defer config.Close()
+	ids, err := os.OpenRoot(contracts.InstallationIDsRoot)
+	if err != nil {
+		return nil, hubAPIInputError("ids")
 	}
-	return &ownerInputs{providerInputs: &providerInputs{files: files, kubernetesEndpoint: c.Kubernetes, postgresEndpoint: c.Postgres}, config: c}, nil
+	defer ids.Close()
+	public, err := os.OpenRoot(contracts.OwnerPublicProjectionRoot)
+	if err != nil {
+		public = nil
+	} else {
+		defer public.Close()
+	}
+	return loadHubAPIInputs(ctx, files, config, ids, public)
 }
 
 // ownerInputCheck names the failed owner input check; the name is fixed text,
@@ -146,18 +156,13 @@ func validateOwnerInput(c contracts.OwnerDeployment, projected bool) error {
 	if _, _, err = mtls.OwnerTrustRoots(c.Postgres.Roots, time.Now()); err != nil {
 		return ownerInputCheck("postgres-roots")
 	}
-	if !validOwnerGuard(c.Guard()) {
-		return ownerInputCheck("guard")
-	}
 	// ADR-182: an installed (provider-authenticated) owner may be promoted
-	// with Native and Public; the legacy layout keeps them exclusive.
-	if c.ProviderAuthentication != nil && (c.Observation == nil || projected && c.Observation.Activation == nil || c.Observation.Activation != nil && c.Observation.Activation.Input.OwnerLayout != contracts.OwnerProviderInstalledLayout || kms.ValidateOwnerProviderAuthentication(c, *c.ProviderAuthentication, time.Now()) != nil) {
+	// with Native and Public; the legacy layout keeps them exclusive. ADR-328:
+	// no guard, activation or projection identity is required.
+	if c.ProviderAuthentication != nil && (c.Observation == nil || kms.ValidateOwnerProviderAuthentication(c, *c.ProviderAuthentication, time.Now()) != nil) {
 		return ownerInputCheck("provider-authentication")
 	}
-	if c.Observation != nil && (projected && c.Observation.Activation == nil || c.Observation.Activation != nil && !kube.OwnerIdentityActivationBound(c, *c.Observation.Activation)) {
-		return ownerInputCheck("observation-activation")
-	}
-	if validateOwnerNativeInputs(c.Native, c.ClusterID, c.ProviderAuthentication != nil) != nil || validateOwnerObservationInputs(c.Observation, projected) != nil || c.Native != nil && c.Observation != nil && c.ProviderAuthentication == nil {
+	if validateOwnerNativeInputs(c.Native, c.ClusterID, c.ProviderAuthentication != nil) != nil || validateOwnerObservationInputs(c.Observation) != nil || c.Native != nil && c.Observation != nil && c.ProviderAuthentication == nil {
 		return ownerInputCheck("native-observation")
 	}
 	if p := c.Public; p != nil {
@@ -180,14 +185,11 @@ func validateOwnerInput(c contracts.OwnerDeployment, projected bool) error {
 		// The installed layout fixes the public port and pins its public provider
 		// recipe; the legacy layout reads token files and has no recipe.
 		installed := c.ProviderAuthentication != nil
-		// ADR-194: the installed layout also names the immutable public runtime
-		// projection, which startup compares with the mounted public root.
-		if installed && (p.Port != contracts.OwnerInstalledPublicPort || providerconfig.ValidateOwnerPublicProviderRecipe(c, *c.ProviderAuthentication, time.Now()) != nil ||
-			p.RuntimeProjection.Name != contracts.PublicRuntimeProjectionName(c.InstallationID) || !authorization.UUID(p.RuntimeProjection.UID)) || !installed && p.ProviderRecipeSHA256 != "" {
+		if installed && (p.Port != contracts.OwnerInstalledPublicPort || providerconfig.ValidateOwnerPublicProviderRecipe(c, *c.ProviderAuthentication, time.Now()) != nil) || !installed && p.ProviderRecipeSHA256 != "" {
 			return ownerInputCheck("public-installed")
 		}
 		// ADR-193: issuance needs the installed layout's pinned channel role.
-		if f := p.Fleet; f != nil && (!installed || !capacityRuntimeReference(f.Settings) || !capacityRuntimeGuard(f.SettingsGuard) || !identity.Text(f.DeliveryProfile, 64) ||
+		if f := p.Fleet; f != nil && (!installed || !capacityRuntimeReference(f.Settings) || !identity.Text(f.DeliveryProfile, 64) ||
 			providerconfig.ValidateOwnerFleetProviderRecipe(c, *c.ProviderAuthentication, time.Now()) != nil) {
 			return ownerInputCheck("fleet")
 		}

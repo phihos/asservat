@@ -198,7 +198,7 @@ func TestOwnerProviderControlRejectsAdditionalTokenAndIdentityAuthority(t *testi
 		"direct":   func(v *ownerProviderAuthReply) { v.TokenPolicies = append(v.TokenPolicies, "other") },
 		"identity": func(v *ownerProviderAuthReply) { v.IdentityPolicies = []string{"other"} },
 		"account": func(v *ownerProviderAuthReply) {
-			v.Metadata["service_account_uid"] = "10000000-0000-4000-8000-000000000099"
+			v.Metadata["service_account_name"] = "another-account"
 		},
 		"metadata": func(v *ownerProviderAuthReply) {
 			delete(v.Metadata, "service_account_secret_name")

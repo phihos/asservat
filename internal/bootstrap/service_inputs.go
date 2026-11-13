@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/pem"
+	"errors"
 	"io"
 	"net/http"
 	"net/netip"
@@ -11,13 +12,13 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/client-go/rest"
+
 	"asservat.local/asservat/internal/adapters/mounts"
 	"asservat.local/asservat/internal/adapters/mtls"
 	"asservat.local/asservat/internal/adapters/postgres"
 	"asservat.local/asservat/internal/contracts"
-	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/identity"
-	"k8s.io/client-go/rest"
 )
 
 // Helm-native service inputs shared by the federation, key service and
@@ -28,20 +29,14 @@ import (
 // service account token and CA); tests replace it.
 var serviceKubernetes = rest.InClusterConfig
 
-func readServiceIDs(ctx context.Context, ids *os.Root) (contracts.ServiceIDs, error) {
-	var out contracts.ServiceIDs
-	if ids == nil {
-		return out, mounts.ErrUnavailable
+func readServiceIDs(_ context.Context, ids *os.Root) (contracts.ServiceIDs, error) {
+	v, err := contracts.ReadInstallationIDs(ids)
+	if err != nil {
+		var key contracts.InstallationIDError
+		errors.As(err, &key)
+		return contracts.ServiceIDs{}, &fixedStepError{"ids/" + string(key), mounts.ErrUnavailable}
 	}
-	for name, dst := range map[string]*string{"installationID": &out.InstallationID, "clusterID": &out.ClusterID, "permissionRootID": &out.PermissionRootID, "issuerEpoch": &out.IssuerEpoch} {
-		b, err := mounts.Read(ctx, ids, name, 64)
-		v := strings.TrimSpace(string(b))
-		if err != nil || !authorization.UUID(v) {
-			return contracts.ServiceIDs{}, &fixedStepError{"ids/" + name, mounts.ErrUnavailable}
-		}
-		*dst = v
-	}
-	return out, nil
+	return v, nil
 }
 
 // readServiceConfig reads config.json with the component's closed decoder.
