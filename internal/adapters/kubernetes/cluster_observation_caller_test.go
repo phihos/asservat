@@ -27,7 +27,7 @@ import (
 // This exercises the concrete adapter against a synthetic HTTPS API. It does
 // not qualify native TokenReview, admission or installation provenance.
 func TestClusterObservationCallerExactNativeReadBoundary(t *testing.T) {
-	for _, mode := range []string{"valid", "parent-cap", "token-cap", "wrong-audience", "unbound", "wrong-account", "extra-admin-group", "duplicate-group", "revoked-review", "replaced-account", "replaced-pod", "replaced-controller", "two-controllers", "changed-template", "changed-pod-command", "changed-after-read", "scaled-down", "deleted-pod", "other-policy", "original-expired", "cancelled"} {
+	for _, mode := range []string{"valid", "parent-cap", "token-cap", "wrong-audience", "unbound", "wrong-account", "extra-admin-group", "duplicate-group", "revoked-review", "replaced-account", "replaced-pod", "replaced-controller", "two-controllers", "changed-template", "changed-pod-command", "changed-after-read", "scaled-down", "deleted-pod", "original-expired", "cancelled"} {
 		t.Run(mode, func(t *testing.T) {
 			start := time.Now().UTC()
 			var clock atomic.Int64
@@ -208,7 +208,7 @@ func TestClusterObservationCallerExactNativeReadBoundary(t *testing.T) {
 			}
 			got, e := a.ObserveClusterObservationCaller(ctx, token, string(pod.UID), request)
 			if mode == "valid" || mode == "parent-cap" || mode == "token-cap" {
-				if e != nil || !got.Matches(request, now()) || got.Pin != pin || got.PodUID != string(pod.UID) || reviews.Load() != 2 || podReads.Load() != 2 || probes.Load() != 1 {
+				if e != nil || !got.Matches(request, now()) || got.Pin != pin || got.PodUID != string(pod.UID) || reviews.Load() != 2 || podReads.Load() != 2 || probes.Load() != 0 {
 					t.Fatalf("exact current caller denied: %v", e)
 				}
 				if d, ok := ctx.Deadline(); ok && got.FreshUntil.After(d) {

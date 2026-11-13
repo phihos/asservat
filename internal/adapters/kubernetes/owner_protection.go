@@ -22,8 +22,8 @@ func (e *ownerProtectionDiagnostic) Unwrap() error     { return e.cause }
 func (e *ownerProtectionDiagnostic) FixedStep() string { return e.step }
 
 // Preserve the boundary's original error class, including its normalization
-// of final reads to ErrChanged. Only this adapter's concrete closed codes may
-// describe the underlying read; arbitrary FixedStep and Error text are ignored.
+// of final reads to ErrChanged. Only cancellation and deadline may describe the
+// underlying cause; arbitrary FixedStep and Error text are ignored.
 func ownerProtectionError(phase string, class, detail error) error {
 	step := "protection." + phase
 	switch {
@@ -31,11 +31,6 @@ func ownerProtectionError(phase string, class, detail error) error {
 		step += "/deadline"
 	case errors.Is(detail, context.Canceled):
 		step += "/canceled"
-	default:
-		var native *configurationWorkerDiagnostic
-		if errors.As(detail, &native) && native != nil {
-			step += "/" + native.check.String()
-		}
 	}
 	return &ownerProtectionDiagnostic{step: step, cause: class}
 }

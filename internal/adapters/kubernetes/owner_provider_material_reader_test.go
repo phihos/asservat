@@ -26,7 +26,7 @@ import (
 // original receipts and token identity remain explicitly synthetic; no SQL or
 // external storage authority is inferred from this component regression.
 func TestProviderOwnerAuditReadRequiresCurrentOriginalMaterial(t *testing.T) {
-	for _, mode := range []string{"valid", "rotated-current", "stale-mount", "replaced-secret", "wrong-secret-kind", "wrong-secret-version", "extra-key", "placeholder", "missing-receipt", "allowing-probe", "wrong-token-pod", "late-secret", "cancelled", "sdk-budget"} {
+	for _, mode := range []string{"valid", "rotated-current", "stale-mount", "replaced-secret", "wrong-secret-kind", "wrong-secret-version", "extra-key", "placeholder", "missing-receipt", "wrong-token-pod", "late-secret", "cancelled", "sdk-budget"} {
 		t.Run(mode, func(t *testing.T) {
 			x := providerOwnerObjectFixture(t)
 			in := x.reader.input

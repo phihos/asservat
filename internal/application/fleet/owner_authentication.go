@@ -98,7 +98,7 @@ func refusalStep(ctx context.Context, step string) {
 	}
 }
 
-// Only exact native protection check codes may cross this diagnostic boundary.
+// Only exact protection check codes may cross this diagnostic boundary.
 // Do not render dependency Error text or accept a compound/private FixedStep.
 // With no reporter, the dependency is not inspected at all.
 func protectionReadRefusal(ctx context.Context, stage string, err error) {
@@ -127,39 +127,12 @@ func protectionReadRefusal(ctx context.Context, stage string, err error) {
 func protectionReadCode(step string) string {
 	phase, detail, nested := strings.Cut(step, "/")
 	switch phase {
-	case "protection.entry", "protection.binding", "protection.namespace-first", "protection.namespace-first-deleting",
-		"protection.guard-first", "protection.probe", "protection.guard-last", "protection.guard-changed",
-		"protection.original-interval", "protection.namespace-last", "protection.namespace-last-deleting",
-		"protection.final-interval", "protection.result", "protection.result-context":
+	case "protection.entry", "protection.binding", "protection.result", "protection.result-context":
 		if !nested || detail == "deadline" || detail == "canceled" {
-			return step
-		}
-		// Native leaf codes occur only at the three guard/probe boundaries.
-		if phase == "protection.guard-first" || phase == "protection.guard-last" || phase == "protection.probe" {
-			if protectionNativeCode(detail) {
-				return step
-			}
-		}
-	default:
-		if !nested && protectionNativeCode(step) {
 			return step
 		}
 	}
 	return "other"
-}
-
-func protectionNativeCode(step string) bool {
-	switch step {
-	case "source.guard-policy-read", "source.guard-policy-decode", "source.guard-policy-identity", "source.guard-policy-spec",
-		"source.guard-binding-read", "source.guard-binding-decode", "source.guard-binding-identity",
-		"source.probe-identity-read", "source.probe-identity-shape", "source.probe-administrator",
-		"source.probe-access-read", "source.probe-access-verdict", "source.probe-object-read", "source.probe-object-shape",
-		"source.probe-denial-body", "source.probe-denial-status", "source.probe-denial-details", "source.probe-denial-cause",
-		"source.probe-control-identity", "source.probe-controller-identity", "source.probe-original-interval",
-		"source.probe-status-decode", "source.probe-conflicts-exhausted":
-		return true
-	}
-	return false
 }
 
 // RemainingBucket coarsely names the time left on ctx for diagnostics.

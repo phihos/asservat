@@ -21,9 +21,7 @@ import (
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	value "asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
-	admission "k8s.io/api/admissionregistration/v1"
 	auth "k8s.io/api/authentication/v1"
-	authorization "k8s.io/api/authorization/v1"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -42,7 +40,7 @@ func (f ownerConfigurationFunc) ReadOwnerConfiguration(c context.Context) (value
 }
 
 func TestOwnerEnrollmentBeforeReadinessAndCurrentProof(t *testing.T) {
-	for _, mode := range []string{"valid", "pending", "not-ready", "status-change", "short-token", "cached-configuration", "invalid-csr", "invalid-purpose", "foreign-binding", "suspended", "configuration-unavailable", "configuration-changed", "configuration-expired", "missing-protection", "wrong-audience", "unbound", "wrong-account", "wrong-pod", "path-pod", "denied-review", "revoked-review", "duplicate-exp", "expired-token", "unbounded-token", "token-read-error", "token-error-redaction", "whitespace-token", "wrong-namespace", "wrong-live-account", "wrong-deployment", "wrong-replica", "wrong-owner", "two-owners", "wrong-selector", "unassigned", "host-network", "host-pid", "host-ipc", "injected-process", "deleted-pod", "failed-pod", "scaled-down", "template-account", "spec-changed", "late", "cancelled"} {
+	for _, mode := range []string{"valid", "pending", "not-ready", "status-change", "short-token", "cached-configuration", "invalid-csr", "invalid-purpose", "foreign-binding", "suspended", "configuration-unavailable", "configuration-changed", "configuration-expired", "wrong-audience", "unbound", "wrong-account", "wrong-pod", "path-pod", "denied-review", "revoked-review", "duplicate-exp", "expired-token", "unbounded-token", "token-read-error", "token-error-redaction", "whitespace-token", "wrong-namespace", "wrong-live-account", "wrong-deployment", "wrong-replica", "wrong-owner", "two-owners", "wrong-selector", "unassigned", "host-network", "host-pid", "host-ipc", "injected-process", "deleted-pod", "failed-pod", "scaled-down", "template-account", "spec-changed", "late", "cancelled"} {
 		t.Run(mode, func(t *testing.T) {
 			start := time.Date(2026, 10, 10, 12, 0, 0, 0, time.UTC)
 			v := ownerFixtureObjects()
@@ -52,15 +50,10 @@ func TestOwnerEnrollmentBeforeReadinessAndCurrentProof(t *testing.T) {
 			v.rs.Spec.Selector = v.deploy.Spec.Selector.DeepCopy()
 			v.rs.Spec.Template.Spec.ServiceAccountName = v.pool.ServiceAccount
 			plan := cfg.OwnerWorkloadAdministration{Name: "owner-workload", Deployment: v.pool.Deployment, DeploymentUID: v.pool.DeploymentUID, ControlNamespace: cfg.NamespaceRef{Name: v.pool.Namespace, UID: v.pool.NamespaceUID}, Administrators: []cfg.KubernetesActor{{Kind: "User", Name: "installer"}}}
-			policy, binding, err := OwnerWorkloadAdmission(plan)
-			if err != nil {
-				t.Fatal(err)
-			}
+			// Helm-native installation: no admission policy, binding, probe
+			// identity or dry-run exists. Enrollment rests on TokenReview, the
+			// live Pod → ReplicaSet → Deployment chain and configuration.
 			pin := GuardPin{PolicyUID: ownerID(11), PolicyGeneration: 1, BindingUID: ownerID(12), BindingResourceVersion: "20"}
-			policy.UID, policy.Generation, policy.ResourceVersion = types.UID(pin.PolicyUID), 1, "10"
-			policy.Status.ObservedGeneration = 1
-			policy.Status.TypeChecking = &admission.TypeChecking{}
-			binding.UID, binding.ResourceVersion = types.UID(pin.BindingUID), pin.BindingResourceVersion
 			_, key, err := ed25519.GenerateKey(rand.Reader)
 			if err != nil {
 				t.Fatal(err)
@@ -111,32 +104,9 @@ func TestOwnerEnrollmentBeforeReadinessAndCurrentProof(t *testing.T) {
 						p.UID = types.UID(ownerID(99))
 					}
 					permissionReply(w, p)
-				case "/apis/admissionregistration.k8s.io/v1/validatingadmissionpolicies/owner-workload":
-					if mode == "missing-protection" {
-						http.NotFound(w, r)
-						return
-					}
-					permissionReply(w, policy)
-				case "/apis/admissionregistration.k8s.io/v1/validatingadmissionpolicybindings/owner-workload":
-					permissionReply(w, binding)
-				case "/apis/authentication.k8s.io/v1/selfsubjectreviews":
-					x := auth.SelfSubjectReview{}
-					x.Status.UserInfo.Username = "probe"
-					x.Status.UserInfo.Groups = []string{"system:authenticated"}
-					permissionReply(w, x)
-				case "/apis/authorization.k8s.io/v1/selfsubjectaccessreviews":
-					x := authorization.SelfSubjectAccessReview{}
-					x.Status.Allowed = true
-					permissionReply(w, x)
 				case "/apis/apps/v1/namespaces/owners/deployments/hub":
-					if r.Method == http.MethodPut {
-						if r.URL.Query().Get("dryRun") != "All" {
-							t.Error("unsafe guard probe")
-						}
-						w.Header().Set("Content-Type", "application/json")
-						w.WriteHeader(403)
-						_ = json.NewEncoder(w).Encode(meta.Status{TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "Status"}, Status: meta.StatusFailure, Reason: meta.StatusReasonForbidden, Code: 403, Details: &meta.StatusDetails{Group: "apps", Kind: "deployments", Causes: []meta.StatusCause{{Message: "ValidatingAdmissionPolicy 'owner-workload' with binding 'owner-workload' denied request: " + ownerWorkloadDenial}}}})
-						return
+					if r.Method != http.MethodGet {
+						t.Error("owner Deployment written during enrollment")
 					}
 					p := v.deploy.DeepCopy()
 					if mode == "wrong-deployment" && n > 0 {

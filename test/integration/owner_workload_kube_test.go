@@ -303,14 +303,10 @@ func exerciseOwnerWorkloadProtection(t *testing.T, ctx context.Context, admin ku
 	if err = admin.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().Delete(ctx, plan.Name, meta.DeleteOptions{}); err != nil {
 		t.Fatal(err)
 	}
-	// A current proof is reused for OwnerProtectionReuse, so loss is observed
-	// once that window ends, not immediately.
-	until = time.Now().Add(kube.OwnerProtectionReuse + 10*time.Second)
-	for _, _, err = guard.Current(ctx); err == nil && time.Now().Before(until); _, _, err = guard.Current(ctx) {
-		time.Sleep(time.Second)
-	}
-	if err == nil {
-		t.Fatal("missing workload protection remained current")
+	// Helm-native installation (2026-11-13): the runtime no longer re-proves
+	// this installer-created policy, so removing it does not end Current.
+	if _, _, err = guard.Current(ctx); err != nil {
+		t.Fatal("workload protection depends on the admission guard", err)
 	}
 	// Negative control proves this is admission enforcement, not ordinary RBAC
 	// or another policy rejecting the same unchanged dry-run update.
