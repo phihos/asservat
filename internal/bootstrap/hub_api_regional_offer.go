@@ -23,6 +23,9 @@ import (
 type hubAPIRegionalOffer struct {
 	namespace, name string
 	offer           contracts.RegionalOffer
+	// peerID and bootstrapSecret are the local connector's generated peer
+	// and the Secret its bootstrap record is written to (mode=combined).
+	peerID, bootstrapSecret string
 }
 
 // buildHubAPIRegionalOffer derives the plain connector offer (no regional
@@ -57,7 +60,7 @@ func buildHubAPIRegionalOffer(ctx context.Context, files *os.Root, h contracts.H
 		ConnectorServerSuffix: contracts.ConnectorServerSuffix(ids.InstallationID), ConnectorIssuerRoots: connectorRoots,
 		Roles:            contracts.ConnectorIdentityRoles{Source: names[0], Journal: names[1], Acknowledgement: names[2], Cleanup: names[3], Verifier: names[4], Finalizer: names[5]},
 		ConnectorBacking: raw, Image: o.Image}
-	return &hubAPIRegionalOffer{namespace: h.Namespace, name: contracts.HubAPIName(h.Name, "regional-offer"), offer: offer}, nil
+	return &hubAPIRegionalOffer{namespace: h.Namespace, name: contracts.HubAPIName(h.Name, "regional-offer"), offer: offer, peerID: ids.PeerID, bootstrapSecret: contracts.HubAPIName(h.Name, "region-bootstrap")}, nil
 }
 
 // publish writes the offer into the empty Helm-rendered ConfigMap; an

@@ -73,6 +73,11 @@ SELECT * FROM fleet_peer_certificate WHERE installation_id=$1 AND peer_id=$2 ORD
 -- name: FindBootstrapIntent :one
 SELECT * FROM fleet_bootstrap_intent WHERE installation_id=$1 AND actor_digest=$2 AND key_digest=$3;
 
+-- name: LatestPeerBootstrapIntent :one
+SELECT sqlc.embed(i), (b.claimed_at IS NOT NULL)::boolean AS claimed FROM fleet_bootstrap_intent i
+LEFT JOIN fleet_bootstrap b ON b.installation_id=i.installation_id AND b.id=i.id
+WHERE i.installation_id=$1 AND i.peer_id=$2 ORDER BY i.not_before DESC LIMIT 1;
+
 -- name: CountBootstrapReservations :one
 WITH reservations AS (
  SELECT i.id,i.not_after FROM fleet_bootstrap_intent i WHERE i.installation_id=$1

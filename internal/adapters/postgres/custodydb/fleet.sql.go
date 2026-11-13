@@ -515,6 +515,62 @@ func (q *Queries) InsertEnrolledPeer(ctx context.Context, arg InsertEnrolledPeer
 	return err
 }
 
+const latestPeerBootstrapIntent = `-- name: LatestPeerBootstrapIntent :one
+SELECT i.installation_id, i.id, i.actor_digest, i.key_digest, i.request_digest, i.actor_json, i.identity_uid, i.identity_generation, i.identity_digest, i.trust_uid, i.trust_generation, i.trust_digest, i.cluster_id, i.peer_id, i.issuer_epoch, i.delivery_profile, i.display_name, i.region, i.not_before, i.not_after, i.credential_recorded_at, i.credential_sha256, i.credential_version, i.audit_acknowledged_at, i.audit_digest, i.audit_object_key, i.audit_object_version, i.audit_object_etag, i.audit_object_bytes, i.audit_object_sha256, i.issued_at, (b.claimed_at IS NOT NULL)::boolean AS claimed FROM fleet_bootstrap_intent i
+LEFT JOIN fleet_bootstrap b ON b.installation_id=i.installation_id AND b.id=i.id
+WHERE i.installation_id=$1 AND i.peer_id=$2 ORDER BY i.not_before DESC LIMIT 1
+`
+
+type LatestPeerBootstrapIntentParams struct {
+	InstallationID pgtype.UUID
+	PeerID         pgtype.UUID
+}
+
+type LatestPeerBootstrapIntentRow struct {
+	FleetBootstrapIntent FleetBootstrapIntent
+	Claimed              bool
+}
+
+func (q *Queries) LatestPeerBootstrapIntent(ctx context.Context, arg LatestPeerBootstrapIntentParams) (LatestPeerBootstrapIntentRow, error) {
+	row := q.db.QueryRow(ctx, latestPeerBootstrapIntent, arg.InstallationID, arg.PeerID)
+	var i LatestPeerBootstrapIntentRow
+	err := row.Scan(
+		&i.FleetBootstrapIntent.InstallationID,
+		&i.FleetBootstrapIntent.ID,
+		&i.FleetBootstrapIntent.ActorDigest,
+		&i.FleetBootstrapIntent.KeyDigest,
+		&i.FleetBootstrapIntent.RequestDigest,
+		&i.FleetBootstrapIntent.ActorJson,
+		&i.FleetBootstrapIntent.IdentityUid,
+		&i.FleetBootstrapIntent.IdentityGeneration,
+		&i.FleetBootstrapIntent.IdentityDigest,
+		&i.FleetBootstrapIntent.TrustUid,
+		&i.FleetBootstrapIntent.TrustGeneration,
+		&i.FleetBootstrapIntent.TrustDigest,
+		&i.FleetBootstrapIntent.ClusterID,
+		&i.FleetBootstrapIntent.PeerID,
+		&i.FleetBootstrapIntent.IssuerEpoch,
+		&i.FleetBootstrapIntent.DeliveryProfile,
+		&i.FleetBootstrapIntent.DisplayName,
+		&i.FleetBootstrapIntent.Region,
+		&i.FleetBootstrapIntent.NotBefore,
+		&i.FleetBootstrapIntent.NotAfter,
+		&i.FleetBootstrapIntent.CredentialRecordedAt,
+		&i.FleetBootstrapIntent.CredentialSha256,
+		&i.FleetBootstrapIntent.CredentialVersion,
+		&i.FleetBootstrapIntent.AuditAcknowledgedAt,
+		&i.FleetBootstrapIntent.AuditDigest,
+		&i.FleetBootstrapIntent.AuditObjectKey,
+		&i.FleetBootstrapIntent.AuditObjectVersion,
+		&i.FleetBootstrapIntent.AuditObjectEtag,
+		&i.FleetBootstrapIntent.AuditObjectBytes,
+		&i.FleetBootstrapIntent.AuditObjectSha256,
+		&i.FleetBootstrapIntent.IssuedAt,
+		&i.Claimed,
+	)
+	return i, err
+}
+
 const lockBootstrap = `-- name: LockBootstrap :one
 SELECT installation_id, id, cluster_id, peer_id, issuer_epoch, secret_sha256, not_before, not_after, revoked, issue_authority_digest, issue_audit_id, issue_audit_key, issue_audit_version, issue_audit_sha256, claimed_at, public_key_sha256, claim_acknowledged_at, claim_audit_digest, claim_object_key, claim_object_version, claim_object_etag, claim_object_bytes, claim_object_sha256 FROM fleet_bootstrap WHERE installation_id=$1 AND id=$2 FOR UPDATE
 `

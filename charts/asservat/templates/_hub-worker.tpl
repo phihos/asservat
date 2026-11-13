@@ -75,7 +75,7 @@ installation ID in Go, object UIDs are read by name.
 {{- if not $clients }}{{ $clients = list (default "asservat-console" .Values.identity.clientID) }}{{ end -}}
 {{- toJson (dict "schemaVersion" "fleet-settings/v1" "revision" (int .Release.Revision) "suspended" false
   "issuer" (default (include "asservat.hubWorker.identityIssuer" .) $f.issuer)
-  "clients" $clients "subjects" (default list $f.subjects) "groups" (default list $f.groups) "deliveryProfiles" (default list $f.deliveryProfiles)
+  "clients" $clients "subjects" (default list $f.subjects) "groups" (default list $f.groups) "deliveryProfiles" (include "asservat.hubApi.deliveryProfiles" . | fromJsonArray)
   "maxActiveBootstraps" (int $f.maxActiveBootstraps) "maxBootstrapHistory" (int $f.maxBootstrapHistory) "maxClusters" (int $f.maxClusters)) -}}
 {{- end -}}
 

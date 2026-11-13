@@ -20,6 +20,9 @@ var (
 	ErrPending     = errors.New("enrollment is pending")
 	ErrCapacity    = errors.New("fleet enrollment limit reached")
 	ErrConflict    = errors.New("enrollment request conflicts with its original identity")
+	// ErrLocalBootstrapConsumed: the installation's own connector claimed its
+	// latest local bootstrap slot; no further local slot is reserved.
+	ErrLocalBootstrapConsumed = errors.New("local cluster bootstrap consumed")
 )
 
 type Reference struct {

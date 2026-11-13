@@ -73,3 +73,25 @@ func AuthorizeEnrollment(i identity.Identity, a Administration, profile string, 
 	out = EnrollmentAuthority{InstallationID: a.InstallationID, IssuerEpoch: a.IssuerEpoch, DeliveryProfile: profile, Actor: i.Principal, IdentityRevision: i.Policy, AdministrationRevision: a.Revision, CheckedAt: now, ValidUntil: identity.Earlier(i.ValidUntil, a.FreshUntil), MaxActiveBootstraps: a.MaxActiveBootstraps, MaxBootstrapHistory: a.MaxBootstrapHistory, MaxClusters: a.MaxClusters}
 	return out, nil
 }
+
+// InstallationEnrollmentActor is the installation itself, the actor of the
+// combined-mode connector's own bootstrap (no human session).
+func InstallationEnrollmentActor(installationID string) identity.Principal {
+	return identity.Principal{Issuer: "urn:asservat:installation:" + installationID, Subject: "local-cluster", ClientID: "hub-api", Kind: identity.Workload}
+}
+
+// AuthorizeInstallationEnrollment authorizes the installation's own connector
+// bootstrap from the current protected fleet administration: it is bound to
+// the same suspension, delivery profiles and bootstrap/cluster limits as an
+// operator's issuance, with the administration revision as identity revision.
+func AuthorizeInstallationEnrollment(a Administration, profile string, now time.Time) (EnrollmentAuthority, error) {
+	var out EnrollmentAuthority
+	if !a.Valid(now) {
+		return out, ErrUnavailable
+	}
+	if a.Suspended || !slices.Contains(a.DeliveryProfiles, profile) {
+		return out, ErrDenied
+	}
+	return EnrollmentAuthority{InstallationID: a.InstallationID, IssuerEpoch: a.IssuerEpoch, DeliveryProfile: profile, Actor: InstallationEnrollmentActor(a.InstallationID), IdentityRevision: a.Revision, AdministrationRevision: a.Revision,
+		CheckedAt: now, ValidUntil: a.FreshUntil, MaxActiveBootstraps: a.MaxActiveBootstraps, MaxBootstrapHistory: a.MaxBootstrapHistory, MaxClusters: a.MaxClusters}, nil
+}

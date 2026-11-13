@@ -23,6 +23,14 @@ func TestDecodeBootstrapRecord(t *testing.T) {
 	if err != nil || e.BootstrapID != slot.ID || e.Binding != slot.Binding || e.RequestDigest != slot.RequestDigest || !e.NotAfter.Equal(slot.NotAfter) || e.Secret != secret {
 		t.Fatal("record not decoded exactly", err)
 	}
+	// The combined-mode hub writes the same record for its own connector.
+	encoded, err := EncodeBootstrapRecord(e)
+	if err != nil || !bytes.Equal(encoded, raw) {
+		t.Fatal("encoded record differs from the channel record", err)
+	}
+	if _, err := EncodeBootstrapRecord(value.BootstrapEnvelope{}); err == nil {
+		t.Fatal("invalid envelope encoded")
+	}
 	for _, bad := range [][]byte{
 		bytes.Replace(raw, []byte(`"bootstrapID"`), []byte(`"BootstrapID"`), 1),
 		bytes.Replace(raw, []byte(`"secret":`), []byte(`"extra":1,"secret":`), 1),

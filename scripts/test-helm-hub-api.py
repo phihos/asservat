@@ -160,8 +160,15 @@ class HubAPI(unittest.TestCase):
         self.assertIn('"asservat-keycloak-state"', public_sources)
         self.assertIn('"console-client-secret"', public_sources)
 
+        # The local connector's bootstrap record Secret: rendered empty and
+        # kept; the hub-api writes bootstrap.json into it by name.
+        record = o[("Secret", NS, "asservat-region-bootstrap")]
+        self.assertNotIn("data", record)
+        self.assertEqual(record["metadata"]["annotations"]["helm.sh/resource-policy"], "keep")
         rules = o[("Role", NS, "asservat-hub-api")]["rules"]
-        self.assertFalse([r for r in rules if "update" in r["verbs"] and r.get("resourceNames") != ["asservat-regional-offer"]])
+        self.assertFalse([r for r in rules if "update" in r["verbs"] and r.get("resourceNames") not in (["asservat-regional-offer"], ["asservat-region-bootstrap"])])
+        self.assertIn({"apiGroups": [""], "resources": ["secrets"], "resourceNames": ["asservat-region-bootstrap"], "verbs": ["get", "update"]}, rules)
+        self.assertFalse([r for r in rules if "secrets" in r["resources"] and r.get("resourceNames") != ["asservat-region-bootstrap"]])
         names = {n for r in rules for n in r.get("resourceNames", [])}
         self.assertLessEqual({"asservat-owner-source", "asservat-browser-settings", "asservat-identity-settings", "asservat-cluster-catalog", "asservat-download-environment", "asservat-processing-source", "asservat-fleet"}, names)
         self.assertEqual(o[("ClusterRole", "", NS + "-asservat-hub-api")]["rules"][0]["resourceNames"], [NS, "asservat-downloads"])
@@ -191,6 +198,21 @@ class HubAPI(unittest.TestCase):
         native = o[("Service", NS, "asservat-hub-api-native")]["spec"]
         self.assertEqual((native["type"], native["ports"][0]["nodePort"]), ("NodePort", 31447))
         self.assertNotIn("nodePort", native["ports"][1])
+
+    def test_combined_local_bootstrap_without_fleet_issuer(self):
+        # The hub-api issues the local connector's bootstrap through the fleet
+        # issuance; without fleet values the profile defaults to "local" in
+        # both the hub-api config and the protected fleet source.
+        values = merge(BUNDLED, {"fleet": {"issuer": "", "deliveryProfiles": []}})
+        o = render(values)
+        config = json.loads(o[("ConfigMap", NS, "asservat-hub-api-config")]["data"]["config.json"])
+        self.assertEqual(config["public"]["fleet"], {"deliveryProfile": "local"})
+        fleet = json.loads(o[("ConfigMap", NS, "asservat-fleet")]["data"]["fleet.json"])
+        self.assertEqual(fleet["deliveryProfiles"], ["local"])
+        # No connector, no record Secret and no Secret access.
+        o = render(merge(values, {"region": {"enabled": False}}))
+        self.assertNotIn(("Secret", NS, "asservat-region-bootstrap"), o)
+        self.assertFalse([r for r in o[("Role", NS, "asservat-hub-api")]["rules"] if "secrets" in r["resources"]])
 
     def test_without_origin_no_public(self):
         values = merge(BUNDLED, {"mode": "hub", "region": {"enabled": False}, "origin": "", "identity": {"issuer": "https://sso.example.test/realms/org", "clientID": "console"}, "services": {"identity": {"provider": "external"}}})

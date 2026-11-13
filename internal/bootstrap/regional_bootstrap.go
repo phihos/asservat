@@ -22,9 +22,9 @@ type regionalChannel interface {
 	Run(context.Context, func([]byte) (connectorlifecycle.Opening, error), connectorlifecycle.Local) (connectorlifecycle.HubFrame, error)
 }
 
-// errRegionalBootstrapExpired: the operator issues a new bootstrap, empties
-// the cluster credential Secret and replaces the bootstrap record Secret; this
-// process never reuses an expired one.
+// errRegionalBootstrapExpired: the operator issues a new bootstrap and
+// replaces the bootstrap record Secret (mode=combined: the hub does); this
+// process never reuses an expired one and reseeds from a newer record.
 var errRegionalBootstrapExpired = errors.New("cluster bootstrap expired")
 
 // errRegionalBootstrapMissing: the cluster credential Secret is empty and no
@@ -102,7 +102,19 @@ func (b regionalBootstrap) Reconcile(ctx context.Context) error {
 		return value.ErrDenied // the regional source names another slot
 	}
 	if !b.now().Before(e.NotAfter) {
-		return errRegionalBootstrapExpired
+		// mode=combined: the hub replaces a slot that expired unclaimed with
+		// a new record for the same binding. The expired slot was never
+		// claimed, so its pending key is discarded with it.
+		next, rerr := b.record.ReadBootstrapRecord(ctx)
+		if rerr != nil || next.Binding != b.binding || next.BootstrapID == e.BootstrapID || !b.now().Before(next.NotAfter) {
+			return errRegionalBootstrapExpired
+		}
+		clear(state.PendingSeed)
+		state = fleetapp.ClusterCredentialSecret{Bootstrap: &next}
+		if version, err = b.store.WriteClusterCredential(ctx, version, state); err != nil {
+			return errors.Join(err, errRegionalCredentialWrite)
+		}
+		e = next
 	}
 	if state.PendingSeed == nil {
 		seed := make([]byte, ed25519.SeedSize)

@@ -63,4 +63,20 @@ metadata:
   labels: {{ include "asservat.labels" (list . "hub-api") | nindent 4 }}
   annotations:
     helm.sh/resource-policy: keep
+{{- if .Values.region.enabled }}
+---
+# The combined-mode connector's bootstrap record: hub-api writes
+# bootstrap.json for the generated local cluster and peer (the installation's
+# own audited fleet bootstrap) and replaces it when it expires unclaimed.
+# Helm only creates the object and keeps it.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "asservat.fullname" (list . "region-bootstrap") }}
+  namespace: {{ .Release.Namespace }}
+  labels: {{ include "asservat.labels" (list . "hub-api") | nindent 4 }}
+  annotations:
+    helm.sh/resource-policy: keep
+type: Opaque
+{{- end }}
 {{- end }}

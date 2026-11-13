@@ -72,6 +72,11 @@ func (h *verifyingHub) Run(_ context.Context, open func([]byte) (connectorlifecy
 	return connectorlifecycle.HubFrame{Kind: "result", Bootstrap: &value.ClusterBootstrapResult{LineageID: "20000000-0000-4000-8000-000000000009", Generation: 1, KeyDigest: digest, IssuedAt: now, ValidUntil: now.Add(time.Hour)}}, nil
 }
 
+// recordFunc is the mounted bootstrap.json.
+type recordFunc func() (value.BootstrapEnvelope, error)
+
+func (f recordFunc) ReadBootstrapRecord(context.Context) (value.BootstrapEnvelope, error) { return f() }
+
 func regionalBootstrapFixture(t *testing.T) (regionalBootstrap, *casSecret, *verifyingHub) {
 	t.Helper()
 	raw := make([]byte, 32)
@@ -83,7 +88,8 @@ func regionalBootstrapFixture(t *testing.T) (regionalBootstrap, *casSecret, *ver
 	store := &casSecret{state: fleetapp.ClusterCredentialSecret{Bootstrap: &value.BootstrapEnvelope{BootstrapID: "20000000-0000-4000-8000-000000000005", Binding: binding, DeliveryProfile: "regional-installer",
 		RequestDigest: artifact.Digest{1}, NotBefore: now.Add(-time.Minute), NotAfter: now.Add(4 * time.Minute), Secret: base64.RawURLEncoding.EncodeToString(raw)}}}
 	hub := &verifyingHub{store: store}
-	return regionalBootstrap{store: store, channel: hub, local: regionalLocal{}, binding: binding, root: "20000000-0000-4000-8000-000000000006", now: time.Now}, store, hub
+	missing := recordFunc(func() (value.BootstrapEnvelope, error) { return value.BootstrapEnvelope{}, errRegionalBootstrapMissing })
+	return regionalBootstrap{store: store, record: missing, channel: hub, local: regionalLocal{}, binding: binding, root: "20000000-0000-4000-8000-000000000006", now: time.Now}, store, hub
 }
 
 // ADR-193 step 3e: the pending key is stored before any request, a lost reply
@@ -125,5 +131,31 @@ func TestRegionalBootstrapRefusals(t *testing.T) {
 	b.binding.PeerID = "20000000-0000-4000-8000-0000000000ee"
 	if err := b.Reconcile(context.Background()); !errors.Is(err, value.ErrDenied) || len(hub.digests) != 0 || store.state.PendingSeed != nil {
 		t.Fatal("bootstrap for another slot", err)
+	}
+}
+
+// mode=combined: the hub replaces a slot that expired unclaimed; the
+// connector reseeds its generation-0 Secret from the newer record of the
+// same binding, never from the expired one or another binding's.
+func TestRegionalBootstrapReseedsFromANewerRecord(t *testing.T) {
+	b, store, hub := regionalBootstrapFixture(t)
+	old := *store.state.Bootstrap
+	old.NotBefore, old.NotAfter = time.Now().Add(-6*time.Minute).UTC(), time.Now().Add(-time.Minute).UTC()
+	store.state.Bootstrap, store.state.PendingSeed = &old, bytes.Repeat([]byte{3}, 32)
+	next := old
+	next.BootstrapID, next.NotBefore, next.NotAfter = "20000000-0000-4000-8000-000000000007", time.Now().UTC().Truncate(time.Microsecond), time.Now().Add(4*time.Minute).UTC().Truncate(time.Microsecond)
+	for _, record := range []value.BootstrapEnvelope{old, func() value.BootstrapEnvelope {
+		e := next
+		e.Binding.PeerID = "20000000-0000-4000-8000-0000000000ee"
+		return e
+	}()} {
+		b.record = recordFunc(func() (value.BootstrapEnvelope, error) { return record, nil })
+		if err := b.Reconcile(context.Background()); !errors.Is(err, errRegionalBootstrapExpired) || len(hub.digests) != 0 || store.state.Bootstrap.BootstrapID != old.BootstrapID {
+			t.Fatal("reseeded from the expired slot or another binding", err)
+		}
+	}
+	b.record = recordFunc(func() (value.BootstrapEnvelope, error) { return next, nil })
+	if err := b.Reconcile(context.Background()); err != nil || store.state.Generation != 1 || len(hub.digests) != 1 || bytes.Equal(store.state.Seed, bytes.Repeat([]byte{3}, 32)) {
+		t.Fatal("newer record not used with a fresh key", err)
 	}
 }

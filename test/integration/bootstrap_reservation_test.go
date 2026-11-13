@@ -237,6 +237,49 @@ func TestEnrollmentBootstrapReservationsWithRealServices(t *testing.T) {
 			}
 		})
 	}
+	// mode=combined: the installation's own connector peer gets a slot for
+	// its fixed generated IDs, a live slot resumes or stays pending, a slot
+	// that expired unclaimed is replaced and a claimed slot ends issuance.
+	t.Run("local-fixed-binding", func(t *testing.T) {
+		request, _ := setup(1, 16, 1)
+		a := request.Authority
+		cluster, peer := uuid.NewString(), uuid.NewString()
+		local, err := postgres.NewLocalBootstrapReservations(ctx, pool, a.InstallationID, cluster, peer, uuid.NewString)
+		if err != nil {
+			t.Fatal(err)
+		}
+		first, err := local.ReserveBootstrap(ctx, request)
+		if err != nil || first.Slot.Binding.ClusterID != cluster || first.Slot.Binding.PeerID != peer {
+			t.Fatal("local slot not bound to the fixed IDs", err)
+		}
+		again, err := local.ReserveBootstrap(ctx, request)
+		if err != nil || again.Slot.ID != first.Slot.ID {
+			t.Fatal("live local slot not resumed", err)
+		}
+		other := request
+		other.KeyDigest[0] = 9
+		if _, err = local.ReserveBootstrap(ctx, other); !errors.Is(err, value.ErrPending) {
+			t.Fatal("second live local slot", err)
+		}
+		// Expire the live slot (fixture-only trigger bypass) and replace it.
+		if _, err = admin.Exec(ctx, `ALTER TABLE fleet_bootstrap_intent DISABLE TRIGGER bootstrap_intent_guard; UPDATE fleet_bootstrap_intent SET not_before=not_before-interval '6 minutes',not_after=not_after-interval '6 minutes' WHERE installation_id='`+a.InstallationID+`'; ALTER TABLE fleet_bootstrap_intent ENABLE TRIGGER bootstrap_intent_guard`); err != nil {
+			t.Fatal(err)
+		}
+		replaced, err := local.ReserveBootstrap(ctx, other)
+		if err != nil || replaced.Slot.ID == first.Slot.ID || replaced.Slot.Binding != first.Slot.Binding {
+			t.Fatal("expired unclaimed local slot not replaced for the same peer", err)
+		}
+		// A claimed slot ends local issuance even after it expired.
+		if _, err = admin.Exec(ctx, `INSERT INTO fleet_bootstrap(installation_id,id,cluster_id,peer_id,issuer_epoch,secret_sha256,not_before,not_after,issue_authority_digest,issue_audit_id,issue_audit_key,issue_audit_version,issue_audit_sha256) SELECT installation_id,id,cluster_id,peer_id,issuer_epoch,$2,not_before,not_after,$2,id,'synthetic-local','v1',$2 FROM fleet_bootstrap_intent WHERE installation_id=$1 AND id=$3`, a.InstallationID, a.IdentityRevision.Digest[:], replaced.Slot.ID); err != nil {
+			t.Fatal(err)
+		}
+		if _, err = admin.Exec(ctx, `UPDATE fleet_bootstrap SET claimed_at=clock_timestamp(),public_key_sha256=$2 WHERE installation_id=$1`, a.InstallationID, a.IdentityRevision.Digest[:]); err != nil {
+			t.Fatal(err)
+		}
+		if _, err = local.ReserveBootstrap(ctx, request); !errors.Is(err, value.ErrLocalBootstrapConsumed) {
+			t.Fatal("claimed local slot replaced", err)
+		}
+	})
 	t.Run("role-and-immutable-record", func(t *testing.T) {
 		request, reservations := setup(8, 16, 16)
 		if _, err := reservations.ReserveBootstrap(ctx, request); err != nil {

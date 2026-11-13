@@ -37,6 +37,15 @@
 {{- end -}}
 {{- end -}}
 
+{{/* fleet.deliveryProfiles (JSON list). mode=combined defaults to
+     ["local"]: the hub-api issues the local connector's bootstrap itself
+     through the fleet issuance with the first profile. */}}
+{{- define "asservat.hubApi.deliveryProfiles" -}}
+{{- $default := list -}}
+{{- if include "asservat.hubApi.combined" . }}{{ $default = list "local" }}{{ end -}}
+{{- toJson (default $default .Values.fleet.deliveryProfiles) -}}
+{{- end -}}
+
 {{/* True when the regional connector shares this release (mode=combined). */}}
 {{- define "asservat.hubApi.combined" -}}
 {{- if eq .Values.mode "combined" }}true{{ end -}}
@@ -75,8 +84,9 @@
 {{- with .Values.identity.permissionDelegations }}{{ $_ := set $pub "permissionDelegations" . }}{{ end -}}
 {{- with .Values.captureHistory }}{{ $_ := set $pub "captureHistory" . }}{{ end -}}
 {{- if eq .Values.exposure.tls.mode "proxy" }}{{ $_ := set $pub "proxyTLS" true }}{{ end -}}
-{{- if .Values.fleet.issuer -}}
-{{- $profiles := required "fleet.deliveryProfiles needs at least one profile when fleet.issuer is set" .Values.fleet.deliveryProfiles -}}
+{{- if or .Values.fleet.issuer (include "asservat.hubApi.combined" .) -}}
+{{- $profiles := include "asservat.hubApi.deliveryProfiles" . | fromJsonArray -}}
+{{- if not $profiles }}{{ fail "fleet.deliveryProfiles needs at least one profile when fleet.issuer is set" }}{{ end -}}
 {{- $_ := set $pub "fleet" (dict "deliveryProfile" (first $profiles)) -}}
 {{- end -}}
 {{- if include "asservat.hubApi.combined" . -}}

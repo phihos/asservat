@@ -34,6 +34,13 @@ rules:
     resources: [configmaps]
     resourceNames: [{{ printf "%s-regional-offer" $n | quote }}]
     verbs: [get, update]
+  {{- if .Values.region.enabled }}
+  # The combined-mode connector's bootstrap record, written by the hub-api.
+  - apiGroups: [""]
+    resources: [secrets]
+    resourceNames: [{{ printf "%s-region-bootstrap" $n | quote }}]
+    verbs: [get, update]
+  {{- end }}
   {{- end }}
   - apiGroups: [asservat.io]
     resources: [debugpolicies]

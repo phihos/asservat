@@ -72,7 +72,10 @@ type OwnerDeployment struct {
 	// recordingCollect is the ADR-248 collect loop; RunPublic supervises it.
 	recordingCollect *RegionalRecordingCollect
 	history          *captureapp.HistoryParameterService
-	shared           publicShared
+	// localBootstrap issues the combined-mode connector's own bootstrap
+	// record; RunPublic supervises it.
+	localBootstrap *app.LocalClusterBootstrap
+	shared         publicShared
 	// ADR-182: backend and public input roots (the owner root in the legacy
 	// layout) and, in the installed layout, the provider effects.
 	backend, publicFiles *providerInputs
@@ -265,6 +268,11 @@ func newOwnerDeployment(ctx context.Context, files *os.Root, podUID string, in *
 		d.closers = append(d.closers, closers...)
 		if err != nil {
 			return nil, &fixedStepError{"public-context", err}
+		}
+		if in.offer != nil && d.publicContext.fleet != nil {
+			if d.localBootstrap, err = newLocalClusterBootstrap(startup, in, d.public, d.publicContext.fleet, d.providers.BootstrapChannel()); err != nil {
+				return nil, err
+			}
 		}
 		nativeConfig.ContextStarts = d.publicContext.starts
 		if nativeConfig.ContextStarts.Authenticator, err = contextStartOwnerAuthenticator(in, c, guard, pool, configs, ledgers["registry"], &d.contextStartStats); err != nil {
@@ -529,6 +537,13 @@ func (d *OwnerDeployment) RunPublic(listener net.Listener) error {
 		go func() {
 			defer d.owners.Done()
 			_ = d.inputs.offer.publish(d.root, d.inputs.providerInputs)
+		}()
+	}
+	if d.localBootstrap != nil {
+		d.owners.Add(1)
+		go func() {
+			defer d.owners.Done()
+			_ = d.localBootstrap.Run(d.root, eventLog(os.Stderr, "local cluster bootstrap"))
 		}()
 	}
 	if d.history != nil {
