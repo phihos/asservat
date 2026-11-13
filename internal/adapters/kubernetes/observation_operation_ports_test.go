@@ -32,7 +32,7 @@ func TestObservationOperationPortsKeepConcreteNativeBrackets(t *testing.T) {
 			t.Fatal("Original changed or re-observed native facts")
 		}
 		final, err := op.Final(ctx)
-		if err != nil || !final.Final || !final.Valid(f.start) || !final.ObservedAt.Equal(again.ObservedAt) || final.FreshUntil.After(again.FreshUntil) || f.observer.Load() <= observer || f.probe.Load() <= probe {
+		if err != nil || !final.Final || !final.Valid(f.start) || !final.ObservedAt.Equal(again.ObservedAt) || final.FreshUntil.After(again.FreshUntil) || f.observer.Load() <= observer || f.probe.Load() != 0 {
 			t.Fatal("final native bracket missing or renewed", err)
 		}
 		if _, err := op.Final(ctx); err == nil {
@@ -56,8 +56,8 @@ func TestObservationOperationPortsKeepConcreteNativeBrackets(t *testing.T) {
 				t.Fatal("source phase/observation lost", ordinal, err)
 			}
 		}
-		if f.gets.Load() != 6 || f.reviews.Load() != 4 {
-			t.Fatal("four real values plus two guard probe reads changed", f.gets.Load(), f.reviews.Load())
+		if f.gets.Load() != 4 || f.reviews.Load() != 4 {
+			t.Fatal("four real values without guard probe reads changed", f.gets.Load(), f.reviews.Load())
 		}
 	})
 }

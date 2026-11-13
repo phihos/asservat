@@ -137,10 +137,8 @@ func (o *ConnectorObservationOperation) Read(ctx context.Context, ordinal int) (
 			<-done
 		}
 	}()
-	// At ordinal four the final independent bracket precedes the last full
-	// value read. The guard probe itself GETs source bytes; reading the value
-	// afterward detects any source change during that proof, rather than
-	// silently treating its ignored probe body as a new source observation.
+	// At ordinal four the final native workload bracket precedes the last
+	// full value read, so a source change during that bracket is detected.
 	workload := o.workload
 	var err error
 	if ordinal == value.ConnectorObservationMaximumChecks {

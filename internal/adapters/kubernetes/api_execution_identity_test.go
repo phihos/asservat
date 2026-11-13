@@ -16,8 +16,6 @@ import (
 	"asservat.local/asservat/internal/domain/artifact"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	value "asservat.local/asservat/internal/domain/execution"
-	admission "k8s.io/api/admissionregistration/v1"
-	auth "k8s.io/api/authentication/v1"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -26,16 +24,16 @@ import (
 )
 
 type apiProofFixture struct {
-	plan                cfg.APIExecutionAdministration
-	clock               atomic.Int64
-	mu                  sync.Mutex
-	object              map[string]any
-	creates             int
-	podReads, proofPuts int
-	mode                string
-	executor, capacity  *APIExecutionProtection
-	preparer            *APIStartPreparer
-	journal             *StartJournal
+	plan               cfg.APIExecutionAdministration
+	clock              atomic.Int64
+	mu                 sync.Mutex
+	object             map[string]any
+	creates            int
+	podReads           int
+	mode               string
+	executor, capacity *APIExecutionProtection
+	preparer           *APIStartPreparer
+	journal            *StartJournal
 }
 
 func newAPIProofFixture(t *testing.T, mode string) *apiProofFixture {
@@ -49,47 +47,13 @@ func newAPIProofFixture(t *testing.T, mode string) *apiProofFixture {
 	for i := range f.plan.ImageDigest {
 		f.plan.ImageDigest[i] = 0xaa
 	}
-	pol, binding, err := APIExecutionAdmission(f.plan)
-	if err != nil {
-		t.Fatal(err)
-	}
-	pin := GuardPin{PolicyUID: ownerID(10), PolicyGeneration: 1, BindingUID: ownerID(11), BindingResourceVersion: "1"}
-	startPin := GuardPin{PolicyUID: ownerID(12), PolicyGeneration: 1, BindingUID: ownerID(13), BindingResourceVersion: "1"}
-	setPolicy := func(p *admission.ValidatingAdmissionPolicy, b *admission.ValidatingAdmissionPolicyBinding, pin GuardPin) {
-		p.APIVersion = "admissionregistration.k8s.io/v1"
-		p.Kind = "ValidatingAdmissionPolicy"
-		p.UID = types.UID(pin.PolicyUID)
-		p.Generation = 1
-		p.ResourceVersion = "1"
-		p.Status = admission.ValidatingAdmissionPolicyStatus{ObservedGeneration: 1, TypeChecking: &admission.TypeChecking{}}
-		b.APIVersion = p.APIVersion
-		b.Kind = "ValidatingAdmissionPolicyBinding"
-		b.UID = types.UID(pin.BindingUID)
-		b.ResourceVersion = "1"
-	}
-	setPolicy(pol, binding, pin)
-	startPol, startBinding, err := StartAdmission(cfg.LocalStartAdministration{Name: "api-start", ControlNamespace: f.plan.ControlNamespace, CapacityUser: "system:serviceaccount:asservat-api:capacity", ExecutionUser: "system:serviceaccount:asservat-api:executor"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	setPolicy(startPol, startBinding, startPin)
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		f.mu.Lock()
 		defer f.mu.Unlock()
 		path := r.URL.Path
 		account := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
-		uids := map[string]string{"executor": f.plan.AccountUID, "capacity": f.plan.CapacityAccountUID, "probe": f.plan.ProbeAccountUID}
+		uids := map[string]string{"executor": f.plan.AccountUID, "capacity": f.plan.CapacityAccountUID}
 		switch {
-		case path == "/apis/authentication.k8s.io/v1/selfsubjectreviews":
-			who := auth.SelfSubjectReview{}
-			who.Status.UserInfo = auth.UserInfo{Username: "system:serviceaccount:asservat-api:" + account, UID: uids[account], Groups: []string{"system:authenticated"}}
-			if account == "executor" && mode != "unbound" {
-				who.Status.UserInfo.Extra = map[string]auth.ExtraValue{"authentication.kubernetes.io/pod-name": {f.plan.PodName}, "authentication.kubernetes.io/pod-uid": {f.plan.PodUID}}
-			}
-			if mode == "administrator" {
-				who.Status.UserInfo.Groups = append(who.Status.UserInfo.Groups, "install-admins")
-			}
-			permissionReply(w, who)
 		case path == "/api/v1/namespaces/asservat-api":
 			permissionReply(w, permissionNamespace("asservat-api", f.plan.ControlNamespace.UID))
 		case strings.Contains(path, "/serviceaccounts/"):
@@ -99,54 +63,21 @@ func newAPIProofFixture(t *testing.T, mode string) *apiProofFixture {
 				uid = ownerID(90)
 			}
 			permissionReply(w, core.ServiceAccount{TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "ServiceAccount"}, ObjectMeta: meta.ObjectMeta{Name: name, Namespace: "asservat-api", UID: types.UID(uid), ResourceVersion: "1"}})
-		case strings.HasSuffix(path, "/validatingadmissionpolicies/api-execution"):
-			permissionReply(w, pol)
-		case strings.HasSuffix(path, "/validatingadmissionpolicybindings/api-execution"):
-			permissionReply(w, binding)
-		case strings.HasSuffix(path, "/validatingadmissionpolicies/api-start"):
-			permissionReply(w, startPol)
-		case strings.HasSuffix(path, "/validatingadmissionpolicybindings/api-start"):
-			permissionReply(w, startBinding)
 		case path == "/api/v1/namespaces/asservat-api/pods/executor":
+			// Plain RBAC replaces the admission guard: only a GET is expected,
+			// never a dry-run denial probe.
 			if r.Method == "GET" {
 				f.podReads++
 				out := pod.DeepCopy()
 				out.ResourceVersion = fmt.Sprint(f.podReads)
-				if mode == "conflict-replaced" && f.podReads > 1 {
-					out.UID = types.UID(ownerID(99))
-				}
 				if mode == "replaced-image" {
 					out.Spec.Containers[0].Image = "registry.invalid/other:latest"
 				}
 				permissionReply(w, out)
 				return
 			}
-			if r.Method != "PUT" || r.URL.Query().Get("dryRun") != "All" || account != "probe" {
-				t.Error("unexpected proof mutation")
-				http.Error(w, "unexpected", 400)
-				return
-			}
-			f.proofPuts++
-			if strings.HasPrefix(mode, "conflict-") && (f.proofPuts == 1 || mode == "conflict-forever") {
-				if mode == "conflict-expired" {
-					f.clock.Add(int64(5 * time.Second))
-				}
-				name := f.plan.PodName
-				if mode == "conflict-wrong-object" {
-					name = "another-pod"
-				}
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusConflict)
-				permissionReply(w, meta.Status{TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "Status"}, Status: "Failure", Code: 409, Reason: meta.StatusReasonConflict, Details: &meta.StatusDetails{Kind: "pods", Name: name}})
-				return
-			}
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusForbidden)
-			message := "ValidatingAdmissionPolicy 'api-execution' with binding 'api-execution' denied request: " + apiExecutionDenial
-			if mode == "other-denial" {
-				message = "RBAC forbids request"
-			}
-			permissionReply(w, meta.Status{TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "Status"}, Status: "Failure", Code: 403, Reason: meta.StatusReasonForbidden, Details: &meta.StatusDetails{Kind: "pods", Causes: []meta.StatusCause{{Message: message}}}})
+			t.Error("unexpected Pod mutation", r.Method)
+			http.Error(w, "unexpected", 400)
 		case strings.Contains(path, "/capacityreservations"):
 			if r.Method == "POST" {
 				if account != "capacity" {
@@ -210,16 +141,16 @@ func newAPIProofFixture(t *testing.T, mode string) *apiProofFixture {
 	}
 	executor, executorConfig := client("executor")
 	capacity, _ := client("capacity")
-	probe, _ := client("probe")
-	f.executor, err = NewAPIExecutionProtection(executor, probe, f.plan, pin)
+	var err error
+	f.executor, err = NewAPIExecutionProtection(executor, f.plan)
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.capacity, err = NewAPIExecutionProtection(capacity, probe, f.plan, pin)
+	f.capacity, err = NewAPIExecutionProtection(capacity, f.plan)
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.preparer, err = NewAPIStartPreparer(f.capacity, "api-start", startPin)
+	f.preparer, err = NewAPIStartPreparer(f.capacity)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -229,8 +160,11 @@ func newAPIProofFixture(t *testing.T, mode string) *apiProofFixture {
 	}
 	return f
 }
-func TestAPIExecutionProcessUsesBoundCredentialLivePinsAndOriginalLifetime(t *testing.T) {
-	for _, mode := range []string{"", "unbound", "replaced-account", "replaced-image", "administrator", "other-denial"} {
+
+// The executor reads its Pod and account under ordinary RBAC; the fixture
+// serves no admission policy, SelfSubjectReview or dry-run endpoint at all.
+func TestAPIExecutionProcessUsesLivePinsAndOriginalLifetimeWithoutAdmissionGuard(t *testing.T) {
+	for _, mode := range []string{"", "replaced-account", "replaced-image"} {
 		t.Run(mode, func(t *testing.T) {
 			f := newAPIProofFixture(t, mode)
 			ctx, cancel := context.WithCancel(context.Background())
@@ -337,36 +271,5 @@ func TestStartAdmissionScopesIndependentControlNamespaces(t *testing.T) {
 		if err != nil || len(p.Spec.MatchConditions) != 1 || p.Spec.MatchConditions[0].Expression != "request.namespace == "+ownerCELString(name) {
 			t.Fatal("global start guard blocks independent namespace", err)
 		}
-	}
-}
-
-func TestAPIExecutionProcessRetriesOnlyExactPodUpdateConflictWithinOriginalInterval(t *testing.T) {
-	for _, tc := range []struct {
-		mode string
-		ok   bool
-		puts int
-	}{
-		{"conflict-once", true, 2}, {"conflict-forever", false, 3}, {"conflict-replaced", false, 1}, {"conflict-wrong-object", false, 1}, {"conflict-expired", false, 1}, {"other-denial", false, 1},
-	} {
-		t.Run(tc.mode, func(t *testing.T) {
-			f := newAPIProofFixture(t, tc.mode)
-			process, err := NewAPIExecutionProcess(context.Background(), f.executor)
-			if err != nil {
-				t.Fatal(err)
-			}
-			started := time.Unix(0, f.clock.Load())
-			proof, err := process.ReadAPIProcess(context.Background())
-			if (err == nil) != tc.ok {
-				t.Fatalf("proof=%+v error=%v", proof, err)
-			}
-			if tc.ok && (!proof.Valid(started) || proof.ValidUntil.After(started.Add(5*time.Second))) {
-				t.Fatal("retry renewed original proof")
-			}
-			f.mu.Lock()
-			defer f.mu.Unlock()
-			if f.proofPuts != tc.puts {
-				t.Fatalf("dry-run attempts=%d want=%d", f.proofPuts, tc.puts)
-			}
-		})
 	}
 }

@@ -122,7 +122,7 @@ func TestOwnerObservationInitialPodStatusOnlyUpdate(t *testing.T) {
 	if err != nil || !final.Final || !sameOwnerNativePeers(original.Peers, final.Peers) || !final.ObservedAt.Equal(original.ObservedAt) || !final.FreshUntil.Equal(original.FreshUntil) {
 		t.Fatal("initial status-only update changed protected facts or dates", err)
 	}
-	if f.observer.Load() != 30 || f.probe.Load() != 6 {
+	if f.observer.Load() != 22 || f.probe.Load() != 0 {
 		t.Fatal("status update added API reads", f.observer.Load(), f.probe.Load())
 	}
 }

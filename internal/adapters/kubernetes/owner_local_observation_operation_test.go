@@ -171,7 +171,7 @@ func TestOwnerLocalObservationActualBoundariesAndCounts(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Counts include one ADR-227 release record read per owner/caller workload check.
-	if f.base.observer.Load() != 22 || f.base.probe.Load() != 3 || f.reviews != 2 {
+	if f.base.observer.Load() != 18 || f.base.probe.Load() != 0 || f.reviews != 2 {
 		t.Fatal("initial real port count", f.base.observer.Load(), f.base.probe.Load(), f.reviews)
 	}
 	original := first.FreshUntil
@@ -179,14 +179,14 @@ func TestOwnerLocalObservationActualBoundariesAndCounts(t *testing.T) {
 	if err != nil || end.After(original) {
 		t.Fatal("claim original bound", err)
 	}
-	if f.base.observer.Load() != 31 || f.base.probe.Load() != 3 || f.reviews != 4 {
+	if f.base.observer.Load() != 27 || f.base.probe.Load() != 0 || f.reviews != 4 {
 		t.Fatal("claim refreshed native guard or omitted actual caller", f.base.observer.Load(), f.base.probe.Load(), f.reviews)
 	}
 	final, err := o.Final(ctx)
 	if err != nil || !final.Final || !final.ObservedAt.Equal(first.ObservedAt) || final.FreshUntil.After(original) {
 		t.Fatal("final original bracket", err)
 	}
-	if f.base.observer.Load() != 53 || f.base.probe.Load() != 6 || f.reviews != 6 {
+	if f.base.observer.Load() != 45 || f.base.probe.Load() != 0 || f.reviews != 6 {
 		t.Fatal("final real port count", f.base.observer.Load(), f.base.probe.Load(), f.reviews)
 	}
 	if _, err = o.Original(ctx); err == nil {
@@ -194,7 +194,7 @@ func TestOwnerLocalObservationActualBoundariesAndCounts(t *testing.T) {
 	}
 }
 func TestOwnerLocalObservationRejectsCallerChangeAndOriginalExpiry(t *testing.T) {
-	for _, mode := range []string{"wrong-token", "wrong-pod", "duplicate-claim", "revoked-claim", "changed-claim", "revoked-final", "changed-final", "guard-final", "expired-original", "no-claim"} {
+	for _, mode := range []string{"wrong-token", "wrong-pod", "duplicate-claim", "revoked-claim", "changed-claim", "revoked-final", "changed-final", "expired-original", "no-claim"} {
 		t.Run(mode, func(t *testing.T) {
 			f := newOwnerLocalNativeFixture(t)
 			o, ctx := f.begin(t)
@@ -249,10 +249,6 @@ func TestOwnerLocalObservationRejectsCallerChangeAndOriginalExpiry(t *testing.T)
 				f.mu.Lock()
 				f.changedPod = true
 				f.mu.Unlock()
-			case "guard-final":
-				f.base.mu.Lock()
-				f.base.binding.UID = types.UID(ownerID(90))
-				f.base.mu.Unlock()
 			}
 			if _, err = o.Final(ctx); err == nil {
 				t.Fatal("final change accepted")

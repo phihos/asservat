@@ -181,12 +181,20 @@ func (p *configurationWorkerTokenInterval) current(ctx context.Context) error {
 }
 
 // In particular this detects a rotated probe token when final native reads
-// contain no probe HTTP request. It does not authenticate a token or reread a
-// source observation. Later operations must perform their own native proof.
+// contain no probe HTTP request. A client that sent no request in this
+// interval has no token to compare and is skipped. It does not authenticate a
+// token or reread a source observation. Later operations must perform their
+// own native proof.
 func (p *configurationWorkerTokenInterval) mountedCurrent(ctx context.Context) error {
 	for i, client := range p.clients {
 		if err := p.current(ctx); err != nil {
 			return err
+		}
+		p.mu.Lock()
+		unused := len(p.tokens[i]) == 0
+		p.mu.Unlock()
+		if unused {
+			continue
 		}
 		value, err := mounts.Read(ctx, client.files, client.file, 16<<10)
 		p.mu.Lock()

@@ -24,7 +24,6 @@ import (
 	"github.com/google/uuid"
 	admission "k8s.io/api/admissionregistration/v1"
 	apps "k8s.io/api/apps/v1"
-	auth "k8s.io/api/authentication/v1"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -46,7 +45,7 @@ func NewConnectorAPISettingsProtection(observer, probe *PermissionClient, p cfg.
 }
 
 // ConnectorAPIExecutionProtection is a concrete composition, not an arbitrary
-// process-reader callback. The installed projection and its own denial proof
+// process-reader callback. The installed settings, read under ordinary RBAC,
 // add API capability to the exact current connector-owned Pod and public CSR.
 type ConnectorAPIExecutionProtection struct {
 	attester                             *ConnectorProcessAttester
@@ -119,17 +118,6 @@ func NewConnectorAPIExecutionProtection(a *ConnectorProcessAttester, credentials
 	if s.ClusterID != a.client.clusterID || s.Namespace != a.client.control.Name || s.NamespaceUID != a.client.control.UID || p.Deployment != s.Deployment || p.DeploymentUID != s.DeploymentUID || p.APIContextStarts == nil || p.APIContextStarts.CapacityAccount != s.CapacityAccount || p.APIContextStarts.CapacityAccountUID != s.CapacityAccountUID || p.APIContextStarts.ExecutionAccount != s.Account || p.APIContextStarts.ExecutionAccountUID != s.AccountUID || hex.EncodeToString(a.protection.digest[:]) != s.WorkloadProtectionDigest {
 		return nil, cfg.ErrInvalid
 	}
-	// An overlapping namespace denial must not impersonate the independently
-	// pinned source policy: only the exact named dry-run probe passes it.
-	probeAllowed := false
-	for _, p := range p.ConfigurationProbes {
-		if p.ConfigMap == name {
-			probeAllowed = true
-		}
-	}
-	if !probeAllowed {
-		return nil, cfg.ErrInvalid
-	}
 	s.Inputs = slices.Clone(s.Inputs)
 	startup, canonical, e := ConnectorAPIStartupDigest(settings.digest, uid, rv, s)
 	if e != nil {
@@ -144,7 +132,9 @@ func NewConnectorAPIExecutionProtection(a *ConnectorProcessAttester, credentials
 // ConnectorAPIStartupDigest is the executor's startup pin, which the hub's
 // catalog entry names: the settings ConfigMap's UID and version, its guard
 // digest and the canonical settings. The regional installer prints the same
-// value in its join record (ADR-196 decision 7).
+// value in its join record (ADR-196 decision 7). The guard digest is computed
+// from the installed plan and pin alone, so the persisted value stays stable
+// while the runtime no longer reads or probes that guard.
 func ConnectorAPIStartupDigest(guard artifact.Digest, uid, rv string, installed contracts.ConnectorAPIContextSettings) (artifact.Digest, []byte, error) {
 	canonical, e := contracts.EncodeConnectorAPIContextSettings(installed)
 	if e != nil {
@@ -158,17 +148,22 @@ func ConnectorAPIStartupDigest(guard artifact.Digest, uid, rv string, installed 
 	return sha256.Sum256(bound), canonical, nil
 }
 
-// ReadSettings returns the guarded, immutable settings ConfigMap's settings,
-// UID and version, read by name at process start (ADR-196 decision 7). The
-// execution protection then rechecks the exact object on every start.
+// ReadSettings returns the immutable settings ConfigMap's settings, UID and
+// version, read by name at process start under ordinary RBAC (ADR-196
+// decision 7). The execution protection then rechecks the exact object on
+// every start. No admission policy is read or probed.
 func (g *ConnectorAPISettingsProtection) ReadSettings(ctx context.Context) (contracts.ConnectorAPIContextSettings, string, string, error) {
 	var zero contracts.ConnectorAPIContextSettings
 	if g == nil || g.configMapProtection == nil || ctx == nil {
 		return zero, "", "", cfg.ErrInvalid
 	}
-	object, e := g.proveObject(ctx)
+	raw, e := g.observer.raw(ctx, "/api/v1/namespaces/"+g.plan.ControlNamespace.Name+"/configmaps/"+g.plan.SourceName, nil)
 	if e != nil {
 		return zero, "", "", e
+	}
+	var object core.ConfigMap
+	if json.Unmarshal(raw, &object) != nil || object.APIVersion != "v1" || object.Kind != "ConfigMap" || object.Name != g.plan.SourceName || object.Namespace != g.plan.ControlNamespace.Name || object.DeletionTimestamp != nil {
+		return zero, "", "", cfg.ErrUnavailable
 	}
 	if object.Immutable == nil || !*object.Immutable || len(object.Data) != 1 || len(object.BinaryData) != 0 || !authorization.UUID(string(object.UID)) || !identity.Text(object.ResourceVersion, 128) {
 		return zero, "", "", cfg.ErrChanged
@@ -279,27 +274,6 @@ func (e *connectorAPIStepError) FixedStep() string {
 	return e.step
 }
 
-func (g *ConnectorAPIExecutionProtection) executionAccount(ctx context.Context, p fleet.ConnectorProcessProof) error {
-	s := g.installed
-	raw, e := g.attester.client.proofPost(ctx, "/apis/authentication.k8s.io/v1/selfsubjectreviews", auth.SelfSubjectReview{TypeMeta: meta.TypeMeta{APIVersion: "authentication.k8s.io/v1", Kind: "SelfSubjectReview"}}, nil)
-	var who auth.SelfSubjectReview
-	if e != nil || strictGuardJSON(raw, &who) != nil || who.Status.UserInfo.Username != "system:serviceaccount:"+s.Namespace+":"+s.Account || who.Status.UserInfo.UID != s.AccountUID {
-		return cfg.ErrUnavailable
-	}
-	for key, want := range map[string]string{"authentication.kubernetes.io/pod-name": p.Pod, "authentication.kubernetes.io/pod-uid": p.Process.PodUID} {
-		v := who.Status.UserInfo.Extra[key]
-		if len(v) != 1 || v[0] != want {
-			return cfg.ErrUnavailable
-		}
-	}
-	for _, a := range g.attester.protection.plan.Administrators {
-		if actorMatches(a, who.Status.UserInfo) {
-			return cfg.ErrInvalid
-		}
-	}
-	return nil
-}
-
 func (g *ConnectorAPIExecutionProtection) produceProof(ctx context.Context) (connectorAPIProof, error) {
 	if g == nil || ctx == nil || ctx.Err() != nil {
 		return connectorAPIProof{}, cfg.ErrUnavailable
@@ -356,18 +330,6 @@ func (g *ConnectorAPIExecutionProtection) produceProof(ctx context.Context) (con
 	call, c2 := context.WithDeadline(call, until)
 	defer c2()
 	mark("process-proof")
-	if e = g.executionAccount(call, proof); e != nil {
-		return connectorAPIProof{}, stage("execution-account", e)
-	}
-	mark("execution-account")
-	digest, sourceUntil, e := g.settings.current(call)
-	if e != nil {
-		return connectorAPIProof{}, stage("settings-guard", e)
-	}
-	until = identity.Earlier(until, sourceUntil)
-	call, c3 := context.WithDeadline(call, until)
-	defer c3()
-	mark("settings-guard")
 	if e = g.snapshot(call); e != nil {
 		return connectorAPIProof{}, stage("settings-snapshot", e)
 	}
@@ -376,26 +338,10 @@ func (g *ConnectorAPIExecutionProtection) produceProof(ctx context.Context) (con
 		return connectorAPIProof{}, stage("workload", e)
 	}
 	mark("workload")
-	last, finalUntil, e := g.settings.current(call)
-	if e != nil || last != digest {
-		return connectorAPIProof{}, stage("settings-guard-after", cfg.ErrChanged)
-	}
-	until = identity.Earlier(until, finalUntil)
-	call, c4 := context.WithDeadline(call, until)
-	defer c4()
-	mark("settings-guard-after")
 	if e = g.snapshot(call); e != nil {
 		return connectorAPIProof{}, stage("settings-snapshot-after", e)
 	}
 	mark("settings-snapshot-after")
-	finalProtection, protectionUntil, e := g.attester.protection.Current(call)
-	if e != nil || finalProtection != proof.ProtectionDigest {
-		return connectorAPIProof{}, stage("workload-guard-after", cfg.ErrChanged)
-	}
-	until = identity.Earlier(until, protectionUntil)
-	call, c5 := context.WithDeadline(call, until)
-	defer c5()
-	mark("workload-guard-after")
 	closed, e := g.attester.source.ReadConnectorIdentitySource(call)
 	if e != nil || !closed.Valid(g.attester.client.now()) || closed.Roles != open.Roles || !closed.Observation.SameSource(open.Observation) {
 		return connectorAPIProof{}, stage("source-close", cfg.ErrChanged)
