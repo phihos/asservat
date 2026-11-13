@@ -69,7 +69,7 @@ func TestReconciliationLeasePinsAndNoCreation(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			s, err := NewReconciliationLeader(client, "reconcile", ownerID(1), ownerID(3))
+			s, err := NewReconciliationLeader(client, "reconcile", ownerID(3))
 			if err != nil {
 				t.Fatal(err)
 			}

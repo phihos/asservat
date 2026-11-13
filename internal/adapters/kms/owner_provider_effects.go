@@ -162,17 +162,32 @@ func (s *ownerProviderEffects) close(ctx context.Context) error {
 }
 
 func newOwnerProviderEffectClient(slot *ownerProviderLifetime, path string) (*bao.Client, error) {
-	return newOwnerProviderClient(slot, path, false)
+	return newOwnerProviderClient(slot, path, providerPathPOST)
 }
+
+// newOwnerProviderReadClient confines a borrowed lifetime to GET of exactly
+// path (a public key read).
+func newOwnerProviderReadClient(slot *ownerProviderLifetime, path string) (*bao.Client, error) {
+	return newOwnerProviderClient(slot, path, providerPathGET)
+}
+
+// providerPathMode is the one request shape a confined client may send.
+type providerPathMode uint8
+
+const (
+	providerPathPOST providerPathMode = iota
+	providerPathRecords
+	providerPathGET
+)
 
 // newOwnerProviderChannelClient confines a borrowed lifetime to GET and POST
 // of single records directly below prefix: one UUID segment, no listing,
 // metadata or deeper path (the ADR-193 bootstrap credential channel).
 func newOwnerProviderChannelClient(slot *ownerProviderLifetime, prefix string) (*bao.Client, error) {
-	return newOwnerProviderClient(slot, prefix, true)
+	return newOwnerProviderClient(slot, prefix, providerPathRecords)
 }
 
-func newOwnerProviderClient(slot *ownerProviderLifetime, path string, records bool) (*bao.Client, error) {
+func newOwnerProviderClient(slot *ownerProviderLifetime, path string, mode providerPathMode) (*bao.Client, error) {
 	if slot == nil || slot.control == nil || slot.control.http == nil {
 		return nil, ErrKeyService
 	}
@@ -190,7 +205,7 @@ func newOwnerProviderClient(slot *ownerProviderLifetime, path string, records bo
 	// transport, never the unvalidated caller's client or another purpose's token.
 	transport := base.Clone()
 	leased := &ownerProviderLeaseTransport{base: transport, source: slot.borrow, now: control.now}
-	httpClient := &http.Client{Timeout: 10 * time.Second, Transport: &ownerProviderEffectTransport{next: leased, endpoint: *endpoint, path: "/v1/" + path, records: records}, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	httpClient := &http.Client{Timeout: 10 * time.Second, Transport: &ownerProviderEffectTransport{next: leased, endpoint: *endpoint, path: "/v1/" + path, mode: mode}, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	config := bao.NewConfig()
 	config.Address, config.Timeout, config.MaxRetries = control.endpoint, 10*time.Second, 0
 	config.HttpClient = httpClient
@@ -210,8 +225,9 @@ type ownerProviderEffectTransport struct {
 	next     *ownerProviderLeaseTransport
 	endpoint url.URL
 	path     string
-	// records admits GET or POST of path + one UUID instead of POST to path.
-	records bool
+	// mode admits POST to path, GET or POST of path + one UUID
+	// (providerPathRecords) or GET of path (providerPathGET).
+	mode providerPathMode
 }
 
 func (t *ownerProviderEffectTransport) CloseIdleConnections() {
@@ -223,13 +239,20 @@ func (t *ownerProviderEffectTransport) RoundTrip(r *http.Request) (*http.Respons
 	if t == nil || t.next == nil || r == nil || r.URL == nil || r.URL.Scheme != t.endpoint.Scheme || r.URL.Host != t.endpoint.Host || r.URL.User != nil || r.URL.RawQuery != "" || r.URL.ForceQuery || r.URL.Fragment != "" || r.Host != "" && r.Host != t.endpoint.Host {
 		return nil, ErrKeyService
 	}
-	if t.records {
+	switch t.mode {
+	case providerPathRecords:
 		record, ok := strings.CutPrefix(r.URL.EscapedPath(), t.path)
 		if !ok || !authorization.UUID(record) || r.Method != http.MethodGet && r.Method != http.MethodPost {
 			return nil, ErrKeyService
 		}
-	} else if r.Method != http.MethodPost || r.URL.EscapedPath() != t.path {
-		return nil, ErrKeyService
+	case providerPathGET:
+		if r.Method != http.MethodGet || r.URL.EscapedPath() != t.path {
+			return nil, ErrKeyService
+		}
+	default:
+		if r.Method != http.MethodPost || r.URL.EscapedPath() != t.path {
+			return nil, ErrKeyService
+		}
 	}
 	return t.next.RoundTrip(r)
 }
