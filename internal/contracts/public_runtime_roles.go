@@ -28,7 +28,7 @@ const PublicRuntimeRoleConnections = PublicRuntimeRetainedHubProcesses + 1
 // The source-stage inventory currently covers identity and retained reads; no installed path
 // can be enabled until the entire public graph and role layout are qualified.
 func PublicRuntimeRolePurposes() []string {
-	out := append(PublicRuntimeHubRolePurposes(), "browser-settings")
+	out := PublicRuntimeHubRolePurposes()
 	out = append(out, PublicRuntimeCaptureCleanupPurposes()...)
 	out = append(out, PublicRuntimeFederationPurposes()...)
 	out = append(out, PublicRuntimePublisherPurposes()...)
@@ -44,9 +44,8 @@ func PublicRuntimeRolePurposes() []string {
 // in order: the permission stream's, then, with a retention section
 // (ADR-195), the retention source's, then, with a worker configuration
 // section (ADR-204), the worker configuration acceptance logins, then, with a
-// context deletion section (ADR-205), the deletion logins, then, with a
-// browser section (ADR-210), the browser settings login.
-func PermissionProjectionPurposes(retention, workerConfiguration, contextDeletion, browser bool) []string {
+// context deletion section (ADR-205), the deletion logins.
+func PermissionProjectionPurposes(retention, workerConfiguration, contextDeletion bool) []string {
 	out := PublicRuntimePermissionPurposes()
 	if retention {
 		out = append(out, PublicRuntimeRetentionPurposes()...)
@@ -56,9 +55,6 @@ func PermissionProjectionPurposes(retention, workerConfiguration, contextDeletio
 	}
 	if contextDeletion {
 		out = append(out, PublicRuntimeContextDeletionPurposes()...)
-	}
-	if browser {
-		out = append(out, "browser-settings")
 	}
 	return out
 }
@@ -113,8 +109,6 @@ func PublicRuntimeHubSharedDuties() []string {
 // product grants and separate projection have been implemented and qualified.
 func PublicRuntimeRoleOrdinal(purpose string) (int, bool) {
 	switch purpose {
-	case "browser-settings":
-		return 1, true
 	case "capture-intent-read":
 		return 16, true
 	case "worker-config-read":

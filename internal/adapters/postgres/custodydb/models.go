@@ -146,8 +146,6 @@ type AuthorityAudit struct {
 }
 
 type BrowserLogin struct {
-	RootID     pgtype.UUID
-	Epoch      pgtype.UUID
 	ID         []byte
 	Browser    []byte
 	Ciphertext []byte
@@ -156,8 +154,6 @@ type BrowserLogin struct {
 }
 
 type BrowserLogout struct {
-	RootID          pgtype.UUID
-	Epoch           pgtype.UUID
 	ID              []byte
 	Issuer          string
 	ClientID        string
@@ -168,8 +164,6 @@ type BrowserLogout struct {
 }
 
 type BrowserSession struct {
-	RootID          pgtype.UUID
-	Epoch           pgtype.UUID
 	ID              []byte
 	Issuer          string
 	ClientID        string
@@ -179,34 +173,11 @@ type BrowserSession struct {
 	CreatedAt       pgtype.Timestamptz
 	AuthenticatedAt pgtype.Timestamptz
 	ExpiresAt       pgtype.Timestamptz
+	LastUsedAt      pgtype.Timestamptz
 	RefreshAt       pgtype.Timestamptz
 	Version         int64
 	RefreshClaim    []byte
 	ClaimUntil      pgtype.Timestamptz
-}
-
-type BrowserSessionEpoch struct {
-	RootID           pgtype.UUID
-	Epoch            pgtype.UUID
-	SourceGeneration int64
-}
-
-type BrowserSessionRoot struct {
-	ID                 pgtype.UUID
-	Epoch              pgtype.UUID
-	Enabled            bool
-	MaxLogins          int32
-	MaxSessions        int32
-	MaxLogoutEvents    int32
-	SourceUid          pgtype.Text
-	SourceGeneration   pgtype.Int8
-	SourceDigest       []byte
-	ObservedAt         pgtype.Timestamptz
-	FreshUntil         pgtype.Timestamptz
-	Issuer             pgtype.Text
-	ClientID           pgtype.Text
-	Origin             pgtype.Text
-	MaxLifetimeSeconds pgtype.Int4
 }
 
 type CapacityAccount struct {

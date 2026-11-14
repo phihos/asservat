@@ -15,89 +15,38 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// BrowserSessions stores browser logins, sessions and back-channel logouts.
+// The process reads browser.json once at start (a change rolls hub-api);
+// NewBrowserSessions shortens existing sessions to its maximum lifetime.
 type BrowserSessions struct {
-	ledger      *Ledger
-	root, epoch string
-	binding     value.BrowserBinding
+	ledger   *Ledger
+	settings value.BrowserSettings
 }
 
 var _ app.BrowserSessionStore = (*BrowserSessions)(nil)
-var _ app.SessionCleanup = (*BrowserSessions)(nil)
 
-func (s *BrowserSessions) Cleanup(ctx context.Context) error {
-	// Cleanup is allowed while the root is disabled, but only under the exact
-	// current epoch. Restoration cannot restart an old cleanup authority.
-	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		root, e := q.LockBrowserRoot(ctx, id(s.root))
-		if e != nil || uid(root.Epoch) != s.epoch {
-			return value.ErrDenied
-		}
-		if e = q.PruneBrowserLogins(ctx, custodydb.PruneBrowserLoginsParams{RootID: id(s.root), Epoch: id(s.epoch)}); e != nil {
-			return e
-		}
-		if e = q.PruneBrowserSessions(ctx, custodydb.PruneBrowserSessionsParams{RootID: id(s.root), Epoch: id(s.epoch)}); e != nil {
-			return e
-		}
-		return q.PruneBrowserLogout(ctx, custodydb.PruneBrowserLogoutParams{RootID: id(s.root), Epoch: id(s.epoch)})
-	})
-	if err != nil {
-		return value.ErrUnavailable
-	}
-	return nil
-}
-
-func NewBrowserSessions(ctx context.Context, pool *pgxpool.Pool, binding value.BrowserBinding) (*BrowserSessions, error) {
-	if !binding.Valid() {
+func NewBrowserSessions(ctx context.Context, pool *pgxpool.Pool, settings value.BrowserSettings) (*BrowserSessions, error) {
+	if !settings.Valid() {
 		return nil, value.ErrInvalid
 	}
 	l, e := New(ctx, pool)
 	if e != nil {
 		return nil, value.ErrUnavailable
 	}
-	return &BrowserSessions{ledger: l, root: binding.RootID, epoch: binding.Epoch, binding: binding}, nil
+	s := &BrowserSessions{ledger: l, settings: settings}
+	if e = s.transaction(ctx, func(q *custodydb.Queries) error {
+		return q.ClampBrowserSessionLifetimes(ctx, int64(settings.MaxLifetime/time.Second))
+	}); e != nil {
+		return nil, e
+	}
+	return s, nil
 }
-func (s *BrowserSessions) transaction(ctx context.Context, exclusive bool, f func(*custodydb.Queries, custodydb.BrowserSessionRoot) error) error {
-	return s.withRoot(ctx, exclusive, true, f)
-}
-func (s *BrowserSessions) withRoot(ctx context.Context, exclusive, current bool, f func(*custodydb.Queries, custodydb.BrowserSessionRoot) error) error {
-	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		var root custodydb.BrowserSessionRoot
-		var e error
-		if exclusive {
-			root, e = q.LockBrowserRoot(ctx, id(s.root))
-		} else {
-			root, e = q.ShareBrowserRoot(ctx, id(s.root))
-		}
-		if e != nil || uid(root.Epoch) != s.epoch {
-			return value.ErrDenied
-		}
-		if current {
-			now, e := q.CurrentTime(ctx)
-			if e != nil {
-				return e
-			}
-			if !browserSettingsCurrent(root, now.Time) {
-				return value.ErrUnavailable
-			}
-		}
-		if root.Issuer.String != s.binding.Issuer || root.ClientID.String != s.binding.ClientID || root.Origin.String != s.binding.Origin {
-			return value.ErrDenied
-		}
-		if e = f(q, root); e != nil {
-			return e
-		}
-		if current {
-			now, e := q.CurrentTime(ctx)
-			if e != nil {
-				return e
-			}
-			if !browserSettingsCurrent(root, now.Time) {
-				return value.ErrUnavailable
-			}
-		}
-		return nil
-	})
-	for _, e := range []error{value.ErrDenied, value.ErrInvalid, value.ErrSessionBusy, value.ErrSessionCapacity} {
+
+func (s *BrowserSessions) inactivity() int64 { return int64(s.settings.InactivityTimeout / time.Second) }
+
+func (s *BrowserSessions) transaction(ctx context.Context, f func(*custodydb.Queries) error) error {
+	err := s.ledger.transaction(ctx, f)
+	for _, e := range []error{value.ErrDenied, value.ErrInvalid, value.ErrSessionBusy} {
 		if errors.Is(err, e) {
 			return e
 		}
@@ -107,17 +56,11 @@ func (s *BrowserSessions) withRoot(ctx context.Context, exclusive, current bool,
 	}
 	return nil
 }
+
 func (s *BrowserSessions) PutLogin(ctx context.Context, l value.BrowserLogin) error {
-	return s.transaction(ctx, true, func(q *custodydb.Queries, r custodydb.BrowserSessionRoot) error {
-		if e := q.PruneBrowserLogins(ctx, custodydb.PruneBrowserLoginsParams{RootID: id(s.root), Epoch: id(s.epoch)}); e != nil {
+	return s.transaction(ctx, func(q *custodydb.Queries) error {
+		if e := q.PruneBrowserLogins(ctx); e != nil {
 			return e
-		}
-		n, e := q.CountBrowserLogins(ctx, id(s.root))
-		if e != nil {
-			return e
-		}
-		if n >= int64(r.MaxLogins) {
-			return value.ErrSessionCapacity
 		}
 		now, e := q.CurrentTime(ctx)
 		if e != nil {
@@ -126,21 +69,22 @@ func (s *BrowserSessions) PutLogin(ctx context.Context, l value.BrowserLogin) er
 		if !l.Valid(now.Time) {
 			return value.ErrDenied
 		}
-		return q.InsertBrowserLogin(ctx, custodydb.InsertBrowserLoginParams{RootID: id(s.root), Epoch: id(s.epoch), ID: l.ID[:], Browser: l.Browser[:], Ciphertext: l.Ciphertext, CreatedAt: ts(l.CreatedAt), ExpiresAt: ts(l.ExpiresAt)})
+		return q.InsertBrowserLogin(ctx, custodydb.InsertBrowserLoginParams{ID: l.ID[:], Browser: l.Browser[:], Ciphertext: l.Ciphertext, CreatedAt: ts(l.CreatedAt), ExpiresAt: ts(l.ExpiresAt)})
 	})
 }
+
 func (s *BrowserSessions) TakeLogin(ctx context.Context, key, browser [32]byte) (value.BrowserLogin, error) {
 	var out value.BrowserLogin
-	err := s.transaction(ctx, false, func(q *custodydb.Queries, _ custodydb.BrowserSessionRoot) error {
-		r, e := q.ConsumeBrowserLogin(ctx, custodydb.ConsumeBrowserLoginParams{RootID: id(s.root), Epoch: id(s.epoch), ID: key[:], Browser: browser[:]})
+	err := s.transaction(ctx, func(q *custodydb.Queries) error {
+		r, e := q.ConsumeBrowserLogin(ctx, custodydb.ConsumeBrowserLoginParams{ID: key[:], Browser: browser[:]})
 		if errors.Is(e, pgx.ErrNoRows) {
 			return value.ErrDenied
 		}
 		if e != nil {
 			return e
 		}
+		// Consumption commits even when expired; the caller checks validity.
 		out = value.BrowserLogin{ID: key, Browser: browser, Ciphertext: r.Ciphertext, CreatedAt: r.CreatedAt.Time.UTC(), ExpiresAt: r.ExpiresAt.Time.UTC()}
-		// Commit consumption even when expired. Return denial after commit.
 		return nil
 	})
 	if err != nil {
@@ -148,41 +92,24 @@ func (s *BrowserSessions) TakeLogin(ctx context.Context, key, browser [32]byte) 
 	}
 	return out, nil
 }
+
 func browserRecord(r custodydb.BrowserSession) value.BrowserSession {
 	out := value.BrowserSession{Principal: value.Principal{Issuer: r.Issuer, Subject: r.Subject, ClientID: r.ClientID, Kind: value.Human}, ProviderSession: r.ProviderSession, Ciphertext: r.Ciphertext, CreatedAt: r.CreatedAt.Time.UTC(), AuthenticatedAt: r.AuthenticatedAt.Time.UTC(), ExpiresAt: r.ExpiresAt.Time.UTC(), RefreshAt: r.RefreshAt.Time.UTC(), Version: r.Version}
 	copy(out.ID[:], r.ID)
 	return out
 }
-func sessionObservation(r custodydb.BrowserSessionRoot, expires time.Time) value.SessionObservation {
-	out := value.SessionObservation{Settings: value.Revision{UID: r.SourceUid.String, Generation: r.SourceGeneration.Int64}, ObservedAt: r.ObservedAt.Time.UTC(), FreshUntil: value.Earlier(r.FreshUntil.Time.UTC(), expires)}
-	copy(out.Settings.Digest[:], r.SourceDigest)
-	return out
-}
+
 func (s *BrowserSessions) CreateSession(ctx context.Context, r value.BrowserSession) (value.BrowserSession, error) {
-	err := s.transaction(ctx, true, func(q *custodydb.Queries, root custodydb.BrowserSessionRoot) error {
-		if r.Principal.Issuer != root.Issuer.String || r.Principal.ClientID != root.ClientID.String {
+	err := s.transaction(ctx, func(q *custodydb.Queries) error {
+		if r.Principal.Issuer != s.settings.Issuer || r.Principal.ClientID != s.settings.ClientID {
 			return value.ErrDenied
 		}
-		r.ExpiresAt = value.Earlier(r.ExpiresAt, r.CreatedAt.Add(time.Duration(root.MaxLifetimeSeconds.Int32)*time.Second))
+		r.ExpiresAt = value.Earlier(r.ExpiresAt, r.CreatedAt.Add(s.settings.MaxLifetime))
 		r.RefreshAt = value.Earlier(r.RefreshAt, r.ExpiresAt)
-		if e := q.PruneBrowserSessions(ctx, custodydb.PruneBrowserSessionsParams{RootID: id(s.root), Epoch: id(s.epoch)}); e != nil {
+		if e := q.PruneBrowserSessions(ctx, s.inactivity()); e != nil {
 			return e
 		}
-		n, e := q.CountBrowserSessions(ctx, id(s.root))
-		if e != nil {
-			return e
-		}
-		if n >= int64(root.MaxSessions) {
-			return value.ErrSessionCapacity
-		}
-		n, e = q.CountBrowserSubject(ctx, custodydb.CountBrowserSubjectParams{RootID: id(s.root), Issuer: r.Principal.Issuer, ClientID: r.Principal.ClientID, Subject: r.Principal.Subject})
-		if e != nil {
-			return e
-		}
-		if n >= 10 {
-			return value.ErrSessionCapacity
-		}
-		blocked, e := q.BrowserSessionLoggedOut(ctx, custodydb.BrowserSessionLoggedOutParams{RootID: id(s.root), Epoch: id(s.epoch), Issuer: r.Principal.Issuer, ClientID: r.Principal.ClientID, ProviderSession: r.ProviderSession, Subject: r.Principal.Subject, IssuedAt: ts(r.AuthenticatedAt)})
+		blocked, e := q.BrowserSessionLoggedOut(ctx, custodydb.BrowserSessionLoggedOutParams{Issuer: r.Principal.Issuer, ClientID: r.Principal.ClientID, ProviderSession: r.ProviderSession, Subject: r.Principal.Subject, IssuedAt: ts(r.AuthenticatedAt)})
 		if e != nil {
 			return e
 		}
@@ -196,26 +123,29 @@ func (s *BrowserSessions) CreateSession(ctx context.Context, r value.BrowserSess
 		if r.Version != 1 || !r.Valid(now.Time) {
 			return value.ErrDenied
 		}
-		// A caller cannot bring its own observation. Preserve the current
-		// configuration's original deadline through application handoff.
-		r.Observation = sessionObservation(root, r.ExpiresAt)
-		return q.InsertBrowserSession(ctx, custodydb.InsertBrowserSessionParams{RootID: id(s.root), Epoch: id(s.epoch), ID: r.ID[:], Issuer: r.Principal.Issuer, ClientID: r.Principal.ClientID, Subject: r.Principal.Subject, ProviderSession: r.ProviderSession, Ciphertext: r.Ciphertext, CreatedAt: ts(r.CreatedAt), AuthenticatedAt: ts(r.AuthenticatedAt), ExpiresAt: ts(r.ExpiresAt), RefreshAt: ts(r.RefreshAt)})
+		return q.InsertBrowserSession(ctx, custodydb.InsertBrowserSessionParams{ID: r.ID[:], Issuer: r.Principal.Issuer, ClientID: r.Principal.ClientID, Subject: r.Principal.Subject, ProviderSession: r.ProviderSession, Ciphertext: r.Ciphertext, CreatedAt: ts(r.CreatedAt), AuthenticatedAt: ts(r.AuthenticatedAt), ExpiresAt: ts(r.ExpiresAt), RefreshAt: ts(r.RefreshAt)})
 	})
 	if err != nil {
 		return value.BrowserSession{}, err
 	}
 	return r, nil
 }
+
+// ReadSession reads an active session and records the request for the
+// inactivity timeout (at most one write per session and minute).
 func (s *BrowserSessions) ReadSession(ctx context.Context, key [32]byte) (value.BrowserSession, error) {
 	return s.readSession(ctx, key, true)
 }
+
+// ReadSessionForCSRF reads without counting as activity.
 func (s *BrowserSessions) ReadSessionForCSRF(ctx context.Context, key [32]byte) (value.BrowserSession, error) {
 	return s.readSession(ctx, key, false)
 }
-func (s *BrowserSessions) readSession(ctx context.Context, key [32]byte, current bool) (value.BrowserSession, error) {
+
+func (s *BrowserSessions) readSession(ctx context.Context, key [32]byte, active bool) (value.BrowserSession, error) {
 	var out value.BrowserSession
-	err := s.withRoot(ctx, false, current, func(q *custodydb.Queries, root custodydb.BrowserSessionRoot) error {
-		r, e := q.ReadBrowserSession(ctx, custodydb.ReadBrowserSessionParams{RootID: id(s.root), Epoch: id(s.epoch), ID: key[:]})
+	err := s.transaction(ctx, func(q *custodydb.Queries) error {
+		r, e := q.ReadBrowserSession(ctx, custodydb.ReadBrowserSessionParams{ID: key[:], InactivitySeconds: s.inactivity()})
 		if errors.Is(e, pgx.ErrNoRows) {
 			return value.ErrDenied
 		}
@@ -227,31 +157,32 @@ func (s *BrowserSessions) readSession(ctx context.Context, key [32]byte, current
 			return e
 		}
 		out = browserRecord(r)
-		if !out.Valid(now.Time) || out.Principal.Issuer != root.Issuer.String || out.Principal.ClientID != root.ClientID.String {
+		if !out.Valid(now.Time) || out.Principal.Issuer != s.settings.Issuer || out.Principal.ClientID != s.settings.ClientID {
 			return value.ErrDenied
 		}
-		if current && len(r.RefreshClaim) > 0 {
+		if !active {
+			return nil
+		}
+		if len(r.RefreshClaim) > 0 {
 			if !now.Time.Before(r.ClaimUntil.Time) {
 				return value.ErrDenied
 			}
 			return value.ErrSessionBusy
 		}
-		if current {
-			out.Observation = sessionObservation(root, out.ExpiresAt)
-		}
-		return nil
+		return q.TouchBrowserSession(ctx, key[:])
 	})
 	if err != nil {
 		return value.BrowserSession{}, err
 	}
 	return out, nil
 }
+
 func (s *BrowserSessions) ClaimRefresh(ctx context.Context, key [32]byte, version int64, claim [32]byte) error {
 	if claim == ([32]byte{}) {
 		return value.ErrInvalid
 	}
-	return s.transaction(ctx, true, func(q *custodydb.Queries, _ custodydb.BrowserSessionRoot) error {
-		r, e := q.LockBrowserSession(ctx, custodydb.LockBrowserSessionParams{RootID: id(s.root), Epoch: id(s.epoch), ID: key[:]})
+	return s.transaction(ctx, func(q *custodydb.Queries) error {
+		r, e := q.LockBrowserSession(ctx, key[:])
 		if errors.Is(e, pgx.ErrNoRows) {
 			return value.ErrDenied
 		}
@@ -274,12 +205,13 @@ func (s *BrowserSessions) ClaimRefresh(ctx context.Context, key [32]byte, versio
 		if r.Version != version {
 			return value.ErrSessionBusy
 		}
-		return q.ClaimBrowserRefresh(ctx, custodydb.ClaimBrowserRefreshParams{RootID: id(s.root), Epoch: id(s.epoch), ID: key[:], RefreshClaim: claim[:], ClaimUntil: ts(value.Earlier(r.ExpiresAt.Time, now.Time.Add(10*time.Second)))})
+		return q.ClaimBrowserRefresh(ctx, custodydb.ClaimBrowserRefreshParams{ID: key[:], RefreshClaim: claim[:], ClaimUntil: ts(value.Earlier(r.ExpiresAt.Time, now.Time.Add(10*time.Second)))})
 	})
 }
+
 func (s *BrowserSessions) FinishRefresh(ctx context.Context, key [32]byte, version int64, claim [32]byte, blob []byte, refreshAt time.Time) error {
-	return s.transaction(ctx, false, func(q *custodydb.Queries, _ custodydb.BrowserSessionRoot) error {
-		r, e := q.LockBrowserSession(ctx, custodydb.LockBrowserSessionParams{RootID: id(s.root), Epoch: id(s.epoch), ID: key[:]})
+	return s.transaction(ctx, func(q *custodydb.Queries) error {
+		r, e := q.LockBrowserSession(ctx, key[:])
 		if errors.Is(e, pgx.ErrNoRows) {
 			return value.ErrDenied
 		}
@@ -293,24 +225,28 @@ func (s *BrowserSessions) FinishRefresh(ctx context.Context, key [32]byte, versi
 		if !r.ClaimUntil.Valid || !browserRefreshDatesCurrent(browserRecord(r), r.ClaimUntil.Time, refreshAt, now.Time) || !bytes.Equal(r.RefreshClaim, claim[:]) || r.Version != version || len(blob) == 0 || len(blob) > value.MaxSessionCiphertext {
 			return value.ErrDenied
 		}
-		return q.FinishBrowserRefresh(ctx, custodydb.FinishBrowserRefreshParams{RootID: id(s.root), Epoch: id(s.epoch), ID: key[:], Ciphertext: blob, RefreshAt: ts(refreshAt)})
+		return q.FinishBrowserRefresh(ctx, custodydb.FinishBrowserRefreshParams{ID: key[:], Ciphertext: blob, RefreshAt: ts(refreshAt)})
 	})
 }
+
 func (s *BrowserSessions) RevokeSession(ctx context.Context, key [32]byte) error {
-	return s.withRoot(ctx, false, false, func(q *custodydb.Queries, _ custodydb.BrowserSessionRoot) error {
-		return q.DeleteBrowserSession(ctx, custodydb.DeleteBrowserSessionParams{RootID: id(s.root), Epoch: id(s.epoch), ID: key[:]})
+	return s.transaction(ctx, func(q *custodydb.Queries) error {
+		return q.DeleteBrowserSession(ctx, key[:])
 	})
 }
+
+// LogoutSessions records a verified back-channel logout and revokes the
+// matching sessions. A receipt outlives every session it can block.
 func (s *BrowserSessions) LogoutSessions(ctx context.Context, event app.LogoutEvent) error {
 	if !value.Text(event.Issuer, 2048) || !value.Text(event.ClientID, 256) || !value.Text(event.ID, 256) || event.Subject == "" && event.SessionID == "" || event.Subject != "" && !value.Text(event.Subject, 256) || event.SessionID != "" && !value.Text(event.SessionID, 256) {
 		return value.ErrInvalid
 	}
+	if event.Issuer != s.settings.Issuer || event.ClientID != s.settings.ClientID {
+		return value.ErrDenied
+	}
 	b, _ := json.Marshal([]string{event.Issuer, event.ClientID, event.ID})
 	key := sha256.Sum256(b)
-	return s.withRoot(ctx, true, false, func(q *custodydb.Queries, r custodydb.BrowserSessionRoot) error {
-		if r.Issuer.String != event.Issuer || r.ClientID.String != event.ClientID {
-			return value.ErrDenied
-		}
+	return s.transaction(ctx, func(q *custodydb.Queries) error {
 		now, e := q.CurrentTime(ctx)
 		if e != nil {
 			return e
@@ -318,7 +254,7 @@ func (s *BrowserSessions) LogoutSessions(ctx context.Context, event app.LogoutEv
 		if !value.Fresh(event.IssuedAt, event.IssuedAt.Add(5*time.Minute), now.Time, 5*time.Minute) {
 			return value.ErrDenied
 		}
-		old, e := q.ReadBrowserLogout(ctx, custodydb.ReadBrowserLogoutParams{RootID: id(s.root), Epoch: id(s.epoch), ID: key[:]})
+		old, e := q.ReadBrowserLogout(ctx, key[:])
 		if e == nil {
 			if old.Issuer == event.Issuer && old.ClientID == event.ClientID && old.Subject == event.Subject && old.ProviderSession == event.SessionID && old.IssuedAt.Time.Equal(event.IssuedAt) {
 				return nil
@@ -328,27 +264,13 @@ func (s *BrowserSessions) LogoutSessions(ctx context.Context, event app.LogoutEv
 		if !errors.Is(e, pgx.ErrNoRows) {
 			return e
 		}
-		if e = q.PruneBrowserLogout(ctx, custodydb.PruneBrowserLogoutParams{RootID: id(s.root), Epoch: id(s.epoch)}); e != nil {
+		if e = q.PruneBrowserLogout(ctx); e != nil {
 			return e
 		}
-		n, e := q.CountBrowserLogout(ctx, id(s.root))
-		if e != nil {
+		if e = q.InsertBrowserLogout(ctx, custodydb.InsertBrowserLogoutParams{ID: key[:], Issuer: event.Issuer, ClientID: event.ClientID, Subject: event.Subject, ProviderSession: event.SessionID, IssuedAt: ts(event.IssuedAt), ExpiresAt: ts(event.IssuedAt.Add(s.settings.MaxLifetime + time.Hour))}); e != nil {
 			return e
 		}
-		if n >= int64(r.MaxLogoutEvents) {
-			return value.ErrSessionCapacity
-		}
-		now, e = q.CurrentTime(ctx)
-		if e != nil {
-			return e
-		}
-		if !value.Fresh(event.IssuedAt, event.IssuedAt.Add(5*time.Minute), now.Time, 5*time.Minute) {
-			return value.ErrDenied
-		}
-		if e = q.InsertBrowserLogout(ctx, custodydb.InsertBrowserLogoutParams{RootID: id(s.root), Epoch: id(s.epoch), ID: key[:], Issuer: event.Issuer, ClientID: event.ClientID, Subject: event.Subject, ProviderSession: event.SessionID, IssuedAt: ts(event.IssuedAt), ExpiresAt: ts(event.IssuedAt.Add(25 * time.Hour))}); e != nil {
-			return e
-		}
-		return q.RevokeBrowserProviderSessions(ctx, custodydb.RevokeBrowserProviderSessionsParams{RootID: id(s.root), Epoch: id(s.epoch), Issuer: event.Issuer, ClientID: event.ClientID, Subject: event.Subject, ProviderSession: event.SessionID, IssuedAt: ts(event.IssuedAt)})
+		return q.RevokeBrowserProviderSessions(ctx, custodydb.RevokeBrowserProviderSessionsParams{Issuer: event.Issuer, ClientID: event.ClientID, Subject: event.Subject, ProviderSession: event.SessionID, IssuedAt: ts(event.IssuedAt)})
 	})
 }
 

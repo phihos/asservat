@@ -21,14 +21,14 @@ import (
 )
 
 var serviceTestIDs = contracts.ServiceIDs{InstallationID: "10000000-0000-4000-8000-000000000001", ClusterID: "10000000-0000-4000-8000-000000000002", PermissionRootID: "10000000-0000-4000-8000-000000000003", IssuerEpoch: "10000000-0000-4000-8000-000000000004",
-	BrowserRootID: "10000000-0000-4000-8000-000000000005", SessionEpoch: "10000000-0000-4000-8000-000000000006", RoleSetupID: "10000000-0000-4000-8000-000000000007", PeerID: "10000000-0000-4000-8000-000000000008"}
+	RoleSetupID: "10000000-0000-4000-8000-000000000007", PeerID: "10000000-0000-4000-8000-000000000008"}
 
 // serviceTestRoots writes the mounted ids directory and returns it opened.
 func serviceTestIDsRoot(t *testing.T, ids contracts.ServiceIDs) *os.Root {
 	t.Helper()
 	dir := t.TempDir()
 	for name, v := range map[string]string{"installationID": ids.InstallationID, "clusterID": ids.ClusterID, "permissionRootID": ids.PermissionRootID, "issuerEpoch": ids.IssuerEpoch,
-		"browserRootID": ids.BrowserRootID, "sessionEpoch": ids.SessionEpoch, "roleSetupID": ids.RoleSetupID, "peerID": ids.PeerID} {
+		"roleSetupID": ids.RoleSetupID, "peerID": ids.PeerID} {
 		if err := os.WriteFile(filepath.Join(dir, name), []byte(v), 0o400); err != nil {
 			t.Fatal(err)
 		}

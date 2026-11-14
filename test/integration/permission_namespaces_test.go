@@ -87,7 +87,6 @@ func TestPermissionNamespaceBindingsWithRealKubernetes(t *testing.T) {
 	t.Run("reconciliation-with-SQL-and-encrypted-audit", func(t *testing.T) {
 		testGuardedReconciliation(t, ctx, c, observer, trust, plan, fixture.Postgres, fixture.S3, fixture.Token)
 		testIdentitySettings(t, ctx, c, permissionFixtureCluster, plan.ControlNamespace, fixture.Token)
-		testBrowserSettingsSource(t, ctx, c, permissionFixtureCluster, plan.ControlNamespace, fixture.Token, fixture.Postgres)
 	})
 	t.Run("namespace-inheritance-with-real-namespaces-SQL-and-audit", func(t *testing.T) {
 		testInheritedReconciliation(t, c, observer, trust, plan, fixture.Postgres, fixture.S3)

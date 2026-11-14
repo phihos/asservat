@@ -101,8 +101,6 @@ func sessionFailure(w http.ResponseWriter, err error) {
 		status = 401
 	} else if errors.Is(err, identity.ErrInvalid) {
 		status = 400
-	} else if errors.Is(err, identity.ErrSessionCapacity) {
-		status = 429
 	}
 	sessionProblem(w, status)
 }

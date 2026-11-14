@@ -6,6 +6,7 @@ import (
 	"encoding/json/jsontext"
 	"errors"
 	"fmt"
+	"os"
 	"reflect"
 	"sync"
 	"testing"
@@ -484,4 +485,14 @@ func qualifyContextPreviews(t *testing.T, ctx context.Context, admin *pgxpool.Po
 			t.Fatal("fresh identity renewed expired complete-deny observation")
 		}
 	})
+}
+
+// readImplementedExample reads the example this runtime implements:
+// examples/implemented/ (pre-ADR-330 contracts) when present, otherwise the
+// canonical example.
+func readImplementedExample(dir, name string) ([]byte, error) {
+	if b, err := os.ReadFile(dir + "implemented/" + name); err == nil {
+		return b, nil
+	}
+	return os.ReadFile(dir + name)
 }

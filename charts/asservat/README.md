@@ -76,7 +76,7 @@ Its Role can only create Secrets and get or patch the named ones.
 
 | Secret | Keys |
 | --- | --- |
-| `<name>-ids` | `installationID`, `clusterID`, `issuerEpoch`, `permissionRootID`, `browserRootID`, `sessionEpoch`, `roleSetupID`, `peerID` |
+| `<name>-ids` | `installationID`, `clusterID`, `issuerEpoch`, `permissionRootID`, `roleSetupID`, `peerID` |
 | `<name>-sql-<component>` | `sql-<purpose>.json` (`{"username","password"}`) per runtime SQL role of hub-api, hub-worker, federation, publisher, key-service |
 | `<name>-audit-mac` | `inputVersion`, `inputKey`, `accountVersion`, `accountKey` |
 | `<name>-artifact-key` | `keys.json`, the local artifact root keyset |

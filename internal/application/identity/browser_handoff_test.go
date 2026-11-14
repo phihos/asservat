@@ -43,7 +43,6 @@ func (s *handoffStore) CreateSession(_ context.Context, r value.BrowserSession) 
 	if s.onCreate != nil {
 		s.onCreate()
 	}
-	r.Observation = s.record.Observation
 	return r, s.createErr
 }
 func (s *handoffStore) RevokeSession(ctx context.Context, key [32]byte) error {
@@ -86,9 +85,8 @@ func handoffFixture(t *testing.T) (*time.Time, *handoffStore, BrowserSessions, s
 	p := value.Principal{Issuer: "https://id.invalid", ClientID: "console", Subject: "synthetic-developer", Kind: value.Human}
 	i := value.Identity{Principal: p, Scopes: []string{"asservat:capture"}, Policy: value.Revision{UID: "identity-policy", Generation: 1, Digest: [32]byte{1}}, VerifiedAt: now, ValidUntil: now.Add(time.Minute)}
 	store := &handoffStore{record: value.BrowserSession{ID: key, Principal: p, ProviderSession: "provider-session", Ciphertext: []byte("placeholder"), CreatedAt: now.Add(-time.Minute), AuthenticatedAt: now.Add(-time.Minute), ExpiresAt: now.Add(2 * time.Second), RefreshAt: now.Add(time.Second), Version: 1}, login: value.BrowserLogin{ID: key, Browser: key, Ciphertext: []byte("placeholder"), CreatedAt: now, ExpiresAt: now.Add(5 * time.Minute)}}
-	store.record.Observation = value.SessionObservation{Settings: value.Revision{UID: "settings", Generation: 1, Digest: [32]byte{2}}, ObservedAt: now, FreshUntil: store.record.ExpiresAt}
 	provider := handoffProvider{tokens: BrowserTokens{Access: "synthetic-access", Refresh: "synthetic-refresh", Subject: p.Subject, SessionID: "provider-session", IssuedAt: now, ExpiresAt: now.Add(time.Minute), AuthenticatedAt: now}}
-	s := BrowserSessions{Store: store, Cipher: handoffCipher{}, Provider: provider, Identities: handoffIdentity{i}, Issuer: p.Issuer, ClientID: p.ClientID, Epoch: "synthetic-epoch", Lifetime: time.Hour, Now: func() time.Time { return now }}
+	s := BrowserSessions{Store: store, Cipher: handoffCipher{}, Provider: provider, Identities: handoffIdentity{i}, Issuer: p.Issuer, ClientID: p.ClientID, Lifetime: time.Hour, Now: func() time.Time { return now }}
 	return &now, store, s, cookie
 }
 
@@ -107,88 +105,9 @@ func TestBrowserCallbackRechecksIdentityAfterSessionCreation(t *testing.T) {
 	now, store, service, cookie := handoffFixture(t)
 	store.onCreate = func() {
 		*now = now.Add(61 * time.Second)
-		store.record.Observation.ObservedAt = *now
-		store.record.Observation.FreshUntil = now.Add(5 * time.Second)
 	}
 	if _, e := service.Complete(context.Background(), cookie, cookie, "synthetic-code"); e == nil {
 		t.Fatal("callback returned identity that expired during session creation")
-	}
-}
-
-func TestBrowserIdentityPreservesSessionAndTokenDeadlinesWithCurrentSettings(t *testing.T) {
-	for _, tokenFirst := range []bool{false, true} {
-		now, store, service, cookie := handoffFixture(t)
-		store.record.ExpiresAt = now.Add(time.Hour)
-		store.record.Observation.ObservedAt = now.Add(-4 * time.Second)
-		store.record.Observation.FreshUntil = now.Add(time.Second)
-		want := service.Identities.(handoffIdentity).identity.ValidUntil
-		if tokenFirst {
-			i := service.Identities.(handoffIdentity)
-			i.identity.ValidUntil = now.Add(500 * time.Millisecond)
-			service.Identities = i
-			want = i.identity.ValidUntil
-		}
-		view, e := service.Resolve(context.Background(), cookie, false)
-		if e != nil || !view.Identity.ValidUntil.Equal(want) {
-			t.Fatal("identity handoff changed token/session authority", e)
-		}
-		*now = store.record.Observation.FreshUntil
-		if _, err := service.Resolve(t.Context(), cookie, false); err == nil {
-			t.Fatal("another session read reused expired settings")
-		}
-	}
-}
-
-func TestBrowserSessionObservationCannotBeMissingStaleOrSubstituted(t *testing.T) {
-	for _, kind := range []string{"missing", "expired", "future", "too-long", "session-expiry", "settings", "session-id", "after-final-read", "cancelled-final-read"} {
-		t.Run(kind, func(t *testing.T) {
-			now, store, service, cookie := handoffFixture(t)
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-			switch kind {
-			case "missing":
-				store.record.Observation = value.SessionObservation{}
-			case "expired":
-				store.record.Observation.FreshUntil = *now
-			case "future":
-				store.record.Observation.ObservedAt = now.Add(time.Second)
-			case "too-long":
-				store.record.ExpiresAt = now.Add(time.Minute)
-				store.record.Observation.FreshUntil = now.Add(6 * time.Second)
-			case "session-expiry":
-				store.record.Observation.FreshUntil = now.Add(3 * time.Second)
-			case "settings":
-				store.record.Observation.Settings = value.Revision{}
-			case "session-id":
-				store.record.ID[0]++
-			case "after-final-read":
-				store.onRead = func(n int) {
-					if n == 2 {
-						*now = now.Add(3 * time.Second)
-					}
-				}
-			case "cancelled-final-read":
-				store.onRead = func(n int) {
-					if n == 2 {
-						cancel()
-					}
-				}
-			}
-			if _, e := service.Resolve(ctx, cookie, false); e == nil {
-				t.Fatal("unsafe identity handoff accepted")
-			}
-		})
-	}
-}
-
-func TestBrowserCallbackPreservesSettingsDeadline(t *testing.T) {
-	_, store, service, cookie := handoffFixture(t)
-	r, e := service.Complete(context.Background(), cookie, cookie, "synthetic-code")
-	if e != nil || !r.Session.Identity.ValidUntil.Equal(store.record.Observation.FreshUntil) {
-		t.Fatal("callback extended current settings", e)
-	}
-	if store.revocations != 0 {
-		t.Fatal("successful callback revoked its session")
 	}
 }
 
@@ -200,7 +119,7 @@ func TestFailedBrowserCallbackDiscardsOnlyItsNewSession(t *testing.T) {
 			defer cancel()
 			switch kind {
 			case "expired":
-				store.onCreate = func() { *now = now.Add(3 * time.Second) }
+				store.onCreate = func() { *now = now.Add(61 * time.Second) }
 			case "cancelled":
 				store.onCreate = cancel
 			case "unknown-commit":

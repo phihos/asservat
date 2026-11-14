@@ -14,7 +14,6 @@ type scheduleStore struct {
 
 func (s *scheduleStore) CreateSession(_ context.Context, r value.BrowserSession) (value.BrowserSession, error) {
 	s.createdRecord = r
-	r.Observation = s.record.Observation
 	return r, nil
 }
 

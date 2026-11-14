@@ -215,8 +215,6 @@ func TestBrowserCurrentRequestRechecksPersistedSessionAfterBlockingReads(t *test
 				case "expired-after-read":
 					*now = now.Add(3 * time.Second)
 				case "settings-renewal":
-					store.record.Observation.ObservedAt = now.Add(time.Second)
-					store.record.Observation.FreshUntil = now.Add(2 * time.Second)
 					*now = now.Add(time.Second)
 				}
 			}
@@ -324,9 +322,8 @@ func TestRecordingSaveRequestWindowPreservesInitialIdentityAndOwner(t *testing.T
 }
 
 // Reuse the existing synthetic store/cipher, but compose the real verified
-// identity Service, BrowserSessions and request owner. Each store read supplies
-// a new five-second settings observation, as the current SQL projection does;
-// no token/session/settings lifetime is renewed by these reads.
+// identity Service, BrowserSessions and request owner. No token or session
+// lifetime is renewed by these reads.
 func composedBrowserEvidenceFixture(t *testing.T) (*time.Time, *handoffStore, BrowserSessions, string, *fixture) {
 	t.Helper()
 	now, store, browser, cookie := handoffFixture(t)
@@ -342,10 +339,7 @@ func composedBrowserEvidenceFixture(t *testing.T) (*time.Time, *handoffStore, Br
 	f.p.FreshUntil = now.Add(30 * time.Second)
 	store.record.ExpiresAt = now.Add(time.Hour)
 	store.record.RefreshAt = now.Add(time.Minute)
-	store.onRead = func(int) {
-		store.record.Observation.ObservedAt = *now
-		store.record.Observation.FreshUntil = value.Earlier(now.Add(5*time.Second), store.record.ExpiresAt)
-	}
+	store.onRead = func(int) {}
 	browser.Identities = service
 	return now, store, browser, cookie, f
 }
@@ -357,10 +351,9 @@ func TestBrowserEvidenceReadRealIdentityAndSessionRetainOriginalRequestWindow(t 
 	if err != nil || !view.Identity.ValidUntil.Equal(started.Add(20*time.Second)) {
 		t.Fatal("real browser pipeline shortened evidence read", err, view.Identity.ValidUntil.Sub(started))
 	}
-	firstSettingsEnd := store.record.Observation.FreshUntil
 	*now = now.Add(6 * time.Second)
 	current, err := owner.ResolveIdentity(t.Context())
-	if err != nil || !current.ValidUntil.Equal(view.Identity.ValidUntil) || store.reads != 4 || !store.record.Observation.FreshUntil.After(firstSettingsEnd) || store.record.Observation.FreshUntil.Sub(store.record.Observation.ObservedAt) != 5*time.Second {
+	if err != nil || !current.ValidUntil.Equal(view.Identity.ValidUntil) || store.reads != 4 {
 		t.Fatal("read must retain original request only after new current session checks", err, store.reads, current.ValidUntil)
 	}
 	*now = started.Add(20 * time.Second)
@@ -376,7 +369,7 @@ func TestBrowserEvidenceReadRealIdentityAndSessionRetainOriginalRequestWindow(t 
 }
 
 func TestBrowserEvidenceReadRealSourcesCannotRenewExpiredOrChangedAuthority(t *testing.T) {
-	for _, mode := range []string{"stale-settings", "invalid-settings", "revoked", "revoked-final-read", "session-short", "session-extended", "token-short", "key-short", "policy-short", "groups-changed", "policy-changed", "parent-short", "cancelled", "cancelled-final-read"} {
+	for _, mode := range []string{"revoked", "revoked-final-read", "session-short", "session-extended", "token-short", "key-short", "policy-short", "groups-changed", "policy-changed", "parent-short", "cancelled", "cancelled-final-read"} {
 		t.Run(mode, func(t *testing.T) {
 			now, store, browser, cookie, f := composedBrowserEvidenceFixture(t)
 			original := *now
@@ -410,10 +403,6 @@ func TestBrowserEvidenceReadRealSourcesCannotRenewExpiredOrChangedAuthority(t *t
 			*now = now.Add(6 * time.Second)
 			fresh := store.onRead
 			switch mode {
-			case "stale-settings":
-				store.onRead = nil
-			case "invalid-settings":
-				store.record.Observation.Settings = value.Revision{}
 			case "revoked":
 				store.readErr = value.ErrDenied
 			case "revoked-final-read":

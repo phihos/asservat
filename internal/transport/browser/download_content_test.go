@@ -69,8 +69,8 @@ func TestNativeContentAuthenticationKeepsOriginalCredentialAndNoGETRefresh(t *te
 				if e != nil || current == nil || !i.Valid(now) {
 					t.Fatal(e)
 				}
-				if mode == "bearer" && (!end.Equal(now.Add(30*time.Second)) || token != "synthetic" || cookie != "") {
-					t.Fatal("lost original bearer/group bound")
+				if mode == "bearer" && (!end.Equal(now.Add(time.Minute)) || token != "synthetic" || cookie != "") {
+					t.Fatal("lost original bearer bound")
 				}
 				if mode == "browser" && (!end.Equal(now.Add(time.Hour)) || token != "" || cookie == "") {
 					t.Fatal("session bounded to observation rather than original end")

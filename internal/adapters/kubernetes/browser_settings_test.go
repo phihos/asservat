@@ -5,13 +5,12 @@ import (
 	"encoding/json"
 	"net/http"
 	"os"
-	"sync/atomic"
 	"testing"
 	"time"
 )
 
 func TestBrowserSettingsProtectedConfig(t *testing.T) {
-	for _, mode := range []string{"valid", "suspended", "replacement", "wrong-root", "zero-epoch", "insecure-issuer", "origin-path", "origin-query", "origin-user", "origin-default-port", "origin-case", "lifetime", "capacity", "unknown", "alias", "extra-data", "expired-read"} {
+	for _, mode := range []string{"valid", "defaults", "replacement", "insecure-issuer", "origin-path", "origin-query", "origin-user", "origin-default-port", "origin-case", "zero-lifetime", "unknown", "alias", "extra-data"} {
 		t.Run(mode, func(t *testing.T) {
 			b, e := readImplementedExample("../../../examples/", "browser-settings.json")
 			if e != nil {
@@ -19,14 +18,10 @@ func TestBrowserSettingsProtectedConfig(t *testing.T) {
 			}
 			var config map[string]any
 			_ = json.Unmarshal(b, &config)
-			root := config["rootID"].(string)
 			switch mode {
-			case "suspended":
-				config["suspended"] = true
-			case "wrong-root":
-				config["rootID"] = "74000000-0000-4000-8000-000000000009"
-			case "zero-epoch":
-				config["sessionEpoch"] = "00000000-0000-0000-0000-000000000000"
+			case "defaults":
+				delete(config, "maxLifetimeSeconds")
+				delete(config, "inactivityTimeoutSeconds")
 			case "insecure-issuer":
 				config["issuer"] = "http://id.example.invalid"
 			case "origin-path":
@@ -39,10 +34,8 @@ func TestBrowserSettingsProtectedConfig(t *testing.T) {
 				config["origin"] = "https://console.invalid:443"
 			case "origin-case":
 				config["origin"] = "https://Console.invalid"
-			case "lifetime":
-				config["maxLifetimeSeconds"] = 86401
-			case "capacity":
-				config["maxSessions"] = 100001
+			case "zero-lifetime":
+				config["maxLifetimeSeconds"] = 0
 			case "unknown":
 				config["clientSecret"] = "must-not-be-accepted"
 			case "alias":
@@ -58,26 +51,21 @@ func TestBrowserSettingsProtectedConfig(t *testing.T) {
 			if mode == "extra-data" {
 				data["other"] = "unexpected"
 			}
-			var clock *atomic.Int64
 			f := newPermissionFixture(t, func(w http.ResponseWriter, r *http.Request) bool {
 				if r.URL.Path != "/api/v1/namespaces/asservat-system/configmaps/browser" {
 					return false
 				}
-				if mode == "expired-read" {
-					clock.Add(int64(5 * time.Second))
-				}
 				permissionReply(w, map[string]any{"apiVersion": "v1", "kind": "ConfigMap", "metadata": map[string]any{"name": "browser", "namespace": permissionControl.Name, "uid": uid, "resourceVersion": "rv"}, "data": data})
 				return true
 			})
-			clock = f.clock
-			reader, e := NewBrowserSettingsClient(f.client, "browser", "browser-config-uid", root)
+			reader, e := NewBrowserSettingsReader(f.client, "browser", "browser-config-uid")
 			if e != nil {
 				t.Fatal(e)
 			}
 			settings, e := reader.BrowserSettings(context.Background())
-			if mode == "valid" || mode == "suspended" {
-				if e != nil || !settings.Valid(time.Unix(0, clock.Load())) || settings.Revision.UID != uid || settings.FreshUntil.Sub(settings.ObservedAt) != 5*time.Second {
-					t.Fatal("protected settings rejected", e)
+			if mode == "valid" || mode == "defaults" {
+				if e != nil || !settings.Valid() || settings.MaxLifetime != 7*24*time.Hour || settings.InactivityTimeout != 24*time.Hour {
+					t.Fatal("settings rejected or defaults lost", e, settings)
 				}
 			} else if e == nil {
 				t.Fatal("unsafe settings accepted")

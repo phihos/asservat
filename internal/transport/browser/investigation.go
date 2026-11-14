@@ -132,7 +132,7 @@ func noOutcomeStage(err error) string {
 
 // failure is sessionFailure, reporting the stage when it answers 503.
 func (h *InvestigationHandler) failure(w http.ResponseWriter, stage string, err error) {
-	if h.Report != nil && !errors.Is(err, identity.ErrSessionBusy) && !errors.Is(err, identity.ErrDenied) && !errors.Is(err, identity.ErrInvalid) && !errors.Is(err, identity.ErrSessionCapacity) {
+	if h.Report != nil && !errors.Is(err, identity.ErrSessionBusy) && !errors.Is(err, identity.ErrDenied) && !errors.Is(err, identity.ErrInvalid) {
 		var step interface{ FixedStep() string }
 		if errors.As(err, &step) {
 			stage += "/" + step.FixedStep()
