@@ -14,18 +14,21 @@ const DownloadEnvironmentMaxBytes = 128 << 10
 // Private administrator policy. No endpoint, credential, raw artifact content,
 // subject search index, or caller-selected processing placement is accepted.
 type DownloadEnvironmentSettings struct {
-	Processors       []ProcessingOrganization    `json:"processors,omitzero"`
-	LiveRead         *LiveReadSettings           `json:"liveRead,omitempty"`
-	Format           string                      `json:"format"`
-	RootID           string                      `json:"rootID,omitempty"`
-	InstallationID   string                      `json:"installationID,omitempty"`
-	RecoveryEpoch    string                      `json:"recoveryEpoch,omitempty"`
-	Revision         int64                       `json:"revision"`
-	Suspended        bool                        `json:"suspended"`
-	PermittedRegions []string                    `json:"permittedRegions"`
-	Paths            []DownloadEnvironmentPath   `json:"paths"`
-	Clients          []DownloadEnvironmentClient `json:"clients"`
-	Operators        []ProcessingOperator        `json:"operators"`
+	Processors       []ProcessingOrganization  `json:"processors,omitzero"`
+	LiveRead         *LiveReadSettings         `json:"liveRead,omitempty"`
+	Format           string                    `json:"format"`
+	RootID           string                    `json:"rootID,omitempty"`
+	InstallationID   string                    `json:"installationID,omitempty"`
+	RecoveryEpoch    string                    `json:"recoveryEpoch,omitempty"`
+	Revision         int64                     `json:"revision"`
+	Suspended        bool                      `json:"suspended"`
+	PermittedRegions []string                  `json:"permittedRegions"`
+	Paths            []DownloadEnvironmentPath `json:"paths"`
+	// InstalledPaths (Helm-native): the paths are the reader's installed
+	// paths (pinned and template-derived); Paths must then be empty.
+	InstalledPaths bool                        `json:"installedPaths,omitempty"`
+	Clients        []DownloadEnvironmentClient `json:"clients"`
+	Operators      []ProcessingOperator        `json:"operators"`
 }
 
 // ProcessingOrganization declares an organization for privacy inventory reports.
@@ -64,6 +67,9 @@ type DownloadEnvironmentClient struct {
 	EvidenceTypes  []string `json:"evidenceTypes"`
 	Purposes       []string `json:"purposes"`
 	PathIDs        []string `json:"pathIDs"`
+	// InstalledPaths (Helm-native): PathIDs are every installed path; the
+	// client lists none. Valid only in an InstalledPaths document.
+	InstalledPaths bool `json:"installedPaths,omitempty"`
 }
 type ProcessingOperator struct {
 	ClientID string `json:"clientID"`

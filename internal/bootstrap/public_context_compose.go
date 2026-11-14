@@ -517,7 +517,7 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	if e := p.Processing; e != nil {
 		// The join adds each cluster's derived path to both sources (ADR-192,
 		// ADR-204), so the reader pins the same derived paths.
-		paths, err := downloadEnvironmentPaths(installation, c.ClusterID, p.DownloadEnvironment.Paths, p.DownloadEnvironment.PathTemplate, catalogTargets(catalog.catalog))
+		paths, err := downloadEnvironmentPaths(installation, c.ClusterID, p.DownloadEnvironment.Paths, p.DownloadEnvironment.PathTemplate, in.pathTargets(catalog))
 		if err != nil {
 			return nil, err
 		}

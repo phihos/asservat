@@ -3,6 +3,7 @@ package bootstrap
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"os"
 	"strings"
@@ -11,11 +12,14 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 
+	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/adapters/mounts"
 	"asservat.local/asservat/internal/adapters/mtls"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/authorization"
+	cfg "asservat.local/asservat/internal/domain/configuration"
 	fleetvalue "asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
 )
 
 // HubAPIDownloadKeyServiceCAFile is the key service's serving CA in
@@ -113,4 +117,55 @@ func (o *hubAPIDownloadControl) publish(ctx context.Context, api kubernetes.Inte
 		return nil, &fixedStepError{"download-control-write", mounts.ErrUnavailable}
 	}
 	return raw, nil
+}
+
+// pathTargets are the clusters with a template-derived download path: the
+// guarded catalog's clusters and, in mode=combined, the hub cluster itself.
+func (in *ownerInputs) pathTargets(catalog publicCatalog) []string {
+	targets := catalogTargets(catalog.catalog)
+	if in.local != nil {
+		targets = append([]string{in.local.ClusterID}, targets...)
+	}
+	return targets
+}
+
+func downloadRevision(r identity.Revision) contracts.DownloadEnvironmentRevision {
+	return contracts.DownloadEnvironmentRevision{UID: r.UID, Generation: r.Generation, SHA256: hex.EncodeToString(r.Digest[:])}
+}
+
+// hubLocalPathTemplate sets the download path template of the hub-local
+// workers (ADR-204 decisions 3 and 4): the evidence store and region, the hub
+// as acquisition, connector and hub cluster, the worker profile revision the
+// hub-api observes now and the accepted owner configuration revision. A later
+// revision of either takes a new process, as for the profile itself.
+func (d *OwnerDeployment) hubLocalPathTemplate(ctx context.Context, observer *kube.PermissionClient, hub identity.Revision) error {
+	c, o := d.inputs.config, d.inputs.downloadControl
+	p := c.Public
+	if p == nil || o == nil || !hub.Valid() {
+		return &fixedStepError{"path-template-inputs", mounts.ErrUnavailable}
+	}
+	client, err := d.workerSourceClient(observer, cfg.NamespaceRef{Name: c.Namespace.Name, UID: c.Namespace.UID})
+	if err != nil {
+		return &fixedStepError{"path-template-client", err}
+	}
+	guard, err := kube.NewPlainWorkerConfigurationProtection(client, p.WorkerConfiguration.Source.Name)
+	if err != nil {
+		return &fixedStepError{"path-template-guard", mounts.ErrUnavailable}
+	}
+	source, err := kube.NewWorkerConfigurationSource(client, guard, p.WorkerConfiguration.Source.Name, p.WorkerConfiguration.Source.UID, c.InstallationID, p.WorkerPKI.IssuerEpoch)
+	if err != nil {
+		return &fixedStepError{"path-template-source", mounts.ErrUnavailable}
+	}
+	observed, err := source.ReadWorkerConfiguration(ctx)
+	if err != nil || !observed.Valid(time.Now()) {
+		return &fixedStepError{"path-template-profile", mounts.ErrUnavailable}
+	}
+	region := o.store.Region
+	t := contracts.DownloadEnvironmentPathTemplate{StoreID: o.store.ID, StorageRegion: region, AcquisitionClusterID: c.ClusterID, AcquisitionRegion: region, ConnectorClusterID: c.ClusterID, ConnectorRegion: region,
+		HubClusterID: c.ClusterID, HubRegion: region, WorkerConfiguration: downloadRevision(observed.Configuration.Profile.Configuration), HubConfiguration: downloadRevision(hub)}
+	if !downloadPathTemplate(t, c.ClusterID) {
+		return &fixedStepError{"path-template", mounts.ErrUnavailable}
+	}
+	p.DownloadEnvironment.PathTemplate = &t
+	return nil
 }

@@ -1,6 +1,7 @@
 package bootstrap
 
 import (
+	"asservat.local/asservat/internal/domain/identity"
 	"context"
 	"crypto/x509"
 	"errors"
@@ -216,6 +217,8 @@ type ownerIdentityParts struct {
 	// accepted owner configuration's source generation.
 	issuerRoots [][]byte
 	revision    int64
+	// ownerRevision is the accepted owner configuration's full revision.
+	ownerRevision identity.Revision
 }
 
 // composeOwnerIdentity opens the owner's SQL credential, reads the accepted
@@ -356,7 +359,7 @@ func composeOwnerIdentity(root, startup context.Context, files *os.Root, podUID 
 		services[usage] = &app.OwnerEnrollmentCoordinator{Verifier: verifier, Proofs: proofs, Ledger: ledgers["enrollment"], Activation: ledgers["activation"], Audit: audits, Acknowledgements: ledgers["audit"], Issuer: issuers[usage], Now: time.Now}
 	}
 	parts.observer, parts.guard, parts.pools, parts.configs, parts.pool, parts.roots = observer, guard, pools, configs, pool, roots
-	parts.issuerRoots, parts.revision = current.Configuration.IssuerRoots, current.Configuration.Revision.Generation
+	parts.issuerRoots, parts.revision, parts.ownerRevision = current.Configuration.IssuerRoots, current.Configuration.Revision.Generation, current.Configuration.Revision
 	parts.ledgers, parts.proofs, parts.endpoints, parts.routes, parts.services = ledgers, proofs, endpoints, routes, services
 	return parts, nil
 }

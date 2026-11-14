@@ -133,6 +133,9 @@ class HubAPI(unittest.TestCase):
         env = json.loads(o[("ConfigMap", NS, "asservat-download-environment")]["data"]["download-environment.json"])
         self.assertEqual((env["permittedRegions"], env["clients"][0]["purposes"]), (["us-east-1"], ["context-trial"]))
         self.assertFalse({"rootID", "installationID", "recoveryEpoch"} & set(env))
+        # The installed (derived) paths are named by marker, never rendered.
+        self.assertEqual((env["paths"], env["installedPaths"]), ([], True))
+        self.assertEqual((env["clients"][0]["pathIDs"], env["clients"][0]["installedPaths"]), ([], True))
         self.assertEqual(o[("ConfigMap", NS, "asservat-processing-source")]["data"], o[("ConfigMap", NS, "asservat-download-environment")]["data"])
         offer = o[("ConfigMap", NS, "asservat-regional-offer")]
         self.assertNotIn("data", offer)

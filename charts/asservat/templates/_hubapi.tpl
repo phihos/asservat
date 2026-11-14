@@ -130,7 +130,8 @@
      the capacity processing source (ADR-192). rootID, installationID and
      recoveryEpoch come from the <name>-ids Secret in the reader. With
      download workers the hub-local region is permitted and every human
-     client may download context captures of the baseline's purpose. */}}
+     client may download context captures of the baseline's purpose over
+     every installed path (installedPaths). */}}
 {{- define "asservat.hubApi.downloadEnvironment" -}}
 {{- $i := .Values.identity -}}
 {{- $id := fromJson (include "asservat.hubApi.identity" .) -}}
@@ -143,13 +144,16 @@
 {{- $purpose := . -}}
 {{- range (default (list (dict "id" $id.clientID "kind" "human")) $i.clients) -}}
 {{- if eq .kind "human" -}}
-{{- $clients = append $clients (dict "issuer" $id.issuer "id" .id "kind" .kind "dataClasses" (list "metadata" "extract" "raw") "privacyClasses" (list "potentialPersonalData") "evidenceTypes" (list "context" "packetCapture" "syscallTrace" "profile" "logs") "purposes" (list $purpose) "pathIDs" list) -}}
+{{- $clients = append $clients (dict "issuer" $id.issuer "id" .id "kind" .kind "dataClasses" (list "metadata" "extract" "raw") "privacyClasses" (list "potentialPersonalData") "evidenceTypes" (list "context" "packetCapture" "syscallTrace" "profile" "logs") "purposes" (list $purpose) "pathIDs" list "installedPaths" true) -}}
 {{- end -}}
 {{- end -}}
 {{- end -}}
 {{- end -}}
 {{- if not $i.processingOperators }}{{ fail "identity.processingOperators needs at least one stable operator identity (the download environment refuses an empty list)" }}{{ end -}}
 {{- $out := dict "format" "asservat-download-environment/v1" "revision" (int .Release.Revision) "suspended" false "permittedRegions" $regions "paths" list "clients" $clients "operators" (default list $i.processingOperators) -}}
+{{- /* With download workers the paths are the readers' installed (derived)
+     paths: Helm does not know their generated fields. */ -}}
+{{- if $regions }}{{ $_ := set $out "installedPaths" true }}{{ end -}}
 {{- if hasKey .Values "processors" }}{{ $_ := set $out "processors" (default list .Values.processors) }}{{ end -}}
 {{- toJson $out -}}
 {{- end -}}

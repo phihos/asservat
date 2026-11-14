@@ -21,7 +21,7 @@ func TestDownloadEnvironmentClosedPolicyCannotInventInstalledPlacement(t *testin
 	path := privacy.DownloadPath{ID: ownerID(3), TargetClusterID: permissionCluster, StoreID: ownerID(4), StorageRegion: "storage", AcquisitionClusterID: ownerID(5), AcquisitionRegion: "regional", ConnectorClusterID: ownerID(5), ConnectorRegion: "regional", HubClusterID: ownerID(6), HubRegion: "hub", WorkerConfiguration: rev, HubConfiguration: rev}
 	wr := contracts.DownloadEnvironmentRevision{UID: rev.UID, Generation: rev.Generation, SHA256: hex.EncodeToString(rev.Digest[:])}
 	w := contracts.DownloadEnvironmentSettings{Format: contracts.DownloadEnvironmentFormat, RootID: ownerID(1), InstallationID: ownerID(1), RecoveryEpoch: ownerID(7), Revision: 1, PermittedRegions: []string{"storage", "regional", "hub"}, Paths: []contracts.DownloadEnvironmentPath{{ID: path.ID, TargetClusterID: path.TargetClusterID, StoreID: path.StoreID, StorageRegion: path.StorageRegion, AcquisitionClusterID: path.AcquisitionClusterID, AcquisitionRegion: path.AcquisitionRegion, ConnectorClusterID: path.ConnectorClusterID, ConnectorRegion: path.ConnectorRegion, HubClusterID: path.HubClusterID, HubRegion: path.HubRegion, WorkerConfiguration: wr, HubConfiguration: wr}}, Clients: []contracts.DownloadEnvironmentClient{{Issuer: "https://id.example.test", ID: "browser", Kind: "human", DataClasses: []string{"metadata"}, PrivacyClasses: []string{"potentialPersonalData"}, EvidenceTypes: []string{"context"}, Purposes: []string{"diagnostics"}, PathIDs: []string{path.ID}}}, Operators: []contracts.ProcessingOperator{{Issuer: "https://id.example.test", ClientID: "browser", Kind: "Group", ID: "privacy"}}}
-	for _, mode := range []string{"valid", "processors-valid", "processors-empty", "processors-null", "processors-unknown", "processors-null-regions", "processors-too-many", "processors-duplicate", "oversized", "live-valid", "live-unknown", "live-null-clients", "live-zero-limit", "missing-client-decision", "null-paths", "missing-suspension", "unknown", "duplicate", "alias", "trailing", "uninstalled-path", "substituted-acquisition", "substituted-hub", "invented-region", "foreign-installation", "bad-issuer", "unknown-class", "replaced-source"} {
+	for _, mode := range []string{"valid", "processors-valid", "processors-empty", "processors-null", "processors-unknown", "processors-null-regions", "processors-too-many", "processors-duplicate", "oversized", "live-valid", "live-unknown", "live-null-clients", "live-zero-limit", "missing-client-decision", "null-paths", "missing-suspension", "unknown", "duplicate", "alias", "trailing", "uninstalled-path", "substituted-acquisition", "substituted-hub", "invented-region", "foreign-installation", "bad-issuer", "unknown-class", "replaced-source", "installed-valid", "installed-with-paths", "installed-client-with-ids", "installed-client-without-document"} {
 		t.Run(mode, func(t *testing.T) {
 			encoded, _ := json.Marshal(w)
 			var m map[string]any
@@ -60,6 +60,20 @@ func TestDownloadEnvironmentClosedPolicyCannotInventInstalledPlacement(t *testin
 				if mode == "live-unknown" {
 					live["rawDownload"] = true
 				}
+			}
+			// Helm-native: the document names the installed paths by marker.
+			client := m["clients"].([]any)[0].(map[string]any)
+			switch mode {
+			case "installed-valid", "installed-with-paths", "installed-client-with-ids":
+				m["installedPaths"], client["installedPaths"] = true, true
+				if mode != "installed-with-paths" {
+					m["paths"] = []any{}
+				}
+				if mode != "installed-client-with-ids" {
+					client["pathIDs"] = []any{}
+				}
+			case "installed-client-without-document":
+				m["paths"], client["installedPaths"], client["pathIDs"] = []any{}, true, []any{}
 			}
 			switch mode {
 			case "missing-client-decision":
@@ -114,7 +128,7 @@ func TestDownloadEnvironmentClosedPolicyCannotInventInstalledPlacement(t *testin
 			})
 			s := &DownloadEnvironmentSource{client: f.client, name: "processing", uid: ownerID(8), root: ownerID(1), installation: ownerID(1), paths: map[string]privacy.DownloadPath{path.ID: path}}
 			p, e := s.snapshot(context.Background())
-			if mode != "valid" && mode != "live-valid" && mode != "processors-valid" && mode != "processors-empty" {
+			if mode != "valid" && mode != "live-valid" && mode != "processors-valid" && mode != "processors-empty" && mode != "installed-valid" {
 				if e == nil {
 					t.Fatal("invalid or unaccepted policy accepted")
 				}
@@ -122,6 +136,9 @@ func TestDownloadEnvironmentClosedPolicyCannotInventInstalledPlacement(t *testin
 			}
 			if e != nil || !p.WellFormed() || len(p.Paths) != 1 || p.Paths[0] != path {
 				t.Fatal("explicit installed placement rejected", e)
+			}
+			if mode == "installed-valid" && (len(p.Clients[0].PathIDs) != 1 || p.Clients[0].PathIDs[0] != path.ID) {
+				t.Fatal("marked client did not get the installed paths", p.Clients[0].PathIDs)
 			}
 			if mode == "valid" && p.Processors != nil || mode == "processors-empty" && (p.Processors == nil || len(p.Processors) != 0) ||
 				mode == "processors-valid" && (len(p.Processors) != 1 || p.Processors[0].ID != "org-1" || p.Processors[0].Regions[0] != "operator-defined-region") {

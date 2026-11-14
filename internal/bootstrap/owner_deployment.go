@@ -291,6 +291,11 @@ func newOwnerDeployment(ctx context.Context, files *os.Root, podUID string, in *
 		}
 		closers = nil
 		phase = startupPublicContext
+		if in.downloadControl != nil {
+			if err = d.hubLocalPathTemplate(startup, observer, parts.ownerRevision); err != nil {
+				return nil, err
+			}
+		}
 		// ADR-208: preview capability and catalog reads get their own clients
 		// with the opening limiter; on the owner's shared clients the capability
 		// read alone took 1-2 s of a preview's five seconds (local run 3).

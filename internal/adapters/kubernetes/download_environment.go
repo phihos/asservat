@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"encoding/json/jsontext"
 	"net/url"
+	"slices"
 	"time"
 
 	"asservat.local/asservat/internal/contracts"
@@ -163,6 +164,21 @@ func (s *DownloadEnvironmentSource) snapshot(ctx context.Context) (privacy.Downl
 			out.LiveRead.Ceilings = append(out.LiveRead.Ceilings, privacy.LiveCeiling{ClusterID: c.ClusterID, NamespaceUID: c.NamespaceUID, WorkloadUID: c.WorkloadUID, Limits: privacy.LiveLimits{Duration: c.Duration, Output: c.Output, Rate: c.Rate, Rows: c.Rows, Buffer: c.Buffer, RowAge: c.RowAge, Replay: c.Replay}})
 		}
 	}
+	// Helm-native: the document names the installed paths without their
+	// generated fields; the reader's installed set is the path list.
+	installedIDs := []string{}
+	if w.InstalledPaths {
+		if len(w.Paths) != 0 {
+			return privacy.DownloadPolicy{}, privacy.ErrInvalid
+		}
+		for id := range s.paths {
+			installedIDs = append(installedIDs, id)
+		}
+		slices.Sort(installedIDs)
+		for _, id := range installedIDs {
+			out.Paths = append(out.Paths, s.paths[id])
+		}
+	}
 	for _, p := range w.Paths {
 		worker, e := processingRevision(p.WorkerConfiguration)
 		if e != nil {
@@ -183,7 +199,14 @@ func (s *DownloadEnvironmentSource) snapshot(ctx context.Context) (privacy.Downl
 		if !validProcessingIssuer(c.Issuer) {
 			return privacy.DownloadPolicy{}, privacy.ErrInvalid
 		}
-		out.Clients = append(out.Clients, privacy.DownloadClient{Issuer: c.Issuer, ID: c.ID, Kind: identity.Kind(c.Kind), DataClasses: c.DataClasses, PrivacyClasses: c.PrivacyClasses, EvidenceTypes: c.EvidenceTypes, Purposes: c.Purposes, PathIDs: c.PathIDs})
+		ids := c.PathIDs
+		if c.InstalledPaths {
+			if !w.InstalledPaths || len(c.PathIDs) != 0 {
+				return privacy.DownloadPolicy{}, privacy.ErrInvalid
+			}
+			ids = slices.Clone(installedIDs)
+		}
+		out.Clients = append(out.Clients, privacy.DownloadClient{Issuer: c.Issuer, ID: c.ID, Kind: identity.Kind(c.Kind), DataClasses: c.DataClasses, PrivacyClasses: c.PrivacyClasses, EvidenceTypes: c.EvidenceTypes, Purposes: c.Purposes, PathIDs: ids})
 	}
 	for _, o := range w.Operators {
 		if !validProcessingIssuer(o.Issuer) {

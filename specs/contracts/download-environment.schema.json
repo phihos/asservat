@@ -91,6 +91,10 @@
       },
       "minItems": 0,
       "description": "Optional operator declarations for inventory reporting only. Omission means declarations were not supplied; an empty array explicitly declares none. These values grant no access or processing authority."
+    },
+    "installedPaths": {
+      "type": "boolean",
+      "description": "Helm-native: paths are the reader's installed (derived) paths; the document lists none."
     }
   },
   "$defs": {
@@ -278,6 +282,10 @@
           "minItems": 0,
           "maxItems": 32,
           "uniqueItems": true
+        },
+        "installedPaths": {
+          "type": "boolean",
+          "description": "Helm-native: the client's pathIDs are every installed path; it lists none."
         }
       }
     },

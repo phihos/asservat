@@ -69,7 +69,7 @@ func newPublicDownloads(ctx context.Context, d *OwnerDeployment, observer, probe
 	// The download environment and the worker configuration are hub-held.
 	// ADR-204 decision 4: one derived path per cluster in the guarded catalog
 	// read at start; a catalog change restarts the process (ADR-196).
-	paths, err := downloadEnvironmentPaths(installation, c.ClusterID, p.DownloadEnvironment.Paths, p.DownloadEnvironment.PathTemplate, catalogTargets(catalog.catalog))
+	paths, err := downloadEnvironmentPaths(installation, c.ClusterID, p.DownloadEnvironment.Paths, p.DownloadEnvironment.PathTemplate, in.pathTargets(catalog))
 	if err != nil {
 		return nil, &fixedStepError{"downloads/paths", err}
 	}
