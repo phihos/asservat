@@ -96,6 +96,7 @@
 {{- $id := fromJson (include "asservat.hubApi.identity" .) -}}
 {{- $pub := dict "origin" .Values.origin "browserAudience" $id.browserAudience "version" (.Chart.AppVersion | default .Chart.Version) -}}
 {{- $_ := set $pub "captures" (int (dig "capturesPerCluster" 8 (default dict .Values.capacity))) -}}
+{{- with dig "workload" "dump" nil (default dict .Values.capacity) }}{{ $_ := set $pub "workloadRate" . }}{{ end -}}
 {{- range $key := list "standby" "previewSeconds" "operationConcurrency" "mcpPerIdentity" "downloadConcurrency" "downloadsPerIdentity" "downloadMaxSeconds" "operationAudit" "downloadPlan" -}}
 {{- $_ := set $pub $key (index $u $key) -}}
 {{- end -}}

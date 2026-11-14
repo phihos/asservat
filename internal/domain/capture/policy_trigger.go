@@ -19,9 +19,23 @@ import (
 // WorkloadTriggerInterval and WorkloadTriggerBurst are the workload rate
 // limit (REQ-CAP-001 defaults): one token bucket with a burst of one and one
 // occurrence per 900 seconds, shared by every policy on the workload.
-const (
+// SetWorkloadRate replaces them with the capacity.workload.dump values;
+// the hub-api calls it once at startup.
+var (
 	WorkloadTriggerInterval = 900 * time.Second
 	WorkloadTriggerBurst    = 1
+)
+
+func SetWorkloadRate(burst int64, intervalSeconds int64) {
+	if burst > 0 {
+		WorkloadTriggerBurst = int(burst)
+	}
+	if intervalSeconds > 0 {
+		WorkloadTriggerInterval = time.Duration(intervalSeconds) * time.Second
+	}
+}
+
+const (
 	// TriggerPollInterval is the restart poll period of one active policy.
 	TriggerPollInterval = 15 * time.Second
 )

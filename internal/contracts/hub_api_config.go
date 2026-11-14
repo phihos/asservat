@@ -141,10 +141,12 @@ type HubAPIPublic struct {
 	Origin          string `json:"origin"`
 	BrowserAudience string `json:"browserAudience"`
 	// Processing reads the capacity processing source <name>-processing-source.
-	Processing           bool                    `json:"processing,omitempty"`
-	CaptureHistory       *CaptureHistoryLimits   `json:"captureHistory,omitempty"`
-	Standby              int                     `json:"standby"`
-	Captures             int                     `json:"captures"`
+	Processing     bool                  `json:"processing,omitempty"`
+	CaptureHistory *CaptureHistoryLimits `json:"captureHistory,omitempty"`
+	Standby        int                   `json:"standby"`
+	Captures       int                   `json:"captures"`
+	// WorkloadRate is capacity.workload.dump: each workload's token bucket.
+	WorkloadRate         *CapacityDumpValues     `json:"workloadRate,omitempty"`
 	PreviewSeconds       int                     `json:"previewSeconds"`
 	DownloadPlan         OwnerPublicDownloadPlan `json:"downloadPlan"`
 	ProxyTLS             bool                    `json:"proxyTLS,omitempty"`

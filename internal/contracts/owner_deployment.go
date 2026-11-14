@@ -64,6 +64,7 @@ type CaptureHistoryLimits struct {
 
 type OwnerPublicDeployment struct {
 	CaptureHistory *CaptureHistoryLimits `json:"captureHistory,omitempty"`
+	WorkloadRate   *CapacityDumpValues   `json:"workloadRate,omitempty"`
 	Format         string                `json:"format"`
 	Origin         string                `json:"origin"`
 	// Identity (ADR-180 decision 3): the pinned browser settings supply the
