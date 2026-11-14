@@ -292,7 +292,6 @@ type ContextProgressData struct {
 	Actions               []ContextActionData `json:"actions"`
 	CaseID                string              `json:"case_id,omitempty"`
 	NavigationURI         string              `json:"navigation_uri"`
-	RetryAfterSeconds     int                 `json:"retry_after_seconds,omitempty"`
 	CanCancel             bool                `json:"can_cancel"`
 	CancellationRequested bool                `json:"cancellation_requested,omitempty"`
 	Blockers              []OperationBlocker  `json:"blockers"`
@@ -643,7 +642,7 @@ func (s *ContextOperations) CallWithContext(ctx context.Context, current identit
 			if progress.ReasonCode == "ProfileCancellationUncertain" {
 				out.Warnings = append(out.Warnings, "Asservat stopped collecting this profile. Whether the application stopped profiling is unknown.")
 			}
-			data := ContextProgressData{CaptureID: progress.CaptureID, Revision: progress.Revision, Phase: progress.Phase, Actions: actions, CaseID: progress.CaseID, NavigationURI: s.config.PublicOrigin + "/captures/" + progress.CaptureID, RetryAfterSeconds: progress.RetryAfterSeconds, CanCancel: progress.CanCancel, Blockers: []OperationBlocker{}, Operation: operation}
+			data := ContextProgressData{CaptureID: progress.CaptureID, Revision: progress.Revision, Phase: progress.Phase, Actions: actions, CaseID: progress.CaseID, NavigationURI: s.config.PublicOrigin + "/captures/" + progress.CaptureID, CanCancel: progress.CanCancel, Blockers: []OperationBlocker{}, Operation: operation}
 			data.CancellationRequested = progress.CancellationRequested
 			data.Reason, data.ReasonState = progress.Reason, progress.ReasonState
 			if operation == "recordingSave" {

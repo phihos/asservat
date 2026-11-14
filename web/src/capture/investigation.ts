@@ -36,6 +36,7 @@ export class Investigation {
   private request?: AbortController;
   private generation = 0;
   private timer?: ReturnType<typeof setTimeout>;
+  private events?: EventSource;
   private previewExpiry?: ReturnType<typeof setTimeout>;
   private receipt?: Receipt;
   private cancellation?: Input<'cancel_capture'>;
@@ -66,7 +67,7 @@ export class Investigation {
     this.state.canContinue = !!(this.session && this.scope && !this.scope.aborted && this.receipt?.captureID && this.receipt.preview_id && this.receipt.idempotency_key && !this.receipt.continuationBlocked && this.state.progress?.phase === 'Pending');
     for (const listener of this.listeners) listener();
   }
-  private invalidate() { ++this.generation; this.request?.abort(); clearTimeout(this.timer); clearTimeout(this.previewExpiry); clearTimeout(this.settingsExpiry); this.state = { ...this.state, settings: undefined }; }
+  private invalidate() { ++this.generation; this.request?.abort(); clearTimeout(this.timer); this.closeEvents(); clearTimeout(this.previewExpiry); clearTimeout(this.settingsExpiry); this.state = { ...this.state, settings: undefined }; }
   private receiptStage(): State['stage'] { return this.receipt?.captureID ? 'progress' : this.receipt?.closed ? 'closed' : this.receipt?.approvalURI ? 'approval' : 'uncertain'; }
 
   attach(session: Session, scope: AbortSignal, captureID?: string) {
@@ -458,15 +459,37 @@ export class Investigation {
     if (!id || this.state.busy) return;
     const data = await this.run('get_capture', { capture_id: id });
     if (!data) { this.publish({ progress: undefined }); return; }
+    if (this.applyProgress(id, data) && !this.events) this.follow(id);
+  };
+  // Server-Sent Events push each committed progress change (REQ-INT-003);
+  // the console sends no status polls.
+  private follow(id: string) {
+    const events = new EventSource('/api/v1/events?capture_id=' + encodeURIComponent(id));
+    this.events = events;
+    events.addEventListener('capture', message => {
+      if (this.events !== events) return;
+      let envelope: { status: string; data: Data<'get_capture'> } | undefined;
+      try { envelope = JSON.parse((message as MessageEvent<string>).data).result; } catch { envelope = undefined; }
+      if (!envelope || envelope.status !== 'ok' || !this.applyProgress(id, envelope.data)) this.closeEvents();
+    });
+    events.addEventListener('accessLost', () => {
+      if (this.events !== events) return;
+      this.closeEvents();
+      this.publish({ progress: undefined, error: 'You no longer have access to this collection status.' });
+    });
+  }
+  private closeEvents() { this.events?.close(); this.events = undefined; }
+  // Applies one verified status; true while the capture is still running.
+  private applyProgress(id: string, data: Data<'get_capture'>): boolean {
     if (!validActionInstances(data) || data.capture_id !== id || this.receipt?.operation && data.operation !== this.receipt.operation || data.revision < (this.receipt?.revision ?? 0)) {
-      this.publish({ progress: undefined, error: 'The collection status could not be verified. Try checking it again.' }); return;
+      this.publish({ progress: undefined, error: 'The collection status could not be verified. Try checking it again.' }); return false;
     }
-    if (this.receipt?.captureID !== id) return;
+    if (this.receipt?.captureID !== id) return false;
     this.receipt.revision = data.revision;
     if (terminal.has(data.phase)) this.cancellation = undefined;
     this.publish({ stage: 'progress', progress: data, cancellationStatus: data.cancellation_requested && !terminal.has(data.phase) ? 'requested' : this.state.cancellationStatus === 'unconfirmed' && !terminal.has(data.phase) ? 'unconfirmed' : undefined });
-    if (!terminal.has(data.phase)) this.timer = setTimeout(() => void this.refreshProgress(), 1000 * (data.retry_after_seconds ?? 5));
-  };
+    return !terminal.has(data.phase);
+  }
 }
 
 // Button eligibility only; current server authority decides every submission.
