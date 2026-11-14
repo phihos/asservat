@@ -40,8 +40,8 @@ func qualifyProcessingRestrictions(t *testing.T, ctx context.Context, admin *pgx
 		t.Fatal("actual pre-publication restriction", blocked, err)
 	}
 	var charged, limit int64
-	if err = admin.QueryRow(ctx, "SELECT a.charged,p.records_per_account FROM operation_audit_account a JOIN operation_audit_pool p USING(root_id,lane) WHERE a.root_id=$1 AND a.lane='normal'", s.a.RootID).Scan(&charged, &limit); err != nil || charged != 1 || limit != 1 {
-		t.Fatal("normal audit pool is not actually full", charged, limit, err)
+	if err = admin.QueryRow(ctx, "SELECT a.charged,p.records_per_account FROM operation_audit_account a JOIN operation_audit_pool p USING(root_id,lane) WHERE a.root_id=$1 AND a.lane='normal'", s.a.RootID).Scan(&charged, &limit); err != nil || charged != 1 || limit != 2 {
+		t.Fatal("normal audit account charged once for the restriction", charged, limit, err)
 	}
 	if err = publish(); err != nil {
 		t.Fatal("restricted evidence must still be safely published", err)

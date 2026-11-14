@@ -141,9 +141,7 @@ func newProcessingTestFixture(t *testing.T, ctx context.Context, poolFor func(st
 		}
 		return p
 	}
-	// One normal record: the first restriction fills the account, so release
-	// is shown to work with a full normal account.
-	normalAccounts, normalRecords := int64(2), int64(1)
+	normalAccounts, normalRecords := int64(2), int64(2)
 	if shares {
 		// Original bounded sharing scenario, including negative ingress and
 		// replays; global/default fixture quotas remain unchanged.
