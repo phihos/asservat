@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -516,6 +517,17 @@ func (s federationServices) Issue(ctx context.Context, region *connectorlifecycl
 	out, err := s.Runners.Issue(ctx, region, id, usage, r)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "federation "+usage+" issue failed: "+federationCause(err))
+	}
+	return out, err
+}
+
+// AuthenticateOwner logs the fixed refusal step of a failed owner
+// authentication (fleet.WithRefusalSteps); the result is unchanged.
+func (s federationServices) AuthenticateOwner(ctx context.Context, region *connectorlifecycle.Region, c value.OwnerCertificate) (connectorlifecycle.OwnerAuthentication, error) {
+	var steps []string
+	out, err := s.Runners.AuthenticateOwner(fleetapp.WithRefusalSteps(ctx, func(step string) { steps = append(steps, step) }), region, c)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "federation owner authentication refused: "+strings.Join(steps, ",")+" "+federationCause(err))
 	}
 	return out, err
 }
