@@ -4,12 +4,13 @@ import argparse
 import importlib.util
 import json
 from pathlib import Path
+import implemented_contracts
 ROOT=Path(__file__).resolve().parents[1]
 spec=importlib.util.spec_from_file_location('permission_crds',ROOT/'scripts/permission-crds.py')
 base=importlib.util.module_from_spec(spec);spec.loader.exec_module(base)
 
 def render():
-    source=json.loads((ROOT/'specs/contracts/retention-policy.schema.json').read_text())
+    source=json.loads(implemented_contracts.path('retention-policy.schema.json').read_text())
     raw=source['properties']['spec']
     for selector in ['namespaceSelector','workloadSelector']:
         labels=raw['properties']['scope']['properties'][selector]['properties']['matchLabels']

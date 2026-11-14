@@ -5,14 +5,11 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
-    "cluster": {
-      "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/uuid",
-      "description": "Workload cluster of a hub-held DebugPolicy (ADR-228); the namespace names a namespace in that cluster."
-    },
     "namespace": {
       "type": "string",
       "minLength": 1,
-      "maxLength": 63
+      "maxLength": 63,
+      "description": "Defaults to the object's own namespace; must equal it when given."
     },
     "workloadRef": {
       "type": "object",
@@ -23,7 +20,8 @@
           "enum": [
             "apps/v1",
             "v1"
-          ]
+          ],
+          "description": "Optional; derived from the kind."
         },
         "kind": {
           "type": "string",
@@ -41,11 +39,11 @@
         "uid": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 64
+          "maxLength": 64,
+          "description": "Optional pin with adoption: pinUID; otherwise provenance only."
         }
       },
       "required": [
-        "apiVersion",
         "kind",
         "name"
       ],
@@ -85,7 +83,6 @@
         "matchLabels": {
           "type": "object",
           "minProperties": 1,
-          "maxProperties": 16,
           "additionalProperties": {
             "type": "string",
             "minLength": 1,
@@ -100,8 +97,9 @@
     "maxPods": {
       "type": "integer",
       "minimum": 1,
-      "maximum": 100,
-      "description": "Maximum pods collected per occurrence; never the monitoring coverage limit."
+      "maximum": 9007199254740991,
+      "description": "Maximum pods collected per occurrence; never the monitoring coverage limit.",
+      "default": 1
     },
     "selection": {
       "type": "string",
@@ -111,33 +109,29 @@
         "allWithinLimit",
         "lowestOrdinal",
         "triggeringPod"
-      ]
+      ],
+      "description": "Defaults to triggeringPod for policies and oldestReady for manual captures."
     },
     "ordinals": {
       "type": "array",
       "items": {
         "type": "integer",
         "minimum": 0,
-        "maximum": 100000
+        "maximum": 9007199254740991
       },
-      "maxItems": 100,
       "minItems": 1,
       "uniqueItems": true
     },
     "adoption": {
       "type": "string",
       "enum": [
-        "pinUID",
-        "followApprovedReplacement"
-      ]
+        "followName",
+        "pinUID"
+      ],
+      "default": "followName"
     }
   },
-  "required": [
-    "namespace",
-    "maxPods",
-    "selection",
-    "adoption"
-  ],
+  "required": [],
   "oneOf": [
     {
       "required": [

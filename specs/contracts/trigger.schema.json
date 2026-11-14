@@ -187,7 +187,7 @@
                 "minimumFailures": {
                   "type": "integer",
                   "minimum": 1,
-                  "maximum": 1000
+                  "maximum": 9007199254740991
                 },
                 "window": {
                   "type": "string",
@@ -240,7 +240,6 @@
                     "minimum": 0,
                     "maximum": 255
                   },
-                  "maxItems": 16,
                   "minItems": 0,
                   "uniqueItems": true
                 },
@@ -251,7 +250,6 @@
                     "minimum": 1,
                     "maximum": 64
                   },
-                  "maxItems": 16,
                   "minItems": 0,
                   "uniqueItems": true
                 },
@@ -266,7 +264,6 @@
                       "CrashLoopBackOff"
                     ]
                   },
-                  "maxItems": 4,
                   "minItems": 0,
                   "uniqueItems": true
                 }
@@ -306,7 +303,6 @@
                 },
                 "matchLabels": {
                   "type": "object",
-                  "maxProperties": 16,
                   "additionalProperties": {
                     "type": "string",
                     "minLength": 1,
@@ -364,7 +360,6 @@
                       "cuda-core"
                     ]
                   },
-                  "maxItems": 5,
                   "minItems": 1,
                   "uniqueItems": true
                 }
@@ -463,7 +458,7 @@
                 "sizeBytes": {
                   "type": "integer",
                   "minimum": 0,
-                  "maximum": 1099511627776
+                  "maximum": 9007199254740991
                 },
                 "pollInterval": {
                   "type": "string",
@@ -627,7 +622,6 @@
               "items": {
                 "$ref": "https://asservat.io/spec/v1/trigger.schema.json#/$defs/expression"
               },
-              "maxItems": 16,
               "minItems": 1,
               "uniqueItems": true
             }
@@ -645,7 +639,6 @@
               "items": {
                 "$ref": "https://asservat.io/spec/v1/trigger.schema.json#/$defs/expression"
               },
-              "maxItems": 16,
               "minItems": 1,
               "uniqueItems": true
             }
@@ -709,7 +702,7 @@
                 "atLeast": {
                   "type": "integer",
                   "minimum": 1,
-                  "maximum": 100000
+                  "maximum": 9007199254740991
                 },
                 "within": {
                   "type": "string",
@@ -743,7 +736,6 @@
                     "minLength": 1,
                     "maxLength": 63
                   },
-                  "maxItems": 16,
                   "minItems": 2,
                   "uniqueItems": true
                 },

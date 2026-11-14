@@ -15,19 +15,19 @@
     "kind": "DebugPolicy",
     "spec": {
       "target": {
-        "namespace": "payments",
         "workloadRef": {
-          "apiVersion": "apps/v1",
           "kind": "StatefulSet",
           "name": "ledger",
-          "uid": "workload-ledger-uid"
+          "uid": "workload-ledger-uid",
+          "apiVersion": "apps/v1"
         },
-        "maxPods": 1,
-        "selection": "triggeringPod",
         "adoption": "pinUID",
         "ordinals": [
           0
-        ]
+        ],
+        "namespace": "payments",
+        "maxPods": 1,
+        "selection": "triggeringPod"
       },
       "detectors": [
         {
@@ -60,9 +60,6 @@
         "maxConcurrentActions": 1
       },
       "retention": "72h",
-      "observation": {
-        "mode": "allAuthorized"
-      },
       "evaluation": {
         "scope": "pod",
         "fireOnActivation": true,

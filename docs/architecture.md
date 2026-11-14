@@ -166,7 +166,7 @@ An explicitly enabled/reviewed policy can accept a narrow manual save from a cur
 
 ## Live observation path
 
-[Live watching](../specs/live-watch.md) adds an optional consumer of already authorized packet/syscall sources: existing source → qualified bounded projection → stream on the connector connection → hub → browser SSE stream or MCP `read_live_watch`. No inbound node port, public raw-stream endpoint or broker. [Internal interfaces](architecture/interfaces.md) separate durable control from transient live exchange. Direct live queries are distinct from object-backed artifact analysis and cannot open a source.
+[Live watching](../specs/live-watch.md) adds an optional consumer of already authorized packet/syscall sources: existing source → qualified bounded projection → stream on the connector connection → hub → browser SSE stream or MCP `watch_live(action=read)`. No inbound node port, public raw-stream endpoint or broker. [Internal interfaces](architecture/interfaces.md) separate durable control from transient live exchange. Direct live queries are distinct from object-backed artifact analysis and cannot open a source.
 
 A LiveWatch is an SQL control row (filter, revision, deadline, charges); row and replay payloads stay bounded transient memory. Strict fanout/scan/output caps, per-view filtering and source-cohort isolation prevent a broad reader from exposing another principal's rows. The watch is authorized once and reused within ADR-311; access changes reach it as pushed events. Regional evidence policy also governs transient routing: if approved extracts may not cross a region, the hub must route within that boundary or refuse the view.
 

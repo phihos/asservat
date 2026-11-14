@@ -12,7 +12,7 @@ The CRD table uses namespaced `asservat.io/v1alpha1` resources unless explicitly
 | `DebugCapture` | Workload namespace; requester/controller | Preset, profileComposition or expanded request with optional result sharing, immutable after acceptance; status projects SQL accepted execution and bounded progress/artifact references |
 | `EvidenceStoragePool` | Hub control namespace; capacity administrator | Backed capacity, protected workload slots, shared burst, system/headroom reserves and transfer ceiling; allocation readiness/usage |
 | `EvidenceBudgetPolicy` | Hub control namespace; capacity administrator | Eligible scope, namespace envelope, per-workload protected/hard/context capacity, dump/rate/queue limits and full-account policy |
-| `CollectionCeiling` | Collector admin namespace; cluster admin | Namespace opt-in/deny, action types, maximum budgets, storage/analysis profiles; readiness |
+| `CollectionCeiling` | Collector admin namespace; cluster admin | Optional. Narrows the default (every non-system namespace collectable): namespace deny, action types, maximum budgets, storage/analysis profiles, live reads; readiness |
 | `AccessBinding` | Application namespace it grants; namespace RBAC writers ([ADR-329](../docs/decisions/329-accessbindings-in-application-namespaces.md)) | Subjects and groups by name, fixed roles, namespace scope or workloads by kind/name, optional expiry; observed by the regional connector through an informer; status Conditions with `observedGeneration` |
 | `EvidenceRetentionPolicy` | Hub/collector control namespace; retention administrator | Scope, finite default/max ages, privacy/type rules, deletion budget, legal-exception mode; `observedGeneration`, propagation and storage-conflict Conditions |
 | `PermissionSource` | Hub control namespace; permission administrators | Typed derivation rule, scope and trusted mapping; Ready Condition with `observedGeneration` |
@@ -87,6 +87,16 @@ The case browser, approval page and sharing page use a same-origin HTTP API with
 ## Schema scope
 
 The checked-in JSON contracts cover user-authored CRDs and public DTOs: target, detectors, actions/recipes, capture profiles, typed composition, syscall actions/results, and policy/capture preset/composition/expanded forms, administrator capacity pools/budget policies, administrator retention policy, artifact privacy/deadlines, artifact manifest/acquisition provenance, access grant, share and protected sharing intent, optional collection-time sharing declarations, permission bindings/sources, access provenance and MCP results/tools. SharingIntent is a SQL-backed runtime DTO, not a CRD or an extra permission CRUD API. SharingRegistration uses transactional reservations under REQ-SHR-006 and REQ-DB-003; migrations enforce capture/artifact uniqueness and bounded counters. Runtime DTO spec/status envelopes must not be mistaken for Kubernetes resources. Helm renders installation-internal configuration; it has no public contract. Capability tables above define remaining controller resource semantics. Generated production CRDs, OpenAPI routes, Helm values schema and API compatibility fixtures must be completed before their implementation phase is declared done.
+
+### Bounds in the contracts
+
+A contract bound needs a stated reason (maintainer rule, 2026-11-14): otherwise it is removed. Capture, policy, recipe, target, trigger, composition, sharing, grant and capacity contracts keep only these kinds of bound:
+
+- **External formats and APIs:** Kubernetes names (63/253 characters, port names 15), OIDC `sub` (255), Linux `PATH_MAX` (4096), `NAME_MAX` (255), `MAX_ARG_STRLEN` (131072 per argument), PID, port, exit-code, signal and snaplen ranges, PSI trigger windows, the classic BPF instruction limit for compiled packet filters, and the JSON exact-integer range (2^53 − 1) that RFC 8785 hashing needs. Duration strings are length-bounded so their value fits int64 nanoseconds.
+- **Memory and storage:** packet/syscall ring and segment sizes, frozen-snapshot bytes and concurrent snapshots, HTTP parser memory, retained events, tracked threads, argument bytes per event, log record bytes and per-node ring/frozen memory protect collector memory; free-text reasons and descriptions bound stored record size.
+- **Maintainer decisions:** storm-protection rate and concurrency limits (policy `budgets`, budget-policy dump, queue, upload and source limits), the administrator retention maximum and expiring grants for automatic intrusive actions.
+
+Lists have no item caps: detectors, expressions, recipe actions, composition components and edits, ordinals, label selectors, sharing recipients and outputs, grant artifacts and allocations are bounded by the resources they consume (capacity admission, the compiled filter) or by pagination. Result pages keep their page size. Expression nesting stays at depth 8 to bound evaluator recursion.
 
 ## Action execution modes and status
 

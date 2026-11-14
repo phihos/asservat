@@ -1,11 +1,11 @@
 // Synthetic tests only; no production import.
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { id, profileVersion, queryHandle } from './test-fixtures';
 import type { PacketField, PacketQuerySelection } from './packet-query';
 export { id, profileVersion, queryHandle, session, SyntheticProjection } from './test-fixtures';
 export const source = { caseID: id(2), artifactID: id(3), version: profileVersion, captureMode: 'networkHeaders' as const };
 export const selection: PacketQuerySelection = { fields: ['packet_index', 'source_port'], max_packets: 100, max_scan_bytes: 8388608 };
-const example = (name:string) => JSON.parse(readFileSync(new URL('../../../examples/'+name, import.meta.url), 'utf8'));
+const example = (name:string) => JSON.parse(readFileSync(existsSync(new URL('../../../examples/implemented/' + name, import.meta.url)) ? new URL('../../../examples/implemented/' + name, import.meta.url) : new URL('../../../examples/' + name, import.meta.url), 'utf8'));
 export function packetPage(raw = false, fields: PacketField[] = selection.fields) {
  const p = example('mcp-packet-query-metadata-result.json');
  p.data.capture_mode = raw ? 'rawPackets' : 'networkHeaders'; p.data_class = raw ? 'raw' : 'extract';

@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"os"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -15,7 +14,7 @@ import (
 func TestWorkTrustProtectedConfig(t *testing.T) {
 	for _, mode := range []string{"valid", "cluster", "epoch", "duplicate-key", "unknown", "case-alias", "padded-key", "offset", "expiry", "replaced", "extra-data", "expired-read", "stale-receiver"} {
 		t.Run(mode, func(t *testing.T) {
-			b, err := os.ReadFile("../../../examples/work-trust.json")
+			b, err := readImplementedExample("../../../examples/", "work-trust.json")
 			if err != nil {
 				t.Fatal(err)
 			}

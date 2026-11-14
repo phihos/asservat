@@ -4,25 +4,30 @@
   "data_class": "metadata",
   "status": "ok",
   "data": {
-    "sources": [
+    "kind": "recordingPage",
+    "recordings": [
       {
-        "source_handle": "opaque-source-handle",
-        "source_session_id": "00000000-0000-4000-8000-000000000702",
-        "workload_uid": "deployment-checkout-uid",
-        "pod_uid": "pod-checkout-8k2p",
+        "recording_handle": "opaque-source-handle",
+        "owner_kind": "manualSession",
+        "capture_id": "00000000-0000-4000-8000-000000000702",
+        "pod_name": "checkout-8k2p",
         "action_id": "syscalls",
-        "owner_kind": "policy",
-        "owner_id": "policy-uid",
+        "kind": "syscallTrace",
         "state": "Ready",
-        "projections": [
+        "history": "Partial",
+        "maximum_before": "0s",
+        "save_eligible": false,
+        "save_via": "captureOutcome",
+        "live_projections": [
           "syscallMetadata"
         ],
-        "eligible": true,
-        "blocker_codes": [],
-        "save_via": "recordingSave",
-        "lease_until": "2026-10-09T12:05:30Z"
+        "blockers": [],
+        "incident_pod_cap": 1,
+        "hard_end": "2026-10-09T12:05:30Z"
       }
-    ]
+    ],
+    "capture_enabled": true,
+    "expires_at": "2026-10-09T12:01:00Z"
   },
   "truncated": false,
   "next_cursor": null,

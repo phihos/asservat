@@ -38,14 +38,43 @@ def read(path: Path):
     return json.loads(path.read_text()) if path.suffix == ".json" else yaml.safe_load(path.read_text())
 
 
+def resolved_binding(spec, issuer):
+    resolved = copy.deepcopy(spec)
+    for subject in resolved["subjects"]:
+        subject.setdefault("issuer", issuer)
+    return resolved
+
+
 def canonical_digest(value) -> str:
     return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()).hexdigest()
 
 
-def collection_spec(doc: dict) -> dict:
-    """Fixture projection only; production resolver must also freeze referenced scope."""
-    excluded = {"grantRef", "sharing", "suspended", "reason", "idempotencyKey"}
-    return {"kind": doc["kind"], "spec": {k: copy.deepcopy(v) for k, v in doc["spec"].items() if k not in excluded}}
+POLICY_BUDGET_DEFAULTS = {"cooldown": "1m", "burst": 2, "maxOccurrencesPerHour": 60, "maxConcurrentActions": 1}
+POLICY_EVALUATION_DEFAULTS = {"scope": "pod", "fireOnActivation": True, "rearmFor": "10s"}
+
+
+def collection_spec(doc: dict, recipes: dict | None = None, deadline: str | None = None) -> dict:
+    """Fixture resolver only (ADR-335 D4): fills the defaults and names the hub
+    resolves at acceptance; production also freezes referenced scope."""
+    excluded = {"grantRef", "automationRef", "sharing", "suspended", "reason", "idempotencyKey", "deadline", "resultAccess"}
+    spec = {k: copy.deepcopy(v) for k, v in doc["spec"].items() if k not in excluded}
+    target = spec.get("target")
+    if target is not None and "presetRef" not in spec:
+        target.setdefault("namespace", doc["metadata"]["namespace"])
+        ref = target.get("workloadRef")
+        if ref is not None:
+            ref.setdefault("apiVersion", "v1" if ref["kind"] == "Pod" else "apps/v1")
+        target.setdefault("maxPods", 1)
+        target.setdefault("selection", "triggeringPod" if doc["kind"] == "DebugPolicy" else "oldestReady")
+        target.setdefault("adoption", "followName")
+    if recipes is not None and "recipeRef" in spec:
+        spec["recipeRef"].setdefault("digest", canonical_digest(recipes[spec["recipeRef"]["name"]]["spec"]))
+    if doc["kind"] == "DebugPolicy" and "presetRef" not in spec:
+        spec["budgets"] = POLICY_BUDGET_DEFAULTS | spec.get("budgets", {})
+        spec["evaluation"] = POLICY_EVALUATION_DEFAULTS | spec.get("evaluation", {})
+    if doc["kind"] == "DebugCapture" and deadline is not None:
+        spec["deadline"] = deadline  # computed at acceptance from the durations
+    return {"kind": doc["kind"], "spec": spec}
 
 
 def duration_seconds(value: str) -> float:
@@ -170,13 +199,13 @@ def guidance_checks(data: dict) -> None:
                     require(bool(rec["blockers"]), "Too many matching processes advertised as executable")
 
 
-def history_selector_fixture_key(cluster_id, namespace_uid, target):
-    """Explicit grouping fixture, not live resolution or production key derivation."""
-    key = {"clusterID": cluster_id, "namespaceUID": namespace_uid}
+def history_selector_fixture_key(cluster, namespace, target):
+    """Explicit grouping fixture, not live resolution or production key derivation.
+    ADR-335 D4: cluster, namespace and workload by name; UIDs are provenance."""
+    key = {"cluster": cluster, "namespace": namespace}
     if "workloadRef" in target:
         ref = target["workloadRef"]
-        require(bool(ref.get("uid")), "Grouping requires resolved workload identity")
-        key["workload"] = {"kind": ref["kind"], "uid": ref["uid"]}
+        key["workload"] = {"kind": ref["kind"], "name": ref["name"]}
     else:
         key["podSelector"] = target["podSelector"]
     # Production indexes use keyed digests. This checks only canonical grouping.
@@ -376,9 +405,11 @@ def compile_composition_fixture(composition, catalog):
                           "sourceClusterID": "00000000-0000-4000-8000-000000000001" if reference["catalog"] == "namespace" else "00000000-0000-4000-8000-000000000010",
                           "sourceNamespaceUID": "fixture-namespace-" + profile["metadata"]["namespace"]})
         resolved.append(entry)
-    require(len(actions) <= 16 and len(bindings) <= 16, "Expanded composition exceeds recipe cardinality")
+    # No action/binding count cap; omitted aggregate bounds resolve to the sum
+    # of outputs and the longest action deadline (capture-profiles.md).
+    longest = max(actions, key=lambda a: duration_seconds(a["limits"]["timeout"]))["limits"]["timeout"]
     recipe = {"description": "Expanded capture profile composition.", "actions": actions,
-              "maxTotalBytes": composition["maxTotalBytes"], "maxDuration": composition["maxDuration"]}
+              "maxTotalBytes": composition.get("maxTotalBytes", sum(a["limits"]["maxBytes"] for a in actions)), "maxDuration": composition.get("maxDuration", longest)}
     if bindings:
         recipe["endpointBindings"] = bindings
     semantic_checks({"kind": "EvidenceRecipe", "spec": recipe})
@@ -411,7 +442,7 @@ def recording_save_checks(doc: dict) -> None:
             require(not row["save_eligible"] or duration_seconds(row["maximum_before"]) > 0, "Zero-history recorder advertised as savable")
     if data.get("kind") == "recordingSavePreview":
         rows = data["selected_recordings"]
-        require(len({r["policy_uid"] for r in rows}) == 1, "Save mixes policies")
+        require(all(r["owner_kind"] == "policy" for r in rows) and len({r["policy_name"] for r in rows}) == 1, "Save mixes policies")
         windows = data["windows"]
         require(len(windows) == len(rows) and {w["recording_handle"] for w in windows} == {r["recording_handle"] for r in rows}, "Save window/selection mismatch")
         bounds = {r["recording_handle"]: duration_seconds(r["maximum_before"]) for r in rows}
@@ -600,7 +631,6 @@ def semantic_checks(doc: dict) -> None:
             if a["kind"] == "packetCapture":
                 params = a["parameters"]
                 ring, profile, peers = params["ring"], params["profile"], params["peers"]
-                require(len(params.get("filter", "").encode("utf-8")) <= 4096, "Packet filter exceeds UTF-8 byte cap")
                 seconds = duration_seconds
                 require(ring["segmentBytes"] * ring["maxSegments"] <= ring["maxBytes"], "Ring segment allocation exceeds bytes")
                 require(seconds(params["before"]) <= seconds(ring["maxAge"]) <= 3600, "Invalid ring history bound")
@@ -648,14 +678,23 @@ def semantic_checks(doc: dict) -> None:
             if a["kind"] == "command":
                 require(a["parameters"]["argv"][0].startswith("/"), "Command executable must be absolute")
                 require(a["impact"] == "intrusive", "Custom command must be intrusive")
-            if a["kind"] in {"liveCore", "runtimeDiagnostic", "profile"}:
+            if a["kind"] in {"liveCore", "runtimeDiagnostic"}:
                 require(a["impact"] == "intrusive", "Diagnostic action needs impact classification")
+            if a["kind"] == "profile":
+                # ADR-335 D5: a pprof GET or the eBPF sampler changes nothing in
+                # the target and is observe; GC, traces, sampling changes and
+                # attached profilers stay intrusive.
+                p = a["parameters"]
+                passive = p["source"]["kind"] in {"httpEndpoint", "ebpfSampler"} and not p.get("forceGC") and p["type"] != "runtimeTrace" and "frequencyHz" not in p
+                require(passive or a["impact"] == "intrusive", "Target-changing profile must be intrusive")
     if kind in {"DebugPolicy", "DebugCapture"} and "presetRef" not in spec:
-        # ADR-228: a hub-held DebugPolicy names its workload cluster; its target
-        # namespace is in that cluster, not the hub control namespace.
-        require(spec["target"]["namespace"] == doc["metadata"]["namespace"] or (kind == "DebugPolicy" and "cluster" in spec["target"]), "Cross-namespace request target")
+        # ADR-335 D14: policies and captures live in the workload's namespace;
+        # an explicit target namespace may only repeat it.
+        require(spec["target"].get("namespace", doc["metadata"]["namespace"]) == doc["metadata"]["namespace"], "Cross-namespace request target")
+        require("cluster" not in spec["target"], "Hub-held target cluster")
         if kind == "DebugCapture":
-            require(spec["target"]["selection"] != "triggeringPod", "Manual capture has no trigger pod")
+            require(spec["target"].get("selection", "oldestReady") != "triggeringPod", "Manual capture has no trigger pod")
+        require(spec["target"].get("adoption", "followName") == "pinUID" or "uid" not in spec["target"].get("workloadRef", {}), "Workload UID pin without adoption: pinUID")
     if kind == "DebugPolicy" and "presetRef" not in spec:
         require(spec["target"].get("workloadRef", {}).get("kind") != "Pod", "Direct Pod is ad hoc only")
         for detector in spec["detectors"]:
@@ -671,7 +710,6 @@ def semantic_checks(doc: dict) -> None:
             require(duration_seconds(spec["evaluation"]["rearmFor"]) <= 300, "Rearm exceeds bound")
         ids = [d["id"] for d in spec["detectors"]]
         require(len(ids) == len(set(ids)), "Duplicate detector ID")
-        require(spec["target"]["namespace"] == doc["metadata"]["namespace"] or "cluster" in spec["target"], "Cross-namespace policy target")
 
         def expression(value, depth=0):
             require(depth <= 8, "Expression too deep")
@@ -700,7 +738,15 @@ def semantic_checks(doc: dict) -> None:
             require(spec["policyExecutor"] == {"issuer": "urn:asservat:installation:" + authority["installationID"], "subject": "policy:" + spec["target"]["policyUID"], "clientID": "policy-executor", "identityType": "workload"}, "Grant executor is not policy-bound")
             require(timestamp(authority["issuedAt"]) <= timestamp(spec["issuedAt"]) < timestamp(spec["notAfter"]) <= timestamp(authority["notAfter"]), "Grant outlives team authority")
             require(all(spec["limits"][key] <= authority["limits"][key] for key in ("maxExecutions", "maxBytes")), "Grant widens team limits")
-        age = (timestamp(spec["notAfter"]) - timestamp(spec["issuedAt"])).total_seconds()
+        start = spec["issuedAt"]
+        if "renewal" in spec:
+            # ADR-335 D6: renewal in place keeps the grant and sets a new expiry.
+            renewal = spec["renewal"]
+            require(spec["grantType"] == "policy", "Only policy grants renew in place")
+            require(timestamp(spec["issuedAt"]) <= timestamp(renewal["renewedAt"]) and timestamp(renewal["previousNotAfter"]) < timestamp(spec["notAfter"]), "Renewal does not extend the grant")
+            start = renewal["renewedAt"]
+        require("renewalDue" not in doc.get("status", {}) or spec["grantType"] == "policy", "Renewal notice on a non-policy grant")
+        age = (timestamp(spec["notAfter"]) - timestamp(start)).total_seconds()
         maximum = spec["approvalPolicyRef"]["maxAgeSeconds"] if spec["grantType"] == "policy" else (28800 if spec["grantType"] == "rawQuery" else 3600)
         require(0 < age <= maximum, "Grant exceeds approval lifetime")
         if "resultAccess" in spec:
@@ -740,29 +786,48 @@ def semantic_checks(doc: dict) -> None:
             require(approver["identityType"] == "human", "Raw share approver must be human")
             require(bool(doc["status"].get("approvedAt")), "Raw share approval timestamp missing")
             require((approver["issuer"], approver["subject"]) != (spec["createdBy"]["issuer"], spec["createdBy"]["subject"]), "Raw share self approval")
-    if kind == "AccessBinding":
+    if kind in {"AccessBinding", "ClusterAccessBinding"}:
         require(all(subject["id"] != "*" for subject in spec["subjects"]), "Wildcard permission subject")
     if kind == "PermissionSource":
         mapping = spec.get("metadataMapping", {})
         if mapping.get("mode") == "valueMap":
             require(all(group != "*" for groups in mapping["values"].values() for group in groups), "Wildcard mapped group")
     if kind == "EvidenceStoragePool":
+        # ADR-335 D2: operators give capacity; reserve, headroom and allocations
+        # default from it. The pool invariant holds for the derived figures and
+        # is enforced at enrollment (REQ-CAP-004), not authored as slot arithmetic.
+        def part(field, dimension, default_share):
+            value = spec.get(field, {"share": f"{default_share}%"})
+            if dimension in value:
+                return value[dimension]
+            if "share" in value:
+                return spec["capacity"].get(dimension, 0) * float(value["share"][:-1]) / 100
+            return 0
         for dimension in ("bytes", "objects"):
-            protected = sum(item["workloadSlots"] * item["protectedPerWorkload"][dimension] for item in spec["protectedAllocations"])
-            fixed = sum(spec[field][dimension] for field in ("safetyHeadroom", "systemReserve", "sharedBurst"))
+            if dimension not in spec["capacity"]:
+                continue
+            protected = sum(item["workloadSlots"] * item["protectedPerWorkload"][dimension] for item in spec.get("protectedAllocations", []))
+            fixed = part("safetyHeadroom", dimension, 5) + part("systemReserve", dimension, 5) + part("sharedBurst", dimension, 0)
             require(protected + fixed <= spec["capacity"][dimension], "Storage pool overcommits " + dimension)
-        names = [item["budgetPolicyRef"] for item in spec["protectedAllocations"]]
+        names = [item["budgetPolicyRef"] for item in spec.get("protectedAllocations", [])]
         require(len(names) == len(set(names)), "Duplicate budget profile allocation")
     if kind == "EvidenceBudgetPolicy":
-        workload = spec["workload"]
-        for dimension in ("bytes", "objects"):
-            require(0 < workload["contextReserve"][dimension] < workload["protected"][dimension] <= workload["hardLimit"][dimension], "Invalid workload protected/context/hard capacity")
-        require(workload["maxConcurrentExpensive"] <= spec["node"]["maxConcurrentExpensive"], "Workload concurrency exceeds node ceiling")
-        require(workload["maxSpoolBytes"] <= spec["node"]["maxSpoolBytes"], "Workload spool exceeds node capacity")
-        require(workload["dump"]["burst"] <= workload["dump"]["maxStartsPerRollingHour"], "Dump burst exceeds hourly start budget")
-        envelope = spec["namespaceEnvelope"]
-        require(envelope["maxWorkloadAccounts"] * workload["protected"]["bytes"] <= envelope["maxStoredBytes"], "Namespace cannot back protected bytes")
-        require(envelope["maxWorkloadAccounts"] * workload["protected"]["objects"] <= envelope["maxObjects"], "Namespace cannot back protected object slots")
+        workload = spec.get("workload", {})
+        share = lambda q, default: float(q.get("share", default)[:-1]) if "bytes" not in q else None
+        protected, hard = workload.get("protected", {}), workload.get("hardLimit", {})
+        if "bytes" in protected and "bytes" in hard:
+            require(protected["bytes"] <= hard["bytes"], "Invalid workload protected/hard capacity")
+            if "contextReserve" in workload and "bytes" in workload["contextReserve"]:
+                require(0 < workload["contextReserve"]["bytes"] < protected["bytes"], "Invalid workload context reserve")
+        elif "bytes" not in protected and "bytes" not in hard:
+            require(share(protected, "2%") <= share(hard, "10%"), "Invalid workload protected/hard share")
+        node = spec.get("node", {})
+        if "maxConcurrentExpensive" in workload and "maxConcurrentExpensive" in node:
+            require(workload["maxConcurrentExpensive"] <= node["maxConcurrentExpensive"], "Workload concurrency exceeds node ceiling")
+        if "maxSpoolBytes" in workload and "maxSpoolBytes" in node:
+            require(workload["maxSpoolBytes"] <= node["maxSpoolBytes"], "Workload spool exceeds node capacity")
+        dump = workload.get("dump", {})
+        require(dump.get("burst", 1) <= dump.get("maxStartsPerRollingHour", 2), "Dump burst exceeds hourly start budget")
     if kind == "EvidenceRetentionPolicy":
         budget = spec["deletionBudgetSeconds"]
         require(all(age > budget for age in spec["maxima"].values()), "Retention maximum leaves no deletion budget")
@@ -838,9 +903,27 @@ def main() -> None:
         for field in ("inputSchema", "outputSchema"):
             Draft202012Validator.check_schema(tool[field])
         require(tool["inputSchema"].get("additionalProperties") is False, "MCP input allows unknown arguments")
-    require(not tools["request_capture"]["enabledByDefault"], "Capture tool must default disabled")
+    # ADR-335: every tool is enabled by default; scopes and current rights decide.
+    require(all(tool["enabledByDefault"] for tool in tools.values()), "MCP tool disabled by default")
+    # specs/mcp.md lists exactly the MCP-transport tools of the catalog.
+    mcp_table = set(re.findall(r"^\| `([a-z_]+)` \|", (ROOT / "specs/mcp.md").read_text(), re.M))
+    require(mcp_table == {n for n, t in tools.items() if "mcp" in t.get("transports", ["browser", "mcp"])}, "MCP table and catalog differ")
+    for name, tool in tools.items():
+        # ADR-335 D4: inputs name clusters, namespaces, workloads and policies.
+        keys, stack = set(), [tool["inputSchema"]]
+        while stack:
+            node = stack.pop()
+            if isinstance(node, dict):
+                keys |= set(node.get("properties", {})) if isinstance(node.get("properties"), dict) else set()
+                stack += list(node.values())
+            elif isinstance(node, list):
+                stack += node
+        require(not any(k == "cluster_id" or k.endswith("_uid") for k in keys), "MCP input requires a UID: " + name)
+        # Reasons are optional except where a reviewer needs one.
+        require(name == "request_raw_access" or '"reason"' not in json.dumps(tool["inputSchema"].get("required", [])), "Mandatory reason: " + name)
+    require("reason" in tools["request_raw_access"]["inputSchema"]["required"], "Raw access request lacks its reviewer reason")
     browser_contract = read(ROOT / "docs/interfaces/browser-openapi.yaml")
-    for name in ("get_file_excerpt", "get_query_result"):
+    for name in ("get_extract", "get_query_result"):
         require(browser_contract["components"]["schemas"]["McpOutput_" + name] == tools[name]["outputSchema"], "Query browser/MCP output contracts differ")
         require(tools[name]["annotations"]["readOnlyHint"], "Approved query semantics changed")
     query_success = tools["get_query_result"]["outputSchema"]["allOf"][1]["oneOf"][0]["properties"]["data"]
@@ -851,9 +934,9 @@ def main() -> None:
     require(header["schema"]["minLength"] == key["minLength"] and header["schema"]["maxLength"] == key["maxLength"], "Request key header/body constraints differ")
     # ADR-330 D9: previews are stateless; no handle, expiry or resolution tool.
     require("resolve_capture_request" not in tools and "/api/v1/operations/resolve_capture_request" not in browser_contract["paths"], "Stateless previews need no resolution tool")
-    for name in ("preview_capture", "preview_recording_save"):
+    for name in ("preview_capture",):
         require("preview_id" not in json.dumps(tools[name]["outputSchema"]) and "preview_id" not in json.dumps(tools["request_capture"]["inputSchema"]), "Preview handle reintroduced")
-    for name in ("get_capture", "get_grant", "get_query_result", "get_artifact_download"):
+    for name in ("get_capture", "get_grant", "get_query_result", "download_artifact"):
         wait = tools[name]["inputSchema"]["properties"]["after_revision"]
         require(wait["type"] == "integer" and wait["minimum"] == 1, "Status tool lacks the server-side revision wait")
 
@@ -895,7 +978,7 @@ def main() -> None:
         require(examples[example] == expected, "Lifecycle projection differs from mixed recipe")
     require([a["executionMode"] for a in examples["lifecycle-plan-policy.json"]["actions"]] == ["ongoing", "ongoing", "onTrigger"], "Mixed lifecycle regression")
     require(examples["lifecycle-plan-post-trigger.json"] == action_lifecycle_plan_fixture(examples["recipe-post-trigger-only.yaml"]["spec"], "DebugPolicy"), "Post-trigger recorder plan drift")
-    for row in examples["mcp-profiles-result.json"]["data"]["profiles"]:
+    for row in examples["mcp-profiles-result.json"]["data"]["diagnostics"]:
         ref = row["profile_ref"]
         profile = profile_catalog[(ref["catalog"], ref["name"], ref["version"])]
         require(row["execution_modes"] == sorted({action_execution_mode(a) for a in profile["spec"]["definition"]["recipe"]["actions"]}), "Catalog hides execution modes")
@@ -964,10 +1047,25 @@ def main() -> None:
         if doc.get("kind") in {"DebugPolicy", "DebugCapture"} and "recipeRef" in doc["spec"]:
             ref = doc["spec"]["recipeRef"]
             require(ref["name"] in recipes, "Example references unknown recipe")
-            require(ref["digest"] == canonical_digest(recipes[ref["name"]]["spec"]), "Recipe digest mismatch")
+            # ADR-335 D4: recipes are named; a digest, when given, is provenance.
+            require(ref.get("digest", canonical_digest(recipes[ref["name"]]["spec"])) == canonical_digest(recipes[ref["name"]]["spec"]), "Recipe digest pin does not match the named recipe")
             actions = {a["id"] for a in recipes[ref["name"]]["spec"]["actions"]}
             selections = doc["spec"].get("sharing", {}).get("outputSelection", {}).get("outputs", [])
             require(all(s["actionID"] in actions for s in selections), "Sharing names unknown action")
+    # ADR-335 D4: authored requests need no UID, digest, grant, idempotency key
+    # or deadline; targets follow their name unless they opt into pinUID.
+    require(schemas[BASE + "target.schema.json"]["properties"]["adoption"]["default"] == "followName", "Targets must follow names by default")
+    for doc in examples.values():
+        if doc.get("kind") in {"DebugPolicy", "DebugCapture"}:
+            bare = copy.deepcopy(doc)
+            bare["spec"].get("recipeRef", {}).pop("digest", None)
+            for key in ("idempotencyKey", "deadline", "reason"):
+                bare["spec"].pop(key, None)
+            target = bare["spec"].get("target", {})
+            if target.get("adoption") == "pinUID":
+                target.pop("adoption"); target.get("workloadRef", {}).pop("uid", None)
+            validate(bare, schemas[BASE + ("policy" if doc["kind"] == "DebugPolicy" else "capture") + ".schema.json"])
+            require("grantRef" not in doc["spec"], "Authored request names a grant")
     for doc in policies.values():
         if "recipeRef" in doc["spec"]:
             recipe = recipes[doc["spec"]["recipeRef"]["name"]]
@@ -986,7 +1084,9 @@ def main() -> None:
     require({k: core_target[k] for k in ("podUID", "nodeUID", "nodeBootID")} in core_scope["podBindings"], "Core example differs from approved pod bindings")
     for name, source in [("resolved-recording-policy-scope.json", "policy-trigger-lifecycles.yaml"), ("resolved-policy-scope.json", "policy-statefulset.yaml"), ("resolved-capture-scope.json", "capture-manual.yaml"), ("resolved-sharing-capture-scope.json", "capture-with-raw-sharing.yaml")]:
         scope = examples[name]
-        require(scope["collection"] == collection_spec(examples[source]), "Resolved fixture differs from authored collection fields")
+        require(scope["collection"] == collection_spec(examples[source], recipes, scope["collection"]["spec"].get("deadline")), "Resolved fixture differs from authored collection fields")
+        target = scope["collection"]["spec"]["target"]
+        require((target["adoption"] == "pinUID") == ("uid" in target.get("workloadRef", {})), "Resolved scope binds a workload UID without adoption: pinUID")
         require(any(d["role"] == "recipe" and d["digest"] == scope["collection"]["spec"]["recipeRef"]["digest"] for d in scope["dependencies"]), "Resolved scope lacks recipe dependency")
     for policy in policies.values():
         if policy["spec"].get("recordingSaves", {}).get("enabled") and "recipeRef" in policy["spec"]:
@@ -998,7 +1098,9 @@ def main() -> None:
     require(save_scope["policy"]["executionDigest"] == canonical_digest(source_scope), "Save uses wrong policy scope")
     require(save_scope["executor"] == source_scope["executor"], "Save transfers policy execution identity")
     require(save_scope["policy"]["policyUID"] == source_scope["source"]["resourceUID"] and save_scope["policy"]["clusterID"] == source_scope["source"]["clusterID"], "Save crosses policy identity")
-    require(save_scope["workloadUID"] == source_scope["collection"]["spec"]["target"]["workloadRef"]["uid"], "Save crosses workload identity")
+    # ADR-335 D4: an authored workload names its kind/name; a pinned uid is optional provenance.
+    authored_uid = source_scope["collection"]["spec"]["target"]["workloadRef"].get("uid")
+    require(authored_uid in (None, save_scope["workloadUID"]), "Save crosses workload identity")
     require(save_scope["incidentPodLimit"] == source_scope["collection"]["spec"]["target"]["maxPods"], "Save changes incident cap")
     sr = recipes[source_scope["collection"]["spec"]["recipeRef"]["name"]]["spec"]
     source_actions = {a["id"]: a for a in sr["actions"]}
@@ -1030,7 +1132,9 @@ def main() -> None:
     plumbing["spec"]["budgets"]["burst"] += 1
     require(collection_spec(plumbing) != original, "Execution change left scope unchanged")
     assignment = examples["manifest.json"]["accessProvenance"]["assignments"][0]
-    binding = examples["access-binding.yaml"]["spec"]
+    # ADR-335 D4: an authored subject's issuer defaults to the installation's;
+    # provenance digests the resolved spec.
+    binding = resolved_binding(examples["access-binding.yaml"]["spec"], examples["identity-settings.json"]["issuer"])
     require(assignment["basisDigest"] == canonical_digest(binding), "Permission provenance digest mismatch")
     require(assignment["subject"] in binding["subjects"] and assignment["role"] in binding["roles"], "Permission provenance exceeds binding")
     retention_policy = examples["retention-policy.yaml"]["spec"]
@@ -1040,18 +1144,16 @@ def main() -> None:
     require(retention["resolvedMaxAgeSeconds"] <= core_limit, "Manifest exceeds example core retention policy")
     pool = examples["storage-pool.yaml"]
     budget = examples["budget-policy.yaml"]
-    allocation = pool["spec"]["protectedAllocations"][0]
     require(budget["spec"]["poolRef"] == pool["metadata"]["name"], "Unknown example storage pool")
-    require(allocation["budgetPolicyRef"] == budget["metadata"]["name"], "Unknown example budget profile")
-    require(allocation["protectedPerWorkload"] == budget["spec"]["workload"]["protected"], "Pool and profile allocation disagree")
-    require(budget["spec"]["workload"]["upload"]["bytesPerSecond"] <= pool["spec"]["upload"]["bytesPerSecond"], "Workload upload exceeds pool ceiling")
+    # ADR-335 D2: the shipped capacity examples need no byte arithmetic.
+    require("protectedAllocations" not in pool["spec"] and all("share" in budget["spec"]["workload"][k] for k in ("protected", "hardLimit")), "Capacity example reintroduces slot arithmetic")
     manifests = {doc["artifactID"]: doc for doc in examples.values() if doc.get("schemaVersion") == "artifact/v1"}
     intent = examples["sharing-intent.yaml"]
     capture = examples["capture-with-raw-sharing.yaml"]
     require(intent["spec"]["requestDigest"] == canonical_digest(capture["spec"]["sharing"]), "Sharing request digest mismatch")
     require(intent["spec"]["source"]["planDigest"] == canonical_digest(examples["resolved-sharing-capture-scope.json"]), "Sharing plan digest mismatch")
-    require(intent["spec"]["source"]["recipeDigest"] == capture["spec"]["recipeRef"]["digest"], "Sharing recipe digest mismatch")
-    owner_binding = examples["access-binding-owners.yaml"]["spec"]
+    require(intent["spec"]["source"]["recipeDigest"] == canonical_digest(recipes[capture["spec"]["recipeRef"]["name"]]["spec"]), "Sharing recipe digest mismatch")
+    owner_binding = resolved_binding(examples["access-binding-owners.yaml"]["spec"], examples["identity-settings.json"]["issuer"])
     require("evidence-owner" in owner_binding["roles"], "Managers lack owner role in fixture")
     require(all(team["subject"] in owner_binding["subjects"] for team in intent["spec"]["management"]["teams"]), "Example manager exceeds owner binding")
     require([team["subject"] for team in intent["spec"]["management"]["teams"]] == capture["spec"]["sharing"]["management"]["teams"], "Resolved manager mismatch")
@@ -1112,7 +1214,7 @@ def main() -> None:
         except (ValueError, __import__("jsonschema").ValidationError):
             negative_checks += 1
             return
-        raise ValueError("Invalid example accepted: " + schema_name)
+        raise ValueError("Invalid example accepted: " + schema_name + " " + __import__("inspect").getsource(mutate).strip()[:200])
 
     # Synthetic installation provenance, never an installable credential example.
     # Cross-object order, identity and deadline checks have separate runtime tests.
@@ -1277,7 +1379,19 @@ def main() -> None:
     sampler = copy.deepcopy(examples["recipe-pprof.yaml"])
     sampler["spec"]["actions"][0]["parameters"].update({"runtime": "any", "source": {"kind": "ebpfSampler"}})
     validate(sampler, schemas[BASE + "recipe.schema.json"])
-    rejects(examples["access-binding.yaml"], "access-binding", lambda d: d["spec"]["subjects"][0].pop("issuer"))
+    rejects(examples["access-binding.yaml"], "access-binding", lambda d: d["spec"]["subjects"][0].pop("id"))
+    rejects(examples["access-binding.yaml"], "access-binding", lambda d: d["spec"]["roles"].append("privacy-operator"))
+    rejects(examples["access-binding.yaml"], "access-binding", lambda d: d["spec"].update({"workloads": [{"kind": "Deployment"}]}))
+    rejects(examples["cluster-access-binding.yaml"], "cluster-access-binding", lambda d: d["spec"].update({"clusters": ["Prod_EU"]}))
+    rejects(examples["cluster-access-binding.yaml"], "cluster-access-binding", lambda d: d["metadata"].update({"namespace": "payments"}))
+    rejects(examples["cluster-access-binding.yaml"], "cluster-access-binding", lambda d: d["spec"]["subjects"][0].update({"id": "*"}), True)
+    rejects(examples["permission-source-namespace.yaml"], "permission-source", lambda d: d["spec"]["metadataMapping"].update({"values": {"payments": ["/payments"]}}))
+    rejects(examples["permission-source-workload.yaml"], "permission-source", lambda d: d["spec"]["metadataMapping"].update({"prefix": "/"}))
+    rejects(examples["permission-source-namespace.yaml"], "permission-source", lambda d: d["spec"].update({"clusterID": "00000000-0000-4000-8000-000000000001"}))
+    rejects(examples["identity-settings.json"], "identity-settings", lambda d: d.update({"administrators": {}}))
+    rejects(examples["identity-settings.json"], "identity-settings", lambda d: d.update({"eligibleGroups": ["platform-developers"]}))
+    rejects(examples["browser-settings.json"], "browser-settings", lambda d: d.update({"maxLifetimeSeconds": 0}))
+    rejects(examples["browser-settings.json"], "browser-settings", lambda d: d.update({"maxSessions": 2000}))
     rejects(examples["access-binding.yaml"], "access-binding", lambda d: d["spec"]["subjects"][0].update({"id": "*"}), True)
     for field, value in [("effect", "Deny"), ("roles", ["evidence-reader"]), ("subjects", [{"kind": "User", "issuer": "https://id.example.invalid", "id": "person"}])]:
         rejects(examples["access-binding-automation.yaml"], "access-binding", lambda d, f=field, v=value: d["spec"].update({f: v}))
@@ -1290,7 +1404,7 @@ def main() -> None:
     rejects(examples["permission-source-exec.yaml"], "permission-source", lambda d: d["spec"].update({"role": "action-approver"}))
     rejects(examples["permission-source-exec.yaml"], "permission-source", lambda d: d["spec"].pop("identityMappingRef"))
     rejects(examples["permission-source-exec.yaml"], "permission-source", lambda d: d["spec"].pop("admissionParity"))
-    rejects(examples["permission-source-workload.yaml"], "permission-source", lambda d: d["spec"]["protection"].pop("guardRef"))
+    rejects(examples["permission-source-workload.yaml"], "permission-source", lambda d: d["spec"]["protection"].update({"mode": "administratorManaged"}))
     rejects(examples["permission-source-workload.yaml"], "permission-source", lambda d: d["spec"]["metadataMapping"].pop("values"))
     rejects(examples["permission-source-namespace.yaml"], "permission-source", lambda d: d["spec"].update({"maxDecisionAgeSeconds": 600}))
     rejects(examples["manifest.json"], "manifest", lambda d: d.pop("accessProvenance"))
@@ -1303,16 +1417,26 @@ def main() -> None:
     rejects(examples["manifest.json"], "manifest", lambda d: d.update({"expiresAt": "2026-10-12T12:00:02Z"}), True)
     rejects(examples["manifest.json"], "manifest", lambda d: d["retention"].update({"deleteBy": "2026-10-10T18:00:00Z"}), True)
     rejects(examples["manifest.json"], "manifest", lambda d: d["retention"].pop("parentExpiresAt"), True)
-    rejects(examples["storage-pool.yaml"], "storage-pool", lambda d: d["spec"]["protectedAllocations"][0].update({"workloadSlots": 5}), True)
-    rejects(examples["storage-pool.yaml"], "storage-pool", lambda d: d["spec"]["sharedBurst"].update({"objects": 40001}), True)
-    rejects(examples["budget-policy.yaml"], "budget-policy", lambda d: d["spec"]["workload"]["hardLimit"].update({"bytes": 1}), True)
+    rejects(examples["storage-pool.yaml"], "storage-pool", lambda d: d["spec"].update({"protectedAllocations": [{"budgetPolicyRef": "payments-default", "workloadSlots": 9, "protectedPerWorkload": {"bytes": 17179869184, "objects": 10000}}]}), True)
+    rejects(examples["storage-pool.yaml"], "storage-pool", lambda d: d["spec"].update({"sharedBurst": {"share": "95%"}}), True)
+    rejects(examples["budget-policy.yaml"], "budget-policy", lambda d: d["spec"]["workload"]["hardLimit"].update({"share": "1%"}), True)
+    rejects(examples["budget-policy.yaml"], "budget-policy", lambda d: d["spec"]["workload"]["hardLimit"].update({"bytes": 1}))
     rejects(examples["budget-policy.yaml"], "budget-policy", lambda d: d["spec"]["workload"].update({"onFull": "EvictOtherWorkload"}))
     rejects(examples["capture-with-sharing.yaml"], "capture", lambda d: d["spec"]["sharing"].update({"futureCaptures": {"enabled": True, "maxCaptures": 10}}))
     rejects(examples["capture-with-sharing.yaml"], "capture", lambda d: d["spec"]["sharing"].update({"owner": intent["spec"]["createdBy"]}))
     rejects(examples["capture-with-sharing.yaml"], "capture", lambda d: d["spec"]["sharing"]["recipients"][0].update({"id": "*"}), True)
     rejects(examples["policy-with-sharing.yaml"], "policy", lambda d: d["spec"]["sharing"].pop("futureCaptures"))
-    rejects(examples["policy-with-sharing.yaml"], "policy", lambda d: d["spec"]["sharing"].pop("notAfter"))
-    rejects(examples["policy-with-sharing.yaml"], "policy", lambda d: d["spec"]["sharing"]["futureCaptures"].update({"maxCaptures": 101}))
+    # ADR-335: removed authoring fields stay rejected.
+    rejects(examples["policy-restart.yaml"], "policy", lambda d: d["spec"].update({"grantRef": "00000000-0000-4000-8000-000000000081"}))
+    rejects(examples["policy-restart.yaml"], "policy", lambda d: d["spec"]["target"].update({"cluster": "00000000-0000-4000-8000-000000000001"}))
+    rejects(examples["policy-restart.yaml"], "policy", lambda d: d["spec"].update({"observation": {"mode": "allAuthorized"}}))
+    rejects(examples["policy-restart.yaml"], "policy", lambda d: d["spec"]["target"].update({"namespace": "other"}), True)
+    rejects(examples["capture-manual.yaml"], "capture", lambda d: d["spec"].update({"grantRef": "00000000-0000-4000-8000-000000000081"}))
+    rejects(examples["capture-manual.yaml"], "capture", lambda d: d["spec"]["target"]["workloadRef"].update({"uid": "workload-ledger-uid"}), True)
+    rejects(examples["grant-ad-hoc.yaml"], "grant", lambda d: d["spec"].update({"renewal": {"count": 1, "renewedAt": d["spec"]["issuedAt"], "renewedBy": d["spec"]["requester"], "previousNotAfter": d["spec"]["issuedAt"]}}), True)
+    # ADR-335 D7: recurring sharing lasts as long as the policy grant; notAfter and maxCaptures are optional.
+    rejects(examples["policy-with-sharing.yaml"], "policy", lambda d: d["spec"]["sharing"].update({"notAfter": "next week"}))
+    rejects(examples["policy-with-sharing.yaml"], "policy", lambda d: d["spec"]["sharing"]["futureCaptures"].update({"maxCaptures": 0}))
     rejects(capture, "capture", lambda d: d["spec"]["sharing"]["outputSelection"]["outputs"][0]["operations"].append("read_memory"))
     rejects(capture, "capture", lambda d: d["spec"]["sharing"]["outputSelection"]["outputs"][0].pop("projectionRef"))
     rejects(capture, "capture", lambda d: d["spec"]["sharing"]["outputSelection"]["outputs"][1].pop("operations"))
@@ -1339,7 +1463,6 @@ def main() -> None:
     def packet_mutation(change):
         return lambda d: change(d["spec"]["actions"][0]["parameters"])
     rejects(http_recipe, "recipe", packet_mutation(lambda p: p.update({"filter": " "})))
-    rejects(http_recipe, "recipe", packet_mutation(lambda p: p.update({"filter": "x" * 4097})))
     rejects(http_recipe, "recipe", packet_mutation(lambda p: p["ring"].update({"maxSegments": 5})), True)
     rejects(http_recipe, "recipe", packet_mutation(lambda p: p["ring"].update({"maxAge": "10s"})), True)
     # encryptedDisk needs no storage profile in this release (ADR-278); an
@@ -1434,7 +1557,7 @@ def main() -> None:
     revoke = {"sharing_intent_id": intent["id"], "expected_revision": 1, "idempotency_key": "revoke-001"}
     validate(revoke, tools["revoke_share"]["inputSchema"])
     rejects_tool_input("revoke_share", {**revoke, "share_id": "00000000-0000-4000-8000-000000000033"})
-    rejects_tool_input("get_http_headers", {"case_id": intent["id"], "artifact_id": intent["id"], "include_body": True})
+    rejects_tool_input("get_extract", {"view": "httpHeaders", "case_id": intent["id"], "artifact_id": intent["id"], "include_body": True})
     rejects_tool_input("request_capture", {**examples["mcp-preview-capture-input.json"], "reason": "silently changed"})
     rejects_tool_input("preview_capture", {**examples["mcp-preview-input.json"], "target_handle": "duplicate-target"})
     rejects_tool_input("preview_capture", {**examples["mcp-preview-input.json"], "container_name": "app"})
@@ -1445,7 +1568,7 @@ def main() -> None:
         invalid = copy.deepcopy(examples["mcp-http-headers-result.json"])
         mutate(invalid)
         try:
-            validate(invalid, tools["get_http_headers"]["outputSchema"])
+            validate(invalid, tools["get_extract"]["outputSchema"])
         except __import__("jsonschema").ValidationError:
             negative_checks += 1
         else:
@@ -1526,10 +1649,10 @@ def main() -> None:
     grouping = history_selector_fixture_key("cluster-A", "namespace-A", target)
     changed = copy.deepcopy(target); changed["maxPods"] = 3
     require(history_selector_fixture_key("cluster-A", "namespace-A", changed) == grouping, "Pod cap splits workload history")
-    changed["workloadRef"]["name"] = "display-name-change"
-    require(history_selector_fixture_key("cluster-A", "namespace-A", changed) == grouping, "Display name defines history identity")
-    changed["workloadRef"]["uid"] = "new-workload"
-    require(history_selector_fixture_key("cluster-A", "namespace-A", changed) != grouping, "Workload recreation inherits history")
+    changed["workloadRef"]["uid"] = "recreated-workload"
+    require(history_selector_fixture_key("cluster-A", "namespace-A", changed) == grouping, "Workload recreated under its name splits history")
+    changed["workloadRef"]["name"] = "another-workload"
+    require(history_selector_fixture_key("cluster-A", "namespace-A", changed) != grouping, "Another workload inherits history")
     require(history_selector_fixture_key("cluster-A", "namespace-B", target) != grouping, "Namespace recreation inherits history")
     require(history_selector_fixture_key("cluster-B", "namespace-A", target) != grouping, "Another cluster inherits history")
     labels = {"podSelector": {"matchLabels": {"app": "ledger", "role": "worker"}}}
@@ -1585,7 +1708,7 @@ def main() -> None:
     cpu = {**repeated_context, "components": [{"id": "cpu", "profileRef": {"catalog": "builtin", "name": "go-cpu", "version": "v1"}}]}
     cpu_recipe, _ = compile_checked(cpu)
     require(cpu_recipe["actions"][0]["parameters"]["source"]["profileRef"] == cpu_recipe["endpointBindings"][0]["name"], "Expanded endpoint reference is dangling")
-    # Check the expanded action ceiling independently of the eight-component ceiling.
+    # Large compositions compile; capacity admission, not a count, bounds them.
     many_sources = copy.deepcopy(profile_catalog)
     first, second = [], []
     for group, destination in ((0, first), (1, second)):
@@ -1601,7 +1724,8 @@ def main() -> None:
         many_sources[("builtin", name, "v1")] = definition
     def too_many(d):
         d["components"] = [{"id": name, "profileRef": {"catalog": "builtin", "name": name, "version": "v1"}} for name in ("nine-first", "nine-second")]
-    rejects_composition(too_many, many_sources)
+    wide = copy.deepcopy(composition); too_many(wide); wide.pop("maxTotalBytes", None); wide.pop("maxDuration", None)
+    require(len(compile_checked(wide, many_sources)[0]["actions"]) == 18, "Composition caps expanded actions")
     rejects(examples["capture-profile-syscall-activity.yaml"], "capture-profile", lambda d: d["spec"]["definition"]["recipe"].update({"profileComposition": composition}))
     rejects(examples["capture-profile-syscall-activity.yaml"], "capture-profile", lambda d: d["spec"]["definition"]["editableFields"][0].update({"actionID": "missing"}), True)
     rejects(examples["capture-profile-syscall-activity.yaml"], "capture-profile", lambda d: d["spec"]["definition"]["editableFields"].append(copy.deepcopy(d["spec"]["definition"]["editableFields"][0])), True)
@@ -1609,7 +1733,7 @@ def main() -> None:
     rejects(examples["policy-composed.yaml"], "policy", lambda d: d["spec"].update({"presetRef": {"name": "workload-failure", "version": "v1"}}))
     rejects_tool_input("preview_capture", {**examples["mcp-composition-preview-input.json"], "diagnostic_handle": "another-plan"})
     rejects_tool_input("preview_capture", {**repeat_input, "profile_composition": composition})
-    rejects_tool_input("list_capture_profiles", {"target_handle": "t", "limit": 101})
+    rejects_tool_input("list_diagnostics", {"target_handle": "t", "limit": 101})
     rejects_tool_input("get_capture_profile", {"target_handle": "t", "profile_ref": {"catalog": "builtin", "name": "go-cpu", "version": "latest"}})
     def syscall_change(change):
         return lambda d: change(d["spec"]["actions"][0]["parameters"])
@@ -1626,14 +1750,14 @@ def main() -> None:
     rejects(argument_recipe, "recipe", syscall_change(lambda p: p["syscalls"].update({"names": ["write", "write"]})))
     # Missing grant permits the pre-admission approval remedy; keyed invocation
     # remains mandatory even for discovery. Runtime authorization still denies reads.
-    rejects_tool_input("syscall_query", {k: v for k, v in examples["mcp-syscall-query-input.json"].items() if k != "idempotency_key"})
-    rejects_tool_input("get_logs", {k: v for k, v in examples["mcp-logs-input.json"].items() if k != "idempotency_key"})
-    rejects_tool_input("get_syscall_events", {"case_id": intent["id"], "artifact_id": intent["id"], "include_arguments": True})
-    rejects_guidance("get_syscall_events", "mcp-syscall-events-result.json", lambda d: d["data"]["events"][0].update({"arguments": []}))
-    rejects_guidance("get_syscall_summary", "mcp-syscall-summary-result.json", lambda d: d["data"]["rows"][0].update({"errors": 11}), True)
-    rejects_guidance("syscall_query", "mcp-syscall-query-result.json", lambda d: d.update({"data_class": "extract"}))
-    rejects_guidance("get_logs", "mcp-logs-result.json", lambda d: d.update({"data_class": "extract"}))
-    rejects_guidance("get_logs", "mcp-logs-result.json", lambda d: d["data"]["entries"][0].update({"bytes_base64": "Cg=="}))
+    rejects_tool_input("query_artifact", {k: v for k, v in examples["mcp-syscall-query-input.json"].items() if k != "idempotency_key"})
+    rejects_tool_input("get_extract", {k: v for k, v in examples["mcp-logs-input.json"].items() if k != "idempotency_key"})
+    rejects_tool_input("get_extract", {"view": "syscallEvents", "case_id": intent["id"], "artifact_id": intent["id"], "include_arguments": True})
+    rejects_guidance("get_extract", "mcp-syscall-events-result.json", lambda d: d["data"]["events"][0].update({"arguments": []}))
+    rejects_guidance("get_extract", "mcp-syscall-summary-result.json", lambda d: d["data"]["rows"][0].update({"errors": 11}), True)
+    rejects_guidance("query_artifact", "mcp-syscall-query-result.json", lambda d: d.update({"data_class": "extract"}))
+    rejects_guidance("get_extract", "mcp-logs-result.json", lambda d: d.update({"data_class": "extract"}))
+    rejects_guidance("get_extract", "mcp-logs-result.json", lambda d: d["data"]["entries"][0].update({"bytes_base64": "Cg=="}))
     rejects(examples["share-extract.yaml"], "share", lambda d: d["spec"]["operations"].append("syscall_query"), True)
     rejects(examples["share-extract.yaml"], "share", lambda d: d["spec"]["operations"].append("get_logs"), True)
     rejects_guidance("preview_capture", "mcp-composition-preview-result.json", lambda d: d.update({"data_class": "metadata"}))
@@ -1697,7 +1821,7 @@ def main() -> None:
     rejects(examples["lifecycle-snapshot.json"], "action-lifecycle", lambda d: d.update({"executionMode": "onTrigger"}))
     rejects(examples["lifecycle-snapshot.json"], "action-lifecycle", lambda d: d.update({"gapReasons": ["sourceLost"]}), True)
     rejects_guidance("preview_capture", "mcp-composition-preview-result.json", lambda d: d["data"].pop("lifecycle_plan"))
-    rejects_guidance("list_capture_profiles", "mcp-profiles-result.json", lambda d: d["data"]["profiles"][0].pop("execution_modes"))
+    rejects_guidance("list_diagnostics", "mcp-profiles-result.json", lambda d: d["data"]["diagnostics"][0].pop("execution_modes"))
     # A typed profile-mode change cannot leave a positive before window behind.
     def mode_only_edit(d):
         d["components"][0]["overrides"].append({"actionID": "http", "field": "actionExecutionMode", "value": "onTrigger"})
@@ -1734,7 +1858,7 @@ def main() -> None:
     positive_profile = examples["mcp-profile-result.json"]["data"]
     require(positive_profile["top"][0]["fraction"] == positive_profile["top"][0]["flat"] / positive_profile["total"], "Positive profile fraction semantics changed")
     for invalid_fraction in [-0.1, 1.1, "unavailable", True]:
-        rejects_guidance("get_profile_summary", "mcp-profile-delta-result.json", lambda d, value=invalid_fraction: d["data"]["top"][0].update({"fraction": value}))
+        rejects_guidance("get_extract", "mcp-profile-delta-result.json", lambda d, value=invalid_fraction: d["data"]["top"][0].update({"fraction": value}))
     # Final review: bind concrete ad hoc pods, complete windows and acquisition identity.
     scope = examples["resolved-capture-scope.json"]
     context_scope = examples["resolved-context-scope.json"]
@@ -1780,11 +1904,11 @@ def main() -> None:
     validate(zero_history_inventory, tools["list_recordings"]["outputSchema"]); semantic_checks(zero_history_inventory)
     rejects_guidance("list_recordings", "mcp-recordings-result.json", lambda d: d["data"]["recordings"][0].update({"maximum_before": "0s"}), True)
     for field in ("after", "argv", "grant_id", "executor", "filter", "target"):
-        rejects_tool_input("preview_recording_save", {**examples["mcp-recording-save-preview-input.json"], field: "forbidden"})
-    rejects_tool_input("preview_recording_save", {"recording_handles": []})
-    rejects_tool_input("preview_recording_save", {"recording_handles": ["same", "same"]})
-    rejects_tool_input("preview_recording_save", {"recording_handles": [str(i) for i in range(17)]})
-    rejects_tool_input("preview_recording_save", {"recording_handles": ["opaque"], "before": "0s"})
+        rejects_tool_input("preview_capture", {**examples["mcp-recording-save-preview-input.json"], field: "forbidden"})
+    rejects_tool_input("preview_capture", {"recording_handles": []})
+    rejects_tool_input("preview_capture", {"recording_handles": ["same", "same"]})
+    rejects_tool_input("preview_capture", {"recording_handles": [str(i) for i in range(17)]})
+    rejects_tool_input("preview_capture", {"recording_handles": ["opaque"], "before": "0s"})
     rejects_tool_input("list_recordings", {"target_handle": "opaque", "include_payload": True})
     rejects_tool_input("request_capture", {**examples["mcp-recording-save-input.json"], "recipe_digest": "f"*64})
     rejects_tool_input("request_capture", {**examples["mcp-recording-save-input.json"], "after": "10s"})
@@ -1798,14 +1922,14 @@ def main() -> None:
     rejects(rs, "recording-save", lambda d: d["sources"][1].update({"podUID": "another-pod"}), True)
     rejects(rs, "recording-save", lambda d: d["dependencies"][1].update({"role": "collectionCeiling"}), True)
     rejects(rs, "recording-save", lambda d: d.update({"finalizeTimeout": "1d"}), True)
-    rejects_guidance("preview_recording_save", "mcp-recording-save-preview-result.json", lambda d: d["data"]["windows"][0].update({"before": "1h"}), True)
-    rejects_guidance("preview_recording_save", "mcp-recording-save-preview-result.json", lambda d: d["data"]["selected_recordings"][1].update({"policy_uid": "another-policy"}), True)
-    rejects_guidance("preview_recording_save", "mcp-recording-save-preview-result.json", lambda d: d["data"]["windows"].pop(), True)
-    rejects_guidance("preview_recording_save", "mcp-recording-save-preview-result.json", lambda d: d["data"].update({"save_scope_digest": "0"*64}), True)
-    rejects_guidance("preview_recording_save", "mcp-recording-save-preview-result.json", lambda d: d["data"]["selected_recordings"][0].update({"handle_expires_at": "2026-10-09T12:10:00Z"}), True)
-    rejects_guidance("preview_recording_save", "mcp-recording-save-preview-result.json", lambda d: d["data"]["selected_recordings"][0].update({"save_eligible": False}), True)
-    rejects_guidance("preview_recording_save", "mcp-recording-save-preview-result.json", lambda d: d["data"]["capture_assessment"]["actions"][0].update({"executionMode": "onTrigger"}), True)
-    rejects_guidance("preview_recording_save", "mcp-recording-save-preview-result.json", lambda d: d["data"].pop("capture_assessment"))
+    rejects_guidance("preview_capture", "mcp-recording-save-preview-result.json", lambda d: d["data"]["windows"][0].update({"before": "1h"}), True)
+    rejects_guidance("preview_capture", "mcp-recording-save-preview-result.json", lambda d: d["data"]["selected_recordings"][1].update({"policy_name": "another-policy"}), True)
+    rejects_guidance("preview_capture", "mcp-recording-save-preview-result.json", lambda d: d["data"]["windows"].pop(), True)
+    rejects_guidance("preview_capture", "mcp-recording-save-preview-result.json", lambda d: d["data"].update({"save_scope_digest": "0"*64}), True)
+    rejects_guidance("preview_capture", "mcp-recording-save-preview-result.json", lambda d: d["data"]["selected_recordings"][0].update({"handle_expires_at": "2026-10-09T12:10:00Z"}), True)
+    rejects_guidance("preview_capture", "mcp-recording-save-preview-result.json", lambda d: d["data"]["selected_recordings"][0].update({"save_eligible": False}), True)
+    rejects_guidance("preview_capture", "mcp-recording-save-preview-result.json", lambda d: d["data"]["capture_assessment"]["actions"][0].update({"executionMode": "onTrigger"}), True)
+    rejects_guidance("preview_capture", "mcp-recording-save-preview-result.json", lambda d: d["data"].pop("capture_assessment"))
     rejects(examples["lifecycle-recording-save.json"], "action-lifecycle", lambda d: d.pop("recordingSaveOrigin"))
     rejects(examples["lifecycle-recording-save.json"], "action-lifecycle", lambda d: d.update({"triggerKind": "manual"}))
     rejects(examples["lifecycle-recording-save.json"], "action-lifecycle", lambda d: d.update({"after": "10s"}))

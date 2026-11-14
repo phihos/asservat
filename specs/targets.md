@@ -22,7 +22,7 @@ Given a capture resolved PID 420 in container X, when X restarts and PID 420 is 
 
 ## REQ-TGT-003 — Cluster and namespace scope
 
-Targets MUST belong to an enrolled cluster and an administrator-enabled namespace within the requesting principal or policy identity's allowed workload scope. Deny rules override opt-in and policy grants. Collector, KMS, identity and secret-management namespaces are excluded by default. Enabling collection for a sensitive namespace requires a cluster-administrator policy change. Evidence sharing does not authorize new collection. Permission derivation, submission identity and automatic-policy execution identity follow [permission management](permissions.md).
+Targets MUST belong to an enrolled cluster and lie within the requesting principal or policy identity's allowed workload scope. Every namespace outside the system namespaces (`kube-*`, the Asservat release namespace, and collector, KMS, identity and secret-management namespaces) is collectable by default; there is no namespace opt-in ([ADR-335](../docs/decisions/335-usable-by-default.md) D1). An optional `CollectionCeiling` or the namespace label `asservat.io/evidence: disabled` narrows or excludes a namespace; deny rules override allows and policy grants. Enabling collection for an excluded system namespace requires a cluster-administrator CollectionCeiling. Evidence sharing does not authorize new collection. Permission derivation, submission identity and automatic-policy execution identity follow [permission management](permissions.md).
 
 ### SC-TGT-003
 
@@ -40,7 +40,7 @@ Given a peer selector `app=database`, when database pods rotate IPs during a fro
 
 ## REQ-TGT-005 — Observation coverage and incident selection
 
-A policy observes every authorized matching pod (no field selects this) through the connector's shared Pod informer, including unready/crashing replicas, within administrator workload/node/cluster sensor ceilings. An optional observation.maxPods may only narrow those ceilings; the initial portable ceiling is 1,000 pods per policy, intersected with the qualified installation envelope. No per-replica approval or user-entered container choice. Attach new replicas under the same workload UID after current pod authorization; do not equate an attached collector with fresh observations.
+A policy observes every authorized matching pod (no field selects this) through the connector's shared Pod informer, including unready/crashing replicas, within administrator workload/node/cluster sensor ceilings. An optional observation.maxPods may only narrow those ceilings; there is no separate per-policy pod cap beyond the administrator ceilings. No per-replica approval or user-entered container choice. Attach new replicas under the same workload UID after current pod authorization; do not equate an attached collector with fresh observations.
 
 On overflow, keep the already armed eligible set stable, fill vacancies in creation-time/UID order and report `CoverageLimited` with observed/eligible counts and authorized skipped pod references. Do not silently rotate sampling or call the workload fully monitored. Permission-denied pods are never observed; only authorized inventory is exposed. Ring/parser memory is reserved separately for each armed pod; adding a ring can reduce that action's coverage without stopping cheap log/resource observation.
 

@@ -1,7 +1,6 @@
 {
   "schemaVersion": "identity-settings/v1",
-  "revision": 1,
-  "issuer": "https://id.example.invalid",
+  "issuer": "https://identity.example.invalid/realms/company",
   "clients": [
     {
       "id": "asservat-console",
@@ -14,10 +13,11 @@
       "classQualified": true
     }
   ],
-  "eligibleSubjects": [],
-  "eligibleGroups": [
-    "platform-developers"
-  ],
-  "groupsAtIssueQualified": true,
-  "groupMaxAgeSeconds": 300
+  "groupsClaim": "groups",
+  "usernameClaim": "preferred_username",
+  "administrators": {
+    "groups": [
+      "/asservat-admins"
+    ]
+  }
 }

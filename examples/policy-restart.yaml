@@ -5,14 +5,9 @@ metadata:
   namespace: payments
 spec:
   target:
-    namespace: payments
     workloadRef:
-      apiVersion: apps/v1
       kind: Deployment
       name: checkout
-    maxPods: 1
-    selection: triggeringPod
-    adoption: pinUID
   detectors:
   - id: crashed
     kind: exit
@@ -25,16 +20,12 @@ spec:
     detector: crashed
   recipeRef:
     name: builtin-pod-status-v1
-    digest: 174a28447df11de92c374c60a44a3a5c03c8481e3f5c57943521ab5da3dce1c3
   budgets:
     cooldown: 5m
     burst: 2
     maxOccurrencesPerHour: 12
     maxConcurrentActions: 1
   retention: 72h
-  suspended: false
-  observation:
-    mode: allAuthorized
   evaluation:
     scope: pod
     fireOnActivation: false

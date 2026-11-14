@@ -13,12 +13,14 @@ import copy
 import json
 from pathlib import Path
 
+import implemented_contracts
+
 ROOT = Path(__file__).resolve().parents[1]
 DEST = ROOT / 'charts/asservat/crds/captureprofiles.yaml'
 
 
 def render():
-    source = json.loads((ROOT / 'specs/contracts/capture-profile.schema.json').read_text())
+    source = json.loads(implemented_contracts.path('capture-profile.schema.json').read_text())
     raw = source['properties']['spec']
     assert raw['additionalProperties'] is False and set(raw['properties']) == {'name', 'version', 'definition', 'availability'}
     availability = raw['properties']['availability']

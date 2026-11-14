@@ -1,0 +1,12 @@
+{
+  "case_id": "00000000-0000-4000-8000-000000000001",
+  "artifact_id": "00000000-0000-4000-8000-000000000021",
+  "idempotency_key": "metadata-packet-page-1",
+  "fields": [
+    "packet_index",
+    "source_port"
+  ],
+  "packet_filter": "tcp port 80",
+  "max_packets": 100,
+  "max_scan_bytes": 8388608
+}

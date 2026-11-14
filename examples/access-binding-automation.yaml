@@ -7,7 +7,6 @@ spec:
   effect: Allow
   subjects:
   - kind: Group
-    issuer: https://identity.example.invalid/realms/company
     id: team-payments
   roles:
   - workload-maintainer
@@ -22,7 +21,4 @@ spec:
     - liveCore
     - runtimeDiagnostic
     - command
-    maxLifetimeSeconds: 2592000
-    maxExecutions: 100
     maxBytes: 1099511627776
-    maxObservedBytes: 1099511627776

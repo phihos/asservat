@@ -19,14 +19,18 @@
           "type": "string",
           "format": "uuid"
         },
-        "grant_id": {
-          "type": "string",
-          "format": "uuid"
-        },
         "idempotency_key": {
           "type": "string",
           "minLength": 1,
           "maxLength": 128
+        },
+        "representation": {
+          "enum": [
+            "bundle",
+            "file"
+          ],
+          "default": "bundle",
+          "description": "Core artifacts only: bundle is the debugger-ready tar (core, executable and libraries under sysroot/, debug files, gdb.cmd, dlv.sh for Go, README.txt, SHA256SUMS); file is the bare core."
         }
       },
       "required": [
@@ -82,18 +86,17 @@
           "enum": [
             "Preparing",
             "Ready",
-            "Streaming",
             "Completed",
-            "Interrupted",
-            "Cancelled",
-            "Expired",
-            "Denied",
-            "Failed"
-          ]
+            "Failed",
+            "Cancelled"
+          ],
+          "description": "An interrupted connection leaves the session Ready; resume with HTTP Range until access_until. Completed, Failed and Cancelled are terminal."
         },
         "filename": {
           "type": "string",
-          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$"
+          "maxLength": 200,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,199}$",
+          "description": "<workload>-<pod>-<time>.<ext> from recorded provenance (core bundle: .core.tar)."
         },
         "native_format": {
           "type": "string",
@@ -103,32 +106,22 @@
         "size_bytes": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 1099511627776
+          "maximum": 1099511627776,
+          "description": "Verified size from the catalog; present in every status while the caller may read the artifact's metadata."
         },
         "sha256": {
           "type": "string",
-          "pattern": "^[a-f0-9]{64}$"
+          "pattern": "^[a-f0-9]{64}$",
+          "description": "Verified full-file SHA-256 from the catalog; present in every status."
         },
         "content_path": {
           "type": "string",
           "pattern": "^/api/v1/downloads/[0-9a-f-]{36}/content$"
         },
-        "expires_at": {
-          "type": "string",
-          "format": "date-time",
-          "description": "Effective transfer deadline, no later than the original session deadline or current managed evidence access expiry. A past deadline is valid for terminal status and never renews preparation, transfer or resume authority."
-        },
-        "managed_read_until": {
-          "type": "string",
-          "format": "date-time"
-        },
         "emitted_bytes": {
           "type": "integer",
           "minimum": 0,
           "maximum": 1099511627776
-        },
-        "resume_available": {
-          "type": "boolean"
         },
         "local_copy_managed": {
           "const": false
@@ -147,19 +140,40 @@
           "pattern": "^\"[A-Za-z0-9_-]{1,120}\"$",
           "description": "Strong opaque native-representation version; use with If-Match when resuming."
         },
-        "continue_preparation": {
-          "const": true,
-          "description": "Only an acknowledged Preparing response to the explicit preparation operation permits bounded automatic continuation with the original key and deadline. Passive status never supplies this instruction."
+        "failure_reason": {
+          "enum": [
+            "Expired",
+            "Denied",
+            "Integrity",
+            "Deleted",
+            "Unavailable"
+          ]
+        },
+        "representation": {
+          "enum": [
+            "bundle",
+            "file"
+          ]
+        },
+        "browser_url": {
+          "type": "string",
+          "pattern": "^/downloads/[0-9a-f-]{36}$",
+          "description": "Console page that downloads this session in the signed-in browser of the same human without another consent or approval."
+        },
+        "access_until": {
+          "type": "string",
+          "format": "date-time",
+          "description": "AccessUntil: the artifact's access end (retention, share or grant end), never extended by status reads. Resumes are allowed until then; the caller's token lifetime does not shorten a started response (ADR-312)."
         }
       },
       "required": [
         "download_id",
         "artifact_id",
         "state",
-        "expires_at",
-        "managed_read_until",
+        "size_bytes",
+        "sha256",
+        "access_until",
         "emitted_bytes",
-        "resume_available",
         "local_copy_managed",
         "handling_notice"
       ],
@@ -168,23 +182,33 @@
           "if": {
             "properties": {
               "state": {
-                "enum": [
-                  "Ready",
-                  "Streaming",
-                  "Interrupted"
-                ]
+                "const": "Ready"
               }
             }
           },
           "then": {
             "required": [
-              "content_path"
+              "content_path",
+              "browser_url",
+              "filename",
+              "native_format",
+              "etag",
+              "coverage_notice"
             ]
           },
           "else": {
             "not": {
-              "required": [
-                "content_path"
+              "anyOf": [
+                {
+                  "required": [
+                    "content_path"
+                  ]
+                },
+                {
+                  "required": [
+                    "browser_url"
+                  ]
+                }
               ]
             }
           }
@@ -193,59 +217,55 @@
           "if": {
             "properties": {
               "state": {
-                "enum": [
-                  "Ready",
-                  "Streaming",
-                  "Interrupted"
-                ]
-              }
-            }
-          },
-          "then": {
-            "required": [
-              "filename",
-              "native_format",
-              "size_bytes",
-              "sha256",
-              "etag",
-              "coverage_notice"
-            ]
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "state": {
-                "enum": [
-                  "Preparing",
-                  "Completed",
-                  "Cancelled",
-                  "Expired",
-                  "Denied",
-                  "Failed"
-                ]
-              }
-            }
-          },
-          "then": {
-            "properties": {
-              "resume_available": {
-                "const": false
-              }
-            }
-          }
-        },
-        {
-          "if": {
-            "required": [
-              "continue_preparation"
-            ]
-          },
-          "then": {
-            "properties": {
-              "state": {
                 "const": "Preparing"
               }
+            }
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "filename"
+                  ]
+                },
+                {
+                  "required": [
+                    "native_format"
+                  ]
+                },
+                {
+                  "required": [
+                    "etag"
+                  ]
+                },
+                {
+                  "required": [
+                    "coverage_notice"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "Failed"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "failure_reason"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "failure_reason"
+              ]
             }
           }
         }
@@ -253,48 +273,26 @@
       "dependentRequired": {
         "filename": [
           "native_format",
-          "size_bytes",
-          "sha256",
           "etag",
           "coverage_notice"
         ],
         "native_format": [
           "filename",
-          "size_bytes",
-          "sha256",
-          "etag",
-          "coverage_notice"
-        ],
-        "size_bytes": [
-          "filename",
-          "native_format",
-          "sha256",
-          "etag",
-          "coverage_notice"
-        ],
-        "sha256": [
-          "filename",
-          "native_format",
-          "size_bytes",
           "etag",
           "coverage_notice"
         ],
         "etag": [
           "filename",
           "native_format",
-          "size_bytes",
-          "sha256",
           "coverage_notice"
         ],
         "coverage_notice": [
           "filename",
           "native_format",
-          "size_bytes",
-          "sha256",
           "etag"
         ]
       },
-      "description": "Current authorized transfer status. Completed records the server transfer outcome, not local file persistence. Terminal status may omit native file metadata and remains readable after the transfer deadline while current evidence metadata authority permits it. Any included native metadata is the complete verified group; status reads never prepare or decrypt a file."
+      "description": "Current authorized transfer status. Every status carries the verified size and SHA-256; Preparing omits the reader's native metadata group (filename, format, ETag, coverage) until the regional reader returns it. Ready carries content_path and browser_url; terminal states carry neither. Completed records the server transfer outcome, not local file persistence. Status reads never prepare or decrypt a file."
     },
     "cancelReceipt": {
       "type": "object",

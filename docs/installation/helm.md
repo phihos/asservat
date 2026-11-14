@@ -75,7 +75,7 @@ services:
   identity:
     provider: keycloak
 administrators:
-  groups: [asservat-admins]
+  groups: [/asservat-admins]
 ```
 
 With these, the chart runs bundled PostgreSQL, SeaweedFS and the local key
@@ -158,13 +158,13 @@ that reads the bootstrap administrator's password.
 The `secrets` hook generates the bootstrap administrator, the console client
 secret and the realm's group IDs once into `<name>-keycloak-state`. setup
 reconciles the realm on every run through the Keycloak admin API: clients,
-redirect URIs, scopes and the groups `asservat-users` and `asservat-admins`.
+redirect URIs, scopes and the groups `/asservat-users` and `/asservat-admins` (Keycloak names groups by path).
 Changing `origin`, `services.identity.keycloak.realm` or the MCP redirect URIs
 takes effect on the next `helm upgrade`.
 
 Create users in one of two ways:
 
-- `services.identity.keycloak.initialUsers: [{username: alice, groups: [asservat-admins]}]`
+- `services.identity.keycloak.initialUsers: [{username: alice, groups: [/asservat-admins]}]`
   creates each user with a generated one-time password in
   `<name>-keycloak-users`; the user changes it at first sign-in.
 - Sign in at `<origin>/idp/admin/` as the bootstrap administrator and manage
@@ -450,7 +450,7 @@ metadata:
 spec:
   effect: Allow
   subjects:
-    - {kind: Group, name: payments-team}
+    - {kind: Group, name: /payments-team}   # Keycloak group path
   roles: [workload-maintainer]
   # Optional: only these workloads of the namespace.
   # workloads: [{kind: Deployment, name: api}]
@@ -482,7 +482,8 @@ Ordinary Kubernetes RBAC decides who writes them:
   ```
 
 - `spec.automation` (team policy delegation) additionally needs `bind` on
-  `accessroles` named `automation`, which no aggregated role grants. An
+  `accessroles` named `automation`, which no aggregated role grants unless
+  `permissions.aggregateAutomation: true` adds it to `admin`. Otherwise an
   administrator binds `<release-namespace>-<name>-accessbindings-automation`
   in each namespace whose team may delegate policies:
   `kubectl -n payments create rolebinding payments-automation

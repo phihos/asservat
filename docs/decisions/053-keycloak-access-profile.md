@@ -1,5 +1,7 @@
 # ADR-053 — Explicit Keycloak access-token profile
 
+> Superseded in part by [ADR-335](335-usable-by-default.md): Keycloak emits the standard `groups` claim with group paths, used by name; no `asservat_groups` attribute claim or group UUIDs.
+
 Date: 2026-10-10. Status: explicitly selected by the maintainer as the first supported/tested provider for browser sign-in and MCP access. Local access-token qualification has passed; this does not qualify an operator's realm or enable public login.
 
 Extend ADR-049 with a separately configured `keycloak-rs256/v1` profile. Preserve the default RFC 9068 adapter; never guess a profile from a token. Keycloak uses `JWT` in the header, signed `typ=Bearer` and `azp` for the originating client. Require the fixed API audience, issuer, algorithm, bounded key snapshot and original timestamps as before. Reject ID/refresh tokens, conflicting `client_id`, delegated/impersonated credentials, unsupported proof-of-possession and ambiguous claims.

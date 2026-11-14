@@ -3,8 +3,6 @@
   "issuer": "https://id.example.invalid/realms/engineering",
   "clientID": "asservat-console",
   "origin": "https://asservat.example.invalid",
-  "maxLifetimeSeconds": 28800,
-  "maxLogins": 256,
-  "maxSessions": 2000,
-  "maxLogoutEvents": 4000
+  "maxLifetimeSeconds": 604800,
+  "inactivityTimeoutSeconds": 86400
 }

@@ -38,6 +38,43 @@ Schemas kept because Go still embeds them with production code paths:
 `charts/asservat/crds/capacityreservations.yaml`
 (`internal/adapters/kubernetes/start_admission.go`). Remove each with its code.
 `local-key-configuration.schema.json` had no runtime consumer and is deleted.
+## ADR-335 contract divergence (2026-11-14)
+
+The canonical contracts, examples and spec checkers follow ADR-335 (usable by
+default), the maintainer decision that MCP and other clients carry the full
+evidence access of the user they act for, and the standing rule that a limit
+stays only with a written reason (resource cost, external constraint or
+maintainer decision; see "Bounds in the contracts" in `specs/apis.md`). The
+runtime still implements the earlier versions, kept under
+`specs/contracts/implemented/` and `examples/implemented/` as in the ADR-330
+pass. `scripts/permission-crds.py`, `profile-crd.py`, `retention-crd.py` and
+the `storage-pool` input of `capacity-crds.py` now also read through
+`scripts/implemented_contracts.py`; all Go and console tests that read
+examples go through `readImplementedExample` or the console equivalent.
+
+| Contract | Canonical change | Runtime still implements (code) |
+| --- | --- | --- |
+| `mcp-tools.json`, `browser-openapi.yaml`, `operations.yaml` | 33 MCP tools: `get_extract(view)`, `query_artifact(operation)`, `download_artifact(action)`, `watch_live(action)`; recording-save preview in `preview_capture`; live sources in `list_recordings`; capture profiles in `list_diagnostics`; no `activate_policy`/`request_policy_grant`; every tool enabled by default | `internal/contracts/investigation_schema.go`, `investigation-schemas/*.json`; `internal/domain/audit/operation.go`, `connector_operation.go`; `internal/bootstrap/public_context.go`, `public_http.go`; `internal/application/authorization/policy_grant_attachment.go`; `internal/adapters/postgres/policy_grant_attachment.go` |
+| `mcp-tools.json` | Names instead of IDs (`cluster`, workload, `policy`, recipe); reasons optional except `request_raw_access`; raw access by `artifact_ids` with defaulted size/expiry | `internal/transport/presentation/*_operations.go` |
+| `artifact-download.schema.json` | Preparing/Ready/Completed/Failed/Cancelled; size and SHA-256 on every status; `content_path`, `browser_url`, `access_until`, bundle `representation`; no `continue_preparation`/`expires_at`/`resume_available` | `internal/transport/presentation/context_download.go`; console `web/src/evidence/evidence.ts` |
+| `live-watch.schema.json`, `watch_live` | No watch deadline, duration or lifetime output cap; 10-minute idle close; no `sourcePage` | `internal/domain/live/source.go`, `watch.go` |
+| `recording-save.schema.json`, `errors.yaml` | Rows with `owner_kind`/`save_via`/`live_projections`; `recordingSaves` default true; `NoCurrentSource` replaces `RecordingSelectionRequired` | `internal/transport/presentation/recording_save_history.go`, `recording_save_operations.go` |
+| `investigation-access.schema.json`, grant views | No `clientIDs`: clients carry the user's access, raw and downloads included | `internal/application/authorization/grants.go`, `raw_query.go`; `internal/domain/authorization/grant.go`; `internal/adapters/postgres/access_grant.go`; `internal/transport/presentation/grant_operations.go` |
+| `sharing-request`, `sharing-intent`, share schemas | No recipient cap (was 32/8), outputs/operations caps or `maxArtifactsPerCapture`; recurring `notAfter`/`maxCaptures` optional | Embedded `internal/adapters/kubernetes/policy-schemas/sharing-request.schema.json`; share admission in `internal/application/authorization` |
+| `policy.schema.json`, `target.schema.json` | Budgets/retention/suspended/observation/evaluation/maxPods/selection/adoption optional; `adoption` default `followName`; no `observation.mode`, `grantRef` or hub-held `target.cluster`; optional `automationRef`; `workloadRef.apiVersion` optional | `internal/application/capture/policy_compile.go` (`pinUID` required, `allAuthorized` mode); `internal/adapters/kubernetes/policy_source.go`, `policy_source_hub.go` (`grantRef`, hub-held cluster; test reads `examples/implemented/policy-restart.yaml`); `internal/adapters/postgres/policy_grant_attachment.go`, `policy.go`, `policy_sources.go`; DebugPolicy CRD |
+| `capture.schema.json`, `capture-composition.schema.json` | `recipeRef.digest`, `reason`, `idempotencyKey`, `deadline`, `maxTotalBytes`/`maxDuration`, `profileRef.version` optional | `internal/domain/planning/composition.go`; `internal/transport/presentation/recorder_preview.go`; console `web/src/capture` |
+| `collection-scope.schema.json` | No `observation.mode` | `internal/application/capture/policy_compile.go`; console capture bundle |
+| `action.schema.json`, `capture-profile-go-cpu.yaml` | Profile `impact` may be `observe` (pprof GET) | `internal/application/planning/profile_plan.go` (refuses non-intrusive); `internal/application/planning/profiles/go-cpu-v1.json` |
+| `grant.schema.json` | Policy-grant `spec.renewal`, `status.renewalDue` | No renewal: `internal/application/authorization/grants.go`, `internal/adapters/postgres/policy_grant_attachment.go` |
+| `budget-policy`, `storage-pool` | Share percentages, all fields optional, `scope.clusters` by name, optional `protectedAllocations` | `internal/adapters/kubernetes/capacity_decode.go` (`workloadSlots`), `capacity-schemas/`, chart CRDs |
+| Capture/policy/trigger/recipe/packet/syscall schemas | No list-count caps; arbitrary maxima raised to 2^53−1; no packet-filter length cap (BPF limit checked at compile); `argv` items up to `MAX_ARG_STRLEN` | Embedded `policy-schemas/`, `capacity-schemas/`, `permission-schemas/approval-policy`, manifest `profile` schema; `internal/domain/planning/composition.go` (`MaxCompositionComponents` 8, `MaxComponentEdits` 32, `MaxCompositionBytes`); generated DebugPolicy/CaptureProfile/capacity CRDs |
+| `identity-settings.schema.json` | `groupsClaim`, `usernameClaim`, optional `requiredGroups`, `administrators`; no eligible lists, `groupMaxAgeSeconds`, `revision` or list caps | `internal/contracts/identity_settings.go`, `permission_runtime.go`, `installer_continuation.go`; `internal/domain/configuration/permissions.go`; `internal/bootstrap/permission_guards.go`; `internal/adapters/kubernetes/hub_worker_capacity_reads.go` |
+| `browser-settings.schema.json` | `maxLifetimeSeconds` (default 7 d) and `inactivityTimeoutSeconds` (default 24 h); no `maxLogins`/`maxSessions`/`maxLogoutEvents` or per-user session count | `internal/contracts/browser_settings.go`, `installer_continuation.go`; `internal/domain/identity/browser_settings.go` |
+| `fleet-settings.schema.json` (deleted) | Administrators replace fleet operators (D14) | `internal/adapters/kubernetes/fleet_settings.go`, `initial_preparer_inputs.go`, `initial_bootstrap_plan.go`, `hub_workload.go`, `configuration_runtime_*.go`; `internal/bootstrap/hub_api_inputs.go`; `internal/contracts/owner_deployment.go` |
+| `access-binding`, `permission-common`, `cluster-access-binding` (new) | Subject `issuer` and `reason` optional; workload by name with optional `uid`; ClusterAccessBinding; `groupName` mapping mode; `reviewRef`/`guardRef` optional; no list or string caps beyond Kubernetes formats | `internal/adapters/kubernetes/permission_decode.go`; `internal/domain/configuration/permissions.go`, `review.go`; chart CRDs (no ClusterAccessBinding CRD) |
+| `permission-source.schema.json` | `cluster` name instead of `clusterID`; no `maxDecisionAgeSeconds`; exclusions and `maxNamespaces` optional; access reviews map to any role | `internal/adapters/kubernetes/permission_decode.go`; `internal/domain/configuration/permissions.go` |
+| `policy-authority.schema.json` | Envelope ceilings, `notAfter` and limits optional, no maxima | `internal/domain/authorization/automation.go`, `policy_grant.go`, `policy_grant_use.go` |
+
 ## Joining workload clusters with `mode: cluster` (ADR-331, 2026-11-14)
 
 Branch `feat/hn-cluster-join` (on `feat/hn-remote-bindings`). The hub's

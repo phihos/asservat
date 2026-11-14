@@ -36,7 +36,15 @@ for t in tools:
  assert apiops[n][2]['x-effect']==('read' if t['annotations'].get('readOnlyHint',False) else 'command')
 assert set(api['components']['schemas']['ConfigSubmitInput']['properties']['kind']['enum'])=={'DebugPolicy','EvidenceRecipe','CaptureProfile'}
 for name,(_,method,op) in apiops.items():
- if op['x-effect']=='command':assert method=='post' and any(p['name']=='Idempotency-Key' and p['required'] for p in op['parameters'])
+ # A tool whose discriminator mixes read and command actions (specs/mcp.md, ADR-335)
+ # requires the key only for its command actions, which also carry body idempotency_key.
+ mixed=op.get('x-command-actions')
+ if op['x-effect']=='command':assert method=='post' and any(p['name']=='Idempotency-Key' and (p['required'] or mixed) for p in op['parameters'])
+ if mixed:
+  t=next(t for t in tools if t['name']==name);disc=next(k for k in ('action','operation','view') if k in t['inputSchema']['properties'])
+  for rule in t['inputSchema']['allOf']:
+   value=rule['if']['properties'][disc]['const'];assert value in t['inputSchema']['properties'][disc]['enum']
+   assert ('idempotency_key' in rule['then']['required'])==(value in mixed),(name,value)
  if method=='post':assert any(p['name']=='X-CSRF-Token' and p['required'] for p in op['parameters'])
 registry={json.loads(p.read_text())['$id']:json.loads(p.read_text()) for p in (ROOT/'specs/contracts').glob('*.schema.json')}
 refs=0

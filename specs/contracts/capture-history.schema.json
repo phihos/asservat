@@ -63,7 +63,6 @@
             ]
           },
           "minItems": 1,
-          "maxItems": 16,
           "uniqueItems": true
         },
         "evidence_state": {

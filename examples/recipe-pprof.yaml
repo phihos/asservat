@@ -4,8 +4,8 @@ metadata:
   name: go-pprof-incident
   namespace: payments
 spec:
-  description: Bounded Go pprof CPU, heap and mutex evidence under a reviewed profiling
-    grant.
+  description: Bounded Go pprof CPU, heap and mutex reads (observe, ADR-335 D5); no
+    forced GC or sampling change.
   actions:
   - id: cpu
     kind: profile
@@ -19,7 +19,7 @@ spec:
       forceGC: false
       mode: interval
     required: true
-    impact: intrusive
+    impact: observe
     limits:
       maxBytes: 16777216
       timeout: 15s
@@ -34,7 +34,7 @@ spec:
       forceGC: false
       mode: snapshot
     required: false
-    impact: intrusive
+    impact: observe
     limits:
       maxBytes: 16777216
       timeout: 5s
@@ -49,7 +49,7 @@ spec:
       forceGC: false
       mode: cumulative
     required: false
-    impact: intrusive
+    impact: observe
     limits:
       maxBytes: 16777216
       timeout: 5s

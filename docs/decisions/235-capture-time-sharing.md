@@ -1,5 +1,7 @@
 # ADR-235 — Capture-time sharing of the published result (S-06 increment 5)
 
+> Superseded in part by [ADR-335](335-usable-by-default.md): capture-time sharing ends with the evidence's access end; no seven-day `notAfter` cap.
+
 Date: 2026-10-26. Status: accepted; implemented; qualification below.
 Requirements: REQ-SHR-004 (narrowed below), S-06 (TASK-07). Plan: `docs/reviews/s06-plan-2026-10-26.md`,
 increment 5 (F5) and the §2.3 simplification "one instruction on the accepted capture, materialized

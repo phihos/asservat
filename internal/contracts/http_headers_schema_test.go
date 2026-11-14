@@ -2,7 +2,6 @@ package contracts
 
 import (
 	"encoding/json"
-	"os"
 	"strings"
 	"testing"
 )
@@ -18,7 +17,7 @@ func TestHTTPHeadersContract(t *testing.T) {
 	if tool, ok := wire.Tool("get_http_headers"); !ok || !tool.MCP() {
 		t.Fatal("get_http_headers is not a shared browser/MCP contract")
 	}
-	sample, err := os.ReadFile("../../examples/mcp-http-headers-result.json")
+	sample, err := readImplementedExample("../../examples/", "mcp-http-headers-result.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -95,7 +94,7 @@ func TestQueryResultServesHTTPHeaderPage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sample, err := os.ReadFile("../../examples/mcp-http-headers-result.json")
+	sample, err := readImplementedExample("../../examples/", "mcp-http-headers-result.json")
 	if err != nil {
 		t.Fatal(err)
 	}

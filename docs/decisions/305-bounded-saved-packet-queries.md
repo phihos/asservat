@@ -1,5 +1,7 @@
 # ADR-305 — Bounded queries over saved packets
 
+> Superseded in part by [ADR-335](335-usable-by-default.md): a client acting for a user has that user's evidence access, including raw evidence and downloads; no client disclosure policy, per-client raw allow list or client data-class ceiling.
+
 > Superseded in whole or in part by [ADR-330](330-event-driven-system-design.md) (event-driven system design, 2026-11-14). Where this record prescribes polling, expiring freshness windows, per-request Jobs, private PKI or enrollment layers, object-store audit, spent-on-uncertain accounting or installer-era guards, ADR-330 applies.
 
 Date: 2026-11-05. Status: implemented; named local component, browser, service

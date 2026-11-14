@@ -2,7 +2,6 @@ package contracts
 
 import (
 	"encoding/json"
-	"os"
 	"testing"
 )
 
@@ -12,7 +11,7 @@ func TestPacketSummaryCanonicalRepliesAndOriginalFiniteView(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, name := range []string{"mcp-packet-summary-result.json", "mcp-packet-summary-unreported-result.json"} {
-		raw, err := os.ReadFile("../../examples/" + name)
+		raw, err := readImplementedExample("../../examples/", name)
 		if err != nil || wire.ValidateOutput("get_pcap_summary", raw) != nil {
 			t.Fatal("canonical packet summary refused", name, err)
 		}

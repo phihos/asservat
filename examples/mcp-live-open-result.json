@@ -12,11 +12,8 @@
     ],
     "projection": "syscallMetadata",
     "accepted_at": "2026-10-09T12:05:00Z",
-    "expires_at": "2026-10-09T12:15:00Z",
-    "idle_expires_at": "2026-10-09T12:05:30Z",
+    "idle_expires_at": "2026-10-09T12:15:00Z",
     "limits": {
-      "duration_seconds": 600,
-      "max_output_bytes": 16777216,
       "bytes_per_second": 65536,
       "max_rows_per_batch": 100,
       "max_buffer_bytes": 1048576,

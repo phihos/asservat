@@ -4,5 +4,4 @@ metadata:
   name: payments
   labels:
     platform.example.invalid/managed: 'true'
-  annotations:
-    platform.example.invalid/owner-group-id: group-payments-123
+    platform.example.invalid/owner-group: payments

@@ -5,7 +5,7 @@ metadata:
   namespace: asservat-system
 spec:
   enabled: false
-  clusterID: 00000000-0000-4000-8000-000000000001
+  cluster: prod
   type: kubernetesAccessReview
   namespaceSelector:
     matchLabels:
@@ -14,12 +14,10 @@ spec:
   - kube-system
   - asservat-system
   role: workload-maintainer
-  maxDecisionAgeSeconds: 30
   maxNamespaces: 200
   identityMappingRef: company-oidc-to-cluster
   admissionParity:
     mode: qualifiedAdapter
-    reviewRef: platform-review/workload-management-2026-10
     adapterRef: workload-change-guard
   accessReview:
     check: workloadPatch

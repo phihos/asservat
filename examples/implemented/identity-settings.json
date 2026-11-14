@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "identity-settings/v1",
+  "revision": 1,
+  "issuer": "https://id.example.invalid",
+  "clients": [
+    {
+      "id": "asservat-console",
+      "kind": "human",
+      "classQualified": true
+    },
+    {
+      "id": "asservat-automation",
+      "kind": "workload",
+      "classQualified": true
+    }
+  ],
+  "eligibleSubjects": [],
+  "eligibleGroups": [
+    "platform-developers"
+  ],
+  "groupsAtIssueQualified": true,
+  "groupMaxAgeSeconds": 300
+}

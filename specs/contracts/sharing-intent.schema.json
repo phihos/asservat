@@ -18,8 +18,8 @@
             "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/recipient"
           },
           "minItems": 1,
-          "maxItems": 32,
-          "uniqueItems": true
+          "uniqueItems": true,
+          "description": "No count limit: recipients are bounded only by the request body byte limit (memory) (maintainer rule: limits need a reason)."
         },
         "source": {
           "type": "object",
@@ -78,7 +78,8 @@
         "maxCaptures": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 100
+          "maximum": 1000000,
+          "description": "Resolved bound; absent for recurring sharing without a capture count (it ends at notAfter)."
         },
         "maxArtifactsPerCapture": {
           "type": "integer",
@@ -227,7 +228,6 @@
         "requestDigest",
         "acceptedAt",
         "notAfter",
-        "maxCaptures",
         "maxArtifactsPerCapture",
         "resolvedSelections",
         "management"
@@ -250,7 +250,10 @@
               "maxCaptures": {
                 "const": 1
               }
-            }
+            },
+            "required": [
+              "maxCaptures"
+            ]
           }
         }
       ]

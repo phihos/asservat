@@ -62,7 +62,6 @@
                 "pattern": "^[a-zA-Z0-9_]{1,64}$"
               },
               "minItems": 1,
-              "maxItems": 128,
               "uniqueItems": true
             }
           },

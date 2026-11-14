@@ -1,5 +1,7 @@
 # ADR-259: Team-policy grants and prepaid sensitive observation
 
+> Superseded in part by [ADR-335](335-usable-by-default.md): policies are accepted on apply with no `activate_policy` or `grantRef`; intrusive actions open their review automatically and the grant (default 90 days) attaches on approval and renews in place.
+
 > Superseded in part by ADR-328 (2026-11-13): the settings observer reads the approval
 > settings ConfigMap under RBAC; no source guard proof is taken. Grants, budgets, clamping and
 > observation spend remain valid.

@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"os"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -13,7 +12,7 @@ import (
 func TestFleetAdministrationProtectedConfig(t *testing.T) {
 	for _, mode := range []string{"valid", "no-operators", "suspended", "generated-ids", "untrusted-issuer", "duplicate-subject", "unbounded", "history", "unknown", "case-alias", "replacement", "extra-data", "expired-read"} {
 		t.Run(mode, func(t *testing.T) {
-			b, err := os.ReadFile("../../../examples/fleet-settings.json")
+			b, err := readImplementedExample("../../../examples/", "fleet-settings.json")
 			if err != nil {
 				t.Fatal(err)
 			}

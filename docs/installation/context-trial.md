@@ -39,7 +39,7 @@ identity:
   clientID: asservat-console
   clientSecret: {existingSecret: oidc-client}
 administrators:
-  groups: [asservat-admins]
+  groups: [/asservat-admins]
 exposure:
   ingress:
     enabled: true

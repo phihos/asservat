@@ -28,7 +28,6 @@
               "items": {
                 "$ref": "https://asservat.io/spec/v1/trigger.schema.json#/$defs/detector"
               },
-              "maxItems": 16,
               "minItems": 1,
               "uniqueItems": true
             },
@@ -46,16 +45,13 @@
                 },
                 "digest": {
                   "type": "string",
-                  "pattern": "^[a-f0-9]{64}$"
+                  "pattern": "^[a-f0-9]{64}$",
+                  "description": "Optional provenance pin; the hub resolves the recipe by name and records the digest (ADR-335 D4)."
                 }
               },
               "required": [
-                "name",
-                "digest"
+                "name"
               ]
-            },
-            "grantRef": {
-              "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/uuid"
             },
             "budgets": {
               "type": "object",
@@ -82,12 +78,8 @@
                   "maximum": 10
                 }
               },
-              "required": [
-                "cooldown",
-                "burst",
-                "maxOccurrencesPerHour",
-                "maxConcurrentActions"
-              ]
+              "required": [],
+              "description": "Storm protection (maintainer decision, ADR-335 D8); administrator budget policies may only tighten it."
             },
             "retention": {
               "type": "string",
@@ -104,18 +96,16 @@
               "type": "object",
               "additionalProperties": false,
               "properties": {
-                "mode": {
-                  "const": "allAuthorized"
-                },
                 "maxPods": {
                   "type": "integer",
                   "minimum": 1,
-                  "maximum": 1000
+                  "maximum": 9007199254740991
                 }
               },
               "required": [
-                "mode"
-              ]
+                "maxPods"
+              ],
+              "description": "Optional narrowing of the administrator observation ceilings; every authorized matching pod is observed."
             },
             "evaluation": {
               "type": "object",
@@ -134,25 +124,32 @@
                   "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/duration"
                 }
               },
-              "required": [
-                "scope",
-                "fireOnActivation",
-                "rearmFor"
-              ]
+              "required": []
             },
             "recordingSaves": {
               "$ref": "https://asservat.io/spec/v1/recording-save.schema.json#/$defs/policyOptIn"
+            },
+            "automationRef": {
+              "type": "object",
+              "additionalProperties": false,
+              "description": "AccessBinding in the policy's namespace whose automation envelope applies; needed only when several envelopes match.",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 253
+                }
+              },
+              "required": [
+                "name"
+              ]
             }
           },
           "required": [
             "target",
             "detectors",
             "when",
-            "recipeRef",
-            "budgets",
-            "retention",
-            "suspended",
-            "observation"
+            "recipeRef"
           ]
         },
         {
@@ -170,15 +167,11 @@
               "items": {
                 "$ref": "https://asservat.io/spec/v1/trigger.schema.json#/$defs/detector"
               },
-              "maxItems": 16,
               "minItems": 1,
               "uniqueItems": true
             },
             "when": {
               "$ref": "https://asservat.io/spec/v1/trigger.schema.json#/$defs/expression"
-            },
-            "grantRef": {
-              "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/uuid"
             },
             "budgets": {
               "type": "object",
@@ -205,12 +198,8 @@
                   "maximum": 10
                 }
               },
-              "required": [
-                "cooldown",
-                "burst",
-                "maxOccurrencesPerHour",
-                "maxConcurrentActions"
-              ]
+              "required": [],
+              "description": "Storm protection (maintainer decision, ADR-335 D8); administrator budget policies may only tighten it."
             },
             "retention": {
               "type": "string",
@@ -227,18 +216,16 @@
               "type": "object",
               "additionalProperties": false,
               "properties": {
-                "mode": {
-                  "const": "allAuthorized"
-                },
                 "maxPods": {
                   "type": "integer",
                   "minimum": 1,
-                  "maximum": 1000
+                  "maximum": 9007199254740991
                 }
               },
               "required": [
-                "mode"
-              ]
+                "maxPods"
+              ],
+              "description": "Optional narrowing of the administrator observation ceilings; every authorized matching pod is observed."
             },
             "evaluation": {
               "type": "object",
@@ -257,28 +244,35 @@
                   "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/duration"
                 }
               },
-              "required": [
-                "scope",
-                "fireOnActivation",
-                "rearmFor"
-              ]
+              "required": []
             },
             "profileComposition": {
               "$ref": "https://asservat.io/spec/v1/capture-composition.schema.json"
             },
             "recordingSaves": {
               "$ref": "https://asservat.io/spec/v1/recording-save.schema.json#/$defs/policyOptIn"
+            },
+            "automationRef": {
+              "type": "object",
+              "additionalProperties": false,
+              "description": "AccessBinding in the policy's namespace whose automation envelope applies; needed only when several envelopes match.",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 253
+                }
+              },
+              "required": [
+                "name"
+              ]
             }
           },
           "required": [
             "target",
             "detectors",
             "when",
-            "profileComposition",
-            "budgets",
-            "retention",
-            "suspended",
-            "observation"
+            "profileComposition"
           ]
         }
       ]

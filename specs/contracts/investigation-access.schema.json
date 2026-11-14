@@ -35,18 +35,6 @@
           "maxItems": 5,
           "uniqueItems": true
         },
-        "clientIDs": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 128
-          },
-          "minItems": 1,
-          "maxItems": 8,
-          "uniqueItems": true,
-          "description": "Selected clients. When omitted, resolve to the authenticated requesting client before recording the review and digest. Explicit selections remain exact; replay never adds or changes a client."
-        },
         "maxArtifacts": {
           "type": "integer",
           "minimum": 1,
@@ -64,7 +52,8 @@
         },
         "notAfter": {
           "type": "string",
-          "format": "date-time"
+          "format": "date-time",
+          "description": "Optional; defaults to the access end (AccessUntil) of the collected evidence, capped by the administrator maximum. No deadline restarts when an artifact arrives."
         }
       },
       "required": [
@@ -72,9 +61,9 @@
         "operations",
         "maxArtifacts",
         "maxBytes",
-        "maxOperations",
-        "notAfter"
-      ]
+        "maxOperations"
+      ],
+      "description": "Result access covers every OAuth client and browser session of the same human; clients carry the user's own evidence access (maintainer decision)."
     },
     "resolved": {
       "type": "object",
@@ -107,17 +96,6 @@
           "maxItems": 5,
           "uniqueItems": true
         },
-        "clientIDs": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 128
-          },
-          "minItems": 1,
-          "maxItems": 8,
-          "uniqueItems": true
-        },
         "maxArtifacts": {
           "type": "integer",
           "minimum": 1,
@@ -145,7 +123,6 @@
       "required": [
         "actionIds",
         "operations",
-        "clientIDs",
         "maxArtifacts",
         "maxBytes",
         "maxOperations",

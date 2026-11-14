@@ -34,7 +34,7 @@ Given a busy pod exceeds an event-rate or ring limit, when tracing continues to 
 
 Use `syscallTrace` as the manifest kind and privacy evidence type. New types default to potentially personal data and inherit configured maxima; an administrator can set a stricter syscall/argument ceiling. Records and artifact provenance include engine/decoder/ABI digests, pod/process origins, windows, mode, filters, budgets and loss. Raw arguments are encrypted raw evidence. Fixed approved metadata projections omit arguments, paths, pointers and buffers and inherit source deadlines.
 
-`get_syscall_summary` returns bounded per-syscall counts, errors and duration aggregates over an approved projection; missing/partial pairs and gaps are explicit. `get_syscall_events` returns a paginated metadata timeline with no argument option. `syscall_query` is a bounded typed raw operation for already collected artifacts, requiring evidence:raw, current artifact rights and a matching raw-query grant. It can select syscall names/errors and return bounded recorded arguments; no arbitrary code, address dereference, live tracing or new acquisition. Add this operation consistently to raw grant/share contracts and delivery checks. Sharing a metadata projection does not grant raw argument queries or live tracing.
+`get_extract(view=syscallSummary)` returns bounded per-syscall counts, errors and duration aggregates over an approved projection; missing/partial pairs and gaps are explicit. `get_extract(view=syscallEvents)` returns a paginated metadata timeline with no argument option. `query_artifact(operation=syscalls)` is a bounded typed raw operation for already collected artifacts, requiring current artifact rights plus the equivalent Kubernetes right (`pods/exec`) or a matching raw-query grant. It can select syscall names/errors and return bounded recorded arguments; no arbitrary code, address dereference, live tracing or new acquisition. Add this operation consistently to raw grant/share contracts and delivery checks. Sharing a metadata projection does not grant raw argument queries or live tracing.
 
 Saved-argument queries ([ADR-306](../docs/decisions/306-bounded-saved-syscall-queries.md))
 run in the [regional reader](evidence.md#req-evd-005--analysis-isolation-and-output-classes)
@@ -71,7 +71,7 @@ The guidance engine can recommend a narrow syscall include list based on the dia
 
 Given an argument trace with a synthetic credential buffer, when a reader asks for summary/events, then only the approved metadata projection is returned. Raw-query and raw-sharing checks remain separate and cumulative. A hostile argument string is never executed or fetched, and expired source evidence cannot be revived by a derived summary or history repeat.
 
-Given that same saved original and a covering `syscall_query` approval, browser
+Given that same saved original and a covering `query_artifact(operation=syscalls)` approval, browser
 and MCP return matching bounded recorded argument events. A download-only grant
 or metadata source cannot supply them. A retry with the same operation ID
 returns the original outcome without new spend, while changed selection or
@@ -86,7 +86,7 @@ For an ongoing source, maxEvents limits resident ring entries and each saved sna
 
 ## Approved live syscall views
 
-[Live watch](live-watch.md) adds a bounded metadata view of an already running syscall source, separate from saved-artifact get_syscall_events/syscall_query. It uses fixed syscall/PID/error/paired-duration fields and typed display filters, delivered over the browser's Server-Sent Events stream or an MCP long-poll read; no user-memory reads, argument bytes, paths, argv or speculative dereference. Unpaired events and lost/filtered/sampled rows are distinct. A viewer cannot change which processes are observed, prolong a manual session or obtain raw argument access through a live subscription. Closing/pausing the viewer leaves the source under its original acquisition authority and budgets.
+[Live watch](live-watch.md) adds a bounded metadata view of an already running syscall source, separate from saved-artifact `get_extract(view=syscallEvents)`/`query_artifact(operation=syscalls)`. It uses fixed syscall/PID/error/paired-duration fields and typed display filters, delivered over the browser's Server-Sent Events stream or an MCP long-poll read; no user-memory reads, argument bytes, paths, argv or speculative dereference. Unpaired events and lost/filtered/sampled rows are distinct. A viewer cannot change which processes are observed, prolong a manual session or obtain raw argument access through a live subscription. Closing/pausing the viewer leaves the source under its original acquisition authority and budgets.
 
 ### Qualified argument-engine exception
 

@@ -92,11 +92,11 @@ Given a header spans several packets and a body shares its last packet, when htt
 
 Each network artifact records profile/projection and engine/compiler digests, link/hook/CNI profile, target identity, authored filter digest, resolved peer generations and activation intervals, requested/achieved time range, wire/captured counts, loss/suppression reasons, ring/frozen/parser ceilings and actual truncation. Generation history is itself bounded (default 1,024 entries per artifact); close a segment/artifact or stop with a visible limit instead of dropping provenance silently. This provenance is part of the encrypted artifact manifest.
 
-`get_pcap_summary` describes sanitized or raw packet metadata; `get_http_headers` returns bounded structured HTTP fields from an approved projection with provenance, cursor/output limits and no body parameter. A raw original remains raw. Its fixed numeric summary may use the transient projection in [ADR-304](../docs/decisions/304-transient-raw-packet-summary.md), with dedicated ordinary aggregate authority and independent output validation. This creates no stored derivative or raw-content permission. `pcap_query` over a raw original or raw fields remains separately granted; metadata-only queries use ordinary current/retained rights. Native/subprocess analysis retains the separate-Job encrypted-scratch boundary. All external-agent disclosures retain existing client policy, audit, share and expiry checks. The UI calls the choices “Network headers”, “HTTP headers” and “Raw packets”, shows unsupported target capabilities early, and lets maintainers choose Kubernetes peers by workload/service rather than typing addresses.
+`get_extract(view=pcapSummary)` describes sanitized or raw packet metadata; `get_extract(view=httpHeaders)` returns bounded structured HTTP fields from an approved projection with provenance, cursor/output limits and no body parameter. A raw original remains raw. Its fixed numeric summary may use the transient projection in [ADR-304](../docs/decisions/304-transient-raw-packet-summary.md), with dedicated ordinary aggregate authority and independent output validation. This creates no stored derivative or raw-content permission. `query_artifact(operation=packets)` over a raw original or raw fields remains separately granted; metadata-only queries use ordinary current/retained rights. Native/subprocess analysis retains the separate-Job encrypted-scratch boundary. External-agent disclosures use the acting user's rights and keep audit, share and expiry checks. The UI calls the choices “Network headers”, “HTTP headers” and “Raw packets”, shows unsupported target capabilities early, and lets maintainers choose Kubernetes peers by workload/service rather than typing addresses.
 
 EXP-02/03 must qualify filter compilation, continuous peer updates, CNI/dual-stack/NAT/hostNetwork/loopback behavior, rings under stalls and HTTP secrecy/resource bounds before capability advertisement. Unsupported environments return specific unavailable results; no blanket packet coverage claim.
 
-Saved `get_pcap_summary` ([ADR-303](../docs/decisions/303-saved-packet-summary.md))
+Saved `get_extract(view=pcapSummary)` ([ADR-303](../docs/decisions/303-saved-packet-summary.md))
 runs in the [regional reader](evidence.md#req-evd-005--analysis-isolation-and-output-classes)
 over the whole authenticated saved PCAPNG within the reader's source size limit:
 fixed directional numeric endpoint/protocol groups, top 100 of at most 16,384
@@ -125,7 +125,7 @@ Given an authorized reader inspects a saved raw packet recording, when the fixed
 summary runs, then only authenticated input contributes to the approved numeric
 output, truncated prefixes remain visible as unclassified records and a unique
 payload marker appears only in separately authorized raw/native inspection.
-The original remains raw; another client, changed source or expired/revoked
+The original remains raw; another principal, changed source or expired/revoked
 authority cannot reuse the summary's query or widen its output.
 
 ### Saved packet queries (REQ-NET-005 / REQ-MCP-003)
@@ -142,7 +142,7 @@ bounded raw captured-frame prefix, with exact names/limits in the canonical
 contract. Prefix bytes come from the saved frame; short saved prefixes never yield
 invented headers, endpoints, flags or padding.
 
-Any raw original requires a current exact pcap_query grant even when only header
+Any raw original requires a current exact `query_artifact(operation=packets)` grant even when only header
 fields are selected. Metadata-only fields from a metadata original need ordinary
 rights. Raw fields unavailable from that original are refused. A covering
 standalone or same-human/selected-client combined result-access grant is reused

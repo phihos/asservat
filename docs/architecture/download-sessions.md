@@ -8,7 +8,7 @@ C-14/C-07/C-08/C-21 contract for REQ-DLD-002–004 under
 
 ## Session
 
-`prepare_artifact_download` creates one SQL `ArtifactDownload` row for an exact
+`download_artifact(action=prepare)` creates one SQL `ArtifactDownload` row for an exact
 immutable artifact/version, actor/client and absolute deadline. The request
 carries an idempotency key: a retry with the same key and request returns the
 existing session; a different request under the same key conflicts. States:
@@ -47,7 +47,7 @@ Rows are exported in batches and retained under the common audit retention.
 
 ## Stop
 
-`cancel_artifact_download` requires the original actor/client to authenticate
+`download_artifact(action=cancel)` requires the original actor/client to authenticate
 and remains available after the caller loses download scopes. It is one SQL
 transition to Cancelled with its audit row, keyed by the request's idempotency
 key; a replay returns the first receipt. The receipt is `Cancelled` or

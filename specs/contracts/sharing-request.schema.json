@@ -13,8 +13,8 @@
             "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/recipient"
           },
           "minItems": 1,
-          "maxItems": 32,
-          "uniqueItems": true
+          "uniqueItems": true,
+          "description": "No count limit: recipients are bounded only by the request body byte limit (memory) (maintainer rule: limits need a reason)."
         },
         "outputSelection": {
           "oneOf": [
@@ -102,7 +102,6 @@
                           ]
                         },
                         "minItems": 1,
-                        "maxItems": 32,
                         "uniqueItems": true
                       }
                     },
@@ -167,7 +166,6 @@
                     ]
                   },
                   "minItems": 1,
-                  "maxItems": 16,
                   "uniqueItems": true
                 }
               },
@@ -184,7 +182,7 @@
         "maxArtifactsPerCapture": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 64,
+          "maximum": 9007199254740991,
           "default": 64
         },
         "reason": {
@@ -210,8 +208,8 @@
             "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/recipient"
           },
           "minItems": 1,
-          "maxItems": 32,
-          "uniqueItems": true
+          "uniqueItems": true,
+          "description": "No count limit: recipients are bounded only by the request body byte limit (memory) (maintainer rule: limits need a reason)."
         },
         "outputSelection": {
           "oneOf": [
@@ -299,7 +297,6 @@
                           ]
                         },
                         "minItems": 1,
-                        "maxItems": 32,
                         "uniqueItems": true
                       }
                     },
@@ -364,7 +361,6 @@
                     ]
                   },
                   "minItems": 1,
-                  "maxItems": 16,
                   "uniqueItems": true
                 }
               },
@@ -376,12 +372,13 @@
           ]
         },
         "notAfter": {
-          "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/timestamp"
+          "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/timestamp",
+          "description": "Optional end of recurring sharing; defaults to the policy grant end (non-intrusive policies: 90 days, at most 365). No weekly renewal."
         },
         "maxArtifactsPerCapture": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 64,
+          "maximum": 9007199254740991,
           "default": 64
         },
         "reason": {
@@ -399,12 +396,12 @@
             "maxCaptures": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 100
+              "maximum": 9007199254740991,
+              "description": "Optional bound on captures shared; omitted means every capture until notAfter."
             }
           },
           "required": [
-            "enabled",
-            "maxCaptures"
+            "enabled"
           ]
         },
         "management": {
@@ -413,7 +410,6 @@
       },
       "required": [
         "recipients",
-        "notAfter",
         "futureCaptures"
       ]
     }

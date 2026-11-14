@@ -24,17 +24,17 @@
         "defaultAgeSeconds": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 31536000
+          "maximum": 9007199254740991
         },
         "maxAgeSeconds": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 31536000
+          "maximum": 9007199254740991
         },
         "renewalNoticeSeconds": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 31536000
+          "maximum": 9007199254740991
         }
       },
       "required": [

@@ -11,6 +11,8 @@ import hashlib
 import json
 from pathlib import Path
 
+import implemented_contracts
+
 ROOT = Path(__file__).resolve().parents[1]
 CONTRACTS = ROOT / 'specs/contracts'
 DEST = ROOT / 'charts/asservat/crds'
@@ -37,7 +39,7 @@ def resolve(ref):
         raise ValueError('nonlocal schema reference')
     name = base.removeprefix('https://asservat.io/spec/v1/')
     if '/' in name or '..' in name: raise ValueError('invalid schema reference')
-    value = json.loads((CONTRACTS/name).read_text())
+    value = json.loads(implemented_contracts.path(name).read_text())
     if fragment:
         for key in fragment.removeprefix('/').split('/'):
             value = value[key.replace('~1','/').replace('~0','~')]
@@ -81,7 +83,7 @@ def structural(value):
     return out
 
 def render(kind, plural, file):
-    source=json.loads((CONTRACTS/file).read_text())
+    source=json.loads(implemented_contracts.path(file).read_text())
     spec=structural(source['properties']['spec'])
     spec['description']='Desired permission configuration. A successful write does not activate access; inspect current-generation status.'
     status=structural(source['properties']['status'])

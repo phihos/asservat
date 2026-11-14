@@ -34,7 +34,7 @@ from the canonical OpenAPI files. AJV compiles standalone validators; the
 browser compiles no schemas, fetches no remote schemas and evaluates no
 generated code at runtime. Generation drift fails `console-check`. Responses
 are schema-validated before display and have decoded-body ceilings (32 KiB for
-session calls, 128 KiB for `preview_recording_save`, 160 KiB for
+session calls, 128 KiB for a recording-save `preview_capture`, 160 KiB for
 `get_capture_settings`).
 
 ## Session state in the browser

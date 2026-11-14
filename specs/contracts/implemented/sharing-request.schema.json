@@ -1,0 +1,421 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/sharing-request.schema.json",
+  "title": "Optional collection-time sharing instructions",
+  "$defs": {
+    "capture": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "recipients": {
+          "type": "array",
+          "items": {
+            "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/recipient"
+          },
+          "minItems": 1,
+          "maxItems": 32,
+          "uniqueItems": true
+        },
+        "outputSelection": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "mode": {
+                  "const": "approvedExtracts"
+                }
+              },
+              "required": [
+                "mode"
+              ]
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "mode": {
+                  "const": "explicit"
+                },
+                "outputs": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "actionID": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9-]{0,62}$"
+                      },
+                      "dataClass": {
+                        "enum": [
+                          "metadata",
+                          "extract",
+                          "raw"
+                        ]
+                      },
+                      "projectionRef": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "pattern": "^[a-z][a-z0-9-]{0,62}$"
+                          },
+                          "version": {
+                            "type": "string",
+                            "pattern": "^v[1-9][0-9]*$"
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "version"
+                        ]
+                      },
+                      "operations": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "enum": [
+                            "get_case",
+                            "list_artifacts",
+                            "get_timeline",
+                            "get_backtrace",
+                            "get_runtime_summary",
+                            "get_profile_summary",
+                            "get_pcap_summary",
+                            "get_zeek_log",
+                            "get_file_excerpt",
+                            "get_logs",
+                            "read_memory",
+                            "debugger_command",
+                            "pcap_query",
+                            "list_cases",
+                            "find_similar_cases",
+                            "compare_profiles",
+                            "get_query_result",
+                            "get_http_headers",
+                            "syscall_query",
+                            "get_syscall_summary",
+                            "get_syscall_events",
+                            "download_artifact"
+                          ]
+                        },
+                        "minItems": 1,
+                        "maxItems": 32,
+                        "uniqueItems": true
+                      }
+                    },
+                    "required": [
+                      "actionID",
+                      "dataClass"
+                    ],
+                    "allOf": [
+                      {
+                        "if": {
+                          "properties": {
+                            "dataClass": {
+                              "const": "raw"
+                            }
+                          }
+                        },
+                        "then": {
+                          "required": [
+                            "operations"
+                          ],
+                          "not": {
+                            "required": [
+                              "projectionRef"
+                            ]
+                          },
+                          "properties": {
+                            "operations": {
+                              "contains": {
+                                "enum": [
+                                  "read_memory",
+                                  "debugger_command",
+                                  "pcap_query",
+                                  "syscall_query",
+                                  "download_artifact"
+                                ]
+                              },
+                              "minContains": 1
+                            }
+                          }
+                        },
+                        "else": {
+                          "required": [
+                            "projectionRef"
+                          ],
+                          "properties": {
+                            "operations": {
+                              "items": {
+                                "not": {
+                                  "enum": [
+                                    "read_memory",
+                                    "debugger_command",
+                                    "pcap_query",
+                                    "syscall_query",
+                                    "download_artifact"
+                                  ]
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "minItems": 1,
+                  "maxItems": 16,
+                  "uniqueItems": true
+                }
+              },
+              "required": [
+                "mode",
+                "outputs"
+              ]
+            }
+          ]
+        },
+        "notAfter": {
+          "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/timestamp"
+        },
+        "maxArtifactsPerCapture": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64,
+          "default": 64
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "management": {
+          "$ref": "https://asservat.io/spec/v1/management.schema.json#/$defs/request"
+        }
+      },
+      "required": [
+        "recipients"
+      ]
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "recipients": {
+          "type": "array",
+          "items": {
+            "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/recipient"
+          },
+          "minItems": 1,
+          "maxItems": 32,
+          "uniqueItems": true
+        },
+        "outputSelection": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "mode": {
+                  "const": "approvedExtracts"
+                }
+              },
+              "required": [
+                "mode"
+              ]
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "mode": {
+                  "const": "explicit"
+                },
+                "outputs": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "actionID": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9-]{0,62}$"
+                      },
+                      "dataClass": {
+                        "enum": [
+                          "metadata",
+                          "extract",
+                          "raw"
+                        ]
+                      },
+                      "projectionRef": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "pattern": "^[a-z][a-z0-9-]{0,62}$"
+                          },
+                          "version": {
+                            "type": "string",
+                            "pattern": "^v[1-9][0-9]*$"
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "version"
+                        ]
+                      },
+                      "operations": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "enum": [
+                            "get_case",
+                            "list_artifacts",
+                            "get_timeline",
+                            "get_backtrace",
+                            "get_runtime_summary",
+                            "get_profile_summary",
+                            "get_pcap_summary",
+                            "get_zeek_log",
+                            "get_file_excerpt",
+                            "get_logs",
+                            "read_memory",
+                            "debugger_command",
+                            "pcap_query",
+                            "list_cases",
+                            "find_similar_cases",
+                            "compare_profiles",
+                            "get_query_result",
+                            "get_http_headers",
+                            "syscall_query",
+                            "get_syscall_summary",
+                            "get_syscall_events",
+                            "download_artifact"
+                          ]
+                        },
+                        "minItems": 1,
+                        "maxItems": 32,
+                        "uniqueItems": true
+                      }
+                    },
+                    "required": [
+                      "actionID",
+                      "dataClass"
+                    ],
+                    "allOf": [
+                      {
+                        "if": {
+                          "properties": {
+                            "dataClass": {
+                              "const": "raw"
+                            }
+                          }
+                        },
+                        "then": {
+                          "required": [
+                            "operations"
+                          ],
+                          "not": {
+                            "required": [
+                              "projectionRef"
+                            ]
+                          },
+                          "properties": {
+                            "operations": {
+                              "contains": {
+                                "enum": [
+                                  "read_memory",
+                                  "debugger_command",
+                                  "pcap_query",
+                                  "syscall_query",
+                                  "download_artifact"
+                                ]
+                              },
+                              "minContains": 1
+                            }
+                          }
+                        },
+                        "else": {
+                          "required": [
+                            "projectionRef"
+                          ],
+                          "properties": {
+                            "operations": {
+                              "items": {
+                                "not": {
+                                  "enum": [
+                                    "read_memory",
+                                    "debugger_command",
+                                    "pcap_query",
+                                    "syscall_query",
+                                    "download_artifact"
+                                  ]
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "minItems": 1,
+                  "maxItems": 16,
+                  "uniqueItems": true
+                }
+              },
+              "required": [
+                "mode",
+                "outputs"
+              ]
+            }
+          ]
+        },
+        "notAfter": {
+          "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/timestamp"
+        },
+        "maxArtifactsPerCapture": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64,
+          "default": 64
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "futureCaptures": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "const": true
+            },
+            "maxCaptures": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          "required": [
+            "enabled",
+            "maxCaptures"
+          ]
+        },
+        "management": {
+          "$ref": "https://asservat.io/spec/v1/management.schema.json#/$defs/request"
+        }
+      },
+      "required": [
+        "recipients",
+        "notAfter",
+        "futureCaptures"
+      ]
+    }
+  }
+}

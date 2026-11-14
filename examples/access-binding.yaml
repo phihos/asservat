@@ -7,7 +7,6 @@ spec:
   effect: Allow
   subjects:
   - kind: Group
-    issuer: https://identity.example.invalid/realms/company
     id: group-payments-123
   roles:
   - workload-maintainer
