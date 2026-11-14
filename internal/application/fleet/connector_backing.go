@@ -59,7 +59,7 @@ func (b ConnectorIdentityBacking) Clone() ConnectorIdentityBacking {
 // is a standing configuration, valid until replaced (ADR-332), not a window a
 // connector must restart or enroll within. The value is RFC 5280's
 // "no well-defined expiration" time; finite, as the SQL columns require.
-var ConnectorBackingStanding = time.Date(9999, 12, 31, 23, 59, 59, 0, time.UTC)
+var ConnectorBackingStanding = audit.StandingAdmission
 
 // The standing backing's structural sizes (ADR-332). They size its accounting
 // only: SQL counts no connector profile, source transition, identity account

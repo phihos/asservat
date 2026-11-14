@@ -261,3 +261,27 @@ func TestConnectorRetirementRetryAfterStoredOutcomeKeepsOriginalRecord(t *testin
 		t.Fatal("retry renewed or replaced original stored outcome", second, err)
 	}
 }
+
+// ADR-332: a standing cohort has no admission end, so expiry never restricts
+// it and records no effect; an explicit retiring source remains its only
+// retirement, and an expiry-cause restriction of it is not a valid record.
+func TestConnectorRetirementStandingTicketHasNoExpiry(t *testing.T) {
+	f, s := retirementService(t)
+	p := connectorTicketPlan(t)
+	p.Backing.Policy.ValidUntil = ConnectorBackingStanding
+	ticket, e := p.Ticket()
+	if e != nil || !ticket.Standing() {
+		t.Fatal("standing ticket", e)
+	}
+	f.record = ConnectorRetirementRecord{Ticket: ticket, AdmissionOpen: true}
+	s.RootID = ticket.RootID
+	f.now = ticket.ConsumeUntil.Add(-time.Minute)
+	result, e := s.Expire(context.Background(), ticket.ID)
+	if !errors.Is(e, value.ErrDenied) || result.Restricted || f.restricts != 0 || f.prepares != 0 || f.begins != 0 {
+		t.Fatalf("standing cohort expired: %+v %v counts %d/%d/%d", result, e, f.restricts, f.prepares, f.begins)
+	}
+	expired := ConnectorRetirementRecord{Ticket: ticket, Restriction: &ConnectorRetirementRestriction{Cause: audit.ConnectorRetirementExpiry}, RestrictedAt: f.now}
+	if expired.Valid() {
+		t.Fatal("expiry restriction of a standing cohort accepted")
+	}
+}

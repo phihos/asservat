@@ -125,6 +125,12 @@ renewals; that machinery has no precedent either.
 - An installation created before this change keeps its stored finite backing
   in the offer ConfigMap and in SQL; the product is unreleased and has no
   migration for it (ADR-330 complexity gate item 10). Reinstall it.
+- A standing cohort's retirement ticket has no admission end, so the
+  expiry retirement (`originalAdmissionEnd`) never applies to it
+  (`ConnectorRetirementTicket.Standing`); only an explicit retiring source
+  retires it. The ticket's reservation no longer withholds any capacity:
+  with the identity-lane caps removed it is an accounting row, consumed by
+  that explicit retirement.
 - Finite backings remain accepted by SQL (tests and older rows); only the
   shipped producer is standing.
 
