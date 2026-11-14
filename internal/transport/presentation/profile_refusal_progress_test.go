@@ -17,7 +17,7 @@ func TestProfileRefusalProgressKeepsFailedReasonAndNoArtifact(t *testing.T) {
 				t.Fatal(err)
 			}
 			p.ActionID, p.Phase, p.ActionPhase, p.ReasonCode = "cpu-profile", "Failed", "Failed", reason
-			p.CaseID, p.CanCancel, p.RetryAfterSeconds = "", false, 0
+			p.CaseID, p.CanCancel = "", false
 			ops, err := NewContextOperations(base.config, current, groupedRecordingProgressFixture{p})
 			if err != nil {
 				t.Fatal(err)
@@ -34,7 +34,7 @@ func TestProfileRefusalProgressKeepsFailedReasonAndNoArtifact(t *testing.T) {
 				t.Fatal("progress reply")
 			}
 			got := envelope.Data
-			if got.Phase != "Failed" || len(got.Actions) != 1 || got.Actions[0].Phase != "Failed" || got.Actions[0].ReasonCode != reason || got.Actions[0].ActionID != "cpu-profile" || got.CaseID != "" || got.CanCancel || got.RetryAfterSeconds != 0 {
+			if got.Phase != "Failed" || len(got.Actions) != 1 || got.Actions[0].Phase != "Failed" || got.Actions[0].ReasonCode != reason || got.Actions[0].ActionID != "cpu-profile" || got.CaseID != "" || got.CanCancel {
 				t.Fatal("profile refusal lost or turned into evidence/retry", string(reply.Body))
 			}
 		})

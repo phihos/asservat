@@ -24,7 +24,7 @@ export function result<N extends Operation>(data: unknown): Output<N> {
   return { schema_version: 'mcp-result/v1', request_id: id(500), data_class: 'metadata', status: 'ok', data, truncated: false, next_cursor: null, narrowing_hint: null, warnings: [], provenance: [] } as unknown as Output<N>;
 }
 export function progressResult(phase: 'Pending' | 'Finalizing' | 'Succeeded' = 'Pending', revision = 1): Output<'get_capture'> {
-  return result<'get_capture'>({ capture_id: id(8), revision, phase, actions: [{ action_id: 'pod-status', phase }], navigation_uri: 'https://asservat.example.invalid/captures/' + id(8), can_cancel: false, blockers: [], retry_after_seconds: 5 });
+  return result<'get_capture'>({ capture_id: id(8), revision, phase, actions: [{ action_id: 'pod-status', phase }], navigation_uri: 'https://asservat.example.invalid/captures/' + id(8), can_cancel: false, blockers: [] });
 }
 export function acceptedResult(): Output<'request_capture'> {
   return result<'request_capture'>({ capture_id: id(8), phase: 'Accepted', navigation_uri: 'https://asservat.example.invalid/captures/' + id(8), operation: 'collect' });

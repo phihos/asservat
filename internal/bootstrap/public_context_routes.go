@@ -18,6 +18,7 @@ type publicContextRoutes struct {
 	host                                                 string
 	sessions, investigations, mcp, content, console      http.Handler // content nil without a configured worker
 	processing, processingRules                          http.Handler // nil without a capacity processing source
+	events                                               http.Handler // nil without a progress listener
 	mcpPath, mcpMetadata, contentPrefix, contentMetadata string
 }
 
@@ -77,6 +78,10 @@ func (h *publicContextRoutes) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		h.processingRules.ServeHTTP(w, r)
 		return
 	}
+	if path == browser.EventsPath && h.events != nil {
+		h.events.ServeHTTP(w, r)
+		return
+	}
 	if r.URL.RawQuery != "" {
 		publicContextProblem(w, http.StatusBadRequest)
 		return
@@ -92,7 +97,7 @@ func (h *publicContextRoutes) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		h.investigations.ServeHTTP(w, r)
 	case path == browser.ProcessingChangesPath && h.processing != nil:
 		h.processing.ServeHTTP(w, r)
-	case path == "/processing" || strings.HasPrefix(path, "/processing/artifacts/") || path == "/" || path == "/live" || path == "/policies" || path == "/shares" || path == "/access-preview" || path == "/capacity" || path == "/retention-preview" || path == "/approvals" || strings.HasPrefix(path, "/approvals/") || strings.HasPrefix(path, "/assets/") || strings.HasPrefix(path, "/captures/") || strings.HasPrefix(path, "/cases/"):
+	case path == "/processing" || strings.HasPrefix(path, "/processing/artifacts/") || path == "/" || path == "/live" || path == "/policies" || path == "/shares" || path == "/access-preview" || path == "/retention-preview" || path == "/approvals" || strings.HasPrefix(path, "/approvals/") || strings.HasPrefix(path, "/assets/") || strings.HasPrefix(path, "/captures/") || strings.HasPrefix(path, "/cases/"):
 		// The bounded console handler validates its exact asset/UUID route set.
 		h.console.ServeHTTP(w, r)
 	default:

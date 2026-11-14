@@ -74,7 +74,7 @@ func (f *contextOperationFixture) ResolveContextRequest(_ context.Context, _ ide
 	return d, f.err
 }
 func (f *contextOperationFixture) Get(context.Context, identities.CurrentIdentity, string) (value.ContextProgress, error) {
-	return value.ContextProgress{ValidUntil: f.metadataUntil, CaptureID: "00000000-0000-4000-8000-000000000030", Revision: 3, Phase: "Finalizing", ActionPhase: "Finalizing", ReasonCode: "VerificationPending", RetryAfterSeconds: 2, Sharing: f.sharing}, f.err
+	return value.ContextProgress{ValidUntil: f.metadataUntil, CaptureID: "00000000-0000-4000-8000-000000000030", Revision: 3, Phase: "Finalizing", ActionPhase: "Finalizing", ReasonCode: "VerificationPending", Sharing: f.sharing}, f.err
 }
 
 func operationFixture(t *testing.T, enabled bool) (*ContextOperations, *contextOperationFixture) {

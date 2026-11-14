@@ -1,5 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { Investigation } from './investigation';
+import { FakeEventSource } from '../test-setup';
 import { SyntheticOperations, session, target, id, previewResult, acceptedResult, progressResult, catalogResult, resolvedAcceptedResult, resolvedClosedResult, recordingPreviewResult, approvalPendingResult, settingsResult, historyResult } from './test-fixtures';
 
 const controllers: Investigation[] = [];
@@ -211,6 +212,34 @@ it('hides progress after a denied read and rejects decreasing durable revisions'
   expect(controller.snapshot().progress).toBeUndefined();
   client.responder = () => progressResult('Pending', 2); await controller.refreshProgress();
   expect(controller.snapshot().progress).toBeUndefined();
+});
+it('follows pushed status events instead of polling and stops at a terminal phase', async () => {
+  vi.useFakeTimers(); const { controller, client } = await ready(); await controller.submit();
+  client.responder = () => progressResult('Pending', 1); await controller.refreshProgress();
+  const stream = FakeEventSource.instances.at(-1)!;
+  expect(stream.url).toBe('/api/v1/events?capture_id=' + id(8));
+  const reads = client.calls.filter(c => c.name === 'get_capture').length;
+  await vi.advanceTimersByTimeAsync(60_000);
+  expect(client.calls.filter(c => c.name === 'get_capture').length).toBe(reads);
+  stream.emit('capture', { type: 'capture', id: id(8), revision: 2, result: progressResult('Finalizing', 2) });
+  expect(controller.snapshot().progress?.phase).toBe('Finalizing');
+  stream.emit('capture', { type: 'capture', id: id(8), revision: 3, result: progressResult('Succeeded', 3) });
+  expect(controller.snapshot().progress?.phase).toBe('Succeeded');
+  expect(stream.closed).toBe(true);
+});
+it('resynchronizes once after the stream closes and reports a failed resync', async () => {
+  vi.useFakeTimers(); const { controller, client } = await ready(); await controller.submit();
+  client.responder = () => progressResult('Pending', 1); await controller.refreshProgress();
+  const first = FakeEventSource.instances.at(-1)!;
+  client.responder = () => progressResult('Finalizing', 2);
+  first.fail(); await vi.advanceTimersByTimeAsync(0);
+  expect(controller.snapshot().progress?.phase).toBe('Finalizing');
+  const second = FakeEventSource.instances.at(-1)!;
+  expect(second).not.toBe(first);
+  client.responder = () => { throw new Error('session ended'); };
+  second.fail(); await vi.advanceTimersByTimeAsync(0);
+  expect(controller.snapshot().error).toMatch(/updates stopped/);
+  expect(FakeEventSource.instances.at(-1)).toBe(second);
 });
 it('rejects a selected pod outside the requested workload even in a schema-valid reply', async () => {
   const { controller, client } = await ready();

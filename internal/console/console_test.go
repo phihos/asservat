@@ -87,7 +87,7 @@ func TestStaticSnapshotAndCacheBoundaries(t *testing.T) {
 	files[strings.TrimPrefix(testJS, "/")].Data[0] = 'x'
 	files["assets/new-01234567.js"] = &fstest.MapFile{Data: []byte("new")}
 
-	for _, target := range []string{"/", "/captures/new", "/live", "/policies", "/shares", "/capacity", "/processing", "/processing/artifacts/00000000-0000-4000-8000-000000000008", "/captures/00000000-0000-4000-8000-000000000008", "/cases/00000000-0000-4000-8000-000000000007", testJS, testCSS} {
+	for _, target := range []string{"/", "/captures/new", "/live", "/policies", "/shares", "/processing", "/processing/artifacts/00000000-0000-4000-8000-000000000008", "/captures/00000000-0000-4000-8000-000000000008", "/cases/00000000-0000-4000-8000-000000000007", testJS, testCSS} {
 		w := httptest.NewRecorder()
 		h.ServeHTTP(w, request("GET", target))
 		if w.Code != 200 {

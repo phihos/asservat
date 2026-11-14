@@ -131,8 +131,8 @@ try {
   await expect(page.getByRole('heading', { name: 'Waiting to start' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Continue collection', exact: true })).toHaveCount(0);
   checks.push('explicit same-key acquisition continuation uses retained receipt, no new request or preview; reload remains passive');
+  // The open capture page receives the change over GET /api/v1/events.
   await captureControl('finalizing');
-  await page.getByRole('button', { name: 'Check status' }).click();
   await expect(page.getByRole('heading', { name: 'Verifying and publishing evidence' })).toBeVisible();
   await expect(page.getByText(/still needs verification and publication/)).toBeVisible();
   await scan('capture-progress');
@@ -144,7 +144,7 @@ try {
   // Problem for invalid cookie/current identity and CSRF authentication.
   assert.equal(badCSRF.status(), 401);
   assert.deepEqual(await badCSRF.json(), { type: 'about:blank', title: 'Unauthorized', status: 401 });
-  checks.push('same-user session refresh preserves only reviewed handle, uncertain commit retries same key, accepted Pending, Finalizing, exact progress reload, real operation CSRF denial');
+  checks.push('same-user session refresh preserves only reviewed handle, uncertain commit retries same key, accepted Pending, Finalizing pushed over the status stream, exact progress reload, real operation CSRF denial');
   await evidenceJourney({ page, origin, output, scan, checks, captureControl, control, evidenceLoads });
   await page.goto(origin + '/captures/new');
   await page.getByLabel('Cluster ID').fill('00000000-0000-4000-8000-000000000001');
@@ -284,23 +284,6 @@ try {
   await scan('shared-policy-budgets');
   checks.push('shared policy budgets and explicit refresh; finite policy approval request through real C03/HTTPS, existing review detail and no self-approval/personal continuation');
   await page.screenshot({ path: output + '/policy-budgets.png', fullPage: true });
-
-  await page.goto(origin + '/capacity');
-  await page.getByLabel('Cluster ID').fill('00000000-0000-4000-8000-000000000001');
-  const capacityResponse = page.waitForResponse(response => new URL(response.url()).pathname === '/api/v1/operations/get_live_capacity');
-  await page.getByRole('button', { name: 'Read live capacity' }).click();
-  const capacityHTTP = await capacityResponse;
-  if (capacityHTTP.status() !== 200) console.log('live capacity HTTP', capacityHTTP.status());
-  await expect(page.getByLabel('Live runtime totals and gauges')).toBeVisible();
-  await expect(page.getByLabel('Live runtime rates')).toBeVisible();
-  await expect(page.getByText('Active viewers', { exact: true })).toBeVisible();
-  await expect(page.getByText('Source-loss events', { exact: true })).toBeVisible();
-  await expect(page.getByText('Transport-dropped rows', { exact: true })).toBeVisible();
-  await expect(page.getByText('Buffered pending rows', { exact: true })).toBeVisible();
-  await expect(page.getByText('Counters and per-second rates cover every current live-enabled node report.')).toBeVisible();
-  await scan('live-capacity');
-  await page.screenshot({ path: output + '/live-capacity.png', fullPage: true });
-  checks.push('fleet-operator live capacity uses canonical browser/CSRF transport and built React without polling or content labels');
 
   await page.goto(origin + '/');
 

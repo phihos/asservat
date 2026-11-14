@@ -88,7 +88,6 @@ type ContextProgress struct {
 	Revision                       int64
 	Phase, ActionPhase, ReasonCode string
 	CanCancel                      bool
-	RetryAfterSeconds              int
 	CreatedAt, Deadline            time.Time
 	// Sharing is reported separately from capture progress (ADR-235); nil
 	// when the capture carries no sharing instruction.
