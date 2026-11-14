@@ -22,4 +22,18 @@ END $$;
 -- +goose StatementEnd
 
 -- +goose Down
-SELECT 1;
+-- +goose StatementBegin
+DO $$
+DECLARE r record; def text;
+BEGIN
+ def:=pg_catalog.pg_get_functiondef('public.project_context_processing()'::regprocedure);
+ FOR r IN SELECT * FROM (VALUES
+  (' OR n>=p.valid_until THEN',' OR n>=p.valid_until OR p.captures>=p.max_captures THEN'),
+  (E' RETURN NEW;\nEND',E' UPDATE public.processing_root SET captures=captures+1 WHERE root_id=NEW.root_id;\n RETURN NEW;\nEND')) AS v(old_text,new_text) LOOP
+  IF (pg_catalog.length(def)-pg_catalog.length(pg_catalog.replace(def,r.old_text,'')))/pg_catalog.length(r.old_text)<>1 THEN
+   RAISE EXCEPTION 'unexpected definition of project_context_processing' USING ERRCODE='55000';END IF;
+  def:=pg_catalog.replace(def,r.old_text,r.new_text);
+ END LOOP;
+ EXECUTE def;
+END $$;
+-- +goose StatementEnd
