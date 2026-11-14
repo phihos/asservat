@@ -1,0 +1,85 @@
+{{- /* ADR-329: AccessBindings live in the application namespace they grant
+  and are governed by ordinary Kubernetes RBAC, like RoleBindings. Namespace
+  `admin`s may write them (aggregated ClusterRole); `view` may read them.
+  Like the RoleBinding `bind` check, writing a binding needs the `bind` verb
+  on the virtual resource `accessroles.asservat.io` named after each role it
+  grants, and `bind` on `automation` for spec.automation (ADR-059: never an
+  ordinary namespace grant). Cluster administrators hold both; the automation
+  ClusterRole below is bound per namespace by an administrator. */}}
+{{- if include "asservat.hub" . }}
+{{- $base := printf "%s-%s" .Release.Namespace (include "asservat.fullname" (list . "accessbindings")) }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ printf "%s-view" $base }}
+  labels:
+    {{- include "asservat.labels" (list . "accessbindings") | nindent 4 }}
+    rbac.authorization.k8s.io/aggregate-to-view: "true"
+    rbac.authorization.k8s.io/aggregate-to-edit: "true"
+    rbac.authorization.k8s.io/aggregate-to-admin: "true"
+rules:
+  - apiGroups: [asservat.io]
+    resources: [accessbindings]
+    verbs: [get, list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ printf "%s-admin" $base }}
+  labels:
+    {{- include "asservat.labels" (list . "accessbindings") | nindent 4 }}
+    rbac.authorization.k8s.io/aggregate-to-admin: "true"
+rules:
+  - apiGroups: [asservat.io]
+    resources: [accessbindings]
+    verbs: [create, update, patch, delete, deletecollection]
+  - apiGroups: [asservat.io]
+    resources: [accessroles]
+    resourceNames: [evidence-reader, workload-maintainer, evidence-owner, action-approver]
+    verbs: [bind]
+---
+# Not aggregated: an administrator binds it in a namespace whose team may
+# write automation-bearing AccessBindings (team policy delegation, ADR-059).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ printf "%s-automation" $base }}
+  labels: {{- include "asservat.labels" (list . "accessbindings") | nindent 4 }}
+rules:
+  - apiGroups: [asservat.io]
+    resources: [accessroles]
+    resourceNames: [automation]
+    verbs: [bind]
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: {{ $base }}
+  labels: {{- include "asservat.labels" (list . "accessbindings") | nindent 4 }}
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [asservat.io]
+        apiVersions: ["*"]
+        operations: [CREATE, UPDATE]
+        resources: [accessbindings]
+  validations:
+    # Only roles and automation that a write adds or changes need bind, as for
+    # RoleBindings; metadata-only updates (finalizers, labels) pass.
+    - expression: "!has(object.spec.roles) || object.spec.roles.all(r, (request.operation == 'UPDATE' && has(oldObject.spec.roles) && r in oldObject.spec.roles) || authorizer.group('asservat.io').resource('accessroles').namespace(request.namespace).name(r).check('bind').allowed())"
+      messageExpression: "'granting ' + (has(object.spec.roles) ? object.spec.roles.join(', ') : '') + ' needs the bind verb on accessroles.asservat.io with each role name in namespace ' + request.namespace"
+      reason: Forbidden
+    - expression: "!has(object.spec.automation) || (request.operation == 'UPDATE' && has(oldObject.spec.automation) && object.spec.automation == oldObject.spec.automation) || authorizer.group('asservat.io').resource('accessroles').namespace(request.namespace).name('automation').check('bind').allowed()"
+      messageExpression: "'spec.automation needs the bind verb on accessroles.asservat.io named automation in namespace ' + request.namespace"
+      reason: Forbidden
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: {{ $base }}
+  labels: {{- include "asservat.labels" (list . "accessbindings") | nindent 4 }}
+spec:
+  policyName: {{ $base }}
+  validationActions: [Deny]
+{{- end }}

@@ -159,9 +159,6 @@
           "items": {
             "type": "object"
           }
-        },
-        "permissionDelegations": {
-          "type": "array"
         }
       }
     },

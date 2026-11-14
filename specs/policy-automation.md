@@ -4,7 +4,7 @@ Accepted ADR-059 refines REQ-AUT-001/003, REQ-PER-001/006/007/008 and REQ-EXE-00
 
 ## Operator configuration and low-effort authoring
 
-`AccessBinding.spec.automation` is an optional reusable **per-policy** ceiling. It is allowed only on an Allow binding whose subjects are stable groups and whose roles include workload-maintainer. It uses the binding's exact cluster/namespace/workload scope and optional notAfter. Existing installation permission administrators manage this field through Kubernetes; ordinary delegated AccessBinding writers cannot create, alter or delete an automation-bearing binding. This prevents an existing permission-writing delegation from acquiring a stronger power on upgrade. Future delegated automation administration requires its own reviewed bounds.
+`AccessBinding.spec.automation` is an optional reusable **per-policy** ceiling. It is allowed only on an Allow binding whose subjects are stable groups and whose roles include workload-maintainer. It uses the binding's own namespace and workload scope and optional notAfter. Creating or updating it needs `bind` on `accessroles.asservat.io` named `automation` in that namespace, which only an administrator grants (the chart's non-aggregated automation ClusterRole, [ADR-329](../docs/decisions/329-accessbindings-in-application-namespaces.md)); ordinary namespace writers who may grant roles cannot create an automation-bearing binding.
 
 The [typed envelope](contracts/policy-authority.schema.json) pins allowed action kinds, maximum policy lifetime in seconds (1–31536000), maximum executions (1–10000), aggregate collected bytes (1–1 TiB), observed bytes (0–1 TiB) and optional cumulative observed events (0–1,000,000,000). An omitted event ceiling means zero and grants no argument-observation events; existing envelopes and their signed scopes retain their original encoding. The protected event ceiling enters accepted authority and its reviewed scope, independently of the matching sensitive grant's event ceiling and spend. Zero observation bytes permits no continuing acquisition of bytes; it does not turn an ongoing recorder into an on-trigger action. Counts/bytes are prospective reservation ceilings, not throughput or overhead estimates. Existing node/workload limits, observation event/session/rate ceilings, protected storage and grant rules remain mandatory. Several policies cannot multiply a workload's aggregate allowance. Restrict actions to the expanded recipe's exact kinds; allowed kinds never waive intrusive review or local safety rules.
 
@@ -22,8 +22,8 @@ Changing executor, sponsorship, envelope definition, authority expiry or limits 
 
 ## Hub-held policies and in-process activation (ADR-228)
 
-The first implemented policies are hub-held: a DebugPolicy in the hub control namespace (like
-AccessBindings) names its workload cluster in `spec.target.cluster`. The policy object's own
+The first implemented policies are hub-held: a DebugPolicy in the hub control namespace (unlike
+AccessBindings since ADR-329) names its workload cluster in `spec.target.cluster`. The policy object's own
 location (submission/source) and its target (accepted authority) therefore differ; the target is
 bound by the accepted authority alone. The authenticated human activates the current revision with
 the MCP/browser operation `activate_policy`; hub-api reads the source, compiles it, resolves the

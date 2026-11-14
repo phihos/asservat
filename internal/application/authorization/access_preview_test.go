@@ -44,8 +44,10 @@ func (f *previewFixture) DecodeAccessBindingSpec(spec []byte) (cfg.Binding, erro
 	if f.decodeErr != nil || string(spec) != `{"effect":"Deny"}` {
 		return cfg.Binding{}, cfg.ErrInvalid
 	}
-	return cfg.Binding{Resource: cfg.Resource{SpecDigest: artifact.Digest{7}}, Effect: "Deny", Subjects: []cfg.Subject{{Kind: "Group", Issuer: f.caller.Principal.Issuer, ID: "team-a"}}, Roles: []string{"evidence-reader"},
-		Scope: cfg.Scope{ClusterID: previewCluster, Namespace: cfg.NamespaceRef{Name: "payments", UID: "ns"}}}, nil
+	return cfg.Binding{Resource: cfg.Resource{SpecDigest: artifact.Digest{7}}, Effect: "Deny", Subjects: []cfg.Subject{{Kind: "Group", Issuer: f.caller.Principal.Issuer, ID: "team-a"}}, Roles: []string{"evidence-reader"}}, nil
+}
+func (f *previewFixture) DecodePermissionSourceSpec([]byte) (cfg.Source, error) {
+	return cfg.Source{}, cfg.ErrInvalid
 }
 
 func newPreviewFixture() (*previewFixture, AccessPreviewer) {
@@ -64,7 +66,8 @@ func newPreviewFixture() (*previewFixture, AccessPreviewer) {
 	return f, AccessPreviewer{InstallationID: explainInstallation, Administration: f, Projections: f, Decoder: f, Recovery: f, Clusters: []string{previewCluster}, Now: time.Now}
 }
 
-var addDeny = []ProposedChange{{Action: "create", Kind: "AccessBinding", Spec: []byte(`{"effect":"Deny"}`)}}
+// ADR-329: the proposed binding's namespace is its scope.
+var addDeny = []ProposedChange{{Action: "create", Kind: "AccessBinding", Spec: []byte(`{"effect":"Deny"}`), ClusterID: previewCluster, Namespace: cfg.NamespaceRef{Name: "payments", UID: "ns"}}}
 
 // ADR-237: a fleet operator previews a proposed deny over the current
 // projection with the real evaluator.

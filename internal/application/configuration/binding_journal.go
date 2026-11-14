@@ -42,24 +42,31 @@ func cloneBinding(b value.Binding) value.Binding {
 	}
 	return b
 }
-func journalIdentity(b value.Binding, cluster string, control value.NamespaceRef) bool {
+
+// journalIdentity checks a binding of the journal's cluster: it lives in any
+// namespace and its scope is exactly that namespace (ADR-329).
+func journalIdentity(b value.Binding, cluster string) bool {
 	r := b.Resource
-	return r.ClusterID == cluster && r.Namespace == control.Name && r.NamespaceUID == control.UID && r.Kind == "AccessBinding" && identity.Text(r.Name, 253) && identity.Text(r.UID, 64) && identity.Text(r.ResourceVersion, 128) && r.Generation > 0 && r.Generation <= 2147483647 && r.SpecDigest != (artifact.Digest{})
+	return r.ClusterID == cluster && identity.Text(r.Namespace, 63) && identity.Text(r.NamespaceUID, 64) && b.Scope.ClusterID == cluster && b.Scope.Namespace == value.NamespaceRef{Name: r.Namespace, UID: r.NamespaceUID} &&
+		r.Kind == "AccessBinding" && identity.Text(r.Name, 253) && identity.Text(r.UID, 64) && identity.Text(r.ResourceVersion, 128) && r.Generation > 0 && r.Generation <= 2147483647 && r.SpecDigest != (artifact.Digest{})
 }
+
+// bindingName keys a binding by namespace and name.
+func bindingName(r value.Resource) string { return r.Namespace + "/" + r.Name }
 func NewBindingJournal(s value.Snapshot, now time.Time) (*BindingJournal, error) {
 	if !authorization.UUID(s.ClusterID) || !identity.Text(s.ControlNamespace.Name, 63) || !identity.Text(s.ControlNamespace.UID, 64) || !identity.Text(s.BindingResourceVersion, 128) || !identity.Fresh(s.ObservedAt, s.FreshUntil, now, 5*time.Second) || len(s.Bindings) > 1024 {
 		return nil, value.ErrInvalid
 	}
 	j := &BindingJournal{cluster: s.ClusterID, control: s.ControlNamespace, cursor: s.BindingResourceVersion, observed: s.ObservedAt, until: s.FreshUntil, byUID: map[string]value.Binding{}, names: map[string]string{}}
 	for _, b := range s.Bindings {
-		if !journalIdentity(b, j.cluster, j.control) || j.names[b.Resource.Name] != "" {
+		if !journalIdentity(b, j.cluster) || j.names[bindingName(b.Resource)] != "" {
 			return nil, value.ErrInvalid
 		}
 		if _, exists := j.byUID[b.Resource.UID]; exists {
 			return nil, value.ErrInvalid
 		}
 		j.byUID[b.Resource.UID] = cloneBinding(b)
-		j.names[b.Resource.Name] = b.Resource.UID
+		j.names[bindingName(b.Resource)] = b.Resource.UID
 	}
 	j.initial = value.PermissionInitialization{ClusterID: s.ClusterID, Control: s.ControlNamespace, BindingsDigest: InitialBindingDigest(s), BindingCount: len(s.Bindings)}
 	return j, nil
@@ -105,20 +112,20 @@ func (j *BindingJournal) Apply(e value.BindingEvent) error {
 		j.cursor = e.ResourceVersion
 		return nil
 	}
-	if e.Binding == nil || !journalIdentity(*e.Binding, j.cluster, j.control) || e.Binding.Resource.ResourceVersion != e.ResourceVersion {
+	if e.Binding == nil || !journalIdentity(*e.Binding, j.cluster) || e.Binding.Resource.ResourceVersion != e.ResourceVersion {
 		return fail()
 	}
 	b := *e.Binding
 	old, exists := j.byUID[b.Resource.UID]
 	switch e.Type {
 	case "ADDED":
-		if exists || j.names[b.Resource.Name] != "" || len(j.byUID) >= 1024 {
+		if exists || j.names[bindingName(b.Resource)] != "" || len(j.byUID) >= 1024 {
 			return fail()
 		}
 		j.byUID[b.Resource.UID] = cloneBinding(b)
-		j.names[b.Resource.Name] = b.Resource.UID
+		j.names[bindingName(b.Resource)] = b.Resource.UID
 	case "MODIFIED", "DELETED":
-		if !exists || old.Resource.Name != b.Resource.Name || b.Resource.Generation < old.Resource.Generation || b.Resource.Generation > old.Resource.Generation+1 || (b.Resource.Generation == old.Resource.Generation && b.Resource.SpecDigest != old.Resource.SpecDigest) || (old.Resource.Deleting && !b.Resource.Deleting && e.Type != "DELETED") {
+		if !exists || bindingName(old.Resource) != bindingName(b.Resource) || old.Resource.NamespaceUID != b.Resource.NamespaceUID || b.Resource.Generation < old.Resource.Generation || b.Resource.Generation > old.Resource.Generation+1 || (b.Resource.Generation == old.Resource.Generation && b.Resource.SpecDigest != old.Resource.SpecDigest) || (old.Resource.Deleting && !b.Resource.Deleting && e.Type != "DELETED") {
 			return fail()
 		}
 		if b.Resource.ResourceVersion == old.Resource.ResourceVersion {
@@ -129,7 +136,7 @@ func (j *BindingJournal) Apply(e value.BindingEvent) error {
 		}
 		if e.Type == "DELETED" {
 			delete(j.byUID, b.Resource.UID)
-			delete(j.names, b.Resource.Name)
+			delete(j.names, bindingName(b.Resource))
 		} else {
 			j.byUID[b.Resource.UID] = cloneBinding(b)
 		}
@@ -205,7 +212,7 @@ func (j *BindingJournal) Ready(now time.Time) bool {
 // would add to a batch prepared at now.
 func (j *BindingJournal) Budget(now time.Time) (bases, rows int) {
 	for _, b := range j.byUID {
-		if (b.Resource.Deleting && b.Effect == "Allow") || (!b.NotAfter.IsZero() && !now.Before(b.NotAfter)) {
+		if b.Invalid || (b.Resource.Deleting && b.Effect == "Allow") || (!b.NotAfter.IsZero() && !now.Before(b.NotAfter)) {
 			continue
 		}
 		bases++
@@ -263,7 +270,7 @@ func (j *BindingJournal) Prepare(f value.PermissionFence, request string, now ti
 		}
 	}
 	for _, b := range bindings {
-		if (b.Resource.Deleting && b.Effect == "Allow") || (!b.NotAfter.IsZero() && !now.Before(b.NotAfter)) {
+		if b.Invalid || (b.Resource.Deleting && b.Effect == "Allow") || (!b.NotAfter.IsZero() && !now.Before(b.NotAfter)) {
 			continue
 		}
 		p := value.PermissionBasis{Resource: b.Resource, Scope: b.Scope, Effect: b.Effect, Subjects: b.Subjects, Roles: b.Roles, NotAfter: b.NotAfter, Automation: b.Automation, Continuous: j.sequence > 0}

@@ -19,7 +19,11 @@ func TestPermissionWatchKeepsIntermediateOwnershipTransitions(t *testing.T) {
 			permissionReply(w, permissionNamespace(permissionControl.Name, permissionControl.UID))
 			return
 		}
-		if r.URL.Query().Get("watch") != "true" || r.URL.Query().Get("resourceVersion") != "opaque:baseline" || r.URL.Query().Has("labelSelector") {
+		if r.URL.Path == "/api/v1/namespaces/payments" {
+			permissionReply(w, permissionNamespace("payments", "payments-uid"))
+			return
+		}
+		if r.URL.Path != "/apis/asservat.io/v1alpha1/accessbindings" || r.URL.Query().Get("watch") != "true" || r.URL.Query().Get("resourceVersion") != "opaque:baseline" || r.URL.Query().Has("labelSelector") {
 			t.Error("watch lost exact unfiltered cursor")
 		}
 		for i, team := range []string{"team-b", "team-a"} {
@@ -45,7 +49,7 @@ func TestPermissionWatchKeepsIntermediateOwnershipTransitions(t *testing.T) {
 	defer watcher.Close()
 	for _, team := range []string{"team-b", "team-a"} {
 		e, err := watcher.Next(context.Background())
-		if err != nil || e.Type != "MODIFIED" || e.Binding == nil || e.Binding.Subjects[0].ID != team {
+		if err != nil || e.Type != "MODIFIED" || e.Binding == nil || e.Binding.Subjects[0].ID != team || e.Binding.Scope.Namespace.UID != "payments-uid" {
 			t.Fatalf("lost %s transition: %+v %v", team, e, err)
 		}
 	}

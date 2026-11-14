@@ -81,7 +81,8 @@ def check_common(docs, ns, executor=True, bootstrap="operator-bootstrap"):
     # No installer machinery: no admission policies, and no hook among these
     # templates except the download-worker namespace the secrets hook fills.
     mine = [x for x in docs if x["metadata"].get("labels", {}).get("app.kubernetes.io/component") in ("connector", "node", "download-worker")]
-    assert not [x for x in docs if x["kind"].startswith("ValidatingAdmissionPolicy")]
+    # The only policy is the ADR-329 AccessBinding bind check of a hub release.
+    assert [x["metadata"]["name"] for x in docs if x["kind"].startswith("ValidatingAdmissionPolicy")] in ([], [ns + "-asservat-accessbindings"] * 2)
     hooks = [(x["kind"], x["metadata"]["name"]) for x in mine if "helm.sh/hook" in x["metadata"].get("annotations", {})]
     assert hooks in ([], [("Namespace", "asservat-downloads")]), hooks
     cred = find(docs, "Secret", "asservat-cluster-credential")
@@ -90,7 +91,7 @@ def check_common(docs, ns, executor=True, bootstrap="operator-bootstrap"):
     secrets = [r for r in role["rules"] if r["resources"] == ["secrets"]][0]
     assert secrets["verbs"] == ["get", "update"] and set(secrets["resourceNames"]) == {"asservat-cluster-credential", "asservat-connector-nodes"}
     assert (("", "serviceaccounts/token", "create") in rules(role)) == executor
-    cluster = rules(find(docs, "ClusterRole")[0])
+    cluster = rules(find(docs, "ClusterRole", ns + "-asservat-connector"))
     for need in [("authentication.k8s.io", "tokenreviews", "create"), ("", "nodes", "get")] + ([("", "pods", "list"), ("", "namespaces", "watch"), ("discovery.k8s.io", "endpointslices", "list")] if executor else []):
         assert need in cluster, need
     if not executor:

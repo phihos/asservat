@@ -65,7 +65,7 @@ func TestInstalledPolicyArgumentsInputsCompile(t *testing.T) {
 
 func TestInstalledPolicyArgumentsProtectedInputSchemas(t *testing.T) {
 	const id = "11111111-1111-4111-8111-111111111111"
-	binding := installedPolicyArgumentsBinding(map[string]any{"subjects": []any{map[string]any{"kind": "Group", "issuer": "https://id.example.test", "id": "fixture-team"}}, "scope": map[string]any{"clusterID": id, "namespaceRef": map[string]any{"name": "payments", "uid": "namespace"}, "workloads": []any{map[string]any{"kind": "Deployment", "name": "api", "uid": "workload"}}}})
+	binding := installedPolicyArgumentsBinding(map[string]any{"subjects": []any{map[string]any{"kind": "Group", "issuer": "https://id.example.test", "id": "fixture-team"}}, "workloads": []any{map[string]any{"kind": "Deployment", "name": "api", "uid": "workload"}}})
 	validateInstalledPolicyProtectedInputs(t, installedPolicyArgumentsSpec(id, "payments", "api"), binding)
 }
 

@@ -77,10 +77,6 @@ type PreviewRead struct {
 	// in change order; the snapshot returns their grants from the accepted
 	// namespace observation and reads the cells of the namespaces granted.
 	Sources []Source
-	// Allowed, when set, restricts which namespaces may match an updated or
-	// deleted object: a delegated previewer's envelope namespaces. A match
-	// elsewhere is reported Unmatched, exactly like a nonexistent object.
-	Allowed []PreviewNamespace
 }
 
 // PreviewCell is one workload scope with its current accepted projection.
@@ -145,67 +141,14 @@ type AccessPreview struct {
 
 func (p AccessPreview) Complete() bool { return len(p.Unavailable) == 0 && len(p.NotEvaluated) == 0 }
 
-// PreviewEnvelope is a delegated permission writer's trusted delegation
-// envelope (ADR-189) as granted to a browser previewer: exact cluster and
-// namespace, optional workloads, allowed roles and subject issuers. A nil
-// envelope list means installation-wide administration.
-type PreviewEnvelope struct {
-	Scope          Scope
-	Roles, Issuers []string
-}
-
-func (e PreviewEnvelope) covers(t authorization.Target) bool {
-	if t.ClusterID != e.Scope.ClusterID || t.NamespaceUID != e.Scope.Namespace.UID {
-		return false
-	}
-	return len(e.Scope.Workloads) == 0 || slices.ContainsFunc(e.Scope.Workloads, func(w WorkloadRef) bool { return w.UID == t.WorkloadUID })
-}
-
-// admits mirrors the delegation part of the native permission guard for a
-// proposed object: exact cluster and namespace, workloads within the
-// envelope, allowed roles and issuers, and no automation envelope.
-func (e PreviewEnvelope) admits(b Binding) bool {
-	if b.Scope.ClusterID != e.Scope.ClusterID || b.Scope.Namespace != e.Scope.Namespace || b.Automation != nil {
-		return false
-	}
-	if len(e.Scope.Workloads) != 0 {
-		if len(b.Scope.Workloads) == 0 {
-			return false
-		}
-		for _, w := range b.Scope.Workloads {
-			if !slices.Contains(e.Scope.Workloads, w) {
-				return false
-			}
-		}
-	}
-	for _, r := range b.Roles {
-		if !slices.Contains(e.Roles, r) {
-			return false
-		}
-	}
-	for _, s := range b.Subjects {
-		if !slices.Contains(e.Issuers, s.Issuer) {
-			return false
-		}
-	}
-	return true
-}
-
-func (e PreviewEnvelope) admitsRow(t authorization.Target, a artifact.AudienceAssignment) bool {
-	return e.covers(t) && slices.Contains(e.Roles, a.Role) && slices.Contains(e.Issuers, a.Issuer)
-}
-
 func validChangeBinding(b Binding) bool {
 	return (b.Effect == "Allow" || b.Effect == "Deny") && len(b.Subjects) > 0 && len(b.Subjects) <= 32 && len(b.Roles) > 0 && len(b.Roles) <= 4 &&
 		authorization.UUID(b.Scope.ClusterID) && identity.Text(b.Scope.Namespace.UID, 64) && len(b.Scope.Workloads) <= 64 && b.Resource.SpecDigest != (artifact.Digest{})
 }
 
-// PreviewChanges validates the proposal against the caller's authority, names
-// each proposed binding's object and returns the projection read it needs.
-// With envelopes (a delegated writer), every proposed object must fit one
-// envelope and PermissionSource changes are refused, as the native guard
-// refuses them (ErrDenied).
-func PreviewChanges(changes []AccessChange, envelopes []PreviewEnvelope) ([]AccessChange, PreviewRead, error) {
+// PreviewChanges validates the proposal, names each proposed binding's object
+// and returns the projection read it needs.
+func PreviewChanges(changes []AccessChange) ([]AccessChange, PreviewRead, error) {
 	if len(changes) < 1 || len(changes) > MaxPreviewChanges {
 		return nil, PreviewRead{}, ErrLimit
 	}
@@ -224,9 +167,6 @@ func PreviewChanges(changes []AccessChange, envelopes []PreviewEnvelope) ([]Acce
 		case c.Action == "delete" && (c.Kind == "AccessBinding" || c.Kind == "PermissionSource") && identity.Text(c.UID, 64):
 		default:
 			return nil, PreviewRead{}, ErrInvalid
-		}
-		if c.Kind == "PermissionSource" && envelopes != nil {
-			return nil, PreviewRead{}, ErrDenied
 		}
 		ref := PreviewBasis{c.Kind, c.UID}
 		if c.UID != "" {
@@ -252,9 +192,6 @@ func PreviewChanges(changes []AccessChange, envelopes []PreviewEnvelope) ([]Acce
 		if !validChangeBinding(c.Binding) {
 			return nil, PreviewRead{}, ErrInvalid
 		}
-		if envelopes != nil && !slices.ContainsFunc(envelopes, func(e PreviewEnvelope) bool { return e.admits(c.Binding) }) {
-			return nil, PreviewRead{}, ErrDenied
-		}
 		ns := PreviewNamespace{c.Binding.Scope.ClusterID, c.Binding.Scope.Namespace.UID}
 		if !slices.Contains(read.Namespaces, ns) {
 			read.Namespaces = append(read.Namespaces, ns)
@@ -266,17 +203,6 @@ func PreviewChanges(changes []AccessChange, envelopes []PreviewEnvelope) ([]Acce
 			if !slices.Contains(read.Workloads[ns], w.UID) {
 				read.Workloads[ns] = append(read.Workloads[ns], w.UID)
 			}
-		}
-	}
-	// A delegated previewer always reads every envelope namespace, so the
-	// target set does not depend on whether an updated or deleted UID exists.
-	for _, e := range envelopes {
-		ns := PreviewNamespace{e.Scope.ClusterID, e.Scope.Namespace.UID}
-		if !slices.Contains(read.Allowed, ns) {
-			read.Allowed = append(read.Allowed, ns)
-		}
-		if !slices.Contains(read.Namespaces, ns) {
-			read.Namespaces = append(read.Namespaces, ns)
 		}
 	}
 	return out, read, nil
@@ -291,12 +217,8 @@ var previewOperations = []authorization.Operation{authorization.CollectContext, 
 // member of that group with no other groups), with every client scope, so the
 // result describes configuration rather than one client. Group members are
 // never enumerated. Cells outside the administered clusters or without a
-// current projection are reported Indeterminate and never evaluated. With
-// envelopes, only cells inside them are reported, and an updated or deleted
-// object with any current assignment outside them is neither removed nor
-// evaluated: it is reported Unmatched, exactly like an object that does not
-// exist, so a previewer cannot learn about objects beyond their envelope.
-func PreviewAccess(changes []AccessChange, snap PreviewSnapshot, administered []string, envelopes []PreviewEnvelope, policy identity.Revision, now time.Time) (AccessPreview, error) {
+// current projection are reported Indeterminate and never evaluated.
+func PreviewAccess(changes []AccessChange, snap PreviewSnapshot, administered []string, policy identity.Revision, now time.Time) (AccessPreview, error) {
 	if len(snap.Cells) > MaxPreviewTargets {
 		return AccessPreview{}, ErrLimit
 	}
@@ -322,42 +244,6 @@ func PreviewAccess(changes []AccessChange, snap PreviewSnapshot, administered []
 		return AccessPreview{}, ErrInvalid
 	}
 	unmatched, requested := slices.Clone(snap.Unmatched), changes
-	if envelopes != nil {
-		// For a delegated previewer an updated or deleted object counts as
-		// matched only when that is proven: every cell was read, at least
-		// one of its current assignments is visible, and all of them lie
-		// inside the envelope. Anything else (foreign, wider than the
-		// envelope, hidden by an unavailable cell, no visible assignment) is
-		// reported exactly like a nonexistent UID: Unmatched, nothing
-		// removed, and an update still adds its proposed rows.
-		available := !slices.ContainsFunc(snap.Cells, func(c PreviewCell) bool { return c.Unavailable != "" })
-		var effective []AccessChange
-		for _, c := range changes {
-			if c.UID == "" || c.sourceSpec() {
-				effective = append(effective, c)
-				continue
-			}
-			seen, admitted := false, true
-			for _, cell := range snap.Cells {
-				for _, rows := range [][]authorization.CurrentAssignment{cell.Projection.Allows, cell.Projection.Denies} {
-					for _, r := range rows {
-						if removedBy([]AccessChange{c}, r.Audience) {
-							seen = true
-							admitted = admitted && slices.ContainsFunc(envelopes, func(e PreviewEnvelope) bool { return e.admitsRow(cell.Target, r.Audience) })
-						}
-					}
-				}
-			}
-			if !available || !seen || !admitted {
-				if ref := (PreviewBasis{c.Kind, c.UID}); !slices.Contains(unmatched, ref) {
-					unmatched = append(unmatched, ref)
-				}
-				c.UID = ""
-			}
-			effective = append(effective, c)
-		}
-		changes = effective
-	}
 	// Report unmatched objects in request order, independent of why.
 	for _, c := range requested {
 		if ref := (PreviewBasis{c.Kind, c.UID}); c.UID != "" && slices.Contains(unmatched, ref) && !slices.Contains(out.Unmatched, ref) {
@@ -365,9 +251,6 @@ func PreviewAccess(changes []AccessChange, snap PreviewSnapshot, administered []
 		}
 	}
 	for _, cell := range snap.Cells {
-		if envelopes != nil && !slices.ContainsFunc(envelopes, func(e PreviewEnvelope) bool { return e.covers(cell.Target) }) {
-			continue
-		}
 		out.Targets++
 		if !slices.Contains(administered, cell.Target.ClusterID) {
 			cell.Unavailable = ClusterUnavailable

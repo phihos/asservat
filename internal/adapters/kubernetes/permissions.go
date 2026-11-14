@@ -3,9 +3,11 @@ package kubernetes
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/url"
 	"strconv"
+	"sync"
 	"time"
 
 	port "asservat.local/asservat/internal/application/configuration"
@@ -28,8 +30,9 @@ const (
 )
 
 // PermissionClient reads an explicit cluster endpoint. The hub reader lists
-// only its pinned control namespace; workload readers need only namespace GET.
-// Neither constructor nor successful reads attest RBAC/admission qualification.
+// the cluster's AccessBindings in every namespace (ADR-329) and the
+// PermissionSources of its control namespace; workload readers need only
+// namespace GET. Successful reads attest no RBAC/admission qualification.
 type PermissionClient struct {
 	api         rest.Interface
 	clusterID   string
@@ -37,7 +40,21 @@ type PermissionClient struct {
 	now         func() time.Time
 	validator   *permissionValidator
 	workerToken *configurationWorkerTokenTransport
+	bindings    *bindingNamespaces
 }
+
+// bindingNamespaces remembers each observed AccessBinding's namespace UID by
+// binding UID (ADR-329). A binding exists only in the namespace incarnation
+// it was created in, so the mapping never changes; a namespace created after
+// the binding is a later incarnation and is refused.
+type bindingNamespaces struct {
+	mu        sync.Mutex
+	byBinding map[string]value.NamespaceRef
+}
+
+// bindingNamespaceResolve bounds the namespace reads that place bindings
+// first seen by a LIST, outside its five-second window.
+const bindingNamespaceResolve = 60 * time.Second
 
 var _ port.PermissionReader = (*PermissionClient)(nil)
 var _ port.NamespaceReader = (*PermissionClient)(nil)
@@ -64,7 +81,7 @@ func NewPermissionClient(config *rest.Config, clusterID string, control value.Na
 	if err != nil {
 		return nil, err
 	}
-	return &PermissionClient{api: api, clusterID: clusterID, control: control, now: now, validator: v}, nil
+	return &PermissionClient{api: api, clusterID: clusterID, control: control, now: now, validator: v, bindings: &bindingNamespaces{byBinding: map[string]value.NamespaceRef{}}}, nil
 }
 
 // newBoundedAPI supplies transport restrictions shared by the narrow adapters.
@@ -193,14 +210,85 @@ func listEnvelopeOf(b []byte, apiVersion, kind string) (permissionListMetadata, 
 	return out, items, nil
 }
 
-func (c *PermissionClient) list(ctx context.Context, kind, plural string, start time.Time, budget *int) (string, []permissionObject, []value.Resource, error) {
+// cached returns a binding's remembered namespace.
+func (c *PermissionClient) cached(m permissionMetadata) (value.NamespaceRef, bool) {
+	if c.bindings == nil {
+		return value.NamespaceRef{}, false
+	}
+	c.bindings.mu.Lock()
+	defer c.bindings.mu.Unlock()
+	ref, ok := c.bindings.byBinding[m.UID]
+	return ref, ok && ref.Name == m.Namespace
+}
+
+// placeBinding reads the namespace of a binding seen for the first time and
+// remembers its UID (ADR-329). The namespace must not be younger than the
+// binding: then it is a later incarnation of the same name. A binding that
+// cannot be placed (namespace gone, younger or without timestamps) is
+// remembered with an empty namespace UID and grants and denies nothing, so
+// it cannot stop the cluster's permission stream.
+func (c *PermissionClient) placeBinding(ctx context.Context, m permissionMetadata) (value.NamespaceRef, error) {
+	if ref, ok := c.cached(m); ok {
+		return ref, nil
+	}
+	ref, err := c.bindingNamespace(ctx, m)
+	if errors.Is(err, value.ErrChanged) {
+		ref, err = value.NamespaceRef{Name: m.Namespace}, nil
+	}
+	if err != nil {
+		return value.NamespaceRef{}, err
+	}
+	if c.bindings == nil {
+		return value.NamespaceRef{}, value.ErrUnavailable
+	}
+	c.bindings.mu.Lock()
+	defer c.bindings.mu.Unlock()
+	if len(c.bindings.byBinding) >= 4*permissionMaxObjects {
+		c.bindings.byBinding = map[string]value.NamespaceRef{}
+	}
+	c.bindings.byBinding[m.UID] = ref
+	return ref, nil
+}
+
+func (c *PermissionClient) bindingNamespace(ctx context.Context, m permissionMetadata) (value.NamespaceRef, error) {
+	b, err := c.raw(ctx, "/api/v1/namespaces/"+m.Namespace, nil)
+	if err != nil {
+		return value.NamespaceRef{}, err
+	}
+	o, err := objectEnvelope(b)
+	if err != nil || o.APIVersion != "v1" || o.Kind != "Namespace" {
+		return value.NamespaceRef{}, value.ErrUnavailable
+	}
+	ns, err := decodeMetadata(o.Metadata, true)
+	if err != nil {
+		return value.NamespaceRef{}, err
+	}
+	if ns.Name != m.Namespace || ns.Created.IsZero() || m.Created.IsZero() || ns.Created.After(m.Created) {
+		return value.NamespaceRef{}, value.ErrChanged
+	}
+	return value.NamespaceRef{Name: ns.Name, UID: ns.UID}, nil
+}
+
+// listPath is a kind's LIST path: every namespace for AccessBindings
+// (ADR-329), the control namespace for PermissionSources.
+func (c *PermissionClient) listPath(plural string) string {
+	if plural == "accessbindings" {
+		return "/apis/asservat.io/v1alpha1/accessbindings"
+	}
+	return "/apis/asservat.io/v1alpha1/namespaces/" + c.control.Name + "/" + plural
+}
+
+// list returns the complete LIST of one kind. Bindings whose namespace is not
+// yet known are returned in unplaced, and the LIST then is not complete.
+func (c *PermissionClient) list(ctx context.Context, kind, plural string, start time.Time, budget *int) (string, []permissionObject, []value.Resource, []permissionMetadata, error) {
 	var objects []permissionObject
 	var refs []value.Resource
+	var unplaced []permissionMetadata
 	rv, continuation := "", ""
 	seenUID, seenName, seenContinue := map[string]bool{}, map[string]bool{}, map[string]bool{}
 	for page := 0; page < 32; page++ {
 		if err := c.current(ctx, start, 5*time.Second); err != nil {
-			return "", nil, nil, err
+			return "", nil, nil, nil, err
 		}
 		params := map[string]string{"limit": strconv.Itoa(permissionPageSize)}
 		if continuation != "" {
@@ -208,48 +296,58 @@ func (c *PermissionClient) list(ctx context.Context, kind, plural string, start 
 		}
 		// No selectors and no resourceVersion=0: authoritative denies require
 		// a complete, most-recent list with consistent pagination.
-		b, err := c.raw(ctx, "/apis/asservat.io/v1alpha1/namespaces/"+c.control.Name+"/"+plural, params)
+		b, err := c.raw(ctx, c.listPath(plural), params)
 		if err != nil {
-			return "", nil, nil, err
+			return "", nil, nil, nil, err
 		}
 		*budget -= len(b)
 		if *budget < 0 {
-			return "", nil, nil, value.ErrLimit
+			return "", nil, nil, nil, value.ErrLimit
 		}
 		meta, items, err := listEnvelope(b, kind)
 		if err != nil {
-			return "", nil, nil, err
+			return "", nil, nil, nil, err
 		}
 		if rv != "" && rv != meta.ResourceVersion {
-			return "", nil, nil, value.ErrUnavailable
+			return "", nil, nil, nil, value.ErrUnavailable
 		}
 		rv = meta.ResourceVersion
 		if len(items) > permissionPageSize || len(objects)+len(items) > permissionMaxObjects {
-			return "", nil, nil, value.ErrLimit
+			return "", nil, nil, nil, value.ErrLimit
 		}
 		for _, item := range items {
 			o, err := objectEnvelope(item)
 			if err != nil || o.APIVersion != "asservat.io/v1alpha1" || o.Kind != kind {
-				return "", nil, nil, value.ErrUnavailable
+				return "", nil, nil, nil, value.ErrUnavailable
 			}
 			m, err := decodeMetadata(o.Metadata, false)
-			if err != nil || m.Namespace != c.control.Name || seenUID[m.UID] || seenName[m.Name] {
-				return "", nil, nil, value.ErrUnavailable
+			key := m.Namespace + "/" + m.Name
+			if err != nil || kind != "AccessBinding" && m.Namespace != c.control.Name || seenUID[m.UID] || seenName[key] {
+				return "", nil, nil, nil, value.ErrUnavailable
 			}
-			seenUID[m.UID], seenName[m.Name] = true, true
+			seenUID[m.UID], seenName[key] = true, true
+			namespace := c.control
+			if kind == "AccessBinding" {
+				ref, ok := c.cached(m)
+				if !ok {
+					unplaced = append(unplaced, m)
+					continue
+				}
+				namespace = ref
+			}
 			objects = append(objects, o)
-			refs = append(refs, value.Resource{ClusterID: c.clusterID, Namespace: m.Namespace, NamespaceUID: c.control.UID, Kind: kind, Name: m.Name, UID: m.UID, ResourceVersion: m.RV, Generation: m.Generation, Deleting: m.Deleting})
+			refs = append(refs, value.Resource{ClusterID: c.clusterID, Namespace: m.Namespace, NamespaceUID: namespace.UID, Kind: kind, Name: m.Name, UID: m.UID, ResourceVersion: m.RV, Generation: m.Generation, Deleting: m.Deleting})
 		}
 		if meta.Continue == "" {
-			return rv, objects, refs, nil
+			return rv, objects, refs, unplaced, nil
 		}
 		if seenContinue[meta.Continue] {
-			return "", nil, nil, value.ErrUnavailable
+			return "", nil, nil, nil, value.ErrUnavailable
 		}
 		seenContinue[meta.Continue] = true
 		continuation = meta.Continue
 	}
-	return "", nil, nil, value.ErrLimit
+	return "", nil, nil, nil, value.ErrLimit
 }
 
 // PermissionSnapshot discards incomplete lists (including 410). A binding error
@@ -257,31 +355,52 @@ func (c *PermissionClient) list(ctx context.Context, kind, plural string, start 
 // not discard independently complete bindings, and are explicitly marked.
 // List freshness starts BEFORE the first API read and is never reset per page.
 // A fresh list is not evidence of continuous assignment history after a gap.
+//
+// ADR-329: bindings live in every namespace. A LIST that finds bindings whose
+// namespace UID is not yet known places them (bounded, outside the window)
+// and lists once more; only a LIST without unplaced bindings is a snapshot.
 func (c *PermissionClient) PermissionSnapshot(ctx context.Context) (value.Snapshot, error) {
+	s, unplaced, err := c.snapshot(ctx)
+	if err != nil || len(unplaced) == 0 {
+		return s, err
+	}
+	place, cancel := context.WithTimeout(ctx, bindingNamespaceResolve)
+	defer cancel()
+	for _, m := range unplaced {
+		if _, err = c.placeBinding(place, m); err != nil {
+			return value.Snapshot{}, err
+		}
+	}
+	if s, unplaced, err = c.snapshot(ctx); err == nil && len(unplaced) != 0 {
+		return value.Snapshot{}, value.ErrUnavailable
+	}
+	return s, err
+}
+
+func (c *PermissionClient) snapshot(ctx context.Context) (value.Snapshot, []permissionMetadata, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	start := c.now()
 	ns, err := c.namespace(ctx, c.control)
 	if err != nil {
-		return value.Snapshot{}, err
+		return value.Snapshot{}, nil, err
 	}
 	if ns.Deleting {
-		return value.Snapshot{}, value.ErrChanged
+		return value.Snapshot{}, nil, value.ErrChanged
 	}
 	budget := permissionTotalBytes
-	rv, objects, refs, err := c.list(ctx, "AccessBinding", "accessbindings", start, &budget)
+	rv, objects, refs, unplaced, err := c.list(ctx, "AccessBinding", "accessbindings", start, &budget)
 	if err != nil {
-		return value.Snapshot{}, err
+		return value.Snapshot{}, nil, err
+	}
+	if len(unplaced) != 0 {
+		return value.Snapshot{}, unplaced, nil
 	}
 	out := value.Snapshot{ClusterID: c.clusterID, ControlNamespace: c.control, BindingResourceVersion: rv, ObservedAt: start, FreshUntil: start.Add(5 * time.Second)}
 	for i, o := range objects {
-		b, err := c.validator.binding(o, refs[i])
-		if err != nil {
-			return value.Snapshot{}, err
-		}
-		out.Bindings = append(out.Bindings, b)
+		out.Bindings = append(out.Bindings, c.validator.observedBinding(o, refs[i]))
 	}
-	rv, objects, refs, err = c.list(ctx, "PermissionSource", "permissionsources", start, &budget)
+	rv, objects, refs, _, err = c.list(ctx, "PermissionSource", "permissionsources", start, &budget)
 	if err == nil {
 		out.SourcesComplete = true
 		out.SourceResourceVersion = rv
@@ -296,15 +415,15 @@ func (c *PermissionClient) PermissionSnapshot(ctx context.Context) (value.Snapsh
 	}
 	ns, err = c.namespace(ctx, c.control)
 	if err != nil {
-		return value.Snapshot{}, err
+		return value.Snapshot{}, nil, err
 	}
 	if ns.Deleting {
-		return value.Snapshot{}, value.ErrChanged
+		return value.Snapshot{}, nil, value.ErrChanged
 	}
 	if err = c.current(ctx, start, 5*time.Second); err != nil {
-		return value.Snapshot{}, err
+		return value.Snapshot{}, nil, err
 	}
-	return out, nil
+	return out, nil, nil
 }
 
 func (c *PermissionClient) NamespaceMetadata(ctx context.Context, q value.NamespaceQuery) (value.NamespaceMetadata, error) {

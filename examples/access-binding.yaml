@@ -2,7 +2,7 @@ apiVersion: asservat.io/v1alpha1
 kind: AccessBinding
 metadata:
   name: payments-maintainers
-  namespace: asservat-system
+  namespace: payments
 spec:
   effect: Allow
   subjects:
@@ -11,9 +11,4 @@ spec:
     id: group-payments-123
   roles:
   - workload-maintainer
-  scope:
-    clusterID: 00000000-0000-4000-8000-000000000001
-    namespaceRef:
-      name: payments
-      uid: namespace-payments-uid
   reason: Provisioned by the platform team's namespace workflow.

@@ -110,9 +110,6 @@ type publicContext struct {
 	// clusterIDs are the hub and the catalog's clusters: the installation's
 	// enrolled clusters for the ADR-237 permission impact preview.
 	clusterIDs []string
-	// previewDelegations are the ADR-237 delegation envelopes with browser
-	// previewers, from the owner deployment input.
-	previewDelegations []contracts.PermissionDelegation
 	// fleet is the ADR-193 bootstrap issuance; nil without Public.Fleet.
 	fleet *fleetapp.FleetBootstrapIssuance
 	// processingPolicy is the capacity processing source that processing
@@ -259,7 +256,6 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	}
 	out.clusters, out.clustersDigest = catalog.source, catalog.digest
 	out.clusterIDs = append([]string{c.ClusterID}, catalogTargets(catalog.catalog)...)
-	out.previewDelegations = p.PermissionDelegations
 	// admit adds one cluster's connector admission, capability, work-trust
 	// signer and limits.
 	admit := func(v contracts.OwnerPublicCluster, capability *kube.ContextCapabilitySource, trust *kube.APIContextWorkTrustSource) error {

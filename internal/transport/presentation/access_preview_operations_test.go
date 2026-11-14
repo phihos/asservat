@@ -59,14 +59,13 @@ func (f *previewOpsFixture) DecodeAccessBindingSpec(spec []byte) (cfg.Binding, e
 	if json.Unmarshal(spec, &in) != nil || in.Reason == "invalid" {
 		return cfg.Binding{}, cfg.ErrInvalid
 	}
-	return cfg.Binding{Resource: cfg.Resource{SpecDigest: artifact.Digest{7}}, Effect: in.Effect, Subjects: in.Subjects, Roles: in.Roles,
-		Scope: cfg.Scope{ClusterID: accessCluster, Namespace: cfg.NamespaceRef{Name: "payments", UID: "ns"}}}, nil
+	return cfg.Binding{Resource: cfg.Resource{SpecDigest: artifact.Digest{7}}, Effect: in.Effect, Subjects: in.Subjects, Roles: in.Roles}, nil
 }
 
 // denySpec is a complete AccessBinding spec denying evidence-reader to group.
 func denySpec(group, reason string) string {
 	return `{"effect":"Deny","subjects":[{"kind":"Group","issuer":"https://id.example.invalid","id":"` + group + `"}],"roles":["evidence-reader"],` +
-		`"scope":{"clusterID":"` + accessCluster + `","namespaceRef":{"name":"payments","uid":"ns"}},"reason":"` + reason + `"}`
+		`"reason":"` + reason + `"}`
 }
 
 func (f *previewOpsFixture) cell(workload, group string) cfg.PreviewCell {
@@ -142,7 +141,7 @@ func callPreview(t *testing.T, f *previewOpsFixture, s *AccessPreviewOperations,
 	return out, nil
 }
 
-var denyTeamA = `{"changes":[{"action":"create","kind":"AccessBinding","spec":` + denySpec("team-a", "Incident review") + `},{"action":"delete","kind":"AccessBinding","uid":"gone"}]}`
+var denyTeamA = `{"changes":[{"action":"create","kind":"AccessBinding","clusterID":"` + accessCluster + `","namespace":{"name":"payments","uid":"ns"},"spec":` + denySpec("team-a", "Incident review") + `},{"action":"delete","kind":"AccessBinding","uid":"gone"}]}`
 
 // ADR-237: the reply validates against the generated contract and reports
 // the evaluator's Allow -> Deny change for the denied group.
@@ -192,7 +191,7 @@ func TestPreviewAccessChangeInvalidInput(t *testing.T) {
 	for _, input := range []string{
 		`{"changes":[]}`,
 		`{"changes":[{"action":"create","kind":"AccessBinding"}]}`,
-		`{"changes":[{"action":"create","kind":"AccessBinding","spec":{"effect":"Deny"}}]}`,
+		`{"changes":[{"action":"create","kind":"AccessBinding","clusterID":"` + accessCluster + `","namespace":{"name":"payments","uid":"ns"},"spec":{"effect":"Deny"}}]}`,
 		`{"changes":[{"action":"delete","kind":"AccessBinding","uid":"a","spec":{}}]}`,
 		`{"changes":[{"action":"create","kind":"PermissionSource","spec":{}}]}`,
 	} {
@@ -200,7 +199,7 @@ func TestPreviewAccessChangeInvalidInput(t *testing.T) {
 			t.Fatalf("%s: %v", input, err)
 		}
 	}
-	got, err := callPreview(t, f, s, `{"changes":[{"action":"create","kind":"AccessBinding","spec":`+denySpec("team-a", "invalid")+`}]}`)
+	got, err := callPreview(t, f, s, `{"changes":[{"action":"create","kind":"AccessBinding","clusterID":"`+accessCluster+`","namespace":{"name":"payments","uid":"ns"},"spec":`+denySpec("team-a", "invalid")+`}]}`)
 	if err != nil || got.Status != "error" || got.Data.Code != "InvalidProposal" {
 		t.Fatalf("%v %+v", err, got)
 	}
@@ -217,7 +216,7 @@ func TestPreviewAccessChangePages(t *testing.T) {
 		f.cells = append(f.cells, f.cell("wl-"+strconv.Itoa(n), group))
 	}
 	input := func(cursor string) string {
-		in := `{"changes":[{"action":"create","kind":"AccessBinding","spec":` + denySpec(group, "Narrow") + `}]`
+		in := `{"changes":[{"action":"create","kind":"AccessBinding","clusterID":"` + accessCluster + `","namespace":{"name":"payments","uid":"ns"},"spec":` + denySpec(group, "Narrow") + `}]`
 		if cursor != "" {
 			in += `,"cursor":"` + cursor + `"`
 		}

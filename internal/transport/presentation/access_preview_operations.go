@@ -67,6 +67,15 @@ type accessPreviewChange struct {
 	Kind   string          `json:"kind"`
 	UID    string          `json:"uid,omitempty"`
 	Spec   json.RawMessage `json:"spec,omitempty"`
+	// ClusterID and Namespace place an AccessBinding create or update: the
+	// namespace it lives in is its scope (ADR-329).
+	ClusterID string               `json:"clusterID,omitempty"`
+	Namespace *previewNamespaceRef `json:"namespace,omitempty"`
+}
+
+type previewNamespaceRef struct {
+	Name string `json:"name"`
+	UID  string `json:"uid"`
 }
 
 // AccessPreviewInput is the closed preview_access_change input. Spec stays the
@@ -187,11 +196,9 @@ func previewFailure(err error) OperationFailure {
 	case errors.Is(err, cfg.ErrLimit):
 		return OperationFailure{"PreviewTooLarge", "The proposal exceeds the preview bounds: at most 16 objects and 1,000 workload targets. Preview fewer objects or narrower scopes.", false}
 	case errors.Is(err, cfg.ErrInvalid):
-		return OperationFailure{"InvalidProposal", "A proposed object is not a valid change. Create and update need a complete AccessBinding or PermissionSource spec, update and delete the existing object's UID, and each object may appear once.", false}
-	case errors.Is(err, cfg.ErrDenied):
-		return OperationFailure{"DelegationExceeded", "A proposed or changed object lies outside the delegation envelope that lets you preview permission changes (cluster, namespace, workloads, roles, issuers; no automation or PermissionSource changes).", false}
+		return OperationFailure{"InvalidProposal", "A proposed object is not a valid change. Create and update need a complete AccessBinding or PermissionSource spec (an AccessBinding also its cluster and namespace), update and delete the existing object's UID, and each object may appear once.", false}
 	case errors.Is(err, identity.ErrDenied):
-		return OperationFailure{"AdministratorRequired", "Previewing permission changes needs a current fleet operator signed in with an operator client, or a configured delegation previewer.", false}
+		return OperationFailure{"AdministratorRequired", "Previewing permission changes needs a current fleet operator signed in with an operator client.", false}
 	}
 	return OperationFailure{"NotAvailable", "The preview is unavailable right now. Retry shortly.", true}
 }
@@ -248,7 +255,10 @@ func (s *AccessPreviewOperations) CallWithContext(ctx context.Context, current i
 	}
 	changes := make([]authapp.ProposedChange, len(in.Changes))
 	for n, c := range in.Changes {
-		changes[n] = authapp.ProposedChange{Action: c.Action, Kind: c.Kind, UID: c.UID, Spec: c.Spec}
+		changes[n] = authapp.ProposedChange{Action: c.Action, Kind: c.Kind, UID: c.UID, Spec: c.Spec, ClusterID: c.ClusterID}
+		if c.Namespace != nil {
+			changes[n].Namespace = cfg.NamespaceRef{Name: c.Namespace.Name, UID: c.Namespace.UID}
+		}
 	}
 	out := OperationEnvelope{SchemaVersion: "mcp-result/v1", RequestID: call.requestID, DataClass: "metadata", Status: "ok", Warnings: []string{}, Provenance: []any{}}
 	until := i.ValidUntil

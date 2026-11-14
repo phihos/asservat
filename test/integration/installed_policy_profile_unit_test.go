@@ -9,7 +9,7 @@ import (
 
 func TestInstalledPolicyProfileProtectedInputs(t *testing.T) {
 	const id = "11111111-1111-4111-8111-111111111111"
-	binding := installedPolicyProfileBinding(map[string]any{"subjects": []any{map[string]any{"kind": "Group", "issuer": "https://id.example.test", "id": "fixture-team"}}, "scope": map[string]any{"clusterID": id, "namespaceRef": map[string]any{"name": "payments", "uid": "namespace"}, "workloads": []any{map[string]any{"kind": "Deployment", "name": "api", "uid": "workload"}}}})
+	binding := installedPolicyProfileBinding(map[string]any{"subjects": []any{map[string]any{"kind": "Group", "issuer": "https://id.example.test", "id": "fixture-team"}}, "workloads": []any{map[string]any{"kind": "Deployment", "name": "api", "uid": "workload"}}})
 	validateInstalledPolicyProtectedInputs(t, installedPolicyProfileSpec(id, "payments", "api"), binding)
 	limits := installedPolicyProfileGrantInput(id)["limits"].(map[string]any)
 	if limits["max_observed_bytes"] != 0 {

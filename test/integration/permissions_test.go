@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -61,10 +62,11 @@ func TestPermissionsWithRealKubernetes(t *testing.T) {
 	}
 	cluster := "11111111-1111-4111-8111-111111111111"
 	gr := schema.GroupVersionResource{Group: "asservat.io", Version: "v1alpha1", Resource: "accessbindings"}
-	bindings := writer.Resource(gr).Namespace(control.Name)
+	// ADR-329: bindings live in the namespace they grant.
+	bindings := writer.Resource(gr).Namespace(ns.Name)
 	sourceGR := schema.GroupVersionResource{Group: "asservat.io", Version: "v1alpha1", Resource: "permissionsources"}
 	for i := 0; i < 65; i++ {
-		o := &unstructured.Unstructured{Object: map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "AccessBinding", "metadata": map[string]any{"name": fmt.Sprintf("fixture-%03d", i), "namespace": control.Name}, "spec": map[string]any{"effect": "Allow", "subjects": []any{map[string]any{"kind": "Group", "issuer": "https://id.example.invalid", "id": "team-payments"}}, "roles": []any{"workload-maintainer"}, "scope": map[string]any{"clusterID": cluster, "namespaceRef": map[string]any{"name": ns.Name, "uid": string(ns.UID)}}, "reason": "synthetic binding"}}}
+		o := &unstructured.Unstructured{Object: map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "AccessBinding", "metadata": map[string]any{"name": fmt.Sprintf("fixture-%03d", i), "namespace": ns.Name}, "spec": map[string]any{"effect": "Allow", "subjects": []any{map[string]any{"kind": "Group", "issuer": "https://id.example.invalid", "id": "team-payments"}}, "roles": []any{"workload-maintainer"}, "reason": "synthetic binding"}}}
 		if _, err := bindings.Create(ctx, o, meta.CreateOptions{}); err != nil {
 			t.Fatal(err)
 		}
@@ -110,8 +112,8 @@ func TestPermissionsWithRealKubernetes(t *testing.T) {
 		if _, err := restricted.Resource(sourceGR).Namespace(control.Name).Create(ctx, source, meta.CreateOptions{}); !apierrors.IsForbidden(err) {
 			t.Fatal("read role wrote source")
 		}
-		if _, err := restricted.Resource(gr).Namespace("other").List(ctx, meta.ListOptions{}); !apierrors.IsForbidden(err) {
-			t.Fatal("read role listed other scope")
+		if _, err := restricted.Resource(sourceGR).Namespace("other").List(ctx, meta.ListOptions{}); !apierrors.IsForbidden(err) {
+			t.Fatal("read role listed sources of another namespace")
 		}
 		for _, resource := range []string{"secrets", "pods"} {
 			if _, err := restricted.Resource(schema.GroupVersionResource{Version: "v1", Resource: resource}).Namespace("payments").List(ctx, meta.ListOptions{}); !apierrors.IsForbidden(err) {
@@ -152,8 +154,10 @@ func TestPermissionsWithRealKubernetes(t *testing.T) {
 		if _, err := bindings.Update(ctx, current, meta.UpdateOptions{}); err != nil {
 			t.Fatal(err)
 		}
-		if s, err := reader.PermissionSnapshot(ctx); err == nil || len(s.Bindings) != 0 {
-			t.Fatal("malformed deny silently omitted")
+		// ADR-329: any namespace writer can store a malformed binding; it
+		// grants and denies nothing and does not stop the stream.
+		if s, err := reader.PermissionSnapshot(ctx); err != nil || len(s.Bindings) != 65 || !slices.ContainsFunc(s.Bindings, func(b value.Binding) bool { return b.Invalid && b.Resource.Name == o.GetName() }) {
+			t.Fatal("malformed binding not kept as an invalid entry", err)
 		}
 		current, err = bindings.Get(ctx, o.GetName(), meta.GetOptions{})
 		if err != nil {
@@ -167,7 +171,8 @@ func TestPermissionsWithRealKubernetes(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if s.Bindings[0].Effect != "Deny" || s.Bindings[0].Resource.Generation < 2 {
+		i := slices.IndexFunc(s.Bindings, func(b value.Binding) bool { return b.Resource.Name == o.GetName() })
+		if i < 0 || s.Bindings[i].Effect != "Deny" || s.Bindings[i].Resource.Generation < 2 || s.Bindings[i].Scope.Namespace != (value.NamespaceRef{Name: ns.Name, UID: string(ns.UID)}) {
 			t.Fatal("current deny revision lost")
 		}
 	})

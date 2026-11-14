@@ -94,7 +94,7 @@
         "role": "workload-maintainer",
         "basisKind": "AccessBinding",
         "basisUID": "binding-payments-uid",
-        "basisDigest": "9c6a14ad8b32e40e97146127fcb3ec9948825236775f59090d79f5283feff78d",
+        "basisDigest": "a4e07426a5083a53564bb91a324e6a99c01dd24f41bd84065cd18af3701678a8",
         "assignmentID": "00000000-0000-4000-8000-000000000020"
       }
     ]

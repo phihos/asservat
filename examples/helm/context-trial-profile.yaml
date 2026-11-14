@@ -17,7 +17,6 @@ identity:
   maxLogoutEvents: 8
   eligibleSubjects: []
   groupMaxAgeSeconds: 300
-  permissionDelegations: []
 processors: []
 captureHistory: {perSelector: 16, perInstallation: 32}
 exposure:

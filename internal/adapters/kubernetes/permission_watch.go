@@ -62,7 +62,7 @@ func (c *PermissionClient) WatchBindings(ctx context.Context, rv string) (port.B
 		cancel()
 		return nil, value.ErrChanged
 	}
-	r := c.api.Get().AbsPath("/apis/asservat.io/v1alpha1/namespaces/"+c.control.Name+"/accessbindings").MaxRetries(0).Param("watch", "true").Param("resourceVersion", rv).Param("allowWatchBookmarks", "true").Param("timeoutSeconds", "4")
+	r := c.api.Get().AbsPath(c.listPath("accessbindings")).MaxRetries(0).Param("watch", "true").Param("resourceVersion", rv).Param("allowWatchBookmarks", "true").Param("timeoutSeconds", "4")
 	body, err := r.Stream(ctx)
 	if err != nil {
 		mapped := permissionError(ctx, err)
@@ -115,13 +115,15 @@ func (w *permissionBindingWatch) Next(ctx context.Context) (value.BindingEvent, 
 		return fail()
 	}
 	m, err := decodeMetadata(o.Metadata, false)
-	if err != nil || m.Namespace != w.client.control.Name {
-		return fail()
-	}
-	ref := value.Resource{ClusterID: w.client.clusterID, Namespace: m.Namespace, NamespaceUID: w.client.control.UID, Kind: "AccessBinding", Name: m.Name, UID: m.UID, ResourceVersion: m.RV, Generation: m.Generation, Deleting: m.Deleting}
-	binding, err := w.client.validator.binding(o, ref)
 	if err != nil {
 		return fail()
 	}
+	// ADR-329: a binding first seen here is placed in its namespace.
+	namespace, err := w.client.placeBinding(ctx, m)
+	if err != nil {
+		return fail()
+	}
+	ref := value.Resource{ClusterID: w.client.clusterID, Namespace: m.Namespace, NamespaceUID: namespace.UID, Kind: "AccessBinding", Name: m.Name, UID: m.UID, ResourceVersion: m.RV, Generation: m.Generation, Deleting: m.Deleting}
+	binding := w.client.validator.observedBinding(o, ref)
 	return value.BindingEvent{Type: event.Type, ResourceVersion: m.RV, Binding: &binding}, nil
 }

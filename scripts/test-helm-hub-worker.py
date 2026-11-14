@@ -163,7 +163,10 @@ class HubWorkerChart(unittest.TestCase):
         named = {(tuple(r["resources"]), tuple(r.get("resourceNames", ()))) for r in w["Role"]["rules"]}
         self.assertIn((("services", "serviceaccounts"), ("asservat-hub-api-owner", "asservat-hub-api")), named)
         self.assertIn((("deployments",), ("asservat-hub-api",)), named)
-        self.assertEqual(w["ClusterRole"]["rules"], [{"apiGroups": [""], "resources": ["namespaces"], "verbs": ["get", "list", "watch"]}])
+        # ADR-329: the hub cluster's AccessBindings in every namespace.
+        self.assertEqual(w["ClusterRole"]["rules"], [{"apiGroups": [""], "resources": ["namespaces"], "verbs": ["get", "list", "watch"]},
+                                                     {"apiGroups": ["asservat.io"], "resources": ["accessbindings"], "verbs": ["get", "list", "watch"]}])
+        self.assertNotIn("accessbindings", [x for r in w["Role"]["rules"] for x in r["resources"]])
 
     def test_external_providers(self):
         w = self.worker(self.render(self.external))

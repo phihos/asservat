@@ -28,33 +28,28 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation"
 )
 
-// permissionAdministrators is the administrator set of the permission plan:
-// Kubernetes RBAC in the release namespace decides who writes
-// PermissionSources and AccessBindings, so the plan names the cluster
-// administrators. It only enters the deterministic trust digest and the plan
-// validation; no admission policy is derived from it.
+// permissionAdministrators is the administrator set of the permission plan.
+// Kubernetes RBAC decides who writes PermissionSources in the release
+// namespace and AccessBindings in application namespaces (ADR-329), so the
+// plan names the cluster administrators. It only enters the deterministic
+// trust digest and the plan validation; no admission policy is derived from it.
 var permissionAdministrators = []cfg.KubernetesActor{{Kind: "Group", Name: "system:masters"}}
 
 // permissionPlan is the installed permission configuration of the release
-// namespace: status users and delegations from Helm.
+// namespace: the status users from Helm.
 func permissionPlan(c contracts.HubWorkerPermission, control cfg.NamespaceRef) cfg.PermissionAdministration {
-	p := kube.PermissionAdministrationOf(contracts.PermissionControlDeployment{
-		Namespace:   contracts.WorkerObjectReference{Name: control.Name, UID: control.UID},
-		StatusUsers: c.StatusUsers, Delegations: c.Delegations,
-	})
-	p.Name, p.Administrators = "asservat-permission", slices.Clone(permissionAdministrators)
-	return p
+	return cfg.PermissionAdministration{Name: "asservat-permission", ControlNamespace: control, Administrators: slices.Clone(permissionAdministrators), StatusUsers: slices.Clone(c.StatusUsers)}
 }
 
 // permissionTrustDigest is the stream's deterministic trust digest: the
-// cluster and the installed plan. A changed status user or delegation is a
-// new trust revision; the SQL stream starts a new epoch under it.
+// cluster and the installed plan. A changed status user is a new trust
+// revision; the SQL stream starts a new epoch under it.
 func permissionTrustDigest(cluster string, plan cfg.PermissionAdministration) (artifact.Digest, error) {
 	b, err := json.Marshal(struct {
 		Format  string
 		Cluster string
 		Plan    cfg.PermissionAdministration
-	}{"asservat-permission-trust/v2", cluster, plan})
+	}{"asservat-permission-trust/v3", cluster, plan})
 	if err != nil {
 		return artifact.Digest{}, mounts.ErrUnavailable
 	}
