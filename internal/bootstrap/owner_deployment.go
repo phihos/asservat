@@ -219,6 +219,19 @@ func newOwnerDeployment(ctx context.Context, files *os.Root, podUID string, in *
 		if err = in.offer.setOwners(parts.pool, parts.revision, parts.issuerRoots); err != nil {
 			return nil, &fixedStepError{"regional-offer-owners", err}
 		}
+		api, e := kubernetes.NewForConfig(in.kubernetes(contracts.HubAPIKubernetesTokenFile))
+		if e != nil {
+			return nil, mounts.ErrUnavailable
+		}
+		stored, e := in.offer.ensure(startup, api)
+		if e != nil {
+			return nil, e
+		}
+		local, e := localCatalogCluster(startup, api, c, in.offer, stored)
+		if e != nil {
+			return nil, e
+		}
+		in.local = &local
 	}
 	if in.downloadControl != nil && c.Public != nil {
 		api, e := kubernetes.NewForConfig(in.kubernetes(contracts.HubAPIKubernetesTokenFile))
@@ -551,14 +564,6 @@ func (d *OwnerDeployment) RunPublic(listener net.Listener) error {
 		go func() {
 			defer d.owners.Done()
 			_ = d.recordingCollect.Run(d.root)
-		}()
-	}
-	if d.inputs.offer != nil {
-		// Decision 11: the combined-mode connector reads the offer.
-		d.owners.Add(1)
-		go func() {
-			defer d.owners.Done()
-			_ = d.inputs.offer.publish(d.root, d.inputs.providerInputs)
 		}()
 	}
 	if d.localBootstrap != nil {

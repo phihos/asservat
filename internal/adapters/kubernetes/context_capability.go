@@ -77,8 +77,29 @@ func NewContextCapabilitySource(c *PermissionClient, p *ContextCapabilityProtect
 	return &ContextCapabilitySource{c, p, recovery, name, uid, installed}, nil
 }
 
+// NewLocalContextCapabilitySource serves the hub's own settings for its
+// combined-mode local cluster (no ConfigMap): the installed settings are the
+// source, uid names their revision. Recovery is checked on every read as for
+// a guarded source.
+func NewLocalContextCapabilitySource(c *PermissionClient, recovery fleetapp.RecoveryReader, uid string, installed contracts.ContextCapabilitySettings) (*ContextCapabilitySource, error) {
+	if c == nil || recovery == nil || !authorization.UUID(uid) || !validInstalledCapability(installed) {
+		return nil, planning.ErrInvalid
+	}
+	return &ContextCapabilitySource{client: c, recovery: recovery, uid: uid, installed: installed}, nil
+}
+
 func (s *ContextCapabilitySource) snapshot(ctx context.Context) (planning.ContextCapability, error) {
 	var out planning.ContextCapability
+	if s.name == "" {
+		raw, err := json.Marshal(s.installed)
+		a := jsontext.Value(raw)
+		if err != nil || a.Canonicalize() != nil {
+			return out, cfg.ErrInvalid
+		}
+		image, _ := capabilityDigest(s.installed.CollectorImageDigest)
+		projection, _ := capabilityDigest(s.installed.ProjectionDigest)
+		return planning.ContextCapability{ExecutionClass: artifact.ContextAPIExecution, Revision: identity.Revision{UID: s.uid, Generation: s.installed.Revision, Digest: sha256.Sum256(a)}, Enabled: true, CollectorVersion: s.installed.CollectorVersion, CollectorImageDigest: image, ProjectionDigest: projection}, nil
+	}
 	data, ref, err := s.client.installationConfigMode(ctx, s.name, s.uid, true)
 	if err != nil || len(data) != 1 || len(data["context-capability.json"]) == 0 || len(data["context-capability.json"]) > contracts.ContextCapabilityMaxBytes {
 		return out, cfg.ErrUnavailable

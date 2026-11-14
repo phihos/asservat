@@ -32,6 +32,8 @@ type hubAPIRegionalOffer struct {
 	// ownersAddress is the hub-api native Service the regional executor
 	// dials; setOwners adds the accepted owner configuration at startup.
 	ownersAddress string
+	// release is the chart's object name prefix.
+	release string
 }
 
 // regionalWorkKeyValidity bounds the offered work key: the offer is
@@ -111,34 +113,7 @@ func buildHubAPIRegionalOffer(ctx context.Context, files *os.Root, h contracts.H
 		ConnectorServerSuffix: contracts.ConnectorServerSuffix(ids.InstallationID), ConnectorIssuerRoots: connectorRoots,
 		Roles:            contracts.ConnectorIdentityRoles{Source: names[0], Journal: names[1], Acknowledgement: names[2], Cleanup: names[3], Verifier: names[4], Finalizer: names[5]},
 		ConnectorBacking: raw, Image: o.Image}
-	return &hubAPIRegionalOffer{namespace: h.Namespace, name: contracts.HubAPIName(h.Name, "regional-offer"), offer: offer, peerID: ids.PeerID, bootstrapSecret: contracts.HubAPIName(h.Name, "region-bootstrap")}, nil
-}
-
-// publish writes the offer into the empty Helm-rendered ConfigMap; an
-// existing offer is kept. It retries every ten seconds until written.
-func (o *hubAPIRegionalOffer) publish(ctx context.Context, in *providerInputs) error {
-	if o == nil {
-		return nil
-	}
-	api, err := kubernetes.NewForConfig(in.kubernetes(contracts.HubAPIKubernetesTokenFile))
-	if err != nil {
-		return mounts.ErrUnavailable
-	}
-	raw, err := json.Marshal(o.offer)
-	if err != nil {
-		return mounts.ErrUnavailable
-	}
-	log := eventLog(os.Stderr, "regional offer")
-	for {
-		if err = o.write(ctx, api, string(raw)); err == nil {
-			log("published")
-			return nil
-		}
-		log("not-published")
-		if !sleepContext(ctx, 10*time.Second) {
-			return ctx.Err()
-		}
-	}
+	return &hubAPIRegionalOffer{namespace: h.Namespace, name: contracts.HubAPIName(h.Name, "regional-offer"), offer: offer, peerID: ids.PeerID, bootstrapSecret: contracts.HubAPIName(h.Name, "region-bootstrap"), release: h.Name}, nil
 }
 
 func (o *hubAPIRegionalOffer) write(ctx context.Context, api kubernetes.Interface, raw string) error {

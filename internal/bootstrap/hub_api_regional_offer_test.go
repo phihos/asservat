@@ -3,17 +3,21 @@ package bootstrap
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/fake"
 
+	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/contracts"
 	value "asservat.local/asservat/internal/domain/fleet"
 )
@@ -130,5 +134,38 @@ func TestHubAPIRegionalOfferExecutorSection(t *testing.T) {
 	cfg := regionalConfig{binding: value.PeerBinding{InstallationID: runtimeID, IssuerEpoch: runtimeID}}
 	if p, err := regionalOwnerPool(cfg, back.Owners.Configuration); err != nil || p != pool {
 		t.Fatal("connector refused the offered owner pool", err)
+	}
+	// The local catalog entry pins the identity document and executor the
+	// local connector derives from the stored offer.
+	const peer, accountUID, capacityUID = "30000000-0000-4000-8000-000000000001", "30000000-0000-4000-8000-000000000002", "30000000-0000-4000-8000-000000000003"
+	o.peerID = peer
+	api := fake.NewClientset(&core.ConfigMap{ObjectMeta: meta.ObjectMeta{Name: "asservat-regional-offer", Namespace: "hub"}},
+		&core.ServiceAccount{ObjectMeta: meta.ObjectMeta{Name: "asservat-connector", Namespace: "hub", UID: types.UID(accountUID)}})
+	stored, err := o.ensure(ctx, api)
+	if err != nil {
+		t.Fatal("ensure", err)
+	}
+	c.Namespace, c.PermissionRootID, c.Public.Standby, c.Public.Captures = contracts.WorkerObjectReference{Name: "hub", UID: runtimeID}, runtimeID, 2, 1
+	local, err := localCatalogCluster(ctx, api, c, o, stored)
+	if err != nil {
+		t.Fatal("local cluster", err)
+	}
+	profile, err := publicConnectorProfile(local, runtimeID, runtimeID)
+	if err != nil || profile.Binding.PeerID != peer || profile.Binding.ClusterID != runtimeID {
+		t.Fatal("local connector profile", err)
+	}
+	binding := value.PeerBinding{InstallationID: runtimeID, ClusterID: runtimeID, IssuerEpoch: runtimeID, PeerID: peer, Role: value.ConnectorPeer}
+	settings, err := kube.ConnectorAPISettings(runtimeID, binding, kube.ConnectorWorkload{Namespace: "hub", NamespaceUID: runtimeID, Account: "asservat-connector", AccountUID: accountUID, Deployment: "asservat-connector", DeploymentUID: runtimeID, Digest: kube.ConnectorWorkloadDigest(runtimeID, "hub", "asservat-connector")}, "asservat-connector-capacity", capacityUID, strings.Repeat("a", 64))
+	if err != nil {
+		t.Fatal(err)
+	}
+	startup := kube.ConnectorAPIStartupDigest(settings)
+	if local.Executor.StartupDigest != hex.EncodeToString(startup[:]) || local.Executor.AccountUID != accountUID || local.Executor.NamespaceUID != runtimeID || local.Trust.Keys[0].ID != "work-v1" || local.Standby != 2 {
+		t.Fatal("local executor pin differs from the connector's", local.Executor)
+	}
+	// The first stored offer stays: a second ensure returns it unchanged.
+	again, err := o.ensure(ctx, api)
+	if err != nil || again.WorkKey.NotBefore != stored.WorkKey.NotBefore {
+		t.Fatal("stored offer replaced", err)
 	}
 }

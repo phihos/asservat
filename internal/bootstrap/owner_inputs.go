@@ -71,6 +71,9 @@ type ownerInputs struct {
 	// downloadControl is the hub-local download workers' control document
 	// the hub-api writes at startup; nil without download workers.
 	downloadControl *hubAPIDownloadControl
+	// local is the combined-mode hub cluster's own context-start entry,
+	// composed at startup from the stored offer; nil otherwise.
+	local *contracts.OwnerPublicCluster
 }
 
 func ownerEndpoint(endpoint string) bool {

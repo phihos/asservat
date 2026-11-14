@@ -260,30 +260,40 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	out.clusters, out.clustersDigest = catalog.source, catalog.digest
 	out.clusterIDs = append([]string{c.ClusterID}, catalogTargets(catalog.catalog)...)
 	out.previewDelegations = p.PermissionDelegations
-	for _, v := range catalog.catalog.Clusters {
-		if _, dup := capabilities[v.ClusterID]; dup || !authorization.UUID(v.ClusterID) || v.Settings.ClusterID != v.ClusterID || v.Trust.ClusterID != v.ClusterID || v.Settings.RootID != root || v.Trust.RootID != root || v.Settings.InstallationID != installation || v.Trust.InstallationID != installation {
-			return nil, mounts.ErrUnavailable
-		}
+	// admit adds one cluster's connector admission, capability, work-trust
+	// signer and limits.
+	admit := func(v contracts.OwnerPublicCluster, capability *kube.ContextCapabilitySource, trust *kube.APIContextWorkTrustSource) error {
 		profile, err := publicConnectorProfile(v, root, installation)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		startup, okStartup := publicDigest(v.Executor.StartupDigest)
 		image, okImage := publicDigest(v.Executor.ImageDigest)
 		if !okStartup || !okImage {
-			return nil, mounts.ErrUnavailable
+			return mounts.ErrUnavailable
 		}
 		registry, err := postgres.NewConnectorObservationRegistry(ctx, shared.nativeRead, profile)
 		if err != nil {
-			return nil, mounts.ErrUnavailable
+			return mounts.ErrUnavailable
 		}
 		admissions = append(admissions, mtls.ContextStartConnectorAdmission{Profile: profile, Executor: mtls.ContextStartExecutorPin{NamespaceUID: v.Executor.NamespaceUID, AccountUID: v.Executor.AccountUID, StartupDigest: startup, ImageDigest: image}, Registry: registry})
+		capabilities[v.ClusterID] = capability
+		if signers[v.ClusterID], err = jose.NewAPIContextWorkSignatures(trust, s.KeyID, key.ForContext, time.Now); err != nil {
+			return mounts.ErrUnavailable
+		}
+		limits.Clusters = append(limits.Clusters, contextstart.ClusterLimit{ClusterID: v.ClusterID, Standby: v.Standby, Captures: v.Captures})
+		return nil
+	}
+	for _, v := range catalog.catalog.Clusters {
+		if _, dup := capabilities[v.ClusterID]; dup || v.ClusterID == c.ClusterID || !authorization.UUID(v.ClusterID) || v.Settings.ClusterID != v.ClusterID || v.Trust.ClusterID != v.ClusterID || v.Settings.RootID != root || v.Trust.RootID != root || v.Settings.InstallationID != installation || v.Trust.InstallationID != installation {
+			return nil, mounts.ErrUnavailable
+		}
 		ca, cp := capacityWorkerGuard(v.Capability.Guard)
 		capGuard, err := kube.NewContextCapabilityProtection(observer, probe, cfg.ConfigMapAdministration{Name: v.Capability.Guard.Name, SourceName: v.Capability.Source.Name, ControlNamespace: control, Administrators: ca}, cp)
 		if err != nil {
 			return nil, mounts.ErrUnavailable
 		}
-		capabilities[v.ClusterID], err = kube.NewContextCapabilitySource(observer, capGuard, out.recovery, v.Capability.Source.Name, v.Capability.Source.UID, v.Settings)
+		capability, err := kube.NewContextCapabilitySource(observer, capGuard, out.recovery, v.Capability.Source.Name, v.Capability.Source.UID, v.Settings)
 		if err != nil {
 			return nil, mounts.ErrUnavailable
 		}
@@ -296,10 +306,25 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 		if err != nil {
 			return nil, mounts.ErrUnavailable
 		}
-		if signers[v.ClusterID], err = jose.NewAPIContextWorkSignatures(trust, s.KeyID, key.ForContext, time.Now); err != nil {
-			return nil, mounts.ErrUnavailable
+		if err = admit(v, capability, trust); err != nil {
+			return nil, err
 		}
-		limits.Clusters = append(limits.Clusters, contextstart.ClusterLimit{ClusterID: v.ClusterID, Standby: v.Standby, Captures: v.Captures})
+	}
+	// mode=combined: the hub admits its own cluster's connector itself; its
+	// capability and work trust are the hub's own settings (no catalog entry).
+	if in.local != nil {
+		v := *in.local
+		capability, err := kube.NewLocalContextCapabilitySource(observer, out.recovery, v.Connector.SourceUID, v.Settings)
+		if err != nil {
+			return nil, &fixedStepError{"local-cluster-capability", mounts.ErrUnavailable}
+		}
+		trust, err := kube.NewLocalAPIContextWorkTrustSource(observer, out.recovery, v.Connector.SourceUID, v.Trust)
+		if err != nil {
+			return nil, &fixedStepError{"local-cluster-trust", mounts.ErrUnavailable}
+		}
+		if err = admit(v, capability, trust); err != nil {
+			return nil, &fixedStepError{"local-cluster", err}
+		}
 	}
 	// The installation-wide ceilings cover every joined cluster's own
 	// reservation; each cluster stays bounded by its catalog entry.
