@@ -173,3 +173,43 @@ func TestWorkerPendingClipsActuallyObservedBounds(t *testing.T) {
 		})
 	}
 }
+
+type startingWorkerJobs struct {
+	pendingWorkerJobs
+	observations, runningAt int
+}
+
+func (s *startingWorkerJobs) ObserveDownloadWorker(ctx context.Context, i value.DownloadWorkerIntent, job value.DownloadWorkerJob) (value.DownloadWorker, error) {
+	s.observations++
+	s.ready = s.observations >= s.runningAt
+	return s.pendingWorkerJobs.ObserveDownloadWorker(ctx, i, job)
+}
+
+// A just-launched Pod that runs within PodStart is bound by the same
+// preparation, so the worker's first enrollment finds its admitted identity
+// instead of waiting for the client's next poll. One that does not run stays
+// pending after a bounded number of complete observations.
+func TestWorkerDispatchBindsPodThatStartsWithinOneRequest(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		runningAt int
+		bound     bool
+	}{{"starts", 3, true}, {"slow", 1000, false}} {
+		t.Run(tc.name, func(t *testing.T) {
+			f, d, _, current := newWorkerLifecycleFixture(t)
+			jobs := &startingWorkerJobs{pendingWorkerJobs: pendingWorkerJobs{workerLifecycleJobs: workerLifecycleJobs{f}}, runningAt: tc.runningAt}
+			d.Jobs, d.PodStart = jobs, time.Second
+			w, err := d.EnsureCurrent(context.Background(), current, f.w.Intent.SessionID, f.w.Intent.ID, f.a.Scope)
+			if tc.bound {
+				if err != nil || w != f.w || f.count("bind-worker") != 1 || jobs.observations != 3 {
+					t.Fatal("started Pod was not bound by the same dispatch", err, jobs.observations)
+				}
+				return
+			}
+			var pending *DownloadWorkerPending
+			if !errors.As(err, &pending) || f.count("bind-worker") != 0 || jobs.observations != 1+int(time.Second/downloadPodPoll) {
+				t.Fatal("unbounded or missing pending observation", err, jobs.observations)
+			}
+		})
+	}
+}

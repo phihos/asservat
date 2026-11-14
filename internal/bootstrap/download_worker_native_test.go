@@ -441,3 +441,49 @@ func TestWorkerNativeCredentialSupervisorDoesNotForwardIndependentCancellation(t
 		t.Fatal("independent enrollment cancellation escaped as owning cancellation or established credentials", err, client.calls, client.peers, client.closed, len(ready))
 	}
 }
+
+// A served download's parent completes; the hub then answers the worker's next
+// lookup "finished" and the worker stops cleanly (first-run Error Pods).
+func TestWorkerNativeStopsCleanlyOnlyOnExactFinishedDownload(t *testing.T) {
+	for _, mode := range []string{"download", "foreign-nonce", "foreign-reference", "projection"} {
+		t.Run(mode, func(t *testing.T) {
+			now := time.Now().UTC()
+			const id = "11111111-1111-4111-8111-111111111111"
+			target := value.WorkerCredentialTarget{InstallationID: id, SessionID: id, WorkerID: id, PodUID: id, CreatedAt: now, RunUntil: now.Add(time.Minute)}
+			if mode == "projection" {
+				target.SessionID, target.QueryID = "", id
+			}
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			stream := &nativeStreamFixture{ctx: ctx}
+			opens := 0
+			loop := workerNativeLoop{target: target, token: &nativeTokenFixture{}, now: func() time.Time { return now }, nonce: workerNativeNonce,
+				open: func(_ context.Context, h contracts.NativeHello) (contracts.NativeStream, error) {
+					opens++
+					if opens == 1 {
+						return stream, nil
+					}
+					f := &contracts.NativeFinished{Reference: h.Reference, Nonce: h.Nonce}
+					if mode == "foreign-nonce" {
+						f.Nonce = workerNativeNonce()
+					}
+					if mode == "foreign-reference" {
+						f.Reference.WorkerID = "22222222-2222-4222-8222-222222222222"
+					}
+					return nil, f
+				},
+				run: func(context.Context, contracts.NativeStream, contracts.NativeHello) (contracts.NativeConversationResult, error) {
+					return contracts.NativeConversationResult{State: contracts.NativeJoined}, nil
+				},
+				wait: func(context.Context, time.Duration) error { return nil },
+			}
+			err := loop.Run(ctx)
+			if mode == "download" && err != nil || mode != "download" && err == nil {
+				t.Fatal("finished disposition handled incorrectly", mode, err)
+			}
+			if opens != 2 {
+				t.Fatal("finished worker reopened", opens)
+			}
+		})
+	}
+}

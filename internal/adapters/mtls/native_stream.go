@@ -145,6 +145,7 @@ func (c *NativeClient) Open(ctx context.Context, hello contracts.NativeHello) (*
 		}
 		text := resp.Header.Get("Asservat-Native-Until")
 		until, parseErr := time.Parse(time.RFC3339Nano, text)
+		finished := single("Asservat-Native-Disposition", "finished") && single("Asservat-Native-Nonce", hello.Nonce) && single("Asservat-Native-Installation", hello.Reference.InstallationID) && hello.Reference.QueryID == "" && nativeIdleParent(resp.Header, hello.Reference) && single("Asservat-Native-Worker", hello.Reference.WorkerID) && len(resp.Header.Values("Asservat-Native-Until")) == 0 && resp.ContentLength == 0 && hello.Reference.OperationID == "" && hello.Reference.Fence == 0
 		valid := parseErr == nil && text == until.UTC().Format(time.RFC3339Nano) && time.Now().Before(until) && !until.After(time.Now().Add(5*time.Second)) && single("Asservat-Native-Disposition", "no-command") && single("Asservat-Native-Nonce", hello.Nonce) && single("Asservat-Native-Installation", hello.Reference.InstallationID) && nativeIdleParent(resp.Header, hello.Reference) && single("Asservat-Native-Worker", hello.Reference.WorkerID) && single("Retry-After", "1") && len(resp.Header.Values("Asservat-Native-Until")) == 1 && resp.ContentLength == 0 && hello.Reference.OperationID == "" && hello.Reference.Fence == 0
 		// Finish the actual Hello write before classifying this as no-command; an
 		// uncertain POST body must never acquire a retryable disposition.
@@ -154,6 +155,9 @@ func (c *NativeClient) Open(ctx context.Context, hello contracts.NativeHello) (*
 		r.Close()
 		resp.Body.Close()
 		t.CloseIdleConnections()
+		if finished && written == nil && setup.Err() == nil && ctx.Err() == nil {
+			return nil, &contracts.NativeFinished{Reference: hello.Reference, Nonce: hello.Nonce}
+		}
 		if valid && written == nil && setup.Err() == nil && ctx.Err() == nil && time.Now().Before(until) {
 			return nil, &contracts.NativeNoCommand{Reference: hello.Reference, Nonce: hello.Nonce, Until: until}
 		}
