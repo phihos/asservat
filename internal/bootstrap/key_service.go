@@ -417,7 +417,7 @@ func (s *mountedKeySource) ReadKeyMaterial(ctx context.Context) (authapp.KeyMate
 	digest := artifact.Digest(sha256.Sum256(payload))
 	c := authorization.LocalKeyConfiguration{Scope: s.scope, ClusterID: s.cluster, NamespaceUID: s.namespace, RecoveryEpoch: s.epoch,
 		Revision: identity.Revision{UID: mountedKeySourceID, Generation: int64(generation), Digest: digest}, SecretUID: mountedKeySourceID, SecretDigest: digest,
-		ObservedAt: started, FreshUntil: started.Add(5 * time.Second)}
+		ObservedAt: started, FreshUntil: identity.Check(started, identity.SQLFenced).Until()}
 	return authapp.KeyMaterial{Configuration: c, Payload: payload}, nil
 }
 

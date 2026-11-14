@@ -29,6 +29,7 @@ import (
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/configuration"
 	value "asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/transport/clustercredential"
 	"asservat.local/asservat/internal/transport/connectorlifecycle"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -662,7 +663,7 @@ func (p platformOwnerProtection) ReadOwnerProtection(ctx context.Context, pool v
 		return value.OwnerProtection{}, value.ErrUnavailable
 	}
 	start := p.now()
-	return value.OwnerProtection{Pool: pool, Digest: artifact.Digest(contracts.WorkloadSourceDigest(pool.ClusterID, pool.Namespace, pool.Deployment)), ObservedAt: start, FreshUntil: start.Add(5 * time.Second)}, nil
+	return value.OwnerProtection{Pool: pool, Digest: artifact.Digest(contracts.WorkloadSourceDigest(pool.ClusterID, pool.Namespace, pool.Deployment)), ObservedAt: start, FreshUntil: identity.Check(start, identity.SQLFenced).Until()}, nil
 }
 
 // federationOfferBacking reads connectorBacking of `<name>-regional-offer`
