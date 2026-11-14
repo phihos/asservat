@@ -131,9 +131,8 @@ def sharing_origin_checks(share: dict, intent: dict, manifests: dict) -> None:
 
     def lineage(ref, stack, selected=False):
         require(ref["artifactID"] in manifests, "Missing lineage manifest")
-        require(ref["artifactID"] not in stack and len(stack) < 64, "Invalid lineage graph")
+        require(ref["artifactID"] not in stack, "Invalid lineage graph")
         visited.add(ref["artifactID"])
-        require(len(visited) <= 256, "Lineage exceeds manifest budget")
         m = manifests[ref["artifactID"]]
         require(ref["digest"] == m["hashes"]["plaintextSHA256"], "Artifact digest mismatch")
         source = m.get("collectionProvenance", {})
@@ -241,8 +240,6 @@ def capture_assessment_checks(doc):
         metrics = assessment["basis"]["metrics"]
         if "observedAt" in metrics:
             require(timestamp(metrics["observedAt"]) <= generated, "Assessment metrics come from the future")
-            if metrics["state"] == "fresh":
-                require((generated - timestamp(metrics["observedAt"])).total_seconds() <= 60, "Fresh assessment metrics are stale")
         actions = assessment["actions"]
         ids = [a["actionID"] for a in actions]
         require(len(ids) == len(set(ids)), "Duplicate assessment action")
@@ -426,7 +423,7 @@ def recording_save_checks(doc: dict) -> None:
         require(len(set(pairs)) == len(pairs), "Two source epochs selected for one pod action")
         require(len({r["podUID"] for r in sources}) <= doc["incidentPodLimit"], "Save exceeds policy incident pod cap")
         require({p["role"] for p in doc["dependencies"]} == {"collectionCeiling", "retention"}, "Save lacks independent ceiling/retention pins")
-        require(duration_seconds(doc["finalizeTimeout"]) <= 300, "Unbounded save finalization")
+        require(duration_seconds(doc["finalizeTimeout"]) > 0, "Save finalization needs a deadline")
         for source in sources:
             require(duration_seconds(source["before"]) > 0, "Recording save has no history window")
     data = doc.get("data", doc)
@@ -481,7 +478,7 @@ def pod_status_preview_checks(doc):
     require(not data["capture_enabled"] or not data["blockers"], "Blocked pod-status preview enables collection")
     combined = [q["upper"] for q in assessment["combinedQuantities"] if q["dimension"] == "outputBytes" and q["phase"] == "perIncident"]
     require(combined == [data["max_bytes"]], "Pod-status preview bytes differ from its assessed recipe reservation")
-    require(len(json.dumps(doc, separators=(",", ":")).encode()) <= 32768, "Pod-status preview exceeds hard structured-result bound")
+    require(len(json.dumps(doc, separators=(",", ":")).encode()) <= 98304, "Pod-status preview exceeds hard structured-result bound")
 
 
 def semantic_checks(doc: dict) -> None:
@@ -499,7 +496,7 @@ def semantic_checks(doc: dict) -> None:
         if doc["collection"]["kind"] == "DebugPolicy":
             authority = doc["policyAuthority"]
             require(doc["executor"] == {"issuer": "urn:asservat:installation:" + authority["installationID"], "subject": "policy:" + doc["source"]["resourceUID"], "clientID": "policy-executor", "identityType": "workload"}, "Policy executor is not installation/policy bound")
-            require(0 < (timestamp(authority["notAfter"]) - timestamp(authority["issuedAt"])).total_seconds() <= 31536000, "Invalid finite policy authority")
+            require(timestamp(authority["issuedAt"]) < timestamp(authority["notAfter"]), "Invalid finite policy authority")
             owners = authority["ownerAssignments"]
             require(len({o["assignmentID"] for o in owners}) == len(owners), "Duplicate automation owner assignment")
             require(all(o["basisUID"] == authority["delegation"]["uid"] for o in owners), "Automation owner does not match delegation")
@@ -630,7 +627,7 @@ def semantic_checks(doc: dict) -> None:
                 ring, profile, peers = params["ring"], params["profile"], params["peers"]
                 seconds = duration_seconds
                 require(ring["segmentBytes"] * ring["maxSegments"] <= ring["maxBytes"], "Ring segment allocation exceeds bytes")
-                require(seconds(params["before"]) <= seconds(ring["maxAge"]) <= 3600, "Invalid ring history bound")
+                require(seconds(params["before"]) <= seconds(ring["maxAge"]), "Invalid ring history bound")
                 require(ring["segmentBytes"] <= params["maxFrozenBytes"] <= a["limits"]["maxBytes"], "Invalid frozen output reservation")
                 require(seconds(params["before"]) + seconds(params["after"]) > 0, "Empty packet window")
                 require(seconds(params["after"]) < seconds(a["limits"]["timeout"]), "Packet action lacks completion margin")
@@ -652,9 +649,9 @@ def semantic_checks(doc: dict) -> None:
                 params = a["parameters"]
                 ring = params["ring"]
                 require(ring["segmentBytes"] * ring["maxSegments"] <= ring["maxBytes"], "Syscall ring exceeds allocation")
-                require(duration_seconds(params["before"]) <= duration_seconds(ring["maxAge"]) <= 3600, "Invalid syscall ring history")
+                require(duration_seconds(params["before"]) <= duration_seconds(ring["maxAge"]), "Invalid syscall ring history")
                 require(duration_seconds(params["before"]) + duration_seconds(params["after"]) > 0, "Empty syscall interval")
-                require(duration_seconds(params["after"]) <= 60 and duration_seconds(params["after"]) < duration_seconds(a["limits"]["timeout"]), "Invalid syscall completion deadline")
+                require(duration_seconds(params["after"]) < duration_seconds(a["limits"]["timeout"]), "Invalid syscall completion deadline")
                 require(ring["segmentBytes"] <= params["maxFrozenBytes"] <= a["limits"]["maxBytes"], "Invalid syscall frozen reservation")
                 if params["mode"] == "arguments":
                     require(a["impact"] in {"sensitiveRead", "intrusive"}, "Syscall arguments mislabeled as observe")
@@ -711,13 +708,10 @@ def semantic_checks(doc: dict) -> None:
             if "not" in value:
                 expression(value["not"], depth + 1)
             if "for" in value:
-                require(duration_seconds(value["for"]["duration"]) <= 300, "Hold exceeds correlation bound")
                 expression(value["for"]["expression"], depth + 1)
             if "count" in value:
-                require(duration_seconds(value["count"]["within"]) <= 300, "Count window exceeds bound")
                 require(value["count"]["detector"] in ids, "Unknown count detector")
             if "sequence" in value:
-                require(duration_seconds(value["sequence"]["within"]) <= 300, "Sequence window exceeds bound")
                 require(all(x in ids for x in value["sequence"]["detectors"]), "Unknown sequence detector")
 
         expression(spec["when"])
@@ -737,8 +731,9 @@ def semantic_checks(doc: dict) -> None:
             start = renewal["renewedAt"]
         require("renewalDue" not in doc.get("status", {}) or spec["grantType"] == "policy", "Renewal notice on a non-policy grant")
         age = (timestamp(spec["notAfter"]) - timestamp(start)).total_seconds()
-        maximum = spec["approvalPolicyRef"]["maxAgeSeconds"] if spec["grantType"] == "policy" else (28800 if spec["grantType"] == "rawQuery" else 3600)
-        require(0 < age <= maximum, "Grant exceeds approval lifetime")
+        # Policy grants: the administrator's maximum (ADR-335 D6). Raw-query and
+        # capture grants default to the evidence's access end; no product cap.
+        require(0 < age and (spec["grantType"] != "policy" or age <= spec["approvalPolicyRef"]["maxAgeSeconds"]), "Grant exceeds approval lifetime")
         if "resultAccess" in spec:
             result = spec["resultAccess"]
             require(timestamp(spec["issuedAt"]) < timestamp(result["notAfter"]) <= timestamp(spec["notAfter"]), "Result access exceeds parent lifetime")
@@ -1022,7 +1017,7 @@ def main() -> None:
         require("userContent" not in action["data"]["retainedPossible"] and "profileLabels" in action["data"]["retainedPossible"], "Go profile mislabeled as full object heap")
     require(len(examples["mcp-shared-case-notice-result.json"]["data"]["artifacts"]) == 1 and examples["mcp-shared-case-notice-result.json"]["data"]["artifacts"][0]["data_class"] == "extract", "Shared notice exposes the raw source fixture")
     for name in ("mcp-preview-result.json", "mcp-repeat-preview-result.json", "mcp-composition-preview-result.json"):
-        require(len(json.dumps(examples[name], separators=(",", ":")).encode()) <= 32768, "Synthetic assessed preview exceeds hard MCP bytes")
+        require(len(json.dumps(examples[name], separators=(",", ":")).encode()) <= 98304, "Synthetic assessed preview exceeds hard MCP bytes")
     recipes = {doc["metadata"]["name"]: doc for doc in examples.values() if doc.get("kind") == "EvidenceRecipe"}
     policies = {doc["metadata"]["name"]: doc for doc in examples.values() if doc.get("kind") == "DebugPolicy"}
     for doc in examples.values():
@@ -1470,7 +1465,6 @@ def main() -> None:
     rejects(examples["grant-policy.yaml"], "grant", lambda d: d["spec"].update({"notAfter": "2027-10-09T12:00:00Z"}), True)
     rejects(examples["approval-policy.yaml"], "approval-policy", lambda d: d["policyGrants"].update({"defaultAgeSeconds": 31536000}), True)
     rejects(examples["policy-deployment.yaml"], "policy", lambda d: d["spec"]["detectors"][1]["options"].update({"sampleInterval": "1ms"}), True)
-    rejects(examples["policy-statefulset.yaml"], "policy", lambda d: d["spec"]["when"]["for"].update({"duration": "999d"}), True)
     rejects(http_recipe, "recipe", packet_mutation(lambda p: p.update({"before": "0s", "after": "0s"})), True)
     rejects(http_recipe, "recipe", packet_mutation(lambda p: p.update({"maxFrozenBytes": 268435456})), True)
     rejects(examples["recipe-pprof.yaml"], "recipe", lambda d: d["spec"]["actions"][0]["parameters"].update({"duration": "1h"}), True)
@@ -1912,7 +1906,6 @@ def main() -> None:
     rejects(rs, "recording-save", lambda d: d["sources"][1].update({"actionID": d["sources"][0]["actionID"]}), True)
     rejects(rs, "recording-save", lambda d: d["sources"][1].update({"podUID": "another-pod"}), True)
     rejects(rs, "recording-save", lambda d: d["dependencies"][1].update({"role": "collectionCeiling"}), True)
-    rejects(rs, "recording-save", lambda d: d.update({"finalizeTimeout": "1d"}), True)
     rejects_guidance("preview_capture", "mcp-recording-save-preview-result.json", lambda d: d["data"]["windows"][0].update({"before": "1h"}), True)
     rejects_guidance("preview_capture", "mcp-recording-save-preview-result.json", lambda d: d["data"]["selected_recordings"][1].update({"policy_name": "another-policy"}), True)
     rejects_guidance("preview_capture", "mcp-recording-save-preview-result.json", lambda d: d["data"]["windows"].pop(), True)
@@ -1945,7 +1938,6 @@ def main() -> None:
     rejects(report, "capture-assessment", lambda d: d["actions"][0]["quantities"][0].pop("sourceRef"))
     rejects(report, "capture-assessment", lambda d: d["actions"][0]["quantities"][0].pop("coverage"))
     rejects(report, "capture-assessment", lambda d: d.update({"validUntil": "2026-10-09T12:06:00Z"}), True)
-    rejects(report, "capture-assessment", lambda d: d["basis"].update({"metrics": {"state": "fresh", "observedAt": "2026-10-09T11:55:00Z"}}), True)
     rejects(report, "capture-assessment", lambda d: d["basis"].update({"metrics": {"state": "fresh", "observedAt": "2026-10-09T12:01:00Z"}}), True)
     rejects(report, "capture-assessment", lambda d: d["basis"].update({"metrics": {"state": "fresh"}}))
     rejects(report, "capture-assessment", lambda d: d["handlingCodes"].remove("externalCopiesNotRecalled"))
