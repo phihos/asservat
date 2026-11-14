@@ -236,7 +236,12 @@ func (t *ownerProviderEffectTransport) CloseIdleConnections() {
 	}
 }
 func (t *ownerProviderEffectTransport) RoundTrip(r *http.Request) (*http.Response, error) {
-	if t == nil || t.next == nil || r == nil || r.URL == nil || r.URL.Scheme != t.endpoint.Scheme || r.URL.Host != t.endpoint.Host || r.URL.User != nil || r.URL.RawQuery != "" || r.URL.ForceQuery || r.URL.Fragment != "" || r.Host != "" && r.Host != t.endpoint.Host {
+	if t == nil || t.next == nil || r == nil || r.URL == nil || r.URL.Scheme != t.endpoint.Scheme || r.URL.Host != t.endpoint.Host || r.URL.User != nil || r.URL.ForceQuery || r.URL.Fragment != "" || r.Host != "" && r.Host != t.endpoint.Host {
+		return nil, ErrKeyService
+	}
+	// Only a channel record read names its original version (KV v2
+	// ?version=1); every other request carries no query.
+	if r.URL.RawQuery != "" && (t.mode != providerPathRecords || r.Method != http.MethodGet || r.URL.RawQuery != "version=1") {
 		return nil, ErrKeyService
 	}
 	switch t.mode {
