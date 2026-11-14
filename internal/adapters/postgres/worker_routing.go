@@ -3,6 +3,7 @@ package postgres
 import (
 	"bytes"
 	"context"
+	"errors"
 	"time"
 
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
@@ -42,7 +43,7 @@ func (s *WorkerRouting) ReadDownloadWorkerEnrollment(ctx context.Context, sessio
 	}
 	o, err := readWorkerIdentity(ctx, s.ledger, s.root, s.installation, nil, session)
 	if err != nil {
-		return value.DownloadWorkerIdentity{}, err
+		return value.DownloadWorkerIdentity{}, finishedWorker(err, worker)
 	}
 	if o.Worker.Intent.ID != worker {
 		return value.DownloadWorkerIdentity{}, artifact.ErrInvalid
@@ -210,6 +211,11 @@ func readWorkerIdentity(ctx context.Context, l *Ledger, root, installation strin
 	if err != nil {
 		return out, err
 	}
+	// A served or otherwise ended parent is a positive observation for the
+	// exact latest unterminated worker, so it can stop cleanly.
+	if current.ID == r.ID && current.TerminationJson == nil && current.RetiredProofJson == nil && artifact.DownloadState(parent.State).Terminal() && identity.Check(start.Time, identity.SQLFenced).Valid(now.Time) && ctx.Err() == nil {
+		return out, &evidence.NativeParentFinished{Worker: w}
+	}
 	if current.ID != r.ID || current.TerminationJson != nil || current.RetiredProofJson != nil || !now.Time.Before(w.Intent.RunUntil) || !now.Time.Before(parent.Deadline.Time) || artifact.DownloadState(parent.State).Terminal() || !identity.Fresh(start.Time, start.Time.Add(5*time.Second), now.Time, 5*time.Second) {
 		return out, artifact.ErrDownloadExpired
 	}
@@ -221,4 +227,14 @@ func readWorkerIdentity(ctx context.Context, l *Ledger, root, installation strin
 		return value.DownloadWorkerIdentity{}, artifact.ErrDownloadExpired
 	}
 	return out, nil
+}
+
+// finishedWorker keeps a finished-parent observation only for the requested
+// worker; any other worker of that session sees an ordinary refusal.
+func finishedWorker(err error, worker string) error {
+	var finished *evidence.NativeParentFinished
+	if errors.As(err, &finished) && finished.Worker.Intent.ID != worker {
+		return artifact.ErrInvalid
+	}
+	return err
 }

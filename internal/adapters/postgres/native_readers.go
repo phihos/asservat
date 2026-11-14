@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"asservat.local/asservat/internal/application/evidence"
@@ -34,13 +35,17 @@ func NewNativeReaders(ctx context.Context, pool *pgxpool.Pool, root, installatio
 	}
 	return &NativeReaders{downloads, installation}, nil
 }
-func (s *NativeReaders) withWorker(ctx context.Context, session, worker string, read func(context.Context, *NativeOwners, value.DownloadWorkerIdentity) error) error {
+func (s *NativeReaders) withWorker(ctx context.Context, session, worker string, visible bool, read func(context.Context, *NativeOwners, value.DownloadWorkerIdentity) error) error {
 	if s == nil || ctx == nil || ctx.Err() != nil || !value.UUID(session) || worker != "" && !value.UUID(worker) || read == nil {
 		return artifact.ErrInvalid
 	}
 	call, stop := context.WithTimeout(ctx, 5*time.Second)
 	defer stop()
 	observation, err := readWorkerIdentity(call, s.downloads.ledger, s.downloads.root, s.installation, nil, session)
+	var finished *evidence.NativeParentFinished
+	if visible && worker != "" && errors.As(err, &finished) {
+		return finishedWorker(err, worker)
+	}
 	if err != nil || !observation.Valid(time.Now()) || worker != "" && observation.Worker.Intent.ID != worker {
 		return sqlStep{"native-worker-identity", artifact.ErrDownloadUnavailable}
 	}
@@ -57,7 +62,8 @@ func (s *NativeReaders) ReadDownloadWorkerEnrollment(ctx context.Context, sessio
 	if !value.UUID(worker) {
 		return out, artifact.ErrInvalid
 	}
-	err = s.withWorker(ctx, session, worker, func(_ context.Context, _ *NativeOwners, observed value.DownloadWorkerIdentity) error {
+	// Only the identity read exposes a finished parent (the worker's lookup).
+	err = s.withWorker(ctx, session, worker, true, func(_ context.Context, _ *NativeOwners, observed value.DownloadWorkerIdentity) error {
 		out = observed
 		return nil
 	})
@@ -67,7 +73,7 @@ func (s *NativeReaders) ReadDownloadWorkerEnrollment(ctx context.Context, sessio
 	return out, nil
 }
 func (s *NativeReaders) ReadDownloadWorkerIdentity(ctx context.Context, session string, peer value.KeyPeer) (out value.DownloadWorkerIdentity, err error) {
-	err = s.withWorker(ctx, session, "", func(call context.Context, owners *NativeOwners, _ value.DownloadWorkerIdentity) error {
+	err = s.withWorker(ctx, session, "", false, func(call context.Context, owners *NativeOwners, _ value.DownloadWorkerIdentity) error {
 		var e error
 		out, e = owners.workers.ReadDownloadWorkerIdentity(call, session, peer)
 		return e
@@ -81,7 +87,7 @@ func (s *NativeReaders) ObserveNativeOperation(ctx context.Context, ref value.Na
 	if s == nil || ref.InstallationID != s.installation {
 		return out, artifact.ErrDownloadUnavailable
 	}
-	err = s.withWorker(ctx, ref.SessionID, ref.WorkerID, func(call context.Context, owners *NativeOwners, _ value.DownloadWorkerIdentity) error {
+	err = s.withWorker(ctx, ref.SessionID, ref.WorkerID, false, func(call context.Context, owners *NativeOwners, _ value.DownloadWorkerIdentity) error {
 		var e error
 		out, e = owners.ObserveNativeOperation(call, ref, peer)
 		return e
@@ -95,7 +101,7 @@ func (s *NativeReaders) LocateNativeOperation(ctx context.Context, installation,
 	if s == nil || installation != s.installation {
 		return out, artifact.ErrDownloadUnavailable
 	}
-	err = s.withWorker(ctx, session, worker, func(call context.Context, owners *NativeOwners, _ value.DownloadWorkerIdentity) error {
+	err = s.withWorker(ctx, session, worker, false, func(call context.Context, owners *NativeOwners, _ value.DownloadWorkerIdentity) error {
 		var e error
 		out, e = owners.LocateNativeOperation(call, installation, session, worker, peer)
 		return e
@@ -109,7 +115,7 @@ func (s *NativeReaders) ReadNativeWorkerCertificate(ctx context.Context, session
 	if !value.UUID(worker) || len(leaf) < 1 || len(leaf) > 16<<10 {
 		return out, artifact.ErrInvalid
 	}
-	err = s.withWorker(ctx, session, worker, func(call context.Context, owners *NativeOwners, _ value.DownloadWorkerIdentity) error {
+	err = s.withWorker(ctx, session, worker, false, func(call context.Context, owners *NativeOwners, _ value.DownloadWorkerIdentity) error {
 		var e error
 		out, e = owners.ReadNativeWorkerCertificate(call, session, worker, leaf)
 		return e

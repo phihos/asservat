@@ -98,7 +98,33 @@ type permissionWorker struct {
 	contextDeletion     *contextDeletionWorker
 	browser             *identities.BrowserSettingsObserver
 	policyGrantSettings *app.PolicyGrantSettingsObserver
-	closers             []func()
+	// Startup ordering (scheduling only, never authority): audit writers
+	// start after the provider's first login, and the retention and context
+	// deletion loops after the capacity child, which exists only once the
+	// permission stream they lock is current. Nil means ready.
+	auditReady    func() bool
+	capacityReady func(context.Context) bool
+	closers       []func()
+}
+
+// startupReadyPoll spaces readiness checks of an in-process prerequisite.
+const startupReadyPoll = 250 * time.Millisecond
+
+// awaitReady polls ready until it reports true or ctx ends.
+func awaitReady(ctx context.Context, ready func() bool) bool {
+	for ready != nil && !ready() {
+		if !sleepContext(ctx, startupReadyPoll) {
+			return false
+		}
+	}
+	return ctx.Err() == nil
+}
+
+func (p *permissionWorker) awaitCapacity(ctx context.Context) bool {
+	if p.capacityReady == nil {
+		return ctx.Err() == nil
+	}
+	return p.capacityReady(ctx)
 }
 
 func (p *permissionWorker) Close() {
@@ -161,7 +187,7 @@ func (w *hubWorker) permissionPools(ctx context.Context, p *permissionWorker, c 
 
 func (w *hubWorker) openPermission(ctx context.Context) (_ *permissionWorker, err error) {
 	c := *w.config.Permission
-	p := &permissionWorker{authority: w.authority}
+	p := &permissionWorker{authority: w.authority, auditReady: w.providers.AuditAvailable, capacityReady: w.awaitCapacity}
 	defer func() {
 		if err != nil {
 			p.Close()
@@ -313,7 +339,11 @@ func (p *permissionWorker) run(ctx context.Context) error {
 			joins[i]()
 		}
 	}()
-	joins = append(joins, goJoined(func() { p.publish(ctx) }))
+	joins = append(joins, goJoined(func() {
+		if awaitReady(ctx, p.auditReady) {
+			p.publish(ctx)
+		}
+	}))
 	// ADR-210: one projection per second keeps the five-second settings
 	// observation current for console logins; a failed read fences it.
 	if p.policyGrantSettings != nil {
@@ -331,13 +361,25 @@ func (p *permissionWorker) run(ctx context.Context) error {
 		}))
 	}
 	if p.retention != nil {
-		joins = append(joins, goJoined(func() { p.retention.run(ctx) }))
+		joins = append(joins, goJoined(func() {
+			if p.awaitCapacity(ctx) {
+				p.retention.run(ctx)
+			}
+		}))
 	}
 	if p.workerConfiguration != nil {
-		joins = append(joins, goJoined(func() { p.workerConfiguration.run(ctx) }))
+		joins = append(joins, goJoined(func() {
+			if awaitReady(ctx, p.auditReady) {
+				p.workerConfiguration.run(ctx)
+			}
+		}))
 	}
 	if p.contextDeletion != nil {
-		joins = append(joins, goJoined(func() { p.contextDeletion.run(ctx) }))
+		joins = append(joins, goJoined(func() {
+			if p.awaitCapacity(ctx) {
+				p.contextDeletion.run(ctx)
+			}
+		}))
 	}
 	// Unknown suspension waits out the 30-second SQL controller lease. A
 	// positively suspended, joined epoch can rebuild from current facts sooner.

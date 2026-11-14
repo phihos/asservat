@@ -96,6 +96,14 @@ func (l workerNativeLoop) Run(parent context.Context) error {
 				stream.Close()
 				return workerNativeStep("open", err)
 			}
+			var finished *contracts.NativeFinished
+			if errors.As(err, &finished) && finished != nil {
+				// The hub positively reported this download's parent ended.
+				if finished.Reference != h.Reference || finished.Nonce != h.Nonce || l.target.Parent().Purpose != value.AcquisitionDownload {
+					return workerNativeStep("finished", nil)
+				}
+				return nil
+			}
 			var idle *contracts.NativeNoCommand
 			receivedAt := l.now()
 			// The server's current observation starts after connection setup.

@@ -675,6 +675,7 @@ var publicRuntimeHubExtensionGrantTable = map[string][]publicRuntimeGrant{
 	// reservation, credential recording, audit acknowledgement, activation.
 	"fleet-bootstrap-reserve": {
 		{"schema", "public", "", "USAGE"},
+		{"table", "cluster_bootstrap_activation", "", "SELECT"},
 		{"table", "fleet_bootstrap", "", "SELECT"},
 		{"table", "fleet_bootstrap_intent", "", "INSERT"},
 		{"table", "fleet_bootstrap_intent", "", "SELECT"},
