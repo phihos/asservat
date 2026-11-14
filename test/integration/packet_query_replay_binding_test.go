@@ -1,18 +1,19 @@
 package integration
 
 import (
+	"context"
+	"encoding/json"
+	"errors"
+	"testing"
+	"time"
+
 	"asservat.local/asservat/internal/adapters/postgres"
 	auditapp "asservat.local/asservat/internal/application/audit"
 	query "asservat.local/asservat/internal/domain/analysis"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/audit"
-	"context"
-	"encoding/json"
-	"errors"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"testing"
-	"time"
 )
 
 type packetReplayState struct {

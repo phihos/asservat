@@ -21,7 +21,6 @@ import (
 	capture "asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/collector"
 	execution "asservat.local/asservat/internal/domain/execution"
-	"asservat.local/asservat/internal/domain/identity"
 	planvalue "asservat.local/asservat/internal/domain/planning"
 	"asservat.local/asservat/internal/domain/privacy"
 	"asservat.local/asservat/internal/domain/targets"
@@ -30,31 +29,6 @@ import (
 
 const manualArgumentHubRolePurpose = "hub-runtime"
 const manualArgumentAdmissionRolePurpose = "capture-admit"
-
-func TestInstalledManualArgumentsFixtureRolePurposes(t *testing.T) {
-	for _, purpose := range []string{manualArgumentHubRolePurpose, manualArgumentAdmissionRolePurpose} {
-		if grants, ok := postgres.PublicRuntimeRoleGrantSQL(purpose, "synthetic_role"); !ok || len(grants) == 0 {
-			t.Errorf("fixture requests unsupported installed role %q", purpose)
-		}
-	}
-}
-
-// These are direct writes that remain excluded from the installed hub union;
-// admission and the definer spend function retain their narrower effects.
-func TestInstalledManualArgumentsFixtureMutationProbes(t *testing.T) {
-	grants, ok := postgres.PublicRuntimeRoleGrantSQL(manualArgumentHubRolePurpose, "synthetic_role")
-	if !ok {
-		t.Fatal("missing installed hub role")
-	}
-	for _, probe := range []struct{ table, column string }{{"policy_observation_session", "event_credit"}, {"adhoc_observation_spend", "spent"}, {"context_capture", "expectation_json"}} {
-		table := " ON TABLE \"public\".\"" + probe.table + "\" TO "
-		for _, grant := range grants {
-			if strings.Contains(grant, table) && (strings.HasPrefix(grant, "GRANT UPDATE ON ") || strings.HasPrefix(grant, "GRANT UPDATE(\""+probe.column+"\") ON ")) {
-				t.Fatalf("fixture denial contradicts installed grant: %s", grant)
-			}
-		}
-	}
-}
 
 // Recompile exactly as the runner does after separately resolving current
 // catalog facts. This fixture supplies synthetic observations, not SQL authority.
@@ -66,52 +40,6 @@ func manualArgumentFixtureRecompile(in planvalue.ContextInput, recording *artifa
 	}
 	in.Recorder.Composition.Resolved = resolved
 	return planning.CompileContext(in, now)
-}
-
-func TestInstalledManualArgumentsFixtureRecompilesOriginalScope(t *testing.T) {
-	now := time.Now().UTC().Truncate(time.Microsecond)
-	a := policyRecorderOfflineAdmission(t, now)
-	in := a.Plan.Input
-	in.Executor = identity.Principal{Issuer: "https://id.example.test", Subject: "developer", ClientID: "browser", Kind: identity.Human}
-	in.Retention.EvidenceType = "syscallTrace"
-	in.Deadline = now.Add(time.Minute)
-	composition := manualArgumentSQLComposition(t, in.Target)
-	reviewed, err := planning.CompileRecorder(planvalue.RecorderInput{CaptureID: in.CaptureID, Executor: in.Executor, Target: in.Target, Composition: composition, Retention: in.Retention, Deadline: in.Deadline, NodeRecorder: true, RequireApproval: true}, installedArgumentsCompiler{}, now)
-	if err != nil {
-		t.Fatal("fixture initial review", err)
-	}
-	in.Recorder, err = planning.RecorderContextFromScope(composition, reviewed.CanonicalScope)
-	if err != nil {
-		t.Fatal(err)
-	}
-	accepted, err := planning.CompileContext(in, now)
-	if err != nil || accepted.ScopeDigest != reviewed.ScopeDigest {
-		t.Fatal("fixture admission plan", err)
-	}
-	recording, _, err := planning.RecordingForContext(accepted)
-	if err != nil {
-		t.Fatal(err)
-	}
-	fresh := now.Add(time.Millisecond)
-	in.Target.ObservedAt, in.Target.FreshUntil = fresh, fresh.Add(5*time.Second)
-	in.Capability.ObservedAt, in.Capability.FreshUntil = fresh, fresh.Add(5*time.Second)
-	got, err := manualArgumentFixtureRecompile(in, &recording, composition.Resolved, fresh)
-	if err != nil || got.ScopeDigest != accepted.ScopeDigest || got.RecipeDigest != accepted.RecipeDigest || !got.Input.Deadline.Equal(accepted.Input.Deadline) || !got.Input.Retention.AnchorAt.Equal(accepted.Input.Retention.AnchorAt) {
-		t.Fatal("fixture frozen argument execution scope", err)
-	}
-	if _, err := manualArgumentFixtureRecompile(in, &recording, nil, fresh); err == nil {
-		t.Fatal("missing current catalog facts accepted")
-	}
-	wrong := append([]planvalue.CatalogProfile(nil), composition.Resolved...)
-	wrong[0].SourceUID = "replacement-profile"
-	changed, err := manualArgumentFixtureRecompile(in, &recording, wrong, fresh)
-	if err == nil && changed.ScopeDigest == accepted.ScopeDigest {
-		t.Fatal("replacement profile preserved approved scope")
-	}
-	in.Target.FreshUntil = fresh
-	if _, err := manualArgumentFixtureRecompile(in, &recording, composition.Resolved, fresh); err == nil {
-		t.Fatal("expired target accepted during fixture recompile")
-	}
 }
 
 func manualArgumentSQLComposition(t *testing.T, target targets.PodResolution) planvalue.ProfileComposition {

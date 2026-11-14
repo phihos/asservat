@@ -4,10 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"strconv"
-	"strings"
-
-	"asservat.local/asservat/internal/domain/artifact"
 )
 
 // ADR-279 manual-raw focus: the namespace CaptureProfile "raw-capture" v1 is
@@ -70,43 +66,4 @@ func manualRawArguments(cluster, namespace, workload string) map[string]any {
 			"maxDuration":   "15s",
 		},
 	}
-}
-
-// manualRawPCAP is the tshark view of the downloaded raw recording.
-type manualRawPCAP struct {
-	Packets, Payload, MaxCaptured int
-}
-
-// checkManualRawFields checks tshark's tcp.port, frame.cap_len and frame.len
-// fields: every packet on the reviewed port, every TCP frame within its
-// approved cap, and at least one frame kept beyond the header-only prefix.
-func checkManualRawFields(out string) (manualRawPCAP, error) {
-	var s manualRawPCAP
-	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
-		fields := strings.Split(line, "\t")
-		if len(fields) != 3 {
-			return s, fmt.Errorf("packet fields %q", line)
-		}
-		captured, e1 := strconv.Atoi(fields[1])
-		length, e2 := strconv.Atoi(fields[2])
-		ports := strings.Split(fields[0], ",")
-		if e1 != nil || e2 != nil || len(ports) != 2 || (ports[0] != "8080" && ports[1] != "8080") {
-			return s, fmt.Errorf("packet outside the reviewed TCP port: %q", line)
-		}
-		if captured < 1 || captured > manualRawTCPCap || captured > length {
-			return s, fmt.Errorf("TCP frame kept %d of %d bytes over the approved %d-byte cap", captured, length, manualRawTCPCap)
-		}
-		s.Packets++
-		if captured > artifact.RecordingSnaplen {
-			s.Payload++
-		}
-		s.MaxCaptured = max(s.MaxCaptured, captured)
-	}
-	if s.Packets == 0 {
-		return s, fmt.Errorf("no captured packets")
-	}
-	if s.Payload == 0 {
-		return s, fmt.Errorf("no frame kept beyond the %d-byte header-only prefix", artifact.RecordingSnaplen)
-	}
-	return s, nil
 }

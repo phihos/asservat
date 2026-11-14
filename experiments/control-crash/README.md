@@ -6,13 +6,13 @@ All identities, counter units and process contents are synthetic. The SQL suite 
 
 ## Results
 
-- [SQL suite](results/sql-test.log): 14 tests passed with the Go race detector; the post-restart test is explicitly skipped here and [run separately](results/sql-restart.log) after killing/restarting only the owned fixture. Tests include deliberately unsafe baselines; their PASS means the hazard was reproduced, not that the unsafe method is acceptable.
-- [Crash matrix](results/crash-results.json): 14 cases passed, including real nested-PID-1 memory fault, matching executable/GDB opening, refusal, stalls, byte cap, receiver loss, spent-entry restart and a 16-process burst.
-- [Failed publication regression](results/publication-expiry-before-fix.log): the experiment originally published a child after grant expiry during an artifact lock wait. The final code validates current time after that lock.
-- [Initial test-harness race](results/sql-initial-race.log): pgx's asynchronous cancellation opened another connection through the injected dialer and overwrote the captured connection pointer. Atomic first-connection selection fixed the harness; the race detector remains enabled.
-- [Initial PID-1 fixture failure](results/crash-initial-pid1.log): explicitly sending SIGSEGV did not kill the namespace init process. The final fixture causes an actual invalid-memory access. Earlier receiver admission reports also lacked finality; final reporting now uses atomic replacement and the harness waits for completed outcomes, including partial cores.
+- SQL suite: 14 tests passed with the Go race detector; the post-restart test is explicitly skipped here and run separately after killing/restarting only the owned fixture. Tests include deliberately unsafe baselines; their PASS means the hazard was reproduced, not that the unsafe method is acceptable.
+- Crash matrix: 14 cases passed, including real nested-PID-1 memory fault, matching executable/GDB opening, refusal, stalls, byte cap, receiver loss, spent-entry restart and a 16-process burst.
+- Failed publication regression: the experiment originally published a child after grant expiry during an artifact lock wait. The final code validates current time after that lock.
+- Initial test-harness race: pgx's asynchronous cancellation opened another connection through the injected dialer and overwrote the captured connection pointer. Atomic first-connection selection fixed the harness; the race detector remains enabled.
+- Initial PID-1 fixture failure: explicitly sending SIGSEGV did not kill the namespace init process. The final fixture causes an actual invalid-memory access. Earlier receiver admission reports also lacked finality; final reporting now uses atomic replacement and the harness waits for completed outcomes, including partial cores.
 
-[Execution manifest](results/execution.json), [VM input record](results/crash-execution.json), [SQL input record](results/sql-test.json) and [cleanup](results/cleanup.json) preserve source hashes, actual command exits and tested boundaries. No whole EXP gate or product TASK is complete.
+Execution manifest, VM input record, SQL input record and cleanup preserve source hashes, actual command exits and tested boundaries. No whole EXP gate or product TASK is complete.
 
 ## Reproduce SQL tests
 

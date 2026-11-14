@@ -1,6 +1,14 @@
 package integration
 
 import (
+	"context"
+	"crypto/ed25519"
+	"crypto/rand"
+	"errors"
+	"sync"
+	"testing"
+	"time"
+
 	"asservat.local/asservat/internal/adapters/jose"
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
@@ -8,17 +16,10 @@ import (
 	"asservat.local/asservat/internal/domain/artifact"
 	value "asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/identity"
-	"context"
-	"crypto/ed25519"
-	"crypto/rand"
-	"errors"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"sync"
-	"testing"
-	"time"
 )
 
 // Provider administration here is fixture-only observation. The actual journal,

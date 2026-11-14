@@ -1,7 +1,6 @@
 package integration
 
 import (
-	"encoding/json"
 	"os"
 )
 
@@ -42,30 +41,4 @@ func manualHeapProfileArguments(cluster, namespace, workload string) map[string]
 			"maxTotalBytes": 16 << 20, "maxDuration": "15s",
 		},
 	}
-}
-
-func manualHeapProfileDefinition() (map[string]any, error) {
-	raw, err := os.ReadFile("../../internal/application/planning/profiles/go-cpu-v1.json")
-	if err != nil {
-		return nil, err
-	}
-	var doc struct {
-		Definition map[string]any `json:"definition"`
-	}
-	if err := json.Unmarshal(raw, &doc); err != nil {
-		return nil, err
-	}
-	doc.Definition["displayName"] = "Go heap allocation snapshot"
-	doc.Definition["description"] = "Heap allocation samples without forcing garbage collection."
-	recipe := doc.Definition["recipe"].(map[string]any)
-	recipe["description"] = doc.Definition["description"]
-	recipe["maxDuration"] = "15s"
-	action := recipe["actions"].([]any)[0].(map[string]any)
-	action["id"] = "heap"
-	parameters := action["parameters"].(map[string]any)
-	parameters["type"], parameters["mode"], parameters["forceGC"] = "heap", "snapshot", false
-	delete(parameters, "duration")
-	action["limits"].(map[string]any)["timeout"] = "5s"
-	doc.Definition["editableFields"] = []any{map[string]any{"actionID": "heap", "field": "actionMaxBytes", "label": "Output limit"}}
-	return doc.Definition, nil
 }

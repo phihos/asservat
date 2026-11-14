@@ -26,7 +26,6 @@ const nativeTrafficRecordBytes = 64
 const nativeTrafficPayload = nativeTrafficRecords * nativeTrafficRecordBytes
 const nativeTrafficBatches = 16
 const nativeTrafficRecordsPerBatch = nativeTrafficRecords / nativeTrafficBatches
-const nativeTrafficInterval = 250 * time.Millisecond
 const nativeTrafficPhase = 8500 * time.Millisecond
 
 // The child owns exactly these ten receipt fields. Parent wall time,

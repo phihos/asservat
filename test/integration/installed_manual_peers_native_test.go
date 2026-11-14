@@ -1,12 +1,5 @@
 package integration
 
-import (
-	"fmt"
-	"regexp"
-	"strconv"
-	"strings"
-)
-
 // ADR-283 manual-peers focus: one finite manual packet-header recording of
 // the target Pod restricted to a Kubernetes peer. The installed journey's
 // ordinary traffic reaches the target through the API server's Pod proxy
@@ -48,42 +41,4 @@ func manualPeersArguments(cluster, namespace, workload string) map[string]any {
 			"maxDuration":   "10s",
 		},
 	}
-}
-
-var manualPeersWarning = regexp.MustCompile(`^Peers: (\d+) Kubernetes endpoints resolved at preview \(members digest ([0-9a-f.]+)\)`)
-
-// manualPeersEndpoints reads the preview's resolved endpoint count and the
-// (bounded) members digest from its review warnings.
-func manualPeersEndpoints(warnings []string) (int, string, bool) {
-	for _, w := range warnings {
-		if m := manualPeersWarning.FindStringSubmatch(w); m != nil {
-			n, err := strconv.Atoi(m[1])
-			return n, m[2], err == nil
-		}
-	}
-	return 0, "", false
-}
-
-// checkManualPeersFields checks tshark's ip.src, ip.dst and tcp.port fields:
-// every packet is to or from the peer on the reviewed port.
-func checkManualPeersFields(out, peer string) (int, error) {
-	packets := 0
-	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
-		fields := strings.Split(line, "\t")
-		if len(fields) != 3 {
-			return packets, fmt.Errorf("packet fields %q", line)
-		}
-		ports := strings.Split(fields[2], ",")
-		if fields[0] != peer && fields[1] != peer {
-			return packets, fmt.Errorf("packet outside the reviewed peer %s: %q", peer, line)
-		}
-		if len(ports) != 2 || (ports[0] != strconv.Itoa(manualPeersPort) && ports[1] != strconv.Itoa(manualPeersPort)) {
-			return packets, fmt.Errorf("packet outside the reviewed TCP port: %q", line)
-		}
-		packets++
-	}
-	if packets == 0 {
-		return 0, fmt.Errorf("no captured packets")
-	}
-	return packets, nil
 }

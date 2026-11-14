@@ -19,7 +19,6 @@ import (
 // One consumer calls Write serially. There are no observers, timers or retries.
 type nativePacingOwnerObserver struct {
 	ctx                                        context.Context
-	admin                                      *pgxpool.Pool
 	root, download                             string
 	destination                                io.Writer
 	first, renewed                             *nativePacingOwnerSample
@@ -61,18 +60,6 @@ type nativePacingOwnerOperation struct {
 	Kind, ParentID   string
 	Generation       int64
 	StartedAt, Until time.Time
-}
-
-func newNativePacingOwnerObserver(ctx context.Context, admin *pgxpool.Pool, root, download string, destination io.Writer) (*nativePacingOwnerObserver, error) {
-	if ctx == nil || ctx.Err() != nil || admin == nil || !authorization.UUID(root) || !authorization.UUID(download) || destination == nil {
-		return nil, errors.New("native owner measurement input unavailable")
-	}
-	if _, bounded := ctx.Deadline(); !bounded {
-		return nil, errors.New("native owner measurement requires original bounded context")
-	}
-	o := &nativePacingOwnerObserver{ctx: ctx, admin: admin, root: root, download: download, destination: destination, now: time.Now}
-	o.read = o.readSQL
-	return o, nil
 }
 
 // This is one statement snapshot. The first lookup uses the exact installation
@@ -143,35 +130,6 @@ func TestNativePacingOwnerSQLProjectionWithRealPostgres(t *testing.T) {
 			t.Fatal("native owner projection changed its scanned shape", fields, rows.Err())
 		}
 	}
-}
-
-func (o *nativePacingOwnerObserver) readSQL(ctx context.Context, pinned *nativePacingOwnerSample) (nativePacingOwnerSample, error) {
-	var sample nativePacingOwnerSample
-	query := nativePacingOwnerProjection + ` AND w.id=r.active_window AND NOT o.closed AND o.retired_at IS NULL LIMIT 2`
-	args := []any{o.root, o.download}
-	if pinned != nil {
-		query = nativePacingOwnerProjection + ` AND o.worker_id=$3 AND o.operation_id=$4 AND o.fence=$5 AND r.id=$6 AND w.id=$7 LIMIT 2`
-		args = append(args, pinned.worker, pinned.operation, pinned.fence, pinned.response, pinned.window)
-	}
-	call, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-	rows, err := o.admin.Query(call, query, args...)
-	if err != nil {
-		return sample, errors.New("native owner SQL measurement unavailable")
-	}
-	defer rows.Close()
-	if !rows.Next() {
-		return sample, errors.New("native owner SQL measurement missing")
-	}
-	err = rows.Scan(&sample.observed, &sample.worker, &sample.operation, &sample.fence, &sample.operationJSON,
-		&sample.sequence, &sample.leaseStarted, &sample.leaseUntil, &sample.ownerClosed, &sample.retired,
-		&sample.response, &sample.generation, &sample.responseSequence, &sample.responseUntil, &sample.responseClosed,
-		&sample.window, &sample.ordinal, &sample.reservedWindows, &sample.windowCount, &sample.activeWindow,
-		&sample.intentAcknowledged, &sample.outcomeAcknowledged, &sample.outcomeSuccess, &sample.verifiedFinal, &sample.keyRows, &sample.usedRoles)
-	if err != nil || rows.Next() || rows.Err() != nil {
-		return nativePacingOwnerSample{}, errors.New("native owner SQL measurement ambiguous or invalid")
-	}
-	return sample, nil
 }
 
 func (o *nativePacingOwnerObserver) sample(ctx context.Context, pinned *nativePacingOwnerSample) (nativePacingOwnerSample, error) {

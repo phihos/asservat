@@ -1181,33 +1181,6 @@ func installedJourneyFocus() string {
 	return os.Getenv("ASSERVAT_JOURNEY_FOCUS")
 }
 
-// installedFastFixture selects the feature focuses that start from the shortest
-// path to a working installation. They run the same product installation,
-// enrollment and authority steps, but skip the checks that qualify the
-// installation process itself: the interrupted-and-resumed runner, the
-// administrator's baseline edit, the demand-lane sampling, the regional
-// installer rerun, connector restart and source-write denial. Their workload
-// exists before its cluster joins. Only the chain focus (and the unsplit run)
-// keeps the full chain, so the feature focuses keep a margin under the
-// 20-minute limit; docs/implementation-progress.md records the split.
-func installedFastFixture() bool {
-	switch installedJourneyFocus() {
-	case "live-observation", "policy", "alert", "logresource", "browser", "restart", "upgrade", "journey", "clusters", "share", "approved-recording", "manual-logs", "manual-syscall", "manual-arguments", "manual-mixed", "manual-raw", "manual-http", "manual-peers", "manual-profile", "profile-comparison", "native-paced", "policy-recording", "policy-arguments", "policy-profile", "ongoing-save", "ongoing-save-disk", "ongoing-incident", "ongoing-syscall", "ongoing-mixed", "journey-store-failure", "journey-start-failure", "retention-shortening", "early-erasure", "processing-workload", "privacy-inventory", "share-retirement":
-		return true
-	}
-	return false
-}
-
-// installedRegionalInstallerChecks reports whether workload cluster index
-// runs the regional installer's own checks (rerun exactness, connector
-// readmission, source-write denial and the demand lane). The fast fixture
-// skips them in the first workload cluster, which the chain focus covers;
-// the second workload cluster, installed only by the clusters focus and the
-// unsplit run, always runs them.
-func installedRegionalInstallerChecks(index int) bool {
-	return !installedFastFixture() || index > 1
-}
-
 // installedJourneyRuns counts journey runs in this installation; only the
 // first initializes processing.
 var installedJourneyRuns int

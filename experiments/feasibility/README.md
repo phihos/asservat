@@ -14,7 +14,7 @@ Executed 2026-10-09. This is isolated experimental code, not the Asservat collec
 | Developer's file | Gadget PCAPNG → encrypted multipart S3 → TLS download → native tshark open, exact SHA-256 preserved | Production UI/OIDC/SQL and distributed relay integration; the test authority is deliberately in memory |
 | Large file | 2 GiB generated stream, encrypted staging only, bounded high-offset range and full checksum-verified retrieval | Production throughput, representative real-core compression, long slow clients or multi-user fairness |
 
-The final ordinary suite has 11 passing tests and three explicitly skipped measurement tests. Those three ran separately in `final-measure`, `final-large` and `final-baseline`, with independent exit/source-hash records. See [test log](results/final-test.log), [large-file result](results/large-stream.json), [measurements](results/storage-measurements.json), [sequential baseline](results/sequential-baseline.json), [kernel filter check](results/kernel-filter-probe.log), [map generations](results/mapprobe.json) and [native-tool check](results/local-tool-validation.txt).
+The final ordinary suite has 11 passing tests and three explicitly skipped measurement tests. Those three ran separately in `final-measure`, `final-large` and `final-baseline`, with independent exit/source-hash records. See test log, large-file result, measurements, sequential baseline, kernel filter check, map generations and native-tool check.
 
 ## Safety and ownership
 
@@ -45,4 +45,4 @@ The SQL grant, current-group mapping, OIDC token verifier, real KMS, production 
 
 Use `vm/lab.py up`, then `pin` after cloud-init prints the host public key to the local serial console. Pinning is from that console, not blind SSH trust. `lab.py ssh <command>` addresses only the recorded VM. An existing disk/key/run record is refused; select a fresh `ASSERVAT_LAB_STATE` directory for another lab. The [VM preparation notes](vm/README.md) record pinned downloads, package prerequisites, workload and probe commands. `lab.py down` verifies process ownership before stopping this VM. Remove only this lab's private cache directory after shutdown if the images are no longer needed.
 
-Test sources and results are retained; disposable infrastructure and private keys were removed at the end of the recorded run. The [execution manifest](results/execution.json) records hashes, outcomes and cleanup. No product TASK or entire EXP gate is marked complete by these limited experiments.
+Test sources and results are retained; disposable infrastructure and private keys were removed at the end of the recorded run. The execution manifest records hashes, outcomes and cleanup. No product TASK or entire EXP gate is marked complete by these limited experiments.

@@ -3,8 +3,6 @@
 package integration
 
 import (
-	"asservat.local/asservat/internal/adapters/jose"
-	"asservat.local/asservat/internal/domain/artifact"
 	"bytes"
 	"context"
 	"crypto/ed25519"
@@ -16,6 +14,9 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"asservat.local/asservat/internal/adapters/jose"
+	"asservat.local/asservat/internal/domain/artifact"
 
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"

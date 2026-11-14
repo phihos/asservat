@@ -1,19 +1,20 @@
 package integration
 
 import (
-	"asservat.local/asservat/internal/adapters/mtls"
-	"asservat.local/asservat/internal/domain/artifact"
-	"asservat.local/asservat/internal/domain/audit"
-	value "asservat.local/asservat/internal/domain/authorization"
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/x509"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"asservat.local/asservat/internal/adapters/mtls"
+	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/audit"
+	value "asservat.local/asservat/internal/domain/authorization"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func workerEnrollmentCase(t *testing.T, ctx context.Context, mode string, w value.DownloadWorker, f workerEnrollmentFixture, current func() artifact.DownloadAuthority, refresh func() error, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool) bool {

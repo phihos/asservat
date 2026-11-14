@@ -8,20 +8,15 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
-	"encoding/json"
 	"encoding/pem"
 	"math/big"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
-
-	"asservat.local/asservat/internal/contracts"
 )
 
 const manualProfileTLSServerName = "profile.fixture.invalid"
-const manualProfileWrongTLSName = "wrong-profile.fixture.invalid"
-const manualProfileWrongTLSProfile = "go-cpu-wrong-tls-peer"
 
 // Transport is independent of profile type. Only this focused CPU fixture uses
 // TLS; ordinary HTTP, heap and prepared resource variants keep their paths.
@@ -114,39 +109,4 @@ func manualProfileTLSFixture(t *testing.T, directory string) manualProfileTLSMat
 	}
 	t.Logf("synthetic app TLS public provenance: rootsSHA256=%x certificateSHA256=%x serverName=%s; private key is app-only fixture input", sha256.Sum256(material.Roots), sha256.Sum256(material.Certificate), manualProfileTLSServerName)
 	return material
-}
-
-func manualTLSProfileEndpoints(roots []byte) []contracts.RegionalProfileEndpoint {
-	endpoints := manualProfileEndpoints()
-	endpoints[0].TLS = &contracts.RegionalProfileEndpointTLS{RootsPEM: string(roots), ServerName: manualProfileTLSServerName}
-	wrong := endpoints[0]
-	wrong.Name = "go-pprof-wrong-tls"
-	wrong.TLS = &contracts.RegionalProfileEndpointTLS{RootsPEM: string(roots), ServerName: manualProfileWrongTLSName}
-	return append(endpoints, wrong)
-}
-
-func manualWrongTLSProfileDefinition(t *testing.T) map[string]any {
-	t.Helper()
-	raw, err := os.ReadFile("../../internal/application/planning/profiles/go-cpu-v1.json")
-	if err != nil {
-		t.Fatal(err)
-	}
-	var doc struct {
-		Definition map[string]any `json:"definition"`
-	}
-	if json.Unmarshal(raw, &doc) != nil {
-		t.Fatal("CPU profile fixture definition")
-	}
-	doc.Definition["displayName"] = "Synthetic wrong TLS peer"
-	recipe := doc.Definition["recipe"].(map[string]any)
-	bindings := recipe["endpointBindings"].([]any)
-	bindings[0].(map[string]any)["templateRef"] = "go-pprof-wrong-tls"
-	return doc.Definition
-}
-
-func manualWrongTLSProfileArguments(cluster, namespace, workload string) map[string]any {
-	arguments := manualProfileArguments(cluster, namespace, workload)
-	component := arguments["profile_composition"].(map[string]any)["components"].([]any)[0].(map[string]any)
-	component["profileRef"] = map[string]string{"catalog": "namespace", "name": manualProfileWrongTLSProfile, "version": "v1"}
-	return arguments
 }

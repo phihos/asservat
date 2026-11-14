@@ -17,7 +17,7 @@ inputs:
     description: Install the pinned Helm binary.
     default: "false"
   go-cache:
-    description: "full: the module/build cache of every unit-test build; native-installed, native-race or native-collector: the smaller one of that kind of native suite (scripts/native-go-cache.sh)."
+    description: "full: the module/build cache of every unit-test build; native-race or native-collector: the smaller one of that kind of native suite (scripts/native-go-cache.sh)."
     default: full
 runs:
   using: composite

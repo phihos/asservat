@@ -1,7 +1,6 @@
 package integration
 
 import (
-	"asservat.local/asservat/internal/adapters/postgres"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -10,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"asservat.local/asservat/internal/adapters/postgres"
 
 	query "asservat.local/asservat/internal/domain/analysis"
 	"asservat.local/asservat/internal/domain/artifact"

@@ -1,10 +1,6 @@
 package integration
 
 import (
-	"asservat.local/asservat/internal/adapters/postgres"
-	"asservat.local/asservat/internal/application/capacity"
-	"asservat.local/asservat/internal/application/evidence"
-	"asservat.local/asservat/internal/application/privacy"
 	"bytes"
 	"compress/gzip"
 	"context"
@@ -13,8 +9,6 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"errors"
-	"github.com/google/pprof/profile"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"io"
 	"os"
 	"os/exec"
@@ -24,6 +18,13 @@ import (
 	"runtime/trace"
 	"testing"
 	"time"
+
+	"asservat.local/asservat/internal/adapters/postgres"
+	"asservat.local/asservat/internal/application/capacity"
+	"asservat.local/asservat/internal/application/evidence"
+	"asservat.local/asservat/internal/application/privacy"
+	"github.com/google/pprof/profile"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"asservat.local/asservat/internal/adapters/diagnostics"
 	"asservat.local/asservat/internal/adapters/objectstore"

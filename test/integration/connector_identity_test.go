@@ -1,7 +1,6 @@
 package integration
 
 import (
-	"asservat.local/asservat/internal/contracts"
 	"bytes"
 	"context"
 	"crypto/ecdsa"
@@ -15,6 +14,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"asservat.local/asservat/internal/contracts"
 
 	"asservat.local/asservat/internal/adapters/mtls"
 	"asservat.local/asservat/internal/adapters/objectstore"

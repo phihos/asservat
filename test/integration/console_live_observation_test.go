@@ -1,6 +1,22 @@
 package integration
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"slices"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"syscall"
+	"testing"
+	"time"
+
 	auditapp "asservat.local/asservat/internal/application/audit"
 	app "asservat.local/asservat/internal/application/live"
 	"asservat.local/asservat/internal/console"
@@ -14,22 +30,7 @@ import (
 	"asservat.local/asservat/internal/transport/browser"
 	mcptransport "asservat.local/asservat/internal/transport/mcp"
 	"asservat.local/asservat/internal/transport/presentation"
-	"context"
-	"encoding/json"
-	"fmt"
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
-	"net/http"
-	"net/http/httptest"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"slices"
-	"strings"
-	"sync"
-	"sync/atomic"
-	"syscall"
-	"testing"
-	"time"
 )
 
 // Explicit synthetic current-source authority and ledger; the real C13 service,

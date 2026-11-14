@@ -19,9 +19,6 @@ const (
 	ongoingSaveAfterPort       = 9103
 	ongoingSaveBefore          = 15 * time.Second
 	ongoingSaveLifetime        = 300
-	// ongoingSaveDiskBytes is the ongoing-save-disk focus's collector ring
-	// volume (ADR-278): room for the one 4 x 4 MiB sealed ring with headroom.
-	ongoingSaveDiskBytes = 64 << 20
 )
 
 // installedOngoingFocus selects the installed ongoing packet source flow:

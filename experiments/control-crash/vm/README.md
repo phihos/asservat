@@ -13,7 +13,7 @@ CARGO_TARGET_DIR=/path/to/lab-cache/helper-target RUSTFLAGS='-C target-feature=+
 CGO_ENABLED=0 GOTELEMETRY=off TMPDIR=/path/to/lab-cache/go-tmp go -C experiments/control-crash/go build -o /path/to/lab-cache/receiver ./cmd/receiver
 ```
 
-Copy the helper, receiver, [fixture.c](fixture.c) and [run.py](run.py) over the lab's recorded SSH connection to `/opt/asservat-lab/{helper,receiver,fixture.c,run.py}`. The Python lab module's `sshargs()` supplies the pinned connection; pipe each file to `cat` at its fixed destination. Make the two executables mode 0755 and run `gcc -g -O0 -o /opt/asservat-lab/fixture /opt/asservat-lab/fixture.c` in the VM. Retain binary/source hashes before testing.
+Copy the helper, receiver, fixture.c and run.py over the lab's recorded SSH connection to `/opt/asservat-lab/{helper,receiver,fixture.c,run.py}`. The Python lab module's `sshargs()` supplies the pinned connection; pipe each file to `cat` at its fixed destination. Make the two executables mode 0755 and run `gcc -g -O0 -o /opt/asservat-lab/fixture /opt/asservat-lab/fixture.c` in the VM. Retain binary/source hashes before testing.
 
 Run inside the VM:
 
