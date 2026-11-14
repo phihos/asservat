@@ -111,7 +111,7 @@ func TestRetentionRecoveryLoggedOnceAfterFailure(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if got := out.String(); got != "hub-worker retention: ok\n" {
+	if got := out.String(); got != "hub-worker retention: source observation ok\n" {
 		t.Fatalf("recovery log %q, want one line", got)
 	}
 }

@@ -39,7 +39,8 @@ type retentionWorker struct {
 }
 
 // retentionRecovery makes a retried reconciler's recovery visible: after a
-// logged failure, the next successful source observation logs one line.
+// logged failure, the next successful source observation logs one line. It
+// reports source reachability, not accepted-history progress.
 type retentionRecovery struct {
 	failed atomic.Bool
 	out    io.Writer // nil is stderr
@@ -57,7 +58,7 @@ func (r *retentionRecovery) observed() {
 		if out == nil {
 			out = os.Stderr
 		}
-		fmt.Fprintln(out, "hub-worker retention: ok")
+		fmt.Fprintln(out, "hub-worker retention: source observation ok")
 	}
 }
 
