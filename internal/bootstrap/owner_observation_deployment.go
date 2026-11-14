@@ -1,7 +1,6 @@
 package bootstrap
 
 import (
-	"asservat.local/asservat/internal/domain/identity"
 	"context"
 	"crypto/x509"
 	"errors"
@@ -9,6 +8,8 @@ import (
 	"os"
 	"sync"
 	"time"
+
+	"asservat.local/asservat/internal/domain/identity"
 
 	"asservat.local/asservat/internal/adapters/kms"
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
@@ -37,17 +38,6 @@ type OwnerObservationDeployment struct {
 	owners    sync.WaitGroup
 	once      sync.Once
 	closeErr  error
-}
-
-func NewOwnerObservationDeployment(ctx context.Context, files *os.Root, podUID string) (*OwnerObservationDeployment, error) {
-	if ctx == nil || files == nil {
-		return nil, mounts.ErrUnavailable
-	}
-	in, err := readOwnerInputs(ctx, files)
-	if err != nil {
-		return nil, ownerStartupError(startupInputs, "none", err)
-	}
-	return newOwnerObservationDeployment(ctx, files, podUID, in)
 }
 
 func newOwnerObservationDeployment(ctx context.Context, files *os.Root, podUID string, in *ownerInputs) (result *OwnerObservationDeployment, err error) {

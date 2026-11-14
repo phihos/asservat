@@ -2,78 +2,14 @@ package kubernetes
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/json"
 	"time"
 
-	app "asservat.local/asservat/internal/application/fleet"
 	"asservat.local/asservat/internal/contracts"
-	"asservat.local/asservat/internal/domain/artifact"
 	cfg "asservat.local/asservat/internal/domain/configuration"
-	fleet "asservat.local/asservat/internal/domain/fleet"
 	auth "k8s.io/api/authentication/v1"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
-
-// InitialPreparationHistoryProtection uses current bootstrap identities solely
-// for exact historical metadata. It cannot create inputs, issue credentials,
-// consume a witness, reactivate SQL, or complete an uncertain launch.
-type InitialPreparationHistoryProtection struct {
-	preparer *InitialPreparer
-	scope    fleet.InstallationWitnessScope
-	plan     artifact.Digest
-}
-
-var _ app.InitialInstallationReadAuthority = (*InitialPreparationHistoryProtection)(nil)
-
-// NewHistoryProtection requires original acknowledged inputs and the explicit
-// new-installation capability. Its subsequent checks re-read the root and exact
-// immutable inputs; retained constructor facts never become current authority.
-func (s *InitialPreparer) NewHistoryProtection(ctx context.Context) (*InitialPreparationHistoryProtection, error) {
-	if !s.HandoverEnabled() || ctx == nil {
-		return nil, cfg.ErrInvalid
-	}
-	_, w, c, _, e := s.passiveHandover(ctx)
-	if e != nil {
-		return nil, e
-	}
-	if w.Activation == nil || w.Activation.Handover == nil {
-		return nil, cfg.ErrChanged
-	}
-	scope := initialPreparationWitnessScope(c)
-	if !scope.Valid() {
-		return nil, cfg.ErrChanged
-	}
-	raw, e := json.Marshal(c)
-	if e != nil {
-		return nil, cfg.ErrInvalid
-	}
-	return &InitialPreparationHistoryProtection{s, scope, artifact.Digest(sha256.Sum256(raw))}, nil
-}
-func (p *InitialPreparationHistoryProtection) Scope() (fleet.InstallationWitnessScope, artifact.Digest) {
-	if p == nil {
-		return fleet.InstallationWitnessScope{}, artifact.Digest{}
-	}
-	return p.scope, p.plan
-}
-func (p *InitialPreparationHistoryProtection) CheckInitialInstallationRead(ctx context.Context, scope fleet.InstallationWitnessScope, plan artifact.Digest) (time.Time, error) {
-	if p == nil || p.preparer == nil || ctx == nil || scope != p.scope || plan != p.plan {
-		return time.Time{}, cfg.ErrInvalid
-	}
-	_, w, c, until, e := p.preparer.passiveHandover(ctx)
-	if e != nil {
-		return time.Time{}, e
-	}
-	raw, e := json.Marshal(c)
-	if e != nil || w.Activation == nil || w.Activation.Handover == nil || initialPreparationWitnessScope(c) != scope || artifact.Digest(sha256.Sum256(raw)) != plan {
-		return time.Time{}, cfg.ErrChanged
-	}
-	return until, nil
-}
-func initialPreparationWitnessScope(c contracts.InitialInstaller) fleet.InstallationWitnessScope {
-	return fleet.InstallationWitnessScope{InstallationID: c.InstallationID, IssuerEpoch: c.IssuerEpoch, ClusterID: c.ClusterID, Namespace: c.Namespace.Name, NamespaceUID: c.Namespace.UID, Name: c.Witness.Name, UID: c.Witness.UID, WriterAccount: c.WriterAccount.Name, WriterAccountUID: c.WriterAccount.UID}
-}
 
 // checkHistoryProbe proves the current, explicitly retained bootstrap account.
 // Neither a rotated bearer token nor cached API authentication may replace its

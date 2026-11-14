@@ -3,16 +3,13 @@ package kubernetes
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"time"
 
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/authorization"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/identity"
-	auth "k8s.io/api/authentication/v1"
 	core "k8s.io/api/core/v1"
-	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // InstalledWorkerProjectionReader reads only the original public resource journal and
@@ -23,27 +20,6 @@ type InstalledWorkerProjectionReader struct {
 	client *PermissionClient
 	guard  *OwnerWorkloadProtection
 	input  contracts.HubWorkerDeployment
-}
-
-func NewInstalledWorkerProjectionReader(client, probe *PermissionClient, input contracts.HubWorkerDeployment) (*InstalledWorkerProjectionReader, error) {
-	if client == nil || probe == nil || client == probe || client.clusterID != input.ClusterID || client.control != (cfg.NamespaceRef{Name: input.Namespace.Name, UID: input.Namespace.UID}) || !HubWorkerActivationBound(input) {
-		return nil, cfg.ErrInvalid
-	}
-	a := input.Activation
-	want := capacityActivationAdministration(input)
-	pin := GuardPin{PolicyUID: a.WorkloadGuard.PolicyUID, PolicyGeneration: a.WorkloadGuard.PolicyGeneration, BindingUID: a.WorkloadGuard.BindingUID, BindingResourceVersion: a.WorkloadGuard.BindingResourceVersion}
-	guard, e := NewOwnerWorkloadProtection(client, probe, want, pin)
-	if e != nil {
-		return nil, e
-	}
-	b, e := json.Marshal(input)
-	var pinned contracts.HubWorkerDeployment
-	if e != nil || json.Unmarshal(b, &pinned) != nil {
-		return nil, cfg.ErrInvalid
-	}
-	// Decoding into the existing shallow copy would reuse nested pointers and
-	// slices, allowing the caller to change this reader's original input pins.
-	return &InstalledWorkerProjectionReader{client: client, guard: guard, input: pinned}, nil
 }
 
 func capacityActivationAdministration(in contracts.HubWorkerDeployment) cfg.OwnerWorkloadAdministration {
@@ -64,93 +40,6 @@ func capacityActivationAdministration(in contracts.HubWorkerDeployment) cfg.Owne
 	h := a.InitialHistoryProbe
 	p.InitialHistoryProbe = &cfg.OwnerInitialHistoryProbe{Namespace: cfg.NamespaceRef{Name: h.Namespace.Name, UID: h.Namespace.UID}, ServiceAccount: h.ServiceAccount.Name, ServiceAccountUID: h.ServiceAccount.UID, Configuration: h.Configuration}
 	return p
-}
-
-// ReadCapacity returns pending only after a successful current read. Neither
-// an unavailable journal nor file existence can become a positive receipt.
-func (s *InstalledWorkerProjectionReader) ReadCapacity(ctx context.Context) (contracts.CapacityRuntimeProjectionClaim, bool, time.Time, error) {
-	var zero contracts.CapacityRuntimeProjectionClaim
-	call, end, state, until, err := s.beginObservation(ctx)
-	if err != nil {
-		return zero, false, time.Time{}, err
-	}
-	defer end()
-	p := state.CapacityProjection
-	if p != nil && p.Receipt != nil {
-		r := p.Receipt
-		if err = s.projectionMetadata(call, state.SetupID, p.OperationID, p.PublicDigest, r.Secret, r.ResourceVersion); err != nil {
-			return zero, false, time.Time{}, err
-		}
-	} else {
-		until = identity.Earlier(until, state.Until)
-	}
-	until, err = s.finishObservation(call, until)
-	if err != nil {
-		return zero, false, time.Time{}, err
-	}
-	if p == nil || p.Receipt == nil {
-		return zero, false, until, nil
-	}
-	return *p, true, until, nil
-}
-
-// Shared only by the two fixed capacity/cleanup methods. This reads no private
-// role journal and cannot select a credential, effect or arbitrary subsystem.
-func (s *InstalledWorkerProjectionReader) beginObservation(ctx context.Context) (context.Context, context.CancelFunc, contracts.InitialRuntimeResourceState, time.Time, error) {
-	var zero contracts.InitialRuntimeResourceState
-	if s == nil || ctx == nil || ctx.Err() != nil {
-		return nil, nil, zero, time.Time{}, cfg.ErrUnavailable
-	}
-	started := s.client.now()
-	call, end := context.WithDeadline(ctx, started.Add(5*time.Second))
-	ok := false
-	defer func() {
-		if !ok {
-			end()
-		}
-	}()
-	// The owner workload admission guard is no longer re-verified here:
-	// Kubernetes RBAC protects the hub namespace (helm-native plan, slice 0).
-	until, _ := call.Deadline()
-	live, narrow := context.WithDeadline(call, until)
-	finish := func() { narrow(); end() }
-	if err := s.identity(live); err != nil {
-		narrow()
-		return nil, nil, zero, time.Time{}, err
-	}
-	state, err := s.journal(live)
-	if err != nil {
-		narrow()
-		return nil, nil, zero, time.Time{}, err
-	}
-	if err = s.workload(live, state); err != nil {
-		narrow()
-		return nil, nil, zero, time.Time{}, err
-	}
-	if err = initialHandoverDeadline(live, s.client.now, until); err != nil {
-		narrow()
-		return nil, nil, zero, time.Time{}, err
-	}
-	ok = true
-	return live, finish, state, until, nil
-}
-
-func (s *InstalledWorkerProjectionReader) finishObservation(ctx context.Context, until time.Time) (time.Time, error) {
-	live, end := context.WithDeadline(ctx, until)
-	defer end()
-	if err := initialHandoverDeadline(live, s.client.now, until); err != nil {
-		return time.Time{}, err
-	}
-	return until, nil
-}
-
-func (s *InstalledWorkerProjectionReader) identity(ctx context.Context) error {
-	raw, e := s.client.proofPost(ctx, "/apis/authentication.k8s.io/v1/selfsubjectreviews", auth.SelfSubjectReview{TypeMeta: meta.TypeMeta{APIVersion: "authentication.k8s.io/v1", Kind: "SelfSubjectReview"}}, nil)
-	var who auth.SelfSubjectReview
-	if e != nil || strictGuardJSON(raw, &who) != nil || who.Status.UserInfo.Username != "system:serviceaccount:"+s.input.Namespace.Name+":"+s.input.Activation.ServiceAccount.Name {
-		return cfg.ErrDenied
-	}
-	return nil
 }
 
 func (s *InstalledWorkerProjectionReader) get(ctx context.Context, path string, out any) error {

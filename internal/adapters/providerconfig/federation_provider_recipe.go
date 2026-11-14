@@ -3,7 +3,6 @@ package providerconfig
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"time"
 
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/authorization"
@@ -90,17 +89,4 @@ func FederationProviderRecipeFor(in contracts.FederationDeployment, selection co
 	d := sha256.Sum256(raw)
 	out.Profile.RecipeSHA256 = hex.EncodeToString(d[:])
 	return out, nil
-}
-
-// ValidateFederationProviderAuthentication recomputes the exact recipe; it
-// is binding validation only, not proof that a provider installed it.
-func ValidateFederationProviderAuthentication(in contracts.FederationDeployment, p contracts.FederationProviderAuthentication, _ time.Time) error {
-	if p.Format != contracts.FederationProviderAuthenticationFormat {
-		return cfg.ErrInvalid
-	}
-	recipe, err := FederationProviderRecipeFor(in, p)
-	if err != nil || recipe.Profile != p {
-		return cfg.ErrInvalid
-	}
-	return nil
 }

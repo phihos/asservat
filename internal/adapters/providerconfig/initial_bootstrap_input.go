@@ -2,92 +2,13 @@ package providerconfig
 
 import (
 	"bytes"
-	"encoding/base64"
-	"encoding/json"
-	"encoding/json/jsontext"
 	"encoding/pem"
 	"slices"
-	"strings"
 	"time"
 
 	"asservat.local/asservat/internal/adapters/mtls"
-	"asservat.local/asservat/internal/contracts"
 	cfg "asservat.local/asservat/internal/domain/configuration"
-	"asservat.local/asservat/internal/domain/identity"
-	"k8s.io/apimachinery/pkg/util/validation"
 )
-
-// CompileInitialBootstrapInput is local normalization, not authentication or
-// acceptance. Actual administrator/Pod/token/guard/API checks remain mandatory.
-// The optional token audience is a hint only; no other claim is returned.
-func CompileInitialBootstrapInput(v contracts.InitialBootstrapInput, kubernetesCA, token []byte, now time.Time) (contracts.InitialBootstrap, error) {
-	var zero contracts.InitialBootstrap
-	if v.Format != contracts.InitialBootstrapInputFormat || v.IdentitySource != "" || v.AuditStore.RootsSource != "" || v.Postgres.RootsSource != "" || v.KeyService.RootsSource != "" || v.RegistryAuthentication != "" && v.RegistryAuthentication != contracts.InitialRegistryAuthentication || now.IsZero() || len(validation.IsDNS1123Label(v.RunnerAccount)) != 0 || len(validation.IsDNS1123Label(v.BootstrapNamespace)) != 0 {
-		return zero, cfg.ErrInvalid
-	}
-	admins, err := initialBootstrapAdministrators(v)
-	if err != nil {
-		return zero, err
-	}
-	kubePEM := []byte(v.Kubernetes.RootsPEM)
-	if len(kubePEM) == 0 {
-		kubePEM = kubernetesCA
-	}
-	k, err := initialBootstrapPEM(kubePEM, now)
-	if err != nil {
-		return zero, err
-	}
-	p, err := initialBootstrapPEM([]byte(v.Postgres.RootsPEM), now)
-	if err != nil {
-		return zero, err
-	}
-	a, err := initialBootstrapPEM([]byte(v.AuditStore.RootsPEM), now)
-	if err != nil {
-		return zero, err
-	}
-	b, err := initialBootstrapPEM([]byte(v.KeyService.RootsPEM), now)
-	if err != nil {
-		return zero, err
-	}
-	audience := v.ProbeAudience
-	if audience == "" {
-		audience, err = initialBootstrapAudienceHint(token, now)
-		if err != nil {
-			return zero, err
-		}
-	}
-	if !identity.Text(audience, 256) {
-		return zero, cfg.ErrInvalid
-	}
-	d := contracts.InitialBootstrap{Format: contracts.InitialBootstrapVersionedAuditFormat, Name: v.Name, BootstrapNamespace: v.BootstrapNamespace, TargetNamespace: v.TargetNamespace, Image: v.Image, RegistryAuthentication: v.RegistryAuthentication, Administrators: admins, ProbeAudience: audience, Kubernetes: contracts.OwnerProviderEndpoint{Endpoint: v.Kubernetes.Endpoint, Roots: k}, Postgres: contracts.OwnerPostgresEndpoint{Host: v.Postgres.Host, Port: v.Postgres.Port, Database: v.Postgres.Database, MaxConnections: v.Postgres.MaxConnections, Roots: p}, AuditStore: contracts.OwnerAuditStore{Endpoint: v.AuditStore.Endpoint, Region: v.AuditStore.Region, Bucket: v.AuditStore.Bucket, Roots: a}, KeyService: contracts.ConfigurationKeyService{Endpoint: v.KeyService.Endpoint, AuditMount: v.KeyService.AuditMount, AuditKey: v.KeyService.AuditKey, Roots: b}, Fleet: v.Fleet, Providers: v.Providers}
-	if Validate(d.Kubernetes, d.Postgres, d.AuditStore, d.KeyService, now) != nil || !InitialProviderNames(d.Providers.IssuerPolicy, d.Providers.WrapRole, d.Providers.WrapPolicy, d.Providers.UnwrapRole, d.Providers.UnwrapPolicy) {
-		return zero, cfg.ErrInvalid
-	}
-	encoded, err := json.Marshal(d)
-	if err != nil || len(encoded) > contracts.InitialBootstrapMaxBytes {
-		return zero, cfg.ErrInvalid
-	}
-	return d, nil
-}
-
-// These are explicit original installation administrators, independent of
-// browser identities and evidence grants. The runner remains an administrator.
-func initialBootstrapAdministrators(v contracts.InitialBootstrapInput) ([]contracts.OwnerDeploymentActor, error) {
-	if len(v.Administrators) > 31 || v.Administrators != nil && len(v.Administrators) == 0 {
-		return nil, cfg.ErrInvalid
-	}
-	runner := contracts.OwnerDeploymentActor{Kind: "User", Name: "system:serviceaccount:" + v.BootstrapNamespace + ":" + v.RunnerAccount}
-	admins := []contracts.OwnerDeploymentActor{runner}
-	seen := map[contracts.OwnerDeploymentActor]bool{runner: true}
-	for _, actor := range v.Administrators {
-		if (actor.Kind != "User" && actor.Kind != "Group") || !identity.Text(actor.Name, 256) || seen[actor] {
-			return nil, cfg.ErrInvalid
-		}
-		seen[actor] = true
-		admins = append(admins, actor)
-	}
-	return admins, nil
-}
 
 // TrustRootsPEM parses at most four exact certificate blocks into sorted,
 // currently valid trust roots, as for the public bootstrap input.
@@ -116,49 +37,4 @@ func initialBootstrapPEM(raw []byte, now time.Time) ([][]byte, error) {
 	}
 	slices.SortFunc(roots, bytes.Compare)
 	return roots, nil
-}
-
-// No signature is checked here because this cannot confer authority. The
-// resulting audience is subsequently used in actual independent API checks.
-func initialBootstrapAudienceHint(token []byte, now time.Time) (string, error) {
-	if len(token) == 0 || len(token) > 16<<10 {
-		return "", cfg.ErrInvalid
-	}
-	parts := strings.Split(string(token), ".")
-	if len(parts) != 3 || parts[0] == "" || parts[2] == "" {
-		return "", cfg.ErrInvalid
-	}
-	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
-	defer clear(payload)
-	if err != nil || base64.RawURLEncoding.EncodeToString(payload) != parts[1] || !jsontext.Value(payload).IsValid() {
-		return "", cfg.ErrInvalid
-	}
-	var claims map[string]json.RawMessage
-	if json.Unmarshal(payload, &claims) != nil {
-		return "", cfg.ErrInvalid
-	}
-	var exp int64
-	if json.Unmarshal(claims["exp"], &exp) != nil || exp <= now.Unix() {
-		return "", cfg.ErrInvalid
-	}
-	if raw, exists := claims["nbf"]; exists {
-		var nbf int64
-		if json.Unmarshal(raw, &nbf) != nil || nbf > now.Unix() {
-			return "", cfg.ErrInvalid
-		}
-	}
-	var audience string
-	if json.Unmarshal(claims["aud"], &audience) != nil {
-		var all []string
-		// Default tokens list every API audience (k3s adds "k3s"); the first
-		// is the server's primary one, which TokenReview accepts.
-		if json.Unmarshal(claims["aud"], &all) != nil || len(all) == 0 {
-			return "", cfg.ErrInvalid
-		}
-		audience = all[0]
-	}
-	if !identity.Text(audience, 256) {
-		return "", cfg.ErrInvalid
-	}
-	return audience, nil
 }

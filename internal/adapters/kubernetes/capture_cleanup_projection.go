@@ -3,21 +3,15 @@ package kubernetes
 import (
 	"bytes"
 	"context"
-	"crypto/ed25519"
 	"encoding/json"
 	"reflect"
-	"slices"
-	"strings"
 	"time"
 
-	"asservat.local/asservat/internal/adapters/providerconfig"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/authorization"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/identity"
 	core "k8s.io/api/core/v1"
-	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 )
 
 // These two independently provisioned storage credentials are private input
@@ -54,194 +48,6 @@ func NewCaptureCleanupProjection(bridge *InitialRuntimeBridge, resources *Initia
 		return nil, cfg.ErrInvalid
 	}
 	return &CaptureCleanupProjection{bridge: bridge, resources: resources, roles: root, deployment: cloned, provider: provider}, nil
-}
-
-func captureCleanupProjectionData(initial contracts.InitialInstaller, deployment contracts.CaptureCleanupDeployment, roles contracts.PublicRuntimeRoleSnapshot, provider CaptureCleanupProviderMaterial, now time.Time) (map[string][]byte, string, error) {
-	if deployment.Format != contracts.CaptureCleanupDeploymentFormat || deployment.InstallationID != initial.InstallationID ||
-		deployment.RoleRootUID != roles.UID || deployment.RoleSetupID != roles.State.OperationID || !authorization.UUID(deployment.StoreID) ||
-		roles.State.Input.InstallationID != initial.InstallationID || roles.State.Input.Namespace != initial.Namespace ||
-		roles.State.CapacitySetup == nil || roles.State.CapacitySetup.Receipt == nil ||
-		roles.State.CapacitySetup.Receipt.RoleRootUID != roles.UID || roles.State.CapacitySetup.Receipt.RoleSetupID != roles.State.OperationID ||
-		roles.State.CapacitySetup.Receipt.InitialClaimID != roles.State.Input.InitialClaimID ||
-		roles.State.CapacitySetup.Receipt.PermissionRootID != deployment.RootID || !runtimeRoleStateValid(roles.State.Input, roles.State, now) ||
-		!publicRuntimeWorkerBindingValid(roles.State.Input) || providerconfig.Validate(initial.Kubernetes, deployment.Postgres, deployment.AuditStore, deployment.KeyService, now) != nil {
-		return nil, "", cfg.ErrInvalid
-	}
-	sign := deployment.Signing
-	if !identity.Text(sign.KeyID, 128) || !identity.Text(sign.Mount, 128) || !identity.Text(sign.Name, 128) ||
-		strings.ContainsAny(sign.Mount+sign.Name, "/?#%\\") || sign.Version < 1 || sign.Version > 1<<31-1 || len(sign.PublicKeys) < 1 || len(sign.PublicKeys) > 16 || len(sign.PublicKeys[sign.KeyID]) != ed25519.PublicKeySize {
-		return nil, "", cfg.ErrInvalid
-	}
-	for name, key := range sign.PublicKeys {
-		if !identity.Text(name, 128) || len(key) != ed25519.PublicKeySize {
-			return nil, "", cfg.ErrInvalid
-		}
-	}
-	for _, credential := range []contracts.OwnerStorageCredential{provider.Cleanup, provider.Verify} {
-		if !identity.Text(credential.AccessKeyID, 256) || !identity.Text(credential.SecretAccessKey, 8192) || len(credential.SessionToken) > 8192 {
-			return nil, "", cfg.ErrInvalid
-		}
-	}
-	if provider.Cleanup.AccessKeyID == provider.Verify.AccessKeyID {
-		return nil, "", cfg.ErrInvalid
-	}
-	data := map[string][]byte{}
-	ok := false
-	defer func() {
-		if !ok {
-			clearRuntimeProjection(data)
-		}
-	}()
-	manifest := contracts.CaptureCleanupCredentialManifest{Format: contracts.CaptureCleanupManifestFormat, Input: roles.State.Input, RootUID: roles.UID, SetupID: roles.State.OperationID, CaptureSetup: *roles.State.CapacitySetup.Receipt}
-	for _, purpose := range contracts.PublicRuntimeCaptureCleanupPurposes() {
-		n := slices.IndexFunc(roles.State.Roles, func(r contracts.PublicRuntimeRoleMaterial) bool { return r.Purpose == purpose })
-		if n < 0 || roles.State.Roles[n].Claim == nil || roles.State.Roles[n].Receipt == nil {
-			return nil, "", cfg.ErrUnavailable
-		}
-		r := roles.State.Roles[n]
-		manifest.Roles = append(manifest.Roles, contracts.PublicRuntimeCredentialProof{Purpose: purpose, Claim: *r.Claim, Receipt: *r.Receipt})
-		data["sql-"+purpose+".json"], _ = json.Marshal(contracts.OwnerSQLCredential{Username: r.Receipt.RoleName, Password: r.Password})
-	}
-	data[contracts.HubWorkerCleanupManifestFile], _ = json.Marshal(manifest)
-	data[contracts.HubWorkerCleanupDeploymentFile], _ = json.Marshal(deployment)
-	data["cleanup-storage.json"], _ = json.Marshal(provider.Cleanup)
-	data["verify-storage.json"], _ = json.Marshal(provider.Verify)
-	digest, err := contracts.CaptureCleanupProjectionDigest(deployment, manifest)
-	if err != nil {
-		return nil, "", cfg.ErrInvalid
-	}
-	ok = true
-	return data, digest, nil
-}
-
-// Publish is the fixed post-handover administrator
-// effect. The caller must first obtain the exact role snapshot from the SQL
-// producer's actual credential/ACL verification. This method independently
-// compares that snapshot to its guarded original private root. No runtime
-// process receives that root, SQL administrator, or another compartment's data.
-func (p *CaptureCleanupProjection) Publish(ctx context.Context, verified contracts.PublicRuntimeRoleSnapshot) (contracts.CaptureCleanupProjectionReceipt, error) {
-	var out contracts.CaptureCleanupProjectionReceipt
-	if p == nil {
-		return out, cfg.ErrInvalid
-	}
-	s, resources, root, deployment, provider := p.bridge, p.resources, p.roles, p.deployment, p.provider
-	if s == nil || resources == nil || root == nil || verified.State.Input != root.input {
-		return out, cfg.ErrInvalid
-	}
-	ctx, releaseRoot, err := root.enter(ctx)
-	if err != nil {
-		return out, err
-	}
-	defer releaseRoot()
-	ctx, releaseResources, err := resources.borrowWorkerProjection(ctx)
-	if err != nil {
-		return out, err
-	}
-	defer releaseResources()
-	err = s.operation(ctx, func(call context.Context) error {
-		roles, _, err := root.read(call)
-		defer clear(roles.State.MAC.InputKey)
-		defer clear(roles.State.MAC.AccountKey)
-		if err != nil || roles.UID != verified.UID || !reflect.DeepEqual(roles.State, verified.State) || !s.source.client.now().Before(verified.ValidUntil) {
-			return cfg.ErrChanged
-		}
-		call, cancel := context.WithDeadline(call, identity.Earlier(roles.ValidUntil, verified.ValidUntil))
-		defer cancel()
-		data, public, err := captureCleanupProjectionData(s.initial, deployment, roles, provider, s.source.client.now())
-		if err != nil {
-			return err
-		}
-		defer clearRuntimeProjection(data)
-		original := roles.State.Input.Worker
-		state, object, err := s.readInstalledWorkerResources(call, resources, original)
-		if err != nil {
-			return err
-		}
-		call, cancelState := context.WithDeadline(call, state.ValidUntil)
-		defer cancelState()
-		fresh := state.State.CleanupProjection == nil
-		if fresh {
-			if p.claimAttempted {
-				return cfg.ErrUnavailable
-			}
-			p.claimAttempted = true
-			now := s.source.client.now().UTC().Truncate(time.Microsecond)
-			until := identity.Earlier(state.ValidUntil, state.State.Until).UTC().Truncate(time.Microsecond)
-			if !now.Before(until) {
-				return cfg.ErrUnavailable
-			}
-			id, e := prepUUID()
-			if e != nil {
-				return e
-			}
-			next := state.State
-			next.CleanupProjection = &contracts.CaptureCleanupProjectionClaim{OperationID: id, PublicDigest: public, Setup: *roles.State.CapacitySetup.Receipt, ClaimedAt: now, Until: until}
-			state, err = s.writeCleanupProjection(call, resources, object, next)
-			if err != nil {
-				return err
-			} // Unknown CAS never permits CREATE.
-		}
-		claim := state.State.CleanupProjection
-		if claim == nil || claim.PublicDigest != public || !equalJSON(claim.Setup, *roles.State.CapacitySetup.Receipt) {
-			return cfg.ErrChanged
-		}
-		if fresh {
-			current, _, e := s.readInstalledWorkerResources(call, resources, original)
-			if e != nil || current.UID != state.UID || !equalJSON(current.State, state.State) {
-				return cfg.ErrChanged
-			}
-			effect, end := context.WithDeadline(call, identity.Earlier(current.ValidUntil, claim.Until))
-			defer end()
-			if s.deadline(effect) != nil {
-				return cfg.ErrUnavailable
-			}
-			secret := core.Secret{TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "Secret"}, ObjectMeta: meta.ObjectMeta{Name: contracts.HubWorkerCleanupProjectionName(s.initial.InstallationID), Namespace: s.initial.Namespace.Name, Annotations: cleanupProjectionAnnotations(original, claim)}, Immutable: ptr.To(true), Type: core.SecretTypeOpaque, Data: data}
-			raw, _ := s.preparer.creator.api.Post().AbsPath("/api/v1/namespaces/"+s.initial.Namespace.Name+"/secrets").Param("fieldValidation", "Strict").Body(&secret).MaxRetries(0).DoRaw(effect)
-			clear(raw) // Exact independent lookup handles successful or unknown CREATE.
-		}
-		receipt, err := s.readCleanupProjection(call, original, claim, data)
-		if err != nil {
-			return err
-		}
-		current, object, err := s.readInstalledWorkerResources(call, resources, original)
-		if err != nil || current.State.CleanupProjection == nil || !equalJSON(current.State.CleanupProjection, claim) {
-			return cfg.ErrChanged
-		}
-		if claim.Receipt == nil {
-			if !s.source.client.now().Before(current.State.Until) {
-				return cfg.ErrUnavailable
-			}
-			next := current.State
-			copy := *claim
-			copy.Receipt = &receipt
-			next.CleanupProjection = &copy
-			if _, err = s.writeCleanupProjection(call, resources, object, next); err != nil {
-				return err
-			}
-		} else if *claim.Receipt != receipt {
-			return cfg.ErrChanged
-		}
-		// A successful CAS is retained provenance only. Recheck actual current
-		// protection and the original private role root before returning it.
-		final, _, err := s.readInstalledWorkerResources(call, resources, original)
-		if err != nil || final.State.CleanupProjection == nil || final.State.CleanupProjection.Receipt == nil ||
-			!equalJSON(*final.State.CleanupProjection.Receipt, receipt) || final.State.CleanupProjection.PublicDigest != public {
-			return cfg.ErrUnavailable
-		}
-		lastRoles, _, err := root.read(call)
-		defer clear(lastRoles.State.MAC.InputKey)
-		defer clear(lastRoles.State.MAC.AccountKey)
-		if err != nil || lastRoles.UID != roles.UID || !equalJSON(lastRoles.State, roles.State) || s.deadline(call) != nil ||
-			!s.source.client.now().Before(identity.Earlier(final.ValidUntil, lastRoles.ValidUntil)) {
-			return cfg.ErrUnavailable
-		}
-		out = receipt
-		return nil
-	})
-	if err != nil {
-		return contracts.CaptureCleanupProjectionReceipt{}, err
-	}
-	return out, nil
 }
 
 func cleanupProjectionAnnotations(original contracts.PublicRuntimeWorkerBinding, claim *contracts.CaptureCleanupProjectionClaim) map[string]string {

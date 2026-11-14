@@ -170,14 +170,6 @@ func EncodeClusterObservationRequest(v ClusterObservationRequest) ([]byte, error
 	return b, nil
 }
 
-func DecodeClusterObservationRequest(b []byte) (ClusterObservationRequest, error) {
-	v, e := decodeClosedRPC[ClusterObservationRequest](bytes.NewReader(b), ClusterObservationBytes)
-	if e != nil {
-		return ClusterObservationRequest{}, ErrClusterObservationProtocol
-	}
-	return v, nil
-}
-
 func EncodeClusterObservationResult(v ClusterObservationResult) ([]byte, error) {
 	b, e := canonicalAPIContext(v, ClusterObservationBytes)
 	if e != nil {

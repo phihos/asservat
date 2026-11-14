@@ -9,11 +9,8 @@ import (
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	fleet "asservat.local/asservat/internal/domain/fleet"
 	admission "k8s.io/api/admissionregistration/v1"
-	apps "k8s.io/api/apps/v1"
 	coordination "k8s.io/api/coordination/v1"
 	core "k8s.io/api/core/v1"
-	rbac "k8s.io/api/rbac/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -171,56 +168,4 @@ func (s *InitialRuntimeResources) object(state contracts.InitialRuntimeResourceS
 		return initialRuntimeObject{policy, path + "validatingadmissionpolicies"}, nil
 	}
 	return initialRuntimeObject{binding, path + "validatingadmissionpolicybindings"}, nil
-}
-
-// Only known defaulted fields of the fixed inert resource kinds are removed.
-// No admission-added privilege, sidecar, selector, mount or account is ignored.
-func normalizeInitialRuntimeObject(obj runtime.Object) error {
-	switch v := obj.(type) {
-	case *apps.Deployment:
-		v.Status = apps.DeploymentStatus{}
-		if v.Spec.RevisionHistoryLimit != nil && *v.Spec.RevisionHistoryLimit == 10 {
-			v.Spec.RevisionHistoryLimit = nil
-		}
-		if v.Spec.ProgressDeadlineSeconds != nil && *v.Spec.ProgressDeadlineSeconds == 600 {
-			v.Spec.ProgressDeadlineSeconds = nil
-		}
-		normalizeInitialPodDefaults(&v.Spec.Template.Spec)
-	case *core.Service:
-		if v.Spec.ClusterIP != core.ClusterIPNone {
-			return cfg.ErrChanged
-		}
-		if len(v.Spec.ClusterIPs) == 1 && v.Spec.ClusterIPs[0] == core.ClusterIPNone {
-			v.Spec.ClusterIPs = nil
-		}
-		if len(v.Spec.IPFamilies) == 1 && (v.Spec.IPFamilies[0] == core.IPv4Protocol || v.Spec.IPFamilies[0] == core.IPv6Protocol) {
-			v.Spec.IPFamilies = nil
-		}
-		if v.Spec.IPFamilyPolicy != nil && *v.Spec.IPFamilyPolicy == core.IPFamilyPolicySingleStack {
-			v.Spec.IPFamilyPolicy = nil
-		}
-		if v.Spec.InternalTrafficPolicy != nil && *v.Spec.InternalTrafficPolicy == core.ServiceInternalTrafficPolicyCluster {
-			v.Spec.InternalTrafficPolicy = nil
-		}
-		if v.Spec.SessionAffinity == core.ServiceAffinityNone {
-			v.Spec.SessionAffinity = ""
-		}
-		v.Status = core.ServiceStatus{}
-	case *admission.ValidatingAdmissionPolicy:
-		v.Status = admission.ValidatingAdmissionPolicyStatus{}
-		normalizePermissionPolicy(&v.Spec)
-	case *core.ServiceAccount, *core.ConfigMap, *rbac.Role, *rbac.RoleBinding, *rbac.ClusterRole, *rbac.ClusterRoleBinding, *coordination.Lease, *admission.ValidatingAdmissionPolicyBinding:
-	default:
-		return cfg.ErrInvalid
-	}
-	m, e := meta.Accessor(obj)
-	if e != nil {
-		return cfg.ErrInvalid
-	}
-	m.SetUID("")
-	m.SetResourceVersion("")
-	m.SetGeneration(0)
-	m.SetCreationTimestamp(metav1.Time{})
-	m.SetManagedFields(nil)
-	return nil
 }

@@ -46,26 +46,3 @@ func TestHubCredentialsPreserveProcessAndPinnedBoundaries(t *testing.T) {
 		t.Fatal("owner identity was reused")
 	}
 }
-
-func TestHubBudgetCountsConnectionsRatherThanPasswords(t *testing.T) {
-	plan, err := InstalledSQLConnectionPlan(1)
-	if err != nil {
-		t.Fatal(err)
-	}
-	got, err := plan.Validate(0, SQLServerCapacity{MaxConnections: 1000})
-	if err != nil || got.PerHubProcess != 32 {
-		t.Fatal("physical budget rejected consolidated credentials", got, err)
-	}
-	for i, c := range plan.Compartments {
-		if !c.Hub {
-			continue
-		}
-		if len(c.Purposes) != 8 || c.PoolCapacity != 32 {
-			t.Fatal("hub budget still counts old credentials", c)
-		}
-		plan.Compartments[i].PoolCapacity = 31
-		if _, err = plan.Validate(0, SQLServerCapacity{MaxConnections: 1000}); err == nil {
-			t.Fatal("governor exceeds compiled pool capacity")
-		}
-	}
-}

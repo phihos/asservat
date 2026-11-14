@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"strings"
-	"time"
 
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/authorization"
@@ -106,17 +105,4 @@ func PublisherProviderRecipeFor(in contracts.PublisherDeployment, selection cont
 	d := sha256.Sum256(raw)
 	out.Profile.RecipeSHA256 = hex.EncodeToString(d[:])
 	return out, nil
-}
-
-// ValidatePublisherProviderAuthentication recomputes the exact recipe; it is
-// binding validation only, not proof that a provider installed it.
-func ValidatePublisherProviderAuthentication(in contracts.PublisherDeployment, p contracts.PublisherProviderAuthentication, _ time.Time) error {
-	if p.Format != contracts.PublisherProviderAuthenticationFormat {
-		return cfg.ErrInvalid
-	}
-	recipe, err := PublisherProviderRecipeFor(in, p)
-	if err != nil || recipe.Profile != p {
-		return cfg.ErrInvalid
-	}
-	return nil
 }

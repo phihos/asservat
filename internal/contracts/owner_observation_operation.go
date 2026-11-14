@@ -40,6 +40,3 @@ func DecodeOwnerObservationOperationReply(b []byte) (OwnerObservationOperationRe
 func EncodeClusterObservationOperationProbe(v ClusterObservationOperationProbe) ([]byte, error) {
 	return encodeObservationRouting(v, 2*ObservationOperationBytes)
 }
-func DecodeClusterObservationOperationProbe(b []byte) (ClusterObservationOperationProbe, error) {
-	return decodeObservationRouting[ClusterObservationOperationProbe](b, 2*ObservationOperationBytes)
-}

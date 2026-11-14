@@ -1,7 +1,6 @@
 package contracts
 
 import (
-	"io"
 	"time"
 )
 
@@ -12,8 +11,6 @@ const OwnerIdentityPoolConnections = 6
 const OwnerIdentityRoleConnections = PublicRuntimeRetainedHubProcesses*OwnerIdentityPoolConnections + 1
 const OwnerIdentityRolesFormat = "asservat-owner-identity-roles/v1"
 const OwnerIdentityRoleStateFormat = "asservat-owner-identity-role-state/v1"
-const OwnerIdentityCredentialManifestFormat = "asservat-owner-identity-credentials/v1"
-const OwnerIdentityRoleMaxBytes = 32 << 10
 
 func OwnerIdentityRolePurposes() []string {
 	return []string{"owner-runtime"}
@@ -77,16 +74,3 @@ type OwnerIdentityCredentialManifest struct {
 	SetupID string                         `json:"setupID"`
 	Roles   []PublicRuntimeCredentialProof `json:"roles"`
 }
-
-func DecodeOwnerIdentityCredentialManifest(r io.Reader) (OwnerIdentityCredentialManifest, error) {
-	return decodeClosedRPC[OwnerIdentityCredentialManifest](r, OwnerIdentityRoleMaxBytes)
-}
-
-func DecodeOwnerIdentityRoleState(r io.Reader) (OwnerIdentityRoleState, error) {
-	return decodeClosedRPC[OwnerIdentityRoleState](r, OwnerIdentityRoleMaxBytes)
-}
-
-func (OwnerIdentityRoleState) String() string      { return "protected owner identity role state" }
-func (OwnerIdentityRoleState) GoString() string    { return "protected owner identity role state" }
-func (OwnerIdentityRoleSnapshot) String() string   { return "protected owner identity role snapshot" }
-func (OwnerIdentityRoleSnapshot) GoString() string { return "protected owner identity role snapshot" }

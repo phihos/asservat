@@ -3,11 +3,8 @@ package bootstrap
 import (
 	"encoding/hex"
 	"slices"
-	"time"
 
 	"asservat.local/asservat/internal/adapters/mounts"
-	"asservat.local/asservat/internal/adapters/mtls"
-	app "asservat.local/asservat/internal/application/capacity"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/identity"
@@ -17,27 +14,6 @@ import (
 
 func capacityRuntimeReference(v contracts.WorkerObjectReference) bool {
 	return authorization.UUID(v.UID) && len(validation.IsDNS1123Subdomain(v.Name)) == 0
-}
-func capacityRuntimeGuard(g contracts.OwnerDeploymentGuard) bool {
-	if len(validation.IsDNS1123Label(g.Name)) != 0 || !authorization.UUID(g.PolicyUID) || !authorization.UUID(g.BindingUID) ||
-		!identity.Text(g.BindingResourceVersion, 128) || g.PolicyGeneration < 1 || g.PolicyGeneration > 2147483647 || len(g.Administrators) < 1 || len(g.Administrators) > 32 {
-		return false
-	}
-	seen := map[contracts.OwnerDeploymentActor]bool{}
-	for _, a := range g.Administrators {
-		if (a.Kind != "User" && a.Kind != "Group") || !identity.Text(a.Name, 256) || seen[a] {
-			return false
-		}
-		seen[a] = true
-	}
-	return true
-}
-func capacityRuntimeEndpoint(p contracts.OwnerProviderEndpoint) bool {
-	if !ownerEndpoint(p.Endpoint) {
-		return false
-	}
-	_, _, err := mtls.OwnerTrustRoots(p.Roots, time.Now())
-	return err == nil
 }
 
 func downloadPathRevision(v contracts.DownloadEnvironmentRevision) (identity.Revision, error) {
@@ -94,15 +70,6 @@ func downloadEnvironmentPaths(installation, hub string, pinned []contracts.Downl
 func catalogTargets(c contracts.OwnerClusterCatalog) []string {
 	out := make([]string, len(c.Clusters))
 	for i, v := range c.Clusters {
-		out[i] = v.ClusterID
-	}
-	return out
-}
-
-// regionalTargets are the capacity hub-worker's: its regional qualifications.
-func regionalTargets(r []app.CapacityNamespaceQualification) []string {
-	out := make([]string, len(r))
-	for i, v := range r {
 		out[i] = v.ClusterID
 	}
 	return out

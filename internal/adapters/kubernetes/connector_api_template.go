@@ -2,14 +2,9 @@ package kubernetes
 
 import (
 	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"encoding/json/jsontext"
-	"maps"
-	"reflect"
-	"strings"
 
-	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	apps "k8s.io/api/apps/v1"
@@ -91,53 +86,4 @@ func ConnectorAPITemplateDigest(t core.PodTemplateSpec) (artifact.Digest, error)
 	var d artifact.Digest
 	copy(d[:], h.Sum(nil))
 	return d, nil
-}
-
-// connectorAPITemplateMatch compares the live Deployment, ReplicaSet and Pod
-// with the installed template and image digests. For a hub Deployment the
-// caller passes the release record (ADR-227): each object is first mapped to
-// its original-image view, so a Pod of the current or previous release image
-// matches during and after a rollout. Connector callers pass nil (unchanged).
-func connectorAPITemplateMatch(deployment *apps.Deployment, replica *apps.ReplicaSet, pod *core.Pod, expected, image artifact.Digest, release *contracts.ReleaseRecord, workload releaseWorkload) error {
-	if deployment == nil || replica == nil || pod == nil || pod.Spec.NodeName == "" {
-		return cfg.ErrChanged
-	}
-	if release != nil {
-		d, e := releaseOriginal(*deployment, release, workload)
-		if e != nil {
-			return cfg.ErrChanged
-		}
-		r, p := releaseOriginalReplicaSet(*replica, release), releaseOriginalPod(*pod, release)
-		deployment, replica, pod = &d, &r, &p
-	}
-	d, e := ConnectorAPITemplateDigest(deployment.Spec.Template)
-	if e != nil || d != expected {
-		return cfg.ErrChanged
-	}
-	r := replica.Spec.Template.DeepCopy()
-	hash, ok := r.Labels[apps.DefaultDeploymentUniqueLabelKey]
-	if !ok || len(hash) < 1 || len(hash) > 63 || pod.Labels[apps.DefaultDeploymentUniqueLabelKey] != hash || replica.Spec.Selector == nil || replica.Spec.Selector.MatchLabels[apps.DefaultDeploymentUniqueLabelKey] != hash {
-		return cfg.ErrChanged
-	}
-	delete(r.Labels, apps.DefaultDeploymentUniqueLabelKey)
-	d, e = ConnectorAPITemplateDigest(*r)
-	if e != nil || d != expected {
-		return cfg.ErrChanged
-	}
-	if !maps.Equal(pod.Labels, replica.Spec.Template.Labels) || !maps.Equal(pod.Annotations, replica.Spec.Template.Annotations) || len(pod.Finalizers) != 0 {
-		return cfg.ErrChanged
-	}
-	live := pod.Spec.DeepCopy()
-	live.NodeName = ""
-	actual, e := connectorAPIPodSpec(*live)
-	if e != nil {
-		return cfg.ErrChanged
-	}
-	want, e := connectorAPIPodSpec(deployment.Spec.Template.Spec)
-	if e != nil || !reflect.DeepEqual(actual, want) || !strings.HasSuffix(actual.Containers[0].Image, "@sha256:"+hex.EncodeToString(image[:])) {
-		return cfg.ErrChanged
-	}
-	// Names, UIDs, selectors, controller refs and current phase are additionally
-	// checked by the concrete ConnectorProcessAttester's exact live chain.
-	return nil
 }

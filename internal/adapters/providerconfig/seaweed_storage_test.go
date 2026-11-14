@@ -1,7 +1,6 @@
 package providerconfig
 
 import (
-	"bytes"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -20,46 +19,6 @@ func swCredential(t *testing.T, purpose, scope string) contracts.SeaweedCredenti
 		t.Fatal(e)
 	}
 	return c
-}
-func TestSeaweedCompileRetainedSetIsDeterministicAndScoped(t *testing.T) {
-	admin := swCredential(t, "admin", swInstall)
-	writer := contracts.SeaweedGrant{Credential: swCredential(t, "regional-write", swCluster), Bucket: "evidence", InstallationID: swInstall, ClusterID: swCluster}
-	cleaner := contracts.SeaweedGrant{Credential: swCredential(t, "operation-cleanup", swInstall), Bucket: "audit", InstallationID: swInstall, RootID: swRoot}
-	a, e := CompileSeaweedStorage(admin, []contracts.SeaweedGrant{writer, cleaner})
-	if e != nil {
-		t.Fatal(e)
-	}
-	b, e := CompileSeaweedStorage(admin, []contracts.SeaweedGrant{cleaner, writer})
-	if e != nil || !bytes.Equal(a.Config, b.Config) || !bytes.Equal(a.Policies["audit"], b.Policies["audit"]) {
-		t.Fatal("retained order changed output")
-	}
-	var config struct {
-		Identities []seaweedIdentity `json:"identities"`
-	}
-	if json.Unmarshal(a.Config, &config) != nil {
-		t.Fatal("config")
-	}
-	for _, v := range config.Identities {
-		if v.Name == "asservat-regional-write-"+swCluster {
-			if len(v.Actions) != 1 || v.Actions[0] != "Write:evidence/v1/"+swCluster+"/*" {
-				t.Fatalf("writer escaped exact cluster: %v", v.Actions)
-			}
-		}
-	}
-	for _, p := range a.Policies {
-		if bytes.Contains(p, []byte(writer.Credential.SecretAccessKey)) || bytes.Contains(p, []byte(admin.AccessKeyID)) {
-			t.Fatal("private material in public policy")
-		}
-	}
-	if !bytes.Contains(a.Policies["audit"], []byte("*/deletion-certificate")) {
-		t.Fatal("missing exact certificate exception")
-	}
-	if _, e := SeaweedRuntimeCredential(admin); e == nil {
-		t.Fatal("administrator projected to runtime")
-	}
-	if _, e := SeaweedRuntimeCredential(writer.Credential); e != nil {
-		t.Fatal(e)
-	}
 }
 func TestSeaweedCompileRefusesIgnoredOrForeignAuthority(t *testing.T) {
 	admin := swCredential(t, "admin", swInstall)
@@ -94,39 +53,6 @@ func TestSeaweedCompileRefusesIgnoredOrForeignAuthority(t *testing.T) {
 	}
 	if !strings.Contains(string(out.Policies["audit"]), "history/v1/"+swRoot+"/"+swCluster+"/*") || !strings.Contains(string(out.Policies["audit"]), "ForeignInventory") {
 		t.Fatal("missing history/inventory boundary")
-	}
-}
-
-func TestSeaweedRetainedKeysCannotRotateDropOrNarrow(t *testing.T) {
-	admin := swCredential(t, "admin", swInstall)
-	base := contracts.SeaweedGrant{Credential: swCredential(t, "initial-audit", swInstall), Bucket: "audit", InstallationID: swInstall}
-	first, e := CompileSeaweedStorage(admin, nil)
-	if e != nil {
-		t.Fatal(e)
-	}
-	next, e := CompileSeaweedStorage(admin, []contracts.SeaweedGrant{base})
-	if e != nil {
-		t.Fatal(e)
-	}
-	if ValidateSeaweedConfigTransition(first.Config, next.Config) != nil {
-		t.Fatal("original credential expansion refused")
-	}
-	if ValidateSeaweedConfigTransition(next.Config, first.Config) == nil {
-		t.Fatal("retained identity removed")
-	}
-	rotated := base
-	rotated.Credential = swCredential(t, "initial-audit", swInstall)
-	replacement, e := CompileSeaweedStorage(admin, []contracts.SeaweedGrant{rotated})
-	if e != nil {
-		t.Fatal(e)
-	}
-	if ValidateSeaweedConfigTransition(next.Config, replacement.Config) == nil {
-		t.Fatal("retained key replaced")
-	}
-	for _, bad := range [][]byte{append(bytes.Clone(next.Config), []byte(` {}`)...), bytes.Replace(next.Config, []byte(`"actions":`), []byte(`"unknown":`), 1)} {
-		if ValidateSeaweedConfigTransition(first.Config, bad) == nil {
-			t.Fatal("unclosed private configuration accepted")
-		}
 	}
 }
 

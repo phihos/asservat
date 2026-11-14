@@ -11,7 +11,9 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type guardPolicyReader struct{ policy admission.ValidatingAdmissionPolicy }
+type guardPolicyReader struct {
+	policy admission.ValidatingAdmissionPolicy
+}
 
 func (r guardPolicyReader) raw(context.Context, string, map[string]string) ([]byte, error) {
 	return json.Marshal(r.policy)

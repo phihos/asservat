@@ -13,12 +13,6 @@ type observationCutoff struct {
 	until time.Time
 }
 
-func (d *observationCutoff) narrow(label string, until time.Time) {
-	if until.Before(d.until) {
-		d.label, d.until = label, until
-	}
-}
-
 type observationCutoffFailure struct {
 	err            error
 	cutoff         observationCutoff

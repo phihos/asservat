@@ -16,16 +16,12 @@ import (
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
-	admission "k8s.io/api/admissionregistration/v1"
 )
 
 const apiContextTrustDenial = "Asservat API context work trust administrator is required."
 
 type APIContextWorkTrustProtection struct{ *configMapProtection }
 
-func APIContextWorkTrustAdmission(p cfg.ConfigMapAdministration) (*admission.ValidatingAdmissionPolicy, *admission.ValidatingAdmissionPolicyBinding, error) {
-	return configMapAdmission(p, "protected-api-context-work-trust", apiContextTrustDenial)
-}
 func NewAPIContextWorkTrustProtection(observer, probe *PermissionClient, p cfg.ConfigMapAdministration, pin GuardPin) (*APIContextWorkTrustProtection, error) {
 	guard, e := newConfigMapProtection(observer, probe, p, pin, "protected-api-context-work-trust", apiContextTrustDenial)
 	if e != nil {

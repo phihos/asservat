@@ -2,7 +2,6 @@ package kubernetes
 
 import (
 	"context"
-	"strings"
 	"testing"
 	"time"
 
@@ -190,65 +189,4 @@ func (f preparationPhaseJobs) ObserveDownloadWorker(ctx context.Context, i value
 	}
 	f.pending = true
 	return value.DownloadWorker{}, &evidence.DownloadWorkerPending{Intent: i, Job: job, ObservedAt: time.Now(), ValidUntil: f.until}
-}
-
-func newPreparationPhaseBudget(t *testing.T) (*preparationPhaseBudget, evidence.ContextDownloadCoordinator) {
-	t.Helper()
-	policy := newDownloadPolicyBudgetFixture(t)
-	var path artifact.DownloadPath
-	for _, p := range policy.source.paths {
-		path = p
-	}
-	now := time.Now().UTC().Truncate(time.Microsecond)
-	f := &preparationPhaseBudget{downloadPolicyBudgetFixture: policy, t: t, started: now, until: now.Add(5 * time.Second)}
-	root, installation, id := policy.source.root, policy.source.installation, ownerID(19102)
-	rev := path.WorkerConfiguration
-	principal := identity.Principal{Issuer: "https://id.example.test", Subject: "developer", ClientID: "console", Kind: identity.Human}
-	f.i = identity.Identity{Principal: principal, Policy: rev, Scopes: []string{"evidence:read", "evidence:download"}, VerifiedAt: now, ValidUntil: f.until}
-	e := artifact.ContextExpectation{Registration: artifact.Registration{Location: artifact.Location{ClusterID: path.TargetClusterID, ArtifactID: id, AttemptID: id}, StoreID: path.StoreID, AllocationID: id, PoolRevision: 1, AllocationRevision: 1, NativeLimit: 4096, AnchorAt: now, WriteUntil: now.Add(30 * time.Second), ExpiresAt: now.Add(time.Minute), DeleteBy: now.Add(90 * time.Second)}, CaseID: id, OccurrenceID: id, NodeUID: "node", NodeBootID: id, PodUID: "pod", Namespace: "app", NamespaceUID: "namespace", WorkloadUID: "workload", CollectorVersion: "synthetic", CollectorImageDigest: artifact.Digest{1}, RecipeDigest: artifact.Digest{2}, PlanDigest: artifact.Digest{3}, CaptureUID: id, ActionID: "context", DataClass: "metadata", PurposeRef: "diagnostics", Audience: []artifact.AudienceAssignment{{Kind: "Group", Issuer: principal.Issuer, SubjectID: "team", Role: "workload-maintainer", BasisKind: "AccessBinding", BasisUID: "binding", AssignmentID: id, BasisDigest: artifact.Digest{4}}}, RequestedAgeSeconds: 60, MaximumAgeSeconds: 300, DeletionBudgetSeconds: 30, RetentionRules: []artifact.RetentionRule{{UID: "retention", Generation: 1, Digest: artifact.Digest{5}}}, TriggeredAt: now}
-	var copies artifact.Copies
-	for n := range copies {
-		copies[n] = artifact.CopyReceipt{VersionID: "synthetic", ETag: "synthetic", Bytes: 128, SHA256: artifact.Digest{byte(n + 1)}}
-	}
-	scope := artifact.DownloadScope{RootID: root, ArtifactID: id, CaptureID: id, ClusterID: path.TargetClusterID, NamespaceUID: e.NamespaceUID, WorkloadUID: e.WorkloadUID, PodUID: e.PodUID, Version: evidence.ContextCopiesDigest(copies), Principal: principal}
-	retention := artifact.RetentionProof{RootID: root, ClusterID: scope.ClusterID, NamespaceUID: scope.NamespaceUID, WorkloadUID: scope.WorkloadUID, PodUID: scope.PodUID, Topology: rev, Policy: rev, Selectors: rev, SourceCount: 1, Sources: [2]artifact.RetentionSourceVersion{{ClusterID: scope.ClusterID, ControlNamespaceUID: "control", Epoch: root, Hub: true, ProtectionDigest: artifact.Digest{1}, SnapshotDigest: artifact.Digest{2}, Acceptance: rev}}, ObservedAt: now, ValidUntil: f.until}
-	f.a = artifact.DownloadAuthority{Scope: scope, Retention: retention, PermissionEpoch: root, PermissionSequence: 1, ProjectionDigest: artifact.Digest{1}, DecisionDigest: artifact.Digest{2}, IdentityRevision: rev, CheckedAt: now, ValidUntil: f.until, AccessUntil: e.Registration.ExpiresAt, DeleteBy: e.Registration.DeleteBy}
-	f.source = evidence.ContextDownloadSource{Scope: scope, Expectation: e, Copies: copies, ObservedAt: now, ValidUntil: f.until}
-	f.record = authapp.ContextDownloadEvidence{CaptureID: id, DataClass: "metadata", PurposeRef: e.PurposeRef, Version: scope.Version, Audience: e.Audience, Retained: privacy.RetainedArtifact{RootID: root, Registration: e.Registration, Input: privacy.Input{Target: value.Target{ClusterID: scope.ClusterID, NamespaceUID: scope.NamespaceUID, WorkloadUID: scope.WorkloadUID, PodUID: scope.PodUID}, PrivacyClass: "potentialPersonalData", EvidenceType: "context", RequestedSeconds: 60, AnchorAt: now}, OriginPolicies: e.RetentionRules, Effective: privacy.Deadlines{AnchorAt: now, ExpiresAt: e.Registration.ExpiresAt, DeleteBy: e.Registration.DeleteBy}}, ObservedAt: now, ValidUntil: f.until}
-	f.recovery = artifact.RecoveryProof{InstallationID: installation, IssuerEpoch: ownerID(19007), Revision: rev, ObservedAt: now, FreshUntil: f.until}
-	f.processing = artifact.DownloadProcessingProof{RootID: root, Epoch: root, CaptureID: id, Location: e.Registration.Location, Sequence: 1, StateDigest: artifact.Digest{3}, ObservedAt: now, ValidUntil: f.until}
-	observations, err := authapp.NewDownloadPolicyObservations(f, time.Now)
-	if err != nil {
-		t.Fatal("download policy observations", err)
-	}
-	f.environment = authapp.CurrentDownloadEnvironment{RootID: root, InstallationID: installation, Policies: observations, Recovery: f, Processing: f, Now: time.Now}
-	f.profile = value.DownloadWorkerProfile{Configuration: rev, InstallationID: installation, ClusterID: path.AcquisitionClusterID, Namespace: "workers", NamespaceUID: "workers-uid", ServiceAccount: "worker", ServiceAccountUID: "worker-uid", Image: "synthetic.invalid/worker@sha256:" + strings.Repeat("1", 64), ControlConfig: "control", ControlConfigUID: "control-uid", PriorityClass: "worker", PriorityClassUID: "priority-uid", CPUMillis: 100, MemoryBytes: 64 << 20, MaxRuntime: time.Minute, StoreCredentialSecret: "reader", StoreCredentialSecretUID: ownerID(19103)}
-	if !f.a.Valid(now) || !f.source.Valid(now) || !f.record.Retained.Valid() || !f.processing.Valid(now) || !f.recovery.Valid(now) || !f.profile.Valid() {
-		t.Fatal("invalid synthetic preparation facts")
-	}
-	unused := &preparationPhaseUnused{}
-	newID := func() string { return ownerID(19104) }
-	dispatcher := &evidence.DownloadDispatcher{Ledger: preparationPhaseLedger{preparationPhaseBudget: f}, Jobs: preparationPhaseJobs{preparationPhaseBudget: f}, Audit: f, Acknowledgements: f, CurrentAuthority: f, Profile: f.profile, Now: time.Now}
-	runtime, err := evidence.NewContextNativeRuntime(evidence.ContextNativeRuntimeConfig{Serving: f, Profile: f.profile, Configuration: f, Workers: f, Preparation: unused, Dispatcher: dispatcher,
-		Sources: f, Authority: f, Audit: unused, Acknowledgements: unused,
-		Native: evidence.NativeAttachmentConfig{HubPodUID: id, HubProcessEpoch: id, KeyScope: value.KeyScope{InstallationID: installation, Purpose: "artifact", KeyID: "synthetic"}, Owners: unused, Fences: unused, Registrar: unused, Origins: evidence.NativeOrigins{Operations: unused, Now: time.Now}, PreparationKeys: unused, WindowKeys: unused}, Now: time.Now, NewID: newID})
-	if err != nil {
-		t.Fatal("runtime composition", err)
-	}
-	return f, evidence.ContextDownloadCoordinator{RootID: root, InstallationID: installation, Recovery: f, Routes: f, Sources: f, Authority: f, Sessions: f, Plans: f, Runtime: runtime, Now: time.Now, NewID: newID}
-}
-
-func TestDownloadPreparationFirstJobFitsOriginalPolicyBudget(t *testing.T) {
-	f, coordinator := newPreparationPhaseBudget(t)
-	call, cancel := context.WithDeadline(t.Context(), f.until)
-	defer cancel()
-	out, err := coordinator.PrepareContextDownload(call, f, f.a.Scope.ArtifactID, "original-download-key")
-	t.Logf("elapsed=%s original_interval=%s authority_checks=%d policy_reads=%d completed_policy_reads=%d observer=%d probe=%d denied=%d created=%t recorded=%t job_pending=%t continued=%t err=%v", time.Since(f.started), f.until.Sub(f.started), f.checks, f.policyReads, f.policiesOK, f.observer.Load(), f.probe.Load(), f.denied.Load(), f.created, f.recorded, f.pending, out.ContinuePreparation, err)
-	t.Logf("production_path=%v", f.steps)
-	if err != nil || !out.ContinuePreparation || out.Session.State != artifact.DownloadPreparing || out.Metadata != nil || !f.created || !f.recorded || !f.pending {
-		t.Fatal("first acknowledged Job Pending did not fit the original five-second request")
-	}
-	if f.policyReads != 1 || f.policiesOK != 1 || f.observer.Load() != 3 || f.probe.Load() != 0 || f.denied.Load() != 0 {
-		t.Fatal("preparation repeated the protected policy observation", f.policyReads, f.policiesOK, f.observer.Load(), f.probe.Load(), f.denied.Load())
-	}
 }

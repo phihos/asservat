@@ -2,7 +2,6 @@ package kubernetes
 
 import (
 	"context"
-	"time"
 
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/authorization"
@@ -11,7 +10,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 )
 
 // PermissionAdministrationOf converts the installed permission deployment's
@@ -34,60 +32,6 @@ func PermissionAdministrationOf(c contracts.PermissionControlDeployment) cfg.Per
 		p.Delegations = append(p.Delegations, cfg.PermissionDelegation{Writers: actors(d.Writers), Scope: scope, Roles: append([]string(nil), d.Roles...), Issuers: append([]string(nil), d.Issuers...)})
 	}
 	return p
-}
-
-// RetentionAdministrationOf derives the retention guard plan (ADR-195) from
-// the permission control section and the retention guard pin: the same
-// administrators, the reserved status user and no delegations. The installer
-// and the hub-worker derive the same plan, so the guard digest is shared.
-func RetentionAdministrationOf(c contracts.PermissionControlDeployment, guard string) cfg.RetentionAdministration {
-	admins := make([]cfg.KubernetesActor, 0, len(c.Guard.Administrators))
-	for _, a := range c.Guard.Administrators {
-		admins = append(admins, cfg.KubernetesActor{Kind: a.Kind, Name: a.Name})
-	}
-	return cfg.RetentionAdministration{Name: guard, ControlNamespace: cfg.NamespaceRef{Name: c.Namespace.Name, UID: c.Namespace.UID}, Administrators: admins, StatusUsers: []string{contracts.RetentionStatusUser}}
-}
-
-// EnsureRetentionGuard creates or exactly reopens the retention guard and
-// returns its pin, like EnsurePermissionGuard.
-func EnsureRetentionGuard(ctx context.Context, config *rest.Config, plan cfg.RetentionAdministration) (contracts.OwnerDeploymentGuard, error) {
-	var out contracts.OwnerDeploymentGuard
-	if ctx == nil || config == nil || !plan.Valid() || !authorization.UUID(plan.ControlNamespace.UID) {
-		return out, cfg.ErrInvalid
-	}
-	policy, binding, err := RetentionAdmission(plan)
-	if err != nil {
-		return out, err
-	}
-	api, err := installerAPI(config)
-	if err != nil {
-		return out, cfg.ErrInvalid
-	}
-	call, end := context.WithTimeout(ctx, 30*time.Second)
-	defer end()
-	return ensureAdmissionGuard(call, api, policy, binding, plan.Administrators)
-}
-
-// EnsurePermissionGuard creates the permission admission policy and binding,
-// or reopens them only when their specs match exactly, and returns the pin of
-// the acknowledged objects (ADR-189). It never updates an existing guard: a
-// changed plan is a new guard revision that fences the stream.
-func EnsurePermissionGuard(ctx context.Context, config *rest.Config, plan cfg.PermissionAdministration) (contracts.OwnerDeploymentGuard, error) {
-	var out contracts.OwnerDeploymentGuard
-	if ctx == nil || config == nil || !authorization.UUID(plan.ControlNamespace.UID) {
-		return out, cfg.ErrInvalid
-	}
-	policy, binding, err := PermissionAdmission(plan)
-	if err != nil {
-		return out, err
-	}
-	api, err := installerAPI(config)
-	if err != nil {
-		return out, cfg.ErrInvalid
-	}
-	call, end := context.WithTimeout(ctx, 30*time.Second)
-	defer end()
-	return ensureAdmissionGuard(call, api, policy, binding, plan.Administrators)
 }
 
 // ensureAdmissionGuard creates a policy and its binding, or reopens them

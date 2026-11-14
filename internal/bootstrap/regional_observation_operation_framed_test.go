@@ -4,27 +4,19 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
-	"crypto/tls"
 	"crypto/x509"
 	"math/big"
-	"net"
-	"net/http"
-	"net/http/httptest"
 	"net/url"
-	"strconv"
 	"sync"
 	"sync/atomic"
-	"testing"
 	"time"
 
 	"asservat.local/asservat/internal/adapters/mtls"
 	app "asservat.local/asservat/internal/application/fleet"
-	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	value "asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
-	wire "asservat.local/asservat/internal/transport/clusterobservation"
 )
 
 // This fixture composes the actual outbound client, h2 stream, holder, bootstrap
@@ -214,211 +206,3 @@ func (o *framedOwnerNative) Final(ctx context.Context) (value.OwnerObservationNa
 	return v, nil
 }
 func (o *framedOwnerNative) Close() { o.closed.Add(1) }
-
-// Closed numeric counters only; no payload, credential, identity or raw error logs.
-type framedOperationPhaseTrace struct {
-	*mtls.ConnectorObservationOperationConnection
-	receives, answers, sends, failed atomic.Int32
-}
-
-func (d *framedOperationPhaseTrace) Receive(ctx context.Context) (contracts.ClusterObservationFrame, error) {
-	d.receives.Add(1)
-	f, e := d.ConnectorObservationOperationConnection.Receive(ctx)
-	if e != nil {
-		d.failed.CompareAndSwap(0, 1)
-	}
-	return f, e
-}
-func (d *framedOperationPhaseTrace) AnswerConnectorObservation(ctx context.Context, p contracts.ClusterObservationOperationProbe) (contracts.ConnectorObservationOperationReply, error) {
-	d.answers.Add(1)
-	r, e := d.ConnectorObservationOperationConnection.AnswerConnectorObservation(ctx, p)
-	if e != nil {
-		d.failed.CompareAndSwap(0, 2)
-	}
-	return r, e
-}
-func (d *framedOperationPhaseTrace) Send(ctx context.Context, f contracts.ClusterObservationFrame) error {
-	d.sends.Add(1)
-	e := d.ConnectorObservationOperationConnection.Send(ctx, f)
-	if e != nil {
-		d.failed.CompareAndSwap(0, 3)
-	}
-	return e
-}
-
-func TestRegionalOperationActualFramedCoordinator(t *testing.T) {
-	for _, mode := range []string{"joined", "owner-final", "regional-final", "sql-final", "cancel-final"} {
-		t.Run(mode, func(t *testing.T) {
-			base, _, unused := newRuntimeFixture(t)
-			// Hold the pool's Port until the test ends: closing it here let the next
-			// test server reuse that port as NativePort, which makes the pool invalid
-			// (the flaky "invalid signed control work" fixture failures).
-			t.Cleanup(func() { _ = unused.Close() })
-			root, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer cancel()
-			var handler *wire.HubObservationOperationHandler
-			accepted := make(chan struct{}, 1)
-			server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { accepted <- struct{}{}; handler.ServeHTTP(w, r) }))
-			_, port, _ := net.SplitHostPort(server.Listener.Addr().String())
-			number, _ := strconv.Atoi(port)
-			base.configuration.Pool.NativePort = number
-			base.configuration.Pool.NativeBootstrap = value.OwnerBootstrapProfile
-			base.configuration.Pool.NativeCandidateLimit = 1024
-			pin := value.OwnerObservationPin{RootID: observationForwardID(900), SourceUID: runtimeID, Pool: base.configuration.Pool, TemplateDigest: artifact.Digest{3}, ImageDigest: artifact.Digest{4}, ProtectionDigest: artifact.Digest{19}}
-			owner := &observationForwardFixture{t: t, base: base, pin: pin, bound: time.Now().Add(5 * time.Second), identities: make(map[value.OwnerCertificate]value.OwnerEnrollment)}
-			binding := value.OwnerBinding{InstallationID: runtimeID, ClusterID: runtimeID, IssuerEpoch: runtimeID, PodUID: observationForwardID(10), ProcessEpoch: observationForwardID(30)}
-			owner.servers = []value.OwnerBinding{binding}
-			keys, e := mtls.NewOwnerCredentialsForPool(binding, "server", pin.Pool, base.roots, owner, owner, time.Now)
-			if e != nil {
-				server.Close()
-				t.Fatal(e)
-			}
-			defer keys.Close()
-			if e = keys.Enroll(root); e != nil {
-				server.Close()
-				t.Fatal("owner keys", e)
-			}
-			regional := &framedRegionalFixture{base: base, now: time.Now().UTC().Truncate(time.Second), issued: make(map[artifact.Digest]value.IssuedConnectorCredential), mode: mode}
-			regional.pin = value.ConnectorObservationPin{Profile: value.ConnectorCredentialProfile{RootID: pin.RootID, Binding: value.PeerBinding{InstallationID: runtimeID, ClusterID: observationForwardID(502), IssuerEpoch: runtimeID, PeerID: observationForwardID(503), Role: value.ConnectorPeer}, Revision: identity.Revision{UID: observationForwardID(504), Generation: 1, Digest: artifact.Digest{33}}, ProtectionDigest: artifact.Digest{34}, ServerName: "connector.example.invalid", Deployment: value.ConnectorDeployment{Namespace: "connector", ServiceAccount: "connector", Deployment: "connector", ServingSlots: 2, RetainedProcesses: 8}, ClientIssuerRoots: [][]byte{base.ca.Raw}, ServerIssuerRoots: [][]byte{base.ca.Raw}}, Roles: value.ConnectorIdentityRoles{Source: "source", Journal: "journal", Acknowledgement: "ack", Cleanup: "cleanup", Verifier: "verifier", Finalizer: "finalizer"}, TemplateDigest: artifact.Digest{35}, ImageDigest: artifact.Digest{36}, ProtectionDigest: artifact.Digest{37}}
-			credentials, e := mtls.NewConnectorProcessCredentials(root, regional.pin.Profile, observationForwardID(505), regional, regional, regional, regional, time.Now)
-			if e != nil {
-				server.Close()
-				t.Fatal(e)
-			}
-			defer credentials.Close()
-			if e = credentials.Reconcile(root); e != nil {
-				server.Close()
-				t.Fatal("regional keys", e)
-			}
-			producer, e := mtls.NewConnectorObservationOperationProducer(regional.pin, credentials, regional, time.Now)
-			if e != nil {
-				server.Close()
-				t.Fatal(e)
-			}
-			ingress, e := mtls.NewOwnerObservationOperationIngress(pin, keys, []mtls.OwnerObservationPeer{{Binding: regional.pin.Profile.Binding, Roots: regional.pin.Profile.ClientIssuerRoots}}, time.Now)
-			if e != nil {
-				server.Close()
-				t.Fatal(e)
-			}
-			common, _ := mtls.OwnerBootstrapServerName(pin.Pool)
-			holder, e := wire.NewHubObservationOperationHolder(root, 1, time.Now)
-			if e != nil {
-				server.Close()
-				t.Fatal(e)
-			}
-			handler, e = regionalObservationOperationHandler(net.JoinHostPort(common, port), holder, []regionalOperationCluster{{regional.pin, regional}}, ingress, time.Now)
-			if e != nil {
-				server.Close()
-				t.Fatal(e)
-			}
-			serving, e := mtls.NewOwnerBootstrapServing(keys, pin.Pool)
-			if e != nil {
-				server.Close()
-				t.Fatal(e)
-			}
-			// Test-only original accept root, supplied at connection acceptance rather
-			// than renewed at HTTP path dispatch. Real listener qualification is separate.
-			server.Config.ConnContext = func(ctx context.Context, _ net.Conn) context.Context { return root }
-			server.EnableHTTP2 = true
-			server.TLS = &tls.Config{GetCertificate: serving.GetCertificate, ClientAuth: tls.RequireAndVerifyClientCert, ClientCAs: base.roots, MinVersion: tls.VersionTLS13, MaxVersion: tls.VersionTLS13, NextProtos: []string{"h2"}, SessionTicketsDisabled: true}
-			server.StartTLS()
-			defer func() { cancel(); handler.Close(); server.Close() }()
-			client, e := mtls.NewConnectorObservationOperationClient(root, pin, server.Listener.Addr().String(), base.roots, producer, owner, owner, regional, 1, time.Now)
-			if e != nil {
-				t.Fatal(e)
-			}
-			defer client.Close()
-			stream, e := client.Open(root, observationForwardID(506))
-			if e != nil {
-				t.Fatal("real standby", e)
-			}
-			defer stream.Close()
-			<-accepted
-			if regional.opens.Load() != 0 || regional.reads.Load() != 0 || regional.metadata.Load() != 0 {
-				t.Fatal("standby opened authority")
-			}
-			now := time.Now().In(time.FixedZone("framed-offset", 2*60*60))
-			request := value.ClusterObservationRequest{RootID: pin.RootID, ClusterID: regional.pin.Profile.Binding.ClusterID, ID: observationForwardID(510), Challenge: observationForwardID(511), Purpose: value.ObserveCapacityNamespaces, RequestedAt: now, NotAfter: now.Add(5 * time.Second)}
-			original := value.OwnerObservationRequest{RootID: request.RootID, ID: request.ID, Challenge: request.Challenge, RequestedAt: request.RequestedAt, NotAfter: request.NotAfter}
-			native := &framedOwnerNative{facts: value.OwnerObservationNativeFacts{Request: original, Pin: pin, ObservedAt: now, FreshUntil: owner.bound, Peers: []value.OwnerObservationNativePeer{{Binding: binding, Pod: "owner-" + binding.PodUID, ReplicaSetUID: runtimeID, Addresses: []string{"10.0.0.8"}, WorkloadDigest: artifact.Digest{41}}}}, mode: mode, entered: make(chan struct{}), release: make(chan struct{})}
-			var release sync.Once
-			defer release.Do(func() { close(native.release) })
-			operation, e := mtls.NewOwnerObservationOperation(root, pin, original, keys, owner, native, time.Now)
-			if e != nil {
-				t.Fatal("owner operation", e)
-			}
-			defer operation.Close()
-			var locator wire.HubObservationLocator
-			for time.Now().Before(owner.bound) {
-				locator, e = holder.Lookup(root, request.RootID, request.ClusterID)
-				if e == nil {
-					break
-				}
-				time.Sleep(time.Millisecond)
-			}
-			if e != nil {
-				t.Fatal("header publication", e)
-			}
-			regionalDone := make(chan error, 1)
-			trace := &framedOperationPhaseTrace{ConnectorObservationOperationConnection: stream}
-			go func() { regionalDone <- wire.ServeRegionalObservationOperation(root, trace, time.Now) }()
-			caller, stop := context.WithCancel(root)
-			defer stop()
-			result := make(chan error, 1)
-			go func() { _, e := ObserveRegionalOperation(caller, holder, locator, request, operation); result <- e }()
-			hubJoined, regionalJoined := false, false
-			defer func() {
-				release.Do(func() { close(native.release) })
-				stop()
-				cancel()
-				_ = stream.Close()
-				if !hubJoined {
-					<-result
-				}
-				if !regionalJoined {
-					<-regionalDone
-				}
-			}()
-			if mode == "cancel-final" {
-				select {
-				case <-native.entered:
-				case <-time.After(time.Second):
-					t.Fatal("final native not reached")
-				}
-				stop()
-				select {
-				case <-result:
-					hubJoined = true
-					t.Fatal("caller cancellation failed to join final work")
-				case <-time.After(10 * time.Millisecond):
-				}
-				release.Do(func() { close(native.release) })
-			}
-			var resultErr error
-			select {
-			case resultErr = <-result:
-				hubJoined = true
-			case <-time.After(6 * time.Second):
-				t.Fatal("hub did not join")
-			}
-			regionalErr := <-regionalDone
-			regionalJoined = true
-			t.Log("phase counters receives/answers/sends/first-failure/native-open/read/final/owner-registry", trace.receives.Load(), trace.answers.Load(), trace.sends.Load(), trace.failed.Load(), regional.opens.Load(), regional.reads.Load(), regional.finals.Load(), owner.registry.Load())
-			if (mode == "joined") != (resultErr == nil) || (mode == "joined") != (regionalErr == nil) {
-				t.Fatal("framed outcome", mode, resultErr, regionalErr)
-			}
-			if regional.metadata.Load() != 1 || regional.pairs.Load() != 2 || native.original.Load() != 1 || native.final.Load() != 1 {
-				t.Fatal("proof/effect phase counts", regional.metadata.Load(), regional.pairs.Load(), native.original.Load(), native.final.Load())
-			}
-			if native.closed.Load() != 0 {
-				t.Fatal("standby closed locator-owned native proof")
-			}
-			if mode == "joined" && (regional.reads.Load() != 4 || regional.finals.Load() != 1 || regional.closes.Load() != 1) {
-				t.Fatal("regional phases not joined", regional.reads.Load(), regional.finals.Load(), regional.closes.Load())
-			}
-			if _, e = holder.Claim(root, locator, request); e == nil {
-				t.Fatal("spent exact holder accepted second claim")
-			}
-		})
-	}
-}

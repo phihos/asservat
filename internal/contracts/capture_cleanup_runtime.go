@@ -1,12 +1,10 @@
 package contracts
 
 import (
-	"io"
 	"time"
 )
 
 const CaptureCleanupDeploymentFormat = "asservat-capture-cleanup-deployment/v2"
-const CaptureCleanupManifestFormat = "asservat-capture-cleanup-credentials/v1"
 const CaptureCleanupDeploymentMaxBytes = 64 << 10
 
 // Generated public scope for the fixed capture/normal/resolution A-HWORK
@@ -38,15 +36,6 @@ type CaptureCleanupSigning struct {
 	PublicKeys map[string][]byte `json:"publicKeys"`
 }
 
-type CaptureCleanupCredentialManifest struct {
-	Format       string                         `json:"format"`
-	Input        PublicRuntimeRoles             `json:"input"`
-	RootUID      string                         `json:"rootUID"`
-	SetupID      string                         `json:"setupID"`
-	Roles        []PublicRuntimeCredentialProof `json:"roles"`
-	CaptureSetup CapacityRootSetupReceipt       `json:"captureSetup"`
-}
-
 // This distinct fixed claim belongs to the original public resource journal.
 // PublicDigest covers only public configuration and original role provenance,
 // never a password/token/private payload or its hash. Neither a claim nor its
@@ -64,11 +53,4 @@ type CaptureCleanupProjectionReceipt struct {
 	Secret          WorkerObjectReference `json:"secret"`
 	ResourceVersion string                `json:"resourceVersion"`
 	ObservedAt      time.Time             `json:"observedAt"`
-}
-
-func DecodeCaptureCleanupDeployment(r io.Reader) (CaptureCleanupDeployment, error) {
-	return decodeClosedRPC[CaptureCleanupDeployment](r, CaptureCleanupDeploymentMaxBytes)
-}
-func DecodeCaptureCleanupCredentialManifest(r io.Reader) (CaptureCleanupCredentialManifest, error) {
-	return decodeClosedRPC[CaptureCleanupCredentialManifest](r, PublicRuntimeCredentialManifestMaxBytes)
 }

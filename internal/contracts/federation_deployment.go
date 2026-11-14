@@ -2,7 +2,6 @@ package contracts
 
 import (
 	"encoding/json"
-	"io"
 	"strings"
 )
 
@@ -110,13 +109,6 @@ type FederationAuditKeys struct {
 	InputKey       []byte `json:"inputKey"`
 	AccountVersion string `json:"accountVersion"`
 	AccountKey     []byte `json:"accountKey"`
-}
-
-func DecodeFederationDeployment(r io.Reader) (FederationDeployment, error) {
-	return decodeClosedRPC[FederationDeployment](r, FederationDeploymentMaxBytes)
-}
-func DecodeFederationAuditKeys(r io.Reader) (FederationAuditKeys, error) {
-	return decodeClosedRPC[FederationAuditKeys](r, 16<<10)
 }
 
 // ConnectorServerSuffix is the installation's connector server-name domain

@@ -1,16 +1,17 @@
 package kms
 
 import (
-	"asservat.local/asservat/internal/adapters/mtls"
-	app "asservat.local/asservat/internal/application/fleet"
-	value "asservat.local/asservat/internal/domain/fleet"
 	"context"
 	"encoding/json"
 	"encoding/pem"
-	bao "github.com/openbao/openbao/api/v2"
 	"io"
 	"net/http"
 	"time"
+
+	"asservat.local/asservat/internal/adapters/mtls"
+	app "asservat.local/asservat/internal/application/fleet"
+	value "asservat.local/asservat/internal/domain/fleet"
+	bao "github.com/openbao/openbao/api/v2"
 )
 
 type ConnectorCredentialIssuer struct {
@@ -22,21 +23,6 @@ type ConnectorCredentialIssuer struct {
 
 var _ app.ConnectorCredentialIssuer = (*ConnectorCredentialIssuer)(nil)
 
-// One fixed role/leaf purpose; no provider-selected private keys, alternate
-// endpoint, root/role management, registration or automatic POST retry.
-func NewConnectorCredentialIssuer(endpoint, token, mount, role, usage string, profile value.ConnectorCredentialProfile, h *http.Client, now func() time.Time) (*ConnectorCredentialIssuer, error) {
-	return newConnectorCredentialIssuer(endpoint, token, nil, mount, role, usage, profile, h, now)
-}
-
-// NewConnectorCredentialIssuerWithTokenSource reads the fixed sign-only token
-// per request, like the owner issuers, so a rotated projection applies.
-func NewConnectorCredentialIssuerWithTokenSource(endpoint string, source TokenSource, mount, role, usage string, profile value.ConnectorCredentialProfile, h *http.Client, now func() time.Time) (*ConnectorCredentialIssuer, error) {
-	if source == nil {
-		return nil, value.ErrInvalid
-	}
-	return newConnectorCredentialIssuer(endpoint, "", source, mount, role, usage, profile, h, now)
-}
-
 // newConnectorCredentialIssuerWithClient signs over an installed provider
 // effect client (ADR-193), whose borrowed token the lifetime owns.
 func newConnectorCredentialIssuerWithClient(c *bao.Client, mount, role, usage string, profile value.ConnectorCredentialProfile, now func() time.Time) (*ConnectorCredentialIssuer, error) {
@@ -44,21 +30,6 @@ func newConnectorCredentialIssuerWithClient(c *bao.Client, mount, role, usage st
 		return nil, value.ErrInvalid
 	}
 	v, e := mtls.NewConnectorCredentialVerifier(profile, now)
-	if e != nil {
-		return nil, e
-	}
-	b := profile.Binding
-	return &ConnectorCredentialIssuer{c, mount + "/sign/" + role, b.InstallationID, b.ClusterID, b.IssuerEpoch, usage, v, now}, nil
-}
-func newConnectorCredentialIssuer(endpoint, token string, source TokenSource, mount, role, usage string, profile value.ConnectorCredentialProfile, h *http.Client, now func() time.Time) (*ConnectorCredentialIssuer, error) {
-	if !keyName.MatchString(mount) || !keyName.MatchString(role) || (usage != "client" && usage != "server") || !profile.Valid() || profile.Suspended {
-		return nil, value.ErrInvalid
-	}
-	v, e := mtls.NewConnectorCredentialVerifier(profile, now)
-	if e != nil {
-		return nil, e
-	}
-	c, e := clientWithSource(endpoint, token, source, h)
 	if e != nil {
 		return nil, e
 	}

@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"encoding/json/jsontext"
-	"errors"
 	"io"
 	"net/http"
 	"reflect"
@@ -201,16 +200,6 @@ func InitialProviderPolicies(profile contracts.InitialProviderProfile, mount, ke
 	return initialProviderPolicyBodies(profile.IssuerPolicy, profile.WrapRole, profile.WrapPolicy, profile.UnwrapRole, profile.UnwrapPolicy, mount, key)
 }
 
-// InitialBootstrapProviderPolicies exposes the same exact public prerequisites
-// before any material object exists. No synthetic UID/profile, API access or
-// provider acceptance is involved; runtime full-profile checks are unchanged.
-func InitialBootstrapProviderPolicies(names contracts.InitialBootstrapProviders, mount, key string) (map[string]string, error) {
-	if !providerconfig.InitialProviderNames(names.IssuerPolicy, names.WrapRole, names.WrapPolicy, names.UnwrapRole, names.UnwrapPolicy) || !keyName.MatchString(mount) || !keyName.MatchString(key) {
-		return nil, ErrKeyService
-	}
-	return initialProviderPolicyBodies(names.IssuerPolicy, names.WrapRole, names.WrapPolicy, names.UnwrapRole, names.UnwrapPolicy, mount, key)
-}
-
 func initialProviderPolicyBodies(issuerPolicy, wrapRole, wrapPolicy, unwrapRole, unwrapPolicy, mount, key string) (map[string]string, error) {
 	policies, err := providerconfig.InitialProviderPolicyBodies(issuerPolicy, wrapRole, wrapPolicy, unwrapRole, unwrapPolicy, mount, key)
 	if err != nil {
@@ -274,19 +263,6 @@ func (e initialProviderCheckFailure) Error() string {
 }
 func (e initialProviderCheckFailure) Unwrap() error { return e.cause }
 
-// InitialProviderCheckStage returns only a fixed local phase label, never a
-// provider response, configured source name, credential or request value.
-func InitialProviderCheckStage(err error) string {
-	var e initialProviderCheckFailure
-	if !errors.As(err, &e) {
-		return ""
-	}
-	switch e.phase {
-	case "input", "wrap-role", "unwrap-role", "policies", "issuer-profile", "final-deadline":
-		return e.phase
-	}
-	return ""
-}
 func (s *InitialProviderIssuer) Check(ctx context.Context, notAfter time.Time) (_ contracts.InitialProviderParent, _ time.Time, err error) {
 	phase := "input"
 	defer func() {

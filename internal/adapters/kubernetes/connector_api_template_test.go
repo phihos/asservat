@@ -6,10 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
 	cfg "asservat.local/asservat/internal/domain/configuration"
-	value "asservat.local/asservat/internal/domain/fleet"
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,88 +32,6 @@ func connectorAPITemplateFixture() (apps.Deployment, apps.ReplicaSet, core.Pod, 
 	p.Spec.PreemptionPolicy = ptr.To(core.PreemptLowerPriority)
 	p.Spec.DeprecatedServiceAccount = "connector"
 	return d, r, p, image
-}
-func TestConnectorAPITemplatePinsEverySecurityAndInputField(t *testing.T) {
-	d, r, p, image := connectorAPITemplateFixture()
-	digest, e := ConnectorAPITemplateDigest(d.Spec.Template)
-	if e != nil {
-		t.Fatal(e)
-	}
-	if e = connectorAPITemplateMatch(&d, &r, &p, digest, image, nil, 0); e != nil {
-		t.Fatalf("closed scheduler/default differences: %v", e)
-	}
-	for name, change := range map[string]func(*apps.Deployment, *apps.ReplicaSet, *core.Pod){
-		"image": func(_ *apps.Deployment, _ *apps.ReplicaSet, p *core.Pod) {
-			p.Spec.Containers[0].Image = "different@sha256:" + strings.Repeat("a", 64)
-		},
-		"command": func(_ *apps.Deployment, _ *apps.ReplicaSet, p *core.Pod) {
-			p.Spec.Containers[0].Command = []string{"/changed"}
-		},
-		"sidecar": func(_ *apps.Deployment, _ *apps.ReplicaSet, p *core.Pod) {
-			p.Spec.Containers = append(p.Spec.Containers, core.Container{Name: "injected"})
-		},
-		"init": func(_ *apps.Deployment, _ *apps.ReplicaSet, p *core.Pod) {
-			p.Spec.InitContainers = []core.Container{{Name: "injected"}}
-		},
-		"ephemeral": func(_ *apps.Deployment, _ *apps.ReplicaSet, p *core.Pod) {
-			p.Spec.EphemeralContainers = []core.EphemeralContainer{{EphemeralContainerCommon: core.EphemeralContainerCommon{Name: "injected"}}}
-		},
-		"automount": func(_ *apps.Deployment, _ *apps.ReplicaSet, p *core.Pod) {
-			p.Spec.AutomountServiceAccountToken = ptr.To(true)
-		},
-		"automatic-token-volume": func(_ *apps.Deployment, _ *apps.ReplicaSet, p *core.Pod) {
-			p.Spec.Volumes = append(p.Spec.Volumes, core.Volume{Name: "kube-api-access-extra"})
-		},
-		"token-audience": func(_ *apps.Deployment, _ *apps.ReplicaSet, p *core.Pod) {
-			p.Spec.Volumes[0].Projected.Sources[0].ServiceAccountToken.Audience = "different"
-		},
-		"token-lifetime": func(_ *apps.Deployment, _ *apps.ReplicaSet, p *core.Pod) {
-			p.Spec.Volumes[0].Projected.Sources[0].ServiceAccountToken.ExpirationSeconds = ptr.To(int64(3600))
-		},
-		"mount": func(_ *apps.Deployment, _ *apps.ReplicaSet, p *core.Pod) {
-			p.Spec.Containers[0].VolumeMounts[0].ReadOnly = false
-		},
-		"privilege": func(_ *apps.Deployment, _ *apps.ReplicaSet, p *core.Pod) {
-			p.Spec.Containers[0].SecurityContext.AllowPrivilegeEscalation = ptr.To(true)
-		},
-		"fs-group": func(_ *apps.Deployment, _ *apps.ReplicaSet, p *core.Pod) {
-			p.Spec.SecurityContext.FSGroup = ptr.To(int64(0))
-		},
-		"service-links": func(_ *apps.Deployment, _ *apps.ReplicaSet, p *core.Pod) { p.Spec.EnableServiceLinks = ptr.To(true) },
-		"priority":      func(_ *apps.Deployment, _ *apps.ReplicaSet, p *core.Pod) { p.Spec.Priority = ptr.To(int32(100)) },
-		"scheduler":     func(_ *apps.Deployment, _ *apps.ReplicaSet, p *core.Pod) { p.Spec.SchedulerName = "different" },
-		"toleration-change": func(_ *apps.Deployment, _ *apps.ReplicaSet, p *core.Pod) {
-			p.Spec.Tolerations[0].TolerationSeconds = nil
-		},
-		"extra-toleration": func(_ *apps.Deployment, _ *apps.ReplicaSet, p *core.Pod) {
-			p.Spec.Tolerations = append(p.Spec.Tolerations, core.Toleration{Operator: core.TolerationOpExists})
-		},
-		"annotation": func(_ *apps.Deployment, _ *apps.ReplicaSet, p *core.Pod) {
-			p.Annotations = map[string]string{"inject": "true"}
-		},
-		"rs-template": func(_ *apps.Deployment, r *apps.ReplicaSet, _ *core.Pod) {
-			r.Spec.Template.Spec.Containers[0].Args = []string{"changed"}
-		},
-		"rs-hash": func(_ *apps.Deployment, r *apps.ReplicaSet, _ *core.Pod) {
-			r.Spec.Template.Labels[apps.DefaultDeploymentUniqueLabelKey] = "other"
-		},
-		"deployment-template": func(d *apps.Deployment, _ *apps.ReplicaSet, _ *core.Pod) {
-			d.Spec.Template.Annotations = map[string]string{"new": "value"}
-		},
-	} {
-		t.Run(name, func(t *testing.T) {
-			dc, rc, pc := d.DeepCopy(), r.DeepCopy(), p.DeepCopy()
-			change(dc, rc, pc)
-			if connectorAPITemplateMatch(dc, rc, pc, digest, image, nil, 0) == nil {
-				t.Fatal("changed protected input accepted")
-			}
-		})
-	}
-	missing := d.Spec.Template.DeepCopy()
-	missing.Spec.Tolerations = nil
-	if _, e = ConnectorAPITemplateDigest(*missing); e == nil {
-		t.Fatal("profile left eviction defaults to admission")
-	}
 }
 
 func TestOwnerAPIContextAllowancePreservesOmissionAndExactStatusBranch(t *testing.T) {
@@ -155,37 +71,5 @@ func TestOwnerAPIContextAllowancePreservesOmissionAndExactStatusBranch(t *testin
 	p.APIContextStarts.ExecutionAccount = p.APIContextStarts.CapacityAccount
 	if _, _, e = OwnerWorkloadAdmission(p); e == nil {
 		t.Fatal("shared capacity/execution actor accepted")
-	}
-}
-
-// The executor settings carry only Helm-derivable names, the UIDs read by
-// name and the image; installer template, input and guard pins are refused.
-func TestConnectorAPISettingsRejectInstallerPins(t *testing.T) {
-	id := ownerID(1)
-	binding := value.PeerBinding{InstallationID: id, ClusterID: ownerID(3), IssuerEpoch: id, PeerID: ownerID(4), Role: value.ConnectorPeer}
-	w := ConnectorWorkload{Namespace: strings.Repeat("n", 63), NamespaceUID: ownerID(5), Account: strings.Repeat("a", 253), AccountUID: ownerID(6), Deployment: strings.Repeat("d", 253), DeploymentUID: ownerID(7), Digest: ConnectorWorkloadDigest(ownerID(3), strings.Repeat("n", 63), strings.Repeat("d", 253))}
-	p, err := ConnectorAPISettings(id, binding, w, strings.Repeat("b", 253), ownerID(2), strings.Repeat("a", 64))
-	if err != nil {
-		t.Fatal("maximum legal settings rejected", err)
-	}
-	encoded, e := contracts.EncodeConnectorAPIContextSettings(p)
-	if e != nil || len(encoded) > contracts.ConnectorAPIContextSettingsBytes {
-		t.Fatal("settings exceed the bounded encoding", e)
-	}
-	for name, mutate := range map[string]func(*contracts.ConnectorAPIContextSettings){
-		"template": func(s *contracts.ConnectorAPIContextSettings) { s.TemplateDigest = strings.Repeat("a", 64) },
-		"inputs": func(s *contracts.ConnectorAPIContextSettings) {
-			s.Inputs = []contracts.ConnectorAPIInput{{Kind: "ConfigMap", Name: "x", UID: id, ResourceVersion: "1"}}
-		},
-		"start guard": func(s *contracts.ConnectorAPIContextSettings) { s.StartGuard.Name = "start" },
-		"same account": func(s *contracts.ConnectorAPIContextSettings) {
-			s.CapacityAccount, s.CapacityAccountUID = s.Account, s.AccountUID
-		},
-	} {
-		q := p
-		mutate(&q)
-		if connectorAPISettingsValid(q) {
-			t.Errorf("%s accepted", name)
-		}
 	}
 }

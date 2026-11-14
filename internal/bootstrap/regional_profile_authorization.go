@@ -1,16 +1,15 @@
 package bootstrap
 
 import (
+	"bytes"
+	"context"
+	"slices"
+	"sync"
+
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/adapters/mounts"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/planning"
-	"bytes"
-	"context"
-	"os"
-	"path/filepath"
-	"slices"
-	"sync"
 )
 
 // The existing protected input guard pins the immutable bundle's UID/version.
@@ -91,15 +90,6 @@ func (r *regionalProfileAuthorizationReader) ReadProfileAuthorization(ctx contex
 		return slices.Clone(b), nil
 	}
 	return nil, mounts.ErrUnavailable
-}
-
-func readInstallerProfileAuthorization(ctx context.Context, path string) ([]byte, error) {
-	root, err := os.OpenRoot(filepath.Dir(path))
-	if err != nil {
-		return nil, mounts.ErrUnavailable
-	}
-	defer root.Close()
-	return mounts.Read(ctx, root, filepath.Base(path), contracts.RegionalProfileAuthorizationMaxBytes)
 }
 
 func (r *regionalProfileAuthorizationReader) close() {

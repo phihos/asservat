@@ -5,8 +5,6 @@ import (
 	"sync"
 	"time"
 
-	"asservat.local/asservat/internal/adapters/objectstore"
-	"asservat.local/asservat/internal/domain/audit"
 	value "asservat.local/asservat/internal/domain/fleet"
 )
 
@@ -29,16 +27,6 @@ func (f *initialWitnessFixture) ReadInstallationWitness(context.Context) (value.
 	}
 	return w, nil
 }
-func (f *initialWitnessFixture) ConsumeInstallationWitness(ctx context.Context, c value.InitialActivationClaim) (value.InstallationWitness, error) {
-	f.mu.Lock()
-	if !c.Current(time.Now()) || f.claim != nil && !f.claim.Same(c) {
-		f.mu.Unlock()
-		return value.InstallationWitness{}, value.ErrDenied
-	}
-	f.claim = &c
-	f.mu.Unlock()
-	return f.ReadInstallationWitness(ctx)
-}
 
 type initialAdminFixture struct{ a value.Administration }
 
@@ -47,16 +35,4 @@ func (f *initialAdminFixture) FleetAdministration(context.Context) (value.Admini
 	a.ObservedAt = time.Now().UTC().Truncate(time.Microsecond)
 	a.FreshUntil = a.ObservedAt.Add(5 * time.Second)
 	return a, nil
-}
-
-type initialAuditFailure struct {
-	*objectstore.InitialInstallationObjects
-	fail bool
-}
-
-func (f *initialAuditFailure) WriteInitialInstallation(ctx context.Context, r audit.InitialInstallation) (audit.Receipt, error) {
-	if f.fail {
-		return audit.Receipt{}, value.ErrUnavailable
-	}
-	return f.InitialInstallationObjects.WriteInitialInstallation(ctx, r)
 }

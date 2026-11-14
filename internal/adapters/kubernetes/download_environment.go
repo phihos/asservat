@@ -27,13 +27,6 @@ type DownloadEnvironmentProtection struct{ *configMapProtection }
 func DownloadEnvironmentAdmission(p cfg.ConfigMapAdministration) (*admission.ValidatingAdmissionPolicy, *admission.ValidatingAdmissionPolicyBinding, error) {
 	return configMapAdmission(p, "protected-processing-namespace", downloadEnvironmentDenial)
 }
-func NewDownloadEnvironmentProtection(observer, probe *PermissionClient, plan cfg.ConfigMapAdministration, pin GuardPin) (*DownloadEnvironmentProtection, error) {
-	g, e := newConfigMapProtection(observer, probe, plan, pin, "protected-processing-namespace", downloadEnvironmentDenial)
-	if e != nil {
-		return nil, e
-	}
-	return &DownloadEnvironmentProtection{g}, nil
-}
 
 // The installed paths are independently accepted deployment pins. Reading a
 // mutable policy can permit or remove an existing path, never invent its

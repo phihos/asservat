@@ -3,7 +3,6 @@ package contracts
 import (
 	"encoding/json"
 	"errors"
-	"strings"
 )
 
 // RegionalOffer is the hub's public offer to regional installers (ADR-193):
@@ -93,7 +92,3 @@ const (
 	RegionalServingSlots      = 2
 	RegionalRetainedProcesses = 8
 )
-
-func RegionalOfferName(installationID string) string {
-	return "asservat-" + strings.ReplaceAll(installationID, "-", "") + "-regional-offer"
-}

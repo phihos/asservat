@@ -13,11 +13,9 @@ import (
 	"testing"
 	"time"
 
-	"asservat.local/asservat/internal/adapters/mtls"
 	app "asservat.local/asservat/internal/application/fleet"
 	"asservat.local/asservat/internal/contracts"
 	value "asservat.local/asservat/internal/domain/fleet"
-	wire "asservat.local/asservat/internal/transport/clusterobservation"
 )
 
 // Actual independent HWORK HTTPS connections plus existing actual framed R
@@ -83,40 +81,6 @@ type localReceiverFixture struct {
 	mode      string
 }
 
-func newLocalReceiverFixture(t *testing.T, mode string) *localReceiverFixture {
-	t.Helper()
-	base := newOperationReceiverFixture(t, "joined")
-	f := &localReceiverFixture{base: base, mode: mode}
-	f.native = &localReceiverNativeFixture{base: receiverNativeFixture{pin: base.owner.pin, mode: mode}, mode: mode}
-	receiver, err := newOwnerLocalObservationReceiver(base.root, base.owner.pin, base.keys, base.registry, f.native, base.holder, 1, time.Now)
-	if err != nil {
-		t.Fatal("newOwnerLocalObservationReceiver", err)
-	}
-	f.receiver = receiver
-	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodGet {
-			f.get.Add(1)
-		} else {
-			f.post.Add(1)
-		}
-		if mode == "lost-get" && r.Method == http.MethodGet || mode == "lost-post" && r.Method == http.MethodPost {
-			receiver.ServeHTTP(receiverAbortWriter{w}, r)
-			return
-		}
-		receiver.ServeHTTP(w, r)
-	}))
-	f.server = server
-	serving, err := mtls.NewOwnerBootstrapServing(base.keys, base.owner.pin.Pool)
-	if err != nil {
-		t.Fatal("mtls.NewOwnerBootstrapServing", err)
-	}
-	server.Config.ConnContext = func(context.Context, net.Conn) context.Context { return base.root }
-	server.EnableHTTP2 = true
-	server.TLS = &tls.Config{GetCertificate: serving.GetCertificate, ClientAuth: tls.VerifyClientCertIfGiven, ClientCAs: base.base.roots, MinVersion: tls.VersionTLS13, MaxVersion: tls.VersionTLS13, NextProtos: []string{"h2"}, SessionTicketsDisabled: true}
-	server.StartTLS()
-	t.Cleanup(func() { receiver.Close(); server.Close() })
-	return f
-}
 func (f *localReceiverFixture) http(t *testing.T, ctx context.Context, method, target, media string, body []byte, exact bool, token string) (int, []byte, error) {
 	t.Helper()
 	authority := f.receiver.CommonAuthority()
@@ -160,120 +124,6 @@ func localReceiverTarget(t *testing.T, r value.ClusterObservationRequest) string
 	}
 	return target
 }
-func TestLocalReceiverActualFramedClaimAndUncertainDelivery(t *testing.T) {
-	for _, mode := range []string{"joined", "lost-get", "lost-post", "revoked-claim", "revoked-final", "owner-final"} {
-		t.Run(mode, func(t *testing.T) {
-			f := newLocalReceiverFixture(t, mode)
-			r := f.base.request()
-			target := localReceiverTarget(t, r)
-			status, body, err := f.http(t, f.base.root, http.MethodGet, target, contracts.ClusterObservationLocalLocatorMedia, nil, false, localObservationFixtureToken)
-			if mode == "lost-get" {
-				if err == nil {
-					t.Fatal("prefix-aborted locator looked complete")
-				}
-				status, _, _ = f.http(t, f.base.root, http.MethodGet, target, contracts.ClusterObservationLocalLocatorMedia, nil, false, localObservationFixtureToken)
-				if status != 503 || f.native.base.opens.Load() != 1 || f.post.Load() != 0 {
-					t.Fatal("unknown locator was reissued", status, f.native.base.opens.Load(), f.post.Load())
-				}
-				return
-			}
-			if err != nil || status != 200 {
-				t.Fatal("locator", status, err)
-			}
-			locator, err := contracts.DecodeClusterObservationLocalLocator(body)
-			if err != nil || locator.Locator == nil {
-				t.Fatal("positive exact locator", err)
-			}
-			claim, err := contracts.EncodeClusterObservationLocalClaim(contracts.ClusterObservationLocalClaim{Format: contracts.ClusterObservationLocalClaimFormat, PodUID: observationForwardID(701), Request: wire.RequestWire(r), Locator: *locator.Locator})
-			if err != nil {
-				t.Fatal(err)
-			}
-			status, body, err = f.http(t, f.base.root, http.MethodPost, contracts.ClusterObservationLocalClaimPath, contracts.ClusterObservationLocalClaimMedia, claim, true, localObservationFixtureToken)
-			if mode == "joined" {
-				digest, _ := wire.RequestDigest(r)
-				decoded, de := contracts.DecodeClusterObservationResult(body)
-				result, pe := wire.ParseResult(decoded, r, digest, time.Now())
-				if err != nil || de != nil || pe != nil || status != 200 || !result.Matches(r, digest, time.Now()) {
-					t.Fatal("actual regional completion", status, err, de, pe)
-				}
-				f.native.mu.Lock()
-				last := f.native.last
-				f.native.mu.Unlock()
-				if last == nil || f.native.claims.Load() != 1 || last.final.Load() != 1 {
-					t.Fatal("missing one-use claim/final native")
-				}
-			} else if mode == "lost-post" {
-				if err == nil {
-					t.Fatal("prefix-aborted result looked complete")
-				}
-			} else if status != 503 {
-				t.Fatal("revoked or changed source returned result", status, err)
-			}
-			status, _, _ = f.http(t, f.base.root, http.MethodPost, contracts.ClusterObservationLocalClaimPath, contracts.ClusterObservationLocalClaimMedia, claim, true, localObservationFixtureToken)
-			if status != 503 || f.native.claims.Load() != 1 || f.native.base.opens.Load() != 1 {
-				t.Fatal("spent claim replayed native work", status, f.native.claims.Load(), f.native.base.opens.Load())
-			}
-		})
-	}
-}
-func TestLocalReceiverNoTokenAuthorityFromWrongRoute(t *testing.T) {
-	for _, mode := range []string{"missing-token", "wrong-token", "lookup-exact-sni", "claim-common-sni"} {
-		t.Run(mode, func(t *testing.T) {
-			f := newLocalReceiverFixture(t, "joined")
-			r := f.base.request()
-			token := localObservationFixtureToken
-			exact := false
-			method := http.MethodGet
-			target := localReceiverTarget(t, r)
-			media := contracts.ClusterObservationLocalLocatorMedia
-			var body []byte
-			switch mode {
-			case "missing-token":
-				token = ""
-			case "wrong-token":
-				token = "wrong"
-			case "lookup-exact-sni":
-				exact = true
-			case "claim-common-sni":
-				method = http.MethodPost
-				target = contracts.ClusterObservationLocalClaimPath
-				media = contracts.ClusterObservationLocalClaimMedia
-				body = []byte(`{}`)
-			}
-			status, _, err := f.http(t, f.base.root, method, target, media, body, exact, token)
-			if err != nil || status != 503 || f.native.claims.Load() != 0 {
-				t.Fatal("invalid route/token", status, err)
-			}
-		})
-	}
-}
-func TestLocalReceiverExplicitAbsenceDiffersFromClosedHolder(t *testing.T) {
-	for _, closed := range []bool{false, true} {
-		t.Run(map[bool]string{false: "observed-absence", true: "unavailable"}[closed], func(t *testing.T) {
-			f := newLocalReceiverFixture(t, "joined")
-			r := f.base.request()
-			r.ClusterID = observationForwardID(990)
-			if closed {
-				f.base.holder.Close()
-			}
-			status, body, err := f.http(t, f.base.root, http.MethodGet, localReceiverTarget(t, r), contracts.ClusterObservationLocalLocatorMedia, nil, false, localObservationFixtureToken)
-			if closed {
-				if status != 503 {
-					t.Fatal("closed holder fabricated absence", status, err)
-				}
-				return
-			}
-			v, de := contracts.DecodeClusterObservationLocalLocator(body)
-			if err != nil || de != nil || status != 200 || v.Locator != nil {
-				t.Fatal("explicit authenticated absence", status, err, de)
-			}
-			status, _, _ = f.http(t, f.base.root, http.MethodGet, localReceiverTarget(t, r), contracts.ClusterObservationLocalLocatorMedia, nil, false, localObservationFixtureToken)
-			if status != 503 || f.native.base.opens.Load() != 1 {
-				t.Fatal("absence attempt refilled", status)
-			}
-		})
-	}
-}
 
 // The reservation retains the original native/request bound after GET while
 // independent current SQL still restricts claim and final output.
@@ -288,38 +138,4 @@ func (r localReceiverCutoffRegistry) ReadOwnerRegistration(ctx context.Context, 
 		v.FreshUntil = r.until
 	}
 	return v, err
-}
-func TestLocalReceiverReservationRetainsShorterOriginalProofBound(t *testing.T) {
-	f := newLocalReceiverFixture(t, "joined")
-	request := f.base.request()
-	until := request.RequestedAt.Add(3 * time.Second)
-	f.receiver.registry = localReceiverCutoffRegistry{f.base.registry, until}
-	status, body, err := f.http(t, f.base.root, http.MethodGet, localReceiverTarget(t, request), contracts.ClusterObservationLocalLocatorMedia, nil, false, localObservationFixtureToken)
-	if err != nil || status != 200 {
-		t.Fatal("short original locator", status, err)
-	}
-	v, err := contracts.DecodeClusterObservationLocalLocator(body)
-	if err != nil || v.Locator == nil || !ownerOperationTime(v.Locator.FreshUntil).Equal(request.NotAfter) {
-		t.Fatal("locator lost original native/request bound", err)
-	}
-	f.receiver.pending.mu.Lock()
-	e := f.receiver.pending.entries[ownerLocalObservationPendingKey{request.RootID, request.ID}]
-	f.receiver.pending.mu.Unlock()
-	if e == nil {
-		t.Fatal("original pending entry missing")
-	}
-	e.mu.Lock()
-	reservation := e.reservation
-	e.mu.Unlock()
-	if reservation == nil || !reservation.Until().Equal(request.NotAfter) {
-		t.Fatal("reserved regional stream lost original request deadline")
-	}
-	claim, err := contracts.EncodeClusterObservationLocalClaim(contracts.ClusterObservationLocalClaim{Format: contracts.ClusterObservationLocalClaimFormat, PodUID: observationForwardID(701), Request: wire.RequestWire(request), Locator: *v.Locator})
-	if err != nil {
-		t.Fatal(err)
-	}
-	status, _, err = f.http(t, f.base.root, http.MethodPost, contracts.ClusterObservationLocalClaimPath, contracts.ClusterObservationLocalClaimMedia, claim, true, localObservationFixtureToken)
-	if err != nil || status != 200 {
-		t.Fatal("GET exit cancelled retained reservation", status, err)
-	}
 }

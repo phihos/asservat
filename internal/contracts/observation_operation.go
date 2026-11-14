@@ -54,12 +54,6 @@ func DecodeObservationOperationRequest(b []byte) (ObservationOperationRequest, e
 	return decodeObservationRouting[ObservationOperationRequest](b, ObservationOperationBytes)
 }
 
-// Generations/backing revisions are exact integers, like locator sequences.
-// Reuse the existing closed raw-integer codec; default RFC8785 conversion would
-// round an original value above 2^53. Legacy v1 bytes/codecs remain unchanged.
-func EncodeConnectorObservationOperationReply(v ConnectorObservationOperationReply) ([]byte, error) {
-	return encodeObservationRouting(v, ObservationOperationBytes)
-}
 func DecodeConnectorObservationOperationReply(b []byte) (ConnectorObservationOperationReply, error) {
 	return decodeObservationRouting[ConnectorObservationOperationReply](b, ObservationOperationBytes)
 }

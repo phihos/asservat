@@ -68,26 +68,6 @@ func FederationProviderSetupFor(in contracts.FederationDeployment) (FederationPr
 	return out, nil
 }
 
-// requests are the create-only writes the applier performs for the federation.
-func (s FederationProviderSetup) requests(in contracts.FederationDeployment) ([]ownerProviderSetupRequest, error) {
-	p := s.Authentication.Profile
-	var out []ownerProviderSetupRequest
-	for _, role := range s.Authentication.Roles {
-		body, err := ownerProviderCanonical(struct {
-			Policy string `json:"policy"`
-		}{string(role.Policy)})
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, ownerProviderSetupRequest{Method: "POST", Path: "sys/policies/acl/" + role.Name, Body: body},
-			ownerProviderSetupRequest{Method: "POST", Path: "auth/" + p.AuthMount + "/role/" + role.Name, Body: role.Role})
-	}
-	for _, role := range s.PKIRoles {
-		out = append(out, ownerProviderSetupRequest{Method: "POST", Path: in.KeyService.PKIMount + "/roles/" + role.Name, Body: role.Role})
-	}
-	return append(out, ownerProviderSetupRequest{Method: "POST", Path: in.KeyService.AuditMount + "/keys/" + in.KeyService.AuditKey, Body: s.TransitKey}), nil
-}
-
 // federationSetupPaths are the named paths the inspection token may read.
 func federationSetupPaths(in contracts.FederationDeployment, s FederationProviderSetup) []string {
 	p := s.Authentication.Profile

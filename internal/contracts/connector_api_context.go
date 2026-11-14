@@ -1,7 +1,5 @@
 package contracts
 
-import "bytes"
-
 // ConnectorAPIContextSettings is a separately pinned immutable public source.
 // It is never populated from an exchange Hello, capture or connector registration.
 type ConnectorAPIContextSettings struct {
@@ -46,11 +44,3 @@ type ConnectorAPIStartGuard struct {
 }
 
 const ConnectorAPIContextFormat = "connector-api-context/v1"
-const ConnectorAPIContextSettingsBytes = 16 << 10
-
-func EncodeConnectorAPIContextSettings(p ConnectorAPIContextSettings) ([]byte, error) {
-	return canonicalAPIContext(p, ConnectorAPIContextSettingsBytes)
-}
-func DecodeConnectorAPIContextSettings(raw []byte) (ConnectorAPIContextSettings, error) {
-	return decodeClosedRPC[ConnectorAPIContextSettings](bytes.NewReader(raw), ConnectorAPIContextSettingsBytes)
-}

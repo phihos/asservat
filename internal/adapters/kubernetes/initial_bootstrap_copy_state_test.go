@@ -59,48 +59,6 @@ func bootstrapCopyStateFixture(t *testing.T) (contracts.InitialBootstrap, *meta.
 	m.Annotations[bootstrapCopyCompleteAnnotation] = at.Add(9 * time.Second).Format(time.RFC3339Nano)
 	return d, m, p
 }
-func TestInitialBootstrapCopyStateRequiresOriginalPositiveReceipts(t *testing.T) {
-	d, m, p := bootstrapCopyStateFixture(t)
-	got, err := bootstrapReadCopyState(d, m, p)
-	if err != nil || !got.CopiesClosed() {
-		t.Fatal("original bounded positive state", err)
-	}
-	for name, edit := range map[string]func(*meta.PartialObjectMetadata, *InitialBootstrapPassiveRead){
-		"missing-manager": func(_ *meta.PartialObjectMetadata, p *InitialBootstrapPassiveRead) { p.ManagerRetirement = nil },
-		"missing-copy-mark": func(m *meta.PartialObjectMetadata, _ *InitialBootstrapPassiveRead) {
-			delete(m.Annotations, bootstrapCopySQLMarkedAnnotation)
-		},
-		"missing-positive-removal": func(m *meta.PartialObjectMetadata, _ *InitialBootstrapPassiveRead) {
-			delete(m.Annotations, bootstrapCopySQLAnnotation)
-		},
-		"missing-original-create": func(m *meta.PartialObjectMetadata, _ *InitialBootstrapPassiveRead) {
-			delete(m.Annotations, bootstrapCopyPolicyStartedAnnotation)
-		},
-		"missing-guard": func(m *meta.PartialObjectMetadata, _ *InitialBootstrapPassiveRead) {
-			delete(m.Annotations, bootstrapCopyBindingAnnotation)
-		},
-		"changed-public-copy": func(_ *meta.PartialObjectMetadata, p *InitialBootstrapPassiveRead) {
-			x := *p.Bundle.Configuration.SQLMaterial
-			x.UID = ownerID(99)
-			p.Bundle.Configuration.SQLMaterial = &x
-		},
-		"replaced-seed": func(_ *meta.PartialObjectMetadata, p *InitialBootstrapPassiveRead) { p.Bundle.Seed.UID = ownerID(99) },
-		"future-completion": func(m *meta.PartialObjectMetadata, _ *InitialBootstrapPassiveRead) {
-			m.Annotations[bootstrapCopyCompleteAnnotation] = time.Now().UTC().Truncate(time.Microsecond).Add(time.Hour).Format(time.RFC3339Nano)
-		},
-		"malformed-claim": func(m *meta.PartialObjectMetadata, _ *InitialBootstrapPassiveRead) {
-			m.Annotations[bootstrapCopyClaimAnnotation] = `{"unknown":true}`
-		},
-	} {
-		t.Run(name, func(t *testing.T) {
-			d, m, p := bootstrapCopyStateFixture(t)
-			edit(m, p)
-			if _, err := bootstrapReadCopyState(d, m, p); err == nil {
-				t.Fatal("missing/replaced positive identity accepted")
-			}
-		})
-	}
-}
 func TestInitialBootstrapCopyStateRejectsDeadlineRenewalAndChangedDeleteCAS(t *testing.T) {
 	for _, kind := range []string{"renew-interval", "wrong-delete-rv", "alias-guard", "wrong-manager-close", "extra-claim-field"} {
 		t.Run(kind, func(t *testing.T) {

@@ -15,37 +15,6 @@ func DownloadWorkerNamespaceName(installationID string) string {
 	return downloadWorkerName(installationID, "-downloads")
 }
 
-// DownloadWorkerAccountName is the worker Pods' account; it holds no rights.
-func DownloadWorkerAccountName(installationID string) string {
-	return downloadWorkerName(installationID, "-download-worker")
-}
-
-// DownloadWorkerPriorityClassName is the cluster-scoped zero-priority,
-// non-preempting class the worker template names (ADR-069).
-func DownloadWorkerPriorityClassName(installationID string) string {
-	return downloadWorkerName(installationID, "-download-worker")
-}
-
-// DownloadWorkerControlName is the immutable worker.json control ConfigMap.
-func DownloadWorkerControlName(installationID string) string {
-	return downloadWorkerName(installationID, "-download-worker-control")
-}
-
-// DownloadWorkerStoreName is the immutable store credential Secret
-// (credentials.json), the only place the download evidence principal lives.
-func DownloadWorkerStoreName(installationID string) string {
-	return downloadWorkerName(installationID, "-download-worker-store")
-}
-
-// DownloadWorkerProfileName is the guarded worker-profile.json source and
-// DownloadWorkerProfileGuardName its administrator admission guard (ADR-070).
-func DownloadWorkerProfileName(installationID string) string {
-	return downloadWorkerName(installationID, "-worker-profile")
-}
-func DownloadWorkerProfileGuardName(installationID string) string {
-	return DownloadWorkerProfileName(installationID) + "-guard"
-}
-
 // WorkerConfigurationAuditKeyName is the worker configuration observer's own
 // audit Transit key (ADR-204 decision 7), on the configuration audit mount.
 func WorkerConfigurationAuditKeyName(installationID string) string {

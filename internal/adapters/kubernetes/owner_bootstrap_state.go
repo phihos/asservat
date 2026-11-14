@@ -145,37 +145,3 @@ func ownerBootstrapReserved(installation string, s contracts.InitialRuntimeResou
 	}
 	return out
 }
-
-// Exactly one optional parent, child admission or child acknowledgement changes.
-// Every other byte, including all sibling effects, remains original.
-func ownerBootstrapTransition(a, b contracts.InitialRuntimeResourceState) bool {
-	if a.OwnerIdentity != nil || b.OwnerIdentity != nil || a.OwnerLaunch != nil || b.OwnerLaunch != nil || b.OwnerBootstrap == nil {
-		return false
-	}
-	x, y := a, b
-	x.OwnerBootstrap = nil
-	y.OwnerBootstrap = nil
-	if !equalJSON(x, y) {
-		return false
-	}
-	p, q := a.OwnerBootstrap, b.OwnerBootstrap
-	if p == nil {
-		return q.Child == nil
-	}
-	first, last := *p, *q
-	first.Child = nil
-	last.Child = nil
-	if !equalJSON(first, last) || q.Child == nil {
-		return false
-	}
-	if p.Child == nil {
-		return q.Child.Receipt == nil
-	}
-	if p.Child.Receipt != nil || q.Child.Receipt == nil {
-		return false
-	}
-	old, next := *p.Child, *q.Child
-	old.Receipt = nil
-	next.Receipt = nil
-	return equalJSON(old, next)
-}

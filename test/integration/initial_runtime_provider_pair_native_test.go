@@ -17,7 +17,6 @@ import (
 	"time"
 
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
-	"asservat.local/asservat/internal/adapters/providerconfig"
 	"asservat.local/asservat/internal/contracts"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials"
@@ -207,46 +206,6 @@ func (p *initialRuntimeNativeProviders) admin(t *testing.T, ctx context.Context,
 		t.Fatalf("owned provider %s status=%d want=%d read=%v", path, response.StatusCode, want, e)
 	}
 	return result
-}
-
-func (p *initialRuntimeNativeProviders) configureWorker(t *testing.T, ctx context.Context, recipe providerconfig.ConfigurationProviderRecipe, worker contracts.HubWorkerDeployment) *providerconfig.SetupReader {
-	t.Helper()
-	paths := []string{"sys/mounts/auth/" + recipe.Profile.AuthMount, "auth/" + recipe.Profile.AuthMount + "/config", "sys/mounts/" + worker.KeyService.AuditMount, worker.KeyService.AuditMount + "/keys/" + worker.KeyService.AuditKey}
-	for _, role := range recipe.Roles {
-		p.admin(t, ctx, http.MethodPost, "sys/policies/acl/"+role.Name, map[string]string{"policy": string(role.Policy)}, 204)
-		p.admin(t, ctx, http.MethodPost, "auth/"+recipe.Profile.AuthMount+"/role/"+role.Name, json.RawMessage(role.Role), 204)
-		paths = append(paths, "sys/policies/acl/"+role.Name, "auth/"+recipe.Profile.AuthMount+"/role/"+role.Name)
-	}
-	acl := map[string]any{}
-	for _, path := range paths {
-		acl[path] = map[string]any{"capabilities": []string{"read"}}
-	}
-	raw, e := json.Marshal(map[string]any{"path": acl})
-	if e != nil {
-		t.Fatal(e)
-	}
-	p.admin(t, ctx, http.MethodPost, "sys/policies/acl/configuration-setup-inspection", map[string]string{"policy": string(raw)}, 204)
-	reply := p.admin(t, ctx, http.MethodPost, "auth/token/create", map[string]any{"policies": []string{"configuration-setup-inspection"}, "no_default_policy": true, "renewable": false, "ttl": "5m", "explicit_max_ttl": "5m"}, 200)
-	var token struct {
-		Auth struct {
-			Token string `json:"client_token"`
-		} `json:"auth"`
-	}
-	if json.Unmarshal(reply, &token) != nil || token.Auth.Token == "" {
-		clear(reply)
-		t.Fatal("actual inspector credential unavailable")
-	}
-	clear(reply)
-	t.Cleanup(func() {
-		c, end := context.WithTimeout(context.Background(), 5*time.Second)
-		defer end()
-		p.admin(t, c, http.MethodPost, "auth/token/revoke", map[string]string{"token": token.Auth.Token}, 204)
-	})
-	reader, e := providerconfig.NewSetupReader(contracts.OwnerProviderEndpoint{Endpoint: worker.KeyService.Endpoint, Roots: worker.KeyService.Roots}, []byte(token.Auth.Token))
-	if e != nil {
-		t.Fatal(e)
-	}
-	return reader
 }
 
 // Dynamic provider administration is an external fixture operation performed

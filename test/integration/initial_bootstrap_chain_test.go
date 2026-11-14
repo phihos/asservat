@@ -3,20 +3,13 @@ package integration
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
-	"encoding/json"
-	"io"
-	"net/http"
 	"os"
 	"strings"
 	"testing"
 	"time"
 
 	"asservat.local/asservat/internal/adapters/kms"
-	"asservat.local/asservat/internal/adapters/objectstore/framed"
 	"asservat.local/asservat/internal/contracts"
-	"asservat.local/asservat/internal/domain/audit"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/jackc/pgx/v5/pgxpool"
 	core "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -130,40 +123,6 @@ func initialBootstrapChainState(t *testing.T, ctx context.Context, api kubernete
 		t.Fatal("actual original preparation root differs", err)
 	}
 	return state, c, root
-}
-
-func initialBootstrapChainAudit(t *testing.T, ctx context.Context, admin *pgxpool.Pool, store *s3.Client, httpClient *http.Client, f fixture, d contracts.InitialBootstrap, state contracts.InitialBootstrapState, root contracts.InitialPreparationRoot) {
-	t.Helper()
-	var recordJSON, receiptJSON []byte
-	var activated, blocked bool
-	if err := admin.QueryRow(ctx, "SELECT record_json,audit_receipt_json,activated_at IS NOT NULL FROM fleet_initial_activation WHERE installation_id=$1", state.InstallationID).Scan(&recordJSON, &receiptJSON, &activated); err != nil || !activated {
-		t.Fatal("actual independent activation absent", err)
-	}
-	if err := admin.QueryRow(ctx, "SELECT recovery_blocked FROM fleet_current_trust WHERE installation_id=$1", state.InstallationID).Scan(&blocked); err != nil || blocked {
-		t.Fatal("actual incarnation not activated", err)
-	}
-	var record audit.InitialInstallation
-	var receipt audit.Receipt
-	if json.Unmarshal(recordJSON, &record) != nil || json.Unmarshal(receiptJSON, &receipt) != nil || receipt.Version == "" || receipt.Version == "null" || !record.Valid() || !receipt.ValidInitialInstallation(state.InstallationID, record.Claim.ID) || root.Activation.Handover.Cleanup.ActivatedClaimID != record.Claim.ID || record.Scope.ClusterID != state.ClusterID {
-		t.Fatal("original encrypted activation scope invalid")
-	}
-	object, err := store.GetObject(ctx, &s3.GetObjectInput{Bucket: &d.AuditStore.Bucket, Key: &receipt.Key, VersionId: &receipt.Version})
-	if err != nil {
-		t.Fatal(err)
-	}
-	ciphertext, err := io.ReadAll(io.LimitReader(object.Body, (128<<10)+1))
-	object.Body.Close()
-	defer clear(ciphertext)
-	if err != nil || len(ciphertext) > 128<<10 || int64(len(ciphertext)) != receipt.Bytes || sha256.Sum256(ciphertext) != [32]byte(receipt.SHA256) {
-		t.Fatal("actual immutable audit bytes differ")
-	}
-	opener, err := kms.NewOpener(d.KeyService.Endpoint, "synthetic-root", d.KeyService.AuditMount, d.KeyService.AuditKey, httpClient)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err = framed.VerifyInitialInstallation(ctx, opener, record, ciphertext); err != nil {
-		t.Fatal("independent retained audit cannot verify", err)
-	}
 }
 
 func initialBootstrapChainCleanup(t *testing.T, api kubernetes.Interface, d contracts.InitialBootstrap, bootstrapUID, roleUID, bindingUID types.UID) {

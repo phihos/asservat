@@ -10,7 +10,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -23,7 +22,6 @@ import (
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/privacy"
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
@@ -235,143 +233,6 @@ func readProcessingReportExports(t *testing.T, driver *installedLiveBrowser, dir
 	}
 	awaitInstalledProcessingBrowser(t, driver)
 	return records
-}
-
-func qualifyInstalledProcessingReport(t *testing.T, parent context.Context, cluster string, run installedProcessingRun, erasure installedEarlyErasure) {
-	t.Helper()
-	ctx, stop := context.WithDeadline(parent, run.ExpiresAt)
-	defer stop()
-	defer func() {
-		if t.Failed() {
-			run.Diagnose()
-		}
-	}()
-	shared := createInstalledReportShare(t, ctx, run)
-	erasure.qualify(t, ctx, cluster, run)
-	session := run.Identity.consoleSession(t, ctx, run.PublicRoot, run.Address, run.Origin)
-	origin, err := url.Parse(session.base)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var cookies []map[string]any
-	for _, c := range session.client.Jar.Cookies(origin) {
-		cookies = append(cookies, map[string]any{"name": c.Name, "value": c.Value, "url": session.base, "httpOnly": true, "secure": true, "sameSite": "Lax"})
-	}
-	driver, output := startProcessingReportBrowser(t, ctx, map[string]any{"origin": session.base, "proxy": installedHistoryBrowserTunnel(t, ctx, session.base, run.Address), "cookies": cookies})
-	clear(cookies)
-	source, err := installedProcessingReportSource(ctx, erasure.hub, erasure.namespace, erasure.installation)
-	if err != nil {
-		t.Fatal("installed report declared source", err)
-	}
-	var settings contracts.DownloadEnvironmentSettings
-	if json.Unmarshal([]byte(source.Data[contracts.DownloadEnvironmentFile]), &settings) != nil {
-		t.Fatal("installed report protected source decoding")
-	}
-	canonical, err := canonicalReportSource(source.Data[contracts.DownloadEnvironmentFile])
-	if err != nil {
-		t.Fatal(err)
-	}
-	policy := sha256.Sum256(canonical)
-	expected := value.ProcessingReportPage{RootID: run.RootID, InstallationID: erasure.installation,
-		PolicyRevision: value.ProcessingReportRevision{UID: string(source.UID), Generation: settings.Revision, Digest: hex.EncodeToString(policy[:])}, ProcessorDeclarations: "supplied"}
-	sharePages := 0
-	var shareAfter value.ProcessingReportCursor
-	records := readProcessingReportExports(t, driver, output, func(summary reportPageSummary, page value.ProcessingReportPage) {
-		if mismatch := installedReportProvenanceMismatch(page, expected); mismatch != "" {
-			t.Fatal("installed report provenance", "section", page.Section, "source", source.Name, "request", summary.RequestID, mismatch)
-		}
-		if page.Section == "shares" {
-			sharePages++
-			if summary.Query.Limit != 3 || sharePages > 2 {
-				t.Fatal("installed report did not paginate the four real recipients at three records per page")
-			}
-			for _, record := range page.Records {
-				if record.Share == nil || record.Share.ShareID != shared.ID {
-					t.Fatal("installed report recipient page changed the actual share")
-				}
-			}
-			if sharePages == 1 {
-				if len(page.Records) != 3 || page.Next == nil || page.Next.Section != "shares" {
-					t.Fatal("installed report failed to continue inside a share's recipient list")
-				}
-				shareAfter = page.Records[2].Cursor()
-				if shareAfter.Ordinal != 3 || !reflect.DeepEqual(page.Next.After, shareAfter) {
-					t.Fatal("installed report lost the third recipient continuation")
-				}
-			} else if len(page.Records) != 1 || !reflect.DeepEqual(summary.Query.After, shareAfter) || page.Next == nil || page.Next.Section != "downloads" {
-				t.Fatal("installed report did not finish the same share with its fourth recipient")
-			}
-		}
-		installedJourneyReadOnly(t, ctx, run.SQL, func(tx pgx.Tx) error {
-			var exact bool
-			err := tx.QueryRow(ctx, `
-SELECT o.lane='normal' AND o.intent->>'Name'='get_processing_report' AND o.intent->>'InputFormat'='context-input/v1'
- AND o.outcome->>'Status'='success' AND o.outcome->>'Effect'='none'
- AND (o.outcome->>'OutputBytes')::bigint=$3 AND o.intent_receipt IS NOT NULL AND o.outcome_receipt IS NOT NULL
- AND l.binding=o.intent->'Lifecycle' AND l.intent_completion->'Receipt'=o.intent_receipt AND l.outcome_completion->'Receipt'=o.outcome_receipt
-FROM operation_audit o JOIN operation_audit_lifecycle l ON l.root_id=o.root_id AND l.operation_id=o.id AND l.lane=o.lane
-WHERE o.root_id=$1 AND o.id=$2`, run.RootID, summary.RequestID, summary.ResponseBytes).Scan(&exact)
-			if err != nil || !exact {
-				t.Fatal("downloaded report page lacks exact acknowledged output audit", page.Section, err)
-			}
-			return nil
-		})
-	})
-	artifactFound, downloadFound := false, false
-	recipients := map[string]bool{}
-	var processors []value.ProcessingOrganization
-	for _, record := range records {
-		if a := record.Artifact; a != nil && a.ArtifactID == run.ArtifactID {
-			artifactFound = true
-			if a.CaseID != run.CaseID || a.ClusterID != cluster || a.CustodyState != "deleted" || a.DeletionState != "deleted" ||
-				a.DeletedAt == nil || !a.OriginalExpiresAt.Equal(run.ExpiresAt) || !a.ExpiresAt.Equal(a.AnchorAt) {
-				t.Fatal("installed report lost retained erasure and original provenance")
-			}
-		}
-		if share := record.Share; share != nil && share.ShareID == shared.ID {
-			recipient := authorization.ShareRecipient{Kind: share.RecipientKind, Issuer: share.RecipientIssuer, ID: share.RecipientID}
-			ordinal := slices.Index(shared.Recipients, recipient) + 1
-			if share.ArtifactID != run.ArtifactID || ordinal == 0 || share.Ordinal != int64(ordinal) || recipients[recipient.Key()] {
-				t.Fatal("installed export changed, repeated or invented an actual share recipient")
-			}
-			recipients[recipient.Key()] = true
-		}
-		if download := record.Download; download != nil && download.ArtifactID == run.ArtifactID && download.State == "Completed" && download.EmittedBytes > 0 && download.ClientReceipt == "unknown" {
-			downloadFound = true
-		}
-		if record.Processor != nil {
-			processors = append(processors, *record.Processor)
-		}
-	}
-	if !artifactFound || len(recipients) != 4 || sharePages != 2 || !downloadFound || !reflect.DeepEqual(processors, reportFixtureProcessors()) {
-		t.Fatal("installed export omitted source artifact, four paginated recipients, completed session or declarations", artifactFound, len(recipients), sharePages, downloadFound)
-	}
-	outsider := run.Identity.unrelated().consoleSession(t, ctx, run.PublicRoot, run.Address, run.Origin)
-	denialCounts := func() (total, acknowledged int64) {
-		t.Helper()
-		installedJourneyReadOnly(t, ctx, run.SQL, func(tx pgx.Tx) error {
-			return tx.QueryRow(ctx, `
-SELECT count(*),count(*) FILTER(WHERE o.lane='normal' AND o.intent->>'InputFormat'='context-input/v1'
- AND o.outcome->>'Status'='denied' AND o.outcome->>'Effect'='none'
- AND o.intent_receipt IS NOT NULL AND o.outcome_receipt IS NOT NULL
- AND l.binding=o.intent->'Lifecycle' AND l.intent_completion->'Receipt'=o.intent_receipt
- AND l.outcome_completion->'Receipt'=o.outcome_receipt)
-FROM operation_audit o LEFT JOIN operation_audit_lifecycle l
- ON l.root_id=o.root_id AND l.operation_id=o.id AND l.lane=o.lane
-WHERE o.root_id=$1 AND o.intent->>'Name'='get_processing_report'
- AND o.intent#>>'{Actor,Issuer}'=$2 AND o.intent#>>'{Actor,Subject}'=$3`, run.RootID, run.Identity.Issuer, shared.OutsiderID).Scan(&total, &acknowledged)
-		})
-		return total, acknowledged
-	}
-	beforeTotal, beforeAcknowledged := denialCounts()
-	if _, status, err := outsider.operation(ctx, "get_processing_report", map[string]any{"section": "artifacts", "limit": 1}, ""); err == nil || status != http.StatusUnauthorized {
-		t.Fatal("installed report nonoperator refusal", status, err)
-	}
-	if total, acknowledged := denialCounts(); total != beforeTotal+1 || acknowledged != beforeAcknowledged+1 {
-		t.Fatal("nonoperator report refusal lacks one new independently acknowledged denial audit", total-beforeTotal, acknowledged-beforeAcknowledged)
-	}
-	qualifyInstalledReportRollbackGuard(t, ctx, run.SQL)
-	t.Log("installed privacy inventory exported every section with exact page audit bytes, recorded recipient and completed session, retained verified deletion and operator declarations")
 }
 
 func installedProcessingReportSource(ctx context.Context, client kubernetes.Interface, namespace, installation string) (*core.ConfigMap, error) {

@@ -11,7 +11,6 @@ import (
 	"asservat.local/asservat/internal/domain/artifact"
 	value "asservat.local/asservat/internal/domain/authorization"
 	cfg "asservat.local/asservat/internal/domain/configuration"
-	admission "k8s.io/api/admissionregistration/v1"
 )
 
 const clusterCatalogDenial = "Asservat cluster catalog administrator is required."
@@ -19,9 +18,6 @@ const clusterCatalogDenial = "Asservat cluster catalog administrator is required
 // ClusterCatalogProtection guards the ADR-185 cluster catalog ConfigMap.
 type ClusterCatalogProtection struct{ *configMapProtection }
 
-func ClusterCatalogAdmission(p cfg.ConfigMapAdministration) (*admission.ValidatingAdmissionPolicy, *admission.ValidatingAdmissionPolicyBinding, error) {
-	return configMapAdmission(p, "protected-cluster-catalog", clusterCatalogDenial)
-}
 func NewClusterCatalogProtection(observer, probe *PermissionClient, plan cfg.ConfigMapAdministration, pin GuardPin) (*ClusterCatalogProtection, error) {
 	g, err := newConfigMapProtection(observer, probe, plan, pin, "protected-cluster-catalog", clusterCatalogDenial)
 	if err != nil {

@@ -33,17 +33,6 @@ func configurationWorkerProviderBound(in contracts.PublicRuntimeRoles) bool {
 	return true
 }
 
-func configurationWorkerProviderMatches(installation string, v contracts.InitialRuntimeResourceState, w contracts.PublicRuntimeWorkerBinding) bool {
-	if w.WorkerLayout == contracts.HubWorkerInstalledLayout {
-		return v.WorkerProvider == nil && v.WorkerInputs == nil && w.Provider == (contracts.PublicRuntimeWorkerProviderBinding{})
-	}
-	p := v.WorkerInputs
-	return w.WorkerLayout == contracts.HubWorkerProviderInstalledLayout && v.WorkerLayout == w.WorkerLayout &&
-		v.OwnerLayout == contracts.OwnerProviderInstalledLayout && v.WorkerProvider != nil && *v.WorkerProvider == w.Provider.Selection &&
-		p != nil && p.Receipt != nil && p.OperationID == w.Provider.InputOperationID && p.PublicDigest == w.Provider.PublicDigest &&
-		p.Receipt.Configuration == w.Provider.Configuration && p.ConfigurationRoot == w.ConfigurationRoot && p.ConfigurationSetupID == w.ConfigurationSetupID
-}
-
 // The versioned public digest covers the complete generated document. It has
 // no secret bytes and cannot substitute for current source/provider proofs.
 // Both original CREATE and every later independent read use this definition.

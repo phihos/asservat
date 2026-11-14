@@ -132,13 +132,6 @@ func (e ownerInputCheck) Unwrap() error     { return mounts.ErrUnavailable }
 // validateOwnerDeployment is the owner's pure input check of a projected input.
 func validateOwnerDeployment(c contracts.OwnerDeployment) error { return validateOwnerInput(c, true) }
 
-// validateUnprojectedOwnerDeployment is the same check before the owner
-// projection attaches the observation activation (ADR-194): the installer runs
-// it on a derived promoted input, and the projection then binds the activation.
-func validateUnprojectedOwnerDeployment(c contracts.OwnerDeployment) error {
-	return validateOwnerInput(c, false)
-}
-
 func validateOwnerInput(c contracts.OwnerDeployment, projected bool) error {
 	var err error
 	if c.Format != contracts.OwnerDeploymentFormat || !authorization.UUID(c.InstallationID) || !authorization.UUID(c.ClusterID) || !authorization.UUID(c.PermissionRootID) || !authorization.UUID(c.Namespace.UID) || !authorization.UUID(c.ConfigurationUID) || !identity.Text(c.Namespace.Name, 63) || c.Connections < 1 || c.Connections > 64 || c.Concurrency < 1 || c.Concurrency > 16 || c.Concurrency > c.Connections {

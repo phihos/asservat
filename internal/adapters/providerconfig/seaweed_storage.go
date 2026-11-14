@@ -1,12 +1,10 @@
 package providerconfig
 
 import (
-	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"io"
 	"regexp"
 	"slices"
 	"strings"
@@ -296,90 +294,6 @@ func seaweedAuditPrefixes(g contracts.SeaweedGrant) []string {
 	case "publisher-audit":
 		if r != "" {
 			return []string{"context-verification/v1/" + r + "/"}
-		}
-	}
-	return nil
-}
-
-// SeaweedRuntimeCredential deliberately refuses the provider administrator.
-func SeaweedRuntimeCredential(c contracts.SeaweedCredential) (contracts.OwnerStorageCredential, error) {
-	if ValidateSeaweedCredential(c) != nil || c.Principal.Purpose == "admin" {
-		return contracts.OwnerStorageCredential{}, ErrSeaweedStorage
-	}
-	return contracts.OwnerStorageCredential{AccessKeyID: c.AccessKeyID, SecretAccessKey: c.SecretAccessKey}, nil
-}
-
-func decodeSeaweedIdentities(raw []byte) (map[string]seaweedIdentity, error) {
-	if len(raw) == 0 || len(raw) > SeaweedConfigLimit {
-		return nil, ErrSeaweedStorage
-	}
-	var doc struct {
-		Identities []seaweedIdentity `json:"identities"`
-	}
-	d := json.NewDecoder(bytes.NewReader(raw))
-	d.DisallowUnknownFields()
-	if d.Decode(&doc) != nil || d.Decode(new(any)) != io.EOF || len(doc.Identities) == 0 || len(doc.Identities) > 4097 {
-		return nil, ErrSeaweedStorage
-	}
-	out := map[string]seaweedIdentity{}
-	keys := map[string]bool{}
-	admins := 0
-	for _, id := range doc.Identities {
-		if len(id.Name) < 46 || !strings.HasPrefix(id.Name, "asservat-") || len(id.Credentials) != 1 || len(id.Actions) == 0 || len(id.Actions) > 65 || out[id.Name].Name != "" {
-			return nil, ErrSeaweedStorage
-		}
-		suffix := len(id.Name) - 36
-		k := contracts.SeaweedPrincipalKey{Purpose: id.Name[len("asservat-") : suffix-1], ScopeID: id.Name[suffix:]}
-		name, e := SeaweedPrincipalName(k)
-		if e != nil || name != id.Name {
-			return nil, ErrSeaweedStorage
-		}
-		key := id.Credentials[0]
-		if ValidateSeaweedCredential(contracts.SeaweedCredential{Principal: k, AccessKeyID: key.Access, SecretAccessKey: key.Secret}) != nil || keys[key.Access] {
-			return nil, ErrSeaweedStorage
-		}
-		keys[key.Access] = true
-		if k.Purpose == "admin" {
-			admins++
-			if !slices.Equal(id.Actions, []string{"Admin", "Read", "Write", "List"}) {
-				return nil, ErrSeaweedStorage
-			}
-		} else {
-			for _, action := range id.Actions {
-				if !(strings.HasPrefix(action, "Read:") || strings.HasPrefix(action, "Write:") || strings.HasPrefix(action, "List:")) || strings.ContainsAny(action, "\r\n") {
-					return nil, ErrSeaweedStorage
-				}
-			}
-		}
-		out[id.Name] = id
-	}
-	if admins != 1 {
-		return nil, ErrSeaweedStorage
-	}
-	return out, nil
-}
-
-// ValidateSeaweedConfigTransition prevents later installer phases from replacing
-// or dropping a retained principal/key/capability. Inputs remain private. It is
-// not a replacement for CompileSeaweedStorage's purpose/recipe checks.
-func ValidateSeaweedConfigTransition(before, after []byte) error {
-	old, e := decodeSeaweedIdentities(before)
-	if e != nil {
-		return e
-	}
-	next, e := decodeSeaweedIdentities(after)
-	if e != nil {
-		return e
-	}
-	for name, identity := range old {
-		n, ok := next[name]
-		if !ok || !slices.Equal(identity.Credentials, n.Credentials) {
-			return ErrSeaweedStorage
-		}
-		for _, a := range identity.Actions {
-			if !slices.Contains(n.Actions, a) {
-				return ErrSeaweedStorage
-			}
 		}
 	}
 	return nil

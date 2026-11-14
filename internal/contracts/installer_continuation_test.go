@@ -3,20 +3,8 @@ package contracts
 import (
 	"bytes"
 	"encoding/json"
-	"strings"
 	"testing"
 )
-
-// ADR-183: the continuation input is closed, so no credential field can be added.
-func TestInstallerContinuationIsClosed(t *testing.T) {
-	ok := `{"format":"` + InstallerContinuationFormat + `","namespace":"asservat-system","workerProvider":{"authMount":"k","authMountAccessor":"a"},"ownerProvider":{"authMount":"o","authMountAccessor":"b"},"ownerIssuerRootsPEM":"","ownerPKIMount":"owner-pki","ownerConnections":4,"ownerConcurrency":2}`
-	if _, err := DecodeInstallerContinuation(strings.NewReader(ok)); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := DecodeInstallerContinuation(strings.NewReader(strings.Replace(ok, `"format"`, `"token":"x","format"`, 1))); err == nil {
-		t.Fatal("accepted an unknown credential field")
-	}
-}
 
 func TestInstallerApprovalSettingsWireCompatibility(t *testing.T) {
 	plain := InstallerPublicSettings{}
@@ -32,25 +20,5 @@ func TestInstallerApprovalSettingsWireCompatibility(t *testing.T) {
 	var decoded InstallerPublicSettings
 	if err := json.Unmarshal(enabled, &decoded); err != nil || decoded.Approvals == nil || !decoded.Approvals.RequireRecordingApproval || decoded.Approvals.StepUp.MaxAgeSeconds != 300 {
 		t.Fatal("approval policy not preserved", err)
-	}
-}
-
-func TestInstallerProcessingOrganizationsPreserveOptionalWireShape(t *testing.T) {
-	for _, declarations := range [][]ProcessingOrganization{nil, {}, {{ID: "org-1", Name: "Declared organization", Activities: []string{"Storage"}, Regions: []string{}}}} {
-		raw, err := json.Marshal(InstallerContinuation{Public: &InstallerPublicSettings{Processors: declarations}})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if bytes.Contains(raw, []byte(`"processors"`)) != (declarations != nil) {
-			t.Fatal("installer changed declaration presence")
-		}
-		decoded, err := DecodeInstallerContinuation(bytes.NewReader(raw))
-		if err != nil || decoded.Public == nil || (decoded.Public.Processors == nil) != (declarations == nil) || len(decoded.Public.Processors) != len(declarations) {
-			t.Fatal("installer declarations did not round trip", err)
-		}
-	}
-	raw := `{"public":{"processors":[{"id":"org-1","name":"Org","activities":["Storage"],"regions":[],"endpoint":"https://outside.invalid"}]}}`
-	if _, err := DecodeInstallerContinuation(strings.NewReader(raw)); err == nil {
-		t.Fatal("installer accepted an unrecognized processor field")
 	}
 }

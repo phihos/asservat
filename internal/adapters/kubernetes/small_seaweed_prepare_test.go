@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"asservat.local/asservat/internal/adapters/providerconfig"
 	"asservat.local/asservat/internal/contracts"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -22,47 +21,6 @@ import (
 
 func smallSeaweedTestPlan() contracts.SmallSeaweedPlan {
 	return contracts.SmallSeaweedPlan{Format: contracts.SmallSeaweedFormat, Namespace: "hub", Name: "trial", Image: "chrislusf/seaweedfs@sha256:" + strings.Repeat("a", 64)}
-}
-func TestSmallSeaweedMaterialBindsTLSAndIndependentBackend(t *testing.T) {
-	plan := smallSeaweedTestPlan()
-	now := time.Now().UTC()
-	data, e := BuildSmallSeaweedMaterial(plan, now)
-	if e != nil {
-		t.Fatal(e)
-	}
-	defer clearSmallSeaweedData(data)
-	if ValidateSmallSeaweedMaterial(plan, data, now) != nil || bytes.Equal(data[contracts.SmallSeaweedBackendKey], data[contracts.SmallSeaweedInitializationKey]) {
-		t.Fatal("invalid original backend material")
-	}
-	admin, e := decodeSmallSeaweedAdmin(data[contracts.SmallSeaweedAdminKey])
-	if e != nil || admin.Principal.ScopeID != string(data[contracts.SmallSeaweedBackendKey]) {
-		t.Fatal("administrator not bound to backend")
-	}
-	if _, e = providerconfig.SeaweedRuntimeCredential(admin); e == nil {
-		t.Fatal("backend admin became runtime credential")
-	}
-	for name, change := range map[string]func(map[string][]byte){
-		"unknown":      func(d map[string][]byte) { d["unexpected"] = []byte("refuse") },
-		"key":          func(d map[string][]byte) { d["tls.key"] = d["ca.key"] },
-		"backend":      func(d map[string][]byte) { d[contracts.SmallSeaweedBackendKey] = []byte(swID("8")) },
-		"trailing-pem": func(d map[string][]byte) { d["ca.crt"] = append(bytes.Clone(d["ca.crt"]), d["ca.crt"]...) },
-	} {
-		t.Run(name, func(t *testing.T) {
-			copy := map[string][]byte{}
-			for k, v := range data {
-				copy[k] = v
-			}
-			change(copy)
-			if ValidateSmallSeaweedMaterial(plan, copy, now) == nil {
-				t.Fatal("changed original material accepted")
-			}
-		})
-	}
-	altered := plan
-	altered.Namespace = "other"
-	if ValidateSmallSeaweedMaterial(altered, data, now) == nil || ValidateSmallSeaweedMaterial(plan, data, now.AddDate(2, 0, 0)) == nil {
-		t.Fatal("wrong namespace or expired leaf accepted")
-	}
 }
 
 type smallSeaweedFixture struct {

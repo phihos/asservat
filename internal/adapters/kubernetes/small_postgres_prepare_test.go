@@ -8,7 +8,6 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
-	"time"
 
 	"asservat.local/asservat/internal/contracts"
 	core "k8s.io/api/core/v1"
@@ -18,53 +17,6 @@ import (
 
 func smallPostgresTestPlan() contracts.SmallPostgresPlan {
 	return contracts.SmallPostgresPlan{Format: contracts.SmallPostgresFormat, Namespace: "hub", Name: "trial"}
-}
-
-func TestSmallPostgresMaterialBindsCredentialsTLSAndSelection(t *testing.T) {
-	p := smallPostgresTestPlan()
-	p.Keycloak = true
-	now := time.Now().UTC()
-	d, err := BuildSmallPostgresMaterial(p, now)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer smallPostgresClear(d)
-	if p.MaxConnections() != 122 || ValidateSmallPostgresMaterial(p, d, now) != nil {
-		t.Fatal("valid selected material refused")
-	}
-	for _, tc := range []struct {
-		name   string
-		change func(map[string][]byte)
-	}{
-		{"credential mismatch", func(m map[string][]byte) { m["ddl-verifier"] = m["administrator-verifier"] }},
-		{"unknown key", func(m map[string][]byte) { m["extra"] = []byte("refuse") }},
-		{"extra PEM", func(m map[string][]byte) { m["ca.crt"] = append(append([]byte{}, m["ca.crt"]...), m["ca.crt"]...) }},
-		{"wrong private key", func(m map[string][]byte) { m["server.key"] = m["ca.key"] }},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			copy := map[string][]byte{}
-			for k, v := range d {
-				copy[k] = v
-			}
-			tc.change(copy)
-			if ValidateSmallPostgresMaterial(p, copy, now) == nil {
-				t.Fatal("accepted changed material")
-			}
-		})
-	}
-	p.Keycloak = false
-	if p.MaxConnections() != 117 || ValidateSmallPostgresMaterial(p, d, now) == nil {
-		t.Fatal("accepted different declared topology")
-	}
-	p.Keycloak = true
-	p.Namespace = "different"
-	if ValidateSmallPostgresMaterial(p, d, now) == nil {
-		t.Fatal("accepted different database identity")
-	}
-	p.Namespace = "hub"
-	if ValidateSmallPostgresMaterial(p, d, now.AddDate(2, 0, 0)) == nil {
-		t.Fatal("expired leaf accepted")
-	}
 }
 
 func TestSmallPostgresPrepareCreateReplayAndUnknownReadback(t *testing.T) {

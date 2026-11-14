@@ -142,11 +142,6 @@ func (s *InitialBootstrap) qualify(ctx context.Context, p contracts.InitialBoots
 	return s.qualifyWithClients(ctx, p, cluster)
 }
 
-// qualifyPrelude checks only public native continuity before any installation
-// identity exists; no cluster assertion is manufactured for the private probe.
-func (s *InitialBootstrap) qualifyPrelude(ctx context.Context, p contracts.InitialBootstrapPrelude) error {
-	return s.qualifyWithClients(ctx, p, "")
-}
 func (s *InitialBootstrap) qualifyWithClients(ctx context.Context, p contracts.InitialBootstrapPrelude, cluster string) error {
 	if e := s.checkPrelude(ctx, p); e != nil {
 		return e

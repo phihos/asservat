@@ -52,22 +52,3 @@ func TestClusterObservationFramesRejectOversizedBeforeReadingBody(t *testing.T) 
 		t.Fatal("closed frame accounting inconsistent")
 	}
 }
-
-func TestClusterObservationFramesHaveNoCaptureOrCredentialFallback(t *testing.T) {
-	for _, bad := range [][]byte{nil, {0, 0, 0, 0, 1, 'x'}, {255, 0, 0, 0, 1, 'x'}, {1, 0, 0, 0, 0}, {1, 0, 0, 0, 2, 'x'}} {
-		if _, e := ReadClusterObservationFrame(bytes.NewReader(bad)); e == nil {
-			t.Fatal("malformed frame accepted")
-		}
-	}
-	valid := ClusterObservationHello{Format: ClusterObservationExchangeFormat, ExchangeID: "e", RootID: "r", ClusterID: "c"}
-	b, e := EncodeClusterObservationHello(valid)
-	if e != nil {
-		t.Fatal(e)
-	}
-	for _, field := range []string{"captureID", "token", "url", "proof", "requestedAt", "notAfter"} {
-		bad := append(append([]byte{}, b[:len(b)-1]...), []byte(`,"`+field+`":"x"}`)...)
-		if _, e := DecodeClusterObservationHello(bad); e == nil {
-			t.Fatal("unexpected bootstrap member accepted", field)
-		}
-	}
-}

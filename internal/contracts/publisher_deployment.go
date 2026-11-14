@@ -1,7 +1,6 @@
 package contracts
 
 import (
-	"io"
 	"strings"
 )
 
@@ -9,22 +8,14 @@ import (
 // Credentials are fixed projected files under PublisherDeploymentRoot; the
 // verifier key exists only in the process (ADR-203).
 const (
-	PublisherDeploymentFormat       = "asservat-publisher-deployment/v1"
-	PublisherDeploymentRoot         = "/run/asservat/publisher"
-	PublisherDeploymentFile         = "publisher.json"
-	PublisherDeploymentMaxBytes     = 64 << 10
-	PublisherCredentialManifestFile = "publisher-roles.json"
-	// PublisherKubernetesToken (observer) and PublisherProbeToken are the
-	// account's projected API tokens for the guard proof and catalog read.
-	PublisherKubernetesToken = "kube-observer.token"
-	PublisherProbeToken      = "kube-probe.token"
+	PublisherDeploymentFormat = "asservat-publisher-deployment/v1"
+	PublisherDeploymentRoot   = "/run/asservat/publisher"
 	// PublisherProviderTokenFile is the projected token with the publisher
 	// provider audience (ADR-203 decision 3).
 	PublisherProviderTokenFile = "provider-auth.token"
 	// PublisherEvidenceCredential and PublisherAuditCredential are the
 	// operator's storage principals (ADR-203 decision 5).
 	PublisherEvidenceCredential = "evidence-read.json"
-	PublisherAuditCredential    = "audit-storage.json"
 )
 
 const PublisherProviderAuthenticationFormat = "asservat-publisher-kubernetes-auth/v1"
@@ -36,11 +27,6 @@ func PublisherProviderAudience(string, string) string { return "asservat-publish
 // PublisherName is the publisher's Deployment and ServiceAccount name.
 func PublisherName(installationID string) string {
 	return "asservat-" + strings.ReplaceAll(installationID, "-", "") + "-publisher"
-}
-
-// PublisherRuntimeProjectionName is the publisher's SQL login projection.
-func PublisherRuntimeProjectionName(installationID string) string {
-	return PublisherName(installationID) + "-sql"
 }
 
 // PublisherVerifierRole is the worker PKI role that signs only
@@ -125,8 +111,4 @@ type PublisherArtifacts struct {
 	Endpoint string   `json:"endpoint"`
 	Roots    [][]byte `json:"roots"`
 	KeyID    string   `json:"keyID"`
-}
-
-func DecodePublisherDeployment(r io.Reader) (PublisherDeployment, error) {
-	return decodeClosedRPC[PublisherDeployment](r, PublisherDeploymentMaxBytes)
 }

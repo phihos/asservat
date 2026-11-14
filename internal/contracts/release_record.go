@@ -93,13 +93,6 @@ func ReleaseImageDigest(image string) ([32]byte, bool) {
 	return out, true
 }
 
-// NewReleaseRecord is revision 1: the original image and the binary schema the
-// installation was created with.
-func NewReleaseRecord(installationID, image string, schema int64) (ReleaseRecord, error) {
-	r := ReleaseRecord{Format: ReleaseRecordFormat, InstallationID: installationID, Revision: 1, Original: image, Image: image, Schema: schema, History: []ReleaseHistoryEntry{{Revision: 1, Image: image, Schema: schema}}}
-	return r, r.Validate()
-}
-
 func (w ReleaseWorkload) valid(revision int64, previous bool) bool {
 	if revision == 1 {
 		return w == ReleaseWorkload{}

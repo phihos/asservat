@@ -133,14 +133,8 @@ type InitialBootstrapCreate struct {
 	Receipt     *InitialPreparationReceipt `json:"receipt,omitempty"`
 }
 
-func DecodeInitialBootstrap(r io.Reader) (InitialBootstrap, error) {
-	return decodeClosedRPC[InitialBootstrap](r, InitialBootstrapMaxBytes)
-}
 func DecodeInitialBootstrapState(r io.Reader) (InitialBootstrapState, error) {
 	return decodeClosedRPC[InitialBootstrapState](r, InitialBootstrapStateMaxBytes)
-}
-func DecodeInitialBootstrapMaterial(r io.Reader) (InitialBootstrapMaterial, error) {
-	return decodeClosedRPC[InitialBootstrapMaterial](r, InitialProviderMaterialMaxBytes)
 }
 func (InitialBootstrapMaterial) String() string    { return "protected initial bootstrap material" }
 func (InitialBootstrapMaterial) GoString() string  { return "protected initial bootstrap material" }

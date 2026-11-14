@@ -141,12 +141,6 @@ func (ConfigurationRuntimeRoleMaterial) String() string {
 func (ConfigurationRuntimeRoleMaterial) GoString() string {
 	return "protected configuration role material"
 }
-func (ConfigurationRuntimeRoleSnapshot) String() string {
-	return "protected configuration role snapshot"
-}
-func (ConfigurationRuntimeRoleSnapshot) GoString() string {
-	return "protected configuration role snapshot"
-}
 
 const ConfigurationRuntimeCredentialManifestFormat = "asservat-configuration-runtime-credentials/v1"
 
@@ -161,8 +155,4 @@ type ConfigurationRuntimeCredentialProof struct {
 	Purpose string                        `json:"purpose"`
 	Claim   ConfigurationRuntimeRoleClaim `json:"claim"`
 	Receipt PublicRuntimeRoleReceipt      `json:"receipt"`
-}
-
-func DecodeConfigurationRuntimeCredentialManifest(r io.Reader) (ConfigurationRuntimeCredentialManifest, error) {
-	return decodeClosedRPC[ConfigurationRuntimeCredentialManifest](r, ConfigurationRuntimeRoleMaxBytes)
 }

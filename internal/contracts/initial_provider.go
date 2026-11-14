@@ -1,7 +1,6 @@
 package contracts
 
 import (
-	"io"
 	"time"
 )
 
@@ -34,9 +33,6 @@ type InitialProviderMaterial struct {
 	BundledIdentity *BundledInitialProviderIdentity `json:"bundledIdentity,omitempty"`
 }
 
-func DecodeInitialProviderMaterial(r io.Reader) (InitialProviderMaterial, error) {
-	return decodeClosedRPC[InitialProviderMaterial](r, InitialProviderMaterialMaxBytes)
-}
 func (InitialProviderMaterial) String() string   { return "protected initial provider material" }
 func (InitialProviderMaterial) GoString() string { return "protected initial provider material" }
 

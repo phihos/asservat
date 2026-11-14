@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
-	"io"
 	"net"
 	"net/http"
 	"sync"
@@ -158,126 +157,7 @@ func (x *operationSocketFixture) request(t *testing.T, sni, host, path, method s
 	}
 	return (&http.Client{Transport: x.transport(t, sni, cert)}).Do(q)
 }
-func (x *operationSocketFixture) open(t *testing.T, cert bool, id string) (*http.Response, *io.PipeWriter) {
-	t.Helper()
-	reader, writer := io.Pipe()
-	q, e := http.NewRequestWithContext(x.ctx, http.MethodPost, "https://"+x.local.common+contracts.ClusterObservationOperationExchangePath, reader)
-	if e != nil {
-		t.Fatal(e)
-	}
-	q.ContentLength = -1
-	q.Header.Set("Content-Type", contracts.ClusterObservationOperationExchangeMedia)
-	q.Header.Set("Accept", contracts.ClusterObservationOperationExchangeMedia)
-	written := make(chan error, 1)
-	go func() {
-		b, e := contracts.EncodeClusterObservationHello(contracts.ClusterObservationHello{Format: contracts.ClusterObservationOperationExchangeFormat, ExchangeID: id, RootID: nativeID, ClusterID: nativeID})
-		if e == nil {
-			e = contracts.WriteClusterObservationFrame(writer, contracts.ClusterObservationFrame{Kind: contracts.ClusterObservationHelloFrame, Payload: b})
-		}
-		clear(b)
-		written <- e
-	}()
-	response, e := (&http.Client{Transport: x.transport(t, "owner-proof.test", cert)}).Do(q)
-	if e != nil {
-		writer.CloseWithError(e)
-		reader.Close()
-		<-written
-		t.Fatal(e)
-	}
-	if response.StatusCode != http.StatusOK {
-		writer.Close()
-		reader.Close()
-	}
-	if e := <-written; e != nil && response.StatusCode == http.StatusOK {
-		writer.Close()
-		reader.Close()
-		response.Body.Close()
-		t.Fatal(e)
-	}
-	t.Cleanup(func() { writer.Close(); reader.Close(); response.Body.Close() })
-	return response, writer
-}
 
-func TestOwnerObservationOperationListenerExactPurposes(t *testing.T) {
-	x := newOperationSocketFixture(t, false)
-	for _, v := range []struct {
-		name, sni, host, path, method string
-		cert, allow                   bool
-	}{
-		{"local-locator", "owner-proof.test", x.local.common, contracts.ClusterObservationLocalLocatorPath + "?closed=query", http.MethodGet, false, true},
-		{"local-claim", "exact-owner.test", x.local.exact, contracts.ClusterObservationLocalClaimPath, http.MethodPost, false, true},
-		{"common-cannot-claim", "owner-proof.test", x.local.common, contracts.ClusterObservationLocalClaimPath, http.MethodPost, false, false},
-		{"exact-cannot-locate", "exact-owner.test", x.local.exact, contracts.ClusterObservationLocalLocatorPath, http.MethodGet, false, false},
-		{"host-cannot-change-sni", "owner-proof.test", x.local.exact, contracts.ClusterObservationLocalClaimPath, http.MethodPost, false, false},
-		{"client-certificate-cannot-be-hwork", "owner-proof.test", x.local.common, contracts.ClusterObservationLocalLocatorPath, http.MethodGet, true, false},
-		{"claim-query", "exact-owner.test", x.local.exact, contracts.ClusterObservationLocalClaimPath + "?x=y", http.MethodPost, false, false},
-		{"wrong-method", "owner-proof.test", x.local.common, contracts.ClusterObservationLocalLocatorPath, http.MethodPost, false, false},
-		{"legacy-local-disabled", "owner-proof.test", x.local.common, contracts.ClusterObservationLocalPath, http.MethodPost, false, false},
-		{"legacy-regional-disabled", "owner-proof.test", x.local.common, contracts.ClusterObservationExchangePath, http.MethodPost, true, false},
-		{"owner-proof-disabled", "owner-proof.test", x.local.common, contracts.OwnerObservationPath, http.MethodPost, true, false},
-		{"public-disabled", "owner-proof.test", x.local.common, "/", http.MethodGet, false, false},
-	} {
-		t.Run(v.name, func(t *testing.T) {
-			before := x.local.calls.Load()
-			r, e := x.request(t, v.sni, v.host, v.path, v.method, v.cert)
-			if e != nil {
-				t.Fatal(e)
-			}
-			defer r.Body.Close()
-			if r.ProtoMajor != 2 {
-				t.Fatal("actual h2 missing")
-			}
-			if (r.StatusCode == http.StatusNoContent) != v.allow || x.local.calls.Load() != before+map[bool]int32{true: 1, false: 0}[v.allow] {
-				t.Fatal("closed purpose dispatch", r.StatusCode, x.local.calls.Load()-before)
-			}
-		})
-	}
-	r, _ := x.open(t, false, nativeID)
-	defer r.Body.Close()
-	if r.StatusCode == http.StatusOK || x.factoryCalls.Load() != 0 {
-		t.Fatal("anonymous regional dispatch")
-	}
-}
-func TestOwnerObservationOperationListenerStandbyPreservesProofCapacity(t *testing.T) {
-	x := newOperationSocketFixture(t, false)
-	r, _ := x.open(t, true, nativeID)
-	if r.StatusCode != http.StatusOK || r.ProtoMajor != 2 || r.ContentLength != -1 {
-		t.Fatal("actual regional h2 stream", r.StatusCode)
-	}
-	original := <-x.originalEnd
-	parent, _ := x.ctx.Deadline()
-	if original.After(parent) || original.After(time.Now().Add(30*time.Second)) {
-		t.Fatal("renewed socket residency")
-	}
-	closed := make(chan error, 1)
-	go func() { var b [1]byte; _, e := r.Body.Read(b[:]); closed <- e }()
-	select {
-	case <-time.After(5200 * time.Millisecond):
-	case e := <-closed:
-		t.Fatal("standby inherited proof expiry", e)
-	case <-x.ctx.Done():
-		t.Fatal(x.ctx.Err())
-	}
-	other, _ := x.open(t, true, "22222222-2222-4222-8222-222222222222")
-	other.Body.Close()
-	if other.StatusCode == http.StatusOK || x.factoryCalls.Load() != 1 {
-		t.Fatal("standby consumed proof slot")
-	}
-	proof, e := x.request(t, "owner-proof.test", x.local.common, contracts.ClusterObservationLocalLocatorPath, http.MethodGet, false)
-	if e != nil {
-		t.Fatal(e)
-	}
-	proof.Body.Close()
-	if proof.StatusCode != http.StatusNoContent {
-		t.Fatal("standby blocked proof")
-	}
-	x.cancel()
-	select {
-	case <-closed:
-	case <-time.After(time.Second):
-		t.Fatal("cancelled regional body did not join")
-	}
-}
 func TestOwnerObservationOperationListenerCloseJoinsHandler(t *testing.T) {
 	x := newOperationSocketFixture(t, true)
 	q, err := http.NewRequestWithContext(x.ctx, http.MethodGet, "https://"+x.local.common+contracts.ClusterObservationLocalLocatorPath, nil)

@@ -38,11 +38,6 @@ func (c InitialActivationClaim) Current(now time.Time) bool {
 	return c.Valid() && !now.Before(c.NotBefore) && now.Before(c.NotAfter)
 }
 
-// SQL and wire roundtrips discard time-zone/monotonic representation, not instants.
-func (c InitialActivationClaim) Same(other InitialActivationClaim) bool {
-	return c.ID == other.ID && c.Database.DatabaseOID == other.Database.DatabaseOID && c.Database.SchemaVersion == other.Database.SchemaVersion && c.Database.StartedAt.Equal(other.Database.StartedAt) && c.FleetSource == other.FleetSource && c.PlanDigest == other.PlanDigest && c.NotBefore.Equal(other.NotBefore) && c.NotAfter.Equal(other.NotAfter)
-}
-
 // InstallationWitnessScope is private installation input. Missing/replaced
 // objects or accounts require recovery; consumers cannot enroll new identities.
 type InstallationWitnessScope struct {
