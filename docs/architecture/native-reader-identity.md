@@ -1,123 +1,30 @@
 # Identity during a native response
 
-Under [ADR-113](../decisions/113-large-native-response-accounting.md), the C-02
-live-reader factory belongs to one authenticated native-content HTTP
-request. It supplies fresh, separately owned short observations while the
-original connection, actor/client, browser session and transfer limits remain
-binding. It does not change `CurrentIdentity`, provide evidence permission,
-refresh credentials or implement a native byte relay. Production composition
-and large-file transfer qualification remain pending.
+C-02 contract for authenticating a native content GET under
+[ADR-311](../decisions/311-operation-authority-recheck.md) and
+[ADR-312](../decisions/312-started-downloads-run-to-original-bounds.md).
 
-`NewBrowserLiveReader` and `NewBearerLiveReader` take the original request
-context, installation-configured authentication services, private original
-credential, expected principal and server-resolved hard deadline. Ingress must
-already enforce its HTTPS/origin/resource/client rules. The hard deadline comes
-from the original download, grant and surrounding request; it is not a public
-duration override. Constructor authentication must pass before a reader is
-returned. A failed constructor cancels and joins its work.
+A content GET resolves `CurrentIdentity` once, before the response starts:
 
-The concrete `LiveReader` implements C-02's `ReaderIdentity`:
+- **Browser:** the session cookie is read with `allowRefresh=false`. GET never
+  refreshes, creates or replaces a session
+  ([ADR-224](../decisions/224-remove-download-refresh-owners.md)). If the
+  session is busy because another request is refreshing it, the GET waits
+  without output for at most two seconds and resolves once more.
+- **Bearer (MCP/OAuth client):** the presented access token is validated as for
+  any API request.
 
-```go
-type ReaderIdentity interface {
-    BeginBatch(context.Context) (IdentityBatch, error)
-    Close()
-}
-type IdentityBatch interface {
-    CurrentIdentity
-    Close()
-}
-```
+The authorization consumer (C-03) then authorizes the exact download with that
+identity's current groups and denies. A raw evidence download charges its raw
+grant pool for the selected range in the same start transaction.
 
-There is at most one owned batch, including initial authentication and cancelled
-observations that have not yet returned. `ErrReaderBusy` differs from the
-provider's `ErrSessionBusy`; neither causes an automatic retry. `BeginBatch`
-uses the existing request constructor with a fresh interval of at most five
-seconds. Batch cancellation remains linked to its caller and original HTTP
-owner even if a later consumer supplies `context.Background()`.
+The started response keeps that identity until its bound: the browser
+session's fixed expiry, or the bearer token's expiry or group-freshness bound,
+whichever applies, intersected with the session and access deadlines. It does
+not resolve identity again. Session revocation or logout reaches it as an event
+and closes the stream; bytes already in transport buffers cannot be recalled.
 
-Each batch keeps the existing exact principal/policy/group/scope checks and
-original nonrenewable interval. Successful shorter observations monotonically
-shorten the batch's tracked interval too; their expiry requires a fresh batch
-and is not mistaken for a new terminal identity denial. A new batch reads
-current groups and policy anew. The C-03 consumer must authorize the same immutable download with those
-current claims; the reader itself does not decide resource entitlement.
-Replacing groups between batches is not permission to merge old and new groups
-or ignore a deny. Old or closed batches cannot resolve identity again.
-
-Under [ADR-312](../decisions/312-started-downloads-run-to-original-bounds.md), a
-content response authenticates through its batches only until it starts. The
-started response opens no further batch (except to authenticate a raw window's
-grant-pool reservation) and is bounded by the reader's original hard end: the
-browser session's fixed expiry or the bearer token's expiry/group-freshness bound.
-
-`Close` cancels and joins active observations before releasing the batch slot.
-The content coordinator retains a batch through its current SQL lease and final
-bounded writes, then closes it before acquiring the next observation. Multiple
-sequential <=1 MiB writes may use that lease while every write checks its
-original deadline/cancellation/range. The reader knows no artifact sizes or
-accounting windows. On reader close, the private credential closure is released
-after joined work; this is not a claim of physical erasure from the Go heap.
-
-Browser resolution always passes `allowRefresh=false`. An independent ordinary
-CSRF-protected POST may rotate the encrypted credentials of the same session;
-the next batch then verifies its new token and groups. GET never refreshes,
-creates a session or adopts a new cookie. A trustworthy observation of a shorter
-session expiry permanently shortens the reader even if that batch later fails;
-a later longer value cannot undo it. SQL row revocation, current settings and
-token/group expiry remain checked by the existing browser resolver.
-
-If the final persisted read finds a strictly newer credential version for that
-same session, the resolver returns `ErrSessionBusy` instead of the old token's
-identity. The session ID, actor/client, provider session, creation and original
-authentication times, current settings revision and unextended expiry must agree;
-both observations retain their original deadlines. This also handles an old-token
-denial racing a committed refresh. Other identity contradictions, revocation,
-expired observations or replacement rows still deny. Neither branch refreshes
-credentials during the GET.
-
-Replacing a browser cookie does not itself tell an already-open GET that its
-original row was revoked. That GET stays tied to its original session and ends
-on its revocation, expiry, connection cancellation or other authority loss. No
-instantaneous cross-process logout notification is claimed; current short leases
-and already-emitted socket buffers retain their documented limits.
-
-For bearer clients, every batch revalidates the same original presented token.
-Fresh policy reads do not change its expiry or issued-at group freshness. A new
-token requires a new authenticated HTTP request and ordinary authorized range
-resume, retaining original download/grant bounds and retransmission accounting.
-No token strings, cookies, `ReaderIdentity` or `CurrentIdentity` are forwarded
-to acquisition workers. Their private transport receives independently checked
-admitted batch/lease identities, never an identity-shaped substitute credential.
-
-Known provider busy may be handled by the content coordinator as a finite,
-zero-output wait before another batch admission. This factory deliberately
-returns the original typed error and performs no refresh, retry, timer-driven
-authentication or authority fallback. A proven source denial/expired credential,
-principal substitution or identity contradiction within a still-live batch marks
-the original reader terminal and cancels it immediately. This does not wait from
-inside the counted observation; consumer cleanup calls Close to join. A later
-permissive source cannot revive that GET. Expiry of the short observation alone
-is distinct: it requires a new batch and full fresh authentication. Metadata
-request handlers continue to use their existing one-operation `CurrentIdentity` and cannot become renewable
-by importing this factory.
-
-Focused tests exercise continuation beyond five seconds, unchanged old-handle
-expiry, current group replacement, principal/client substitution, retained
-shortening from failed work, typed busy without provider refresh/retry,
-token/group-age expiry, owner cancellation with Background, and blocked-reader
-joining before slot release. The integrated Go/race, architecture, SQL and
-contract gates passed, as recorded in [implementation progress](../implementation-progress.md).
-The [real Keycloak/PostgreSQL/OpenBao run](../../test/results/native-reader-identity.log)
-also passed continuation beyond the first observation, separate explicit POST
-refresh and logout rejection. Its
-[terminal check](../../test/results/native-reader-identity-check.log) records
-exit 0, unchanged sources and complete cleanup. Synthetic unit sources are not
-production identity authority. Complete response/accounting/HTTP relay
-qualification remains separate; no public-runtime or large-file claim follows
-from this factory alone.
-
-The browser reader never refreshes the session. Under
-[ADR-224](../decisions/224-remove-download-refresh-owners.md) a long download whose
-console tab is closed or frozen stops when the session next needs refreshing;
-the console resumes it with Range after its own explicit refresh.
+A long download that outlives its session or token stops there; the client
+resumes with a new authenticated GET and `Range` within the original download
+deadlines. Tokens, cookies and `CurrentIdentity` are never forwarded to readers
+or connectors.
