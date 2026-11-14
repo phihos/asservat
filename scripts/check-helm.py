@@ -238,6 +238,10 @@ def check_examples(render, directory):
                      .replace("sha256:REPLACE_PRODUCT_MANIFEST_DIGEST", DIGEST).replace("REPLACE_PG_MANIFEST_DIGEST", "b" * 64))
     docs = render({}, files=(profile, small))
     assert {"asservat-postgres", "asservat-objectstore", "asservat-openbao"} <= {r["metadata"]["name"] for r in docs if r["kind"] == "StatefulSet"}
+    setup = [r for r in docs if r["kind"] == "Job" and r["metadata"]["name"].startswith("asservat-setup-")]
+    assert len(setup) == 1 and setup[0]["spec"]["ttlSecondsAfterFinished"] > 0
+    # The bundled store's IAM config comes from the generated s3-* Secrets.
+    assert "bundled SeaweedFS" in render({"secrets": {"s3-hub-audit": {"existingSecret": "x"}}}, ok=False, files=(profile, small))
 
 
 def check_collector(directory):
