@@ -110,8 +110,7 @@ fleet:
 # `<name>-join-<name>`, which the operator copies to that cluster.
 clusters: []
 # - name: payments-eu        # DNS label; names the join Secret
-#   clusterID: ""            # a lowercase UUID you choose (uuidgen); budget
-#                            # policies name it in scope.clusterID
+#   clusterID: ""            # a lowercase UUID you choose (uuidgen)
 #   namespace: ""            # its release namespace; default: this one
 #   standby: 2               # context-start standby connections
 #   captures: 1              # concurrent captures
@@ -125,10 +124,27 @@ remote:
   keyService: ""   # https://host:port -> <name>-key-service:9447
   objectStore: ""  # https://host:port -> the evidence object store
 
-# Initial capacity sources (the former bootstrap.continuation.public.capacity,
-# same field names). Set to enable capacity; poolSpec and policySpec render
-# the EvidenceStoragePool `pool` and EvidenceBudgetPolicy `policy`.
+# Evidence capacity (specs/capacity.md). It is on when any value is set;
+# every field is optional and changes apply on helm upgrade. Namespaces labelled asservat.io/evidence: disabled, system
+# namespaces and the release namespace take no part.
 capacity: {}
+#   evidenceStorage: 128Gi     # default: the bundled store's volume size;
+#                              # required for an external store
+#   storageAssurance: bestEffort   # or qualifiedReservedBackend
+#   capturesPerCluster: 8      # concurrent captures per cluster
+#   namespaceLimit: 25%        # default: no namespace cap
+#   workload:
+#     share: 16Gi              # protected per workload; default 1/8 of the rest
+#     limit: 10%               # protected share plus burst
+#     dump: {burst: 1, minimumIntervalSeconds: 900}
+#     maxConcurrentExpensive: 1
+#     onFull: RejectNewExpensive   # or DeleteOldestEligibleInAccount
+
+# Deployment/StatefulSet label and annotation keys only administrators may
+# set (ADR-247), for workloadMetadata PermissionSources.
+workloadKeys: {}
+#   labels: []
+#   annotations: []
 
 # The hub's baseline retention policy (the former
 # bootstrap.continuation.public.retentionBaseline: purposeRef, defaults,

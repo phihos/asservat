@@ -81,7 +81,7 @@ func OwnerWorkloadAdmission(p cfg.OwnerWorkloadAdministration) (*admission.Valid
 		if len(validation.IsDNS1123Subdomain(a.ServiceAccount)) != 0 {
 			return nil, nil, cfg.ErrInvalid
 		}
-		allowed = append(allowed, "(has(request.dryRun) && request.dryRun && request.operation == 'CREATE' && request.resource.group == 'asservat.io' && request.resource.version == 'v1alpha1' && request.resource.resource in ['evidencestoragepools', 'evidencebudgetpolicies', 'accessbindings', 'evidenceretentionpolicies'] && request.subResource == '' && request.userInfo.username == "+ownerCELString("system:serviceaccount:"+p.ControlNamespace.Name+":"+a.ServiceAccount)+" && request.userInfo.uid == "+ownerCELString(a.ServiceAccountUID)+")")
+		allowed = append(allowed, "(has(request.dryRun) && request.dryRun && request.operation == 'CREATE' && request.resource.group == 'asservat.io' && request.resource.version == 'v1alpha1' && request.resource.resource in ['accessbindings', 'evidenceretentionpolicies'] && request.subResource == '' && request.userInfo.username == "+ownerCELString("system:serviceaccount:"+p.ControlNamespace.Name+":"+a.ServiceAccount)+" && request.userInfo.uid == "+ownerCELString(a.ServiceAccountUID)+")")
 	}
 	if a := p.APIContextStarts; a != nil {
 		if len(validation.IsDNS1123Subdomain(a.CapacityAccount)) != 0 || len(validation.IsDNS1123Subdomain(a.ExecutionAccount)) != 0 {

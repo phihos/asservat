@@ -3,7 +3,7 @@
 {{- $w := index .Values.hub "hub-worker" }}
 {{- $bao := fromJson (include "asservat.openBao" .) }}
 {{- $root := "/run/asservat/hub-worker" }}
-{{- $capacity := not (empty .Values.capacity) }}
+{{- $capacity := include "asservat.capacity" . }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:

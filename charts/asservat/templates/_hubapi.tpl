@@ -81,9 +81,9 @@
 {{- $_ := set $c "concurrency" (int $h.concurrency) -}}
 {{- $obs := dict -}}
 {{- with $h.peers }}{{ $_ := set $obs "peers" . }}{{ end -}}
-{{- with .Values.capacity -}}
-{{- $lc := dict "keys" (sortAlpha (required "capacity.namespaceKeys is required" .namespaceKeys)) -}}
-{{- with .workloadKeys -}}
+{{- if include "asservat.capacity" . -}}
+{{- $lc := dict "keys" (list "asservat.io/evidence") -}}
+{{- with .Values.workloadKeys -}}
 {{- with .labels }}{{ $_ := set $lc "labelKeys" . }}{{ end -}}
 {{- with .annotations }}{{ $_ := set $lc "annotationKeys" . }}{{ end -}}
 {{- end -}}
@@ -98,7 +98,7 @@
 {{- range $key := list "standby" "captures" "previewSeconds" "operationConcurrency" "mcpPerIdentity" "downloadConcurrency" "downloadsPerIdentity" "downloadMaxSeconds" "operationAudit" "downloadPlan" -}}
 {{- $_ := set $pub $key (index $u $key) -}}
 {{- end -}}
-{{- if or $u.processing .Values.capacity }}{{ $_ := set $pub "processing" true }}{{ end -}}
+{{- if or $u.processing (include "asservat.capacity" .) }}{{ $_ := set $pub "processing" true }}{{ end -}}
 {{- with .Values.captureHistory }}{{ $_ := set $pub "captureHistory" . }}{{ end -}}
 {{- if eq .Values.exposure.tls.mode "proxy" }}{{ $_ := set $pub "proxyTLS" true }}{{ end -}}
 {{- if or .Values.fleet.issuer (include "asservat.hubApi.offer" .) -}}
@@ -109,8 +109,7 @@
 {{- if include "asservat.hubApi.offer" . -}}
 {{- $fed := include "asservat.fullname" (list . "federation") -}}
 {{- $connector := required "mode=combined and clusters require federation.connector (the regional offer's connector limits)" (dig "connector" nil (default dict .Values.federation)) -}}
-{{- $backup := required "mode=combined and clusters require capacity.backup (the regional offer's backup profile)" (dig "backup" nil (default dict .Values.capacity)) -}}
-{{- $offer := dict "federation" (printf "https://%s.%s.svc:9446" $fed .Release.Namespace) "serverName" (printf "%s.%s.svc" $fed .Release.Namespace) "image" (include "asservat.image" .) "connector" $connector "backup" $backup -}}
+{{- $offer := dict "federation" (printf "https://%s.%s.svc:9446" $fed .Release.Namespace) "serverName" (printf "%s.%s.svc" $fed .Release.Namespace) "image" (include "asservat.image" .) "connector" $connector -}}
 {{- if not (include "asservat.hubApi.combined" .) }}{{ $_ := set $offer "hubOnly" true }}{{ end -}}
 {{- if .Values.clusters -}}
 {{- $r := .Values.remote -}}

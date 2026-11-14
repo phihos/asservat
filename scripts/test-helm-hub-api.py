@@ -22,7 +22,6 @@ NS = "asservat-system"
 
 CONNECTOR = {"retainedSeconds": 4000, "purgeLeases": 2,
              "footprint": {"rowBytes": 1048576, "transitionWALBytes": 1048576}}
-BACKUP = {"horizonSeconds": 1, "cleanupBudgetSeconds": 60, "proofWindowSeconds": 60, "backupCopies": 1, "walCopies": 1}
 BUNDLED = {
     "mode": "combined",
     "image": {"repository": "registry.example/asservat", "digest": "sha256:" + "a" * 64},
@@ -30,7 +29,7 @@ BUNDLED = {
     "identity": {"eligibleGroups": ["00000000-0000-4000-8000-000000000001"], "processingOperators": [{"clientID": "asservat-console", "issuer": "https://login.example.org/realms/asservat", "kind": "User", "id": "0f03f92a-6920-47cd-85d5-26080d3571d5"}]},
     "exposure": {"tlsSecret": "asservat-public-tls"},
     "fleet": {"issuer": "https://id.example.test/realms/asservat", "clients": ["asservat-console"], "deliveryProfiles": ["regional-installer"]},
-    "capacity": {"namespaceKeys": ["asservat-trial"], "backup": BACKUP},
+    "capacity": {"workload": {"share": "1Gi"}},
     "federation": {"connector": CONNECTOR},
     "retention": {"purposeRef": "context-trial"},
     "region": {"enabled": True},
@@ -113,7 +112,7 @@ class HubAPI(unittest.TestCase):
         self.assertEqual(config["postgres"], {"host": f"asservat-postgres.{NS}.svc", "port": 5432, "database": "asservat"})
         self.assertEqual(config["objectStore"]["auditBucket"], "asservat-audit")
         self.assertEqual(config["native"], {"workerNamespaces": ["asservat-downloads"], "retentionTopologies": []})
-        self.assertEqual(config["observation"], {"localCapacity": {"keys": ["asservat-trial"]}})
+        self.assertEqual(config["observation"], {"localCapacity": {"keys": ["asservat.io/evidence"]}})
         public = config["public"]
         self.assertEqual((public["origin"], public["browserAudience"], public["fleet"]), ("https://asservat.example.test", "asservat-console", {"deliveryProfile": "regional-installer"}))
         self.assertTrue(public["processing"])

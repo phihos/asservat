@@ -99,7 +99,7 @@ func enrollmentFixture(n time.Time) (EnrollmentObservation, Enrollment) {
 	namespace.ObservedAt = n
 	namespace.FreshUntil = n.Add(4 * time.Second)
 	accepted := AcceptedCapacitySource{Format: CapacityAcceptedSourceFormat, RootID: key.RootID, InstallationID: o.Recovery.InstallationID, QualificationID: o.Recovery.InstallationID, Revision: 1, QualificationDigest: artifact.Digest{4}, ProtectionDigest: artifact.Digest{5}, Observation: sourceObservationFixture(source), ObservedAt: n, FreshUntil: source.FreshUntil}
-	selected, e := SelectBudget(source, namespace, []string{"team"}, n)
+	selected, e := SelectBudget(source, namespace, []string{EligibilityLabel}, n)
 	if e != nil {
 		panic("invalid synthetic capacity selection")
 	}
@@ -110,7 +110,7 @@ func enrollmentFixture(n time.Time) (EnrollmentObservation, Enrollment) {
 	o.Plan = plan
 	o.PlanDigest = plan.Digest()
 	o.SourceDigest = plan.value.SourceDigest
-	o.NamespaceLabels = map[string]string{"team": "one"}
+	o.NamespaceLabels = map[string]string{EligibilityLabel: "enabled"}
 	v := Enrollment{Format: CapacityEnrollmentFormat, Key: key, ID: "30000000-0000-4000-8000-000000000006", AttemptID: "30000000-0000-4000-8000-000000000007", AllocationID: "30000000-0000-4000-8000-000000000008", DownloadAllocationID: "30000000-0000-4000-8000-000000000009", SourceDigest: o.SourceDigest, PlanDigest: o.PlanDigest, Revision: 1, InitialObservedAt: n, InitialUntil: o.FreshUntil, ReservedAt: n, AccountVersion: "original", AccountDigest: artifact.Digest{4}}
 	return o, v
 }

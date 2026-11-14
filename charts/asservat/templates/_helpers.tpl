@@ -245,12 +245,10 @@ checksum/config: {{ $sum | sha256sum | quote }}
 {{/* Value checks shared by every template. */}}
 {{- define "asservat.validate" -}}
 {{- if not (has .Values.mode (list "hub" "cluster" "combined")) }}{{ fail "mode must be hub, cluster or combined" }}{{ end -}}
-{{- if and .Values.capacity .Values.federation -}}
-{{- with .Values.federation.connector -}}
-{{- $backup := $.Values.capacity.backup -}}
-{{- $minimum := add 1800 (mul 2 (int64 $backup.horizonSeconds)) (mul 3 (int64 $backup.cleanupBudgetSeconds)) (int64 $backup.proofWindowSeconds) 60 -}}
-{{- if lt (int64 .retainedSeconds) $minimum }}{{ fail "federation.connector.retainedSeconds must cover a 1800-second connector process run + 2*capacity.backup.horizonSeconds + 3*capacity.backup.cleanupBudgetSeconds + capacity.backup.proofWindowSeconds + 60" }}{{ end -}}
-{{- end -}}
+{{- with dig "connector" nil (default dict .Values.federation) -}}
+{{- /* A 1800-second process run, two backup horizons, three cleanup budgets,
+     the proof window and a minute (contracts.CapacityBackup). */ -}}
+{{- if lt (int64 .retainedSeconds) 2102 }}{{ fail "federation.connector.retainedSeconds must be at least 2102" }}{{ end -}}
 {{- end -}}
 {{- $s := .Values.services -}}
 {{- if and (eq .Values.mode "cluster") (or (eq $s.postgres.provider "bundled") (eq $s.identity.provider "keycloak") (eq $s.objectStore.provider "seaweedfs") (eq $s.keyService.provider "openbao")) }}{{ fail "bundled hub services require mode hub or combined" }}{{ end -}}
@@ -262,4 +260,22 @@ checksum/config: {{ $sum | sha256sum | quote }}
 {{/* True for a release that runs the hub (mode hub or combined). */}}
 {{- define "asservat.hub" -}}
 {{- if ne .Values.mode "cluster" }}true{{ end -}}
+{{- end -}}
+
+{{/* The resolved `capacity` values (contracts.CapacityValues), or empty when
+     capacity is off. It runs in the hub when any capacity value is set;
+     evidenceStorage defaults to the bundled store's volume size and is
+     required for an external store. */}}
+{{- define "asservat.capacity" -}}
+{{- if include "asservat.hub" . -}}
+{{- $c := deepCopy (default dict .Values.capacity) -}}
+{{- $bundled := eq (dig "objectStore" "provider" "external" (default dict .Values.services)) "seaweedfs" -}}
+{{- if $c -}}
+{{- if not $c.evidenceStorage -}}
+{{- if not $bundled }}{{ fail "capacity.evidenceStorage is required with an external object store" }}{{ end -}}
+{{- $_ := set $c "evidenceStorage" .Values.services.objectStore.seaweedfs.persistence.size -}}
+{{- end -}}
+{{- toJson $c -}}
+{{- end -}}
+{{- end -}}
 {{- end -}}

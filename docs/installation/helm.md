@@ -261,23 +261,23 @@ cluster. Runtime Pods log in with their projected ServiceAccount token.
 
 ## Capacity and retention
 
-Capacity and retention defaults work without values. Change them on any
-`helm upgrade`; they take effect at once.
+Capacity is on when any `capacity` value is set; every other value is
+derived. Change them on any `helm upgrade`; they take effect at once.
 
 | Value | Default | Meaning |
 | --- | --- | --- |
 | `capacity.evidenceStorage` | the bundled object store's volume size | Evidence storage Asservat may use; required for an external store |
-| `capacity.workloadShare` | `evidenceStorage` ÷ max(eligible workloads, 8) | Storage protected for each workload; a quantity or a share of `evidenceStorage` |
-| `capacity.workloadLimit` | `10%` | Most a single workload may use, protected share plus shared burst |
+| `capacity.workload.share` | `evidenceStorage` ÷ max(eligible workloads, 8) | Storage protected for each workload; a quantity or a share of `evidenceStorage` |
+| `capacity.workload.limit` | `10%` | Most a single workload may use, protected share plus shared burst |
 | `capacity.capturesPerCluster` | larger of 8 and the node count | Concurrent captures per cluster |
 | `retention.evidence`, `retention.cores` | `14d` | Default retention |
 | `retention.maximum` | the longest default | Administrator maximum; requests beyond it are refused. Shares last until their evidence's retention ends |
 
-The default budget policy covers every namespace except system namespaces,
-the release namespace and namespaces labelled `asservat.io/evidence: disabled`.
-Access still requires an AccessBinding. Lowering a limit below current use
-blocks new captures there; it never deletes evidence. For different storage
-or teams, add EvidenceStoragePool and EvidenceBudgetPolicy objects
+Capacity covers every namespace except system namespaces, the release
+namespace and namespaces labelled `asservat.io/evidence: disabled`. Access
+still requires an AccessBinding. Lowering a limit below current use blocks new
+captures there; it never deletes evidence. The full set of values is
+[capacity.schema.json](../../specs/contracts/capacity.schema.json)
 ([capacity isolation](../../specs/capacity.md)).
 
 ## Upgrade and roll back

@@ -102,7 +102,7 @@ func buildHubAPIRegionalOffer(ctx context.Context, files *os.Root, h contracts.H
 		}
 		names[i] = name
 	}
-	backing, err := buildConnectorBacking(o.Connector, o.Backup, ids.PermissionRootID, ids.InstallationID, capacityAccountVersion(ids), ids.RoleSetupID, now)
+	backing, err := buildConnectorBacking(o.Connector, contracts.CapacityBackup(), ids.PermissionRootID, ids.InstallationID, capacityAccountVersion(ids), ids.RoleSetupID, now)
 	if err != nil {
 		return nil, hubAPIInputError("regional-offer-backing")
 	}

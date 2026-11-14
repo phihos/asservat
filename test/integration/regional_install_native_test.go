@@ -14,7 +14,6 @@ import (
 	"testing"
 	"time"
 
-	wire "asservat.local/asservat/api/v1alpha1"
 	"asservat.local/asservat/internal/adapters/kms"
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
@@ -447,18 +446,17 @@ func nodeInternalIP(t *testing.T, ctx context.Context, api kubernetes.Interface,
 	return ""
 }
 
-// regionalBudget is the operator's capacity configuration for one workload
-// cluster on the hub: its budget policy with a slot in the existing pool, and
-// the workload's maintainer AccessBinding. Cluster index n uses its own names.
+// regionalBudget is the workload's maintainer AccessBinding for one workload
+// cluster (capacity derives from the hub's values). Cluster index n uses its own names.
 type regionalBudget struct {
-	t                       *testing.T
-	ctx                     context.Context
-	client                  rest.Interface
-	base, issuer, cluster   string
-	subjectKind, subjectID  string
-	policyName, bindingName string
-	index                   int
-	binding                 map[string]any
+	t                      *testing.T
+	ctx                    context.Context
+	client                 rest.Interface
+	base, issuer, cluster  string
+	subjectKind, subjectID string
+	bindingName            string
+	index                  int
+	binding                map[string]any
 }
 
 func newRegionalBudget(t *testing.T, ctx context.Context, hub kubernetes.Interface, namespace, issuer, cluster string, index int) *regionalBudget {
@@ -467,18 +465,8 @@ func newRegionalBudget(t *testing.T, ctx context.Context, hub kubernetes.Interfa
 		suffix = "-" + strconv.Itoa(index)
 	}
 	b := &regionalBudget{t: t, ctx: ctx, client: hub.CoreV1().RESTClient(), base: "/apis/asservat.io/v1alpha1/namespaces/" + namespace + "/", issuer: issuer, cluster: cluster,
-		policyName: "regional" + suffix, bindingName: "regional-maintainers" + suffix, index: index}
-	if os.Getenv("ASSERVAT_HELM_CONTEXT_NATIVE") == "1" || os.Getenv("ASSERVAT_HELM_BUNDLED_IDENTITY") == "1" {
-		if index != 1 {
-			t.Fatal("the declared context trial covers one regional cluster")
-		}
-		b.policyName = "trial-region"
-	}
+		bindingName: "regional-maintainers" + suffix, index: index}
 	return b
-}
-
-func (b *regionalBudget) amount(bytes, objects int64) map[string]int64 {
-	return map[string]int64{"bytes": bytes, "objects": objects}
 }
 
 // installedRegionalContextReserve is the workload's context reserve: each
@@ -515,90 +503,6 @@ func installedFocusContextReserve() (bytes, objects int64) {
 		objects = 4 * (4 + 1 + int64(stream.PartLimit()) + 4)
 	}
 	return bytes, objects
-}
-
-func (b *regionalBudget) addPolicy() {
-	b.t.Helper()
-	if os.Getenv("ASSERVAT_HELM_CONTEXT_NATIVE") == "1" || os.Getenv("ASSERVAT_HELM_BUNDLED_IDENTITY") == "1" {
-		b.addDeclaredPolicy()
-		return
-	}
-	// The operator's regional budget: a policy for the joined cluster and its
-	// slot in the existing pool, with the pool's capacity raised to fit.
-	// Ongoing sources, re-arms, Saves and incident snapshots share the default
-	// eight-record/32-object reserve. Manual profiles explicitly fund their
-	// four-capture journey and history before any admission takes place.
-	reserveBytes, reserveObjects := installedRegionalContextReserve()
-	policy := map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "EvidenceBudgetPolicy", "metadata": map[string]any{"name": b.policyName}, "spec": map[string]any{
-		"poolRef": "capacity", "scope": map[string]any{"clusterID": b.cluster, "namespaceSelector": map[string]any{"matchLabels": map[string]string{"team": "regional"}}},
-		"namespaceEnvelope": map[string]int64{"maxWorkloadAccounts": 1, "maxStoredBytes": 2147483648, "maxObjects": 2000},
-		// records = min(bytes/1544192, objects/4, 512): normally 8, manual
-		// profile 12. Both fit their configured root's qualified record ceiling;
-		// enrollment refuses any reserve above that ceiling.
-		"workload": map[string]any{"protected": b.amount(1073741824, 1000), "hardLimit": b.amount(2147483648, 2000), "contextReserve": b.amount(reserveBytes, reserveObjects),
-			"dump":                   map[string]int64{"burst": 1, "minimumIntervalSeconds": 900, "maxStartsPerRollingHour": 2, "maxInputBytesPerRollingHour": 4294967296},
-			"maxConcurrentExpensive": 1, "maxQueuedExpensive": 1, "maxQueueAgeSeconds": 30, "upload": map[string]int64{"bytesPerSecond": 33554432, "burstBytes": 4194304}, "maxUploadRequestsPerSecond": 20, "maxSpoolBytes": 2147483648, "onFull": "RejectNewExpensive"},
-		"node": map[string]any{"maxConcurrentExpensive": 2, "maxQueuedExpensive": 10, "upload": map[string]int64{"bytesPerSecond": 67108864, "burstBytes": 8388608}, "maxSpoolBytes": 4294967296, "impactProfileRef": "standard-node", "unhealthySamples": 3, "sampleIntervalSeconds": 5, "recoveryHealthySeconds": 60}}}
-	body, _ := json.Marshal(policy)
-	if err := b.client.Post().AbsPath(b.base + "evidencebudgetpolicies").Body(body).Do(b.ctx).Error(); err != nil {
-		b.t.Fatal("operator regional budget policy", err)
-	}
-	raw, err := b.client.Get().AbsPath(b.base + "evidencestoragepools/capacity").DoRaw(b.ctx)
-	if err != nil {
-		b.t.Fatal(err)
-	}
-	var pool map[string]any
-	if json.Unmarshal(raw, &pool) != nil {
-		b.t.Fatal("pool")
-	}
-	spec := pool["spec"].(map[string]any)
-	spec["capacity"] = b.amount(137438953472+int64(b.index)*1073741824, installedPoolCapacityObjects()+int64(b.index)*1000)
-	spec["protectedAllocations"] = append(spec["protectedAllocations"].([]any), map[string]any{"budgetPolicyRef": b.policyName, "workloadSlots": 1, "protectedPerWorkload": b.amount(1073741824, 1000)})
-	body, _ = json.Marshal(pool)
-	if err = b.client.Put().AbsPath(b.base + "evidencestoragepools/capacity").Body(body).Do(b.ctx).Error(); err != nil {
-		b.t.Fatal("operator pool extension", err)
-	}
-}
-
-// The guide's operator step derives a regional policy from the original public
-// policy and spends one pre-reserved pool slot. It never raises backend/pool
-// capacity to make the test fit or changes the root's accepted record ceiling.
-func (b *regionalBudget) addDeclaredPolicy() {
-	b.t.Helper()
-	profile := helmContextTrialProfile(b.t).Public.Capacity
-	spec := *profile.PolicySpec
-	spec.Scope.ClusterID = b.cluster
-	spec.NamespaceEnvelope = wire.CapacityNamespaceEnvelope{MaxWorkloadAccounts: 1, MaxStoredBytes: spec.Workload.HardLimit.Bytes, MaxObjects: spec.Workload.HardLimit.Objects}
-	policy := map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "EvidenceBudgetPolicy", "metadata": map[string]any{"name": b.policyName}, "spec": spec}
-	body, err := json.Marshal(policy)
-	if err != nil {
-		b.t.Fatal("declared regional policy", err)
-	}
-	if err = b.client.Post().AbsPath(b.base + "evidencebudgetpolicies").Body(body).Do(b.ctx).Error(); err != nil {
-		b.t.Fatal("operator declared regional policy", err)
-	}
-	path := b.base + "evidencestoragepools/" + profile.Pool
-	raw, err := b.client.Get().AbsPath(path).DoRaw(b.ctx)
-	var pool map[string]any
-	if err != nil || json.Unmarshal(raw, &pool) != nil {
-		b.t.Fatal("operator declared pool read", err)
-	}
-	poolSpec, ok := pool["spec"].(map[string]any)
-	if !ok {
-		b.t.Fatal("operator declared pool spec")
-	}
-	allocations, ok := poolSpec["protectedAllocations"].([]any)
-	if !ok {
-		b.t.Fatal("operator declared pool allocations")
-	}
-	poolSpec["protectedAllocations"] = append(allocations, wire.CapacityProtectedAllocation{BudgetPolicyRef: b.policyName, WorkloadSlots: 1, ProtectedPerWorkload: spec.Workload.Protected})
-	body, err = json.Marshal(pool)
-	if err != nil {
-		b.t.Fatal("operator declared pool update", err)
-	}
-	if err = b.client.Put().AbsPath(path).Body(body).Do(b.ctx).Error(); err != nil {
-		b.t.Fatal("operator declared pool slot", err)
-	}
 }
 
 // installedRegionalBindingRoles are the maintainer binding's roles. Share,
@@ -674,13 +578,6 @@ func createRegionalWorkload(t *testing.T, ctx context.Context, region kubernetes
 	// The regional workload: a labeled namespace (the selector guard admits
 	// the administrator) and a Deployment with no replicas.
 	labels := map[string]string{"team": "regional"}
-	if os.Getenv("ASSERVAT_HELM_CONTEXT_NATIVE") == "1" || os.Getenv("ASSERVAT_HELM_BUNDLED_IDENTITY") == "1" {
-		selector := helmContextTrialProfile(t).Public.Capacity.PolicySpec.Scope.NamespaceSelector
-		if len(selector.MatchLabels) == 0 {
-			t.Fatal("context trial requires its exact declared namespace labels")
-		}
-		labels = selector.MatchLabels
-	}
 	if installedRecordingFocus() || installedLogsFocus() || os.Getenv("ASSERVAT_HELM_BUNDLED_IDENTITY") == "1" {
 		labels["pod-security.kubernetes.io/enforce"] = "restricted"
 	}

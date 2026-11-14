@@ -18,7 +18,6 @@ func TestInstalledWorkerCapacityReadProbeGraphIsClosed(t *testing.T) {
 	}
 	prefix := "asservat-" + strings.ReplaceAll(installation, "-", "")
 	want := []rbac.PolicyRule{
-		{APIGroups: []string{"asservat.io"}, Resources: []string{"evidencestoragepools", "evidencebudgetpolicies"}, Verbs: []string{"get", "list", "create"}},
 		{APIGroups: []string{""}, Resources: []string{"configmaps"}, ResourceNames: []string{prefix + "-processing-source"}, Verbs: []string{"get", "update"}},
 	}
 	guards := []rbac.PolicyRule{{APIGroups: []string{"admissionregistration.k8s.io"}, Resources: []string{"validatingadmissionpolicies", "validatingadmissionpolicybindings"}, ResourceNames: []string{prefix + "-capacity-guard", prefix + "-processing-guard"}, Verbs: []string{"get"}}}
