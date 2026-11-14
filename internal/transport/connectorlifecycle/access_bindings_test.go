@@ -17,19 +17,21 @@ import (
 
 type deliveryServices struct {
 	scriptedServices
-	cluster string
-	items   int
+	cluster   string
+	items     int
+	stored    string
+	unchanged bool
 }
 
 func (s *deliveryServices) AccessBindings(ctx context.Context, region *Region) error {
-	d, err := region.ReadAccessBindings(ctx)
+	d, unchanged, err := region.ReadAccessBindings(ctx, s.stored)
 	if err != nil {
 		return err
 	}
-	if _, err = region.ReadAccessBindings(ctx); err == nil {
+	if _, _, err = region.ReadAccessBindings(ctx, s.stored); err == nil {
 		return ErrChannel // one delivery per conversation
 	}
-	s.cluster, s.items = region.Presented().Profile.ClusterID, len(d.Items)
+	s.cluster, s.items, s.unchanged = region.Presented().Profile.ClusterID, len(d.Items), unchanged
 	return nil
 }
 
@@ -79,6 +81,16 @@ func TestAccessBindingDeliveryOverRealHTTP2(t *testing.T) {
 	if err != nil || result.Kind != "result" || services.items != 1000 || services.cluster != process.Binding.ClusterID {
 		t.Fatal("delivery", result.Kind, err, services.items, services.cluster)
 	}
+	// With the hub's stored digest equal to the connector's, nothing is sent.
+	services.stored, services.items = delivery.Digest(), 0
+	if result, err = client.Run(context.Background(), open, deliveringReader{delivery: delivery}); err != nil || result.Kind != "result" || !services.unchanged || services.items != 0 {
+		t.Fatal("unchanged delivery", result.Kind, err, services.unchanged, services.items)
+	}
+	services.stored = "0000"
+	if result, err = client.Run(context.Background(), open, deliveringReader{delivery: delivery}); err != nil || services.unchanged || services.items != 1000 {
+		t.Fatal("changed delivery", err, services.unchanged, services.items)
+	}
+	services.stored = ""
 	// A connector without the reader answers with an error.
 	services.items = 0
 	if _, err = client.Run(context.Background(), open, localReader{}); err == nil || services.items != 0 {

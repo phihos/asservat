@@ -41,6 +41,22 @@ func (q *Queries) ListRemoteAccessBindingDigests(ctx context.Context, rootID pgt
 	return items, nil
 }
 
+const readRemoteAccessBindingDigest = `-- name: ReadRemoteAccessBindingDigest :one
+SELECT digest FROM remote_access_binding_delivery WHERE root_id=$1 AND cluster_id=$2
+`
+
+type ReadRemoteAccessBindingDigestParams struct {
+	RootID    pgtype.UUID
+	ClusterID pgtype.UUID
+}
+
+func (q *Queries) ReadRemoteAccessBindingDigest(ctx context.Context, arg ReadRemoteAccessBindingDigestParams) ([]byte, error) {
+	row := q.db.QueryRow(ctx, readRemoteAccessBindingDigest, arg.RootID, arg.ClusterID)
+	var digest []byte
+	err := row.Scan(&digest)
+	return digest, err
+}
+
 const readRemoteAccessBindings = `-- name: ReadRemoteAccessBindings :one
 SELECT observed_at,digest,bindings FROM remote_access_binding_delivery WHERE root_id=$1 AND cluster_id=$2
 `

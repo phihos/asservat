@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"k8s.io/client-go/rest"
 	"net/http"
 	"os"
 	"sync"
@@ -35,10 +36,11 @@ type Regional struct {
 	// nil in mode=combined, where the hub-worker observes the hub cluster.
 	bindings  AccessBindingReader
 	lifecycle *RegionalLifecycle
-	// capacity delivers this cluster's capacity observation under the join
-	// offer's capacityKeys (ADR-330); nil without them.
-	capacity     CapacityReader
+	// capacityKeys select this cluster's delivered capacity observation
+	// (ADR-330); empty without them. watchConfig is the connector's API
+	// configuration for the delivery watches.
 	capacityKeys []string
+	watchConfig  *rest.Config
 	closers      []func()
 	// API round trips of the shared observer client, for the executor's stop
 	// line (ADR-196): counts and transport time only.
@@ -92,13 +94,6 @@ const (
 	regionalRetry     = 5 * time.Second
 	regionalReconcile = time.Minute
 	regionalRotation  = time.Minute
-	// regionalBindingDelivery spaces AccessBinding deliveries: three per
-	// 30-second ADR-311 window, so one lost delivery keeps allows current.
-	regionalBindingDelivery = 10 * time.Second
-	// regionalCapacityDelivery spaces capacity deliveries: an observation is
-	// current for five seconds from the hub's admission (ADR-330), so two
-	// seconds leave the reconciler at least three.
-	regionalCapacityDelivery = 2 * time.Second
 )
 
 func RunRegional(ctx context.Context, podUID string) error {
@@ -287,9 +282,9 @@ func NewRegional(ctx context.Context, files *os.Root, podUID string) (r *Regiona
 	lifecycle := &RegionalLifecycle{Client: channel, Local: regionalLocal{native, source}, Credential: r.rotator, Now: time.Now, Timing: r.lifecycleTiming()}
 	r.bootstrap = regionalBootstrap{store: secret, seed: secret, record: regionalBootstrapRecord{in}, channel: channel, local: regionalLocal{native, source}, binding: c.binding, root: c.rootID(), now: time.Now}
 	if raw.Mode == contracts.ConnectorModeCluster {
-		r.bindings, r.lifecycle = observer, lifecycle
+		r.bindings, r.lifecycle, r.watchConfig = observer, lifecycle, in.kubernetes(contracts.ConnectorKubeTokenFile)
 		if c.executor && len(c.offer.CapacityKeys) != 0 {
-			r.capacity, r.capacityKeys = observer, c.offer.CapacityKeys
+			r.capacityKeys = c.offer.CapacityKeys
 		}
 	}
 	r.credentials, err = mtls.NewConnectorProcessCredentials(ctx, current.Source.Observation.Profile, podUID, lifecycle, lifecycle, source, lifecycle, time.Now)
@@ -374,18 +369,12 @@ func (r *Regional) Run(ctx context.Context) error {
 			r.nodes = nil
 		}
 	}()
-	// ADR-329: deliveries run beside the supervision loop once enrolled.
-	var delivering atomic.Bool
-	if r.bindings != nil {
-		wait := goJoined(func() { r.deliverBindings(contextCtx, &delivering) })
-		defer func() { stopContext(); wait() }()
-	}
-	if r.capacity != nil {
-		wait := goJoined(func() {
-			r.deliver(contextCtx, &delivering, regionalCapacityDelivery, "capacity", func(ctx context.Context) error {
-				return r.lifecycle.DeliverCapacity(ctx, r.capacity, r.capacityKeys)
-			})
-		})
+	// ADR-329/330: watch-driven deliveries beside the supervision loop,
+	// starting once enrolled.
+	enrolledDeliveries := make(chan struct{})
+	var enrolledOnce sync.Once
+	if r.bindings != nil || len(r.capacityKeys) != 0 {
+		wait := goJoined(func() { r.runDeliveries(contextCtx, enrolledDeliveries) })
 		defer func() { stopContext(); wait() }()
 	}
 	var attemptAt time.Time
@@ -445,7 +434,7 @@ func (r *Regional) Run(ctx context.Context) error {
 			err := r.credentials.Reconcile(ctx)
 			if err == nil && !enrolled {
 				enrolled = true
-				delivering.Store(true)
+				enrolledOnce.Do(func() { close(enrolledDeliveries) })
 				fmt.Fprintln(os.Stderr, "connector process credentials active")
 			}
 			// One closed cause per change, never inputs or remote text.
@@ -464,38 +453,6 @@ func (r *Regional) Run(ctx context.Context) error {
 			if err := r.rotator.Reconcile(ctx); errors.Is(err, value.ErrClusterCredentialFenced) {
 				return err
 			}
-		}
-	}
-}
-
-// deliverBindings sends this cluster's AccessBindings to the hub every
-// regionalBindingDelivery while enrolled (ADR-329) and logs each change of
-// outcome. A failed delivery is retried at the next interval.
-func (r *Regional) deliverBindings(ctx context.Context, enrolled *atomic.Bool) {
-	r.deliver(ctx, enrolled, regionalBindingDelivery, "access binding", func(ctx context.Context) error {
-		return r.lifecycle.DeliverAccessBindings(ctx, r.bindings)
-	})
-}
-
-// deliver runs one delivery every interval while enrolled and logs each
-// change of outcome. A failed delivery is retried at the next interval.
-func (r *Regional) deliver(ctx context.Context, enrolled *atomic.Bool, interval time.Duration, name string, send func(context.Context) error) {
-	last := "ok"
-	tick := time.NewTicker(interval)
-	defer tick.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-tick.C:
-		}
-		if !enrolled.Load() {
-			continue
-		}
-		err := send(ctx)
-		if cause := regionalOutcome(err); cause != last && ctx.Err() == nil {
-			last = cause
-			fmt.Fprintln(os.Stderr, "connector "+name+" delivery: "+cause)
 		}
 	}
 }

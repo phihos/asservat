@@ -8,13 +8,11 @@ import (
 	"time"
 
 	value "asservat.local/asservat/internal/domain/configuration"
-	"asservat.local/asservat/internal/domain/identity"
 )
 
 // refreshRemoteBindings rereads the joined clusters' AccessBinding
 // deliveries (ADR-329) within three seconds. A failed read, the hub
-// cluster's own row and an invalid delivery keep the previous state, whose
-// allows lapse with its ADR-311 window.
+// cluster's own row and an invalid delivery keep the previous state.
 func (s *bindingRun) refreshRemoteBindings(ctx context.Context) {
 	if s.r.RemoteBindings == nil {
 		return
@@ -43,19 +41,18 @@ func (s *bindingRun) refreshRemoteBindings(ctx context.Context) {
 }
 
 // remoteBindingBases adds the joined clusters' AccessBindings to the batch
-// exactly like the hub cluster's (ADR-329), in cluster order. A delivery's
-// allows grant only within its ADR-311 window from ObservedAt; its denies
-// stay until a later delivery removes them, so a connector outage never
-// lifts a deny. A cluster whose bases do not fit the stream's remaining
+// exactly like the hub cluster's (ADR-329), in cluster order. The last
+// delivery stays in effect until a newer one replaces it: connector liveness
+// is a health signal, not authority, and new remote actions need the
+// connector anyway. A cluster whose bases do not fit the stream's remaining
 // budget contributes nothing. Continuity is never claimed across deliveries.
 func (s *bindingRun) remoteBindingBases(now time.Time, out *inheritanceState, bases, rows *int) {
 	for _, cluster := range slices.Sorted(maps.Keys(s.remoteBindings)) {
 		d := s.remoteBindings[cluster]
-		fresh := identity.Check(d.ObservedAt, identity.Recheck).Valid(now)
 		var add []value.PermissionBasis
 		added := 0
 		for _, b := range d.Bindings {
-			if b.Invalid || (b.Resource.Deleting && b.Effect == "Allow") || (!b.NotAfter.IsZero() && !now.Before(b.NotAfter)) || b.Effect != "Deny" && !fresh {
+			if b.Invalid || (b.Resource.Deleting && b.Effect == "Allow") || (!b.NotAfter.IsZero() && !now.Before(b.NotAfter)) {
 				continue
 			}
 			p := value.PermissionBasis{Resource: b.Resource, Scope: b.Scope, Effect: b.Effect, Subjects: slices.Clone(b.Subjects), Roles: slices.Clone(b.Roles), NotAfter: b.NotAfter, Automation: b.Automation}

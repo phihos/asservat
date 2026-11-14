@@ -304,7 +304,7 @@ func (w *hubWorker) runCapacityOnce(ctx context.Context) (err error) {
 		return err
 	}
 	closers = append(closers, accounts.Close)
-	reconciler, err := w.capacityReconciler(startup, q, pools, observer, accounts, digest)
+	reconciler, err := w.capacityReconciler(startup, ctx, q, pools, observer, accounts, digest)
 	if err != nil {
 		return err
 	}
@@ -315,7 +315,8 @@ func (w *hubWorker) runCapacityOnce(ctx context.Context) (err error) {
 	return reconciler.Run(ctx)
 }
 
-func (w *hubWorker) capacityReconciler(ctx context.Context, q app.CapacityQualification, pools map[string]*pgxpool.Pool, observer *kube.PermissionClient, accounts *auditapp.CaptureAccounts, digest artifact.Digest) (*app.CapacityReconciler, error) {
+// run bounds background readers (the joined clusters' observation watch).
+func (w *hubWorker) capacityReconciler(ctx, run context.Context, q app.CapacityQualification, pools map[string]*pgxpool.Pool, observer *kube.PermissionClient, accounts *auditapp.CaptureAccounts, digest artifact.Digest) (*app.CapacityReconciler, error) {
 	c := w.config.Capacity
 	root, installation, cluster := w.ids.PermissionRootID, w.ids.InstallationID, w.ids.ClusterID
 	source, err := kube.NewCapacitySource(observer)
@@ -337,6 +338,11 @@ func (w *hubWorker) capacityReconciler(ctx context.Context, q app.CapacityQualif
 	regionalStore, err := postgres.NewRemoteCapacity(pools["capacity"], root)
 	if err != nil {
 		return nil, err
+	}
+	if len(c.RemoteClusters) != 0 {
+		// The delivered observations stay in memory, reloaded on the table's
+		// change notification (ADR-330); the reconciler's reads never poll SQL.
+		go regionalStore.Watch(run, eventLog(os.Stderr, "capacity remote observations"))
 	}
 	clusters := make([]app.CapacityClusterReaders, 0, len(q.NamespaceGuards))
 	for _, pin := range q.NamespaceGuards {

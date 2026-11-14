@@ -12,3 +12,6 @@ SELECT cluster_id,observed_at,digest FROM remote_access_binding_delivery WHERE r
 
 -- name: ReadRemoteAccessBindings :one
 SELECT observed_at,digest,bindings FROM remote_access_binding_delivery WHERE root_id=$1 AND cluster_id=$2;
+
+-- name: ReadRemoteAccessBindingDigest :one
+SELECT digest FROM remote_access_binding_delivery WHERE root_id=$1 AND cluster_id=$2;

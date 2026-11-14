@@ -5,6 +5,7 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -127,10 +128,28 @@ func qualifyRemoteAccessBindings(t *testing.T, ctx context.Context, pool *pgxpoo
 	binding := cfg.Binding{Resource: cfg.Resource{ClusterID: profile.ClusterID, Namespace: ns.Name, NamespaceUID: ns.UID, Kind: "AccessBinding", Name: "readers", UID: "b-1", ResourceVersion: "3", Generation: 1, SpecDigest: artifact.Digest{1}},
 		Scope: cfg.Scope{ClusterID: profile.ClusterID, Namespace: ns}, Effect: "Allow", Subjects: []cfg.Subject{{Kind: "Group", Issuer: "https://id.example.test", ID: "team-a"}}, Roles: []string{"evidence-reader"}}
 	now := time.Now().UTC().Truncate(time.Microsecond)
-	if err = store.StoreRemoteBindings(ctx, cfg.RemoteBindings{ClusterID: profile.ClusterID, ObservedAt: now, Bindings: []cfg.Binding{binding}}); err != nil {
+	// ADR-329 (revised): the table's trigger notifies the hub-worker.
+	listening, stop := context.WithCancel(ctx)
+	defer stop()
+	changes := postgres.Listen(listening, pool, postgres.RemoteBindingsChannel)
+	select {
+	case <-changes: // the established connection signals once
+	case <-time.After(10 * time.Second):
+		t.Fatal("notification connection not established")
+	}
+	first, second := strings.Repeat("1", 64), strings.Repeat("2", 64)
+	if err = store.StoreRemoteBindings(ctx, cfg.RemoteBindings{ClusterID: profile.ClusterID, ObservedAt: now, Bindings: []cfg.Binding{binding}}, first); err != nil {
 		t.Fatal("store delivery", err)
 	}
-	if err = store.StoreRemoteBindings(ctx, cfg.RemoteBindings{ClusterID: profile.ClusterID, ObservedAt: now.Add(-time.Second)}); err != nil {
+	select {
+	case <-changes:
+	case <-time.After(10 * time.Second):
+		t.Fatal("stored delivery not notified")
+	}
+	if d, err := store.RemoteBindingsDigest(ctx, profile.ClusterID); err != nil || d != first {
+		t.Fatal("stored digest", d, err)
+	}
+	if err = store.StoreRemoteBindings(ctx, cfg.RemoteBindings{ClusterID: profile.ClusterID, ObservedAt: now.Add(-time.Second)}, second); err != nil {
 		t.Fatal("store older delivery", err)
 	}
 	got, err := store.RemoteBindings(ctx)
@@ -138,7 +157,7 @@ func qualifyRemoteAccessBindings(t *testing.T, ctx context.Context, pool *pgxpoo
 		t.Fatal("read delivery", got, err)
 	}
 	later := now.Add(time.Second)
-	if err = store.StoreRemoteBindings(ctx, cfg.RemoteBindings{ClusterID: profile.ClusterID, ObservedAt: later}); err != nil {
+	if err = store.StoreRemoteBindings(ctx, cfg.RemoteBindings{ClusterID: profile.ClusterID, ObservedAt: later}, second); err != nil {
 		t.Fatal("store newer delivery", err)
 	}
 	if got, err = store.RemoteBindings(ctx); err != nil || len(got) != 1 || !got[0].ObservedAt.Equal(later) || len(got[0].Bindings) != 0 {

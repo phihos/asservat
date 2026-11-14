@@ -228,8 +228,13 @@ func (w *hubWorker) openPermission(ctx context.Context) (_ *permissionWorker, er
 	if err != nil {
 		return nil, &fixedStepError{"permission/remote-bindings", err}
 	}
+	// A changed delivery is signalled by the table's trigger (LISTEN/NOTIFY);
+	// nothing polls it.
+	listening, stopListening := context.WithCancel(ctx)
+	p.closers = append(p.closers, stopListening)
+	changes := postgres.Listen(listening, pools["permission-accept"], postgres.RemoteBindingsChannel)
 	p.reconciler = app.BindingReconciler{RootID: root, Reader: observer, Watcher: observer, Trust: trust, Store: store, Namespaces: namespaces, NamespaceClusterID: cluster,
-		Guards: &w.guards, Remote: &w.guards, Workloads: &w.guards, WorkloadGuards: &w.guards, RemoteBindings: remoteBindings, Now: time.Now, NewID: uuid.NewString}
+		Guards: &w.guards, Remote: &w.guards, Workloads: &w.guards, WorkloadGuards: &w.guards, RemoteBindings: remoteBindings, RemoteBindingChanges: changes, Now: time.Now, NewID: uuid.NewString}
 	if b := c.Browser; b != nil {
 		browserObserver, e := w.kubeOpeningClient()
 		if e != nil {

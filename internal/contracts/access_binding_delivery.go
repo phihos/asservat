@@ -1,6 +1,10 @@
 package contracts
 
-import "encoding/json"
+import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+)
 
 // AccessBindingDeliveryMaxBytes bounds one connector's AccessBinding delivery
 // on the lifecycle channel, the same byte budget as the hub cluster's LIST
@@ -25,4 +29,19 @@ type DeliveredAccessBinding struct {
 	Generation      int64           `json:"generation"`
 	Deleting        bool            `json:"deleting,omitempty"`
 	Spec            json.RawMessage `json:"spec"`
+}
+
+// Digest identifies a delivery's content for the hub's stored copy: the
+// items only, since the LIST resource version changes with any write.
+func (d AccessBindingDelivery) Digest() string {
+	return deliveryDigest(d.Items)
+}
+
+func deliveryDigest(v any) string {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return ""
+	}
+	sum := sha256.Sum256(b)
+	return hex.EncodeToString(sum[:])
 }

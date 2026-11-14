@@ -146,7 +146,7 @@ rules:
     verbs: [get{{ if $executor }}, list, watch{{ end }}]
   - apiGroups: [""]
     resources: [pods]
-    verbs: [get{{ if $executor }}, list{{ end }}]
+    verbs: [get{{ if $executor }}, list{{ end }}{{ if and $executor (eq $mode "cluster") }}, watch{{ end }}]
   - apiGroups: [apps]
     resources: [replicasets]
     verbs: [get]
@@ -160,10 +160,10 @@ rules:
   {{- if $executor }}
   # ADR-179/230/241/283: target resolution, probe Events, logs, metrics,
   # capture profiles and Kubernetes packet peers in this cluster; in
-  # mode=cluster also the capacity delivery's workload lists (ADR-330).
+  # mode=cluster also the capacity delivery's workload watches (ADR-330).
   - apiGroups: [apps]
     resources: [deployments, statefulsets]
-    verbs: [get{{ if eq $mode "cluster" }}, list{{ end }}]
+    verbs: [get{{ if eq $mode "cluster" }}, list, watch{{ end }}]
   - apiGroups: [""]
     resources: [events]
     verbs: [list]

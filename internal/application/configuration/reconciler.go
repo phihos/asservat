@@ -52,8 +52,11 @@ type BindingReconciler struct {
 	// clusters joined with mode: cluster (ADR-329). Without it their
 	// AccessBindings grant and deny nothing.
 	RemoteBindings RemoteBindingReader
-	Now            func() time.Time
-	NewID          func() string
+	// RemoteBindingChanges signals a changed stored delivery (PostgreSQL
+	// LISTEN/NOTIFY); deliveries are reread only on a signal and at start.
+	RemoteBindingChanges <-chan struct{}
+	Now                  func() time.Time
+	NewID                func() string
 }
 
 // NamespaceGuardReader proves, within its original interval, that one
@@ -429,6 +432,9 @@ func (s *bindingRun) start(ctx context.Context) error {
 			return reconcileStep("review", err)
 		}
 	}
+	// The joined clusters' stored deliveries, before the first acceptance
+	// (ADR-329): later changes arrive as RemoteBindingChanges.
+	s.refreshRemoteBindings(ctx)
 	if err = s.accept(ctx, false); err != nil {
 		return reconcileStep("accept", err)
 	}
@@ -439,7 +445,6 @@ var errWatchBehind = errors.New("permission watch has not reached current comple
 
 func (s *bindingRun) refresh(ctx context.Context) error {
 	// Before the trust window opens: a slow connector cannot consume it.
-	s.refreshRemoteBindings(ctx)
 	s.refreshRemote(ctx)
 	s.refreshWorkloads(ctx)
 	// Proofs last: closest to the acceptance that uses them.
@@ -558,6 +563,13 @@ func (s *bindingRun) consume(ctx context.Context, watch BindingWatch, ticks <-ch
 		case <-ticks:
 			if err := s.refresh(ctx); err != nil && !errors.Is(err, errWatchBehind) {
 				return reconcileStep("refresh", err)
+			}
+		case <-s.r.RemoteBindingChanges:
+			// ADR-329: a stored delivery changed (or the notification
+			// connection was re-established): reread and accept.
+			s.refreshRemoteBindings(ctx)
+			if err := s.accept(ctx, false); err != nil {
+				return reconcileStep("accept", err)
 			}
 		case item := <-s.feedItems():
 			if err := s.namespaceItem(ctx, item); err != nil {

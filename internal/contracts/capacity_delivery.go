@@ -32,3 +32,6 @@ type DeliveredCapacityWorkload struct {
 	UID             string `json:"uid"`
 	ResourceVersion string `json:"resourceVersion"`
 }
+
+// Digest identifies a delivery's content for the hub's stored copy.
+func (d CapacityDelivery) Digest() string { return deliveryDigest(d.Namespaces) }

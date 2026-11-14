@@ -17,20 +17,22 @@ type capacityServices struct {
 	scriptedServices
 	cluster    string
 	namespaces int
+	stored     string
+	unchanged  bool
 }
 
 func (s *capacityServices) Capacity(ctx context.Context, region *Region) error {
-	d, err := region.ReadCapacity(ctx)
+	d, unchanged, err := region.ReadCapacity(ctx, s.stored)
 	if err != nil {
 		return err
 	}
-	if _, err = region.ReadCapacity(ctx); err == nil {
+	if _, _, err = region.ReadCapacity(ctx, s.stored); err == nil {
 		return ErrChannel // one delivery per conversation
 	}
-	if _, err = region.ReadAccessBindings(ctx); err == nil {
+	if _, _, err = region.ReadAccessBindings(ctx, ""); err == nil {
 		return ErrChannel // and no AccessBinding request beside it
 	}
-	s.cluster, s.namespaces = region.Presented().Profile.ClusterID, len(d.Namespaces)
+	s.cluster, s.namespaces, s.unchanged = region.Presented().Profile.ClusterID, len(d.Namespaces), unchanged
 	return nil
 }
 
@@ -80,7 +82,11 @@ func TestCapacityDeliveryOverRealHTTP2(t *testing.T) {
 	if err != nil || result.Kind != "result" || services.namespaces != 300 || services.cluster != process.Binding.ClusterID {
 		t.Fatal("delivery", result.Kind, err, services.namespaces, services.cluster)
 	}
-	services.namespaces = 0
+	services.stored, services.namespaces = delivery.Digest(), 0
+	if result, err = client.Run(context.Background(), open, capacityReader{delivery: delivery}); err != nil || !services.unchanged || services.namespaces != 0 {
+		t.Fatal("unchanged delivery", result.Kind, err)
+	}
+	services.stored = ""
 	if _, err = client.Run(context.Background(), open, localReader{}); err == nil || services.namespaces != 0 {
 		t.Fatal("delivery without a local reader", err)
 	}

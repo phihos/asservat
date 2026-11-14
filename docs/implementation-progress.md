@@ -20,6 +20,23 @@ passed (45.5 s) on a second fresh install. The local runs used an uncommitted
 no-op `00162` placeholder because the embedded schema requires contiguous
 versions.
 
+Maintainer correction (no polling where an event source exists), applied to
+ADR-329 (c) and ADR-330: connectors watch AccessBindings and capacity
+metadata (informers) and deliver only on change (≤ 1/s, digest-compared with
+the hub's stored copy, no periodic resend); remote allows no longer expire;
+a trigger in migration 00163 notifies `asservat_remote_bindings` /
+`asservat_remote_capacity`, and the hub-worker LISTENs instead of reading the
+rows each second (capacity rows stay in memory). Fresh kind runs:
+`TestHelmNativeKindClusterJoin` passed (21.4 s); idle, neither delivery row
+changed for 40 s; labelling the remote AccessBinding stored a new delivery
+within 0.24 s. `TestHelmNativeKindJourney` passed (31.0 s) on another fresh
+install. Real PostgreSQL: `scripts/test-custody.py --run
+'^TestContextAdmissionWithRealServices$/^connector-identity-fast$'` passed,
+including the trigger notification, stored digest and older-delivery
+refusal (with the local `00162` placeholder). Not run: `make
+permission-integration`, an image upgrade of a joined cluster, external
+providers, a LoadBalancer or Gateway passthrough.
+
 ## AccessBindings in application namespaces (ADR-329, 2026-11-14)
 
 Branch `feat/hn-accessbindings` on the Helm-native candidate. AccessBindings

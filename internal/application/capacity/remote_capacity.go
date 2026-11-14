@@ -75,8 +75,11 @@ type RemoteCapacityStore interface {
 }
 
 // RemoteCapacityReader serves the capacity reconciler's reads of one joined
-// cluster from its latest delivered observation (ADR-330), which is current
-// for CapacitySourceInterval from the hub's own admission time. Its
+// cluster from its latest delivered observation (ADR-330). The connector
+// delivers on change, so the latest delivery stays the cluster's current
+// state until a newer one replaces it; each read is current for
+// CapacitySourceInterval from the read. Connector liveness is a health
+// signal, not capacity authority (as ADR-329 (c) for AccessBindings). Its
 // namespace guard is the cluster's write-once regional qualification pin:
 // the connector delivers only namespaces carrying the pin's keys.
 type RemoteCapacityReader struct {
@@ -91,7 +94,7 @@ var (
 	_ CapacityGuardedWorkloadReader     = RemoteCapacityReader{}
 )
 
-// current is the latest observation while it is still fresh.
+// current is the latest observation, observed now.
 func (r RemoteCapacityReader) current(ctx context.Context) (RemoteCapacity, time.Time, error) {
 	if r.Store == nil || r.Now == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(r.Pin.ClusterID) {
 		return RemoteCapacity{}, time.Time{}, cfg.ErrUnavailable
@@ -100,11 +103,11 @@ func (r RemoteCapacityReader) current(ctx context.Context) (RemoteCapacity, time
 	if err != nil {
 		return RemoteCapacity{}, time.Time{}, err
 	}
-	until := c.ObservedAt.Add(CapacitySourceInterval)
-	if c.ClusterID != r.Pin.ClusterID || !c.Valid() || !identity.Fresh(c.ObservedAt, until, r.Now(), CapacitySourceInterval) {
+	if c.ClusterID != r.Pin.ClusterID || !c.Valid() {
 		return RemoteCapacity{}, time.Time{}, cfg.ErrUnavailable
 	}
-	return c, until, nil
+	c.ObservedAt = r.Now()
+	return c, c.ObservedAt.Add(CapacitySourceInterval), nil
 }
 
 func (r RemoteCapacityReader) DiscoverCapacityNamespaces(ctx context.Context, continuation string) (CapacityNamespacePage, error) {

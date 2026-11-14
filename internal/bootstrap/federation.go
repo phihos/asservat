@@ -467,7 +467,8 @@ type federationServices struct {
 	peers    *federationPeers
 	bindings *federationBindings
 	capacity interface {
-		StoreRemoteCapacity(context.Context, capacityapp.RemoteCapacity) error
+		StoreRemoteCapacity(context.Context, capacityapp.RemoteCapacity, string) error
+		RemoteCapacityDigest(context.Context, string) (string, error)
 	}
 }
 
@@ -481,8 +482,12 @@ func (s federationServices) Capacity(ctx context.Context, region *connectorlifec
 	if p.Profile.RootID != s.peers.ids.PermissionRootID || p.Profile.InstallationID != s.peers.ids.InstallationID || p.Profile.ClusterID == s.peers.ids.ClusterID {
 		return mounts.ErrUnavailable
 	}
-	delivery, err := region.ReadCapacity(ctx)
+	stored, err := s.capacity.RemoteCapacityDigest(ctx, p.Profile.ClusterID)
 	if err != nil {
+		return err
+	}
+	delivery, unchanged, err := region.ReadCapacity(ctx, stored)
+	if err != nil || unchanged {
 		return err
 	}
 	observed, err := kube.DeliveredCapacity(p.Profile.ClusterID, p.CheckedAt, delivery)
@@ -490,7 +495,7 @@ func (s federationServices) Capacity(ctx context.Context, region *connectorlifec
 		fmt.Fprintln(os.Stderr, "federation capacity refused: invalid delivery")
 		return err
 	}
-	if err = s.capacity.StoreRemoteCapacity(ctx, observed); err != nil {
+	if err = s.capacity.StoreRemoteCapacity(ctx, observed, delivery.Digest()); err != nil {
 		fmt.Fprintln(os.Stderr, "federation capacity store failed: "+federationCause(err))
 	}
 	return err
@@ -501,7 +506,8 @@ func (s federationServices) Capacity(ctx context.Context, region *connectorlifec
 type federationBindings struct {
 	decoder *kube.AccessBindingSpecDecoder
 	store   interface {
-		StoreRemoteBindings(context.Context, configuration.RemoteBindings) error
+		StoreRemoteBindings(context.Context, configuration.RemoteBindings, string) error
+		RemoteBindingsDigest(context.Context, string) (string, error)
 	}
 }
 
@@ -516,8 +522,14 @@ func (s federationServices) AccessBindings(ctx context.Context, region *connecto
 	if p.Profile.RootID != s.peers.ids.PermissionRootID || p.Profile.InstallationID != s.peers.ids.InstallationID || p.Profile.ClusterID == s.peers.ids.ClusterID {
 		return mounts.ErrUnavailable
 	}
-	delivery, err := region.ReadAccessBindings(ctx)
+	// The connector answers "unchanged" when its current LIST has the
+	// stored digest; the stored delivery then stays in effect.
+	stored, err := s.bindings.store.RemoteBindingsDigest(ctx, p.Profile.ClusterID)
 	if err != nil {
+		return err
+	}
+	delivery, unchanged, err := region.ReadAccessBindings(ctx, stored)
+	if err != nil || unchanged {
 		return err
 	}
 	bindings, err := s.bindings.decoder.DeliveredBindings(p.Profile.ClusterID, delivery)
@@ -530,7 +542,7 @@ func (s federationServices) AccessBindings(ctx context.Context, region *connecto
 		fmt.Fprintln(os.Stderr, "federation access bindings refused: over the per-cluster bounds")
 		return configuration.ErrLimit
 	}
-	if err = s.bindings.store.StoreRemoteBindings(ctx, d); err != nil {
+	if err = s.bindings.store.StoreRemoteBindings(ctx, d, delivery.Digest()); err != nil {
 		fmt.Fprintln(os.Stderr, "federation access bindings store failed: "+federationCause(err))
 	}
 	return err

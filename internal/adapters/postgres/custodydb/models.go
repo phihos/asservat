@@ -2441,6 +2441,7 @@ type RemoteCapacityDelivery struct {
 	RootID     pgtype.UUID
 	ClusterID  pgtype.UUID
 	ObservedAt pgtype.Timestamptz
+	Digest     []byte
 	Namespaces []byte
 }
 

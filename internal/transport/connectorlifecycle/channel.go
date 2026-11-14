@@ -98,6 +98,10 @@ type HubFrame struct {
 	Recovery          *value.RecoveryState                `json:",omitempty"`
 	Bootstrap         *value.ClusterBootstrapResult       `json:",omitempty"`
 	Failure           string                              `json:",omitempty"`
+	// Digest is the hub's stored delivery digest of an "access-bindings" or
+	// "capacity" request; the connector answers Unchanged when its current
+	// delivery has the same digest (ADR-329, ADR-330).
+	Digest string `json:",omitempty"`
 }
 
 // RegionFrame answers one hub frame.
@@ -110,6 +114,8 @@ type RegionFrame struct {
 	AccessBindings *contracts.AccessBindingDelivery `json:",omitempty"`
 	// Capacity answers the hub's "capacity" request (ADR-330).
 	Capacity *contracts.CapacityDelivery `json:",omitempty"`
+	// Unchanged answers a delivery request whose digest matches.
+	Unchanged bool `json:",omitempty"`
 }
 
 // CapacityLocal is the regional reader of the connector's capacity

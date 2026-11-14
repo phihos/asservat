@@ -70,16 +70,21 @@ remote:                 # how connectors reach the hub (TCP passthrough)
   values. Namespace and account UIDs are not pinned (ADR-328: writers of the
   Asservat namespaces are trusted); the image digest is the release's current
   image.
-- Capacity: each joined connector delivers its cluster's capacity
-  observation every two seconds over the lifecycle channel (purpose
-  `capacity`, as ADR-329 decision (c) delivers AccessBindings): the
-  namespaces carrying a capacity key, only those labels, and their
-  Deployments, StatefulSets and unowned Pods. The federation stores it under
-  the presented cluster at its own admission time (migration 00163, one row
-  per cluster). The hub-worker qualifies each joined cluster once (the
-  existing write-once `qualify_capacity_cluster`) and serves the reconciler's
-  reads of that cluster from the latest row while it is within the existing
-  five-second capacity window.
+- Capacity: each joined connector watches its cluster's namespaces,
+  Deployments, StatefulSets and Pods (metadata informers) and delivers on
+  change over the lifecycle channel (purpose `capacity`, as ADR-329
+  decision (c) delivers AccessBindings): the namespaces carrying a capacity
+  key, only those labels, and their Deployments, StatefulSets and unowned
+  Pods, each workload versioned by its generation so status updates send
+  nothing. Deliveries coalesce to one per second and carry the hub's stored
+  digest; no periodic resend. The federation stores it under the presented
+  cluster (migration 00163, one row per cluster); the table's trigger
+  notifies `asservat_remote_capacity`, and the hub-worker keeps the rows in
+  memory, reloaded on each notification and on (re)connecting its LISTEN
+  connection. It qualifies each joined cluster once (the existing write-once
+  `qualify_capacity_cluster`) and serves the reconciler's reads of that
+  cluster from the last delivered set, current until a newer one replaces it
+  (connector liveness is not capacity authority).
 - With bundled SeaweedFS the secrets hook generates
   `<name>-s3-regional-write-<cluster>` and `-regional-history-<cluster>`,
   scoped to the joined cluster's ID; with an external store the operator
@@ -114,20 +119,22 @@ outbound-only connector.
 4. Above.
 5. hub-api: `create` on Secrets in the release namespace (create cannot be
    limited by name), `get/update` on the join Secrets, `get` on the joined
-   clusters' capability Secrets. Connector (`mode: cluster`): `list` on
-   Deployments and StatefulSets. Federation login: one table; hub-worker
+   clusters' capability Secrets. Connector (`mode: cluster`): `list/watch`
+   on Deployments and StatefulSets and `watch` on Pods. Federation login: one table; hub-worker
    capacity login: one table and one existing function. No new listener or
    credential type.
-6. One degraded state: a stale capacity delivery (that cluster's capacity
-   reads fail until the next delivery).
+6. One degraded state: an unreachable connector (its last delivered
+   capacity set stays in effect until it delivers again).
 7. No configuration of the mechanism itself; `clusters` and `remote` describe
    the topology.
 8. The connector must reach the four hub endpoints, which every joined
    function already needs.
-9. Per joined cluster every two seconds: one LIST of namespaces plus three
-   metadata LISTs per capacity namespace on the member's API server, one
-   lifecycle conversation and one upsert on the hub, and one row read per
-   reconcile step. Linear in clusters and capacity namespaces.
+9. Per joined cluster: four metadata watches on the member's API server and
+   the connector's cache of that metadata (Pods cluster-wide); one lifecycle
+   conversation and one upsert per change, at most one per second; one
+   notification per change and one reload of the rows in the hub-worker,
+   whose reconcile reads stay in memory. Linear in clusters and capacity
+   workloads.
 10. Upgrade adds a table; removing a `clusters` entry stops its join and
     capacity reads; downgrade drops the table.
 11. Copying the bootstrap by hand from OpenBao, or documenting the gap, would
@@ -142,5 +149,6 @@ outbound-only connector.
 - The connector backing (`federation.connector`) is fixed at the first
   install: a cluster beyond `profiles` needs a reinstall.
 - Remote captures need the joined cluster to run the hub's image digest.
-- Capacity deliveries poll the member's API every two seconds; an informer
-  would remove that cost and is not implemented.
+- During a connector outage the hub keeps the last delivered capacity set:
+  a workload deleted meanwhile keeps its binding until the next delivery
+  (new captures there need the connector anyway).

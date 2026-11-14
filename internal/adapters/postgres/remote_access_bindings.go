@@ -4,12 +4,15 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"sync"
 
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
 	"asservat.local/asservat/internal/domain/authorization"
 	cfg "asservat.local/asservat/internal/domain/configuration"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -36,21 +39,40 @@ func NewRemoteAccessBindings(ctx context.Context, pool *pgxpool.Pool, root strin
 	return &RemoteAccessBindings{ledger: l, root: root, cache: map[string]cfg.RemoteBindings{}, digest: map[string][]byte{}}, nil
 }
 
-// StoreRemoteBindings records d unless a newer delivery of its cluster is
-// already stored.
-func (s *RemoteAccessBindings) StoreRemoteBindings(ctx context.Context, d cfg.RemoteBindings) error {
-	if s == nil || ctx == nil || !d.Valid() {
+// StoreRemoteBindings records d with its delivery digest (hex,
+// contracts.AccessBindingDelivery.Digest) unless a newer delivery of its
+// cluster is already stored. The table's trigger notifies the hub-worker.
+func (s *RemoteAccessBindings) StoreRemoteBindings(ctx context.Context, d cfg.RemoteBindings, digest string) error {
+	sum, err := hex.DecodeString(digest)
+	if s == nil || ctx == nil || !d.Valid() || err != nil || len(sum) != sha256.Size {
 		return cfg.ErrInvalid
 	}
 	body, err := json.Marshal(d.Bindings)
 	if err != nil {
 		return cfg.ErrInvalid
 	}
-	sum := sha256.Sum256(body)
 	return permissionError(s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		_, err := q.StoreRemoteAccessBindings(ctx, custodydb.StoreRemoteAccessBindingsParams{RootID: id(s.root), ClusterID: id(d.ClusterID), ObservedAt: ts(d.ObservedAt), Digest: sum[:], Bindings: body})
+		_, err := q.StoreRemoteAccessBindings(ctx, custodydb.StoreRemoteAccessBindingsParams{RootID: id(s.root), ClusterID: id(d.ClusterID), ObservedAt: ts(d.ObservedAt), Digest: sum, Bindings: body})
 		return err
 	}))
+}
+
+// RemoteBindingsDigest is cluster's stored delivery digest (hex), "" when
+// none is stored.
+func (s *RemoteAccessBindings) RemoteBindingsDigest(ctx context.Context, cluster string) (string, error) {
+	if s == nil || ctx == nil || !authorization.UUID(cluster) {
+		return "", cfg.ErrInvalid
+	}
+	var out string
+	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
+		d, err := q.ReadRemoteAccessBindingDigest(ctx, custodydb.ReadRemoteAccessBindingDigestParams{RootID: id(s.root), ClusterID: id(cluster)})
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil
+		}
+		out = hex.EncodeToString(d)
+		return err
+	})
+	return out, permissionError(err)
 }
 
 // RemoteBindings returns every cluster's latest delivery. Bindings are read
@@ -80,7 +102,7 @@ func (s *RemoteAccessBindings) RemoteBindings(ctx context.Context) ([]cfg.Remote
 					return err
 				}
 				d = cfg.RemoteBindings{ClusterID: cluster, ObservedAt: full.ObservedAt.Time}
-				if sum := sha256.Sum256(full.Bindings); !bytes.Equal(sum[:], full.Digest) || json.Unmarshal(full.Bindings, &d.Bindings) != nil {
+				if json.Unmarshal(full.Bindings, &d.Bindings) != nil {
 					continue // an unreadable row grants and denies nothing
 				}
 				row.Digest = full.Digest

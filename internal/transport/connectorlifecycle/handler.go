@@ -309,10 +309,15 @@ func (r *Region) peer(b value.PeerBinding) bool {
 // ask sends one payload-free request frame and receives its reply under the
 // channel lock. Any failure closes the channel.
 func (r *Region) ask(ctx context.Context, kind string, reply *RegionFrame) error {
+	return r.askFrame(ctx, HubFrame{Kind: kind}, reply)
+}
+
+func (r *Region) askFrame(ctx context.Context, frame HubFrame, reply *RegionFrame) error {
+	kind := frame.Kind
 	if r.closed || ctx == nil {
 		return ErrChannel
 	}
-	if r.conn.Send(HubFrame{Kind: kind}) != nil {
+	if r.conn.Send(frame) != nil {
 		r.closed = true
 		return ErrChannel
 	}
@@ -355,47 +360,55 @@ func (r *Region) ReadConnectorIdentityConfiguration(ctx context.Context) (app.Co
 }
 
 // ReadAccessBindings asks the presenting connector for its cluster's complete
-// AccessBinding LIST (ADR-329), once per conversation. Only this request
-// raises the conversation's read bound, by the delivery's own byte bound.
-func (r *Region) ReadAccessBindings(ctx context.Context) (contracts.AccessBindingDelivery, error) {
+// AccessBinding LIST (ADR-329), once per conversation, with the hub's stored
+// digest: unchanged reports that the connector's current delivery has it.
+// Only this request raises the conversation's read bound, by the delivery's
+// own byte bound.
+func (r *Region) ReadAccessBindings(ctx context.Context, stored string) (_ contracts.AccessBindingDelivery, unchanged bool, _ error) {
 	r.conn.mu.Lock()
 	defer r.conn.mu.Unlock()
 	if r.slot != nil || r.delivered {
-		return contracts.AccessBindingDelivery{}, ErrChannel
+		return contracts.AccessBindingDelivery{}, false, ErrChannel
 	}
 	r.delivered = true
 	r.conn.limit.n += contracts.AccessBindingDeliveryMaxBytes
 	var reply RegionFrame
-	if err := r.ask(ctx, "access-bindings", &reply); err != nil {
-		return contracts.AccessBindingDelivery{}, err
+	if err := r.askFrame(ctx, HubFrame{Kind: "access-bindings", Digest: stored}, &reply); err != nil {
+		return contracts.AccessBindingDelivery{}, false, err
 	}
-	if reply.AccessBindings == nil || reply.Source != nil || reply.Configuration != nil || reply.Observation != nil {
+	if reply.Unchanged && reply.AccessBindings == nil && stored != "" {
+		return contracts.AccessBindingDelivery{}, true, nil
+	}
+	if reply.Unchanged || reply.AccessBindings == nil || reply.Capacity != nil || reply.Source != nil || reply.Configuration != nil || reply.Observation != nil {
 		r.closed = true
-		return contracts.AccessBindingDelivery{}, ErrChannel
+		return contracts.AccessBindingDelivery{}, false, ErrChannel
 	}
-	return *reply.AccessBindings, nil
+	return *reply.AccessBindings, false, nil
 }
 
 // ReadCapacity asks the presenting connector for its capacity observation
-// (ADR-330), once per conversation, raising the read bound by the
+// (ADR-330) like ReadAccessBindings, raising the read bound by the
 // delivery's own byte bound.
-func (r *Region) ReadCapacity(ctx context.Context) (contracts.CapacityDelivery, error) {
+func (r *Region) ReadCapacity(ctx context.Context, stored string) (_ contracts.CapacityDelivery, unchanged bool, _ error) {
 	r.conn.mu.Lock()
 	defer r.conn.mu.Unlock()
 	if r.slot != nil || r.delivered {
-		return contracts.CapacityDelivery{}, ErrChannel
+		return contracts.CapacityDelivery{}, false, ErrChannel
 	}
 	r.delivered = true
 	r.conn.limit.n += contracts.CapacityDeliveryMaxBytes
 	var reply RegionFrame
-	if err := r.ask(ctx, "capacity", &reply); err != nil {
-		return contracts.CapacityDelivery{}, err
+	if err := r.askFrame(ctx, HubFrame{Kind: "capacity", Digest: stored}, &reply); err != nil {
+		return contracts.CapacityDelivery{}, false, err
 	}
-	if reply.Capacity == nil || reply.AccessBindings != nil || reply.Source != nil || reply.Configuration != nil || reply.Observation != nil {
+	if reply.Unchanged && reply.Capacity == nil && stored != "" {
+		return contracts.CapacityDelivery{}, true, nil
+	}
+	if reply.Unchanged || reply.Capacity == nil || reply.AccessBindings != nil || reply.Source != nil || reply.Configuration != nil || reply.Observation != nil {
 		r.closed = true
-		return contracts.CapacityDelivery{}, ErrChannel
+		return contracts.CapacityDelivery{}, false, ErrChannel
 	}
-	return *reply.Capacity, nil
+	return *reply.Capacity, false, nil
 }
 
 func (r *Region) BeginConnectorLifecycle(ctx context.Context, req app.ConnectorLifecycleRequest) (app.ConnectorLifecycleOperation, error) {

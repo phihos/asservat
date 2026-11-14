@@ -1,96 +1,69 @@
 package kubernetes
 
 import (
-	"context"
+	"sort"
+	"strconv"
 	"time"
 
 	app "asservat.local/asservat/internal/application/capacity"
 	"asservat.local/asservat/internal/contracts"
 	cfg "asservat.local/asservat/internal/domain/configuration"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation"
 )
 
-// capacityDeliveryRead bounds the reads of one capacity delivery.
-const capacityDeliveryRead = 10 * time.Second
-
-// CapacityDelivery returns the connector cluster's capacity observation for
-// the hub (ADR-330): the namespaces carrying at least one of keys, with only
-// those labels, and their Deployments, StatefulSets and unowned Pods, read
-// with the same metadata pages as the hub cluster's own capacity discovery.
-// Deleting objects are left out.
-func (c *PermissionClient) CapacityDelivery(ctx context.Context, keys []string) (contracts.CapacityDelivery, error) {
-	var out contracts.CapacityDelivery
-	if c == nil || ctx == nil || len(keys) < 1 || len(keys) > 256 {
+// CapacityDeliveryFromCache builds the capacity delivery from watched
+// metadata (informer caches, ADR-330): the namespaces carrying at least one
+// of keys, with only those labels, and their Deployments, StatefulSets and
+// unowned Pods. A workload's version is its generation, so status-only
+// updates change nothing and send nothing.
+func CapacityDeliveryFromCache(keys []string, namespaces, deployments, statefulsets, pods []*metav1.PartialObjectMetadata) (contracts.CapacityDelivery, error) {
+	out := contracts.CapacityDelivery{Namespaces: []contracts.DeliveredCapacityNamespace{}}
+	if len(keys) < 1 || len(keys) > 256 {
 		return out, cfg.ErrInvalid
 	}
-	for _, k := range keys {
-		if len(validation.IsQualifiedName(k)) != 0 {
-			return out, cfg.ErrInvalid
+	byName := map[string]int{}
+	for _, item := range namespaces {
+		if item == nil || item.DeletionTimestamp != nil {
+			continue
 		}
+		labels := map[string]string{}
+		for _, k := range keys {
+			if v, ok := item.Labels[k]; ok {
+				labels[k] = v
+			}
+		}
+		if len(labels) == 0 {
+			continue
+		}
+		byName[item.Name] = len(out.Namespaces)
+		out.Namespaces = append(out.Namespaces, contracts.DeliveredCapacityNamespace{Name: item.Name, UID: string(item.UID), ResourceVersion: item.ResourceVersion, Labels: labels, Workloads: []contracts.DeliveredCapacityWorkload{}})
 	}
-	ctx, cancel := context.WithTimeout(ctx, capacityDeliveryRead)
-	defer cancel()
-	out.Namespaces = []contracts.DeliveredCapacityNamespace{}
 	workloads := 0
-	for continuation := ""; ; {
-		page, err := c.capacityMetadataPage(ctx, "/api/v1/namespaces", "", continuation)
-		if err != nil {
-			return contracts.CapacityDelivery{}, err
-		}
-		for _, item := range page.Items {
-			if item.DeletionTimestamp != nil || item.DeletionGracePeriodSeconds != nil {
+	for _, set := range []struct {
+		kind  string
+		items []*metav1.PartialObjectMetadata
+	}{{"Deployment", deployments}, {"StatefulSet", statefulsets}, {"Pod", pods}} {
+		for _, item := range set.items {
+			i, ok := byName[item.Namespace]
+			if !ok || item.DeletionTimestamp != nil || set.kind == "Pod" && len(item.OwnerReferences) != 0 {
 				continue
 			}
-			labels := map[string]string{}
-			for _, k := range keys {
-				if v, ok := item.Labels[k]; ok {
-					labels[k] = v
-				}
-			}
-			if len(labels) == 0 {
-				continue
-			}
-			n := contracts.DeliveredCapacityNamespace{Name: item.Name, UID: string(item.UID), ResourceVersion: item.ResourceVersion, Labels: labels, Workloads: []contracts.DeliveredCapacityWorkload{}}
-			for _, kind := range []string{"Deployment", "StatefulSet", "Pod"} {
-				if n.Workloads, err = c.capacityDeliveryWorkloads(ctx, item.Name, kind, n.Workloads); err != nil {
-					return contracts.CapacityDelivery{}, err
-				}
-			}
-			workloads += len(n.Workloads)
-			out.Namespaces = append(out.Namespaces, n)
-			if len(out.Namespaces) > contracts.CapacityDeliveryNamespaces || workloads > contracts.CapacityDeliveryWorkloads {
-				return contracts.CapacityDelivery{}, cfg.ErrLimit
-			}
-		}
-		if continuation = page.Continue; continuation == "" {
-			return out, nil
+			n := &out.Namespaces[i]
+			n.Workloads = append(n.Workloads, contracts.DeliveredCapacityWorkload{Kind: set.kind, Name: item.Name, UID: string(item.UID), ResourceVersion: "g" + strconv.FormatInt(item.Generation, 10)})
+			workloads++
 		}
 	}
-}
-
-func (c *PermissionClient) capacityDeliveryWorkloads(ctx context.Context, namespace, kind string, out []contracts.DeliveredCapacityWorkload) ([]contracts.DeliveredCapacityWorkload, error) {
-	path, ok := capacityWorkloadPath(namespace, kind)
-	if !ok {
-		return nil, cfg.ErrInvalid
+	if len(out.Namespaces) > contracts.CapacityDeliveryNamespaces || workloads > contracts.CapacityDeliveryWorkloads {
+		return contracts.CapacityDelivery{}, cfg.ErrLimit
 	}
-	for continuation := ""; ; {
-		page, err := c.capacityMetadataPage(ctx, path, namespace, continuation)
-		if err != nil {
-			return nil, err
-		}
-		for _, item := range page.Items {
-			if item.DeletionTimestamp != nil || item.DeletionGracePeriodSeconds != nil || kind == "Pod" && len(item.OwnerReferences) != 0 {
-				continue
-			}
-			out = append(out, contracts.DeliveredCapacityWorkload{Kind: kind, Name: item.Name, UID: string(item.UID), ResourceVersion: item.ResourceVersion})
-			if len(out) > contracts.CapacityDeliveryWorkloads {
-				return nil, cfg.ErrLimit
-			}
-		}
-		if continuation = page.Continue; continuation == "" {
-			return out, nil
-		}
+	// Cache order is arbitrary; the digest needs a fixed one.
+	sort.Slice(out.Namespaces, func(a, b int) bool { return out.Namespaces[a].Name < out.Namespaces[b].Name })
+	for i := range out.Namespaces {
+		w := out.Namespaces[i].Workloads
+		sort.Slice(w, func(a, b int) bool { return w[a].Kind+"/"+w[a].Name < w[b].Kind+"/"+w[b].Name })
 	}
+	return out, nil
 }
 
 // DeliveredCapacity checks a connector's delivery and attributes it to the

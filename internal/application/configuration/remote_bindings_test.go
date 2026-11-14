@@ -8,7 +8,6 @@ import (
 
 	"asservat.local/asservat/internal/domain/artifact"
 	value "asservat.local/asservat/internal/domain/configuration"
-	"asservat.local/asservat/internal/domain/identity"
 )
 
 type remoteBindingFixture struct {
@@ -41,9 +40,10 @@ func remoteBases(b value.PermissionBatch, cluster string) map[string]string {
 }
 
 // ADR-329: a joined cluster's delivered AccessBindings grant and deny in that
-// cluster like the hub cluster's. Allows lapse with the delivery's ADR-311
-// window; denies stay until a later delivery removes them. The hub cluster's
-// own row and invalid deliveries are ignored, and a failed read keeps state.
+// cluster like the hub cluster's. The last delivery stays in effect, allows
+// included, until a newer one replaces it (connector liveness is not
+// authority). The hub cluster's own row and invalid deliveries are ignored,
+// and a failed read keeps state.
 func TestReconcilerAcceptsRemoteClusterBindings(t *testing.T) {
 	f, _, s, ctx := inheritanceRun(t)
 	now := s.r.Now()
@@ -67,18 +67,18 @@ func TestReconcilerAcceptsRemoteClusterBindings(t *testing.T) {
 			t.Fatalf("hub-cluster row or mislabelled delivery accepted: %+v", p.Resource)
 		}
 	}
-	// A failed read keeps the last delivery; once its window lapses only the
-	// deny remains.
+	// A failed read keeps the last delivery, and an old delivery keeps its
+	// allows: no expiry.
 	reader.err = errors.New("sql unavailable")
 	s.refreshRemoteBindings(ctx)
 	d := s.remoteBindings[remoteCluster]
-	d.ObservedAt = s.r.Now().Add(-identity.AuthorityRecheckInterval)
+	d.ObservedAt = s.r.Now().Add(-time.Hour)
 	s.remoteBindings[remoteCluster] = d
 	if err := s.accept(ctx, false); err != nil {
 		t.Fatal(err)
 	}
-	if got := remoteBases(f.accepted[len(f.accepted)-1], remoteCluster); len(got) != 1 || got["blocked"] != "Deny" {
-		t.Fatalf("stale delivery: want only its deny, got %v", got)
+	if got := remoteBases(f.accepted[len(f.accepted)-1], remoteCluster); len(got) != 2 || got["readers"] != "Allow" || got["blocked"] != "Deny" {
+		t.Fatalf("old delivery: want both bindings, got %v", got)
 	}
 	// An older delivery never replaces a newer one; a newer one without the
 	// deny removes it.
@@ -141,4 +141,28 @@ func TestRemoteBindingsValidBounds(t *testing.T) {
 			t.Fatal(name)
 		}
 	}
+}
+
+// Deliveries are reread on a change signal, not on the reconciler's tick.
+func TestReconcilerRereadsRemoteBindingsOnSignal(t *testing.T) {
+	_, _, s, ctx := inheritanceRun(t)
+	now := s.r.Now()
+	reader := &countingRemoteBindings{remoteBindingFixture: remoteBindingFixture{deliveries: []value.RemoteBindings{{ClusterID: remoteCluster, ObservedAt: now, Bindings: []value.Binding{remoteBinding(remoteCluster, "readers", "uid-allow", "Allow")}}}}}
+	s.r.RemoteBindings = reader
+	if err := s.refresh(ctx); err != nil && !errors.Is(err, errWatchBehind) {
+		t.Fatal(err)
+	}
+	if reader.reads != 0 {
+		t.Fatal("the reconciler tick reread the deliveries", reader.reads)
+	}
+}
+
+type countingRemoteBindings struct {
+	remoteBindingFixture
+	reads int
+}
+
+func (r *countingRemoteBindings) RemoteBindings(ctx context.Context) ([]value.RemoteBindings, error) {
+	r.reads++
+	return r.remoteBindingFixture.RemoteBindings(ctx)
 }

@@ -379,7 +379,8 @@ def check_cluster_join(render):
     assert any(j.get("optional") and j["items"] == [{"key": "bootstrap.json", "path": "bootstrap.json"}] for j in join), join
     assert any({i["key"] for i in j["items"]} == {"evidence-storage.json", "history-storage.json"} for j in join), join
     connector = named(docs, "ClusterRole", "asservat-system-asservat-connector")["rules"]
-    assert {"apiGroups": ["apps"], "resources": ["deployments", "statefulsets"], "verbs": ["get", "list"]} in connector
+    assert {"apiGroups": ["apps"], "resources": ["deployments", "statefulsets"], "verbs": ["get", "list", "watch"]} in connector
+    assert {"apiGroups": [""], "resources": ["pods"], "verbs": ["get", "list", "watch"]} in connector
     for bad in [{"region": {"enabled": True}}, {"region": {"enabled": True, "joinSecret": "x", "bootstrapSecret": "y"}}, {"region": {"enabled": True, "clusterID": cluster}}]:
         render({**work, **bad}, ok=False)
 

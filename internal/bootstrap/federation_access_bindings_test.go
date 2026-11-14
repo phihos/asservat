@@ -40,11 +40,16 @@ func (p lineagePresenter) Present(_ context.Context, r value.ClusterCredentialRe
 
 type recordedBindings struct {
 	stored []configuration.RemoteBindings
+	digest string
 }
 
-func (r *recordedBindings) StoreRemoteBindings(_ context.Context, d configuration.RemoteBindings) error {
-	r.stored = append(r.stored, d)
+func (r *recordedBindings) StoreRemoteBindings(_ context.Context, d configuration.RemoteBindings, digest string) error {
+	r.stored, r.digest = append(r.stored, d), digest
 	return nil
+}
+
+func (r *recordedBindings) RemoteBindingsDigest(context.Context, string) (string, error) {
+	return r.digest, nil
 }
 
 type staticBindings struct {
@@ -108,6 +113,11 @@ func TestFederationAttributesAccessBindingsToPresentedCluster(t *testing.T) {
 	if d.ClusterID != remote || len(d.Bindings) != 1 || d.Bindings[0].Scope.ClusterID != remote || d.Bindings[0].Invalid || d.ObservedAt.IsZero() || !d.Valid() {
 		t.Fatalf("stored %+v", d)
 	}
+	// An unchanged LIST matches the stored digest: nothing is stored again.
+	if result, err = run(remote); err != nil || result.Kind != "result" || len(store.stored) != 1 {
+		t.Fatal("unchanged delivery stored again", result.Kind, err, len(store.stored))
+	}
+	store.digest = ""
 	// The hub cluster's own connector is observed directly, never delivered.
 	if result, err = run(hub); err != nil || result.Kind != "failure" || len(store.stored) != 1 {
 		t.Fatal("hub cluster delivery accepted", result.Kind, err)

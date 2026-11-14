@@ -29,9 +29,8 @@ func remoteTestCapacity(at time.Time) RemoteCapacity {
 		Labels: map[string]string{"asservat-trial": "true", "other": "x"}, Workloads: []RemoteCapacityWorkload{{Workload: cfg.WorkloadRef{Kind: "Deployment", Name: "api", UID: "w-1"}, ResourceVersion: "9"}}}}}
 }
 
-// ADR-330: a joined cluster's reads come from its latest delivery while it
-// is current (five seconds from the hub's admission), under the
-// qualification pin's keys only.
+// ADR-330: a joined cluster's reads come from its latest delivery, which
+// stays current until replaced, under the qualification pin's keys only.
 func TestRemoteCapacityReaderServesTheCurrentDelivery(t *testing.T) {
 	at := time.Date(2026, 11, 14, 12, 0, 0, 0, time.UTC)
 	now := at.Add(2 * time.Second)
@@ -51,7 +50,7 @@ func TestRemoteCapacityReaderServesTheCurrentDelivery(t *testing.T) {
 		t.Fatal("other kind", w, err)
 	}
 	guard, workload, err := r.ReadCapacityGuardedWorkload(ctx, ns, ref, pin.Keys)
-	if err != nil || guard.Digest != pin.Digest || !guard.FreshUntil.Equal(at.Add(CapacitySourceInterval)) || workload.Namespace.Labels["asservat-trial"] != "true" || len(workload.Namespace.Labels) != 1 || workload.WorkloadResourceVersion != "9" {
+	if err != nil || guard.Digest != pin.Digest || !guard.FreshUntil.Equal(now.Add(CapacitySourceInterval)) || workload.Namespace.Labels["asservat-trial"] != "true" || len(workload.Namespace.Labels) != 1 || workload.WorkloadResourceVersion != "9" {
 		t.Fatal("guarded read", guard, workload, err)
 	}
 	if _, err = r.ReadCapacityWorkload(ctx, ns, ref, []string{"other"}); err == nil {
@@ -60,15 +59,14 @@ func TestRemoteCapacityReaderServesTheCurrentDelivery(t *testing.T) {
 	if _, err = r.ReadCapacityWorkload(ctx, ns, cfg.WorkloadRef{Kind: "Deployment", Name: "api", UID: "w-2"}, pin.Keys); !errors.Is(err, cfg.ErrChanged) {
 		t.Fatal("replaced workload", err)
 	}
-	now = at.Add(CapacitySourceInterval)
-	if _, err = r.CapacityNamespaceProtection(ctx); err == nil {
-		t.Fatal("stale delivery accepted")
+	now = at.Add(time.Hour)
+	if g, err := r.CapacityNamespaceProtection(ctx); err != nil || !g.ObservedAt.Equal(now) {
+		t.Fatal("an old delivery is no longer current", err)
 	}
-	now = at.Add(-time.Second)
+	r.Store = remoteStore{err: cfg.ErrUnavailable}
 	if _, err = r.CapacityNamespaceProtection(ctx); err == nil {
-		t.Fatal("delivery from the future accepted")
+		t.Fatal("no delivery accepted")
 	}
-	now = at.Add(time.Second)
 	other := remoteTestCapacity(at)
 	other.ClusterID = "40000000-0000-4000-8000-000000000002"
 	r.Store = remoteStore{c: other}

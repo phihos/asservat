@@ -454,9 +454,10 @@ Ordinary Kubernetes RBAC decides who writes them:
 A workload cluster joined with `mode: cluster` needs no extra step: its
 release renders the same RBAC and policy, and its connector (with
 `get/list/watch accessbindings`) delivers the cluster's bindings to the hub
-every 10 seconds. A binding change there takes effect at the hub within about
-11 seconds. If the connector cannot reach the hub, that cluster's allows stop
-granting after 30 seconds while its denies stay. Each cluster has its own
+whenever they change (a watch, at most once per second). A binding change
+there takes effect at the hub within about a second. If the connector cannot
+reach the hub, its last delivered bindings stay in effect, allows and denies,
+until it delivers again. Each cluster has its own
 1,024-binding and 4,096-row bound. The permission impact
 preview is for fleet operators; teams check a binding with
 `kubectl apply --dry-run=server` and their own access with `explain_access`.
