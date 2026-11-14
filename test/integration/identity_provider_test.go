@@ -220,7 +220,7 @@ func TestKeycloakProvider(t *testing.T) {
 	}
 	common := []any{
 		map[string]any{"name": "api-audience", "protocol": "openid-connect", "protocolMapper": "oidc-audience-mapper", "config": map[string]string{"included.custom.audience": "asservat-api", "access.token.claim": "true", "id.token.claim": "false"}},
-		map[string]any{"name": "stable-groups", "protocol": "openid-connect", "protocolMapper": "oidc-usermodel-attribute-mapper", "config": map[string]string{"user.attribute": "asservat_group_id", "claim.name": "asservat_groups", "jsonType.label": "String", "multivalued": "true", "aggregate.attrs": "true", "access.token.claim": "true", "id.token.claim": "false", "userinfo.token.claim": "false"}},
+		map[string]any{"name": "stable-groups", "protocol": "openid-connect", "protocolMapper": "oidc-usermodel-attribute-mapper", "config": map[string]string{"user.attribute": "asservat_group_id", "claim.name": "groups", "jsonType.label": "String", "multivalued": "true", "aggregate.attrs": "true", "access.token.claim": "true", "id.token.claim": "false", "userinfo.token.claim": "false"}},
 	}
 	for _, client := range []string{"console", "account-test"} {
 		// ADR-249: the "acr" client scope puts the signed acr claim into access

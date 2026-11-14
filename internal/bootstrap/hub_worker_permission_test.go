@@ -44,7 +44,7 @@ func permissionTestConfig() contracts.HubWorkerConfig {
 func TestHubWorkerPermissionConfigDecodesClosed(t *testing.T) {
 	body := `{"format":"` + contracts.HubWorkerConfigFormat + `","permission":{"statusUsers":["u"],"retention":true,` +
 		`"workerConfiguration":{"namespace":"w","source":"s"},"contextDeletion":{"evidenceStore":{"endpoint":"https://e","region":"r","bucket":"b"}},` +
-		`"browser":{"settings":"b"},"identity":{"settings":"i","issuer":"https://i"},"review":"r"}}`
+		`"identity":{"settings":"i","issuer":"https://i"},"review":"r"}}`
 	c, err := contracts.DecodeHubWorkerConfig(strings.NewReader(body))
 	if err != nil || c.Permission == nil || !c.Permission.Retention || c.Permission.WorkerConfiguration.Source != "s" || c.Permission.ContextDeletion.EvidenceStore.Bucket != "b" {
 		t.Fatal("permission section not decoded", err)
