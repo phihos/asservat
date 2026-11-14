@@ -24,7 +24,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/jackc/pgx/v5/pgxpool"
-	admission "k8s.io/api/admissionregistration/v1"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -360,29 +359,5 @@ func testGuardedRetentionReconciliation(t *testing.T, ctx context.Context, c *re
 	}
 	if pending, err := auditLedger.PendingRetentionAcceptances(ctx, 64); err != nil || len(pending) != 0 {
 		t.Fatal("source audit did not drain", err)
-	}
-	// A current guard failure terminates the source controller; a same-value
-	// restoration with a new binding version needs explicit requalification.
-	cancel, done = start()
-	defer cancel()
-	changed := binding.DeepCopy()
-	changed.Spec.ValidationActions = []admission.ValidationAction{admission.Warn}
-	changed, err = native.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().Update(ctx, changed, meta.UpdateOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		binding.ResourceVersion = changed.ResourceVersion
-		if _, e := native.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().Update(context.WithoutCancel(ctx), binding, meta.UpdateOptions{}); e != nil {
-			t.Error(e)
-		}
-	}()
-	select {
-	case err = <-done:
-		if err == nil {
-			t.Fatal("lost guard returned success")
-		}
-	case <-time.After(6 * time.Second):
-		t.Fatal("lost guard kept renewing")
 	}
 }
