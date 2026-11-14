@@ -114,13 +114,32 @@ func (consumedReservations) ReserveBootstrap(context.Context, value.BootstrapReq
 	return value.BootstrapIntent{}, value.ErrLocalBootstrapConsumed
 }
 
-// A claimed slot ends the loop; no record is written.
-func TestLocalClusterBootstrapStopsWhenClaimed(t *testing.T) {
+// An activated enrollment ends the loop; no record is written.
+func TestLocalClusterBootstrapStopsWhenEnrolled(t *testing.T) {
 	f, l, records := newLocalFixture()
 	l.Issuer.Reservations = consumedReservations{f}
 	var events []string
-	if err := l.Run(context.Background(), func(e string) { events = append(events, e) }); err != nil || len(events) != 1 || events[0] != "claimed" || len(records.written) != 0 {
-		t.Fatal("claimed local slot", events, err)
+	if err := l.Run(context.Background(), func(e string) { events = append(events, e) }); err != nil || len(events) != 1 || events[0] != "enrolled" || len(records.written) != 0 {
+		t.Fatal("enrolled local slot", events, err)
+	}
+}
+
+type pendingReservations struct{ *bootstrapFixture }
+
+func (pendingReservations) ReserveBootstrap(context.Context, value.BootstrapRequest) (value.BootstrapIntent, error) {
+	return value.BootstrapIntent{}, value.ErrPending
+}
+
+// A claimed slot whose enrollment has not activated keeps the loop running
+// (pending), so a failed claim is replaced once its slot expires.
+func TestLocalClusterBootstrapKeepsRunningWhileClaimPending(t *testing.T) {
+	f, l, _ := newLocalFixture()
+	l.Issuer.Reservations = pendingReservations{f}
+	ctx, cancel := context.WithCancel(context.Background())
+	var events []string
+	err := l.Run(ctx, func(e string) { events = append(events, e); cancel() })
+	if !errors.Is(err, context.Canceled) || len(events) != 1 || events[0] != "pending" {
+		t.Fatal("pending claim ended local issuance", events, err)
 	}
 }
 
