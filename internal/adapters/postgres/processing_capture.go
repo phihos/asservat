@@ -22,7 +22,7 @@ var _ app.ContextProcessingCoverageReader = (*ProcessingReads)(nil)
 func processingCaptureCoverage(p custodydb.ProcessingRoot, rows []custodydb.ProcessingRule, in value.ProcessingCoverageRequest, installation, issuerEpoch string, now time.Time) error {
 	if !in.Valid() || in.AnchorAt.After(now) || uid(p.RootID) != in.RootID || !processingRootValid(p, installation, now) || uid(p.IssuerEpoch) != issuerEpoch ||
 		!authorization.UUID(uid(p.InitializationID)) || !authorization.UUID(uid(p.Epoch)) || !authorization.UUID(uid(p.SourceUid)) || p.Sequence < 1 || p.Sequence > 1<<60 || p.BackingRevision < 1 ||
-		len(p.ProtectionDigest) != 32 || bytes.Equal(p.ProtectionDigest, make([]byte, 32)) || p.Captures < 0 || p.Captures > p.MaxCaptures || p.Rules < int64(len(rows)) || p.Rules > p.MaxRules ||
+		len(p.ProtectionDigest) != 32 || bytes.Equal(p.ProtectionDigest, make([]byte, 32)) || p.Rules < int64(len(rows)) || p.Rules > p.MaxRules ||
 		p.RootTransitions < 1 || p.RootTransitions > p.MaxRootTransitions || p.InitializedAt.Time.After(now) || len(rows) > privacy.MaxProcessingRules {
 		return value.ErrUnavailable
 	}
@@ -47,9 +47,6 @@ func processingCaptureCoverage(p custodydb.ProcessingRoot, rows []custodydb.Proc
 	// A malformed unrelated row remains unavailable, not an assurance of completeness.
 	if short {
 		return value.ErrProcessingCoverage
-	}
-	if p.Captures == p.MaxCaptures {
-		return value.ErrCapacity
 	}
 	return nil
 }

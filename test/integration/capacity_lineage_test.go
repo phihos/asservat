@@ -78,18 +78,18 @@ func (f *capacitySQLFixture) checkManagedProcessingLineage(t *testing.T, expecte
 	}
 	ctx, end := context.WithTimeout(f.ctx, 5*time.Second)
 	defer end()
-	var initialized, current, room, action, data, capture, artifactID, covered bool
-	err := f.admin.QueryRow(ctx, `SELECT p.initialized_at IS NOT NULL,clock_timestamp()<p.valid_until,p.captures<p.max_captures,
+	var initialized, current, action, data, capture, artifactID, covered bool
+	err := f.admin.QueryRow(ctx, `SELECT p.initialized_at IS NOT NULL,clock_timestamp()<p.valid_until,
  e->>'ActionID'='pod-status',e->>'DataClass'='metadata',(e->>'CaptureUID')::uuid=c.id,
  (e#>>'{Registration,Location,ArtifactID}')::uuid=$3::uuid,(e#>>'{Registration,DeleteBy}')::timestamptz<=p.valid_until
  FROM context_capture c JOIN processing_root p ON p.root_id=c.root_id
  CROSS JOIN LATERAL (SELECT convert_from(c.expectation_json,'UTF8')::jsonb AS e) j
- WHERE c.root_id=$1 AND c.id=$2`, f.input.PermissionRootID, expected.CaptureUID, expected.Registration.Location.ArtifactID).Scan(&initialized, &current, &room, &action, &data, &capture, &artifactID, &covered)
+ WHERE c.root_id=$1 AND c.id=$2`, f.input.PermissionRootID, expected.CaptureUID, expected.Registration.Location.ArtifactID).Scan(&initialized, &current, &action, &data, &capture, &artifactID, &covered)
 	if err != nil {
 		t.Fatal("managed processing lineage diagnostic unavailable")
 	}
-	t.Logf("managed_processing_lineage initialized=%t current=%t room=%t action=%t data=%t capture=%t artifact=%t horizon=%t", initialized, current, room, action, data, capture, artifactID, covered)
-	if !initialized || !current || !room || !action || !data || !capture || !artifactID || !covered {
+	t.Logf("managed_processing_lineage initialized=%t current=%t action=%t data=%t capture=%t artifact=%t horizon=%t", initialized, current, action, data, capture, artifactID, covered)
+	if !initialized || !current || !action || !data || !capture || !artifactID || !covered {
 		t.Fatal("managed processing original lineage is not publishable")
 	}
 }

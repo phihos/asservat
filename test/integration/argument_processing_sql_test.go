@@ -118,10 +118,6 @@ func qualifyArgumentProcessingSQL(t *testing.T, ctx context.Context, admin *pgxp
  VALUES($1,$2,$3,'{}','{}',decode(repeat('01',32),'hex'),$4,$5,$6,'started',$4)`, root, accepted.CaptureID, accepted.Expectation.Registration.Location.AttemptID, now, now.Add(5*time.Second), custodyID())
 			}
 			exec("SET LOCAL session_replication_role=origin")
-			var before int64
-			if err := tx.QueryRow(ctx, "SELECT captures FROM processing_root WHERE root_id=$1", root).Scan(&before); err != nil {
-				t.Fatal(err)
-			}
 			_, err = tx.Exec(ctx, "INSERT INTO context_catalog(artifact_id,capture_id,root_id) VALUES($1,$2,$3)", accepted.Expectation.Registration.Location.ArtifactID, accepted.CaptureID, root)
 			want := name == "arguments" || name == "metadata" || name == "profile"
 			if !want {
@@ -133,10 +129,9 @@ func qualifyArgumentProcessingSQL(t *testing.T, ctx context.Context, admin *pgxp
 			if err != nil {
 				t.Fatal("valid processing lineage", err)
 			}
-			var after int64
 			var count int
-			if err := tx.QueryRow(ctx, `SELECT p.captures,(SELECT count(*) FROM context_processing c WHERE c.root_id=p.root_id AND c.capture_id=$2 AND c.origin='capture' AND c.parents='[]') FROM processing_root p WHERE p.root_id=$1`, root, accepted.CaptureID).Scan(&after, &count); err != nil || after != before+1 || count != 1 {
-				t.Fatal("processing projection/counter", before, after, count, err)
+			if err := tx.QueryRow(ctx, `SELECT count(*) FROM context_processing c WHERE c.root_id=$1 AND c.capture_id=$2 AND c.origin='capture' AND c.parents='[]'`, root, accepted.CaptureID).Scan(&count); err != nil || count != 1 {
+				t.Fatal("processing projection", count, err)
 			}
 			if name == "arguments" {
 				rows, err := custodydb.New(tx).ListStartedRecordings(ctx, custodydb.ListStartedRecordingsParams{RootID: id(root), StartedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true}, Limit: 16})
