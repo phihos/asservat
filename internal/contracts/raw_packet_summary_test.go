@@ -2,7 +2,6 @@ package contracts
 
 import (
 	"encoding/json"
-	"os"
 	"testing"
 )
 
@@ -11,7 +10,7 @@ func TestRawPacketSummaryCanonicalCoverageField(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	base, err := os.ReadFile("../../examples/mcp-packet-summary-result.json")
+	base, err := readImplementedExample("../../examples/", "mcp-packet-summary-result.json")
 	if err != nil {
 		t.Fatal(err)
 	}

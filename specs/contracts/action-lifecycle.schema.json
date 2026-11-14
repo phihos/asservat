@@ -190,8 +190,7 @@
               }
             ]
           },
-          "minItems": 1,
-          "maxItems": 16
+          "minItems": 1
         },
         "ongoingPodScope": {
           "enum": [
@@ -336,7 +335,6 @@
             ]
           },
           "minItems": 0,
-          "maxItems": 11,
           "uniqueItems": true
         },
         "sourceStoppedAt": {

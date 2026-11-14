@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"os"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -13,7 +12,7 @@ import (
 func TestSubmissionTrustProtectedConfig(t *testing.T) {
 	for _, mode := range []string{"valid", "root", "installation", "epoch", "replacement", "duplicate-key", "unknown", "alias", "key-encoding", "empty", "expired-read"} {
 		t.Run(mode, func(t *testing.T) {
-			b, e := os.ReadFile("../../../examples/submission-trust.json")
+			b, e := readImplementedExample("../../../examples/", "submission-trust.json")
 			if e != nil {
 				t.Fatal(e)
 			}

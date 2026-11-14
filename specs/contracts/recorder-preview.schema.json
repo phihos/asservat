@@ -107,7 +107,6 @@
     "filters": {
       "type": "array",
       "minItems": 0,
-      "maxItems": 16,
       "items": {
         "type": "object",
         "additionalProperties": false,
@@ -119,8 +118,7 @@
           },
           "expression": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 4096
+            "minLength": 1
           },
           "linkType": {
             "const": "EN10MB"
@@ -202,7 +200,6 @@
         "reasons": {
           "type": "array",
           "minItems": 1,
-          "maxItems": 16,
           "items": {
             "type": "object",
             "additionalProperties": false,
@@ -236,27 +233,27 @@
             "maxSessionSeconds": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 3600
+              "maximum": 9007199254740991
             },
             "maxObservedBytes": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 1099511627776
+              "maximum": 9007199254740991
             },
             "maxBytesPerSecond": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 1073741824
+              "maximum": 9007199254740991
             },
             "maxConcurrentSessions": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 1000
+              "maximum": 9007199254740991
             },
             "maxObservedEvents": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 1000000000
+              "maximum": 9007199254740991
             }
           },
           "required": [
@@ -275,7 +272,6 @@
     "profileEndpoints": {
       "type": "array",
       "minItems": 1,
-      "maxItems": 16,
       "items": {
         "type": "object",
         "additionalProperties": false,
@@ -371,7 +367,6 @@
           "names": {
             "type": "array",
             "minItems": 1,
-            "maxItems": 128,
             "uniqueItems": true,
             "items": {
               "type": "string",

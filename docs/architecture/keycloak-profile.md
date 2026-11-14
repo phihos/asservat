@@ -1,7 +1,8 @@
 # Keycloak reference identity profile
 
 Keycloak is the first supported and tested provider for browser sign-in and
-MCP access (REQ-AUT-001, TASK-07, [ADR-053](../decisions/053-keycloak-access-profile.md)).
+MCP access (REQ-AUT-001, TASK-07, [ADR-053](../decisions/053-keycloak-access-profile.md),
+[ADR-335](../decisions/335-usable-by-default.md) D4/D5/D14).
 With `services.identity.provider: external`, the realm stays operator-managed;
 the [bundled-services profile](../installation/small-profile.md) selects
 Keycloak explicitly and prepares its own realm. Selecting an external provider
@@ -17,36 +18,55 @@ reuses the generic HTTPS/JWKS and signature verification of
   `azp`.
 - ID and refresh tokens are rejected, as are delegation, impersonation (actor
   claims) and proof-of-possession tokens.
-- Only the `asservat_groups` claim supplies group membership, as stable group
-  IDs. Group names and paths never confer access. An absent claim means no
-  groups. Malformed, null, duplicate or oversized claims fail verification.
-- A token without `sub` fails verification.
+- Group membership comes from the configured groups claim (`identity.groupsClaim`,
+  default `groups`), as group names. An absent claim means no groups.
+  Malformed, null, duplicate or oversized claims fail verification.
+- A token without `sub` fails verification; the username comes from
+  `preferred_username` unless `identity.usernameClaim` says otherwise.
 
 ## Realm configuration
 
 - An audience mapper adds the API audience.
-- A multivalued User Attribute mapper for `asservat_group_id`, with aggregation,
-  emits `asservat_groups` only in access tokens. Each group's attribute holds its
-  native group UUID. Inherited groups contribute their IDs; renames do not
-  change them. Group IDs are never recycled.
-- The attribute is protected against user writes; user, group, client and mapper
-  administration is restricted; unmanaged attributes are disabled.
-- Keep the `basic` client scope, which supplies `sub`.
-- The console client gets `evidence:share` as a default client scope
-  ([ADR-232](../decisions/232-concrete-evidence-share.md)); MCP clients request
-  it as an optional scope.
-- The human client uses authorization code with S256 PKCE; direct password
-  grants, implicit flow and service accounts are disabled. Workloads use a
-  separate confidential client with browser and password flows disabled.
+- Keycloak's standard Group Membership mapper emits the `groups` claim with
+  full group paths (`/payments`, `/platform/sre`), so subgroups with equal
+  names stay distinct. Bindings and `identity.administrators` use those paths.
+  Renaming or moving a group changes its path; bindings naming the old path
+  stop matching until they are updated, as with Kubernetes OIDC groups.
+- Keep the `basic` client scope, which supplies `sub`, and the `profile`
+  scope, which supplies `preferred_username` and the display name.
+- The console client and the MCP client get `evidence:share` as a default
+  client scope ([ADR-232](../decisions/232-concrete-evidence-share.md)).
+- The human clients use authorization code with S256 PKCE; direct password
+  grants, implicit flow and service accounts are disabled. The MCP client is a
+  public client whose redirect URIs are the loopback addresses on any port
+  (RFC 8252 §7.3), so desktop MCP tools need no per-tool registration.
+  Workloads use a separate confidential client with browser and password flows
+  disabled.
+- Step-up is not configured by default. An operator who enables
+  `approvals.stepUp` configures a Keycloak authentication flow whose level of
+  assurance maps to the configured `acr` values; `max_age` re-authentication
+  is the minimal working setup.
 
-Group membership is recomputed at token refresh. An accepted group assertion is
-bounded from the access token's original `iat`. Closing a provider session does
-not revoke already issued JWTs; Asservat's identity policy, checked once per
-operation, can remove a client or subject independently. The installation guide
-documents these realm settings; Asservat needs no realm-admin credential or
-Admin API access at runtime.
+Group membership is recomputed at every token issuance, including refresh, and
+is valid for the access token's lifetime (Keycloak default five minutes).
+Closing a provider session does not revoke already issued JWTs; Asservat's
+identity configuration, checked once per operation, can remove a client or
+subject independently. Asservat needs no realm-admin credential or Admin API
+access at runtime.
 
-Recurring team policies do not depend on a creator's SSO session
+## Bundled realm
+
+The bundled realm creates the console client, the MCP client and the group
+`/asservat-admins`, which is the default of the Helm value `administrators.groups`. The
+chart creates an initial administrator user named in values, with its password
+read from an existing Secret or generated into one; that user belongs to
+`/asservat-admins`. Administrators create further users in the Keycloak admin
+console with a temporary password, which Keycloak makes the user replace at
+first sign-in, and add them to team groups. There is no self-registration and
+no default password. The realm's groups and clients are reconciled on
+`helm upgrade`.
+
+Recurring team policies do not depend on an author's SSO session
 ([ADR-059](../decisions/059-unattended-policy-authority.md),
 [background identity research](../research/background-identity.md)); no
 directory-reader or offline credential is required.
@@ -59,7 +79,8 @@ docs/implementation-progress.md.
 Sources: [Keycloak 26.8.0 release notes](https://www.keycloak.org/2026/10/keycloak-2680-released)
 (actor claims on impersonation),
 [group membership mapper](https://github.com/keycloak/keycloak/blob/26.8.0/services/src/main/java/org/keycloak/protocol/oidc/mappers/GroupMembershipMapper.java)
-(emits names/paths),
-[user attribute mapper](https://github.com/keycloak/keycloak/blob/26.8.0/services/src/main/java/org/keycloak/protocol/oidc/mappers/UserAttributeMapper.java)
-(aggregation),
-[group administration](https://www.keycloak.org/docs/latest/server_admin/index.html#_groups).
+(emits names or full paths),
+[group administration](https://www.keycloak.org/docs/latest/server_admin/index.html#_groups),
+[Kubernetes OIDC groups claim](https://kubernetes.io/docs/reference/access-authn-authz/authentication/#openid-connect-tokens),
+[RFC 8252 §7.3](https://www.rfc-editor.org/rfc/rfc8252#section-7.3)
+(loopback redirects on any port).

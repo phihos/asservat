@@ -2,7 +2,6 @@ package contracts
 
 import (
 	"encoding/json"
-	"os"
 	"testing"
 )
 
@@ -13,11 +12,11 @@ func TestPacketQuerySchemasAndNestedPage(t *testing.T) {
 	}
 	for _, name := range []string{"metadata", "raw"} {
 		t.Run(name, func(t *testing.T) {
-			input, err := os.ReadFile("../../examples/mcp-packet-query-" + name + "-input.json")
+			input, err := readImplementedExample("../../examples/", "mcp-packet-query-"+name+"-input.json")
 			if err != nil || wire.ValidateInput("pcap_query", input) != nil {
 				t.Fatal("packet query input", err)
 			}
-			body, err := os.ReadFile("../../examples/mcp-packet-query-" + name + "-result.json")
+			body, err := readImplementedExample("../../examples/", "mcp-packet-query-"+name+"-result.json")
 			if err != nil || wire.ValidateOutput("pcap_query", body) != nil {
 				t.Fatal("packet query page", err)
 			}
@@ -100,7 +99,7 @@ func TestLimitedPacketQueryRequiresCanonicalNarrowingHint(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	body, err := os.ReadFile("../../examples/mcp-packet-query-raw-result.json")
+	body, err := readImplementedExample("../../examples/", "mcp-packet-query-raw-result.json")
 	if err != nil {
 		t.Fatal(err)
 	}

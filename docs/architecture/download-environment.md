@@ -6,7 +6,7 @@
 
 `download-environment.json` is a ConfigMap rendered by the Helm chart, closed by [its schema](../../specs/contracts/download-environment.schema.json) and at most 128 KiB. Each hub process reads it from a mounted file or a shared informer. The last valid revision stays in force until a newer valid revision replaces it (ADR-330 D1); an invalid update is rejected and logged, and the previous revision remains. The accepted revision and digest are logged.
 
-The policy selects, per client and region, which configured store/reader paths may deliver. It may permit or remove a configured path; it cannot invent a reader, hub pool or processing location. Empty permitted sets deny. A client allowlist alone does not grant disclosure.
+The policy selects, per region, which configured store/reader paths may deliver; it never restricts a client relative to its user (ADR-335). It may permit or remove a configured path; it cannot invent a reader, hub pool or processing location. Empty permitted sets deny.
 
 ## Processing restrictions
 

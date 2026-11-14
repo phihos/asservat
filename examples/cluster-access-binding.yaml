@@ -1,0 +1,15 @@
+apiVersion: asservat.io/v1alpha1
+kind: ClusterAccessBinding
+metadata:
+  name: sre-approvers
+spec:
+  effect: Allow
+  subjects:
+  - kind: Group
+    id: /sre
+  roles:
+  - action-approver
+  - evidence-reader
+  clusters:
+  - '*'
+  reason: Central SRE approves intrusive captures across the fleet.

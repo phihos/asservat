@@ -41,7 +41,6 @@
                   "items": {
                     "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/artifactRef"
                   },
-                  "maxItems": 64,
                   "minItems": 1,
                   "uniqueItems": true
                 }
@@ -135,7 +134,6 @@
             "minLength": 1,
             "maxLength": 64
           },
-          "maxItems": 16,
           "minItems": 1,
           "uniqueItems": true
         },
@@ -155,12 +153,12 @@
             "maxBytes": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 1099511627776
+              "maximum": 9007199254740991
             },
             "maxExecutions": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 10000
+              "maximum": 9007199254740991
             },
             "maxDuration": {
               "type": "string",
@@ -197,7 +195,7 @@
             "maxAgeSeconds": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 31536000
+              "maximum": 9007199254740991
             }
           },
           "required": [
@@ -213,27 +211,27 @@
             "maxSessionSeconds": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 3600
+              "maximum": 9007199254740991
             },
             "maxObservedBytes": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 1099511627776
+              "maximum": 9007199254740991
             },
             "maxBytesPerSecond": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 1073741824
+              "maximum": 9007199254740991
             },
             "maxConcurrentSessions": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 1000
+              "maximum": 9007199254740991
             },
             "maxObservedEvents": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 1000000000
+              "maximum": 9007199254740991
             }
           },
           "required": [
@@ -254,6 +252,35 @@
         },
         "policyAuthority": {
           "$ref": "https://asservat.io/spec/v1/policy-authority.schema.json#/$defs/accepted"
+        },
+        "renewal": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Last in-place renewal of a policy grant (ADR-335 D6): same grant, counters and execution digest, new notAfter.",
+          "properties": {
+            "count": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "renewedAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "renewedBy": {
+              "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/principal"
+            },
+            "previousNotAfter": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          "required": [
+            "count",
+            "renewedAt",
+            "renewedBy",
+            "previousNotAfter"
+          ]
         }
       },
       "required": [
@@ -495,50 +522,54 @@
         "revision": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 1000000
+          "maximum": 9007199254740991
         },
         "reservedBytes": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 1099511627776
+          "maximum": 9007199254740991
         },
         "spentBytes": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 1099511627776
+          "maximum": 9007199254740991
         },
         "executionsSpent": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 10000
+          "maximum": 9007199254740991
         },
         "executionsReserved": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 10000
+          "maximum": 9007199254740991
         },
         "observedBytesReserved": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 1099511627776
+          "maximum": 9007199254740991
         },
         "observedBytesSpent": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 1099511627776
+          "maximum": 9007199254740991
         },
         "observedEventsReserved": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 1000000000
+          "maximum": 9007199254740991
         },
         "observedEventsSpent": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 1000000000
+          "maximum": 9007199254740991
         },
         "resultAccessCounters": {
           "$ref": "https://asservat.io/spec/v1/investigation-access.schema.json#/$defs/counters"
+        },
+        "renewalDue": {
+          "type": "boolean",
+          "description": "Policy grant within renewalNoticeSeconds of notAfter; the policy reports RenewalDue."
         }
       },
       "required": [

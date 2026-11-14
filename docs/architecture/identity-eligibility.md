@@ -1,7 +1,8 @@
 # Identity and ordinary eligibility
 
 Scope: C-02 identity, C-03 authorization, C-21 protocol adapters and C-24
-values; REQ-AUT-001/002, REQ-PER-001/006/008, TASK-07, S-01/S-02. The
+values; REQ-AUT-001/002, REQ-PER-001/006/008, TASK-07, S-01/S-02 and
+[ADR-335](../decisions/335-usable-by-default.md) D4/D14. The
 [identity research](../research/identity-foundation.md) and
 [settings research](../research/identity-settings-foundation.md) record the
 external sources. This boundary returns eligibility, not an execution permit or
@@ -16,8 +17,8 @@ exact issuer, resource audience, `client_id`, consistent optional `azp`,
 required timestamps and token ID, and bounded scope/group claims. ID tokens,
 opaque, encrypted, delegated and proof-of-possession tokens are rejected.
 Providers with a different access-token layout get an explicit profile, as the
-[Keycloak profile](keycloak-profile.md) does; guessed e-mail or group display
-names are never accepted.
+[Keycloak profile](keycloak-profile.md) does; e-mail is never a fallback
+identity.
 
 Issuer, audience, JWKS URL, CA trust and cache limits come from the mounted
 identity configuration. Token fields cannot choose endpoints, algorithms or key
@@ -34,7 +35,7 @@ accepted.
 | JWKS cache | Last-known-good key set per issuer; refreshed when a token names an unknown `kid` |
 | JWKS refresh | Serialized, at most one attempt per second per issuer; no per-attacker-key cache |
 | Network I/O timeout | 5 seconds |
-| Signed groups / scopes | At most 256 stable IDs / 64 scopes |
+| Signed groups / scopes | At most 256 group names (each ≤ 255 bytes) / 64 scopes |
 
 The JWKS cache follows go-oidc `RemoteKeySet`: keys stay valid until a refresh
 replaces them, and an unknown `kid` triggers one rate-limited refresh. A failed
@@ -43,30 +44,41 @@ works without a timer, and a provider outage does not reject tokens signed by a
 cached key. Revoking an issuer or client is done in the identity configuration,
 not by expiring keys.
 
-## Organization eligibility and policy
+## Eligibility, administrators and groups
 
 `identity.Service` takes verified claims from `TokenVerifier` and checks them
-against the current installation identity policy for that exact issuer. A valid
-signature alone is insufficient: the policy must admit a stable subject or a
-group, and the registered client. Client IDs and resource audiences are
-distinct.
+against the current identity configuration for that exact issuer. A valid
+signature from the configured issuer through a registered client makes a human
+eligible; `identity.requiredGroups`, when set, additionally requires membership
+in one of the named groups. Client IDs and resource audiences are distinct.
 
 Each client is configured as human-only or workload-only; there is no human
-default for a mixed client. Group eligibility requires a provider configuration
-that signs the complete list of stable group IDs and refreshes it at token
-issuance, including refresh. The RFC 9068 profile requires an explicit, possibly
-empty groups array; the Keycloak profile uses its dedicated stable-ID mapper.
-Group names or paths are never a fallback. A group assertion is accepted for at
-most five minutes from the token's original `iat`.
+default for a mixed client. The console client and, when the identity provider
+is bundled, the MCP client are registered by default; an external provider's
+MCP client is one entry in `identity.clients`. Groups are the names in the
+configured groups claim (`identity.groupsClaim`, default `groups`), the complete
+list the provider signs at every issuance, including refresh; an absent claim
+means no groups. A group assertion is valid until the access token expires.
 
-The policy is `identity.json`, validated against the
+`identity.administrators` names administrator groups and users (by username).
+The service marks a principal as administrator when its current token matches;
+this is the only identity list besides `requiredGroups`. Fleet, retention,
+share and privacy administration all check it (REQ-AUT-001).
+
+Each successful sign-in or first MCP request of a token upserts the
+principal's known-principals row (issuer, subject, username, display name,
+groups seen, last seen). User and group pickers search it with a prefix match,
+limited to 20 results and to callers who may share or bind; it never confers
+access.
+
+The configuration is `identity.json`, validated against the
 [identity settings contract](../../specs/contracts/identity-settings.schema.json)
 ([example](../../examples/identity-settings.json)). The Helm chart renders it into
 a ConfigMap. `IdentityPolicyClient` reads it from the mounted file, or through a
-shared informer, and keeps the parsed policy valid until a change replaces it.
-A watch or parse failure keeps the last valid policy and reports the error; it
-never falls back to a permissive policy. Unknown fields, duplicate clients,
-unqualified identity classes and invalid group bounds are rejected when the new
+shared informer, and keeps the parsed configuration valid until a change replaces it.
+A watch or parse failure keeps the last valid configuration and reports the error; it
+never falls back to a default or more permissive configuration. Unknown fields, duplicate clients,
+unqualified identity classes and invalid bounds are rejected when the new
 content is parsed. Client or subject removal takes effect when the changed
 content arrives.
 
@@ -100,8 +112,8 @@ before its relist completes, eligibility is denied. Projections have bounded
 allow/deny rows and no catch-all fallback.
 
 Evidence reads also intersect the caller's current assignments with the
-artifact's retained audience. The audience is stored as issuer plus stable
-subject or stable IdP group ID, with role (D11). A new owner team cannot read old
+artifact's retained audience. The audience is stored as issuer plus subject
+or group name, with role (ADR-330 D11, ADR-335 D4). A new owner team cannot read old
 evidence through ownership alone. New members of a still-listed group can read.
 Several original teams stay independently eligible. The creator gets no special
 access.
@@ -110,14 +122,14 @@ access.
 the default audience for a new capture. `Evaluator.ContextEligibility` returns
 caller eligibility and, separately, the complete default audience from the same
 projection: all current reader, maintainer and owner assignments for the
-target, excluding approver-only assignments and denied subjects, with at most 32
-entries and no truncation. It performs no artifact lookup or acquisition.
+target, excluding approver-only assignments and denied subjects, complete and
+without truncation. It performs no artifact lookup or acquisition.
 
 Read checks may evaluate a larger current projection before intersecting it with
 the artifact's audience, so assignments added later never block an existing
-reader. A stored artifact keeps at most 32 audience entries.
+reader. A stored artifact keeps its complete audience.
 
-Raw operations, shares, approvals, step-up authentication, collection
+Raw operations, shares, approvals, optional step-up authentication, collection
 ceilings, capacity, execution, audit and disclosure are composed by their own
 components before any effect. `AudienceReader` reads only published catalog
 entries, never stored but unpublished custody rows.

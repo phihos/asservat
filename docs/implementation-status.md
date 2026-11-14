@@ -89,7 +89,7 @@ physical restore, internal accounts/static keys and full production operational
 qualification remain unfinished.
 
 Packet/syscall collectors remain
-[disposable-test-host only](installation/helm.md#node-collector-test-hosts-only).
+[disposable-test-host only](installation/helm.md#node-collector).
 Keep them off ordinary homelab nodes. Named recording Save, history/settings,
 Repeat and profile workflows now have later installed passes; the older blanket
 recording-history failure descriptions are superseded at those boundaries.

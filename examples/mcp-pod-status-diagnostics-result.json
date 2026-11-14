@@ -6,6 +6,7 @@
   "data": {
     "diagnostics": [
       {
+        "kind": "preset",
         "name": "Pod status",
         "version": "v1",
         "description": "A bounded snapshot of one pod: phase, readiness and aggregate runtime/restart counts. No logs, process inspection, file reads or network capture.",
@@ -22,7 +23,10 @@
         "preset_ref": {
           "name": "pod-status",
           "version": "v1"
-        }
+        },
+        "execution_modes": [
+          "onTrigger"
+        ]
       }
     ]
   },

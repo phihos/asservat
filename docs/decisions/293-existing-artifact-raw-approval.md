@@ -1,5 +1,7 @@
 # ADR-293 — Existing-artifact raw download approval
 
+> Superseded in part by [ADR-335](335-usable-by-default.md): a caller holding the equivalent Kubernetes right (`pods/exec`) downloads raw evidence without review; step-up is optional and off by default.
+
 Date: 2026-11-03. Status: native download implemented and installed-qualified on `af8d2b07`
 (Native41673309250); other raw operations remain unimplemented.
 Requirements: REQ-AUT-002–004, REQ-DLD-002, REQ-INV-002, REQ-SYS-003.

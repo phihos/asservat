@@ -8,18 +8,23 @@
     "recordings": [
       {
         "recording_handle": "recording-synthetic-traffic",
-        "policy_uid": "policy-trigger-lifecycles-uid",
+        "owner_kind": "policy",
         "policy_name": "trigger-lifecycles",
-        "pod_uid": "pod-uid",
         "pod_name": "api-synthetic",
         "action_id": "traffic",
         "kind": "packetCapture",
         "state": "Ready",
-        "available_before_seconds": 30,
+        "history": "Full",
         "maximum_before": "30s",
-        "observed_at": "2026-10-09T12:00:00Z",
         "save_eligible": true,
+        "save_via": "recordingSave",
+        "live_projections": [
+          "packetMetadata"
+        ],
         "blockers": [],
+        "incident_pod_cap": 1,
+        "available_before_seconds": 30,
+        "observed_at": "2026-10-09T12:00:00Z",
         "execution_authority": {
           "mode": "team",
           "executor": {
@@ -44,24 +49,27 @@
               "id": "team-payments"
             }
           ]
-        },
-        "history": "Full",
-        "incident_pod_cap": 1
+        }
       },
       {
         "recording_handle": "recording-synthetic-syscalls",
-        "policy_uid": "policy-trigger-lifecycles-uid",
+        "owner_kind": "policy",
         "policy_name": "trigger-lifecycles",
-        "pod_uid": "pod-uid",
         "pod_name": "api-synthetic",
         "action_id": "syscalls",
         "kind": "syscallTrace",
         "state": "Ready",
-        "available_before_seconds": 30,
+        "history": "Full",
         "maximum_before": "30s",
-        "observed_at": "2026-10-09T12:00:00Z",
         "save_eligible": true,
+        "save_via": "recordingSave",
+        "live_projections": [
+          "syscallMetadata"
+        ],
         "blockers": [],
+        "incident_pod_cap": 1,
+        "available_before_seconds": 30,
+        "observed_at": "2026-10-09T12:00:00Z",
         "execution_authority": {
           "mode": "team",
           "executor": {
@@ -86,9 +94,7 @@
               "id": "team-payments"
             }
           ]
-        },
-        "history": "Full",
-        "incident_pod_cap": 1
+        }
       }
     ],
     "capture_enabled": false,

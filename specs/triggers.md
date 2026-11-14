@@ -24,7 +24,7 @@ Initial implementation order: log/resource/probe/exit/external/manual, then cras
 
 Policies MUST define named typed detectors and a `when` expression combining detector states through `all`, `any`, `not`, `for`, count/window, or ordered sequence. Implement a constrained typed AST with CEL for leaf predicates, not arbitrary scripts. No network, file, process or unbounded iteration functions exist in expressions. Admission MUST reject unknown fields, impossible units, invalid regular expressions, excessive depth and expressions over the evaluation budget.
 
-Default ceilings: 16 detectors/policy, nesting depth 8, 64 KiB policy text, 64 KiB per assembled log record, 1 MiB buffered log data per pod, fairly split across its sources, 5-minute maximum correlation window, 5-second metric interval. Overlong records are dropped and counted by default. Explicit matchPrefix mode may match a truncated literal/regexp prefix, tagged incomplete; structured JSON predicates never evaluate incomplete JSON. Regular expressions use Go's linear-time engine; no backreferences or look-around.
+Default ceilings: nesting depth 8 (evaluator recursion), 64 KiB per assembled log record and 1 MiB buffered log data per pod (connector memory), fairly split across its sources, 5-minute maximum correlation window. Node-local cgroup samples default to a 5-second interval; the metrics-API resource source samples at its own 15-second resolution (see [Resource](#resource)). Overlong records are dropped and counted by default. Explicit matchPrefix mode may match a truncated literal/regexp prefix, tagged incomplete; structured JSON predicates never evaluate incomplete JSON. Regular expressions use Go's linear-time engine; no backreferences or look-around.
 
 ### SC-TRG-001
 
@@ -52,7 +52,7 @@ Given a matching CRI record split across partial entries and followed by rotatio
 
 ## REQ-TRG-004 — Deduplication and budgets
 
-Each trigger occurrence MUST have an idempotency key derived from cluster, policy UID/generation, pod/correlation identity, contributing source IDs, detector transition ID and source epoch. Enforce per-policy, per-workload, per-node and installation-wide budgets. Defaults: one occurrence per workload per 5 minutes, burst 2; one invasive action per pod at once; two artifact streams per node; ten active actions per node. Budget changes cannot retroactively authorize a previously denied action. The [capacity rules](capacity.md) add stricter workload-wide dump limits, staged admission, bounded suppression summaries and shared counters across every replica/policy/generation. Context burst capacity never authorizes a dump burst.
+Each trigger occurrence MUST have an idempotency key derived from cluster, policy UID/generation, pod/correlation identity, contributing source IDs, detector transition ID and source epoch. Enforce per-policy, per-workload, per-node and installation-wide budgets. Defaults: occurrences that start an expensive action (dump, command, intrusive profile, recording save) are limited to one per workload per 5 minutes, burst 2; occurrences with only context, log, non-intrusive profile or recorder-window actions are limited by each policy's own `cooldown` (default 1 minute) and `maxOccurrencesPerHour` (default 60); one intrusive action per pod at once. Per-node concurrency (artifact streams, active actions) defaults from the node collector's resource limits, at least 4 artifact streams and 16 active actions per node; these are tuning values in Helm, not fixed caps. There is no limit on the number of policies; their cost is the watched workloads, bounded by the connector's shared informers. Budget changes cannot retroactively authorize a previously denied action. The [capacity rules](capacity.md) add stricter workload-wide dump limits, staged admission, bounded suppression summaries and shared counters across every replica/policy/generation. Context burst capacity never authorizes a dump burst.
 
 Related crash-agent, exit, probe and alert signals within a 30-second correlation window MAY append to one occurrence. Preserve each signal's provenance. A signature used before analysis MUST be marked provisional. Rate-limited occurrences keep content-free counts and gap reasons instead of pretending evidence was collected. Aggregate suppressed signals in bounded windows rather than creating a control object or durable event per raw match.
 
@@ -60,9 +60,9 @@ Related crash-agent, exit, probe and alert signals within a 30-second correlatio
 
 Given duplicate Alertmanager deliveries and a local crash for the same process, when they arrive across a controller restart, then the same occurrence is recovered and no invasive action is automatically repeated after an ambiguous start.
 
-## REQ-TRG-005 — Dynamic policy activation
+## REQ-TRG-005 — Dynamic policy application
 
-Policy updates MUST compile and validate as a new immutable generation before activation. Each generation retains an authenticated submission and approved execution identity under [permission management](permissions.md); every resolved target must remain within that identity's current derived or explicit scope. Intrusive policy grants bind the collection execution scope and recipe digests under [execution identity](execution.md); changes to that scope invalidate approval. Display, sharing, pause and grant-reference changes have separate effects and cannot broaden collection. Preset authoring binds both submitted input and the immutable resolved catalog/plan as specified in [ergonomics](ergonomics.md). A node or connector switches generation atomically and acknowledges it. Status reports `metadata.generation` and `status.observedGeneration`, armed targets, failed targets and reason. Removing a policy cancels observations and future actions; already uploaded evidence follows retention.
+A DebugPolicy takes effect when it is applied; there is no separate activation step. Policy updates MUST compile and validate as a new immutable generation before they run. Re-applying an unchanged spec is idempotent: a generation whose resolved execution digest is unchanged keeps its acceptance, approval, counters and expiry ([execution identity](execution.md)). Actions that need an approval wait for an approval of the current scope; the approval links to the policy by namespace and name and attaches itself, so no grant identifier is copied into the policy. Each generation retains an authenticated submission and approved execution identity under [permission management](permissions.md); every resolved target must remain within that identity's current derived or explicit scope. Intrusive policy grants bind the collection execution scope and recipe digests under [execution identity](execution.md); changes to that scope invalidate approval. Display, sharing and pause changes have separate effects and cannot broaden collection. Preset authoring binds both submitted input and the immutable resolved catalog/plan as specified in [ergonomics](ergonomics.md). A node or connector switches generation atomically and acknowledges it. Status reports `metadata.generation` and `status.observedGeneration`, armed targets, failed targets and reason. Suspending (`spec.suspend: true`) or removing a policy cancels observations and future actions; already uploaded evidence follows retention. Resuming the same scope continues its counters and an intrusive grant's original expiry.
 
 ### SC-TRG-005
 
@@ -82,7 +82,7 @@ The default evaluation key is pod UID, with internal source/restart identities r
 
 A detector is either a fresh level (resource/network/Kubernetes condition) or an event source (log/exit/alert/crashArtifact/schedule/file). Event leaves are true while at least one deduplicated event remains in eventWindow (default 30 seconds, maximum five minutes), false only while the source is fresh and its window is empty, Unknown on coverage loss. Probe threshold is a level over deduplicated failure events. count counts distinct source occurrences or qualified rising transitions for level detectors, never every true sample. sequence consumes distinct ordered occurrences, compares local observed time with stable source-ID tie breaks, does not reuse one event for multiple sequence positions, and expires incomplete prefixes at within. Each completed sequence is a one-evaluation pulse. for requires continuous known true; not uses three-valued logic (not Unknown is Unknown), all is false if any operand is false and otherwise Unknown if any is unknown; any is the dual. Temporal windows use (now-window, now]. Replays do not advance event counts. Reset correlation state on source epoch changes with an explicit gap, without resetting workload budgets.
 
-Absolute pod CPU/memory values use qualified aggregate accounting without double-counting parent/child cgroups. Limit/quota ratios and PSI are evaluated on each available runtime component and combined with any under the same pod; no user container selector exists. A component without a finite limit is Unknown for that ratio, not zero; preserve each contributor/unit and partial coverage. CPU requests are never a denominator. Admission rejects unsupported metric/runtime combinations. All sample intervals are at least one second (default five); correlation/hold/probe windows are at most five minutes. Invalid Go regex and CEL types require the actual Go compiler in production; the Python checker is not a substitute.
+Absolute pod CPU/memory values use qualified aggregate accounting without double-counting parent/child cgroups. Limit/quota ratios and PSI are evaluated on each available runtime component and combined with any under the same pod; no user container selector exists. A component without a finite limit is Unknown for that ratio, not zero; preserve each contributor/unit and partial coverage. CPU requests are never a denominator. Admission rejects unsupported metric/runtime combinations. Node-local sample intervals are at least one second (default five); the metrics-API source is described under [Resource](#resource). Correlation/hold/probe windows are at most five minutes. Invalid Go regex and CEL types require the actual Go compiler in production; the Python checker is not a substitute.
 
 Schedules use five-field minute cron and explicit IANA timeZone (preset default Etc/UTC), no embedded TZ macros or second field. Persist the last admitted nominal UTC slot; deterministic jitter is less than the minimum interval and charged to the original slot. No replay/catch-up after downtime, suspension or expiry; report missed slots. Nonexistent DST local times are skipped; repeated local minute runs once per policy/local date-minute, identified with the first UTC occurrence. Distinct policies still share workload budgets. A file sizeAbove detector requires sizeBytes; a stable-size observation never proves an application finished writing a dump.
 
@@ -92,13 +92,20 @@ Given replica A logs an error while B is under memory pressure, when default pod
 
 ## Connector detectors
 
-The first implemented detectors run in each region's connector, for a hub-held DebugPolicy
-(`spec.target.cluster`) that runs the pod-status context recipe on the triggering Pod
-(`maxPods: 1`, `selection: triggeringPod`). No node agent is needed. They are event-driven
-([ADR-330](../docs/decisions/330-event-driven-system-design.md) D1):
+A team writes its DebugPolicy in the workload's own namespace of the workload cluster, like a
+PrometheusRule or a Kyverno `Policy`; Kubernetes RBAC on that namespace decides who may write it
+([ADR-335](../docs/decisions/335-usable-by-default.md) D14). The connector watches DebugPolicies
+and delivers them to the hub over its connection; the policy names no cluster or namespace, both
+follow from where it lives. A policy may run any recipe or capture-profile composition that a
+manual capture may run ([ADR-335](../docs/decisions/335-usable-by-default.md) D15), within each
+action's [lifecycle](action-lifecycle.md). The detectors below run in each region's connector, so
+no node collector is needed to trigger. Actions that need the node collector (packets, syscalls,
+eBPF profiles, dumps, file reads) run where it is installed; on a node without it that action ends
+`Unsupported` with reason `NodeCollectorUnavailable` while the policy's other actions proceed.
+The detectors are event-driven ([ADR-330](../docs/decisions/330-event-driven-system-design.md) D1):
 
 - The connector keeps shared informers (LIST once, then WATCH): one Pod informer per namespace
-  with an active policy and, for probe policies, one Events informer per such namespace with field
+  with a policy and, for probe policies, one Events informer per such namespace with field
   selector `involvedObject.kind=Pod,reason=Unhealthy`. It evaluates each policy's detector in
   process on watch events and pushes only occurrences over its hub connection.
 - Detector state (per-Pod baselines and last seen counters) lives in connector memory. A connector
@@ -107,8 +114,8 @@ The first implemented detectors run in each region's connector, for a hub-held D
   neither fires nor re-arms.
 - The hub stores one row per occurrence with a unique constraint on its idempotency key; the
   occurrence ID is the capture idempotency key, so duplicate deliveries and retries never start
-  another capture. Policy activation, deactivation and changes reach the connector as events; the
-  connector starts or stops evaluating the workload when they arrive.
+  another capture. Applying, suspending, changing and deleting a policy reach the connector as
+  watch events; the connector starts or stops evaluating the workload when they arrive.
 - Timers that end a window (re-arm after `window`/`eventWindow` without a failure) are local timers
   started from observed event times, not polls.
 
@@ -116,16 +123,17 @@ Shared refinements of REQ-TRG-002/004/007 for these detectors:
 
 - Every occurrence fires on a rising edge, keyed (policy, Pod UID, detector-specific instant). The
   first observation of a Pod is its baseline and is armed only when its condition is false; a Pod
-  already failing at activation waits for a proven recovery. A source time later than the
-  connector's clock counts as now.
-- The shared workload budget (one occurrence per five minutes, burst two) holds for every policy
-  on the workload; a policy's own cooldown and hourly bound only tighten it. An execution is
-  charged at admission by the occurrence idempotency key and released on a definite refusal before
-  start. Suppression is a saturating count per policy and reason, never a durable record per
-  signal; capacity shortfalls are suppressions, never queued.
-- Not applicable and not implemented: the 30-second correlation append (REQ-TRG-004 MAY) and
-  per-node budgets (no node agent runs). Every other detector, expression, recipe or option is
-  rejected at activation with its field path.
+  already failing when the policy is applied waits for a proven recovery. A source time later than
+  the connector's clock counts as now.
+- Workload budgets (REQ-TRG-004) hold for every policy on the workload; a policy's own cooldown and
+  hourly bound only tighten them. An execution is charged at admission by the occurrence
+  idempotency key and released on a definite refusal before start. Suppression is a saturating
+  count per policy and reason, never a durable record per signal; capacity shortfalls are
+  suppressions, never queued.
+- The 30-second correlation append (REQ-TRG-004 MAY) is not applied to connector detectors.
+  Options that need node-local data (`kubeletMetrics`, cgroup-only metrics, PSI, file and network
+  conditions) are evaluated by the node collector where it runs; without it the policy reports
+  `DetectorUnavailable` with the field path.
 - Changing a policy's detector re-baselines every Pod: state of another detector is never compared.
 - Only per-Pod levels, counts and instants leave the region. Event text, log text, alert labels,
   annotations, fingerprints, `generatorURL` and metric labels stay in the connector and are never
@@ -135,7 +143,7 @@ Shared refinements of REQ-TRG-002/004/007 for these detectors:
 
 The exit detector's restart counter evaluates Pod update events of the named workload:
 
-- A counter has no level, so there is no re-arm interval, and activation never fires
+- A counter has no level, so there is no re-arm interval, and applying the policy never fires
   (`evaluation.fireOnActivation: true` is rejected with its field path).
 - One occurrence per (policy, Pod UID, restart count) whose latest termination matches the reasons
   (OOMKilled, Error, CrashLoopBackOff) and optional exit codes. When one update raises the count by
@@ -144,8 +152,8 @@ The exit detector's restart counter evaluates Pod update events of the named wor
 
 ### SC-TRG-008
 
-Given an activated restart policy on a three-replica Deployment, when one container is killed, then
-exactly one pod-status capture of that Pod runs under the policy executor and its team's audience
+Given an applied restart policy running the pod-status recipe on a three-replica Deployment, when
+one container is killed, then exactly one pod-status capture of that Pod runs under the policy executor and its team's audience
 can download it; when all three replicas crash repeatedly for 150 seconds, then at most the shared
 workload budget is admitted, every other observed restart is counted as suppressed, the hub holds
 one occurrence row per admitted occurrence and one suppression counter per reason, and no capture
@@ -153,12 +161,13 @@ follows once the restarts stop.
 
 ### SC-TRG-009
 
-Given an activated restart policy that has already captured, when a current maintainer of its
-delegating team deactivates it, then the connector stops evaluating the workload when the
-deactivation event arrives: a further container kill creates no occurrence, suppression count or
-execution charge; the existing capture and its evidence remain; repeating the deactivation is a
-replay; status reports `deactivated`; and activating the unchanged revision again is refused, so its
-charges and expiry cannot be reset.
+Given an applied restart policy that has already captured, when its team sets
+`spec.suspend: true`, then the connector stops evaluating the workload when the update event
+arrives: a further container kill creates no occurrence, suppression count or execution charge; the
+existing capture and its evidence remain; and status reports `Suspended`. Re-applying the same YAML
+is a no-op that changes no generation, counter or expiry. Resuming continues the cooldown and
+hourly counters and an intrusive grant's original expiry; neither suspension nor re-apply resets
+them.
 
 ### Probe failure
 
@@ -187,11 +196,11 @@ rules already express.
 
 ### SC-TRG-010
 
-Given an activated probe policy (Readiness, two failures within one minute) on a workload whose
+Given an applied probe policy (Readiness, two failures within one minute) on a workload whose
 replicas pass their readiness probe, when one Pod's readiness probe starts failing every few
-seconds, then exactly one pod-status capture of that Pod runs under the policy executor, further
+seconds, then exactly one capture of that Pod runs under the policy executor, further
 failures of the same failing period create no occurrence, and no Event text appears in status,
-occurrences, logs or the capture request. A Pod already failing when the policy is activated fires
+occurrences, logs or the capture request. A Pod already failing when the policy is applied fires
 only after a minute without failure followed by a new failure.
 
 ### External alert
@@ -199,35 +208,45 @@ only after a minute without failure followed by a new failure.
 The `alert` detector receives the standard Alertmanager version-4 webhook (see
 [alert delivery](#alert-delivery-and-incident-identity)). The connector serves the receiver on an
 in-cluster Service; the operator adds it as a `webhook_configs` receiver with
-`send_resolved: true` and a bearer credential from a Helm-generated Secret
-(`http_config.authorization`). A policy cannot name an address. These semantics refine
+`send_resolved: true`. The receiver authenticates the sender with a bearer credential
+(`http_config.authorization`) read from a Secret the Helm values name: an existing Secret that
+Alertmanager already mounts, or one the chart generates. An Alertmanager in the same cluster may
+instead present its projected ServiceAccount token (`http_config.authorization.credentials_file`)
+with the connector audience, checked by TokenReview as for connectors
+(ADR-334). A policy cannot name an address. These semantics refine
 REQ-TRG-002/004/006/007 for this source:
 
 - Options: `receiverRef: alertmanager` (the cluster's configured receiver; any other value is
-  rejected), `status: firing`, optional `matchLabels` (at most 16 exact label values; `namespace`
-  and `pod` are rejected because the mapping below sets them). `eventWindow` is rejected: the
+  rejected), `status: firing`, optional `matchLabels` (at most 16 exact label values; `namespace`,
+  `pod` and the workload labels below are rejected because the mapping sets them). `eventWindow` is rejected: the
   alert is a level. A longer hold belongs to the rule's `for` and `keep_firing_for`.
-- Mapping: an alert counts for a Pod when its `namespace` label is the policy's namespace, its
-  `pod` label names a current Pod of the workload and every `matchLabels` value matches. Alerts
-  without a `pod` label (workload- or node-level rules) are ignored, since the policy captures the
-  triggering Pod only. An Alertmanager shared by several clusters needs a cluster label in
-  `matchLabels`.
-- Level: a Pod is failing while at least one matching alert is firing and not resolved. The
+- Mapping: an alert counts when its `namespace` label is the policy's namespace, every
+  `matchLabels` value matches and it names the workload: a `pod` label naming a current Pod of the
+  workload makes that Pod the triggering Pod; otherwise a `deployment` or `statefulset` label
+  equal to the policy's workload name (or a `service` label naming a Service whose selector
+  selects the workload's Pods) makes it a workload-level occurrence. A workload-level occurrence
+  collects the pods chosen by `target.selection` (REQ-TGT-005); with the default `triggeringPod`
+  it collects the most recently started ready Pod of the workload, ordered by start time then UID,
+  and the capture records that the alert named no Pod. Alerts naming neither are ignored. An
+  Alertmanager shared by several clusters needs a cluster label in `matchLabels`.
+- Level: a Pod (or, for workload-level alerts, the workload) is failing while at least one matching
+  alert is firing and not resolved. The
   occurrence instant is the newest matching `startsAt` second; Alertmanager HA copies carry the
   same identity and never start another capture. After an occurrence the Pod re-arms when its last
   matching alert resolves; a later `startsAt` after the re-arm fires again, subject to budgets.
 - Unknown (fires nothing, never re-arms): after a connector restart until the next notification
   for the group (Alertmanager resends at `group_interval`/`repeat_interval`). A request without the
   credential, over 1 MiB or more than 1024 alerts, or malformed is rejected. A region without a
-  configured receiver refuses activation (`DetectorUnavailable`).
+  configured receiver reports `DetectorUnavailable`.
 
 ### SC-TRG-011
 
-Given an activated alert policy (`alertname: HighErrorRate`) on a workload whose cluster's
+Given an applied alert policy (`alertname: HighErrorRate`) on a workload whose cluster's
 Alertmanager sends to the receiver, when Alertmanager reports a matching alert labelled with one
-Pod's namespace and name, then exactly one pod-status capture of that Pod runs under the policy
-executor; repeated notifications while the alert stays active, a second matching alert on the same
-Pod and alerts in another namespace, on another Pod or without a pod label create no occurrence;
+Pod's namespace and name, then exactly one capture of that Pod runs under the policy executor; a
+matching alert labelled only with the Deployment's name captures one Pod chosen by the policy's
+selection; repeated notifications while the alert stays active, a second matching alert on the same
+Pod and alerts in another namespace, on another Pod or naming no Pod or workload create no occurrence;
 no alert label or annotation appears in status, occurrences, logs or the capture request; and a
 resolved notification re-arms the Pod.
 
@@ -239,8 +258,10 @@ connector (`get` on `pods/log`). A stream for a new container instance starts at
 start time; a reconnect resumes at the last record time and deduplicates by record time and content
 digest. These semantics refine REQ-TRG-001/002/003/004/007 for this source:
 
-- Options: `stream: both` only (`stdout`/`stderr` are rejected: the log API's stream filter is a
-  feature-gated parameter that is silently ignored where the gate is off); `match` literal
+- Options: `stream` (default `both`; `stdout`/`stderr` need the node collector's CRI log tail,
+  which records the stream, because the log API's stream filter is a feature-gated parameter that
+  is silently ignored where the gate is off; without a node collector they report
+  `DetectorUnavailable` with the field path); `match` literal
   (substring) or regexp (Go's RE2 engine, Perl syntax, no backreferences or look-around, at most
   4096 compiled instructions); `pattern` 1–1024 bytes; optional `jsonField`, a dotted path of at
   most 8 object keys whose value (a string's text, a number's or boolean's literal) is matched
@@ -262,9 +283,9 @@ digest. These semantics refine REQ-TRG-001/002/003/004/007 for this source:
 
 ### SC-TRG-012
 
-Given an activated log policy (regexp `SYNTHETIC-PANIC [0-9]+`, eventWindow 30 s) on a workload
+Given an applied log policy (regexp `SYNTHETIC-PANIC [0-9]+`, eventWindow 30 s) on a workload
 whose replicas log only non-matching lines, when one Pod writes a matching line, then exactly one
-pod-status capture of that Pod runs under the policy executor; the line staying in the window
+capture of that Pod runs under the policy executor; the line staying in the window
 creates no further occurrence; no log text appears in status, occurrences or the capture request;
 the Pod re-arms after the window passes without a match; and a Pod whose log stream fails without
 a match neither fires nor re-arms.
@@ -279,9 +300,12 @@ at most 1024 items). These semantics refine REQ-TRG-002/006/007 and the resource
 this source:
 
 - Options: `metric` cpuCores, cpuQuotaRatio, memoryBytes or memoryLimitRatio; `operator`
-  gt/gte/lt/lte; `threshold` ≥ 0 (ratios may exceed one); `sampleInterval` 30 s–5 min, the oldest
-  sample still evaluated. cpuThrottledRatio, memoryGrowthBytesPerSecond and the PSI metrics need
-  the node-local cgroup reader and are rejected with their path. `evaluation.rearmFor` may be at
+  gt/gte/lt/lte; `threshold` ≥ 0 (ratios may exceed one); `sampleInterval` (default 30 s, at most
+  5 min), the oldest sample still evaluated. A `sampleInterval` below 30 s is valid for the
+  node-local cgroup reader (minimum one second); on the metrics API it is evaluated as 30 s and
+  status reports the effective interval. cpuThrottledRatio, memoryGrowthBytesPerSecond and the PSI
+  metrics need the node-local cgroup reader; without it they report `DetectorUnavailable` with
+  their path. `evaluation.rearmFor` may be at
   most 15 s.
 - Value: the Pod's sum over its containers of CPU usage in cores or memory working set in bytes; a
   ratio divides it by the Pod's finite effective limit (the Pod-level limit if set, otherwise the
@@ -292,16 +316,16 @@ this source:
 - Unknown (per Pod): no sample, a sample older than `sampleInterval` or older than the Pod's start
   (an earlier Pod of the same name), or a sample missing a running container. A malformed or
   unavailable (503) metrics API makes the sample Unknown. The metrics API being absent (404)
-  refuses activation (`DetectorUnavailable`) and leaves later samples Unknown: absence is never
-  read as zero.
+  reports `DetectorUnavailable` and leaves later samples Unknown: absence is never read as zero.
 
 ### SC-TRG-013
 
-Given an activated resource policy (cpuQuotaRatio gt 0.5, sampleInterval 60 s) on a workload with
+Given an applied resource policy (cpuQuotaRatio gt 0.5, sampleInterval 60 s) on a workload with
 CPU limits whose replicas are idle, when one Pod's CPU stays at its limit, then exactly one
-pod-status capture of that Pod runs under the policy executor and further samples while it stays
+capture of that Pod runs under the policy executor and further samples while it stays
 busy create no occurrence; while metrics-server is unavailable no occurrence is created and no Pod
-re-arms; and a cluster without the metrics API refuses the policy's activation.
+re-arms; and in a cluster without the metrics API and without a node collector the policy reports
+`DetectorUnavailable`.
 
 ## Trigger-to-action lifecycle
 

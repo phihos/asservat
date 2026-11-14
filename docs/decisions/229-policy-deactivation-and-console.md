@@ -1,5 +1,7 @@
 # ADR-229 — Policy deactivation, console policy page, off-loop policy captures
 
+> Superseded in part by [ADR-335](335-usable-by-default.md): no hub-held policies or `activate_policy`; `deactivate_policy` stays.
+
 Date: 2026-10-26. Status: accepted; implemented; qualification results below.
 Requirements: REQ-AUT-001/003 (ADR-059), REQ-TRG-005, S-03 (TASK-04). Extends
 [ADR-228](228-restart-triggered-policy-captures.md).

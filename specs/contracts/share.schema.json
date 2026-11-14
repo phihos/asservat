@@ -30,9 +30,9 @@
           "items": {
             "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/recipient"
           },
-          "maxItems": 32,
           "minItems": 1,
-          "uniqueItems": true
+          "uniqueItems": true,
+          "description": "No count limit: recipients are bounded only by the request body byte limit (memory) (maintainer rule: limits need a reason)."
         },
         "dataClasses": {
           "type": "array",

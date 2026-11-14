@@ -14,7 +14,7 @@ spec:
     workloadUID: workload-ledger-uid
     recipeDigest: 5a5eff2029e270d2ec764af201abcb29dfaa0305071797ffca2ef784a788af43
     policyUID: policy-ledger-memory-uid
-    executionDigest: 127313099fe43d953ffa3fe105c810c1de91122cdc8b80705fd91ac667e830b3
+    executionDigest: dfe4ed17b7bce98b4e593b02a4db350201bfe85aba16f3c03d3595bcbf614989
   operations:
   - runtimeDiagnostic
   - command
@@ -33,8 +33,8 @@ spec:
   issuedAt: '2026-10-09T12:00:00Z'
   approvalPolicyRef:
     name: installation-default
-    digest: 7408dc1c2a95a5aa56803b5e4487dcc664d71b24143c680a99f4914f35b7ec51
-    maxAgeSeconds: 2592000
+    digest: 246f445a9cc43ca1d064737e479adbfc7adc8407f7539046714aa672eac98d15
+    maxAgeSeconds: 15552000
   policyAuthority:
     mode: team
     installationID: 00000000-0000-4000-8000-000000000098
@@ -70,3 +70,4 @@ status:
   spentBytes: 0
   executionsSpent: 0
   executionsReserved: 0
+  renewalDue: false

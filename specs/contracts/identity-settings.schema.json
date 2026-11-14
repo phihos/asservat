@@ -2,23 +2,17 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://asservat.io/spec/v1/identity-settings.schema.json",
   "title": "Protected Asservat installation identity settings v1",
-  "description": "Content of identity.json in an enrolled administrator-protected ConfigMap. Qualification flags require actual provider validation and cannot come from tokens. Not a CRD or public API.",
+  "description": "Content of identity.json in the Helm-rendered settings ConfigMap (ADR-335 D4, D14). Groups are read by name from groupsClaim and valid until the access token expires; any authenticated human of a registered client is eligible unless requiredGroups restricts sign-in. administrators is the only identity list; everyone else gets access through AccessBindings, ClusterAccessBindings and PermissionSources. Not a CRD or public API. Lists are not capped; the ConfigMap size limit (1 MiB) bounds them.",
   "type": "object",
   "additionalProperties": false,
   "properties": {
     "schemaVersion": {
       "const": "identity-settings/v1"
     },
-    "revision": {
-      "type": "integer",
-      "minimum": 1,
-      "maximum": 2147483647
-    },
     "issuer": {
       "type": "string",
       "format": "uri",
-      "pattern": "^https://",
-      "maxLength": 2048
+      "pattern": "^https://"
     },
     "clients": {
       "type": "array",
@@ -29,7 +23,6 @@
           "id": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 256,
             "pattern": "^[^\\x00-\\x1f\\x7f]+$"
           },
           "kind": {
@@ -48,57 +41,81 @@
           "classQualified"
         ]
       },
-      "minItems": 1,
-      "maxItems": 64
+      "minItems": 1
     },
-    "eligibleSubjects": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "id": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 256,
-            "pattern": "^[^\\x00-\\x1f\\x7f]+$"
-          },
-          "kind": {
-            "enum": [
-              "human",
-              "workload"
-            ]
-          }
-        },
-        "required": [
-          "id",
-          "kind"
-        ]
-      },
-      "maxItems": 256,
-      "uniqueItems": true
+    "groupsClaim": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_.:/-]+$",
+      "default": "groups",
+      "description": "Token claim carrying group names (Keycloak: full paths such as /payments)."
     },
-    "eligibleGroups": {
+    "usernameClaim": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_.:/-]+$",
+      "default": "preferred_username",
+      "description": "Claim shown and searched for people; sub stays the internal key."
+    },
+    "requiredGroups": {
+      "description": "Optional: only members of one of these groups may sign in (for a realm shared with other organizations). Omitted: every authenticated user of the issuer and client is eligible.",
       "type": "array",
       "items": {
         "type": "string",
         "minLength": 1,
-        "maxLength": 256,
         "pattern": "^[^\\x00-\\x1f\\x7f]+$"
       },
-      "maxItems": 256,
       "uniqueItems": true
     },
-    "groupsAtIssueQualified": {
-      "const": true
-    },
-    "groupMaxAgeSeconds": {
-      "type": "integer",
-      "minimum": 1,
-      "maximum": 300
+    "administrators": {
+      "description": "Installation administrators by group name or subject. They hold every administrative right including privacy processing and cluster registration.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "groups": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+          },
+          "uniqueItems": true
+        },
+        "subjects": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+          },
+          "uniqueItems": true
+        }
+      },
+      "anyOf": [
+        {
+          "required": [
+            "groups"
+          ],
+          "properties": {
+            "groups": {
+              "minItems": 1
+            }
+          }
+        },
+        {
+          "required": [
+            "subjects"
+          ],
+          "properties": {
+            "subjects": {
+              "minItems": 1
+            }
+          }
+        }
+      ]
     },
     "approvals": {
-      "description": "Protected installation approval settings (ADR-249). stepUp names the IdP acr values accepted as approval step-up and their maximum authentication age; without it no approval can be decided. requireRecordingApproval makes metadata packet/syscall recordings need the same individual approval as sensitive acquisitions (REQ-SYS-002).",
+      "description": "Installation approval settings (ADR-249, ADR-335 D5). stepUp is optional and off by default; when set, approving additionally requires the token's signed acr to be one of acrValues and auth_time at most maxAgeSeconds old. requireRecordingApproval makes metadata packet/syscall recordings need the same individual approval as sensitive acquisitions (REQ-SYS-002).",
       "type": "object",
       "additionalProperties": false,
       "properties": {
@@ -111,17 +128,14 @@
               "items": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 128,
                 "pattern": "^[^\\x00-\\x1f\\x7f]+$"
               },
               "minItems": 1,
-              "maxItems": 8,
               "uniqueItems": true
             },
             "maxAgeSeconds": {
               "type": "integer",
-              "minimum": 30,
-              "maximum": 3600
+              "minimum": 1
             }
           },
           "required": [
@@ -134,35 +148,15 @@
         },
         "policyGrants": {
           "$ref": "https://asservat.io/spec/v1/approval-policy.schema.json#/$defs/policyGrants",
-          "description": "Finite policy grant periods. Omitted defaults: seven days, maximum thirty days, renewal notice one day. An accepted lower maximum irreversibly clamps all earlier-issued grants from their original issuedAt; raising it does not extend them."
+          "description": "Policy grant periods (ADR-335 D6). Omitted defaults: 90 days, renewed in place by an approver, maximum 365 days. An accepted lower maximum clamps earlier-issued grants from their original issuedAt; raising it does not extend them."
         }
       }
     }
   },
   "required": [
     "schemaVersion",
-    "revision",
     "issuer",
     "clients",
-    "eligibleSubjects",
-    "eligibleGroups",
-    "groupsAtIssueQualified",
-    "groupMaxAgeSeconds"
-  ],
-  "anyOf": [
-    {
-      "properties": {
-        "eligibleSubjects": {
-          "minItems": 1
-        }
-      }
-    },
-    {
-      "properties": {
-        "eligibleGroups": {
-          "minItems": 1
-        }
-      }
-    }
+    "administrators"
   ]
 }

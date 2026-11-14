@@ -18,7 +18,8 @@
     "duration": {
       "type": "string",
       "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$",
-      "maxLength": 16
+      "maxLength": 16,
+      "description": "Length bound keeps the value inside the int64-nanosecond duration range."
     },
     "metadata": {
       "type": "object",
@@ -51,7 +52,8 @@
         "subject": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 256
+          "maxLength": 256,
+          "description": "OIDC Core: sub is at most 255 ASCII characters."
         },
         "clientID": {
           "type": "string",
@@ -125,7 +127,7 @@
         "maxBytes": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 1099511627776
+          "maximum": 9007199254740991
         },
         "timeout": {
           "type": "string",

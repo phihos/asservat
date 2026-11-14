@@ -28,7 +28,7 @@ Maintain reviewed mechanism/qualification rule versions with capability data and
 
 ## Storm and capacity operations
 
-Configure protected workload allocations and shared burst once per storage pool, with automatic namespace budget profiles. The [sample pool](../examples/storage-pool.yaml) backs four 16 GiB workload allocations in 128 GiB total, with separate system/headroom and 40 GiB shared burst. The [budget profile](../examples/budget-policy.yaml) caps each workload at 32 GiB, reserves context space and limits dumps to one episode per 15 minutes and two individual process starts per rolling hour. These are illustrative values requiring workload/backend qualification.
+The chart renders the default pool and budget policy from `capacity.*` values (ADR-335 D2); further pools and policies are CRDs. The [sample pool](../examples/storage-pool.yaml) states only its 128 GiB capacity: system reserve and headroom default to 5 % each and workloads are allocated at enrollment. The [budget profile](../examples/budget-policy.yaml) protects 2 % and caps 10 % of the pool per workload and limits dumps to one episode per 15 minutes and two individual process starts per rolling hour. These are illustrative values requiring workload/backend qualification.
 
 Check byte and object reservations before acquisition; keep versions, multipart remnants and deletion-pending copies charged. Defaults preserve existing evidence and refuse new expensive capture when that workload fills its quota. Optional rolling deletion affects only its own eligible evidence. Never borrow another workload's protected allocation. Show physical/backend capacity separately from logical usage and refuse an unsupported isolation claim on best-effort storage.
 

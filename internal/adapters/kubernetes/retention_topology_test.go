@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"encoding/json/jsontext"
 	"net/http"
-	"os"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -20,7 +19,7 @@ import (
 func TestRetentionTopologyReadsNamedImmutableConfiguration(t *testing.T) {
 	for _, mode := range []string{"hub-local", "hub-only-explicit", "missing-local", "wrong-local-cluster", "duplicate-source", "missing-hub", "wrong-root", "replaced-namespace", "mutable", "extra-data", "unknown", "case-alias", "zero-digest", "bad-hex", "expired", "different-target", "missing-object"} {
 		t.Run(mode, func(t *testing.T) {
-			b, err := os.ReadFile("../../../examples/retention-topology.json")
+			b, err := readImplementedExample("../../../examples/", "retention-topology.json")
 			if err != nil {
 				t.Fatal(err)
 			}

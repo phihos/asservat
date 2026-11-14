@@ -5,19 +5,14 @@ metadata:
   namespace: payments
 spec:
   target:
-    namespace: payments
     workloadRef:
-      apiVersion: apps/v1
       kind: Deployment
       name: api
-    maxPods: 1
-    selection: triggeringPod
-    adoption: pinUID
   detectors:
   - id: panic-log
     kind: log
     options:
-      stream: stderr
+      stream: both
       pattern: panic|fatal error|connection reset
       match: regexp
       maxRecordBytes: 65536
@@ -27,7 +22,7 @@ spec:
       metric: memoryLimitRatio
       operator: gte
       threshold: 0.85
-      sampleInterval: 5s
+      sampleInterval: 30s
   - id: probe-failed
     kind: probe
     options:
@@ -45,16 +40,12 @@ spec:
     - detector: probe-failed
   recipeRef:
     name: incident-context
-    digest: e722f814e860fe25c9b686be0ab23107fc224327ada6fa0f1fa779c6724d6896
   budgets:
     cooldown: 5m
     burst: 2
     maxOccurrencesPerHour: 12
     maxConcurrentActions: 3
   retention: 72h
-  suspended: false
-  observation:
-    mode: allAuthorized
   evaluation:
     scope: pod
     fireOnActivation: true

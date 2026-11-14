@@ -20,11 +20,11 @@ Go's pprof HTTP API distinguishes binary profiles, optional GC and duration/delt
 
 The `profile` action MUST specify runtime, profile type, acquisition mode (`snapshot`, `cumulative`, `delta` or `interval`), named acquisition source, duration where meaningful, and the ordinary action byte/deadline limits. Go pprof CPU and heap collection are part of the first production scope; other Go types are available when their application prerequisites are satisfied. Additional runtime formats are independently qualified capability packs.
 
-CPU profiles for runtimes without an approved pprof endpoint come from the node collector's eBPF sampler ([ADR-201](../docs/decisions/201-ebpf-cpu-profiles.md)): a `profile` action with `runtime: any`, `type: cpu` and source kind `ebpfSampler`, which names no endpoint profile and attaches nothing to the target. The evidence scope is the whole selected pod, under the same rule as syscall traces: no container selector and no host-wide fallback. The kernel program samples host-wide during the bounded session only because the qualified profiler has no cgroup filter. The collector MUST attribute each sample by verified pod, cgroup, process-start and node-boot identity and MUST drop a sample whose membership is uncertain, counting it as `unattributedSamples`. Samples of other processes are discarded in collector memory before encoding, encryption or any output, are never written to disk, logs or metrics, and are not counted, so no other workload's activity is disclosed; the collector suppresses its own core dumps. The artifact is pprof with `runtime: any`, the `detectedRuntimes` it found and build IDs for native mappings; missing symbols are reported. Allocation, lock and heap profiles remain per-runtime adapters.
+CPU profiles for runtimes without an approved pprof endpoint come from the node collector's eBPF sampler ([ADR-201](../docs/decisions/201-ebpf-cpu-profiles.md)): a `profile` action with `runtime: any`, `type: cpu` and source kind `ebpfSampler`, which names no endpoint and attaches nothing to the target. The evidence scope is the whole selected pod, under the same rule as syscall traces: no container selector and no host-wide fallback. The kernel program samples host-wide during the bounded session only because the qualified profiler has no cgroup filter. The collector MUST attribute each sample by verified pod, cgroup, process-start and node-boot identity and MUST drop a sample whose membership is uncertain, counting it as `unattributedSamples`. Samples of other processes are discarded in collector memory before encoding, encryption or any output, are never written to disk, logs or metrics, and are not counted, so no other workload's activity is disclosed; the collector suppresses its own core dumps. The artifact is pprof with `runtime: any`, the `detectedRuntimes` it found and build IDs for native mappings; missing symbols are reported. Allocation, lock and heap profiles remain per-runtime adapters.
 
-Acquire through an administrator-approved endpoint profile or a qualified runtime adapter. Resolve endpoints to the selected pod identity; support pod IP and loopback within the target netns. A localhost endpoint MUST NOT resolve to the collector's own loopback. Do not accept arbitrary URLs, redirects, ports, headers or query parameters from an MCP client. TLS/auth credentials come from named profiles and are not captured as evidence.
+Acquire through an administrator-approved named endpoint or a qualified runtime adapter. Resolve endpoints to the selected pod identity; support pod IP and loopback within the target netns. A localhost endpoint MUST NOT resolve to the collector's own loopback. Do not accept arbitrary URLs, redirects, ports, headers or query parameters from an MCP client. TLS/auth credentials come from named profiles and are not captured as evidence.
 
-The acquisition request originates on the exact target node. Under [ADR-287](../docs/decisions/287-go-profile-acquisition.md), the node uploads its bounded in-memory result directly over the existing authenticated mTLS channel to the regional connector, which encrypts it before managed storage. The admitted attempt selects the destination; no alternative destination or hub plaintext proxy is allowed. The node receives no evidence key credentials. Plaintext residency is bounded by the admitted node response limit and the acquisition/upload deadlines. Named endpoint profiles are administrator-managed entries under the local collection ceiling; they pin target/port/path policy, TLS trust and credential references. To avoid per-application setup tickets, an administrator may also publish a reusable endpoint template. A maintainer binds it in `EvidenceRecipe.spec.endpointBindings` with a local binding name, template reference, approved target address mode and declared pod port name. Profile `source.profileRef` resolves to that local binding or a fully configured administrator profile; duplicate/ambiguous names are rejected. Resolve a port name across the pod specification; reject ambiguous duplicate resolutions and enforce the template's allowed port range, fixed path policy and target identity. No free URL, hostname, credential or path override is accepted. Credentialed templates must explicitly scope the credential to permitted workload identities, so a maintainer cannot redirect a privileged credential to their own listener. Approval binds the resolved template digest and endpoint parameters. Autodetection may suggest a declared port/runtime, but never activates profiling or weakens these checks.
+The acquisition request originates on the exact target node. Under [ADR-287](../docs/decisions/287-go-profile-acquisition.md), the node uploads its bounded in-memory result directly over the existing authenticated mTLS channel to the regional connector, which encrypts it before managed storage. The admitted attempt selects the destination; no alternative destination or hub plaintext proxy is allowed. The node receives no evidence key credentials. Plaintext residency is bounded by the admitted node response limit and the acquisition/upload deadlines. Named endpoint profiles are administrator-managed entries under the local collection ceiling; they pin target/port/path policy, TLS trust and credential references. To avoid per-application setup tickets, an administrator may also publish a reusable endpoint template. A maintainer binds it in `EvidenceRecipe.spec.endpointBindings` with a local binding name, template reference, approved target address mode and either a declared pod port name or a numeric port within the template's allowed range, so an application that already serves pprof on a port needs no Deployment change or rollout. Profile `source.profileRef` resolves to that local binding or a fully configured administrator endpoint; duplicate/ambiguous names are rejected. Resolve a port name across the pod specification; reject ambiguous duplicate resolutions and enforce the template's allowed port range, fixed path policy and target identity. No free URL, hostname, credential or path override is accepted. Credentialed templates must explicitly scope the credential to permitted workload identities, so a maintainer cannot redirect a privileged credential to their own listener. Approval binds the resolved template digest and endpoint parameters. Autodetection may suggest a declared port/runtime or the conventional `6060` within the template's range, but never activates profiling or weakens these checks.
 
 Named Go endpoints may use TLS ([ADR-299](../docs/decisions/299-named-go-endpoint-tls.md)).
 A regional endpoint entry may carry explicit public certificate roots (at most
@@ -55,7 +55,7 @@ Given a pod with pprof bound to its network namespace localhost, when a policy r
 
 ## REQ-PRF-002 — Overhead and mutual exclusion
 
-Live profiling MUST be classified as intrusive for approval/budget purposes even if the mechanism is an HTTP GET. Default CPU profile duration 10 seconds, maximum 60 seconds under the administrator ceiling; default trace duration 5 seconds, maximum 15 seconds. Default profile output cap 16 MiB, maximum 64 MiB; default trace output cap 32 MiB, maximum 128 MiB. Snapshot profiles have a 5-second default acquisition deadline. Action deadlines must include setup/shutdown margin beyond timed recording duration.
+Classification follows what the acquisition changes in the target ([ADR-335](../docs/decisions/335-usable-by-default.md) D5). A Go pprof GET that reads what the application already serves is `observe`: heap without forced GC, allocs, goroutine, block, mutex and threadcreate snapshots or cumulative/delta reads, and CPU intervals within the administrator duration ceiling. It needs ordinary collection rights and no approval, in manual captures and in policies. `forceGC=true`, changed sampling rates, runtime execution traces, JFR/EventPipe sessions, the inspector and attaching an external profiler (async-profiler, py-spy) are `intrusive` and need the applicable approval. The eBPF CPU sampler attaches nothing to the target and is `observe`. An administrator may require approval for all profiles with `approvals.requireProfileApproval` (default off). Default CPU profile duration 10 seconds, maximum 60 seconds under the administrator ceiling; default trace duration 5 seconds, maximum 15 seconds. Default profile output cap 16 MiB, maximum 64 MiB; default trace output cap 32 MiB, maximum 128 MiB. Snapshot profiles have a 5-second default acquisition deadline. Action deadlines must include setup/shutdown margin beyond timed recording duration.
 
 Do not force GC for a heap profile by default. `forceGC=true`, changes to sample rates, attachment of an external profiler, or starting high-frequency tracing require exact approved parameters. The bounded Go HTTP adapter supports forced GC only for heap snapshots: the standard handler processes `seconds` through its delta path before the GC branch, so `forceGC=true` combined with delta mode is unavailable and must be rejected during capability validation rather than silently ignored. [Go HTTP pprof implementation](https://go.dev/src/net/http/pprof/pprof.go). Block/mutex profiles that contain no data because sampling is disabled MUST be distinguished from a valid zero-contention result.
 
@@ -111,9 +111,9 @@ Given a trigger that starts a 10-second CPU recording, when the case timeline is
 
 ## REQ-PRF-005 — Bounded MCP profile queries and comparison
 
-[ADR-291](../docs/decisions/291-bounded-profile-summary.md) separates the approved summary operation from raw input disclosure. A closed pprof summary requires current ordinary read rights, the original retained audience and client permission for extract/profile output; it does not confer native download or arbitrary raw query authority. The original input remains raw for processing and retention. Metadata-only shares do not authorize profile summaries.
+[ADR-291](../docs/decisions/291-bounded-profile-summary.md) separates the approved summary operation from raw input disclosure. A closed pprof summary requires current ordinary read rights, and the original retained audience; it does not confer native download or arbitrary raw query authority. The original input remains raw for processing and retention. Metadata-only shares do not authorize profile summaries.
 
-`get_profile_summary` MUST provide selected sample type, units, duration, total, top-N flat/cumulative functions, and symbol/completeness warnings. `compare_profiles` MUST authorize both artifacts independently, require compatible profile/sample semantics or return a mismatch, and label raw deltas versus duration-normalized rates. Default top-N 20, maximum 100. Cursors, shares, grants, output ceilings and audit rules apply normally. Summary totals, flat and cumulative values retain their signs for delta profiles. The displayed fraction is flat divided by total only when all selected sample values are nonnegative and the total is positive; otherwise it is null, not a fabricated zero or an absolute-value normalization.
+`get_extract(view=profileSummary)` MUST provide selected sample type, units, duration, total, top-N flat/cumulative functions, and symbol/completeness warnings. `compare_profiles` MUST authorize both artifacts independently, require compatible profile/sample semantics or return a mismatch, and label raw deltas versus duration-normalized rates. Default top-N 20, maximum 100. Cursors, shares, grants, output ceilings and audit rules apply normally. Summary totals, flat and cumulative values retain their signs for delta profiles. The displayed fraction is flat divided by total only when all selected sample values are nonnegative and the total is positive; otherwise it is null, not a fabricated zero or an absolute-value normalization.
 
 The browser uses saved acquisition metadata to suggest an editable summary sample
 type: `inuse_space` for heap profiles, with the existing `cpu` default for CPU or
@@ -196,9 +196,11 @@ profile nor obtain an approval.
 [ADR-285](../docs/decisions/285-profile-preview-plans.md) connects the passive
 endpoint planner to manual preview through regional configuration. The plan
 freezes the public definition and endpoint digests without dialing or reading
-credentials. `builtin/go-cpu/v1` selects a ten-second CPU interval; custom
-profiles may use the supported Go modes or the eBPF CPU sampler. Plans state raw
-native output and the required `liveProfile` approval reason.
+credentials. `builtin/go-cpu/v1` selects a ten-second CPU interval and
+`builtin/go-profile/v1` exposes the Go profile type (cpu, heap, allocs,
+goroutine, block, mutex) as an editable field; custom profiles may use the
+supported Go modes or the eBPF CPU sampler. Plans state raw native output and,
+only for intrusive profiles, the required `liveProfile` approval reason.
 
 ### Finite profile admission and custody
 
@@ -212,21 +214,27 @@ resolves its actual pinned Pod and verifies its concrete endpoint against that
 stable scope. Ordinary replica replacement does not change collection intent;
 changing the protected definition or binding does.
 
-Policy profiles require independent raw `policyCollection`/`liveProfile`
-approval and atomically spend the existing execution/native-output pools.
-They do not acquire packet or syscall observation budgets. A collection grant
-alone cannot authorize inspection/download of the result; current human raw
-approval must independently cover the exact published artifact. All existing
-finite Go mode limits and prerequisites apply. Runtime trace remains trace
-format and cannot enter pprof analysis.
+A non-intrusive policy profile needs no approval and has no expiry or run count
+(ADR-335 D6); an intrusive one (forced GC, traces, sampling changes) needs the
+expiring `policyCollection`/`liveProfile` grant. Both spend the existing
+execution/native-output pools and acquire no packet or syscall observation
+budgets. Profiles collected by an applied team policy are read and downloaded by
+the policy's audience under ordinary evidence rights; no per-artifact human
+approval is needed (ADR-335 D5). All existing finite Go mode limits and
+prerequisites apply. Runtime trace remains trace format and cannot enter pprof
+analysis.
 
 A qualified manual Go endpoint acquisition is a distinct typed profile request,
 never a packet recorder. Persist the reviewed composition, expanded endpoint
 bindings, definition/endpoint digests, native byte ceiling and action timeout;
 re-resolve the exact endpoint before starting without rewriting the reviewed
-plan. `liveProfile` requires raw approval regardless of the installation's
-optional all-recordings approval setting. Same-human result-access children
-govern raw inspection/download; capture-time raw sharing is refused.
+plan. A non-intrusive manual profile is collected under the requester's ordinary
+rights; the requester, and other users with current evidence rights who hold
+`pods/portforward` or `pods/proxy` on that workload, download it without a
+second person's approval. An intrusive manual
+profile needs the one independent approval; the same approval covers the
+requester's selected result inspection/download ([investigation
+approval](investigation-approval.md)).
 
 The persisted approval review and shared browser/MCP response carry the profile
 runtime, type, mode, optional duration, timeout, forced-GC choice, native limit

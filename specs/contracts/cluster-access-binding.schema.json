@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/cluster-access-binding.schema.json",
+  "title": "Asservat ClusterAccessBinding v1",
+  "description": "Cluster-scoped AccessBinding, like a ClusterRoleBinding (ADR-335 D14, REQ-PER-001). In a workload cluster it grants its roles in every namespace matching namespaceSelector. In the hub cluster spec.clusters names joined clusters (or *) and the role privacy-operator may be granted. Canonical only: the runtime has no CRD yet.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "apiVersion": {
+      "const": "asservat.io/v1alpha1"
+    },
+    "kind": {
+      "const": "ClusterAccessBinding"
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 253,
+          "description": "Kubernetes object name (DNS subdomain, 253 characters)."
+        }
+      },
+      "required": [
+        "name"
+      ]
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "effect": {
+          "type": "string",
+          "enum": [
+            "Allow",
+            "Deny"
+          ]
+        },
+        "subjects": {
+          "type": "array",
+          "items": {
+            "$ref": "https://asservat.io/spec/v1/permission-common.schema.json#/$defs/bindingSubject"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "roles": {
+          "type": "array",
+          "items": {
+            "$ref": "https://asservat.io/spec/v1/permission-common.schema.json#/$defs/clusterRole"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "namespaceSelector": {
+          "$ref": "https://asservat.io/spec/v1/permission-common.schema.json#/$defs/selector",
+          "description": "Optional; omitted selects every namespace outside system namespaces."
+        },
+        "clusters": {
+          "description": "Hub cluster only: cluster names or * for every joined cluster. Omitted: the binding's own cluster.",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^(\\*|[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?)$"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "notAfter": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "effect",
+        "subjects",
+        "roles"
+      ],
+      "description": "Lists are not capped: the Kubernetes object size limit bounds them; roles are bounded by their enum and uniqueItems."
+    },
+    "status": {
+      "$ref": "https://asservat.io/spec/v1/permission-common.schema.json#/$defs/status"
+    }
+  },
+  "required": [
+    "apiVersion",
+    "kind",
+    "metadata",
+    "spec"
+  ]
+}

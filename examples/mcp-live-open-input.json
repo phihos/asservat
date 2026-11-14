@@ -1,4 +1,5 @@
 {
+  "action": "open",
   "source_handles": [
     "opaque-source-handle"
   ],
@@ -12,6 +13,5 @@
       }
     ]
   },
-  "duration_seconds": 600,
   "idempotency_key": "live-open-20261009-01"
 }

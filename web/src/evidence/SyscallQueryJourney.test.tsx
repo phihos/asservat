@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import EvidenceWorkspace from './EvidenceWorkspace';
@@ -22,7 +22,7 @@ it('requires approval before querying the same saved arguments through the HTTP 
     requested_by: { issuer: session.principal.issuer, subject: session.principal.subject_id, client_id: 'console' }, requested_at: new Date(Date.now() - 1000).toISOString(), review_until: until, lifetime_seconds: 3600, can_decide: false, can_revoke: true, approval_navigation_uri: 'https://asservat.example.invalid/approvals/' + id(41),
     raw_access: { case_id: id(2), reason: 'Inspect saved arguments', operations: ['syscall_query'], max_bytes: 49152, max_operations: 10000, not_after: until, artifact_count: 1, bytes_used: 0, operations_used: 0,
       artifacts: [{ artifact_id: artifact.artifact_id, capture_id: id(42), action_id: 'calls', digest: artifact.digest, execution_digest: 'cd'.repeat(32), native_type: 'syscallArguments', native_bytes: 8192, expires_at: until, target: artifact.target }] } });
-  const example = (name: string) => JSON.parse(readFileSync(new URL('../../../examples/' + name, import.meta.url), 'utf8'));
+  const example = (name: string) => JSON.parse(readFileSync(existsSync(new URL('../../../examples/implemented/' + name, import.meta.url)) ? new URL('../../../examples/implemented/' + name, import.meta.url) : new URL('../../../examples/' + name, import.meta.url), 'utf8'));
   const page = example('mcp-syscall-query-result.json');
   page.provenance = [{ artifactID: artifact.artifact_id, digest: artifact.digest }];
   const queryObservedAt = new Date();

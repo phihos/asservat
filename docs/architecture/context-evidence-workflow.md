@@ -10,7 +10,7 @@ After publication, capture progress carries a separately authorized `case_id`;
 the console links only that ID to `/cases/<uuid>`. `get_case` returns current
 authorized metadata and artifacts; no access returns a nondisclosing
 unavailable screen. Each authorized artifact has Download.
-`prepare_artifact_download` uses an idempotency key; Preparing shows no native
+`download_artifact(action=prepare)` uses an idempotency key; Preparing shows no native
 size, checksum or filename. Ready metadata supplies native format, length,
 full SHA-256, coverage, current retention and an authenticated same-origin
 content path. The browser saves the bytes directly from that path, without

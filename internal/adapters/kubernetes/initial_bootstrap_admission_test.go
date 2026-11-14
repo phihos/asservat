@@ -2,7 +2,6 @@ package kubernetes
 
 import (
 	"encoding/json"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -13,7 +12,7 @@ import (
 func bootstrapAdmissionFixture(t *testing.T) contracts.InitialBootstrap {
 	t.Helper()
 	root := ownerConfigurationTestRoot(t, time.Now())
-	raw, err := os.ReadFile("../../../examples/fleet-settings.json")
+	raw, err := readImplementedExample("../../../examples/", "fleet-settings.json")
 	var fleet contracts.FleetSettings
 	if err != nil || json.Unmarshal(raw, &fleet) != nil {
 		t.Fatal("synthetic fleet fixture unavailable")

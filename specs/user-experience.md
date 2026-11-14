@@ -12,11 +12,11 @@ Given an evidence-only recipient following a maintainer’s case/workload URL, w
 
 ## REQ-UI-002 — Low-effort bounded authoring
 
-Provide target/goal, typed profile composition and one final review. Show process/network guidance provenance and freshness; a discovery or survey is explicit collection. Preserve valid entered values through Back and field errors. Separate observation count, incident pod cap, ongoing recording and on-trigger actions. Preview includes combined effects, uncertainty, possible sensitive data, default audience and inherited deadlines. Do not add generic consent or repeated confirmation to an already reviewed ordinary submission.
+Provide target/goal, typed profile composition and one final review. Users choose clusters, namespaces, workloads, recipes, users and groups by name from search pickers; no form asks for a UUID, UID, digest or grant ID ([ADR-335](../docs/decisions/335-usable-by-default.md) D4). Show process/network guidance provenance and freshness; a discovery or survey is explicit collection. Preserve valid entered values through Back and field errors. Separate observation count, incident pod cap, ongoing recording and on-trigger actions. Preview includes combined effects, uncertainty, possible sensitive data, default audience and inherited deadlines. Do not add generic consent or repeated confirmation to an already reviewed ordinary submission.
 
 ### SC-UI-002
 
-Given a maintainer composing context, HTTP evidence and a live core, when they review, then the UI explains recording history, process pause and approval independently; changing the selection refreshes the assessment, and one submit cannot start an unapproved core.
+Given a maintainer composing context, HTTP evidence and a live core, when they review, then the UI explains recording history, process pause and approval independently; changing the selection refreshes the assessment, and one submit cannot start an unapproved core. Every target, recipient and recipe is selected by name without copying an identifier.
 
 ## REQ-UI-003 — Truthful progress and recovery
 
@@ -37,7 +37,7 @@ Given partial packets and an awaiting-approval core, when a cluster disconnects 
 
 ## REQ-UI-004 — Sharing, review and administration
 
-Make concrete sharing, per-capture future sharing, bounded recurring instructions, manager teams and immutable creator distinct. Preview the recipient’s projection. Differentiate stopping future publication from revoking child shares. Human review binds exact scope, current revision, independence and verified step-up. Configuration previews hand administrator writes back to Kubernetes/GitOps. Privacy/capacity views show managed-copy deadlines, unresolved charges and verification gaps.
+Make concrete sharing, per-capture future sharing, bounded recurring instructions, manager teams and immutable creator distinct. Preview the recipient’s projection. Differentiate stopping future publication from revoking child shares. Human review binds exact scope, current revision and independence, plus step-up re-authentication only where the installation enables it (off by default, [ADR-335](../docs/decisions/335-usable-by-default.md) D5). An approval starts the approved work itself; the requester is never asked to submit again. Configuration previews hand administrator writes back to Kubernetes/GitOps. Privacy/capacity views show managed-copy deadlines and verification gaps.
 
 ### SC-UI-004
 

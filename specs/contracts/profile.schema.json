@@ -79,15 +79,14 @@
           "type",
           "unit"
         ]
-      },
-      "maxItems": 16
+      }
     },
     "durationNanoseconds": {
       "anyOf": [
         {
           "type": "integer",
           "minimum": 0,
-          "maximum": 86400000000000
+          "maximum": 9007199254740991
         },
         {
           "type": "null"
@@ -131,7 +130,7 @@
         {
           "type": "integer",
           "minimum": 0,
-          "maximum": 1000000000000
+          "maximum": 9007199254740991
         },
         {
           "type": "null"
@@ -145,12 +144,12 @@
         "resolvedLocations": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 1000000000000
+          "maximum": 9007199254740991
         },
         "totalLocations": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 1000000000000
+          "maximum": 9007199254740991
         }
       },
       "required": [
@@ -186,7 +185,7 @@
         "unattributedSamples": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 1000000000000
+          "maximum": 9007199254740991
         }
       },
       "oneOf": [
@@ -257,8 +256,7 @@
           "beam"
         ]
       },
-      "uniqueItems": true,
-      "maxItems": 10
+      "uniqueItems": true
     }
   },
   "required": [

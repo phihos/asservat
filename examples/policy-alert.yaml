@@ -1,24 +1,18 @@
 apiVersion: asservat.io/v1alpha1
 kind: DebugPolicy
 metadata:
-  # Hub-held (ADR-228): in the hub control namespace, like AccessBindings.
   name: checkout-error-rate
-  namespace: asservat-system
+  namespace: payments
 spec:
   target:
-    cluster: 00000000-0000-4000-8000-000000000001
-    namespace: payments
     workloadRef:
-      apiVersion: apps/v1
       kind: Deployment
       name: checkout
-    maxPods: 1
-    selection: triggeringPod
-    adoption: pinUID
   detectors:
   # Alertmanager delivers webhooks (send_resolved: true) to the connector's
-  # receiver. An alert counts for a Pod when its namespace and pod labels name
-  # a Pod of the workload and its other labels match matchLabels. Fires once
+  # receiver. An alert counts when its namespace label is this namespace, its pod label
+  # names a Pod of the workload (or a deployment label names the workload)
+  # and its other labels match matchLabels. Fires once
   # when such an alert starts; re-arms when Alertmanager reports it resolved.
   - id: errors
     kind: alert
@@ -32,16 +26,12 @@ spec:
     detector: errors
   recipeRef:
     name: builtin-pod-status-v1
-    digest: 174a28447df11de92c374c60a44a3a5c03c8481e3f5c57943521ab5da3dce1c3
   budgets:
     cooldown: 5m
     burst: 2
     maxOccurrencesPerHour: 12
     maxConcurrentActions: 1
   retention: 72h
-  suspended: false
-  observation:
-    mode: allAuthorized
   evaluation:
     scope: pod
     fireOnActivation: false

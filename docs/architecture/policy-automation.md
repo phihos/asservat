@@ -6,24 +6,26 @@ C-09, C-10, C-20 and C-24; REQ-PER-007 and TASK-07. C-01 accepts
 administrator configuration, C-03 evaluates delegation and grants, C-09/C-10
 accept and run policies. Mechanisms follow
 [ADR-330](../decisions/330-event-driven-system-design.md) D1, D5, D6, D7 and
-D10.
+D10 and [ADR-335](../decisions/335-usable-by-default.md) D5, D6, D8 and D14.
 
 ## Authority
 
 An automation-bearing AccessBinding in the application namespace it grants
-carries the typed `spec.automation` envelope (allowed actions, counts, bytes,
-sponsoring and maintainer groups), as in ADR-329. Adding or changing
-`spec.automation` requires `bind` on `accessroles.asservat.io` named
-`automation`, enforced by the Helm-rendered ValidatingAdmissionPolicy and
-never aggregated into `admin` ([permission-observation.md](permission-observation.md)).
+carries the typed `spec.automation` envelope (allowed action kinds and, for
+intrusive kinds, an execution count and grant period; its subjects are the
+sponsoring groups), as in ADR-329. Adding or changing `spec.automation`
+requires `bind` on `accessroles.asservat.io` named `automation`, enforced by the
+Helm-rendered ValidatingAdmissionPolicy and aggregated into `admin` only when
+`permissions.aggregateAutomation` is set
+([permission-observation.md](permission-observation.md)).
 The structural CRD validates its shape with reviewed CEL rules.
 
 `authorization.PolicyPrincipal` is the installation-local identity a policy
 runs as. `AcceptedPolicyAuthority`, `AutomationProjection` and `PolicyUse`
 are distinct types from bearer identity, evidence-read authorization and
-local permits. `ValidatePolicyAcceptance` requires the activating human's
-current entitlement and membership; `EvaluatePolicy` evaluates later team
-authority without a human token. The evaluator pins the accepted policy and
+local permits. `ValidatePolicyAcceptance` checks that a generation fits its
+namespace's envelope and that the sponsoring groups hold `workload-maintainer`;
+`EvaluatePolicy` evaluates team authority without a human token. The evaluator pins the accepted policy and
 digest, installation and workload, supports only arm, incident and
 recordingSave purposes, intersects the original expiry with current source
 and deny state, and checks the action, count and byte envelope. A personal
@@ -33,39 +35,50 @@ failure never falls back to controller privileges.
 
 ## Policy source
 
-The hub-worker runs a DebugPolicy informer (LIST once, then WATCH; relist only
-after a watch restart or `410 Gone`). Each policy is validated against the
+DebugPolicies live in application namespaces, next to the workloads they
+target. Each cluster's connector (the hub-worker for the hub cluster) runs a
+DebugPolicy informer (LIST once, then WATCH; relist only after a watch restart
+or `410 Gone`) and pushes changes over its hub connection, as for
+AccessBindings. Each policy is validated against the
 embedded canonical schemas; status is never authority. The informer cache
 stays valid until a watch event replaces it; deletion leaves a UID tombstone
 so a same-name replacement is a new policy. Accepted policies stay valid
-until replaced or deleted, not until a timer expires. The controller writes
-`status.observedGeneration` and conditions (`Accepted`, `Active`) for the
-generation it processed.
+until replaced or deleted, not until a timer expires; only intrusive actions
+depend on a grant's expiry. The number of policies per cluster is not limited
+beyond Kubernetes object limits. The connector writes
+`status.observedGeneration` and conditions (`Accepted`, `ApprovalRequired`,
+`RenewalDue`, `Active`) for the generation the hub processed.
 
 The collection-intent digest covers the spec minus the control fields listed
 in REQ-EXE-001 (an omitted recording-save opt-in is false). Pause, resume and
 other control edits keep the accepted scope, expiry and limits. A new
-generation that changes the collection-intent digest suspends the policy
-until it is activated again. The execution digest that lets approvals
-survive label or sharing edits stays.
+generation that changes the collection-intent digest is accepted as a new
+scope; when it also changes the execution digest of an intrusive action, it
+opens a new review. The execution digest that lets approvals survive label or
+sharing edits stays. An unchanged reapply changes nothing.
 
-## Activation and deactivation
+## Acceptance, grants and deactivation
 
-`activate_policy` (MCP and browser) is an authenticated request. It compiles
-the policy, checks the current human, the exact delegation and the original
-deadlines, and in one SQL transaction records the immutable acceptance, the
-active acceptance ID and an audit row ([operation-audit.md](operation-audit.md)).
-The request's idempotency key is stored with the acceptance: a retry with the
-same key returns the original acceptance and never reactivates a replaced or
-deactivated one. Replacing a scope names the prior acceptance; a stale
-concurrent replacement fails. The original creator is recorded on first
-acceptance and each later submitter separately, for independent-review
-checks. The stored record holds identifiers, revisions, digests, ceilings and
-sponsoring groups; no tokens, membership lists or recipe text.
+The hub accepts each pushed generation when it arrives: it compiles the
+policy, resolves the envelope and sponsoring groups, and in one SQL
+transaction records the acceptance, the active acceptance ID and an audit row
+([operation-audit.md](operation-audit.md)). The acceptance is keyed by
+(policy UID, generation), so a duplicate delivery or reapply returns the
+existing acceptance and never reactivates a replaced or deactivated one. The
+stored record holds identifiers, revisions, digests, limits and sponsoring
+groups; no tokens, membership lists or recipe text.
+
+When the accepted generation has intrusive actions, the same transaction
+opens its `policyCollection` review. `decide_review` approving it creates the
+grant and attaches it to the acceptance in one transaction; renewal updates
+the same grant's expiry. Approval is decided by any current
+`action-approver`; there is no request or attach call and no grant reference
+in the policy spec.
 
 `deactivate_policy` (team-maintainer authority) clears the active acceptance
 under the row lock and writes an audit row. The console page `/policies`
-lists, activates and deactivates policies through the same operations.
+lists policies with their status, opens reviews and renewals, and
+deactivates.
 
 ## Triggers
 
@@ -89,7 +102,8 @@ previous detector state, and an overlong log record is counted under the suppres
 reason `overlong`. The hub evaluates level and re-arm against the per-detector
 state in the trigger ledger and reuses the S-02 investigation with the
 policy executor; eligibility and the SQL checks after locks evaluate the
-executor through its current acceptance and team delegation. Each occurrence
+executor through its current acceptance and team delegation. Triggers are
+events, so the number of armed policies adds no polling. Each occurrence
 key is the idempotency key of the capture it starts.
 
 Recorder policies (finite onTrigger and before-zero network headers) compile
@@ -104,10 +118,11 @@ boundary qualify.
 ## Recurring sharing
 
 A DebugPolicy may declare bounded `spec.sharing`
-([ADR-239](../decisions/239-recurring-policy-sharing.md)). Activation needs the
-activating human's `evidence:share` and an evidence-owner group of the
-automation AccessBinding as sponsor; those groups become the share managers,
-recorded as stable group IDs. The acceptance record carries the
+([ADR-239](../decisions/239-recurring-policy-sharing.md)). It takes effect
+with the acceptance when a sponsoring group of the automation AccessBinding
+holds sharing authority (`evidence-owner` or `workload-maintainer`); those
+groups become the share managers, recorded by name, and the policy is the
+recorded creator. The acceptance record carries the
 instruction. The policy principal has no sharing right of its own: each
 capture consumes one slot of the reviewed instruction. `sharing` is outside
 the collection-intent digest, so editing it stops sharing without
@@ -115,12 +130,13 @@ interrupting collection.
 
 ## Policy CRD
 
-The DebugPolicy CRD declares exactly one `recipeRef` or `profileComposition`,
-synchronized by `scripts/policy-crd.py` for the component, profile and
-override shapes and the UUID `grantRef`. `override.value` keeps its JSON type
-because a structural property cannot express that union; the canonical
-schema validates it before compilation. Existing installations apply CRD
-changes separately from `helm upgrade`.
+The namespaced DebugPolicy CRD declares exactly one `recipeRef` (a recipe
+name; the hub records its digest) or `profileComposition`, and names its
+target workload by kind and name in its own namespace; it has no grant
+reference. `scripts/policy-crd.py` synchronizes the component, profile and
+override shapes. `override.value` keeps its JSON type because a structural
+property cannot express that union; the canonical schema validates it before
+compilation.
 
 ## Boundaries
 

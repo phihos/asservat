@@ -157,7 +157,7 @@ at admission. [ADR-296](../decisions/296-finite-policy-go-profiles.md).
   application conflicts report `Failed`/`ProfilerBusy`. They create no evidence, replacement
   target or automatic retry, and release the operation's reservations. Only the application
   owner stops its profiler. [ADR-298](../decisions/298-explicit-go-profile-refusals.md).
-- Summary refusal (ADR-291): a `get_profile_summary` authorization failure before query
+- Summary refusal (ADR-291): a `get_extract(view=profileSummary)` authorization failure before query
   admission becomes a content-free `NotAvailable`; denied, missing, unsupported and unavailable
   sources share that response and audit outcome. Native Go trace download stays available
   (REQ-PRF-005, SC-PRF-003/005). [ADR-291](../decisions/291-bounded-profile-summary.md).

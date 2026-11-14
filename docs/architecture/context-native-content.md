@@ -4,7 +4,7 @@ C-14 owns the download session and native stream, C-03 evidence authority, C-02 
 
 ## Preparation
 
-`prepare_artifact_download` (browser or MCP) carries an idempotency key. In one SQL transaction it authorizes the caller once (ADR-311), checks the artifact's stored retention deadline, charges the workload's transfer budget, inserts the session row with its original bounds (session deadline, `AccessUntil`, byte reservation) and writes the audit row. A retry with the same key returns the same session. It returns the content URL immediately; no Job, worker enrollment or key slot is created.
+`download_artifact(action=prepare)` (browser or MCP) carries an idempotency key. In one SQL transaction it authorizes the caller once (ADR-311), checks the artifact's stored retention deadline, charges the workload's transfer budget, inserts the session row with its original bounds (session deadline, `AccessUntil`, byte reservation) and writes the audit row. A retry with the same key returns the same session. It returns the content URL immediately; no Job, worker enrollment or key slot is created.
 
 ## Serving bytes
 

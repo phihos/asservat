@@ -15,16 +15,15 @@
     "kind": "DebugPolicy",
     "spec": {
       "target": {
-        "namespace": "payments",
         "workloadRef": {
-          "apiVersion": "apps/v1",
           "kind": "Deployment",
           "name": "api",
-          "uid": "workload-api-uid"
+          "apiVersion": "apps/v1"
         },
+        "namespace": "payments",
         "maxPods": 1,
         "selection": "triggeringPod",
-        "adoption": "pinUID"
+        "adoption": "followName"
       },
       "detectors": [
         {
@@ -87,9 +86,6 @@
         "maxConcurrentActions": 3
       },
       "retention": "72h",
-      "observation": {
-        "mode": "allAuthorized"
-      },
       "evaluation": {
         "scope": "pod",
         "fireOnActivation": true,

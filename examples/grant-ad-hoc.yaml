@@ -13,7 +13,7 @@ spec:
     clusterID: 00000000-0000-4000-8000-000000000001
     workloadUID: workload-ledger-uid
     captureUID: 00000000-0000-4000-8000-000000000045
-    executionDigest: d3a5adbd38a80a8d859b62c31fe7e1662a2b27dcd774ff60a631907c5337fd71
+    executionDigest: cb1d805b3a9143ded3d6bee0508b1ef790dd344e102725ff5599673e928576c7
     recipeDigest: 5a5eff2029e270d2ec764af201abcb29dfaa0305071797ffca2ef784a788af43
   operations:
   - runtimeDiagnostic

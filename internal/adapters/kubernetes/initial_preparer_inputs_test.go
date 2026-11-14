@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -21,7 +20,7 @@ func finalInputFixture(t *testing.T, mode string) (*preparerFixture, *InitialPre
 		t.Fatal(e)
 	}
 	var fleet contracts.FleetSettings
-	raw, e := os.ReadFile("../../../examples/fleet-settings.json")
+	raw, e := readImplementedExample("../../../examples/", "fleet-settings.json")
 	if e != nil || json.Unmarshal(raw, &fleet) != nil {
 		t.Fatal("synthetic fleet", e)
 	}

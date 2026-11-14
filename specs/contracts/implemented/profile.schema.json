@@ -1,0 +1,324 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/profile.schema.json",
+  "title": "Asservat profile metadata v1",
+  "description": "Acquisition facts recorded by the producer. An endpoint producer does not parse the response, so sampleTypes, samplePeriod, lostSamples and symbolCoverage are absent there; the publisher verifies the native bytes and queries recompute those facts (ADR-284). A producer that builds the profile itself (the eBPF sampler) may record them.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "const": "profile/v1"
+    },
+    "format": {
+      "type": "string",
+      "enum": [
+        "pprof",
+        "go-trace",
+        "jfr",
+        "nettrace",
+        "speedscope",
+        "v8-cpuprofile"
+      ]
+    },
+    "runtime": {
+      "type": "string",
+      "enum": [
+        "go",
+        "jvm",
+        "dotnet",
+        "python",
+        "node",
+        "native",
+        "any"
+      ]
+    },
+    "profileType": {
+      "type": "string",
+      "enum": [
+        "cpu",
+        "heap",
+        "allocs",
+        "goroutine",
+        "block",
+        "mutex",
+        "threadcreate",
+        "offCpu",
+        "wall",
+        "lock",
+        "events",
+        "runtimeTrace"
+      ]
+    },
+    "mode": {
+      "type": "string",
+      "enum": [
+        "snapshot",
+        "interval",
+        "cumulative",
+        "delta"
+      ]
+    },
+    "sampleTypes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "type": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          }
+        },
+        "required": [
+          "type",
+          "unit"
+        ]
+      },
+      "maxItems": 16
+    },
+    "durationNanoseconds": {
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 86400000000000
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "samplePeriod": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "unit": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "value": {
+              "type": "number",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "type",
+            "unit",
+            "value"
+          ]
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "lostSamples": {
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000000
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "symbolCoverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "resolvedLocations": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000000
+        },
+        "totalLocations": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000000
+        }
+      },
+      "required": [
+        "resolvedLocations",
+        "totalLocations"
+      ]
+    },
+    "acquisition": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mechanism": {
+          "enum": [
+            "endpoint",
+            "ebpfSampler"
+          ]
+        },
+        "sourceRef": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 63
+        },
+        "endpointDigest": {
+          "description": "Digest of the resolved endpoint template, endpoint, credential audience and parameters (ADR-284).",
+          "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/hash"
+        },
+        "forceGC": {
+          "type": "boolean"
+        },
+        "settingsKnown": {
+          "type": "boolean"
+        },
+        "unattributedSamples": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000000
+        }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "mechanism": {
+              "const": "endpoint"
+            }
+          },
+          "required": [
+            "sourceRef",
+            "endpointDigest",
+            "forceGC",
+            "settingsKnown"
+          ],
+          "not": {
+            "required": [
+              "unattributedSamples"
+            ]
+          }
+        },
+        {
+          "properties": {
+            "mechanism": {
+              "const": "ebpfSampler"
+            }
+          },
+          "required": [
+            "mechanism",
+            "settingsKnown",
+            "unattributedSamples"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "sourceRef"
+                ]
+              },
+              {
+                "required": [
+                  "forceGC"
+                ]
+              },
+              {
+                "required": [
+                  "endpointDigest"
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "detectedRuntimes": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "go",
+          "jvm",
+          "dotnet",
+          "python",
+          "node",
+          "native",
+          "ruby",
+          "php",
+          "perl",
+          "beam"
+        ]
+      },
+      "uniqueItems": true,
+      "maxItems": 10
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "format",
+    "runtime",
+    "profileType",
+    "mode",
+    "durationNanoseconds",
+    "acquisition"
+  ],
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "acquisition": {
+            "properties": {
+              "mechanism": {
+                "const": "ebpfSampler"
+              }
+            },
+            "required": [
+              "mechanism"
+            ]
+          }
+        },
+        "required": [
+          "acquisition"
+        ]
+      },
+      "then": {
+        "properties": {
+          "runtime": {
+            "const": "any"
+          },
+          "profileType": {
+            "const": "cpu"
+          },
+          "format": {
+            "const": "pprof"
+          }
+        },
+        "required": [
+          "detectedRuntimes"
+        ]
+      },
+      "else": {
+        "properties": {
+          "runtime": {
+            "not": {
+              "const": "any"
+            }
+          }
+        },
+        "not": {
+          "required": [
+            "detectedRuntimes"
+          ]
+        }
+      }
+    }
+  ]
+}

@@ -35,7 +35,7 @@ examples:
   schema: https://asservat.io/spec/v1/manifest.schema.json
 - file: examples/mcp-backtrace-result.json
   schema: https://asservat.io/spec/v1/mcp-result.schema.json
-  tool: get_backtrace
+  tool: get_extract
 - file: examples/case-event.json
   schema: https://asservat.io/spec/v1/event.schema.json
 - file: examples/recipe-pprof.yaml
@@ -48,10 +48,10 @@ examples:
   schema: https://asservat.io/spec/v1/profile.schema.json
 - file: examples/mcp-profile-result.json
   schema: https://asservat.io/spec/v1/mcp-result.schema.json
-  tool: get_profile_summary
+  tool: get_extract
 - file: examples/mcp-profile-delta-result.json
   schema: https://asservat.io/spec/v1/mcp-result.schema.json
-  tool: get_profile_summary
+  tool: get_extract
 - file: examples/access-binding.yaml
   schema: https://asservat.io/spec/v1/access-binding.schema.json
 - file: examples/permission-source-namespace.yaml
@@ -95,6 +95,8 @@ examples:
 - file: examples/mcp-capture-sharing-result.json
   schema: https://asservat.io/spec/v1/mcp-result.schema.json
   tool: request_capture
+- file: examples/cluster-access-binding.yaml
+  schema: https://asservat.io/spec/v1/cluster-access-binding.schema.json
 - file: examples/access-binding-owners.yaml
   schema: https://asservat.io/spec/v1/access-binding.schema.json
 - file: examples/recipe-http-headers.yaml
@@ -103,7 +105,7 @@ examples:
   schema: https://asservat.io/spec/v1/recipe.schema.json
 - file: examples/mcp-http-headers-result.json
   schema: https://asservat.io/spec/v1/mcp-result.schema.json
-  tool: get_http_headers
+  tool: get_extract
 - file: examples/approval-policy.yaml
   schema: https://asservat.io/spec/v1/approval-policy.schema.json
 - file: examples/recipe-selected-process.yaml
@@ -196,10 +198,10 @@ examples:
 - file: examples/policy-composed.yaml
   schema: https://asservat.io/spec/v1/policy.schema.json
 - file: examples/mcp-profiles-input.json
-  input_tool: list_capture_profiles
+  input_tool: list_diagnostics
 - file: examples/mcp-profiles-result.json
   schema: https://asservat.io/spec/v1/mcp-result.schema.json
-  tool: list_capture_profiles
+  tool: list_diagnostics
 - file: examples/mcp-profile-definition-input.json
   input_tool: get_capture_profile
 - file: examples/mcp-profile-definition-result.json
@@ -212,15 +214,15 @@ examples:
   tool: preview_capture
 - file: examples/mcp-syscall-summary-result.json
   schema: https://asservat.io/spec/v1/mcp-result.schema.json
-  tool: get_syscall_summary
+  tool: get_extract
 - file: examples/mcp-syscall-events-result.json
   schema: https://asservat.io/spec/v1/mcp-result.schema.json
-  tool: get_syscall_events
+  tool: get_extract
 - file: examples/mcp-syscall-query-result.json
   schema: https://asservat.io/spec/v1/mcp-result.schema.json
-  tool: syscall_query
+  tool: query_artifact
 - file: examples/mcp-syscall-query-input.json
-  input_tool: syscall_query
+  input_tool: query_artifact
 - file: examples/resolved-composition-scope.json
   schema: https://asservat.io/spec/v1/collection-scope.schema.json
 - file: examples/resolved-recorder-preview.json
@@ -270,10 +272,10 @@ examples:
   schema: https://asservat.io/spec/v1/mcp-result.schema.json
   tool: list_recordings
 - file: examples/mcp-recording-save-preview-input.json
-  input_tool: preview_recording_save
+  input_tool: preview_capture
 - file: examples/mcp-recording-save-preview-result.json
   schema: https://asservat.io/spec/v1/mcp-result.schema.json
-  tool: preview_recording_save
+  tool: preview_capture
 - file: examples/mcp-recording-save-input.json
   input_tool: request_capture
 - file: examples/mcp-recording-save-result.json
@@ -290,37 +292,37 @@ examples:
 - file: examples/manifest-recording-save.json
   schema: https://asservat.io/spec/v1/manifest.schema.json
 - file: examples/mcp-recording-save-sharing-input.json
-  input_tool: preview_recording_save
+  input_tool: preview_capture
 - file: examples/live-watch.json
   schema: https://asservat.io/spec/v1/live-watch.schema.json
 - file: examples/mcp-live-open-input.json
-  input_tool: open_live_watch
+  input_tool: watch_live
 - file: examples/mcp-live-open-result.json
   schema: https://asservat.io/spec/v1/mcp-result.schema.json
-  tool: open_live_watch
+  tool: watch_live
 - file: examples/mcp-live-read-input.json
-  input_tool: read_live_watch
+  input_tool: watch_live
 - file: examples/mcp-live-read-result.json
   schema: https://asservat.io/spec/v1/mcp-result.schema.json
-  tool: read_live_watch
+  tool: watch_live
 - file: examples/mcp-live-update-input.json
-  input_tool: update_live_watch
+  input_tool: watch_live
 - file: examples/mcp-live-close-input.json
-  input_tool: close_live_watch
+  input_tool: watch_live
 - file: examples/mcp-live-sources-result.json
   schema: https://asservat.io/spec/v1/mcp-result.schema.json
-  tool: list_live_sources
+  tool: list_recordings
 - file: examples/mcp-live-sources-input.json
-  input_tool: list_live_sources
+  input_tool: list_recordings
 - file: examples/mcp-live-packet-result.json
   schema: https://asservat.io/spec/v1/mcp-result.schema.json
-  tool: read_live_watch
+  tool: watch_live
 - file: examples/mcp-live-http-result.json
   schema: https://asservat.io/spec/v1/mcp-result.schema.json
-  tool: read_live_watch
+  tool: watch_live
 - file: examples/mcp-live-paused-result.json
   schema: https://asservat.io/spec/v1/mcp-result.schema.json
-  tool: read_live_watch
+  tool: watch_live
 - file: examples/internal-armSource.json
   schema: https://asservat.io/spec/v1/internal-work.schema.json
 - file: examples/internal-runAction.json
@@ -336,17 +338,17 @@ examples:
 - file: examples/internal-receipt.json
   schema: https://asservat.io/spec/v1/internal-work.schema.json
 - file: examples/download-prepare.json
-  input_tool: prepare_artifact_download
+  input_tool: download_artifact
 - file: examples/download-ready.json
   schema: https://asservat.io/spec/v1/mcp-result.schema.json
-  tool: prepare_artifact_download
+  tool: download_artifact
 - file: examples/download-get.json
-  input_tool: get_artifact_download
+  input_tool: download_artifact
 - file: examples/download-cancel.json
-  input_tool: cancel_artifact_download
+  input_tool: download_artifact
 - file: examples/download-cancelled.json
   schema: https://asservat.io/spec/v1/mcp-result.schema.json
-  tool: cancel_artifact_download
+  tool: download_artifact
 - file: examples/internal-downloadArtifact.json
   schema: https://asservat.io/spec/v1/internal-work.schema.json
 - file: examples/grant-investigation.yaml
@@ -373,8 +375,6 @@ examples:
   schema: https://asservat.io/spec/v1/collection-scope.schema.json
 - file: examples/recipe-pod-status.json
   schema: https://asservat.io/spec/v1/recipe.schema.json
-- file: examples/fleet-settings.json
-  schema: https://asservat.io/spec/v1/fleet-settings.schema.json
 - file: examples/retention-topology.json
   schema: https://asservat.io/spec/v1/retention-topology.schema.json
 - file: examples/access-binding-automation.yaml
@@ -398,10 +398,10 @@ examples:
   schema: https://asservat.io/spec/v1/capture.schema.json
 - file: examples/mcp-context-excerpt-result.json
   schema: https://asservat.io/spec/v1/mcp-result.schema.json
-  tool: get_file_excerpt
+  tool: get_extract
 - file: examples/mcp-context-excerpt-pending.json
   schema: https://asservat.io/spec/v1/mcp-result.schema.json
-  tool: get_file_excerpt
+  tool: get_extract
 - file: examples/mcp-context-query-result.json
   schema: https://asservat.io/spec/v1/mcp-result.schema.json
   tool: get_query_result
@@ -416,33 +416,33 @@ examples:
 
 - file: examples/mcp-packet-summary-result.json
   schema: https://asservat.io/spec/v1/mcp-result.schema.json
-  tool: get_pcap_summary
+  tool: get_extract
 - file: examples/mcp-packet-summary-unreported-result.json
   schema: https://asservat.io/spec/v1/mcp-result.schema.json
-  tool: get_pcap_summary
+  tool: get_extract
 
 - file: examples/mcp-raw-packet-summary-result.json
   schema: https://asservat.io/spec/v1/mcp-result.schema.json
-  tool: get_pcap_summary
+  tool: get_extract
 - file: examples/mcp-raw-packet-summary-unclassified-result.json
   schema: https://asservat.io/spec/v1/mcp-result.schema.json
-  tool: get_pcap_summary
+  tool: get_extract
 
 - file: examples/mcp-packet-query-metadata-input.json
-  input_tool: pcap_query
+  input_tool: query_artifact
 - file: examples/mcp-packet-query-raw-input.json
-  input_tool: pcap_query
+  input_tool: query_artifact
 - file: examples/mcp-packet-query-raw-result.json
   schema: https://asservat.io/spec/v1/mcp-result.schema.json
-  tool: pcap_query
+  tool: query_artifact
 - file: examples/mcp-packet-query-metadata-result.json
   schema: https://asservat.io/spec/v1/mcp-result.schema.json
-  tool: pcap_query
+  tool: query_artifact
 
 - file: examples/mcp-logs-input.json
-  input_tool: get_logs
+  input_tool: get_extract
 - file: examples/mcp-logs-result.json
   schema: https://asservat.io/spec/v1/mcp-result.schema.json
-  tool: get_logs
+  tool: get_extract
 - file: examples/capture-profile-finite-logs.yaml
   schema: https://asservat.io/spec/v1/capture-profile.schema.json

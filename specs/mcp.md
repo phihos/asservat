@@ -14,81 +14,68 @@ Given representative clients for both revisions, when they call discovery/list/t
 
 ## Tool catalogue
 
-The machine-readable catalog is [mcp-tools.json](contracts/mcp-tools.json). A UI uses the same authorization/query services; it does not bypass tool-equivalent checks.
+The machine-readable catalog is [mcp-tools.json](contracts/mcp-tools.json); this table lists every MCP tool and is generated from it. A UI uses the same authorization/query services; it does not bypass tool-equivalent checks. Tools that differ only by evidence kind or by step of one workflow are one tool with a typed discriminator, so an agent selects among few tools ([ADR-335](../docs/decisions/335-usable-by-default.md)). Every tool is enabled by default; what a caller can do depends only on its OAuth scopes and current rights.
 
 | Tool | Purpose | Access and bounds |
 | --- | --- | --- |
 | `list_cases` | Filter by cluster, workload, time, status, signature, shared-with-me | Authorized projections only; default 20, max 100 cases |
 | `get_case` | Minimal case timeline, available artifacts/classes, capture gaps | Shared callers see only the shared projection |
 | `find_similar_cases` | Exact signature and structured similarity, optional bounded text | Authorization-filtered results/counts; deterministic ranking |
-| `list_artifacts` | Authorized artifact descriptors and provenance | No storage paths, wrapped keys or credentials |
+| `list_artifacts` | Authorized artifact descriptors, provenance and the extract views each supports | No storage paths, wrapped keys or credentials |
 | `get_timeline` | Time-ordered incident and collection events | Stable cursor; source-clock uncertainty included |
-| `get_backtrace` | Bounded threads/frames, symbols and source locations | Extract; no arbitrary local variable values |
-| `get_runtime_summary` | Typed heap/thread/GC/profile aggregates | Extract; runtime pack version and omissions included |
-| `get_profile_summary` | Profile totals, units and bounded flat/cumulative hotspots | Extract; sample type and symbol coverage explicit |
+| `get_extract` | Approved extract of one artifact; `view` = `backtrace`, `runtimeSummary`, `profileSummary`, `syscallSummary`, `syscallEvents`, `pcapSummary`, `httpHeaders`, `zeekLog`, `fileExcerpt` or `logs` | View must match the artifact kind; ordinary read rights; no live reads, bodies, local variables or argument data |
 | `compare_profiles` | Baseline/incident deltas or normalized rates | Authorize both artifacts; reject incompatible sample types/units |
-| `get_syscall_summary` | Syscall counts, errors and paired duration totals | Approved metadata projection; loss and incomplete pairs explicit |
-| `get_syscall_events` | Bounded recorded syscall metadata timeline | No argument option; source authorization and expiry |
-| `syscall_query` | Typed recorded argument query | Raw scope, artifact/share permission, matching grant and cumulative limits |
-| `get_pcap_summary` | Traffic counters, peers, handshake/error summaries where present | Extract; distinguish header-only from payload-derived findings |
-| `get_http_headers` | Approved plain HTTP/1 method/status/header fields and coverage gaps | Structured extract only; no bodies or arbitrary header selection |
-| `get_zeek_log` | Allowed log stream, fields and time window | Extract projection only; fields may be absent for headers-only input |
-| `get_file_excerpt` | Approved text/structured projection of a collected file | Extracts only by default; no live file reads |
-| `get_logs` | Redacted incident log extract with context bounds | No direct cluster log tailing through this tool |
-| `request_raw_access` | Request artifact-operation grant | Creates pending grant; does not collect or disclose evidence |
-| `get_grant` | Own grant state and remaining quota; optional bounded wait for the next change | Requester/approver-specific views; anyone else sees the same reply as for an unknown ID (ADR-249). The approval inbox `list_reviews`, `decide_review` and `revoke_grant` are browser-only console operations |
-| `read_memory` | Bounded core-memory view at an address | Raw scope + share/ACL + grant; max 16 KiB/call, cumulative quota |
-| `debugger_command` | Structured enum operation with typed arguments | Raw grant; no text command language, shell or code evaluation |
-| `pcap_query` | Bounded saved-packet fields, tcpdump/libpcap packet filter and typed time/flag selectors | Ordinary rights for metadata-only; exact pcap_query grant for any raw source/fields; scan/packet/output caps |
-| `get_query_result` | Retrieve result of an explicit analysis job | Authorization under REQ-INT-003; optional bounded wait; never charged |
-| `list_shares` | View owned/received concrete shares; optionally the sharing instructions of owned captures and policy acceptances; administrators: every share management-only (view administration) | Current personal/team-manager-only instructions; bounded origins and combined pagination; administration view without recipients, ≤ 100 per cursor page |
-| `create_share` | Request an explicit user/group evidence share | Sharing authority; raw-sharing may be pending approval |
-| `revoke_share` | Revoke one share or an owned/admin-managed sharing instruction (by capture or acceptance ID) and its dependent shares | Exactly one target ID; expected revision and idempotency required; current managers and installation administrators |
-| `transfer_share` | Replace the managing owner teams of one share (audited transfer or administrator recovery) | Current manager with teams they hold, or installation administrator with current owner teams (also for a Suspended share); expected revision and idempotency required; creator, recipients and expiry unchanged |
-| `stop_future_sharing` | Stop the future sharing of a recurring policy sharing (ADR-239); already selected captures still publish, existing shares stay | `sharing_intent_id` = the policy acceptance ID, expected revision 1 and idempotency required; creator, current owner-team member or installation administrator; changes no collection authority |
-| `explain_access` | Explain the caller's own Allow/Deny/Indeterminate decision for one workload and operation | Caller only; real evaluator; uniform reply without own allow; no evidence lookup |
-| `list_capture_history` | Previous accepted captures for one workload/selector | Default manual origin; retained/current history rights; bounded pages |
-| `get_capture_settings` | Retained collection parameters for review/editing | Protected immutable projection; no credentials, grants or sharing; ordinary byte limit |
-| `list_targets` | Discover authorized pods/workloads | Whole-pod collection eligibility; no share-based inventory |
-| `get_target_discovery` | Read approved process/flow/coverage projections from a discovery capture | Extracts; source artifact access and live-target eligibility; no acquisition |
-| `recommend_diagnostics` | Rank diagnostics for a goal and produce previewable handles | Passive; at most four discovery inputs/eight choices; current scope, stateless plans |
-| `list_capture_profiles` | Target-aware builtin/organization/namespace catalog | Bounded summary only; no collection or publication authority |
-| `get_capture_profile` | Versioned definition and exposed editable fields | Target/configuration-authorized extract; no secret material |
-| `list_diagnostics` | Discover usable presets/recipes for a target | Bounded capability-aware handles; no manual digest entry |
-| `preview_capture` | Resolve scope, impact, retention and missing approval | Side-effect-free dry run returning the resolved plan and `plan_digest`; nothing stored |
-| `list_live_sources` | Inventory of existing policy/manual sources and live projection capabilities | Metadata only; current maintainer and source audience rights |
-| `open_live_watch` | Open a finite approved view from now | Viewer mutation only; no new capture, grant transfer or raw content |
-| `read_live_watch` | Bounded transient rows and explicit gaps | Bounded wait (≤ 30 s), continuation cursor and no durable replay |
-| `update_live_watch` | Pause/resume or replace typed display filter | Revision/idempotency; no lifetime, budget or acquisition change |
-| `close_live_watch` | Close own viewer and release subscriber resources | Source recording continues independently |
-| `list_recordings` | Discover eligible existing packet/syscall recordings and history coverage | Passive, current whole-pod collection rights; bounded selection references |
-| `preview_recording_save` | Preview a snapshot-only save and incremental handling/impact | Existing-source selection only; submits via request_capture |
+| `query_artifact` | Typed query of saved evidence; `operation` = `packets` (pcap filter and fields), `syscalls` (recorded arguments), `memory` (core address range) or `debugger` (enum command) | Metadata-only packet fields need ordinary rights; raw operations need the equivalent Kubernetes right or a covering grant (REQ-MCP-003); scan/row/output caps |
+| `get_query_result` | Retrieve the result of a pending query | Authorization under REQ-INT-003; optional bounded wait; never charged |
+| `request_raw_access` | Request a grant for raw queries or downloads the caller cannot already perform | Creates a pending grant; does not collect or disclose evidence; reason required for the reviewer |
+| `get_grant` | Own grant state and remaining quota; optional bounded wait for the next change | Requester/approver-specific views; anyone else sees the reply for an unknown ID (ADR-249). The approval inbox `list_reviews`, `decide_review` and `revoke_grant` are browser-only |
+| `download_artifact` | `action` = `prepare`, `status` or `cancel` a native download or core bundle | `evidence:download`; returns metadata, `content_path` and `browser_url`, never bytes ([downloads](artifact-downloads.md)) |
+| `list_shares` | Owned/received concrete shares; optionally the sharing instructions of owned captures and policies; administrators: management-only view | Combined pagination; administration view without recipients, ≤ 100 per page |
+| `create_share` | Share evidence with users or groups named by user name, e-mail or group name | Sharing authority; raw sharing may be pending approval; optional reason |
+| `revoke_share` | Revoke one share or a sharing instruction (by capture or policy) and its dependent shares | Exactly one target; expected revision and idempotency; current managers and administrators |
+| `transfer_share` | Replace the managing owner teams of one share | Current manager with teams they hold, or administrator; expected revision and idempotency; creator, recipients and expiry unchanged |
+| `stop_future_sharing` | Stop future sharing of a policy; already selected captures still publish, existing shares stay | Creator, current owner-team member or administrator; changes no collection authority |
+| `explain_access` | Explain the caller's own Allow/Deny/Indeterminate decision for one workload and operation | Caller only; real evaluator; no evidence lookup |
+| `list_targets` | Search authorized clusters, namespaces, workloads and pods by name | Whole-pod collection eligibility; no share-based inventory |
+| `list_diagnostics` | Usable presets, recipes, capture profiles and discovery diagnostics for a target (`kind` per row), with execution modes | Bounded capability-aware handles; no digest entry |
+| `get_capture_profile` | Versioned capture-profile definition and editable fields | Target/configuration-authorized; no secret material |
+| `get_target_discovery` | Approved process/flow/coverage projections from a discovery capture | Extracts; source artifact access and target eligibility; no acquisition |
+| `recommend_diagnostics` | Rank diagnostics for a goal and produce previewable handles | Passive; at most four discovery inputs/eight choices |
+| `list_recordings` | Running and stopped policy/manual packet/syscall sources with history, save eligibility and live projections | Passive; evidence-read on the source audience; save rows need collection rights |
+| `preview_capture` | Dry run of a new capture, a repeat from history or a save of existing recordings | Returns the resolved plan and `plan_digest`; stores nothing |
+| `request_capture` | Submit a previewed capture or save, with optional result sharing and result access | `evidence:capture`; collection rights; approval, when required, starts it automatically |
 | `get_capture` | Collection, approval and partial outcomes; optional bounded wait for the next change | Current requester/maintainer view; case/approval navigation |
-| `cancel_capture` | Stop remaining collection | Disabled by default; revision/idempotency and cancellation authority |
-| `request_capture` | Submit a recipe-bound capture with optional result-sharing instruction | Disabled by default; collection scope/rights plus evidence:share and owner authority if sharing is requested |
+| `cancel_capture` | Stop remaining collection | `evidence:capture`; revision/idempotency and cancellation authority |
+| `list_capture_history` | Previous accepted captures for one workload | Retained/current history rights; bounded pages |
+| `get_capture_settings` | Retained collection parameters for review/editing | Protected projection; no credentials, grants or sharing |
+| `watch_live` | `action` = `open`, `read`, `update` (pause/resume/filter) or `close` a live view | Viewer state only; no capture, grant transfer or raw content ([live watch](live-watch.md)) |
+| `deactivate_policy` | Stop an accepted policy | Sponsoring-group maintainer; idempotent |
+| `get_policy_status` | Policy acceptance, counters, sharing state and grant | No content |
 
-Collection-time sharing follows [REQ-SHR-004–008](authorization.md#req-shr-004--share-results-when-requesting-collection). request_capture returns capture status; when sharing is requested, `sharing_intent_id` is the capture ID (or, for a policy, its acceptance ID) and `get_capture` reports `sharing.state` (`Pending`, `Shared`, `SharingUnavailable`) separately from collection. create_share still requires a concrete existing snapshot. list_shares(include_intents=true) is valid only for the owned view; limit/cursor bounds cover the combined shares/instructions count, and recipients never discover an empty pending case. Returned child origin fields are opaque provenance, not authority to inspect the parent instruction or other recipients. revoke_share accepts exactly one of share_id or sharing_intent_id and never approves an action or raw query. Parent revocation reaches delivery under REQ-INT-003. Missing sharing authority refuses the request with `SharingNotPermitted`; raw outputs need raw-sharing review (REQ-SHR-006).
+Collection-time sharing follows [REQ-SHR-004–008](authorization.md#req-shr-004--share-results-when-requesting-collection). request_capture returns capture status; when sharing is requested, `sharing_intent_id` is the capture ID (or, for a policy, its acceptance ID) and `get_capture` reports `sharing.state` (`Pending`, `Shared`, `SharingUnavailable`) separately from collection. create_share still requires a concrete existing snapshot. list_shares(include_intents=true) is valid only for the owned view; limit/cursor bounds cover the combined shares/instructions count, and recipients never discover an empty pending case. Returned child origin fields are opaque provenance, not authority to inspect the parent instruction or other recipients. revoke_share accepts exactly one of share_id or sharing_intent_id and never approves an action or raw query. Missing sharing authority refuses the request with `SharingNotPermitted`; raw outputs need raw-sharing review (REQ-SHR-006).
+
+create_share resolves recipient names against the principals and groups known to the installation (users who have signed in, `groups` claim values and groups named in AccessBindings) ([ADR-335](../docs/decisions/335-usable-by-default.md) D4). An ambiguous or unknown name returns up to ten candidates instead of a share. Reasons are optional everywhere except `request_raw_access`, where the reviewer needs one.
 
 ## REQ-MCP-002 — Bounded result contract
 
-Every tool result MUST carry `schema_version`, `request_id`, `data_class`, `status`, `data`, `truncated`, `next_cursor`, `narrowing_hint`, `warnings` and provenance references where available. `data_class` is the maximum sensitivity represented in the result, including mixed fields. The default serialized structured result budget is 24 KiB, with a 32 KiB specification ceiling for ordinary results; runtime subsets may enforce a smaller bound. Every MCP response, including structured/text representations and protocol overhead, stays within 64 KiB; there is no caller-selected response budget. `preview_recording_save` returns one aggregate effective-retention summary per source plus authenticated navigation to the per-policy details.
+Every tool result MUST carry `schema_version`, `request_id`, `data_class`, `status`, `data`, `truncated`, `next_cursor`, `narrowing_hint`, `warnings` and provenance references where available. `data_class` is the maximum sensitivity represented in the result, including mixed fields. The default serialized structured result budget is 24 KiB, with a 32 KiB specification ceiling for ordinary results; runtime subsets may enforce a smaller bound. Every MCP response, including structured/text representations and protocol overhead, stays within 64 KiB; there is no caller-selected response budget. A recording-save preview returns one aggregate effective-retention summary per source plus authenticated navigation to the per-policy details.
 
 Token counts are estimates, not enforceable universal units. Default output aims at roughly 5,000–8,000 tokens where practical; the actual safety bound is bytes/items. `truncated=true` requires a useful narrowing hint, and a cursor only if further authorized data exists. The explicit live-watch continuation contract below is the exception: an empty active batch can return a cursor for future rows. Cursor tokens are opaque, HMAC-authenticated and bind query parameters, principal/client and budgets. They do not expire and do not bind grant or share revisions; each page is authorized under REQ-INT-003, so a revoked share fails within 30 s. Cursors carry no raw secrets.
 
-Long work returns `status=pending` with a server-minted query handle and a `revision` in `data`. Status tools (`get_capture`, `get_grant`, `get_query_result`, `get_artifact_download`) accept an optional `after_revision`; the server holds the call until the revision changes or at most 30 s, woken by PostgreSQL `LISTEN/NOTIFY`, and then returns current state. Status reads are never charged and carry no not-before advice. Store only bounded current job state, not transport session state. Default query wall time 10 seconds, administrator maximum 60 seconds; input scan default 256 MiB, max 1 GiB without an explicit larger profile. A 100 GiB core may require a separately budgeted acquisition/staging job before a bounded memory query can run.
+Long work returns `status=pending` with a server-minted query handle and a `revision` in `data`. A query handle stays valid as long as its source evidence is readable (ADR-335 D9). Status tools (`get_capture`, `get_grant`, `get_query_result`, `download_artifact(action=status)`) accept an optional `after_revision`; the server holds the call until the revision changes or at most 30 s, woken by PostgreSQL `LISTEN/NOTIFY`, and then returns current state. Status reads are never charged and carry no not-before advice. Store only bounded current job state, not transport session state. Default query wall time 10 seconds, administrator maximum 60 seconds; input scan default 256 MiB, max 1 GiB without an explicit larger profile. A 100 GiB core may require a separately budgeted acquisition/staging job before a bounded memory query can run.
 
 For `get_query_result`, validate the nested result against the original tool's output schema, identified by the server-owned handle. The caller cannot choose a weaker schema through `tool_name`. Byte ceilings apply to the entire wrapped response.
 
 The [approved pod-status read profile](../docs/architecture/context-projection.md)
-uses the existing `get_file_excerpt` input and a fixed `pod-status.txt` projection.
+uses `get_extract(view=fileExcerpt)` and a fixed `pod-status.txt` projection.
 A long-running regional reader serves the read ([ADR-330](../docs/decisions/330-event-driven-system-design.md) D4);
 no Job, worker certificate or key slot is created per query. The query is
 authorized once at creation and that decision is reused under REQ-INT-003; the
 query lifetime is bounded by the original evidence/access deadlines. A pending
 handle binds the original tool, principal/client, committed source version, line
 selection and budgets. `get_query_result` never starts another query, capture or
-analyzer. Fixed ordinary reads need no caller idempotency key (SC-AUT-005); the
-saved-packet query keeps its idempotency key under REQ-MCP-003.
+analyzer. Fixed ordinary reads need no caller idempotency key (SC-AUT-005);
+`query_artifact` keeps its idempotency key under REQ-MCP-003.
 
 For these two query operations, successful and pending `data` includes
 `query_observed_at` and `query_expires_at`. The first timestamps the prepared
@@ -105,7 +92,7 @@ Given a query with more output than the byte cap, when it completes, then trunca
 ### SC-MCP-006
 
 Given an authorized browser or MCP reader and a committed pod-status artifact,
-when `get_file_excerpt` reads the selected lines, then both return the same fixed
+when `get_extract(view=fileExcerpt)` reads the selected lines, then both return the same fixed
 approved projection without download scope, new collection or extra consent.
 Given a known query handle and a lost outward reply, a later `get_query_result`
 returns the same result without starting another read; a reader whose access was
@@ -114,20 +101,25 @@ PostgreSQL transaction; when the audit row cannot be written nothing is disclose
 
 ## REQ-MCP-003 — Typed raw operations
 
-`syscall_query` selects names/errors in an existing saved argument recording,
-with a required idempotency key and optional approval-discovery `grant_id`.
-An admitted read always requires the exact current `syscall_query` grant for
-the artifact and requesting client. No supplied grant returns the existing
-raw-approval remedy before admission, not argument data. The canonical and
+Every `query_artifact` operation that returns raw content (`syscalls`, `memory`,
+`debugger`, and `packets` over a raw original) is admitted when the caller holds
+the equivalent Kubernetes right on the recorded workload's namespace
+(`pods/exec`, [ADR-335](../docs/decisions/335-usable-by-default.md) D5) or a
+covering grant for that artifact and operation; otherwise it returns the
+prefilled `request_raw_access` remedy before admission, not data.
+
+`query_artifact(operation=syscalls)` selects names/errors in an existing saved
+argument recording, with a required idempotency key and optional
+approval-discovery `grant_id`. The canonical and
 browser contracts share raw event fields, native encoded values, provenance,
 query observation/expiry timestamps and the 24 KiB result bound. A retry with
 the same key returns the original query; pages use the authenticated cursor
 under the same key.
 See [the saved-argument contract](syscalls.md#req-sys-003--evidence-projections-and-mcp).
 
-`debugger_command` MUST accept an enum such as `backtrace`, `threads`, `registers`, `frame_variables`, `managed_stack`, or `heap_statistics`, plus validated numeric/frame/thread selectors and projection limits. The implementation constructs fixed debugger scripts or MI calls itself. Do not accept shell, Python, debugger expressions, `source`, output redirection, extension loading or arbitrary `print` expressions. A command-name allowlist applied to free text is insufficient.
+`query_artifact(operation=debugger)` MUST accept an enum such as `backtrace`, `threads`, `registers`, `frame_variables`, `managed_stack`, or `heap_statistics`, plus validated numeric/frame/thread selectors and projection limits. The implementation constructs fixed debugger scripts or MI calls itself. Do not accept shell, Python, debugger expressions, `source`, output redirection, extension loading or arbitrary `print` expressions. A command-name allowlist applied to free text is insufficient.
 
-`pcap_query` MUST validate a bounded **tcpdump/libpcap packet-filter** subset,
+`query_artifact(operation=packets)` MUST validate a bounded **tcpdump/libpcap packet-filter** subset,
 closed packet fields and typed numeric/time/address/flag selections. The
 `packet_filter` input is capture-filter syntax, not Wireshark display-filter
 syntax ([ADR-305](../docs/decisions/305-bounded-saved-packet-queries.md)). The
@@ -141,18 +133,20 @@ outcomes separately from expressions. The closed field catalog and selector
 limits MUST be identical across canonical input, browser/MCP, scope and reader.
 
 Metadata-only source/fields use current ordinary and retained rights without a
-raw grant. Any raw original needs an exact `pcap_query` grant even for header-only
-fields; the raw-summary aggregate right, collection grant, raw share or download
-operation does not replace it. A raw captured-frame prefix may be returned as
-bounded hex only from a raw original under that grant. It is a prefix of saved
+raw grant. Any raw original needs the Kubernetes right or an exact packet-query
+grant even for header-only fields; the raw-summary aggregate right, collection
+grant, raw share or download operation does not replace it. A raw captured-frame
+prefix may be returned as bounded hex only from a raw original under that
+authority. It is a prefix of saved
 frame bytes, not inferred application payload. Missing/truncated headers remain
 null or explicitly unavailable. Authorization follows REQ-INT-003; Stop and
 retention cut-offs end a running query as events.
 
 Return one transient page of at most 100 saved-record rows, 32 selected fields and
 24 KiB encoded structured output including required wrapping. Keep input/native,
-parser/evaluator work and elapsed-time bounds separate. The declared 1 GiB scan
-ceiling does not qualify sources larger than the 8 MiB published packet bound.
+parser/evaluator work and elapsed-time bounds separate. A query scans at most
+`max_scan_bytes` (default 256 MiB, maximum 1 GiB) of any saved packet artifact,
+whatever its size; typed time bounds select the window of a larger artifact.
 Logical `scanned_bytes` sums captured frame lengths visited in original order,
 including nonmatches; do not visit a record that would cross `max_scan_bytes`.
 Stop logical matching/projection at its row or scan cap, report visited work and
@@ -172,15 +166,15 @@ invocation has its own audit request ID.
 Query-only raw grant pools fund returned disclosure rather than require coverage
 of the whole native file; retain verified native size as an exact source fact and
 the existing 1 GiB query-only request ceiling. A scope also selecting download keeps
-whole-file coverage and its existing download ceiling. Both operations spend the
+whole-file coverage, charged once per artifact version. Both operations spend the
 same parent pool across artifacts/clients. Reuse covering standalone or combined
-result-access grants under REQ-INV-001–003; an unlisted client needs its own review.
+result-access grants under REQ-INV-001–003; every client of the same human uses them.
 Store bounded normalized filter/program, numeric/enum selectors, exact source and
 keyed control identity, never rows, frame bytes or arbitrary payload/string
 literals in SQL/audit/logs. Numeric addresses still have finite user-data retention.
 No new capture, native download, stored derivative or capture-history entry is
-implicit in a query. `read_memory` likewise requires a collected core, validated
-address range and artifact digest; it never reads a live process. Returned byte
+implicit in a query. `query_artifact(operation=memory)` likewise requires a collected core, validated
+address range and artifact digest; it returns at most 16 KiB per call; it never reads a live process. Returned byte
 views are bounded raw query results, not artifact downloads.
 
 ### SC-MCP-003
@@ -192,13 +186,17 @@ backtrace cannot load target-provided Python pretty-printers. A supported packet
 filter uses the pinned program, typed time/flag bounds and exact saved fields;
 truncation cannot manufacture a missing field. A metadata-only query needs no
 raw grant, while header-only selection from a raw original still needs its exact
-pcap_query grant. A logical scan/row stop followed by a corrupt authenticated tail
+packet-query authority. A logical scan/row stop followed by a corrupt authenticated tail
 returns no page. Retrying an uncertain query with its original key does not
 create another query or disclosure charge; a changed selection conflicts.
 
 ## REQ-MCP-004 — OAuth and untrusted evidence
 
-Publish RFC 9728 resource metadata, validate audience strictly, and use configured issuers and preregistered clients. Advertise only `evidence:read` as the minimal scope; additional `evidence:raw`, `evidence:share`, and `evidence:capture` are requested through precise insufficient-scope challenges when necessary. An IdP adapter must pass discovery, resource/audience mapping and step-up tests. Separate workload token exchange is preferred to direct projected-token acceptance.
+Asservat is one OAuth protected resource whose identifier is the installation origin (`https://<host>`, no path). Its RFC 9728 metadata is served at `/.well-known/oauth-protected-resource` and every 401/403 from `/mcp` and from `/api/v1/downloads/{download_id}/content` names it in `resource_metadata`. A token whose audience is that origin is valid at both endpoints; the hub is the resource server for both, so this is not token passthrough. Validate issuer, audience and client strictly, and use configured issuers and preregistered clients.
+
+This follows the MCP authorization specification ([2025-11-25](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization), [2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization)) exactly: it requires the `resource` parameter to name the MCP server's canonical URI and lists an origin without path as a valid canonical URI; it requires servers to accept only tokens issued for their own resources and forbids passing a received token to another service. It defines no file transfer and says nothing about other HTTP endpoints of the same server, so it does not require a second protected resource for downloads. A separate download resource would only add a second authorization round for every client and is not used.
+
+`scopes_supported` and the initial 401 challenge are `evidence:read evidence:download evidence:capture`, so the first consent covers investigation, download and collection. `evidence:share` is requested through one precise insufficient-scope challenge, naming all scopes the operation needs at once. There is no separate raw scope: raw content is gated by the Kubernetes right or a grant (REQ-MCP-003, [downloads](artifact-downloads.md)). Scopes never grant workload entitlement. Step-up re-authentication is optional and off by default (ADR-335 D5); when an installation enables it for reviews, the IdP adapter must pass step-up tests. An IdP adapter must pass discovery and resource/audience mapping tests. Separate workload token exchange is preferred to direct projected-token acceptance.
 
 Treat all evidence text as untrusted data. Tool descriptions and result schemas MUST state that logs/files/source excerpts may contain attacker instructions. Keep provenance, user content and system-generated summaries separate; never convert content into tool instructions or automatically follow embedded URLs. This reduces ambiguity for a client agent but cannot guarantee the behavior of external models. No tool automatically remediates a workload or executes a suggestion found in evidence.
 
@@ -214,13 +212,13 @@ Use stable application codes in the result envelope: `NotAuthorized`, `GrantRequ
 
 `create_share` accepts optional management selection under REQ-SHR-008; the service derives the creator and the managing groups from current allows. `request_capture.sharing` uses the same resolver. `list_shares(view=owned)` means currently manageable through personal/team authority; received views stay concrete-artifact-only. `revoke_share` can be used by any valid manager, but does not approve raw access or transfer grant ownership.
 
-`get_http_headers(case_id, artifact_id, cursor?, limit?)` reads an already approved HTTP/1 projection, with at most 100 bounded records, inherited privacy deadlines, provenance and reported gaps. It has no body, decryption or arbitrary header-selection option. `get_pcap_summary.capture_mode` is networkHeaders or rawPackets; it does not confuse L3/L4 and HTTP headers. [ADR-304](../docs/decisions/304-transient-raw-packet-summary.md) permits the fixed transient Go summary of a raw original with dedicated ordinary aggregate rights and independently checked numeric output. Raw results require `unclassified_packets`; metadata results omit it. The original stays raw and broader queries/downloads retain separate grants. Native/subprocess analyzers retain qualified encrypted scratch and separate Jobs. All result/output/client/audit limits continue to apply.
+`get_extract(view=httpHeaders, case_id, artifact_id, cursor?, limit?)` reads an already approved HTTP/1 projection, with at most 100 bounded records, inherited privacy deadlines, provenance and reported gaps. It has no body, decryption or arbitrary header-selection option. The `pcapSummary` view's `capture_mode` is networkHeaders or rawPackets; it does not confuse L3/L4 and HTTP headers. [ADR-304](../docs/decisions/304-transient-raw-packet-summary.md) permits the fixed transient Go summary of a raw original with dedicated ordinary aggregate rights and independently checked numeric output. Raw results require `unclassified_packets`; metadata results omit it. The original stays raw and broader queries/downloads retain separate grants. Native/subprocess analyzers retain qualified encrypted scratch and separate Jobs. All result/output/client/audit limits continue to apply.
 
 ## REQ-MCP-005 — Complete capture workflow
 
-An enabled collection client can use list_targets → list_diagnostics → preview_capture → request_capture → get_capture, then ordinary case tools. list_targets lists only currently collectable pod/workload scope; a shared-evidence reader gains no workload inventory. list_diagnostics accepts exactly one target_handle or explicit target_ref and returns applicable immutable preset references or recipe handles, capability gaps and approval requirements for one target. Each row contains exactly one preset_ref or diagnostic_handle; a stable preset reference is not a scoped handle or evidence authority. Default pages are 20, maximum 100, with existing byte/cursor ceilings and current authorization.
+A client with `evidence:capture` uses list_targets → list_diagnostics → preview_capture → request_capture → get_capture, then ordinary case tools. list_targets lists only currently collectable pod/workload scope; a shared-evidence reader gains no workload inventory. list_diagnostics accepts exactly one target_handle or explicit target_ref and returns applicable immutable preset references or recipe handles, capability gaps and approval requirements for one target. Each row contains exactly one preset_ref or diagnostic_handle; a stable preset reference is not a scoped handle or evidence authority. Default pages are 20, maximum 100, with existing byte/cursor ceilings and current authorization.
 
-preview_capture also supports the exclusive history_capture_id restore branch in [REQ-HIS-004](capture-history.md); this creates a fresh passive preview with current checks. For a new plan, preview_capture accepts either a discovered target_handle or an explicit cluster/namespace/kind/name, and exactly one of a diagnostic_handle, versioned preset or profile_composition. It resolves pod-wide scope, runtime capabilities, budgets, retention, owner/sharing eligibility and approval requirements without acquiring application evidence, arming sensors, executing a command or reserving execution capacity. Preview is a dry run ([ADR-330](../docs/decisions/330-event-driven-system-design.md) D9): it returns the resolved plan and a `plan_digest` over immutable target UIDs, dependencies and the normalized request, and stores nothing. Target and diagnostic handles are opaque, stateless encodings of the listed target or recipe reference, bound to principal/client; the server stores nothing for them and resolves them again with current checks on use. They are not bearer permissions.
+preview_capture also supports the exclusive history_capture_id restore branch in [REQ-HIS-004](capture-history.md); this creates a fresh passive preview with current checks. For a new plan, preview_capture accepts either a discovered target_handle or an explicit cluster/namespace/kind/name, and exactly one of a diagnostic_handle, versioned preset or profile_composition; the recording-save branch takes `recording_handles` instead ([REQ-SAV-004](recording-saves.md)). It resolves pod-wide scope, runtime capabilities, budgets, retention, owner/sharing eligibility and approval requirements without acquiring application evidence, arming sensors, executing a command or reserving execution capacity. Preview is a dry run ([ADR-330](../docs/decisions/330-event-driven-system-design.md) D9): it returns the resolved plan and a `plan_digest` over immutable target UIDs, dependencies and the normalized request, and stores nothing. Target and diagnostic handles are opaque, stateless encodings of the listed target or recipe reference, bound to principal/client; the server stores nothing for them and resolves them again with current checks on use. They are not bearer permissions.
 
 The fixed `pod-status/v1` preset resolves only `builtin-pod-status-v1`; it is not an alias for the broader `incident-context/v1` preset or a CaptureProfile. Its successful preview echoes `preset_ref` and `target_ref`, returns one `selected_pods` row with actual owning workload identity, and states `pod_selection=explicitPod|lexicalEligiblePod`. The selected UID and owner are independently resolved, never accepted as input. `pod_count=1`, `max_bytes=4096`, `max_process_starts=0` and the single on-trigger pod-status lifecycle remain exact. An unchanged preset/handle/composition/history branch retains its schema; an unimplemented runtime branch returns a bounded explicit error rather than substituting this preset. [Paired synthetic example](../examples/mcp-pod-status-preview-result.json) demonstrates the contract, not an enabled collector.
 
@@ -230,21 +228,21 @@ For `pod-status/v1`, each assessment action reports `retention.anchorRule: submi
 
 The assessment carries a digest and no validity period. Submission recomputes the plan and assessment; when the digest differs from `expected_plan_digest` it returns ReviewChanged with the differences and never silently changes reviewed scope. All pre-eligibility target lookup errors remain nondisclosing.
 
-request_capture accepts either the explicit shape or the previewed request with `expected_plan_digest`, always with an `idempotency_key` (browser: `Idempotency-Key`). A retry with the same key returns the original operation rather than recapturing; a changed request under the same key is Conflict. A lost reply is resolved by retrying with the same key. Stale scope requires a fresh preview, without silently widening it. The service creates any pending ad hoc action-grant request using the frozen capture UID/scope; browser review stays mandatory. Sharing checks remain independent. The accepted response always includes a capture navigation URI. The connector resumes accepted work by operation ID after an interruption; status reads, reload and session refresh never start or repeat collection, and a new investigation requires a deliberate fresh review.
+request_capture accepts either the explicit shape or the previewed request with `expected_plan_digest`, always with an `idempotency_key` (browser: `Idempotency-Key`). A retry with the same key returns the original operation rather than recapturing; a changed request under the same key is Conflict. A lost reply is resolved by retrying with the same key. Stale scope requires a fresh preview, without silently widening it. When the plan needs an independent approval, the service creates the pending request from the frozen scope and the approval itself starts the accepted capture; the requester submits nothing again ([ADR-335](../docs/decisions/335-usable-by-default.md) D5). Sharing checks remain independent. The accepted response always includes a capture navigation URI. The connector resumes accepted work by operation ID after an interruption; status reads, reload and session refresh never start or repeat collection, and a new investigation requires a deliberate fresh review.
 
-get_capture returns authorized revision/phase, bounded per-action progress, available case reference, gaps, `revision` and existing approval navigation where eligible; it supports the bounded `after_revision` wait. It does not return evidence bytes, commands or hidden recipients. Read access is requester/current scoped maintainer or administrator; mere receipt of one shared artifact does not expose the entire collection plan. Requests across clients by the same user still require current scope; idempotency keys and raw-query grants remain client-bound. Errors name the remedy/role only after access is established. Navigation links are same-installation authenticated URLs and contain no tokens.
+get_capture returns authorized revision/phase, bounded per-action progress, available case reference, gaps, `revision` and existing approval navigation where eligible; it supports the bounded `after_revision` wait. It does not return evidence bytes, commands or hidden recipients. Read access is requester/current scoped maintainer or administrator; mere receipt of one shared artifact does not expose the entire collection plan. Requests across clients by the same user still require current scope; idempotency keys remain client-bound; grants belong to the human, so every OAuth client of that user carries the user's own evidence access (maintainer decision). Errors name the remedy/role only after access is established. Navigation links are same-installation authenticated URLs and contain no tokens.
 
 Capture status is one phase plus the Conditions Accepted, Collected, Verified and Published ([state machines](apis.md#state-machines)). Succeeded requires Published for every required output. Wall-clock passage alone never changes the phase. Case navigation requires its own current authorization.
 
-cancel_capture is disabled by default alongside request_capture; when enabled it needs evidence:capture and current requester/workload cancellation authority, expected revision and idempotency key. It stops remaining collection, does not erase artifacts or retract shares, and never reruns/resumes work. Return cancellation_requested and current phase; a sent cancellation is not proof a profiler or kernel operation stopped. All capture-workflow tools retain strict schemas, audit, privacy, request/output limits and no automatic approval.
+cancel_capture needs evidence:capture and current requester/workload cancellation authority, expected revision and idempotency key. It stops remaining collection, does not erase artifacts or retract shares, and never reruns/resumes work. Return cancellation_requested and current phase; a sent cancellation is not proof a profiler or kernel operation stopped. All capture-workflow tools retain strict schemas, audit, privacy, request/output limits and no automatic approval.
 
 ### SC-MCP-005
 
-Given an authorized agent with collection enabled but no hashes, when it discovers a workload, previews incident-context and submits the previewed request with its plan digest, then it can follow the same capture with get_capture and reach the resulting case. An intrusive preview leads to browser approval; context can progress independently. A replayed submission with the same key returns the same capture; a changed plan is reported as ReviewChanged; a foreign handle, changed parameters under the same key or a received share cannot authorize collection. Cancellation cannot delete evidence or revoke shares implicitly.
+Given an authorized agent with `evidence:capture` but no hashes, when it discovers a workload, previews incident-context and submits the previewed request with its plan digest, then it can follow the same capture with get_capture and reach the resulting case. An intrusive preview leads to browser approval, after which the capture starts without another submission; context can progress independently. A replayed submission with the same key returns the same capture; a changed plan is reported as ReviewChanged; a foreign handle, changed parameters under the same key or a received share cannot authorize collection. Cancellation cannot delete evidence or revoke shares implicitly.
 
 ## Guided selection
 
-REQ-GDE-001–006 in [guidance](guidance.md) add `get_target_discovery` and `recommend_diagnostics`, with strict [projection contracts](contracts/guidance.schema.json). Both are read-only tools using `evidence:read` plus current target collection eligibility; read-only annotations never authorize live process/packet collection. The existing `evidence:capture`/disabled-by-default submission gate controls every new survey. Recommendation focus may name up to 16 process references and/or 16 flow references from supplied discovery captures, so agents can refine plans without copying PIDs or peer addresses. Resolve all references against caller/client and current source rights; they constrain the recommendation, not execution authority. If a durable selector also matches other processes or peers, show the expanded set and require the ordinary explicit plan selection; never silently discard a focus constraint. Unsupported or conflicting focus yields a useful blocker.
+REQ-GDE-001–006 in [guidance](guidance.md) add `get_target_discovery` and `recommend_diagnostics`, with strict [projection contracts](contracts/guidance.schema.json). Both are read-only tools using `evidence:read` plus current target collection eligibility; read-only annotations never authorize live process/packet collection. `evidence:capture` and ordinary collection rights gate every new survey. Recommendation focus may name up to 16 process references and/or 16 flow references from supplied discovery captures, so agents can refine plans without copying PIDs or peer addresses. Resolve all references against caller/client and current source rights; they constrain the recommendation, not execution authority. If a durable selector also matches other processes or peers, show the expanded set and require the ordinary explicit plan selection; never silently discard a focus constraint. Unsupported or conflicting focus yields a useful blocker.
 
 `preferences.max_bytes` caps aggregate acquired output across selected pods; `max_ring_bytes` separately caps their total live ring allocation. Show frozen/parser/scratch reservations alongside these values; neither field overrides administrator resource accounts.
 
@@ -256,13 +254,13 @@ The strict [history projections](contracts/capture-history.schema.json) back lis
 
 ## Capture-profile composition and syscall projections
 
-[Capture profiles](capture-profiles.md) reuse preview_capture → request_capture → get_capture. Full composition provenance in a preview is an extract and subject to the ordinary byte bound. If it cannot fit, return a bounded error with authenticated browser navigation; do not silently drop component settings or approval-relevant differences. List/detail are passive and require current target eligibility plus the relevant catalog visibility. Save/publish remains Kubernetes configuration, not a new MCP mutation or permission CRUD API.
+[Capture profiles](capture-profiles.md) reuse preview_capture → request_capture → get_capture; list_diagnostics lists them with `kind=captureProfile`. Full composition provenance in a preview is an extract and subject to the ordinary byte bound. If it cannot fit, return a bounded error with authenticated browser navigation; do not silently drop component settings or approval-relevant differences. List/detail are passive and require current target eligibility plus the relevant catalog visibility. Save/publish remains Kubernetes configuration, not a new MCP mutation or permission CRUD API.
 
-[Syscall evidence](syscalls.md) adds two approved extract tools and syscall_query to the typed raw-operation set. The latter has no live tracing, pointer dereference or code-execution operation. Bound scan work as well as returned rows; shared views select only permitted artifacts/projections. get_query_result authorizes the same scope/grant under REQ-INT-003. Argument-bearing results, tool strings and catalog descriptions are untrusted data.
+[Syscall evidence](syscalls.md) adds the `syscallSummary` and `syscallEvents` extract views and the `syscalls` query operation. The latter has no live tracing, pointer dereference or code-execution operation. Bound scan work as well as returned rows; shared views select only permitted artifacts/projections. get_query_result authorizes the same scope/grant under REQ-INT-003. Argument-bearing results, tool strings and catalog descriptions are untrusted data.
 
 ## Lifecycle-aware planning
 
-list_capture_profiles rows include execution_modes; preview_capture always includes lifecycle_plan (action-lifecycle/v1), resolving per-action mode, policyArming versus manualSession and requested history/post-window. These fields contain configuration/metadata only and do not arm anything. get_capture reports incident progress; policy source readiness is separate. Recommendations and history repeat pass through this same compiler and cannot treat a ten-second live profiler as prior history or a delayed newly started ring as pre-trigger evidence. No new tool can bypass source approval or start an unbounded recorder.
+list_diagnostics rows include execution_modes; preview_capture always includes lifecycle_plan (action-lifecycle/v1), resolving per-action mode, policyArming versus manualSession and requested history/post-window. These fields contain configuration/metadata only and do not arm anything. get_capture reports incident progress; policy source readiness is separate. Recommendations and history repeat pass through this same compiler and cannot treat a ten-second live profiler as prior history or a delayed newly started ring as pre-trigger evidence. No new tool can bypass source approval or start an unbounded recorder.
 
 ## Impact assessment and handling notices
 
@@ -272,26 +270,24 @@ get_case/list_artifacts descriptors require handling_notice with possible conten
 
 ## Saving existing recordings
 
-[Recording saves](recording-saves.md) add two passive tools: list_recordings for authorized ongoing-source inventory, and preview_recording_save for a bounded selection/lookback and incremental impact/privacy assessment; like preview_capture it is a dry run that returns the resolved save plan and its `plan_digest` and stores nothing. They use existing metadata result limits and principal/client-bound selection references, and do not freeze/read buffers. Submit with request_capture, the preview's `expected_plan_digest` and an idempotency key; get_capture and cancel_capture handle the resulting operation=recordingSave. The existing mutation enable switch, OAuth scope and current workload permissions apply. No tool accepts a policy trigger event, arbitrary source ID, post-window, core/command or filter override.
+[Recording saves](recording-saves.md) use list_recordings for authorized source inventory and the recording-save branch of preview_capture (`recording_handles`, optional `before`, `reason`, `sharing`) for a bounded selection/lookback and incremental impact/privacy assessment. Like every preview it is a dry run that returns the resolved save plan and its `plan_digest` and stores nothing; it does not freeze or read buffers. Submit with request_capture, the preview's `expected_plan_digest` and an idempotency key; get_capture and cancel_capture handle the resulting operation=recordingSave. No tool accepts a policy trigger event, arbitrary source ID, post-window, core/command or filter override.
 
-get_capture_settings returns either ordinary captureSettings or recordingSaveSettings. A saved-recording history entry has origin=manual, operation=recordingSave and repeat_state=requiresSelection while usable; ordinary preview_capture redirects it to fresh inventory. A schema-valid handle alone never authorizes access, and partial/expired sources are never silently replaced. A raw-result share still confers no inventory/capture rights.
+get_capture_settings returns either ordinary captureSettings or recordingSaveSettings. A saved-recording history entry has origin=manual and operation=recordingSave; preview_capture(history_capture_id) preselects the same policy actions on current sources. A schema-valid handle alone never authorizes access, and partial/expired sources are never silently replaced. A raw-result share still confers no inventory/capture rights.
 
 ## Live watching of existing sources
 
-[REQ-LIV-001–006](live-watch.md) add five typed tools and the [live contract](contracts/live-watch.schema.json). `list_live_sources` is separate from policy-save inventory because finite manual sessions may be watched without gaining the policy-only save capability. Open/update/close are enabled viewer-state operations under evidence:read plus current source eligibility; they do not enable request_capture/cancel_capture or require evidence:capture. Opening a watch is explicit user/agent intent and never acquisition. Source selection/projection are immutable for that watch; only a typed approved display filter and pause state can change.
+[REQ-LIV-001–006](live-watch.md) add one tool, `watch_live`, and the [live contract](contracts/live-watch.schema.json); list_recordings reports which sources support which live projections. `action=open|update|close` are viewer-state operations under evidence:read plus the viewer rights of REQ-LIV-001; they do not require evidence:capture. Opening a watch is explicit user/agent intent and never acquisition. Source selection/projection are immutable for that watch; only a typed approved display filter and pause state can change.
 
-MCP uses `read_live_watch`, which waits server-side up to `wait_ms` (at most 30 s, [REQ-LIV-003](live-watch.md)) for rows and returns bounded rows and explicit gaps. Its next_cursor continues an active stream, including when the current batch is empty; it does not promise unread historical rows. Timeout/connection loss does not close the watch or extend its original deadline. Reads are not charged and are authorized under REQ-INT-003; stale view revisions or an aged-out resume position yield a gap/fresh position rather than an unbounded backlog. No tool creates a raw live grant, subscribes to hidden sources, invokes arbitrary expressions or returns an infinite stream. Both supported MCP protocol profiles use these bounded tools; notifications are not required. Live row references identify transient source observations, not durable artifact citations.
+`watch_live(action=read)` waits server-side up to `wait_ms` (at most 30 s, [REQ-LIV-003](live-watch.md)) and returns bounded rows and explicit gaps. Its next_cursor continues an active stream, including when the current batch is empty; it does not promise unread historical rows. The watch stays open while reads arrive at most 10 minutes apart, so an agent may reason between reads. Reads are not charged and are authorized under REQ-INT-003; stale view revisions or an aged-out resume position yield a gap/fresh position rather than an unbounded backlog. No tool creates a raw live grant, subscribes to hidden sources, invokes arbitrary expressions or returns an infinite stream. Both supported MCP protocol profiles use this bounded tool; notifications are not required. Live row references identify transient source observations, not durable artifact citations.
 
-Stateless HTTP remains a transport property. LiveWatch is domain state (slot accounting and view settings), not a connection-bound MCP session. The browser receives rows over one Server-Sent Events stream per watch, bounded by the watch lifetime and byte budget; the replica serving the stream subscribes to the source over the connector connection for the stream's lifetime and resumes from `Last-Event-ID` = (source session, sequence) within the resume window, otherwise it sends a gap event. Any replica serves an MCP read from the source's bounded buffer over the connector connection. No client affinity, hub projection owner or owner fencing is required.
+Stateless HTTP remains a transport property. LiveWatch is domain state (slot accounting and view settings), not a connection-bound MCP session. The browser receives rows over one Server-Sent Events stream per watch, bounded by the watch lifetime and delivery rate; the replica serving the stream subscribes to the source over the connector connection for the stream's lifetime and resumes from `Last-Event-ID` = (source session, sequence) within the resume window, otherwise it sends a gap event. Any replica serves an MCP read from the source's bounded buffer over the connector connection. No client affinity, hub projection owner or owner fencing is required.
 
 ## Native-file handoff
 
-`prepare_artifact_download`, `get_artifact_download` and `cancel_artifact_download` share browser contracts. Preparation requires explicit user intent plus evidence:download and current artifact access; raw files additionally require evidence:raw and an existing grant covering download_artifact. Results contain status and, when available and currently authorized, the complete verified native filename/size/format/checksum group. Ready/Streaming/Interrupted require that group and an authenticated application content path; terminal states expose neither content path nor resume. Completed may return status without native metadata after the regional result cache is gone, including after the original transfer deadline while current evidence metadata authority still permits disclosure. Do not infer local file persistence or checksum verification from Completed. Status reads never re-prepare evidence. Results never contain file bodies, base64, credentials or presigned URLs. An OAuth-capable client uses the separate streaming HTTP endpoint outside the model context; browser handoff rebinds to that browser principal/client. Existing bounded raw-query tools remain useful and unchanged. See [downloads](artifact-downloads.md).
+`download_artifact(action=prepare|status|cancel)` shares the browser contract. Preparation requires explicit user intent plus evidence:download and current artifact access; raw files additionally require the Kubernetes right or a covering grant ([REQ-DLD-002](artifact-downloads.md#req-dld-002--reuse-authority-review-only-where-required)). Results contain status and, when currently authorized, the complete verified native filename/size/format/checksum group; every status, including terminal ones, returns the artifact's verified size and SHA-256 while the caller may read its metadata. Ready and interrupted sessions return `content_path` and `browser_url`; terminal states return neither. Do not infer local file persistence or checksum verification from Completed. Status reads never re-prepare evidence. Results never contain file bodies, base64, credentials or presigned URLs.
 
-The native download resource has its own protected-resource metadata at `/.well-known/oauth-protected-resource/downloads`, pinned to the installed origin and issuer. Clients obtain authorization for that exact resource and original client identity; an MCP audience alone does not authorize the content endpoint. The fixed HTTP preflight audit is not advertised as a tool. Native bytes remain outside all model responses and transcripts.
-
-Advertise evidence:download as an optional file-transfer scope alongside evidence:read; it is not raw eligibility. Raw native transfers still use the existing evidence:raw challenge and explicit artifact grant. File content is excluded from ordinary MCP response-byte/token budgets because it travels on the separate fully accounted HTTP transfer, not because those budgets are bypassed.
+A client that can stream an authenticated HTTP resource to disk GETs `content_path` with its existing token for the installation's single protected resource (REQ-MCP-004); bytes stay outside the model context. Any other client gives the user `browser_url`, which the signed-in browser of the same human opens to download the same session without another consent or approval. File content is excluded from MCP response-byte/token budgets because it travels on the separate fully accounted HTTP transfer.
 
 ## One review for collection and investigation
 
-preview_capture and expanded request_capture accept result_access as a finite instruction, not a grant. It selects output action IDs, operations, registered clients for the same human and aggregate limits/deadline; the planner resolves friendly UI selections. Submit-by-preview forbids overriding it. preview_capture returns the resolved result_access scope; get_capture returns current result_access state and authorized child grant IDs. Use [investigation-access.schema.json](contracts/investigation-access.schema.json) and [REQ-INV-001–003](investigation-approval.md). Selecting an agent client is explicit. Artifact tools reuse exact current child grants automatically; unrelated clients/principals need their own review. A pending access materialization never asks the agent to recollect evidence.
+preview_capture and expanded request_capture accept result_access as a finite instruction, not a grant. It selects output action IDs, operations and aggregate limits/deadline and covers every client and browser session of the same human; the planner resolves friendly UI selections. Submit-by-preview forbids overriding it. preview_capture returns the resolved result_access scope; get_capture returns current result_access state and authorized child grant IDs. Use [investigation-access.schema.json](contracts/investigation-access.schema.json) and [REQ-INV-001–003](investigation-approval.md). Artifact tools reuse exact current child grants automatically; other principals need their own review. A pending access materialization never asks the agent to recollect evidence.

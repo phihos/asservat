@@ -31,6 +31,14 @@ stated reason. Cached state remains valid until replaced: do not expire it
 merely to force refreshes. Every new ticker/sleep loop, periodic full resend
 or expiry-driven refresh must justify in its PR why no event source works.
 
+## Limits need a reason (maintainer, 2026-11-14)
+
+"If you can not give a good reason for a limit then remove the limit." A limit
+stays only with a concrete resource cost that grows with it (and a bound
+derived from that cost), an external protocol or API constraint, or an explicit
+maintainer decision; write the reason next to it. Prefer pagination or
+streaming over caps on lists.
+
 ## Threat model and security evidence (maintainer, 2026-11-13)
 
 Operators keep every non-Asservat-administrator completely out of the Asservat

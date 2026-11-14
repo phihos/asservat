@@ -1,0 +1,293 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/policy.schema.json",
+  "title": "Asservat policy v1",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "apiVersion": {
+      "const": "asservat.io/v1alpha1"
+    },
+    "kind": {
+      "const": "DebugPolicy"
+    },
+    "metadata": {
+      "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/metadata"
+    },
+    "spec": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "target": {
+              "$ref": "https://asservat.io/spec/v1/target.schema.json"
+            },
+            "detectors": {
+              "type": "array",
+              "items": {
+                "$ref": "https://asservat.io/spec/v1/trigger.schema.json#/$defs/detector"
+              },
+              "maxItems": 16,
+              "minItems": 1,
+              "uniqueItems": true
+            },
+            "when": {
+              "$ref": "https://asservat.io/spec/v1/trigger.schema.json#/$defs/expression"
+            },
+            "recipeRef": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 63
+                },
+                "digest": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              },
+              "required": [
+                "name",
+                "digest"
+              ]
+            },
+            "grantRef": {
+              "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/uuid"
+            },
+            "budgets": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "cooldown": {
+                  "type": "string",
+                  "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$",
+                  "maxLength": 16
+                },
+                "burst": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 10
+                },
+                "maxOccurrencesPerHour": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1000
+                },
+                "maxConcurrentActions": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 10
+                }
+              },
+              "required": [
+                "cooldown",
+                "burst",
+                "maxOccurrencesPerHour",
+                "maxConcurrentActions"
+              ]
+            },
+            "retention": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$",
+              "maxLength": 16
+            },
+            "suspended": {
+              "type": "boolean"
+            },
+            "sharing": {
+              "$ref": "https://asservat.io/spec/v1/sharing-request.schema.json#/$defs/policy"
+            },
+            "observation": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "mode": {
+                  "const": "allAuthorized"
+                },
+                "maxPods": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1000
+                }
+              },
+              "required": [
+                "mode"
+              ]
+            },
+            "evaluation": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "scope": {
+                  "enum": [
+                    "pod",
+                    "workload"
+                  ]
+                },
+                "fireOnActivation": {
+                  "type": "boolean"
+                },
+                "rearmFor": {
+                  "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/duration"
+                }
+              },
+              "required": [
+                "scope",
+                "fireOnActivation",
+                "rearmFor"
+              ]
+            },
+            "recordingSaves": {
+              "$ref": "https://asservat.io/spec/v1/recording-save.schema.json#/$defs/policyOptIn"
+            }
+          },
+          "required": [
+            "target",
+            "detectors",
+            "when",
+            "recipeRef",
+            "budgets",
+            "retention",
+            "suspended",
+            "observation"
+          ]
+        },
+        {
+          "$ref": "https://asservat.io/spec/v1/preset-input.schema.json#/$defs/policy"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "target": {
+              "$ref": "https://asservat.io/spec/v1/target.schema.json"
+            },
+            "detectors": {
+              "type": "array",
+              "items": {
+                "$ref": "https://asservat.io/spec/v1/trigger.schema.json#/$defs/detector"
+              },
+              "maxItems": 16,
+              "minItems": 1,
+              "uniqueItems": true
+            },
+            "when": {
+              "$ref": "https://asservat.io/spec/v1/trigger.schema.json#/$defs/expression"
+            },
+            "grantRef": {
+              "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/uuid"
+            },
+            "budgets": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "cooldown": {
+                  "type": "string",
+                  "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$",
+                  "maxLength": 16
+                },
+                "burst": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 10
+                },
+                "maxOccurrencesPerHour": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1000
+                },
+                "maxConcurrentActions": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 10
+                }
+              },
+              "required": [
+                "cooldown",
+                "burst",
+                "maxOccurrencesPerHour",
+                "maxConcurrentActions"
+              ]
+            },
+            "retention": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$",
+              "maxLength": 16
+            },
+            "suspended": {
+              "type": "boolean"
+            },
+            "sharing": {
+              "$ref": "https://asservat.io/spec/v1/sharing-request.schema.json#/$defs/policy"
+            },
+            "observation": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "mode": {
+                  "const": "allAuthorized"
+                },
+                "maxPods": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1000
+                }
+              },
+              "required": [
+                "mode"
+              ]
+            },
+            "evaluation": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "scope": {
+                  "enum": [
+                    "pod",
+                    "workload"
+                  ]
+                },
+                "fireOnActivation": {
+                  "type": "boolean"
+                },
+                "rearmFor": {
+                  "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/duration"
+                }
+              },
+              "required": [
+                "scope",
+                "fireOnActivation",
+                "rearmFor"
+              ]
+            },
+            "profileComposition": {
+              "$ref": "https://asservat.io/spec/v1/capture-composition.schema.json"
+            },
+            "recordingSaves": {
+              "$ref": "https://asservat.io/spec/v1/recording-save.schema.json#/$defs/policyOptIn"
+            }
+          },
+          "required": [
+            "target",
+            "detectors",
+            "when",
+            "profileComposition",
+            "budgets",
+            "retention",
+            "suspended",
+            "observation"
+          ]
+        }
+      ]
+    }
+  },
+  "required": [
+    "apiVersion",
+    "kind",
+    "metadata",
+    "spec"
+  ]
+}

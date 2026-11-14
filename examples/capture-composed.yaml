@@ -5,20 +5,13 @@ metadata:
   namespace: payments
 spec:
   target:
-    namespace: payments
     workloadRef:
-      apiVersion: apps/v1
       kind: StatefulSet
       name: ledger
-      uid: workload-ledger-uid
-    maxPods: 1
     selection: lowestOrdinal
-    adoption: pinUID
     ordinals:
     - 0
   reason: Investigate a synthetic ledger stall.
-  idempotencyKey: composed-ledger-001
-  deadline: '2026-10-09T12:05:00Z'
   profileComposition:
     components:
     - id: http

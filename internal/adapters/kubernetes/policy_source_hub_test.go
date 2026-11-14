@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"os"
 	"testing"
 
 	app "asservat.local/asservat/internal/application/capture"
@@ -17,7 +16,7 @@ import (
 // namespace of a workload cluster. Only the hub reader accepts it; the
 // shipped example compiles to the accepted restart subset.
 func TestHubHeldPolicySourceReadsTheControlNamespace(t *testing.T) {
-	y, e := os.ReadFile("../../../examples/policy-restart.yaml")
+	y, e := readImplementedExample("../../../examples/", "policy-restart.yaml")
 	if e != nil {
 		t.Fatal(e)
 	}

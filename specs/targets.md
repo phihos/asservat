@@ -2,17 +2,19 @@
 
 ## REQ-TGT-001 — Stable workload selection
 
-A policy MUST select exactly one namespace-local workload reference or pod label selector. Workload references support `apps/v1` Deployment and StatefulSet in the first release; direct Pod references are supported for ad hoc captures. The controller MUST resolve owner UIDs, follow Deployment → ReplicaSet → Pod ownership, and refuse same-name workload replacement unless the policy explicitly adopts a new UID after authorization review. A policy can follow ordinary rolling updates under the same workload UID; its grant decides whether image digests are constrained.
+A policy MUST select exactly one namespace-local workload reference or pod label selector. Workload references name a Deployment or StatefulSet by kind and name (`apiVersion` is derived from the kind); direct Pod references are supported for ad hoc captures. The target namespace is the object's own namespace. The controller resolves owner UIDs and follows Deployment → ReplicaSet → Pod ownership. By default a target follows its name ([ADR-335](../docs/decisions/335-usable-by-default.md) D4): a workload deleted and recreated under the same name in the same namespace, for example by an Argo CD replace or a blue/green recreate, stays the target, and the new UID is recorded in status and in each occurrence's provenance. `adoption: pinUID` opts into binding the UID seen at acceptance; a replacement under that setting reports `TargetReplaced`. Rolling updates keep the target either way; an intrusive grant decides whether image digests are constrained.
+
+Omitted target fields default to `maxPods: 1`, `selection: triggeringPod` for policies and `oldestReady` for manual captures, and `adoption: followName`.
 
 The pod is the smallest public configuration, authorization and collection unit (ADR-028). There are no container selectors, container permissions or container filters. Include all available regular, sidecar, init and ephemeral container sources belonging to an authorized pod; unavailable terminated sources produce explicit gaps. Runtime container/process identities remain internal attribution and anti-reuse data. `target.maxPods` limits collection per occurrence, not observation. Policies observe all authorized replicas under separate administrator sensor limits. StatefulSet ordinal filters deliberately narrow the pod set and are shown in preview. A collection label selector never grants namespace access. Separately configured, protected namespace/workload metadata may establish ownership through [permission sources](permissions.md).
 
 ### SC-TGT-001
 
-Given a policy pinned to Deployment UID A, when a ReplicaSet rolls to a new image under A, then selected replacement pods are armed according to the image policy. When Deployment A is deleted and its name reused with UID B, then B is not collected and the policy reports `TargetReplaced`.
+Given a policy targeting Deployment `checkout` (UID A), when a ReplicaSet rolls to a new image under A, then selected replacement pods are armed according to the image policy. When `checkout` is deleted and recreated with UID B, then the policy follows B without an edit, status reports the new UID and B's occurrences record UID B. With `adoption: pinUID`, B is not collected and the policy reports `TargetReplaced`.
 
 ## REQ-TGT-002 — Execution identity
 
-Each action MUST bind cluster UUID, node UID/boot ID, pod UID, full runtime container ID, restart count, host PID and process start time where applicable. Check this identity locally on the node immediately before opening a namespace, file, socket or debugger; authorization is the operation's single decision under REQ-EXE-002 and is not repeated per attach. A mismatch MUST produce `TargetGone` or `TargetChanged`, not silently retarget a restarted process.
+Each action MUST bind the internal cluster ID, node UID/boot ID, pod UID, full runtime container ID, restart count, host PID and process start time where applicable. Check this identity locally on the node immediately before opening a namespace, file, socket or debugger; authorization is the operation's single decision under REQ-EXE-002 and is not repeated per attach. A mismatch MUST produce `TargetGone` or `TargetChanged`, not silently retarget a restarted process.
 
 ### SC-TGT-002
 
@@ -20,7 +22,7 @@ Given a capture resolved PID 420 in container X, when X restarts and PID 420 is 
 
 ## REQ-TGT-003 — Cluster and namespace scope
 
-Targets MUST belong to an enrolled cluster and an administrator-enabled namespace within the requesting principal or policy identity's allowed workload scope. Deny rules override opt-in and policy grants. Collector, KMS, identity and secret-management namespaces are excluded by default. Enabling collection for a sensitive namespace requires a cluster-administrator policy change. Evidence sharing does not authorize new collection. Permission derivation, submission identity and automatic-policy execution identity follow [permission management](permissions.md).
+Targets MUST belong to an enrolled cluster and lie within the requesting principal or policy identity's allowed workload scope. Every namespace outside the system namespaces (`kube-*`, the Asservat release namespace, and collector, KMS, identity and secret-management namespaces) is collectable by default; there is no namespace opt-in ([ADR-335](../docs/decisions/335-usable-by-default.md) D1). An optional `CollectionCeiling` or the namespace label `asservat.io/evidence: disabled` narrows or excludes a namespace; deny rules override allows and policy grants. Enabling collection for an excluded system namespace requires a cluster-administrator CollectionCeiling. Evidence sharing does not authorize new collection. Permission derivation, submission identity and automatic-policy execution identity follow [permission management](permissions.md).
 
 ### SC-TGT-003
 
@@ -38,7 +40,7 @@ Given a peer selector `app=database`, when database pods rotate IPs during a fro
 
 ## REQ-TGT-005 — Observation coverage and incident selection
 
-An expanded policy MUST declare `observation.mode: allAuthorized`; presets resolve that automatically. Observe every authorized matching pod through the connector's shared Pod informer, including unready/crashing replicas, within administrator workload/node/cluster sensor ceilings. An optional observation.maxPods may only narrow those ceilings; the initial portable ceiling is 1,000 pods per policy, intersected with the qualified installation envelope. No per-replica approval or user-entered container choice. Attach new replicas under the same workload UID after current pod authorization; do not equate an attached collector with fresh observations.
+A policy observes every authorized matching pod (no field selects this) through the connector's shared Pod informer, including unready/crashing replicas, within administrator workload/node/cluster sensor ceilings. An optional observation.maxPods may only narrow those ceilings; there is no separate per-policy pod cap beyond the administrator ceilings. No per-replica approval or user-entered container choice. Attach new replicas under the same workload UID after current pod authorization; do not equate an attached collector with fresh observations.
 
 On overflow, keep the already armed eligible set stable, fill vacancies in creation-time/UID order and report `CoverageLimited` with observed/eligible counts and authorized skipped pod references. Do not silently rotate sampling or call the workload fully monitored. Permission-denied pods are never observed; only authorized inventory is exposed. Ring/parser memory is reserved separately for each armed pod; adding a ring can reduce that action's coverage without stopping cheap log/resource observation.
 

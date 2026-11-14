@@ -119,7 +119,6 @@
                 ]
               },
               "minItems": 1,
-              "maxItems": 3,
               "uniqueItems": true
             }
           },
@@ -143,8 +142,8 @@
     "filter": {
       "type": "string",
       "minLength": 1,
-      "maxLength": 4096,
-      "pattern": "\\S"
+      "pattern": "\\S",
+      "description": "No length cap: the compiled program must fit the kernel classic BPF limit (BPF_MAXINSNS, 4096 instructions), checked at compile."
     },
     "ring": {
       "type": "object",
@@ -156,7 +155,7 @@
         "maxBytes": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 268435456
+          "maximum": 9007199254740991
         },
         "segmentBytes": {
           "type": "integer",
@@ -208,7 +207,6 @@
                       "maxLength": 64
                     },
                     "minItems": 1,
-                    "maxItems": 128,
                     "uniqueItems": true
                   }
                 },
@@ -232,7 +230,6 @@
                       "matchLabels": {
                         "type": "object",
                         "minProperties": 1,
-                        "maxProperties": 16,
                         "additionalProperties": {
                           "type": "string",
                           "minLength": 1,
@@ -334,7 +331,6 @@
             ]
           },
           "minItems": 1,
-          "maxItems": 16,
           "uniqueItems": true
         },
         "protocol": {
@@ -353,7 +349,6 @@
             "maximum": 65535
           },
           "minItems": 1,
-          "maxItems": 32,
           "uniqueItems": true
         },
         "resolution": {
@@ -365,7 +360,7 @@
         "maxEndpoints": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 4096
+          "maximum": 9007199254740991
         }
       },
       "required": [

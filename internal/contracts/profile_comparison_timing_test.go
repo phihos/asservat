@@ -2,7 +2,6 @@ package contracts
 
 import (
 	"encoding/json"
-	"os"
 	"testing"
 )
 
@@ -11,7 +10,7 @@ func TestProfileComparisonRequiresOriginalPairTiming(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	raw, err := os.ReadFile("../../examples/mcp-profile-comparison-result.json")
+	raw, err := readImplementedExample("../../examples/", "mcp-profile-comparison-result.json")
 	if err != nil {
 		t.Fatal(err)
 	}
