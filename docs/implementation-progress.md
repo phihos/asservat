@@ -1,5 +1,31 @@
 # Sustained implementation progress
 
+## Helm-native installation (2026-11-14)
+
+Candidate: PR #233 `feat/helm-native-install` (head `189f7f68`), following the
+[plan](reviews/helm-native-install-plan.md) and
+[field map](reviews/helm-native-field-map.md). The chart renders every
+Kubernetes object. The `asservat secrets` pre-install/pre-upgrade hook Job
+creates missing generated Secrets once and never rotates them. The ordinary
+`asservat setup` Job (`<name>-setup-<hash>`) applies migrations, creates or
+updates runtime SQL roles, seeds installation trust and configures bundled
+OpenBao and SeaweedFS; hub workloads wait in a `wait-schema` init container.
+In `mode: combined` hub-api issues the local connector's bootstrap into
+`<name>-region-bootstrap`, so the connector self-enrolls without a manual step.
+The installer Pod, its continuation, guards, journals and resume command are
+removed.
+
+A fresh all-bundled combined install (PostgreSQL, OpenBao, SeaweedFS,
+Keycloak) on the owned kind cluster passes the full journey in
+`test/integration/helm_native_kind_test.go` (`TestHelmNativeKindJourney`,
+PASS in 24.06s at image `sha256:6cd289e5…`): Keycloak sign-in of a synthetic
+human, processing initialization, MCP preview and pod-status capture,
+verification and publication, and a 355-byte native download through the
+hub-local worker. External providers, mixed provider combinations and
+`mode: cluster` remote regions are not qualified with the Helm-native chart;
+the hub publishes its regional offer only in combined mode. Installation docs:
+[Install with Helm](installation/helm.md).
+
 ## Qualified bundled PostgreSQL restart workflow (2026-11-12)
 
 Candidate: `feature/bundled-postgres-restart` in `asservat-small-restart`, based
