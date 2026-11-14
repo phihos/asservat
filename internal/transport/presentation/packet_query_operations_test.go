@@ -92,7 +92,7 @@ func TestPacketQueryActualAuditedBeginReplayAndReadyEnvelope(t *testing.T) {
 				f.a.Scope.SourceFormat = artifact.RawPCAPNGFormat
 				r.GrantID = f.next()
 				f.a.Scope.RawGrantID = r.GrantID
-				f.a.Grant = value.ContextQueryGrant{ParentID: r.GrantID, ChildID: f.next()}
+				f.a.Grant = value.ContextQueryGrant{ParentID: r.GrantID, ArtifactRef: f.next()}
 			}
 			f.a.Scope.DisplayVersion = value.PacketQueryDisplayVersion
 			f.a.Scope.SourceProjectionDigest = artifact.Digest{}
@@ -275,7 +275,7 @@ func TestPacketQueryMaximumAdmittedPageFitsDirectAndNestedEnvelope(t *testing.T)
 			f.a.Scope.Selection = value.LineSelection{}
 			f.a.Scope.RawGrantID = r.GrantID
 			f.a.Scope.PacketQuery, _ = selection.Window()
-			f.a.Grant = value.ContextQueryGrant{ParentID: r.GrantID, ChildID: f.next()}
+			f.a.Grant = value.ContextQueryGrant{ParentID: r.GrantID, ArtifactRef: f.next()}
 			f.p.Profile.Worker.MemoryBytes, f.p.Profile.Worker.WorkerTransientBytes = value.PacketQueryWorkerBytes, value.PacketQueryWorkerBytes
 			admittedRows, admittedBytes := len(page.Rows), page.EncodedSize()
 			f.result = &value.ProjectionResult{PacketQuery: &page}

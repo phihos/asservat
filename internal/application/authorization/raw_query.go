@@ -47,7 +47,7 @@ type RawQueryGrantStore interface {
 	RawQueryCandidates(context.Context, artifact.DownloadScope, value.GrantUse) ([]value.Grant, error)
 	GrantUseByID(context.Context, string) (GrantUseRequest, error)
 	// CountRegisteredGrantArtifacts counts distinct selected artifacts already
-	// registered under the parent across its reviewed clients; at most 64 IDs.
+	// registered under the grant.
 	CountRegisteredGrantArtifacts(context.Context, string, []string) (int, error)
 }
 type RawPacketQuerySelectionReader interface {
@@ -77,7 +77,7 @@ func normalizeRawQueryRequest(in RawQueryRequestInput) (RawQueryRequestInput, er
 	slices.SortFunc(in.ArtifactDigests, func(a, b artifact.Digest) int { return bytes.Compare(a[:], b[:]) })
 	in.Operations = slices.Clone(in.Operations)
 	slices.Sort(in.Operations)
-	if !value.UUID(in.CaseID) || len(in.ArtifactDigests) < 1 || len(in.ArtifactDigests) > value.GrantMaxResultArtifacts || !identity.Text(in.Reason, 512) || !identity.Text(in.IdempotencyKey, 128) || in.MaxBytes < 1 || in.MaxBytes > artifact.MaxNativeBytes || in.Lifetime < time.Second || in.Lifetime > value.GrantMaxLifetime || in.Lifetime%time.Second != 0 {
+	if !value.UUID(in.CaseID) || len(in.ArtifactDigests) < 1 || !identity.Text(in.Reason, 512) || !identity.Text(in.IdempotencyKey, 128) || in.MaxBytes < 1 || in.Lifetime < time.Second || in.Lifetime%time.Second != 0 {
 		return in, value.ErrGrantInvalid
 	}
 	if !value.ValidResultOperations(in.Operations) {
@@ -186,11 +186,11 @@ func (s GrantService) RequestRaw(ctx context.Context, current identities.Current
 		return 0
 	})
 	now := s.Now().UTC().Truncate(time.Microsecond)
-	scope := value.RawQueryScope{CaseID: in.CaseID, Artifacts: artifacts, Operations: in.Operations, Reason: in.Reason, MaxBytes: in.MaxBytes, MaxOperations: value.GrantMaxResultOperations, NotAfter: now.Add(in.Lifetime)}
+	scope := value.RawQueryScope{CaseID: in.CaseID, Artifacts: artifacts, Operations: in.Operations, Reason: in.Reason, MaxBytes: in.MaxBytes, MaxOperations: value.RawQueryDefaultOperations, NotAfter: now.Add(in.Lifetime)}
 	if !scope.Valid(now) {
 		return zero, false, value.ErrGrantInvalid
 	}
-	review := RawQueryReview{CaseID: in.CaseID, Artifacts: slices.Clone(selected.Review), Operations: slices.Clone(in.Operations), Reason: in.Reason, MaxBytes: in.MaxBytes, MaxOperations: value.GrantMaxResultOperations, NotAfter: scope.NotAfter}
+	review := RawQueryReview{CaseID: in.CaseID, Artifacts: slices.Clone(selected.Review), Operations: slices.Clone(in.Operations), Reason: in.Reason, MaxBytes: in.MaxBytes, MaxOperations: value.RawQueryDefaultOperations, NotAfter: scope.NotAfter}
 	slices.SortFunc(review.Artifacts, func(a, b RawQueryReviewArtifact) int {
 		if a.Output.ArtifactID < b.Output.ArtifactID {
 			return -1
@@ -217,7 +217,6 @@ func (s GrantService) RequestRaw(ctx context.Context, current identities.Current
 	g.ReviewDigest = ReviewDigest(g, g.Review)
 	probe := g
 	probe.RequestedAt = now
-	probe.ReviewUntil = now.Add(value.GrantReviewWindow)
 	if !probe.Valid() || !RawQueryScopeMatches(probe) {
 		return zero, false, value.ErrGrantInvalid
 	}
@@ -240,7 +239,7 @@ func (s GrantService) RequestRaw(ctx context.Context, current identities.Current
 	if err != nil {
 		return zero, false, err
 	}
-	if out.Requester != i.Principal || !RawQueryScopeMatches(out) || ReviewDigest(out, out.Review) != out.ReviewDigest {
+	if !sameHuman(out.Requester, i.Principal) || !RawQueryScopeMatches(out) || ReviewDigest(out, out.Review) != out.ReviewDigest {
 		return zero, false, ErrGrantConflict
 	}
 	if err = s.finalRawQuery(effect, current, i, until); err != nil {
@@ -299,7 +298,7 @@ func (s GrantService) coveringRawSelection(ctx context.Context, i identity.Ident
 		return value.Grant{}, false, ErrGrantUnavailable
 	}
 	for _, g := range candidates {
-		if !sameHuman(g.Requester, i.Principal) || g.Kind == value.GrantRawQuery && (g.Requester != i.Principal || !RawQueryScopeMatches(g)) || ReviewDigest(g, g.Review) != g.ReviewDigest || !value.PoolCovers(g, use) {
+		if !sameHuman(g.Requester, i.Principal) || g.Kind == value.GrantRawQuery && !RawQueryScopeMatches(g) || ReviewDigest(g, g.Review) != g.ReviewDigest || !value.PoolCovers(g, use) {
 			continue
 		}
 		if g.Kind == value.GrantAdHocCapture && (g.ResultAccess == nil || g.ResultAccess.MaxArtifacts < len(selection.Artifacts)) {
@@ -319,7 +318,7 @@ func (s GrantService) coveringRawSelection(ctx context.Context, i identity.Ident
 		}
 		for _, a := range selection.Artifacts {
 			group, err := s.outputGroup(ctx, g, a.Output)
-			if err != nil || value.CheckMaterialize(g, a.Output, i.Principal.ClientID, true, s.Now(), group) != nil {
+			if err != nil || value.CheckRegister(g, a.Output, true, s.Now(), group) != nil {
 				covered = false
 				break
 			}
@@ -396,10 +395,10 @@ func (s GrantService) rawParentFor(ctx context.Context, current identities.Curre
 		if !ok {
 			legacyErr = value.ErrGrantScope
 		} else if actionID != "" {
-			legacyErr = value.CheckMaterialize(g, output, i.Principal.ClientID, true, s.Now(), group)
+			legacyErr = value.CheckRegister(g, output, true, s.Now(), group)
 			if preparing && g.Valid() && legacyErr != value.ErrGrantInvalid {
 				r := g.ResultAccess
-				if r == nil || !slices.Contains(r.ActionIDs, output.ActionID) || !slices.Contains(r.ClientIDs, i.Principal.ClientID) || !slices.Contains(r.Operations, value.GrantDownloadOperation) {
+				if r == nil || !slices.Contains(r.ActionIDs, output.ActionID) || !slices.Contains(r.Operations, value.GrantDownloadOperation) {
 					missing = true
 					if legacyErr == nil {
 						legacyErr = value.ErrGrantScope
@@ -407,10 +406,10 @@ func (s GrantService) rawParentFor(ctx context.Context, current identities.Curre
 				}
 			}
 		} else {
-			child, e := s.Store.GrantChildFor(ctx, g.ID, scope.ArtifactID, i.Principal.ClientID)
+			child, e := s.Store.GrantArtifactFor(ctx, g.ID, scope.ArtifactID)
 			if e != nil {
 				legacyErr = e
-			} else if !childMatchesScope(child, scope) {
+			} else if !registrationMatchesScope(child, scope) {
 				legacyErr = value.ErrGrantScope
 			} else {
 				output = child.Output
@@ -447,7 +446,7 @@ func (s GrantService) rawParentFor(ctx context.Context, current identities.Curre
 	}
 	incomplete := false
 	for _, candidate := range candidates {
-		if candidate.Kind != value.GrantRawQuery || candidate.Requester != i.Principal || ReviewDigest(candidate, candidate.Review) != candidate.ReviewDigest {
+		if candidate.Kind != value.GrantRawQuery || !sameHuman(candidate.Requester, i.Principal) || ReviewDigest(candidate, candidate.Review) != candidate.ReviewDigest {
 			incomplete = true
 			continue
 		}
@@ -456,7 +455,7 @@ func (s GrantService) rawParentFor(ctx context.Context, current identities.Curre
 			incomplete = true
 			continue
 		}
-		if check := value.CheckMaterialize(candidate, output, i.Principal.ClientID, true, s.Now()); check != nil {
+		if check := value.CheckRegister(candidate, output, true, s.Now(), nil); check != nil {
 			incomplete = incomplete || errors.Is(check, value.ErrGrantInvalid)
 			continue
 		}

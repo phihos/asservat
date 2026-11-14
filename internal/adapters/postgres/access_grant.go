@@ -18,9 +18,9 @@ import (
 )
 
 // AccessGrants is the ADR-249 grant ledger (Migration 00097). It stores
-// requests, one decision, one revocation, exact children and monotonic pool
-// spend; it never decides who may approve. SQL re-checks self-approval,
-// review window, decision, revocation, expiry and pool bounds.
+// requests, one decision, one revocation, used-artifact registrations and
+// monotonic pool spend; it never decides who may approve. SQL re-checks
+// self-approval, decision, revocation, expiry and pool bounds.
 type AccessGrants struct {
 	ledger       *Ledger
 	root         string
@@ -55,7 +55,6 @@ type grantReasonWire struct {
 type grantResultAccessWire struct {
 	ActionIDs     []string `json:"actionIDs"`
 	Operations    []string `json:"operations"`
-	ClientIDs     []string `json:"clientIDs"`
 	MaxArtifacts  int      `json:"maxArtifacts"`
 	MaxBytes      int64    `json:"maxBytes"`
 	MaxOperations int64    `json:"maxOperations"`
@@ -78,7 +77,7 @@ func grantFromRow(r custodydb.AccessGrant) (authorization.Grant, error) {
 		Target:    authorization.Target{ClusterID: uid(r.ClusterID), NamespaceUID: r.NamespaceUid.String, WorkloadUID: r.WorkloadUid.String, PodUID: r.PodUid.String},
 		DataClass: r.DataClass, Scope: bytes.Clone(r.Scope), Review: bytes.Clone(r.Review),
 		Requester:   identity.Principal{Issuer: r.RequesterIssuer, Subject: r.RequesterSubject, ClientID: r.RequesterClient, Kind: identity.Human},
-		RequestedAt: r.RequestedAt.Time, ReviewUntil: r.ReviewUntil.Time, Lifetime: time.Duration(r.LifetimeSeconds) * time.Second,
+		RequestedAt: r.RequestedAt.Time, Lifetime: time.Duration(r.LifetimeSeconds) * time.Second,
 		ExpiresAt: optionalTime(r.ExpiresAt), RevokedAt: optionalTime(r.RevokedAt), Revision: int64(r.Revision),
 		Spent: authorization.GrantSpend{Artifacts: int(r.ArtifactsSpent), Bytes: r.BytesSpent, Operations: r.OperationsSpent}}
 	copy(g.ExecutionDigest[:], r.ExecutionDigest)
@@ -124,7 +123,7 @@ func grantFromRow(r custodydb.AccessGrant) (authorization.Grant, error) {
 		if err != nil || len(r.ResultAccessDigest) != 32 || int64(w.MaxArtifacts) != int64(r.MaxArtifacts) || w.MaxBytes != r.MaxBytes || w.MaxOperations != r.MaxOperations || !r.NotAfter.Valid || !r.NotAfter.Time.Equal(notAfter) {
 			return authorization.Grant{}, authapp.ErrGrantUnavailable
 		}
-		g.ResultAccess = &authorization.ResultAccess{ActionIDs: w.ActionIDs, Operations: w.Operations, ClientIDs: w.ClientIDs, MaxArtifacts: w.MaxArtifacts, MaxBytes: w.MaxBytes, MaxOperations: w.MaxOperations, NotAfter: r.NotAfter.Time}
+		g.ResultAccess = &authorization.ResultAccess{ActionIDs: w.ActionIDs, Operations: w.Operations, MaxArtifacts: w.MaxArtifacts, MaxBytes: w.MaxBytes, MaxOperations: w.MaxOperations, NotAfter: r.NotAfter.Time}
 		copy(g.ResultAccessDigest[:], r.ResultAccessDigest)
 	}
 	if r.Decision.Valid {
@@ -192,7 +191,7 @@ func (s *AccessGrants) RequestGrant(ctx context.Context, r authapp.StoredGrantRe
 		if !notAfter.Equal(a.NotAfter) {
 			return zero, false, authorization.ErrGrantInvalid
 		}
-		if params.ResultAccess, err = json.Marshal(grantResultAccessWire{a.ActionIDs, a.Operations, a.ClientIDs, a.MaxArtifacts, a.MaxBytes, a.MaxOperations, notAfter.Format(time.RFC3339Nano)}); err != nil {
+		if params.ResultAccess, err = json.Marshal(grantResultAccessWire{a.ActionIDs, a.Operations, a.MaxArtifacts, a.MaxBytes, a.MaxOperations, notAfter.Format(time.RFC3339Nano)}); err != nil {
 			return zero, false, authorization.ErrGrantInvalid
 		}
 		params.NotAfter = ts(notAfter)
@@ -341,10 +340,10 @@ func (s *AccessGrants) DecideGrant(ctx context.Context, in authapp.GrantDecision
 	until = until.UTC().Truncate(time.Microsecond)
 	decision := "denied"
 	params := custodydb.DecideGrantParams{EffectUntil: ts(until), RootID: id(s.root), ID: id(in.GrantID), ApproverIssuer: in.Approver.Issuer, ApproverSubject: in.Approver.Subject, ApproverClient: in.Approver.ClientID, DecisionReason: in.Reason, DecisionKey: in.IdempotencyKey}
-	stepped := identity.Text(in.ACR, 128) && !in.AuthTime.IsZero()
 	if in.Approve {
 		decision = "approved"
-		if stepped {
+		// Step-up is optional (ADR-335 D5); a stepped-up approval records it.
+		if identity.Text(in.ACR, 128) && !in.AuthTime.IsZero() {
 			params.DecisionAcr, params.DecisionAuthTime = grantText(in.ACR), ts(in.AuthTime)
 		}
 	}
@@ -368,10 +367,6 @@ func (s *AccessGrants) DecideGrant(ctx context.Context, in authapp.GrantDecision
 		} else {
 			if current.RequesterIssuer == in.Approver.Issuer && current.RequesterSubject == in.Approver.Subject {
 				return authorization.ErrSelfApproval
-			}
-			// An approval records the verified authentication context.
-			if in.Approve && !stepped {
-				return authorization.ErrStepUpRequired
 			}
 			if current, err = q.DecideGrant(ctx, params); errors.Is(err, pgx.ErrNoRows) {
 				// Revoked or no longer reviewable.
@@ -433,29 +428,29 @@ func (s *AccessGrants) RevokeGrant(ctx context.Context, in authapp.GrantRevocati
 	return out, replay, nil
 }
 
-func childFromRow(record any, parent authorization.Grant, groups ...*authorization.GrantOutputGroup) (authorization.GrantChild, error) {
+func registrationFromRow(record any, parent authorization.Grant, groups ...*authorization.GrantOutputGroup) (authorization.GrantArtifact, error) {
 	var r custodydb.AccessGrantChild
 	var raw []byte
 	var source []byte
 	switch row := record.(type) {
 	case custodydb.AccessGrantChild:
 		r = row
-	case custodydb.ReadGrantChildRow:
+	case custodydb.ReadGrantArtifactRow:
 		r, raw, source = row.AccessGrantChild, row.GroupAssociation, row.SourceScopeDigest
-	case custodydb.ReadGrantChildByIDRow:
+	case custodydb.ReadGrantArtifactByIDRow:
 		r, raw, source = row.AccessGrantChild, row.GroupAssociation, row.SourceScopeDigest
 	default:
-		return authorization.GrantChild{}, authapp.ErrGrantUnavailable
+		return authorization.GrantArtifact{}, authapp.ErrGrantUnavailable
 	}
-	c := authorization.GrantChild{ID: uid(r.ID), ParentID: uid(r.ParentID), ClientID: r.ClientID, CreatedAt: r.CreatedAt.Time, Output: authorization.VerifiedOutput{CaptureID: uid(r.CaptureID), ActionID: r.ActionID, ArtifactID: uid(r.ArtifactID), ExecutionDigest: parent.ExecutionDigest, Target: parent.Target}}
+	c := authorization.GrantArtifact{ID: uid(r.ID), ParentID: uid(r.ParentID), CreatedAt: r.CreatedAt.Time, Output: authorization.VerifiedOutput{CaptureID: uid(r.CaptureID), ActionID: r.ActionID, ArtifactID: uid(r.ArtifactID), ExecutionDigest: parent.ExecutionDigest, Target: parent.Target}}
 	if len(r.ArtifactDigest) != 32 {
-		return authorization.GrantChild{}, authapp.ErrGrantUnavailable
+		return authorization.GrantArtifact{}, authapp.ErrGrantUnavailable
 	}
 	copy(c.Output.ArtifactDigest[:], r.ArtifactDigest)
 	if parent.Kind == authorization.GrantRawQuery {
 		expected, ok := rawQueryChildOutput(parent, c.Output.ArtifactID)
-		if !ok || c.Output.CaptureID != expected.CaptureID || c.Output.ActionID != expected.ActionID || c.Output.ArtifactDigest != expected.ArtifactDigest || c.ClientID != parent.Requester.ClientID {
-			return authorization.GrantChild{}, authapp.ErrGrantUnavailable
+		if !ok || c.Output.CaptureID != expected.CaptureID || c.Output.ActionID != expected.ActionID || c.Output.ArtifactDigest != expected.ArtifactDigest {
+			return authorization.GrantArtifact{}, authapp.ErrGrantUnavailable
 		}
 		c.Output = expected
 	} else if parent.Kind == authorization.GrantAdHocCapture && c.Output.CaptureID != parent.CaptureID {
@@ -464,35 +459,35 @@ func childFromRow(record any, parent authorization.Grant, groups ...*authorizati
 			group = *groups[0]
 			source = group.ExecutionDigest[:]
 		} else if len(raw) == 0 || queryDecode(raw, 4096, &group) != nil {
-			return authorization.GrantChild{}, authapp.ErrGrantUnavailable
+			return authorization.GrantArtifact{}, authapp.ErrGrantUnavailable
 		}
 		if len(source) != 32 {
-			return authorization.GrantChild{}, authapp.ErrGrantUnavailable
+			return authorization.GrantArtifact{}, authapp.ErrGrantUnavailable
 		}
 		copy(c.Output.ExecutionDigest[:], source)
 		c.Group = &group
 		if !group.Matches(parent, c.Output) {
-			return authorization.GrantChild{}, authapp.ErrGrantUnavailable
+			return authorization.GrantArtifact{}, authapp.ErrGrantUnavailable
 		}
 	} else if parent.Kind != authorization.GrantAdHocCapture {
-		return authorization.GrantChild{}, authapp.ErrGrantUnavailable
+		return authorization.GrantArtifact{}, authapp.ErrGrantUnavailable
 	}
 	if !c.Valid() || c.ParentID != parent.ID {
-		return authorization.GrantChild{}, authapp.ErrGrantUnavailable
+		return authorization.GrantArtifact{}, authapp.ErrGrantUnavailable
 	}
 	return c, nil
 }
 
-// MaterializeGrantChild registers one verified output for one approved
-// client in one transaction: parent row lock, current decision, revocation,
-// expiry and scope, the published locator of exactly this capture and
-// target, the distinct-artifact count and the idempotent child insert.
-func (s *AccessGrants) MaterializeGrantChild(ctx context.Context, in authapp.GrantChildRequest) (authorization.GrantChild, bool, error) {
-	var zero authorization.GrantChild
-	if s == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(in.ChildID) || !authorization.UUID(in.ParentID) || !in.Output.Valid() || !identity.Text(in.ClientID, 256) {
+// RegisterGrantArtifact registers one verified output under its grant in one
+// transaction: grant row lock, current decision, revocation, expiry and
+// scope, the published locator of exactly this capture and target, the
+// distinct-artifact count and the idempotent insert.
+func (s *AccessGrants) RegisterGrantArtifact(ctx context.Context, in authapp.GrantArtifactRequest) (authorization.GrantArtifact, bool, error) {
+	var zero authorization.GrantArtifact
+	if s == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(in.ID) || !authorization.UUID(in.ParentID) || !in.Output.Valid() {
 		return zero, false, authorization.ErrGrantInvalid
 	}
-	var out authorization.GrantChild
+	var out authorization.GrantArtifact
 	replay := false
 	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
 		replay = false
@@ -511,31 +506,20 @@ func (s *AccessGrants) MaterializeGrantChild(ctx context.Context, in authapp.Gra
 		if err != nil {
 			return err
 		}
-		existing, err := q.ReadGrantChild(ctx, custodydb.ReadGrantChildParams{ParentID: id(in.ParentID), ArtifactID: id(in.Output.ArtifactID), ClientID: in.ClientID})
+		existing, err := q.ReadGrantArtifact(ctx, custodydb.ReadGrantArtifactParams{ParentID: id(in.ParentID), ArtifactID: id(in.Output.ArtifactID)})
 		if err == nil {
-			// A repeated commit delivery: the same child, still only while
-			// the parent is current.
-			existingChild, decodeErr := childFromRow(existing, parent)
-			if decodeErr != nil || existingChild.Output != in.Output || in.Group != nil && (existingChild.Group == nil || *in.Group != *existingChild.Group) {
+			// A repeated use or commit delivery: the same registration, still
+			// only while the grant is current.
+			out, err = registrationFromRow(existing, parent)
+			if err != nil || out.Output != in.Output || in.Group != nil && (out.Group == nil || *in.Group != *out.Group) {
 				return authorization.ErrGrantScope
 			}
-			if err = authorization.CheckMaterialize(parent, in.Output, in.ClientID, true, now.Time, existingChild.Group); err != nil {
+			if err = authorization.CheckRegister(parent, in.Output, true, now.Time, out.Group); err != nil {
 				return err
-			}
-			if !bytes.Equal(existing.AccessGrantChild.ArtifactDigest, in.Output.ArtifactDigest[:]) || existing.AccessGrantChild.ActionID != in.Output.ActionID {
-				return authorization.ErrGrantScope
 			}
 			replay = true
-			out, err = childFromRow(existing, parent)
-			if err != nil {
-				return err
-			}
 			return nil
 		} else if !errors.Is(err, pgx.ErrNoRows) {
-			return err
-		}
-		registered, err := q.GrantArtifactRegistered(ctx, custodydb.GrantArtifactRegisteredParams{ParentID: id(in.ParentID), ArtifactID: id(in.Output.ArtifactID)})
-		if err != nil {
 			return err
 		}
 		var group *authorization.GrantOutputGroup
@@ -547,7 +531,7 @@ func (s *AccessGrants) MaterializeGrantChild(ctx context.Context, in authapp.Gra
 			}
 			group = g
 		}
-		if err = authorization.CheckMaterialize(parent, in.Output, in.ClientID, registered, now.Time, group); err != nil {
+		if err = authorization.CheckRegister(parent, in.Output, false, now.Time, group); err != nil {
 			return err
 		}
 		t := in.Output.Target
@@ -560,19 +544,17 @@ func (s *AccessGrants) MaterializeGrantChild(ctx context.Context, in authapp.Gra
 				return err
 			}
 		}
-		if !registered {
-			if _, err = q.ChargeGrantArtifact(ctx, custodydb.ChargeGrantArtifactParams{RootID: id(s.root), ID: id(in.ParentID)}); errors.Is(err, pgx.ErrNoRows) {
-				return authorization.ErrGrantPoolExhausted
-			} else if err != nil {
-				return err
-			}
+		if _, err = q.ChargeGrantArtifact(ctx, custodydb.ChargeGrantArtifactParams{RootID: id(s.root), ID: id(in.ParentID)}); errors.Is(err, pgx.ErrNoRows) {
+			return authorization.ErrGrantPoolExhausted
+		} else if err != nil {
+			return err
 		}
-		child, err := q.InsertGrantChild(ctx, custodydb.InsertGrantChildParams{ID: id(in.ChildID), RootID: id(s.root), ParentID: id(in.ParentID), CaptureID: id(in.Output.CaptureID),
-			ActionID: in.Output.ActionID, ArtifactID: id(in.Output.ArtifactID), ArtifactDigest: in.Output.ArtifactDigest[:], ClientID: in.ClientID})
+		registered, err := q.InsertGrantArtifact(ctx, custodydb.InsertGrantArtifactParams{ID: id(in.ID), RootID: id(s.root), ParentID: id(in.ParentID), CaptureID: id(in.Output.CaptureID),
+			ActionID: in.Output.ActionID, ArtifactID: id(in.Output.ArtifactID), ArtifactDigest: in.Output.ArtifactDigest[:]})
 		if err != nil {
 			return err
 		}
-		if out, err = childFromRow(child, parent, group); err != nil {
+		if out, err = registrationFromRow(registered, parent, group); err != nil {
 			return err
 		}
 		return ctx.Err()
@@ -583,13 +565,13 @@ func (s *AccessGrants) MaterializeGrantChild(ctx context.Context, in authapp.Gra
 	return out, replay, nil
 }
 
-// GrantChildFor reads the parent's child for one artifact and client.
-func (s *AccessGrants) GrantChildFor(ctx context.Context, parentID, artifactID, clientID string) (authorization.GrantChild, error) {
-	var zero authorization.GrantChild
-	if s == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(parentID) || !authorization.UUID(artifactID) || !identity.Text(clientID, 256) {
+// GrantArtifactFor reads the grant's registration of one artifact.
+func (s *AccessGrants) GrantArtifactFor(ctx context.Context, parentID, artifactID string) (authorization.GrantArtifact, error) {
+	var zero authorization.GrantArtifact
+	if s == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(parentID) || !authorization.UUID(artifactID) {
 		return zero, authorization.ErrGrantInvalid
 	}
-	var out authorization.GrantChild
+	var out authorization.GrantArtifact
 	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
 		prow, err := q.ReadGrant(ctx, custodydb.ReadGrantParams{RootID: id(s.root), ID: id(parentID)})
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -602,14 +584,14 @@ func (s *AccessGrants) GrantChildFor(ctx context.Context, parentID, artifactID, 
 		if err != nil {
 			return err
 		}
-		row, err := q.ReadGrantChild(ctx, custodydb.ReadGrantChildParams{ParentID: id(parentID), ArtifactID: id(artifactID), ClientID: clientID})
+		row, err := q.ReadGrantArtifact(ctx, custodydb.ReadGrantArtifactParams{ParentID: id(parentID), ArtifactID: id(artifactID)})
 		if errors.Is(err, pgx.ErrNoRows) {
 			return authapp.ErrGrantNotFound
 		}
 		if err != nil {
 			return err
 		}
-		out, err = childFromRow(row, parent)
+		out, err = registrationFromRow(row, parent)
 		return err
 	})
 	if err != nil {
@@ -618,14 +600,14 @@ func (s *AccessGrants) GrantChildFor(ctx context.Context, parentID, artifactID, 
 	return out, nil
 }
 
-func (s *AccessGrants) GrantChild(ctx context.Context, childID string) (authorization.GrantChild, error) {
-	var zero authorization.GrantChild
-	if s == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(childID) {
+func (s *AccessGrants) GrantArtifact(ctx context.Context, ref string) (authorization.GrantArtifact, error) {
+	var zero authorization.GrantArtifact
+	if s == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(ref) {
 		return zero, authorization.ErrGrantInvalid
 	}
-	var out authorization.GrantChild
+	var out authorization.GrantArtifact
 	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		row, err := q.ReadGrantChildByID(ctx, custodydb.ReadGrantChildByIDParams{RootID: id(s.root), ID: id(childID)})
+		row, err := q.ReadGrantArtifactByID(ctx, custodydb.ReadGrantArtifactByIDParams{RootID: id(s.root), ID: id(ref)})
 		if errors.Is(err, pgx.ErrNoRows) {
 			return authapp.ErrGrantNotFound
 		}
@@ -640,7 +622,7 @@ func (s *AccessGrants) GrantChild(ctx context.Context, childID string) (authoriz
 		if err != nil {
 			return err
 		}
-		out, err = childFromRow(row, parent)
+		out, err = registrationFromRow(row, parent)
 		return err
 	})
 	if err != nil {
@@ -649,14 +631,14 @@ func (s *AccessGrants) GrantChild(ctx context.Context, childID string) (authoriz
 	return out, nil
 }
 
-// ReserveGrantUse charges one use to the parent's shared pool before
+// ReserveGrantUse charges one use to the grant's pool before
 // delivery, in one transaction with its operation record. The UPDATE holds
 // the parent row lock, so a concurrent revocation or another reservation is
 // serialized: after a revocation commits no reservation can succeed, and the
 // pool is never exceeded. A retry with the same use ID charges nothing.
 func (s *AccessGrants) ReserveGrantUse(ctx context.Context, in authapp.GrantUseRequest) (authorization.Grant, bool, error) {
 	var zero authorization.Grant
-	if s == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(in.UseID) || !authorization.UUID(in.ParentID) || !authorization.UUID(in.ChildID) || (in.Use.Operation != authorization.GrantDownloadOperation && in.Use.Operation != authorization.GrantPacketQueryOperation && in.Use.Operation != authorization.GrantSyscallQueryOperation) || in.Use.Bytes < 0 || in.Use.Operations < 0 || in.Use.Bytes+in.Use.Operations == 0 {
+	if s == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(in.UseID) || !authorization.UUID(in.ParentID) || !authorization.UUID(in.ArtifactRef) || (in.Use.Operation != authorization.GrantDownloadOperation && in.Use.Operation != authorization.GrantPacketQueryOperation && in.Use.Operation != authorization.GrantSyscallQueryOperation) || in.Use.Bytes < 0 || in.Use.Operations < 0 || in.Use.Bytes+in.Use.Operations == 0 {
 		return zero, false, authorization.ErrGrantInvalid
 	}
 	var out authorization.Grant
@@ -677,7 +659,7 @@ func (s *AccessGrants) ReserveGrantUse(ctx context.Context, in authapp.GrantUseR
 
 // grantUseMatches binds a replay to the original irreversible reservation.
 func grantUseMatches(previous custodydb.AccessGrantUse, in authapp.GrantUseRequest) bool {
-	return uid(previous.ParentID) == in.ParentID && uid(previous.ChildID) == in.ChildID && previous.Operation == in.Use.Operation && previous.Bytes == in.Use.Bytes && previous.Operations == in.Use.Operations
+	return uid(previous.ParentID) == in.ParentID && uid(previous.ChildID) == in.ArtifactRef && previous.Operation == in.Use.Operation && previous.Bytes == in.Use.Bytes && previous.Operations == in.Use.Operations
 }
 
 // reserveGrantUse performs SQL only, within its caller's existing
@@ -686,7 +668,7 @@ func (s *AccessGrants) reserveGrantUse(ctx context.Context, q *custodydb.Queries
 	var out authorization.Grant
 	replay := false
 	var row custodydb.AccessGrant
-	var child custodydb.ReadGrantChildByIDRow
+	var child custodydb.ReadGrantArtifactByIDRow
 	previous, err := q.ReadGrantUse(ctx, custodydb.ReadGrantUseParams{RootID: id(s.root), ID: id(in.UseID)})
 	switch {
 	case err == nil:
@@ -698,13 +680,13 @@ func (s *AccessGrants) reserveGrantUse(ctx context.Context, q *custodydb.Queries
 		if row, err = q.ReadGrant(ctx, custodydb.ReadGrantParams{RootID: id(s.root), ID: id(in.ParentID)}); err != nil {
 			return out, false, err
 		}
-		child, err = q.ReadGrantChildByID(ctx, custodydb.ReadGrantChildByIDParams{RootID: id(s.root), ID: id(in.ChildID)})
+		child, err = q.ReadGrantArtifactByID(ctx, custodydb.ReadGrantArtifactByIDParams{RootID: id(s.root), ID: id(in.ArtifactRef)})
 		if err != nil {
 			return out, false, err
 		}
 		replay = true
 	case errors.Is(err, pgx.ErrNoRows):
-		child, err = q.ReadGrantChildByID(ctx, custodydb.ReadGrantChildByIDParams{RootID: id(s.root), ID: id(in.ChildID)})
+		child, err = q.ReadGrantArtifactByID(ctx, custodydb.ReadGrantArtifactByIDParams{RootID: id(s.root), ID: id(in.ArtifactRef)})
 		if errors.Is(err, pgx.ErrNoRows) || err == nil && uid(child.AccessGrantChild.ParentID) != in.ParentID {
 			return out, false, authorization.ErrGrantScope
 		} else if err != nil {
@@ -737,7 +719,7 @@ func (s *AccessGrants) reserveGrantUse(ctx context.Context, q *custodydb.Queries
 		} else if err != nil {
 			return out, false, err
 		}
-		if _, err = q.InsertGrantUse(ctx, custodydb.InsertGrantUseParams{ID: id(in.UseID), RootID: id(s.root), ParentID: id(in.ParentID), ChildID: id(in.ChildID), Operation: in.Use.Operation, Bytes: in.Use.Bytes, Operations: in.Use.Operations}); err != nil {
+		if _, err = q.InsertGrantUse(ctx, custodydb.InsertGrantUseParams{ID: id(in.UseID), RootID: id(s.root), ParentID: id(in.ParentID), ChildID: id(in.ArtifactRef), Operation: in.Use.Operation, Bytes: in.Use.Bytes, Operations: in.Use.Operations}); err != nil {
 			return out, false, err
 		}
 	default:
@@ -747,7 +729,7 @@ func (s *AccessGrants) reserveGrantUse(ctx context.Context, q *custodydb.Queries
 		return out, false, err
 	}
 
-	if _, err := childFromRow(child, out); err != nil {
+	if _, err := registrationFromRow(child, out); err != nil {
 		return out, false, err
 	}
 	if !grantUseOperationAllowed(out, in.Use.Operation) {

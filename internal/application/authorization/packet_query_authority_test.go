@@ -31,7 +31,7 @@ func TestPacketQueryAuthorityKeepsRawGrantSeparateFromSummary(t *testing.T) {
 			scope.RawGrantID = projectionTestID(80)
 			scope.PacketQuery, _ = (query.PacketQuerySelection{Fields: []query.PacketQueryField{query.PacketIndex}, MaxPackets: 10, MaxScanBytes: 100}).Window()
 			f.identity.Scopes = append(f.identity.Scopes, "evidence:raw")
-			proof := &packetGrantProof{ref: query.ContextQueryGrant{ParentID: scope.RawGrantID, ChildID: projectionTestID(81)}, until: f.now.Add(time.Minute)}
+			proof := &packetGrantProof{ref: query.ContextQueryGrant{ParentID: scope.RawGrantID, ArtifactRef: projectionTestID(81)}, until: f.now.Add(time.Minute)}
 			s.PacketGrants = proof
 			switch mode {
 			case "missing":

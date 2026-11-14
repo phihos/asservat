@@ -193,7 +193,6 @@ func (s GrantService) RequestPolicy(ctx context.Context, current identities.Curr
 	}
 	probe := g
 	probe.RequestedAt = s.Now()
-	probe.ReviewUntil = probe.RequestedAt.Add(value.GrantReviewWindow)
 	probe.PolicyNotAfter = identity.Earlier(probe.RequestedAt.Add(lifetime), plan.Authority.NotAfter)
 	if !probe.Valid() {
 		return zero, false, value.ErrGrantInvalid

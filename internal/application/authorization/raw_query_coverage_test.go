@@ -59,7 +59,7 @@ func TestRawQueryLegacyReuseRequiresSelectedArtifactCapacity(t *testing.T) {
 		t.Fatal(err)
 	}
 	g = f.approve(t, g)
-	selection := value.RawQueryScope{CaseID: grantID(99), Operations: []string{value.GrantDownloadOperation}, Reason: "Inspect both saved files", MaxBytes: 20, MaxOperations: value.GrantMaxResultOperations, NotAfter: f.now.Add(time.Hour)}
+	selection := value.RawQueryScope{CaseID: grantID(99), Operations: []string{value.GrantDownloadOperation}, Reason: "Inspect both saved files", MaxBytes: 20, MaxOperations: value.RawQueryDefaultOperations, NotAfter: f.now.Add(time.Hour)}
 	for n := 1; n <= 2; n++ {
 		selection.Artifacts = append(selection.Artifacts, value.RawQueryArtifact{Output: value.VerifiedOutput{CaptureID: g.CaptureID, ActionID: "a1", ArtifactID: grantID(20 + n), ExecutionDigest: g.ExecutionDigest, ArtifactDigest: artifact.Digest{byte(n)}, Target: g.Target}, NativeBytes: 10, ExpiresAt: f.now.Add(time.Hour)})
 	}
@@ -76,16 +76,13 @@ func TestRawQueryLegacyReuseCountsOnlySelectedRegisteredArtifacts(t *testing.T) 
 		name       string
 		max, spent int
 		children   []int
-		clients    []string
 		covered    bool
 	}{
-		{"free capacity", 2, 0, nil, nil, true},
-		{"one existing selected", 3, 2, []int{1, 3}, []string{"agent", "console"}, true},
-		{"both existing across clients", 2, 2, []int{1, 2}, []string{"agent", "console"}, true},
-		{"only hidden files", 2, 2, []int{3, 4}, []string{"console", "agent"}, false},
-		{"one hidden file", 2, 2, []int{1, 3}, []string{"console", "agent"}, false},
-		{"same file two clients", 2, 2, []int{1, 1}, []string{"console", "agent"}, false},
-		{"unreviewed client", 2, 2, []int{1, 2}, []string{"console", "unreviewed"}, false},
+		{"free capacity", 2, 0, nil, true},
+		{"one existing selected", 3, 2, []int{1, 3}, true},
+		{"both existing", 2, 2, []int{1, 2}, true},
+		{"only hidden files", 2, 2, []int{3, 4}, false},
+		{"one hidden file", 2, 2, []int{1, 3}, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			f := newGrantFixture(t)
@@ -106,10 +103,10 @@ func TestRawQueryLegacyReuseCountsOnlySelectedRegisteredArtifacts(t *testing.T) 
 				return value.VerifiedOutput{CaptureID: g.CaptureID, ActionID: "a1", ArtifactID: grantID(20 + n), ExecutionDigest: g.ExecutionDigest, ArtifactDigest: artifact.Digest{byte(n)}, Target: g.Target}
 			}
 			for n, id := range tc.children {
-				child := value.GrantChild{ID: grantID(500 + n), ParentID: g.ID, ClientID: tc.clients[n], Output: output(id), CreatedAt: f.now}
+				child := value.GrantArtifact{ID: grantID(500 + n), ParentID: g.ID, Output: output(id), CreatedAt: f.now}
 				f.store.children[child.ID] = child
 			}
-			selection := value.RawQueryScope{CaseID: grantID(99), Operations: []string{value.GrantDownloadOperation}, Reason: "Inspect two files", MaxBytes: 20, MaxOperations: value.GrantMaxResultOperations, NotAfter: f.now.Add(time.Hour)}
+			selection := value.RawQueryScope{CaseID: grantID(99), Operations: []string{value.GrantDownloadOperation}, Reason: "Inspect two files", MaxBytes: 20, MaxOperations: value.RawQueryDefaultOperations, NotAfter: f.now.Add(time.Hour)}
 			for n := 1; n <= 2; n++ {
 				selection.Artifacts = append(selection.Artifacts, value.RawQueryArtifact{Output: output(n), NativeBytes: 10, ExpiresAt: f.now.Add(time.Hour)})
 			}
@@ -136,7 +133,7 @@ func (m *memoryGrants) CountRegisteredGrantArtifacts(_ context.Context, parent s
 		return 0, nil
 	}
 	for _, c := range m.children {
-		if c.ParentID == parent && slices.Contains(ids, c.Output.ArtifactID) && slices.Contains(g.ResultAccess.ClientIDs, c.ClientID) {
+		if c.ParentID == parent && slices.Contains(ids, c.Output.ArtifactID) {
 			registered[c.Output.ArtifactID] = true
 		}
 	}

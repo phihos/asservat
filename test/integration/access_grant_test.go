@@ -117,7 +117,7 @@ func qualifyAccessGrants(t *testing.T, ctx context.Context, admin *pgxpool.Pool,
 			Reasons: []authorization.SensitiveReason{{ActionID: "a1", Code: "rawBytePredicate"}}, Review: authapp.GrantReview{Namespace: "app", WorkloadKind: "Deployment", WorkloadName: "api", PodName: "api-123", Actions: []authapp.GrantReviewAction{{ActionID: "a1", Kind: "packetCapture"}}, Deadline: time.Now().Add(5 * time.Minute)},
 			Lifetime: authorization.GrantDefaultLifetime, ResultAccess: access, IdempotencyKey: key}
 	}
-	access := &authorization.ResultAccess{ActionIDs: []string{"a1"}, Operations: []string{authorization.GrantDownloadOperation}, ClientIDs: []string{client, "synthetic-agent"}, MaxArtifacts: 1, MaxBytes: 100, MaxOperations: 1000, NotAfter: time.Now().Add(2 * time.Hour).UTC().Truncate(time.Microsecond)}
+	access := &authorization.ResultAccess{ActionIDs: []string{"a1"}, Operations: []string{authorization.GrantDownloadOperation}, MaxArtifacts: 1, MaxBytes: 100, MaxOperations: 1000, NotAfter: time.Now().Add(2 * time.Hour).UTC().Truncate(time.Microsecond)}
 
 	// The published capture's request: pending, then self-approval refused
 	// through another client, by service and by SQL.
@@ -191,30 +191,23 @@ func qualifyAccessGrants(t *testing.T, ctx context.Context, admin *pgxpool.Pool,
 		t.Fatal("approved grant does not cover its plan", err)
 	}
 
-	// Exact children after verified commit: only the published artifact of
-	// this capture; repeated delivery and a second client add no artifact.
+	// Registration after verified commit: only the published artifact of
+	// this capture; a repeated delivery adds no artifact.
 	output := authorization.VerifiedOutput{CaptureID: e.CaptureUID, ActionID: "a1", ArtifactID: e.Registration.Location.ArtifactID, ExecutionDigest: pending.ExecutionDigest, ArtifactDigest: artifact.Digest{7}, Target: target}
 	unknown := output
 	unknown.ArtifactID = custodyID()
-	if _, _, err := grants.Materialize(ctx, pending.ID, client, unknown); !errors.Is(err, authorization.ErrGrantScope) {
-		t.Fatal("unpublished artifact became a child", err)
+	if _, _, err := grants.Register(ctx, pending.ID, unknown); !errors.Is(err, authorization.ErrGrantScope) {
+		t.Fatal("unpublished artifact registered", err)
 	}
-	child, replay, err := grants.Materialize(ctx, pending.ID, client, output)
+	child, replay, err := grants.Register(ctx, pending.ID, output)
 	if err != nil || replay {
-		t.Fatal("materialize", err)
+		t.Fatal("register", err)
 	}
-	if again, replay, err := grants.Materialize(ctx, pending.ID, client, output); err != nil || !replay || again.ID != child.ID {
+	if again, replay, err := grants.Register(ctx, pending.ID, output); err != nil || !replay || again.ID != child.ID {
 		t.Fatal("duplicate commit delivery", err)
 	}
-	agentChild, _, err := grants.Materialize(ctx, pending.ID, "synthetic-agent", output)
-	if err != nil {
-		t.Fatal(err)
-	}
 	if g, _ := store.Grant(ctx, pending.ID); g.Spent.Artifacts != 1 {
-		t.Fatal("a second client charged another artifact", g.Spent)
-	}
-	if _, _, err := grants.Materialize(ctx, pending.ID, "synthetic-cli", output); !errors.Is(err, authorization.ErrGrantScope) {
-		t.Fatal("unlisted client", err)
+		t.Fatal("a repeated registration charged another artifact", g.Spent)
 	}
 
 	// One finite pool under concurrency: 8 uses of 10 bytes, then 6 more
@@ -233,7 +226,7 @@ func qualifyAccessGrants(t *testing.T, ctx context.Context, admin *pgxpool.Pool,
 			defer wg.Done()
 			who, c := devConsole, child
 			if n%2 == 1 {
-				who, c = devAgent, agentChild
+				who = devAgent
 			}
 			// A reservation that waited past the one-second lock timeout is
 			// unavailable and charged nothing; the client retries it with the
@@ -272,7 +265,7 @@ func qualifyAccessGrants(t *testing.T, ctx context.Context, admin *pgxpool.Pool,
 
 	// Concurrent use against revocation on a fresh grant: after the
 	// revocation commits no use succeeds and the pool is never exceeded.
-	second, _, err := grants.Request(ctx, requester(client), input(custodyID(), &authorization.ResultAccess{ActionIDs: []string{"a1"}, Operations: []string{authorization.GrantDownloadOperation}, ClientIDs: []string{client}, MaxArtifacts: 1, MaxBytes: 1 << 20, MaxOperations: 10000, NotAfter: access.NotAfter}, "grant-2"))
+	second, _, err := grants.Request(ctx, requester(client), input(custodyID(), &authorization.ResultAccess{ActionIDs: []string{"a1"}, Operations: []string{authorization.GrantDownloadOperation}, MaxArtifacts: 1, MaxBytes: 1 << 20, MaxOperations: 10000, NotAfter: access.NotAfter}, "grant-2"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -283,7 +276,7 @@ func qualifyAccessGrants(t *testing.T, ctx context.Context, admin *pgxpool.Pool,
 	// artifact); the service already proved the published-locator rule above.
 	childID := custodyID()
 	digest := sha256.Sum256([]byte("synthetic artifact"))
-	if _, err := admin.Exec(ctx, "INSERT INTO access_grant_child(id,root_id,parent_id,capture_id,action_id,artifact_id,artifact_digest,client_id) VALUES($1,$2,$3,$4,'a1',$5,$6,$7)", childID, s.a.RootID, second.ID, second.CaptureID, custodyID(), digest[:], client); err != nil {
+	if _, err := admin.Exec(ctx, "INSERT INTO access_grant_child(id,root_id,parent_id,capture_id,action_id,artifact_id,artifact_digest) VALUES($1,$2,$3,$4,'a1',$5,$6)", childID, s.a.RootID, second.ID, second.CaptureID, custodyID(), digest[:]); err != nil {
 		t.Fatal(err)
 	}
 	var after atomic.Int64

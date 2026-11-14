@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-// PacketProjectionGrants proves one exact reviewed parent/child; it never reads
+// PacketProjectionGrants proves one exact reviewed grant and artifact; it never reads
 // evidence or reserves disclosure. The existing paid-batch transaction does that.
 type PacketProjectionGrants interface {
 	PacketProjectionGrant(context.Context, identities.CurrentIdentity, analysis.ContextProjectionScope, ContextProjectionEvidence, bool) (analysis.ContextQueryGrant, time.Time, error)
@@ -38,23 +38,16 @@ func (s GrantService) rawProjectionGrant(ctx context.Context, current identities
 	if err != nil || g.RootID != s.RootID || ReviewDigest(g, g.Review) != g.ReviewDigest || g.Kind == value.GrantRawQuery && (!RawQueryScopeMatches(g) || g.RawQuery.CaseID != scope.CaseID) {
 		return zero, time.Time{}, value.ErrGrantScope
 	}
-	if !sameHuman(g.Requester, i.Principal) || g.Kind == value.GrantRawQuery && (g.Requester != i.Principal || !slices.Contains(g.RawQuery.Operations, operation)) || g.Kind == value.GrantAdHocCapture && (g.ResultAccess == nil || !slices.Contains(g.ResultAccess.Operations, operation)) {
+	if !sameHuman(g.Requester, i.Principal) || g.Kind == value.GrantRawQuery && !slices.Contains(g.RawQuery.Operations, operation) || g.Kind == value.GrantAdHocCapture && (g.ResultAccess == nil || !slices.Contains(g.ResultAccess.Operations, operation)) {
 		return zero, time.Time{}, value.ErrGrantScope
 	}
-	var child value.GrantChild
+	var child value.GrantArtifact
 	if materialize {
-		group, e := s.outputGroup(ctx, g, output)
-		if e != nil {
-			return zero, time.Time{}, e
-		}
-		if e = value.CheckMaterialize(g, output, i.Principal.ClientID, true, s.Now(), group); e != nil {
-			return zero, time.Time{}, e
-		}
-		child, _, err = s.materialize(ctx, g.ID, i.Principal.ClientID, output, group)
+		child, _, err = s.register(ctx, g.ID, output, nil)
 	} else {
-		// The existing child read resolves its immutable group association in the
+		// The registration read resolves its immutable group association in the
 		// same SQL join; current checks need no separate association lookup.
-		child, err = s.Store.GrantChildFor(ctx, g.ID, scope.ArtifactID, i.Principal.ClientID)
+		child, err = s.Store.GrantArtifactFor(ctx, g.ID, scope.ArtifactID)
 	}
 	if err != nil || child.Output != output || child.ParentID != g.ID {
 		return zero, time.Time{}, value.ErrGrantScope
@@ -69,7 +62,7 @@ func (s GrantService) rawProjectionGrant(ctx context.Context, current identities
 	if err = s.finalRawQuery(ctx, current, i, until); err != nil {
 		return zero, time.Time{}, err
 	}
-	return analysis.ContextQueryGrant{ParentID: g.ID, ChildID: child.ID}, until, nil
+	return analysis.ContextQueryGrant{ParentID: g.ID, ArtifactRef: child.ID}, until, nil
 }
 
 // Produced only after complete current ordinary/raw-client/retained checks,

@@ -122,7 +122,7 @@ func TestRecorderPolicyActivationPreservesEventEnvelope(t *testing.T) {
 	if err != nil || !replay.Replay || len(f.accepted) != 2 {
 		t.Fatal("unchanged event envelope reissued acceptance", err)
 	}
-	for _, invalid := range []int64{-1, 1_000_000_001} {
+	for _, invalid := range []int64{-1} {
 		f.envelope.MaxObservedEvents = invalid
 		if _, err := s.Activate(t.Context(), f, "restarts", "invalid", true); err == nil || len(f.accepted) != 2 {
 			t.Fatal("invalid event ceiling accepted", invalid, err)

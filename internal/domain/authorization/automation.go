@@ -17,7 +17,7 @@ type AutomationEnvelope struct {
 }
 
 func (e AutomationEnvelope) Valid() bool {
-	if len(e.AllowedActions) == 0 || !identity.Strings(e.AllowedActions, 14, 32) || e.MaxLifetimeSeconds < 1 || e.MaxLifetimeSeconds > 31536000 || e.MaxExecutions < 1 || e.MaxExecutions > 10000 || e.MaxBytes < 1 || e.MaxBytes > 1<<40 || e.MaxObservedBytes < 0 || e.MaxObservedBytes > 1<<40 || e.MaxObservedEvents < 0 || e.MaxObservedEvents > 1_000_000_000 {
+	if len(e.AllowedActions) == 0 || !identity.Strings(e.AllowedActions, 14, 32) || e.MaxLifetimeSeconds < 1 || e.MaxExecutions < 1 || e.MaxBytes < 1 || e.MaxObservedBytes < 0 || e.MaxObservedEvents < 0 {
 		return false
 	}
 	for _, a := range e.AllowedActions {

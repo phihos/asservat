@@ -36,7 +36,6 @@
               "maxLength": 64
             },
             "minItems": 1,
-            "maxItems": 16,
             "uniqueItems": true
           },
           "operations": {
@@ -53,32 +52,20 @@
               ]
             }
           },
-          "clientIDs": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 128
-            },
-            "minItems": 1,
-            "maxItems": 4,
-            "uniqueItems": true,
-            "description": "Selected clients. When omitted, resolve to the authenticated requesting client before recording the review and digest. Explicit selections remain exact; replay never adds or changes a client."
-          },
           "maxArtifacts": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 64
+            "maximum": 9007199254740991
           },
           "maxBytes": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 274877906944
+            "maximum": 9007199254740991
           },
           "maxOperations": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 10000
+            "maximum": 9007199254740991
           },
           "notAfter": {
             "type": "string",
@@ -92,7 +79,8 @@
           "maxBytes",
           "maxOperations",
           "notAfter"
-        ]
+        ],
+        "description": "Result access covers every OAuth client and browser session of the same human; clients carry the user's own evidence access (maintainer decision)."
       }
     },
     "required": [

@@ -35,7 +35,7 @@ func rawGrantView(now time.Time, count int) authapp.GrantView {
 	g.ResultAccess = nil
 	g.Reasons = []authorization.SensitiveReason{{ActionID: "download_artifact", Code: "rawDisclosure"}}
 	g.ResultAccessDigest = artifact.Digest{}
-	g.RawQuery = &authorization.RawQueryScope{CaseID: "00000000-0000-4000-8000-000000000002", Reason: "inspect existing evidence", Operations: []string{"download_artifact"}, MaxBytes: int64(count) * 512, MaxOperations: authorization.GrantMaxResultOperations, NotAfter: now.Add(time.Hour)}
+	g.RawQuery = &authorization.RawQueryScope{CaseID: "00000000-0000-4000-8000-000000000002", Reason: "inspect existing evidence", Operations: []string{"download_artifact"}, MaxBytes: int64(count) * 512, MaxOperations: authorization.RawQueryDefaultOperations, NotAfter: now.Add(time.Hour)}
 	v.Review = authapp.GrantReview{RawQuery: &authapp.RawQueryReview{CaseID: g.RawQuery.CaseID, Reason: g.RawQuery.Reason, Operations: g.RawQuery.Operations, MaxBytes: g.RawQuery.MaxBytes, MaxOperations: g.RawQuery.MaxOperations, NotAfter: g.RawQuery.NotAfter}}
 	for n := 0; n < count; n++ {
 		o := authorization.VerifiedOutput{ArtifactID: fmt.Sprintf("00000000-0000-4000-8000-%012d", 100+n), CaptureID: "00000000-0000-4000-8000-000000000045", ActionID: "calls", ArtifactDigest: artifact.Digest{byte(n + 1)}, ExecutionDigest: artifact.Digest{2}, Target: authorization.Target{ClusterID: "00000000-0000-4000-8000-000000000004", NamespaceUID: "ns", WorkloadUID: fmt.Sprintf("workload-%d", n), PodUID: fmt.Sprintf("pod-%d", n)}}

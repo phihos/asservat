@@ -82,7 +82,6 @@ type AccessGrantChild struct {
 	ActionID       string
 	ArtifactID     pgtype.UUID
 	ArtifactDigest []byte
-	ClientID       string
 	CreatedAt      pgtype.Timestamptz
 }
 

@@ -164,7 +164,7 @@ func admitLogsMixedGroup(t *testing.T, f *queryLedgerFixture) logsMixedAccepted 
 		t.Fatal(err)
 	}
 	g := authorization.Grant{ID: custodyID(), RootID: p.RootID, Kind: authorization.GrantAdHocCapture, PreviewID: p.ID, CaptureID: p.CaptureID, Target: in.Target.Target(), Requester: p.Actor, ExecutionDigest: p.ScopeDigest, Scope: p.CanonicalScope, Review: []byte(`{}`), DataClass: "raw", Reasons: reasons, Lifetime: time.Hour, Revision: 1}
-	g.ResultAccess = &authorization.ResultAccess{ActionIDs: []string{group.Children[logsIndex].ActionID}, Operations: []string{authorization.GrantDownloadOperation, authorization.GrantLogQueryOperation}, ClientIDs: []string{p.Actor.ClientID}, MaxArtifacts: 1, MaxBytes: 2 * query.ContextResultBytes, MaxOperations: 2, NotAfter: now.Add(time.Hour)}
+	g.ResultAccess = &authorization.ResultAccess{ActionIDs: []string{group.Children[logsIndex].ActionID}, Operations: []string{authorization.GrantDownloadOperation, authorization.GrantLogQueryOperation}, MaxArtifacts: 1, MaxBytes: 2 * query.ContextResultBytes, MaxOperations: 2, NotAfter: now.Add(time.Hour)}
 	g.ResultAccessDigest = authapp.ResultAccessDigest(g.CaptureID, g.ExecutionDigest, *g.ResultAccess)
 	g.ReviewDigest = authapp.ReviewDigest(g, g.Review)
 	g, _, err = grants.RequestGrant(ctx, authapp.StoredGrantRequest{Grant: g, IdempotencyKey: "mixed-logs-review", RequestDigest: sha256.Sum256([]byte("synthetic-reviewed-mixed-logs"))})
@@ -363,7 +363,7 @@ func assertMixedLogGrantAssociation(t *testing.T, f *queryLedgerFixture, m logsM
 				o.ArtifactDigest = evidence.ContextCopiesDigest(standalone.Copies)
 				o.ExecutionDigest = standalone.Expectation.PlanDigest
 			}
-			_, _, err := m.grants.MaterializeGrantChild(ctx, authapp.GrantChildRequest{ChildID: custodyID(), ParentID: m.grant.ID, ClientID: m.grant.Requester.ClientID, Output: o, Group: &g})
+			_, _, err := m.grants.RegisterGrantArtifact(ctx, authapp.GrantArtifactRequest{ID: custodyID(), ParentID: m.grant.ID, Output: o, Group: &g})
 			if !errors.Is(err, authorization.ErrGrantScope) {
 				t.Fatal("unassociated output materialized", kind, err)
 			}
@@ -372,18 +372,18 @@ func assertMixedLogGrantAssociation(t *testing.T, f *queryLedgerFixture, m logsM
 			}
 		})
 	}
-	child, replay, err := m.grants.MaterializeGrantChild(ctx, authapp.GrantChildRequest{ChildID: custodyID(), ParentID: m.grant.ID, ClientID: m.grant.Requester.ClientID, Output: output, Group: &group})
+	child, replay, err := m.grants.RegisterGrantArtifact(ctx, authapp.GrantArtifactRequest{ID: custodyID(), ParentID: m.grant.ID, Output: output, Group: &group})
 	if err != nil || replay || child.Group == nil || *child.Group != group || child.Output != output {
 		t.Fatal("exact child was relabeled or not materialized", err)
 	}
-	again, replay, err := m.grants.MaterializeGrantChild(ctx, authapp.GrantChildRequest{ChildID: custodyID(), ParentID: m.grant.ID, ClientID: m.grant.Requester.ClientID, Output: output, Group: &group})
+	again, replay, err := m.grants.RegisterGrantArtifact(ctx, authapp.GrantArtifactRequest{ID: custodyID(), ParentID: m.grant.ID, Output: output, Group: &group})
 	if err != nil || !replay || again.ID != child.ID {
 		t.Fatal("exact materialization replay", err)
 	}
 	after := snapshot()
 	bad := group
 	bad.ChildIndex = (bad.ChildIndex + 1) % 3
-	if _, _, err = m.grants.MaterializeGrantChild(ctx, authapp.GrantChildRequest{ChildID: custodyID(), ParentID: m.grant.ID, ClientID: m.grant.Requester.ClientID, Output: output, Group: &bad}); !errors.Is(err, authorization.ErrGrantScope) || snapshot() != after {
+	if _, _, err = m.grants.RegisterGrantArtifact(ctx, authapp.GrantArtifactRequest{ID: custodyID(), ParentID: m.grant.ID, Output: output, Group: &bad}); !errors.Is(err, authorization.ErrGrantScope) || snapshot() != after {
 		t.Fatal("stale replay assertion accepted/charged", err)
 	}
 }

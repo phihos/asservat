@@ -24,7 +24,7 @@ func rawQueryTestRow(t *testing.T) custodydb.AccessGrant {
 		t.Fatal(err)
 	}
 	canonical, d := app.RawQueryScopeBytes(scope)
-	return custodydb.AccessGrant{ID: id(p.ID), RootID: id(p.RootID), Kind: value.GrantRawQuery, ExecutionDigest: d[:], ReviewDigest: append([]byte{4}, make([]byte, 31)...), DataClass: "raw", Reasons: []byte(`[{"actionID":"download_artifact","code":"rawDisclosure"}]`), Scope: canonical, Review: []byte(`{}`), RequesterIssuer: p.Actor.Issuer, RequesterSubject: p.Actor.Subject, RequesterClient: p.Actor.ClientID, RequesterKind: string(p.Actor.Kind), RequesterKey: policyGrantActorKey(p.Actor), RequestOperation: "requestRawAccess", LifetimeSeconds: 3600, RequestedAt: ts(now), ReviewUntil: ts(now.Add(time.Hour)), NotAfter: ts(scope.NotAfter), MaxArtifacts: 1, MaxBytes: scope.MaxBytes, MaxOperations: scope.MaxOperations, RawQuery: raw, Revision: 1}
+	return custodydb.AccessGrant{ID: id(p.ID), RootID: id(p.RootID), Kind: value.GrantRawQuery, ExecutionDigest: d[:], ReviewDigest: append([]byte{4}, make([]byte, 31)...), DataClass: "raw", Reasons: []byte(`[{"actionID":"download_artifact","code":"rawDisclosure"}]`), Scope: canonical, Review: []byte(`{}`), RequesterIssuer: p.Actor.Issuer, RequesterSubject: p.Actor.Subject, RequesterClient: p.Actor.ClientID, RequesterKind: string(p.Actor.Kind), RequesterKey: policyGrantActorKey(p.Actor), RequestOperation: "requestRawAccess", LifetimeSeconds: 3600, RequestedAt: ts(now), NotAfter: ts(scope.NotAfter), MaxArtifacts: 1, MaxBytes: scope.MaxBytes, MaxOperations: scope.MaxOperations, RawQuery: raw, Revision: 1}
 }
 func TestRawQueryGrantRowPreservesExactOriginalMember(t *testing.T) {
 	row := rawQueryTestRow(t)
@@ -33,15 +33,15 @@ func TestRawQueryGrantRowPreservesExactOriginalMember(t *testing.T) {
 		t.Fatal(g, err)
 	}
 	output := g.RawQuery.Artifacts[0].Output
-	childRow := custodydb.AccessGrantChild{ID: id(g.RawQuery.CaseID), RootID: row.RootID, ParentID: row.ID, CaptureID: id(output.CaptureID), ActionID: output.ActionID, ArtifactID: id(output.ArtifactID), ArtifactDigest: output.ArtifactDigest[:], ClientID: g.Requester.ClientID, CreatedAt: row.RequestedAt}
-	child, err := childFromRow(childRow, g)
+	childRow := custodydb.AccessGrantChild{ID: id(g.RawQuery.CaseID), RootID: row.RootID, ParentID: row.ID, CaptureID: id(output.CaptureID), ActionID: output.ActionID, ArtifactID: id(output.ArtifactID), ArtifactDigest: output.ArtifactDigest[:], CreatedAt: row.RequestedAt}
+	child, err := registrationFromRow(childRow, g)
 	if err != nil || child.Output != output || child.Output.ExecutionDigest == g.ExecutionDigest {
 		t.Fatal("child used raw parent query digest/empty target", child, err)
 	}
-	for _, alter := range []func(*custodydb.AccessGrantChild){func(r *custodydb.AccessGrantChild) { r.ClientID += "other" }, func(r *custodydb.AccessGrantChild) { r.CaptureID = id("00000000-0000-4000-8000-000000000099") }, func(r *custodydb.AccessGrantChild) { r.ActionID = "other" }, func(r *custodydb.AccessGrantChild) { r.ArtifactDigest = make([]byte, 32) }} {
+	for _, alter := range []func(*custodydb.AccessGrantChild){func(r *custodydb.AccessGrantChild) { r.CaptureID = id("00000000-0000-4000-8000-000000000099") }, func(r *custodydb.AccessGrantChild) { r.ActionID = "other" }, func(r *custodydb.AccessGrantChild) { r.ArtifactDigest = make([]byte, 32) }} {
 		bad := childRow
 		alter(&bad)
-		if _, err := childFromRow(bad, g); err == nil {
+		if _, err := registrationFromRow(bad, g); err == nil {
 			t.Fatal("unreviewed child accepted")
 		}
 	}

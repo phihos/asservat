@@ -294,21 +294,13 @@ func TestCompositionRefusalsAndRequestWire(t *testing.T) {
 	}
 	// result_access travels only to the reviewed-plan request.
 	f.err = nil
-	withAccess := `{"preview_id":"00000000-0000-4000-8000-000000000020","idempotency_key":"same-key","result_access":{"actionIds":["a1"],"operations":["download_artifact"],"clientIDs":["console"],"maxArtifacts":1,"maxBytes":1024,"maxOperations":2,"notAfter":"2030-01-01T00:00:00Z"}}`
-	if _, err = s.Call(t.Context(), f, "request_capture", []byte(withAccess)); err != nil || f.access == nil || f.access.MaxBytes != 1024 || f.access.ClientIDs[0] != "console" {
+	withAccess := `{"preview_id":"00000000-0000-4000-8000-000000000020","idempotency_key":"same-key","result_access":{"actionIds":["a1"],"operations":["download_artifact"],"maxArtifacts":1,"maxBytes":1024,"maxOperations":2,"notAfter":"2030-01-01T00:00:00Z"}}`
+	if _, err = s.Call(t.Context(), f, "request_capture", []byte(withAccess)); err != nil || f.access == nil || f.access.MaxBytes != 1024 {
 		t.Fatalf("result access not passed: %v %+v", err, f.access)
 	}
-	omittedClient := strings.Replace(withAccess, `"clientIDs":["console"],`, "", 1)
-	if _, err = s.Call(t.Context(), f, "request_capture", []byte(omittedClient)); err != nil || f.access == nil || len(f.access.ClientIDs) != 1 || f.access.ClientIDs[0] != f.i.Principal.ClientID {
-		t.Fatalf("currentclientdefault %v %+v", err, f.access)
-	}
-	explicitAgent := strings.Replace(withAccess, `"clientIDs":["console"]`, `"clientIDs":["agent"]`, 1)
-	if _, err = s.Call(t.Context(), f, "request_capture", []byte(explicitAgent)); err != nil || len(f.access.ClientIDs) != 1 || f.access.ClientIDs[0] != "agent" {
-		t.Fatalf("explicitclientrewritten %v %+v", err, f.access)
-	}
 	for name, bad := range map[string]string{
-		"read_memory":  strings.Replace(withAccess, `"download_artifact"`, `"read_memory"`, 1),
-		"five clients": strings.Replace(withAccess, `["console"]`, `["a","b","c","d","e"]`, 1),
+		"read_memory": strings.Replace(withAccess, `"download_artifact"`, `"read_memory"`, 1),
+		"client list": strings.Replace(withAccess, `"maxArtifacts"`, `"clientIDs":["console"],"maxArtifacts"`, 1),
 	} {
 		if _, err := s.Call(t.Context(), f, "request_capture", []byte(bad)); err == nil {
 			t.Fatalf("%s accepted by the runtime subset", name)

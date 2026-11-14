@@ -138,7 +138,6 @@ func attachPolicyAccountingGrantModeWithLimits(t *testing.T, ctx context.Context
 	g.ReviewDigest = app.ReviewDigest(g, g.Review)
 	blueprint := g
 	blueprint.RequestedAt = now
-	blueprint.ReviewUntil = now.Add(authorization.GrantReviewWindow)
 	blueprint.PolicyNotAfter = identity.Earlier(now.Add(g.Lifetime), a.NotAfter)
 	if !blueprint.Valid() || sha256.Sum256(scope) != g.ExecutionDigest || app.ReviewDigest(g, g.Review) != g.ReviewDigest {
 		t.Fatal("synthetic grant blueprint violates immutable domain/scope/review bindings")

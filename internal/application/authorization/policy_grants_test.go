@@ -519,8 +519,8 @@ func TestPolicyGrantMetadataNeverOffersPersonalCaptureContinuation(t *testing.T)
 		actor := f.requester
 		actor.Principal.ClientID = client
 		v, _, err := f.svc.Get(t.Context(), grantIdentity{actor, &f.now}, g.ID)
-		if err != nil || v.CanResume || v.CanResolve || v.ResumeRequiresOriginalClient {
-			t.Fatal("team grant became personal capture continuation", client, v.CanResume, v.CanResolve, v.ResumeRequiresOriginalClient, err)
+		if err != nil || v.CanResume {
+			t.Fatal("team grant became personal capture continuation", client, v.CanResume, err)
 		}
 	}
 }
@@ -542,7 +542,7 @@ func TestPolicyGrantCurrentSponsorCanInspectAfterRequesterDepartureWithoutDecisi
 		return old.WorkloadPermissions(ctx, target)
 	})
 	v, until, err := f.svc.Get(t.Context(), grantIdentity{bob, &f.now}, g.ID)
-	if err != nil || v.Grant.ID != g.ID || !v.CanRevoke || v.Approver || v.CanResume || v.CanResolve || v.ResumeRequiresOriginalClient || !until.After(f.now) || reads != 1 {
+	if err != nil || v.Grant.ID != g.ID || !v.CanRevoke || v.Approver || v.CanResume || !until.After(f.now) || reads != 1 {
 		t.Fatal("current sponsor cannot manage original team grant without becoming approver", v, until, reads, err)
 	}
 	if _, _, err = f.svc.Decide(t.Context(), grantIdentity{bob, &f.now}, g.ID, true, "current sponsor cannot review", "no-review"); !errors.Is(err, value.ErrNotApprover) {

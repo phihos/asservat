@@ -37,7 +37,7 @@ func (s ContextCaseService) ResolveRawLogQuery(ctx context.Context, source ident
 }
 func (s ContextCaseService) resolveRawSelection(ctx context.Context, source identities.CurrentIdentity, caseID string, digests []artifact.Digest, operation authorization.Operation) (permissions.RawQuerySelection, error) {
 	var zero permissions.RawQuerySelection
-	if len(digests) < 1 || len(digests) > authorization.GrantMaxResultArtifacts {
+	if len(digests) < 1 {
 		return zero, value.ErrUnavailable
 	}
 	seen := map[artifact.Digest]bool{}

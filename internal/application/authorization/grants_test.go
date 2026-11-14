@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
-	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -23,7 +22,7 @@ type memoryGrants struct {
 	now          func() time.Time
 	rows         map[string]value.Grant
 	keys         map[string]string
-	children     map[string]value.GrantChild
+	children     map[string]value.GrantArtifact
 	uses         map[string]GrantUseRequest
 	decided      map[string]string
 	revoked      map[string]string
@@ -32,7 +31,7 @@ type memoryGrants struct {
 }
 
 func newMemoryGrants(now func() time.Time) *memoryGrants {
-	return &memoryGrants{now: now, rows: map[string]value.Grant{}, keys: map[string]string{}, children: map[string]value.GrantChild{}, uses: map[string]GrantUseRequest{}, decided: map[string]string{}, revoked: map[string]string{}, locator: map[string]string{}, policyInputs: map[string]artifact.Digest{}}
+	return &memoryGrants{now: now, rows: map[string]value.Grant{}, keys: map[string]string{}, children: map[string]value.GrantArtifact{}, uses: map[string]GrantUseRequest{}, decided: map[string]string{}, revoked: map[string]string{}, locator: map[string]string{}, policyInputs: map[string]artifact.Digest{}}
 }
 
 func (m *memoryGrants) RequestGrant(_ context.Context, r StoredGrantRequest) (value.Grant, bool, error) {
@@ -55,7 +54,6 @@ func (m *memoryGrants) RequestGrant(_ context.Context, r StoredGrantRequest) (va
 	}
 	g := r.Grant
 	g.RequestedAt = m.now()
-	g.ReviewUntil = g.RequestedAt.Add(value.GrantReviewWindow)
 	if g.Kind == value.GrantPolicy {
 		g.PolicyNotAfter = identity.Earlier(g.RequestedAt.Add(g.Lifetime), g.Policy.Authority.NotAfter)
 	}
@@ -131,20 +129,14 @@ func (m *memoryGrants) DecideGrant(_ context.Context, in GrantDecisionInput) (va
 		return value.Grant{}, false, value.ErrSelfApproval
 	}
 	now := m.now()
-	if !g.RevokedAt.IsZero() || !now.Before(g.ReviewUntil) {
+	if !g.RevokedAt.IsZero() || g.Phase(now) != value.GrantPending {
 		return value.Grant{}, false, value.ErrGrantNotPending
 	}
 	g.Decision = &value.GrantDecision{Approved: in.Approve, Approver: in.Approver, Reason: in.Reason, ACR: in.ACR, AuthenticatedAt: in.AuthTime, DecidedAt: now}
 	if in.Approve {
-		g.ExpiresAt = now.Add(g.Lifetime)
-		if g.Kind == value.GrantPolicy {
-			g.ExpiresAt = g.PolicyNotAfter
-		}
-		if g.RawQuery != nil {
-			g.ExpiresAt = identity.Earlier(g.ExpiresAt, g.RawQuery.NotAfter)
-		}
-		if g.ResultAccess != nil {
-			g.ExpiresAt = identity.Earlier(g.ExpiresAt, g.ResultAccess.NotAfter)
+		g.ExpiresAt = g.PendingUntil()
+		if g.ExpiresAt.IsZero() {
+			g.ExpiresAt = now.Add(g.Lifetime)
 		}
 	}
 	g.Revision++
@@ -177,59 +169,53 @@ func (m *memoryGrants) RevokeGrant(_ context.Context, in GrantRevocationInput) (
 	return g, false, nil
 }
 
-func (m *memoryGrants) MaterializeGrantChild(_ context.Context, in GrantChildRequest) (value.GrantChild, bool, error) {
+func (m *memoryGrants) RegisterGrantArtifact(_ context.Context, in GrantArtifactRequest) (value.GrantArtifact, bool, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	g, ok := m.rows[in.ParentID]
 	if !ok {
-		return value.GrantChild{}, false, ErrGrantNotFound
+		return value.GrantArtifact{}, false, ErrGrantNotFound
 	}
-	registered := false
 	for _, c := range m.children {
 		if c.ParentID == in.ParentID && c.Output.ArtifactID == in.Output.ArtifactID {
-			registered = true
-			if c.ClientID == in.ClientID {
-				if err := value.CheckMaterialize(g, in.Output, in.ClientID, true, m.now(), in.Group); err != nil {
-					return value.GrantChild{}, false, err
-				}
-				return c, true, nil
+			if err := value.CheckRegister(g, in.Output, true, m.now(), in.Group); err != nil {
+				return value.GrantArtifact{}, false, err
 			}
+			return c, true, nil
 		}
 	}
-	if err := value.CheckMaterialize(g, in.Output, in.ClientID, registered, m.now(), in.Group); err != nil {
-		return value.GrantChild{}, false, err
+	if err := value.CheckRegister(g, in.Output, false, m.now(), in.Group); err != nil {
+		return value.GrantArtifact{}, false, err
 	}
 	if m.locator[in.Output.ArtifactID] != in.Output.CaptureID {
-		return value.GrantChild{}, false, value.ErrGrantScope
+		return value.GrantArtifact{}, false, value.ErrGrantScope
 	}
-	if !registered {
-		g.Spent.Artifacts++
-		m.rows[g.ID] = g
-	}
-	c := value.GrantChild{ID: in.ChildID, ParentID: in.ParentID, ClientID: in.ClientID, Output: in.Output, Group: in.Group, CreatedAt: m.now()}
+	g.Spent.Artifacts++
+	m.rows[g.ID] = g
+	c := value.GrantArtifact{ID: in.ID, ParentID: in.ParentID, Output: in.Output, Group: in.Group, CreatedAt: m.now()}
 	m.children[c.ID] = c
 	return c, false, nil
 }
 
-func (m *memoryGrants) GrantChild(_ context.Context, id string) (value.GrantChild, error) {
+func (m *memoryGrants) GrantArtifact(_ context.Context, id string) (value.GrantArtifact, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	c, ok := m.children[id]
 	if !ok {
-		return value.GrantChild{}, ErrGrantNotFound
+		return value.GrantArtifact{}, ErrGrantNotFound
 	}
 	return c, nil
 }
 
-func (m *memoryGrants) GrantChildFor(_ context.Context, parent, artifactID, client string) (value.GrantChild, error) {
+func (m *memoryGrants) GrantArtifactFor(_ context.Context, parent, artifactID string) (value.GrantArtifact, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	for _, c := range m.children {
-		if c.ParentID == parent && c.Output.ArtifactID == artifactID && c.ClientID == client {
+		if c.ParentID == parent && c.Output.ArtifactID == artifactID {
 			return c, nil
 		}
 	}
-	return value.GrantChild{}, ErrGrantNotFound
+	return value.GrantArtifact{}, ErrGrantNotFound
 }
 
 func (m *memoryGrants) ReserveGrantUse(_ context.Context, in GrantUseRequest) (value.Grant, bool, error) {
@@ -324,7 +310,7 @@ func (f *grantFixture) input(capture int, access *value.ResultAccess) GrantReque
 }
 
 func (f *grantFixture) access() *value.ResultAccess {
-	return &value.ResultAccess{ActionIDs: []string{"a1"}, Operations: []string{value.GrantDownloadOperation}, ClientIDs: []string{"console", "agent"}, MaxArtifacts: 1, MaxBytes: 100, MaxOperations: 3, NotAfter: f.now.Add(2 * time.Hour)}
+	return &value.ResultAccess{ActionIDs: []string{"a1"}, Operations: []string{value.GrantDownloadOperation}, MaxArtifacts: 1, MaxBytes: 100, MaxOperations: 3, NotAfter: f.now.Add(2 * time.Hour)}
 }
 
 func (f *grantFixture) request(t *testing.T, capture int, access *value.ResultAccess) value.Grant {
@@ -506,63 +492,59 @@ func TestGrantRevocationDenialAndVisibility(t *testing.T) {
 	if _, _, err := f.svc.Request(ctx, grantIdentity{f.approver, &f.now}, f.input(5, nil)); err == nil {
 		t.Fatal("a non-actor opened a request")
 	}
-	// The review window lapses.
+	// A review has no fixed window: it stays decidable hours later.
 	p := f.request(t, 6, nil)
-	f.now = p.ReviewUntil
-	if _, _, err := f.svc.Decide(ctx, grantIdentity{f.approver, &f.now}, p.ID, true, "late", "late-2"); !errors.Is(err, value.ErrGrantNotPending) {
-		t.Fatal("decided after the review window", err)
+	f.now = f.now.Add(9 * time.Hour)
+	if _, _, err := f.svc.Decide(ctx, grantIdentity{f.approver, &f.now}, p.ID, false, "late", "late-2"); err != nil {
+		t.Fatal("review lapsed without a bound", err)
 	}
 }
 
-// REQ-INV-002: exact children after verified commit share one finite pool;
-// never another client, capture or unpublished artifact.
+// REQ-INV-002: the grant covers published artifacts of its capture; every
+// client of the requesting human spends its one pool; never another person,
+// capture or unpublished artifact.
 func TestGrantResultAccessPool(t *testing.T) {
 	ctx := context.Background()
 	f := newGrantFixture(t)
 	g := f.approve(t, f.request(t, 7, f.access()))
-	if !g.ExpiresAt.Equal(f.now.Add(time.Hour)) || g.ResultAccessDigest != ResultAccessDigest(g.CaptureID, g.ExecutionDigest, NormalizeResultAccess(*f.access())) {
+	if !g.ExpiresAt.Equal(f.access().NotAfter) || g.ResultAccessDigest != ResultAccessDigest(g.CaptureID, g.ExecutionDigest, NormalizeResultAccess(*f.access())) {
 		t.Fatal("result access binding", g.ExpiresAt)
 	}
 	out := value.VerifiedOutput{CaptureID: g.CaptureID, ActionID: "a1", ArtifactID: grantID(500), ExecutionDigest: g.ExecutionDigest, ArtifactDigest: artifact.Digest{5}, Target: f.target}
-	if _, _, err := f.svc.Materialize(ctx, g.ID, "console", out); !errors.Is(err, value.ErrGrantScope) {
-		t.Fatal("unpublished artifact became a child", err)
+	if _, _, err := f.svc.Register(ctx, g.ID, out); !errors.Is(err, value.ErrGrantScope) {
+		t.Fatal("unpublished artifact registered", err)
 	}
 	f.store.locator[out.ArtifactID] = g.CaptureID
-	c1, replay, err := f.svc.Materialize(ctx, g.ID, "console", out)
+	c1, replay, err := f.svc.Register(ctx, g.ID, out)
 	if err != nil || replay {
 		t.Fatal(err)
 	}
-	if again, replay, err := f.svc.Materialize(ctx, g.ID, "console", out); err != nil || !replay || again.ID != c1.ID {
+	if again, replay, err := f.svc.Register(ctx, g.ID, out); err != nil || !replay || again.ID != c1.ID {
 		t.Fatal("duplicate commit delivery", err)
 	}
-	c2, _, err := f.svc.Materialize(ctx, g.ID, "agent", out)
-	if err != nil || f.store.rows[g.ID].Spent.Artifacts != 1 {
-		t.Fatal("a second client charged another artifact", err)
+	if f.store.rows[g.ID].Spent.Artifacts != 1 {
+		t.Fatal("a repeated registration charged another artifact")
 	}
 	second := out
 	second.ArtifactID = grantID(501)
 	f.store.locator[second.ArtifactID] = g.CaptureID
-	if _, _, err := f.svc.Materialize(ctx, g.ID, "console", second); !errors.Is(err, value.ErrGrantPoolExhausted) {
+	if _, _, err := f.svc.Register(ctx, g.ID, second); !errors.Is(err, value.ErrGrantPoolExhausted) {
 		t.Fatal("max artifacts exceeded", err)
 	}
-	for name, bad := range map[string]struct {
-		client string
-		mut    func(*value.VerifiedOutput)
-	}{
-		"unlisted client":  {"cli", func(*value.VerifiedOutput) {}},
-		"other action":     {"console", func(o *value.VerifiedOutput) { o.ActionID = "a2" }},
-		"other capture":    {"console", func(o *value.VerifiedOutput) { o.CaptureID = grantID(8) }},
-		"forged execution": {"console", func(o *value.VerifiedOutput) { o.ExecutionDigest = artifact.Digest{7} }},
+	for name, mut := range map[string]func(*value.VerifiedOutput){
+		"other action":     func(o *value.VerifiedOutput) { o.ActionID = "a2" },
+		"other capture":    func(o *value.VerifiedOutput) { o.CaptureID = grantID(8) },
+		"forged execution": func(o *value.VerifiedOutput) { o.ExecutionDigest = artifact.Digest{7} },
 	} {
 		o := out
-		bad.mut(&o)
-		if _, _, err := f.svc.Materialize(ctx, g.ID, bad.client, o); !errors.Is(err, value.ErrGrantScope) {
+		mut(&o)
+		if _, _, err := f.svc.Register(ctx, g.ID, o); !errors.Is(err, value.ErrGrantScope) {
 			t.Fatal(name, err)
 		}
 	}
 	agent := f.requester
 	agent.Principal.ClientID = "agent"
-	use := func(who identity.Identity, child value.GrantChild, id int, bytes int64) error {
+	use := func(who identity.Identity, child value.GrantArtifact, id int, bytes int64) error {
 		_, _, err := f.svc.Use(ctx, grantIdentity{who, &f.now}, child.ID, grantID(id), value.GrantUse{Operation: value.GrantDownloadOperation, Bytes: bytes, Operations: 1})
 		return err
 	}
@@ -570,7 +552,7 @@ func TestGrantResultAccessPool(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Both clients spend one pool: 60 + 40 = the 100-byte cap.
-	if err := use(agent, c2, 601, 40); err != nil {
+	if err := use(agent, c1, 601, 40); err != nil {
 		t.Fatal(err)
 	}
 	if err := use(f.requester, c1, 602, 1); !errors.Is(err, value.ErrGrantPoolExhausted) {
@@ -584,31 +566,25 @@ func TestGrantResultAccessPool(t *testing.T) {
 	if err := use(f.requester, c1, 600, 61); !errors.Is(err, ErrGrantConflict) {
 		t.Fatal("changed replay", err)
 	}
-	// The child's client is binding; another human never uses it.
-	if err := use(agent, c1, 603, 0); err == nil {
-		t.Fatal("another client used a child")
-	}
+	// Another human never uses it.
 	if err := use(f.outside, c1, 604, 0); err == nil {
-		t.Fatal("another person used a child")
+		t.Fatal("another person used the grant")
 	}
-	// Revocation of the parent stops every child use and new children.
+	// Revocation stops every use and new registration.
 	if _, _, err := f.svc.Revoke(ctx, grantIdentity{f.approver, &f.now}, g.ID, 2, "stop"); err != nil {
 		t.Fatal(err)
 	}
 	if err := use(f.requester, c1, 605, 0); !errors.Is(err, value.ErrGrantRevoked) {
 		t.Fatal("revoked parent used", err)
 	}
-	if _, _, err := f.svc.Materialize(ctx, g.ID, "console", out); !errors.Is(err, value.ErrGrantRevoked) {
-		t.Fatal("revoked parent materialized", err)
+	if _, _, err := f.svc.Register(ctx, g.ID, out); !errors.Is(err, value.ErrGrantRevoked) {
+		t.Fatal("revoked grant registered", err)
 	}
-	// NotAfter caps the approved lifetime.
+	// NotAfter is the approved expiry.
 	short := f.access()
 	short.NotAfter = f.now.Add(10 * time.Minute)
 	s := f.approve(t, f.request(t, 9, short))
 	if !s.ExpiresAt.Equal(short.NotAfter) {
-		t.Fatal("not_after does not cap expiry", s.ExpiresAt)
-	}
-	if !slices.Equal(s.ResultAccess.ClientIDs, []string{"agent", "console"}) {
-		t.Fatal("client set not normalized", s.ResultAccess.ClientIDs)
+		t.Fatal("not_after is not the expiry", s.ExpiresAt)
 	}
 }

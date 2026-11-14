@@ -57,8 +57,8 @@ func grantView(now time.Time) authapp.GrantView {
 		Target: authorization.Target{ClusterID: "00000000-0000-4000-8000-000000000004", NamespaceUID: "ns", WorkloadUID: "w", PodUID: "pod"}, ExecutionDigest: artifact.Digest{1}, ReviewDigest: artifact.Digest{2}, DataClass: "extract",
 		Reasons: []authorization.SensitiveReason{{ActionID: "a1", Code: "rawBytePredicate"}}, Scope: []byte("{}"), Review: []byte("{}"),
 		Requester:   identity.Principal{Issuer: "https://id.example.invalid", Subject: "dev", ClientID: "console", Kind: identity.Human},
-		RequestedAt: now, ReviewUntil: now.Add(time.Hour), Lifetime: time.Hour, Revision: 1,
-		ResultAccess: &authorization.ResultAccess{ActionIDs: []string{"a1"}, Operations: []string{"download_artifact"}, ClientIDs: []string{"console"}, MaxArtifacts: 1, MaxBytes: 100, MaxOperations: 2, NotAfter: now.Add(2 * time.Hour)}, ResultAccessDigest: artifact.Digest{3}}
+		RequestedAt: now, Lifetime: time.Hour, Revision: 1,
+		ResultAccess: &authorization.ResultAccess{ActionIDs: []string{"a1"}, Operations: []string{"download_artifact"}, MaxArtifacts: 1, MaxBytes: 100, MaxOperations: 2, NotAfter: now.Add(2 * time.Hour)}, ResultAccessDigest: artifact.Digest{3}}
 	return authapp.GrantView{Grant: g, Phase: authorization.GrantPending, Approver: true, Review: authapp.GrantReview{Namespace: "payments", WorkloadKind: "Deployment", WorkloadName: "api", PodName: "api-a", Deadline: now.Add(5 * time.Minute),
 		Actions:           []authapp.GrantReviewAction{{ActionID: "a1", Kind: "packetCapture", ExecutionMode: "ongoing", Before: "30s", After: "10s", Filter: "tcp[13] & 2 != 0", FilterDigest: artifact.Digest{4}, FilterInstructions: 4, MaxBytes: 16 << 20, RingMaxBytes: 16 << 20, RingMaxAge: "50s", Sensitive: []string{"rawBytePredicate"}}},
 		ObservationLimits: &authapp.GrantObservationLimits{MaxSessionSeconds: 15, MaxObservedBytes: 1 << 30, MaxBytesPerSecond: 16 << 20, MaxConcurrentSessions: 1}}}
@@ -86,16 +86,16 @@ func TestGrantOperationsWire(t *testing.T) {
 	if err != nil || json.Unmarshal(reply.Body, &out) != nil || out.Status != "ok" || out.Data.Phase != "Pending" || !out.Data.CanDecide || out.Data.Actions[0].Filter != "tcp[13] & 2 != 0" || out.Data.ResultAccess.MaxBytes != 100 || *out.Data.RemainingBytes != 100 || out.Data.NavigationURI != "https://console.invalid/approvals/00000000-0000-4000-8000-0000000009a1" {
 		t.Fatalf("get_grant: %v %s", err, reply.Body)
 	}
-	if out.Data.CanResume == nil || *out.Data.CanResume || out.Data.CanResolve == nil || *out.Data.CanResolve || out.Data.ResumeRequiresOriginalClient == nil || *out.Data.ResumeRequiresOriginalClient {
+	if out.Data.CanResume == nil || *out.Data.CanResume {
 		t.Fatal("detail must carry explicit advisory flags")
 	}
 	if out.Data.CaptureDeadlineRule != "previewDeadline" || !out.Data.PreviewDeadline.Equal(uc.view.Review.Deadline) || out.Data.CaptureWindowSeconds != 0 {
 		t.Fatal("legacy timing changed")
 	}
-	uc.view.CanResume, uc.view.CanResolve = true, true
+	uc.view.CanResume = true
 	uc.view.Grant.Scope = []byte(`{"timing":"approvedAcceptance/v1"}`)
 	marked, e := s.Call(t.Context(), f, "get_grant", []byte(`{"grant_id":"00000000-0000-4000-8000-0000000009a1"}`))
-	if e != nil || json.Unmarshal(marked.Body, &out) != nil || out.Data.CaptureDeadlineRule != "acceptanceWithinGrant" || out.Data.CaptureWindowSeconds != 300 || !*out.Data.CanResume || !*out.Data.CanResolve || !out.Data.PreviewDeadline.Equal(uc.view.Review.Deadline) {
+	if e != nil || json.Unmarshal(marked.Body, &out) != nil || out.Data.CaptureDeadlineRule != "acceptanceWithinGrant" || out.Data.CaptureWindowSeconds != 300 || !*out.Data.CanResume || !out.Data.PreviewDeadline.Equal(uc.view.Review.Deadline) {
 		t.Fatalf("approved timing: %v %s", e, marked.Body)
 	}
 	if len(reply.Body) > 24<<10 {

@@ -159,7 +159,7 @@ func qualifyRawQueryService(t *testing.T, ctx context.Context, s captureAdmissio
 	if until, err := service.CurrentResultAccessForPreparation(ctx, as(false), scope, output.ActionID, &nativeBytes); err != nil || !time.Now().Before(until) {
 		t.Fatal("full-file service result access/materialization", err)
 	}
-	child, err := store.GrantChildFor(ctx, approved.ID, output.ArtifactID, approved.Requester.ClientID)
+	child, err := store.GrantArtifactFor(ctx, approved.ID, output.ArtifactID)
 	if err != nil || child.Output != output || child.ParentID != approved.ID {
 		t.Fatal("exact service-materialized child", err)
 	}

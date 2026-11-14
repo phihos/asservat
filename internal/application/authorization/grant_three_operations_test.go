@@ -104,7 +104,7 @@ func TestRawSyscallQueryThreeOperationParentProducer(t *testing.T) {
 				t.Fatal("packet exact child", err)
 			}
 			syscallRef, _, err := f.svc.SyscallProjectionGrant(t.Context(), caller, syscall, syscallRecord, true)
-			if err != nil || !syscallRef.Valid() || syscallRef.ParentID != approved.ID || syscallRef.ChildID == packetRef.ChildID {
+			if err != nil || !syscallRef.Valid() || syscallRef.ParentID != approved.ID || syscallRef.ArtifactRef == packetRef.ArtifactRef {
 				t.Fatal("syscall exact child", err)
 			}
 			stored := f.store.rows[approved.ID]
@@ -134,8 +134,8 @@ func TestRawSyscallQueryThreeOperationParentProducer(t *testing.T) {
 				t.Fatal("typed profile query refusal materialized or spent")
 			}
 			output := value.VerifiedOutput{CaptureID: profile.CaptureID, ActionID: "profile", ArtifactID: profile.ArtifactID, ExecutionDigest: approved.ExecutionDigest, ArtifactDigest: profile.Version, Target: f.target}
-			child, replay, err := f.svc.Materialize(t.Context(), approved.ID, f.requester.Principal.ClientID, output)
-			if err != nil || replay || child.Output != output || child.ParentID != approved.ID || child.ID == packetRef.ChildID || child.ID == syscallRef.ChildID {
+			child, replay, err := f.svc.Register(t.Context(), approved.ID, output)
+			if err != nil || replay || child.Output != output || child.ParentID != approved.ID || child.ID == packetRef.ArtifactRef || child.ID == syscallRef.ArtifactRef {
 				t.Fatal("selected profile exact download association", err, replay)
 			}
 			stored = f.store.rows[approved.ID]

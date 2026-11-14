@@ -549,7 +549,7 @@ func qualifyPacketQueryManagedLifecycle(t *testing.T, f *queryLedgerFixture) {
 		assertPacketQueryUses(t, f, q.Grant.ParentID, 2*query.ContextResultBytes, 2)
 		// Exhausted disclosure does not erase the exact original child/query. A
 		// separately named native use competes on the SAME pool and must be denied.
-		_, _, e = grantStore.ReserveGrantUse(ctx, authapp.GrantUseRequest{UseID: custodyID(), ParentID: q.Grant.ParentID, ChildID: q.Grant.ChildID, Use: value.GrantUse{Operation: value.GrantDownloadOperation, Bytes: 1, Operations: 1}})
+		_, _, e = grantStore.ReserveGrantUse(ctx, authapp.GrantUseRequest{UseID: custodyID(), ParentID: q.Grant.ParentID, ArtifactRef: q.Grant.ArtifactRef, Use: value.GrantUse{Operation: value.GrantDownloadOperation, Bytes: 1, Operations: 1}})
 		if e == nil {
 			t.Fatal("native disclosure did not compete with spent packet-page pool")
 		}
@@ -670,7 +670,7 @@ func packetQueryBatchRollback(t *testing.T, f *queryLedgerFixture, pool *pgxpool
 	if _, err = tx.Exec(ctx, `UPDATE access_grant SET bytes_spent=bytes_spent+24576,operations_spent=operations_spent+1 WHERE root_id=$1 AND id=$2`, q.Scope.RootID, q.Grant.ParentID); err != nil {
 		t.Fatal("rollback setup charge", err)
 	}
-	if _, err = tx.Exec(ctx, `INSERT INTO access_grant_use(id,root_id,parent_id,child_id,operation,bytes,operations) VALUES($1,$2,$3,$4,$5,24576,1)`, batchID, q.Scope.RootID, q.Grant.ParentID, q.Grant.ChildID, packetQueryFixtureOperation(f)); err != nil {
+	if _, err = tx.Exec(ctx, `INSERT INTO access_grant_use(id,root_id,parent_id,child_id,operation,bytes,operations) VALUES($1,$2,$3,$4,$5,24576,1)`, batchID, q.Scope.RootID, q.Grant.ParentID, q.Grant.ArtifactRef, packetQueryFixtureOperation(f)); err != nil {
 		t.Fatal("rollback setup use", err)
 	}
 	now := time.Now().UTC().Truncate(time.Microsecond)

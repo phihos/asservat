@@ -85,7 +85,7 @@ func newStoredProfileReview(t *testing.T, namespace bool) storedProfileReview {
 		t.Fatal("preview persistence")
 	}
 	f.previews[stored.ID] = stored
-	access := &authorization.ResultAccess{ActionIDs: []string{preview.Plan.Actions[0].ID}, Operations: []string{authorization.GrantDownloadOperation}, ClientIDs: []string{"console"}, MaxArtifacts: 1, MaxBytes: 16 << 20, MaxOperations: 1, NotAfter: f.now.Add(time.Hour)}
+	access := &authorization.ResultAccess{ActionIDs: []string{preview.Plan.Actions[0].ID}, Operations: []string{authorization.GrantDownloadOperation}, MaxArtifacts: 1, MaxBytes: 16 << 20, MaxOperations: 1, NotAfter: f.now.Add(time.Hour)}
 	return storedProfileReview{f, preview, grants, catalog, endpoint, access}
 }
 

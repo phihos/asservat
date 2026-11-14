@@ -874,16 +874,6 @@
                             },
                             "uniqueItems": true
                           },
-                          "client_ids": {
-                            "type": "array",
-                            "minItems": 1,
-                            "maxItems": 4,
-                            "items": {
-                              "type": "string",
-                              "minLength": 1,
-                              "maxLength": 256
-                            }
-                          },
                           "max_artifacts": {
                             "type": "integer",
                             "minimum": 1,
@@ -922,7 +912,6 @@
                         "required": [
                           "action_ids",
                           "operations",
-                          "client_ids",
                           "max_artifacts",
                           "max_bytes",
                           "max_operations",
@@ -968,14 +957,6 @@
                       "can_resume": {
                         "type": "boolean",
                         "description": "Advisory current original requester/client collection eligibility under this exact approved grant. Submission rechecks all authority."
-                      },
-                      "can_resolve": {
-                        "type": "boolean",
-                        "description": "Advisory original requester/client may recover a possibly accepted request after an approved decision. Never offered for pending or denied review; a missing acceptance closes the original intent."
-                      },
-                      "resume_requires_original_client": {
-                        "type": "boolean",
-                        "description": "Guidance only for the same requesting human on another OAuth client while this marked plan is Approved. It confers no authority or grant transfer."
                       },
                       "policy": {
                         "type": "object",
@@ -1089,16 +1070,13 @@
                       "reasons",
                       "requested_by",
                       "requested_at",
-                      "review_until",
                       "lifetime_seconds",
                       "can_decide",
                       "can_revoke",
                       "approval_navigation_uri",
                       "actions",
                       "capture_deadline_rule",
-                      "can_resume",
-                      "can_resolve",
-                      "resume_requires_original_client"
+                      "can_resume"
                     ],
                     "allOf": [
                       {
@@ -1211,12 +1189,6 @@
                               "const": "policyAuthority"
                             },
                             "can_resume": {
-                              "const": false
-                            },
-                            "can_resolve": {
-                              "const": false
-                            },
-                            "resume_requires_original_client": {
                               "const": false
                             }
                           },
@@ -1495,12 +1467,6 @@
                       "can_resume": {
                         "const": false
                       },
-                      "can_resolve": {
-                        "const": false
-                      },
-                      "resume_requires_original_client": {
-                        "const": false
-                      },
                       "raw_access": {
                         "type": "object",
                         "additionalProperties": false,
@@ -1693,7 +1659,6 @@
                       "reasons",
                       "requested_by",
                       "requested_at",
-                      "review_until",
                       "lifetime_seconds",
                       "can_decide",
                       "can_revoke",
