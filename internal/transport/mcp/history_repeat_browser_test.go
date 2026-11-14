@@ -61,7 +61,7 @@ func (f *repeatBrowserFacts) ContextCapability(ctx context.Context, t authorizat
 func (f *repeatBrowserFacts) IdentityPolicy(context.Context, string) (identity.Policy, error) {
 	now := time.Now()
 	actor := testIdentity()
-	return identity.Policy{Revision: actor.Policy, Issuer: actor.Principal.Issuer, ObservedAt: now, FreshUntil: now.Add(5 * time.Second), Clients: []identity.Client{{ID: actor.Principal.ClientID, Kind: identity.Human, ClassQualified: true}}, EligibleGroups: []string{"maintainers"}, GroupsAtIssueQualified: true, GroupMaxAge: time.Minute, RequireRecordingApproval: true}, nil
+	return identity.Policy{Revision: actor.Policy, Issuer: actor.Principal.Issuer, ObservedAt: now, FreshUntil: now.Add(5 * time.Second), Clients: []identity.Client{{ID: actor.Principal.ClientID, Kind: identity.Human, ClassQualified: true}}}, nil
 }
 func (f *repeatBrowserFacts) PacketRecorder(context.Context, targets.PodResolution) error { return nil }
 func (f *repeatBrowserFacts) ResolvePacketRecorder(ctx context.Context, r targets.Request) (targets.PodResolution, error) {
@@ -118,7 +118,7 @@ func testHistoryEditedRepeatBrowser(t *testing.T, nanoseconds bool) {
 	server.EnableHTTP2 = true
 	server.StartTLS()
 	defer server.Close()
-	service := app.ContextInvestigation{RootID: reserveID(1), InstallationID: reserveID(2), Previews: facts, Replay: facts, Admission: facts, Targets: facts, Eligibility: access.Evaluator{Permissions: facts, Now: time.Now}, Capabilities: facts, Retention: facts, Storage: facts, Processing: facts, Recorders: facts, Filters: facts, Approvals: facts, Lifetime: time.Minute, Now: time.Now, NewID: func() string { return reserveID(100 + int(facts.ids.Add(1))) }}
+	service := app.ContextInvestigation{RootID: reserveID(1), InstallationID: reserveID(2), Previews: facts, Replay: facts, Admission: facts, Targets: facts, Eligibility: access.Evaluator{Permissions: facts, Now: time.Now}, Capabilities: facts, Retention: facts, Storage: facts, Processing: facts, Recorders: facts, Filters: facts, Lifetime: time.Minute, Now: time.Now, NewID: func() string { return reserveID(100 + int(facts.ids.Add(1))) }}
 	service.ReportPreviewFailure = func(stage string) { t.Log("preview stage", stage) }
 	history := app.ContextHistoryService{RootID: reserveID(1), InstallationID: reserveID(2), Reader: facts, Targets: facts, Workloads: facts, Previews: service, Now: time.Now}
 	ops, err := presentation.NewContextOperationsWithHistory(presentation.ContextOperationsConfig{PublicOrigin: server.URL, CollectionEnabled: true, Now: time.Now, NewID: func() string { return reserveID(500) }}, service, &mcpCaptureFixture{}, history)

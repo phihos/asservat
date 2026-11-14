@@ -28,14 +28,8 @@ type InstallerPublicSettings struct {
 	Issuer             string                   `json:"issuer"`
 	ClientID           string                   `json:"clientID"`
 	MaxLifetimeSeconds int                      `json:"maxLifetimeSeconds"`
-	MaxLogins          int                      `json:"maxLogins"`
-	MaxSessions        int                      `json:"maxSessions"`
-	MaxLogoutEvents    int                      `json:"maxLogoutEvents"`
 	Clients            []IdentityClient         `json:"clients"`
-	EligibleSubjects   []IdentitySubject        `json:"eligibleSubjects"`
-	EligibleGroups     []string                 `json:"eligibleGroups"`
-	GroupMaxAgeSeconds int                      `json:"groupMaxAgeSeconds"`
-	// Approvals passes protected step-up and manual-recording policy unchanged.
+	// Approvals passes the approval settings unchanged.
 	Approvals *IdentityApprovals `json:"approvals,omitempty"`
 	// Capacity is the operator's capacity profile and ProcessingOperators the
 	// processing release operators (ADR-190). Both are required for capacity.

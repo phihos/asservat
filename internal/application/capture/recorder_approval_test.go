@@ -15,7 +15,6 @@ import (
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/collector"
-	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/domain/planning"
 )
 
@@ -45,15 +44,6 @@ func (g *fakeGrants) Covering(_ context.Context, _ identities.CurrentIdentity, c
 		return g.grant, time.Time{}, authorization.ErrGrantScope
 	}
 	return g.grant, time.Now().Add(time.Second), g.covering
-}
-
-type fixedApprovalSettings struct {
-	policy identity.Policy
-	err    error
-}
-
-func (s fixedApprovalSettings) IdentityPolicy(context.Context, string) (identity.Policy, error) {
-	return s.policy, s.err
 }
 
 // ADR-249: a raw byte predicate makes the preview need approval; submitting
@@ -116,27 +106,13 @@ func TestSensitiveRecorderPlanNeedsApprovalBeforeAnything(t *testing.T) {
 	}
 }
 
-func TestRecorderApprovalSettingsAndResultAccess(t *testing.T) {
+func TestResultAccessRefusedWithoutReview(t *testing.T) {
 	f := newInvestigationFixture()
 	ctx := context.Background()
-	// The installation's switch makes a metadata recording need approval.
-	policy := identity.Policy{Revision: identity.Revision{UID: "identity", Generation: 1, Digest: [32]byte{1}}, Issuer: f.actor.Issuer, ObservedAt: f.now, FreshUntil: f.now.Add(30 * time.Second), Clients: []identity.Client{{ID: "console", Kind: identity.Human, ClassQualified: true}}, EligibleGroups: []string{"dev-team"}, GroupsAtIssueQualified: true, GroupMaxAge: time.Minute, RequireRecordingApproval: true}
-	f.svc.Approvals = fixedApprovalSettings{policy: policy}
-	r, err := f.svc.PreviewComposition(ctx, f.source(t, ctx), f.compositionIntent(networkComposition()))
-	if err != nil || r.Plan.Approval == nil || r.Plan.Approval.Reasons[0].Code != planning.ReasonRecordingApproval || r.Plan.Approval.ObservationLimits != nil {
-		t.Fatal("installation requirement not applied", err)
-	}
-	// A failing settings read refuses the preview rather than skipping it.
-	f.svc.Approvals = fixedApprovalSettings{err: identity.ErrUnavailable}
-	if _, err = f.svc.PreviewComposition(ctx, f.source(t, ctx), f.compositionIntent(networkComposition())); err == nil {
-		t.Fatal("unavailable approval settings ignored")
-	}
-	// Without the switch the metadata plan needs no approval, and a
-	// result-access instruction on it is invalid.
-	policy.RequireRecordingApproval = false
-	f.svc.Approvals = fixedApprovalSettings{policy: policy}
+	// A metadata plan needs no approval, and a result-access instruction on
+	// it is invalid.
 	f.svc.Grants = &fakeGrants{}
-	r, err = f.svc.PreviewComposition(ctx, f.source(t, ctx), f.compositionIntent(networkComposition()))
+	r, err := f.svc.PreviewComposition(ctx, f.source(t, ctx), f.compositionIntent(networkComposition()))
 	if err != nil || r.Plan.Approval != nil {
 		t.Fatal(err)
 	}
@@ -146,45 +122,6 @@ func TestRecorderApprovalSettingsAndResultAccess(t *testing.T) {
 	}
 	if _, err = f.request(t, r.Preview, "k"); !errors.Is(err, value.ErrRecorderUnavailable) {
 		t.Fatal(err)
-	}
-}
-
-func TestRecordingApprovalSettingsChangeRequiresFreshReview(t *testing.T) {
-	for _, original := range []bool{false, true} {
-		t.Run(map[bool]string{false: "approval-now-required", true: "approval-no-longer-required"}[original], func(t *testing.T) {
-			f := newInvestigationFixture()
-			ctx := context.Background()
-			policy := identity.Policy{Revision: identity.Revision{UID: "identity", Generation: 1, Digest: [32]byte{1}}, Issuer: f.actor.Issuer, ObservedAt: f.now, FreshUntil: f.now.Add(30 * time.Second), Clients: []identity.Client{{ID: "console", Kind: identity.Human, ClassQualified: true}}, EligibleGroups: []string{"dev-team"}, GroupsAtIssueQualified: true, GroupMaxAge: time.Minute, RequireRecordingApproval: original}
-			f.svc.Approvals = fixedApprovalSettings{policy: policy}
-			preview, err := f.svc.PreviewComposition(ctx, f.source(t, ctx), f.compositionIntent(networkComposition()))
-			if err != nil {
-				t.Fatal(err)
-			}
-			policy.RequireRecordingApproval = !original
-			f.svc.Approvals = fixedApprovalSettings{policy: policy}
-			if _, err = f.request(t, preview.Preview, "changed-settings"); !errors.Is(err, value.ErrChanged) || f.admissions.Load() != 0 {
-				t.Fatal("changed administrator requirement did not require new review", err)
-			}
-		})
-	}
-}
-
-func TestRecorderSubmissionRejectsAnotherIssuersApprovalSettings(t *testing.T) {
-	f := newInvestigationFixture()
-	ctx := context.Background()
-	p, err := f.svc.PreviewComposition(ctx, f.source(t, ctx), f.compositionIntent(networkComposition()))
-	if err != nil {
-		t.Fatal(err)
-	}
-	// A complete, fresh policy for another issuer cannot supply this issuer's
-	// administrator settings, even if its switch agrees with the frozen plan.
-	policy := identity.Policy{Revision: identity.Revision{UID: "other-policy", Generation: 1, Digest: [32]byte{1}}, Issuer: "https://other.example.invalid", ObservedAt: f.now, FreshUntil: f.now.Add(30 * time.Second), Clients: []identity.Client{{ID: "console", Kind: identity.Human, ClassQualified: true}}, EligibleGroups: []string{"dev-team"}, GroupsAtIssueQualified: true, GroupMaxAge: time.Minute}
-	if policy.Validate(f.now) != nil {
-		t.Fatal("fixture policy is invalid")
-	}
-	f.svc.Approvals = fixedApprovalSettings{policy: policy}
-	if _, err = f.request(t, p.Preview, "other-issuer"); !errors.Is(err, value.ErrUnavailable) || f.admissions.Load() != 0 {
-		t.Fatal("foreign settings supplied approval authority", err)
 	}
 }
 

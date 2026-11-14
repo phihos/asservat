@@ -1,10 +1,11 @@
 package capture
 
 import (
-	"asservat.local/asservat/internal/domain/authorization"
 	"context"
 	"testing"
 	"time"
+
+	"asservat.local/asservat/internal/domain/authorization"
 )
 
 type recordingLiveAccepted struct {

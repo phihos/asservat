@@ -1,7 +1,6 @@
 package capture
 
 import (
-	compiler "asservat.local/asservat/internal/application/planning"
 	"context"
 	"encoding/json"
 	"errors"
@@ -9,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"asservat.local/asservat/internal/domain/identity"
+	compiler "asservat.local/asservat/internal/application/planning"
 
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
@@ -52,23 +51,22 @@ func TestMixedCompositionPreviewsAsGroup(t *testing.T) {
 	f.target.ExecutionClass, f.cap.ExecutionClass = artifact.ContextAPIExecution, artifact.ContextAPIExecution
 	f.svc.Recorders, f.svc.Filters = bothRecorders{availableRecording{f}}, &stubFilters{}
 	f.svc.ReportPreviewFailure = func(stage string) { t.Log("stage", stage) }
-	f.svc.Approvals = fixedApprovalSettings{policy: identity.Policy{Revision: identity.Revision{UID: "identity", Generation: 1, Digest: [32]byte{1}}, Issuer: f.actor.Issuer, ObservedAt: f.now, FreshUntil: f.now.Add(30 * time.Second), Clients: []identity.Client{{ID: "console", Kind: identity.Human, ClassQualified: true}}, EligibleGroups: []string{"dev-team"}, GroupsAtIssueQualified: true, GroupMaxAge: time.Minute, RequireRecordingApproval: true}}
 	r, err := f.svc.PreviewComposition(t.Context(), f.source(t, t.Context()), f.compositionIntent(mixedComposition()))
 	if err != nil {
 		t.Fatal(err, errors.Unwrap(err))
 	}
 	g := r.Preview.CompositionGroup
-	if r.Plan.Approval == nil || !r.Recordable || g == nil || len(g.Children) != 2 || len(r.Plan.Actions) != 2 || len(r.Assessment.Actions) != 2 || g.Children[0].ScopeDigest == g.Children[1].ScopeDigest {
+	if r.Plan.Approval != nil || !r.Recordable || g == nil || len(g.Children) != 2 || len(r.Plan.Actions) != 2 || len(r.Assessment.Actions) != 2 || g.Children[0].ScopeDigest == g.Children[1].ScopeDigest {
 		t.Fatalf("group preview %+v", r.Preview.CompositionGroup)
 	}
 }
 
 func TestLogsAndMetadataRecordersShareOneGroupReview(t *testing.T) {
 	for _, mode := range []struct {
-		name                string
-		required, sensitive bool
-	}{{name: "ordinary"}, {name: "protected", required: true}, {name: "authored-sensitive", sensitive: true}} {
-		required, reviewed := mode.required, mode.required || mode.sensitive
+		name      string
+		sensitive bool
+	}{{name: "ordinary"}, {name: "authored-sensitive", sensitive: true}} {
+		reviewed := mode.sensitive
 		t.Run(mode.name, func(t *testing.T) {
 			f := newInvestigationFixture()
 			admission := &logsGroupAdmission{retainedRecording: &retainedRecording{investigationFixture: f}}
@@ -77,7 +75,6 @@ func TestLogsAndMetadataRecordersShareOneGroupReview(t *testing.T) {
 			f.target.ExecutionClass, f.cap.ExecutionClass = artifact.ContextAPIExecution, artifact.ContextAPIExecution
 			f.svc.Recorders, f.svc.Filters = bothRecorders{availableRecording{f}}, &stubFilters{}
 			f.svc.ReportPreviewFailure = func(stage string) { t.Log("stage", stage) }
-			f.svc.Approvals = fixedApprovalSettings{policy: identity.Policy{Revision: identity.Revision{UID: "identity", Generation: 1, Digest: [32]byte{1}}, Issuer: f.actor.Issuer, ObservedAt: f.now, FreshUntil: f.now.Add(30 * time.Second), Clients: []identity.Client{{ID: "console", Kind: identity.Human, ClassQualified: true}}, EligibleGroups: []string{"dev-team"}, GroupsAtIssueQualified: true, GroupMaxAge: time.Minute, RequireRecordingApproval: required}}
 			c := mixedComposition()
 			c.MaxTotalBytes = 64 << 20
 			c.Components = append(c.Components, planning.ProfileComponent{ID: "logs", Profile: planning.ProfileRef{Catalog: "builtin", Name: "finite-logs", Version: "v1"}})
@@ -161,7 +158,6 @@ func TestArgumentCompositionGroupRefusedBeforePersistence(t *testing.T) {
 			f.target.ExecutionClass, f.cap.ExecutionClass = artifact.ContextAPIExecution, artifact.ContextAPIExecution
 			f.svc.Recorders, f.svc.Filters = bothRecorders{availableRecording{f}}, &approvalArgumentCompiler{}
 			f.svc.ReportPreviewFailure = func(stage string) { t.Log("stage", stage) }
-			f.svc.Approvals = fixedApprovalSettings{policy: identity.Policy{Revision: identity.Revision{UID: "identity", Generation: 1, Digest: [32]byte{1}}, Issuer: f.actor.Issuer, ObservedAt: f.now, FreshUntil: f.now.Add(30 * time.Second), Clients: []identity.Client{{ID: "console", Kind: identity.Human, ClassQualified: true}}, EligibleGroups: []string{"dev-team"}, GroupsAtIssueQualified: true, GroupMaxAge: time.Minute, RequireRecordingApproval: true}}
 			raw, err := os.ReadFile("../planning/profiles/syscall-activity-v1.json")
 			if err != nil {
 				t.Fatal(err)

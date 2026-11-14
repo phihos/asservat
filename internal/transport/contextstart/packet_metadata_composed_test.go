@@ -147,7 +147,7 @@ func (f *packetMetadataFixture) AdmitReviewedContext(context.Context, string, ca
 }
 func (f *packetMetadataFixture) IdentityPolicy(_ context.Context, issuer string) (identity.Policy, error) {
 	now := time.Now()
-	return identity.Policy{Revision: identity.Revision{UID: "identity", Generation: 1, Digest: artifact.Digest{1}}, Issuer: issuer, ObservedAt: now, FreshUntil: now.Add(30 * time.Second), Clients: []identity.Client{{ID: "console", Kind: identity.Human, ClassQualified: true}}, EligibleGroups: []string{"developers"}, GroupsAtIssueQualified: true, GroupMaxAge: time.Minute, RequireRecordingApproval: true}, nil
+	return identity.Policy{Revision: identity.Revision{UID: "identity", Generation: 1, Digest: artifact.Digest{1}}, Issuer: issuer, ObservedAt: now, FreshUntil: now.Add(30 * time.Second), Clients: []identity.Client{{ID: "console", Kind: identity.Human, ClassQualified: true}}}, nil
 }
 func (f *packetMetadataFixture) Request(context.Context, identities.CurrentIdentity, authapp.GrantRequestInput) (auth.Grant, bool, error) {
 	return auth.Grant{}, false, errors.New("test must use its existing covering grant")
@@ -308,7 +308,7 @@ func newPacketMetadataFixture(t *testing.T) *packetMetadataFixture {
 		router.Close()
 	})
 	targetPort := Targets{Router: router, Now: time.Now}
-	f.svc = captureapp.ContextInvestigation{RootID: f.channel.RootID, InstallationID: f.channel.Hub.InstallationID, Previews: f, Replay: f, Admission: f, Targets: targetPort, Recorders: targetPort, Eligibility: authapp.Evaluator{Permissions: f, Now: time.Now}, Capabilities: f, Retention: f, Storage: f, Processing: f, Approvals: f, Grants: f, Lifetime: 120 * time.Second, Now: time.Now, NewID: func() string { return metadataID(100 + int(f.ids.Add(1))) }, ReportPreviewFailure: func(s string) { f.stages = append(f.stages, s) }}
+	f.svc = captureapp.ContextInvestigation{RootID: f.channel.RootID, InstallationID: f.channel.Hub.InstallationID, Previews: f, Replay: f, Admission: f, Targets: targetPort, Recorders: targetPort, Eligibility: authapp.Evaluator{Permissions: f, Now: time.Now}, Capabilities: f, Retention: f, Storage: f, Processing: f, Grants: f, Lifetime: 120 * time.Second, Now: time.Now, NewID: func() string { return metadataID(100 + int(f.ids.Add(1))) }, ReportPreviewFailure: func(s string) { f.stages = append(f.stages, s) }}
 	return f
 }
 

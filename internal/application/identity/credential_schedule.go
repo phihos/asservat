@@ -9,13 +9,13 @@ import (
 // CredentialWindow schedules token work; it never grants identity or evidence
 // authority. The protected policy and verified token supplied all of its dates.
 type CredentialWindow struct {
-	IssuedAt, TokenExpiresAt, GroupsExpireAt time.Time
-	Policy                                   value.Revision
-	ObservedAt, FreshUntil                   time.Time
+	IssuedAt, TokenExpiresAt time.Time
+	Policy                   value.Revision
+	ObservedAt, FreshUntil   time.Time
 }
 
 func (w CredentialWindow) Valid(now time.Time) bool {
-	return w.Policy.Valid() && !w.IssuedAt.IsZero() && !w.IssuedAt.After(now) && w.TokenExpiresAt.After(w.IssuedAt) && w.GroupsExpireAt.After(w.IssuedAt) && !w.GroupsExpireAt.After(w.IssuedAt.Add(5*time.Minute)) && now.Before(w.TokenExpiresAt) && now.Before(w.GroupsExpireAt) && value.Fresh(w.ObservedAt, w.FreshUntil, now, value.AuthorityRecheckInterval)
+	return w.Policy.Valid() && !w.IssuedAt.IsZero() && !w.IssuedAt.After(now) && w.TokenExpiresAt.After(w.IssuedAt) && now.Before(w.TokenExpiresAt) && value.Fresh(w.ObservedAt, w.FreshUntil, now, value.AuthorityRecheckInterval)
 }
 
 // RefreshAt is deterministic for this credential/policy. A short authorization
@@ -23,14 +23,8 @@ func (w CredentialWindow) Valid(now time.Time) bool {
 // already scheduled time for the same credential version.
 func (w CredentialWindow) RefreshAt(end time.Time) time.Time {
 	due := value.Earlier(w.IssuedAt.Add(time.Minute), end)
-	for _, deadline := range []time.Time{w.TokenExpiresAt, w.GroupsExpireAt} {
-		lead := deadline.Sub(w.IssuedAt) / 2
-		if lead > 15*time.Second {
-			lead = 15 * time.Second
-		}
-		due = value.Earlier(due, deadline.Add(-lead))
-	}
-	return due
+	lead := min(w.TokenExpiresAt.Sub(w.IssuedAt)/2, 15*time.Second)
+	return value.Earlier(due, w.TokenExpiresAt.Add(-lead))
 }
 
 type CredentialObservation struct {

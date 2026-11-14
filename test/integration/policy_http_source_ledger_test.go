@@ -112,8 +112,7 @@ func TestHTTPSourceLedgerWithRealServices(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				settings := identity.Policy{Revision: identity.Revision{UID: "synthetic-settings", Generation: 1, Digest: [32]byte{1}}, Issuer: accepted.Authority.Creator.Issuer, ObservedAt: n, FreshUntil: n.Add(5 * time.Second), Clients: []identity.Client{{ID: accepted.Authority.Creator.ClientID, Kind: identity.Human, ClassQualified: true}}, EligibleGroups: []string{"maintainers"}, GroupsAtIssueQualified: true, GroupMaxAge: time.Minute}
-				return captureapp.PolicySourceCheck{Policy: accepted.Compiled, Authority: accepted.Authority, Target: target, Node: targets.PacketSourceObservation{PodUID: target.Pin.UID, NodeUID: nodeID, BootID: bootID, CollectorPodUID: collectorID, CollectorEpoch: epoch, ObservedAt: n, FreshUntil: n.Add(5 * time.Second)}, Retention: resolved, Settings: settings, SourceID: sourceID, Fence: fence, BytesPerSecond: 4 << 20, SourceSlots: 4, ObservedAt: n, ValidUntil: n.Add(5 * time.Second)}
+				return captureapp.PolicySourceCheck{Policy: accepted.Compiled, Authority: accepted.Authority, Target: target, Node: targets.PacketSourceObservation{PodUID: target.Pin.UID, NodeUID: nodeID, BootID: bootID, CollectorPodUID: collectorID, CollectorEpoch: epoch, ObservedAt: n, FreshUntil: n.Add(5 * time.Second)}, Retention: resolved, SourceID: sourceID, Fence: fence, BytesPerSecond: 4 << 20, SourceSlots: 4, ObservedAt: n, ValidUntil: n.Add(5 * time.Second)}
 			}
 			in := fresh()
 			in.Initial = true

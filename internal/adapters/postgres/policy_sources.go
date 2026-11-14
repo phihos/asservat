@@ -64,7 +64,7 @@ func sourceCheckCurrent(in app.PolicySourceCheck, now time.Time) bool {
 		!compiler.RawBytePredicate(p.Action.Filter) && in.Authority.Valid(now) &&
 		in.Target.ExecutionClass == artifact.ContextAPIExecution && in.Target.Valid(now) && in.Node.Valid(now) &&
 		in.Target.Request.ClusterID == in.Authority.ClusterID && in.Target.Request.Namespace.UID == in.Authority.NamespaceUID && in.Target.Request.Workload.UID == in.Authority.WorkloadUID &&
-		in.Target.Request.PodUID == in.Node.PodUID && in.Settings.Validate(now) == nil &&
+		in.Target.Request.PodUID == in.Node.PodUID &&
 		identity.Fresh(in.ObservedAt, in.ValidUntil, now, 5*time.Second) && now.Before(in.Retention.ValidUntil) && in.Retention.Target == in.Target.Target() && in.Retention.Proof.Valid(now) &&
 		authorization.UUID(in.SourceID) && authorization.UUID(in.Fence) && in.BytesPerSecond > 0 && in.BytesPerSecond <= collector.MaxInputRate && in.SourceSlots > 0 && in.SourceSlots <= collector.MaxActiveSources &&
 		in.InitialCredit >= 0 && in.ExpectedCredit >= 0 && in.AdditionalCredit >= 0 && in.ExpectedCredit <= math.MaxInt64-in.AdditionalCredit &&
@@ -86,7 +86,6 @@ func (s *PolicySources) AdmitSource(ctx context.Context, in app.PolicySourceChec
 	narrow("target", in.Target.FreshUntil)
 	narrow("node", in.Node.FreshUntil)
 	narrow("retention", in.Retention.ValidUntil)
-	narrow("settings", in.Settings.FreshUntil)
 	call, end := context.WithDeadline(ctx, until)
 	defer end()
 	var cutoff *time.Timer
@@ -127,7 +126,7 @@ func (s *PolicySources) AdmitSource(ctx context.Context, in app.PolicySourceChec
 			return err
 		}
 		a := accepted.Authority
-		if !reflect.DeepEqual(a, in.Authority) || in.Settings.Issuer != a.Creator.Issuer || app.RecorderPolicyScopeDigest(a.PolicyUID, record.IntentVersion, policySource(policy).CollectionDigest, in.Policy, a.NamespaceUID, a.WorkloadUID, a.Delegation, a.Owners, a.Actions, a.Limits) != a.ScopeDigest {
+		if !reflect.DeepEqual(a, in.Authority) || app.RecorderPolicyScopeDigest(a.PolicyUID, record.IntentVersion, policySource(policy).CollectionDigest, in.Policy, a.NamespaceUID, a.WorkloadUID, a.Delegation, a.Owners, a.Actions, a.Limits) != a.ScopeDigest {
 			return value.ErrChanged
 		}
 		step = "projection"
@@ -173,7 +172,7 @@ func (s *PolicySources) AdmitSource(ctx context.Context, in app.PolicySourceChec
 		http := policySourceHTTP(in.Recorder())
 		// An ordinary require-all review is checked without consuming a raw-byte
 		// grant pool. A changed attachment cannot refill this source's input credit.
-		if http || in.Settings.RequireRecordingApproval || policy.AuthoredGrantRef != "" {
+		if http || policy.AuthoredGrantRef != "" {
 			if !policy.GrantAttachmentID.Valid {
 				return value.ErrDenied
 			}

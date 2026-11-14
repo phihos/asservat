@@ -118,23 +118,28 @@
 {{- toJson (dict "format" "asservat-owner-worker-trust/v1" "controls" list) -}}
 {{- end -}}
 
-{{/* browser.json (contracts.BrowserSettings): rootID and sessionEpoch come
-     from the <name>-ids Secret in the reader. */}}
+{{/* browser.json (contracts.BrowserSettings). */}}
 {{- define "asservat.hubApi.browserSettings" -}}
 {{- $i := .Values.identity -}}
 {{- $id := fromJson (include "asservat.hubApi.identity" .) -}}
-{{- toJson (dict "schemaVersion" "browser-settings/v1" "revision" (int .Release.Revision) "issuer" (required "identity.issuer is required" $id.issuer) "clientID" (required "identity.clientID is required" $id.clientID) "origin" .Values.origin "suspended" false
-  "maxLifetimeSeconds" (int $i.maxLifetimeSeconds) "maxLogins" (int $i.maxLogins) "maxSessions" (int $i.maxSessions) "maxLogoutEvents" (int $i.maxLogoutEvents)) -}}
+{{- toJson (dict "schemaVersion" "browser-settings/v1" "issuer" (required "identity.issuer is required" $id.issuer) "clientID" (required "identity.clientID is required" $id.clientID) "origin" .Values.origin
+  "maxLifetimeSeconds" (int $i.maxLifetimeSeconds) "inactivityTimeoutSeconds" (int $i.inactivityTimeoutSeconds)) -}}
 {{- end -}}
 
 {{/* identity.json (contracts.IdentitySettings). Without identity.clients the
-     console client is the one human client. */}}
+     console client is the one human client. Bundled Keycloak defaults the
+     administrators to its /asservat-administrators group. */}}
 {{- define "asservat.hubApi.identitySettings" -}}
 {{- $i := .Values.identity -}}
 {{- $id := fromJson (include "asservat.hubApi.identity" .) -}}
-{{- if and (empty $i.eligibleSubjects) (empty $i.eligibleGroups) (ne .Values.services.identity.provider "keycloak") }}{{ fail "identity.eligibleSubjects or identity.eligibleGroups is required when origin is set" }}{{ end -}}
 {{- $clients := default (list (dict "id" $id.clientID "kind" "human" "classQualified" true)) $i.clients -}}
-{{- $out := dict "schemaVersion" "identity-settings/v1" "revision" (int .Release.Revision) "issuer" $id.issuer "clients" $clients "eligibleSubjects" (default list $i.eligibleSubjects) "eligibleGroups" (default list $i.eligibleGroups) "groupsAtIssueQualified" true "groupMaxAgeSeconds" (int $i.groupMaxAgeSeconds) -}}
+{{- $admins := dict -}}
+{{- with $i.administrators.groups }}{{ $_ := set $admins "groups" . }}{{ end -}}
+{{- with $i.administrators.subjects }}{{ $_ := set $admins "subjects" . }}{{ end -}}
+{{- if and (empty $admins) (eq .Values.services.identity.provider "keycloak") }}{{ $_ := set $admins "groups" (list "/asservat-administrators") }}{{ end -}}
+{{- if empty $admins }}{{ fail "identity.administrators.groups or identity.administrators.subjects is required" }}{{ end -}}
+{{- $out := dict "schemaVersion" "identity-settings/v1" "issuer" $id.issuer "clients" $clients "groupsClaim" (default "groups" $i.groupsClaim) "usernameClaim" (default "preferred_username" $i.usernameClaim) "administrators" $admins -}}
+{{- with $i.requiredGroups }}{{ $_ := set $out "requiredGroups" . }}{{ end -}}
 {{- with $i.approvals }}{{ $_ := set $out "approvals" . }}{{ end -}}
 {{- $admins := dict -}}
 {{- with $i.administrators }}{{ with .groups }}{{ $_ := set $admins "groups" . }}{{ end }}{{ with .subjects }}{{ $_ := set $admins "subjects" . }}{{ end }}{{ end -}}

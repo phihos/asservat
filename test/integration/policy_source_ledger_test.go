@@ -82,7 +82,7 @@ func TestPolicySourceLedgerWithRealPostgres(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				policy := identity.Policy{Revision: identity.Revision{UID: "synthetic-settings", Generation: 1, Digest: [32]byte{1}}, Issuer: accepted.Authority.Creator.Issuer, ObservedAt: n, FreshUntil: n.Add(5 * time.Second), Clients: []identity.Client{{ID: accepted.Authority.Creator.ClientID, Kind: identity.Human, ClassQualified: true}}, EligibleGroups: []string{"maintainers"}, GroupsAtIssueQualified: true, GroupMaxAge: time.Minute}
+				policy := identity.Policy{Revision: identity.Revision{UID: "synthetic-settings", Generation: 1, Digest: [32]byte{1}}, Issuer: accepted.Authority.Creator.Issuer, ObservedAt: n, FreshUntil: n.Add(5 * time.Second), Clients: []identity.Client{{ID: accepted.Authority.Creator.ClientID, Kind: identity.Human, ClassQualified: true}}}
 				node := targets.PacketSourceObservation{PodUID: target.Pin.UID, NodeUID: custodyID(), BootID: custodyID(), CollectorPodUID: custodyID(), CollectorEpoch: custodyID(), ObservedAt: n, FreshUntil: n.Add(5 * time.Second)}
 				if old.Permit.Binding.SourceID != "" {
 					node.NodeUID = old.Permit.Binding.NodeUID
@@ -119,7 +119,7 @@ func TestPolicySourceLedgerWithRealPostgres(t *testing.T) {
 					}
 					t.Logf("source_accepted_readable=%t", readErr == nil)
 					scopeMatches := readErr == nil && captureapp.RecorderPolicyScopeDigest(diagnosticAuthority.PolicyUID, persisted.IntentVersion, accepted.Source.CollectionDigest, accepted.Compiled, diagnosticAuthority.NamespaceUID, diagnosticAuthority.WorkloadUID, diagnosticAuthority.Delegation, diagnosticAuthority.Owners, diagnosticAuthority.Actions, diagnosticAuthority.Limits) == diagnosticAuthority.ScopeDigest
-					t.Logf("source_accepted_readback authority_exact=%t issued_instant=%t expiry_instant=%t current_scope=%t issuer=%t", readErr == nil && reflect.DeepEqual(diagnosticAuthority, accepted.Authority), readErr == nil && diagnosticAuthority.IssuedAt.Equal(originalCheck.Authority.IssuedAt), readErr == nil && diagnosticAuthority.NotAfter.Equal(originalCheck.Authority.NotAfter), scopeMatches, readErr == nil && originalCheck.Settings.Issuer == diagnosticAuthority.Creator.Issuer)
+					t.Logf("source_accepted_readback authority_exact=%t issued_instant=%t expiry_instant=%t current_scope=%t", readErr == nil && reflect.DeepEqual(diagnosticAuthority, accepted.Authority), readErr == nil && diagnosticAuthority.IssuedAt.Equal(originalCheck.Authority.IssuedAt), readErr == nil && diagnosticAuthority.NotAfter.Equal(originalCheck.Authority.NotAfter), scopeMatches)
 
 					topology, topologyErr := s.retention.topology.RetentionTopology(diagnosticCtx, diagnosticAuthority.ClusterID)
 					if topologyErr != nil {

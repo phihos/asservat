@@ -68,6 +68,12 @@ func newPublicIdentity(ctx context.Context, in *ownerInputs, files *providerInpu
 	if e != nil {
 		return fail(mounts.ErrUnavailable)
 	}
+	// The groups claim name is fixed for this process; a settings change
+	// rolls hub-api (the Deployment carries the settings checksum).
+	identitySettings, e := policies.IdentityPolicy(ctx, settings.Issuer)
+	if e != nil {
+		return fail(mounts.ErrUnavailable)
+	}
 	secret, e := mounts.Read(ctx, files.files, contracts.OwnerPublicClientSecretFile, 4096)
 	if e != nil {
 		return fail(mounts.ErrUnavailable)
@@ -77,7 +83,7 @@ func newPublicIdentity(ctx context.Context, in *ownerInputs, files *providerInpu
 	// The Keycloak profile (ADR-053) fixes these issuer-relative endpoints.
 	issuer := strings.TrimSuffix(settings.Issuer, "/")
 	trust := func(audience string) oidc.Trust {
-		return oidc.Trust{Issuer: settings.Issuer, Audience: audience, JWKSURL: issuer + "/protocol/openid-connect/certs", Profile: oidc.Keycloak, RootCA: pemRoots(p.ProviderRoots), KeyMaxAge: time.Minute}
+		return oidc.Trust{Issuer: settings.Issuer, Audience: audience, JWKSURL: issuer + "/protocol/openid-connect/certs", GroupsClaim: identitySettings.GroupsClaim, Profile: oidc.Keycloak, RootCA: pemRoots(p.ProviderRoots), KeyMaxAge: time.Minute}
 	}
 	provider, e := oidc.NewBrowser(oidc.BrowserTrust{Access: trust(p.BrowserAudience), ClientID: settings.ClientID, ClientSecret: clientSecret, AuthorizationEndpoint: issuer + "/protocol/openid-connect/auth", TokenEndpoint: issuer + "/protocol/openid-connect/token", RedirectURI: p.Origin + "/auth/callback", Scopes: publicIdentityScopes}, time.Now)
 	if e != nil {

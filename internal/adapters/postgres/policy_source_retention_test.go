@@ -48,8 +48,7 @@ func sourceRetentionCheckFixture(t *testing.T, maximum, deletion int64) (capture
 	if err != nil {
 		t.Fatal("actual retention resolver", err)
 	}
-	settings := identity.Policy{Revision: revision, Issuer: a.Creator.Issuer, ObservedAt: now, FreshUntil: now.Add(5 * time.Second), Clients: []identity.Client{{ID: a.Creator.ClientID, Kind: identity.Human, ClassQualified: true}}, EligibleGroups: []string{"team"}, GroupsAtIssueQualified: true, GroupMaxAge: time.Minute}
-	return captureapp.PolicySourceCheck{Policy: p, Authority: a, Target: target, Node: targets.PacketSourceObservation{PodUID: target.Pin.UID, NodeUID: preview.ID, BootID: preview.ID, CollectorPodUID: preview.ID, CollectorEpoch: preview.ID, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}, Retention: retention, Settings: settings, SourceID: preview.ID, Fence: preview.ID, BytesPerSecond: 1 << 20, SourceSlots: 1, Initial: true, InitialCredit: 1 << 20, ObservedAt: now, ValidUntil: now.Add(5 * time.Second)}, now
+	return captureapp.PolicySourceCheck{Policy: p, Authority: a, Target: target, Node: targets.PacketSourceObservation{PodUID: target.Pin.UID, NodeUID: preview.ID, BootID: preview.ID, CollectorPodUID: preview.ID, CollectorEpoch: preview.ID, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}, Retention: retention, SourceID: preview.ID, Fence: preview.ID, BytesPerSecond: 1 << 20, SourceSlots: 1, Initial: true, InitialCredit: 1 << 20, ObservedAt: now, ValidUntil: now.Add(5 * time.Second)}, now
 }
 
 func TestPolicySourceRingFitsEffectiveContentRetention(t *testing.T) {

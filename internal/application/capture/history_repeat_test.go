@@ -1,14 +1,15 @@
 package capture
 
 import (
-	"asservat.local/asservat/internal/domain/artifact"
-	"asservat.local/asservat/internal/domain/authorization"
-	value "asservat.local/asservat/internal/domain/capture"
-	"asservat.local/asservat/internal/domain/planning"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"testing"
+
+	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/authorization"
+	value "asservat.local/asservat/internal/domain/capture"
+	"asservat.local/asservat/internal/domain/planning"
 )
 
 func historyRecordingFixture(t *testing.T) (*investigationFixture, ContextHistoryService, *historyReaderFixture) {

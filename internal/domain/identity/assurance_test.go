@@ -25,12 +25,10 @@ func TestStepUpAssurance(t *testing.T) {
 		"other acr":        func(c *Claims, _ *Policy) { c.ACR = "silver" },
 		"too old":          func(c *Claims, _ *Policy) { c.AuthTime = now.Add(-6 * time.Minute) },
 		"no auth_time":     func(c *Claims, _ *Policy) { c.AuthTime = time.Time{} },
-		"no policy":        func(_ *Claims, p *Policy) { p.StepUp = StepUpPolicy{} },
 		"future auth_time": func(c *Claims, _ *Policy) { c.AuthTime = now.Add(time.Second) },
 		"no acr":           func(c *Claims, _ *Policy) { c.ACR = "" },
 		"workload identity": func(_ *Claims, p *Policy) {
 			p.Clients = []Client{{"console", Workload, true}}
-			p.EligibleSubjects = []Subject{{"developer", Workload}}
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -43,11 +41,23 @@ func TestStepUpAssurance(t *testing.T) {
 			}
 		})
 	}
-	for _, bad := range []StepUpPolicy{{ACRValues: []string{"gold"}, MaxAge: time.Second}, {ACRValues: []string{"gold"}, MaxAge: 2 * time.Hour}, {MaxAge: time.Minute}, {ACRValues: []string{"a", "a"}, MaxAge: time.Minute}} {
+	for _, bad := range []StepUpPolicy{{ACRValues: []string{"gold"}}, {MaxAge: time.Minute}, {ACRValues: []string{"a", "a"}, MaxAge: time.Minute}} {
 		pp := p
 		pp.StepUp = bad
 		if pp.Validate(now) == nil {
 			t.Fatal("invalid step-up policy accepted", bad)
 		}
+	}
+}
+
+func TestNoConfiguredStepUpAdmitsApprovals(t *testing.T) {
+	c, p, now := fixture()
+	i, err := Admit(c, p, now)
+	if err != nil || !i.SteppedUp(now) || !i.Assurance.StepUpUntil.Equal(i.ValidUntil) {
+		t.Fatal("approval needs no step-up when none is configured", err)
+	}
+	p.Clients[0].Kind = Workload
+	if i, err = Admit(c, p, now); err != nil || i.SteppedUp(now) {
+		t.Fatal("workload identity approved", err)
 	}
 }

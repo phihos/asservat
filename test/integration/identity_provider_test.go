@@ -390,7 +390,7 @@ func TestKeycloakProvider(t *testing.T) {
 	service := f.tokens(f.Issuer+"/protocol/openid-connect/token", url.Values{"grant_type": {"client_credentials"}, "client_id": {"automation"}, "client_secret": {secret}}, 200)
 	serviceClaims := check(service.Access)
 	now := time.Now()
-	policy := identity.Policy{Revision: identity.Revision{UID: "fixture-policy", Generation: 1, Digest: [32]byte{1}}, Issuer: f.Issuer, ObservedAt: now, FreshUntil: now.Add(30 * time.Second), Clients: []identity.Client{{ID: "console", Kind: identity.Human, ClassQualified: true}, {ID: "automation", Kind: identity.Workload, ClassQualified: true}}, EligibleSubjects: []identity.Subject{{ID: userID, Kind: identity.Human}, {ID: serviceClaims.Subject, Kind: identity.Workload}}, GroupsAtIssueQualified: true, GroupMaxAge: 5 * time.Minute}
+	policy := identity.Policy{Revision: identity.Revision{UID: "fixture-policy", Generation: 1, Digest: [32]byte{1}}, Issuer: f.Issuer, ObservedAt: now, FreshUntil: now.Add(30 * time.Second), Clients: []identity.Client{{ID: "console", Kind: identity.Human, ClassQualified: true}, {ID: "automation", Kind: identity.Workload, ClassQualified: true}}}
 	for _, c := range []identity.Claims{claims, serviceClaims} {
 		resolved, err := identity.Admit(c, policy, time.Now())
 		if err != nil || c.ClientID == "automation" && resolved.Principal.Kind != identity.Workload || c.ClientID == "console" && resolved.Principal.Kind != identity.Human {

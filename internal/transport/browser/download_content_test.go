@@ -32,7 +32,7 @@ func (f *contentCredentialFixture) ObserveCredential(ctx context.Context, token 
 	}
 	p := identity.Revision{UID: "policy", Generation: 1, Digest: [32]byte{1}}
 	i := identity.Identity{Principal: identity.Principal{Issuer: f.issuer, Subject: "developer", ClientID: "native-client", Kind: identity.Human}, Policy: p, Scopes: []string{"evidence:read", "evidence:download"}, VerifiedAt: f.now, ValidUntil: f.now.Add(5 * time.Second)}
-	return identities.CredentialObservation{Identity: i, Window: identities.CredentialWindow{IssuedAt: f.now, TokenExpiresAt: f.now.Add(time.Minute), GroupsExpireAt: f.now.Add(30 * time.Second), Policy: p, ObservedAt: f.now, FreshUntil: i.ValidUntil}}, ctx.Err()
+	return identities.CredentialObservation{Identity: i, Window: identities.CredentialWindow{IssuedAt: f.now, TokenExpiresAt: f.now.Add(time.Minute), Policy: p, ObservedAt: f.now, FreshUntil: i.ValidUntil}}, ctx.Err()
 }
 func (f *contentCredentialFixture) Resolve(ctx context.Context, token string) (identity.Identity, error) {
 	v, e := f.ObserveCredential(ctx, token)

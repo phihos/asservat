@@ -98,9 +98,7 @@ func newPublicHandler(ctx context.Context, d *OwnerDeployment, a publicAuditStor
 		return nil, &fixedStepError{"audit-resolution", mounts.ErrUnavailable}
 	}
 
-	// ADR-249: the protected identity settings carry the approval settings
-	// (step-up and the installation's recording-approval switch).
-	pc.investigation.Approvals = id.mcp.Policies
+	// ADR-335 D14: identity.administrators names the installation administrators.
 	pc.administrators = id.mcp.Policies
 	ongoingSources := pc.packetSourceRuntime(time.Now, ownerRandomID)
 	operations, err := NewPublicContextOperations(PublicContextOperationsConfig{RootID: root, InstallationID: installation, PublicOrigin: p.Origin, CollectionEnabled: true, Now: time.Now, NewID: ownerRandomID},

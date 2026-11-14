@@ -145,7 +145,7 @@ func manualRecordingSaveFixture(t *testing.T, ctx context.Context, hub *pgxpool.
 		t.Fatal("accepted source window")
 	}
 	deadline := identity.Earlier(now.Add(min(actionTimeout, recipeTimeout)), fresh.Authority.NotAfter).UTC()
-	request := artifact.SourceSnapshotRequest{SourceBindingDigest: artifact.Digest(source.Target.BindingDigest), SourceID: source.Binding.SourceID, Fence: source.Binding.Fence, SnapshotID: custodyID(), SourceStartedAt: source.StartedAt.UTC(), SourceHardUntil: source.HardUntil.UTC(), T0: now, IssuedAt: now, StartBy: identity.Earlier(fresh.ValidUntil, identity.Earlier(now.Add(5*time.Second), source.HardUntil)).UTC(), ProcessingUntil: deadline, Before: before, After: 0, MaxBytes: maximumBytes, RequireApproval: fresh.Settings.RequireRecordingApproval}
+	request := artifact.SourceSnapshotRequest{SourceBindingDigest: artifact.Digest(source.Target.BindingDigest), SourceID: source.Binding.SourceID, Fence: source.Binding.Fence, SnapshotID: custodyID(), SourceStartedAt: source.StartedAt.UTC(), SourceHardUntil: source.HardUntil.UTC(), T0: now, IssuedAt: now, StartBy: identity.Earlier(fresh.ValidUntil, identity.Earlier(now.Add(5*time.Second), source.HardUntil)).UTC(), ProcessingUntil: deadline, Before: before, After: 0, MaxBytes: maximumBytes}
 	resolution, err := privacy.Resolve(retained, privacy.Input{Target: source.Target.Target(), PrivacyClass: "potentialPersonalData", EvidenceType: "packetCapture", RequestedSeconds: accepted.Compiled.RetentionSeconds, AnchorAt: artifact.SourceSnapshotAnchor(request)}, now)
 	if err != nil {
 		t.Fatal("snapshot source-age retention", err)

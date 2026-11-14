@@ -6,12 +6,14 @@ import "time"
 // of a person's token/session lifetime. Grant issuance/clamping belongs to C-03.
 type PolicyGrantApproval struct{ DefaultAge, MaxAge, RenewalNotice time.Duration }
 
+// Valid keeps MaxAge within one year: the SQL settings row stores it as
+// integer seconds bounded to 31536000.
 func (p PolicyGrantApproval) Valid() bool {
 	return p.DefaultAge >= time.Second && p.MaxAge >= p.DefaultAge && p.MaxAge <= 365*24*time.Hour && p.RenewalNotice >= time.Second && p.RenewalNotice <= p.MaxAge && p.DefaultAge%time.Second == 0 && p.MaxAge%time.Second == 0 && p.RenewalNotice%time.Second == 0
 }
 
 func DefaultPolicyGrantApproval() PolicyGrantApproval {
-	return PolicyGrantApproval{DefaultAge: 7 * 24 * time.Hour, MaxAge: 30 * 24 * time.Hour, RenewalNotice: 24 * time.Hour}
+	return PolicyGrantApproval{DefaultAge: 90 * 24 * time.Hour, MaxAge: 365 * 24 * time.Hour, RenewalNotice: 14 * 24 * time.Hour}
 }
 
 // PolicyGrantSettingsObservation is one protected accepted-settings candidate.

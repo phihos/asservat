@@ -98,10 +98,6 @@ func (s ContextInvestigation) previewCompositionGroup(ctx context.Context, sourc
 	if err != nil {
 		return zero, previewFailure("facts", err)
 	}
-	required, err := s.requireRecordingApproval(ctx, source, i.Principal)
-	if err != nil {
-		return zero, previewFailure("approvals", err)
-	}
 	p := value.ContextPreview{ID: s.NewID(), RootID: s.RootID, InstallationID: s.InstallationID, CaptureID: s.NewID(), CaseID: s.NewID(), OccurrenceID: s.NewID(), ArtifactID: s.NewID(), AttemptID: s.NewID(), AssessmentID: s.NewID(), Actor: i.Principal, Intent: intent, Target: target.Request, Pin: target.Pin, Storage: f.storage.Selection, Retention: retentionReview(f.retention), Audience: slices.Clone(f.eligibility.DefaultAudience), CreatedAt: created, Deadline: created.Add(s.Lifetime), CompositionGroup: &value.CompositionGroupPreview{}}
 	p.Intent.Composition = intent.Composition.Clone()
 	p.ExecutionClass = target.ExecutionClass
@@ -114,7 +110,7 @@ func (s ContextInvestigation) previewCompositionGroup(ctx context.Context, sourc
 			return zero, err
 		}
 		child := value.CompositionGroupChild{CaptureID: s.NewID(), ArtifactID: s.NewID(), AttemptID: s.NewID(), OccurrenceID: s.NewID(), AssessmentID: s.NewID(), Composition: *c.Clone(), Retention: retentionReview(facts[n].retention)}
-		plans[n], err = compiler.CompileRecorder(planning.RecorderInput{CaptureID: child.CaptureID, Executor: p.Actor, Target: target, Composition: c, Retention: facts[n].retention, Deadline: p.Deadline, NodeRecorder: true, RequireApproval: required}, s.Filters, s.Now())
+		plans[n], err = compiler.CompileRecorder(planning.RecorderInput{CaptureID: child.CaptureID, Executor: p.Actor, Target: target, Composition: c, Retention: facts[n].retention, Deadline: p.Deadline, NodeRecorder: true}, s.Filters, s.Now())
 		if errors.As(err, new(compiler.PeerResolutionNeeded)) {
 			// ADR-283 part 2: Kubernetes peers are plan-only; the plan-only
 			// preview resolves them, as for a single recording.
@@ -140,9 +136,9 @@ func (s ContextInvestigation) previewCompositionGroup(ctx context.Context, sourc
 		p.CompositionGroup.Children = append(p.CompositionGroup.Children, child)
 	}
 	// One combined review covers all siblings when any authored action needs
-	// review. Recompile only that mixed case with the existing shared approval
-	// marker; action impact and disclosure rights remain unchanged.
-	if !required && slices.ContainsFunc(plans, func(p planning.RecorderPlan) bool { return p.Approval != nil }) {
+	// review: recompile them with the shared approval marker; action impact and
+	// disclosure rights remain unchanged.
+	if slices.ContainsFunc(plans, func(p planning.RecorderPlan) bool { return p.Approval != nil }) {
 		for n := range plans {
 			input := plans[n].Input
 			input.RequireApproval = true

@@ -27,7 +27,7 @@ func newFixture() (*fixture, Service) {
 	n := time.Date(2026, 10, 9, 12, 0, 0, 0, time.UTC)
 	f := &fixture{now: n}
 	f.c = value.Claims{Issuer: "https://issuer.invalid", Subject: "developer", ClientID: "console", Groups: []string{"team"}, IssuedAt: n.Add(-time.Minute), ExpiresAt: n.Add(time.Minute), KeyUntil: n.Add(20 * time.Second)}
-	f.p = value.Policy{Revision: value.Revision{UID: "policy", Generation: 1, Digest: [32]byte{1}}, Issuer: f.c.Issuer, ObservedAt: n, FreshUntil: n.Add(30 * time.Second), Clients: []value.Client{{ID: "console", Kind: value.Human, ClassQualified: true}}, EligibleGroups: []string{"team"}, GroupsAtIssueQualified: true, GroupMaxAge: 5 * time.Minute}
+	f.p = value.Policy{Revision: value.Revision{UID: "policy", Generation: 1, Digest: [32]byte{1}}, Issuer: f.c.Issuer, ObservedAt: n, FreshUntil: n.Add(30 * time.Second), Clients: []value.Client{{ID: "console", Kind: value.Human, ClassQualified: true}}}
 	return f, Service{Tokens: f, Policies: f, Now: func() time.Time { return f.now }}
 }
 func TestPolicyAndKeyFreshnessAfterWait(t *testing.T) {
@@ -45,7 +45,7 @@ func TestPolicyAndKeyFreshnessAfterWait(t *testing.T) {
 		t.Fatal("revoked client survived")
 	}
 	f, s = newFixture()
-	f.p.EligibleGroups = []string{"another-team"}
+	f.p.RequiredGroups = []string{"another-team"}
 	if _, err := s.Resolve(context.Background(), "token"); err == nil {
 		t.Fatal("organization removal survived")
 	}

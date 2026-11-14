@@ -233,8 +233,8 @@ func TestLiveReaderPinsActorClientAndOriginalHardDeadline(t *testing.T) {
 	}
 }
 
-func TestLiveReaderBearerDoesNotRenewTokenOrGroupAge(t *testing.T) {
-	for _, cause := range []string{"token-expiry", "group-age"} {
+func TestLiveReaderBearerDoesNotRenewToken(t *testing.T) {
+	for _, cause := range []string{"token-expiry"} {
 		t.Run(cause, func(t *testing.T) {
 			c := newLiveClock()
 			start := c.now()
@@ -245,13 +245,9 @@ func TestLiveReaderBearerDoesNotRenewTokenOrGroupAge(t *testing.T) {
 					t.Fatal("bearer fabricated or substituted")
 				}
 				i := requestIdentity(c.now())
-				p := value.Policy{Revision: i.Policy, Issuer: i.Principal.Issuer, ObservedAt: c.now(), FreshUntil: c.now().Add(time.Minute), Clients: []value.Client{{ID: i.Principal.ClientID, Kind: value.Human, ClassQualified: true}}, EligibleSubjects: []value.Subject{{ID: i.Principal.Subject, Kind: value.Human}}, GroupsAtIssueQualified: true, GroupMaxAge: time.Minute}
+				p := value.Policy{Revision: i.Policy, Issuer: i.Principal.Issuer, ObservedAt: c.now(), FreshUntil: c.now().Add(time.Minute), Clients: []value.Client{{ID: i.Principal.ClientID, Kind: value.Human, ClassQualified: true}}}
 				claims := value.Claims{Issuer: i.Principal.Issuer, Subject: i.Principal.Subject, ClientID: i.Principal.ClientID, Scopes: i.Scopes, Groups: i.Groups, IssuedAt: start, ExpiresAt: start.Add(time.Minute), KeyUntil: start.Add(time.Hour)}
-				if cause == "token-expiry" {
-					claims.ExpiresAt = start.Add(10 * time.Second)
-				} else {
-					p.GroupMaxAge = 10 * time.Second
-				}
+				claims.ExpiresAt = start.Add(10 * time.Second)
 				return value.Admit(claims, p, c.now())
 			})
 			r, err := NewBearerLiveReader(t.Context(), resolver, "original-token", requestIdentity(start).Principal, start.Add(time.Hour), c.now)

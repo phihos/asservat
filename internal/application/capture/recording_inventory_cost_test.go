@@ -1,11 +1,12 @@
 package capture
 
 import (
-	identities "asservat.local/asservat/internal/application/identity"
-	"asservat.local/asservat/internal/domain/authorization"
 	"context"
 	"testing"
 	"time"
+
+	identities "asservat.local/asservat/internal/application/identity"
+	"asservat.local/asservat/internal/domain/authorization"
 )
 
 type inventoryCostPorts struct {

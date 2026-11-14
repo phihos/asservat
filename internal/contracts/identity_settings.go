@@ -1,28 +1,30 @@
 // Package contracts contains versioned wire shapes, never authority decisions.
 package contracts
 
+// IdentitySettings is identity.json of the Helm-rendered settings ConfigMap
+// (specs/contracts/identity-settings.schema.json).
 type IdentitySettings struct {
-	SchemaVersion          string            `json:"schemaVersion"`
-	Revision               int64             `json:"revision"`
-	Issuer                 string            `json:"issuer"`
-	Clients                []IdentityClient  `json:"clients"`
-	EligibleSubjects       []IdentitySubject `json:"eligibleSubjects"`
-	EligibleGroups         []string          `json:"eligibleGroups"`
-	GroupsAtIssueQualified bool              `json:"groupsAtIssueQualified"`
-	GroupMaxAgeSeconds     int               `json:"groupMaxAgeSeconds"`
-	// Administrators are the installation administrators (ADR-335 D14).
-	Administrators *IdentityAdministrators `json:"administrators,omitempty"`
-	// Approvals are the protected installation approval settings (ADR-249).
-	// Absent: no step-up is configured, so no approval can be decided.
-	Approvals *IdentityApprovals `json:"approvals,omitempty"`
+	SchemaVersion  string                 `json:"schemaVersion"`
+	Issuer         string                 `json:"issuer"`
+	Clients        []IdentityClient       `json:"clients"`
+	GroupsClaim    string                 `json:"groupsClaim,omitempty"`
+	UsernameClaim  string                 `json:"usernameClaim,omitempty"`
+	RequiredGroups []string               `json:"requiredGroups,omitempty"`
+	Administrators IdentityAdministrators `json:"administrators"`
+	Approvals      *IdentityApprovals     `json:"approvals,omitempty"`
 }
 
-// IdentityApprovals configures approval step-up and whether metadata
-// packet/syscall recordings also need individual approval (REQ-SYS-002).
+// IdentityAdministrators name installation administrators by group or subject.
+type IdentityAdministrators struct {
+	Groups   []string `json:"groups,omitempty"`
+	Subjects []string `json:"subjects,omitempty"`
+}
+
+// IdentityApprovals configures the optional approval step-up and policy
+// grant periods.
 type IdentityApprovals struct {
-	PolicyGrants             *PolicyGrantApproval `json:"policyGrants,omitempty"`
-	StepUp                   *IdentityStepUp      `json:"stepUp,omitempty"`
-	RequireRecordingApproval bool                 `json:"requireRecordingApproval,omitempty"`
+	PolicyGrants *PolicyGrantApproval `json:"policyGrants,omitempty"`
+	StepUp       *IdentityStepUp      `json:"stepUp,omitempty"`
 }
 
 // IdentityStepUp names the IdP acr values accepted as step-up and their
@@ -30,12 +32,6 @@ type IdentityApprovals struct {
 type IdentityStepUp struct {
 	ACRValues     []string `json:"acrValues"`
 	MaxAgeSeconds int      `json:"maxAgeSeconds"`
-}
-
-// IdentityAdministrators names administrators by group name or subject.
-type IdentityAdministrators struct {
-	Groups   []string `json:"groups,omitempty"`
-	Subjects []string `json:"subjects,omitempty"`
 }
 
 type IdentityClient struct {
@@ -48,9 +44,10 @@ type IdentitySubject struct {
 	Kind string `json:"kind"`
 }
 
-// PolicyGrantApproval configures finite team-policy review periods.
+// PolicyGrantApproval configures policy grant periods; omitted values use
+// the defaults (90 days, 365 days, 14 days).
 type PolicyGrantApproval struct {
-	DefaultAgeSeconds    int64 `json:"defaultAgeSeconds"`
-	MaxAgeSeconds        int64 `json:"maxAgeSeconds"`
-	RenewalNoticeSeconds int64 `json:"renewalNoticeSeconds"`
+	DefaultAgeSeconds    int64 `json:"defaultAgeSeconds,omitempty"`
+	MaxAgeSeconds        int64 `json:"maxAgeSeconds,omitempty"`
+	RenewalNoticeSeconds int64 `json:"renewalNoticeSeconds,omitempty"`
 }

@@ -72,10 +72,9 @@ type Claims struct {
 	AuthTime time.Time
 }
 
-// StepUpPolicy names the protected installation's accepted step-up assurance
-// (ADR-249, REQ-AUT-003): a signed acr value among ACRValues whose auth_time
-// is at most MaxAge old. The zero value configures no step-up, so no approval
-// can be decided.
+// StepUpPolicy is the optional approval step-up (ADR-249, ADR-335 D5): a
+// signed acr value among ACRValues whose auth_time is at most MaxAge old. The
+// zero value configures none; approvals then need no step-up.
 type StepUpPolicy struct {
 	ACRValues []string
 	MaxAge    time.Duration
@@ -88,7 +87,7 @@ func (s StepUpPolicy) valid() bool {
 	if !s.Configured() {
 		return s.MaxAge == 0
 	}
-	return len(s.ACRValues) <= 8 && Strings(s.ACRValues, 8, 128) && s.MaxAge >= 30*time.Second && s.MaxAge <= time.Hour
+	return Distinct(s.ACRValues) && s.MaxAge > 0
 }
 
 // Assurance is the verified authentication context of one identity
@@ -99,38 +98,31 @@ type Assurance struct {
 	AuthenticatedAt, StepUpUntil time.Time
 }
 
-// Client pins identity class only for a qualified issuer/client configuration
-// which cannot issue another class under the same client. Mixed clients require
-// a future qualified mapping, not a human-by-default fallback.
+// Client pins identity class for a registered client.
 type Client struct {
 	ID             string
 	Kind           Kind
 	ClassQualified bool
 }
+
+// Subject is a principal ID with its identity class.
 type Subject struct {
 	ID   string
 	Kind Kind
 }
 
-// Policy is an accepted protected installation projection, not a public API.
-// GroupsAtIssueQualified attests complete stable group IDs refreshed at iat,
-// including refresh-token issuance. Group display names are not acceptable IDs.
+// Policy is the protected installation identity settings (identity.json).
+// Groups are read by name from GroupsClaim and valid until the token expires.
+// Empty RequiredGroups admits every authenticated user of a registered client.
 type Policy struct {
-	Revision               Revision
-	Issuer                 string
-	ObservedAt, FreshUntil time.Time
-	Clients                []Client
-	EligibleSubjects       []Subject
-	EligibleGroups         []string
-	GroupsAtIssueQualified bool
-	GroupMaxAge            time.Duration
-	// StepUp and RequireRecordingApproval are the protected installation
-	// approval settings (ADR-249). RequireRecordingApproval is the REQ-SYS-002
-	// "unless an administrator requires more" switch: metadata packet/syscall
-	// recordings then need the same individual approval as sensitive ones.
-	StepUp                   StepUpPolicy
-	RequireRecordingApproval bool
-	PolicyGrants             *PolicyGrantApproval
+	Revision                   Revision
+	Issuer                     string
+	ObservedAt, FreshUntil     time.Time
+	Clients                    []Client
+	GroupsClaim, UsernameClaim string
+	RequiredGroups             []string
+	StepUp                     StepUpPolicy
+	PolicyGrants               *PolicyGrantApproval
 	// AdministratorGroups and AdministratorSubjects are identity.administrators
 	// (ADR-335 D14): the installation administrators.
 	AdministratorGroups, AdministratorSubjects []string
@@ -139,18 +131,10 @@ type Policy struct {
 // Administrator reports whether i is an installation administrator: a
 // listed subject or a member of a listed group of the policy's issuer.
 func (p Policy) Administrator(i Identity) bool {
-	if i.Principal.Issuer != p.Issuer {
+	if i.Principal.Kind != Human || i.Principal.Issuer != p.Issuer {
 		return false
 	}
-	if slices.Contains(p.AdministratorSubjects, i.Principal.Subject) {
-		return true
-	}
-	for _, g := range i.Groups {
-		if slices.Contains(p.AdministratorGroups, g) {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(p.AdministratorSubjects, i.Principal.Subject) || slices.ContainsFunc(i.Groups, func(g string) bool { return slices.Contains(p.AdministratorGroups, g) })
 }
 
 type Identity struct {
@@ -192,6 +176,10 @@ func Strings(v []string, maxCount, maxLength int) bool {
 	}
 	return true
 }
+
+// Distinct reports distinct, non-empty, control-free strings.
+func Distinct(v []string) bool { return Strings(v, len(v), 1<<16) }
+
 func Fresh(observed, until, now time.Time, maximum time.Duration) bool {
 	return !observed.IsZero() && !observed.After(now) && until.After(observed) && !until.After(observed.Add(maximum)) && now.Before(until)
 }
@@ -203,7 +191,7 @@ func Earlier(a, b time.Time) time.Time {
 }
 
 func (p Policy) Validate(now time.Time) error {
-	if !p.Revision.Valid() || !Text(p.Issuer, 2048) || !Fresh(p.ObservedAt, p.FreshUntil, now, 60*time.Second) || len(p.Clients) < 1 || len(p.Clients) > 64 || len(p.EligibleSubjects) > 256 || len(p.EligibleGroups) > 256 || len(p.EligibleSubjects)+len(p.EligibleGroups) == 0 || !p.GroupsAtIssueQualified || p.GroupMaxAge <= 0 || p.GroupMaxAge > 5*time.Minute || !Strings(p.EligibleGroups, 256, 256) || !p.StepUp.valid() || p.PolicyGrants != nil && !p.PolicyGrants.Valid() {
+	if !p.Revision.Valid() || !Text(p.Issuer, 2048) || !Fresh(p.ObservedAt, p.FreshUntil, now, 60*time.Second) || len(p.Clients) < 1 || !Distinct(p.RequiredGroups) || !p.StepUp.valid() || p.PolicyGrants != nil && !p.PolicyGrants.Valid() {
 		return ErrUnavailable
 	}
 	clients := map[string]bool{}
@@ -213,24 +201,17 @@ func (p Policy) Validate(now time.Time) error {
 		}
 		clients[c.ID] = true
 	}
-	seen := map[Subject]bool{}
-	for _, s := range p.EligibleSubjects {
-		if !Text(s.ID, 256) || !ValidKind(s.Kind) || seen[s] {
-			return ErrUnavailable
-		}
-		seen[s] = true
-	}
 	return nil
 }
 
-// Admit cannot turn a valid issuer token into membership without the explicit
-// organization policy. Freshness is intersected, never renewed at verification.
+// Admit admits a verified token of a registered client. Freshness is
+// intersected, never renewed at verification.
 func Admit(c Claims, p Policy, now time.Time) (Identity, error) {
 	var out Identity
 	if p.Validate(now) != nil {
 		return out, ErrUnavailable
 	}
-	if c.Issuer != p.Issuer || !Text(c.Subject, 256) || !Text(c.ClientID, 256) || !Strings(c.Scopes, 64, 128) || !Strings(c.Groups, 256, 256) || c.IssuedAt.IsZero() || c.IssuedAt.After(now) || !c.ExpiresAt.After(c.IssuedAt) || !now.Before(c.ExpiresAt) || !now.Before(c.KeyUntil) {
+	if c.Issuer != p.Issuer || !Text(c.Subject, 256) || !Text(c.ClientID, 256) || !Distinct(c.Scopes) || !Distinct(c.Groups) || c.IssuedAt.IsZero() || c.IssuedAt.After(now) || !c.ExpiresAt.After(c.IssuedAt) || !now.Before(c.ExpiresAt) || !now.Before(c.KeyUntil) {
 		return out, ErrDenied
 	}
 	var kind Kind
@@ -242,25 +223,29 @@ func Admit(c Claims, p Policy, now time.Time) (Identity, error) {
 	if !ValidKind(kind) {
 		return out, ErrDenied
 	}
-	eligible := slices.Contains(p.EligibleSubjects, Subject{c.Subject, kind})
-	for _, g := range c.Groups {
-		eligible = eligible || slices.Contains(p.EligibleGroups, g)
+	if len(p.RequiredGroups) > 0 && !slices.ContainsFunc(c.Groups, func(g string) bool { return slices.Contains(p.RequiredGroups, g) }) {
+		return out, ErrDenied
 	}
-	until := Earlier(Earlier(c.ExpiresAt, c.KeyUntil), Earlier(p.FreshUntil, c.IssuedAt.Add(p.GroupMaxAge)))
-	if !eligible || !now.Before(until) {
+	until := Earlier(Earlier(c.ExpiresAt, c.KeyUntil), p.FreshUntil)
+	if !now.Before(until) {
 		return out, ErrDenied
 	}
 	return Identity{Principal{c.Issuer, c.Subject, c.ClientID, kind}, slices.Clone(c.Scopes), slices.Clone(c.Groups), p.Revision, now, until, assurance(c, p, kind, now, until)}, nil
 }
 
-// assurance derives step-up only from the signed acr/auth_time of a human
-// token and the protected policy; it ends at the earlier of auth_time+MaxAge
-// and the identity's own validity.
+// assurance derives step-up from the signed acr/auth_time of a human token
+// and the protected policy; it ends at the earlier of auth_time+MaxAge and the
+// identity's own validity. Without a configured step-up every human identity
+// satisfies it for its own validity (ADR-335 D5).
 func assurance(c Claims, p Policy, kind Kind, now, until time.Time) Assurance {
-	if c.ACR == "" || !Text(c.ACR, 128) {
-		return Assurance{}
+	var a Assurance
+	if kind == Human && !p.StepUp.Configured() {
+		a.StepUpUntil = until
 	}
-	a := Assurance{ACR: c.ACR}
+	if c.ACR == "" || !Text(c.ACR, 128) {
+		return a
+	}
+	a.ACR = c.ACR
 	if c.AuthTime.IsZero() || c.AuthTime.After(now) {
 		return a
 	}
@@ -274,5 +259,5 @@ func assurance(c Claims, p Policy, kind Kind, now, until time.Time) Assurance {
 }
 
 func (i Identity) Valid(now time.Time) bool {
-	return i.Principal.Valid() && i.Policy.Valid() && Strings(i.Scopes, 64, 128) && Strings(i.Groups, 256, 256) && Fresh(i.VerifiedAt, i.ValidUntil, now, 60*time.Second)
+	return i.Principal.Valid() && i.Policy.Valid() && Distinct(i.Scopes) && Distinct(i.Groups) && Fresh(i.VerifiedAt, i.ValidUntil, now, 60*time.Second)
 }

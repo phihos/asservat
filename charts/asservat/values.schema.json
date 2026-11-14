@@ -114,22 +114,35 @@
             "type": "object"
           }
         },
-        "eligibleSubjects": {
-          "type": "array",
-          "items": {
-            "type": "object"
-          }
+        "groupsClaim": {
+          "type": "string"
         },
-        "eligibleGroups": {
+        "usernameClaim": {
+          "type": "string"
+        },
+        "requiredGroups": {
           "type": "array",
           "items": {
             "type": "string"
           }
         },
-        "groupMaxAgeSeconds": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 300
+        "administrators": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "groups": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "subjects": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
         },
         "administrators": {
           "type": "object",
@@ -155,23 +168,11 @@
         },
         "maxLifetimeSeconds": {
           "type": "integer",
-          "minimum": 60,
-          "maximum": 86400
+          "minimum": 1
         },
-        "maxLogins": {
+        "inactivityTimeoutSeconds": {
           "type": "integer",
-          "minimum": 1,
-          "maximum": 10000
-        },
-        "maxSessions": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 100000
-        },
-        "maxLogoutEvents": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 100000
+          "minimum": 1
         },
         "approvals": {
           "type": "object"

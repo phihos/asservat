@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"reflect"
 	"sync"
@@ -60,9 +61,9 @@ func newIdentityObservationFixture(t *testing.T) *identityObservationFixture {
 func (f *identityObservationFixture) set(t *testing.T, revision int, group string) {
 	t.Helper()
 	settings := identitySettingsFixture(t)
-	settings["revision"] = revision
-	settings["eligibleGroups"] = []string{group}
-	settings["eligibleSubjects"] = []any{map[string]any{"id": "direct-user", "kind": "human"}}
+	settings["requiredGroups"] = []string{group}
+	settings["administrators"] = map[string]any{"subjects": []string{"direct-user"}}
+	settings["usernameClaim"] = fmt.Sprintf("name-%d", revision)
 	raw, err := json.Marshal(settings)
 	if err != nil {
 		t.Fatal(err)
@@ -216,15 +217,15 @@ func TestIdentityPolicyObservationClonesAllReturnedSlices(t *testing.T) {
 		t.Fatal(err)
 	}
 	first.Clients[0].ID = "caller-mutated-client"
-	first.EligibleGroups[0] = "caller-mutated-group"
-	first.EligibleSubjects[0].ID = "caller-mutated-user"
+	first.RequiredGroups[0] = "caller-mutated-group"
+	first.AdministratorSubjects[0] = "caller-mutated-user"
 	again, err := f.read(t.Context())
-	if err != nil || again.Clients[0].ID != "asservat-console" || again.EligibleGroups[0] != "platform-developers" || again.EligibleSubjects[0].ID != "direct-user" || f.reads.Load() != 1 {
+	if err != nil || again.Clients[0].ID != "asservat-console" || again.RequiredGroups[0] != "platform-developers" || again.AdministratorSubjects[0] != "direct-user" || f.reads.Load() != 1 {
 		t.Fatal("returned snapshot mutated retained policy or forced another read", err)
 	}
-	again.EligibleGroups[0] = "another-mutation"
+	again.RequiredGroups[0] = "another-mutation"
 	third, err := f.read(t.Context())
-	if err != nil || third.EligibleGroups[0] != "platform-developers" || f.reads.Load() != 1 {
+	if err != nil || third.RequiredGroups[0] != "platform-developers" || f.reads.Load() != 1 {
 		t.Fatal("cache hit exposed mutable retained storage", err)
 	}
 }

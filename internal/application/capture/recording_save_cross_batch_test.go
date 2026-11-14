@@ -1,6 +1,10 @@
 package capture
 
 import (
+	"context"
+	"testing"
+	"time"
+
 	authapp "asservat.local/asservat/internal/application/authorization"
 	deliveryapp "asservat.local/asservat/internal/application/delivery"
 	compiler "asservat.local/asservat/internal/application/planning"
@@ -9,9 +13,6 @@ import (
 	value "asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/domain/targets"
-	"context"
-	"testing"
-	"time"
 )
 
 // Reuses the stable synthetic app authority/source ports. This checks passive
@@ -21,10 +22,9 @@ func crossBatchSaveFixture(t *testing.T, count int) (*inventoryFixture, Recordin
 	x, inv, _, _ := newRecordingInventoryFixture(t, count)
 	f := x.f
 	current := &manualSaveCaller{f: f, actor: f.actor}
-	team, _, settings, _ := newTeamRecordingFixture(t)
+	team, _, _ := newTeamRecordingFixture(t)
 	f.audience = team.audience
 	f.cap.ExecutionClass = artifact.ContextAPIExecution
-	f.svc.Approvals = settings
 	accepted := inv.Accepted
 	f.svc.Eligibility = authapp.CaptureEligibility{Human: authapp.Evaluator{Permissions: f, Now: func() time.Time { return f.now }}, Accepted: accepted, Current: accepted.(*teamRecordingAuthority), Now: func() time.Time { return f.now }}
 	x.policy.Policy.IncidentPods = 2

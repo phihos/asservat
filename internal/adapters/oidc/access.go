@@ -39,9 +39,12 @@ const (
 // or algorithm may be selected by token headers, claims or public callers.
 type Trust struct {
 	Issuer, Audience, JWKSURL string
-	Profile                   TokenProfile
-	RootCA                    []byte
-	KeyMaxAge                 time.Duration
+	// GroupsClaim names the claim carrying group names (identity settings
+	// groupsClaim); empty means "groups".
+	GroupsClaim string
+	Profile     TokenProfile
+	RootCA      []byte
+	KeyMaxAge   time.Duration
 }
 type keySnapshot struct {
 	keys            map[string]crypto.PublicKey
@@ -66,7 +69,10 @@ func New(t Trust, now func() time.Time) (*Verifier, error) {
 	if t.Profile == "" {
 		t.Profile = RFC9068
 	}
-	if t.Profile != RFC9068 && t.Profile != Keycloak {
+	if t.GroupsClaim == "" {
+		t.GroupsClaim = "groups"
+	}
+	if t.Profile != RFC9068 && t.Profile != Keycloak || !identity.Text(t.GroupsClaim, 256) {
 		return nil, identity.ErrInvalid
 	}
 	if !endpoint(t.Issuer) || !endpoint(t.JWKSURL) || !identity.Text(t.Audience, 256) || t.KeyMaxAge < time.Second || t.KeyMaxAge > 5*time.Minute || now == nil {
@@ -133,9 +139,8 @@ type claimsDTO struct {
 	NotBefore       *int64          `json:"nbf"`
 	ID              string          `json:"jti"`
 	Scope           string          `json:"scope"`
-	Groups          []string        `json:"groups"`
 	Type            string          `json:"typ"`
-	StableGroups    []string        `json:"asservat_groups"`
+	Groups          []string        `json:"-"`
 	// ADR-249: optional IdP assurance; approval step-up is decided from
 	// these signed claims and the protected policy only.
 	// A malformed value is treated as absent (no assurance), never as a
@@ -145,10 +150,10 @@ type claimsDTO struct {
 }
 
 func parse(raw string) (header, claimsDTO, error) {
-	return parseProfile(raw, RFC9068)
+	return parseProfile(raw, RFC9068, "groups")
 }
 
-func parseProfile(raw string, profile TokenProfile) (header, claimsDTO, error) {
+func parseProfile(raw string, profile TokenProfile, groupsClaim string) (header, claimsDTO, error) {
 	var h header
 	var c claimsDTO
 	if len(raw) == 0 || len(raw) > MaxTokenBytes {
@@ -182,7 +187,7 @@ func parseProfile(raw string, profile TokenProfile) (header, claimsDTO, error) {
 	// encoding/json struct matching is case-insensitive; JWT claim names are
 	// not. Reject aliases rather than permitting two interpretations.
 	for name := range fields {
-		for _, known := range []string{"iss", "sub", "client_id", "azp", "aud", "iat", "exp", "nbf", "jti", "scope", "groups", "act", "may_act", "cnf", "nonce", "typ", "asservat_groups", "acr", "auth_time"} {
+		for _, known := range []string{"iss", "sub", "client_id", "azp", "aud", "iat", "exp", "nbf", "jti", "scope", groupsClaim, "act", "may_act", "cnf", "nonce", "typ", "acr", "auth_time"} {
 			if name != known && strings.EqualFold(name, known) {
 				return h, c, identity.ErrInvalid
 			}
@@ -190,7 +195,7 @@ func parseProfile(raw string, profile TokenProfile) (header, claimsDTO, error) {
 	}
 	required := []string{"iss", "sub", "aud", "iat", "exp", "jti"}
 	if profile == RFC9068 {
-		required = append(required, "client_id", "groups")
+		required = append(required, "client_id")
 	} else {
 		required = append(required, "azp", "typ")
 	}
@@ -205,7 +210,7 @@ func parseProfile(raw string, profile TokenProfile) (header, claimsDTO, error) {
 			return h, c, identity.ErrInvalid
 		}
 	}
-	for _, name := range []string{"iss", "sub", "client_id", "aud", "iat", "exp", "jti", "scope", "groups", "typ", "asservat_groups"} {
+	for _, name := range []string{"iss", "sub", "client_id", "aud", "iat", "exp", "jti", "scope", groupsClaim, "typ"} {
 		if b, ok := fields[name]; ok && bytes.Equal(bytes.TrimSpace(b), []byte("null")) {
 			return h, c, identity.ErrInvalid
 		}
@@ -225,9 +230,10 @@ func parseProfile(raw string, profile TokenProfile) (header, claimsDTO, error) {
 			return h, c, identity.ErrInvalid
 		}
 		c.Client = *c.AuthorizedParty
-		// Only the protected stable-ID mapper is used, never Keycloak's
-		// mutable group-name/path claim. No attributes means no membership.
-		c.Groups = c.StableGroups
+	}
+	// Groups are read by name from the configured claim; absent means none.
+	if b, ok := fields[groupsClaim]; ok && json.Unmarshal(b, &c.Groups) != nil {
+		return h, c, identity.ErrInvalid
 	}
 	return h, c, nil
 }
@@ -239,7 +245,7 @@ func (v *Verifier) Verify(ctx context.Context, raw string) (identity.Claims, err
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	h, c, err := parseProfile(raw, v.trust.Profile)
+	h, c, err := parseProfile(raw, v.trust.Profile, v.trust.GroupsClaim)
 	if err != nil {
 		return out, err
 	}
@@ -267,7 +273,7 @@ func (v *Verifier) Verify(ctx context.Context, raw string) (identity.Claims, err
 	if c.Scope != "" {
 		scopes = strings.Split(c.Scope, " ")
 	}
-	if !identity.Strings(scopes, 64, 128) || !identity.Strings(c.Groups, 256, 256) {
+	if !identity.Strings(scopes, 64, 128) || !identity.Distinct(c.Groups) {
 		return out, identity.ErrDenied
 	}
 	for _, s := range scopes {

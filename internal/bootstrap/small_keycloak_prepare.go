@@ -127,7 +127,9 @@ func smallKeycloakRealm(s contracts.SmallKeycloakSettings, group string) ([]byte
 	audience := func(value string) map[string]any {
 		return map[string]any{"name": "audience", "protocol": "openid-connect", "protocolMapper": "oidc-audience-mapper", "config": map[string]string{"included.custom.audience": value, "access.token.claim": "true", "id.token.claim": "false"}}
 	}
-	groups := map[string]any{"name": "stable-groups", "protocol": "openid-connect", "protocolMapper": "oidc-usermodel-attribute-mapper", "config": map[string]string{"user.attribute": "asservat_group_id", "claim.name": "asservat_groups", "jsonType.label": "String", "multivalued": "true", "aggregate.attrs": "true", "access.token.claim": "true", "id.token.claim": "false", "userinfo.token.claim": "false"}}
+	// Group names by full path (/asservat-administrators) in the standard
+	// groups claim (identity settings groupsClaim, ADR-335 D4).
+	groups := map[string]any{"name": "groups", "protocol": "openid-connect", "protocolMapper": "oidc-group-membership-mapper", "config": map[string]string{"claim.name": "groups", "full.path": "true", "access.token.claim": "true", "id.token.claim": "false", "userinfo.token.claim": "false"}}
 	scopes := []any{}
 	for _, name := range []string{"evidence:read", "evidence:download", "evidence:capture", "evidence:share", "evidence:raw"} {
 		scopes = append(scopes, map[string]any{"name": name, "protocol": "openid-connect", "attributes": map[string]string{"include.in.token.scope": "true"}})
@@ -154,7 +156,7 @@ func smallKeycloakRealm(s contracts.SmallKeycloakSettings, group string) ([]byte
 		map[string]any{"name": "email", "permissions": map[string]any{"view": []string{"admin", "user"}, "edit": []string{"admin", "user"}}, "validations": map[string]any{"email": map[string]any{}, "length": map[string]int{"max": 255}}},
 		map[string]any{"name": "asservat_group_id", "multivalued": true, "permissions": map[string]any{"view": []string{"admin"}, "edit": []string{"admin"}}},
 	}, "groups": []any{}})
-	realmGroups := []any{map[string]any{"id": group, "name": "asservat-users", "attributes": map[string]any{"asservat_group_id": []string{group}}}}
+	realmGroups := []any{map[string]any{"id": group, "name": "asservat-users", "attributes": map[string]any{"asservat_group_id": []string{group}}}, map[string]any{"name": "asservat-administrators"}}
 	if s.ProcessingOperators {
 		id, err := smallKeycloakProcessingGroup(group)
 		if err != nil {

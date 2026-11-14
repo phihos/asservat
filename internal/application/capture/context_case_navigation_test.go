@@ -1,13 +1,14 @@
 package capture
 
 import (
+	"context"
+	"testing"
+	"time"
+
 	identities "asservat.local/asservat/internal/application/identity"
 	"asservat.local/asservat/internal/domain/artifact"
 	capturevalue "asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/catalog"
-	"context"
-	"testing"
-	"time"
 )
 
 type caseReadFunc func(context.Context, identities.CurrentIdentity, string) (catalog.ContextCase, error)

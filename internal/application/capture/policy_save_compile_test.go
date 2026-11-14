@@ -1,10 +1,11 @@
 package capture
 
 import (
-	"asservat.local/asservat/internal/domain/targets"
 	"context"
 	"encoding/json"
 	"testing"
+
+	"asservat.local/asservat/internal/domain/targets"
 
 	compiler "asservat.local/asservat/internal/application/planning"
 	"asservat.local/asservat/internal/contracts"

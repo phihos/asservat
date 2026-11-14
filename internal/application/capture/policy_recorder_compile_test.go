@@ -1,6 +1,13 @@
 package capture
 
 import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"testing"
+
 	compiler "asservat.local/asservat/internal/application/planning"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
@@ -8,12 +15,6 @@ import (
 	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/domain/targets"
 	"asservat.local/asservat/internal/transport/conversion"
-	"bytes"
-	"context"
-	"encoding/json"
-	"errors"
-	"fmt"
-	"testing"
 
 	value "asservat.local/asservat/internal/domain/capture"
 	planningvalue "asservat.local/asservat/internal/domain/planning"
