@@ -1,18 +1,19 @@
 package integration
 
 import (
+	"context"
+	"crypto/tls"
+	"encoding/base64"
+	"encoding/hex"
+	"testing"
+	"time"
+
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/syscalls"
 	"asservat.local/asservat/internal/domain/artifact"
 	value "asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/fleet"
-	"context"
-	"crypto/tls"
-	"encoding/base64"
-	"encoding/hex"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"testing"
-	"time"
 )
 
 // The owned fixture supplies a real independently reviewed argument acquisition,

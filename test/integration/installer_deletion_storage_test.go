@@ -1,7 +1,6 @@
 package integration
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -9,9 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"asservat.local/asservat/internal/contracts"
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/smithy-go"
@@ -42,21 +39,6 @@ func installerEvidenceBucketPolicy(bucket string) string {
 		map[string]any{"Sid": "DenyEvidenceAdministration", "Effect": "Deny", "Principal": deletion, "Action": []string{"s3:PutBucketVersioning", "s3:PutBucketPolicy", "s3:DeleteBucketPolicy", "s3:PutLifecycleConfiguration", "s3:PutBucketAcl", "s3:DeleteBucket"}, "Resource": resource},
 	}})
 	return string(policy)
-}
-
-func installerEvidenceDeleteCredential(t *testing.T, ctx context.Context, p *initialRuntimeNativeProviders, bucket string, users []string) []byte {
-	t.Helper()
-	raw := installerOperatorStorage(t, ctx, p, "evidence-delete", []string{"List:" + bucket}, users)
-	credential, err := contracts.DecodeOwnerStorageCredential(bytes.NewReader(raw))
-	if err != nil {
-		t.Fatal("deletion credential", err)
-	}
-	client := func(key, secret string) *s3.Client {
-		return s3.New(s3.Options{Region: p.desired.AuditStore.Region, BaseEndpoint: &p.desired.AuditStore.Endpoint, UsePathStyle: true, Credentials: credentials.NewStaticCredentialsProvider(key, secret, ""), HTTPClient: p.client, RetryMaxAttempts: 1})
-	}
-	admin, cleaner := client("synthetic-only", "synthetic-only-secret"), client(credential.AccessKeyID, credential.SecretAccessKey)
-	qualifyInstalledEvidenceDeleteCredential(t, ctx, admin, cleaner, bucket)
-	return raw
 }
 
 // Both the full installer and the small owned-S3 fixture run these exact

@@ -78,7 +78,7 @@ already in-memory principal; its public `live1` shape is unchanged.
 - Real PostgreSQL qualification covers exact control reads, wrong principal and
   fence refusal, idempotent close and original accounting bounds under the
   compiled hub role. Migration generation and affected package/vet gates pass.
-- Installed native run [42705246482](../../test/results/live-owner-failover-42705246482/README.md)
+- Installed native run 42705246482
   passed at `c890dc86`: exact Pod replacement and a new activated epoch,
   terminal same-revision MCP close, unchanged SQL spend, unchanged sources and
   no cleanup failures. This is the named policy/MCP path, not every client or

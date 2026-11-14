@@ -11,11 +11,7 @@ core.[0-9]*
 web/node_modules/
 web/dist/
 .remember/
-test/results/context-storage-timing.log
 /.kube/
 
-# Generated validation output belongs in CI artifacts or an external local archive.
-# Keep concise provenance summaries; existing tracked historical reports remain.
-/test/results/**
-!/test/results/**/
-!/test/results/**/*.md
+# Generated validation output belongs in CI artifacts, never in the tree.
+/test/results/

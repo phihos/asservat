@@ -123,7 +123,7 @@ unchanged freshness renewal alongside retained SHARE locks, restrictive writer
 blocking, eight existing locking/query forms, the contrasting ordinary-join
 behavior, exclusive-lock contention and absent/mismatched source/incarnation
 denials. Its first run's diagnostic-name parser failure remains preserved.
-[Probe evidence](../../test/results/fleet-freshness-lock-feasibility/README.md)
+Probe evidence
 includes the independent archive/cleanup verification. This
 synthetic schema experiment does not qualify the production migration, producer
 functions, first activation or installed owner startup.
@@ -132,32 +132,32 @@ PostgreSQL documents privileged function execution hazards for REFERENCES and
 TRIGGER ([PostgreSQL privileges](https://www.postgresql.org/docs/18/ddl-priv.html)).
 They apply to untrusted roles; installation roles are trusted under ADR-328.
 
-The [production SQL qualification](../../test/results/fleet-freshness-native-1/result.json)
+The production SQL qualification
 passes all 31 named cases using the actual 58→59 migration, separate scoped roles,
 encrypted audit and first activation. It covers retained SHARE renewal, restrictive
 locking, exact lock-site classification, basis/ABA/failure ordering, original
 expiry, missing observation, activation/replay and privilege/hook refusals.
 Protected Kubernetes source inputs remain explicit fixtures.
 
-The [second component gate](../../test/results/fleet-freshness-component-2/result.json)
+The second component gate
 passes 265 top-level / 1,428 named race tests with no skips, SQL/schema and canonical
 checks; compilation and full vet passed separately. The preserved first gate
 failed three old reconciler fixtures missing the new original basis; the second
 uses only the reviewed fixture-input correction. Frozen source/archive hashes and
 owned cleanup are independently verified.
 
-The broader [initial-installation run](../../test/results/fleet-freshness-initial-installation-1/result.json)
+The broader initial-installation run
 passes 84 of 87 named executions but fails two old bridge expectations and their
 parent. After the reviewed fixture correction, the
-[second full run](../../test/results/fleet-freshness-initial-installation-2/result.json)
+second full run
 passes all 87 named cases without skips, including positive renewal under the
 actual bridge SHARE and preserved original expiry. The
-[full fleet run](../../test/results/fleet-freshness-fleet-1/result.json) also passes
+full fleet run also passes
 all 176 named tests with independently verified source/archive and cleanup
-closure. The [database recovery run](../../test/results/fleet-freshness-database-recovery-1/result.json)
+closure. The database recovery run
 passes all three real initial/restart/restore phases with independently verified
 server/database identity changes, source/archive hashes and owned cleanup. The unchanged
-[installed-owner run 11](../../test/results/runtime-provider-owner-native-11/result.json)
+installed-owner run 11
 also fails a final native projection check, with a same-call source limiter
 refusal. These failures remain preserved; no rate or deadline was increased.
 Complete the remaining custody and full-Go qualification

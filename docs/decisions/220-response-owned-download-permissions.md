@@ -99,7 +99,7 @@ handoff with current SQL attachment reads and original cutoff negatives. The
 owned real SQL response fixture must still deny a known permission suspension
 while the retained ordinary observation and short authority remain live.
 
-The [component archive](../../test/results/resumed-c62e02ac-response-permission-cadence/README.md)
+The component archive
 records genuine RED exit 1, focused GREEN exit 0, complete authorization/evidence
 package race exit 0 (1.306/3.986 seconds), and integration-package compilation.
 All 2,610 Go/module hashes remained unchanged during each command. The cadence

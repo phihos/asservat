@@ -1,24 +1,25 @@
 package integration
 
 import (
-	"asservat.local/asservat/internal/adapters/objectstore"
-	"asservat.local/asservat/internal/domain/artifact"
-	"asservat.local/asservat/internal/domain/capture"
 	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/credentials"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
-	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
-	"github.com/aws/smithy-go"
 	"io"
 	"os"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
+
+	"asservat.local/asservat/internal/adapters/objectstore"
+	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/capture"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/aws/smithy-go"
 )
 
 // Actual IAM and storage SDK/TLS behavior, synthetic ciphertexts and registration.

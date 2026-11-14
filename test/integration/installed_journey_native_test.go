@@ -1198,16 +1198,6 @@ func installedFastFixture() bool {
 	return false
 }
 
-// installedRegionalInstallerChecks reports whether workload cluster index
-// runs the regional installer's own checks (rerun exactness, connector
-// readmission, source-write denial and the demand lane). The fast fixture
-// skips them in the first workload cluster, which the chain focus covers;
-// the second workload cluster, installed only by the clusters focus and the
-// unsplit run, always runs them.
-func installedRegionalInstallerChecks(index int) bool {
-	return !installedFastFixture() || index > 1
-}
-
 // installedJourneyRuns counts journey runs in this installation; only the
 // first initializes processing.
 var installedJourneyRuns int

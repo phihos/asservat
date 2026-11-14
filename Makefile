@@ -74,33 +74,6 @@ authority-window-check:
 context-integration:
 	$(PYTHON) scripts/test-context-storage.py
 
-# Local installed loop (docs/development-workflow.md): one installed focus on
-# owned kind clusters, e.g. make installed-focus FOCUS=manual-logs. The harness
-# refuses collector focuses without the disposable-host guard; this target
-# additionally accepts only the collector-free focuses below.
-LOCAL_FOCUSES = chain journey browser restart clusters upgrade policy alert logresource share manual-logs journey-store-failure journey-start-failure retention-shortening early-erasure processing-workload privacy-inventory share-retirement
-.PHONY: installed-focus
-installed-focus:
-	$(if $(and $(filter 1,$(words $(FOCUS))),$(filter $(FOCUS),$(LOCAL_FOCUSES))),,$(error FOCUS must be one collector-free focus: $(LOCAL_FOCUSES)))
-	mkdir -p "$(ASSERVAT_BUILD_TMP)"
-	TMPDIR="$(ASSERVAT_BUILD_TMP)" ASSERVAT_JOURNEY_FOCUS="$(FOCUS)" $(PYTHON) scripts/test-context-storage.py --initial-bootstrap-chain --runtime-provider-pair --installer-continuation $(ARGS)
-
-# Development only, never a qualification (docs/development-workflow.md):
-# installed-keep installs once and keeps it; installed-rerun runs only the
-# focus on it (KEPT defaults to the newest kept manifest); installed-teardown
-# removes it and verifies nothing is left.
-KEPT ?= $(shell ls -t $(HOME)/.cache/asservat-build/kept/context-*.json 2>/dev/null | head -n 1)
-.PHONY: installed-keep installed-rerun installed-teardown
-installed-keep:
-	$(MAKE) --no-print-directory installed-focus FOCUS="$(or $(FOCUS),manual-logs)" ARGS="--keep-installed $(ARGS)"
-installed-rerun:
-	$(if $(KEPT),,$(error no kept installation; run make installed-keep))
-	mkdir -p "$(ASSERVAT_BUILD_TMP)"
-	TMPDIR="$(ASSERVAT_BUILD_TMP)" $(PYTHON) scripts/test-context-storage.py --rerun-installed "$(KEPT)"
-installed-teardown:
-	$(if $(KEPT),,$(error no kept installation))
-	$(PYTHON) scripts/test-context-storage.py --cleanup-kept "$(KEPT)"
-
 .PHONY: go-vuln-check
 go-vuln-check:
 	go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
@@ -172,10 +145,6 @@ audit-storage-integration:
 database-recovery-integration:
 	$(PYTHON) scripts/test-custody.py --database-recovery
 
-.PHONY: initial-installation-integration
-initial-installation-integration:
-	$(PYTHON) scripts/test-custody.py --initial-installation
-
 .PHONY: manifest-schema-check
 .PHONY: investigation-schema-check
 investigation-schema-check:
@@ -243,14 +212,6 @@ helm-check: permission-crd-check policy-crd-check start-crd-check retention-crd-
 helm-integration: helm-check
 	$(PYTHON) scripts/test-helm.py
 
-.PHONY: initial-handover-integration
-initial-handover-integration:
-	$(PYTHON) scripts/test-context-storage.py --initial-handover
-
-.PHONY: initial-schema-handover-integration
-initial-schema-handover-integration:
-	$(PYTHON) scripts/test-context-storage.py --initial-schema-handover
-
 # Fast local gates before a push: the checks job's gates and self-tests, the
 # go job's vet and sql-check, the console job's console-check (including
 # generated-contract drift), gofmt and the test shards' race tests for the
@@ -266,7 +227,7 @@ pre-push:
 	$(MAKE) go-affected-test
 
 gate-self-tests:
-	for f in scripts/test-ci-changes.py scripts/test-go-shards.py scripts/test-kept-cleanup.py scripts/test-*-selection.py scripts/test-collector-provenance.py scripts/test-pod-log-stream.py; do $(PYTHON) "$$f" || exit 1; done
+	for f in scripts/test-ci-changes.py scripts/test-go-shards.py scripts/test-*-selection.py scripts/test-collector-provenance.py; do $(PYTHON) "$$f" || exit 1; done
 
 gofmt-check:
 	@unformatted=$$(gofmt -l api cmd internal migrations test); if [ -n "$$unformatted" ]; then echo "gofmt needed:"; echo "$$unformatted"; exit 1; fi
@@ -287,16 +248,14 @@ history-storage-integration:
 # Fast component preflight for the complete profile path. No external fixtures.
 .PHONY: profile-preflight
 profile-preflight:
-	TMPDIR="$(ASSERVAT_BUILD_TMP)" go test -race -count=1 -timeout=30s test/fixtures/worker-resource-probe/main.go test/fixtures/worker-resource-probe/main_test.go
 	TMPDIR="$(ASSERVAT_BUILD_TMP)" go test -race -count=1 -timeout=3m -run '^(TestRecordingProfileUnavailable|TestCaseView|TestAcquisitionWindow|TestContextVerificationAcquisition|TestContextVerificationReturns|TestPolicyProfile|TestPolicyEndpoint|TestPolicyExecutor|TestGoProfileEndpoint|TestInstalledProfile|TestDownloadWorkerProfileAndPathTemplate|TestPublicProfile|TestComparison|TestProjectionComparison|TestNativeComparison|TestPublicSnapshotCancellation|TestSourceWork|TestConnectorProfile|TestProfile|TestPprof|TestReadProfile|TestSharedManifest|TestNativeTypeRegistry|TestNodeProfile|TestOneShotProfile|TestCurrentDownloadEnvironment)' ./internal/bootstrap ./internal/domain/catalog ./internal/domain/collector ./internal/domain/execution ./internal/domain/capture ./internal/domain/planning ./internal/domain/targets ./internal/domain/authorization ./internal/domain/privacy ./internal/domain/artifact ./internal/domain/audit ./internal/domain/analysis ./internal/application/catalog ./internal/application/planning ./internal/application/authorization ./internal/application/capture ./internal/application/analysis ./internal/application/evidence ./internal/adapters/kubernetes ./internal/transport/presentation ./internal/transport/browser ./internal/transport/mcp ./internal/adapters/diagnostics ./internal/adapters/objectstore ./internal/adapters/objectstore/manifest ./internal/adapters/jose ./internal/transport/contextstart ./internal/transport/native ./internal/adapters/postgres
-	TMPDIR="$(ASSERVAT_BUILD_TMP)" go test -race -count=1 -timeout=3m -run '^(TestPolicy(Profile|Recorder)AdmissionFixtureOfflineBindings|TestInstalled(PolicyProfile|ManualProfile|ProfileComparison|PacketSummary|RecordingPassive|ApprovedRecordingFixtureShape))' ./test/integration
+	TMPDIR="$(ASSERVAT_BUILD_TMP)" go test -race -count=1 -timeout=3m -run '^TestPolicy(Profile|Recorder)AdmissionFixtureOfflineBindings' ./test/integration
 
 # Finite argument composition, without loading a collector or external services.
 .PHONY: argument-preflight
 argument-preflight:
 	TMPDIR="$(ASSERVAT_BUILD_TMP)" go test -race -count=1 -timeout=3m ./internal/contracts
 	TMPDIR="$(ASSERVAT_BUILD_TMP)" go test -race -count=1 -timeout=3m -run 'Test.*(Argument|CaseProjection|InitialSchema|InitialBootstrapSchema|InitialInstallerSchema|RecordingStop|RecordingCollection|SourceWork|PublicSnapshotCancellation)' ./internal/bootstrap ./internal/adapters/kubernetes ./internal/domain/artifact ./internal/domain/collector ./internal/domain/authorization ./internal/application/evidence ./internal/application/delivery ./internal/application/capture ./internal/application/execution ./internal/application/planning ./internal/adapters/gadget ./internal/adapters/postgres ./internal/adapters/jose ./internal/adapters/syscalls ./internal/adapters/objectstore/manifest ./internal/transport/contextstart ./internal/transport/presentation ./internal/transport/mcp
-	TMPDIR="$(ASSERVAT_BUILD_TMP)" go test -race -count=1 -timeout=3m -run '^TestInstalledManualArguments' ./test/integration
 
 # Owned SQL/S3 service composition, after local preflight and source freeze.
 .PHONY: profile-service-preflight
@@ -310,7 +269,6 @@ profile-service-preflight:
 .PHONY: packet-summary-preflight
 packet-summary-preflight:
 	TMPDIR="$(ASSERVAT_BUILD_TMP)" go test -race -count=1 -timeout=3m -run '^(TestRawPacket|TestPacketQuery|TestNativePacketQuery|TestPacketSummary|TestPacketProjection|TestSavedPacketMigration|TestProjectionSource|TestProjectionScope|TestProjectionResult|TestProfileSummarySource|TestContextQueryAuditNamesFormatsAndEffects)' ./internal/domain/analysis ./internal/domain/audit ./internal/application/analysis ./internal/application/authorization ./internal/application/evidence ./internal/adapters/packets ./internal/adapters/objectstore ./internal/adapters/postgres ./internal/contracts ./internal/transport/native ./internal/transport/presentation ./internal/bootstrap
-	TMPDIR="$(ASSERVAT_BUILD_TMP)" go test -race -count=1 -timeout=3m -run '^TestInstalledPacket(Summary|Query)' ./test/integration
 
 # Optional fresh-host qualification; local CPU schedulers may not enforce quotas.
 .PHONY: logs-resource-check

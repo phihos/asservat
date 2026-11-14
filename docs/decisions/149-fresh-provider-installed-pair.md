@@ -60,7 +60,7 @@ Pinned SeaweedFS experiments distinguish these properties: the standard policy c
 
 The fresh native bootstrap-to-worker-input continuation now passes, as recorded
 in [implementation progress](../implementation-progress.md) and
-[the exact run report](../../test/results/provider-pair-native-3/result.json).
+the exact run report.
 It uses the actual original bootstrap/activation, nineteen resource receipts,
 retained guard handover, scoped versioned audit backend, named provider
 inspection and SQL3 producer with unchanged original client aliases and bounds.
@@ -103,7 +103,7 @@ The generated owner deployment takes permission root and logical peers from the 
 This initial batch is not a permanent multi-cluster ceiling. Later enrollment has a separate bounded protected regional plan/journal tied to the stable installation and permission root, real namespace/account/settings receipts and actual permission/source/SQL49 activation. A later peer requires a positively acknowledged observation backend/rollout update; it cannot silently expand the old immutable bootstrap allowlist, rerun initial activation or revive retired initial credentials. That later producer is a separate incomplete continuation, not a generic registry introduced here.
 
 The owner selection producer and generator are integrated with passing component
-race, schema and architecture checks; see [the integration record](../../test/results/owner-bootstrap-selection-integration.json).
+race, schema and architecture checks; see the integration record.
 Those checks use synthetic current native/SQL authority and do not establish
 real SQL4 production or installed owner startup. Existing native worker-input
 evidence predates this allocation. No runtime selector is enabled. Original

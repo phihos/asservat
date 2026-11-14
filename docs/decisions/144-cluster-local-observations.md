@@ -232,7 +232,7 @@ only shorten them. Selection of a route cannot create a later deadline. Existing
 observation entry points retain their original behavior. Slots remain charged
 through actual socket closure and admitted handler joins. The new three-path
 entry point does not include exact-owner forwarding or claim complete installed
-qualification. Its [focused component checks](../../test/results/regional-observation-listener-integration.json)
+qualification. Its focused component checks
 pass compilation, 24 race entries and vet; native installation remains pending.
 
 
@@ -259,7 +259,7 @@ together with a fresh explicit original layout; already claimed v1 bytes are
 not upgraded. Component codec checks cannot qualify installed multi-cluster
 availability within the original five-second interval.
 
-The [routing value checkpoint](../../test/results/regional-observation-routing-contract-integration.json)
+The routing value checkpoint
 passes compilation, 154 named race entries, vet and Go architecture. Current
 receiving/forwarding composition and native availability remain pending.
 

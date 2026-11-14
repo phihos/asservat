@@ -1,3 +1,0 @@
-Creating owned synthetic cluster 1
-Component test exit: 1
-{"terminalExit": 1, "testExit": 1, "passedEntries": 6, "sourceHashes": 1140, "unchanged": true, "changedAfterExit": [], "cleanupFailures": []}

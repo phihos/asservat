@@ -2,7 +2,7 @@
 
 Status: technology baseline selected for implementation planning, inspected 2026-10-09. React/TypeScript is explicitly accepted by the maintainer; the engineering selections below still require their stated integration/release qualifications. A dependency is not approved merely because its repository licence is acceptable. Exact image digests, all transitive packages, build provenance, source notices and egress tests are release requirements.
 
-Read the [component build/reuse matrix](architecture/build-or-reuse.md), [research and remaining gates](research/technology-selection.md), and [reproducible experiments](../experiments/technology-selection/README.md). Observed versions are research snapshots, not a claim that every combination is qualified.
+Read the [component build/reuse matrix](architecture/build-or-reuse.md), [research and remaining gates](research/technology-selection.md), and reproducible experiments. Observed versions are research snapshots, not a claim that every combination is qualified.
 
 Subsequent [packet/download feasibility experiments](research/feasibility-packet-downloads.md) provide real Gadget/Kubernetes and S3/TLS evidence, including native PCAPNG opening and a 2 GiB framed artifact. They support the selected libraries without freezing the production format or qualifying the full adapters. The isolated SeaweedFS fixture is test evidence, not production qualification. [Small-deployment research](research/small-deployments.md) now separately recommends bundled SeaweedFS alongside the external Ceph reference.
 

@@ -41,7 +41,7 @@ Point a policy at a Deployment, StatefulSet, or selected pods. Combine log patte
 | [Technology choices](technology.md) | Selected stack, alternatives, dependency licences and no-call-home review |
 | [Small-deployment alternatives](research/small-deployments.md) | Researched internal identity/keys, bundled storage/database, backups, maintenance and migration recommendations |
 | [Build or reuse](architecture/build-or-reuse.md) | All 24 component responsibilities, reusable libraries/tools and integration risks |
-| [Technology experiments](../experiments/technology-selection/README.md) | Reproducible synthetic dependency tests, failures and remaining qualification |
+| Technology experiments | Reproducible synthetic dependency tests, failures and remaining qualification |
 | [Packet and download feasibility](research/feasibility-packet-downloads.md) | Actual VM capture, filter/compiler findings, endpoint-map updates, ring pressure and a 2 GiB encrypted native-download experiment |
 | [SQL and crash-path feasibility](research/feasibility-control-crash.md) | Actual grant/quota races, lost COMMIT reply, expiry defects and bounded native-core handoff with GDB verification |
 | [Specification format](specification-format.md) | Research into agent workflows and the format used here |

@@ -1,2 +1,0 @@
-python3 scripts/test-custody.py --scoped-audit
-Scoped-audit-storage integration exit: 0

@@ -1,16 +1,8 @@
 package integration
 
 import (
-	"asservat.local/asservat/internal/adapters/kms"
-	"asservat.local/asservat/internal/adapters/objectstore"
-	"asservat.local/asservat/internal/domain/artifact"
-	"asservat.local/asservat/internal/domain/audit"
-	"asservat.local/asservat/internal/domain/identity"
 	"context"
 	"encoding/json"
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/credentials"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"net/http"
 	"net/http/httptest"
 	"net/http/httputil"
@@ -21,6 +13,15 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"asservat.local/asservat/internal/adapters/kms"
+	"asservat.local/asservat/internal/adapters/objectstore"
+	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/audit"
+	"asservat.local/asservat/internal/domain/identity"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
 // Actual OpenBao+S3 requests and elapsed time for six bounded audit pairs. This

@@ -1,12 +1,6 @@
 package integration
 
 import (
-	identities "asservat.local/asservat/internal/application/identity"
-	"asservat.local/asservat/internal/console"
-	"asservat.local/asservat/internal/contracts"
-	"asservat.local/asservat/internal/domain/catalog"
-	"asservat.local/asservat/internal/transport/browser"
-	"asservat.local/asservat/internal/transport/presentation"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -19,6 +13,13 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	identities "asservat.local/asservat/internal/application/identity"
+	"asservat.local/asservat/internal/console"
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/catalog"
+	"asservat.local/asservat/internal/transport/browser"
+	"asservat.local/asservat/internal/transport/presentation"
 )
 
 // Exact installed JS/Go bridge, real built React and GoTLS/session/case HTTP.

@@ -19,7 +19,7 @@ class EvidenceDeleteSelection(unittest.TestCase):
                 self.assertFalse(fixture.installed_evidence_delete_selection(pattern))
 
     def test_other_profiles_cannot_be_combined(self):
-        for option in ["fleet", "database_recovery", "initial_installation", "connector_retirement", "scoped_audit", "owner_audit_inventory"]:
+        for option in ["fleet", "database_recovery", "connector_retirement", "scoped_audit", "owner_audit_inventory"]:
             with self.subTest(option=option):
                 with self.assertRaisesRegex(ValueError, "Installed evidence deletion owns its exact"):
                     fixture.main(test_pattern="^" + fixture.INSTALLED_EVIDENCE_DELETE_TEST + "$", **{option: True})

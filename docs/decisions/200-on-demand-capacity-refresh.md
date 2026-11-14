@@ -11,14 +11,14 @@ Current qualification (2026-10-20): the capture readiness wait overlaps
 independent facts work and joins before the authoritative storage read. Both
 retain the one-second selection margin and original deadlines. Download demand
 rearming is implemented and SQL-tested. In
-[resumed native47](../../test/results/resumed-c62e02ac-native47/result.json),
+resumed native47,
 the demand lane supplied six distinct observations and 37 usable samples over
 15 seconds, but a later request was refused at the final storage margin.
 Refresh sampling does not guarantee sufficient freshness at a later read.
 [ADR-213](213-storage-readiness-at-consumption.md) adds bounded readiness at
 consumption within the same owned wait. Its implementation and
-[complete capture race checks](../../test/results/resumed-c62e02ac-storage-consumption/verification.json)
-pass. [Resumed native48](../../test/results/resumed-c62e02ac-native48/result.json)
+complete capture race checks
+pass. Resumed native48
 included that change, passed demand readiness with six distinct observations
 and 25 usable samples over 15 seconds, and reached acquisition and publication.
 The evidence does not establish that consumption polling caused that success.
@@ -130,7 +130,7 @@ Historical checkpoints recorded before the 2026-10-20 status refresh above:
   stage `refresh-demand-names-only-ready-workloads` and the native
   continuation's three consecutive fresh reads after a demand are pending
   qualification. Downloads still use discovery refreshes.
-- [CI continuation runs 22a–22c](../../test/results/adr200-continuation-ci-22a/native-continuation-1/context-storage-environment.json)
+- CI continuation runs 22a–22c
   (39068539505, 39068545264, 39068550936) all failed. In 22a and 22c the
   demand lane refreshed the regional binding (`ok` after 2.6–3.6 s), but other
   attempts stopped at `guarded-read`, `source`, `enroll/read` or
@@ -142,7 +142,7 @@ Historical checkpoints recorded before the 2026-10-20 status refresh above:
   every 250 ms for 15 s after the demand and requires three refreshes and one
   sample with a second left, and each demand outcome is logged with the
   guarded read's freshness left on return.
-- [CI continuation runs 23a/23b](../../test/results/adr200-continuation-ci-23a/native-continuation-1/context-storage-environment.json)
+- CI continuation runs 23a/23b
   (39070667782, 39070672636) failed before the demand check: the regional
   workload never enrolled. The hub-worker's permission reconciler stopped
   repeatedly (`permission reconciler stopped: unavailable`, retried every 31
@@ -152,7 +152,7 @@ Historical checkpoints recorded before the 2026-10-20 status refresh above:
   run 18b. The reconciler now names the phase that stopped it (`start`,
   `watch`, `watch-next`, `apply`, `accept`, and inside `refresh`: `trust`,
   `snapshot`, `confirm-expired`, `renew`, `accept`).
-- [CI continuation runs 24a–24c](../../test/results/adr200-continuation-ci-24a/native-continuation-1/context-storage-environment.json)
+- CI continuation runs 24a–24c
   (39072929605, 39072934693, 39072939641): **24a passed the demand check**:
   after one refresh demand the regional binding had five distinct
   observations and seven samples with at least one second of freshness left in
@@ -161,7 +161,7 @@ Historical checkpoints recorded before the 2026-10-20 status refresh above:
   reconciler's `start` and `accept` phases are now labelled one level deeper,
   with `trust-expired` separating an expired trust window from a store
   refusal.
-- [CI continuation runs 25a–25c](../../test/results/adr200-continuation-ci-25a/native-continuation-1/context-storage-environment.json)
+- CI continuation runs 25a–25c
   (39075218716, 39075224097, 39075229161): 25a and 25c **passed** (five and
   six refreshes, eight and nine samples with a second left, in 15 s). 25b
   failed earlier: the promoted owner's native port never became reachable

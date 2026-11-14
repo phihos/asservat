@@ -1,4 +1,0 @@
-ok  	asservat.local/asservat/internal/domain/privacy	1.010s
-ok  	asservat.local/asservat/internal/application/privacy	1.026s
-ok  	asservat.local/asservat/internal/adapters/objectstore/framed	6.476s
-ok  	asservat.local/asservat/internal/adapters/jose	1.485s

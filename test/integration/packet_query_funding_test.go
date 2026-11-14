@@ -1,11 +1,12 @@
 package integration
 
 import (
+	"testing"
+	"time"
+
 	app "asservat.local/asservat/internal/application/capacity"
 	query "asservat.local/asservat/internal/domain/analysis"
 	"asservat.local/asservat/internal/domain/artifact"
-	"testing"
-	"time"
 )
 
 func TestPacketQueryOriginalManagedFunding(t *testing.T) {

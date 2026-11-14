@@ -11,7 +11,7 @@ Gap 4 of [ADR-196](196-regional-cluster-join.md). Builds on
 
 Current qualification (2026-10-20): regional qualification, additive pool
 extension and v2 workload enrollment have passed the named two-cluster tests.
-[Resumed native47](../../test/results/resumed-c62e02ac-native47/result.json)
+Resumed native47
 also passed regional enrollment and ADR-200's demand-refresh check. These
 results qualify those capacity boundaries; the complete installed
 investigation workflow remains unfinished.
@@ -113,7 +113,7 @@ extended.
      source window of at most five seconds.
      - One v2 observation measured about 135–143 observer and 24–27 probe
        calls across hub-worker, holder and connector, with idle limiters
-       ([direct-observation-native-6](../../test/results/direct-observation-native-6/direct/context-storage.log)).
+       (direct-observation-native-6).
      - Two of them cannot fit at 20 QPS per client. A combined
        guard-and-workload v2 purpose (an ADR-150 amendment) is the
        expected fix, decided by the spike's measurements.
@@ -163,8 +163,8 @@ regional slot.
 
 Historical checkpoints recorded before the 2026-10-20 status refresh above:
 
-- **Spike part A** ([run 2](../../test/results/adr197-spike-direct-2/environment.json);
-  [run 1](../../test/results/adr197-spike-direct-1/environment.json) is
+- **Spike part A** (run 2;
+  run 1 is
   retained: its subtest stopped before logging). The direct v2 fixture was
   rebuilt; it had not compiled since ADR-193 changed `connectorlifecycle.Runners`.
   - The four single observations took 2.48–2.73 s each.
@@ -187,7 +187,7 @@ Historical checkpoints recorded before the 2026-10-20 status refresh above:
       combined observation of about 3 s therefore allows about 100–150 ms
       per owner read.
     - Part B measures what one lifecycle conversation actually costs.
-- **Spike part B** ([ADR-196 continuation run 9](../../test/results/adr196-continuation-native-9/environment.json),
+- **Spike part B** (ADR-196 continuation run 9,
   passed with exit 0, all four tests, no cleanup failures, source unchanged).
   The first lifecycle conversation of each purpose in the installed
   region:
@@ -279,11 +279,11 @@ Historical checkpoints recorded before the 2026-10-20 status refresh above:
     and the hub-worker restarts like the hub-api on a catalog change.
 - **Native runs** (two clusters, installed composition, `scripts/test-context-storage.py
   --initial-bootstrap-chain --runtime-provider-pair --installer-continuation`):
-  - [Run 1](../../test/results/adr197-continuation-native-1/exit.txt) was
+  - Run 1 was
     interrupted by a host power outage while its kind clusters were being
     created; no test ran.
-  - [Run 2](../../test/results/adr197-continuation-native-2/environment.json)
-    and [run 3](../../test/results/adr197-continuation-native-3/environment.json)
+  - Run 2
+    and run 3
     failed at the last check. The hub-api recorded the qualification, the
     region's standby composed and the operator stage applied, but the
     regional workload never got a capacity row. Run 3's added diagnostics
@@ -295,7 +295,7 @@ Historical checkpoints recorded before the 2026-10-20 status refresh above:
     it. Decision 6 now restarts **only the capacity child** inside the
     running process. Run 2 also exposed an unpaced standby retry loop;
     failed standbys now retry at most once per second.
-  - [Run 4](../../test/results/adr197-continuation-native-4/environment.json):
+  - Run 4:
     the child-only restart works ("capacity restarts with the new set") and
     the fleet-trust lapse is gone. The regional workload still got no row.
     Hub-worker claims reach the holder but fail at locate or claim after
@@ -307,12 +307,12 @@ Historical checkpoints recorded before the 2026-10-20 status refresh above:
   - Run 5 was stopped during its image build because another session had
     raised the host load to 5.8; timing-bound results there would not be
     valid.
-  - [Run 6](../../test/results/adr197-continuation-native-6/environment.json)
+  - Run 6
     failed before the regional stage: the existing check that the owner's
     native port is reachable timed out, with no diagnostics on that path.
     Run 7 passed the same check. That path now prints the owner's
     diagnostics.
-  - [Run 7](../../test/results/adr197-continuation-native-7/environment.json)
+  - Run 7
     measured the regional side: each claimed standby's native open, reads and
     metadata finish in about 0.3 s with 28 API calls. The region's failing
     source reads are a symptom: the hub's conversations reach them with
@@ -336,7 +336,7 @@ Historical checkpoints recorded before the 2026-10-20 status refresh above:
       identity's budget. If a v2 observation still does not fit its own
       20 QPS within five seconds, the fix is consolidating its proofs, as
       ADR-199 did for the executor, not a higher limit.
-  - [Run 8](../../test/results/adr197-continuation-native-8/environment.json):
+  - Run 8:
     with pacing and isolation, regional discovery observations succeed
     (namespaces and workloads in 2.2–2.9 s), and the hub-api restarts only
     for the join. The guarded-workload observation still failed. Successes
@@ -347,13 +347,13 @@ Historical checkpoints recorded before the 2026-10-20 status refresh above:
     discovery therefore always landed in that gap. After a served standby,
     up to five failed opens now retry at 100 ms each before the one-second
     pacing applies.
-  - [CI run 1](../../test/results/adr197-continuation-ci-1/native-continuation-1/context-storage-environment.json)
+  - CI run 1
     (GitHub Actions run 39026237800, fresh runner): the quick retries
     restore most discovery reads, and one guarded-workload observation
     succeeded, but no enrollment row appeared within five minutes. The
     reconciler discarded `ReconcileWorkload`'s error; each refusal now
     names its fixed stage and regional clusters log one line per change.
-  - [CI run 2](../../test/results/adr197-continuation-ci-2/native-continuation-1/context-storage-environment.json)
+  - CI run 2
     (run 39028306118): every guarded-workload attempt stopped at `claim`,
     logged as `guarded-read (unavailable)`. Discovery still alternated
     between success and a refused claim, and the guarded read always
@@ -363,14 +363,14 @@ Historical checkpoints recorded before the 2026-10-20 status refresh above:
     standbys open and the hub holder admits three entries (two live, one
     served entry in joined cleanup), so a ready standby remains while the
     other is replaced. Request deadlines and claim checks are unchanged.
-  - [CI run 3](../../test/results/adr197-continuation-ci-3/native-continuation-1/context-storage-environment.json)
+  - CI run 3
     (run 39030184231): two standbys did not change the pattern, which
     corrects the run-2 reading. `locate` finds a ready standby; the
     exchange behind `claim` fails, and the region reports `serve
     (unavailable)`, sometimes right after its first native read. The
     hub-worker's claim sub-steps, the hub-api's claim handler and the hub
     coordinator's operation steps now each log their fixed refusal stage.
-  - [CI run 4](../../test/results/adr197-continuation-ci-4/native-continuation-1/context-storage-environment.json)
+  - CI run 4
     (run 39032137482): failures are `claim/post` on the hub-worker and
     `observe` in the hub-api's claim handler. The region completed 13
     full serves (all four native reads), and several hub failures take
@@ -382,7 +382,7 @@ Historical checkpoints recorded before the 2026-10-20 status refresh above:
     observation across hub-worker, hub-api and region, with 51 requests
     spending 76 ms in the API server: most of each 2.4–2.8 s observation
     is client-side 20 QPS limiting.
-  - [CI run 5](../../test/results/adr197-continuation-ci-5/native-continuation-1/context-storage-environment.json)
+  - CI run 5
     (run 39033973438): the refusals are `observe/conversation/registration-1`
     and `registration-3`, occasionally `exchange`: the hub's SQL registry
     read of two consecutive native values around the activated-leaf check.
@@ -390,7 +390,7 @@ Historical checkpoints recorded before the 2026-10-20 status refresh above:
     so registration-3 often stops between the reads (value check or SQL);
     registration-1 fails after both reads. The registry now names each
     check, distinguishing expired values from mismatches.
-  - [CI run 6](../../test/results/adr197-continuation-ci-6/native-continuation-1/context-storage-environment.json)
+  - CI run 6
     (run 39035890980): the hub's refusals are transport reads over the
     standby (`registration-1/first-read`, `registration-3/last-read`,
     `exchange`, `receipt`), not registry checks. About nine of the
@@ -399,7 +399,7 @@ Historical checkpoints recorded before the 2026-10-20 status refresh above:
     the hub's owner candidates and verifies the hub owner's proof through
     its own lifecycle reads. The region's probe answer, producer setup and
     serve loop now carry fixed steps, and its standby log prints the chain.
-  - [CI run 7](../../test/results/adr197-continuation-ci-7/native-continuation-1/context-storage-environment.json)
+  - CI run 7
     (run 39037953153): the region names `serve/answer` in ten failed
     serves. In the event order, most follow a successful native read 4
     (510–600 ms for its 22 calls) or read 3, so the region refuses after
@@ -408,7 +408,7 @@ Historical checkpoints recorded before the 2026-10-20 status refresh above:
     limiters. The connection layer had flattened the channel's step; it
     now passes it through, the answer distinguishes `window` from `keys`,
     and each failed serve logs its elapsed time.
-  - [CI run 9](../../test/results/adr197-continuation-ci-9/native-continuation-1/context-storage-environment.json)
+  - CI run 9
     (run 39040224004) names the cause: the region's dominant refusal is
     `serve/answer/channel/candidates (hub-channel)`. Each probe answer
     re-reads the hub's owner candidates over the lifecycle channel, and
@@ -419,7 +419,7 @@ Historical checkpoints recorded before the 2026-10-20 status refresh above:
     federation now admits four conversations; its SQL pools stay at one
     connection each. The window hypothesis is not supported: the failures
     are channel refusals, not expired bounds.
-  - [CI run 10](../../test/results/adr197-continuation-ci-10/native-continuation-1/context-storage-environment.json)
+  - CI run 10
     (run 39042349815): with four federation slots the `hub-channel`
     refusals are gone and failed exchanges fell from about fourteen to
     four. Discovery observations now always succeed; every guarded-workload
@@ -429,20 +429,20 @@ Historical checkpoints recorded before the 2026-10-20 status refresh above:
     native reader's client and shared its 20 QPS limiter, so the guarded
     metadata spent the final bracket's budget. The metadata now has its
     own observer instance at the same fixed limit.
-  - [CI run 11](../../test/results/adr197-continuation-ci-11/native-continuation-1/context-storage-environment.json)
+  - CI run 11
     (run 39044413471): with separate limiters the first guarded-workload
     observation succeeded (2.12 s), and enrollment then refused at its
     `enroll` stage about 20 ms later without a reservation row. The
     enrollment coordinator's steps (observation, read, reserve, mismatch,
     account, capture, publish) are now labelled and the cause is passed
     through.
-  - [Direct-observation CI run](../../test/results/adr197-direct-ci-2/native-direct-observation-1/context-storage-environment.json)
+  - Direct-observation CI run
     (run 39046711116, 6.5 minutes): the focused suite now runs every
     capacity purpose, including the combined guarded workload, against
     real Kubernetes in two clusters with the v2 holder path. All passed;
     the guarded exchange took 2.99 s with 2.0 s of its window left. The
     measurement-only spike that motivated decision 3 is removed.
-  - [Local SQL runs 8–9](../../test/results/adr197-custody-9/environment.json)
+  - Local SQL runs 8–9
     reproduce the enrollment step in 78 s instead of a 28-minute native
     run. The reservation's refusal is `capacity qualified account or
     protocol ceiling reached`. In the native test the operator's regional
@@ -455,7 +455,7 @@ Historical checkpoints recorded before the 2026-10-20 status refresh above:
     refused without a row when they are exhausted. Follow-up: a policy
     above the root's qualified protocol is only refused at reservation;
     source acceptance should report it to the operator.
-  - [CI runs 14 and 15](../../test/results/adr197-continuation-ci-15a/native-continuation-1/context-storage-environment.json)
+  - CI runs 14 and 15
     (39049020194, 39051059253, 39051064937): discovery observations always
     succeed while guarded-workload observations mostly fail; run 15a had
     two guarded successes, then composition refused. The common cause is
@@ -469,7 +469,7 @@ Historical checkpoints recorded before the 2026-10-20 status refresh above:
     which is why both passed. Also: a failed TokenReview call is no longer
     reported as `denied`, composition names its steps, and the regional
     cause words include the capacity errors.
-  - [CI runs 16a/16b](../../test/results/adr197-continuation-ci-16a/native-continuation-1/context-storage-environment.json)
+  - CI runs 16a/16b
     (39054066644, 39054072422) tried starting a regional read only while
     the source had 3.5 s left: the gate never opened, because the source
     observation itself spends part of its five seconds before it is
@@ -480,13 +480,13 @@ Historical checkpoints recorded before the 2026-10-20 status refresh above:
     composition and enrollment. No interval is renewed or extended, the
     authority reads become fresher, and every effect still follows every
     check. The hub cluster's local path is unchanged.
-  - [CI run 17b](../../test/results/adr197-continuation-ci-17b/native-continuation-1/context-storage-environment.json)
+  - CI run 17b
     (39056242919, 22.6 minutes) **passed with the read-first path**: the
     regional workload enrolled through the v2 exchange to `ready_at` with
     a fresh binding, and the pool extended once. This is the first
     complete installed two-cluster continuation pass of ADR-197. It uses
     the fixture's explicit synthetic setup roots, like every earlier run.
-  - [CI run 17a](../../test/results/adr197-continuation-ci-17a/native-continuation-1/context-storage-environment.json)
+  - CI run 17a
     (39056235249), the same commit, failed earlier. After its restart the
     hub-worker started capacity with zero regional clusters and never
     restarted the child with the joined cluster; runs 14–16 logged that
@@ -495,7 +495,7 @@ Historical checkpoints recorded before the 2026-10-20 status refresh above:
     failed qualification read as no change and did not log it, so the run
     cannot show why. The read now names its step (`query`,
     `query-timeout`) and the watcher logs each change of outcome.
-  - [CI runs 18a/18b](../../test/results/adr197-continuation-ci-18b/native-continuation-1/context-storage-environment.json)
+  - CI runs 18a/18b
     (39058402129, 39058408756): 18a passed like 17b. In 18b the hub-worker
     picked up the joined cluster and every guarded observation succeeded
     in about 2.2 s, but after one early `not-allocated` refusal each
@@ -506,7 +506,7 @@ Historical checkpoints recorded before the 2026-10-20 status refresh above:
     phase (`recovery`, `revision`, `protection`, `read`, `input`,
     `accept`, `result`) and the hub-worker logs each change of outcome.
     So far two of four runs on the read-first path pass.
-  - [CI runs 19a/19b](../../test/results/adr197-continuation-ci-19b/native-continuation-1/context-storage-environment.json)
+  - CI runs 19a/19b
     (39060582454, 39060589794): 19a passed, so three of six read-first
     runs pass. In 19b the source loop recovered after one `accept`
     refusal and the regional workload reached `ready_at`, but its binding
@@ -520,7 +520,7 @@ Historical checkpoints recorded before the 2026-10-20 status refresh above:
     authority publisher's errors. Both are now logged per change, and on
     timeout the test prints each basis's sequence, live and retired
     assignments and unacknowledged audits.
-  - [CI runs 20a–20c](../../test/results/adr197-continuation-ci-20c/native-continuation-1/context-storage-environment.json)
+  - CI runs 20a–20c
     (39062760404, 39062766911, 39062774420): 20b passed (four of nine
     read-first runs). The new diagnostics rule out the permission theory:
     in 20a and 20c the only permission basis is current, live and
@@ -533,7 +533,7 @@ Historical checkpoints recorded before the 2026-10-20 status refresh above:
     still running after two source intervals with its cluster and stage,
     and the hub cluster's observations and outcomes are logged as
     `capacity local ...`.
-  - [CI runs 21a–21c](../../test/results/adr197-continuation-ci-21a/native-continuation-1/context-storage-environment.json)
+  - CI runs 21a–21c
     (39065053466, 39065059100, 39065064989): 21b passed (five of twelve).
     No loop step stalled. The silence was the observation log, which
     prints a line only when it differs from the previous one: discovery

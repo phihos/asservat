@@ -2,7 +2,7 @@
 
 These slices refine [TASK-01–11](../implementation-plan.md); they do not replace those IDs or remove product scope. Slice status is in [implementation progress](../implementation-progress.md). Implement shared authority, privacy and capacity foundations before enabling effects.
 
-The [technology selection experiments](../../experiments/technology-selection/README.md) and the feasibility labs are S-00 evidence, not S-00 completion. The [build/reuse matrix](build-or-reuse.md) names reusable pieces and ownership for every component. Mechanisms follow [ADR-330](../decisions/330-event-driven-system-design.md).
+The technology selection experiments and the feasibility labs are S-00 evidence, not S-00 completion. The [build/reuse matrix](build-or-reuse.md) names reusable pieces and ownership for every component. Mechanisms follow [ADR-330](../decisions/330-event-driven-system-design.md).
 
 ## Sequence
 

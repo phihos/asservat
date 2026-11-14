@@ -1,20 +1,9 @@
 package integration
 
 import (
-	identities "asservat.local/asservat/internal/application/identity"
-	"asservat.local/asservat/internal/console"
-	"asservat.local/asservat/internal/contracts"
-	query "asservat.local/asservat/internal/domain/analysis"
-	"asservat.local/asservat/internal/domain/artifact"
-	"asservat.local/asservat/internal/domain/catalog"
-	identity "asservat.local/asservat/internal/domain/identity"
-	"asservat.local/asservat/internal/transport/browser"
-	mcptransport "asservat.local/asservat/internal/transport/mcp"
-	"asservat.local/asservat/internal/transport/presentation"
 	"bufio"
 	"context"
 	"encoding/json"
-	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
@@ -28,6 +17,18 @@ import (
 	"syscall"
 	"testing"
 	"time"
+
+	identities "asservat.local/asservat/internal/application/identity"
+	"asservat.local/asservat/internal/console"
+	"asservat.local/asservat/internal/contracts"
+	query "asservat.local/asservat/internal/domain/analysis"
+	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/catalog"
+	identity "asservat.local/asservat/internal/domain/identity"
+	"asservat.local/asservat/internal/transport/browser"
+	mcptransport "asservat.local/asservat/internal/transport/mcp"
+	"asservat.local/asservat/internal/transport/presentation"
+	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 type savedLogsBrowserSource struct {

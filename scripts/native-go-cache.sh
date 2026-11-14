@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
-# native-go-cache.sh installed|race|collector
+# native-go-cache.sh race|collector
 #
 # Trim a restored full Go cache to what one kind of native suite builds
 # (.github/workflows/native.yml restores it as go-native-<kind>-*):
-#   installed  continuation-* (test package without -race, hub and collector images)
 #   race       component suites (test package with -race, hub image, fixtures)
 #   collector  collector-* (test package with the libpcap tag, collector image)
 # The unit-test race builds of every package and the tool modules stay out.
@@ -15,7 +14,7 @@
 # missing here only compiles in its native job, as on any cache miss.
 set -euo pipefail
 [[ ${GITHUB_ACTIONS:-} == true ]] || { echo "CI only: it deletes most of this machine's Go caches" >&2; exit 2; }
-kind=${1:?installed, race or collector}
+kind=${1:?race or collector}
 cache=$(go env GOCACHE)
 tmp=${ASSERVAT_BUILD_TMP:-$HOME/.cache/asservat-build/tmp}
 mkdir -p "$tmp"
@@ -33,12 +32,6 @@ hub_image() {
 builds() {
   "${fixture[@]}" ./test/fixtures/profile-native/main.go
   case $kind in
-    installed)
-      go test -count=1 -run '^$' ./test/integration >/dev/null
-      hub_image
-      collector_image
-      "${fixture[@]}" ./test/fixtures/worker-resource-probe/main.go
-      ;;
     race)
       go test -race -count=1 -run '^$' ./test/integration >/dev/null
       go test -c -o /dev/null ./internal/adapters/objectstore

@@ -1,16 +1,14 @@
 package integration
 
 import (
+	"context"
+	"encoding/json"
+	"testing"
+	"time"
+
 	"asservat.local/asservat/internal/contracts"
 	query "asservat.local/asservat/internal/domain/analysis"
 	"asservat.local/asservat/internal/domain/artifact"
-	"context"
-	"encoding/json"
-	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
-	"net/http"
-	"strings"
-	"testing"
-	"time"
 )
 
 type installedPacketQuerySource struct {
@@ -45,48 +43,6 @@ func installedPacketQuerySelection(mode ...string) query.PacketQuerySelection {
 		s.FramePrefix = nil
 	}
 	return s
-}
-func queryInstalledPacketQuery(t *testing.T, ctx context.Context, identity *installedIdentity, transport http.RoundTripper, origin string, source installedPacketQuerySource, check installedProjectionCheck) query.PacketQueryResult {
-	t.Helper()
-	if check == nil {
-		t.Fatal("packet query requires independent SQL proof")
-	}
-	verify := check(source.ArtifactID)
-	token := identity.packetQueryTokenSource(origin)
-	if _, err := token.Token(ctx); err != nil {
-		t.Fatal(err)
-	}
-	wire, err := contracts.NewInvestigationContracts()
-	if err != nil {
-		t.Fatal(err)
-	}
-	client := sdk.NewClient(&sdk.Implementation{Name: "installed-packet-query", Version: "1"}, nil)
-	session, err := client.Connect(ctx, &sdk.StreamableClientTransport{Endpoint: strings.TrimSuffix(origin, "/") + "/mcp", HTTPClient: &http.Client{Transport: installedJourneyBearer{transport, token.Token}, Timeout: 60 * time.Second}, MaxRetries: -1, DisableStandaloneSSE: true}, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer session.Close()
-	call := func(name string, args any) installedComparisonReply {
-		t.Helper()
-		started := time.Now()
-		result, err := session.CallTool(ctx, &sdk.CallToolParams{Name: name, Arguments: args})
-		if err != nil {
-			t.Fatal("packet query outcome unavailable; no replay", name, err)
-		}
-		raw, err := json.Marshal(result.StructuredContent)
-		var out installedComparisonReply
-		if err != nil || wire.ValidateOutput(name, raw) != nil || json.Unmarshal(raw, &out) != nil || result.IsError != (out.Status == "error") {
-			t.Fatal("canonical packet query response", name)
-		}
-		t.Logf("installed packet query %s status=%s elapsed=%s", name, out.Status, time.Since(started))
-		return out
-	}
-	denied := call("prepare_artifact_download", map[string]string{"artifact_id": source.ArtifactID, "idempotency_key": "raw-query-no-native"})
-	if denied.Status != "error" {
-		t.Fatal("read+raw session obtained native preparation")
-	}
-	verify("", "")
-	return queryInstalledPacketQueryWithCall(t, ctx, source, installedPacketQueryRequest(source, "installed-packet-query-mcp-"+source.ArtifactID), call, verify, true)
 }
 
 // Same-key Begin replay is exercised only by the MCP caller. Browser mode
@@ -223,16 +179,6 @@ func (p *installedPacketTerminalPipeline) add(t *testing.T, wait func()) {
 	}
 	p.pending = append(p.pending, wait)
 	p.admitted++
-}
-func (p *installedPacketTerminalPipeline) drain(t *testing.T) {
-	t.Helper()
-	if len(p.pending) == 0 {
-		t.Fatal("missing original raw-query terminal proof")
-	}
-	wait := p.pending[0]
-	p.pending = p.pending[1:]
-	wait()
-	p.joined++
 }
 func (p *installedPacketTerminalPipeline) finish(t *testing.T) {
 	t.Helper()

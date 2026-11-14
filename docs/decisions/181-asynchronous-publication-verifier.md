@@ -96,7 +96,7 @@ from the test.
   `ContextKeyUnwrapGrantSQL` implement the authority; `ContextPublicationQueue`
   lists stored, unpublished captures with their attempt and copies.
 - **Real PostgreSQL**
-  ([result](../../test/results/adr181-sql-2/result.json)). The authority and
+  (result). The authority and
   queue run under narrow logins with their exact product grants. The checks
   cover:
   - the queue listing;
@@ -105,7 +105,7 @@ from the test.
   - the allowance shared across two certificates, with unwrap 13 refused;
   - removal from the queue and refusal of unwraps after publication.
 
-  [Run 1](../../test/results/adr181-sql-1/result.json) failed on a test
+  Run 1 failed on a test
   fixture whose key peer spanned 61 minutes; key peers are limited to one
   hour.
 - **Roles.**
@@ -114,7 +114,7 @@ from the test.
     `publisher-identity-read` (65) and `publisher-retention-read` (66).
   - `context-verify` gained `SELECT(capture_id)` on `context_catalog` for the
     queue.
-  - The [initial-installation suite](../../test/results/adr181-roles-1/result.json)
+  - The initial-installation suite
     provisions and verifies all 66 roles: exit 0, 87 tests.
 - **Key service.** `authapp.KeyOperationAuthorizers` dispatches `operation/role`
   before `operation`. The key service composes `unwrap/verifier` over its own

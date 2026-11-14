@@ -1,15 +1,6 @@
 package integration
 
 import (
-	"asservat.local/asservat/internal/adapters/kms"
-	kube "asservat.local/asservat/internal/adapters/kubernetes"
-	"asservat.local/asservat/internal/adapters/mtls"
-	"asservat.local/asservat/internal/adapters/objectstore"
-	"asservat.local/asservat/internal/adapters/postgres"
-	app "asservat.local/asservat/internal/application/fleet"
-	"asservat.local/asservat/internal/contracts"
-	"asservat.local/asservat/internal/domain/audit"
-	value "asservat.local/asservat/internal/domain/fleet"
 	"bytes"
 	"context"
 	"crypto/ed25519"
@@ -19,14 +10,24 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"errors"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"io"
-	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	"asservat.local/asservat/internal/adapters/kms"
+	kube "asservat.local/asservat/internal/adapters/kubernetes"
+	"asservat.local/asservat/internal/adapters/mtls"
+	"asservat.local/asservat/internal/adapters/objectstore"
+	"asservat.local/asservat/internal/adapters/postgres"
+	app "asservat.local/asservat/internal/application/fleet"
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/audit"
+	value "asservat.local/asservat/internal/domain/fleet"
+	"github.com/jackc/pgx/v5/pgxpool"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 )
 
 // Only this fixture renews the independently supplied installation recovery

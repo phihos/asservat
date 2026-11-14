@@ -7,11 +7,11 @@ Qualification is recorded in [implementation progress](../implementation-progres
 Requirements: REQ-EXE-002, REQ-DB-003–004; S-02.
 
 Current qualification (2026-10-20): the
-[real-service regression](../../test/results/resumed-c62e02ac-api-preparation-green/result.json)
+real-service regression
 passes post-lock headroom refusal, zero new effects, a later fresh first winner
 and exact expired prepared-row replay into uncertainty, with synthetic current
 authority.
-[Resumed native48](../../test/results/resumed-c62e02ac-native48/result.json)
+Resumed native48
 records a headroom refusal on the first same-capture continuation, then a first
 preparation on the second continuation with 1.095163 seconds remaining. Start,
 acquisition and stored completion occurred before that preparation's original
@@ -26,7 +26,7 @@ transport cutoff. Native48 failed before fresh status/case retrieval and
 download. Native47's earlier zero-execution-row failure did not reach this
 preparation floor.
 
-[Resumed native49](../../test/results/resumed-c62e02ac-native49/result.json)
+Resumed native49
 again completed start, acquisition and storage before the original preparation
 deadline, followed by installed publication. It recovered the accepted capture
 through fresh authorized `get_capture` and `get_case` reads despite

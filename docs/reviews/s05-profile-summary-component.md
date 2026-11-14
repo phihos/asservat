@@ -63,7 +63,7 @@ Verification at this component checkpoint:
   passed (15.398 s / 1.014 s); targeted `go vet` passed.
 - `go test ./internal/adapters/diagnostics -run '^$' -fuzz '^FuzzPprofSummary$'
   -fuzztime=15s -parallel=2` passed with 236,182 executions; actual output is in
-  [the fuzz log](../../test/results/pprof-summary-component-fuzz.log).
+  the fuzz log.
 - `make spec-check architecture-check go-architecture-check
   investigation-schema-check design-check` passed: 13,464 specification
   assertions, 1,330 architecture checks, 69 Go packages/427 internal edges,

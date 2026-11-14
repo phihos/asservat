@@ -1,6 +1,13 @@
 package integration
 
 import (
+	"context"
+	"encoding/json"
+	"errors"
+	"sync"
+	"testing"
+	"time"
+
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
 	auditapp "asservat.local/asservat/internal/application/audit"
@@ -10,13 +17,7 @@ import (
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/identity"
-	"context"
-	"encoding/json"
-	"errors"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"sync"
-	"testing"
-	"time"
 )
 
 type contextPublicationTestGate struct {

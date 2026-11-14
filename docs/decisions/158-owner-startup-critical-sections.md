@@ -15,7 +15,7 @@ The accepted SQL reader reports `fleet-interval/expired-interval` using its
 original rows and database clock. Individual native responses still have time
 remaining. The fleet observer records lock timeouts while startup holds the
 shared recovery row across its first native graph, effects and final graph.
-See [the original run](../../test/results/runtime-provider-owner-native-4/result.json); this is measured
+See the original run; this is measured
 failure, not a claim that the following correction is qualified.
 
 ADR-155 prevents an additional suspension after a definitely aborted unchanged

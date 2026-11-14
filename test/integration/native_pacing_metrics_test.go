@@ -1,16 +1,10 @@
 package integration
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
-	"io"
-	"net/http"
 	"os"
-	"strings"
 	"time"
-
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // All counters belong to the owned fixture. Runtime authorization never reads
@@ -67,10 +61,6 @@ func nativePacingTargetCPUSamples(before, after *nativeTrafficCPU) nativePacingT
 }
 
 type nativePacingMeasurement struct {
-	traffic                                                  nativeTrafficHelper
-	admin                                                    *pgxpool.Pool
-	root                                                     string
-	providers                                                *initialRuntimeNativeProviders
 	Phases                                                   []nativePacingPhase `json:"phases"`
 	Traffic                                                  nativeTrafficResult
 	TargetCPU                                                nativePacingTargetCPU
@@ -92,36 +82,6 @@ type nativePacingMeasurement struct {
 	ObservedSQLDelta                      map[uint32]nativeSQLCounters
 	ObservedProviderDelta                 map[string]nativeProviderCounters
 	ObservedStartedAt, ObservedFinishedAt time.Time
-}
-
-func (m *nativePacingMeasurement) snapshot(ctx context.Context) (nativePacingSnapshot, error) {
-	s := nativePacingSnapshot{StartedAt: time.Now().UTC()}
-	var err error
-	s.SQL, err = nativePacingSQLSnapshot(ctx, m.admin)
-	if err != nil {
-		return s, err
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimSuffix(m.providers.fixture.NativeProviders.S3, "/")+"/__asservat_fixture/counters", nil)
-	if err != nil {
-		return s, errors.New("provider counter URL unavailable")
-	}
-	response, err := m.providers.client.Do(req)
-	if err != nil {
-		return s, errors.New("provider counters unavailable")
-	}
-	defer response.Body.Close()
-	raw, err := io.ReadAll(io.LimitReader(response.Body, 16385))
-	if err != nil || len(raw) > 16384 || response.StatusCode != http.StatusOK || json.Unmarshal(raw, &s.Providers) != nil || len(s.Providers) != len(nativeProviderCategories) {
-		return s, errors.New("provider counter shape unavailable")
-	}
-	for _, name := range nativeProviderCategories {
-		c, ok := s.Providers[name]
-		if !ok || !c.valid() {
-			return s, errors.New("provider counter category unavailable")
-		}
-	}
-	s.FinishedAt = time.Now().UTC()
-	return s, nil
 }
 
 func (c nativeProviderCounters) valid() bool {
@@ -146,41 +106,6 @@ func nativeProviderDelta(a, b map[string]nativeProviderCounters) (map[string]nat
 		out[name] = d
 	}
 	return out, nil
-}
-
-// End snapshots enclose the phase edges. Their own administrative SQL and
-// provider-counter reads are excluded by the lower-level fixture counters.
-func (m *nativePacingMeasurement) begin(ctx context.Context, name string) (func() error, error) {
-	if m == nil || len(m.Phases) >= 24 {
-		return nil, errors.New("native phase budget exceeded")
-	}
-	for _, p := range m.Phases {
-		if p.Name == name {
-			return nil, errors.New("duplicate native phase")
-		}
-	}
-	before, err := m.snapshot(ctx)
-	if err != nil {
-		return nil, err
-	}
-	phase := nativePacingPhase{Name: name, Before: before, StartedAt: time.Now().UTC()}
-	ended := false
-	return func() error {
-		if ended {
-			return errors.New("native phase already ended")
-		}
-		ended = true
-		phase.FinishedAt = time.Now().UTC()
-		phase.After, err = m.snapshot(ctx)
-		if err == nil {
-			phase.SQLDelta, err = nativePacingSQLDelta(before.SQL, phase.After.SQL)
-		}
-		if err == nil {
-			phase.ProviderDelta, err = nativeProviderDelta(before.Providers, phase.After.Providers)
-		}
-		m.Phases = append(m.Phases, phase)
-		return err
-	}, nil
 }
 
 func (m *nativePacingMeasurement) writeReport() error {

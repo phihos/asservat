@@ -12,13 +12,13 @@ topology pins).
 
 Current qualification (2026-10-20): the installer deploys the publisher with
 its provider setup, credentials and protected inputs.
-[Independent fresh lifecycles](../../test/results/resumed-c62e02ac-publication-grants-green/result.json)
+Independent fresh lifecycles
 using the compiled verifier and publisher roles pass publication, historical
 replay and purpose-isolation checks, with synthetic current authority.
-[Resumed native48](../../test/results/resumed-c62e02ac-native48/result.json)
+Resumed native48
 completed acquisition and storage, followed by installed verification, encrypted
 verification-audit acknowledgement and catalog publication. The
-[SQL postmortem](../../test/results/resumed-c62e02ac-native48/postmortem-publication.log)
+SQL postmortem
 records publication at `2026-10-20T18:09:06.234647Z`. The generic custody row
 remains `stored_unpublished`; the separate verification, audit and catalog
 records establish publication.
@@ -27,7 +27,7 @@ Native48's overall installed test exited 1. Its public capture response remained
 `OutcomeUnknown`, and an exhausted admission-resolution reservation stopped the
 fixture before fresh capture/case reads or download.
 
-[Resumed native49](../../test/results/resumed-c62e02ac-native49/result.json)
+Resumed native49
 again reached installed verification, audit acknowledgement and catalog
 publication, then recovered the accepted capture and completed fresh authorized
 `get_capture` and `get_case` reads with one published artifact. Its outward
@@ -149,7 +149,7 @@ Historical checkpoints recorded before the 2026-10-20 status refresh above:
   verifier signing; the in-process verifier credential; and the process
   composition with the guard proof, catalog pins and restart on catalog
   change. Native qualification is pending.
-- [CI run 39091781828](../../test/results/ci-publisher-1/native-continuation-1/context-storage-environment.json)
+- CI run 39091781828
   installed every publisher step, including the readback of the
   operator-applied OpenBao setup, but the process stopped with a generic
   message; the next run, with startup phases, stopped at `publisher/catalog`:

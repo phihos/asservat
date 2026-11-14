@@ -1,14 +1,15 @@
 package integration
 
 import (
+	"context"
+	"testing"
+	"time"
+
 	"asservat.local/asservat/internal/adapters/postgres"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/identity"
 	value "asservat.local/asservat/internal/domain/privacy"
-	"context"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"testing"
-	"time"
 )
 
 // Reuse the existing actual initialized/restricted SQL fixture. Only the

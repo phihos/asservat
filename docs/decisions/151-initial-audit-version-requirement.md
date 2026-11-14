@@ -64,7 +64,7 @@ fresh original bootstrap chain against actual Kubernetes, SQL, key and object
 services, asserting the committed initial audit version and exact cleanup.
 Actual results, including interrupted checks, remain in the progress record.
 
-The [original native run](../../test/results/initial-versioned-audit-native-1/result.json)
+The original native run
 passes all four selected cases with 2,142 unchanged source hashes and complete
 owned cleanup. Both runtime Deployments stay at zero replicas. The [combined
 component gate](../../test/results/initial-owner-integration-1/result.json) also
@@ -102,7 +102,7 @@ The private helper supplies no authority or writer-completion fact. This change
 does not migrate generic stores to version-required construction or establish
 retirement coverage for additional audit families.
 
-The [broader correction](../../test/results/audit-create-pinning-integration.json)
+The broader correction
 reproduces the original owner-version substitution and download-window availability
 failure. Corrected object/framing races pass 60 top-level / 185 named cases and
 audit-application races pass 34 top-level / 75 named cases with no skips; whole
@@ -114,7 +114,7 @@ The initial receipt predicate also requires a nonempty, non-`null` version.
 This applies at SQL acknowledgement, activation, historical observation and
 post-activation runtime-bridge construction, so a previously stored empty/null
 receipt cannot bypass the new-write constructor. Existing bytes remain untouched;
-there is no automatic migration or synthesized version. The [history regression](../../test/results/initial-audit-history-version-integration.json)
+there is no automatic migration or synthesized version. The history regression
 reproduces two direct and four persisted-history acceptance failures with the old
 predicate. Corrected component races pass 10 top-level / 66 named entries with
 no skips; compilation and affected vet pass with 3,025 unchanged dependencies.

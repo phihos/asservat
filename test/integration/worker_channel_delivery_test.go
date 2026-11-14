@@ -1,11 +1,12 @@
 package integration
 
 import (
-	"asservat.local/asservat/internal/application/evidence"
-	value "asservat.local/asservat/internal/domain/authorization"
 	"context"
 	"sync"
 	"time"
+
+	"asservat.local/asservat/internal/application/evidence"
+	value "asservat.local/asservat/internal/domain/authorization"
 )
 
 type fixtureWorkerIssuance interface {

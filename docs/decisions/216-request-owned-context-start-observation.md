@@ -89,7 +89,7 @@ uncertain-effect behavior. Component evidence does not establish installed
 availability. Record actual results and remaining gaps in
 [implementation progress](../implementation-progress.md).
 
-The [component archive](../../test/results/resumed-c62e02ac-capture-start-observation/README.md)
+The component archive
 records genuine failing baseline regressions and passing execution, bootstrap,
 context-start and mTLS race suites. Before first preparation, the composed path
 now makes one accepted-work read and 24 capability HTTP requests. The successful
@@ -97,7 +97,7 @@ runner makes one target/eligibility/capability/retention observation and retains
 its separate completion process check. These results do not qualify installed
 latency or a complete native capture/download.
 
-The [selected real PostgreSQL/S3 gates](../../test/results/resumed-c62e02ac-capture-start-gates/README.md)
+The selected real PostgreSQL/S3 gates
 pass on frozen `9543cff7`, including permission revocation committed while the
 retained observation waits on the permission lock. The effect refuses while the
 original observation and caller remain live, and preserves the immutable

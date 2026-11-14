@@ -15,7 +15,7 @@ download workers), [ADR-069](069-download-worker-dispatch.md) to
 
 Current qualification (2026-10-20): hub-local worker, enrollment,
 native-transfer and acquisition-key composition exists.
-[Resumed native47](../../test/results/resumed-c62e02ac-native47/context-storage.log)
+Resumed native47
 completed worker/profile provisioning and configuration acceptance, but the
 installed journey did not reach native download. Component download evidence
 remains separate: installed transfer, interruption, Stop, revocation and expiry

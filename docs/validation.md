@@ -90,12 +90,10 @@ Each shard uploads a record of the plan, its executed units and measured times;
 `ci-ok` fails unless all fourteen records share one plan and together executed
 every unit exactly once. `check-go-tests.py --update-weights <dir>` refreshes the
 weights from downloaded records. Pushes that change only documentation outside
-`docs/interfaces/`, recorded results, the design prototype or root Markdown run
+`docs/interfaces/`, the design prototype or root Markdown run
 only the documentation and schema gates. The documentation, schema, SQL, Helm,
 console (`console-check`, no Go) and console browser gates run as parallel jobs. Native suites run only
-on dispatch (`native.yml`, suites from `scripts/ci-native.sh --list`; grouped
-installed suites run several focuses after one bootstrap, see
-docs/development-workflow.md), each on a fresh runner; their `test/results` output is uploaded as a run artifact. A CI run
+on dispatch (`native.yml`, suites from `scripts/ci-native.sh --list`), each on a fresh runner; their `test/results` output is uploaded as a run artifact. A CI run
 is recorded like a local run: run URL, exit, selected tests and the harness's
 source hashes. The custody suite (`make custody-integration`, about 16 minutes
 locally) runs in CI as `custody-1` … `custody-4` (`CUSTODY_SHARDS` in
@@ -115,21 +113,10 @@ pass, and the Go, test and console jobs must pass unless `changes` classified th
 change as documentation-only. Native suites can be
 dispatched on a pull request branch with `gh workflow run native.yml --ref <branch>`.
 
-For local debugging, `scripts/test-context-storage.py --keep-on-failure` leaves
-a failed run's own clusters and labelled containers (and the Go fixtures'
-objects) running and records them in a manifest under the build cache;
-`--cleanup-kept MANIFEST` later removes exactly those resources after checking
-each name or label against the run, and writes
-`test/results/kept-cleanup-<run>.json` as the cleanup evidence. A kept run is
-never a qualification result. The direct-observation suite
-(`scripts/ci-native.sh direct-observation`, about eight minutes) covers every
-regional capacity purpose, including the combined guarded workload, without
-the full installation replay.
-
 S-01/S-02 qualification includes the actual installed constructor and every
 nested authority/provider read on its successful path. Passing isolated
 components does not establish that their composition can finish. The recorded
-[native observation failure](../test/results/regional-observation-native-cost-test.log)
+native observation failure
 is an expected-denial regression, not a successful routing result.
 
 Before an expensive native run, count requests by the actual shared API client
@@ -359,11 +346,11 @@ The [user-task review](reviews/user-task-review.md) is expert inspection, not pa
 
 ## Technology-selection evidence and pending gates
 
-The [isolated dependency experiments](../experiments/technology-selection/README.md) record actual Go tests, frontend build, TypeScript generation and failed Go-generation/version-resolution attempts. They do not replace EXP gates. The [technology research](research/technology-selection.md) adds explicit pre-freeze qualification for large native-range artifact layout, parser/schema parity, real libpcap-to-Gadget filter integration and the React dependency set. Use the [build/reuse matrix](architecture/build-or-reuse.md) when assigning implementation/qualification owners; all 24 components retain their existing requirements.
+The isolated dependency experiments record actual Go tests, frontend build, TypeScript generation and failed Go-generation/version-resolution attempts. They do not replace EXP gates. The [technology research](research/technology-selection.md) adds explicit pre-freeze qualification for large native-range artifact layout, parser/schema parity, real libpcap-to-Gadget filter integration and the React dependency set. Use the [build/reuse matrix](architecture/build-or-reuse.md) when assigning implementation/qualification owners; all 24 components retain their existing requirements.
 
 ## First mechanism spikes: partial evidence, 2026-10-09
 
-The [lab and reproduction instructions](../experiments/feasibility/README.md) retain final command exits, source hashes, failed assumptions and cleanup records. Eleven ordinary Go tests passed with the race detector; three explicitly opt-in measurement tests each passed separately. The VM kernel filter corpus passed all 11 libpcap-generated cases. Gadget's own compiler rejected one valid IPv6 case, so a successful comparison-test exit is not compiler parity.
+The lab and reproduction instructions retain final command exits, source hashes, failed assumptions and cleanup records. Eleven ordinary Go tests passed with the race detector; three explicitly opt-in measurement tests each passed separately. The VM kernel filter corpus passed all 11 libpcap-generated cases. Gadget's own compiler rejected one valid IPv6 case, so a successful comparison-test exit is not compiler parity.
 
 | Gate | Measured subset | Still required |
 | --- | --- | --- |
@@ -376,7 +363,7 @@ The storage fixture is SeaweedFS for testing, not a replacement production selec
 
 ## SQL and crash-path spikes: partial evidence, 2026-10-09
 
-The [second lab](../experiments/control-crash/README.md) retained 14 passing race-tested Go tests, one separately passing post-restart test, and 14 passing VM crash cases. It preserved the intentionally unsafe SQL baseline, the publication-expiry regression before its fix, the initial fault-wrapper race and the corrected PID-1 signal fixture. See [findings, environment, timings and limitations](research/feasibility-control-crash.md).
+The second lab retained 14 passing race-tested Go tests, one separately passing post-restart test, and 14 passing VM crash cases. It preserved the intentionally unsafe SQL baseline, the publication-expiry regression before its fix, the initial fault-wrapper race and the corrected PID-1 signal fixture. See [findings, environment, timings and limitations](research/feasibility-control-crash.md).
 
 | Gate | Measured subset | Still required |
 | --- | --- | --- |

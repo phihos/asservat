@@ -3,7 +3,7 @@
 > Superseded in part by ADR-328 (2026-11-13): decision 1's reason (a continuation replay inside the journal window) no longer applies; deriving capacity identities deterministically remains useful so that a re-run `setup` hook Job rebuilds the same input. The per-source guards named under Consequences are replaced by plain RBAC, and the context's "owner workload guard denies the hub-api's Job create" is no longer a constraint. Decisions 2 and 3 remain valid.
 
 Date: 2026-10-15. Status: accepted; steps 1–3 implemented and natively qualified
-([continuation run 43](../../test/results/adr183-continuation-native-43/result.json):
+(continuation run 43:
 capacity root `ReadyAt` set). Runs 35–42 are retained failures, listed below.
 Requirements: REQ-CAP-004–006, REQ-DLD-003, REQ-DEP-003, S-02; TASK-11.
 Amends [ADR-190](190-capacity-readiness-and-promoted-owner.md) decision 5 and
@@ -100,8 +100,8 @@ settings.
 
 ## Qualification findings
 
-- [Run 35](../../test/results/adr183-continuation-native-35/result.json) and
-  [run 37](../../test/results/adr183-continuation-native-37/result.json): the
+- Run 35 and
+  run 37: the
   launched owner exited at `provider-prime`.
   - `Prime` ended the process on the first failed provider-slot refresh.
   - Each refresh runs the owner's current proof twice within five seconds.
@@ -109,27 +109,27 @@ settings.
   - **Fix:** `Prime` waits for the slot's own backoff (1 s, 2 s, 4 s, ...)
     inside its original 30-second bound. A refusal without new backoff
     stays final.
-- [Run 36](../../test/results/adr183-continuation-native-36/result.json):
+- Run 36:
   the capacity projection was published, but the workload did not reach
   `ReadyAt`, and the hub-worker gave no stop detail.
   - **Fix:** the hub-worker now prints the stopped child, the stage and the
     error class.
   - The native test dumps Pod restarts, the logs and the capacity workload
     phases.
-- [Run 40](../../test/results/adr183-continuation-native-40/result.json):
+- Run 40:
   the hub-worker stopped at `capacity/open/deployment/control`.
   - The capacity deployment named the hub-worker as a status user of the
     capacity guard, but the guard was created with none. The rebuilt
     admission plan therefore missed the pin.
   - **Fix:** the deployment carries the installed plan. Namespace keys are
     sorted once.
-- [Run 41](../../test/results/adr183-continuation-native-41/result.json) and
+- Run 41 and
   run 35: the owner launch finalization failed once at `final-native`.
   - A new projection controller cannot continue an already claimed launch,
     so the attempt is terminal by design.
   - The code now carries the failure class and elapsed time. This failure
     stays an open reliability item.
-- [Run 42](../../test/results/adr183-continuation-native-42/result.json):
+- Run 42:
   the test waited on `capacity_workload`. That table stays empty without
   labelled application workloads; `ReadyAt` lives in the source's root
   configuration.

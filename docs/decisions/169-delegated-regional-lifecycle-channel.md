@@ -102,14 +102,14 @@ SQL, encrypted audit and the ADR-168 SQL store. The regional Pod holds only its
 cluster credential Secret (get/update on that one name) and in-cluster readers;
 it no longer receives the connector journal, acknowledgement, read or recovery
 SQL credentials. Run 4 passed all six required tests with empty cleanup and
-unchanged sources ([result](../../test/results/adr169-direct-native-4/result.json)).
+unchanged sources (result).
 The provider issuer and setup roots remain explicit fixture authority.
 
 Runs 1–3 failed and are retained:
-[1](../../test/results/adr169-direct-native-1/result.json) let the regional Pod
+1 let the regional Pod
 start before the owner listener existed (the harness now installs its input
-after the owner is ready). [2](../../test/results/adr169-direct-native-2/result.json)
-and [3](../../test/results/adr169-direct-native-3/result.json) added closed
+after the owner is ready). 2
+and 3 added closed
 diagnostic phases. They showed that presentation and real SQL source staging
 succeeded, but the regional Kubernetes reader refused the begun operation. The
 channel client had passed its 30-second conversation context, while the reader

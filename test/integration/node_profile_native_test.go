@@ -1,7 +1,6 @@
 package integration
 
 import (
-	"asservat.local/asservat/internal/adapters/diagnostics"
 	"bytes"
 	"context"
 	"crypto/sha256"
@@ -14,6 +13,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"asservat.local/asservat/internal/adapters/diagnostics"
 
 	"asservat.local/asservat/internal/application/delivery"
 	"asservat.local/asservat/internal/domain/artifact"

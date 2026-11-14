@@ -1,8 +1,0 @@
-{
-  "sourceCommit": "ec1298012173ed8efc59f50841321290dacf1513",
-  "harnessExit": 1,
-  "sourceHashesMatchedCommittedBlobs": 4052,
-  "sourceUnchanged": true,
-  "cleanupFailures": [],
-  "finding": "The read-only native proof query incorrectly applied JSON operators to binding_json bytea. Runtime terminal/progress/cancellation/evidence guards had passed their preceding assertions; whole test failed."
-}

@@ -1,12 +1,13 @@
 package integration
 
 import (
-	query "asservat.local/asservat/internal/domain/analysis"
-	"asservat.local/asservat/internal/domain/artifact"
 	"context"
 	"encoding/json"
-	"github.com/jackc/pgx/v5"
 	"testing"
+
+	query "asservat.local/asservat/internal/domain/analysis"
+	"asservat.local/asservat/internal/domain/artifact"
+	"github.com/jackc/pgx/v5"
 )
 
 func rawSyscallQuerySQLScope(t *testing.T) []byte {

@@ -1,14 +1,6 @@
 package integration
 
 import (
-	"asservat.local/asservat/internal/adapters/kms"
-	"asservat.local/asservat/internal/adapters/mtls"
-	"asservat.local/asservat/internal/adapters/objectstore"
-	"asservat.local/asservat/internal/adapters/postgres"
-	app "asservat.local/asservat/internal/application/fleet"
-	"asservat.local/asservat/internal/domain/artifact"
-	"asservat.local/asservat/internal/domain/audit"
-	value "asservat.local/asservat/internal/domain/fleet"
 	"bytes"
 	"context"
 	"crypto/ed25519"
@@ -17,12 +9,21 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"asservat.local/asservat/internal/adapters/kms"
+	"asservat.local/asservat/internal/adapters/mtls"
+	"asservat.local/asservat/internal/adapters/objectstore"
+	"asservat.local/asservat/internal/adapters/postgres"
+	app "asservat.local/asservat/internal/application/fleet"
+	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/audit"
+	value "asservat.local/asservat/internal/domain/fleet"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type ownerProofFunction func(context.Context, value.OwnerEnrollmentRequest) (value.OwnerEnrollmentProof, error)

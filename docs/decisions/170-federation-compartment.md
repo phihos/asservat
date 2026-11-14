@@ -62,7 +62,7 @@ federation role raises these to 65 and 161.
   `public-runtime-roles-{matrix,unknown-claim,lost-completion,held-lock,recovery-after-lock}`
   provisioned all 41 roles (including these 8) and verified each exact ACL and
   resolved overload. It passed with 87 tests, empty cleanup and unchanged sources
-  ([result](../../test/results/adr170-roles-1/result.json)).
+  (result).
 
 ## Processes
 
@@ -96,7 +96,7 @@ grants, real OpenBao PKI and transit, encrypted S3 audit and the v2 retirement
 layout. The regional Pod mounts no Secret. Run 10 passed: the hub's SQL shows
 an accepted process for that Pod with both leaves activated, and the region
 reports active credentials after the delegated registry checks, with no
-restarts ([result](../../test/results/adr170-product-native-10/result.json)).
+restarts (result).
 Roles, PKI, owner/fleet trust and generation 1 are explicit fixture setup; no
 product installer ran.
 

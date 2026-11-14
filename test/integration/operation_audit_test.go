@@ -1,6 +1,13 @@
 package integration
 
 import (
+	"context"
+	"encoding/json"
+	"errors"
+	"sync"
+	"testing"
+	"time"
+
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
 	app "asservat.local/asservat/internal/application/audit"
@@ -8,16 +15,10 @@ import (
 	"asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/migrations"
-	"context"
-	"encoding/json"
-	"errors"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
-	"sync"
-	"testing"
-	"time"
 )
 
 // Synthetic identity/bootstrap with actual separate-role SQL, encrypted objects
