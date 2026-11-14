@@ -7,6 +7,6 @@
     "before": "20s",
     "reason": "Preserve the current latency incident."
   },
-  "expected_plan_digest": "cc1d2458717eb5676b053b17cbae10f49d0635ef882c99efb1c6a01cd35ef880",
+  "expected_plan_digest": "b514e8e20fa380a9af045442ed2e34c4c7ee7aecce680acb8dab14591339517c",
   "idempotency_key": "save-recordings-synthetic-001"
 }

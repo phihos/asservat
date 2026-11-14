@@ -1,0 +1,308 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/retention-policy.schema.json",
+  "title": "Asservat retention-policy v1",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "apiVersion": {
+      "const": "asservat.io/v1alpha1"
+    },
+    "kind": {
+      "const": "EvidenceRetentionPolicy"
+    },
+    "metadata": {
+      "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/metadata"
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "scope": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "clusterIDs": {
+              "type": "array",
+              "items": {
+                "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/uuid"
+              },
+              "minItems": 1,
+              "maxItems": 100,
+              "uniqueItems": true
+            },
+            "namespaceSelector": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "matchLabels": {
+                  "type": "object",
+                  "minProperties": 1,
+                  "maxProperties": 16,
+                  "propertyNames": {
+                    "maxLength": 253
+                  },
+                  "additionalProperties": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 63
+                  }
+                }
+              },
+              "required": [
+                "matchLabels"
+              ]
+            },
+            "workloadSelector": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "matchLabels": {
+                  "type": "object",
+                  "minProperties": 1,
+                  "maxProperties": 16,
+                  "propertyNames": {
+                    "maxLength": 253
+                  },
+                  "additionalProperties": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 63
+                  }
+                }
+              },
+              "required": [
+                "matchLabels"
+              ]
+            }
+          },
+          "required": []
+        },
+        "purposeRef": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "defaults": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "evidenceSeconds": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 315360000
+            },
+            "caseMetadataSeconds": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 315360000
+            },
+            "auditMetadataSeconds": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 315360000
+            }
+          },
+          "required": [
+            "evidenceSeconds",
+            "caseMetadataSeconds",
+            "auditMetadataSeconds"
+          ]
+        },
+        "maxima": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "evidenceSeconds": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 315360000
+            },
+            "caseMetadataSeconds": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 315360000
+            },
+            "auditMetadataSeconds": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 315360000
+            }
+          },
+          "required": [
+            "evidenceSeconds",
+            "caseMetadataSeconds",
+            "auditMetadataSeconds"
+          ]
+        },
+        "rules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 63
+              },
+              "privacyClasses": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "unknown",
+                    "potentialPersonalData",
+                    "personalData",
+                    "specialCategoryPossible",
+                    "verifiedNonPersonal"
+                  ]
+                },
+                "minItems": 1,
+                "maxItems": 5,
+                "uniqueItems": true
+              },
+              "evidenceTypes": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "coreDump",
+                    "heapDump",
+                    "packetCapture",
+                    "logs",
+                    "files",
+                    "profile",
+                    "commandOutput",
+                    "context",
+                    "other",
+                    "syscallTrace"
+                  ]
+                },
+                "minItems": 1,
+                "maxItems": 10,
+                "uniqueItems": true
+              },
+              "maxAgeSeconds": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 315360000
+              }
+            },
+            "required": [
+              "name",
+              "maxAgeSeconds"
+            ]
+          },
+          "minItems": 0,
+          "maxItems": 64,
+          "uniqueItems": true
+        },
+        "deletionBudgetSeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 86400
+        },
+        "legalExceptions": {
+          "type": "string",
+          "enum": [
+            "disabled",
+            "reviewed"
+          ]
+        }
+      },
+      "required": [
+        "scope",
+        "purposeRef",
+        "defaults",
+        "maxima",
+        "rules",
+        "deletionBudgetSeconds",
+        "legalExceptions"
+      ]
+    },
+    "status": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "phase": {
+          "type": "string",
+          "enum": [
+            "Pending",
+            "Ready",
+            "Stale",
+            "Rejected",
+            "Degraded"
+          ]
+        },
+        "observedGeneration": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483647
+        },
+        "policyDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "backendCompatible": {
+          "type": "boolean"
+        },
+        "maximumOutstandingLeaseSeconds": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 60
+        },
+        "reasons": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "maxItems": 16
+        },
+        "clusterAcknowledgements": {
+          "type": "array",
+          "maxItems": 1024,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "clusterID": {
+                "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/uuid"
+              },
+              "policyDigest": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "observedAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "validUntil": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "clusterID",
+              "policyDigest",
+              "observedAt",
+              "validUntil"
+            ]
+          }
+        }
+      },
+      "required": [
+        "phase",
+        "observedGeneration"
+      ]
+    }
+  },
+  "required": [
+    "apiVersion",
+    "kind",
+    "metadata",
+    "spec"
+  ]
+}

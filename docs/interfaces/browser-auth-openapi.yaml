@@ -24,7 +24,7 @@ paths:
     get:
       operationId: begin_browser_step_up
       summary: Sign in again with the configured approval assurance
-      description: Uses current protected identity settings for acr_values and requests max_age=0. Reuses the normal bounded state, nonce, PKCE and browser-binding challenge. Does not decide a review or confer assurance; approval still requires current signed acr/auth_time and target permissions. Unavailable settings return an administrator-directed sanitized problem.
+      description: Step-up is optional and off by default (ADR-335 D5); when an administrator enables it, this uses current protected identity settings for acr_values and requests max_age=0 (OIDC Core forced re-authentication). Reuses the normal bounded state, nonce, PKCE and browser-binding challenge. Does not decide a review or confer assurance; approval still requires current signed acr/auth_time and target permissions. Unavailable settings return an administrator-directed sanitized problem.
       parameters:
       - in: query
         name: return_to
@@ -120,7 +120,7 @@ components:
     CSRF: {in: header, name: X-CSRF-Token, required: true, schema: {type: string, minLength: 43, maxLength: 43}}
   responses:
     Problem:
-      description: "Sanitized failure. 400 malformed; 401 sign-in required; 403 CSRF/origin denied; 429 capacity; 409 same-session credential rotation in progress (Retry-After: 1), including CSRF lookup; 503 unavailable. Retain the cookie and current page during bounded Busy retry. CSRF and the following POST share the original attempt budget. For logout, 409 guarantees rejection before revocation starts; uncertain revocation returns 503 and must not be automatically retried. No stale CSRF token, identity or evidence is returned. No upstream credential details."
+      description: "Sanitized failure. 400 malformed; 401 sign-in required; 403 CSRF/origin denied; 429 capacity; 409 same-session credential rotation in progress (Retry-After: 1), including CSRF lookup; 503 unavailable. Retain the cookie and current page during bounded Busy retry. For logout, 409 guarantees rejection before revocation starts; uncertain revocation returns 503 and must not be automatically retried. No stale CSRF token, identity or evidence is returned. No upstream credential details."
       content:
         application/problem+json:
           schema:

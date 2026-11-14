@@ -4,13 +4,13 @@
 
 ## Delivery policy
 
-`download-environment.json` is a ConfigMap rendered by the Helm chart, closed by [its schema](../../specs/contracts/download-environment.schema.json) and at most 128 KiB. Each hub process reads it from a mounted file or a shared informer. The last valid revision stays in force until a newer valid revision replaces it (ADR-330 D1); an invalid update is rejected and logged, and the previous revision remains. The accepted revision and digest are logged.
+`download-environment.json` is a ConfigMap rendered by the Helm chart, closed by [its schema](../../specs/contracts/download-environment.schema.json); its size is bounded only by the Kubernetes ConfigMap limit (1 MiB). Each hub process reads it from a mounted file or a shared informer. The last valid revision stays in force until a newer valid revision replaces it (ADR-330 D1); an invalid update is rejected and logged, and the previous revision remains. The accepted revision and digest are logged.
 
 The policy selects, per region, which configured store/reader paths may deliver; it never restricts a client relative to its user (ADR-335). It may permit or remove a configured path; it cannot invent a reader, hub pool or processing location. Empty permitted sets deny.
 
 ## Processing restrictions
 
-`ProcessingChanges` records privacy-operator decisions (restrict, release) as SQL rows; `ProcessingReads` reads them. A captured artifact's lineage row is written in the same transaction as catalog publication; there is no permissive backfill. The reader follows at most 64 nodes, 16 parents each and 1,024 rules. Missing nodes, cycles, unsupported origins and missing state deny. Artifact rules and workload/acquisition-time rules apply to current and later matching artifacts at read time.
+`ProcessingChanges` records privacy-operator decisions (restrict, release) as SQL rows; `ProcessingReads` reads them. A captured artifact's lineage row is written in the same transaction as catalog publication; there is no permissive backfill. The reader traverses the stored lineage with a recursive query that detects cycles and looks up matching rules through an index; the graph and rule set are bounded by the stored rows, with no node, parent or rule count cap. Missing nodes, cycles, unsupported origins and missing state deny. Artifact rules and workload/acquisition-time rules apply to current and later matching artifacts at read time.
 
 Each decision is one SQL transaction that updates the rule, checks the operator's current rights and writes one audit row (ADR-330 D6). The request carries an idempotency key; a retry returns the stored outcome (D7). A restriction stays in force until an explicit release; expiry of a rule's date never releases it.
 

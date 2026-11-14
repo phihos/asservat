@@ -84,27 +84,32 @@
     "maxFrozenBytes": {
       "type": "integer",
       "minimum": 1,
-      "maximum": 268435456
+      "maximum": 9007199254740991,
+      "description": "At most the ring size; derived from the node collector memory allocation (budget node maxFrozenBytes)."
     },
     "maxConcurrentSnapshots": {
       "type": "integer",
       "minimum": 1,
-      "maximum": 4
+      "maximum": 9007199254740991,
+      "description": "Bounded by the node frozen byte budget and the trigger rate limits."
     },
     "maxEvents": {
       "type": "integer",
       "minimum": 1,
-      "maximum": 1000000
+      "maximum": 9007199254740991,
+      "description": "Optional finite event total for a manual or argument-mode trace (reviewed observation budget). Always-on recorders are bounded by maxEventsPerSecond and the ring, not a lifetime total (ADR-335 D6)."
     },
     "maxEventsPerSecond": {
       "type": "integer",
       "minimum": 1,
-      "maximum": 100000
+      "maximum": 9007199254740991,
+      "description": "Reviewed observation rate; the shipped default is derived from measured per-node collector event throughput."
     },
     "maxTrackedThreads": {
       "type": "integer",
       "minimum": 1,
-      "maximum": 16384
+      "maximum": 9007199254740991,
+      "description": "Sizes the eBPF per-thread map (memory per tracked thread); derived from the collector map memory budget."
     },
     "arguments": {
       "type": "object",
@@ -135,7 +140,6 @@
     "ring",
     "maxFrozenBytes",
     "maxConcurrentSnapshots",
-    "maxEvents",
     "maxEventsPerSecond",
     "maxTrackedThreads"
   ],

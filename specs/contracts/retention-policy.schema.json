@@ -28,7 +28,6 @@
                 "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/uuid"
               },
               "minItems": 1,
-              "maxItems": 100,
               "uniqueItems": true
             },
             "namespaceSelector": {
@@ -38,7 +37,6 @@
                 "matchLabels": {
                   "type": "object",
                   "minProperties": 1,
-                  "maxProperties": 16,
                   "propertyNames": {
                     "maxLength": 253
                   },
@@ -60,7 +58,6 @@
                 "matchLabels": {
                   "type": "object",
                   "minProperties": 1,
-                  "maxProperties": 16,
                   "propertyNames": {
                     "maxLength": 253
                   },
@@ -90,17 +87,17 @@
             "evidenceSeconds": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 315360000
+              "maximum": 9007199254740991
             },
             "caseMetadataSeconds": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 315360000
+              "maximum": 9007199254740991
             },
             "auditMetadataSeconds": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 315360000
+              "maximum": 9007199254740991
             }
           },
           "required": [
@@ -116,17 +113,17 @@
             "evidenceSeconds": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 315360000
+              "maximum": 9007199254740991
             },
             "caseMetadataSeconds": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 315360000
+              "maximum": 9007199254740991
             },
             "auditMetadataSeconds": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 315360000
+              "maximum": 9007199254740991
             }
           },
           "required": [
@@ -186,7 +183,7 @@
               "maxAgeSeconds": {
                 "type": "integer",
                 "minimum": 1,
-                "maximum": 315360000
+                "maximum": 9007199254740991
               }
             },
             "required": [
@@ -195,13 +192,12 @@
             ]
           },
           "minItems": 0,
-          "maxItems": 64,
           "uniqueItems": true
         },
         "deletionBudgetSeconds": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 86400
+          "maximum": 9007199254740991
         },
         "legalExceptions": {
           "type": "string",
@@ -247,49 +243,12 @@
         "backendCompatible": {
           "type": "boolean"
         },
-        "maximumOutstandingLeaseSeconds": {
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 60
-        },
         "reasons": {
           "type": "array",
           "items": {
             "type": "string",
             "minLength": 1,
             "maxLength": 256
-          },
-          "maxItems": 16
-        },
-        "clusterAcknowledgements": {
-          "type": "array",
-          "maxItems": 1024,
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "clusterID": {
-                "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/uuid"
-              },
-              "policyDigest": {
-                "type": "string",
-                "pattern": "^[a-f0-9]{64}$"
-              },
-              "observedAt": {
-                "type": "string",
-                "format": "date-time"
-              },
-              "validUntil": {
-                "type": "string",
-                "format": "date-time"
-              }
-            },
-            "required": [
-              "clusterID",
-              "policyDigest",
-              "observedAt",
-              "validUntil"
-            ]
           }
         }
       },

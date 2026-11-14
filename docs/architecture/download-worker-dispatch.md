@@ -16,14 +16,18 @@ created per download or query.
 
 The Pod runs under Pod Security `restricted`: non-root UID/GID 65532,
 RuntimeDefault seccomp, no added capabilities, no privilege escalation,
-read-only root filesystem, CPU/memory requests equal to limits and a small
-ephemeral-storage limit. It mounts its configuration ConfigMap, the read-only
+read-only root filesystem, CPU/memory requests equal to limits and a 64 MiB
+ephemeral-storage limit (the reader streams and writes no evidence to disk;
+the limit only protects the node from disk pressure). It mounts its configuration ConfigMap, the read-only
 object-store credential for evidence and one audience-bound projected
 ServiceAccount token. It has no host namespaces, no automatic API token and no
 Kubernetes API permissions.
 
-Each replica serves at most a configured number of concurrent streams
-(set in the reader configuration). A request beyond the free capacity of all
+Each replica serves at most a number of concurrent streams derived from its
+memory: (memory limit − process baseline) ÷ per-stream memory, where a stream
+holds its open keysets plus one 1 MiB data frame per hop
+([native exchange](native-exchange.md)). The chart computes this default from
+the reader's memory limit; administrators may override it. A request beyond the free capacity of all
 replicas is refused with a retryable busy status; it does not queue a paid
 operation.
 
@@ -57,4 +61,5 @@ retirement step or orphan cleanup exists because no per-request object exists.
 
 Rollouts use the Deployment's ordinary `maxUnavailable`/`maxSurge`; a stopping
 replica stops accepting streams and finishes open ones within
-`terminationGracePeriodSeconds`.
+`terminationGracePeriodSeconds` (the Kubernetes Pod lifecycle bound;
+interrupted downloads resume with `Range`).

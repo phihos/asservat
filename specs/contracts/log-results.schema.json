@@ -68,22 +68,22 @@
         "fragment": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 67108864
+          "maximum": 9007199254740991
         },
         "line": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 67108864
+          "maximum": 9007199254740991
         },
         "offset": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 67108864
+          "maximum": 9007199254740991
         },
         "line_offset": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 67108864
+          "maximum": 9007199254740991
         },
         "continuation": {
           "type": "boolean"
@@ -190,7 +190,7 @@
             "complete_origins": {
               "type": "integer",
               "minimum": 0,
-              "maximum": 128
+              "maximum": 9007199254740991
             },
             "partial_origins": {
               "type": "integer",
@@ -210,17 +210,17 @@
             "gapped_origins": {
               "type": "integer",
               "minimum": 0,
-              "maximum": 128
+              "maximum": 9007199254740991
             },
             "source_bytes": {
               "type": "integer",
               "minimum": 0,
-              "maximum": 67108864
+              "maximum": 9007199254740991
             },
             "total_fragments": {
               "type": "integer",
               "minimum": 0,
-              "maximum": 67108864
+              "maximum": 9007199254740991
             }
           },
           "required": [

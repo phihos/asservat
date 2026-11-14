@@ -18,7 +18,9 @@ renewal.
    and, for a private CA, `hub.caBundle`. No Secret is copied between
    clusters.
 3. If the hub can neither reach the issuer nor be given its JWKS, an
-   administrator issues a kubeadm-style join token (valid 24 hours), passed
+   administrator issues a kubeadm-style join token (valid 24 hours, the kubeadm
+   bootstrap-token default: a single-use secret's exposure grows with its
+   lifetime, and a day suits a human handing it over), passed
    to the workload cluster's release with the hub CA certificate hash. The
    connector uses it only to register its cluster's ServiceAccount public
    keys; the hub stores only the token hash and writes an audit row.

@@ -8,7 +8,8 @@ collection permit, benchmark or safety certification.
 
 The report binds the plan, reviewed rule and capability digests. It reports
 one incident pod, no ongoing observation and an `onTrigger` Kubernetes
-snapshot. The 4096-byte native output ceiling is a configured limit; it
+snapshot. The native output is bounded by the 2 MiB Kubernetes API response
+cap (etcd's 1.5 MiB object limit plus JSON overhead); this bound
 excludes the API response, encryption/object overhead and collector memory.
 Resource pressure, coexistence and overhead are unmeasured, so impact is
 reported as unknown. The explanation names API collection, encryption and
@@ -40,5 +41,6 @@ anchor in both execution-class digests. Because previews are stateless
 the change.
 
 C-20 `transport/presentation` gives browser and MCP the same typed assessment
-and lifecycle projections. The maximum 64-policy response fits the 24 KiB
-output ceiling.
+and lifecycle projections. Policy provenance is not capped; a long policy
+list is paginated with a cursor, and MCP results follow the 96 KiB tool-result
+bound in [MCP runtime](mcp-runtime.md).

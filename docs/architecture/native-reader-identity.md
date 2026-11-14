@@ -10,7 +10,8 @@ A content GET resolves `CurrentIdentity` once, before the response starts:
   refreshes, creates or replaces a session
   ([ADR-224](../decisions/224-remove-download-refresh-owners.md)). If the
   session is busy because another request is refreshing it, the GET waits
-  without output for at most two seconds and resolves once more.
+  without output for that refresh, bounded only by the ordinary five-second
+  I/O timeout (ADR-330 D5), and resolves once more.
 - **Bearer (MCP/OAuth client):** the presented access token is validated as for
   any API request.
 
@@ -18,13 +19,15 @@ The authorization consumer (C-03) then authorizes the exact download with that
 identity's current groups and denies. A raw evidence download charges its raw
 grant pool for the selected range in the same start transaction.
 
-The started response keeps that identity until its bound: the browser
-session's fixed expiry, or the bearer token's expiry or group-freshness bound,
-whichever applies, intersected with the session and access deadlines. It does
-not resolve identity again. Session revocation or logout reaches it as an event
-and closes the stream; bytes already in transport buffers cannot be recalled.
+The started response keeps that identity until the download's original
+bounds: the download session deadline, `AccessUntil`, Stop and, for a browser,
+the session's fixed expiry. A bearer download is not bounded by its access
+token's expiry or group freshness: it runs to these bounds regardless of
+access-token expiry ([ADR-335](../decisions/335-usable-by-default.md) D9). It
+does not resolve identity again. Session revocation or logout reaches it as an
+event and closes the stream; bytes already in transport buffers cannot be
+recalled.
 
-A long download that outlives its session or token stops there; the client
-resumes with a new authenticated GET and `Range` within the original download
-deadlines. Tokens, cookies and `CurrentIdentity` are never forwarded to readers
+A download that outlives its bounds stops there; the client resumes with a new
+authenticated GET and `Range` within the original download deadlines. Tokens, cookies and `CurrentIdentity` are never forwarded to readers
 or connectors.

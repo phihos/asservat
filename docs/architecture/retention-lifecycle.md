@@ -15,7 +15,8 @@ namespace. Both namespaces are administrator-only
 ([ADR-328](../decisions/328-administrator-only-namespaces.md)), so Kubernetes
 RBAC decides who writes policies. The CRD schema and CEL rules validate shape
 only: bounded selectors, named rule-list identity and a deletion budget that
-leaves positive usable time. `status.observedGeneration` and conditions report
+leaves positive usable time; selector size is bounded by the Kubernetes CRD
+validation and CEL cost limits, with no extra Asservat number. `status.observedGeneration` and conditions report
 what the hub has applied; status is informational and never authority.
 
 Which sources apply to a cluster (the hub source, plus the cluster's local
@@ -46,14 +47,15 @@ existing deadlines stay bound.
 
 Matching follows [the privacy specification](../../specs/privacy.md): selector
 dimensions are ANDed, cluster IDs and rules ORed, all matching policies apply
-and the shortest maximum wins. Local policies only tighten the hub baseline. At
-most 64 applicable policy references are allowed per artifact; overflow fails
-planning and is never truncated.
+and the shortest maximum wins. Local policies only tighten the hub baseline.
+The number of applicable policies is not capped (ADR-335 D8); an artifact's
+applicable policy references are stored as SQL rows (ADR-330 D8), never
+truncated.
 
 Selectors match against the namespace and workload labels the connector
 delivers. At admission, the artifact row stores the target identity, the
 selector-relevant namespace and workload labels, the applicable policy UIDs and
-generations, and the resulting deadlines. Later policy changes match against
+generations (as rows), and the resulting deadlines. Later policy changes match against
 these stored labels, so a newly selected label selector can always be evaluated
 for existing evidence and later label edits cannot lengthen retention.
 
@@ -86,6 +88,10 @@ WHERE <stored-label and class/type match>
   AND (effective_expires_at > $read_cutoff_expr OR effective_delete_by > $delete_expr)
 LIMIT <batch>;   -- via a keyed subselect, repeated until no row changes
 ```
+
+The batch size bounds lock and WAL cost per statement; it is derived from the
+five-second statement timeout (ADR-330 D5) as measured rows updated per second
+with a margin.
 
 Each batch writes one append-only `retention_decision` row with the policy
 revision, the number of rows changed and the earliest new dates, in the same

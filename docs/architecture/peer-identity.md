@@ -20,20 +20,24 @@ that replica and its Service/headless DNS address.
 Each cluster has one connector identity. An administrator-issued, single-use
 bootstrap token obtains the first client certificate; the connector then
 rotates it with a certificate signing request before expiry (kubelet TLS
-bootstrapping, OCM cluster registration). Certificates last at most one hour.
+bootstrapping, OCM cluster registration). Certificates last 90 days and are
+renewed at two thirds of their lifetime (kubelet/cert-manager practice);
+revocation does not depend on short validity because the SQL peer row and its
+change event revoke immediately.
 
 The URI SAN is `spiffe://asservat.<installation-uuid>/cluster/<cluster-uuid>/connector/<peer-uuid>`,
 with exact canonical spelling and no query, fragment, port or additional
 identity. The certificate uses digital-signature usage, the client-auth EKU,
 non-CA basic constraints and no common name, DNS, IP or email identity. TLS 1.3
-is required. There is no forwarded-certificate or proxy-header fallback.
+is required (RFC 8446; no version to tune). There is no forwarded-certificate or proxy-header fallback.
 
 `mtls.PeerVerifier` verifies the client chain against the installation roots
 during the handshake. The hub checks the SQL peer registration (enabled,
 expected cluster, certificate digest not revoked) at handshake and at
 certificate renewal; a revocation closes the peer's open connection. There is
-no per-request registry lookup on a reused connection. A reused connection
-never outlives its certificate.
+no per-request registry lookup on a reused connection. After renewal the
+connector opens new streams on a connection with the new certificate and the old
+connection drains gracefully; a connection never outlives its certificate.
 
 ## In-cluster workloads
 

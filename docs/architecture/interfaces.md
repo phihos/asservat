@@ -12,7 +12,7 @@ The [internal-work/v1 schema](../../specs/contracts/internal-work.schema.json) d
 | --- | --- | --- |
 | armSource | Source session, activation and action IDs | Verify ongoing mode, observation approval/resources and target before attaching. A duplicate cannot create another source. |
 | runAction | Capture/action/attempt IDs | Resolve the frozen `onTrigger` plan and consume its [start row](local-start.md); no action/argv override. |
-| saveRecording | Capture/snapshot/source, immutable end time, bounded lookback, policy execution digest | Verify the recording-save scope, source rights and reviewed enablement. Dispatch only SnapshotExecutor. The one-hour cap is a transport ceiling. |
+| saveRecording | Capture/snapshot/source, immutable end time, bounded lookback, policy execution digest | Verify the recording-save scope, source rights and reviewed enablement. Dispatch only SnapshotExecutor. The lookback is bounded by the source ring's actual coverage. |
 | analysisStage | Analysis ID, stage, generation, input ref, output slot | Only the connector schedules the matching reviewed Job template. |
 | eraseCopy | Copy identity/generation and deletion-work ID | Check cleanup authority and the copy ledger. Expired acquisition grants never block required deletion. |
 | downloadArtifact | Download/artifact/digest | Stream the artifact through a regional reader replica; no analysis, new acquisition or arbitrary destination. |
@@ -28,7 +28,7 @@ Each connector holds one outbound, multiplexed HTTP/2 connection to the hub with
 
 Negotiation binds peer build identity, protocol major/minor, supported action/projection schema versions and maximum byte/item limits. Hub and connector support N/N-1 minors of one major; required capabilities fail explicitly and no downgrade omits a limit.
 
-Work is pushed: a hub transaction that makes work eligible issues `NOTIFY`, and the replica holding the connection sends it on the command stream. Work moves `Queued → Sent → Running` and then to a terminal state; `Sent` records the connection epoch. After a reconnect the hub resends every non-terminal item and the connector returns the existing state for a known `workID`. Commands carry no signatures. One work message is at most 128 KiB; its decoded control payload at most 64 KiB. Receipts are at most 64 KiB or 100 entries per message.
+Work is pushed: a hub transaction that makes work eligible issues `NOTIFY`, and the replica holding the connection sends it on the command stream. Work moves `Queued → Sent → Running` and then to a terminal state; `Sent` records the connection epoch. After a reconnect the hub resends every non-terminal item and the connector returns the existing state for a known `workID`. Commands carry no signatures. A command or control frame is at most 64 KiB, which holds the largest typed command payload (a 4096-instruction classic-BPF program of 32 KiB) plus envelope; download and live data frames are at most 1 MiB, the memory one in-flight frame costs. A receipt batch fills at most one control frame; further receipts go in further frames.
 
 Cluster state (namespaces, workloads, Pods, EndpointSlices, AccessBindings, permission sources) is pushed when it changes. After a reconnect the connector compares a digest and resends only on mismatch. HTTP/2 PING frames detect a dead connection; there is no separate heartbeat request.
 
@@ -36,9 +36,9 @@ Delivery is at least once. The connector acknowledges Accepted only after its du
 
 ### I-02 — Node control
 
-Each collector holds one mTLS connection to its regional connector, with the same work/receipt message family. The collector authenticates once per connection with its audience-bound projected ServiceAccount token, checked by TokenReview; the connector then issues its client certificate ([node collector](node-collector.md), D3). Node identity comes from the reviewed Pod's node, never from a request field. A collector credential cannot receive another node's work or resolve another source's references. One collector process per node; a replacement process's new connection supersedes the old one.
+Each collector holds one server-TLS connection to its regional connector, with the same work/receipt message family. The collector authenticates once per connection with its audience-bound projected ServiceAccount token, checked by TokenReview; there is no node certificate or CSR ([node collector](node-collector.md), D3). Node identity comes from the reviewed Pod's node, never from a request field. A collector credential cannot receive another node's work or resolve another source's references. One collector process per node; a replacement process's new connection supersedes the old one.
 
-Work kinds include `armSource`, `stopSource`, `snapshot`, `peerGeneration`, `packetSource` and `stopPacketSource`. Start consumption goes through the [start row](local-start.md). Typed ports `lookup-start`, `checkpoint-source` and `report-usage` accept no CRD YAML or SQL.
+Work kinds include `armSource`, `stopSource`, `snapshot`, `peerGeneration` and `packetCapture`. Start consumption goes through the [start row](local-start.md). Typed ports `lookup-start`, `checkpoint-source` and `report-usage` accept no CRD YAML or SQL.
 
 Node status is sent as a delta when a source, ring or accounting state changes. Live-viewing counters (active cohorts, buffered rows, scan and delivery totals, refused admissions, source-loss and dropped-row counts) are cumulative and included in those deltas; they carry no source, filter or payload labels. C-19 aggregates node totals per cluster for fleet status. A first report or nonmonotonic counter marks rates incomplete.
 
@@ -48,7 +48,7 @@ A started source runs to its admitted hard end while the connector is disconnect
 
 Use an installation-owned Unix-domain stream socket with restricted ownership/mode and peer credentials. The helper verifies the collector peer; the collector verifies the helper and resolves the kernel-provided process identifiers itself. No caller-supplied executable path or argument becomes authority.
 
-A fixed-version header of at most 4 KiB carries numeric IDs, process start identity when available and a nonce. The node refuses promptly or returns an acceptance tied to one prepared envelope, a budget-lease allocation and a byte/time limit. Only then consume bytes, with bounded backpressure and a hard close deadline. No remote call occurs while the crashed process is held. The encrypted spool has its own budget. Exact Linux header/pidfd behavior is a required native-core spike; socket credentials alone do not solve PID reuse.
+A fixed-version header of at most 4 KiB (one page, a fixed allocation while the crashed process is held) carries numeric IDs, process start identity when available and a nonce. The node refuses promptly or returns an acceptance tied to one prepared envelope, a budget-lease allocation and a byte/time limit. Only then consume bytes, with bounded backpressure and a hard close deadline. No remote call occurs while the crashed process is held. The encrypted spool has its own budget. Exact Linux header/pidfd behavior is a required native-core spike; socket credentials alone do not solve PID reuse.
 
 ### I-04 — Gadget observation
 
@@ -56,9 +56,9 @@ The C-23 adapter drives pinned approved gadget definitions through the engine li
 
 ### I-07 and I-12 — Live delivery and ingress routing
 
-SQL stores a LiveWatch's control state (filter, view revision, deadline) and charges. A view holds at most sixteen source references and sixteen typed predicates and never writes rows into SQL or audit rows ([ADR-310](../decisions/310-finite-approved-live-observation.md)).
+SQL stores a LiveWatch's control state (filter, view revision, deadline) and charges. Views are finite (maintainer decision): C-07 charges each source reference against the administrator's live-viewer budget, which bounds a view's sources, and the view's CPU slice (predicates × rows/s) bounds its typed predicates. A view never writes rows into SQL or audit rows ([ADR-310](../decisions/310-finite-approved-live-observation.md)).
 
-Live rows arrive on the connector's live stream (I-01) at the A-HAPI replica holding the connection. Any A-HAPI replica accepts the viewer's request; if another replica holds the connection, the viewer's replica opens the row stream from it over hub mTLS, found through the connection's SQL row (I-12). There is no separate projection owner. The browser receives rows over one Server-Sent Events stream per page; MCP waits server-side up to 30 seconds and returns on the first batch. The viewer is authorized once per operation (D5). Rows carry their original observation/expiry/coverage metadata; there is no durable replay, SQL row per event or outbox body. Bounded queues drop with a recorded gap or close; a slow viewer never backs up acquisition. If the connection moves to another replica, the stream reports a gap and resumes from the current source head. A view that would violate region policy is rejected.
+Live rows arrive on the connector's live stream (I-01) at the A-HAPI replica holding the connection. Any A-HAPI replica accepts the viewer's request; if another replica holds the connection, the viewer's replica opens the row stream from it over hub mTLS, found through the connection's SQL row (I-12). There is no separate projection owner. The browser receives rows over one Server-Sent Events stream per page; MCP waits server-side up to 30 seconds (ADR-330 D1) and returns on the first batch. The viewer is authorized once per operation (D5). Rows carry their original observation/expiry/coverage metadata; there is no durable replay, SQL row per event or outbox body. Bounded queues drop with a recorded gap or close; a slow viewer never backs up acquisition. If the connection moves to another replica, the stream reports a gap and resumes from the current source head. A view that would violate region policy is rejected.
 
 ## In-process and staged contracts
 

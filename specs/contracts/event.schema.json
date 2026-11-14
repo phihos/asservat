@@ -62,7 +62,6 @@
             "type": "string",
             "format": "uuid"
           },
-          "maxItems": 64,
           "minItems": 0,
           "uniqueItems": true
         },

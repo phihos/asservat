@@ -50,7 +50,6 @@
                 ]
               },
               "minItems": 1,
-              "maxItems": 8,
               "uniqueItems": true
             }
           },
@@ -119,7 +118,6 @@
                       "maxLength": 128
                     },
                     "minItems": 1,
-                    "maxItems": 32,
                     "uniqueItems": true
                   }
                 },
@@ -129,7 +127,6 @@
                 ]
               },
               "minItems": 1,
-              "maxItems": 8,
               "uniqueItems": true
             }
           },

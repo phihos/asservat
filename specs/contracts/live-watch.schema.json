@@ -248,8 +248,7 @@
               }
             ]
           },
-          "minItems": 0,
-          "maxItems": 16
+          "minItems": 0
         }
       },
       "required": [
@@ -270,22 +269,24 @@
         "bytes_per_second": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 262144
+          "maximum": 9007199254740991,
+          "description": "Per-watch rate; default derived from connector bandwidth and the hub-api memory request \u00f7 concurrent watches."
         },
         "max_rows_per_batch": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 100
+          "maximum": 9007199254740991
         },
         "max_buffer_bytes": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 1048576
+          "maximum": 9007199254740991,
+          "description": "Per-watch transient buffer; bounds replay and rows awaiting a read."
         },
         "replay_seconds": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 5
+          "maximum": 9007199254740991
         }
       },
       "required": [
@@ -333,7 +334,7 @@
             {
               "type": "integer",
               "minimum": 0,
-              "maximum": 1000000000
+              "maximum": 9007199254740991
             },
             {
               "type": "null"
@@ -377,7 +378,7 @@
         "filter_generation": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 1000000000
+          "maximum": 9007199254740991
         },
         "last_observed_at": {
           "anyOf": [
@@ -470,12 +471,12 @@
             "clock_uncertainty_ms": {
               "type": "integer",
               "minimum": 0,
-              "maximum": 5000
+              "maximum": 9007199254740991
             },
             "filter_generation": {
               "type": "integer",
               "minimum": 0,
-              "maximum": 1000000000
+              "maximum": 9007199254740991
             },
             "projection": {
               "const": "packetMetadata"
@@ -604,12 +605,12 @@
             "clock_uncertainty_ms": {
               "type": "integer",
               "minimum": 0,
-              "maximum": 5000
+              "maximum": 9007199254740991
             },
             "filter_generation": {
               "type": "integer",
               "minimum": 0,
-              "maximum": 1000000000
+              "maximum": 9007199254740991
             },
             "projection": {
               "const": "httpHeaders"
@@ -705,7 +706,7 @@
                     {
                       "type": "integer",
                       "minimum": 0,
-                      "maximum": 60000
+                      "maximum": 9007199254740991
                     },
                     {
                       "type": "null"
@@ -771,12 +772,12 @@
             "clock_uncertainty_ms": {
               "type": "integer",
               "minimum": 0,
-              "maximum": 5000
+              "maximum": 9007199254740991
             },
             "filter_generation": {
               "type": "integer",
               "minimum": 0,
-              "maximum": 1000000000
+              "maximum": 9007199254740991
             },
             "projection": {
               "const": "syscallMetadata"
@@ -820,7 +821,7 @@
                     {
                       "type": "integer",
                       "minimum": 0,
-                      "maximum": 1000000000000
+                      "maximum": 9007199254740991
                     },
                     {
                       "type": "null"
@@ -868,7 +869,7 @@
         "revision": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 1000000000
+          "maximum": 9007199254740991
         },
         "state": {
           "enum": [
@@ -887,8 +888,7 @@
             "type": "string",
             "format": "uuid"
           },
-          "minItems": 1,
-          "maxItems": 16
+          "minItems": 1
         },
         "projection": {
           "$ref": "https://asservat.io/spec/v1/live-watch.schema.json#/$defs/projection"
@@ -950,7 +950,7 @@
         "revision": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 1000000000
+          "maximum": 9007199254740991
         },
         "batch_id": {
           "type": "string",
@@ -972,24 +972,21 @@
           "items": {
             "$ref": "https://asservat.io/spec/v1/live-watch.schema.json#/$defs/row"
           },
-          "minItems": 0,
-          "maxItems": 100
+          "minItems": 0
         },
         "sources": {
           "type": "array",
           "items": {
             "$ref": "https://asservat.io/spec/v1/live-watch.schema.json#/$defs/sourceStatus"
           },
-          "minItems": 0,
-          "maxItems": 16
+          "minItems": 0
         },
         "gaps": {
           "type": "array",
           "items": {
             "$ref": "https://asservat.io/spec/v1/live-watch.schema.json#/$defs/gap"
           },
-          "minItems": 0,
-          "maxItems": 32
+          "minItems": 0
         },
         "interval_from": {
           "type": "string",
@@ -1045,7 +1042,7 @@
         "revision": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 1000000000
+          "maximum": 9007199254740991
         },
         "type": {
           "enum": [
@@ -1072,8 +1069,7 @@
               "items": {
                 "$ref": "https://asservat.io/spec/v1/live-watch.schema.json#/$defs/sourceStatus"
               },
-              "minItems": 0,
-              "maxItems": 16
+              "minItems": 0
             },
             "output_bytes_spent": {
               "type": "integer",

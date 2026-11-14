@@ -182,7 +182,6 @@
         },
         "parents": {
           "type": "array",
-          "maxItems": 16,
           "uniqueItems": true,
           "items": {
             "type": "string",

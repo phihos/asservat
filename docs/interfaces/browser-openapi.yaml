@@ -1074,11 +1074,10 @@ paths:
     post:
       operationId: get_capture_settings
       summary: Read an authorized immutable parameter snapshot for editing/review.
-        Strings are untrusted; excludes old grants, secrets, reason and sharing. MCP
-        keeps its standard byte cap; SettingsTooLarge returns browser navigation and
-        repeat by reference remains possible without downloading settings. The authenticated
-        browser has a fixed server-owned 160 KiB response budget on the same authorization/audit
-        path for this operation only.
+        Strings are untrusted; excludes old grants, secrets, reason and sharing. Settings
+        larger than the 96 KiB MCP result bound return SettingsTooLarge with browser
+        navigation, and repeat by reference remains possible without downloading settings.
+        The browser has no response byte ceiling.
       tags:
       - Shared browser and MCP
       x-domain-contract: get_capture_settings
@@ -1862,7 +1861,6 @@ paths:
         explode: true
         schema:
           type: array
-          maxItems: 16
           uniqueItems: true
           items:
             type: string
@@ -1874,7 +1872,6 @@ paths:
         explode: true
         schema:
           type: array
-          maxItems: 16
           uniqueItems: true
           items:
             type: string
@@ -1886,7 +1883,6 @@ paths:
         explode: true
         schema:
           type: array
-          maxItems: 16
           uniqueItems: true
           items:
             type: string
@@ -2719,7 +2715,7 @@ components:
         expected_revision:
           type: integer
           minimum: 1
-          maximum: 1000000000
+          maximum: 9007199254740991
         idempotency_key:
           type: string
           minLength: 1
@@ -2775,7 +2771,6 @@ components:
           type: array
           items:
             $ref: https://asservat.io/spec/v1/common.schema.json#/$defs/artifactRef
-          maxItems: 64
           minItems: 1
         recipients:
           type: array
@@ -2827,7 +2822,7 @@ components:
         reason:
           type: string
           minLength: 1
-          maxLength: 512
+          maxLength: 4096
         idempotency_key:
           type: string
           minLength: 1
@@ -2883,7 +2878,7 @@ components:
         reason:
           type: string
           minLength: 1
-          maxLength: 512
+          maxLength: 4096
         idempotency_key:
           type: string
           minLength: 1
@@ -2924,7 +2919,7 @@ components:
         after_revision:
           type: integer
           minimum: 1
-          maximum: 1000000000
+          maximum: 9007199254740991
           description: Wait server-side until the state revision differs from this
             value or 30 seconds pass, then return the current state. Omit for an immediate
             read. Status reads are never charged.
@@ -2980,7 +2975,7 @@ components:
             after_revision:
               type: integer
               minimum: 1
-              maximum: 1000000000
+              maximum: 9007199254740991
               description: Wait server-side until the state revision differs from
                 this value or 30 seconds pass, then return the current state. Omit
                 for an immediate read. Status reads are never charged.
@@ -3082,7 +3077,7 @@ components:
         after_revision:
           type: integer
           minimum: 1
-          maximum: 1000000000
+          maximum: 9007199254740991
           description: Wait server-side until the state revision differs from this
             value or 30 seconds pass, then return the current state. Omit for an immediate
             read. Status reads are never charged.
@@ -3188,10 +3183,12 @@ components:
           type: integer
           minimum: 1
           maximum: 64
+          description: Threads per page (page size); continue with next_cursor.
         max_frames:
           type: integer
           minimum: 1
           maximum: 128
+          description: Frames per thread per page; deeper stacks continue with next_cursor.
         sample_type:
           type: string
           minLength: 1
@@ -3220,7 +3217,6 @@ components:
             minLength: 1
             maxLength: 64
           minItems: 1
-          maxItems: 64
           uniqueItems: true
         errors_only:
           type: boolean
@@ -3230,7 +3226,6 @@ components:
             type: string
             minLength: 1
             maxLength: 64
-          maxItems: 32
         stream:
           type: string
           enum:
@@ -3242,7 +3237,7 @@ components:
         line_start:
           type: integer
           minimum: 1
-          maximum: 1000000000
+          maximum: 9007199254740991
         max_lines:
           type: integer
           minimum: 1
@@ -3286,10 +3281,22 @@ components:
               type: integer
               minimum: 1
               maximum: 64
+              description: Threads per page (page size); continue with next_cursor.
             max_frames:
               type: integer
               minimum: 1
               maximum: 128
+              description: Frames per thread per page; deeper stacks continue with
+                next_cursor.
+            cursor:
+              anyOf:
+              - type: string
+                minLength: 1
+                maxLength: 4096
+              - type: string
+                minLength: 1
+                maxLength: 64
+                pattern: ^[0-9]{1,8}:[0-9]{1,4}:[0-9a-f]{32}$
           required:
           - view
           - case_id
@@ -3410,7 +3417,6 @@ components:
                 minLength: 1
                 maxLength: 64
               minItems: 1
-              maxItems: 64
               uniqueItems: true
             errors_only:
               type: boolean
@@ -3502,7 +3508,6 @@ components:
                 type: string
                 minLength: 1
                 maxLength: 64
-              maxItems: 32
             stream:
               type: string
               enum:
@@ -3538,7 +3543,7 @@ components:
             line_start:
               type: integer
               minimum: 1
-              maximum: 1000000000
+              maximum: 9007199254740991
             max_lines:
               type: integer
               minimum: 1
@@ -3599,7 +3604,7 @@ components:
         after_revision:
           type: integer
           minimum: 1
-          maximum: 1000000000
+          maximum: 9007199254740991
           description: Wait server-side until the state revision differs from this
             value or 30 seconds pass, then return the current state. Omit for an immediate
             read. Status reads are never charged.
@@ -3659,7 +3664,7 @@ components:
         after_revision:
           type: integer
           minimum: 1
-          maximum: 1000000000
+          maximum: 9007199254740991
           description: Wait server-side until the state revision differs from this
             value or 30 seconds pass, then return the current state. Omit for an immediate
             read. Status reads are never charged.
@@ -3973,6 +3978,10 @@ components:
           type: integer
           minimum: 1
           maximum: 100
+        cursor:
+          type: string
+          minLength: 1
+          maxLength: 4096
       required:
       - view
     McpInput_list_shares:
@@ -4043,7 +4052,6 @@ components:
         changes:
           type: array
           minItems: 1
-          maxItems: 16
           items:
             oneOf:
             - type: object
@@ -4200,7 +4208,7 @@ components:
         reason:
           type: string
           minLength: 1
-          maxLength: 512
+          maxLength: 4096
         sharing:
           $ref: https://asservat.io/spec/v1/sharing-request.schema.json#/$defs/capture
         history_capture_id:
@@ -4353,7 +4361,6 @@ components:
         changes:
           type: array
           minItems: 1
-          maxItems: 16
           items:
             oneOf:
             - type: object
@@ -4402,6 +4409,10 @@ components:
               required:
               - action
               - uid
+        cursor:
+          type: string
+          minLength: 1
+          maxLength: 4096
       required:
       - changes
     McpInput_query_artifact:
@@ -4454,23 +4465,14 @@ components:
             - icmp_code
             - frame_prefix_hex
           minItems: 1
-          maxItems: 32
           uniqueItems: true
         max_packets:
           type: integer
           minimum: 1
           maximum: 100
-        max_scan_bytes:
-          type: integer
-          minimum: 1
-          maximum: 1073741824
-          description: 'Logical scan budget: sum of captured lengths of all visited
-            saved records, including nonmatches. Full bounded source authentication
-            still completes after a logical cap. The API ceiling does not qualify
-            larger sources.'
         packet_filter:
           type: string
-          maxLength: 512
+          maxLength: 4096
           description: Supported tcpdump/libpcap packet-filter subset; no name resolution
             or bracket predicates. Omitted or empty means no packet-filter restriction.
             This is not Wireshark display-filter syntax.
@@ -4510,11 +4512,11 @@ components:
             offset:
               type: integer
               minimum: 0
-              maximum: 1499
+              maximum: 65534
             length:
               type: integer
               minimum: 1
-              maximum: 64
+              maximum: 65535
           required:
           - offset
           - length
@@ -4536,7 +4538,6 @@ components:
             minLength: 1
             maxLength: 64
           minItems: 1
-          maxItems: 64
           uniqueItems: true
         errors_only:
           type: boolean
@@ -4546,7 +4547,11 @@ components:
         length:
           type: integer
           minimum: 1
-          maximum: 16384
+          maximum: 32768
+          default: 8192
+          description: Bytes to read; at most 32 KiB per call (hex output fits the
+            96 KiB MCP result bound), default 8 KiB (fits the 24 KiB default target).
+            Continue at the next address.
         command:
           type: string
           enum:
@@ -4563,7 +4568,7 @@ components:
         frame:
           type: integer
           minimum: 0
-          maximum: 10000
+          maximum: 2147483647
         max_items:
           type: integer
           minimum: 1
@@ -4621,23 +4626,14 @@ components:
                 - icmp_code
                 - frame_prefix_hex
               minItems: 1
-              maxItems: 32
               uniqueItems: true
             max_packets:
               type: integer
               minimum: 1
               maximum: 100
-            max_scan_bytes:
-              type: integer
-              minimum: 1
-              maximum: 1073741824
-              description: 'Logical scan budget: sum of captured lengths of all visited
-                saved records, including nonmatches. Full bounded source authentication
-                still completes after a logical cap. The API ceiling does not qualify
-                larger sources.'
             packet_filter:
               type: string
-              maxLength: 512
+              maxLength: 4096
               description: Supported tcpdump/libpcap packet-filter subset; no name
                 resolution or bracket predicates. Omitted or empty means no packet-filter
                 restriction. This is not Wireshark display-filter syntax.
@@ -4677,17 +4673,21 @@ components:
                 offset:
                   type: integer
                   minimum: 0
-                  maximum: 1499
+                  maximum: 65534
                 length:
                   type: integer
                   minimum: 1
-                  maximum: 64
+                  maximum: 65535
               required:
               - offset
               - length
               description: Raw-only actual saved-frame byte window. Offset plus length
                 must not exceed 1500. Missing bytes remain unavailable; no padding
                 or inferred payload start.
+            cursor:
+              type: string
+              minLength: 1
+              maxLength: 4096
           required:
           - operation
           - case_id
@@ -4695,7 +4695,6 @@ components:
           - idempotency_key
           - fields
           - max_packets
-          - max_scan_bytes
           allOf:
           - if:
               properties:
@@ -4750,7 +4749,6 @@ components:
                 minLength: 1
                 maxLength: 64
               minItems: 1
-              maxItems: 64
               uniqueItems: true
             errors_only:
               type: boolean
@@ -4797,14 +4795,17 @@ components:
             length:
               type: integer
               minimum: 1
-              maximum: 16384
+              maximum: 32768
+              default: 8192
+              description: Bytes to read; at most 32 KiB per call (hex output fits
+                the 96 KiB MCP result bound), default 8 KiB (fits the 24 KiB default
+                target). Continue at the next address.
           required:
           - operation
           - case_id
           - artifact_id
           - idempotency_key
           - address
-          - length
       - if:
           properties:
             operation:
@@ -4849,7 +4850,7 @@ components:
             frame:
               type: integer
               minimum: 0
-              maximum: 10000
+              maximum: 2147483647
             max_items:
               type: integer
               minimum: 1
@@ -4885,7 +4886,6 @@ components:
             type: string
             format: uuid
           minItems: 1
-          maxItems: 4
           uniqueItems: true
         preferences:
           type: object
@@ -4894,11 +4894,11 @@ components:
             history_seconds:
               type: integer
               minimum: 1
-              maximum: 3600
+              maximum: 9007199254740991
             max_bytes:
               type: integer
               minimum: 1
-              maximum: 109951162777600
+              maximum: 9007199254740991
             max_impact:
               enum:
               - observe
@@ -4907,7 +4907,7 @@ components:
             max_ring_bytes:
               type: integer
               minimum: 1
-              maximum: 26843545600
+              maximum: 9007199254740991
           required: []
         focus:
           type: object
@@ -4921,7 +4921,6 @@ components:
                 minLength: 1
                 maxLength: 128
               minItems: 1
-              maxItems: 16
               uniqueItems: true
             flow_refs:
               type: array
@@ -4930,7 +4929,6 @@ components:
                 minLength: 1
                 maxLength: 128
               minItems: 1
-              maxItems: 16
               uniqueItems: true
       required:
       - target_handle
@@ -4959,7 +4957,7 @@ components:
         reason:
           type: string
           minLength: 1
-          maxLength: 512
+          maxLength: 4096
         idempotency_key:
           type: string
           minLength: 1
@@ -5026,7 +5024,7 @@ components:
             reason:
               type: string
               minLength: 1
-              maxLength: 512
+              maxLength: 4096
             sharing:
               $ref: https://asservat.io/spec/v1/sharing-request.schema.json#/$defs/capture
             history_capture_id:
@@ -5229,14 +5227,12 @@ components:
             type: string
             format: uuid
           minItems: 1
-          maxItems: 64
           uniqueItems: true
         artifact_digests:
           type: array
           items:
             type: string
             pattern: ^[a-f0-9]{64}$
-          maxItems: 64
           minItems: 1
           uniqueItems: true
           description: Optional provenance pin of the exact artifact versions.
@@ -5262,17 +5258,17 @@ components:
         reason:
           type: string
           minLength: 1
-          maxLength: 512
+          maxLength: 4096
         max_bytes:
           type: integer
           minimum: 1
-          maximum: 1099511627776
+          maximum: 9007199254740991
           description: Optional; defaults to the verified sizes of the selected artifacts
             (download) or the query allowance.
         expires_in_seconds:
           type: integer
           minimum: 1
-          maximum: 315360000
+          maximum: 9007199254740991
           description: Optional; defaults to the artifacts' access end (AccessUntil),
             capped by the administrator maximum.
         idempotency_key:
@@ -5284,17 +5280,6 @@ components:
       - operations
       - reason
       - idempotency_key
-      allOf:
-      - if:
-          properties:
-            operations:
-              not:
-                contains:
-                  const: download_artifact
-        then:
-          properties:
-            max_bytes:
-              maximum: 1073741824
       anyOf:
       - required:
         - artifact_ids
@@ -5329,7 +5314,7 @@ components:
         expected_revision:
           type: integer
           minimum: 1
-          maximum: 1000000000
+          maximum: 9007199254740991
         idempotency_key:
           type: string
           minLength: 1
@@ -5398,7 +5383,7 @@ components:
         expected_revision:
           type: integer
           minimum: 1
-          maximum: 1000000000
+          maximum: 9007199254740991
         idempotency_key:
           type: string
           minLength: 1
@@ -5417,7 +5402,7 @@ components:
         expected_revision:
           type: integer
           minimum: 1
-          maximum: 1000000000
+          maximum: 9007199254740991
         idempotency_key:
           type: string
           minLength: 1
@@ -5484,7 +5469,7 @@ components:
         expected_revision:
           type: integer
           minimum: 1
-          maximum: 1000000000
+          maximum: 9007199254740991
         mode:
           enum:
           - Active
@@ -5634,7 +5619,7 @@ components:
             expected_revision:
               type: integer
               minimum: 1
-              maximum: 1000000000
+              maximum: 9007199254740991
             idempotency_key:
               type: string
               minLength: 1
@@ -5673,7 +5658,7 @@ components:
             expected_revision:
               type: integer
               minimum: 1
-              maximum: 1000000000
+              maximum: 9007199254740991
             idempotency_key:
               type: string
               minLength: 1
@@ -5715,7 +5700,7 @@ components:
                 revision:
                   type: integer
                   minimum: 1
-                  maximum: 1000000000
+                  maximum: 9007199254740991
                 cancellation_requested:
                   type: boolean
                 navigation_uri:
@@ -5746,7 +5731,7 @@ components:
                 revision:
                   type: integer
                   minimum: 1
-                  maximum: 1000000000
+                  maximum: 9007199254740991
               required:
               - query_handle
               - revision
@@ -5784,7 +5769,7 @@ components:
                 retry_after_seconds:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 2147483647
               required:
               - code
               - message
@@ -5829,7 +5814,6 @@ components:
                         anyOf:
                         - type: string
                           minLength: 1
-                          maxLength: 512
                         - type: 'null'
                       baseline:
                         type: number
@@ -5854,8 +5838,6 @@ components:
                   items:
                     type: string
                     minLength: 1
-                    maxLength: 512
-                  maxItems: 16
                 aggregation:
                   const: cumulative
                 case_id:
@@ -5901,7 +5883,6 @@ components:
                       anyOf:
                       - type: number
                         exclusiveMinimum: 0
-                        maximum: 86400
                       - type: 'null'
                     total:
                       type: integer
@@ -6014,7 +5995,6 @@ components:
                       anyOf:
                       - type: number
                         exclusiveMinimum: 0
-                        maximum: 86400
                       - type: 'null'
                     total:
                       type: integer
@@ -6168,7 +6148,6 @@ components:
                         duration_seconds:
                           type: number
                           exclusiveMinimum: 0
-                          maximum: 86400
                     incident:
                       properties:
                         mode:
@@ -6178,7 +6157,6 @@ components:
                         duration_seconds:
                           type: number
                           exclusiveMinimum: 0
-                          maximum: 86400
             data_class:
               const: extract
             provenance:
@@ -6203,7 +6181,7 @@ components:
                 revision:
                   type: integer
                   minimum: 1
-                  maximum: 1000000000
+                  maximum: 9007199254740991
                 query_observed_at:
                   type: string
                   format: date-time
@@ -6260,7 +6238,7 @@ components:
                 retry_after_seconds:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 2147483647
               required:
               - code
               - message
@@ -6314,7 +6292,7 @@ components:
                 revision:
                   type: integer
                   minimum: 1
-                  maximum: 1000000000
+                  maximum: 9007199254740991
               required:
               - query_handle
               - revision
@@ -6352,7 +6330,7 @@ components:
                 retry_after_seconds:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 2147483647
               required:
               - code
               - message
@@ -6433,7 +6411,7 @@ components:
                 retry_after_seconds:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 2147483647
               required:
               - code
               - message
@@ -6490,7 +6468,7 @@ components:
                 revision:
                   type: integer
                   minimum: 1
-                  maximum: 1000000000
+                  maximum: 9007199254740991
               required:
               - query_handle
               - revision
@@ -6528,7 +6506,7 @@ components:
                 retry_after_seconds:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 2147483647
               required:
               - code
               - message
@@ -6586,7 +6564,7 @@ components:
                 retry_after_seconds:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 2147483647
               required:
               - code
               - message
@@ -6671,7 +6649,6 @@ components:
                   - pod_uid
                 assignments:
                   type: array
-                  maxItems: 32
                   items:
                     type: object
                     additionalProperties: false
@@ -6713,10 +6690,13 @@ components:
                     - basis_kind
                     - basis_uid
                     - revision
+                  description: All of the caller's contributing assignments; bounded
+                    by the caller's AccessBinding and PermissionSource objects, so
+                    the list is not paged.
                 assignments_total:
                   type: integer
                   minimum: 0
-                  maximum: 256
+                  maximum: 9007199254740991
               required:
               - decision
               - operation
@@ -6758,7 +6738,7 @@ components:
                 retry_after_seconds:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 2147483647
               required:
               - code
               - message
@@ -6831,7 +6811,7 @@ components:
                 revision:
                   type: integer
                   minimum: 1
-                  maximum: 1000000000
+                  maximum: 9007199254740991
               required:
               - query_handle
               - revision
@@ -6869,7 +6849,7 @@ components:
                 retry_after_seconds:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 2147483647
               required:
               - code
               - message
@@ -6895,7 +6875,7 @@ components:
                 revision:
                   type: integer
                   minimum: 1
-                  maximum: 1000000000
+                  maximum: 9007199254740991
                 phase:
                   enum:
                   - Pending
@@ -6974,7 +6954,6 @@ components:
                       - action_instance_id
                       - pod_uid
                   minItems: 0
-                  maxItems: 16
                 case_id:
                   type: string
                   format: uuid
@@ -7004,7 +6983,7 @@ components:
                       message:
                         type: string
                         minLength: 1
-                        maxLength: 256
+                        maxLength: 1024
                       responsible_role:
                         enum:
                         - maintainer
@@ -7019,7 +6998,6 @@ components:
                     - responsible_role
                     - retryable
                   minItems: 0
-                  maxItems: 32
                 repeated_from_capture_id:
                   type: string
                   format: uuid
@@ -7056,7 +7034,7 @@ components:
                 reason:
                   type: string
                   minLength: 1
-                  maxLength: 512
+                  maxLength: 4096
                   description: Authorized parent Save reason, preserved verbatim;
                     never restored on repeat.
                 reason_state:
@@ -7114,7 +7092,7 @@ components:
                 revision:
                   type: integer
                   minimum: 1
-                  maximum: 1000000000
+                  maximum: 9007199254740991
               required:
               - query_handle
               - revision
@@ -7152,7 +7130,7 @@ components:
                 retry_after_seconds:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 2147483647
               required:
               - code
               - message
@@ -7203,7 +7181,7 @@ components:
                 revision:
                   type: integer
                   minimum: 1
-                  maximum: 1000000000
+                  maximum: 9007199254740991
               required:
               - query_handle
               - revision
@@ -7241,7 +7219,7 @@ components:
                 retry_after_seconds:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 2147483647
               required:
               - code
               - message
@@ -7281,7 +7259,7 @@ components:
                 revision:
                   type: integer
                   minimum: 1
-                  maximum: 1000000000
+                  maximum: 9007199254740991
               required:
               - query_handle
               - revision
@@ -7319,7 +7297,7 @@ components:
                 retry_after_seconds:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 2147483647
               required:
               - code
               - message
@@ -7415,7 +7393,7 @@ components:
                       verified_native_bytes:
                         type: integer
                         minimum: 0
-                        maximum: 1099511627776
+                        maximum: 9007199254740991
                       target:
                         type: object
                         additionalProperties: false
@@ -7490,7 +7468,7 @@ components:
                             - integer
                             - 'null'
                             minimum: 1000
-                            maximum: 60000
+                            maximum: 9007199254740991
                             multipleOf: 1000
                           force_gc:
                             type: boolean
@@ -7539,7 +7517,7 @@ components:
                               requested_duration_ms:
                                 type: integer
                                 minimum: 1000
-                                maximum: 60000
+                                maximum: 9007199254740991
                                 multipleOf: 1000
                               force_gc:
                                 const: false
@@ -7552,7 +7530,7 @@ components:
                               requested_duration_ms:
                                 type: integer
                                 minimum: 1000
-                                maximum: 15000
+                                maximum: 9007199254740991
                                 multipleOf: 1000
                               force_gc:
                                 const: false
@@ -7601,7 +7579,7 @@ components:
                               requested_duration_ms:
                                 type: integer
                                 minimum: 1000
-                                maximum: 60000
+                                maximum: 9007199254740991
                                 multipleOf: 1000
                               force_gc:
                                 const: false
@@ -7641,6 +7619,8 @@ components:
                         required:
                         - native_format
                   maxItems: 100
+                  description: First 100 artifacts (page size); list_artifacts pages
+                    through all of them.
                 timeline:
                   type: array
                   items:
@@ -7657,11 +7637,11 @@ components:
                       summary:
                         type: string
                         minLength: 1
-                        maxLength: 512
+                        maxLength: 1024
                       clock_uncertainty_ms:
                         type: integer
                         minimum: 0
-                        maximum: 3600000
+                        maximum: 9007199254740991
                     required:
                     - time
                     - kind
@@ -7689,7 +7669,7 @@ components:
                 revision:
                   type: integer
                   minimum: 1
-                  maximum: 1000000000
+                  maximum: 9007199254740991
               required:
               - query_handle
               - revision
@@ -7727,7 +7707,7 @@ components:
                 retry_after_seconds:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 2147483647
               required:
               - code
               - message
@@ -7766,24 +7746,23 @@ components:
                             index:
                               type: integer
                               minimum: 0
-                              maximum: 10000
+                              maximum: 2147483647
                             function:
                               anyOf:
                               - type: string
                                 minLength: 1
-                                maxLength: 512
                               - type: 'null'
                             file:
                               anyOf:
                               - type: string
                                 minLength: 1
-                                maxLength: 1024
+                                maxLength: 4096
                               - type: 'null'
                             line:
                               anyOf:
                               - type: integer
                                 minimum: 0
-                                maximum: 100000000
+                                maximum: 9007199254740991
                               - type: 'null'
                             address:
                               type: string
@@ -7792,11 +7771,9 @@ components:
                           required:
                           - index
                           - function
-                        maxItems: 128
                     required:
                     - thread_id
                     - frames
-                  maxItems: 64
                 symbol_status:
                   type: string
                   enum:
@@ -7824,7 +7801,7 @@ components:
                 revision:
                   type: integer
                   minimum: 1
-                  maximum: 1000000000
+                  maximum: 9007199254740991
               required:
               - query_handle
               - revision
@@ -7862,7 +7839,7 @@ components:
                 retry_after_seconds:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 2147483647
               required:
               - code
               - message
@@ -7949,7 +7926,6 @@ components:
                         anyOf:
                         - type: string
                           minLength: 1
-                          maxLength: 512
                         - type: 'null'
                       flat:
                         type: number
@@ -8018,7 +7994,7 @@ components:
                 revision:
                   type: integer
                   minimum: 1
-                  maximum: 1000000000
+                  maximum: 9007199254740991
                 query_observed_at:
                   type: string
                   format: date-time
@@ -8068,7 +8044,7 @@ components:
                 revision:
                   type: integer
                   minimum: 1
-                  maximum: 1000000000
+                  maximum: 9007199254740991
                 query_observed_at:
                   type: string
                   format: date-time
@@ -8125,7 +8101,7 @@ components:
                   - integer
                   - 'null'
                   minimum: 0
-                  maximum: 1000000000000
+                  maximum: 9007199254740991
                   description: Producer-reported exclusions with the exact meaning
                     given by drop_reporting; null means unavailable. This is not measured
                     network loss.
@@ -8170,7 +8146,7 @@ components:
                 conversations_total:
                   type: integer
                   minimum: 0
-                  maximum: 16384
+                  maximum: 9007199254740991
                 conversations_truncated:
                   type: boolean
                 query_observed_at:
@@ -8262,7 +8238,6 @@ components:
                         maximum: 599
                       headers:
                         type: array
-                        maxItems: 32
                         items:
                           type: object
                           additionalProperties: false
@@ -8294,14 +8269,13 @@ components:
                 dropped_flows:
                   type: integer
                   minimum: 0
-                  maximum: 1000000000000
+                  maximum: 9007199254740991
                 incomplete_flows:
                   type: integer
                   minimum: 0
-                  maximum: 1000000000000
+                  maximum: 9007199254740991
                 coverage_gaps:
                   type: array
-                  maxItems: 32
                   items:
                     type: string
                     minLength: 1
@@ -8332,7 +8306,6 @@ components:
                     type: string
                     minLength: 1
                     maxLength: 64
-                  maxItems: 32
                 rows:
                   type: array
                   items:
@@ -8343,7 +8316,6 @@ components:
                       - number
                       - boolean
                       - 'null'
-                    maxItems: 32
                   maxItems: 100
               required:
               - fields
@@ -8366,13 +8338,12 @@ components:
                 line_start:
                   type: integer
                   minimum: 1
-                  maximum: 1000000000
+                  maximum: 9007199254740991
                 lines:
                   type: array
                   items:
                     type: string
                     minLength: 1
-                    maxLength: 4096
                   maxItems: 200
                 query_observed_at:
                   type: string
@@ -8495,7 +8466,6 @@ components:
                   reasons:
                     type: array
                     minItems: 1
-                    maxItems: 16
                     items:
                       type: object
                       additionalProperties: false
@@ -8520,31 +8490,21 @@ components:
                     type: object
                     additionalProperties: false
                     properties:
-                      max_session_seconds:
-                        type: integer
-                        minimum: 1
-                        maximum: 3600
                       max_observed_bytes:
                         type: integer
                         minimum: 1
-                        maximum: 1099511627776
+                        maximum: 9007199254740991
                       max_bytes_per_second:
                         type: integer
                         minimum: 1
                         maximum: 1073741824
-                      max_concurrent_sessions:
-                        type: integer
-                        minimum: 1
-                        maximum: 1000
                       max_observed_events:
                         type: integer
                         minimum: 0
-                        maximum: 1000000000
+                        maximum: 9007199254740991
                     required:
-                    - max_session_seconds
                     - max_observed_bytes
                     - max_bytes_per_second
-                    - max_concurrent_sessions
                   requested_by:
                     type: object
                     additionalProperties: false
@@ -8574,7 +8534,9 @@ components:
                   lifetime_seconds:
                     type: integer
                     minimum: 1
-                    maximum: 31536000
+                    maximum: 9007199254740991
+                    description: Approval window in seconds, bounded by the administrator-configured
+                      maximum.
                   decision:
                     type: object
                     additionalProperties: false
@@ -8609,7 +8571,7 @@ components:
                       reason:
                         type: string
                         minLength: 1
-                        maxLength: 512
+                        maxLength: 4096
                       authentication_context:
                         type: object
                         additionalProperties: false
@@ -8666,7 +8628,6 @@ components:
                   actions:
                     type: array
                     minItems: 1
-                    maxItems: 16
                     items:
                       type: object
                       additionalProperties: false
@@ -8703,15 +8664,15 @@ components:
                         filter_instructions:
                           type: integer
                           minimum: 1
-                          maximum: 256
+                          maximum: 4096
                         max_bytes:
                           type: integer
                           minimum: 1
-                          maximum: 1099511627776
+                          maximum: 9007199254740991
                         ring_max_bytes:
                           type: integer
                           minimum: 1
-                          maximum: 268435456
+                          maximum: 9007199254740991
                         ring_max_age:
                           type: string
                           minLength: 1
@@ -8909,7 +8870,7 @@ components:
                           max_bytes:
                             type: integer
                             minimum: 1
-                            maximum: 67108864
+                            maximum: 9007199254740991
                         required:
                         - before
                         - after
@@ -8934,7 +8895,6 @@ components:
                       action_ids:
                         type: array
                         minItems: 1
-                        maxItems: 16
                         items:
                           type: string
                           minLength: 1
@@ -8953,30 +8913,30 @@ components:
                       max_artifacts:
                         type: integer
                         minimum: 1
-                        maximum: 64
+                        maximum: 9007199254740991
                       max_bytes:
                         type: integer
                         minimum: 1
-                        maximum: 274877906944
+                        maximum: 9007199254740991
                       max_operations:
                         type: integer
                         minimum: 1
-                        maximum: 10000
+                        maximum: 9007199254740991
                       not_after:
                         type: string
                         format: date-time
                       artifacts_used:
                         type: integer
                         minimum: 0
-                        maximum: 64
+                        maximum: 9007199254740991
                       bytes_used:
                         type: integer
                         minimum: 0
-                        maximum: 274877906944
+                        maximum: 9007199254740991
                       operations_used:
                         type: integer
                         minimum: 0
-                        maximum: 10000
+                        maximum: 9007199254740991
                     required:
                     - action_ids
                     - operations
@@ -8990,15 +8950,11 @@ components:
                   remaining_bytes:
                     type: integer
                     minimum: 0
-                    maximum: 1000000000000
-                  remaining_executions:
-                    type: integer
-                    minimum: 0
-                    maximum: 10000
+                    maximum: 9007199254740991
                   remaining_observation_bytes:
                     type: integer
                     minimum: 0
-                    maximum: 1099511627776
+                    maximum: 9007199254740991
                   preview_deadline:
                     type: string
                     format: date-time
@@ -9057,47 +9013,42 @@ components:
                       authority_not_after:
                         type: string
                         format: date-time
-                      max_executions:
-                        type: integer
-                        minimum: 1
-                        maximum: 10000
                       executions_used:
                         type: integer
                         minimum: 0
-                        maximum: 10000
+                        maximum: 9007199254740991
                       max_collected_bytes:
                         type: integer
                         minimum: 1
-                        maximum: 1099511627776
+                        maximum: 9007199254740991
                       max_observed_bytes:
                         type: integer
                         minimum: 0
-                        maximum: 1099511627776
+                        maximum: 9007199254740991
                       collected_bytes_used:
                         type: integer
                         minimum: 0
-                        maximum: 1099511627776
+                        maximum: 9007199254740991
                       observed_bytes_used:
                         type: integer
                         minimum: 0
-                        maximum: 1099511627776
+                        maximum: 9007199254740991
                       max_observed_events:
                         type: integer
                         minimum: 0
-                        maximum: 1000000000
+                        maximum: 9007199254740991
                         description: Cumulative eligible entry and exit probe ceiling;
                           zero or absent grants no argument observation.
                       observed_events_used:
                         type: integer
                         minimum: 0
-                        maximum: 1000000000
+                        maximum: 9007199254740991
                         description: Charged event units.
                     required:
                     - uid
                     - executor
                     - authority_issued_at
                     - authority_not_after
-                    - max_executions
                     - executions_used
                     - max_collected_bytes
                     - max_observed_bytes
@@ -9145,8 +9096,10 @@ components:
                     - preview_deadline
                     properties:
                       lifetime_seconds:
-                        minimum: 60
-                        maximum: 28800
+                        minimum: 1
+                        maximum: 9007199254740991
+                        description: Approval window in seconds, bounded by the administrator-configured
+                          maximum.
                       target:
                         required:
                         - pod_name
@@ -9277,7 +9230,9 @@ components:
                   lifetime_seconds:
                     type: integer
                     minimum: 1
-                    maximum: 31536000
+                    maximum: 9007199254740991
+                    description: Approval window in seconds, bounded by the administrator-configured
+                      maximum.
                   decision:
                     type: object
                     additionalProperties: false
@@ -9312,7 +9267,7 @@ components:
                       reason:
                         type: string
                         minLength: 1
-                        maxLength: 512
+                        maxLength: 4096
                       authentication_context:
                         type: object
                         additionalProperties: false
@@ -9378,7 +9333,7 @@ components:
                       reason:
                         type: string
                         minLength: 1
-                        maxLength: 512
+                        maxLength: 4096
                       operations:
                         type: array
                         items:
@@ -9393,7 +9348,7 @@ components:
                       max_bytes:
                         type: integer
                         minimum: 1
-                        maximum: 1099511627776
+                        maximum: 9007199254740991
                       max_operations:
                         const: 10000
                       not_after:
@@ -9402,15 +9357,15 @@ components:
                       artifact_count:
                         type: integer
                         minimum: 1
-                        maximum: 64
+                        maximum: 9007199254740991
                       bytes_used:
                         type: integer
                         minimum: 0
-                        maximum: 1099511627776
+                        maximum: 9007199254740991
                       operations_used:
                         type: integer
                         minimum: 0
-                        maximum: 10000
+                        maximum: 9007199254740991
                       artifacts:
                         type: array
                         items:
@@ -9440,7 +9395,7 @@ components:
                             native_bytes:
                               type: integer
                               minimum: 0
-                              maximum: 1099511627776
+                              maximum: 9007199254740991
                             expires_at:
                               type: string
                               format: date-time
@@ -9498,7 +9453,6 @@ components:
                           - expires_at
                           - target
                         minItems: 1
-                        maxItems: 64
                     required:
                     - case_id
                     - reason
@@ -9545,7 +9499,7 @@ components:
                 revision:
                   type: integer
                   minimum: 1
-                  maximum: 1000000000
+                  maximum: 9007199254740991
               required:
               - query_handle
               - revision
@@ -9583,7 +9537,7 @@ components:
                 retry_after_seconds:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 2147483647
               required:
               - code
               - message
@@ -9631,7 +9585,7 @@ components:
                 generation:
                   type: integer
                   minimum: 1
-                  maximum: 2147483647
+                  maximum: 9007199254740991
                 expires_at:
                   type: string
                   format: date-time
@@ -9654,10 +9608,6 @@ components:
                   type: integer
                   minimum: 0
                   maximum: 2147483647
-                max_executions:
-                  type: integer
-                  minimum: 1
-                  maximum: 10000
                 watched_pods:
                   type: integer
                   minimum: 0
@@ -9672,7 +9622,6 @@ components:
                   maximum: 2147483647
                 recent:
                   type: array
-                  maxItems: 8
                   items:
                     type: object
                     additionalProperties: false
@@ -9784,7 +9733,6 @@ components:
                         - OOMKilled
                     exit_codes:
                       type: array
-                      maxItems: 16
                       items:
                         type: integer
                         minimum: 0
@@ -9797,11 +9745,11 @@ components:
                     minimum_failures:
                       type: integer
                       minimum: 1
-                      maximum: 1000
+                      maximum: 2147483647
                     window_seconds:
                       type: integer
                       minimum: 30
-                      maximum: 300
+                      maximum: 9007199254740991
                     match:
                       enum:
                       - literal
@@ -9827,7 +9775,7 @@ components:
                     sample_interval_seconds:
                       type: integer
                       minimum: 30
-                      maximum: 300
+                      maximum: 9007199254740991
                   required:
                   - kind
                 sharing:
@@ -9856,11 +9804,11 @@ components:
                     shared_captures:
                       type: integer
                       minimum: 0
-                      maximum: 100
+                      maximum: 9007199254740991
                     max_captures:
                       type: integer
                       minimum: 1
-                      maximum: 100
+                      maximum: 9007199254740991
                       description: Optional bound; recurring sharing otherwise lasts
                         as long as the policy grant.
                     not_after:
@@ -9872,7 +9820,7 @@ components:
                     revision:
                       type: integer
                       minimum: 1
-                      maximum: 1000000000
+                      maximum: 9007199254740991
                     stopped_at:
                       type: string
                       format: date-time
@@ -9885,26 +9833,26 @@ components:
                 collected_bytes_spent:
                   type: integer
                   minimum: 0
-                  maximum: 1099511627776
+                  maximum: 9007199254740991
                   description: Native-output charges shared by this acceptance; a
                     reservation is released when its outcome is known. Not measured
                     bytes.
                 max_collected_bytes:
                   type: integer
                   minimum: 0
-                  maximum: 1099511627776
+                  maximum: 9007199254740991
                   description: Original accepted cumulative native-output ceiling,
                     shared across grant replacements and controls.
                 observed_bytes_spent:
                   type: integer
                   minimum: 0
-                  maximum: 1099511627776
+                  maximum: 9007199254740991
                   description: Pre-filter observation charges shared by this acceptance.
                     Not collected output.
                 max_observed_bytes:
                   type: integer
                   minimum: 0
-                  maximum: 1099511627776
+                  maximum: 9007199254740991
                   description: Original accepted cumulative pre-filter observation
                     ceiling; zero permits no continuing acquisition.
                 collection_kind:
@@ -9922,23 +9870,16 @@ components:
                   description: Grant named by the current attachment pointer; does
                     not assert that its authority, budget or recorder readiness currently
                     permits collection.
-                max_grant_starts:
-                  type: integer
-                  minimum: 1
-                  maximum: 10000
-                  description: Server-derived ceiling in action-start units for the
-                    currently accepted policy grant plan. Policy executions remain
-                    a separate once-per-Save counter.
                 max_observed_events:
                   type: integer
                   minimum: 0
-                  maximum: 1000000000
+                  maximum: 9007199254740991
                   description: Cumulative eligible entry and exit probe ceiling; zero
                     or absent grants no argument observation.
                 observed_events_spent:
                   type: integer
                   minimum: 0
-                  maximum: 1000000000
+                  maximum: 9007199254740991
                   description: Charged event units.
                 renewal_due:
                   type: boolean
@@ -9991,7 +9932,7 @@ components:
                 retry_after_seconds:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 2147483647
               required:
               - code
               - message
@@ -10043,7 +9984,7 @@ components:
                 retry_after_seconds:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 2147483647
               required:
               - code
               - message
@@ -10095,7 +10036,7 @@ components:
                 retry_after_seconds:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 2147483647
               required:
               - code
               - message
@@ -10164,7 +10105,7 @@ components:
                 revision:
                   type: integer
                   minimum: 1
-                  maximum: 1000000000
+                  maximum: 9007199254740991
                 query_observed_at:
                   type: string
                   format: date-time
@@ -10219,7 +10160,7 @@ components:
                 retry_after_seconds:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 2147483647
               required:
               - code
               - message
@@ -10257,7 +10198,7 @@ components:
                 revision:
                   type: integer
                   minimum: 1
-                  maximum: 1000000000
+                  maximum: 9007199254740991
               required:
               - query_handle
               - revision
@@ -10295,7 +10236,7 @@ components:
                 retry_after_seconds:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 2147483647
               required:
               - code
               - message
@@ -10331,11 +10272,11 @@ components:
                       summary:
                         type: string
                         minLength: 1
-                        maxLength: 512
+                        maxLength: 1024
                       clock_uncertainty_ms:
                         type: integer
                         minimum: 0
-                        maximum: 3600000
+                        maximum: 9007199254740991
                     required:
                     - time
                     - kind
@@ -10361,7 +10302,7 @@ components:
                 revision:
                   type: integer
                   minimum: 1
-                  maximum: 1000000000
+                  maximum: 9007199254740991
               required:
               - query_handle
               - revision
@@ -10399,7 +10340,7 @@ components:
                 retry_after_seconds:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 2147483647
               required:
               - code
               - message
@@ -10484,7 +10425,7 @@ components:
                 revision:
                   type: integer
                   minimum: 1
-                  maximum: 1000000000
+                  maximum: 9007199254740991
               required:
               - query_handle
               - revision
@@ -10522,7 +10463,7 @@ components:
                 retry_after_seconds:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 2147483647
               required:
               - code
               - message
@@ -10560,7 +10501,7 @@ components:
                 revision:
                   type: integer
                   minimum: 1
-                  maximum: 1000000000
+                  maximum: 9007199254740991
               required:
               - query_handle
               - revision
@@ -10598,7 +10539,7 @@ components:
                 retry_after_seconds:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 2147483647
               required:
               - code
               - message
@@ -10671,7 +10612,7 @@ components:
                 revision:
                   type: integer
                   minimum: 1
-                  maximum: 1000000000
+                  maximum: 9007199254740991
               required:
               - query_handle
               - revision
@@ -10709,7 +10650,7 @@ components:
                 retry_after_seconds:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 2147483647
               required:
               - code
               - message
@@ -10750,7 +10691,6 @@ components:
                       description:
                         type: string
                         minLength: 1
-                        maxLength: 512
                       approval_required:
                         type: boolean
                       available:
@@ -10768,7 +10708,7 @@ components:
                             message:
                               type: string
                               minLength: 1
-                              maxLength: 256
+                              maxLength: 1024
                             responsible_role:
                               enum:
                               - maintainer
@@ -10783,7 +10723,6 @@ components:
                           - responsible_role
                           - retryable
                         minItems: 0
-                        maxItems: 16
                       preset_ref:
                         type: object
                         additionalProperties: false
@@ -10810,7 +10749,6 @@ components:
                       display_name:
                         type: string
                         minLength: 1
-                        maxLength: 128
                       execution_modes:
                         type: array
                         items:
@@ -10898,7 +10836,7 @@ components:
                 revision:
                   type: integer
                   minimum: 1
-                  maximum: 1000000000
+                  maximum: 9007199254740991
               required:
               - query_handle
               - revision
@@ -10936,7 +10874,7 @@ components:
                 retry_after_seconds:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 2147483647
               required:
               - code
               - message
@@ -10974,7 +10912,7 @@ components:
                 revision:
                   type: integer
                   minimum: 1
-                  maximum: 1000000000
+                  maximum: 9007199254740991
               required:
               - query_handle
               - revision
@@ -11012,7 +10950,7 @@ components:
                 retry_after_seconds:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 2147483647
               required:
               - code
               - message
@@ -11113,7 +11051,6 @@ components:
                         reasons:
                           type: array
                           minItems: 1
-                          maxItems: 16
                           items:
                             type: object
                             additionalProperties: false
@@ -11138,31 +11075,21 @@ components:
                           type: object
                           additionalProperties: false
                           properties:
-                            max_session_seconds:
-                              type: integer
-                              minimum: 1
-                              maximum: 3600
                             max_observed_bytes:
                               type: integer
                               minimum: 1
-                              maximum: 1099511627776
+                              maximum: 9007199254740991
                             max_bytes_per_second:
                               type: integer
                               minimum: 1
                               maximum: 1073741824
-                            max_concurrent_sessions:
-                              type: integer
-                              minimum: 1
-                              maximum: 1000
                             max_observed_events:
                               type: integer
                               minimum: 0
-                              maximum: 1000000000
+                              maximum: 9007199254740991
                           required:
-                          - max_session_seconds
                           - max_observed_bytes
                           - max_bytes_per_second
-                          - max_concurrent_sessions
                         requested_by:
                           type: object
                           additionalProperties: false
@@ -11192,7 +11119,9 @@ components:
                         lifetime_seconds:
                           type: integer
                           minimum: 1
-                          maximum: 31536000
+                          maximum: 9007199254740991
+                          description: Approval window in seconds, bounded by the
+                            administrator-configured maximum.
                         decision:
                           type: object
                           additionalProperties: false
@@ -11227,7 +11156,7 @@ components:
                             reason:
                               type: string
                               minLength: 1
-                              maxLength: 512
+                              maxLength: 4096
                             authentication_context:
                               type: object
                               additionalProperties: false
@@ -11334,47 +11263,42 @@ components:
                             authority_not_after:
                               type: string
                               format: date-time
-                            max_executions:
-                              type: integer
-                              minimum: 1
-                              maximum: 10000
                             executions_used:
                               type: integer
                               minimum: 0
-                              maximum: 10000
+                              maximum: 9007199254740991
                             max_collected_bytes:
                               type: integer
                               minimum: 1
-                              maximum: 1099511627776
+                              maximum: 9007199254740991
                             max_observed_bytes:
                               type: integer
                               minimum: 0
-                              maximum: 1099511627776
+                              maximum: 9007199254740991
                             collected_bytes_used:
                               type: integer
                               minimum: 0
-                              maximum: 1099511627776
+                              maximum: 9007199254740991
                             observed_bytes_used:
                               type: integer
                               minimum: 0
-                              maximum: 1099511627776
+                              maximum: 9007199254740991
                             max_observed_events:
                               type: integer
                               minimum: 0
-                              maximum: 1000000000
+                              maximum: 9007199254740991
                               description: Cumulative eligible entry and exit probe
                                 ceiling; zero or absent grants no argument observation.
                             observed_events_used:
                               type: integer
                               minimum: 0
-                              maximum: 1000000000
+                              maximum: 9007199254740991
                               description: Charged event units.
                           required:
                           - uid
                           - executor
                           - authority_issued_at
                           - authority_not_after
-                          - max_executions
                           - executions_used
                           - max_collected_bytes
                           - max_observed_bytes
@@ -11420,8 +11344,10 @@ components:
                           - preview_deadline
                           properties:
                             lifetime_seconds:
-                              minimum: 60
-                              maximum: 28800
+                              minimum: 1
+                              maximum: 9007199254740991
+                              description: Approval window in seconds, bounded by
+                                the administrator-configured maximum.
                             target:
                               required:
                               - pod_name
@@ -11530,7 +11456,9 @@ components:
                         lifetime_seconds:
                           type: integer
                           minimum: 1
-                          maximum: 31536000
+                          maximum: 9007199254740991
+                          description: Approval window in seconds, bounded by the
+                            administrator-configured maximum.
                         decision:
                           type: object
                           additionalProperties: false
@@ -11565,7 +11493,7 @@ components:
                             reason:
                               type: string
                               minLength: 1
-                              maxLength: 512
+                              maxLength: 4096
                             authentication_context:
                               type: object
                               additionalProperties: false
@@ -11629,7 +11557,7 @@ components:
                             reason:
                               type: string
                               minLength: 1
-                              maxLength: 512
+                              maxLength: 4096
                             operations:
                               type: array
                               items:
@@ -11644,7 +11572,7 @@ components:
                             max_bytes:
                               type: integer
                               minimum: 1
-                              maximum: 1099511627776
+                              maximum: 9007199254740991
                             max_operations:
                               const: 10000
                             not_after:
@@ -11653,15 +11581,15 @@ components:
                             artifact_count:
                               type: integer
                               minimum: 1
-                              maximum: 64
+                              maximum: 9007199254740991
                             bytes_used:
                               type: integer
                               minimum: 0
-                              maximum: 1099511627776
+                              maximum: 9007199254740991
                             operations_used:
                               type: integer
                               minimum: 0
-                              maximum: 10000
+                              maximum: 9007199254740991
                           required:
                           - case_id
                           - reason
@@ -11709,7 +11637,7 @@ components:
                 revision:
                   type: integer
                   minimum: 1
-                  maximum: 1000000000
+                  maximum: 9007199254740991
               required:
               - query_handle
               - revision
@@ -11747,7 +11675,7 @@ components:
                 retry_after_seconds:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 2147483647
               required:
               - code
               - message
@@ -11799,7 +11727,6 @@ components:
                         items:
                           $ref: https://asservat.io/spec/v1/common.schema.json#/$defs/recipient
                         minItems: 1
-                        maxItems: 8
                         uniqueItems: true
                       origin:
                         type: object
@@ -11851,11 +11778,11 @@ components:
                       registered_captures:
                         type: integer
                         minimum: 0
-                        maximum: 100
+                        maximum: 9007199254740991
                       max_captures:
                         type: integer
                         minimum: 1
-                        maximum: 100
+                        maximum: 9007199254740991
                     required:
                     - sharing_intent_id
                     - source_kind
@@ -11886,7 +11813,7 @@ components:
                 revision:
                   type: integer
                   minimum: 1
-                  maximum: 1000000000
+                  maximum: 9007199254740991
               required:
               - query_handle
               - revision
@@ -11924,7 +11851,7 @@ components:
                 retry_after_seconds:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 2147483647
               required:
               - code
               - message
@@ -11973,7 +11900,7 @@ components:
                       available_pods:
                         type: integer
                         minimum: 0
-                        maximum: 1000
+                        maximum: 9007199254740991
                       coverage_limited:
                         type: boolean
                     required:
@@ -12006,7 +11933,7 @@ components:
                 revision:
                   type: integer
                   minimum: 1
-                  maximum: 1000000000
+                  maximum: 9007199254740991
               required:
               - query_handle
               - revision
@@ -12044,7 +11971,7 @@ components:
                 retry_after_seconds:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 2147483647
               required:
               - code
               - message
@@ -12073,7 +12000,7 @@ components:
                 targets_evaluated:
                   type: integer
                   minimum: 0
-                  maximum: 1000
+                  maximum: 9007199254740991
                 fresh_until:
                   type: string
                   format: date-time
@@ -12083,7 +12010,7 @@ components:
                 unavailable_total:
                   type: integer
                   minimum: 0
-                  maximum: 1000
+                  maximum: 9007199254740991
                 listed_rows:
                   type: integer
                   minimum: 0
@@ -12092,7 +12019,6 @@ components:
                   minimum: 0
                 unavailable:
                   type: array
-                  maxItems: 1000
                   items:
                     type: object
                     additionalProperties: false
@@ -12126,7 +12052,6 @@ components:
                     - unmet
                 deltas:
                   type: array
-                  maxItems: 4096
                   items:
                     type: object
                     additionalProperties: false
@@ -12179,7 +12104,6 @@ components:
                         - DecisionTimeSource
                       before_basis:
                         type: array
-                        maxItems: 8
                         items:
                           type: object
                           additionalProperties: false
@@ -12218,7 +12142,6 @@ components:
                           - proposed
                       after_basis:
                         type: array
-                        maxItems: 8
                         items:
                           type: object
                           additionalProperties: false
@@ -12271,7 +12194,6 @@ components:
                     - after_basis
                 not_evaluated:
                   type: array
-                  maxItems: 16
                   items:
                     type: object
                     additionalProperties: false
@@ -12300,7 +12222,6 @@ components:
                     - reason
                 unmatched:
                   type: array
-                  maxItems: 16
                   items:
                     type: object
                     additionalProperties: false
@@ -12362,7 +12283,7 @@ components:
                 retry_after_seconds:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 2147483647
               required:
               - code
               - message
@@ -12394,15 +12315,15 @@ components:
                 pod_count:
                   type: integer
                   minimum: 0
-                  maximum: 100
+                  maximum: 9007199254740991
                 max_bytes:
                   type: integer
                   minimum: 0
-                  maximum: 109951162777600
+                  maximum: 9007199254740991
                 max_process_starts:
                   type: integer
                   minimum: 0
-                  maximum: 10000
+                  maximum: 9007199254740991
                 approval_required:
                   type: boolean
                 capture_enabled:
@@ -12420,7 +12341,7 @@ components:
                       message:
                         type: string
                         minLength: 1
-                        maxLength: 256
+                        maxLength: 1024
                       responsible_role:
                         enum:
                         - maintainer
@@ -12435,7 +12356,6 @@ components:
                     - responsible_role
                     - retryable
                   minItems: 0
-                  maxItems: 32
                 warnings:
                   type: array
                   items:
@@ -12443,7 +12363,6 @@ components:
                     minLength: 1
                     maxLength: 256
                   minItems: 0
-                  maxItems: 32
                 navigation_uri:
                   type: string
                   format: uri
@@ -12509,7 +12428,6 @@ components:
                 selected_pods:
                   type: array
                   minItems: 1
-                  maxItems: 100
                   uniqueItems: true
                   items:
                     type: object
@@ -12566,7 +12484,6 @@ components:
                     or authority to select a replacement.
                 result_access_actions:
                   type: array
-                  maxItems: 16
                   description: Advisory follow-up access choices for this exact reviewed
                     raw plan. Current authority, retained source and selected operations
                     are checked again on submission. Absence grants no access.
@@ -12678,7 +12595,7 @@ components:
                 revision:
                   type: integer
                   minimum: 1
-                  maximum: 1000000000
+                  maximum: 9007199254740991
               required:
               - query_handle
               - revision
@@ -12716,7 +12633,7 @@ components:
                 retry_after_seconds:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 2147483647
               required:
               - code
               - message
@@ -12762,25 +12679,25 @@ components:
                 artifacts_scanned:
                   type: integer
                   minimum: 0
-                  maximum: 10000
+                  maximum: 9007199254740991
                 scan_limited:
                   type: boolean
                 affected_total:
                   type: integer
                   minimum: 0
-                  maximum: 10000
+                  maximum: 9007199254740991
                 read_closed_total:
                   type: integer
                   minimum: 0
-                  maximum: 10000
+                  maximum: 9007199254740991
                 deletion_due_total:
                   type: integer
                   minimum: 0
-                  maximum: 10000
+                  maximum: 9007199254740991
                 unknown_total:
                   type: integer
                   minimum: 0
-                  maximum: 10000
+                  maximum: 9007199254740991
                 earliest_expires_at:
                   type: string
                   format: date-time
@@ -12791,7 +12708,6 @@ components:
                   type: boolean
                 groups:
                   type: array
-                  maxItems: 32
                   items:
                     type: object
                     additionalProperties: false
@@ -12821,23 +12737,23 @@ components:
                       scanned:
                         type: integer
                         minimum: 0
-                        maximum: 10000
+                        maximum: 9007199254740991
                       affected:
                         type: integer
                         minimum: 0
-                        maximum: 10000
+                        maximum: 9007199254740991
                       read_closed:
                         type: integer
                         minimum: 0
-                        maximum: 10000
+                        maximum: 9007199254740991
                       deletion_due:
                         type: integer
                         minimum: 0
-                        maximum: 10000
+                        maximum: 9007199254740991
                       unknown:
                         type: integer
                         minimum: 0
-                        maximum: 10000
+                        maximum: 9007199254740991
                       earliest_expires_at:
                         type: string
                         format: date-time
@@ -12856,10 +12772,9 @@ components:
                 groups_total:
                   type: integer
                   minimum: 0
-                  maximum: 20000
+                  maximum: 9007199254740991
                 incomplete_clusters:
                   type: array
-                  maxItems: 32
                   items:
                     type: object
                     additionalProperties: false
@@ -12876,10 +12791,9 @@ components:
                 incomplete_total:
                   type: integer
                   minimum: 0
-                  maximum: 20000
+                  maximum: 9007199254740991
                 not_evaluated:
                   type: array
-                  maxItems: 16
                   items:
                     type: object
                     additionalProperties: false
@@ -12953,7 +12867,7 @@ components:
                 retry_after_seconds:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 2147483647
               required:
               - code
               - message
@@ -12999,7 +12913,6 @@ components:
                     - icmp_code
                     - frame_prefix_hex
                   minItems: 1
-                  maxItems: 32
                   uniqueItems: true
                 rows:
                   type: array
@@ -13007,13 +12920,11 @@ components:
                   items:
                     type: array
                     minItems: 1
-                    maxItems: 32
                     items:
                       type:
                       - string
                       - integer
                       - 'null'
-                      maxLength: 128
                       minimum: 0
                       maximum: 4294967295
                   description: Exactly one cell per selected field. Fixed field types,
@@ -13022,7 +12933,9 @@ components:
                 scanned_bytes:
                   type: integer
                   minimum: 0
-                  maximum: 1073741824
+                  maximum: 9007199254740991
+                  description: Captured bytes of saved records visited by this call,
+                    including nonmatches.
                 scanned_packets:
                   type: integer
                   minimum: 0
@@ -13145,7 +13058,7 @@ components:
                 revision:
                   type: integer
                   minimum: 1
-                  maximum: 1000000000
+                  maximum: 9007199254740991
                 query_observed_at:
                   type: string
                   format: date-time
@@ -13200,7 +13113,7 @@ components:
                 retry_after_seconds:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 2147483647
               required:
               - code
               - message
@@ -13236,11 +13149,11 @@ components:
                 value:
                   type: string
                   pattern: ^[a-f0-9]*$
-                  maxLength: 32768
+                  maxLength: 65536
                 bytes_returned:
                   type: integer
                   minimum: 0
-                  maximum: 16384
+                  maximum: 32768
               required:
               - address
               - encoding
@@ -13264,7 +13177,7 @@ components:
                 revision:
                   type: integer
                   minimum: 1
-                  maximum: 1000000000
+                  maximum: 9007199254740991
               required:
               - query_handle
               - revision
@@ -13289,7 +13202,6 @@ components:
                     type: string
                     minLength: 1
                     maxLength: 64
-                  maxItems: 16
                 rows:
                   type: array
                   items:
@@ -13300,7 +13212,6 @@ components:
                       - number
                       - boolean
                       - 'null'
-                    maxItems: 16
                   maxItems: 100
               required:
               - operation
@@ -13339,7 +13250,7 @@ components:
                 revision:
                   type: integer
                   minimum: 1
-                  maximum: 1000000000
+                  maximum: 9007199254740991
               required:
               - query_handle
               - revision
@@ -13377,7 +13288,7 @@ components:
                 retry_after_seconds:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 2147483647
               required:
               - code
               - message
@@ -13452,7 +13363,7 @@ components:
                 revision:
                   type: integer
                   minimum: 1
-                  maximum: 1000000000
+                  maximum: 9007199254740991
               required:
               - query_handle
               - revision
@@ -13490,7 +13401,7 @@ components:
                 retry_after_seconds:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 2147483647
               required:
               - code
               - message
@@ -13545,7 +13456,7 @@ components:
                 revision:
                   type: integer
                   minimum: 1
-                  maximum: 1000000000
+                  maximum: 9007199254740991
               required:
               - query_handle
               - revision
@@ -13583,7 +13494,7 @@ components:
                 retry_after_seconds:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 2147483647
               required:
               - code
               - message
@@ -13634,7 +13545,7 @@ components:
                 revision:
                   type: integer
                   minimum: 1
-                  maximum: 1000000000
+                  maximum: 9007199254740991
               required:
               - query_handle
               - revision
@@ -13672,7 +13583,7 @@ components:
                 retry_after_seconds:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 2147483647
               required:
               - code
               - message
@@ -13700,7 +13611,7 @@ components:
                 revision:
                   type: integer
                   minimum: 1
-                  maximum: 1000000000
+                  maximum: 9007199254740991
                 sharing_intent_id:
                   $ref: https://asservat.io/spec/v1/common.schema.json#/$defs/uuid
               required:
@@ -13729,7 +13640,7 @@ components:
                 revision:
                   type: integer
                   minimum: 1
-                  maximum: 1000000000
+                  maximum: 9007199254740991
               required:
               - query_handle
               - revision
@@ -13767,7 +13678,7 @@ components:
                 retry_after_seconds:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 2147483647
               required:
               - code
               - message
@@ -13819,7 +13730,7 @@ components:
                 retry_after_seconds:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 2147483647
               required:
               - code
               - message
@@ -13846,7 +13757,7 @@ components:
                 revision:
                   type: integer
                   minimum: 2
-                  maximum: 1000000000
+                  maximum: 9007199254740991
               required:
               - sharing_intent_id
               - state
@@ -13885,7 +13796,7 @@ components:
                 retry_after_seconds:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 2147483647
               required:
               - code
               - message
@@ -13916,7 +13827,7 @@ components:
                 revision:
                   type: integer
                   minimum: 2
-                  maximum: 1000000000
+                  maximum: 9007199254740991
                 sharing_intent_id:
                   $ref: https://asservat.io/spec/v1/common.schema.json#/$defs/uuid
                 managed_by:
@@ -13924,7 +13835,6 @@ components:
                   items:
                     $ref: https://asservat.io/spec/v1/common.schema.json#/$defs/recipient
                   minItems: 1
-                  maxItems: 8
                   uniqueItems: true
               required:
               - phase
@@ -13953,7 +13863,7 @@ components:
                 revision:
                   type: integer
                   minimum: 1
-                  maximum: 1000000000
+                  maximum: 9007199254740991
               required:
               - query_handle
               - revision
@@ -13991,7 +13901,7 @@ components:
                 retry_after_seconds:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 2147483647
               required:
               - code
               - message
@@ -14045,7 +13955,7 @@ components:
                 retry_after_seconds:
                   type: integer
                   minimum: 1
-                  maximum: 60
+                  maximum: 2147483647
               required:
               - code
               - message
@@ -14089,7 +13999,7 @@ components:
         retry_after_seconds: &id005
           type: integer
           minimum: 0
-          maximum: 1000000
+          maximum: 2147483647
         safe_action:
           enum:
           - sign_in
@@ -14199,7 +14109,6 @@ components:
           items:
             type: string
             maxLength: 80
-          maxItems: 16
         csrf_token:
           type: string
           maxLength: 256
@@ -14235,7 +14144,6 @@ components:
           items:
             type: string
             maxLength: 80
-          maxItems: 16
         source_refs:
           type: array
           items: *id008
@@ -14287,23 +14195,6 @@ components:
       - protected_summary_ref
       - expires_at
       - state
-    ReviewPage:
-      type: object
-      additionalProperties: false
-      properties:
-        items:
-          type: array
-          items:
-            $ref: '#/components/schemas/ReviewItem'
-          maxItems: 100
-        next_cursor:
-          type:
-          - string
-          - 'null'
-          maxLength: 4096
-      required:
-      - items
-      - next_cursor
     CommandReceipt:
       type: object
       additionalProperties: false
@@ -14344,7 +14235,6 @@ components:
           items:
             type: string
             maxLength: 80
-          maxItems: 32
         submission:
           enum:
           - authenticatedMaintainer
@@ -14356,7 +14246,7 @@ components:
             scanned_targets:
               type: integer
               minimum: 0
-              maximum: 1000
+              maximum: 9007199254740991
             complete: &id011
               type: boolean
             changes:
@@ -14383,7 +14273,6 @@ components:
                     items:
                       type: string
                       maxLength: 80
-                    maxItems: 16
                 required:
                 - target_handle
                 - before
@@ -14419,7 +14308,6 @@ components:
         revision: *id009
         display_name:
           type: string
-          maxLength: 128
         region:
           type: string
           maxLength: 64
@@ -14433,7 +14321,6 @@ components:
         conditions:
           type: array
           items: *id010
-          maxItems: 32
       required:
       - cluster_id
       - revision
@@ -14478,7 +14365,6 @@ components:
         conditions:
           type: array
           items: *id010
-          maxItems: 32
       required:
       - report_id
       - cluster_id
@@ -14549,7 +14435,6 @@ components:
         conditions:
           type: array
           items: *id010
-          maxItems: 16
       required:
       - account_id
       - revision
@@ -14680,7 +14565,6 @@ components:
         conditions:
           type: array
           items: *id010
-          maxItems: 32
         configured_release:
           type: string
           maxLength: 128
@@ -14714,7 +14598,7 @@ components:
         revision:
           type: integer
           minimum: 1
-          maximum: 1000000000
+          maximum: 9007199254740991
         result: {}
       required:
       - type
@@ -14803,7 +14687,6 @@ components:
         artifact_ids:
           type: array
           items: *id004
-          maxItems: 100
         expected_selection_digest:
           type: string
           maxLength: 64
@@ -14901,7 +14784,6 @@ components:
       properties:
         display_name:
           type: string
-          maxLength: 128
         region:
           type: string
           maxLength: 64
@@ -14957,7 +14839,9 @@ components:
           maxLength: 64
         manifest_yaml:
           type: string
-          maxLength: 65536
+          maxLength: 1572864
+          description: At most 1.5 MiB, the Kubernetes API server request limit for
+            the staged object.
         base_resource_version:
           type: string
           maxLength: 256
@@ -14979,7 +14863,6 @@ components:
           items:
             type: string
             maxLength: 80
-          maxItems: 32
       required:
       - protected_draft_handle
       - expires_at

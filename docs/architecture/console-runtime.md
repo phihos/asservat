@@ -33,9 +33,8 @@ Operation request/response types and validators are generated at build time
 from the canonical OpenAPI files. AJV compiles standalone validators; the
 browser compiles no schemas, fetches no remote schemas and evaluates no
 generated code at runtime. Generation drift fails `console-check`. Responses
-are schema-validated before display and have decoded-body ceilings (32 KiB for
-session calls, 128 KiB for a recording-save `preview_capture`, 160 KiB for
-`get_capture_settings`).
+are schema-validated before display. The browser sets no client-side
+response byte ceiling; server pagination and SSE bound response size.
 
 ## Session state in the browser
 
@@ -63,7 +62,7 @@ diagnostics cannot silently become pod status.
 Users keep the administrator default retention or request a shorter finite
 duration. The preview (ADR-330 D9) is a dry run that returns the resolved
 plan and its digest. Review shows the selected Pod and workload, one-pod
-selection, the 4 KiB output limit, unmeasured resource impact, possibly
+selection, the output bound (the 2 MiB Kubernetes API response cap), unmeasured resource impact, possibly
 retained user data, access/deletion ages and local-copy limits. Disabled
 collection, blockers and unsupported approval cannot be overridden in the UI.
 

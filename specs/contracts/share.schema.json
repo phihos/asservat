@@ -21,7 +21,6 @@
           "items": {
             "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/artifactRef"
           },
-          "maxItems": 64,
           "minItems": 1,
           "uniqueItems": true
         },
@@ -62,7 +61,7 @@
         "reason": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 512
+          "maxLength": 4096
         },
         "notAfter": {
           "type": "string",
@@ -158,7 +157,7 @@
         "revision": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 1000000
+          "maximum": 9007199254740991
         },
         "approvedBy": {
           "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/principal"

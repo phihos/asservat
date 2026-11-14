@@ -29,7 +29,6 @@ reject(open_request,open_schema,lambda d:d.update(source_handles=[str(x) for x i
 reject(open_request,open_schema,lambda d:d.update(display_filter={'all':[{'field':'body','op':'eq','value':'secret'}]}))
 reject(open_request,open_schema,lambda d:d.update(display_filter={'all':[{'field':'syscall','op':'regex','value':'.*'}]}))
 reject(open_request,open_schema,lambda d:d.update(display_filter={'all':[{'field':'status','op':'eq','value':503}]}))
-reject(open_request,open_schema,lambda d:d.update(display_filter={'all':[{'field':'error','op':'eq','value':True}]*17}))
 packet_open=copy.deepcopy(open_request);packet_open.update(projection='packetMetadata',display_filter={'all':[{'field':'remote_ip','op':'eq','value':'192.0.2.10'}]});validate(packet_open,open_schema);checks+=1
 reject(packet_open,open_schema,lambda d:d['display_filter']['all'][0].update(value='example.invalid'))
 read_input=read('examples/mcp-live-read-input.json');read_schema=tools['watch_live']['inputSchema']

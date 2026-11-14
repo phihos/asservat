@@ -32,7 +32,7 @@
                 "pattern": {
                   "type": "string",
                   "minLength": 1,
-                  "maxLength": 1024
+                  "description": "RE2 syntax; RE2 bounds compile and match cost by its program-size limit, so the source text needs no separate cap."
                 },
                 "match": {
                   "type": "string",
@@ -43,13 +43,13 @@
                 },
                 "jsonField": {
                   "type": "string",
-                  "minLength": 1,
-                  "maxLength": 128
+                  "minLength": 1
                 },
                 "maxRecordBytes": {
                   "type": "integer",
                   "minimum": 1,
-                  "maximum": 65536
+                  "maximum": 9007199254740991,
+                  "description": "Per-stream line buffer. CRI runtimes split log lines into 16 KiB partial records; the default covers several joined partials and administrators may raise it within the connector memory request."
                 },
                 "overlong": {
                   "enum": [
@@ -305,8 +305,7 @@
                   "type": "object",
                   "additionalProperties": {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 256
+                    "minLength": 1
                   }
                 },
                 "status": {

@@ -132,7 +132,7 @@
           "program": {
             "type": "array",
             "minItems": 1,
-            "maxItems": 256,
+            "maxItems": 4096,
             "items": {
               "type": "array",
               "prefixItems": [
@@ -160,7 +160,7 @@
               "minItems": 4,
               "maxItems": 4
             },
-            "description": "Classic BPF instructions (code, jt, jf, k) as emitted by libpcap pcap_compile."
+            "description": "Classic BPF instructions emitted by libpcap; the kernel limit BPF_MAXINSNS is 4096."
           },
           "programDigest": {
             "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/hash",

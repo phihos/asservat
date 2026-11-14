@@ -50,22 +50,26 @@
             "maxFlows": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 1024
+              "description": "Optional; the tracked-flow bound is maxReassemblyBytes \u00f7 maxReassemblyBytesPerFlow, and a given value must not exceed that quotient."
             },
             "maxHeaderBytes": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 32768
+              "maximum": 32768,
+              "default": 32768,
+              "description": "Common HTTP server header limits (nginx large_client_header_buffers 4 \u00d7 8 KiB) bound one request header block."
             },
             "maxReassemblyBytesPerFlow": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 262144
+              "default": 65536,
+              "description": "Default 2 \u00d7 maxHeaderBytes, so one complete header block plus its segment overlap fits."
             },
             "maxReassemblyBytes": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 16777216
+              "default": 16777216,
+              "description": "Per-target reassembly memory budget; the default 16 MiB is derived from the node collector memory limit together with the ring and frozen budgets."
             },
             "idleTimeout": {
               "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/duration"
@@ -75,7 +79,6 @@
             "kind",
             "protocol",
             "projectionRef",
-            "maxFlows",
             "maxHeaderBytes",
             "maxReassemblyBytesPerFlow",
             "maxReassemblyBytes",
@@ -143,7 +146,8 @@
       "type": "string",
       "minLength": 1,
       "pattern": "\\S",
-      "description": "No length cap: the compiled program must fit the kernel classic BPF limit (BPF_MAXINSNS, 4096 instructions), checked at compile."
+      "description": "At most 4 KiB of filter text; the authoritative bound is the compiled classic BPF program, which must fit the kernel limit BPF_MAXINSNS (4096 instructions), checked at compile.",
+      "maxLength": 4096
     },
     "ring": {
       "type": "object",
@@ -160,12 +164,13 @@
         "segmentBytes": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 67108864
+          "maximum": 9007199254740991
         },
         "maxSegments": {
           "type": "integer",
           "minimum": 2,
-          "maximum": 64
+          "maximum": 9007199254740991,
+          "description": "Derived bound: ring maxBytes \u00f7 segmentBytes; at least 2 so the ring can rotate."
         },
         "medium": {
           "enum": [
@@ -373,12 +378,14 @@
     "maxFrozenBytes": {
       "type": "integer",
       "minimum": 1,
-      "maximum": 268435456
+      "maximum": 9007199254740991,
+      "description": "At most the ring maxBytes; derived from the node collector memory/scratch allocation (budget node maxFrozenBytes), not a fixed constant."
     },
     "maxConcurrentSnapshots": {
       "type": "integer",
       "minimum": 1,
-      "maximum": 4
+      "maximum": 9007199254740991,
+      "description": "Bounded by the node frozen byte budget (node maxFrozenBytes \u00f7 ring maxBytes) and the trigger rate limits."
     }
   },
   "required": [

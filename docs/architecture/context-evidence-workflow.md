@@ -52,8 +52,9 @@ support.
 The `/cases/<uuid>` shell lazily loads `web/src/evidence`, which uses the
 canonical `get_case` and download prepare/get/cancel contracts through the
 same-origin CSRF transport. **View evidence** appears only for a returned case
-ID. One active download request per tab; the original artifact/session/key
-receipt is retained for the same user, and protected metadata clears on scope
+ID. A tab may run several downloads in parallel (for example a core and its
+companions); server concurrency slots and the reader's busy status bound load.
+The original artifact/session/key receipt is retained for the same user, and protected metadata clears on scope
 loss or sign-out. No local or session storage is used.
 
 Only verified Ready metadata creates the same-origin attachment link; there is

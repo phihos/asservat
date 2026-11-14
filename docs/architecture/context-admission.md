@@ -7,8 +7,9 @@ Mechanisms follow [ADR-330](../decisions/330-event-driven-system-design.md).
 ## Plan
 
 `planning.CompileContext` compiles one pinned Pod into `builtin-pod-status-v1`:
-one required on-trigger pod-status action, five seconds of collection,
-4096 native bytes. It requires the exact projection definition and the
+one required on-trigger pod-status action whose single API GET has the
+five-second I/O timeout (ADR-330 D5) and whose output is bounded by the 2 MiB
+API response cap (etcd's 1.5 MiB object limit plus JSON overhead). It requires the exact projection definition and the
 capability reported for the target cluster ([context capability](context-capability.md)).
 General snapshot recipes and unknown projections cannot use it.
 
@@ -20,8 +21,9 @@ and has no node authority. Requested retention and `effectiveRetention` bind
 each action's purpose, class/type, maximum, deletion budget and every applied
 policy UID/generation/digest. Reason, sharing, result access, grant handle and
 idempotency key are separate submission fields. Compilation runs no
-acquisition. The original request deadline is at most five minutes away; the
-dependency limit is 64 and overflow fails with a consolidation diagnostic.
+acquisition. The request deadline is the approval's stated window or the
+capture's configured duration (ADR-335 D5). Policy and rule references are not
+capped (ADR-335 D8); the scope stores them as SQL rows (ADR-330 D8).
 
 ## Retention intersection
 
@@ -29,7 +31,7 @@ The C-15 resolver takes the complete policy set matching the exact target plus
 exactly one installation baseline. All maxima apply, defaults use the shortest
 default, and deletion reserves the largest required budget inside the shortest
 maximum. Incompatible purposes, a combined budget leaving no usable interval,
-duplicate policy/rule identities and excessive inputs fail.
+and duplicate policy/rule identities fail.
 
 Unknown classification receives potential-personal-data restrictions; stricter
 classes also match broader personal-data rules; generic `other` output matches

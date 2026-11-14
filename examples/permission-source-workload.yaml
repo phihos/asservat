@@ -17,7 +17,6 @@ spec:
     matchLabels:
       platform.example.invalid/ownership-managed: 'true'
   role: workload-maintainer
-  maxNamespaces: 50
   protection:
     mode: admissionEnforced
     guardRef: workload-owner-guard-v1

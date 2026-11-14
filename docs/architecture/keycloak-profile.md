@@ -20,7 +20,9 @@ reuses the generic HTTPS/JWKS and signature verification of
   claims) and proof-of-possession tokens.
 - Group membership comes from the configured groups claim (`identity.groupsClaim`,
   default `groups`), as group names. An absent claim means no groups.
-  Malformed, null, duplicate or oversized claims fail verification.
+  Malformed, null or duplicate claims fail verification; the claim's size is
+  bounded only by the 32 KiB access-token limit, which fits common HTTP
+  `Authorization` header limits.
 - A token without `sub` fails verification; the username comes from
   `preferred_username` unless `identity.usernameClaim` says otherwise.
 
@@ -48,7 +50,10 @@ reuses the generic HTTPS/JWKS and signature verification of
   is the minimal working setup.
 
 Group membership is recomputed at every token issuance, including refresh, and
-is valid for the access token's lifetime (Keycloak default five minutes).
+is valid for the access token's lifetime (Keycloak default five minutes, an
+external provider default). That lifetime bounds group freshness for new
+operations only; a started download runs to its original bounds regardless of
+access-token expiry ([ADR-335](../decisions/335-usable-by-default.md) D9).
 Closing a provider session does not revoke already issued JWTs; Asservat's
 identity configuration, checked once per operation, can remove a client or
 subject independently. Asservat needs no realm-admin credential or Admin API

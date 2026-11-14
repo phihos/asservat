@@ -18,7 +18,7 @@
         "reason": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 512
+          "maxLength": 4096
         }
       },
       "required": [
@@ -112,7 +112,7 @@
         "rss_bytes": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 109951162777600
+          "maximum": 9007199254740991
         },
         "selector_candidate": {
           "$ref": "https://asservat.io/spec/v1/action.schema.json#/$defs/processSelector"
@@ -124,7 +124,6 @@
             "minLength": 1,
             "maxLength": 128
           },
-          "maxItems": 16,
           "uniqueItems": true
         },
         "observed_at": {
@@ -197,8 +196,7 @@
           "items": {
             "$ref": "https://asservat.io/spec/v1/guidance.schema.json#/$defs/peer"
           },
-          "minItems": 0,
-          "maxItems": 16
+          "minItems": 0
         },
         "peer_basis": {
           "$ref": "https://asservat.io/spec/v1/guidance.schema.json#/$defs/basis"
@@ -210,8 +208,7 @@
             "minLength": 1,
             "maxLength": 128
           },
-          "minItems": 0,
-          "maxItems": 16
+          "minItems": 0
         },
         "process_basis": {
           "$ref": "https://asservat.io/spec/v1/guidance.schema.json#/$defs/basis"
@@ -244,12 +241,12 @@
         "requested_pods": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 100
+          "maximum": 9007199254740991
         },
         "covered_pods": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 100
+          "maximum": 9007199254740991
         },
         "process_inventory_complete": {
           "type": "boolean"
@@ -347,8 +344,7 @@
             "type": "string",
             "format": "uuid"
           },
-          "minItems": 1,
-          "maxItems": 16
+          "minItems": 1
         },
         "expires_at": {
           "type": "string",
@@ -384,11 +380,9 @@
           "type": "array",
           "items": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 256
+            "minLength": 1
           },
-          "minItems": 0,
-          "maxItems": 32
+          "minItems": 0
         }
       },
       "required": [
@@ -463,37 +457,34 @@
         "history_seconds": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 3600
+          "maximum": 9007199254740991
         },
         "burst_factor": {
           "type": "integer",
-          "minimum": 1,
-          "maximum": 8
+          "minimum": 1
         },
         "segment_bytes": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 67108864
+          "maximum": 9007199254740991
         },
         "segments": {
           "type": "integer",
           "minimum": 2,
-          "maximum": 64
+          "maximum": 9007199254740991
         },
         "ring_bytes": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 268435456
+          "maximum": 9007199254740991
         },
         "limitations": {
           "type": "array",
           "items": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 256
+            "minLength": 1
           },
-          "minItems": 1,
-          "maxItems": 16
+          "minItems": 1
         }
       },
       "required": [
@@ -519,7 +510,7 @@
         "message": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 256
+          "maxLength": 1024
         },
         "responsible_role": {
           "enum": [
@@ -556,28 +547,23 @@
         },
         "explanation": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 1024
+          "minLength": 1
         },
         "answers": {
           "type": "array",
           "items": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 256
+            "minLength": 1
           },
-          "minItems": 1,
-          "maxItems": 8
+          "minItems": 1
         },
         "limitations": {
           "type": "array",
           "items": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 256
+            "minLength": 1
           },
-          "minItems": 1,
-          "maxItems": 16
+          "minItems": 1
         },
         "basis": {
           "$ref": "https://asservat.io/spec/v1/guidance.schema.json#/$defs/basis"
@@ -589,8 +575,7 @@
             "minLength": 1,
             "maxLength": 64
           },
-          "minItems": 1,
-          "maxItems": 16
+          "minItems": 1
         },
         "impact": {
           "enum": [
@@ -602,17 +587,17 @@
         "max_bytes": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 109951162777600
+          "maximum": 9007199254740991
         },
         "max_process_starts": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 10000
+          "maximum": 9007199254740991
         },
         "retention_seconds": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 31536000
+          "maximum": 9007199254740991
         },
         "approval_required": {
           "type": "boolean"
@@ -622,8 +607,7 @@
           "items": {
             "$ref": "https://asservat.io/spec/v1/guidance.schema.json#/$defs/blocker"
           },
-          "minItems": 0,
-          "maxItems": 16
+          "minItems": 0
         },
         "process_selector": {
           "$ref": "https://asservat.io/spec/v1/action.schema.json#/$defs/processSelector"
@@ -714,26 +698,22 @@
             "type": "string",
             "format": "uuid"
           },
-          "minItems": 0,
-          "maxItems": 4
+          "minItems": 0
         },
         "recommendations": {
           "type": "array",
           "items": {
             "$ref": "https://asservat.io/spec/v1/guidance.schema.json#/$defs/recommendation"
           },
-          "minItems": 1,
-          "maxItems": 8
+          "minItems": 1
         },
         "missing_observations": {
           "type": "array",
           "items": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 256
+            "minLength": 1
           },
-          "minItems": 0,
-          "maxItems": 16
+          "minItems": 0
         }
       },
       "required": [

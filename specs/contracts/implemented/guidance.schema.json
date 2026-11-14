@@ -1,0 +1,759 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/guidance.schema.json",
+  "title": "Approved discovery projections and passive diagnostic recommendations; evidence text is untrusted",
+  "$defs": {
+    "basis": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "confidence": {
+          "enum": [
+            "observed",
+            "inferred",
+            "ambiguous",
+            "unknown"
+          ]
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        }
+      },
+      "required": [
+        "confidence",
+        "reason"
+      ]
+    },
+    "peer": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "Service",
+            "Deployment",
+            "StatefulSet",
+            "Pod"
+          ]
+        },
+        "namespace": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 63
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 253
+        },
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        }
+      },
+      "required": [
+        "kind",
+        "namespace",
+        "name",
+        "uid"
+      ]
+    },
+    "process": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "process_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "pod_uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "display_pid": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4194304
+        },
+        "executable_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "executable_path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "runtime": {
+          "enum": [
+            "native",
+            "go",
+            "dotnet",
+            "python",
+            "node",
+            "jvm",
+            "unknown"
+          ]
+        },
+        "identity_basis": {
+          "$ref": "https://asservat.io/spec/v1/guidance.schema.json#/$defs/basis"
+        },
+        "parent_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "rss_bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 109951162777600
+        },
+        "selector_candidate": {
+          "$ref": "https://asservat.io/spec/v1/action.schema.json#/$defs/processSelector"
+        },
+        "build_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "maxItems": 16,
+          "uniqueItems": true
+        },
+        "observed_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "process_ref",
+        "pod_uid",
+        "display_pid",
+        "runtime",
+        "identity_basis",
+        "observed_at"
+      ]
+    },
+    "flow": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "flow_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "pod_uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "transport": {
+          "enum": [
+            "tcp",
+            "udp",
+            "icmp",
+            "other"
+          ]
+        },
+        "peer_address": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "peer_port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "direction": {
+          "enum": [
+            "ingress",
+            "egress",
+            "unknown"
+          ]
+        },
+        "protocol": {
+          "enum": [
+            "unknown",
+            "dns",
+            "http1",
+            "http2Cleartext",
+            "tls"
+          ]
+        },
+        "protocol_basis": {
+          "$ref": "https://asservat.io/spec/v1/guidance.schema.json#/$defs/basis"
+        },
+        "peer_candidates": {
+          "type": "array",
+          "items": {
+            "$ref": "https://asservat.io/spec/v1/guidance.schema.json#/$defs/peer"
+          },
+          "minItems": 0,
+          "maxItems": 16
+        },
+        "peer_basis": {
+          "$ref": "https://asservat.io/spec/v1/guidance.schema.json#/$defs/basis"
+        },
+        "process_refs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "minItems": 0,
+          "maxItems": 16
+        },
+        "process_basis": {
+          "$ref": "https://asservat.io/spec/v1/guidance.schema.json#/$defs/basis"
+        },
+        "observation_point": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      },
+      "required": [
+        "flow_ref",
+        "pod_uid",
+        "transport",
+        "peer_address",
+        "direction",
+        "protocol",
+        "protocol_basis",
+        "peer_candidates",
+        "peer_basis",
+        "process_refs",
+        "process_basis",
+        "observation_point"
+      ]
+    },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "requested_pods": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "covered_pods": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "process_inventory_complete": {
+          "type": "boolean"
+        },
+        "traffic_complete": {
+          "type": "boolean"
+        },
+        "dropped_packets": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "stop_reason": {
+          "enum": [
+            "completed",
+            "duration",
+            "outputLimit",
+            "observationLimit",
+            "impactLimit",
+            "cancelled",
+            "capabilityGap",
+            "targetGone"
+          ]
+        }
+      },
+      "required": [
+        "requested_pods",
+        "covered_pods",
+        "process_inventory_complete",
+        "traffic_complete",
+        "dropped_packets",
+        "stop_reason"
+      ]
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "started_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "ended_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "observed_wire_bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1099511627776
+        },
+        "retained_bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1099511627776
+        },
+        "coverage": {
+          "$ref": "https://asservat.io/spec/v1/guidance.schema.json#/$defs/coverage"
+        },
+        "classifier_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "capture_mode": {
+          "enum": [
+            "none",
+            "networkHeaders",
+            "rawPackets"
+          ]
+        }
+      },
+      "required": [
+        "started_at",
+        "ended_at",
+        "observed_wire_bytes",
+        "retained_bytes",
+        "coverage",
+        "capture_mode"
+      ]
+    },
+    "discoveryPage": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "discoveryPage"
+        },
+        "capture_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "source_artifact_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "minItems": 1,
+          "maxItems": 16
+        },
+        "expires_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "section": {
+          "enum": [
+            "summary",
+            "processes",
+            "flows"
+          ]
+        },
+        "summary": {
+          "$ref": "https://asservat.io/spec/v1/guidance.schema.json#/$defs/summary"
+        },
+        "processes": {
+          "type": "array",
+          "items": {
+            "$ref": "https://asservat.io/spec/v1/guidance.schema.json#/$defs/process"
+          },
+          "minItems": 0,
+          "maxItems": 100
+        },
+        "flows": {
+          "type": "array",
+          "items": {
+            "$ref": "https://asservat.io/spec/v1/guidance.schema.json#/$defs/flow"
+          },
+          "minItems": 0,
+          "maxItems": 100
+        },
+        "gaps": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "minItems": 0,
+          "maxItems": 32
+        }
+      },
+      "required": [
+        "kind",
+        "capture_id",
+        "source_artifact_ids",
+        "expires_at",
+        "section",
+        "summary",
+        "gaps"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "section": {
+                "const": "processes"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "processes"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "processes"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "section": {
+                "const": "flows"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "flows"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "flows"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "ringSizing": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "basis": {
+          "enum": [
+            "measuredProjection",
+            "estimated"
+          ]
+        },
+        "retained_bytes_per_second": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1073741824
+        },
+        "history_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3600
+        },
+        "burst_factor": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8
+        },
+        "segment_bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 67108864
+        },
+        "segments": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 64
+        },
+        "ring_bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 268435456
+        },
+        "limitations": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "minItems": 1,
+          "maxItems": 16
+        }
+      },
+      "required": [
+        "basis",
+        "retained_bytes_per_second",
+        "history_seconds",
+        "burst_factor",
+        "segment_bytes",
+        "segments",
+        "ring_bytes",
+        "limitations"
+      ]
+    },
+    "blocker": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "responsible_role": {
+          "enum": [
+            "maintainer",
+            "approver",
+            "administrator",
+            "none"
+          ]
+        },
+        "retryable": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "code",
+        "message",
+        "responsible_role",
+        "retryable"
+      ]
+    },
+    "recommendation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "diagnostic_handle": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "explanation": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "answers": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "minItems": 1,
+          "maxItems": 8
+        },
+        "limitations": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "minItems": 1,
+          "maxItems": 16
+        },
+        "basis": {
+          "$ref": "https://asservat.io/spec/v1/guidance.schema.json#/$defs/basis"
+        },
+        "evidence_kinds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "minItems": 1,
+          "maxItems": 16
+        },
+        "impact": {
+          "enum": [
+            "observe",
+            "sensitiveRead",
+            "intrusive"
+          ]
+        },
+        "max_bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 109951162777600
+        },
+        "max_process_starts": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "retention_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 31536000
+        },
+        "approval_required": {
+          "type": "boolean"
+        },
+        "blockers": {
+          "type": "array",
+          "items": {
+            "$ref": "https://asservat.io/spec/v1/guidance.schema.json#/$defs/blocker"
+          },
+          "minItems": 0,
+          "maxItems": 16
+        },
+        "process_selector": {
+          "$ref": "https://asservat.io/spec/v1/action.schema.json#/$defs/processSelector"
+        },
+        "packet_parameters": {
+          "$ref": "https://asservat.io/spec/v1/packet-capture.schema.json"
+        },
+        "ring_sizing": {
+          "$ref": "https://asservat.io/spec/v1/guidance.schema.json#/$defs/ringSizing"
+        },
+        "process_batch": {
+          "$ref": "https://asservat.io/spec/v1/action.schema.json#/$defs/batch"
+        },
+        "process_match_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 256
+        },
+        "process_inventory_complete": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "diagnostic_handle",
+        "title",
+        "explanation",
+        "answers",
+        "limitations",
+        "basis",
+        "evidence_kinds",
+        "impact",
+        "max_bytes",
+        "max_process_starts",
+        "retention_seconds",
+        "approval_required",
+        "blockers"
+      ],
+      "dependentRequired": {
+        "ring_sizing": [
+          "packet_parameters"
+        ],
+        "process_selector": [
+          "process_batch",
+          "process_match_count",
+          "process_inventory_complete"
+        ],
+        "process_batch": [
+          "process_selector"
+        ]
+      }
+    },
+    "recommendations": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "diagnosticRecommendations"
+        },
+        "target_handle": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "goal": {
+          "enum": [
+            "unknown",
+            "crash",
+            "memoryGrowth",
+            "highCPU",
+            "latency",
+            "hang",
+            "network",
+            "dns",
+            "probeFailure"
+          ]
+        },
+        "catalog_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "expires_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "source_capture_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "minItems": 0,
+          "maxItems": 4
+        },
+        "recommendations": {
+          "type": "array",
+          "items": {
+            "$ref": "https://asservat.io/spec/v1/guidance.schema.json#/$defs/recommendation"
+          },
+          "minItems": 1,
+          "maxItems": 8
+        },
+        "missing_observations": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "minItems": 0,
+          "maxItems": 16
+        }
+      },
+      "required": [
+        "kind",
+        "target_handle",
+        "goal",
+        "catalog_digest",
+        "expires_at",
+        "source_capture_ids",
+        "recommendations",
+        "missing_observations"
+      ]
+    }
+  },
+  "oneOf": [
+    {
+      "$ref": "https://asservat.io/spec/v1/guidance.schema.json#/$defs/discoveryPage"
+    },
+    {
+      "$ref": "https://asservat.io/spec/v1/guidance.schema.json#/$defs/recommendations"
+    }
+  ]
+}

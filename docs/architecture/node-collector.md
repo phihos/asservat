@@ -58,7 +58,7 @@ pushed work, status on change, standard workload identity.
 
 ## Assessment
 
-`Assess` requires, for both mechanisms: kernel ≥ 5.15, BTF, cgroup v2, BPF program load, host
+`Assess` requires, for both mechanisms: kernel ≥ 5.15 (the first long-term kernel with the BTF, cgroup v2 BPF and tc features used), BTF, cgroup v2, BPF program load, host
 processes visible (host PID namespace), a known runtime (containerd or CRI-O daemon observed) and
 an initialized engine; packet additionally TCX (preferred) or tc, syscall additionally tracefs.
 `Prerequisites` reports whether they hold. The packet recorder is `Available` when they hold
@@ -90,18 +90,32 @@ queued work; it is not inherited. The facts are not a grant.
 
 ## Limits
 
-At most 5,000 nodes per connector, one stream per node, 64 queued items per node, 64 receipts per
-report and 64 KiB per message. TokenReviews for new streams are rate limited per connector (default 50/s,
-burst 200); excess Hellos receive a retry-after. Node ceilings default to 256 MiB ring, 256 MiB frozen,
-32 MiB/s upload with a 64 MiB burst, and bound the container memory limit
-(ring + frozen + 128 MiB). Only manual packet captures exist (no rings in production, policy
+- Nodes per connector: at most 5,000, Kubernetes' published scalability threshold per cluster.
+- One stream per node. The per-node work queue holds the node's admitted concurrent work (hub
+  admission caps it, ADR-335 D8) plus pending stop/cancel items, so it never refuses admitted
+  work.
+- Messages: a control message holds at most the largest typed work payload, a profile work item
+  whose TLS bundle is bounded by its 1 MiB ConfigMap plus credential and envelope, so 2 MiB; data
+  is streamed in 1 MiB chunks. Both bound memory per decoded message. A status report carries as
+  many receipts as fit one message; more receipts go in further messages.
+- TokenReviews for new streams are rate limited per connector (default 50/s, burst 200, within the
+  connector's API-client QPS; 5,000 nodes reconnect in about 100 s); excess Hellos receive a
+  retry-after.
+- Node ceilings are administrator values whose memory cost sets the container memory limit
+  (ring + frozen + 128 MiB): default 256 MiB ring, 256 MiB frozen, 32 MiB/s upload with a 64 MiB
+  burst. Rings are maintainer-approved bounds (ADR-335 D6); the defaults should follow node
+  allocatable memory (ADR-335 D2).
+
+Only manual packet captures exist (no rings in production, policy
 arming or snapshots); budget policy node limits are accepted by the schema but not yet
 intersected at admission.
 
 ## Ongoing-source resources (ADR-262)
 
 `NodeDeployment.Ceilings` carries aggregate active-source count, input bytes/s and input burst
-alongside the ring/frozen/upload limits (chart development references 16 / 16 MiB/s / 16 MiB).
+alongside the ring/frozen/upload limits. Their defaults are derived: active sources = node ring
+budget ÷ per-source minimum ring; input rate and burst from the upload rate and collector CPU
+budget.
 All-zero input denies ongoing capacity and leaves finite work unchanged; partial node caps are
 invalid. Optional node/workload budget-policy values (`SourceResources`, `maxRingBytes`,
 `maxFrozenBytes`) only lower these limits; ongoing admission intersects them with the collector
@@ -113,8 +127,9 @@ it is a resource observation, not a source permit or read permission.
 
 `packets.CheckPrefixProgram` checks a cBPF program before a sensitive predicate may use it. It
 reuses the maintained typed disassembler and VM validation and checks every instruction,
-including unreachable ones. Absolute/MSH reads must fit the 134-byte prefix. X starts at zero
-and can be loaded only from a constant ≤ 60 or MSH (4 × low nibble ≤ 60); TAX and scratch-to-X
+including unreachable ones. Absolute/MSH reads must fit the 134-byte prefix (Ethernet 14 + maximum IPv4 header 60 + maximum
+TCP header 60). X starts at zero
+and can be loaded only from a constant ≤ 60 or MSH (4 × low nibble ≤ 60, the IPv4 IHL maximum); TAX and scratch-to-X
 are refused. Indirect reads use that bound with uint64 arithmetic. Some programs whose actual
 paths fit are rejected deliberately. `LD len` keeps `Filter.vmFor` specialization from the
 original wire length, so a prefix evaluates exactly like the full frame. No call site is wired.

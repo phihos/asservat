@@ -30,14 +30,15 @@ ADR-074–088, 116, 122 and 288.
 
 The hub authorizes the public request once (ADR-311) and, for content,
 creates the download operation row in the same transaction as its start audit
-row and byte reservation. The operation ID is the idempotency key for the
+row (and, for raw evidence, its raw-pool reservation). The operation ID is the idempotency key for the
 stream. The command sent to the reader names only the operation ID, artifact
 version and byte range.
 
 After the response starts, nothing is rechecked per frame, chunk or hop. The
-stream ends at its original bounds (ADR-312): caller session/token expiry,
+stream ends at its original bounds (ADR-312): browser session expiry, download
 session deadline, `AccessUntil`, effective retention cut-off, Stop, recovery
-incarnation change or exhausted reservation. Stop and retention changes are SQL
+incarnation change or the end of the selected range. Access-token expiry does
+not end a started stream ([ADR-335](../decisions/335-usable-by-default.md) D9). Stop and retention changes are SQL
 transitions announced with `LISTEN/NOTIFY`; the hub replica serving the stream
 cancels it, which resets the stream to the reader.
 
@@ -59,9 +60,13 @@ the stream's lifetime and clears them when it ends.
 
 ## Frames and flow control
 
-- Command and control frames are at most 64 KiB; data frames at most 1 MiB.
-- HTTP/2 flow control provides backpressure end to end. Each hop holds at most
-  one pending data frame; a slow client slows the reader, not memory.
+- Command and control frames are at most 64 KiB: the largest command, a
+  recording start with a 4096-instruction classic-BPF program (32 KiB), plus
+  its envelope. The same ceiling applies on the
+  [connector connection](regional-context-start.md).
+- Data frames are at most 1 MiB. HTTP/2 flow control provides backpressure end
+  to end. Each hop holds at most one pending data frame, so memory is 1 MiB ×
+  hops × concurrent streams; a slow client slows the reader, not memory.
 - The reader ends a successful stream with `Done` carrying the byte count.
   Clients use no retry-enabling headers and follow no redirects; a failed
   stream is never replayed automatically.
@@ -70,11 +75,12 @@ the stream's lifetime and clears them when it ends.
 
 The hub is the final writer to the caller and therefore knows the bytes it
 handed to the transport. When the response ends it writes one outcome audit
-row and settles the reservation to the bytes delivered, in one transaction:
+row and records the bytes delivered (settling any raw-pool reservation), in one
+transaction:
 
 - Completed: `Done` received and the full range written and flushed.
 - Interrupted: stream reset, reader loss, caller disconnect or a bound ended
-  it; actual bytes are charged and the rest released.
+  it; actual bytes are recorded and any unused raw-pool remainder released.
 
 A retry after an unknown outcome looks up the operation ID. No charge stays
 spent because an outcome was uncertain. An HTTP flush does not prove that the

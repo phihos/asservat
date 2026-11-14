@@ -43,7 +43,8 @@ evidence is deleted or moved to a backed residual account (REQ-CAP-006).
 ## Accounting
 
 Each workload account holds byte and object counters for live evidence and a
-count of retained capture metadata rows ([context control capacity](context-control-capacity.md)).
+count of retained capture metadata rows, derived from the workload's storage
+share ([context control capacity](context-control-capacity.md)).
 Admission charges them with a conditional update (`WHERE used + n <= limit`);
 deleting evidence or metadata releases the charge. An effect whose outcome is
 unknown is resolved by its idempotency key and its charge is released when the
@@ -52,15 +53,20 @@ outcome is known (D7).
 Pool rows hold the pool's protected total and shared burst counters. Parent
 envelopes subtract unused protected allocations of their children before
 granting burst (REQ-CAP-004). Storm protection uses per-workload token-bucket
-rate limits from the budget policy.
+rate limits from the budget policy (maintainer decision, ADR-335 D8; defaults
+derive from cluster size).
 
 ## Packet evidence funding
 
 An authored packet reserve funds
-`records = min(context bytes / 1544192, context objects / 4, 512)` records,
+`records = min(context bytes / 1544192, context objects / 4)` records,
 `min(context bytes, records * 9928704)` evidence bytes and `records * 4`
-objects ([ADR-257](../decisions/257-approved-recording-funding.md)). This covers
-the 8 MiB packet output cap.
+objects ([ADR-257](../decisions/257-approved-recording-funding.md)). 1,544,192
+and 9,928,704 bytes are per-record footprint estimates derived from the
+artifact format (internal estimates, ADR-335 D2); the byte and object budgets
+bound the record count. The packet output of one record or save is the
+capture's configured duration × its configured ring/segment size, bounded by
+the workload's storage share; there is no fixed output cap.
 
 ## Saved settings of accepted captures
 

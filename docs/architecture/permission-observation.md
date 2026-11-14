@@ -62,15 +62,12 @@ only on mismatch. Per-object payloads keep the object UID, resourceVersion,
 generation, deletion state and the SHA-256 of the RFC 8785 canonical spec;
 free-text reasons count toward the digest but are not stored.
 
-Fail-closed bounds (no silent truncation): 1,024 bindings per namespace,
-1,024 ClusterAccessBindings and 1,024 sources per cluster, 64 KiB per spec, at
-most 32 selected label keys per source, 65,536 namespaces carrying a selected
-key per cluster, 256 rows for one Pod. Delivery and storage are paged, so the
-number of namespaces and bindings per cluster is otherwise bounded only by
-memory. An overflow rejects only the offending namespace's bindings (or the
-offending source) with a narrowing diagnostic, never by dropping an owner or a
-deny, and never the rest of the cluster. A malformed object is reported as invalid; valid objects of the
-same kind stay usable. A terminating deny stays effective until it is gone.
+Asservat adds no count or size caps on bindings, sources, selected label
+keys, namespaces or rows per Pod: Kubernetes object limits (about 1.5 MiB per
+object, the etcd request limit) bound each spec, delivery and storage are
+paged, and the connector's memory request bounds the projection it holds.
+Nothing is silently truncated. A malformed object is reported as invalid;
+valid objects of the same kind stay usable. A terminating deny stays effective until it is gone.
 
 ## Acceptance
 
@@ -129,9 +126,10 @@ principal holds the configured Kubernetes permission (for exec,
 (30 s, ADR-311); denials are not cached; a miss runs a SubjectAccessReview.
 This is the only time-bounded permission cache. An allow adds a `Reviewed` user allow for that principal and Pod to the
 current evaluation only; nothing is stored per decision. At capture time the
-connector also reviews each of the principal's current groups alone (at most
-256, batched) to record the groups that hold the same right as audience
-(REQ-PER-008). A source mapped to another role (`evidence-owner`,
+connector also reviews each of the principal's current groups alone to
+record the groups that hold the same right as audience (REQ-PER-008). The
+group list is bounded by the signed token size; the reviews are batched at
+the connector's API-client QPS, with no separate group-count cap. A source mapped to another role (`evidence-owner`,
 `action-approver`) contributes that role the same way. The operation that
 used the decision records it in its own audit row.
 

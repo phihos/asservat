@@ -4,12 +4,12 @@ Approved pod-status queries ([context projection](context-projection.md)) and cl
 
 ## Limits
 
-Query work is bounded by these limits:
+Query work costs reader CPU and memory, so the limits derive from reader capacity (total concurrency = reader replicas × concurrent streams per replica, [download worker dispatch](download-worker-dispatch.md)):
 
-- **Per principal:** a token-bucket rate limit and a concurrency cap across that principal's OAuth clients.
-- **Per workload:** a concurrency cap on queries against the workload's evidence, so one workload's investigation cannot starve the reader for others.
-- **Per query:** at most 4 MiB read work, a 24 KiB structured result and a 64 KiB wire response for pod status. The source artifact is the 4096-byte pod-status profile.
-- **Reader:** CPU, memory and replica count are Helm values; the reader sheds work with a retryable "busy" result when its queue is full.
+- **Per principal:** a token-bucket rate limit (storm protection, ADR-335 D8) and a concurrency cap across that principal's OAuth clients; both defaults derive from total reader concurrency.
+- **Per workload:** a concurrency cap of half the total reader concurrency, so one workload's investigation cannot starve the reader for others.
+- **Per query:** read work is at most the reader memory limit divided by its per-replica concurrency. Results are paginated with a cursor; MCP results follow the 96 KiB tool-result bound ([MCP runtime](mcp-runtime.md)). The pod-status source is within the 2 MiB Kubernetes API response cap.
+- **Reader:** CPU, memory and replica count are Helm values; the reader sheds work with a retryable "busy" result when its queue is full, so shedding is bounded by those values.
 
 A query charges its concurrency slot at start and releases it when the query ends, fails or is canceled. An unknown outcome is resolved by the query's idempotency key. These are configured ceilings, not measured overhead.
 
@@ -23,4 +23,4 @@ One public `get_extract(view=fileExcerpt)` or `get_query_result` request authori
 
 ## Closed profile summaries
 
-[ADR-291](../decisions/291-bounded-profile-summary.md) admits one retained raw pprof source for a closed `get_extract(view=profileSummary)` under `evidence:read`, audience and retention. It grants no raw download and no `ReadApproved` on arbitrary raw evidence. One summary may read up to 80 MiB of work (the 64 MiB maximum source plus framing, index and manifest); a smaller authored native ceiling stays smaller. The reader's memory limit must cover this bound; the chart default is 256 MiB.
+[ADR-291](../decisions/291-bounded-profile-summary.md) admits one retained raw pprof source for a closed `get_extract(view=profileSummary)` under `evidence:read`, audience and retention. It grants no raw download and no `ReadApproved` on arbitrary raw evidence. The maximum source is the profile verification bound (reader memory request divided by its concurrent verifications, default 16 MiB), which also caps profile collection, so every collectable profile can be summarized; a smaller authored native ceiling stays smaller. One summary reads that source plus its framing, index and manifest. The reader's memory limit must cover this work; the chart default is 256 MiB.

@@ -22,7 +22,6 @@
         },
         "labels": {
           "type": "object",
-          "maxProperties": 16,
           "additionalProperties": {
             "type": "string",
             "minLength": 1,
@@ -31,11 +30,9 @@
         },
         "annotations": {
           "type": "object",
-          "maxProperties": 16,
           "additionalProperties": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 1024
+            "minLength": 1
           }
         }
       },

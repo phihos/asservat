@@ -14,7 +14,7 @@ The generic adapter accepts RFC 9068 JWT access tokens signed with RS256 for one
 resource audience from a configured HTTPS issuer. It uses go-oidc verification
 and go-jose JWK parsing, and additionally checks the access-token media type,
 exact issuer, resource audience, `client_id`, consistent optional `azp`,
-required timestamps and token ID, and bounded scope/group claims. ID tokens,
+required timestamps and token ID. ID tokens,
 opaque, encrypted, delegated and proof-of-possession tokens are rejected.
 Providers with a different access-token layout get an explicit profile, as the
 [Keycloak profile](keycloak-profile.md) does; e-mail is never a fallback
@@ -26,16 +26,15 @@ URLs. Requests use verified HTTPS without ambient proxies, cookies, forwarded
 bearer tokens or redirects. Where `key_ops` is present, only verification use is
 accepted.
 
-| Input/work | Bound |
-| --- | --- |
-| Compact token / decoded header / decoded claims | 32 KiB / 2 KiB / 24 KiB |
-| Header / claims JSON | 64 / 2048 tokens, depth 4 / 8; duplicate keys, invalid Unicode and ambiguous aliases rejected |
-| JWKS response | 128 KiB, 8192 JSON tokens, depth 8, at most 32 keys |
-| Signature keys | RSA public keys, 2048–8192 bits; private/symmetric material rejected |
-| JWKS cache | Last-known-good key set per issuer; refreshed when a token names an unknown `kid` |
-| JWKS refresh | Serialized, at most one attempt per second per issuer; no per-attacker-key cache |
-| Network I/O timeout | 5 seconds |
-| Signed groups / scopes | At most 256 group names (each ≤ 255 bytes) / 64 scopes |
+| Input/work | Bound | Reason |
+| --- | --- | --- |
+| Compact token / decoded claims | 32 KiB / 24 KiB | The token travels in the `Authorization` header; ingress header limits are 8–16 KiB by default and raised for large group claims, 32 KiB covers raised limits. 24 KiB is base64-decoded 32 KiB. This byte cap is the only bound on headers, claims, groups and scopes |
+| Token JSON | Duplicate keys, invalid Unicode and ambiguous aliases rejected | Unambiguous claims, not a size bound |
+| JWKS response | 128 KiB | Memory and network per fetch; holds about 32 RSA-8192 keys with `x5c` chains |
+| Signature keys | RSA public keys, 2048–8192 bits; private/symmetric material rejected | 2048 is the RFC 7518 §3.3 / NIST SP 800-131A minimum; verification CPU grows with modulus and 8192 is the largest common size |
+| JWKS cache | Last-known-good key set per issuer; refreshed when a token names an unknown `kid` | — |
+| JWKS refresh | Serialized, at most one attempt per second per issuer; no per-attacker-key cache | Each unknown `kid` would otherwise cost an outbound fetch; matches go-oidc `RemoteKeySet` |
+| Network I/O timeout | 5 seconds | ADR-330 D5 I/O timeout |
 
 The JWKS cache follows go-oidc `RemoteKeySet`: keys stay valid until a refresh
 replaces them, and an unknown `kid` triggers one rate-limited refresh. A failed
@@ -68,8 +67,8 @@ share and privacy administration all check it (REQ-AUT-001).
 Each successful sign-in or first MCP request of a token upserts the
 principal's known-principals row (issuer, subject, username, display name,
 groups seen, last seen). User and group pickers search it with a prefix match,
-limited to 20 results and to callers who may share or bind; it never confers
-access.
+returning pages of 20 results with a continuation cursor, only to callers who
+may share or bind; it never confers access.
 
 The configuration is `identity.json`, validated against the
 [identity settings contract](../../specs/contracts/identity-settings.schema.json)
@@ -108,8 +107,8 @@ Explicit denies subtract the named role's operations. The permission projection
 is maintained from permission-source watch events
 ([permission observation](permission-observation.md)); allows and denies come
 from the same cache. While that cache is unavailable after a watch failure and
-before its relist completes, eligibility is denied. Projections have bounded
-allow/deny rows and no catch-all fallback.
+before its relist completes, eligibility is denied. Projections hold every
+matching allow/deny row and have no catch-all fallback.
 
 Evidence reads also intersect the caller's current assignments with the
 artifact's retained audience. The audience is stored as issuer plus subject

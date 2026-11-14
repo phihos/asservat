@@ -143,19 +143,18 @@
             "minLength": 1,
             "maxLength": 64
           },
-          "maxItems": 16,
           "uniqueItems": true,
           "description": "Actionable blocker codes, for example NotSaveEnabled, LiveViewDisabled or SourceStopped."
         },
         "incident_pod_cap": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 16
+          "maximum": 9007199254740991
         },
         "available_before_seconds": {
           "type": "number",
           "minimum": 0,
-          "maximum": 3600
+          "maximum": 9007199254740991
         },
         "observed_at": {
           "type": "string",
@@ -294,7 +293,7 @@
         "maxBytes": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 268435456
+          "maximum": 9007199254740991
         }
       },
       "required": [
@@ -415,7 +414,7 @@
               "maxBytes": {
                 "type": "integer",
                 "minimum": 1,
-                "maximum": 268435456
+                "maximum": 9007199254740991
               }
             },
             "required": [
@@ -433,13 +432,12 @@
             ]
           },
           "minItems": 1,
-          "maxItems": 16,
           "uniqueItems": true
         },
         "incidentPodLimit": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 100
+          "maximum": 9007199254740991
         },
         "finalizeTimeout": {
           "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/duration"
@@ -497,7 +495,6 @@
             "$ref": "https://asservat.io/spec/v1/recording-save.schema.json#/$defs/recording"
           },
           "minItems": 0,
-          "maxItems": 100,
           "uniqueItems": true
         },
         "capture_enabled": {
@@ -535,7 +532,6 @@
             "$ref": "https://asservat.io/spec/v1/recording-save.schema.json#/$defs/recording"
           },
           "minItems": 1,
-          "maxItems": 16,
           "uniqueItems": true
         },
         "windows": {
@@ -563,7 +559,6 @@
             ]
           },
           "minItems": 1,
-          "maxItems": 16,
           "uniqueItems": true
         },
         "capture_assessment": {
@@ -577,7 +572,6 @@
             "maxLength": 64
           },
           "minItems": 0,
-          "maxItems": 16,
           "uniqueItems": true,
           "description": "Blocker codes; NoCurrentSource when a repeated save finds no matching running source (follow navigation_uri to list_recordings)."
         },
@@ -592,7 +586,7 @@
         "incident_pod_cap": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 16
+          "maximum": 9007199254740991
         }
       },
       "required": [
@@ -702,7 +696,6 @@
                 ]
               },
               "minItems": 1,
-              "maxItems": 16,
               "uniqueItems": true
             }
           },

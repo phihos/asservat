@@ -1,0 +1,396 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/processing.schema.json",
+  "$defs": {
+    "Scope": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "artifact"
+            },
+            "location": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "clusterID": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "artifactID": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "attemptID": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              },
+              "required": [
+                "clusterID",
+                "artifactID",
+                "attemptID"
+              ]
+            }
+          },
+          "required": [
+            "kind",
+            "location"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "workloadInterval"
+            },
+            "clusterID": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "namespaceUID": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "workloadUID": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "acquiredFrom": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "acquiredUntil": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          "required": [
+            "kind",
+            "clusterID",
+            "namespaceUID",
+            "workloadUID",
+            "acquiredFrom",
+            "acquiredUntil"
+          ]
+        }
+      ]
+    },
+    "Rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 16
+        },
+        "state": {
+          "enum": [
+            "reserved",
+            "restricted",
+            "released"
+          ]
+        },
+        "scope": {
+          "$ref": "https://asservat.io/spec/v1/processing.schema.json#/$defs/Scope"
+        },
+        "administrationUntil": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "retireBy": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "state",
+        "scope",
+        "administrationUntil",
+        "retireBy"
+      ]
+    },
+    "Inventory": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "rootID": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "initialized": {
+          "type": "boolean"
+        },
+        "epoch": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "sequence": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1152921504606846976
+        },
+        "rules": {
+          "type": "array",
+          "maxItems": 100,
+          "items": {
+            "$ref": "https://asservat.io/spec/v1/processing.schema.json#/$defs/Rule"
+          }
+        },
+        "nextCursor": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "observedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "validUntil": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "rootID",
+        "initialized",
+        "epoch",
+        "sequence",
+        "rules",
+        "observedAt",
+        "validUntil"
+      ]
+    },
+    "Change": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "action": {
+              "const": "initialize_processing"
+            }
+          },
+          "required": [
+            "action"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "action": {
+              "const": "restrict_processing"
+            },
+            "ruleID": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "expectedRevision": {
+              "const": 0
+            },
+            "artifactID": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "required": [
+            "action",
+            "ruleID",
+            "expectedRevision",
+            "artifactID"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "action": {
+              "enum": [
+                "restrict_processing",
+                "release_processing"
+              ]
+            },
+            "ruleID": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "expectedRevision": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 15
+            },
+            "scope": {
+              "$ref": "https://asservat.io/spec/v1/processing.schema.json#/$defs/Scope"
+            }
+          },
+          "required": [
+            "action",
+            "ruleID",
+            "expectedRevision",
+            "scope"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "action": {
+              "const": "request_early_erasure"
+            },
+            "artifactID": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "required": [
+            "action",
+            "artifactID"
+          ]
+        }
+      ]
+    },
+    "Receipt": {
+      "oneOf": [
+        {
+          "$ref": "https://asservat.io/spec/v1/processing.schema.json#/$defs/StateReceipt"
+        },
+        {
+          "$ref": "https://asservat.io/spec/v1/processing.schema.json#/$defs/ErasureReceipt"
+        }
+      ]
+    },
+    "StateReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "rootID": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "epoch": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "requestID": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "ruleID": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "operationID": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "state": {
+          "enum": [
+            "initialized",
+            "restricted",
+            "released"
+          ]
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 16
+        },
+        "sequence": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1152921504606846976
+        },
+        "observedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "validUntil": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "rootID",
+        "epoch",
+        "requestID",
+        "operationID",
+        "state",
+        "revision",
+        "sequence",
+        "observedAt",
+        "validUntil"
+      ]
+    },
+    "ErasureReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "rootID": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "epoch": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "requestID": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "operationID": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "state": {
+          "const": "erasureRequested"
+        },
+        "sequence": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1152921504606846976
+        },
+        "observedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "validUntil": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "rootID",
+        "epoch",
+        "requestID",
+        "operationID",
+        "state",
+        "sequence",
+        "observedAt",
+        "validUntil"
+      ]
+    }
+  },
+  "oneOf": [
+    {
+      "$ref": "https://asservat.io/spec/v1/processing.schema.json#/$defs/Inventory"
+    },
+    {
+      "$ref": "https://asservat.io/spec/v1/processing.schema.json#/$defs/Change"
+    },
+    {
+      "$ref": "https://asservat.io/spec/v1/processing.schema.json#/$defs/Receipt"
+    }
+  ]
+}

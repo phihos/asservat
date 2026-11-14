@@ -65,7 +65,6 @@
         "minLength": 1,
         "maxLength": 1024
       },
-      "maxItems": 32,
       "minItems": 0,
       "uniqueItems": true
     },
@@ -74,7 +73,6 @@
       "items": {
         "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/artifactRef"
       },
-      "maxItems": 64,
       "minItems": 0,
       "uniqueItems": true
     }

@@ -188,7 +188,7 @@
         "reason": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 512
+          "maxLength": 4096
         },
         "management": {
           "$ref": "https://asservat.io/spec/v1/management.schema.json#/$defs/request"
@@ -384,7 +384,7 @@
         "reason": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 512
+          "maxLength": 4096
         },
         "futureCaptures": {
           "type": "object",

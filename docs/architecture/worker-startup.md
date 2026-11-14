@@ -15,7 +15,9 @@ or query.
   limits are in [download reader deployment](download-worker-dispatch.md).
 - Each replica holds one long-lived HTTP/2 stream on which the hub pushes
   work (download, approved pod-status read, query). The reader reconnects only
-  after a failure, with exponential backoff. It does not poll for commands.
+  after a failure, with exponential backoff (1 s doubling to 60 s with jitter,
+as for the connector in [connector connection](regional-context-start.md); it
+bounds reconnect load as replicas grow). It does not poll for commands.
 - Download bytes travel as a stream on the connector connection
   ([connector connection](regional-context-start.md)) to the hub, which
   relays them to the authenticated caller (I-13).
@@ -34,7 +36,7 @@ reader:
    AEAD binding of the wrapped keyset, with no SQL lookup or ticket
    ([local key service](local-key-service.md)),
 3. decrypts and streams the plaintext bytes,
-4. stops at the session's original bounds: caller session/token expiry,
+4. stops at the session's original bounds: browser session expiry, download
    session deadline, `AccessUntil`, the stored retention cutoff, Stop or
    cancellation ([ADR-312](../decisions/312-started-downloads-run-to-original-bounds.md)).
 

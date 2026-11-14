@@ -60,7 +60,7 @@
         "restartCount": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 100000
+          "maximum": 2147483647
         },
         "hostPID": {
           "type": "integer",
@@ -356,10 +356,8 @@
           "type": "array",
           "items": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 256
+            "minLength": 1
           },
-          "maxItems": 32,
           "minItems": 0,
           "uniqueItems": true
         }
@@ -378,12 +376,12 @@
         "plaintextBytes": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 1099511627776
+          "maximum": 9007199254740991
         },
         "ciphertextBytes": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 1108101562368
+          "maximum": 9007199254740991
         }
       },
       "required": [
@@ -454,7 +452,6 @@
           "items": {
             "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/artifactRef"
           },
-          "maxItems": 16,
           "minItems": 0,
           "uniqueItems": true
         },
@@ -469,7 +466,6 @@
             "type": "string",
             "pattern": "^[a-f0-9]{64}$"
           },
-          "maxItems": 32,
           "minItems": 0,
           "uniqueItems": true
         },
@@ -480,7 +476,6 @@
             "minLength": 1,
             "maxLength": 128
           },
-          "maxItems": 128,
           "minItems": 0,
           "uniqueItems": true
         },
@@ -557,12 +552,10 @@
       ],
       "properties": {
         "canonicalScope": {
-          "type": "object",
-          "maxProperties": 64
+          "type": "object"
         },
         "binding": {
-          "type": "object",
-          "maxProperties": 32
+          "type": "object"
         }
       }
     }
@@ -776,7 +769,7 @@
               "sizes": {
                 "properties": {
                   "plaintextBytes": {
-                    "maximum": 4096
+                    "maximum": 1572864
                   }
                 }
               }
@@ -813,7 +806,7 @@
               "sizes": {
                 "properties": {
                   "plaintextBytes": {
-                    "maximum": 8388608
+                    "maximum": 9007199254740991
                   }
                 }
               }
@@ -850,7 +843,7 @@
               "sizes": {
                 "properties": {
                   "plaintextBytes": {
-                    "maximum": 8388608
+                    "maximum": 9007199254740991
                   }
                 }
               }
@@ -887,7 +880,7 @@
               "sizes": {
                 "properties": {
                   "plaintextBytes": {
-                    "maximum": 8388608
+                    "maximum": 9007199254740991
                   }
                 }
               }
@@ -924,7 +917,7 @@
               "sizes": {
                 "properties": {
                   "plaintextBytes": {
-                    "maximum": 8388608
+                    "maximum": 9007199254740991
                   }
                 }
               }
@@ -973,7 +966,7 @@
               "sizes": {
                 "properties": {
                   "plaintextBytes": {
-                    "maximum": 67108864
+                    "maximum": 9007199254740991
                   }
                 }
               }
@@ -1020,7 +1013,7 @@
               "sizes": {
                 "properties": {
                   "plaintextBytes": {
-                    "maximum": 134217728
+                    "maximum": 9007199254740991
                   }
                 }
               }
@@ -1057,7 +1050,7 @@
               "sizes": {
                 "properties": {
                   "plaintextBytes": {
-                    "maximum": 8388608
+                    "maximum": 9007199254740991
                   }
                 }
               }
@@ -1094,7 +1087,7 @@
               "sizes": {
                 "properties": {
                   "plaintextBytes": {
-                    "maximum": 67108864
+                    "maximum": 9007199254740991
                   }
                 }
               }

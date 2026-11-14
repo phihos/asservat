@@ -30,7 +30,7 @@ and omits the link on failure. `can_cancel` is false for this profile.
 Admission, execution, custody and publication transactions advance
 `progress_revision` and issue `NOTIFY capture_progress, '<capture-id>'`. The
 hub API listens and pushes the new projection to the page's SSE stream; MCP
-`get_capture` with a known revision waits server-side up to 30 s and returns on
+`get_capture` with a known revision waits server-side up to 30 s (ADR-330 D1) and returns on
 the first change. After a reconnect a listener catches up with one query by
 revision. Clients do not poll.
 

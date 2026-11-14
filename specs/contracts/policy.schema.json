@@ -65,17 +65,12 @@
                 "burst": {
                   "type": "integer",
                   "minimum": 1,
-                  "maximum": 10
-                },
-                "maxOccurrencesPerHour": {
-                  "type": "integer",
-                  "minimum": 1,
-                  "maximum": 1000
+                  "maximum": 9007199254740991
                 },
                 "maxConcurrentActions": {
                   "type": "integer",
                   "minimum": 1,
-                  "maximum": 10
+                  "maximum": 9007199254740991
                 }
               },
               "required": [],
@@ -185,17 +180,12 @@
                 "burst": {
                   "type": "integer",
                   "minimum": 1,
-                  "maximum": 10
-                },
-                "maxOccurrencesPerHour": {
-                  "type": "integer",
-                  "minimum": 1,
-                  "maximum": 1000
+                  "maximum": 9007199254740991
                 },
                 "maxConcurrentActions": {
                   "type": "integer",
                   "minimum": 1,
-                  "maximum": 10
+                  "maximum": 9007199254740991
                 }
               },
               "required": [],

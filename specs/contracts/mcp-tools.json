@@ -1,6 +1,6 @@
 {
   "schema_version": "mcp-tool-catalog/v1",
-  "note": "Design catalog; product implementation pending (runtime: specs/contracts/implemented/mcp-tools.json). Clients receive dereferenced self-contained schemas. Limits: output array maxItems and page limit maxima derive from the 24/32 KiB structured and 64 KiB combined MCP response bounds (memory/protocol, REQ-MCP-002); input array and string bounds cap the work one request starts (scan, fan-out, request body memory); integer maxima of counters are representation bounds. Clients carry their user's own evidence access: there is no per-client selection or data-class ceiling.",
+  "note": "Design catalog; product implementation pending (runtime: specs/contracts/implemented/mcp-tools.json). Clients receive dereferenced self-contained schemas. Limits: one tool result is at most 96 KiB, derived from the common MCP client tool-output limit (Claude Code MAX_MCP_OUTPUT_TOKENS 25,000 tokens, about 100 KB), and aims at 24 KiB by default to leave room in the model context (REQ-MCP-002); list-shaped results paginate with cursors (limit default 20, maximum 100). Remaining string bounds are identifier/format lengths or the external limit named next to them; integer maxima of counters are representation bounds (2^53-1). Clients carry their user's own evidence access: there is no per-client selection or data-class ceiling.",
   "tools": [
     {
       "name": "list_cases",
@@ -144,7 +144,7 @@
                       "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 1000000000
+                        "maximum": 9007199254740991
                       }
                     },
                     "required": [
@@ -197,7 +197,7 @@
                       "retry_after_seconds": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 2147483647
                       }
                     },
                     "required": [
@@ -345,7 +345,7 @@
                             "verified_native_bytes": {
                               "type": "integer",
                               "minimum": 0,
-                              "maximum": 1099511627776
+                              "maximum": 9007199254740991
                             },
                             "target": {
                               "type": "object",
@@ -435,7 +435,7 @@
                                     "null"
                                   ],
                                   "minimum": 1000,
-                                  "maximum": 60000,
+                                  "maximum": 9007199254740991,
                                   "multipleOf": 1000
                                 },
                                 "force_gc": {
@@ -502,7 +502,7 @@
                                         "requested_duration_ms": {
                                           "type": "integer",
                                           "minimum": 1000,
-                                          "maximum": 60000,
+                                          "maximum": 9007199254740991,
                                           "multipleOf": 1000
                                         },
                                         "force_gc": {
@@ -523,7 +523,7 @@
                                         "requested_duration_ms": {
                                           "type": "integer",
                                           "minimum": 1000,
-                                          "maximum": 15000,
+                                          "maximum": 9007199254740991,
                                           "multipleOf": 1000
                                         },
                                         "force_gc": {
@@ -603,7 +603,7 @@
                                         "requested_duration_ms": {
                                           "type": "integer",
                                           "minimum": 1000,
-                                          "maximum": 60000,
+                                          "maximum": 9007199254740991,
                                           "multipleOf": 1000
                                         },
                                         "force_gc": {
@@ -678,7 +678,8 @@
                             }
                           ]
                         },
-                        "maxItems": 100
+                        "maxItems": 100,
+                        "description": "First 100 artifacts (page size); list_artifacts pages through all of them."
                       },
                       "timeline": {
                         "type": "array",
@@ -698,12 +699,12 @@
                             "summary": {
                               "type": "string",
                               "minLength": 1,
-                              "maxLength": 512
+                              "maxLength": 1024
                             },
                             "clock_uncertainty_ms": {
                               "type": "integer",
                               "minimum": 0,
-                              "maximum": 3600000
+                              "maximum": 9007199254740991
                             }
                           },
                           "required": [
@@ -745,7 +746,7 @@
                       "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 1000000000
+                        "maximum": 9007199254740991
                       }
                     },
                     "required": [
@@ -798,7 +799,7 @@
                       "retry_after_seconds": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 2147483647
                       }
                     },
                     "required": [
@@ -946,7 +947,7 @@
                       "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 1000000000
+                        "maximum": 9007199254740991
                       }
                     },
                     "required": [
@@ -999,7 +1000,7 @@
                       "retry_after_seconds": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 2147483647
                       }
                     },
                     "required": [
@@ -1150,7 +1151,7 @@
                       "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 1000000000
+                        "maximum": 9007199254740991
                       }
                     },
                     "required": [
@@ -1203,7 +1204,7 @@
                       "retry_after_seconds": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 2147483647
                       }
                     },
                     "required": [
@@ -1290,12 +1291,12 @@
                             "summary": {
                               "type": "string",
                               "minLength": 1,
-                              "maxLength": 512
+                              "maxLength": 1024
                             },
                             "clock_uncertainty_ms": {
                               "type": "integer",
                               "minimum": 0,
-                              "maximum": 3600000
+                              "maximum": 9007199254740991
                             }
                           },
                           "required": [
@@ -1335,7 +1336,7 @@
                       "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 1000000000
+                        "maximum": 9007199254740991
                       }
                     },
                     "required": [
@@ -1388,7 +1389,7 @@
                       "retry_after_seconds": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 2147483647
                       }
                     },
                     "required": [
@@ -1452,12 +1453,14 @@
           "max_threads": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 64
+            "maximum": 64,
+            "description": "Threads per page (page size); continue with next_cursor."
           },
           "max_frames": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 128
+            "maximum": 128,
+            "description": "Frames per thread per page; deeper stacks continue with next_cursor."
           },
           "sample_type": {
             "type": "string",
@@ -1497,7 +1500,6 @@
               "maxLength": 64
             },
             "minItems": 1,
-            "maxItems": 64,
             "uniqueItems": true
           },
           "errors_only": {
@@ -1509,8 +1511,7 @@
               "type": "string",
               "minLength": 1,
               "maxLength": 64
-            },
-            "maxItems": 32
+            }
           },
           "stream": {
             "type": "string",
@@ -1525,7 +1526,7 @@
           "line_start": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 1000000000
+            "maximum": 9007199254740991
           },
           "max_lines": {
             "type": "integer",
@@ -1581,12 +1582,29 @@
                 "max_threads": {
                   "type": "integer",
                   "minimum": 1,
-                  "maximum": 64
+                  "maximum": 64,
+                  "description": "Threads per page (page size); continue with next_cursor."
                 },
                 "max_frames": {
                   "type": "integer",
                   "minimum": 1,
-                  "maximum": 128
+                  "maximum": 128,
+                  "description": "Frames per thread per page; deeper stacks continue with next_cursor."
+                },
+                "cursor": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 4096
+                    },
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64,
+                      "pattern": "^[0-9]{1,8}:[0-9]{1,4}:[0-9a-f]{32}$"
+                    }
+                  ]
                 }
               },
               "required": [
@@ -1763,7 +1781,6 @@
                     "maxLength": 64
                   },
                   "minItems": 1,
-                  "maxItems": 64,
                   "uniqueItems": true
                 },
                 "errors_only": {
@@ -1897,8 +1914,7 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 64
-                  },
-                  "maxItems": 32
+                  }
                 },
                 "stream": {
                   "type": "string",
@@ -1949,7 +1965,7 @@
                 "line_start": {
                   "type": "integer",
                   "minimum": 1,
-                  "maximum": 1000000000
+                  "maximum": 9007199254740991
                 },
                 "max_lines": {
                   "type": "integer",
@@ -2059,14 +2075,13 @@
                                   "index": {
                                     "type": "integer",
                                     "minimum": 0,
-                                    "maximum": 10000
+                                    "maximum": 2147483647
                                   },
                                   "function": {
                                     "anyOf": [
                                       {
                                         "type": "string",
-                                        "minLength": 1,
-                                        "maxLength": 512
+                                        "minLength": 1
                                       },
                                       {
                                         "type": "null"
@@ -2078,7 +2093,7 @@
                                       {
                                         "type": "string",
                                         "minLength": 1,
-                                        "maxLength": 1024
+                                        "maxLength": 4096
                                       },
                                       {
                                         "type": "null"
@@ -2090,7 +2105,7 @@
                                       {
                                         "type": "integer",
                                         "minimum": 0,
-                                        "maximum": 100000000
+                                        "maximum": 9007199254740991
                                       },
                                       {
                                         "type": "null"
@@ -2107,16 +2122,14 @@
                                   "index",
                                   "function"
                                 ]
-                              },
-                              "maxItems": 128
+                              }
                             }
                           },
                           "required": [
                             "thread_id",
                             "frames"
                           ]
-                        },
-                        "maxItems": 64
+                        }
                       },
                       "symbol_status": {
                         "type": "string",
@@ -2156,7 +2169,7 @@
                       "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 1000000000
+                        "maximum": 9007199254740991
                       }
                     },
                     "required": [
@@ -2209,7 +2222,7 @@
                       "retry_after_seconds": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 2147483647
                       }
                     },
                     "required": [
@@ -2332,8 +2345,7 @@
                               "anyOf": [
                                 {
                                   "type": "string",
-                                  "minLength": 1,
-                                  "maxLength": 512
+                                  "minLength": 1
                                 },
                                 {
                                   "type": "null"
@@ -2423,7 +2435,7 @@
                       "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 1000000000
+                        "maximum": 9007199254740991
                       },
                       "query_observed_at": {
                         "type": "string",
@@ -2485,7 +2497,7 @@
                       "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 1000000000
+                        "maximum": 9007199254740991
                       },
                       "query_observed_at": {
                         "type": "string",
@@ -2556,7 +2568,7 @@
                           "null"
                         ],
                         "minimum": 0,
-                        "maximum": 1000000000000,
+                        "maximum": 9007199254740991,
                         "description": "Producer-reported exclusions with the exact meaning given by drop_reporting; null means unavailable. This is not measured network loss."
                       },
                       "conversations": {
@@ -2609,7 +2621,7 @@
                       "conversations_total": {
                         "type": "integer",
                         "minimum": 0,
-                        "maximum": 16384
+                        "maximum": 9007199254740991
                       },
                       "conversations_truncated": {
                         "type": "boolean"
@@ -2722,7 +2734,6 @@
                             },
                             "headers": {
                               "type": "array",
-                              "maxItems": 32,
                               "items": {
                                 "type": "object",
                                 "additionalProperties": false,
@@ -2767,16 +2778,15 @@
                       "dropped_flows": {
                         "type": "integer",
                         "minimum": 0,
-                        "maximum": 1000000000000
+                        "maximum": 9007199254740991
                       },
                       "incomplete_flows": {
                         "type": "integer",
                         "minimum": 0,
-                        "maximum": 1000000000000
+                        "maximum": 9007199254740991
                       },
                       "coverage_gaps": {
                         "type": "array",
-                        "maxItems": 32,
                         "items": {
                           "type": "string",
                           "minLength": 1,
@@ -2818,8 +2828,7 @@
                           "type": "string",
                           "minLength": 1,
                           "maxLength": 64
-                        },
-                        "maxItems": 32
+                        }
                       },
                       "rows": {
                         "type": "array",
@@ -2832,8 +2841,7 @@
                               "boolean",
                               "null"
                             ]
-                          },
-                          "maxItems": 32
+                          }
                         },
                         "maxItems": 100
                       }
@@ -2867,14 +2875,13 @@
                       "line_start": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 1000000000
+                        "maximum": 9007199254740991
                       },
                       "lines": {
                         "type": "array",
                         "items": {
                           "type": "string",
-                          "minLength": 1,
-                          "maxLength": 4096
+                          "minLength": 1
                         },
                         "maxItems": 200
                       },
@@ -3029,8 +3036,7 @@
                               "anyOf": [
                                 {
                                   "type": "string",
-                                  "minLength": 1,
-                                  "maxLength": 512
+                                  "minLength": 1
                                 },
                                 {
                                   "type": "null"
@@ -3066,10 +3072,8 @@
                         "type": "array",
                         "items": {
                           "type": "string",
-                          "minLength": 1,
-                          "maxLength": 512
-                        },
-                        "maxItems": 16
+                          "minLength": 1
+                        }
                       },
                       "aggregation": {
                         "const": "cumulative"
@@ -3128,8 +3132,7 @@
                             "anyOf": [
                               {
                                 "type": "number",
-                                "exclusiveMinimum": 0,
-                                "maximum": 86400
+                                "exclusiveMinimum": 0
                               },
                               {
                                 "type": "null"
@@ -3309,8 +3312,7 @@
                             "anyOf": [
                               {
                                 "type": "number",
-                                "exclusiveMinimum": 0,
-                                "maximum": 86400
+                                "exclusiveMinimum": 0
                               },
                               {
                                 "type": "null"
@@ -3534,8 +3536,7 @@
                                 },
                                 "duration_seconds": {
                                   "type": "number",
-                                  "exclusiveMinimum": 0,
-                                  "maximum": 86400
+                                  "exclusiveMinimum": 0
                                 }
                               }
                             },
@@ -3549,8 +3550,7 @@
                                 },
                                 "duration_seconds": {
                                   "type": "number",
-                                  "exclusiveMinimum": 0,
-                                  "maximum": 86400
+                                  "exclusiveMinimum": 0
                                 }
                               }
                             }
@@ -3591,7 +3591,7 @@
                       "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 1000000000
+                        "maximum": 9007199254740991
                       },
                       "query_observed_at": {
                         "type": "string",
@@ -3659,7 +3659,7 @@
                       "retry_after_seconds": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 2147483647
                       }
                     },
                     "required": [
@@ -3684,7 +3684,7 @@
     },
     {
       "name": "request_raw_access",
-      "description": "Request independent approval for whole-file downloads, bounded saved-packet queries, or both over selected existing raw artifacts. This creates no collection or disclosure. Current runtime operations are download_artifact and pcap_query. Exact verified sizes, targets, requester/client and the fixed 10000-operation ceiling are reviewed. Query-only output budgets need not cover the whole native file; each returned query page is charged at most 24 KiB and one operation. Retry an uncertain reply with the same selection and idempotency key; original expiry and spend do not reset. Operation identifiers name the raw query_artifact operations (pcap_query = packets, syscall_query = syscalls, read_memory = memory, debugger_command = debugger), get_logs and download_artifact. Callers with the equivalent Kubernetes right need no grant.",
+      "description": "Request independent approval for whole-file downloads, bounded saved-packet queries, or both over selected existing raw artifacts. This creates no collection or disclosure. Current runtime operations are download_artifact and pcap_query. Exact verified sizes, targets and requester/client are reviewed; the selection is bounded only by the request body. Query-only output budgets need not cover the whole native file; each returned query page is charged at most 24 KiB and one operation. Retry an uncertain reply with the same selection and idempotency key; original expiry and spend do not reset. Operation identifiers name the raw query_artifact operations (pcap_query = packets, syscall_query = syscalls, read_memory = memory, debugger_command = debugger), get_logs and download_artifact. Callers with the equivalent Kubernetes right need no grant.",
       "enabledByDefault": true,
       "annotations": {
         "readOnlyHint": false,
@@ -3706,7 +3706,6 @@
               "format": "uuid"
             },
             "minItems": 1,
-            "maxItems": 64,
             "uniqueItems": true
           },
           "artifact_digests": {
@@ -3715,7 +3714,6 @@
               "type": "string",
               "pattern": "^[a-f0-9]{64}$"
             },
-            "maxItems": 64,
             "minItems": 1,
             "uniqueItems": true,
             "description": "Optional provenance pin of the exact artifact versions."
@@ -3745,18 +3743,18 @@
           "reason": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 512
+            "maxLength": 4096
           },
           "max_bytes": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 1099511627776,
+            "maximum": 9007199254740991,
             "description": "Optional; defaults to the verified sizes of the selected artifacts (download) or the query allowance."
           },
           "expires_in_seconds": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 315360000,
+            "maximum": 9007199254740991,
             "description": "Optional; defaults to the artifacts' access end (AccessUntil), capped by the administrator maximum."
           },
           "idempotency_key": {
@@ -3770,28 +3768,6 @@
           "operations",
           "reason",
           "idempotency_key"
-        ],
-        "allOf": [
-          {
-            "if": {
-              "properties": {
-                "operations": {
-                  "not": {
-                    "contains": {
-                      "const": "download_artifact"
-                    }
-                  }
-                }
-              }
-            },
-            "then": {
-              "properties": {
-                "max_bytes": {
-                  "maximum": 1073741824
-                }
-              }
-            }
-          }
         ],
         "anyOf": [
           {
@@ -3871,7 +3847,7 @@
                       "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 1000000000
+                        "maximum": 9007199254740991
                       }
                     },
                     "required": [
@@ -3924,7 +3900,7 @@
                       "retry_after_seconds": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 2147483647
                       }
                     },
                     "required": [
@@ -3964,7 +3940,7 @@
           "after_revision": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 1000000000,
+            "maximum": 9007199254740991,
             "description": "Wait server-side until the state revision differs from this value or 30 seconds pass, then return the current state. Omit for an immediate read. Status reads are never charged."
           }
         },
@@ -4086,7 +4062,6 @@
                           "reasons": {
                             "type": "array",
                             "minItems": 1,
-                            "maxItems": 16,
                             "items": {
                               "type": "object",
                               "additionalProperties": false,
@@ -4118,37 +4093,25 @@
                             "type": "object",
                             "additionalProperties": false,
                             "properties": {
-                              "max_session_seconds": {
-                                "type": "integer",
-                                "minimum": 1,
-                                "maximum": 3600
-                              },
                               "max_observed_bytes": {
                                 "type": "integer",
                                 "minimum": 1,
-                                "maximum": 1099511627776
+                                "maximum": 9007199254740991
                               },
                               "max_bytes_per_second": {
                                 "type": "integer",
                                 "minimum": 1,
                                 "maximum": 1073741824
                               },
-                              "max_concurrent_sessions": {
-                                "type": "integer",
-                                "minimum": 1,
-                                "maximum": 1000
-                              },
                               "max_observed_events": {
                                 "type": "integer",
                                 "minimum": 0,
-                                "maximum": 1000000000
+                                "maximum": 9007199254740991
                               }
                             },
                             "required": [
-                              "max_session_seconds",
                               "max_observed_bytes",
-                              "max_bytes_per_second",
-                              "max_concurrent_sessions"
+                              "max_bytes_per_second"
                             ]
                           },
                           "requested_by": {
@@ -4188,7 +4151,8 @@
                           "lifetime_seconds": {
                             "type": "integer",
                             "minimum": 1,
-                            "maximum": 31536000
+                            "maximum": 9007199254740991,
+                            "description": "Approval window in seconds, bounded by the administrator-configured maximum."
                           },
                           "decision": {
                             "type": "object",
@@ -4233,7 +4197,7 @@
                               "reason": {
                                 "type": "string",
                                 "minLength": 1,
-                                "maxLength": 512
+                                "maxLength": 4096
                               },
                               "authentication_context": {
                                 "type": "object",
@@ -4310,7 +4274,6 @@
                           "actions": {
                             "type": "array",
                             "minItems": 1,
-                            "maxItems": 16,
                             "items": {
                               "type": "object",
                               "additionalProperties": false,
@@ -4356,17 +4319,17 @@
                                 "filter_instructions": {
                                   "type": "integer",
                                   "minimum": 1,
-                                  "maximum": 256
+                                  "maximum": 4096
                                 },
                                 "max_bytes": {
                                   "type": "integer",
                                   "minimum": 1,
-                                  "maximum": 1099511627776
+                                  "maximum": 9007199254740991
                                 },
                                 "ring_max_bytes": {
                                   "type": "integer",
                                   "minimum": 1,
-                                  "maximum": 268435456
+                                  "maximum": 9007199254740991
                                 },
                                 "ring_max_age": {
                                   "type": "string",
@@ -4691,7 +4654,7 @@
                                     "max_bytes": {
                                       "type": "integer",
                                       "minimum": 1,
-                                      "maximum": 67108864
+                                      "maximum": 9007199254740991
                                     }
                                   },
                                   "required": [
@@ -4743,7 +4706,6 @@
                               "action_ids": {
                                 "type": "array",
                                 "minItems": 1,
-                                "maxItems": 16,
                                 "items": {
                                   "type": "string",
                                   "minLength": 1,
@@ -4767,17 +4729,17 @@
                               "max_artifacts": {
                                 "type": "integer",
                                 "minimum": 1,
-                                "maximum": 64
+                                "maximum": 9007199254740991
                               },
                               "max_bytes": {
                                 "type": "integer",
                                 "minimum": 1,
-                                "maximum": 274877906944
+                                "maximum": 9007199254740991
                               },
                               "max_operations": {
                                 "type": "integer",
                                 "minimum": 1,
-                                "maximum": 10000
+                                "maximum": 9007199254740991
                               },
                               "not_after": {
                                 "type": "string",
@@ -4786,17 +4748,17 @@
                               "artifacts_used": {
                                 "type": "integer",
                                 "minimum": 0,
-                                "maximum": 64
+                                "maximum": 9007199254740991
                               },
                               "bytes_used": {
                                 "type": "integer",
                                 "minimum": 0,
-                                "maximum": 274877906944
+                                "maximum": 9007199254740991
                               },
                               "operations_used": {
                                 "type": "integer",
                                 "minimum": 0,
-                                "maximum": 10000
+                                "maximum": 9007199254740991
                               }
                             },
                             "required": [
@@ -4814,17 +4776,12 @@
                           "remaining_bytes": {
                             "type": "integer",
                             "minimum": 0,
-                            "maximum": 1000000000000
-                          },
-                          "remaining_executions": {
-                            "type": "integer",
-                            "minimum": 0,
-                            "maximum": 10000
+                            "maximum": 9007199254740991
                           },
                           "remaining_observation_bytes": {
                             "type": "integer",
                             "minimum": 0,
-                            "maximum": 1099511627776
+                            "maximum": 9007199254740991
                           },
                           "preview_deadline": {
                             "type": "string",
@@ -4891,46 +4848,41 @@
                                 "type": "string",
                                 "format": "date-time"
                               },
-                              "max_executions": {
-                                "type": "integer",
-                                "minimum": 1,
-                                "maximum": 10000
-                              },
                               "executions_used": {
                                 "type": "integer",
                                 "minimum": 0,
-                                "maximum": 10000
+                                "maximum": 9007199254740991
                               },
                               "max_collected_bytes": {
                                 "type": "integer",
                                 "minimum": 1,
-                                "maximum": 1099511627776
+                                "maximum": 9007199254740991
                               },
                               "max_observed_bytes": {
                                 "type": "integer",
                                 "minimum": 0,
-                                "maximum": 1099511627776
+                                "maximum": 9007199254740991
                               },
                               "collected_bytes_used": {
                                 "type": "integer",
                                 "minimum": 0,
-                                "maximum": 1099511627776
+                                "maximum": 9007199254740991
                               },
                               "observed_bytes_used": {
                                 "type": "integer",
                                 "minimum": 0,
-                                "maximum": 1099511627776
+                                "maximum": 9007199254740991
                               },
                               "max_observed_events": {
                                 "type": "integer",
                                 "minimum": 0,
-                                "maximum": 1000000000,
+                                "maximum": 9007199254740991,
                                 "description": "Cumulative eligible entry and exit probe ceiling; zero or absent grants no argument observation."
                               },
                               "observed_events_used": {
                                 "type": "integer",
                                 "minimum": 0,
-                                "maximum": 1000000000,
+                                "maximum": 9007199254740991,
                                 "description": "Charged event units."
                               }
                             },
@@ -4939,7 +4891,6 @@
                               "executor",
                               "authority_issued_at",
                               "authority_not_after",
-                              "max_executions",
                               "executions_used",
                               "max_collected_bytes",
                               "max_observed_bytes",
@@ -5006,8 +4957,9 @@
                               ],
                               "properties": {
                                 "lifetime_seconds": {
-                                  "minimum": 60,
-                                  "maximum": 28800
+                                  "minimum": 1,
+                                  "maximum": 9007199254740991,
+                                  "description": "Approval window in seconds, bounded by the administrator-configured maximum."
                                 },
                                 "target": {
                                   "required": [
@@ -5230,7 +5182,8 @@
                           "lifetime_seconds": {
                             "type": "integer",
                             "minimum": 1,
-                            "maximum": 31536000
+                            "maximum": 9007199254740991,
+                            "description": "Approval window in seconds, bounded by the administrator-configured maximum."
                           },
                           "decision": {
                             "type": "object",
@@ -5275,7 +5228,7 @@
                               "reason": {
                                 "type": "string",
                                 "minLength": 1,
-                                "maxLength": 512
+                                "maxLength": 4096
                               },
                               "authentication_context": {
                                 "type": "object",
@@ -5363,7 +5316,7 @@
                               "reason": {
                                 "type": "string",
                                 "minLength": 1,
-                                "maxLength": 512
+                                "maxLength": 4096
                               },
                               "operations": {
                                 "type": "array",
@@ -5382,7 +5335,7 @@
                               "max_bytes": {
                                 "type": "integer",
                                 "minimum": 1,
-                                "maximum": 1099511627776
+                                "maximum": 9007199254740991
                               },
                               "max_operations": {
                                 "const": 10000
@@ -5394,17 +5347,17 @@
                               "artifact_count": {
                                 "type": "integer",
                                 "minimum": 1,
-                                "maximum": 64
+                                "maximum": 9007199254740991
                               },
                               "bytes_used": {
                                 "type": "integer",
                                 "minimum": 0,
-                                "maximum": 1099511627776
+                                "maximum": 9007199254740991
                               },
                               "operations_used": {
                                 "type": "integer",
                                 "minimum": 0,
-                                "maximum": 10000
+                                "maximum": 9007199254740991
                               },
                               "artifacts": {
                                 "type": "array",
@@ -5441,7 +5394,7 @@
                                     "native_bytes": {
                                       "type": "integer",
                                       "minimum": 0,
-                                      "maximum": 1099511627776
+                                      "maximum": 9007199254740991
                                     },
                                     "expires_at": {
                                       "type": "string",
@@ -5515,8 +5468,7 @@
                                     "target"
                                   ]
                                 },
-                                "minItems": 1,
-                                "maxItems": 64
+                                "minItems": 1
                               }
                             },
                             "required": [
@@ -5578,7 +5530,7 @@
                       "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 1000000000
+                        "maximum": 9007199254740991
                       }
                     },
                     "required": [
@@ -5631,7 +5583,7 @@
                       "retry_after_seconds": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 2147483647
                       }
                     },
                     "required": [
@@ -5653,7 +5605,7 @@
     },
     {
       "name": "list_reviews",
-      "description": "List approval requests (ADR-249): view pending is the approver inbox, the reviewable requests of other people for workloads where you hold the action-approver role now; view requested lists your own requests in every phase. Newest first, at most limit (default 20, maximum 100). Approvals are decided in the console. Existing-artifact rawQuery approvals show exact selected files, verified sizes, targets, requesting client and finite download budgets; they authorize no collection.",
+      "description": "List approval requests (ADR-249): view pending is the approver inbox, the reviewable requests of other people for workloads where you hold the action-approver role now; view requested lists your own requests in every phase. Newest first, pages of at most limit (default 20, maximum 100); continue with next_cursor. Approvals are decided in the console. Existing-artifact rawQuery approvals show exact selected files, verified sizes, targets, requesting client and finite download budgets; they authorize no collection.",
       "enabledByDefault": true,
       "transports": [
         "browser"
@@ -5677,6 +5629,11 @@
             "type": "integer",
             "minimum": 1,
             "maximum": 100
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
           }
         },
         "required": [
@@ -5804,7 +5761,6 @@
                                 "reasons": {
                                   "type": "array",
                                   "minItems": 1,
-                                  "maxItems": 16,
                                   "items": {
                                     "type": "object",
                                     "additionalProperties": false,
@@ -5836,37 +5792,25 @@
                                   "type": "object",
                                   "additionalProperties": false,
                                   "properties": {
-                                    "max_session_seconds": {
-                                      "type": "integer",
-                                      "minimum": 1,
-                                      "maximum": 3600
-                                    },
                                     "max_observed_bytes": {
                                       "type": "integer",
                                       "minimum": 1,
-                                      "maximum": 1099511627776
+                                      "maximum": 9007199254740991
                                     },
                                     "max_bytes_per_second": {
                                       "type": "integer",
                                       "minimum": 1,
                                       "maximum": 1073741824
                                     },
-                                    "max_concurrent_sessions": {
-                                      "type": "integer",
-                                      "minimum": 1,
-                                      "maximum": 1000
-                                    },
                                     "max_observed_events": {
                                       "type": "integer",
                                       "minimum": 0,
-                                      "maximum": 1000000000
+                                      "maximum": 9007199254740991
                                     }
                                   },
                                   "required": [
-                                    "max_session_seconds",
                                     "max_observed_bytes",
-                                    "max_bytes_per_second",
-                                    "max_concurrent_sessions"
+                                    "max_bytes_per_second"
                                   ]
                                 },
                                 "requested_by": {
@@ -5906,7 +5850,8 @@
                                 "lifetime_seconds": {
                                   "type": "integer",
                                   "minimum": 1,
-                                  "maximum": 31536000
+                                  "maximum": 9007199254740991,
+                                  "description": "Approval window in seconds, bounded by the administrator-configured maximum."
                                 },
                                 "decision": {
                                   "type": "object",
@@ -5951,7 +5896,7 @@
                                     "reason": {
                                       "type": "string",
                                       "minLength": 1,
-                                      "maxLength": 512
+                                      "maxLength": 4096
                                     },
                                     "authentication_context": {
                                       "type": "object",
@@ -6086,46 +6031,41 @@
                                       "type": "string",
                                       "format": "date-time"
                                     },
-                                    "max_executions": {
-                                      "type": "integer",
-                                      "minimum": 1,
-                                      "maximum": 10000
-                                    },
                                     "executions_used": {
                                       "type": "integer",
                                       "minimum": 0,
-                                      "maximum": 10000
+                                      "maximum": 9007199254740991
                                     },
                                     "max_collected_bytes": {
                                       "type": "integer",
                                       "minimum": 1,
-                                      "maximum": 1099511627776
+                                      "maximum": 9007199254740991
                                     },
                                     "max_observed_bytes": {
                                       "type": "integer",
                                       "minimum": 0,
-                                      "maximum": 1099511627776
+                                      "maximum": 9007199254740991
                                     },
                                     "collected_bytes_used": {
                                       "type": "integer",
                                       "minimum": 0,
-                                      "maximum": 1099511627776
+                                      "maximum": 9007199254740991
                                     },
                                     "observed_bytes_used": {
                                       "type": "integer",
                                       "minimum": 0,
-                                      "maximum": 1099511627776
+                                      "maximum": 9007199254740991
                                     },
                                     "max_observed_events": {
                                       "type": "integer",
                                       "minimum": 0,
-                                      "maximum": 1000000000,
+                                      "maximum": 9007199254740991,
                                       "description": "Cumulative eligible entry and exit probe ceiling; zero or absent grants no argument observation."
                                     },
                                     "observed_events_used": {
                                       "type": "integer",
                                       "minimum": 0,
-                                      "maximum": 1000000000,
+                                      "maximum": 9007199254740991,
                                       "description": "Charged event units."
                                     }
                                   },
@@ -6134,7 +6074,6 @@
                                     "executor",
                                     "authority_issued_at",
                                     "authority_not_after",
-                                    "max_executions",
                                     "executions_used",
                                     "max_collected_bytes",
                                     "max_observed_bytes",
@@ -6199,8 +6138,9 @@
                                     ],
                                     "properties": {
                                       "lifetime_seconds": {
-                                        "minimum": 60,
-                                        "maximum": 28800
+                                        "minimum": 1,
+                                        "maximum": 9007199254740991,
+                                        "description": "Approval window in seconds, bounded by the administrator-configured maximum."
                                       },
                                       "target": {
                                         "required": [
@@ -6381,7 +6321,8 @@
                                 "lifetime_seconds": {
                                   "type": "integer",
                                   "minimum": 1,
-                                  "maximum": 31536000
+                                  "maximum": 9007199254740991,
+                                  "description": "Approval window in seconds, bounded by the administrator-configured maximum."
                                 },
                                 "decision": {
                                   "type": "object",
@@ -6426,7 +6367,7 @@
                                     "reason": {
                                       "type": "string",
                                       "minLength": 1,
-                                      "maxLength": 512
+                                      "maxLength": 4096
                                     },
                                     "authentication_context": {
                                       "type": "object",
@@ -6511,7 +6452,7 @@
                                     "reason": {
                                       "type": "string",
                                       "minLength": 1,
-                                      "maxLength": 512
+                                      "maxLength": 4096
                                     },
                                     "operations": {
                                       "type": "array",
@@ -6530,7 +6471,7 @@
                                     "max_bytes": {
                                       "type": "integer",
                                       "minimum": 1,
-                                      "maximum": 1099511627776
+                                      "maximum": 9007199254740991
                                     },
                                     "max_operations": {
                                       "const": 10000
@@ -6542,17 +6483,17 @@
                                     "artifact_count": {
                                       "type": "integer",
                                       "minimum": 1,
-                                      "maximum": 64
+                                      "maximum": 9007199254740991
                                     },
                                     "bytes_used": {
                                       "type": "integer",
                                       "minimum": 0,
-                                      "maximum": 1099511627776
+                                      "maximum": 9007199254740991
                                     },
                                     "operations_used": {
                                       "type": "integer",
                                       "minimum": 0,
-                                      "maximum": 10000
+                                      "maximum": 9007199254740991
                                     }
                                   },
                                   "required": [
@@ -6619,7 +6560,7 @@
                       "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 1000000000
+                        "maximum": 9007199254740991
                       }
                     },
                     "required": [
@@ -6672,7 +6613,7 @@
                       "retry_after_seconds": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 2147483647
                       }
                     },
                     "required": [
@@ -6721,7 +6662,7 @@
           "reason": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 512
+            "maxLength": 4096
           },
           "idempotency_key": {
             "type": "string",
@@ -6803,7 +6744,7 @@
                       "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 1000000000
+                        "maximum": 9007199254740991
                       }
                     },
                     "required": [
@@ -6856,7 +6797,7 @@
                       "retry_after_seconds": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 2147483647
                       }
                     },
                     "required": [
@@ -6973,7 +6914,7 @@
                       "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 1000000000
+                        "maximum": 9007199254740991
                       }
                     },
                     "required": [
@@ -7026,7 +6967,7 @@
                       "retry_after_seconds": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 2147483647
                       }
                     },
                     "required": [
@@ -7048,7 +6989,7 @@
     },
     {
       "name": "query_artifact",
-      "description": "Run a typed query on saved evidence. operation = packets (libpcap filter and fields), syscalls (recorded arguments), memory (core address range) or debugger (enum command). Metadata-only packet fields need ordinary rights; raw operations need the equivalent Kubernetes right on the workload or a covering grant, reused automatically. Scan, row and output caps apply; long queries return a handle for get_query_result.",
+      "description": "Run a typed query on saved evidence. operation = packets (libpcap filter and fields), syscalls (recorded arguments), memory (core address range) or debugger (enum command). Metadata-only packet fields need ordinary rights; raw operations need the equivalent Kubernetes right on the workload or a covering grant, reused automatically. Row and output caps apply; a packet query that reaches max_packets or the 30 s server wait continues with next_cursor, and long queries return a handle for get_query_result. A memory read returns at most 32 KiB per call (default 8 KiB).",
       "enabledByDefault": true,
       "annotations": {
         "readOnlyHint": true,
@@ -7110,7 +7051,6 @@
               ]
             },
             "minItems": 1,
-            "maxItems": 32,
             "uniqueItems": true
           },
           "max_packets": {
@@ -7118,15 +7058,9 @@
             "minimum": 1,
             "maximum": 100
           },
-          "max_scan_bytes": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 1073741824,
-            "description": "Logical scan budget: sum of captured lengths of all visited saved records, including nonmatches. Full bounded source authentication still completes after a logical cap. The API ceiling does not qualify larger sources."
-          },
           "packet_filter": {
             "type": "string",
-            "maxLength": 512,
+            "maxLength": 4096,
             "description": "Supported tcpdump/libpcap packet-filter subset; no name resolution or bracket predicates. Omitted or empty means no packet-filter restriction. This is not Wireshark display-filter syntax."
           },
           "start_time": {
@@ -7169,12 +7103,12 @@
               "offset": {
                 "type": "integer",
                 "minimum": 0,
-                "maximum": 1499
+                "maximum": 65534
               },
               "length": {
                 "type": "integer",
                 "minimum": 1,
-                "maximum": 64
+                "maximum": 65535
               }
             },
             "required": [
@@ -7201,7 +7135,6 @@
               "maxLength": 64
             },
             "minItems": 1,
-            "maxItems": 64,
             "uniqueItems": true
           },
           "errors_only": {
@@ -7214,7 +7147,9 @@
           "length": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 16384
+            "maximum": 32768,
+            "default": 8192,
+            "description": "Bytes to read; at most 32 KiB per call (hex output fits the 96 KiB MCP result bound), default 8 KiB (fits the 24 KiB default target). Continue at the next address."
           },
           "command": {
             "type": "string",
@@ -7235,7 +7170,7 @@
           "frame": {
             "type": "integer",
             "minimum": 0,
-            "maximum": 10000
+            "maximum": 2147483647
           },
           "max_items": {
             "type": "integer",
@@ -7307,7 +7242,6 @@
                     ]
                   },
                   "minItems": 1,
-                  "maxItems": 32,
                   "uniqueItems": true
                 },
                 "max_packets": {
@@ -7315,15 +7249,9 @@
                   "minimum": 1,
                   "maximum": 100
                 },
-                "max_scan_bytes": {
-                  "type": "integer",
-                  "minimum": 1,
-                  "maximum": 1073741824,
-                  "description": "Logical scan budget: sum of captured lengths of all visited saved records, including nonmatches. Full bounded source authentication still completes after a logical cap. The API ceiling does not qualify larger sources."
-                },
                 "packet_filter": {
                   "type": "string",
-                  "maxLength": 512,
+                  "maxLength": 4096,
                   "description": "Supported tcpdump/libpcap packet-filter subset; no name resolution or bracket predicates. Omitted or empty means no packet-filter restriction. This is not Wireshark display-filter syntax."
                 },
                 "start_time": {
@@ -7366,12 +7294,12 @@
                     "offset": {
                       "type": "integer",
                       "minimum": 0,
-                      "maximum": 1499
+                      "maximum": 65534
                     },
                     "length": {
                       "type": "integer",
                       "minimum": 1,
-                      "maximum": 64
+                      "maximum": 65535
                     }
                   },
                   "required": [
@@ -7379,6 +7307,11 @@
                     "length"
                   ],
                   "description": "Raw-only actual saved-frame byte window. Offset plus length must not exceed 1500. Missing bytes remain unavailable; no padding or inferred payload start."
+                },
+                "cursor": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
                 }
               },
               "required": [
@@ -7387,8 +7320,7 @@
                 "artifact_id",
                 "idempotency_key",
                 "fields",
-                "max_packets",
-                "max_scan_bytes"
+                "max_packets"
               ],
               "allOf": [
                 {
@@ -7468,7 +7400,6 @@
                     "maxLength": 64
                   },
                   "minItems": 1,
-                  "maxItems": 64,
                   "uniqueItems": true
                 },
                 "errors_only": {
@@ -7531,7 +7462,9 @@
                 "length": {
                   "type": "integer",
                   "minimum": 1,
-                  "maximum": 16384
+                  "maximum": 32768,
+                  "default": 8192,
+                  "description": "Bytes to read; at most 32 KiB per call (hex output fits the 96 KiB MCP result bound), default 8 KiB (fits the 24 KiB default target). Continue at the next address."
                 }
               },
               "required": [
@@ -7539,8 +7472,7 @@
                 "case_id",
                 "artifact_id",
                 "idempotency_key",
-                "address",
-                "length"
+                "address"
               ]
             }
           },
@@ -7599,7 +7531,7 @@
                 "frame": {
                   "type": "integer",
                   "minimum": 0,
-                  "maximum": 10000
+                  "maximum": 2147483647
                 },
                 "max_items": {
                   "type": "integer",
@@ -7665,7 +7597,6 @@
                           ]
                         },
                         "minItems": 1,
-                        "maxItems": 32,
                         "uniqueItems": true
                       },
                       "rows": {
@@ -7674,14 +7605,12 @@
                         "items": {
                           "type": "array",
                           "minItems": 1,
-                          "maxItems": 32,
                           "items": {
                             "type": [
                               "string",
                               "integer",
                               "null"
                             ],
-                            "maxLength": 128,
                             "minimum": 0,
                             "maximum": 4294967295
                           }
@@ -7691,7 +7620,8 @@
                       "scanned_bytes": {
                         "type": "integer",
                         "minimum": 0,
-                        "maximum": 1073741824
+                        "maximum": 9007199254740991,
+                        "description": "Captured bytes of saved records visited by this call, including nonmatches."
                       },
                       "scanned_packets": {
                         "type": "integer",
@@ -7881,7 +7811,7 @@
                       "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 1000000000
+                        "maximum": 9007199254740991
                       },
                       "query_observed_at": {
                         "type": "string",
@@ -7946,7 +7876,7 @@
                       "retry_after_seconds": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 2147483647
                       }
                     },
                     "required": [
@@ -8000,12 +7930,12 @@
                       "value": {
                         "type": "string",
                         "pattern": "^[a-f0-9]*$",
-                        "maxLength": 32768
+                        "maxLength": 65536
                       },
                       "bytes_returned": {
                         "type": "integer",
                         "minimum": 0,
-                        "maximum": 16384
+                        "maximum": 32768
                       }
                     },
                     "required": [
@@ -8039,7 +7969,7 @@
                       "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 1000000000
+                        "maximum": 9007199254740991
                       }
                     },
                     "required": [
@@ -8074,8 +8004,7 @@
                           "type": "string",
                           "minLength": 1,
                           "maxLength": 64
-                        },
-                        "maxItems": 16
+                        }
                       },
                       "rows": {
                         "type": "array",
@@ -8088,8 +8017,7 @@
                               "boolean",
                               "null"
                             ]
-                          },
-                          "maxItems": 16
+                          }
                         },
                         "maxItems": 100
                       }
@@ -8132,7 +8060,7 @@
           "after_revision": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 1000000000,
+            "maximum": 9007199254740991,
             "description": "Wait server-side until the state revision differs from this value or 30 seconds pass, then return the current state. Omit for an immediate read. Status reads are never charged."
           }
         },
@@ -8213,7 +8141,7 @@
                       "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 1000000000
+                        "maximum": 9007199254740991
                       },
                       "query_observed_at": {
                         "type": "string",
@@ -8278,7 +8206,7 @@
                       "retry_after_seconds": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 2147483647
                       }
                     },
                     "required": [
@@ -8416,7 +8344,6 @@
                                 "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/recipient"
                               },
                               "minItems": 1,
-                              "maxItems": 8,
                               "uniqueItems": true
                             },
                             "origin": {
@@ -8485,12 +8412,12 @@
                             "registered_captures": {
                               "type": "integer",
                               "minimum": 0,
-                              "maximum": 100
+                              "maximum": 9007199254740991
                             },
                             "max_captures": {
                               "type": "integer",
                               "minimum": 1,
-                              "maximum": 100
+                              "maximum": 9007199254740991
                             }
                           },
                           "required": [
@@ -8535,7 +8462,7 @@
                       "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 1000000000
+                        "maximum": 9007199254740991
                       }
                     },
                     "required": [
@@ -8588,7 +8515,7 @@
                       "retry_after_seconds": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 2147483647
                       }
                     },
                     "required": [
@@ -8630,7 +8557,6 @@
             "items": {
               "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/artifactRef"
             },
-            "maxItems": 64,
             "minItems": 1
           },
           "recipients": {
@@ -8698,7 +8624,7 @@
           "reason": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 512
+            "maxLength": 4096
           },
           "idempotency_key": {
             "type": "string",
@@ -8780,7 +8706,7 @@
                       "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 1000000000
+                        "maximum": 9007199254740991
                       }
                     },
                     "required": [
@@ -8833,7 +8759,7 @@
                       "retry_after_seconds": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 2147483647
                       }
                     },
                     "required": [
@@ -8873,7 +8799,7 @@
           "expected_revision": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 1000000000
+            "maximum": 9007199254740991
           },
           "idempotency_key": {
             "type": "string",
@@ -8928,7 +8854,7 @@
                       "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 1000000000
+                        "maximum": 9007199254740991
                       },
                       "sharing_intent_id": {
                         "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/uuid"
@@ -8975,7 +8901,7 @@
                       "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 1000000000
+                        "maximum": 9007199254740991
                       }
                     },
                     "required": [
@@ -9028,7 +8954,7 @@
                       "retry_after_seconds": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 2147483647
                       }
                     },
                     "required": [
@@ -9067,7 +8993,7 @@
           "expected_revision": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 1000000000
+            "maximum": 9007199254740991
           },
           "idempotency_key": {
             "type": "string",
@@ -9107,7 +9033,7 @@
                       "revision": {
                         "type": "integer",
                         "minimum": 2,
-                        "maximum": 1000000000
+                        "maximum": 9007199254740991
                       }
                     },
                     "required": [
@@ -9161,7 +9087,7 @@
                       "retry_after_seconds": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 2147483647
                       }
                     },
                     "required": [
@@ -9201,7 +9127,7 @@
           "expected_revision": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 1000000000
+            "maximum": 9007199254740991
           },
           "idempotency_key": {
             "type": "string",
@@ -9264,7 +9190,7 @@
                       "revision": {
                         "type": "integer",
                         "minimum": 2,
-                        "maximum": 1000000000
+                        "maximum": 9007199254740991
                       },
                       "sharing_intent_id": {
                         "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/uuid"
@@ -9275,7 +9201,6 @@
                           "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/recipient"
                         },
                         "minItems": 1,
-                        "maxItems": 8,
                         "uniqueItems": true
                       }
                     },
@@ -9321,7 +9246,7 @@
                       "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 1000000000
+                        "maximum": 9007199254740991
                       }
                     },
                     "required": [
@@ -9374,7 +9299,7 @@
                       "retry_after_seconds": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 2147483647
                       }
                     },
                     "required": [
@@ -9427,7 +9352,7 @@
           "reason": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 512
+            "maxLength": 4096
           },
           "idempotency_key": {
             "type": "string",
@@ -9513,7 +9438,7 @@
               "reason": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 512
+                "maxLength": 4096
               },
               "sharing": {
                 "$ref": "https://asservat.io/spec/v1/sharing-request.schema.json#/$defs/capture"
@@ -9993,7 +9918,7 @@
                       "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 1000000000
+                        "maximum": 9007199254740991
                       }
                     },
                     "required": [
@@ -10046,7 +9971,7 @@
                       "retry_after_seconds": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 2147483647
                       }
                     },
                     "required": [
@@ -10161,7 +10086,7 @@
                             "available_pods": {
                               "type": "integer",
                               "minimum": 0,
-                              "maximum": 1000
+                              "maximum": 9007199254740991
                             },
                             "coverage_limited": {
                               "type": "boolean"
@@ -10209,7 +10134,7 @@
                       "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 1000000000
+                        "maximum": 9007199254740991
                       }
                     },
                     "required": [
@@ -10262,7 +10187,7 @@
                       "retry_after_seconds": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 2147483647
                       }
                     },
                     "required": [
@@ -10427,8 +10352,7 @@
                             },
                             "description": {
                               "type": "string",
-                              "minLength": 1,
-                              "maxLength": 512
+                              "minLength": 1
                             },
                             "approval_required": {
                               "type": "boolean"
@@ -10450,7 +10374,7 @@
                                   "message": {
                                     "type": "string",
                                     "minLength": 1,
-                                    "maxLength": 256
+                                    "maxLength": 1024
                                   },
                                   "responsible_role": {
                                     "enum": [
@@ -10471,8 +10395,7 @@
                                   "retryable"
                                 ]
                               },
-                              "minItems": 0,
-                              "maxItems": 16
+                              "minItems": 0
                             },
                             "preset_ref": {
                               "type": "object",
@@ -10509,8 +10432,7 @@
                             },
                             "display_name": {
                               "type": "string",
-                              "minLength": 1,
-                              "maxLength": 128
+                              "minLength": 1
                             },
                             "execution_modes": {
                               "type": "array",
@@ -10671,7 +10593,7 @@
                       "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 1000000000
+                        "maximum": 9007199254740991
                       }
                     },
                     "required": [
@@ -10724,7 +10646,7 @@
                       "retry_after_seconds": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 2147483647
                       }
                     },
                     "required": [
@@ -10825,7 +10747,7 @@
           "reason": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 512
+            "maxLength": 4096
           },
           "sharing": {
             "$ref": "https://asservat.io/spec/v1/sharing-request.schema.json#/$defs/capture"
@@ -11155,17 +11077,17 @@
                       "pod_count": {
                         "type": "integer",
                         "minimum": 0,
-                        "maximum": 100
+                        "maximum": 9007199254740991
                       },
                       "max_bytes": {
                         "type": "integer",
                         "minimum": 0,
-                        "maximum": 109951162777600
+                        "maximum": 9007199254740991
                       },
                       "max_process_starts": {
                         "type": "integer",
                         "minimum": 0,
-                        "maximum": 10000
+                        "maximum": 9007199254740991
                       },
                       "approval_required": {
                         "type": "boolean"
@@ -11187,7 +11109,7 @@
                             "message": {
                               "type": "string",
                               "minLength": 1,
-                              "maxLength": 256
+                              "maxLength": 1024
                             },
                             "responsible_role": {
                               "enum": [
@@ -11208,8 +11130,7 @@
                             "retryable"
                           ]
                         },
-                        "minItems": 0,
-                        "maxItems": 32
+                        "minItems": 0
                       },
                       "warnings": {
                         "type": "array",
@@ -11218,8 +11139,7 @@
                           "minLength": 1,
                           "maxLength": 256
                         },
-                        "minItems": 0,
-                        "maxItems": 32
+                        "minItems": 0
                       },
                       "navigation_uri": {
                         "type": "string",
@@ -11318,7 +11238,6 @@
                       "selected_pods": {
                         "type": "array",
                         "minItems": 1,
-                        "maxItems": 100,
                         "uniqueItems": true,
                         "items": {
                           "type": "object",
@@ -11390,7 +11309,6 @@
                       },
                       "result_access_actions": {
                         "type": "array",
-                        "maxItems": 16,
                         "description": "Advisory follow-up access choices for this exact reviewed raw plan. Current authority, retained source and selected operations are checked again on submission. Absence grants no access.",
                         "items": {
                           "type": "object",
@@ -11554,7 +11472,7 @@
                       "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 1000000000
+                        "maximum": 9007199254740991
                       }
                     },
                     "required": [
@@ -11607,7 +11525,7 @@
                       "retry_after_seconds": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 2147483647
                       }
                     },
                     "required": [
@@ -11672,7 +11590,7 @@
           "after_revision": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 1000000000,
+            "maximum": 9007199254740991,
             "description": "Wait server-side until the state revision differs from this value or 30 seconds pass, then return the current state. Omit for an immediate read. Status reads are never charged."
           }
         },
@@ -11704,7 +11622,7 @@
                       "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 1000000000
+                        "maximum": 9007199254740991
                       },
                       "phase": {
                         "enum": [
@@ -11793,8 +11711,7 @@
                             ]
                           }
                         },
-                        "minItems": 0,
-                        "maxItems": 16
+                        "minItems": 0
                       },
                       "case_id": {
                         "type": "string",
@@ -11831,7 +11748,7 @@
                             "message": {
                               "type": "string",
                               "minLength": 1,
-                              "maxLength": 256
+                              "maxLength": 1024
                             },
                             "responsible_role": {
                               "enum": [
@@ -11852,8 +11769,7 @@
                             "retryable"
                           ]
                         },
-                        "minItems": 0,
-                        "maxItems": 32
+                        "minItems": 0
                       },
                       "repeated_from_capture_id": {
                         "type": "string",
@@ -11901,7 +11817,7 @@
                       "reason": {
                         "type": "string",
                         "minLength": 1,
-                        "maxLength": 512,
+                        "maxLength": 4096,
                         "description": "Authorized parent Save reason, preserved verbatim; never restored on repeat."
                       },
                       "reason_state": {
@@ -11989,7 +11905,7 @@
                       "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 1000000000
+                        "maximum": 9007199254740991
                       }
                     },
                     "required": [
@@ -12042,7 +11958,7 @@
                       "retry_after_seconds": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 2147483647
                       }
                     },
                     "required": [
@@ -12082,7 +11998,7 @@
           "expected_revision": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 1000000000
+            "maximum": 9007199254740991
           },
           "idempotency_key": {
             "type": "string",
@@ -12136,7 +12052,7 @@
                       "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 1000000000
+                        "maximum": 9007199254740991
                       },
                       "cancellation_requested": {
                         "type": "boolean"
@@ -12179,7 +12095,7 @@
                       "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 1000000000
+                        "maximum": 9007199254740991
                       }
                     },
                     "required": [
@@ -12232,7 +12148,7 @@
                       "retry_after_seconds": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 2147483647
                       }
                     },
                     "required": [
@@ -12335,7 +12251,7 @@
                       "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 1000000000
+                        "maximum": 9007199254740991
                       }
                     },
                     "required": [
@@ -12388,7 +12304,7 @@
                       "retry_after_seconds": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 2147483647
                       }
                     },
                     "required": [
@@ -12446,7 +12362,6 @@
               "format": "uuid"
             },
             "minItems": 1,
-            "maxItems": 4,
             "uniqueItems": true
           },
           "preferences": {
@@ -12456,12 +12371,12 @@
               "history_seconds": {
                 "type": "integer",
                 "minimum": 1,
-                "maximum": 3600
+                "maximum": 9007199254740991
               },
               "max_bytes": {
                 "type": "integer",
                 "minimum": 1,
-                "maximum": 109951162777600
+                "maximum": 9007199254740991
               },
               "max_impact": {
                 "enum": [
@@ -12473,7 +12388,7 @@
               "max_ring_bytes": {
                 "type": "integer",
                 "minimum": 1,
-                "maximum": 26843545600
+                "maximum": 9007199254740991
               }
             },
             "required": []
@@ -12491,7 +12406,6 @@
                   "maxLength": 128
                 },
                 "minItems": 1,
-                "maxItems": 16,
                 "uniqueItems": true
               },
               "flow_refs": {
@@ -12502,7 +12416,6 @@
                   "maxLength": 128
                 },
                 "minItems": 1,
-                "maxItems": 16,
                 "uniqueItems": true
               }
             }
@@ -12561,7 +12474,7 @@
                       "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 1000000000
+                        "maximum": 9007199254740991
                       }
                     },
                     "required": [
@@ -12614,7 +12527,7 @@
                       "retry_after_seconds": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 2147483647
                       }
                     },
                     "required": [
@@ -12832,7 +12745,7 @@
                       "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 1000000000
+                        "maximum": 9007199254740991
                       }
                     },
                     "required": [
@@ -12885,7 +12798,7 @@
                       "retry_after_seconds": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 2147483647
                       }
                     },
                     "required": [
@@ -12907,7 +12820,7 @@
     },
     {
       "name": "get_capture_settings",
-      "description": "Read an authorized immutable parameter snapshot for editing/review. Strings are untrusted; excludes old grants, secrets, reason and sharing. MCP keeps its standard byte cap: SettingsTooLarge returns browser navigation, and repeat by reference remains possible without downloading settings. The authenticated browser has a fixed server-owned 160 KiB response budget on the same authorization/audit path for this operation only.",
+      "description": "Read an authorized immutable parameter snapshot for editing/review. Strings are untrusted; excludes old grants, secrets, reason and sharing. Settings larger than the 96 KiB MCP result bound return SettingsTooLarge with browser navigation, and repeat by reference remains possible without downloading settings. The browser has no response byte ceiling.",
       "enabledByDefault": true,
       "annotations": {
         "readOnlyHint": true,
@@ -12977,7 +12890,7 @@
                       "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 1000000000
+                        "maximum": 9007199254740991
                       }
                     },
                     "required": [
@@ -13030,7 +12943,7 @@
                       "retry_after_seconds": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 2147483647
                       }
                     },
                     "required": [
@@ -13195,7 +13108,7 @@
                       "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 1000000000
+                        "maximum": 9007199254740991
                       }
                     },
                     "required": [
@@ -13248,7 +13161,7 @@
                       "retry_after_seconds": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 2147483647
                       }
                     },
                     "required": [
@@ -13382,7 +13295,7 @@
                       "revision": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 1000000000
+                        "maximum": 9007199254740991
                       }
                     },
                     "required": [
@@ -13435,7 +13348,7 @@
                       "retry_after_seconds": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 2147483647
                       }
                     },
                     "required": [
@@ -13523,7 +13436,7 @@
           "expected_revision": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 1000000000
+            "maximum": 9007199254740991
           },
           "mode": {
             "enum": [
@@ -13759,7 +13672,7 @@
                 "expected_revision": {
                   "type": "integer",
                   "minimum": 1,
-                  "maximum": 1000000000
+                  "maximum": 9007199254740991
                 },
                 "idempotency_key": {
                   "type": "string",
@@ -13821,7 +13734,7 @@
                 "expected_revision": {
                   "type": "integer",
                   "minimum": 1,
-                  "maximum": 1000000000
+                  "maximum": 9007199254740991
                 },
                 "idempotency_key": {
                   "type": "string",
@@ -13903,7 +13816,7 @@
                       "retry_after_seconds": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 2147483647
                       }
                     },
                     "required": [
@@ -13987,7 +13900,7 @@
           "after_revision": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 1000000000,
+            "maximum": 9007199254740991,
             "description": "Wait server-side until the state revision differs from this value or 30 seconds pass, then return the current state. Omit for an immediate read. Status reads are never charged."
           }
         },
@@ -14063,7 +13976,7 @@
                 "after_revision": {
                   "type": "integer",
                   "minimum": 1,
-                  "maximum": 1000000000,
+                  "maximum": 9007199254740991,
                   "description": "Wait server-side until the state revision differs from this value or 30 seconds pass, then return the current state. Omit for an immediate read. Status reads are never charged."
                 }
               },
@@ -14179,7 +14092,7 @@
                       "retry_after_seconds": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 2147483647
                       }
                     },
                     "required": [
@@ -14342,7 +14255,7 @@
                       "retry_after_seconds": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 2147483647
                       }
                     },
                     "required": [
@@ -14451,7 +14364,7 @@
                       "generation": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 2147483647
+                        "maximum": 9007199254740991
                       },
                       "expires_at": {
                         "type": "string",
@@ -14481,11 +14394,6 @@
                         "minimum": 0,
                         "maximum": 2147483647
                       },
-                      "max_executions": {
-                        "type": "integer",
-                        "minimum": 1,
-                        "maximum": 10000
-                      },
                       "watched_pods": {
                         "type": "integer",
                         "minimum": 0,
@@ -14503,7 +14411,6 @@
                       },
                       "recent": {
                         "type": "array",
-                        "maxItems": 8,
                         "items": {
                           "type": "object",
                           "additionalProperties": false,
@@ -14653,7 +14560,6 @@
                           },
                           "exit_codes": {
                             "type": "array",
-                            "maxItems": 16,
                             "items": {
                               "type": "integer",
                               "minimum": 0,
@@ -14670,12 +14576,12 @@
                           "minimum_failures": {
                             "type": "integer",
                             "minimum": 1,
-                            "maximum": 1000
+                            "maximum": 2147483647
                           },
                           "window_seconds": {
                             "type": "integer",
                             "minimum": 30,
-                            "maximum": 300
+                            "maximum": 9007199254740991
                           },
                           "match": {
                             "enum": [
@@ -14710,7 +14616,7 @@
                           "sample_interval_seconds": {
                             "type": "integer",
                             "minimum": 30,
-                            "maximum": 300
+                            "maximum": 9007199254740991
                           }
                         },
                         "required": [
@@ -14740,12 +14646,12 @@
                           "shared_captures": {
                             "type": "integer",
                             "minimum": 0,
-                            "maximum": 100
+                            "maximum": 9007199254740991
                           },
                           "max_captures": {
                             "type": "integer",
                             "minimum": 1,
-                            "maximum": 100,
+                            "maximum": 9007199254740991,
                             "description": "Optional bound; recurring sharing otherwise lasts as long as the policy grant."
                           },
                           "not_after": {
@@ -14759,7 +14665,7 @@
                           "revision": {
                             "type": "integer",
                             "minimum": 1,
-                            "maximum": 1000000000
+                            "maximum": 9007199254740991
                           },
                           "stopped_at": {
                             "type": "string",
@@ -14777,25 +14683,25 @@
                       "collected_bytes_spent": {
                         "type": "integer",
                         "minimum": 0,
-                        "maximum": 1099511627776,
+                        "maximum": 9007199254740991,
                         "description": "Native-output charges shared by this acceptance; a reservation is released when its outcome is known. Not measured bytes."
                       },
                       "max_collected_bytes": {
                         "type": "integer",
                         "minimum": 0,
-                        "maximum": 1099511627776,
+                        "maximum": 9007199254740991,
                         "description": "Original accepted cumulative native-output ceiling, shared across grant replacements and controls."
                       },
                       "observed_bytes_spent": {
                         "type": "integer",
                         "minimum": 0,
-                        "maximum": 1099511627776,
+                        "maximum": 9007199254740991,
                         "description": "Pre-filter observation charges shared by this acceptance. Not collected output."
                       },
                       "max_observed_bytes": {
                         "type": "integer",
                         "minimum": 0,
-                        "maximum": 1099511627776,
+                        "maximum": 9007199254740991,
                         "description": "Original accepted cumulative pre-filter observation ceiling; zero permits no continuing acquisition."
                       },
                       "collection_kind": {
@@ -14813,22 +14719,16 @@
                         "format": "uuid",
                         "description": "Grant named by the current attachment pointer; does not assert that its authority, budget or recorder readiness currently permits collection."
                       },
-                      "max_grant_starts": {
-                        "type": "integer",
-                        "minimum": 1,
-                        "maximum": 10000,
-                        "description": "Server-derived ceiling in action-start units for the currently accepted policy grant plan. Policy executions remain a separate once-per-Save counter."
-                      },
                       "max_observed_events": {
                         "type": "integer",
                         "minimum": 0,
-                        "maximum": 1000000000,
+                        "maximum": 9007199254740991,
                         "description": "Cumulative eligible entry and exit probe ceiling; zero or absent grants no argument observation."
                       },
                       "observed_events_spent": {
                         "type": "integer",
                         "minimum": 0,
-                        "maximum": 1000000000,
+                        "maximum": 9007199254740991,
                         "description": "Charged event units."
                       },
                       "renewal_due": {
@@ -14896,7 +14796,7 @@
                       "retry_after_seconds": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 2147483647
                       }
                     },
                     "required": [
@@ -15079,7 +14979,6 @@
                       },
                       "assignments": {
                         "type": "array",
-                        "maxItems": 32,
                         "items": {
                           "type": "object",
                           "additionalProperties": false,
@@ -15134,12 +15033,13 @@
                             "basis_uid",
                             "revision"
                           ]
-                        }
+                        },
+                        "description": "All of the caller's contributing assignments; bounded by the caller's AccessBinding and PermissionSource objects, so the list is not paged."
                       },
                       "assignments_total": {
                         "type": "integer",
                         "minimum": 0,
-                        "maximum": 256
+                        "maximum": 9007199254740991
                       }
                     },
                     "required": [
@@ -15196,7 +15096,7 @@
                       "retry_after_seconds": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 2147483647
                       }
                     },
                     "required": [
@@ -15218,7 +15118,7 @@
     },
     {
       "name": "preview_access_change",
-      "description": "Preview the effect of proposed AccessBinding and PermissionSource changes before applying them through Kubernetes (ADR-237). For each workload scope of the affected namespaces (at most 1,000) within your administration, reports which users, groups or workloads named by the added or removed assignments would change between Allow, Deny and Indeterminate for capture, read and download, with the assignment revisions that decide each side, evaluated by the same rules as the operations themselves over the current accepted permission data. Targets whose permission data is unavailable or outside the enrolled clusters, and PermissionSource creations or edits whose namespace metadata the accepted observation lacks, are Indeterminate. Namespace-metadata sources are evaluated against the accepted namespace observation (ADR-242). The result is bounded to 256 KiB and delivered in pages: repeat the same request with next_cursor. Group members are never listed and no evidence is read. For fleet operators and configured delegation previewers; it changes nothing: apply the change with kubectl or GitOps.",
+      "description": "Preview the effect of proposed AccessBinding and PermissionSource changes before applying them through Kubernetes (ADR-237). For each workload scope of the affected namespaces within your administration, reports which users, groups or workloads named by the added or removed assignments would change between Allow, Deny and Indeterminate for capture, read and download, with the assignment revisions that decide each side, evaluated by the same rules as the operations themselves over the current accepted permission data. Targets whose permission data is unavailable or outside the enrolled clusters, and PermissionSource creations or edits whose namespace metadata the accepted observation lacks, are Indeterminate. Namespace-metadata sources are evaluated against the accepted namespace observation (ADR-242). The result is delivered in pages that end at the MCP result bound: repeat the same request with next_cursor. Group members are never listed and no evidence is read. For fleet operators and configured delegation previewers; it changes nothing: apply the change with kubectl or GitOps.",
       "enabledByDefault": true,
       "transports": [
         "browser"
@@ -15235,7 +15135,6 @@
           "changes": {
             "type": "array",
             "minItems": 1,
-            "maxItems": 16,
             "items": {
               "oneOf": [
                 {
@@ -15413,7 +15312,7 @@
                       "targets_evaluated": {
                         "type": "integer",
                         "minimum": 0,
-                        "maximum": 1000
+                        "maximum": 9007199254740991
                       },
                       "fresh_until": {
                         "type": "string",
@@ -15426,7 +15325,7 @@
                       "unavailable_total": {
                         "type": "integer",
                         "minimum": 0,
-                        "maximum": 1000
+                        "maximum": 9007199254740991
                       },
                       "listed_rows": {
                         "type": "integer",
@@ -15438,7 +15337,6 @@
                       },
                       "unavailable": {
                         "type": "array",
-                        "maxItems": 1000,
                         "items": {
                           "type": "object",
                           "additionalProperties": false,
@@ -15483,7 +15381,6 @@
                       },
                       "deltas": {
                         "type": "array",
-                        "maxItems": 4096,
                         "items": {
                           "type": "object",
                           "additionalProperties": false,
@@ -15551,7 +15448,6 @@
                             },
                             "before_basis": {
                               "type": "array",
-                              "maxItems": 8,
                               "items": {
                                 "type": "object",
                                 "additionalProperties": false,
@@ -15604,7 +15500,6 @@
                             },
                             "after_basis": {
                               "type": "array",
-                              "maxItems": 8,
                               "items": {
                                 "type": "object",
                                 "additionalProperties": false,
@@ -15676,7 +15571,6 @@
                       },
                       "not_evaluated": {
                         "type": "array",
-                        "maxItems": 16,
                         "items": {
                           "type": "object",
                           "additionalProperties": false,
@@ -15716,7 +15610,6 @@
                       },
                       "unmatched": {
                         "type": "array",
-                        "maxItems": 16,
                         "items": {
                           "type": "object",
                           "additionalProperties": false,
@@ -15799,7 +15692,7 @@
                       "retry_after_seconds": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 2147483647
                       }
                     },
                     "required": [
@@ -15908,7 +15801,7 @@
                       "retry_after_seconds": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 2147483647
                       }
                     },
                     "required": [
@@ -16014,7 +15907,7 @@
                       "retry_after_seconds": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 2147483647
                       }
                     },
                     "required": [
@@ -16173,7 +16066,7 @@
                       "retry_after_seconds": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 2147483647
                       }
                     },
                     "required": [
@@ -16195,7 +16088,7 @@
     },
     {
       "name": "preview_retention_change",
-      "description": "Preview how proposed EvidenceRetentionPolicy changes would shorten the retention of evidence already stored, before applying them through Kubernetes (ADR-240). Applies the proposal to the latest accepted policies of the hub (no source_cluster_id) or of one cluster's local source exactly as reconciliation will after acceptance, over at most 10,000 retained artifacts whose deletion is not yet due: affected artifacts per cluster and class, how many would become unreadable or due for deletion at once, and the earliest new access end and deletion dates. A longer limit never moves an already bound date. Artifacts for which a newly selected label selector would need historical labels are Unknown, never assumed; clusters whose policy source is not current are listed as incomplete. For fleet operators; it changes nothing: apply the change with kubectl or GitOps.",
+      "description": "Preview how proposed EvidenceRetentionPolicy changes would shorten the retention of evidence already stored, before applying them through Kubernetes (ADR-240). Applies the proposal to the latest accepted policies of the hub (no source_cluster_id) or of one cluster's local source exactly as reconciliation will after acceptance, over all retained artifacts whose deletion is not yet due (one aggregate over the stored deadlines): affected artifacts per cluster and class, how many would become unreadable or due for deletion at once, and the earliest new access end and deletion dates. A longer limit never moves an already bound date. Artifacts for which a newly selected label selector would need historical labels are Unknown, never assumed; clusters whose policy source is not current are listed as incomplete. Groups and incomplete clusters are paged: repeat the same request with next_cursor. For fleet operators; it changes nothing: apply the change with kubectl or GitOps.",
       "enabledByDefault": true,
       "transports": [
         "browser"
@@ -16212,7 +16105,6 @@
           "changes": {
             "type": "array",
             "minItems": 1,
-            "maxItems": 16,
             "items": {
               "oneOf": [
                 {
@@ -16285,6 +16177,11 @@
                 }
               ]
             }
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
           }
         },
         "required": [
@@ -16323,7 +16220,7 @@
                       "artifacts_scanned": {
                         "type": "integer",
                         "minimum": 0,
-                        "maximum": 10000
+                        "maximum": 9007199254740991
                       },
                       "scan_limited": {
                         "type": "boolean"
@@ -16331,22 +16228,22 @@
                       "affected_total": {
                         "type": "integer",
                         "minimum": 0,
-                        "maximum": 10000
+                        "maximum": 9007199254740991
                       },
                       "read_closed_total": {
                         "type": "integer",
                         "minimum": 0,
-                        "maximum": 10000
+                        "maximum": 9007199254740991
                       },
                       "deletion_due_total": {
                         "type": "integer",
                         "minimum": 0,
-                        "maximum": 10000
+                        "maximum": 9007199254740991
                       },
                       "unknown_total": {
                         "type": "integer",
                         "minimum": 0,
-                        "maximum": 10000
+                        "maximum": 9007199254740991
                       },
                       "earliest_expires_at": {
                         "type": "string",
@@ -16361,7 +16258,6 @@
                       },
                       "groups": {
                         "type": "array",
-                        "maxItems": 32,
                         "items": {
                           "type": "object",
                           "additionalProperties": false,
@@ -16396,27 +16292,27 @@
                             "scanned": {
                               "type": "integer",
                               "minimum": 0,
-                              "maximum": 10000
+                              "maximum": 9007199254740991
                             },
                             "affected": {
                               "type": "integer",
                               "minimum": 0,
-                              "maximum": 10000
+                              "maximum": 9007199254740991
                             },
                             "read_closed": {
                               "type": "integer",
                               "minimum": 0,
-                              "maximum": 10000
+                              "maximum": 9007199254740991
                             },
                             "deletion_due": {
                               "type": "integer",
                               "minimum": 0,
-                              "maximum": 10000
+                              "maximum": 9007199254740991
                             },
                             "unknown": {
                               "type": "integer",
                               "minimum": 0,
-                              "maximum": 10000
+                              "maximum": 9007199254740991
                             },
                             "earliest_expires_at": {
                               "type": "string",
@@ -16442,11 +16338,10 @@
                       "groups_total": {
                         "type": "integer",
                         "minimum": 0,
-                        "maximum": 20000
+                        "maximum": 9007199254740991
                       },
                       "incomplete_clusters": {
                         "type": "array",
-                        "maxItems": 32,
                         "items": {
                           "type": "object",
                           "additionalProperties": false,
@@ -16470,11 +16365,10 @@
                       "incomplete_total": {
                         "type": "integer",
                         "minimum": 0,
-                        "maximum": 20000
+                        "maximum": 9007199254740991
                       },
                       "not_evaluated": {
                         "type": "array",
-                        "maxItems": 16,
                         "items": {
                           "type": "object",
                           "additionalProperties": false,
@@ -16572,7 +16466,7 @@
                       "retry_after_seconds": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 60
+                        "maximum": 2147483647
                       }
                     },
                     "required": [

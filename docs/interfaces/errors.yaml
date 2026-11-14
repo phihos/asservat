@@ -20,4 +20,3 @@ errors:
   - {code: ReviewChanged, http_status: 409, retry: after-fresh-review, action: review-changes, copy: The plan changed since your review; review the differences before submitting again.}
   - {code: NoCurrentSource, http_status: 409, retry: after-source-starts, action: list-recordings, copy: No matching recording runs on the workload now; choose a current recording to save.}
   - {code: SharingApprovalRequired, http_status: 403, retry: after-independent-review, action: open-own-review, copy: This evidence selection needs sharing approval.}
-  - {code: SharingCapacityUnavailable, http_status: 429, retry: bounded-retry-time-if-known, action: review-sharing-limits, copy: Bounded sharing capacity is unavailable.}

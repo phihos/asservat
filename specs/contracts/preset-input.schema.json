@@ -162,7 +162,7 @@
         "reason": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 512
+          "maxLength": 4096
         },
         "retention": {
           "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/duration"

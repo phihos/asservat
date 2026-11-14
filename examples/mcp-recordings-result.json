@@ -36,9 +36,7 @@
           "continuesAfterCreatorLeaves": true,
           "notAfter": "2026-11-08T12:00:00Z",
           "limits": {
-            "maxExecutions": 100,
-            "maxBytes": 1099511627776,
-            "maxObservedBytes": 1099511627776
+            "maxBytes": 1099511627776
           },
           "state": "Ready",
           "reasonCodes": [],
@@ -81,9 +79,7 @@
           "continuesAfterCreatorLeaves": true,
           "notAfter": "2026-11-08T12:00:00Z",
           "limits": {
-            "maxExecutions": 100,
-            "maxBytes": 1099511627776,
-            "maxObservedBytes": 1099511627776
+            "maxBytes": 1099511627776
           },
           "state": "Ready",
           "reasonCodes": [],

@@ -8,7 +8,8 @@ retention to C-15 and atomic admission to C-21. Mechanisms follow
 [ADR-330](../decisions/330-event-driven-system-design.md) (D5, D7, D8, D9).
 
 The supported diagnostic is the exact `builtin-pod-status-v1` recipe: one
-whole-pod Kubernetes status projection with a 4096-byte native ceiling.
+whole-pod Kubernetes status projection, bounded by the 2 MiB API response cap
+(etcd's 1.5 MiB object limit plus JSON overhead).
 Unsupported recipes (`incident-context/v1`, logs, process lists, network
 counters) return a typed unavailable error before target resolution.
 
@@ -70,8 +71,8 @@ Recorders that need approval follow [ADR-252](../decisions/252-approved-capture-
 
 - The approval stores the reviewed plan and digest. The plan binds action
   durations, not an absolute preview deadline.
-- Submission by the same requester fixes one capture deadline within five
-  minutes and the grant's expiry, checks current target, eligibility, storage,
+- Submission by the same requester fixes one capture deadline within the
+  approved window and the grant's expiry (ADR-335 D5), checks current target, eligibility, storage,
   retention and assessment against the approved digest and admits. Admission
   checks the grant and its revocation in the same SQL transaction.
 - The administrator's approval-required setting is read once per submission; a

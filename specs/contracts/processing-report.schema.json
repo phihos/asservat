@@ -14,7 +14,7 @@
         "generation": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 2147483647
+          "maximum": 9007199254740991
         },
         "digest": {
           "type": "string",
@@ -65,7 +65,7 @@
         "ordinal": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 8
+          "maximum": 2147483647
         }
       },
       "required": [
@@ -85,7 +85,7 @@
         "ordinal": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 100
+          "maximum": 2147483647
         }
       },
       "required": [
@@ -132,7 +132,7 @@
             "limit": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 3,
+              "maximum": 100,
               "default": 3
             },
             "created_before": {
@@ -171,7 +171,7 @@
             "limit": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 3,
+              "maximum": 100,
               "default": 3
             },
             "created_before": {
@@ -212,7 +212,7 @@
             "limit": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 3,
+              "maximum": 100,
               "default": 3
             },
             "created_before": {
@@ -253,7 +253,7 @@
             "limit": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 3,
+              "maximum": 100,
               "default": 3
             },
             "created_before": {
@@ -294,7 +294,7 @@
             "limit": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 3,
+              "maximum": 100,
               "default": 3
             },
             "created_before": {
@@ -335,7 +335,7 @@
             "limit": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 3,
+              "maximum": 100,
               "default": 3
             },
             "created_before": {
@@ -376,7 +376,7 @@
             "limit": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 3,
+              "maximum": 100,
               "default": 3
             },
             "created_before": {
@@ -480,7 +480,6 @@
             "format": "uuid"
           },
           "minItems": 0,
-          "maxItems": 16,
           "uniqueItems": true
         },
         "anchor_at": {
@@ -624,7 +623,7 @@
         "ordinal": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 8
+          "maximum": 2147483647
         },
         "created_at": {
           "type": "string",
@@ -715,7 +714,7 @@
         "emitted_bytes": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 1152921504606846976
+          "maximum": 9007199254740991
         },
         "client_receipt": {
           "const": "unknown"
@@ -750,7 +749,7 @@
         "ordinal": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 100
+          "maximum": 2147483647
         },
         "name": {
           "type": "string",
@@ -804,7 +803,7 @@
         "output_bytes": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 1152921504606846976
+          "maximum": 9007199254740991
         },
         "client_receipt": {
           "const": "unknown"
@@ -1086,7 +1085,6 @@
             "maxLength": 128
           },
           "minItems": 1,
-          "maxItems": 8,
           "uniqueItems": true
         },
         "regions": {
@@ -1097,7 +1095,6 @@
             "maxLength": 128
           },
           "minItems": 0,
-          "maxItems": 16,
           "uniqueItems": true
         }
       },
@@ -1287,7 +1284,7 @@
         },
         "records": {
           "type": "array",
-          "maxItems": 3
+          "maxItems": 100
         },
         "next": {
           "$ref": "https://asservat.io/spec/v1/processing-report.schema.json#/$defs/Continuation"
@@ -1340,7 +1337,7 @@
                 "$ref": "https://asservat.io/spec/v1/processing-report.schema.json#/$defs/ArtifactRecord"
               },
               "minItems": 0,
-              "maxItems": 3
+              "maxItems": 100
             },
             "next": {
               "allOf": [
@@ -1393,7 +1390,7 @@
                 "$ref": "https://asservat.io/spec/v1/processing-report.schema.json#/$defs/ShareRecord"
               },
               "minItems": 0,
-              "maxItems": 3
+              "maxItems": 100
             },
             "next": {
               "allOf": [
@@ -1446,7 +1443,7 @@
                 "$ref": "https://asservat.io/spec/v1/processing-report.schema.json#/$defs/DownloadRecord"
               },
               "minItems": 0,
-              "maxItems": 3
+              "maxItems": 100
             },
             "next": {
               "allOf": [
@@ -1499,7 +1496,7 @@
                 "$ref": "https://asservat.io/spec/v1/processing-report.schema.json#/$defs/OperationRecord"
               },
               "minItems": 0,
-              "maxItems": 3
+              "maxItems": 100
             },
             "next": {
               "allOf": [
@@ -1552,7 +1549,7 @@
                 "$ref": "https://asservat.io/spec/v1/processing-report.schema.json#/$defs/RuleRecord"
               },
               "minItems": 0,
-              "maxItems": 3
+              "maxItems": 100
             },
             "next": {
               "allOf": [
@@ -1605,7 +1602,7 @@
                 "$ref": "https://asservat.io/spec/v1/processing-report.schema.json#/$defs/PathRecord"
               },
               "minItems": 0,
-              "maxItems": 3
+              "maxItems": 100
             },
             "next": {
               "allOf": [
@@ -1658,7 +1655,7 @@
                 "$ref": "https://asservat.io/spec/v1/processing-report.schema.json#/$defs/ProcessorRecord"
               },
               "minItems": 0,
-              "maxItems": 3
+              "maxItems": 100
             },
             "next": {
               "allOf": [
@@ -1750,7 +1747,7 @@
                     "retry_after_seconds": {
                       "type": "integer",
                       "minimum": 1,
-                      "maximum": 60
+                      "maximum": 2147483647
                     }
                   },
                   "required": [

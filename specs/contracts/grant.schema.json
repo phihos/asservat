@@ -140,7 +140,7 @@
         "reason": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 512
+          "maxLength": 4096
         },
         "notAfter": {
           "type": "string",
@@ -158,7 +158,8 @@
             "maxExecutions": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 9007199254740991
+              "maximum": 9007199254740991,
+              "description": "Query count of a raw-query grant (required there). Policy grants have no run count (ADR-335 D6): they are bounded by expiry and rate limits."
             },
             "maxDuration": {
               "type": "string",
@@ -168,7 +169,6 @@
           },
           "required": [
             "maxBytes",
-            "maxExecutions",
             "maxDuration"
           ]
         },
@@ -499,6 +499,42 @@
                   ]
                 }
               ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "grantType": {
+                "const": "rawQuery"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "limits": {
+                "required": [
+                  "maxExecutions"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "grantType": {
+                "const": "policy"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "limits": {
+                "properties": {
+                  "maxExecutions": false
+                }
+              }
             }
           }
         }

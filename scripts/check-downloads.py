@@ -94,8 +94,8 @@ checks += 3
 raw = validator(tools['request_raw_access']['inputSchema'])
 request = {'case_id': sample['artifact_id'], 'artifact_digests': ['a'*64], 'operations': ['download_artifact'], 'reason': 'Inspect with local GDB', 'max_bytes': 4 * 1024**3, 'expires_in_seconds': 3600, 'idempotency_key': 'download-access-1'}
 valid(raw, request)
-bad = copy.deepcopy(request); bad['operations'] = ['read_memory']; invalid(raw, bad)
-bad = copy.deepcopy(request); bad['max_bytes'] = 1099511627777; invalid(raw, bad)
+bad = copy.deepcopy(request); bad['operations'] = ['unknown_operation']; invalid(raw, bad)
+bad = copy.deepcopy(request); bad['max_bytes'] = 9007199254740992; invalid(raw, bad)
 for fixture in ('examples/download-get.json', 'examples/download-cancel.json'):
     value = read(fixture); valid(inputs, value)
     bad = copy.deepcopy(value); bad['actor'] = 'another-user'; invalid(inputs, bad)

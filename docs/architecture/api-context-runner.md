@@ -1,7 +1,8 @@
 # Regional API context execution
 
 The connector runs the [Kubernetes API context](api-context-execution.md) for
-its cluster. It captures only the fixed 4096-byte Pod status projection and
+its cluster. It captures only the fixed Pod status projection (bounded by the 2 MiB API
+response cap, see [the API context](api-context-execution.md)) and
 needs no Node, exec, Secret, log or container access.
 
 ## Flow

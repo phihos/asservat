@@ -112,7 +112,7 @@
         "deletionBudgetSeconds": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 86400
+          "maximum": 9007199254740991
         },
         "deleteBy": {
           "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/timestamp"
@@ -131,7 +131,7 @@
               "generation": {
                 "type": "integer",
                 "minimum": 1,
-                "maximum": 2147483647
+                "maximum": 9007199254740991
               },
               "digest": {
                 "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/hash"
@@ -144,7 +144,6 @@
             ]
           },
           "minItems": 1,
-          "maxItems": 64,
           "uniqueItems": true
         },
         "parentExpiresAt": {

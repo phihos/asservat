@@ -12,8 +12,11 @@ D10 and [ADR-335](../decisions/335-usable-by-default.md) D5, D6, D8 and D14.
 
 An automation-bearing AccessBinding in the application namespace it grants
 carries the typed `spec.automation` envelope (allowed action kinds and, for
-intrusive kinds, an execution count and grant period; its subjects are the
-sponsoring groups), as in ADR-329. Adding or changing `spec.automation`
+intrusive kinds, the grant period, administrator-configured with a default of
+90 days per ADR-335 D6; its subjects are the sponsoring groups), as in
+ADR-329. There is no execution count or lifetime byte budget: storms are
+bounded by the rate and concurrency limits (ADR-335 D8), the per-incident
+cap, the per-workload storage quota and retention. Adding or changing `spec.automation`
 requires `bind` on `accessroles.asservat.io` named `automation`, enforced by the
 Helm-rendered ValidatingAdmissionPolicy and aggregated into `admin` only when
 `permissions.aggregateAutomation` is set
@@ -28,7 +31,7 @@ namespace's envelope and that the sponsoring groups hold `workload-maintainer`;
 `EvaluatePolicy` evaluates team authority without a human token. The evaluator pins the accepted policy and
 digest, installation and workload, supports only arm, incident and
 recordingSave purposes, intersects the original expiry with current source
-and deny state, and checks the action, count and byte envelope. A personal
+and deny state, and checks the action kind and grant expiry. A personal
 deny of the former creator does not revoke team authority; a sponsor or
 executor deny does. It never issues a disclosure identity or approval, and
 failure never falls back to controller privileges.
@@ -92,14 +95,14 @@ deactivation, both delivered as events.
 | exit / restart | Pod informer (container restart count and last termination) |
 | probe | Event informer, field-selected to probe failures of the policy's Pods |
 | alert | Alertmanager `webhook_config` receiver on the connector, matched against the policy's label matchers |
-| log | One `pods/log?follow=true&sinceTime=` stream per armed container (≤ 32 containers per policy, records ≤ 4 MiB per window) |
+| log | One `pods/log?follow=true&sinceTime=` stream per armed container of every Pod within the administrator's replica ceiling; the connector's concurrent streams and per-stream window buffer are derived from its memory request (memory request ÷ per-stream buffer) |
 | resource | `metrics.k8s.io` PodMetrics sampled at the policy's configured interval (no watch exists) |
 
 A region without a configured Alertmanager receiver reports `unsupported`,
 so activation refuses alert policies there. Each delta carries the Pod, the
 detector level and its time; a Pod whose state is unknown keeps its
-previous detector state, and an overlong log record is counted under the suppression
-reason `overlong`. The hub evaluates level and re-arm against the per-detector
+previous detector state, and a log record larger than the per-stream window
+buffer is counted under the suppression reason `overlong`. The hub evaluates level and re-arm against the per-detector
 state in the trigger ledger and reuses the S-02 investigation with the
 policy executor; eligibility and the SQL checks after locks evaluate the
 executor through its current acceptance and team delegation. Triggers are
@@ -111,7 +114,7 @@ the same accepted composition as activation. The exact recorder scope must
 match the accepted authority before an occurrence is spent; the trigger
 previews the triggering Pod and submits through the normal capture request
 pipeline. Atomic admission matches the actual plan action before reserving
-output or grant spend; a snapshot-only grant cannot authorize a recorder.
+output; a snapshot-only grant cannot authorize a recorder.
 Raw predicates stay refused until the live-observation authority and node
 boundary qualify.
 
@@ -124,7 +127,9 @@ holds sharing authority (`evidence-owner` or `workload-maintainer`); those
 groups become the share managers, recorded by name, and the policy is the
 recorded creator. The acceptance record carries the
 instruction. The policy principal has no sharing right of its own: each
-capture consumes one slot of the reviewed instruction. `sharing` is outside
+capture consumes one slot of the reviewed instruction (the maintainer's
+"explicitly bounded recurring-policy sharing"); slots carry no time cap and
+need no renewal (ADR-335 D7). `sharing` is outside
 the collection-intent digest, so editing it stops sharing without
 interrupting collection.
 

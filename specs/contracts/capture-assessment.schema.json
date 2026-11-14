@@ -39,8 +39,7 @@
         },
         "explanation": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 256
+          "minLength": 1
         }
       },
       "required": [
@@ -300,8 +299,7 @@
         },
         "coverage": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 256
+          "minLength": 1
         }
       },
       "required": [
@@ -533,7 +531,7 @@
               "message": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 256
+                "maxLength": 1024
               },
               "blocking": {
                 "type": "boolean"
@@ -578,13 +576,11 @@
               },
               "benefit": {
                 "type": "string",
-                "minLength": 1,
-                "maxLength": 192
+                "minLength": 1
               },
               "coverageLoss": {
                 "type": "string",
-                "minLength": 1,
-                "maxLength": 192
+                "minLength": 1
               }
             },
             "required": [

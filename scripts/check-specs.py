@@ -49,7 +49,7 @@ def canonical_digest(value) -> str:
     return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()).hexdigest()
 
 
-POLICY_BUDGET_DEFAULTS = {"cooldown": "1m", "burst": 2, "maxOccurrencesPerHour": 60, "maxConcurrentActions": 1}
+POLICY_BUDGET_DEFAULTS = {"cooldown": "1m", "burst": 2, "maxConcurrentActions": 1}
 POLICY_EVALUATION_DEFAULTS = {"scope": "pod", "fireOnActivation": True, "rearmFor": "10s"}
 
 
@@ -737,7 +737,7 @@ def semantic_checks(doc: dict) -> None:
             authority = spec["policyAuthority"]
             require(spec["policyExecutor"] == {"issuer": "urn:asservat:installation:" + authority["installationID"], "subject": "policy:" + spec["target"]["policyUID"], "clientID": "policy-executor", "identityType": "workload"}, "Grant executor is not policy-bound")
             require(timestamp(authority["issuedAt"]) <= timestamp(spec["issuedAt"]) < timestamp(spec["notAfter"]) <= timestamp(authority["notAfter"]), "Grant outlives team authority")
-            require(all(spec["limits"][key] <= authority["limits"][key] for key in ("maxExecutions", "maxBytes")), "Grant widens team limits")
+            require(all(spec["limits"][key] <= authority["limits"][key] for key in ("maxBytes",)), "Grant widens team limits")
         start = spec["issuedAt"]
         if "renewal" in spec:
             # ADR-335 D6: renewal in place keeps the grant and sets a new expiry.
@@ -771,7 +771,7 @@ def semantic_checks(doc: dict) -> None:
             require((approver["issuer"], approver["subject"]) != (requester["issuer"], requester["subject"]), "Self approval")
         state = doc.get("status", {})
         require(state.get("reservedBytes", 0) + state.get("spentBytes", 0) <= spec["limits"]["maxBytes"], "Grant byte budget exceeded")
-        require(state.get("executionsReserved", 0) + state.get("executionsSpent", 0) <= spec["limits"]["maxExecutions"], "Grant execution budget exceeded")
+        require(state.get("executionsReserved", 0) + state.get("executionsSpent", 0) <= spec["limits"].get("maxExecutions", float("inf")), "Grant execution budget exceeded")
     if doc.get("schemaVersion") == "approval-policy/v1":
         limits = doc["policyGrants"]
         require(limits["defaultAgeSeconds"] <= limits["maxAgeSeconds"], "Approval default exceeds maximum")
@@ -1239,7 +1239,6 @@ def main() -> None:
     declared_environment = {**download_environment, "processors": [organization]}
     for mutate in (
         lambda d: d.update(processors=None),
-        lambda d: d.update(processors=[{**organization, "id": str(n)} for n in range(17)]),
         lambda d: d.update(processors=[organization, organization]),
         lambda d: d["processors"][0].update(endpoint="https://unexpected.invalid"),
         lambda d: d["processors"][0].pop("regions"),
@@ -1249,9 +1248,7 @@ def main() -> None:
         lambda d: d["processors"][0].update(regions=["local"] * 2),
         lambda d: d["processors"][0].update(id="x" * 65),
         lambda d: d["processors"][0].update(name="x" * 161),
-        lambda d: d["processors"][0].update(activities=[str(i) for i in range(9)]),
         lambda d: d["processors"][0].update(activities=["x" * 129]),
-        lambda d: d["processors"][0].update(regions=[str(i) for i in range(17)]),
         lambda d: d["processors"][0].update(regions=["x" * 129]),
         lambda d: d["processors"][0].update(id=""),
         lambda d: d["processors"][0].update(name="line\nfeed"),
@@ -1306,7 +1303,6 @@ def main() -> None:
         lambda d: d.update(activeVersion=0),
         lambda d: d.update(activeVersion=2147483648),
         lambda d: d.update(keys=[]),
-        lambda d: d.update(keys=d["keys"] * 17),
         lambda d: d.update(password="default"),
         lambda d: d.pop("activeVersion"),
         lambda d: d["keys"][0].update(version=-1),
@@ -1489,7 +1485,6 @@ def main() -> None:
     rejects(examples["policy-deployment.yaml"], "policy", lambda d: d["spec"]["target"].update({"ordinals": [0]}))
     rejects(examples["grant-policy.yaml"], "grant", lambda d: d["spec"].update({"grantType": "adHocCapture"}))
     rejects(examples["grant-ad-hoc.yaml"], "grant", lambda d: d["spec"]["target"].pop("captureUID"))
-    rejects(examples["grant-policy.yaml"], "grant", lambda d: d["status"].update({"executionsReserved": 12, "executionsSpent": 1}), True)
     rejects(examples["grant-policy.yaml"], "grant", lambda d: d["spec"].update({"notAfter": "2027-10-09T12:00:00Z"}), True)
     rejects(examples["approval-policy.yaml"], "approval-policy", lambda d: d["policyGrants"].update({"defaultAgeSeconds": 31536000}), True)
     rejects(examples["policy-deployment.yaml"], "policy", lambda d: d["spec"]["detectors"][1]["options"].update({"sampleInterval": "1ms"}), True)
@@ -1779,7 +1774,7 @@ def main() -> None:
     recorder = examples["resolved-recorder-preview.json"]
     rejects(recorder, "recorder-preview", lambda d: d.update({"acceptance": "accepted"}))
     rejects(recorder, "recorder-preview", lambda d: d["filters"][0].update({"linkType": "RAW"}))
-    rejects(recorder, "recorder-preview", lambda d: d["filters"][0]["program"].extend([[6, 0, 0, 0]] * 256))
+    rejects(recorder, "recorder-preview", lambda d: d["filters"][0]["program"].extend([[6, 0, 0, 0]] * 4096))
     # ADR-243: an embedded builtin has no source object; inventing one is refused.
     rejects(composed_scope, "collection-scope", lambda d: next(p for p in d["dependencies"] if p["role"] == "captureProfile").update({"source": {"clusterID": "00000000-0000-4000-8000-000000000010", "namespaceUID": "replacement-namespace", "resourceUID": "fixture-http-headers-v1"}}), True)
     rejects(composed_scope, "collection-scope", lambda d: d["profileComposition"]["resolvedProfiles"][0].update({"sourceUID": "fixture-http-headers-v1", "sourceClusterID": "00000000-0000-4000-8000-000000000010", "sourceNamespaceUID": "replacement-namespace"}))

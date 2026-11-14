@@ -817,8 +817,7 @@
               "type": "array",
               "items": {
                 "type": "string",
-                "minLength": 1,
-                "maxLength": 128
+                "minLength": 1
               },
               "minItems": 0,
               "uniqueItems": true
@@ -894,7 +893,7 @@
             "path": {
               "type": "string",
               "minLength": 1,
-              "maxLength": 1024,
+              "maxLength": 4096,
               "pattern": "^/[^?#]*$"
             },
             "method": {
@@ -1126,7 +1125,8 @@
             "frequencyHz": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 9007199254740991
+              "maximum": 9007199254740991,
+              "description": "Bounded by the node's kernel.perf_event_max_sample_rate, which the kernel lowers itself under load."
             },
             "forceGC": {
               "type": "boolean"
@@ -1491,12 +1491,14 @@
         "maxProcesses": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 9007199254740991
+          "maximum": 9007199254740991,
+          "description": "The default batch covers every resolved main process of the Pod, sidecars included; the batch is bounded by maxProcesses \u00d7 maxBytesPerProcess \u2264 the action maxBytes and by maxTotalStop."
         },
         "maxBytesPerProcess": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 9007199254740991
+          "maximum": 9007199254740991,
+          "description": "Bounded only by the action and capture byte budget."
         },
         "maxStopPerProcess": {
           "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/duration"

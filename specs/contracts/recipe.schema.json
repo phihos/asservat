@@ -20,8 +20,7 @@
       "properties": {
         "description": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 1024
+          "minLength": 1
         },
         "actions": {
           "type": "array",
