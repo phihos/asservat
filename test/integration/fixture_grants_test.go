@@ -2,6 +2,7 @@ package integration
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -37,11 +38,10 @@ func preserveFixtureGrants(t *testing.T, ctx context.Context, admin *pgxpool.Poo
 		t.Fatal("snapshot fixture grants", len(grants), err)
 	}
 	return func(ctx context.Context) {
-		for _, g := range grants {
-			if _, err := admin.Exec(ctx, g); err != nil {
-				t.Error("restore fixture grant", g, err)
-				return
-			}
+		// One implicit transaction: one synchronous commit for all grants.
+		if _, err := admin.Exec(ctx, strings.Join(grants, ";\n")); err != nil {
+			t.Error("restore fixture grants", err)
+			return
 		}
 		after, err := listFixtureGrants(ctx, admin)
 		if err != nil {

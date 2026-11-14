@@ -582,8 +582,9 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 		s := create(t)
 		basis := s.b.Bases[0]
 		basis.Resource.ClusterID = s.target.ClusterID
-		basis.Resource.Namespace = "asservat"
-		basis.Resource.NamespaceUID = "control"
+		// ADR-329: a binding lives in the application namespace it scopes.
+		basis.Resource.Namespace = basis.Scope.Namespace.Name
+		basis.Resource.NamespaceUID = basis.Scope.Namespace.UID
 		basis.Resource.Name = "owners"
 		binding := cfg.Binding{Resource: basis.Resource, Scope: basis.Scope, Effect: basis.Effect, Subjects: basis.Subjects, Roles: basis.Roles}
 		now := time.Now().UTC().Truncate(time.Microsecond)

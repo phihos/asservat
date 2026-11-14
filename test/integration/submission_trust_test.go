@@ -7,7 +7,6 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
-	"os"
 	"testing"
 	"time"
 
@@ -33,7 +32,7 @@ func testSubmissionTrustSource(t *testing.T, ctx context.Context, c *rest.Config
 	if e != nil {
 		t.Fatal(e)
 	}
-	data, e := os.ReadFile("../../examples/submission-trust.json")
+	data, e := readImplementedExample("../../examples/", "submission-trust.json")
 	if e != nil {
 		t.Fatal(e)
 	}
