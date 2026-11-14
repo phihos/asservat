@@ -90,7 +90,7 @@ Under ADR-184's single immutable launch, neither order works.
 5. **Operator inputs, minted identities, derived values.** No measured
    release values exist for the history footprints. The docs make them,
    like the backup horizon, inputs that an operator profile must qualify
-   ([capture intent lifecycle](../architecture/capture-intent-lifecycle.md)).
+   (capture intent lifecycle).
    - **Operator profile** (continuation input):
      - pool and policy names and the approved selector keys;
      - accounts, records per account and per-lane sizes;

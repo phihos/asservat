@@ -14,6 +14,6 @@ Recheck current configuration and retain the earliest original deadline. Return 
 
 ## Consequences
 
-The [owner enrollment contract](../architecture/owner-enrollment-proof.md) fixes the internal types, audience, proof lifetime and failure behavior. There is no public API, CRD, SQL migration, dependency or developer approval change. The existing worker TokenReview adapter shares the same bounded review decoder but keeps its separate audience and expected Pod-name check.
+The owner enrollment contract fixes the internal types, audience, proof lifetime and failure behavior. There is no public API, CRD, SQL migration, dependency or developer approval change. The existing worker TokenReview adapter shares the same bounded review decoder but keeps its separate audience and expected Pod-name check.
 
 Node/controller/API-server and administrator trust remain explicit (ADR-328). Complete registration, encrypted enrollment audit, pre-I/O signing spend, certificate audit/activation, renewal and forwarding remain subsequent work.

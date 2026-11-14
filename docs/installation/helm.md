@@ -339,7 +339,7 @@ metrics API.
 `identity.permissionDelegations` lets selected Kubernetes identities write
 AccessBindings within a fixed envelope. The same entry names browser
 identities allowed to preview those changes. The default `[]` delegates
-nothing. See [permission acceptance](../architecture/permission-acceptance.md)
+nothing. See permission acceptance
 and the [access preview](../decisions/237-permission-impact-preview.md).
 
 ```yaml

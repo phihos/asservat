@@ -1,7 +1,7 @@
 # ADR-124: Retire prepaid Stop obligations with positive writer proof
 
 Status: Accepted design; component implementation and qualification tracked in
-[the architecture contract](../architecture/download-stop-lifecycle.md).
+the architecture contract.
 
 ## Context
 

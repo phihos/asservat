@@ -113,7 +113,7 @@ operation, as does cancellation at any point.
 This removes repeated work from dispatch and enrollment without another timer,
 configuration option, durable record or credential. It amends the per-step
 external-identity refresh described in
-[the worker lifecycle contract](../architecture/worker-current-lifecycle.md).
+the worker lifecycle contract.
 The 2026-10-23 refinement extends that ownership to the complete finite prepare
 request: coordinator entry, installed native runtime, and final Preparing/Ready
 view consume the same original authority. The private native handoff validates

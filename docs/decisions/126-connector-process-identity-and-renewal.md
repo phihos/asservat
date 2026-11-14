@@ -2,7 +2,7 @@
 
 > Superseded in part by ADR-328 (2026-11-13): Independently protected source/guard proof and live controller-chain reads defended against forged Pods and tampered configuration in the connector namespace and no longer apply. Pod-bound TokenReview, process-epoch enrollment, bounded renewal and SQL lifecycle rows remain valid.
 
-Status: Accepted design; the isolated component checkpoint has no installed runtime enablement. Actual qualification and outstanding retirement work are listed in [the architecture contract](../architecture/connector-renewal.md).
+Status: Accepted design; the isolated component checkpoint has no installed runtime enablement. Actual qualification and outstanding retirement work are listed in the architecture contract.
 
 ## Context
 

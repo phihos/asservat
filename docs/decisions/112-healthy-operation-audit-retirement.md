@@ -62,4 +62,4 @@ required qualified restart/restore bridge remain unfinished. The current
 incarnation fence intentionally denies historical cleanup after a database
 restart; supporting ordinary restart safely is required before enablement.
 The policy does not assert physical media sanitization or make unmanaged
-operator backups disappear. See [the implementation contract](../architecture/operation-audit-lifecycle.md).
+operator backups disappear. See the implementation contract.

@@ -42,7 +42,7 @@ positively revoke external rights and reconcile its original writers. Ordinary
 upgrades cannot rotate unresolved material. Uninstall retains unresolved material
 and journals, and deleting a Kubernetes Secret never revokes provider credentials.
 
-See [the continuation architecture](../architecture/initial-preparation-state.md)
+See the continuation architecture
 for implemented scope, required composition and verification. This decision does
 not enable Helm runtime services, replace consumed/expired claims or complete the
 preparation/activation supervisor.

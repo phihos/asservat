@@ -38,7 +38,7 @@ offer). Several of those are immutable, and none may be rewritten.
    tolerated, unreadable).
 2. **Upgrade migrator.** A one-shot migrator (originally the `installer-upgrade` command run by the
    installer runner account; under ADR-328 a Helm pre-upgrade hook Job) uses the operator's DDL credential (the DDL role keeps its login and owns the
-   schema; [initial schema](../architecture/initial-schema.md)). It requires the completed
+   schema; initial schema). It requires the completed
    installation root, verifies the applied history is an exact prefix of its embedded migrations with
    nothing foreign, and applies the rest with the same advisory lock and step checks as
    InitialSchema. It never edits the completed InitialSchema record. Phase 1 migrations add no runtime

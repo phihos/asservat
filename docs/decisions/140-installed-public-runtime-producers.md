@@ -57,7 +57,7 @@ public preparation/status/content. All retained compatibility fields and
 original account-key versions remain binding.
 
 The component source, measured checks and remaining production prerequisites
-are described in [configuration credential provisioning](../architecture/configuration-credential-provisioning.md).
+are described in configuration credential provisioning.
 This decision enables no public listener, Helm runtime, new approval or SQL
 schema migration.
 

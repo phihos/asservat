@@ -10,4 +10,4 @@ The acquisition adapter creates a batch-bound remote opener after audit and the 
 
 This initial implementation concerns a complete 4096-byte context reader, not arbitrary raw downloads or a key-service call per payload chunk. Large artifacts must keep a bounded authorized reader across byte-delivery batches and recheck delivery rights without reconstructing the decoder or unwrapping keys per frame. Their reader/process lifetime and scheduling require separate qualification; three wraps per prepared artifact and three unwraps per opened reader remain the format contract.
 
-The [contract](../architecture/download-key-authority.md) separates actual SQL/TLS/S3 results from pending protected peer issuance, key lifecycle, control mediation and public workflow. Static service-role ACLs, a freely renewable unwrap token and mounting roots into acquisition are rejected alternatives.
+The contract separates actual SQL/TLS/S3 results from pending protected peer issuance, key lifecycle, control mediation and public workflow. Static service-role ACLs, a freely renewable unwrap token and mounting roots into acquisition are rejected alternatives.

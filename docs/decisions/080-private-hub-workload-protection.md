@@ -14,7 +14,7 @@ Prove current enforcement with a separate non-administrator, non-controller iden
 
 ## Limits and consequences
 
-The [private contract](../architecture/owner-workload-protection.md) defines the controller profile, scope and qualification. This is current enforcement, not proof of historical integrity or owner enrollment. Installation must establish a clean protected namespace, least-privilege Secret access and independently trusted workload identity before accepting tokens. Applying this policy after compromise does not repair it. A compromised node/controller, cluster administrator or actor with credential-read/impersonation authority remains outside this boundary.
+The private contract defines the controller profile, scope and qualification. This is current enforcement, not proof of historical integrity or owner enrollment. Installation must establish a clean protected namespace, least-privilege Secret access and independently trusted workload identity before accepting tokens. Applying this policy after compromise does not repair it. A compromised node/controller, cluster administrator or actor with credential-read/impersonation authority remains outside this boundary.
 
 Do not reuse this namespace for user workloads or acquisition Jobs whose application controllers need write access. The installer must arrange separate scopes. Unsupported controller identities/operations fail closed until separately qualified; do not solve an installation failure by granting all service accounts or all authenticated users access. Native integration covers the reference controller path and attack denials; it does not certify every controller branch or managed Kubernetes distribution.
 

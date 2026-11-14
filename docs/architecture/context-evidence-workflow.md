@@ -32,7 +32,7 @@ support.
 | Session and reservation | `internal/application/evidence/download.go`, `internal/adapters/postgres/download.go` | [Download control](context-download-control.md): idempotency key, workload counter, session row and audit row in one transaction. |
 | Native metadata and bytes | `internal/application/evidence/context_download.go` | Regional reader Deployment (A-READ) over the connector connection; the hub holds no unwrap key ([native exchange](native-exchange.md)). |
 | HTTP attachment | `internal/transport/browser/download_delivery.go`, `download_range.go` | Authenticated GET, authorization before headers, range selection, no compression, run to original bounds ([ADR-312](../decisions/312-started-downloads-run-to-original-bounds.md)). |
-| Cancellation and status | `CancelDownload`, `LookupDownload` | [Shared operations](public-context-download.md) and [Stop](download-stop-lifecycle.md); status changes are pushed by SSE / MCP bounded wait. |
+| Cancellation and status | `CancelDownload`, `LookupDownload` | [Shared operations](public-context-download.md) and Stop; status changes are pushed by SSE / MCP bounded wait. |
 
 ## Canonical meanings
 

@@ -62,5 +62,5 @@ pin the plan and retire temporary roles. Constructors are not attestations.
 The implementation does not qualify a deployed installer, independent historical
 checkpoints, old-primary fencing, restored grants/accounting reconciliation or
 automatic lossless-restart activation. Those remain mandatory before the full
-platform is operational. The [component contract](../architecture/initial-installation.md)
+platform is operational. The component contract
 and progress record distinguish synthetic inputs from actual provider evidence.

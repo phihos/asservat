@@ -49,7 +49,7 @@ No dependency installation or new authority framework is introduced.
 
 ## Consequences and qualification
 
-See [Helm bootstrap](../architecture/helm-bootstrap.md) for the boundaries and
+See Helm bootstrap for the boundaries and
 [operator instructions](../installation/helm.md). The underlying ADR-133 v3
 four-command chain is native-qualified separately. This increment requires an
 actual packaged Helm run with empty SQL, original activation and retirement,

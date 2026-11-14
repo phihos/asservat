@@ -13,7 +13,7 @@ the precise schema/table/column grant options; it is not a superuser and must
 never be mounted into the activation Pod or ordinary services.
 
 Generate independent 256-bit secrets, persist their exact closed
-[private state](../../specs/contracts/initial-sql-credentials.schema.json) in
+private state in
 protected immutable storage before creating roles, and keep one fifteen-minute
 password validity interval. Bind that state to the installation and the digest
 of its complete public startup plan. Replay neither replaces passwords nor

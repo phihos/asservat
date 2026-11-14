@@ -57,7 +57,7 @@ supervisor or enable Helm runtime services; the same supported installation path
 must compose those remaining typed effects.
 
 Evidence and implementation scope are described in
-[initial preparer](../architecture/initial-preparer.md). This refines ADR-102 only
+initial preparer. This refines ADR-102 only
 for this continuously protected finite set and leaves its original APIs unchanged.
 
 Primary references: Kubernetes [object names and UIDs](https://kubernetes.io/docs/concepts/overview/working-with-objects/names/),

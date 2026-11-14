@@ -7,7 +7,6 @@ percentage.
 
 [ADR-098](decisions/098-first-installation-activation.md) implements the first-installation SQL/audit coordinator and its native protected-input composition. Continue protected installer plan/credential/pin provisioning and the separate qualified restart/restore protocol. This does not enable Helm runtime services or complete S-01/S-02.
 
-Work has resumed after the [ADR-097 witness component](architecture/installation-witness.md). Its protected one-use record is implemented; production installer provisioning and independent restart/restore activation remain required. Complete atomic eligible-SQL checks, independent encrypted activation audit, protected installer credentials/pins and qualified recovery before enabling activation. Current verification and open gaps are in [implementation progress](implementation-progress.md).
 
 [ADR-096](decisions/096-database-incarnation-fence.md) adds a database-incarnation prerequisite to recovery activation. Continue the independent protected installation/recovery protocol, including retained checkpoints, conservative spend and automated qualified lossless-restart activation. A view or a synthetic administrator fixture is not that protocol.
 
@@ -19,25 +18,16 @@ Work has resumed after the [ADR-097 witness component](architecture/installation
 
 [ADR-092](decisions/092-independent-source-admission-probes.md) fixes namespace/source admission composition with exact nonpersistent probes. Its actual qualification is recorded in [implementation progress](implementation-progress.md); installation, restore and end-user workflow completion remain open.
 
-[ADR-091](architecture/configuration-reconciliation.md) adds protected fleet/owner source reconciliation through the private hub-worker command. Continue installer-generated inputs/roles, independent initial recovery/restore acceptance and native in-Pod operation before enabling public evidence flows.
 
-[ADR-090](architecture/owner-deployment.md) supplies the owner deployment loader and private `hub-api` command. Continue installation-generated projections, source/recovery reconciliation and native in-Pod routing, followed by actual evidence transfer and public investigation flows. Provider composition tests do not complete a slice.
 
-[ADR-089](architecture/worker-routing.md) removes the single-cluster assumption in owner forwarding. The loader/credential composition is now supplied by ADR-090. Continue protected control-document synchronization and native multi-cluster routing; read-facet and synthetic TLS tests do not complete a slice.
 
-[ADR-088](architecture/owner-startup.md) implements pre-Ready identity checking and a concrete owner runtime lifetime. ADR-090 adds the loader and private entry point. Continue installation provisioning, recovery/source reconciliation and native in-Pod routing before evidence transfer; no full TASK or S-01/S-02 exit follows.
 
 [ADR-087](decisions/087-live-owner-delivery.md) connects remote request cancellation to the existing worker ingress through one finite open TLS response. Continue protected process startup, native routing, connector proof mediation and actual evidence transfer; no complete TASK or S-01/S-02 exit is claimed.
 
-[ADR-086](architecture/owner-forwarding.md) adds outbound owner certificate transfer using current identity and exact locator checks before HTTP, non-replayable transport and verified worker results. Protected startup, native routing, connector proof mediation and evidence transfer remain necessary before enabling the public workflow.
 
-[ADR-085](architecture/owner-relay.md) implements the private enrollment receiving boundary with current local/remote identity checks and socket lifetime. Continue outbound exact-owner forwarding, protected startup, connector proof mediation and native transfer; this does not complete S-01/S-02 or a whole TASK.
 
-[ADR-084 process-owned credentials](architecture/owner-credentials.md) adds private key custody, actual TLS callbacks and paired renewal under TASK-02. Continue protected bootstrap/listener composition and exact-request forwarding. This does not complete a whole TASK or S-01/S-02; measured qualification remains in [implementation progress](implementation-progress.md).
 
-[ADR-083 peer authentication](architecture/owner-authentication.md) adds the current TLS/registry/protection/Ready-route gate and native enrollment-to-activation composition. Continue owner credential transport/supervision, protected bootstrap and locator-bound forwarding; no whole TASK or S-01/S-02 exit follows from component qualification.
 
-[ADR-082 owner registration](architecture/owner-registration.md) implements private durable process/key enrollment, audited bounded signing/activation and finite SQL history under TASK-02. Protected bootstrap, owner transport, native forwarding and full S-01/S-02 acceptance remain pending; component results are in [implementation progress](implementation-progress.md).
 
 Status: the maintainer authorized initial implementation after the feasibility phases. Artifact storage/context, PostgreSQL custody and complete pod-status verification are **in progress** under TASK-02/03/05/11 and S-01/S-02; no whole TASK or slice exit is complete. See the [artifact implementation record](research/artifact-foundation.md), [custody continuation](research/custody-foundation.md) and [manifest verification](research/manifest-foundation.md). Current custody records do not authorize capture or publish readable artifacts. Next connect trusted accepted execution/current authorization, durable object audit and catalog publication, retaining production writer fencing/privacy requirements before the UI/MCP/native-download flow. Other product work remains planned.
 
@@ -45,7 +35,6 @@ TASK-07 now also has an [initial identity/eligibility implementation](research/i
 
 The [permission observation continuation](research/permission-foundation.md) implements Kubernetes configuration/namespace read ports and unaccepted mapping proposals, with real API/RBAC tests and a corrected five-second deny deadline. Next implement protected configuration acceptance and persistent SQL audience assignment continuity across ownership changes/watch gaps; then supply accepted authorization projections. Raw API observations, CRD status and the test fixture's administrator identity do not fill that gap. TASK-07 and S-01/S-02 remain unchecked.
 
-Current download continuation: [ADR-070](decisions/070-protected-worker-configuration.md) adds protected worker configuration and rollout fencing under TASK-02/07/11. The [progress record](implementation-progress.md) is authoritative for actual qualification and supersedes the older prerequisite snapshots above. [ADR-071](decisions/071-download-worker-enrollment.md) now adds audited acquisition credential issuance/activation and bounded renewal. [ADR-072](decisions/072-worker-credential-channel.md) supplies the bounded private credential transport and process-owned key/renewal client, with a request-bound current-authority operation. [ADR-073](architecture/worker-startup.md) adds typed immutable startup pins and the initial credential-phase executable/supervisor, with original-template cleanup. [ADR-074](architecture/worker-request-routing.md) adds bounded process-local request-owner routing and response lifetime. [ADR-075](architecture/worker-owner-locator.md) adds minimized shared owner locators and exact local receiving under migration 28. [ADR-076](architecture/hub-owner-discovery.md) adds pinned hub endpoint observations and exact TLS process identity verification. [ADR-077](architecture/owner-configuration.md) supplies protected pool/public-root observations and current route composition. [ADR-078](decisions/078-owner-configuration-acceptance.md) adds durable source/revision acceptance and encrypted audit under migration 29, retaining current recovery and original deadlines. [ADR-079](decisions/079-owner-certificate-issuance.md) adds the owner certificate provider/verification boundary and fixed renewal periods. Next compose protected recovery/workload/issuer bootstrap and durable enrollment/activation, authenticated private forwarding, connector proof mediation and actual supervised native transfer before enabling downloads. Continue local identity and bundled-service installation; no whole task or S-01/S-02 exit is complete.
 
 ## Architecture and implementation sequence
 
@@ -150,7 +139,6 @@ Exit: EXP-02/03 and SC-NET-001 through SC-NET-005 pass; no application bytes in 
 
 Implement accepted [ADR-059](decisions/059-unattended-policy-authority.md) under [team policy automation](../specs/policy-automation.md): standard human sessions and bounded team execution that survives creator departure. Configuration/eligibility and the initial SQL/encrypted acceptance components do not complete protected submission/source production, transactional spending or worker composition. No mandatory directory reader, stale human-claim extension or silent executor migration.
 
-Current component scope and next wiring: [identity and ordinary eligibility](architecture/identity-eligibility.md), [permission acceptance](architecture/permission-acceptance.md) and its [test record](research/permission-acceptance-foundation.md). All task checkboxes below remain open until their complete integration and acceptance gates pass.
 
 - [ ] Implement AccessBinding/PermissionSource CRDs, structural schema/explain documentation, status readiness, server-side apply/conflict behavior and delegated admission checks. Add read-only preview/explanation to the existing browser service.
 - [ ] Implement protected namespace/workload metadata sources, exact exec/generic SAR inheritance and per-cluster identity/admission qualification.

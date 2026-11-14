@@ -16,4 +16,4 @@ For each original immutable copy, add only its exact closure annotation through 
 
 This removes only Asservat's two setup input copies and broad seed payload. It does not revoke operator-owned upstream credentials, remove operator originals, erase Go memory or guarantee erasure from Kubernetes/etcd backups. The retained history-only credential and public provenance remain purpose-scoped. Official Helm packaging and public runtime enablement remain separate qualification work.
 
-See the [implementation contract](../architecture/initial-bootstrap-copy-closure.md) for ordering and unresolved crash cases.
+See the implementation contract for ordering and unresolved crash cases.

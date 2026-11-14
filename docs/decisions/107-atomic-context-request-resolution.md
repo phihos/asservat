@@ -56,5 +56,5 @@ per-workload control-metadata capacity and dependency-aware finite retirement
 remain separate work. Closing a passive preview never releases evidence storage,
 execution spend or retained audit obligations.
 
-See [context request resolution](../architecture/context-request-resolution.md)
+See context request resolution
 for the component boundary and measured scope.

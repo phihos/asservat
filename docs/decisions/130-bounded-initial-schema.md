@@ -14,6 +14,6 @@ The root is long-lived installation provenance; each actual phase has fresh curr
 
 The setup manager must be established and pinned before the final plan. This increment accepts a supplied manager and installs only the compiled narrow grants. ADR131 owns the supported automatic producer, original private credentials and retirement; operators are not intended to hand-author OIDs. Resuming preparation after child-role creation uses a separate read-only schema-completion check; completed installation uses passive history and does not reopen active DDL or setup credentials.
 
-Implementation and limitations: [initial schema architecture](../architecture/initial-schema.md).
+Implementation and limitations: initial schema architecture.
 
 Primary implementation references: [Goose Provider](https://pressly.github.io/goose/documentation/provider/), [pinned Provider API](https://github.com/pressly/goose/blob/v3.28.0/provider.go), [pinned lock and transaction handling](https://github.com/pressly/goose/blob/v3.28.0/provider_run.go), [PostgreSQL transaction-level and session-level advisory locks](https://www.postgresql.org/docs/18/explicit-locking.html#ADVISORY-LOCKS).

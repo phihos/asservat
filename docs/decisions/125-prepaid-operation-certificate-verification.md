@@ -1,7 +1,7 @@
 # ADR-125: Spend a bounded allowance before operation-certificate verification
 
 Status: Accepted design; staged component checks and actual provider qualification
-are distinguished in [the architecture contract](../architecture/operation-audit-lifecycle.md).
+are distinguished in the architecture contract.
 
 ## Context
 

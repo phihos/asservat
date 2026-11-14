@@ -29,7 +29,7 @@ rules today make the two layers impossible to combine:
 The installed template already reserves the means for both layers: optional
 observation and public projection Secrets at `/run/asservat/owner-observation`
 and `/run/asservat/public`, the native port 9444 and the public port 9445.
-[installed-owner-identity.md](../architecture/installed-owner-identity.md) states
+installed-owner-identity.md states
 that backend and public promotion require positive projection receipts. Volume
 presence does not count.
 

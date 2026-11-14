@@ -14,13 +14,13 @@ Do not run the fixture's plaintext/private endpoint or synthetic role grants aga
 
 `00006_peer_identity.sql` adds blocked-by-default current fleet trust, disabled connector registrations and two bounded certificate slots. Its reader has SELECT-only credentials; it does not implement or authorize enrollment/issuance. See [peer identity](../docs/architecture/peer-identity.md).
 
-`00007_enrollment_claim.sql` adds one-use, short-lived bootstrap claims bound to one CSR public key. The claim role cannot issue credentials or activate peers. [Claim contract and tests](../docs/architecture/enrollment-claims.md).
+`00007_enrollment_claim.sql` adds one-use, short-lived bootstrap claims bound to one CSR public key. The claim role cannot issue credentials or activate peers. Claim contract and tests.
 
 `00008_enrollment_audit.sql` adds write-once encrypted claim-audit receipts. `00009_certificate_issuance.sql` adds two bounded signing attempts, immutable public certificate results, encrypted certificate-audit receipts and atomic activation. These runtime facets consume an existing reviewed bootstrap; they do not supply its issuance producer. [Activation contract](../docs/architecture/enrollment-activation.md).
 
-`00010_bootstrap_reservation.sql` adds immutable internal issuance reservations with actor/client idempotency and current serialized capacity checks. It creates no claimable token. See [bootstrap reservation](../docs/architecture/bootstrap-reservation.md).
+`00010_bootstrap_reservation.sql` adds immutable internal issuance reservations with actor/client idempotency and current serialized capacity checks. It creates no claimable token. See bootstrap reservation.
 
-`00011_bootstrap_issuance.sql` adds immutable credential digests, encrypted issuance-intent audit receipts and final claimable-token activation. The reserve, record, audit and activate roles have separate column/table grants. Provider credential storage alone creates no usable enrollment token. See [audited issuance](../docs/architecture/bootstrap-issuance.md).
+`00011_bootstrap_issuance.sql` adds immutable credential digests, encrypted issuance-intent audit receipts and final claimable-token activation. The reserve, record, audit and activate roles have separate column/table grants. Provider credential storage alone creates no usable enrollment token. See audited issuance.
 
 `00012_context_publication.sql` adds immutable semantic-verification facts, encrypted verification-audit receipts and unique catalog associations. Narrow verification/audit/publish/read roles preserve the separation from generic ciphertext custody. See [context publication](../docs/architecture/context-publication.md); its external result/privacy gate and public delivery remain separate prerequisites.
 
@@ -28,11 +28,11 @@ Do not run the fixture's plaintext/private endpoint or synthetic role grants aga
 
 `00014_retention_lifecycle.sql` separates immutable original registration from monotonic effective cutoffs and appends exact lifecycle decisions with separately acknowledged signed/encrypted journal receipts. Existing attempts initialize from their original cutoffs. Runtime roles gain no deadline-extension or hold capability. [Contract and qualification](../docs/architecture/retention-lifecycle.md).
 
-`00015_retention_sources.sql` persists pinned source identities, non-reusable controller epochs and immutable ordered policy checkpoints. Separate audit acknowledgement cannot mark a source Ready. Recovery blocking is not writable by source runtime roles. Read the [checkpoint contract](../docs/architecture/retention-checkpoints.md) for restart, review and catch-up boundaries.
+`00015_retention_sources.sql` persists pinned source identities, non-reusable controller epochs and immutable ordered policy checkpoints. Separate audit acknowledgement cannot mark a source Ready. Recovery blocking is not writable by source runtime roles. Read the checkpoint contract for restart, review and catch-up boundaries.
 
 `00016_closed_retained_interval.sql` permits an effective read cutoff equal to the acquisition anchor when a new cleanup budget consumes the old lifetime. Original registration remains strict and deadlines never extend. See [ADR-055](../docs/decisions/055-retained-evidence-cutoffs.md).
 
-`00017_retention_catchup.sql` adds ordered, non-rewindable context catch-up pages and exact lifecycle-effect links. Bookmarks update a separate fenced resume cursor without scheduling evidence scans. The [catch-up contract](../docs/architecture/retention-catchup.md) describes the initial known-scope limit and remaining Ready barrier.
+`00017_retention_catchup.sql` adds ordered, non-rewindable context catch-up pages and exact lifecycle-effect links. Bookmarks update a separate fenced resume cursor without scheduling evidence scans. The catch-up contract describes the initial known-scope limit and remaining Ready barrier.
 
 `00018_retention_observation.sql` separates finite complete-source observations from immutable policy history and bookmark progress. Availability is computed from fresh guard/LIST proof, the watch watermark, completed catch-up and exact audit receipts; there is no writable Ready flag. See [ADR-056](../docs/decisions/056-retention-watch-watermark.md).
 
@@ -40,26 +40,26 @@ Do not run the fixture's plaintext/private endpoint or synthetic role grants aga
 
 `00020_browser_sessions.sql` adds protected session roots/epochs, encrypted one-use login state, fixed-lifetime browser sessions, non-reusable refresh claims and bounded logout receipts. These operational credentials never confer policy or evidence authority. See [browser sessions](../docs/architecture/browser-sessions.md).
 
-`00022_download_key_bindings.sql` adds private exact-batch/acquisition-certificate local-key bindings, original finite deadlines and a monotonically spent three-role mask. Coordinator insertion and key-service consumption use separate SQL credentials; current parent download, recovery and privacy fences still apply. It contains no keysets or artifact bytes. See [download key authority](../docs/architecture/download-key-authority.md).
+`00022_download_key_bindings.sql` adds private exact-batch/acquisition-certificate local-key bindings, original finite deadlines and a monotonically spent three-role mask. Coordinator insertion and key-service consumption use separate SQL credentials; current parent download, recovery and privacy fences still apply. It contains no keysets or artifact bytes. See download key authority.
 
-`00023_local_key_configuration.sql` adds protected local key snapshots and immutable version fingerprints, with per-installation key-material uniqueness. No private root bytes enter SQL. Additive rotation and original source freshness are checked under recovery/scope locks; runtime cannot update/delete version history. See [local key lifecycle](../docs/architecture/local-key-lifecycle.md).
+`00023_local_key_configuration.sql` adds protected local key snapshots and immutable version fingerprints, with per-installation key-material uniqueness. No private root bytes enter SQL. Additive rotation and original source freshness are checked under recovery/scope locks; runtime cannot update/delete version history. See local key lifecycle.
 
-`00024_download_worker_proof.sql` binds original finite Kubernetes worker proofs to existing download key children. It stores minimized identities/digests, never bearer tokens; legacy NULL rows deny rather than receiving fabricated proofs. Runtime roles cannot replace proofs or renew deadlines. See [worker attestation](../docs/architecture/download-worker-attestation.md).
+`00024_download_worker_proof.sql` binds original finite Kubernetes worker proofs to existing download key children. It stores minimized identities/digests, never bearer tokens; legacy NULL rows deny rather than receiving fabricated proofs. Runtime roles cannot replace proofs or renew deadlines. See worker attestation.
 
 `00025_download_workers.sql` adds immutable dispatch/audit/launch/Job/Pod and termination/retirement transitions, separately counted unresolved workers and no expiry refund. See [worker lifecycle](../docs/architecture/download-worker-dispatch.md).
 
-`00026_worker_configuration.sql` adds the current protected download-worker configuration head and immutable revision/audit history. Column-scoped observer, audit and reader credentials separate acceptance from use; monotonic triggers prohibit identity/revision rollback. Legacy worker records without a qualified configuration remain unavailable rather than receiving fabricated authority. See [worker configuration](../docs/architecture/worker-configuration.md).
+`00026_worker_configuration.sql` adds the current protected download-worker configuration head and immutable revision/audit history. Column-scoped observer, audit and reader credentials separate acceptance from use; monotonic triggers prohibit identity/revision rollback. Legacy worker records without a qualified configuration remain unavailable rather than receiving fabricated authority. See worker configuration.
 
-`00027_worker_enrollment.sql` records immutable worker public-key enrollment, per-period signing attempts, public certificate/chain, independent encrypted audit acknowledgement and activation. No provider-call refund follows expiry; activation and signing/audit use disjoint roles. [Contract](../docs/architecture/worker-enrollment.md).
+`00027_worker_enrollment.sql` records immutable worker public-key enrollment, per-period signing attempts, public certificate/chain, independent encrypted audit acknowledgement and activation. No provider-call refund follows expiry; activation and signing/audit use disjoint roles. Contract.
 
-`00030_owner_enrollment.sql` adds immutable hub Pod/process/key registration, irreversible per-period signing spend, encrypted audit acknowledgements, separate activation/current registry and expiry-safe bounded pruning. [Contract](../docs/architecture/owner-registration.md).
+`00030_owner_enrollment.sql` adds immutable hub Pod/process/key registration, irreversible per-period signing spend, encrypted audit acknowledgements, separate activation/current registry and expiry-safe bounded pruning. Contract.
 
 `00058_audit_retirement_validator_scope.sql` preserves the original deferred
 retirement predicates while allowing their two read-only trigger functions to
 read shared lifecycle/history rows as the migration owner. Runtime capture
 cleanup roles retain only their private filtered views and fixed effects; they
 receive no shared-table or direct-validator execution grant. The fixed search
-path and qualified relation names are retained. See [capture-intent lifecycle](../docs/architecture/capture-intent-lifecycle.md).
+path and qualified relation names are retained. See capture-intent lifecycle.
 
 `00100_packet_evidence_backing.sql` corrects the authored context-byte projection
 for supported packet recordings. It atomically validates and adjusts retained

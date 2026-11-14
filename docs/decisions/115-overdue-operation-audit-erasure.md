@@ -42,5 +42,5 @@ claimed-but-unclosed certificates and exhausted cleanup budgets remain excluded.
 Database restart/restore still requires the independently accepted historical
 ledger reconciliation bridge; a fresh source observation cannot invent it.
 
-See [the implementation contract](../architecture/operation-audit-overdue.md)
+See the implementation contract
 for states, roles, bounds, qualification and remaining work.

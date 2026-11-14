@@ -10,4 +10,4 @@ This avoids requiring another mutable configuration journal merely to describe a
 
 The chart generates the configuration; app maintainers get no additional task or prompt. Source identity migration requires preserving prior retention obligations and qualifying the replacement before activation. Ordinary retention policy changes remain mutable guarded CRDs. Restore composition remains required.
 
-The [component contract](../architecture/retention-topology.md) defines the bounded multi-cluster router, schema, freshness and current qualification status.
+The component contract defines the bounded multi-cluster router, schema, freshness and current qualification status.

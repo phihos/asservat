@@ -14,4 +14,4 @@ Completed acknowledgement reuse is a separate exact bounded SELECT, without jour
 
 Public accepted replay stays passive. Runtime composition must add an explicit fresh-current continuation of the original request for a persisted admission whose first start reply was lost. It must preserve the original capture/attempt and never infer that an unknown start had no effect. The current private bridge is not enabled until intent lifecycle, same-request timing, regional start and native transfer are actually qualified.
 
-See [the concrete runtime contract](../architecture/capture-intent-lifecycle.md). This decision adds no public request parameter, regional transport, background acquisition queue or recovery activation.
+See the concrete runtime contract. This decision adds no public request parameter, regional transport, background acquisition queue or recovery activation.

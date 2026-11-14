@@ -14,4 +14,4 @@ Require TLS 1.3 and separate server/client leaves, with explicit issuer roots, a
 
 The new verifier establishes a signed identity only. It does not issue or activate a certificate, prove the caller's current membership in the owner pool, accept a locator as a capability, or confer human/evidence access. The future private forwarder must verify both endpoints before sending credentials, retain original cancellation/deadlines, and check the current exact SQL/local request fence at the receiver. Current connector-origin proof and ordinary enrollment authorization remain mandatory.
 
-See [the contract](../architecture/hub-owner-discovery.md) and [verification progress](../implementation-progress.md). The synthetic TLS issuer and restricted pause-Pod fixture are test inputs, never production bootstrap.
+See the contract and [verification progress](../implementation-progress.md). The synthetic TLS issuer and restricted pause-Pod fixture are test inputs, never production bootstrap.

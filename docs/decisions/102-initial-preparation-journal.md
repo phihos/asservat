@@ -9,7 +9,7 @@ Status: superseded by ADR-328 (administrator-only namespaces); the mechanism is 
 Reuse the staging policy's public preparation ConfigMap as a bounded creation
 journal. Retain the exact installation, preparation request, public plan digest,
 new namespace and admission identities in its initial document. The private
-[wire contract](../../specs/contracts/initial-preparation.schema.json) permits at
+wire contract permits at
 most 64 ordered Kubernetes create intents within 48 KiB. It contains only public
 resource identity/specification digests and acknowledged UIDs/resource versions.
 Credentials, secret-payload hashes, evidence and arbitrary provider responses

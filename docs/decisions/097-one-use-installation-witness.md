@@ -60,7 +60,7 @@ restart activation should be automatic; no routine developer approval is added.
 
 C-04 owns the read/consume ports and domain values; C-21 implements their native
 Kubernetes boundary. No public API, CRD, SQL migration, dependency or runnable
-installer is added. See the [component contract](../architecture/installation-witness.md)
+installer is added. See the component contract
 and [measured verification](../implementation-progress.md). Native tests qualify
 the protected record with actual API tokens, not a protected Pod-bound installer
 or a complete installation/restore workflow.

@@ -14,4 +14,4 @@ The initial rollout policy interrupts old-profile downloads: a changed revision 
 
 Configuration history is capped at 1024 immutable revisions per enrolled source; observations reuse the existing revision. Safe history cleanup and its backup obligations remain required. The actual acquisition executable/issuer, continuous runtime supervision and Helm composition remain unfinished. The transactional projection establishes these particular boundaries without claiming a deployed investigation platform.
 
-See [worker configuration contract](../architecture/worker-configuration.md), [schema](../../specs/contracts/worker-configuration.schema.json) and [implementation progress](../implementation-progress.md) for actual tests and limits.
+See worker configuration contract, schema and [implementation progress](../implementation-progress.md) for actual tests and limits.

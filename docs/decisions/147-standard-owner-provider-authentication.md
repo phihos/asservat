@@ -16,7 +16,7 @@ dedicated projected audience, verified auth mount and original provider recipes.
 Keep the current SQL, recovery and signing-attempt checks
 independent and current. A provider credential does not activate a process.
 
-The new closed [public profile](../../specs/contracts/owner-provider-auth.schema.json)
+The new closed public profile
 contains only the original ServiceAccount and selected audit Secret identities,
 auth mount/accessor and public recipe digest. Role/policy names, audience,
 filenames and timing are generated. Role/policy names use the full SHA-256 of
