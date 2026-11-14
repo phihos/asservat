@@ -61,11 +61,9 @@ implement the canonical contract.
 | (no JSON schema) node channel | Hello with version and capabilities; no enroll/poll, CSR, boot ID or epoch | `internal/contracts/node_channel.go`, `internal/bootstrap/node_channel.go` |
 
 Schemas kept because Go still embeds them with production code paths:
-`work-trust`, `submission-trust`, `installation-witness`, `retention-topology`
-(`internal/adapters/kubernetes/permission_decode.go` and their readers), and
-`local-start` with `scripts/start-crd.py` and
-`charts/asservat/crds/capacityreservations.yaml`
-(`internal/adapters/kubernetes/start_admission.go`). Remove each with its code.
+`work-trust`, `submission-trust`, `installation-witness` and `retention-topology`
+(`internal/adapters/kubernetes/permission_decode.go` and their readers). Remove
+each with its code.
 `local-key-configuration.schema.json` had no runtime consumer and is deleted.
 ## ADR-335 contract divergence (2026-11-14)
 

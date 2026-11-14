@@ -185,8 +185,6 @@ region:
   executor:
     enabled: true
     concurrency: 4
-    # Empty uses the API server's default token audience.
-    capacityAudience: ""
     # mode=cluster: Secret with evidence-storage.json and
     # history-storage.json (and profile-authorization.json with
     # profileAuthorization); default: the join Secret. mode=combined uses

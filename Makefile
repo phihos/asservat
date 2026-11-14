@@ -56,7 +56,7 @@ investigation-check:
 
 # Product component gates. The integration target creates/removes owned fixtures.
 .PHONY: go-check go-architecture-check context-integration
-go-check: manifest-schema-check permission-schema-check policy-schema-check permission-crd-check control-schema-check start-crd-check retention-crd-check profile-crd-check investigation-schema-check authority-window-check
+go-check: manifest-schema-check permission-schema-check policy-schema-check permission-crd-check control-schema-check retention-crd-check profile-crd-check investigation-schema-check authority-window-check
 	go vet ./...
 	# Preserve race/count/deadline checks with exact sequential Kubernetes groups.
 	$(PYTHON) scripts/test-go-shards.py
@@ -208,10 +208,6 @@ permission-integration:
 control-schema-check:
 	$(PYTHON) scripts/manifest-schemas.py --bundle control
 
-.PHONY: start-crd-check
-start-crd-check:
-	$(PYTHON) scripts/start-crd.py
-
 .PHONY: fleet-integration
 fleet-integration:
 	$(PYTHON) scripts/test-custody.py --fleet
@@ -229,7 +225,7 @@ identity-integration:
 	$(PYTHON) scripts/test-identity.py
 
 .PHONY: helm-check helm-integration
-helm-check: permission-crd-check policy-crd-check start-crd-check retention-crd-check profile-crd-check
+helm-check: permission-crd-check policy-crd-check retention-crd-check profile-crd-check
 	$(PYTHON) scripts/check-helm.py
 	$(PYTHON) scripts/check-helm-region.py
 	$(PYTHON) scripts/test-helm-runtime-node-access.py
@@ -254,7 +250,7 @@ initial-schema-handover-integration:
 # Use the spec virtual environment: make pre-push PYTHON=<spec-venv>/bin/python
 PRE_PUSH_GATES := spec-check architecture-check design-check openapi-check live-check download-check investigation-check \
 	go-architecture-check manifest-schema-check investigation-schema-check permission-schema-check policy-schema-check \
-	permission-crd-check control-schema-check start-crd-check retention-crd-check helm-check \
+	permission-crd-check control-schema-check retention-crd-check helm-check \
 	gate-self-tests sql-check console-check gofmt-check go-vet go-affected-test authority-window-check
 .PHONY: pre-push gate-self-tests gofmt-check go-vet go-affected-test
 pre-push:
