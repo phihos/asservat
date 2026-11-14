@@ -389,7 +389,7 @@ func ValidateSeaweedConfigTransition(before, after []byte) error {
 // The Helm render regression compares the actual chart command to this value.
 func SeaweedServerArgs() []string {
 	return []string{
-		"server", "-dir=/data", "-ip=127.0.0.1", "-ip.bind=127.0.0.1", "-master=true", "-volume=true", "-filer=true", "-s3=true", "-master.telemetry=false", "-s3.ip.bind=0.0.0.0", "-s3.port=8333", "-s3.port.https=0", "-s3.cert.file=/run/asservat/objectstore-tls/tls.crt", "-s3.key.file=/run/asservat/objectstore-tls/tls.key", "-s3.config=/run/asservat/objectstore-iam/s3.json", "-s3.iam=false", "-s3.autoCreateBucket=false", "-s3.port.iceberg=0", "-s3.port.lance=0", "-iam=false", "-webdav=false", "-sftp=false", "-mq.broker=false", "-mq.agent=false", "-metricsPort=0", "-debug=false",
+		"server", "-dir=/data", "-ip=127.0.0.1", "-ip.bind=127.0.0.1", "-master=true", "-volume=true", "-master.volumeSizeLimitMB=1024", "-volume.max=64", "-filer=true", "-s3=true", "-master.telemetry=false", "-s3.ip.bind=0.0.0.0", "-s3.port=8333", "-s3.port.https=0", "-s3.cert.file=/run/asservat/objectstore-tls/tls.crt", "-s3.key.file=/run/asservat/objectstore-tls/tls.key", "-s3.config=/run/asservat/objectstore-iam/s3.json", "-s3.iam=false", "-s3.autoCreateBucket=false", "-s3.port.iceberg=0", "-s3.port.lance=0", "-iam=false", "-webdav=false", "-sftp=false", "-mq.broker=false", "-mq.agent=false", "-metricsPort=0", "-debug=false",
 	}
 }
 

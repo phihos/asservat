@@ -74,6 +74,11 @@ spec:
             - -ip.bind=127.0.0.1
             - -master=true
             - -volume=true
+            # Small volumes so each bucket (collection) can grow its own
+            # volumes on a small disk; Seaweed's 30 GB default exhausted the
+            # slots before the evidence bucket got a writable volume.
+            - -master.volumeSizeLimitMB=1024
+            - -volume.max=64
             - -filer=true
             - -s3=true
             - -master.telemetry=false
