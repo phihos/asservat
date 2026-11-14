@@ -54,6 +54,18 @@ spec:
         runAsGroup: 1000
         fsGroup: 1000
         seccompProfile: {type: RuntimeDefault}
+      initContainers:
+        # Keycloak exits when its database is unreachable at startup; wait for
+        # PostgreSQL to accept connections instead of crash-looping on first install.
+        - name: wait-database
+          image: {{ $kc.image | quote }}
+          imagePullPolicy: IfNotPresent
+          command: [bash, -c, 'until (exec 3<>/dev/tcp/{{ $host }}/{{ int $db.port }}) 2>/dev/null; do sleep 2; done']
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+          resources:
+            {{- toYaml $kc.resources | nindent 12 }}
       containers:
         - name: keycloak
           image: {{ $kc.image | quote }}
