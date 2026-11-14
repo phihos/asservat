@@ -37,8 +37,6 @@ type PublicContextServices struct {
 	AuditMAC                      *auditapp.OperationMAC
 	Native                        *evidence.ContextNativeRuntime
 	Transfer                      evidence.DownloadResponseTransfer
-	// Fleet is the ADR-193 issuance route's service; nil leaves it absent.
-	Fleet browser.FleetBootstrapService
 	// Processing is the ADR-210 operator change service; nil leaves it absent.
 	Processing      browser.ProcessingChangeService
 	ProcessingRules browser.ProcessingInventoryService
@@ -96,12 +94,6 @@ func NewPublicContextHandler(c PublicContextConfig, s PublicContextServices, fil
 		handler.Refused = downloadRefusalReport(timedEventLog(os.Stderr, "download content refused"), time.Now)
 		content = handler
 	}
-	var fleet http.Handler
-	if s.Fleet != nil {
-		if fleet, e = browser.NewFleetHandler(sessions, s.Fleet); e != nil {
-			return nil, &fixedStepError{"fleet", e}
-		}
-	}
 	var processing http.Handler
 	if s.Processing != nil {
 		if processing, e = browser.NewProcessingHandler(sessions, s.Processing); e != nil {
@@ -115,7 +107,7 @@ func NewPublicContextHandler(c PublicContextConfig, s PublicContextServices, fil
 		}
 	}
 	return &publicContextRoutes{
-		host: host, sessions: sessions, investigations: investigations, fleet: fleet, processing: processing, processingRules: processingRules,
+		host: host, sessions: sessions, investigations: investigations, processing: processing, processingRules: processingRules,
 		mcp: mcpHandler, content: content, console: static,
 		mcpPath: mcp.Path, mcpMetadata: mcp.MetadataPath,
 		contentPrefix:   browser.DownloadContentPrefix,

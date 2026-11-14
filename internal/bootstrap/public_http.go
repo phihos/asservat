@@ -201,9 +201,6 @@ func newPublicHandler(ctx context.Context, d *OwnerDeployment, a publicAuditStor
 	}
 	o := p.OperationAudit
 	services := PublicContextServices{Sessions: id.sessions, MCPIdentity: id.mcp, DownloadIdentity: id.download, Operations: operations, NormalAudit: normal, ResolutionAudit: resolution, AuditMAC: pc.mac, Native: dl.native.Runtime, Transfer: dl.native.Transfer}
-	if pc.fleet != nil {
-		services.Fleet = pc.fleet
-	}
 	// ADR-210: privacy changes use the normal lane and its separately reserved
 	// release lane; both audit facets pin their accepted policy through Finish.
 	if pc.processingPolicy != nil {

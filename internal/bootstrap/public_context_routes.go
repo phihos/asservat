@@ -17,7 +17,6 @@ import (
 type publicContextRoutes struct {
 	host                                                 string
 	sessions, investigations, mcp, content, console      http.Handler // content nil without a configured worker
-	fleet                                                http.Handler // nil without issuance
 	processing, processingRules                          http.Handler // nil without a capacity processing source
 	mcpPath, mcpMetadata, contentPrefix, contentMetadata string
 }
@@ -91,11 +90,9 @@ func (h *publicContextRoutes) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		h.content.ServeHTTP(w, r)
 	case strings.HasPrefix(path, "/api/v1/operations/"):
 		h.investigations.ServeHTTP(w, r)
-	case path == browser.FleetBootstrapPath && h.fleet != nil:
-		h.fleet.ServeHTTP(w, r)
 	case path == browser.ProcessingChangesPath && h.processing != nil:
 		h.processing.ServeHTTP(w, r)
-	case path == "/fleet" || path == "/processing" || strings.HasPrefix(path, "/processing/artifacts/") || path == "/" || path == "/live" || path == "/policies" || path == "/shares" || path == "/access-preview" || path == "/capacity" || path == "/retention-preview" || path == "/approvals" || strings.HasPrefix(path, "/approvals/") || strings.HasPrefix(path, "/assets/") || strings.HasPrefix(path, "/captures/") || strings.HasPrefix(path, "/cases/"):
+	case path == "/processing" || strings.HasPrefix(path, "/processing/artifacts/") || path == "/" || path == "/live" || path == "/policies" || path == "/shares" || path == "/access-preview" || path == "/capacity" || path == "/retention-preview" || path == "/approvals" || strings.HasPrefix(path, "/approvals/") || strings.HasPrefix(path, "/assets/") || strings.HasPrefix(path, "/captures/") || strings.HasPrefix(path, "/cases/"):
 		// The bounded console handler validates its exact asset/UUID route set.
 		h.console.ServeHTTP(w, r)
 	default:

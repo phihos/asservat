@@ -404,11 +404,10 @@ roots, or `hub.caBundle` for a private CA. The hub generates the cluster's ID
 from its name and pushes its settings over the connection; changes need no
 restart. Add clusters at any time.
 
-If the hub can neither reach the issuer nor be given its JWKS, an
-administrator issues a join token in the console or with the CLI (valid
-24 hours). Pass it to the workload cluster's release as `join.token` together
-with `join.caHash`; the connector uses it once to register its ServiceAccount
-keys.
+If the hub cannot reach the workload cluster's issuer (k3s and kubeadm default to the
+in-cluster `https://kubernetes.default.svc.cluster.local`), copy the public keys into that cluster's
+entry instead: `jwks: '<output of kubectl get --raw /openid/v1/jwks>'`.
+Update it when that cluster rotates its ServiceAccount signing key.
 
 Removing a cluster from `clusters`, or setting `revoked: true`, closes its
 connection and refuses its tokens.

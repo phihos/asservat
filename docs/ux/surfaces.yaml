@@ -770,7 +770,7 @@ screens:
   personas:
   - admin
   entity: ClusterRegistration
-  purpose: See connectivity, enrollment and capability coverage by region
+  purpose: See connectivity and capability coverage by region; clusters are registered in Helm values
   route: '#/clusters'
   states:
   - normal
@@ -789,23 +789,6 @@ screens:
   entity: ClusterRegistration
   purpose: Inspect node pools, local ceilings and bounded disconnected authority
   route: '#/cluster'
-  states:
-  - normal
-  - loading
-  - empty
-  - denied
-  - expired
-  - offline
-  - quota
-- id: enroll
-  surface_id: UI-045
-  title: Enroll a cluster
-  group: Operate
-  personas:
-  - admin
-  entity: ClusterRegistration
-  purpose: Prepare a short-lived bootstrap credential and bounded installation bundle
-  route: '#/enroll'
   states:
   - normal
   - loading
@@ -1134,7 +1117,6 @@ dialogs:
 - review-grant
 - request-raw
 - privacy-action
-- enrollment
 - configuration-handoff
 journeys:
   capture:
@@ -1175,7 +1157,6 @@ journeys:
   - approval
   operate:
   - install
-  - enroll
   - cluster
   - capabilities
   - permission-preview

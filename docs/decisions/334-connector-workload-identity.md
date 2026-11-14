@@ -2,7 +2,9 @@
 
 Date: 2026-11-14. Status: accepted (maintainer decision: copying a Secret
 from the hub to a workload cluster is a no-go; "Let's go with your
-recommendation"). Supersedes the join Secret, the one-use bootstrap record and
+recommendation"; amended 2026-11-14: "Why do we need a UI for that or an API
+endpoint? We already have the JWT service account token setup. Why do we need
+a second way to accomplish that?"). Supersedes the join Secret, the one-use bootstrap record and
 connector certificate enrollment of ADR-331 and ADR-330 D3's connector
 bootstrap, and the four separately exposed connector endpoints of ADR-331.
 
@@ -18,7 +20,6 @@ bootstrap, and the four separately exposed connector endpoints of ADR-331.
    ```yaml
    clusters:
      - name: eu
-       clusterID: <uuid>
        issuer: https://eu-apiserver.example     # the member's ServiceAccount issuer
        # jwks: '<kubectl get --raw /openid/v1/jwks>'  # when the hub cannot reach the issuer
        # connector: asservat-system/asservat-connector  # default namespace/ServiceAccount
@@ -42,13 +43,13 @@ bootstrap, and the four separately exposed connector endpoints of ADR-331.
    settings it needs (installation and cluster IDs, protocol capabilities,
    limits); later changes are pushed on the connection. No offer is copied
    and no restart is needed.
-5. **Fallback join token.** For a cluster whose ServiceAccount public keys the
-   hub cannot obtain, the hub issues a kubeadm-style token
-   (`<id>.<secret>`, default validity 24 h, reusable within it) shown once in
-   the console or by a CLI command, passed to the member's chart as one value
-   together with the hub CA certificate hash. The connector uses it only to
-   register its ServiceAccount public keys with the hub; afterwards it
-   authenticates as in 1.
+5. **One way to register.** The hub's values are the only way to register,
+   change or revoke (`revoked: true` or removal) a cluster. There is no
+   console page, API operation, CLI command or join token for it. A cluster
+   whose issuer the hub cannot reach is registered with its public JWKS,
+   which an administrator copies from the member
+   (`kubectl get --raw /openid/v1/jwks`); this is public key material, not a
+   secret.
 6. **Optional mTLS.** Where the hub is exposed by TLS passthrough, connectors
    may additionally use client certificates the hub signs for a CSR
    authenticated by the ServiceAccount token (kubelet TLS bootstrapping
@@ -69,8 +70,6 @@ Bearer tokens pass through any proxy.
   ([Vault docs](https://developer.hashicorp.com/vault/docs/auth/jwt/oidc-providers/kubernetes)).
 - Cloud workload identity federation (EKS IRSA, GKE fleet workload identity)
   trusts a cluster's ServiceAccount issuer instead of distributing secrets.
-- kubeadm join tokens with CA hash pinning for the fallback
-  ([kubeadm join](https://www.kubernetes.io/docs/reference/setup-tools/kubeadm/kubeadm-join)).
 - kubelet TLS bootstrapping and Open Cluster Management registration for the
   optional certificate path.
 
@@ -80,7 +79,9 @@ Bearer tokens pass through any proxy.
   bootstrap reservations/issuance for connectors, connector certificate
   enrollment and renewal, the regional offer ConfigMap/Secret copy, the
   `remote.*` endpoint list and the federation, hub-api native, key-service and
-  object-store exposure for connectors.
+  object-store exposure for connectors; the console "Enroll a cluster" page,
+  the `POST /api/v1/fleet/cluster-bootstraps` route and the `enroll_cluster`
+  and `revoke_cluster` console operations.
 - Limitation: a cluster whose issuer is unreachable from the hub (for example
   k3s' default in-cluster issuer) needs its public JWKS in the hub's values,
   updated when that cluster rotates its ServiceAccount signing key.
@@ -104,4 +105,6 @@ Bearer tokens pass through any proxy.
 9. One signature check per connection setup and token rotation; JWKS cached
    per cluster.
 10. Unreleased product: replace the ADR-331 join path without compatibility.
-11. A longer-lived bootstrap record would still be a copied Secret.
+11. A longer-lived bootstrap record would still be a copied Secret. A join
+    token as a fallback would be a second registration path for the case the
+    static JWKS already covers.

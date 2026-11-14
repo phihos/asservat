@@ -14,10 +14,11 @@ import (
 	cfg "asservat.local/asservat/internal/domain/configuration"
 )
 
-// newPublicFleet composes the ADR-193 fleet-operator bootstrap issuance; nil
-// without Public.Fleet. It needs the installed provider layout: the KV
-// channel is the owner's pinned bootstrap-channel lifetime. Authority comes
-// from each request's identity and the guarded fleet.json.
+// newPublicFleet composes the shared bootstrap issuance dependencies and the
+// protected fleet settings; nil without Public.Fleet. It needs the installed
+// provider layout: the KV channel is the owner's pinned bootstrap-channel
+// lifetime. The local and remote cluster bootstraps add their own fixed
+// reservations; the settings also authorize the fleet-operator previews.
 func newPublicFleet(ctx context.Context, c contracts.OwnerDeployment, providers *kms.InstalledOwnerProviderEffects, pools *publicPools, observer, probe *kube.PermissionClient, a publicAuditStore) (*fleetapp.FleetBootstrapIssuance, error) {
 	if c.Public == nil || c.Public.Fleet == nil {
 		return nil, nil
@@ -36,14 +37,6 @@ func newPublicFleet(ctx context.Context, c contracts.OwnerDeployment, providers 
 		return nil, &fixedStepError{"fleet-settings", mounts.ErrUnavailable}
 	}
 	settings.Report = eventLog(os.Stderr, "fleet settings refused")
-	reservePool, err := pools.open(ctx, "fleet-bootstrap-reserve")
-	if err != nil {
-		return nil, &fixedStepError{"fleet-reserve-pool", mounts.ErrUnavailable}
-	}
-	reserve, err := postgres.NewBootstrapReservations(ctx, reservePool, c.InstallationID, ownerRandomID)
-	if err != nil {
-		return nil, &fixedStepError{"fleet-reserve", mounts.ErrUnavailable}
-	}
 	var issues [3]*postgres.BootstrapIssues
 	for i, duty := range []string{"record", "audit", "activate"} {
 		pool, err := pools.open(ctx, "fleet-bootstrap-"+duty)
@@ -54,6 +47,6 @@ func newPublicFleet(ctx context.Context, c contracts.OwnerDeployment, providers 
 			return nil, &fixedStepError{"fleet-issues", mounts.ErrUnavailable}
 		}
 	}
-	return &fleetapp.FleetBootstrapIssuance{Settings: settings, Reservations: reserve, Credentials: providers.BootstrapChannel(), Records: issues[0], Audits: issues[1],
+	return &fleetapp.FleetBootstrapIssuance{Settings: settings, Credentials: providers.BootstrapChannel(), Records: issues[0], Audits: issues[1],
 		Objects: a.bootstrapObjects(), Activation: issues[2], Now: time.Now}, nil
 }

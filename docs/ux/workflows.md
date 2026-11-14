@@ -79,7 +79,7 @@ Installation is a capability checklist with configured, inspected and actively q
 
 Capacity view separates protected allocations, shared burst, reserved, committed and uncertain charges, source rings versus saved evidence, and upload/action limits. Filter by scope only when authorized. Do not offer eviction of another workload’s protected evidence to make an incident succeed. Retention preview identifies shortened read/deletion deadlines, derived children, object versions, scratch, backups/WAL and incompatible storage locks. Privacy actions return tracked work, not a “deleted” toast.
 
-Enrollment exposes no bootstrap secret in HTML, clipboard or command line; provide the approved secret-channel handoff. Upgrade accepts an operator-selected pinned release, checks compatibility, schema/profile consequences, private images and recovery prerequisites. There is no unsolicited update check. Audit shows minimized actor/decision/reference, not evidence text.
+Clusters are registered only in the hub's Helm values (ADR-334); the console shows their connectivity but offers no enrollment. Upgrade accepts an operator-selected pinned release, checks compatibility, schema/profile consequences, private images and recovery prerequisites. There is no unsolicited update check. Audit shows minimized actor/decision/reference, not evidence text.
 
 ## State, validation and recovery copy
 
